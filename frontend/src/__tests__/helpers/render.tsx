@@ -110,7 +110,7 @@ function buildDefaultAuth(): React.ComponentProps<typeof AuthContext.Provider>["
     logout: vi.fn(),
     refreshUser: vi.fn(),
     acceptUser: vi.fn(),
-    applyEmailOtpSignIn: vi.fn(),
+    applySignIn: vi.fn(),
   };
 }
 

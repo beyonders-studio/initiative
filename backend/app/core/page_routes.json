@@ -110,6 +110,7 @@
   "/c/$communityId/tags/$tagId",
   "/communities",
   "/community/$communityId/login",
+  "/demo",
   "/download",
   "/forgot-password",
   "/invite/$code",

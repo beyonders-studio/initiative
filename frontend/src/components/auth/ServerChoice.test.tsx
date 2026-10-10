@@ -4,16 +4,22 @@
  * inside the card and keeps the address it was given.
  */
 import { Capacitor } from "@capacitor/core";
-import { screen } from "@testing-library/react";
+import { screen, waitFor } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
+import { HttpResponse, http } from "msw";
 import { describe, expect, it, vi } from "vitest";
 
 import { buildUser } from "@/__tests__/factories";
+import { server } from "@/__tests__/helpers/msw-server";
 import { renderWithProviders } from "@/__tests__/helpers/render";
 import { getSelfHostedAddress, setSelfHostedAddress } from "@/lib/serverStorage";
 import { freshAnswers, readStartDraft, saveStartDraft } from "@/lib/startFlow";
 
 import { ServerChip, ServerPicker, ServerSubtitle } from "./ServerChoice";
+
+const asDemo = http.get("/api/v1/auth/bootstrap", () =>
+  HttpResponse.json({ has_users: true, public_registration_enabled: false, demo: true })
+);
 
 const mocks = vi.hoisted(() => ({
   clearStart: vi.fn(),
@@ -35,6 +41,14 @@ describe("ServerChip", () => {
     expect(screen.getByText(/^self-hosted$/i)).toBeInTheDocument();
     expect(screen.queryByRole("combobox")).not.toBeInTheDocument();
     expect(screen.queryByRole("textbox")).not.toBeInTheDocument();
+  });
+
+  it("says Demo on the demo deployment", async () => {
+    server.use(asDemo);
+    renderWithProviders(<ServerChip />);
+
+    expect(await screen.findByText("Demo")).toBeInTheDocument();
+    expect(screen.queryByText(/^self-hosted$/i)).not.toBeInTheDocument();
   });
 });
 
@@ -69,6 +83,20 @@ describe("ServerSubtitle", () => {
     await user.click(screen.getByRole("menuitem", { name: /your own server/i }));
 
     expect(screen.getByRole("textbox", { name: /server address/i })).toBeInTheDocument();
+  });
+
+  it("signs the app in to Demo on the demo deployment, menu and all", async () => {
+    server.use(asDemo);
+    const user = userEvent.setup();
+    renderWithProviders(<ServerSubtitle />, {
+      server: { isNativePlatform: true, getServerOrigin: () => "https://demo.example" },
+    });
+
+    const menu = screen.getByRole("button", { name: /^server$/i });
+    await waitFor(() => expect(menu).toHaveTextContent("Demo"));
+    expect(screen.getByLabelText("Server: Demo")).toBeInTheDocument();
+    await user.click(menu);
+    expect(screen.getByRole("menuitem", { name: /your own server/i })).toBeInTheDocument();
   });
 });
 

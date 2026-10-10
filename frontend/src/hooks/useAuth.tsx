@@ -109,7 +109,9 @@ interface AuthContextValue {
   login: (payload: LoginPayload) => Promise<void>;
   completeSecondFactor: (payload: SecondFactorPayload) => Promise<void>;
   applyPasskeySignIn: (result: PasskeySignInResult) => Promise<void>;
-  applyEmailOtpSignIn: (token: Token) => Promise<void>;
+  /** Adopt a session a sign-in route answered with directly: a code sent to
+   *  an address, or a demo link. */
+  applySignIn: (token: Token) => Promise<void>;
   stepUpWithFactor: (payload: StepUpPayload) => Promise<void>;
   stepUpWithPasskey: () => Promise<void>;
   stepUpWithEmailCode: (payload: EmailCodeStepUpPayload) => Promise<void>;
@@ -484,8 +486,8 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
     [adoptSession, t]
   );
 
-  /** Adopt the session a code sent to an address produced. */
-  const applyEmailOtpSignIn = useCallback(
+  /** Adopt the session a code sent to an address, or a demo link, produced. */
+  const applySignIn = useCallback(
     async (token: Token) => {
       await adoptSession(token, { begin: true });
     },
@@ -673,7 +675,7 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
     login,
     completeSecondFactor,
     applyPasskeySignIn,
-    applyEmailOtpSignIn,
+    applySignIn,
     stepUpWithFactor,
     stepUpWithPasskey,
     stepUpWithEmailCode,

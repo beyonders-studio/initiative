@@ -59,7 +59,7 @@ const compact = (value: string) => value.replace(/\s+/g, "");
 
 export const EmailOtpCard = ({ onCancel, onSignedIn, inviteCode, registration }: Props) => {
   const { t } = useTranslation("auth");
-  const { applyEmailOtpSignIn } = useAuth();
+  const { applySignIn } = useAuth();
   // Null on the deployments that run no captcha, which is most of them.
   const { captcha } = useAppConfig();
 
@@ -121,7 +121,7 @@ export const EmailOtpCard = ({ onCancel, onSignedIn, inviteCode, registration }:
         return;
       }
       if (response.data.access_token) {
-        await applyEmailOtpSignIn({ ...response.data, access_token: response.data.access_token });
+        await applySignIn({ ...response.data, access_token: response.data.access_token });
         onSignedIn(false);
       }
     } catch (err) {
@@ -145,7 +145,7 @@ export const EmailOtpCard = ({ onCancel, onSignedIn, inviteCode, registration }:
         username: username.trim(),
         ...(inviteCode ? { invite_code: inviteCode } : {}),
       });
-      await applyEmailOtpSignIn(token);
+      await applySignIn(token);
       onSignedIn(true);
     } catch (err) {
       setError(getErrorMessage(err, "auth:emailOtp.registerError"));

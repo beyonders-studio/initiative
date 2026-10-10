@@ -30,15 +30,15 @@ vi.mock("@/components/auth/CaptchaWidget", () => ({
 const mount = async (props: Partial<Parameters<typeof EmailOtpCard>[0]> = {}) => {
   const onSignedIn = vi.fn();
   const onCancel = vi.fn();
-  const applyEmailOtpSignIn = vi.fn();
+  const applySignIn = vi.fn();
   const result = renderPage(
     () => <EmailOtpCard onSignedIn={onSignedIn} onCancel={onCancel} {...props} />,
-    { auth: { applyEmailOtpSignIn } }
+    { auth: { applySignIn } }
   );
   await waitFor(() => {
     expect(result.router.state.status).toBe("idle");
   });
-  return { onSignedIn, onCancel, applyEmailOtpSignIn };
+  return { onSignedIn, onCancel, applySignIn };
 };
 
 /** Ask for a code at an address and land on the code step. */
@@ -66,16 +66,14 @@ describe("EmailOtpCard", () => {
         return HttpResponse.json({ access_token: "a-token", token_type: "bearer" });
       })
     );
-    const { onSignedIn, applyEmailOtpSignIn } = await mount();
+    const { onSignedIn, applySignIn } = await mount();
 
     const user = await askAt("reader@example.com");
     await user.type(screen.getByLabelText(/^code$/i), "123456");
     await user.click(screen.getByRole("button", { name: /^sign in$/i }));
 
     await waitFor(() => expect(onSignedIn).toHaveBeenCalledWith(false));
-    expect(applyEmailOtpSignIn).toHaveBeenCalledWith(
-      expect.objectContaining({ access_token: "a-token" })
-    );
+    expect(applySignIn).toHaveBeenCalledWith(expect.objectContaining({ access_token: "a-token" }));
     expect(sent).toEqual([{ challenge: "handle-1", code: "123456" }]);
   });
 
@@ -97,7 +95,7 @@ describe("EmailOtpCard", () => {
       })
     );
     // What the start flow already asked goes out with the account.
-    const { onSignedIn, applyEmailOtpSignIn } = await mount({
+    const { onSignedIn, applySignIn } = await mount({
       registration: { community: { name: "Riverside Players" } },
     });
 
@@ -110,7 +108,7 @@ describe("EmailOtpCard", () => {
     await user.click(screen.getByRole("button", { name: /create account/i }));
 
     await waitFor(() => expect(onSignedIn).toHaveBeenCalledWith(true));
-    expect(applyEmailOtpSignIn).toHaveBeenCalledWith(
+    expect(applySignIn).toHaveBeenCalledWith(
       expect.objectContaining({ access_token: "new-token" })
     );
     expect(registered[0]).toMatchObject({

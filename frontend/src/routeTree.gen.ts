@@ -11,6 +11,7 @@
 import { Route as rootRouteImport } from './routes/__root'
 import { Route as ServerRequiredRouteImport } from './routes/_serverRequired'
 import { Route as ServerRequiredAuthenticatedRouteImport } from './routes/_serverRequired/_authenticated'
+import { Route as ServerRequiredDemoRouteImport } from './routes/_serverRequired/demo'
 import { Route as ServerRequiredDownloadRouteImport } from './routes/_serverRequired/download'
 import { Route as ServerRequiredForgotPasswordRouteImport } from './routes/_serverRequired/forgot-password'
 import { Route as ServerRequiredLoginRouteImport } from './routes/_serverRequired/login'
@@ -188,6 +189,11 @@ const ServerRequiredAuthenticatedRoute =
     id: '/_authenticated',
     getParentRoute: () => ServerRequiredRoute,
   } as any)
+const ServerRequiredDemoRoute = ServerRequiredDemoRouteImport.update({
+  id: '/demo',
+  path: '/demo',
+  getParentRoute: () => ServerRequiredRoute,
+} as any)
 const ServerRequiredDownloadRoute = ServerRequiredDownloadRouteImport.update({
   id: '/download',
   path: '/download',
@@ -1433,6 +1439,7 @@ const ServerRequiredAuthenticatedCCommunityIdIInitiativeIdCalendarsCalendarIdEve
 
 export interface FileRoutesByFullPath {
   '/': typeof ServerRequiredAuthenticatedIndexRoute
+  '/demo': typeof ServerRequiredDemoRoute
   '/download': typeof ServerRequiredDownloadRoute
   '/forgot-password': typeof ServerRequiredForgotPasswordRoute
   '/login': typeof ServerRequiredLoginRoute
@@ -1602,6 +1609,7 @@ export interface FileRoutesByFullPath {
 }
 export interface FileRoutesByTo {
   '/': typeof ServerRequiredAuthenticatedIndexRoute
+  '/demo': typeof ServerRequiredDemoRoute
   '/download': typeof ServerRequiredDownloadRoute
   '/forgot-password': typeof ServerRequiredForgotPasswordRoute
   '/login': typeof ServerRequiredLoginRoute
@@ -1756,6 +1764,7 @@ export interface FileRoutesById {
   __root__: typeof rootRouteImport
   '/_serverRequired': typeof ServerRequiredRouteWithChildren
   '/_serverRequired/_authenticated': typeof ServerRequiredAuthenticatedRouteWithChildren
+  '/_serverRequired/demo': typeof ServerRequiredDemoRoute
   '/_serverRequired/download': typeof ServerRequiredDownloadRoute
   '/_serverRequired/forgot-password': typeof ServerRequiredForgotPasswordRoute
   '/_serverRequired/login': typeof ServerRequiredLoginRoute
@@ -1928,6 +1937,7 @@ export interface FileRouteTypes {
   fileRoutesByFullPath: FileRoutesByFullPath
   fullPaths:
     | '/'
+    | '/demo'
     | '/download'
     | '/forgot-password'
     | '/login'
@@ -2097,6 +2107,7 @@ export interface FileRouteTypes {
   fileRoutesByTo: FileRoutesByTo
   to:
     | '/'
+    | '/demo'
     | '/download'
     | '/forgot-password'
     | '/login'
@@ -2250,6 +2261,7 @@ export interface FileRouteTypes {
     | '__root__'
     | '/_serverRequired'
     | '/_serverRequired/_authenticated'
+    | '/_serverRequired/demo'
     | '/_serverRequired/download'
     | '/_serverRequired/forgot-password'
     | '/_serverRequired/login'
@@ -2438,6 +2450,13 @@ declare module '@tanstack/react-router' {
       path: ''
       fullPath: '/'
       preLoaderRoute: typeof ServerRequiredAuthenticatedRouteImport
+      parentRoute: typeof ServerRequiredRoute
+    }
+    '/_serverRequired/demo': {
+      id: '/_serverRequired/demo'
+      path: '/demo'
+      fullPath: '/demo'
+      preLoaderRoute: typeof ServerRequiredDemoRouteImport
       parentRoute: typeof ServerRequiredRoute
     }
     '/_serverRequired/download': {
@@ -4280,6 +4299,7 @@ const ServerRequiredAuthenticatedRouteWithChildren =
 
 interface ServerRequiredRouteChildren {
   ServerRequiredAuthenticatedRoute: typeof ServerRequiredAuthenticatedRouteWithChildren
+  ServerRequiredDemoRoute: typeof ServerRequiredDemoRoute
   ServerRequiredDownloadRoute: typeof ServerRequiredDownloadRoute
   ServerRequiredForgotPasswordRoute: typeof ServerRequiredForgotPasswordRoute
   ServerRequiredLoginRoute: typeof ServerRequiredLoginRoute
@@ -4301,6 +4321,7 @@ interface ServerRequiredRouteChildren {
 const ServerRequiredRouteChildren: ServerRequiredRouteChildren = {
   ServerRequiredAuthenticatedRoute:
     ServerRequiredAuthenticatedRouteWithChildren,
+  ServerRequiredDemoRoute: ServerRequiredDemoRoute,
   ServerRequiredDownloadRoute: ServerRequiredDownloadRoute,
   ServerRequiredForgotPasswordRoute: ServerRequiredForgotPasswordRoute,
   ServerRequiredLoginRoute: ServerRequiredLoginRoute,

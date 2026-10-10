@@ -3,6 +3,7 @@ import { Check, ChevronDown } from "lucide-react";
 import { type FormEvent, type ReactNode, useState } from "react";
 import { Trans, useTranslation } from "react-i18next";
 
+import { useBootstrapStatus } from "@/api/generated/auth/auth";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import {
@@ -33,15 +34,17 @@ import AppEnvironment from "@/plugins/appEnvironment";
  */
 export const ServerChip = () => {
   const { t } = useTranslation("auth");
+  const kind = useIsDemo() ? t("server.demo") : t("server.selfHosted");
   return (
-    <Badge
-      className="hover:bg-primary"
-      aria-label={`${t("server.label")}: ${t("server.selfHosted")}`}
-    >
-      {t("server.selfHosted")}
+    <Badge className="hover:bg-primary" aria-label={`${t("server.label")}: ${kind}`}>
+      {kind}
     </Badge>
   );
 };
+
+/** Whether this server is the demo deployment, which names itself "Demo". */
+const useIsDemo = (): boolean =>
+  useBootstrapStatus({ query: { staleTime: 60_000 } }).data?.demo === true;
 
 /**
  * Where signing in or up goes, inside its card. In the app a self-hosted
@@ -96,6 +99,7 @@ export const ServerSubtitle = () => {
   const { t } = useTranslation("auth");
   const { isNativePlatform, getServerOrigin } = useServer();
   const host = hostOf(getServerOrigin());
+  const demo = useIsDemo();
   const [editing, setEditing] = useState(false);
 
   if (!isNativePlatform) return <ServerChip />;
@@ -107,13 +111,13 @@ export const ServerSubtitle = () => {
           <Trans
             t={t}
             i18nKey="login.signInTo"
-            values={{ server: host ?? t("server.selfHosted") }}
+            values={{ server: demo ? t("server.demo") : (host ?? t("server.selfHosted")) }}
             components={{
               server: <ServerMenu onChooseOwn={() => setEditing(true)} />,
             }}
           />
         </p>
-        {host ? <ServerChip /> : null}
+        {host || demo ? <ServerChip /> : null}
       </div>
       {editing ? <ServerAddressForm onConnected={() => setEditing(false)} /> : null}
     </div>

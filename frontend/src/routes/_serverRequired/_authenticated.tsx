@@ -20,6 +20,7 @@ import { ChooseHandle } from "@/components/ChooseHandle";
 import { CommandCenter } from "@/components/CommandCenter";
 import { ConfirmBirthdate } from "@/components/ConfirmBirthdate";
 import { CommunityAccessBanner } from "@/components/communities/CommunityAccessBanner";
+import { DemoBannerOrTabs } from "@/components/demo/DemoBanner";
 import { DeviceVerificationDialog } from "@/components/messages/DeviceVerificationDialog";
 import { BottomNav } from "@/components/navigation/BottomNav";
 import { CreateActionProvider } from "@/components/navigation/CreateActionContext";
@@ -143,8 +144,9 @@ function AppLayout() {
 
   // The tabs bar is cross-community by design (names only): one user-context
   // query, valid in any community and in personal mode.
+  // A demo visitor's banner takes the tabs' row, so it has no use for them.
   const recentQuery = useRecents({
-    enabled: !loading && !!user,
+    enabled: !loading && !!user && !user.demo_expires_at,
     staleTime: 30_000,
   });
 
@@ -320,21 +322,24 @@ function AppLayout() {
                 >
                   {/* Mobile hamburger lives in BottomNav and search now lives in
                     the sidebar, so this desktop-only row is just recents — and
-                    with nothing recent it takes up no room at all. */}
-                  {(recentQuery.isLoading || (recentItems?.length ?? 0) > 0) && (
-                    <div className="hidden h-12 md:flex">
-                      <div className="min-w-0 flex-1">
-                        <RecentTabsBar
-                          items={recentItems}
-                          loading={recentQuery.isLoading}
-                          activeKey={activeRecentKey}
-                          onClose={handleClearRecent}
-                          onCloseOthers={handleCloseOtherRecents}
-                          onCloseAll={handleCloseAllRecents}
-                        />
+                    with nothing recent it takes up no room at all. A demo
+                    visitor's banner takes the row instead, on every width. */}
+                  <DemoBannerOrTabs>
+                    {(recentQuery.isLoading || (recentItems?.length ?? 0) > 0) && (
+                      <div className="hidden h-12 md:flex">
+                        <div className="min-w-0 flex-1">
+                          <RecentTabsBar
+                            items={recentItems}
+                            loading={recentQuery.isLoading}
+                            activeKey={activeRecentKey}
+                            onClose={handleClearRecent}
+                            onCloseOthers={handleCloseOtherRecents}
+                            onCloseAll={handleCloseAllRecents}
+                          />
+                        </div>
                       </div>
-                    </div>
-                  )}
+                    )}
+                  </DemoBannerOrTabs>
                   <OfflineBanner />
                   <CommunityAccessBanner />
                   <PushPermissionPrompt />
