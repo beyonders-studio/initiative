@@ -26,6 +26,10 @@ export const columnsOf = (definition: ViewDefinitionInput): string[] =>
 /** Where a node is in a tree: the child it is at each level below the root. */
 export type NodePath = readonly number[];
 
+/** Where a part is put: among the children of the node at `parent`, at
+ *  `index`. A table's column is put at `index` among its columns. */
+export type Place = { parent: NodePath; index: number };
+
 /** A path as a key, the root's being "". */
 export const pathKey = (path: NodePath): string => path.join(".");
 
@@ -171,14 +175,21 @@ export const dropOn = (from: NodePath, over: NodePath): NodePath | null => {
   return siblings ? over : (pathAfterRemove(over, from) as NodePath);
 };
 
+/** Where the part at `from` goes when it is put at `index` among the children
+ *  of `holder` (both read before the move), or null where that would put it
+ *  inside itself. */
+export const dropAt = (from: NodePath, holder: NodePath, index: number): NodePath | null => {
+  if (startsWith(holder, from)) return null;
+  // Taken from before the place, it leaves one fewer ahead of it.
+  const ahead =
+    from.length === holder.length + 1 && startsWith(from, holder) && (from.at(-1) ?? 0) < index;
+  return [...(pathAfterRemove(holder, from) as NodePath), ahead ? index - 1 : index];
+};
+
 /** Where the part at `from` goes when it is dropped at the end of the group
  *  at `holder`, or null where that would put it inside itself. */
-export const dropInto = (root: ViewNode, from: NodePath, holder: NodePath): NodePath | null => {
-  if (startsWith(holder, from)) return null;
-  const length = nodeAt(root, holder)?.children?.length ?? 0;
-  const leaves = from.length === holder.length + 1 && startsWith(from, holder);
-  return [...(pathAfterRemove(holder, from) as NodePath), leaves ? length - 1 : length];
-};
+export const dropInto = (root: ViewNode, from: NodePath, holder: NodePath): NodePath | null =>
+  dropAt(from, holder, nodeAt(root, holder)?.children?.length ?? 0);
 
 /** The parts that hold others, where a part can be added or dropped. */
 export const HOLDERS = new Set(["card", "stack", "section", "header", "main", "side"]);

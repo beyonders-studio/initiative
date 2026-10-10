@@ -6,6 +6,7 @@ import {
   addableFields,
   addablePluginParts,
   changeAt,
+  dropAt,
   dropInto,
   dropOn,
   historyReducer,
@@ -153,6 +154,16 @@ describe("where a dragged part lands", () => {
     expect(dropOn([0, 1], [1])).toEqual([1]);
     expect(dropOn([1], [0, 1])).toEqual([0, 1]);
     expect(dropOn([0], [0, 1])).toBeNull();
+  });
+
+  it("goes before or after the part it is put beside", () => {
+    // After the description, from ahead of it in its own group.
+    expect(dropAt([0, 0], [0], 2)).toEqual([0, 1]);
+    // Before the title, from outside the group.
+    expect(dropAt([1], [0], 0)).toEqual([0, 0]);
+    // After the group, from inside it.
+    expect(dropAt([0, 1], [], 1)).toEqual([1]);
+    expect(dropAt([0], [0, 1], 0)).toBeNull();
   });
 
   it("goes last in a group dropped into", () => {

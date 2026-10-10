@@ -19,7 +19,11 @@ import { EyeOff, FileText, GripVertical, LayoutList, Plus } from "lucide-react";
 import { type ReactNode, useState } from "react";
 import { useTranslation } from "react-i18next";
 
-import { TaskPageFieldId, type ToolViewWrite } from "@/api/generated/initiativeAPI.schemas";
+import {
+  TaskPageFieldId,
+  type ToolViewWrite,
+  type ViewDefinitionInput,
+} from "@/api/generated/initiativeAPI.schemas";
 import { Button } from "@/components/ui/button";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
 import { cn } from "@/lib/utils";
@@ -58,6 +62,105 @@ type PickerPlugin = {
 
 /** A part the picker offers beside the fields, under the group it names. */
 type PickerPart = { group: "builtin" | "properties" | "layout"; label: string; node: ViewNode };
+
+/** What Add offers where something is added: the fields, each plug-in's
+ *  parts, and the other parts. */
+export type AddChoices = { fields: FieldDef[]; plugins: PickerPlugin[]; parts: PickerPart[] };
+
+/** What a pick in the Add picker does. */
+export type Adders = {
+  onField: (field: FieldDef) => void;
+  onPart: (plugin: number, part: string) => void;
+  onNode: (node: ViewNode) => void;
+};
+
+/** What a view can add: a card's fields and parts, or a table's columns. */
+export const viewChoices = (
+  definition: ViewDefinitionInput,
+  fields: ReadonlyMap<string, FieldDef>,
+  plugins: PickerPlugin[],
+  translate: TranslateFn
+): AddChoices => {
+  const layout = definition.layout.type;
+  if (layout === "calendar") return { fields: [], plugins: [], parts: [] };
+  const card = cardOf(definition);
+  const board = layout === "board";
+  return {
+    fields: addableFields(definition, fields),
+    // A table draws fields only; a card takes parts as well.
+    plugins: plugins.map((plugin) => ({
+      ...plugin,
+      parts: board ? addablePluginParts(card, plugin.id, plugin.parts) : [],
+    })),
+    parts: board
+      ? [
+          ...(holdsPart(card, "properties")
+            ? []
+            : [
+                {
+                  group: "properties" as const,
+                  label: translate("viewEditor.allProperties"),
+                  node: { type: "properties" },
+                },
+              ]),
+          {
+            group: "layout" as const,
+            label: translate("viewEditor.group"),
+            node: { type: "stack", props: { align: "start" }, children: [] },
+          },
+        ]
+      : [],
+  };
+};
+
+/** What a task's page can add: its fields not placed, its own parts once
+ *  each, plug-in parts, sections and groups. */
+export const pageChoices = (
+  page: ViewNode,
+  fields: ReadonlyMap<string, FieldDef>,
+  plugins: PickerPlugin[],
+  translate: TranslateFn
+): AddChoices => {
+  const named = namedFields(page);
+  const pageFields = new Set<string>(Object.values(TaskPageFieldId));
+  return {
+    fields: [...fields.values()].filter(
+      (field) =>
+        !named.has(field.id) &&
+        ((field.source === "builtin" && pageFields.has(field.id)) || field.source === "plugin")
+    ),
+    plugins: plugins.map((plugin) => ({
+      ...plugin,
+      parts: addablePluginParts(page, plugin.id, plugin.parts),
+    })),
+    parts: [
+      ...PAGE_PARTS.filter((type) => !holdsPart(page, type)).map((type) => ({
+        group: "builtin" as const,
+        label: translate(`viewEditor.parts.${type}`),
+        node: { type },
+      })),
+      ...(holdsPart(page, "properties")
+        ? []
+        : [
+            {
+              group: "properties" as const,
+              label: translate("viewEditor.allProperties"),
+              node: { type: "properties" },
+            },
+          ]),
+      {
+        group: "layout" as const,
+        label: translate("viewEditor.section"),
+        node: { type: "section", children: [] },
+      },
+      {
+        group: "layout" as const,
+        label: translate("viewEditor.group"),
+        node: { type: "stack", children: [] },
+      },
+    ],
+  };
+};
 
 /** The parts of a task's page that are its own, which it places at most once. */
 const PAGE_PARTS = [
@@ -151,6 +254,8 @@ export const ViewOutline = ({
   view,
   fields,
   plugins,
+  choices,
+  adders,
   selection,
   edits,
   locked,
@@ -158,6 +263,9 @@ export const ViewOutline = ({
   view: ToolViewWrite;
   fields: ReadonlyMap<string, FieldDef>;
   plugins: ReadonlyMap<number, PluginOnItems>;
+  /** What Add offers, and what a pick does. */
+  choices: AddChoices;
+  adders: Adders;
   selection: Selection;
   edits: ViewEdits;
   /** A save is under way, and nothing changes until it answers. */
@@ -166,7 +274,7 @@ export const ViewOutline = ({
   const { t } = useTranslation(VIEW_NAMESPACES);
   const translate = t as TranslateFn;
   const sensors = useOutlineSensors();
-  const { labelOf, partLabel, pickerPlugins } = usePartLabel(fields, plugins);
+  const { labelOf, partLabel } = usePartLabel(fields, plugins);
   const { definition } = view;
   const layout = definition.layout.type;
   const card = cardOf(definition);
@@ -251,43 +359,7 @@ export const ViewOutline = ({
       </div>
       {layout === "calendar" ? null : (
         <div className="border-t p-3">
-          <AddPicker
-            fields={addableFields(definition, fields)}
-            labelOf={labelOf}
-            onField={(field) =>
-              layout === "board"
-                ? edits.addPart({ type: "field", props: { field: field.id } })
-                : edits.addColumn(field.id)
-            }
-            // A table draws fields only; a card takes parts as well.
-            plugins={pickerPlugins.map((plugin) => ({
-              ...plugin,
-              parts: layout === "board" ? addablePluginParts(card, plugin.id, plugin.parts) : [],
-            }))}
-            onPart={(plugin, part) => edits.addPart({ type: "plugin", props: { plugin, part } })}
-            parts={
-              layout === "board"
-                ? [
-                    ...(holdsPart(card, "properties")
-                      ? []
-                      : [
-                          {
-                            group: "properties" as const,
-                            label: translate("viewEditor.allProperties"),
-                            node: { type: "properties" },
-                          },
-                        ]),
-                    {
-                      group: "layout" as const,
-                      label: translate("viewEditor.group"),
-                      node: { type: "stack", props: { align: "start" }, children: [] },
-                    },
-                  ]
-                : []
-            }
-            onNode={edits.addPart}
-            locked={locked}
-          />
+          <AddPicker choices={choices} labelOf={labelOf} adders={adders} locked={locked} />
         </div>
       )}
     </nav>
@@ -305,6 +377,8 @@ export const PageOutline = ({
   page,
   fields,
   plugins,
+  choices,
+  adders,
   selection,
   edits,
   locked,
@@ -313,22 +387,21 @@ export const PageOutline = ({
   page: ViewNode;
   fields: ReadonlyMap<string, FieldDef>;
   plugins: ReadonlyMap<number, PluginOnItems>;
+  choices: AddChoices;
+  adders: Adders;
   selection: Selection;
   edits: ViewEdits;
   locked: boolean;
 }) => {
   const { t } = useTranslation(VIEW_NAMESPACES);
   const translate = t as TranslateFn;
-  const { labelOf, partLabel, pickerPlugins } = usePartLabel(fields, plugins);
+  const { labelOf, partLabel } = usePartLabel(fields, plugins);
   const regions = page.children ?? [];
   const unplaced = unplacedFields({
     header: regions[0]?.children ?? [],
     main: regions[1]?.children ?? [],
     side: regions[2]?.children ?? [],
   });
-  const named = namedFields(page);
-  const pageFields = new Set<string>(Object.values(TaskPageFieldId));
-
   return (
     <nav aria-label={translate("viewEditor.outline")} className="flex h-full flex-col">
       <div className="flex-1 space-y-1 overflow-y-auto p-3">
@@ -372,49 +445,7 @@ export const PageOutline = ({
         ) : null}
       </div>
       <div className="border-t p-3">
-        <AddPicker
-          fields={[...fields.values()].filter(
-            (field) =>
-              !named.has(field.id) &&
-              ((field.source === "builtin" && pageFields.has(field.id)) ||
-                field.source === "plugin")
-          )}
-          labelOf={labelOf}
-          onField={(field) => edits.addPart({ type: "field", props: { field: field.id } })}
-          plugins={pickerPlugins.map((plugin) => ({
-            ...plugin,
-            parts: addablePluginParts(page, plugin.id, plugin.parts),
-          }))}
-          onPart={(plugin, part) => edits.addPart({ type: "plugin", props: { plugin, part } })}
-          parts={[
-            ...PAGE_PARTS.filter((type) => !holdsPart(page, type)).map((type) => ({
-              group: "builtin" as const,
-              label: translate(`viewEditor.parts.${type}`),
-              node: { type },
-            })),
-            ...(holdsPart(page, "properties")
-              ? []
-              : [
-                  {
-                    group: "properties" as const,
-                    label: translate("viewEditor.allProperties"),
-                    node: { type: "properties" },
-                  },
-                ]),
-            {
-              group: "layout" as const,
-              label: translate("viewEditor.section"),
-              node: { type: "section", children: [] },
-            },
-            {
-              group: "layout" as const,
-              label: translate("viewEditor.group"),
-              node: { type: "stack", children: [] },
-            },
-          ]}
-          onNode={edits.addPart}
-          locked={locked}
-        />
+        <AddPicker choices={choices} labelOf={labelOf} adders={adders} locked={locked} />
       </div>
     </nav>
   );
@@ -624,29 +655,29 @@ type PickerGroupEntry = {
 
 /** What can be added, shown as things rather than ids: fields and parts by
  *  where they come from, each plug-in's under its name, and the layout
- *  parts. */
-const AddPicker = ({
-  fields,
+ *  parts. Opened from the outline's Add, or from a point on the canvas. */
+export const AddPicker = ({
+  choices: { fields, plugins, parts },
   labelOf,
-  onField,
-  plugins,
-  onPart,
-  parts,
-  onNode,
+  adders: { onField, onPart, onNode },
   locked,
+  trigger,
+  onOpenChange,
 }: {
-  fields: FieldDef[];
+  choices: AddChoices;
   labelOf: (field: FieldDef) => string;
-  onField: (field: FieldDef) => void;
-  /** Each plug-in, with the parts it can still place. */
-  plugins: PickerPlugin[];
-  onPart: (plugin: number, part: string) => void;
-  parts: PickerPart[];
-  onNode: (node: ViewNode) => void;
+  adders: Adders;
   locked: boolean;
+  /** In place of the outline's Add button. */
+  trigger?: ReactNode;
+  onOpenChange?: (open: boolean) => void;
 }) => {
   const { t } = useTranslation("projects");
-  const [open, setOpen] = useState(false);
+  const [open, setOpenState] = useState(false);
+  const setOpen = (next: boolean) => {
+    setOpenState(next);
+    onOpenChange?.(next);
+  };
   const own = (group: PickerPart["group"]) => parts.filter((part) => part.group === group);
   const groups: PickerGroupEntry[] = [
     {
@@ -688,19 +719,19 @@ const AddPicker = ({
   };
   return (
     <Popover open={open} onOpenChange={setOpen}>
-      <PopoverTrigger asChild>
-        <Button
-          type="button"
-          variant="outline"
-          size="sm"
-          className="w-full"
-          disabled={groups.length === 0 || locked}
-        >
-          <Plus className="h-4 w-4" />
-          {t("viewEditor.add")}
-        </Button>
+      <PopoverTrigger asChild disabled={groups.length === 0 || locked}>
+        {trigger ?? (
+          <Button type="button" variant="outline" size="sm" className="w-full">
+            <Plus className="h-4 w-4" />
+            {t("viewEditor.add")}
+          </Button>
+        )}
       </PopoverTrigger>
-      <PopoverContent align="start" className="max-h-96 w-72 overflow-y-auto p-2">
+      <PopoverContent
+        align="start"
+        className="max-h-96 w-72 overflow-y-auto p-2"
+        aria-label={t("viewEditor.add")}
+      >
         {groups.map((group) => (
           <PickerGroup key={group.key} heading={group.heading}>
             {group.parts.map((part) => (

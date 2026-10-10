@@ -47,6 +47,8 @@ import {
   cardOf,
   changeAt,
   columnsOf,
+  dropAt,
+  dropInto,
   HOLDERS,
   historyReducer,
   insertAt,
@@ -55,8 +57,10 @@ import {
   moveNode,
   type NodePath,
   nodeAt,
+  type Place,
   pathAfterMove,
   pathAfterRemove,
+  pathKey,
   type Selection,
   startHistory,
   VIEW_SELECTED,
@@ -65,10 +69,21 @@ import {
 import { pluginFields, usePluginsOnItems } from "@/lib/views/plugins";
 import { type StoredRegions, storedLayout, taskFields, taskPageRoot } from "@/lib/views/tasks";
 import type { ViewNode } from "@/lib/views/tree";
+import type { TranslateFn } from "@/types/i18n";
 
-import { PageCanvas, type PreviewWidth, ViewCanvas } from "./ViewCanvas";
-import { PageOutline, ViewOutline } from "./ViewOutline";
+import { type CanvasTools, PageCanvas, type PreviewWidth, ViewCanvas } from "./ViewCanvas";
+import {
+  type Adders,
+  AddPicker,
+  PageOutline,
+  pageChoices,
+  usePartLabel,
+  ViewOutline,
+  viewChoices,
+} from "./ViewOutline";
 import { PageSettingsPanel, ViewSettingsPanel } from "./ViewSettingsPanel";
+
+const noop = () => {};
 
 const WIDTHS: { width: PreviewWidth; icon: typeof Laptop }[] = [
   { width: "desktop", icon: Laptop },
@@ -88,10 +103,12 @@ export type ViewEdits = {
   movePart: (from: NodePath, to: NodePath) => void;
   removePart: (path: NodePath) => void;
   changePart: (path: NodePath, node: ViewNode) => void;
-  addPart: (node: ViewNode) => void;
+  /** At `at`, or where the selection says. */
+  addPart: (node: ViewNode, at?: Place) => void;
   moveColumn: (from: number, to: number) => void;
   removeColumn: (field: string) => void;
-  addColumn: (field: string) => void;
+  /** At `index`, or last. */
+  addColumn: (field: string, index?: number) => void;
   /** The task page goes back to the shipped one. */
   resetPage: () => void;
 };
@@ -283,10 +300,10 @@ export const ViewEditor = ({
       if (!tree) return;
       changeTree(changeAt(tree, path, () => node));
     },
-    addPart: (node) => {
+    addPart: (node, at) => {
       if (!tree) return;
       // A page takes what is added into its main column; a card at its end.
-      const { parent, index } = placeFor(tree, selection, onPage ? [1] : []);
+      const { parent, index } = at ?? placeFor(tree, selection, onPage ? [1] : []);
       // What was added is selected, to change it at once.
       changeTree(insertAt(tree, parent, node, index), {
         kind: "part",
@@ -308,13 +325,94 @@ export const ViewEditor = ({
         VIEW_SELECTED
       );
     },
-    addColumn: (field) => {
+    addColumn: (field, index) => {
       if (!current) return;
-      changeDefinition(
-        { ...current.definition, columns: [...columns, field] },
-        { kind: "column", field }
-      );
+      const next = [...columns];
+      next.splice(index ?? next.length, 0, field);
+      changeDefinition({ ...current.definition, columns: next }, { kind: "column", field });
     },
+  };
+
+  // What Add offers, in the outline and at a point on the canvas, and what a
+  // pick does there.
+  const { labelOf, partLabel, pickerPlugins } = usePartLabel(fields, plugins);
+  const translate = t as TranslateFn;
+  const choices = current
+    ? viewChoices(current.definition, fields, pickerPlugins, translate)
+    : pageChoices(page, fields, pickerPlugins, translate);
+  const addersAt = (place?: Place): Adders =>
+    current?.definition.layout.type === "table"
+      ? { onField: (field) => edits.addColumn(field.id, place?.index), onPart: noop, onNode: noop }
+      : {
+          onField: (field) => edits.addPart({ type: "field", props: { field: field.id } }, place),
+          onPart: (plugin, part) =>
+            edits.addPart({ type: "plugin", props: { plugin, part } }, place),
+          onNode: (node) => edits.addPart(node, place),
+        };
+  // The regions of a page, and a card itself, stay where they are.
+  const fixedDepth = onPage ? 1 : 0;
+  const holds = (of: Selection) =>
+    of.kind === "part" && tree !== null && HOLDERS.has(nodeAt(tree, of.path)?.type ?? "");
+  const tools: CanvasTools = {
+    locked: saving,
+    nameOf: (of) => {
+      if (of.kind === "column") {
+        const field = fields.get(of.field);
+        return field ? labelOf(field) : "";
+      }
+      const node = of.kind === "part" && tree ? nodeAt(tree, of.path) : undefined;
+      return node ? partLabel(node) : "";
+    },
+    around: (of) => {
+      if (of.kind === "column") {
+        const index = columns.indexOf(of.field);
+        return index < 0
+          ? null
+          : {
+              before: { parent: [], index },
+              after: { parent: [], index: index + 1 },
+              across: true,
+            };
+      }
+      if (of.kind !== "part" || !tree || of.path.length <= fixedDepth) return null;
+      const parent = of.path.slice(0, -1);
+      const index = of.path.at(-1) ?? 0;
+      const holder = nodeAt(tree, parent);
+      return {
+        before: { parent, index },
+        after: { parent, index: index + 1 },
+        across: holder?.type === "stack" && holder.props?.direction === "row",
+      };
+    },
+    holds,
+    movable: (of) => of.kind === "column" || (of.kind === "part" && of.path.length > fixedDepth),
+    move: (from, over, after) => {
+      if (from.kind === "column" && over.kind === "column") {
+        const at = columns.indexOf(from.field);
+        let to = columns.indexOf(over.field) + (after ? 1 : 0);
+        if (at < to) to -= 1;
+        if (at >= 0 && to !== at) edits.moveColumn(at, to);
+        return;
+      }
+      if (from.kind !== "part" || over.kind !== "part" || !tree) return;
+      // Onto a group, it goes last in it; beside a part, before or after it.
+      const to = holds(over)
+        ? dropInto(tree, from.path, over.path)
+        : over.path.length > 0
+          ? dropAt(from.path, over.path.slice(0, -1), (over.path.at(-1) ?? 0) + (after ? 1 : 0))
+          : null;
+      if (to && pathKey(to) !== pathKey(from.path)) edits.movePart(from.path, to);
+    },
+    addAt: (place, trigger, onOpenChange) => (
+      <AddPicker
+        choices={choices}
+        labelOf={labelOf}
+        adders={addersAt(place)}
+        locked={saving}
+        trigger={trigger}
+        onOpenChange={onOpenChange}
+      />
+    ),
   };
 
   // A view is opened (and a new one added) as the last of the views with
@@ -552,6 +650,8 @@ export const ViewEditor = ({
               page={page}
               fields={fields}
               plugins={plugins}
+              choices={choices}
+              adders={addersAt()}
               selection={selection}
               edits={edits}
               locked={saving}
@@ -566,6 +666,7 @@ export const ViewEditor = ({
               width={width}
               selection={selection}
               onSelect={setSelected}
+              tools={tools}
             />
           </main>
           <aside className="min-h-0 overflow-y-auto border-l">
@@ -589,6 +690,8 @@ export const ViewEditor = ({
               }}
               fields={fields}
               plugins={plugins}
+              choices={choices}
+              adders={addersAt()}
               selection={selection}
               edits={edits}
               locked={saving}
@@ -603,6 +706,7 @@ export const ViewEditor = ({
               width={width}
               selection={selection}
               onSelect={setSelected}
+              tools={tools}
             />
           </main>
           <aside className="min-h-0 overflow-y-auto border-l">

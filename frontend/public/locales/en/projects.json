@@ -358,6 +358,8 @@
     "move": "Move {{name}}",
     "hide": "Hide {{name}}",
     "add": "Add",
+    "addBefore": "Add before {{name}}",
+    "addAfter": "Add after {{name}}",
     "builtIn": "Built-in",
     "properties": "Properties",
     "layoutParts": "Layout",
