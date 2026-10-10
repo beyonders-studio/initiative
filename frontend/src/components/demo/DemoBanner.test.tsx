@@ -11,6 +11,7 @@ import { describe, expect, it, vi } from "vitest";
 import { buildCommunity, buildUser } from "@/__tests__/factories";
 import { server } from "@/__tests__/helpers/msw-server";
 import { renderPage } from "@/__tests__/helpers/render";
+import type { CommunityRole } from "@/api/generated/initiativeAPI.schemas";
 import { toast } from "@/lib/mascotToast";
 
 import { DemoBannerOrTabs } from "./DemoBanner";
@@ -32,7 +33,7 @@ const onServer = (demo: boolean) => {
 };
 
 /** Signed in to a community, at `role`, that the pitch handler answers for. */
-const inCommunity = (role: string) => {
+const inCommunity = (role: CommunityRole) => {
   const community = buildCommunity({ id: 3, role });
   return {
     auth: { user: buildUser({ demo_expires_at: null }) },
