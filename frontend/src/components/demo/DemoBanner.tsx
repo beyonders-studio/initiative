@@ -15,21 +15,22 @@ import { getErrorMessage } from "@/lib/errorMessage";
 import { listFormat, numberFormat } from "@/lib/intl";
 import { toast } from "@/lib/mascotToast";
 
-const hours = numberFormat(undefined, { style: "unit", unit: "hour", unitDisplay: "narrow" });
-const minutes = numberFormat(undefined, { style: "unit", unit: "minute", unitDisplay: "narrow" });
-const parts = listFormat(undefined, { type: "unit", style: "narrow" });
-
 /** Publishing is queued, so the pitch is read again this often until the new
  *  version lands, and given up on after this long. */
 const PUBLISH_POLL_MS = 2_000;
 const PUBLISH_TIMEOUT_MS = 120_000;
 
-/** Whole hours and minutes until `expiresAt`, as "3h 12m", never below none. */
-const timeLeft = (expiresAt: number, now: number): string => {
+/** Whole hours and minutes until `expiresAt`, as "3h 12m" in `locale`, never
+ *  below none. */
+const timeLeft = (expiresAt: number, now: number, locale: string): string => {
   const left = Math.max(0, Math.ceil((expiresAt - now) / 60_000));
   const whole = Math.floor(left / 60);
-  const rest = minutes.format(left % 60);
-  return whole > 0 ? parts.format([hours.format(whole), rest]) : rest;
+  const unit = (value: number, unit: "hour" | "minute") =>
+    numberFormat(locale, { style: "unit", unit, unitDisplay: "narrow" }).format(value);
+  const rest = unit(left % 60, "minute");
+  return whole > 0
+    ? listFormat(locale, { type: "unit", style: "narrow" }).format([unit(whole, "hour"), rest])
+    : rest;
 };
 
 /** The row both banners share: an icon, what it says, and what can be done. */
@@ -105,9 +106,10 @@ const LeadPopover = () => {
  * use for everyone else.
  */
 export const DemoBanner = ({ copy }: { copy: DemoCopy }) => {
-  const { t } = useTranslation("auth");
+  const { t, i18n } = useTranslation("auth");
+  const locale = i18n.resolvedLanguage ?? i18n.language;
   const expiresAt = new Date(copy.expiresAt).getTime();
-  const remaining = useLiveClockValue((now) => timeLeft(expiresAt, now));
+  const remaining = useLiveClockValue((now) => timeLeft(expiresAt, now, locale));
 
   return (
     <BannerRow
