@@ -830,5 +830,12 @@
   "APPEAL_NOT_SUSPENDED": "Your account isn't suspended, so there is nothing to appeal.",
   "APPEAL_NOWHERE_TO_SEND": "Appeals aren't set up on this server yet. Use the address below instead.",
   "DEMO_LINK_NOT_FOUND": "This demo link doesn't work any more. Ask whoever sent it for a new one.",
-  "DEMO_BUSY": "All demo spaces are busy. Try again in a minute."
+  "DEMO_BUSY": "All demo spaces are busy. Try again in a minute.",
+  "DEMO_COPY_NOT_FOUND": "This demo copy is gone.",
+  "DEMO_PITCH_NOT_FOUND": "This community isn't a demo pitch.",
+  "DEMO_PITCH_ADMIN_REQUIRED": "Only this pitch's admins can publish it.",
+  "DEMO_PITCH_SOURCE_INVALID": "The pitch's export file can't be imported, or an editor it names has no account.",
+  "DEMO_PITCH_HELD": "This pitch holds content under review, so it can't be deleted yet.",
+  "DEMO_PERSONA_TAKEN": "That handle belongs to a real account.",
+  "DEMO_LINK_EXPIRY_INVALID": "A demo link can't end in the past."
 }

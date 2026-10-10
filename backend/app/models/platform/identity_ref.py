@@ -49,6 +49,9 @@ class IdentityEntity(str, Enum):
 
     user = "user"
     guild = "guild"
+    #: A demo deployment's link (``demo_links``), named to the install that
+    #: makes pitches there.
+    demo_link = "demo_link"
 
     @property
     def code(self) -> str:

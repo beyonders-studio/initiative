@@ -154,6 +154,7 @@ export function buildUser(overrides: Partial<UserRead> = {}): UserRead {
     password_required: true,
     has_federated_identity: false,
     demo_expires_at: null,
+    demo_community_id: null,
     initiative_roles: [],
     created_at: "2026-01-15T00:00:00.000Z",
     updated_at: "2026-01-15T00:00:00.000Z",

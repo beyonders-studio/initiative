@@ -76,7 +76,13 @@ from sqlmodel import select
 from sqlmodel.ext.asyncio.session import AsyncSession
 
 from app.core import webhook_events
-from app.core.plugin_scopes import UnknownPluginScope, plugin_scope_target, expand
+from app.core.plugin_scopes import (
+    LEVEL_SCOPES,
+    InstallLevel,
+    UnknownPluginScope,
+    plugin_scope_target,
+    expand,
+)
 from app.db.session import (
     set_rls_context,
 )
@@ -139,6 +145,9 @@ class InstallReach:
     placed: frozenset[int]
     readable: frozenset[str]
     plugins: frozenset[str] = frozenset()
+    #: Whether the seat's grant holds the community-admin standing, which the
+    #: demo's events need.
+    administers: bool = False
 
     @classmethod
     def from_row(
@@ -166,6 +175,8 @@ class InstallReach:
             placed=frozenset(placed or ()),
             readable=frozenset(readable),
             plugins=frozenset(plugins),
+            administers=LEVEL_SCOPES[InstallLevel.community_admin]
+            in (granted_scopes or ()),
         )
 
     def hears_plugin(self, emitter: str, initiative_id: int | None) -> bool:
@@ -257,6 +268,23 @@ def _matches_plugin_event(
     return True
 
 
+def _matches_demo_event(
+    event: PluginEventOutbox,
+    subscription: WebhookSubscription,
+    reach: InstallReach | None,
+) -> bool:
+    """Whether one of the demo's events belongs in this subscription's batch:
+    it is a subscription of the install the event is addressed to, which is
+    live and whose grant holds the community-admin standing."""
+    return (
+        event.event_type in subscription.event_types
+        and subscription.plugin_install_id == event.install_id
+        and reach is not None
+        and reach.live
+        and reach.administers
+    )
+
+
 def _envelope(
     subscription: WebhookSubscription,
     txn_id: int,
@@ -265,7 +293,7 @@ def _envelope(
     guild_ref: str,
     actor_ref: str | None,
     actor_plugin: str | None = None,
-    plugin_events: Sequence[tuple[PluginEventOutbox, str]] = (),
+    plugin_events: Sequence[tuple[PluginEventOutbox, str | None]] = (),
 ) -> dict[str, Any]:
     """One transaction's matching rows as a single envelope.
 
@@ -283,7 +311,8 @@ def _envelope(
     ``actor_ref``: a plug-in acting as its community names no person.
 
     ``plugin_events`` are the events plug-ins emitted in the transaction, each with
-    its emitter's ``public_id``. Each is one entry in ``changes`` carrying its
+    its emitter's ``public_id`` (``None`` for one of the demo's own events,
+    which no plug-in emits). Each is one entry in ``changes`` carrying its
     payload, and the initiative it landed in for this subscription: its own,
     or for one about no initiative, the initiative the subscription is
     narrowed to (``None`` for the community's).
@@ -518,17 +547,22 @@ async def _drain_subscription(
         batch = [row for row, _listing_uid in matched]
         # An emitter is named by its install's listing, so an install that is
         # gone emits to nobody.
-        plugin_events = [
-            (event, emitter)
-            for event, listing_uid, placed in await session.exec(
-                select(PluginEventOutbox, GuildPlugin.listing_uid, _emitter_placed())
-                .outerjoin(GuildPlugin, GuildPlugin.id == PluginEventOutbox.install_id)
-                .where(PluginEventOutbox.txn_id == txn_id)
-                .order_by(PluginEventOutbox.id.asc())
-            )
-            if (emitter := (plugin_ids or {}).get(listing_uid or "")) is not None
-            and _matches_plugin_event(event, emitter, placed or (), subscription, reach)
-        ]
+        plugin_events: list[tuple[PluginEventOutbox, str | None]] = []
+        for event, listing_uid, placed in await session.exec(
+            select(PluginEventOutbox, GuildPlugin.listing_uid, _emitter_placed())
+            .outerjoin(GuildPlugin, GuildPlugin.id == PluginEventOutbox.install_id)
+            .where(PluginEventOutbox.txn_id == txn_id)
+            .order_by(PluginEventOutbox.id.asc())
+        ):
+            if event.event_type in webhook_events.DEMO_EVENT_TYPES:
+                if _matches_demo_event(event, subscription, reach):
+                    plugin_events.append((event, None))
+                continue
+            emitter = (plugin_ids or {}).get(listing_uid or "")
+            if emitter is not None and _matches_plugin_event(
+                event, emitter, placed or (), subscription, reach
+            ):
+                plugin_events.append((event, emitter))
         if not batch and not plugin_events:
             # Nothing in this transaction was for this subscriber. Record it so
             # it is not reconsidered every pass; no request was made, so nothing

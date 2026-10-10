@@ -54,6 +54,7 @@ from app.db.request_context import SystemGuild
 __all__ = [
     "REF_MAX_LENGTH",
     "forget_guild",
+    "ensure_install_ref",
     "ensure_plugin_guild_ref",
     "ensure_plugin_guild_refs",
     "resolve_plugin_guild_ref",
@@ -223,7 +224,7 @@ async def install_refs(
     return found, minted
 
 
-async def _ensure_install_ref(
+async def ensure_install_ref(
     *, guild_id: int, plugin_install_id: int, entity: IdentityEntity, entity_id: int
 ) -> str:
     """What one install calls one entity, from this process's cache or, on a
@@ -255,7 +256,7 @@ async def ensure_plugin_ref(
     request handler routed into a guild role, so a miss opens a session of its
     own, like ``identity_refs.billing_refs``.
     """
-    return await _ensure_install_ref(
+    return await ensure_install_ref(
         guild_id=guild_id,
         plugin_install_id=plugin_install_id,
         entity=IdentityEntity.user,
@@ -270,7 +271,7 @@ async def ensure_plugin_guild_ref(*, guild_id: int, plugin_install_id: int) -> s
     installed in two guilds holds two unrelated values for them — the same
     property the member reference has, applied to the tenant.
     """
-    return await _ensure_install_ref(
+    return await ensure_install_ref(
         guild_id=guild_id,
         plugin_install_id=plugin_install_id,
         entity=IdentityEntity.guild,

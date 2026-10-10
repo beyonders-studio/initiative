@@ -1765,13 +1765,28 @@ class ContactGrantMessages:
 
 
 class DemoMessages:
-    """The demo deployment's links."""
+    """The demo deployment's links, copies and pitches."""
 
     #: The link is unknown, revoked, expired or used up, or its pitch has
     #: nothing published.
     DEMO_LINK_NOT_FOUND = "DEMO_LINK_NOT_FOUND"
     #: No demo space is free right now.
     DEMO_BUSY = "DEMO_BUSY"
+    #: The account was not made for a demo copy, or its copy is gone.
+    DEMO_COPY_NOT_FOUND = "DEMO_COPY_NOT_FOUND"
+    #: The community is not a pitch, or the reference names none.
+    DEMO_PITCH_NOT_FOUND = "DEMO_PITCH_NOT_FOUND"
+    #: Publishing a pitch is for its admins.
+    DEMO_PITCH_ADMIN_REQUIRED = "DEMO_PITCH_ADMIN_REQUIRED"
+    #: The pitch's bundle can't be imported, or an editor it names has no
+    #: account.
+    DEMO_PITCH_SOURCE_INVALID = "DEMO_PITCH_SOURCE_INVALID"
+    #: The platform holds content in the pitch, so it stays until released.
+    DEMO_PITCH_HELD = "DEMO_PITCH_HELD"
+    #: A persona's handle belongs to an account that is not a persona.
+    DEMO_PERSONA_TAKEN = "DEMO_PERSONA_TAKEN"
+    #: A link's end is in the past.
+    DEMO_LINK_EXPIRY_INVALID = "DEMO_LINK_EXPIRY_INVALID"
 
 
 class ContactMessages:

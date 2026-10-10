@@ -30,6 +30,14 @@ from app.db.event_capture import (
 #: restore as ``created``, so this is the whole vocabulary.
 ACTIONS: tuple[str, ...] = ("created", "updated", "deleted")
 
+#: The demo deployment's events (``app.demo``): a link opened for the first
+#: time, and an address left on one. Each names the link by the receiving
+#: install's reference for it, and only an install in the operations community
+#: whose grant holds the community-admin standing hears them.
+DEMO_LINK_OPENED = "demo.link_opened"
+DEMO_LEAD_LEFT = "demo.lead_left"
+DEMO_EVENT_TYPES: frozenset[str] = frozenset({DEMO_LINK_OPENED, DEMO_LEAD_LEFT})
+
 
 @lru_cache(maxsize=1)
 def _vocabulary() -> dict[str, frozenset[str]]:

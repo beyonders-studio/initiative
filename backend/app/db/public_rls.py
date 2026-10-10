@@ -646,11 +646,13 @@ SHARED_TABLE_REGISTRY: dict[str, SharedTable] = {
             platform_base=frozenset({SELECT, INSERT, DELETE}),
         ),
     ),
-    # The demo deployment's links, copies and visitor accounts (``DEMO_MODE``):
-    # written when a link is made or opened and by the pool loop, and read for
-    # an account's own copy expiry, all on the system engine. No request role
+    # The demo deployment's links, copies, visitor accounts and left addresses
+    # (``DEMO_MODE``): written when a link is made or opened, when a visitor
+    # leaves an address, and by the pool loop, and read for an account's own
+    # copy and for the sales plug-in, all on the system engine. No request role
     # reaches them.
     "demo_accounts": SharedTable(rls=FORCED_NO_POLICY, grants=Grants(app_admin=DML)),
+    "demo_leads": SharedTable(rls=FORCED_NO_POLICY, grants=Grants(app_admin=DML)),
     "demo_links": SharedTable(rls=FORCED_NO_POLICY, grants=Grants(app_admin=DML)),
     "demo_sandboxes": SharedTable(rls=FORCED_NO_POLICY, grants=Grants(app_admin=DML)),
     # Part of the direct-message transport, per-account and cross-guild (see

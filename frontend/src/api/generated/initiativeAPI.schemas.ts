@@ -4035,6 +4035,31 @@ export interface DeletionEligibilityResponse {
 }
 
 /**
+ * A demo visitor's own copy, and whether its import has finished.
+ */
+export interface DemoCopyRead {
+  community_id: number;
+  ready: boolean;
+  expires_at?: string | null;
+}
+
+/**
+ * An address a demo visitor leaves for a follow-up.
+ */
+export interface DemoLeadCreate {
+  email: string;
+}
+
+/**
+ * Whether a community is a pitch, and when it was last published: the
+ * version visitors get.
+ */
+export interface DemoPitchRead {
+  is_pitch: boolean;
+  last_published_at?: string | null;
+}
+
+/**
  * A demo link's token, read from the link's fragment.
  */
 export interface DemoRedeem {
@@ -4044,6 +4069,7 @@ export interface DemoRedeem {
    */
   token: string;
   captcha_token?: string | null;
+  email?: string | null;
 }
 
 /**
@@ -6924,6 +6950,7 @@ export interface OperatorUserRead {
   has_password: boolean;
   password_required: boolean;
   demo_expires_at: string | null;
+  demo_community_id: number | null;
   initiative_roles: UserInitiativeRole[];
   purge_at: string | null;
   sign_in_locked_until: string | null;
@@ -10140,6 +10167,7 @@ export interface UserRead {
   has_password: boolean;
   password_required: boolean;
   demo_expires_at: string | null;
+  demo_community_id: number | null;
   initiative_roles: UserInitiativeRole[];
   readonly can_create_communities: boolean;
   /**

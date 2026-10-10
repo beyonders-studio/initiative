@@ -830,5 +830,12 @@
   "APPEAL_NOT_SUSPENDED": "Votre compte n'est pas suspendu : il n'y a rien à contester.",
   "APPEAL_NOWHERE_TO_SEND": "Ce serveur ne reçoit pas encore de recours. Utilisez plutôt l'adresse ci-dessous.",
   "DEMO_LINK_NOT_FOUND": "Ce lien de démonstration ne fonctionne plus. Demandez-en un nouveau à la personne qui vous l'a envoyé.",
-  "DEMO_BUSY": "Tous les espaces de démonstration sont occupés. Réessayez dans une minute."
+  "DEMO_BUSY": "Tous les espaces de démonstration sont occupés. Réessayez dans une minute.",
+  "DEMO_COPY_NOT_FOUND": "Cette copie de démonstration n'existe plus.",
+  "DEMO_PITCH_NOT_FOUND": "Cette communauté n'est pas une présentation de démonstration.",
+  "DEMO_PITCH_ADMIN_REQUIRED": "Seuls les administrateurs de cette présentation peuvent la publier.",
+  "DEMO_PITCH_SOURCE_INVALID": "Le fichier d'export de la présentation ne peut pas être importé, ou un éditeur indiqué n'a pas de compte.",
+  "DEMO_PITCH_HELD": "Cette présentation contient du contenu en cours d'examen et ne peut pas encore être supprimée.",
+  "DEMO_PERSONA_TAKEN": "Cet identifiant appartient à un vrai compte.",
+  "DEMO_LINK_EXPIRY_INVALID": "Un lien de démonstration ne peut pas se terminer dans le passé."
 }

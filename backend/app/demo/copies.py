@@ -21,17 +21,19 @@ from sqlalchemy import delete, exists, func, or_
 from sqlmodel import select
 from sqlmodel.ext.asyncio.session import AsyncSession
 
+from app.core import webhook_events
 from app.core.image_headers import validate_image
 from app.db import cohorts, post_commit
 from app.db.advisory_locks import LockNamespace, advisory_lock
 from app.db.request_context import SystemGuild, Unattributed
 from app.db.session import set_rls_context
-from app.demo import accounts, pitches
+from app.demo import accounts, pitches, sales
 from app.models.platform.demo import (
     DemoAccount,
     DemoLink,
     DemoSandbox,
     DemoSandboxState,
+    LinkState,
 )
 from app.models.platform.guild import (
     CommunityRole,
@@ -41,7 +43,7 @@ from app.models.platform.guild import (
 )
 from app.models.platform.guild_image import IMAGE_SPECS, GuildImage, GuildImageVariant
 from app.models.platform.user import User, UserRole, UserStatus
-from app.models.tenant.import_job import ImportJobStatus
+from app.models.tenant.import_job import ImportJob, ImportJobStatus
 from app.services.import_engine import backup as backup_service
 from app.services.import_engine import engine as import_engine
 from app.services.platform import guild_images, guild_purge
@@ -63,6 +65,8 @@ CLEANUP_AFTER = timedelta(days=30)
 CLEANUP_EVERY_SECONDS = 24 * 60 * 60
 #: What a pool community is called until a link names it after its pitch.
 _POOLED_NAME = "Demo"
+#: The import job states a copy's import ends in.
+_FINISHED = (ImportJobStatus.done, ImportJobStatus.failed)
 
 
 class LinkNotLive(Exception):
@@ -86,11 +90,15 @@ class Redemption:
     expires_at: datetime
 
 
-async def redeem(session: AsyncSession, token: str) -> Redemption:
+async def redeem(
+    session: AsyncSession, token: str, email: str | None = None
+) -> Redemption:
     """Open the link ``token`` names: claim a pooled community as the visitor's
-    copy, make their account in it with the link's role, and queue the import
-    of the pitch's newest export, its dates moved from the pitch's creation to
-    now. ``session`` is a platform system session."""
+    copy, make their account in it with the link's role, keep ``email`` as a
+    lead on the link when one is given, and queue the import of the pitch's
+    newest export, its dates moved from the pitch's creation to now. The sales
+    plug-in hears of the link's first opening and of a new lead. ``session`` is
+    a platform system session."""
     await set_rls_context(session, Unattributed())
     digest = pitches.hash_token(token)
     source_id = _live(
@@ -98,10 +106,10 @@ async def redeem(session: AsyncSession, token: str) -> Redemption:
     ).source_guild_id
     if not await _count(session, DemoSandbox.state == DemoSandboxState.pooled):
         raise PoolBusy
-    artifact = await pitches.newest_export(source_id)
-    if artifact is None:
+    newest = await pitches.newest_export(source_id)
+    if newest is None:
         raise LinkNotLive
-    async with import_engine.open_payload(source_id, artifact) as bundle:
+    async with import_engine.open_payload(source_id, newest[0]) as bundle:
         if bundle is None:
             raise LinkNotLive
         plan = await asyncio.to_thread(
@@ -177,9 +185,14 @@ async def redeem(session: AsyncSession, token: str) -> Redemption:
             sandbox.import_job_id = job_id
             session.add(sandbox)
             session.add(DemoAccount(user_id=visitor.id, sandbox_guild_id=guild_id))
+            first_open = link.redemption_count == 0
             link.redemption_count += 1
             link.last_redeemed_at = now
             session.add(link)
+            new_lead = email is not None and await sales.keep_lead(
+                session, link.id, email
+            )
+            link_id = link.id
             # The job is committed only once the claim is.
             await session.commit()
             await guild_session.commit()
@@ -187,6 +200,10 @@ async def redeem(session: AsyncSession, token: str) -> Redemption:
 
         if role is CommunityRole.superadmin:
             await _hand_over_seat(session, guild_id, host_id)
+    if first_open:
+        await sales.announce(webhook_events.DEMO_LINK_OPENED, link_id)
+    if new_lead:
+        await sales.announce(webhook_events.DEMO_LEAD_LEFT, link_id)
     return Redemption(
         user_id=visitor_id,
         token_version=token_version,
@@ -197,15 +214,7 @@ async def redeem(session: AsyncSession, token: str) -> Redemption:
 
 
 def _live(link: DemoLink | None, now: datetime) -> DemoLink:
-    if (
-        link is None
-        or link.revoked_at is not None
-        or (link.expires_at is not None and link.expires_at <= now)
-        or (
-            link.max_redemptions is not None
-            and link.redemption_count >= link.max_redemptions
-        )
-    ):
+    if link is None or pitches.link_state(link, now) is not LinkState.live:
         raise LinkNotLive
     return link
 
@@ -275,17 +284,49 @@ async def _hand_over_seat(session: AsyncSession, guild_id: int, host_id: int) ->
     await session.commit()
 
 
-async def copy_expiry(user_id: int) -> datetime | None:
-    """When the copy this account was made for is deleted, or ``None`` for an
-    account made some other way."""
+@dataclass(frozen=True)
+class AccountCopy:
+    """The copy a visitor's account was made for."""
+
+    guild_id: int
+    expires_at: datetime | None
+    #: The link it was opened from, while that link is kept.
+    link_id: int | None
+    #: The import filling it, in its own schema.
+    import_job_id: int | None
+
+
+async def account_copy(user_id: int) -> AccountCopy | None:
+    """The copy this account was made for, or ``None`` for an account made
+    some other way."""
     async with cohorts.system_session(None) as session:
-        return (
+        row = (
             await session.exec(
-                select(DemoSandbox.expires_at)
+                select(
+                    DemoSandbox.guild_id,
+                    DemoSandbox.expires_at,
+                    DemoSandbox.link_id,
+                    DemoSandbox.import_job_id,
+                )
                 .join(DemoAccount, DemoAccount.sandbox_guild_id == DemoSandbox.guild_id)
                 .where(DemoAccount.user_id == user_id)
             )
         ).first()
+    return None if row is None else AccountCopy(*row)
+
+
+async def copy_ready(copy: AccountCopy) -> bool:
+    """Whether the import filling the copy has finished. One that is missing
+    counts as failed. Read on the system engine routed into the copy: a
+    member visitor does not read import jobs."""
+    async with cohorts.system_session(copy.guild_id) as session:
+        await set_rls_context(session, SystemGuild(copy.guild_id))
+        status = (
+            await session.exec(
+                select(ImportJob.status).where(ImportJob.id == copy.import_job_id)
+            )
+        ).first()
+    return status is None or status in _FINISHED
 
 
 # --- the pool loop -----------------------------------------------------------
@@ -296,15 +337,17 @@ _cleaned_at: float | None = None
 
 
 async def pool_pass() -> None:
-    """One pass of the pool loop: delete the copies whose time is up, then
-    build pool communities one at a time while the pool is short and the
-    ceiling allows, and once a day run the cleanup. One process runs it at a
-    time."""
+    """One pass of the pool loop: delete the copies whose time is up and the
+    leads left too long ago, then build pool communities one at a time while
+    the pool is short and the ceiling allows, and once a day run the cleanup.
+    One process runs it at a time."""
     global _cleaned_at
     async with cohorts.system_session(None) as lock:
         if not await advisory_lock(lock, LockNamespace.DEMO_POOL, wait=False):
             return
-        await expire_copies(datetime.now(timezone.utc))
+        now = datetime.now(timezone.utc)
+        await expire_copies(now)
+        await sales.forget_leads(now - sales.LEAD_LIFETIME)
         while await _pool_short():
             await build_copy()
         if _cleaned_at is None or time.monotonic() - _cleaned_at >= (

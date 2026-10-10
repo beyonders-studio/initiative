@@ -214,6 +214,9 @@ def _install_context(**overrides):
             None,
             id="another-plugins-event",
         ),
+        pytest.param(
+            {"guild_admin": True}, ["demo.link_opened"], None, id="demo-event-admin"
+        ),
     ],
 )
 def test_an_install_may_subscribe_within_its_standing(
@@ -251,6 +254,12 @@ def test_an_install_may_subscribe_within_its_standing(
         ),
         pytest.param({}, ["files.created"], 13, id="not-placed"),
         pytest.param({}, [_GH_EVENT], None, id="plugins-scope-missing"),
+        pytest.param(
+            {"token_scopes": frozenset({"community:admin"})},
+            ["demo.lead_left"],
+            None,
+            id="demo-event-without-admin-standing",
+        ),
     ],
 )
 def test_an_install_may_not_subscribe_beyond_its_standing(

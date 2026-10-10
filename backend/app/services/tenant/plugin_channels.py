@@ -530,10 +530,29 @@ async def keep_event(
             PluginChannelMessages.INITIATIVE_NOT_PLACED, status_code=403
         )
 
+    await stage_event(
+        session,
+        install_id=plugin.id,
+        event_type=event_type,
+        payload=payload,
+        initiative_id=initiative_id,
+    )
+
+
+async def stage_event(
+    session: AsyncSession,
+    *,
+    install_id: int,
+    event_type: str,
+    payload: dict[str, Any],
+    initiative_id: Optional[int] = None,
+) -> None:
+    """Write one event to the routed community's plug-in outbox, in the
+    caller's transaction, and wake the outbox drain once it commits."""
     session.add(
         PluginEventOutbox(
             txn_id=func.txid_current(),
-            install_id=plugin.id,
+            install_id=install_id,
             event_type=event_type,
             initiative_id=initiative_id,
             payload=payload,

@@ -4,25 +4,56 @@
  * Initiative API
  * OpenAPI spec version: 0.75.3
  */
-import { useMutation } from "@tanstack/react-query";
+import { useMutation, useQuery } from "@tanstack/react-query";
 import type {
+  DataTag,
+  DefinedInitialDataOptions,
+  DefinedUseQueryResult,
   MutationFunction,
   QueryClient,
+  QueryFunction,
+  QueryKey,
+  UndefinedInitialDataOptions,
   UseMutationOptions,
   UseMutationResult,
+  UseQueryOptions,
+  UseQueryResult,
 } from "@tanstack/react-query";
 
-import type { DemoRedeem, DemoRedemption, HTTPValidationError } from "../initiativeAPI.schemas";
+import type {
+  DemoCopyRead,
+  DemoLeadCreate,
+  DemoPitchRead,
+  DemoRedeem,
+  DemoRedemption,
+  HTTPValidationError,
+} from "../initiativeAPI.schemas";
 
 import { apiMutator } from "../../mutator";
 import type { ErrorType, BodyType } from "../../mutator";
 
 type SecondParameter<T extends (...args: never) => unknown> = Parameters<T>[1];
 
+const withQueryKey = <T extends object, K>(query: T, queryKey: K): T & { queryKey: K } => {
+  const result = { queryKey } as T & { queryKey: K };
+  for (const key of Object.keys(query)) {
+    // The explicit queryKey always wins, matching the previous
+    // `{ ...query, queryKey }` spread where it was set last.
+    if (key === "queryKey") continue;
+    Object.defineProperty(result, key, {
+      enumerable: true,
+      configurable: true,
+      get: () => (query as Record<string, unknown>)[key],
+    });
+  }
+  return result;
+};
+
 /**
  * Open a demo link: a new account in a new copy of the link's pitch,
- * signed in for as long as the copy lasts. Answers 503 ``DEMO_BUSY`` when no
- * copy is free, and 404 everywhere but the demo deployment.
+ * signed in for as long as the copy lasts, with ``email`` kept for a
+ * follow-up when one is given. Answers 503 ``DEMO_BUSY`` when no copy is
+ * free.
  * @summary Redeem Demo Link
  */
 export const redeemDemoLink = (
@@ -106,4 +137,407 @@ export const useRedeemDemoLink = <TError = ErrorType<HTTPValidationError>, TCont
   TContext
 > => {
   return useMutation(getRedeemDemoLinkMutationOptions(options), queryClient);
+};
+/**
+ * The signed-in visitor's copy, and whether the import filling it has
+ * finished. 404 for an account not made for a copy.
+ * @summary Read Demo Copy
+ */
+export const readDemoCopy = (
+  options?: SecondParameter<typeof apiMutator>,
+  signal?: AbortSignal
+) => {
+  return apiMutator<DemoCopyRead>({ url: `/api/v1/demo/copy`, method: "GET", signal }, options);
+};
+
+export const getReadDemoCopyQueryKey = () => {
+  return [`/api/v1/demo/copy`] as const;
+};
+
+export const getReadDemoCopyQueryOptions = <
+  TData = Awaited<ReturnType<typeof readDemoCopy>>,
+  TError = ErrorType<HTTPValidationError>,
+>(options?: {
+  query?: Partial<UseQueryOptions<Awaited<ReturnType<typeof readDemoCopy>>, TError, TData>>;
+  request?: SecondParameter<typeof apiMutator>;
+}) => {
+  const { query: queryOptions, request: requestOptions } = options ?? {};
+
+  const queryKey = queryOptions?.queryKey ?? getReadDemoCopyQueryKey();
+
+  const queryFn: QueryFunction<Awaited<ReturnType<typeof readDemoCopy>>> = ({ signal }) =>
+    readDemoCopy(requestOptions, signal);
+
+  return { queryKey, queryFn, ...queryOptions } as UseQueryOptions<
+    Awaited<ReturnType<typeof readDemoCopy>>,
+    TError,
+    TData
+  > & { queryKey: DataTag<QueryKey, TData, TError> };
+};
+
+export type ReadDemoCopyQueryResult = NonNullable<Awaited<ReturnType<typeof readDemoCopy>>>;
+export type ReadDemoCopyQueryError = ErrorType<HTTPValidationError>;
+
+export function useReadDemoCopy<
+  TData = Awaited<ReturnType<typeof readDemoCopy>>,
+  TError = ErrorType<HTTPValidationError>,
+>(
+  options: {
+    query: Partial<UseQueryOptions<Awaited<ReturnType<typeof readDemoCopy>>, TError, TData>> &
+      Pick<
+        DefinedInitialDataOptions<
+          Awaited<ReturnType<typeof readDemoCopy>>,
+          TError,
+          Awaited<ReturnType<typeof readDemoCopy>>
+        >,
+        "initialData"
+      >;
+    request?: SecondParameter<typeof apiMutator>;
+  },
+  queryClient?: QueryClient
+): DefinedUseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData, TError> };
+export function useReadDemoCopy<
+  TData = Awaited<ReturnType<typeof readDemoCopy>>,
+  TError = ErrorType<HTTPValidationError>,
+>(
+  options?: {
+    query?: Partial<UseQueryOptions<Awaited<ReturnType<typeof readDemoCopy>>, TError, TData>> &
+      Pick<
+        UndefinedInitialDataOptions<
+          Awaited<ReturnType<typeof readDemoCopy>>,
+          TError,
+          Awaited<ReturnType<typeof readDemoCopy>>
+        >,
+        "initialData"
+      >;
+    request?: SecondParameter<typeof apiMutator>;
+  },
+  queryClient?: QueryClient
+): UseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData, TError> };
+export function useReadDemoCopy<
+  TData = Awaited<ReturnType<typeof readDemoCopy>>,
+  TError = ErrorType<HTTPValidationError>,
+>(
+  options?: {
+    query?: Partial<UseQueryOptions<Awaited<ReturnType<typeof readDemoCopy>>, TError, TData>>;
+    request?: SecondParameter<typeof apiMutator>;
+  },
+  queryClient?: QueryClient
+): UseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData, TError> };
+/**
+ * @summary Read Demo Copy
+ */
+
+export function useReadDemoCopy<
+  TData = Awaited<ReturnType<typeof readDemoCopy>>,
+  TError = ErrorType<HTTPValidationError>,
+>(
+  options?: {
+    query?: Partial<UseQueryOptions<Awaited<ReturnType<typeof readDemoCopy>>, TError, TData>>;
+    request?: SecondParameter<typeof apiMutator>;
+  },
+  queryClient?: QueryClient
+): UseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData, TError> } {
+  const queryOptions = getReadDemoCopyQueryOptions(options);
+
+  const query = useQuery(queryOptions, queryClient) as UseQueryResult<TData, TError> & {
+    queryKey: DataTag<QueryKey, TData, TError>;
+  };
+
+  return withQueryKey(query, queryOptions.queryKey);
+}
+
+/**
+ * Leave an address for a follow-up about the visitor's demo, on the link
+ * their copy was opened from. Kept apart from the account.
+ * @summary Leave Demo Lead
+ */
+export const leaveDemoLead = (
+  demoLeadCreate: BodyType<DemoLeadCreate>,
+  options?: SecondParameter<typeof apiMutator>,
+  signal?: AbortSignal
+) => {
+  return apiMutator<void>(
+    {
+      url: `/api/v1/demo/lead`,
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      data: demoLeadCreate,
+      signal,
+    },
+    options
+  );
+};
+
+export const getLeaveDemoLeadMutationKey = () => ["leaveDemoLead"] as const;
+
+export const getLeaveDemoLeadMutationOptions = <
+  TError = ErrorType<HTTPValidationError>,
+  TContext = unknown,
+>(options?: {
+  mutation?: UseMutationOptions<
+    Awaited<ReturnType<typeof leaveDemoLead>>,
+    TError,
+    LeaveDemoLeadMutationVariables,
+    TContext
+  >;
+  request?: SecondParameter<typeof apiMutator>;
+}): UseMutationOptions<
+  Awaited<ReturnType<typeof leaveDemoLead>>,
+  TError,
+  LeaveDemoLeadMutationVariables,
+  TContext
+> => {
+  const mutationKey = getLeaveDemoLeadMutationKey();
+  const { mutation: mutationOptions, request: requestOptions } = options
+    ? options.mutation && "mutationKey" in options.mutation && options.mutation.mutationKey
+      ? options
+      : { ...options, mutation: { ...options.mutation, mutationKey } }
+    : { mutation: { mutationKey }, request: undefined };
+
+  const mutationFn: MutationFunction<
+    Awaited<ReturnType<typeof leaveDemoLead>>,
+    LeaveDemoLeadMutationVariables
+  > = (props) => {
+    const { data } = props ?? {};
+
+    return leaveDemoLead(data, requestOptions);
+  };
+
+  return { mutationFn, ...mutationOptions };
+};
+
+export type LeaveDemoLeadMutationResult = NonNullable<Awaited<ReturnType<typeof leaveDemoLead>>>;
+export type LeaveDemoLeadMutationBody = BodyType<DemoLeadCreate>;
+export type LeaveDemoLeadMutationError = ErrorType<HTTPValidationError>;
+export type LeaveDemoLeadMutationVariables = { data: BodyType<DemoLeadCreate> };
+
+/**
+ * @summary Leave Demo Lead
+ */
+export const useLeaveDemoLead = <TError = ErrorType<HTTPValidationError>, TContext = unknown>(
+  options?: {
+    mutation?: UseMutationOptions<
+      Awaited<ReturnType<typeof leaveDemoLead>>,
+      TError,
+      LeaveDemoLeadMutationVariables,
+      TContext
+    >;
+    request?: SecondParameter<typeof apiMutator>;
+  },
+  queryClient?: QueryClient
+): UseMutationResult<
+  Awaited<ReturnType<typeof leaveDemoLead>>,
+  TError,
+  LeaveDemoLeadMutationVariables,
+  TContext
+> => {
+  return useMutation(getLeaveDemoLeadMutationOptions(options), queryClient);
+};
+/**
+ * Whether this community is a pitch, and when it was last published:
+ * the version visitors get. ``is_pitch`` is false everywhere else.
+ * @summary Read Demo Pitch
+ */
+export const readDemoPitch = (
+  communityId: number,
+  options?: SecondParameter<typeof apiMutator>,
+  signal?: AbortSignal
+) => {
+  return apiMutator<DemoPitchRead>(
+    { url: `/api/v1/c/${communityId}/demo/pitch`, method: "GET", signal },
+    options
+  );
+};
+
+export const getReadDemoPitchQueryKey = (communityId: number) => {
+  return [`/api/v1/c/${communityId}/demo/pitch`] as const;
+};
+
+export const getReadDemoPitchQueryOptions = <
+  TData = Awaited<ReturnType<typeof readDemoPitch>>,
+  TError = ErrorType<HTTPValidationError>,
+>(
+  communityId: number,
+  options?: {
+    query?: Partial<UseQueryOptions<Awaited<ReturnType<typeof readDemoPitch>>, TError, TData>>;
+    request?: SecondParameter<typeof apiMutator>;
+  }
+) => {
+  const { query: queryOptions, request: requestOptions } = options ?? {};
+
+  const queryKey = queryOptions?.queryKey ?? getReadDemoPitchQueryKey(communityId);
+
+  const queryFn: QueryFunction<Awaited<ReturnType<typeof readDemoPitch>>> = ({ signal }) =>
+    readDemoPitch(communityId, requestOptions, signal);
+
+  return {
+    queryKey,
+    queryFn,
+    enabled: communityId !== null && communityId !== undefined,
+    ...queryOptions,
+  } as UseQueryOptions<Awaited<ReturnType<typeof readDemoPitch>>, TError, TData> & {
+    queryKey: DataTag<QueryKey, TData, TError>;
+  };
+};
+
+export type ReadDemoPitchQueryResult = NonNullable<Awaited<ReturnType<typeof readDemoPitch>>>;
+export type ReadDemoPitchQueryError = ErrorType<HTTPValidationError>;
+
+export function useReadDemoPitch<
+  TData = Awaited<ReturnType<typeof readDemoPitch>>,
+  TError = ErrorType<HTTPValidationError>,
+>(
+  communityId: number,
+  options: {
+    query: Partial<UseQueryOptions<Awaited<ReturnType<typeof readDemoPitch>>, TError, TData>> &
+      Pick<
+        DefinedInitialDataOptions<
+          Awaited<ReturnType<typeof readDemoPitch>>,
+          TError,
+          Awaited<ReturnType<typeof readDemoPitch>>
+        >,
+        "initialData"
+      >;
+    request?: SecondParameter<typeof apiMutator>;
+  },
+  queryClient?: QueryClient
+): DefinedUseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData, TError> };
+export function useReadDemoPitch<
+  TData = Awaited<ReturnType<typeof readDemoPitch>>,
+  TError = ErrorType<HTTPValidationError>,
+>(
+  communityId: number,
+  options?: {
+    query?: Partial<UseQueryOptions<Awaited<ReturnType<typeof readDemoPitch>>, TError, TData>> &
+      Pick<
+        UndefinedInitialDataOptions<
+          Awaited<ReturnType<typeof readDemoPitch>>,
+          TError,
+          Awaited<ReturnType<typeof readDemoPitch>>
+        >,
+        "initialData"
+      >;
+    request?: SecondParameter<typeof apiMutator>;
+  },
+  queryClient?: QueryClient
+): UseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData, TError> };
+export function useReadDemoPitch<
+  TData = Awaited<ReturnType<typeof readDemoPitch>>,
+  TError = ErrorType<HTTPValidationError>,
+>(
+  communityId: number,
+  options?: {
+    query?: Partial<UseQueryOptions<Awaited<ReturnType<typeof readDemoPitch>>, TError, TData>>;
+    request?: SecondParameter<typeof apiMutator>;
+  },
+  queryClient?: QueryClient
+): UseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData, TError> };
+/**
+ * @summary Read Demo Pitch
+ */
+
+export function useReadDemoPitch<
+  TData = Awaited<ReturnType<typeof readDemoPitch>>,
+  TError = ErrorType<HTTPValidationError>,
+>(
+  communityId: number,
+  options?: {
+    query?: Partial<UseQueryOptions<Awaited<ReturnType<typeof readDemoPitch>>, TError, TData>>;
+    request?: SecondParameter<typeof apiMutator>;
+  },
+  queryClient?: QueryClient
+): UseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData, TError> } {
+  const queryOptions = getReadDemoPitchQueryOptions(communityId, options);
+
+  const query = useQuery(queryOptions, queryClient) as UseQueryResult<TData, TError> & {
+    queryKey: DataTag<QueryKey, TData, TError>;
+  };
+
+  return withQueryKey(query, queryOptions.queryKey);
+}
+
+/**
+ * Publish this pitch: export it, so the copies opened from now on get it
+ * as it is. For the pitch's admins; 404 for a community that is not a
+ * pitch.
+ * @summary Publish Demo Pitch
+ */
+export const publishDemoPitch = (
+  communityId: number,
+  options?: SecondParameter<typeof apiMutator>,
+  signal?: AbortSignal
+) => {
+  return apiMutator<unknown>(
+    { url: `/api/v1/c/${communityId}/demo/publish`, method: "POST", signal },
+    options
+  );
+};
+
+export const getPublishDemoPitchMutationKey = () => ["publishDemoPitch"] as const;
+
+export const getPublishDemoPitchMutationOptions = <
+  TError = ErrorType<HTTPValidationError>,
+  TContext = unknown,
+>(options?: {
+  mutation?: UseMutationOptions<
+    Awaited<ReturnType<typeof publishDemoPitch>>,
+    TError,
+    PublishDemoPitchMutationVariables,
+    TContext
+  >;
+  request?: SecondParameter<typeof apiMutator>;
+}): UseMutationOptions<
+  Awaited<ReturnType<typeof publishDemoPitch>>,
+  TError,
+  PublishDemoPitchMutationVariables,
+  TContext
+> => {
+  const mutationKey = getPublishDemoPitchMutationKey();
+  const { mutation: mutationOptions, request: requestOptions } = options
+    ? options.mutation && "mutationKey" in options.mutation && options.mutation.mutationKey
+      ? options
+      : { ...options, mutation: { ...options.mutation, mutationKey } }
+    : { mutation: { mutationKey }, request: undefined };
+
+  const mutationFn: MutationFunction<
+    Awaited<ReturnType<typeof publishDemoPitch>>,
+    PublishDemoPitchMutationVariables
+  > = (props) => {
+    const { communityId } = props ?? {};
+
+    return publishDemoPitch(communityId, requestOptions);
+  };
+
+  return { mutationFn, ...mutationOptions };
+};
+
+export type PublishDemoPitchMutationResult = NonNullable<
+  Awaited<ReturnType<typeof publishDemoPitch>>
+>;
+
+export type PublishDemoPitchMutationError = ErrorType<HTTPValidationError>;
+export type PublishDemoPitchMutationVariables = { communityId: number };
+
+/**
+ * @summary Publish Demo Pitch
+ */
+export const usePublishDemoPitch = <TError = ErrorType<HTTPValidationError>, TContext = unknown>(
+  options?: {
+    mutation?: UseMutationOptions<
+      Awaited<ReturnType<typeof publishDemoPitch>>,
+      TError,
+      PublishDemoPitchMutationVariables,
+      TContext
+    >;
+    request?: SecondParameter<typeof apiMutator>;
+  },
+  queryClient?: QueryClient
+): UseMutationResult<
+  Awaited<ReturnType<typeof publishDemoPitch>>,
+  TError,
+  PublishDemoPitchMutationVariables,
+  TContext
+> => {
+  return useMutation(getPublishDemoPitchMutationOptions(options), queryClient);
 };

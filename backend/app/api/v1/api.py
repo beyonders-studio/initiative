@@ -130,7 +130,7 @@ api_router.include_router(config.router, tags=["config"])
 # Unauthenticated: the signup form links to them.
 api_router.include_router(legal.router, tags=["legal"])
 api_router.include_router(auth.router, prefix="/auth", tags=["auth"])
-# Opening a demo link; 404 unless the deployment runs as the demo.
+# The demo deployment's routes; 404 unless the deployment runs as the demo.
 api_router.include_router(demo.router, prefix="/demo", tags=["demo"])
 # Mounted on the same prefix: the factor routes are part of /auth, kept in
 # their own module rather than growing the sign-in one.
@@ -309,6 +309,8 @@ guild_router.include_router(
     attachments.router, prefix="/attachments", tags=["attachments"]
 )
 guild_router.include_router(exports.router, prefix="/exports", tags=["exports"])
+guild_router.include_router(demo.community_router, prefix="/demo", tags=["demo"])
+guild_router.include_router(demo.sales_router, prefix="/demo", tags=["demo"])
 guild_router.include_router(imports.router, prefix="/imports", tags=["imports"])
 guild_router.include_router(queues.router, **_tool_mount(Tool.queue))
 # Flat read-back routes, at the guild root: an event envelope names a

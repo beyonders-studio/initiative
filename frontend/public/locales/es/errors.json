@@ -830,5 +830,12 @@
   "APPEAL_NOT_SUSPENDED": "Tu cuenta no está suspendida, así que no hay nada que apelar.",
   "APPEAL_NOWHERE_TO_SEND": "Este servidor aún no recibe apelaciones. Usa la dirección de abajo.",
   "DEMO_LINK_NOT_FOUND": "Este enlace de demostración ya no funciona. Pide uno nuevo a quien te lo envió.",
-  "DEMO_BUSY": "Todos los espacios de demostración están ocupados. Vuelve a intentarlo en un minuto."
+  "DEMO_BUSY": "Todos los espacios de demostración están ocupados. Vuelve a intentarlo en un minuto.",
+  "DEMO_COPY_NOT_FOUND": "Esta copia de demostración ya no existe.",
+  "DEMO_PITCH_NOT_FOUND": "Esta comunidad no es una presentación de demostración.",
+  "DEMO_PITCH_ADMIN_REQUIRED": "Solo los administradores de esta presentación pueden publicarla.",
+  "DEMO_PITCH_SOURCE_INVALID": "No se puede importar el archivo de exportación de la presentación, o un editor indicado no tiene cuenta.",
+  "DEMO_PITCH_HELD": "Esta presentación tiene contenido en revisión, así que aún no se puede eliminar.",
+  "DEMO_PERSONA_TAKEN": "Ese identificador pertenece a una cuenta real.",
+  "DEMO_LINK_EXPIRY_INVALID": "Un enlace de demostración no puede terminar en el pasado."
 }

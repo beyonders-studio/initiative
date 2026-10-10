@@ -1,18 +1,23 @@
-"""The demo's own accounts: the demo host, and each visitor's account.
+"""The demo's own accounts: the demo host, the personas its communities cast,
+and each visitor's account.
 
-Both are made with no password and no address, so nothing can sign in to one
+All are made with no password and no address, so nothing can sign in to one
 but the session the demo opens for it, and every notification that would
 leave the app is off.
 """
 
 from __future__ import annotations
 
-from sqlalchemy import ColumnElement, and_, exists, func
+from datetime import datetime, timezone
+
+from sqlalchemy import ColumnElement, and_, exists, func, update
 from sqlmodel import select
 from sqlmodel.ext.asyncio.session import AsyncSession
 
 from app.core.audit_events import AuditEventType
 from app.core.notification_categories import CATEGORY_SPECS, Channel
+from app.models.platform.demo import DemoAccount
+from app.models.platform.guild import GuildMembership
 from app.models.platform.user import User
 from app.models.platform.user_email import UserEmail
 from app.services import audit as audit_service
@@ -64,6 +69,43 @@ async def demo_host(session: AsyncSession) -> User:
     )
 
 
+class HandleTaken(Exception):
+    """The handle belongs to an account that is not a persona."""
+
+
+async def ensure_persona(
+    session: AsyncSession, *, handle: str, display_name: str
+) -> User:
+    """The persona ``handle`` names, made when there is none, called
+    ``display_name`` in every community it is in. Raises :class:`HandleTaken`
+    when the handle is somebody's account, a visitor's or the demo host's.
+    Staged; the caller commits."""
+    user = await by_handle(session, handle)
+    if user is None:
+        user = await create(session, handle=handle)
+    elif (
+        handle.lower() == HOST_HANDLE
+        or (
+            await session.exec(
+                select(User.id).where(
+                    User.id == user.id,
+                    ~unloginable() | exists().where(DemoAccount.user_id == User.id),
+                )
+            )
+        ).first()
+    ):
+        raise HandleTaken(handle)
+    if user.age_confirmed_at is None:
+        user.age_confirmed_at = datetime.now(timezone.utc)
+        session.add(user)
+    await session.exec(
+        update(GuildMembership)
+        .where(GuildMembership.user_id == user.id)
+        .values(display_name=display_name)
+    )
+    return user
+
+
 async def create(session: AsyncSession, *, handle: str | None = None) -> User:
     """A new account with ``handle``, or a generated one when it is ``None``.
     Staged; the caller commits."""
@@ -71,7 +113,14 @@ async def create(session: AsyncSession, *, handle: str | None = None) -> User:
         name, number = await username_service.allocate_from_seed(session)
     else:
         name, number = _split(handle)
-    user = User(username=name, discriminator=number, username_chosen=True)
+    user = User(
+        username=name,
+        discriminator=number,
+        username_chosen=True,
+        # Listed communities seat only accounts that answered the age
+        # question, and nobody can answer it for the host or a persona.
+        age_confirmed_at=None if handle is None else datetime.now(timezone.utc),
+    )
     session.add(user)
     await session.flush()
     await dm_settings_service.seed_for_new_account(session, user_id=user.id)

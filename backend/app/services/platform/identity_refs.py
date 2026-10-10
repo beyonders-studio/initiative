@@ -15,6 +15,7 @@ from __future__ import annotations
 
 import logging
 import secrets
+from collections.abc import Sequence
 from datetime import datetime, timezone
 
 from sqlalchemy import and_, exists, func, or_
@@ -23,6 +24,7 @@ from sqlalchemy.dialects.postgresql import insert as pg_insert
 from sqlmodel import delete, select, update
 from sqlmodel.ext.asyncio.session import AsyncSession
 
+from app.models.platform.demo import DemoLink
 from app.models.platform.guild import Guild, CommunityStatus
 from app.models.platform.identity_ref import (
     REF_ENTROPY_BYTES,
@@ -57,6 +59,7 @@ __all__ = [
     "reissue_ref",
     "resolve_billing_ref",
     "resolve_ref",
+    "resolve_refs",
 ]
 
 logger = logging.getLogger(__name__)
@@ -246,20 +249,32 @@ async def resolve_ref(
     A retired reference still resolves until its grace window closes; past
     that it is treated as unknown even while the row waits to be swept.
     """
-    if not ref or len(ref) > REF_MAX_LENGTH:
-        return None
+    found = await resolve_refs(session, refs=[ref], now=now)
+    return found[0] if found else None
+
+
+async def resolve_refs(
+    session: AsyncSession, *, refs: Sequence[str], now: datetime | None = None
+) -> list[IdentityRef]:
+    """The rows ``refs`` name, in one read, as :func:`resolve_ref` resolves
+    each. A value that names nothing is left out."""
+    wanted = [ref for ref in refs if ref and len(ref) <= REF_MAX_LENGTH]
+    if not wanted:
+        return []
     moment = now or datetime.now(timezone.utc)
-    return (
-        await session.exec(
-            select(IdentityRef).where(
-                IdentityRef.ref == ref,
-                or_(
-                    IdentityRef.retired_at.is_(None),
-                    IdentityRef.retired_at > moment - REF_GRACE_PERIOD,
-                ),
+    return list(
+        (
+            await session.exec(
+                select(IdentityRef).where(
+                    IdentityRef.ref.in_(wanted),
+                    or_(
+                        IdentityRef.retired_at.is_(None),
+                        IdentityRef.retired_at > moment - REF_GRACE_PERIOD,
+                    ),
+                )
             )
-        )
-    ).first()
+        ).all()
+    )
 
 
 def _sector_clause(sector: tuple[int | None, int | None]):
@@ -489,7 +504,8 @@ async def purge_orphaned_sector_refs(session: AsyncSession) -> int:
 
 
 async def purge_orphaned_entity_refs(session: AsyncSession) -> int:
-    """Drop references naming an erased account or a purged guild.
+    """Drop references naming an erased account, a purged guild or a deleted
+    demo link.
 
     Returns the count. The entity column cannot be a foreign key — erasure
     keeps the ``users`` row as an anonymized husk — so these are removed by
@@ -503,6 +519,7 @@ async def purge_orphaned_entity_refs(session: AsyncSession) -> int:
         User.status != UserStatus.anonymized,
     )
     live_guild = select(Guild.id).where(Guild.id == IdentityRef.entity_id)
+    live_link = select(DemoLink.id).where(DemoLink.id == IdentityRef.entity_id)
     result = await session.exec(
         delete(IdentityRef).where(
             or_(
@@ -513,6 +530,10 @@ async def purge_orphaned_entity_refs(session: AsyncSession) -> int:
                 and_(
                     IdentityRef.entity_type == IdentityEntity.guild,
                     ~exists(live_guild),
+                ),
+                and_(
+                    IdentityRef.entity_type == IdentityEntity.demo_link,
+                    ~exists(live_link),
                 ),
             )
         )

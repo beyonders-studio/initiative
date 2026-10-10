@@ -19,28 +19,32 @@ from datetime import datetime, timedelta, timezone
 from pathlib import Path
 from typing import Any, cast
 
-from sqlalchemy import exists, func, tuple_
+from sqlalchemy import exists, func, tuple_, update
 from sqlmodel import select
 from sqlmodel.sql.expression import SelectOfScalar
 from sqlmodel.ext.asyncio.session import AsyncSession
 
 from app.core import usernames
+from app.core.config import settings
 from app.core.image_headers import validate_image
 from app.db import cohorts
 from app.db.request_context import SystemGuild, Unattributed
 from app.db.session import set_rls_context
 from app.demo import accounts
-from app.models.platform.demo import DemoAccount, DemoLink, DemoSandbox
-from app.models.platform.guild import CommunityRole, Guild
+from app.models.platform.demo import DemoAccount, DemoLink, DemoSandbox, LinkState
+from app.models.platform.guild import CommunityRole, CommunityStatus, Guild
 from app.models.platform.guild_image import IMAGE_SPECS, GuildImageVariant
 from app.models.platform.user import User
 from app.models.tenant.export_job import ExportJob, ExportJobStatus
 from app.models.tenant.import_job import ImportJob, ImportJobStatus
+from app.models.tenant.initiative import Initiative
+from app.schemas.platform.demo import DemoDirectoryCard
 from app.schemas.tenant.import_job import BackupPlanPerson
 from app.services.import_engine import backup as backup_service
 from app.services.import_engine import worker as import_worker
 from app.services.import_engine.common import handle_key
-from app.services.platform import guild_images
+from app.services.platform import app_settings as app_settings_service
+from app.services.platform import guild_images, guild_purge
 from app.services.platform import guilds as guilds_service
 
 #: How long a link lasts unless it is made for longer, or for good.
@@ -55,6 +59,26 @@ IMPORT_POLL_SECONDS = 1.0
 def hash_token(token: str) -> bytes:
     """How a link's token is kept and looked up."""
     return hashlib.sha256(token.encode()).digest()
+
+
+def link_url(token: str) -> str:
+    """The address a link's token is handed out at. The token rides in the
+    fragment, which the browser keeps to itself."""
+    return f"{settings.APP_URL.rstrip('/')}/demo#{token}"
+
+
+def link_state(link: DemoLink, now: datetime) -> LinkState:
+    """Whether the link still opens copies, and if not, why."""
+    if link.revoked_at is not None:
+        return LinkState.revoked
+    if link.expires_at is not None and link.expires_at <= now:
+        return LinkState.expired
+    if (
+        link.max_redemptions is not None
+        and link.redemption_count >= link.max_redemptions
+    ):
+        return LinkState.used_up
+    return LinkState.live
 
 
 async def seat_cast(
@@ -105,14 +129,16 @@ async def make_pitch(
     name: str,
     logo: bytes | None = None,
     editors: Sequence[str] = (),
+    directory: DemoDirectoryCard | None = None,
 ) -> int:
     """Make a pitch named ``name`` from ``bundle``, with ``logo`` as its icon,
     and publish it. Returns its id.
 
     The accounts ``editors`` names by handle are made its admins, the
     personas the bundle names are seated in it, and its dates move from the
-    bundle's export to now. The import runs here; the export is queued once
-    it is done."""
+    bundle's export to now. With ``directory`` it is listed in the community
+    directory with that card, and its initiatives take the card's join
+    policy. The import runs here; the export is queued once it is done."""
     icon = validate_image(IMAGE_SPECS[GuildImageVariant.icon], logo) if logo else None
     # Refused here, before a community is made for it.
     plan = await asyncio.to_thread(
@@ -148,6 +174,8 @@ async def make_pitch(
         seated = await seat_cast(
             session, guild_id=guild_id, people=plan.people, actor_id=host.id
         )
+        if directory is not None:
+            await _list(session, guild, directory)
         await session.commit()
     async with cohorts.system_session(guild_id) as session:
         await set_rls_context(session, SystemGuild(guild_id))
@@ -165,8 +193,50 @@ async def make_pitch(
         await session.commit()
         job_id = cast(int, job.id)
     await _wait_for_import(guild_id, job_id)
+    if directory is not None:
+        async with cohorts.system_session(guild_id) as session:
+            await set_rls_context(session, SystemGuild(guild_id))
+            await session.exec(
+                update(Initiative).values(join_policy=directory.join_policy.value)
+            )
+            await session.commit()
     await publish(guild_id, host)
     return guild_id
+
+
+async def _list(session: AsyncSession, guild: Guild, card: DemoDirectoryCard) -> None:
+    """Put the community in the directory with ``card``, and the directory
+    on. Staged."""
+    row = await app_settings_service.get_app_settings(session)
+    row.community_directory_enabled = True
+    session.add(row)
+    guild.is_community = True
+    guild.categories = guilds_service.normalize_categories(
+        [category.value for category in card.categories]
+    )
+    # A listing declares its audience, and the demo's are all ages.
+    guild.has_adult_content = False
+    session.add(guild)
+    await session.flush()
+
+
+async def delete_pitch(session: AsyncSession, pitch_id: int) -> bool:
+    """End the pitch's links and delete its community now. ``False`` when it
+    is not a pitch. Raises ``HoldsInForce`` while the platform holds anything
+    there, its links already ended. ``session`` is a platform system
+    session."""
+    if not await is_pitch(session, pitch_id):
+        return False
+    await session.exec(
+        update(DemoLink)
+        .where(DemoLink.source_guild_id == pitch_id, DemoLink.revoked_at.is_(None))
+        .values(revoked_at=datetime.now(timezone.utc))
+    )
+    await session.commit()
+    pitch = await session.get(Guild, pitch_id)
+    if pitch is not None:
+        await guild_purge.destroy_now(session, pitch)
+    return True
 
 
 async def _wait_for_import(guild_id: int, job_id: int) -> None:
@@ -241,12 +311,15 @@ def _published(column: Any) -> SelectOfScalar[Any]:
     )
 
 
-async def newest_export(guild_id: int) -> str | None:
-    """Where the pitch's newest finished community backup is stored, or
-    ``None`` when it has none."""
+async def newest_export(guild_id: int) -> tuple[str, datetime] | None:
+    """Where the pitch's newest finished community backup is stored, and when
+    it was taken, or ``None`` when it has none."""
     async with cohorts.system_session(guild_id) as session:
         await set_rls_context(session, SystemGuild(guild_id))
-        return (await session.exec(_published(ExportJob.artifact_ref))).first()
+        newest = (await session.exec(_published(ExportJob))).first()
+    return (
+        None if newest is None else (cast(str, newest.artifact_ref), newest.created_at)
+    )
 
 
 async def published_export_id(session: AsyncSession, guild_id: int) -> int | None:
@@ -272,6 +345,27 @@ async def is_pitch(session: AsyncSession, guild_id: int) -> bool:
         and guild.created_by == host.id
         and await session.get(DemoSandbox, guild_id) is None
     )
+
+
+async def find_pitches(
+    session: AsyncSession, names: Sequence[str]
+) -> list[tuple[int, str, datetime]]:
+    """The pitches named exactly one of ``names``, as ``(id, name,
+    created_at)``, oldest first. ``session`` is a platform system session."""
+    host = await accounts.by_handle(session, accounts.HOST_HANDLE)
+    if host is None:
+        return []
+    rows = await session.exec(
+        select(Guild.id, Guild.name, Guild.created_at)
+        .where(
+            Guild.created_by == host.id,
+            Guild.name.in_(list(names)),
+            Guild.status != CommunityStatus.deleted.value,
+            ~exists().where(DemoSandbox.guild_id == Guild.id),
+        )
+        .order_by(Guild.created_at, Guild.id)
+    )
+    return [(cast(int, id_), name, created_at) for id_, name, created_at in rows]
 
 
 async def make_link(

@@ -40,13 +40,14 @@ class PluginEventOutbox(SQLModel, table=True):
         sa_column=Column(DateTime(timezone=True), nullable=False, index=True),
     )
 
-    #: The install that emitted it. A weak reference, like the change log's
-    #: actor: removing the plug-in leaves the row to retention, and delivery names
-    #: an emitter only while its install is there.
+    #: The install that emitted it, or for one of the demo deployment's own
+    #: events (``demo.*``), the install it is addressed to. A weak reference,
+    #: like the change log's actor: removing the plug-in leaves the row to
+    #: retention, and delivery names an emitter only while its install is there.
     install_id: int = Field(sa_column=Column(Integer, nullable=False))
 
     #: ``plugin.<public_id>.<event>``, an ``emit`` endpoint the pinned definition
-    #: declares.
+    #: declares, or one of the demo's (``webhook_events.DEMO_EVENT_TYPES``).
     event_type: str = Field(sa_column=Column(String(length=200), nullable=False))
 
     #: The initiative the event is about, or NULL for one about the community.

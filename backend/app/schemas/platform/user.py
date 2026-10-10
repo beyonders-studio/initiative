@@ -751,6 +751,9 @@ class UserRead(UserBase):
     #: account; ``None`` for every other account. Populated with the fields
     #: above.
     demo_expires_at: Optional[datetime] = None
+    #: The demo copy this account was made for; ``None`` for every other
+    #: account. Populated with the fields above.
+    demo_community_id: Optional[int] = None
     initiative_roles: List["UserInitiativeRole"] = Field(default_factory=list)
 
     @computed_field(return_type=bool)  # type: ignore[misc]

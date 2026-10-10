@@ -1,5 +1,7 @@
-"""Pitches, links and copies: opening a link, the pool, expiry and cleanup."""
+"""Pitches, links and copies: opening a link, the pool, expiry and cleanup,
+leaving an address, publishing a pitch, and the sales plug-in's API."""
 
+import json
 import time
 from datetime import datetime, timedelta, timezone
 from types import SimpleNamespace
@@ -8,7 +10,9 @@ import pytest
 from sqlalchemy import func
 from sqlmodel import select
 
+from app.core import webhook_events
 from app.core.config import settings
+from app.core.plugin_scopes import LEVEL_SCOPES, InstallLevel
 from app.core.messages import DemoMessages, GuildMessages
 from app.db import cohorts
 from app.demo import accounts, copies, pitches
@@ -24,22 +28,29 @@ from app.models.platform.user import User
 from app.models.tenant.export_job import ExportJob, ExportJobStatus
 from app.models.tenant.import_job import ImportJob, ImportJobStatus
 from app.models.tenant.initiative import Initiative, InitiativeMember
+from app.models.tenant.plugin_event_outbox import PluginEventOutbox
 from app.models.tenant.task import Task
 from app.services.export import worker as export_worker
 from app.services.guild_sweeps import Scope, each_guild
 from app.services.import_engine import engine as import_engine
 from app.services.import_engine import worker as import_worker
 from app.services.platform import users as users_service
+from app.services.platform.app_settings import get_app_settings
 from app.testing import (
     create_export_job,
     create_guild,
     create_guild_membership,
+    create_guild_plugin,
+    create_import_job,
     create_initiative_member,
     create_task,
     create_user,
     route_session_to_guild,
 )
+from app.testing.plugin_clients import InstalledPlugin, install_headers, install_plugin
+from app.services.tenant.webhook_subscriptions_test import _grant_scopes
 
+ADMIN = LEVEL_SCOPES[InstallLevel.community_admin]
 REDEEM = "/api/v1/demo/redeem"
 
 
@@ -72,9 +83,11 @@ async def pitch(client, acting_user, session, monkeypatch):
     return link, bea.id, a.guild.id
 
 
-async def _open(client, token: str) -> tuple[dict, dict, dict]:
+async def _open(
+    client, token: str, email: str | None = None
+) -> tuple[dict, dict, dict]:
     """Open the link; the answer, the visitor's headers and their account."""
-    response = await client.post(REDEEM, json={"token": token})
+    response = await client.post(REDEEM, json={"token": token, "email": email})
     assert response.status_code == 200, response.text
     opened = response.json()
     headers = {"Authorization": f"Bearer {opened['access_token']}"}
@@ -101,6 +114,7 @@ async def test_two_openings_make_two_copies_apart(pitch, client, session):
 
     assert {first["community_id"], second["community_id"]} == pooled
     assert first_me["id"] != second_me["id"]
+    assert first_me["demo_community_id"] == first["community_id"]
     expires_at = datetime.fromisoformat(first_me["demo_expires_at"])
     signed_in = (
         await session.exec(
@@ -311,9 +325,9 @@ async def test_making_a_pitch_imports_and_publishes(pitch, session):
     _link, bea, source = pitch
     editor = await create_user(session, username="rev", discriminator=1000)
     await session.commit()
-    artifact = await pitches.newest_export(source)
-    assert artifact is not None
-    async with import_engine.open_payload(source, artifact) as bundle:
+    newest = await pitches.newest_export(source)
+    assert newest is not None
+    async with import_engine.open_payload(source, newest[0]) as bundle:
         assert bundle is not None
         pitch_id = await pitches.make_pitch(
             bundle=bundle, name="Rosie's", editors=["rev#1000"]
@@ -385,3 +399,361 @@ async def test_the_pool_loop_cleans_up_once_a_day(monkeypatch):
     monkeypatch.setattr(copies, "_cleaned_at", a_day_ago)
     await copies.pool_pass()
     assert len(runs) == 2
+
+
+# --- publishing a pitch ----------------------------------------------------------
+
+
+async def test_a_pitch_admin_publishes_it(pitch, client, session, acting_user):
+    _link, _bea, source = pitch
+    host = await accounts.demo_host(session)
+    guild = await session.get(Guild, source)
+    await create_guild_membership(
+        session, user=host, guild=guild, role=CommunityRole.superadmin
+    )
+    editor = await acting_user(guild_role=CommunityRole.admin, guild=guild)
+    member = await acting_user(guild_role=CommunityRole.member, guild=guild)
+
+    published = await client.post(editor.g("/demo/publish"), headers=editor.headers)
+    assert published.status_code == 202, published.text
+    refused = await client.post(member.g("/demo/publish"), headers=member.headers)
+    assert refused.status_code == 403
+    assert refused.json()["detail"] == DemoMessages.DEMO_PITCH_ADMIN_REQUIRED
+
+    before = (await client.get(editor.g("/demo/pitch"), headers=editor.headers)).json()
+    await export_worker.process_export_jobs()
+    after = (await client.get(member.g("/demo/pitch"), headers=member.headers)).json()
+    assert before["is_pitch"] and after["is_pitch"]
+    assert after["last_published_at"] > before["last_published_at"]
+
+
+async def test_a_community_that_is_no_pitch_publishes_nothing(
+    client, acting_user, monkeypatch
+):
+    monkeypatch.setattr(settings, "DEMO_MODE", True)
+    a = await acting_user(guild_role=CommunityRole.admin)
+    published = await client.post(a.g("/demo/publish"), headers=a.headers)
+    assert published.status_code == 404
+    assert published.json()["detail"] == DemoMessages.DEMO_PITCH_NOT_FOUND
+    status = await client.get(a.g("/demo/pitch"), headers=a.headers)
+    assert status.json() == {"is_pitch": False, "last_published_at": None}
+
+
+# --- the sales plug-in -----------------------------------------------------------
+
+
+async def _sales_install(session, acting_user, role_session) -> InstalledPlugin:
+    """An install the seat granted community admin, in the operations
+    community."""
+    installed = await install_plugin(
+        session,
+        acting_user,
+        role_session,
+        granted=[ADMIN],
+        requested=[ADMIN],
+    )
+    row = await get_app_settings(session)
+    row.operations_guild_id = installed.guild.id
+    session.add(row)
+    await session.commit()
+    return installed
+
+
+def _api(ops: int, path: str) -> str:
+    return f"/api/v1/c/{ops}/demo/{path}"
+
+
+async def test_the_demo_api_answers_only_the_operations_install_with_admin_standing(
+    client, session, acting_user, role_session, monkeypatch
+):
+    installed = await _sales_install(session, acting_user, role_session)
+    ops = installed.guild.id
+    links_read = _api(ops, "links/read")
+    body = {"link_refs": ["dplu_unknown"]}
+
+    monkeypatch.setattr(settings, "DEMO_MODE", False)
+    off = await client.post(
+        links_read, json=body, headers=install_headers(installed, [ADMIN])
+    )
+    assert off.status_code == 404
+
+    monkeypatch.setattr(settings, "DEMO_MODE", True)
+    allowed = await client.post(
+        links_read, json=body, headers=install_headers(installed, [ADMIN])
+    )
+    assert allowed.status_code == 200, allowed.text
+    assert allowed.json() == {"links": []}
+    # The SDK writes 0 for an install's community; the token's is the one used.
+    as_the_sdk = await client.post(
+        "/api/v1/c/0/demo/links/read",
+        json=body,
+        headers=install_headers(installed, [ADMIN]),
+    )
+    assert as_the_sdk.status_code == 200, as_the_sdk.text
+    naive = await client.post(
+        _api(ops, "links"),
+        json={
+            "pitch_ref": "dplu_unknown",
+            "label": "Rosie",
+            "expires_at": "2099-01-01T00:00:00",
+        },
+        headers=install_headers(installed, [ADMIN]),
+    )
+    assert naive.status_code == 422
+    unscoped = await client.post(
+        links_read, json=body, headers=install_headers(installed, [])
+    )
+    assert unscoped.status_code == 403
+    await _grant_scopes(role_session, installed, [])
+    taken_back = await client.post(
+        links_read, json=body, headers=install_headers(installed, [ADMIN])
+    )
+    assert taken_back.status_code == 403
+    await _grant_scopes(role_session, installed, [ADMIN])
+    person = await acting_user(guild_role=CommunityRole.admin, guild=installed.guild)
+    as_a_person = await client.post(links_read, json=body, headers=person.headers)
+    assert as_a_person.status_code == 401
+
+    elsewhere = await create_guild(session)
+    row = await get_app_settings(session)
+    row.operations_guild_id = elsewhere.id
+    session.add(row)
+    await session.commit()
+    outside = await client.post(
+        links_read, json=body, headers=install_headers(installed, [ADMIN])
+    )
+    assert outside.status_code == 403
+
+
+async def test_personas_are_ensured_once_and_never_over_a_real_account(
+    client, session, acting_user, role_session, monkeypatch
+):
+    monkeypatch.setattr(settings, "DEMO_MODE", True)
+    installed = await _sales_install(session, acting_user, role_session)
+    ops = installed.guild.id
+    headers = install_headers(installed, [ADMIN])
+    body = {"personas": [{"handle": "Bea#0042", "display_name": "Bea"}]}
+
+    first = await client.post(_api(ops, "personas"), json=body, headers=headers)
+    assert first.status_code == 200, first.text
+    assert first.json() == {"handles": ["bea#0042"]}
+    bea = await accounts.by_handle(session, "bea#0042")
+    assert bea is not None and bea.age_confirmed_at is not None
+    await create_guild_membership(session, user=bea, guild=installed.guild)
+
+    body["personas"][0]["display_name"] = "Bea the baker"
+    again = await client.post(_api(ops, "personas"), json=body, headers=headers)
+    assert again.status_code == 200, again.text
+    session.expire_all()
+    assert (await accounts.by_handle(session, "bea#0042")).id == bea.id
+    membership = (
+        await session.exec(
+            select(GuildMembership).where(GuildMembership.user_id == bea.id)
+        )
+    ).one()
+    assert membership.display_name == "Bea the baker"
+
+    await create_user(session, username="sam", discriminator=7)
+    taken = await client.post(
+        _api(ops, "personas"),
+        json={
+            "personas": [
+                {"handle": "ada#0001", "display_name": "Ada"},
+                {"handle": "sam#0007", "display_name": "Sam"},
+            ]
+        },
+        headers=headers,
+    )
+    assert taken.status_code == 409
+    assert taken.json()["detail"] == DemoMessages.DEMO_PERSONA_TAKEN
+    assert await accounts.by_handle(session, "ada#0001") is None
+
+
+async def test_a_listed_pitch_from_the_api_and_its_deletion(
+    pitch, client, session, acting_user, role_session
+):
+    _link, bea, source = pitch
+    installed = await _sales_install(session, acting_user, role_session)
+    ops = installed.guild.id
+    headers = install_headers(installed, [ADMIN])
+    await create_user(session, username="rev", discriminator=1000)
+
+    newest = await pitches.newest_export(source)
+    assert newest is not None
+    async with import_engine.open_payload(source, newest[0]) as bundle:
+        assert bundle is not None
+        made = await client.post(
+            _api(ops, "pitches"),
+            data={
+                "name": "Alumni",
+                "editors": ["rev#1000"],
+                "directory": json.dumps(
+                    {"categories": ["education"], "join_policy": "request"}
+                ),
+            },
+            files={"bundle": ("alumni.zip", bundle.read_bytes(), "application/zip")},
+            headers=headers,
+        )
+    assert made.status_code == 200, made.text
+    pitch_ref = made.json()["pitch_ref"]
+    pitch_id = (
+        await session.exec(select(Guild.id).where(Guild.name == "Alumni"))
+    ).one()
+    listed = await session.get(Guild, pitch_id)
+    created_at = listed.created_at
+    assert listed.is_community and listed.categories == ["education"]
+    assert listed.has_adult_content is False
+    assert (await get_app_settings(session)).community_directory_enabled
+    await route_session_to_guild(session, pitch_id)
+    assert set((await session.exec(select(Initiative.join_policy))).all()) == {
+        "request"
+    }
+    await export_worker.process_export_jobs()
+    linked = await client.post(
+        _api(ops, "links"),
+        json={"pitch_ref": pitch_ref, "label": "Alumni"},
+        headers=headers,
+    )
+    assert linked.status_code == 200, linked.text
+    found = await client.post(
+        _api(ops, "pitches/find"),
+        json={"names": ["Alumni", "alumni", "Nobody"]},
+        headers=headers,
+    )
+    assert found.status_code == 200, found.text
+    assert [
+        (one["pitch_ref"], one["name"], datetime.fromisoformat(one["created_at"]))
+        for one in found.json()["pitches"]
+    ] == [(pitch_ref, "Alumni", created_at)]
+
+    deleted = await client.post(
+        _api(ops, "pitches/delete"),
+        json={"pitch_ref": pitch_ref},
+        headers=headers,
+    )
+    assert deleted.status_code == 204, deleted.text
+    session.expire_all()
+    assert await session.get(Guild, pitch_id) is None
+    assert (
+        await session.exec(
+            select(DemoLink.id).where(DemoLink.source_guild_id == pitch_id)
+        )
+    ).all() == []
+    gone = await client.post(
+        _api(ops, "pitches/delete"),
+        json={"pitch_ref": pitch_ref},
+        headers=headers,
+    )
+    assert gone.status_code == 404
+    assert gone.json()["detail"] == DemoMessages.DEMO_PITCH_NOT_FOUND
+    after = await client.post(
+        _api(ops, "pitches/find"), json={"names": ["Alumni"]}, headers=headers
+    )
+    assert after.json() == {"pitches": []}
+
+
+async def test_a_link_from_the_api_reports_its_opening_and_its_leads(
+    pitch, client, session, acting_user, role_session
+):
+    _link, _bea, source = pitch
+    installed = await _sales_install(session, acting_user, role_session)
+    headers = install_headers(installed, [ADMIN])
+    ops = installed.guild.id
+    unscoped = await create_guild_plugin(
+        session,
+        installed.guild,
+        installed.seat.user,
+        definition={"plugin_kind": "service", "service": {"public_id": "x.other"}},
+        listing_uid="OTHERLISTING01",
+    )
+    unscoped_id = unscoped.id
+
+    newest = await pitches.newest_export(source)
+    assert newest is not None
+    async with import_engine.open_payload(source, newest[0]) as bundle:
+        assert bundle is not None
+        made = await client.post(
+            _api(ops, "pitches"),
+            data={"name": "Rosie's"},
+            files={"bundle": ("rosies.zip", bundle.read_bytes(), "application/zip")},
+            headers=headers,
+        )
+    assert made.status_code == 200, made.text
+    await export_worker.process_export_jobs()
+    linked = await client.post(
+        _api(ops, "links"),
+        json={"pitch_ref": made.json()["pitch_ref"], "label": "Rosie"},
+        headers=headers,
+    )
+    assert linked.status_code == 200, linked.text
+    link_ref = linked.json()["link_ref"]
+    token = linked.json()["url"].rpartition("#")[2]
+
+    await copies.build_copy()
+    opened, visitor, _me = await _open(client, token, email="Rosie@Example.com")
+    copy = await client.get("/api/v1/demo/copy", headers=visitor)
+    assert copy.json()["community_id"] == opened["community_id"]
+    assert copy.json()["ready"] is False
+    await import_worker.process_import_jobs()
+    await create_import_job(
+        session,
+        await session.get(Guild, opened["community_id"]),
+        await accounts.demo_host(session),
+        status=ImportJobStatus.cancelled,
+    )
+    copy = await client.get("/api/v1/demo/copy", headers=visitor)
+    assert copy.json()["ready"] is True
+
+    async def read() -> dict:
+        response = await client.post(
+            _api(ops, "links/read"),
+            json={"link_refs": [link_ref]},
+            headers=headers,
+        )
+        assert response.status_code == 200, response.text
+        (report,) = response.json()["links"]
+        return report
+
+    first = await read()
+    assert (first["state"], first["redemption_count"]) == ("live", 1)
+    assert first["last_redeemed_at"] is not None
+    assert [lead["email"] for lead in first["leads"]] == ["rosie@example.com"]
+    assert first["leads"][0]["id"] and first["leads"][0]["created_at"]
+    assert (await read())["leads"] == first["leads"]
+
+    left = await client.post(
+        "/api/v1/demo/lead", json={"email": "baker@example.com"}, headers=visitor
+    )
+    assert left.status_code == 204, left.text
+    again = await client.post(
+        "/api/v1/demo/lead", json={"email": "baker@example.com"}, headers=visitor
+    )
+    assert again.status_code == 204, again.text
+    assert [lead["email"] for lead in (await read())["leads"]] == [
+        "rosie@example.com",
+        "baker@example.com",
+    ]
+
+    await route_session_to_guild(session, ops)
+    events = (
+        await session.exec(
+            select(
+                PluginEventOutbox.install_id,
+                PluginEventOutbox.event_type,
+                PluginEventOutbox.payload,
+            ).order_by(PluginEventOutbox.id)
+        )
+    ).all()
+    assert unscoped_id not in {install_id for install_id, _type, _payload in events}
+    assert [(install_id, kind) for install_id, kind, _payload in events] == [
+        (installed.plugin.id, webhook_events.DEMO_LINK_OPENED),
+        (installed.plugin.id, webhook_events.DEMO_LEAD_LEFT),
+        (installed.plugin.id, webhook_events.DEMO_LEAD_LEFT),
+    ]
+    assert {payload["link_ref"] for _id, _kind, payload in events} == {link_ref}
+
+    revoked = await client.post(
+        _api(ops, "links/revoke"), json={"link_ref": link_ref}, headers=headers
+    )
+    assert revoked.status_code == 204
+    assert (await read())["state"] == "revoked"
