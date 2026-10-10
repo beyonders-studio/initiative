@@ -27,6 +27,7 @@ from app.db.session import require_guild_context
 from app.models.platform.user import User
 from app.models.tenant.calendar import Calendar
 from app.models.tenant.calendar_event import CalendarEvent
+from app.services.tenant import calendar_occurrences as occurrences_service
 from app.services.export.adapters._common import require_may_leave
 from app.services.export.contract import RenderItem, RenderRequest
 from app.services.export.engine import ExportError
@@ -84,8 +85,10 @@ async def event_dicts(
     events = await _query(session, user, params)
     reach = await require_may_leave(session, await _reach(session, events))
     files = await files_for_events(session, events)
+    answers = await occurrences_service.answers_of(session, events)
     return [
-        event_export_dict(event, files.get(event.id, [])) for event in events
+        event_export_dict(event, files.get(event.id, []), answers.get(event.id))
+        for event in events
     ], reach
 
 

@@ -261,9 +261,10 @@ def serialize_calendar_event(
     *,
     context: ActorContext,
     user_id: Optional[int] = None,
-    answers: Mapping[int, RSVPStatus] | None = None,
+    answers: Mapping[int, RSVPStatus],
 ) -> CalendarEventRead:
-    """``answers`` are one occurrence's, shown in place of the series'."""
+    """``answers`` are what was answered to the event, or to the one
+    occurrence shown; someone with none is still to answer."""
     skipped, extra = (
         recurrence.exception_starts(
             event.recurrence, event.start_at, event.recurrence_shift
@@ -280,7 +281,7 @@ def serialize_calendar_event(
             from_row(
                 CalendarEventAttendeeRead,
                 attendee,
-                rsvp_status=(answers or {}).get(attendee.user_id, attendee.rsvp_status),
+                rsvp_status=answers.get(attendee.user_id, RSVPStatus.pending),
             )
             for attendee in event.attendees
         ],

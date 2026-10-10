@@ -24,6 +24,7 @@ from app.models.platform.user import User
 from app.models.tenant.calendar import DEFAULT_CALENDAR_COLOR, Calendar
 from app.models.tenant.calendar_event import (
     CalendarEvent,
+    CalendarEventAnswer,
     CalendarEventAttendee,
     RSVPStatus,
 )
@@ -297,13 +298,17 @@ class CalendarImporter(NamesPeopleInPassing):
                 rsvp = RSVPStatus(attendee.rsvp)
             except ValueError:
                 rsvp = RSVPStatus.pending
-            session.add(
-                CalendarEventAttendee(
-                    calendar_event_id=event.id,
-                    user_id=uid,
-                    rsvp_status=rsvp,
+            session.add(CalendarEventAttendee(calendar_event_id=event.id, user_id=uid))
+            if rsvp is not RSVPStatus.pending:
+                event_id, start = calendar_occurrences.answer_key(event)
+                session.add(
+                    CalendarEventAnswer(
+                        calendar_event_id=event_id,
+                        user_id=uid,
+                        occurrence_start=start,
+                        rsvp_status=rsvp,
+                    )
                 )
-            )
             attendees_matched += 1
 
         # Its own restore: what the event's savepoint rolls back goes with it.

@@ -12,11 +12,11 @@ from datetime import datetime, time, timedelta, timezone
 from typing import Any, List, Optional
 
 from fastapi import HTTPException, status
-from sqlalchemy import ColumnElement, and_, or_
+from sqlalchemy import ColumnElement, and_, exists, or_
 from sqlalchemy import delete as sa_delete
 from sqlalchemy.dialects.postgresql import insert as pg_insert
 from sqlmodel.ext.asyncio.session import AsyncSession
-from sqlalchemy.orm import selectinload
+from sqlalchemy.orm import aliased, selectinload
 from sqlmodel import select
 
 from app.core import recurrence
@@ -28,6 +28,7 @@ from app.models.platform.user import User
 from app.models.tenant.calendar import Calendar
 from app.models.tenant.calendar_event import (
     CalendarEvent,
+    CalendarEventAnswer,
     CalendarEventAttendee,
 )
 from app.core.tools import Tool
@@ -426,6 +427,27 @@ async def query_my_calendar_events(
 # ---------------------------------------------------------------------------
 
 
+def _answers_given_to(event: CalendarEvent) -> ColumnElement[bool]:
+    """The answers kept for ``event``: an occurrence's own, or a series'
+    except where an occurrence's own row still lists the person."""
+    event_id, start = occurrences_service.answer_key(event)
+    if start is not None:
+        return and_(
+            CalendarEventAnswer.calendar_event_id == event_id,
+            CalendarEventAnswer.occurrence_start == start,
+        )
+    own = aliased(CalendarEvent)
+    return and_(
+        CalendarEventAnswer.calendar_event_id == event_id,
+        ~exists().where(
+            own.series_id == event_id,
+            own.original_start == CalendarEventAnswer.occurrence_start,
+            CalendarEventAttendee.calendar_event_id == own.id,
+            CalendarEventAttendee.user_id == CalendarEventAnswer.user_id,
+        ),
+    )
+
+
 async def set_event_attendees(
     session: AsyncSession,
     event: CalendarEvent,
@@ -439,7 +461,9 @@ async def set_event_attendees(
     Everyone named must be able to open ``calendar``; ``carried`` is the
     existing list following the event somewhere new, which keeps those who
     still can rather than refusing. Someone already attending keeps their
-    answer.
+    answer, and someone taken off the list takes theirs with them: an
+    occurrence's, or a series' every one but those whose own row still lists
+    them.
     """
     wanted = list(dict.fromkeys(user_ids))
     governing = named_people.Governing.of(Tool.calendar, calendar)
@@ -449,12 +473,23 @@ async def set_event_attendees(
     else:
         await named_people.require_readers(session, governing, wanted)
 
-    await session.exec(
-        sa_delete(CalendarEventAttendee).where(
-            CalendarEventAttendee.calendar_event_id == event.id,
-            CalendarEventAttendee.user_id.not_in(wanted),
+    removed = (
+        await session.exec(
+            sa_delete(CalendarEventAttendee)
+            .where(
+                CalendarEventAttendee.calendar_event_id == event.id,
+                CalendarEventAttendee.user_id.not_in(wanted),
+            )
+            .returning(CalendarEventAttendee.user_id)
         )
-    )
+    ).all()
+    if removed:
+        await session.exec(
+            sa_delete(CalendarEventAnswer).where(
+                CalendarEventAnswer.user_id.in_([user_id for (user_id,) in removed]),
+                _answers_given_to(event),
+            )
+        )
     if wanted:
         now = datetime.now(timezone.utc)
         await session.exec(

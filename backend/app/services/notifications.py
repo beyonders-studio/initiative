@@ -1786,9 +1786,10 @@ async def _left_out(
             select(
                 CalendarEventAnswer.calendar_event_id,
                 CalendarEventAnswer.user_id,
-                CalendarEventAnswer.original_start,
+                CalendarEventAnswer.occurrence_start,
             ).where(
                 CalendarEventAnswer.calendar_event_id.in_(ids),
+                CalendarEventAnswer.occurrence_start.is_not(None),  # type: ignore[union-attr]
                 CalendarEventAnswer.rsvp_status == RSVPStatus.declined,
             )
         )
@@ -2317,6 +2318,8 @@ async def reminder_scan(*, now: datetime) -> Scan | None:
     routed into only those communities, with their own membership context, to
     dispatch reminders for the events they attend there.
     """
+    from app.services.tenant import calendar_occurrences
+
     horizon = now + timedelta(days=1)
     # Allow events that started within the grace window so a 0-minute
     # ("at the time of the event") reminder still fires on the next poll.
@@ -2351,7 +2354,9 @@ async def reminder_scan(*, now: datetime) -> Scan | None:
                 )
                 .where(
                     CalendarEventAttendee.user_id.in_(list(lead)),
-                    CalendarEventAttendee.rsvp_status != RSVPStatus.declined,
+                    ~calendar_occurrences.answered(
+                        CalendarEventAttendee.user_id, RSVPStatus.declined
+                    ),
                     CalendarEvent.deleted_at.is_(None),
                     _starting(lower, horizon),
                 )
@@ -2395,7 +2400,9 @@ async def reminder_scan(*, now: datetime) -> Scan | None:
                     )
                     .where(
                         CalendarEventAttendee.user_id == user_id,
-                        CalendarEventAttendee.rsvp_status != RSVPStatus.declined,
+                        ~calendar_occurrences.answered(
+                            CalendarEventAttendee.user_id, RSVPStatus.declined
+                        ),
                         CalendarEvent.deleted_at.is_(None),
                         _starting(lower, horizon),
                     )

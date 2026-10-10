@@ -12,9 +12,10 @@ split ("this and following") ends the series before an occurrence and starts a
 new one there, and the overrides from that occurrence on move with it.
 
 An answer is for one event, so a repeating one is answered an occurrence at a
-time: on its override's attendee row when it has one, and otherwise in
-``calendar_event_answers``, since answering takes read access and making an
-override takes write.
+time. Every answer lives in ``calendar_event_answers``, keyed by the event, or
+for an occurrence by its series and its start there (``answer_key``), whether
+or not it has a row of its own. Only the person it names writes what it says;
+moving an event moves its answers, which its editors may do.
 """
 
 from __future__ import annotations
@@ -23,7 +24,13 @@ from datetime import datetime, timezone
 from typing import Iterable
 
 from fastapi import HTTPException, status
-from sqlalchemy import delete as sa_delete, exists, update as sa_update
+from sqlalchemy import (
+    ColumnElement,
+    delete as sa_delete,
+    exists,
+    func,
+    update as sa_update,
+)
 from sqlalchemy.dialects.postgresql import insert as pg_insert
 from sqlmodel import select
 from sqlmodel.ext.asyncio.session import AsyncSession
@@ -124,6 +131,72 @@ def has_plain_from(
     return any(start not in own for start in starts)
 
 
+def answer_key(event: CalendarEvent) -> tuple[int, datetime | None]:
+    """Where ``event``'s answers are kept: its series and its start there for
+    an occurrence with a row of its own, else the event itself."""
+    if event.series_id is not None and event.original_start is not None:
+        return event.series_id, _utc(event.original_start)
+    return int(event.id), None  # type: ignore[arg-type]
+
+
+def _at(event_id: int, start: datetime | None) -> ColumnElement[bool]:
+    return (CalendarEventAnswer.calendar_event_id == event_id) & (
+        CalendarEventAnswer.occurrence_start.is_not_distinct_from(start)  # type: ignore[union-attr]
+    )
+
+
+def answered(user_id: ColumnElement[int], answer: RSVPStatus) -> ColumnElement[bool]:
+    """Whether the person in ``user_id`` gave ``answer`` to the ``CalendarEvent``
+    row of the query it is used in."""
+    return exists().where(
+        CalendarEventAnswer.user_id == user_id,
+        CalendarEventAnswer.calendar_event_id
+        == func.coalesce(CalendarEvent.series_id, CalendarEvent.id),
+        CalendarEventAnswer.occurrence_start.is_not_distinct_from(  # type: ignore[union-attr]
+            CalendarEvent.original_start
+        ),
+        CalendarEventAnswer.rsvp_status == answer,
+    )
+
+
+async def answers_on(
+    session: AsyncSession, event: CalendarEvent
+) -> dict[int, RSVPStatus]:
+    """The answers given to ``event``, by person."""
+    return await answers_at(session, *answer_key(event))
+
+
+async def answers_of(
+    session: AsyncSession, events: Iterable[CalendarEvent]
+) -> dict[int, dict[int, RSVPStatus]]:
+    """The answers given to each event, by event id and person, in one read."""
+    keys = {int(event.id): answer_key(event) for event in events}  # type: ignore[arg-type]
+    if not keys:
+        return {}
+    rows = await session.exec(
+        select(CalendarEventAnswer).where(
+            CalendarEventAnswer.calendar_event_id.in_(
+                sorted({event_id for event_id, _ in keys.values()})
+            )
+        )
+    )
+    kept: dict[tuple[int, datetime | None], dict[int, RSVPStatus]] = {}
+    for row in rows.all():
+        start = _utc(row.occurrence_start) if row.occurrence_start else None
+        kept.setdefault((row.calendar_event_id, start), {})[row.user_id] = (
+            row.rsvp_status
+        )
+    return {event_id: kept.get(key, {}) for event_id, key in keys.items()}
+
+
+async def answers_at(
+    session: AsyncSession, event_id: int, start: datetime | None
+) -> dict[int, RSVPStatus]:
+    """The answers kept at one key, by person."""
+    rows = await session.exec(select(CalendarEventAnswer).where(_at(event_id, start)))
+    return {row.user_id: row.rsvp_status for row in rows.all()}
+
+
 async def attendees_of(
     session: AsyncSession, event_ids: Iterable[int]
 ) -> dict[int, RSVPStatus]:
@@ -131,13 +204,26 @@ async def attendees_of(
     where they declined all of them."""
     found: dict[int, RSVPStatus] = {}
     rows = await session.exec(
-        select(CalendarEventAttendee).where(
-            CalendarEventAttendee.calendar_event_id.in_(sorted(set(event_ids)))
+        select(CalendarEventAttendee.user_id, CalendarEventAnswer.rsvp_status)
+        .join(
+            CalendarEvent, CalendarEvent.id == CalendarEventAttendee.calendar_event_id
         )
+        .outerjoin(
+            CalendarEventAnswer,
+            (CalendarEventAnswer.user_id == CalendarEventAttendee.user_id)
+            & (
+                CalendarEventAnswer.calendar_event_id
+                == func.coalesce(CalendarEvent.series_id, CalendarEvent.id)
+            )
+            & CalendarEventAnswer.occurrence_start.is_not_distinct_from(  # type: ignore[union-attr]
+                CalendarEvent.original_start
+            ),
+        )
+        .where(CalendarEvent.id.in_(sorted(set(event_ids))))
     )
-    for row in rows.all():
-        if found.get(row.user_id) in (None, RSVPStatus.declined):
-            found[row.user_id] = row.rsvp_status
+    for user_id, answer in rows.all():
+        if found.get(user_id) in (None, RSVPStatus.declined):
+            found[user_id] = RSVPStatus(answer) if answer else RSVPStatus.pending
     return found
 
 
@@ -185,31 +271,17 @@ async def _copy_lists(
     target: CalendarEvent,
     lists: Iterable[str] = LISTS,
 ) -> None:
-    """Give ``target`` the source's attendees (with their answers), tags or
-    property values, replacing its own."""
+    """Give ``target`` the source's attendees, tags or property values,
+    replacing its own. What attendees answered stays where it is kept."""
     lists = set(lists)
     if "attendees" in lists:
-        answers = {a.user_id: a.rsvp_status for a in source.attendees}
         await events_service.set_event_attendees(
             session,
             target,
-            list(answers),
+            [attendee.user_id for attendee in source.attendees],
             calendar=source.calendar,
             carried=True,
         )
-        await session.flush()
-        for attendee in (
-            await session.exec(
-                select(CalendarEventAttendee).where(
-                    CalendarEventAttendee.calendar_event_id == target.id
-                )
-            )
-        ).all():
-            if attendee.rsvp_status == RSVPStatus.pending:
-                attendee.rsvp_status = answers.get(
-                    attendee.user_id, attendee.rsvp_status
-                )
-                session.add(attendee)
     if "tags" in lists:
         await tags_service.replace_entity_tags(session, _TAGS, target.id, [])
         await tags_service.copy_entity_tags(session, _TAGS, {source.id: target.id})
@@ -224,8 +296,8 @@ async def occurrence(
     session: AsyncSession, series: CalendarEvent, at: datetime
 ) -> CalendarEvent:
     """The override for the series' occurrence at ``at``, made from the series
-    the first time it is asked for. Answers kept for that occurrence move onto
-    its attendee rows."""
+    the first time it is asked for. The occurrence's answers stay keyed by the
+    series and ``at``, so they are its row's from the start."""
     at = require_occurrence(series, at)
     existing = (
         await session.exec(
@@ -258,18 +330,6 @@ async def occurrence(
     session.add(override)
     await session.flush()
     await _copy_lists(session, series, override)
-    answers = (
-        await session.exec(
-            select(CalendarEventAnswer).where(
-                CalendarEventAnswer.calendar_event_id == series.id,
-                CalendarEventAnswer.original_start == at,
-            )
-        )
-    ).all()
-    for answer in answers:
-        await answer_on(session, override, answer.user_id, answer.rsvp_status)
-        await session.delete(answer)
-    await session.flush()
     return override
 
 
@@ -277,6 +337,53 @@ def _rsvp_closed() -> HTTPException:
     return HTTPException(
         status_code=status.HTTP_403_FORBIDDEN,
         detail=CalendarEventMessages.RSVP_CLOSED,
+    )
+
+
+async def _keep(
+    session: AsyncSession,
+    event_id: int,
+    start: datetime | None,
+    user_id: int,
+    answer: RSVPStatus,
+) -> None:
+    row = pg_insert(CalendarEventAnswer).values(
+        calendar_event_id=event_id,
+        user_id=user_id,
+        occurrence_start=start,
+        rsvp_status=answer,
+    )
+    await session.exec(
+        row.on_conflict_do_update(
+            constraint="uq_calendar_event_answers_key",
+            set_={"rsvp_status": row.excluded.rsvp_status},
+        )
+    )
+
+
+async def _invited(session: AsyncSession, event_id: int, user_id: int) -> bool:
+    return (
+        await session.exec(
+            select(
+                exists().where(
+                    CalendarEventAttendee.calendar_event_id == event_id,
+                    CalendarEventAttendee.user_id == user_id,
+                )
+            )
+        )
+    ).one()
+
+
+async def _join(session: AsyncSession, event: CalendarEvent, user_id: int) -> None:
+    """Put ``user_id`` on the event's list, if they are not on it."""
+    await session.exec(
+        pg_insert(CalendarEventAttendee)
+        .values(
+            calendar_event_id=event.id,
+            user_id=user_id,
+            created_at=datetime.now(timezone.utc),
+        )
+        .on_conflict_do_nothing(index_elements=["calendar_event_id", "user_id"])
     )
 
 
@@ -288,33 +395,13 @@ async def answer_on(
     *,
     join: bool = True,
 ) -> None:
-    """``user_id``'s answer on the event's own attendee row, which ``join``
-    adds when they are not on its list; without it, only someone already on
-    the list answers."""
-    if not join:
-        result = await session.exec(
-            sa_update(CalendarEventAttendee)
-            .where(
-                CalendarEventAttendee.calendar_event_id == event.id,
-                CalendarEventAttendee.user_id == user_id,
-            )
-            .values(rsvp_status=answer)
-        )
-        if not result.rowcount:
-            raise _rsvp_closed()
-        return
-    row = pg_insert(CalendarEventAttendee).values(
-        calendar_event_id=event.id,
-        user_id=user_id,
-        rsvp_status=answer,
-        created_at=datetime.now(timezone.utc),
-    )
-    await session.exec(
-        row.on_conflict_do_update(
-            index_elements=["calendar_event_id", "user_id"],
-            set_={"rsvp_status": row.excluded.rsvp_status},
-        )
-    )
+    """``user_id``'s answer to the event, putting them on its list when
+    ``join``; without it, only someone already on the list answers."""
+    if join:
+        await _join(session, event, user_id)
+    elif not await _invited(session, int(event.id), user_id):  # type: ignore[arg-type]
+        raise _rsvp_closed()
+    await _keep(session, *answer_key(event), user_id, answer)
 
 
 async def answer_occurrence(
@@ -326,9 +413,9 @@ async def answer_occurrence(
     *,
     join: bool = True,
 ) -> None:
-    """``user_id``'s answer for one occurrence: on its override when it has
-    one, else kept beside the series. Without ``join``, only someone on the
-    occurrence's list answers."""
+    """``user_id``'s answer for one occurrence. One with a row of its own is
+    answered as that row is; without ``join``, only someone on the
+    occurrence's list answers, or who already answered it while it was open."""
     at = require_occurrence(series, at)
     override = (
         await session.exec(
@@ -341,68 +428,19 @@ async def answer_occurrence(
     if override is not None:
         await answer_on(session, override, user_id, answer, join=join)
         return
-    # Closed, an answer comes from the series' list or from someone who already
-    # answered this occurrence while it was open.
-    if (
-        not join
-        and not (
-            await session.exec(
-                select(
-                    exists().where(
-                        CalendarEventAttendee.calendar_event_id == series.id,
-                        CalendarEventAttendee.user_id == user_id,
-                    )
-                    | exists().where(
-                        CalendarEventAnswer.calendar_event_id == series.id,
-                        CalendarEventAnswer.user_id == user_id,
-                        CalendarEventAnswer.original_start == at,
-                    )
-                )
-            )
-        ).one()
+    if not join and not (
+        await _invited(session, int(series.id), user_id)  # type: ignore[arg-type]
+        or user_id in await answers_at(session, int(series.id), at)  # type: ignore[arg-type]
     ):
         raise _rsvp_closed()
-    row = pg_insert(CalendarEventAnswer).values(
-        calendar_event_id=series.id,
-        user_id=user_id,
-        original_start=at,
-        rsvp_status=answer,
-    )
-    await session.exec(
-        row.on_conflict_do_update(
-            index_elements=["calendar_event_id", "user_id", "original_start"],
-            set_={"rsvp_status": row.excluded.rsvp_status},
-        )
-    )
+    await _keep(session, int(series.id), at, user_id, answer)  # type: ignore[arg-type]
 
 
 async def answers_for(
     session: AsyncSession, series_id: int, at: datetime
 ) -> dict[int, RSVPStatus]:
-    """One occurrence's answers: its own row's, or those kept beside the
-    series when it has none."""
-    own = (
-        await session.exec(
-            select(CalendarEvent.id).where(
-                CalendarEvent.series_id == series_id,
-                CalendarEvent.original_start == _utc(at),
-            )
-        )
-    ).one_or_none()
-    if own is not None:
-        attendees = await session.exec(
-            select(CalendarEventAttendee).where(
-                CalendarEventAttendee.calendar_event_id == own
-            )
-        )
-        return {row.user_id: row.rsvp_status for row in attendees.all()}
-    rows = await session.exec(
-        select(CalendarEventAnswer).where(
-            CalendarEventAnswer.calendar_event_id == series_id,
-            CalendarEventAnswer.original_start == _utc(at),
-        )
-    )
-    return {row.user_id: row.rsvp_status for row in rows.all()}
+    """One occurrence's answers."""
+    return await answers_at(session, series_id, _utc(at))
 
 
 async def follow(
@@ -484,26 +522,22 @@ async def rehome(
         if not set(TIMES) & set(override.overridden_fields):
             override.start_at, override.end_at = start, start + length
         session.add(override)
-    # Answers kept for an occurrence go where it went, or with it.
+    # Answers given to an occurrence go where it went, or with it.
     for answer in (
         await session.exec(
             select(CalendarEventAnswer).where(
-                CalendarEventAnswer.calendar_event_id == series.id
+                CalendarEventAnswer.calendar_event_id == series.id,
+                CalendarEventAnswer.occurrence_start.is_not(None),  # type: ignore[union-attr]
             )
         )
     ).all():
-        start = rehomed(answer.original_start)
-        await session.delete(answer)
+        start = rehomed(answer.occurrence_start)  # type: ignore[arg-type]
         if occurs(start):
-            await session.flush()
-            session.add(
-                CalendarEventAnswer(
-                    calendar_event_id=series.id,
-                    user_id=answer.user_id,
-                    original_start=start,
-                    rsvp_status=answer.rsvp_status,
-                )
-            )
+            answer.occurrence_start = start
+            session.add(answer)
+        else:
+            await session.delete(answer)
+        await session.flush()
     return binned
 
 
@@ -540,23 +574,14 @@ async def split(
         if override.original_start is not None and _utc(override.original_start) >= at:
             override.series_id = rest.id
             session.add(override)
-    for answer in (
-        await session.exec(
-            select(CalendarEventAnswer).where(
-                CalendarEventAnswer.calendar_event_id == series.id,
-                CalendarEventAnswer.original_start >= at,
-            )
+    await session.exec(
+        sa_update(CalendarEventAnswer)
+        .where(
+            CalendarEventAnswer.calendar_event_id == series.id,
+            CalendarEventAnswer.occurrence_start >= at,  # type: ignore[operator]
         )
-    ).all():
-        session.add(
-            CalendarEventAnswer(
-                calendar_event_id=rest.id,
-                user_id=answer.user_id,
-                original_start=answer.original_start,
-                rsvp_status=answer.rsvp_status,
-            )
-        )
-        await session.delete(answer)
+        .values(calendar_event_id=rest.id)
+    )
     series.recurrence = head
     session.add(series)
     await session.flush()
@@ -586,7 +611,7 @@ async def end_before(
     await session.exec(
         sa_delete(CalendarEventAnswer).where(
             CalendarEventAnswer.calendar_event_id == series.id,
-            CalendarEventAnswer.original_start >= at,
+            CalendarEventAnswer.occurrence_start >= at,  # type: ignore[operator]
         )
     )
     series.recurrence = head
@@ -611,7 +636,7 @@ async def skip(
     await session.exec(
         sa_delete(CalendarEventAnswer).where(
             CalendarEventAnswer.calendar_event_id == series.id,
-            CalendarEventAnswer.original_start == at,
+            CalendarEventAnswer.occurrence_start == at,
         )
     )
     series.recurrence = recurrence.skipped(
@@ -650,6 +675,11 @@ async def detach(
     """Copy the occurrence at ``at`` out into an event of its own, which the
     series then skips."""
     event = await occurrence(session, series, at)
+    await session.exec(
+        sa_update(CalendarEventAnswer)
+        .where(_at(int(series.id), _utc(at)))  # type: ignore[arg-type]
+        .values(calendar_event_id=event.id, occurrence_start=None)
+    )
     event.series_id = None
     event.original_start = None
     event.overridden_fields = []

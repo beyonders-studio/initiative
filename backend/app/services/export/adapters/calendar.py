@@ -32,7 +32,8 @@ from app.services.tenant.ical_service import files_for_events
 from app.core.tools import Tool, tool_envelope_type
 from app.models.platform.user import User
 from app.models.tenant.calendar import Calendar
-from app.models.tenant.calendar_event import CalendarEvent
+from app.models.tenant.calendar_event import CalendarEvent, RSVPStatus
+from app.services.tenant import calendar_occurrences as occurrences_service
 from app.services.export.adapters._common import (
     BuildContext,
     ToolExportAdapter,
@@ -64,6 +65,7 @@ class _Events:
 
     by_calendar: dict[int, list[CalendarEvent]]
     files: dict[int, list]
+    answers: dict[int, dict[int, RSVPStatus]]
 
 
 class CalendarAdapter(ToolExportAdapter):
@@ -186,11 +188,11 @@ class CalendarAdapter(ToolExportAdapter):
                 calendar_id: [event for event in events if event.id in kept]
                 for calendar_id, events in by_calendar.items()
             }
+        everything = [event for events in by_calendar.values() for event in events]
         return _Events(
             by_calendar,
-            await files_for_events(
-                session, [event for events in by_calendar.values() for event in events]
-            ),
+            await files_for_events(session, everything),
+            await occurrences_service.answers_of(session, everything),
         )
 
     async def prepared_reach(
@@ -212,6 +214,7 @@ class CalendarAdapter(ToolExportAdapter):
             ctx.format,
             ctx.date,
             ctx.prepared.files,
+            ctx.prepared.answers,
         )
 
 
@@ -227,12 +230,16 @@ def build_calendar_item(
     format: str,
     date: str,
     files: dict[int, list],
+    answers: dict[int, dict[int, RSVPStatus]],
 ) -> RenderItem:
     """One render item per calendar: an ``ics`` VCALENDAR or an importable
     ``initiative-calendar`` JSON envelope, both carrying the events given."""
     from app.services.tenant.ical_service import event_export_dict
 
-    dicts = [event_export_dict(event, files.get(event.id, [])) for event in events]
+    dicts = [
+        event_export_dict(event, files.get(event.id, []), answers.get(event.id))
+        for event in events
+    ]
     if format == "json":
         # The envelope is importable machine data — stays canonical, never
         # localized (translating field keys / enum values breaks import).

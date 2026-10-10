@@ -141,7 +141,8 @@ def _write_recurrence_until(_mapper, _connection, row: CalendarEvent) -> None:
 
 
 class CalendarEventAttendee(SQLModel, table=True):
-    """Attendee (invitee) on a calendar event with RSVP status."""
+    """Someone invited to a calendar event. What they answered is theirs, in
+    ``calendar_event_answers``; the invitation is the event's editors'."""
 
     __tablename__ = "calendar_event_attendees"
 
@@ -153,14 +154,6 @@ class CalendarEventAttendee(SQLModel, table=True):
         ),
     )
     user_id: int = Field(foreign_key="users.id", primary_key=True, index=True)
-    rsvp_status: RSVPStatus = Field(
-        default=RSVPStatus.pending,
-        sa_column=Column(
-            SQLEnum(RSVPStatus, name="rsvp_status", create_type=True),
-            nullable=False,
-            server_default="pending",
-        ),
-    )
     created_at: datetime = Field(
         default_factory=lambda: datetime.now(timezone.utc),
         sa_column=Column(DateTime(timezone=True), nullable=False),
@@ -178,27 +171,40 @@ class CalendarEventAttendee(SQLModel, table=True):
 
 
 class CalendarEventAnswer(SQLModel, table=True):
-    """An attendee's answer for one occurrence of a repeating event that has no
-    row of its own. Answering takes read access, like the attendee row beside
-    it, and an occurrence's own row takes write, so the answer waits here; it
-    moves onto the attendee row when the occurrence gets one."""
+    """One person's answer to an event: to an event that doesn't repeat, keyed
+    by the event alone, or to one occurrence of a series, keyed by the series
+    and the occurrence's start there. An occurrence with a row of its own is
+    still answered by its series and start, so making that row moves nothing.
+
+    Only the person it names, an import or the system engine writes what it
+    says; the event's editors may move it with the event or clear it."""
 
     __tablename__ = "calendar_event_answers"
+    __table_args__ = (
+        UniqueConstraint(
+            "calendar_event_id",
+            "user_id",
+            "occurrence_start",
+            name="uq_calendar_event_answers_key",
+            postgresql_nulls_not_distinct=True,
+        ),
+    )
 
+    id: Optional[int] = Field(default=None, primary_key=True)
     calendar_event_id: int = Field(
         sa_column=Column(
             Integer,
             ForeignKey("calendar_events.id", ondelete="CASCADE"),
-            primary_key=True,
+            nullable=False,
         ),
     )
-    user_id: int = Field(primary_key=True, index=True)
-    original_start: datetime = Field(
-        sa_column=Column(DateTime(timezone=True), primary_key=True),
+    user_id: int = Field(index=True)
+    occurrence_start: Optional[datetime] = Field(
+        default=None, sa_column=Column(DateTime(timezone=True), nullable=True)
     )
     rsvp_status: RSVPStatus = Field(
         sa_column=Column(
-            SQLEnum(RSVPStatus, name="rsvp_status", create_type=False),
+            SQLEnum(RSVPStatus, name="rsvp_status", create_type=True),
             nullable=False,
         ),
     )

@@ -97,12 +97,13 @@ async def _events_initiative(session: AsyncSession, creator):
 
 
 async def _add_attendee(session, initiative, event, user, *, rsvp=RSVPStatus.pending):
-    attendee = CalendarEventAttendee(
-        calendar_event_id=event.id,
-        user_id=user.id,
-        rsvp_status=rsvp,
-    )
-    session.add(attendee)
+    session.add(CalendarEventAttendee(calendar_event_id=event.id, user_id=user.id))
+    if rsvp is not RSVPStatus.pending:
+        session.add(
+            CalendarEventAnswer(
+                calendar_event_id=event.id, user_id=user.id, rsvp_status=rsvp
+            )
+        )
     await session.commit()
     # Reminders are gathered in the attendee's own context, so they must be a
     # guild + initiative member to see the event under RLS (as the real app
@@ -252,7 +253,7 @@ async def test_event_reminder_fires_for_each_occurrence_of_a_repeat(
         CalendarEventAnswer(
             calendar_event_id=event.id,
             user_id=away.id,
-            original_start=upcoming,
+            occurrence_start=upcoming,
             rsvp_status=RSVPStatus.declined,
         )
     )

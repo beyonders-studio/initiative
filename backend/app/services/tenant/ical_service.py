@@ -8,7 +8,7 @@ writes it as it is, and import only moves a file's rule into UTC terms.
 import logging
 import math
 from datetime import date, datetime, time, timedelta, timezone, tzinfo
-from typing import List, Optional, Sequence, Tuple
+from typing import List, Mapping, Optional, Sequence, Tuple
 from zoneinfo import ZoneInfo
 
 import icalendar
@@ -18,7 +18,7 @@ from sqlmodel.ext.asyncio.session import AsyncSession
 from app.core import recurrence
 from app.core.relationships import Related
 from app.core.user_input_validators import resolve_zone
-from app.models.tenant.calendar_event import CalendarEvent
+from app.models.tenant.calendar_event import CalendarEvent, RSVPStatus
 from app.schemas.tenant.ical import (
     ICalEventPreview,
     ICalImportError,
@@ -48,7 +48,11 @@ _RSVP_TO_PARTSTAT = {
 # ---------------------------------------------------------------------------
 
 
-def event_export_dict(event: CalendarEvent, files: "Sequence[Related]" = ()) -> dict:
+def event_export_dict(
+    event: CalendarEvent,
+    files: "Sequence[Related]" = (),
+    answers: Mapping[int, RSVPStatus] | None = None,
+) -> dict:
     """One event's JSON-safe export record — the single intermediate both the
     ics renderer and the json envelope consume. Must stay JSON-serializable:
     ``RenderItem.data`` crosses the export engine's job boundary (persisted
@@ -86,9 +90,7 @@ def event_export_dict(event: CalendarEvent, files: "Sequence[Related]" = ()) -> 
                 # An address is never a guild's to hand out, so ATTENDEE
                 # carries the participant without a reachable mailbox.
                 "email": None,
-                "rsvp": attendee.rsvp_status.value
-                if hasattr(attendee.rsvp_status, "value")
-                else str(attendee.rsvp_status),
+                "rsvp": (answers or {}).get(attendee.user_id, RSVPStatus.pending).value,
             }
             for attendee in event.attendees or []
             if attendee.user is not None

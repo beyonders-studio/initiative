@@ -10,6 +10,7 @@ from app.core.tools import Tool
 from app.models.tenant.calendar import DEFAULT_CALENDAR_COLOR, Calendar
 from app.models.tenant.calendar_event import (
     CalendarEvent,
+    CalendarEventAnswer,
     CalendarEventAttendee,
     RSVPStatus,
 )
@@ -292,11 +293,17 @@ async def seed(c: Community) -> None:
         for name, rsvp in d.get("attendees", ()):
             c.session.add(
                 CalendarEventAttendee(
-                    calendar_event_id=event.id,
-                    user_id=c.users[name].id,
-                    rsvp_status=rsvp,
+                    calendar_event_id=event.id, user_id=c.users[name].id
                 )
             )
+            if rsvp is not RSVPStatus.pending:
+                c.session.add(
+                    CalendarEventAnswer(
+                        calendar_event_id=event.id,
+                        user_id=c.users[name].id,
+                        rsvp_status=rsvp,
+                    )
+                )
             c.ids["calendar_event_attendees"].append((event.id, name))
         tag(c, event, d.get("tags", ()))
         for title in d.get("files", ()):

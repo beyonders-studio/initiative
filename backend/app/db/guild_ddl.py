@@ -470,6 +470,10 @@ _AUTHORED_SECTION = """\
 --   it; restoring it, they are the one who trashed it, or the community's
 --   admin. The system engine moderates, and the admin's purge leaves
 --   tombstones.
+-- calendar_event_answers: an answer is filed by the person it names, an
+--   import, or the system engine. tr_calendar_event_answers_owner_guard keeps
+--   who answered and what they answered theirs; the event's editors may still
+--   move an answer with the event, or clear it.
 -- ==========================================================================="""
 
 #: Where what someone writes carries them as its author.
@@ -543,6 +547,21 @@ $trash_follows$;
 """
 
 
+_ANSWER_OWNER_GUARD_FN = f"""
+CREATE OR REPLACE FUNCTION public.fn_calendar_event_answer_owner_guard() RETURNS trigger
+    LANGUAGE plpgsql AS $answer_owner$
+BEGIN
+    IF {IN_POLICY.system} OR (NEW.user_id = OLD.user_id AND (
+        NEW.rsvp_status = OLD.rsvp_status OR OLD.user_id = {gucs.USER_ID.once}
+    )) THEN
+        RETURN NEW;
+    END IF;
+    RAISE EXCEPTION 'only its member changes an answer' USING ERRCODE = '42501';
+END;
+$answer_owner$;
+"""
+
+
 def _authored_block() -> str:
     queue = managed_write("initiative_id")
     return "\n".join(
@@ -573,6 +592,13 @@ def _authored_block() -> str:
             " AFTER UPDATE ON comments DEFERRABLE INITIALLY DEFERRED FOR EACH ROW"
             " WHEN (OLD.deleted_at IS NULL AND NEW.deleted_at IS NOT NULL)"
             " EXECUTE FUNCTION public.fn_comment_trash_follows();",
+            "DROP POLICY IF EXISTS owner_insert ON calendar_event_answers;",
+            "CREATE POLICY owner_insert ON calendar_event_answers AS RESTRICTIVE"
+            f" FOR INSERT WITH CHECK ({_REQUESTER} OR ({gucs.IMPORTING}) IS TRUE);",
+            _ANSWER_OWNER_GUARD_FN,
+            "CREATE OR REPLACE TRIGGER tr_calendar_event_answers_owner_guard"
+            " BEFORE UPDATE ON calendar_event_answers FOR EACH ROW"
+            " EXECUTE FUNCTION public.fn_calendar_event_answer_owner_guard();",
         ]
     )
 

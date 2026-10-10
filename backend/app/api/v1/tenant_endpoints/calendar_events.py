@@ -295,7 +295,7 @@ async def _serialized_event(
         answers=(
             await occurrences_service.answers_for(session, event.id, occurrence)
             if occurrence is not None
-            else None
+            else await occurrences_service.answers_on(session, event)
         ),
     )
 
@@ -704,10 +704,11 @@ async def _apply_update(
             # Skip anyone who declined — a declined attendee isn't coming, so
             # reschedules/edits are noise (mirrors the reminder pass, which
             # also skips declined RSVPs).
+            answers = await occurrences_service.answers_on(session, event)
             notify_ids: list[int | None] = [
                 attendee.user_id
                 for attendee in event.attendees
-                if attendee.rsvp_status != RSVPStatus.declined
+                if answers.get(attendee.user_id) != RSVPStatus.declined
             ]
             await _notify_about_event(
                 session,
