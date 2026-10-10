@@ -1,6 +1,6 @@
 import { Link } from "@tanstack/react-router";
 import { Hourglass, Presentation } from "lucide-react";
-import { type ReactNode, useId, useState } from "react";
+import { type ReactNode, useEffect, useId, useState } from "react";
 import { useTranslation } from "react-i18next";
 
 import { useLeaveDemoLead, usePublishDemoPitch, useReadDemoPitch } from "@/api/generated/demo/demo";
@@ -18,6 +18,11 @@ import { toast } from "@/lib/mascotToast";
 const hours = numberFormat(undefined, { style: "unit", unit: "hour", unitDisplay: "narrow" });
 const minutes = numberFormat(undefined, { style: "unit", unit: "minute", unitDisplay: "narrow" });
 const parts = listFormat(undefined, { type: "unit", style: "narrow" });
+
+/** Publishing is queued, so the pitch is read again this often until the new
+ *  version lands, and given up on after this long. */
+const PUBLISH_POLL_MS = 2_000;
+const PUBLISH_TIMEOUT_MS = 120_000;
 
 /** Whole hours and minutes until `expiresAt`, as "3h 12m", never below none. */
 const timeLeft = (expiresAt: number, now: number): string => {
@@ -119,7 +124,8 @@ export const DemoBanner = ({ copy }: { copy: DemoCopy }) => {
 
 /**
  * A pitch's admins see which version visitors get, and publish the one they
- * have now. `onPublished` reads the pitch again.
+ * have now. `onPublished` is handed the publish time the press was made
+ * against, so the pitch can be read until it moves.
  */
 const PitchBanner = ({
   communityId,
@@ -128,16 +134,13 @@ const PitchBanner = ({
 }: {
   communityId: number;
   lastPublishedAt: string | null;
-  onPublished: () => void;
+  onPublished: (before: string | null) => void;
 }) => {
   const { t } = useTranslation("auth");
   const when = useRelativeTime(lastPublishedAt);
   const publish = usePublishDemoPitch({
     mutation: {
-      onSuccess: () => {
-        toast.success(t("demo.pitch.published"));
-        onPublished();
-      },
+      onSuccess: () => toast.success(t("demo.pitch.published")),
       onError: (error) => toast.error(getErrorMessage(error, "auth:demo.pitch.failed")),
     },
   });
@@ -150,7 +153,9 @@ const PitchBanner = ({
       <Button
         size="sm"
         disabled={publish.isPending}
-        onClick={() => publish.mutate({ communityId })}
+        onClick={() =>
+          publish.mutate({ communityId }, { onSuccess: () => onPublished(lastPublishedAt) })
+        }
       >
         {t("demo.pitch.publish")}
       </Button>
@@ -169,9 +174,29 @@ export const DemoBannerOrTabs = ({ children }: { children: ReactNode }) => {
   const administers = !copy && activeCommunity?.can.administer === true;
   const demo = useIsDemoServer(administers);
   const communityId = activeCommunity?.id ?? 0;
+  // A publish still on its way: the community and the publish time it was
+  // pressed against.
+  const [publishing, setPublishing] = useState<{
+    communityId: number;
+    before: string | null;
+  } | null>(null);
+  const unmoved = (publishedAt: string | null | undefined) =>
+    publishing?.communityId === communityId && (publishedAt ?? null) === publishing.before;
   const pitch = useReadDemoPitch(communityId, {
-    query: { enabled: administers && demo, staleTime: 60_000 },
+    query: {
+      enabled: administers && demo,
+      staleTime: 60_000,
+      refetchInterval: (query) =>
+        unmoved(query.state.data?.last_published_at) ? PUBLISH_POLL_MS : false,
+    },
   });
+  const waiting = unmoved(pitch.data?.last_published_at);
+
+  useEffect(() => {
+    if (!waiting) return;
+    const timer = window.setTimeout(() => setPublishing(null), PUBLISH_TIMEOUT_MS);
+    return () => window.clearTimeout(timer);
+  }, [waiting]);
 
   if (copy) return <DemoBanner copy={copy} />;
   if (administers && pitch.data?.is_pitch) {
@@ -179,7 +204,7 @@ export const DemoBannerOrTabs = ({ children }: { children: ReactNode }) => {
       <PitchBanner
         communityId={communityId}
         lastPublishedAt={pitch.data.last_published_at ?? null}
-        onPublished={() => void pitch.refetch()}
+        onPublished={(before) => setPublishing({ communityId, before })}
       />
     );
   }

@@ -6,7 +6,7 @@
 import { screen, waitFor } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { HttpResponse, http } from "msw";
-import { describe, expect, it, vi } from "vitest";
+import { afterEach, describe, expect, it, vi } from "vitest";
 
 import { buildCommunity, buildUser } from "@/__tests__/factories";
 import { server } from "@/__tests__/helpers/msw-server";
@@ -54,6 +54,10 @@ const mount = async (options: Parameters<typeof renderPage>[1]) => {
 };
 
 describe("DemoBannerOrTabs", () => {
+  afterEach(() => {
+    vi.useRealTimers();
+  });
+
   it("shows a demo account its copy and the time left, in place of the tabs", async () => {
     // A little under 3 h 12 m, so the minutes round up to 12.
     const expiresAt = new Date(Date.now() + (192 * 60 - 20) * 1000).toISOString();
@@ -108,10 +112,11 @@ describe("DemoBannerOrTabs", () => {
   });
 
   it("shows a pitch's admin when visitors' version was published, and publishes", async () => {
+    vi.useFakeTimers({ shouldAdvanceTime: true });
     onServer(true);
     const read = vi.fn();
     const published = vi.fn();
-    const lastPublishedAt = new Date(Date.now() - 5 * 60_000).toISOString();
+    let lastPublishedAt = new Date(Date.now() - 5 * 60_000).toISOString();
     server.use(
       http.get(PITCH, ({ params }) => {
         read(params.communityId);
@@ -129,12 +134,29 @@ describe("DemoBannerOrTabs", () => {
     ).toBeInTheDocument();
     expect(screen.queryByText("recent tabs")).not.toBeInTheDocument();
 
-    await userEvent.setup().click(screen.getByRole("button", { name: "Publish" }));
+    await userEvent
+      .setup({ advanceTimers: vi.advanceTimersByTime })
+      .click(screen.getByRole("button", { name: "Publish" }));
     await waitFor(() => expect(published).toHaveBeenCalledWith("3"));
     expect(toast.success).toHaveBeenCalledWith(
       "Publishing now. Visitors get this version once it's ready."
     );
+
+    // The export is queued: the pitch is read again until its time moves.
+    await vi.advanceTimersByTimeAsync(2_000);
     await waitFor(() => expect(read).toHaveBeenCalledTimes(2));
+    expect(screen.getByText(/5 minutes ago/)).toBeInTheDocument();
+
+    lastPublishedAt = new Date(Date.now() - 60_000).toISOString();
+    await vi.advanceTimersByTimeAsync(2_000);
+    expect(
+      await screen.findByText("Visitors get the version you last published 1 minute ago.")
+    ).toBeInTheDocument();
+    expect(read).toHaveBeenCalledTimes(3);
+
+    // And then it stops asking.
+    await vi.advanceTimersByTimeAsync(6_000);
+    expect(read).toHaveBeenCalledTimes(3);
   });
 
   it("keeps the tabs for a pitch's members", async () => {

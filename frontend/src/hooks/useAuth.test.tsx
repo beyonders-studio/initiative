@@ -12,6 +12,7 @@ import { beforeEach, describe, expect, it, vi } from "vitest";
 
 import { buildUser } from "@/__tests__/factories";
 import { getBootstrapStatusQueryKey } from "@/api/generated/auth/auth";
+import { getListNotificationsQueryKey } from "@/api/generated/notifications/notifications";
 
 const get = vi.fn();
 const post = vi.fn();
@@ -471,6 +472,36 @@ describe("useAuth passkey sign-in", () => {
     await expect(
       auth.applyPasskeySignIn({ token_type: "bearer", redirect_to: "initiative://oidc/callback" })
     ).rejects.toThrow();
+  });
+});
+
+describe("useAuth account switch", () => {
+  beforeEach(() => {
+    get.mockReset();
+    post.mockReset().mockResolvedValue({ data: {} });
+    getItem.mockReset().mockReturnValue(null);
+  });
+
+  it("drops the previous account's answers when a sign-in names somebody else", async () => {
+    const before = buildUser({ username: "Before" });
+    get.mockResolvedValue({ data: before });
+    renderAuth();
+    await waitFor(() => expect(auth.user?.username).toBe("Before"));
+    queryClient.setQueryData(getListNotificationsQueryKey(), { items: ["theirs"] });
+
+    // A re-read of the same account keeps what it holds.
+    await act(async () => {
+      await auth.refreshUser();
+    });
+    expect(queryClient.getQueryData(getListNotificationsQueryKey())).toBeDefined();
+
+    get.mockResolvedValue({ data: buildUser({ username: "Demo" }) });
+    await act(async () => {
+      await auth.applySignIn({ access_token: "demo-token", token_type: "bearer" });
+    });
+
+    expect(auth.user?.username).toBe("Demo");
+    expect(queryClient.getQueryData(getListNotificationsQueryKey())).toBeUndefined();
   });
 });
 

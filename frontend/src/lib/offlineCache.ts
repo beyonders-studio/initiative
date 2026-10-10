@@ -230,7 +230,8 @@ const store = createIdbStore(IDB_NAME, IDB_STORE);
 export const offlineCacheBuster = (serverUrl: string): string =>
   `v${OFFLINE_CACHE_SCHEMA_VERSION}|${serverUrl}`;
 
-/** Whose cache was restored at boot, per the session snapshot beside it. */
+/** Whose answers the query client holds: the account last confirmed here, or,
+ *  at boot, whoever the restored cache was saved for. */
 let restoredForUserId: number | null = null;
 
 export const noteRestoredIdentity = (userId: number | null): void => {
@@ -238,9 +239,10 @@ export const noteRestoredIdentity = (userId: number | null): void => {
 };
 
 /**
- * True when the server confirms a different user than the one whose cache was
- * restored, which can happen when a sign-out did not complete. The caller
- * clears the query client and purges the blob.
+ * True when the server confirms a different user than the one whose answers
+ * the client holds: a sign-in over a live session, or a sign-out that did not
+ * complete. Used on every platform; the caller clears the query client and
+ * purges the blob.
  */
 export const restoredIdentityMismatch = (confirmedUserId: number): boolean => {
   const mismatch = restoredForUserId !== null && restoredForUserId !== confirmedUserId;
