@@ -64,6 +64,7 @@ export const DemoPage = () => {
   const [landing, setLanding] = useState<number | null>(null);
   const [email, setEmail] = useState("");
   const [timedOut, setTimedOut] = useState(false);
+  const [redeemed, setRedeemed] = useState<Awaited<ReturnType<typeof redeemDemoLink>> | null>(null);
   const emailId = useId();
 
   useEffect(() => {
@@ -108,11 +109,15 @@ export const DemoPage = () => {
     setStarting(true);
     setRefusal(null);
     try {
-      const opened = await redeemDemoLink({
-        token,
-        captcha_token: captcha ? captchaToken : undefined,
-        email: email.trim() || undefined,
-      });
+      // An opening already made is signed in to again rather than spent twice.
+      const opened =
+        redeemed ??
+        (await redeemDemoLink({
+          token,
+          captcha_token: captcha ? captchaToken : undefined,
+          email: email.trim() || undefined,
+        }));
+      setRedeemed(opened);
       await applySignIn(opened);
       setLanding(opened.community_id);
     } catch (error) {

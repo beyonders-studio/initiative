@@ -145,6 +145,27 @@ describe("the demo page", () => {
     await waitFor(() => expect(mounted.state.location.pathname).toBe("/c/7"));
   });
 
+  it("signs in to the opening it made when signing in failed, without opening another", async () => {
+    let openings = 0;
+    server.use(
+      http.post(REDEEM, () => {
+        openings += 1;
+        return HttpResponse.json({ access_token: "demo-token", community_id: 7, import_job_id: 3 });
+      })
+    );
+    const applySignIn = vi.fn().mockRejectedValueOnce(new Error("offline"));
+    const { router: mounted } = await openLink("tok-1", { auth: { user: null, applySignIn } });
+
+    const user = userEvent.setup();
+    await user.click(await screen.findByRole("button", { name: "Start the demo" }));
+    expect(await screen.findByRole("alert")).toBeInTheDocument();
+    await user.click(screen.getByRole("button", { name: "Start the demo" }));
+
+    await waitFor(() => expect(mounted.state.location.pathname).toBe("/c/7"));
+    expect(openings).toBe(1);
+    expect(applySignIn).toHaveBeenCalledTimes(2);
+  });
+
   it("says a link without a working token is dead, and offers no start", async () => {
     await openLink(null);
 
