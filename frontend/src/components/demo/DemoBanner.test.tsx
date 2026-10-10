@@ -1,14 +1,44 @@
 /**
  * The top bar's first row: a demo visitor sees their copy and how long it has
- * left there, and every other account keeps the recents tabs.
+ * left there, a pitch's admins on the demo server see its Publish banner, and
+ * every other account keeps the recents tabs.
  */
 import { screen, waitFor } from "@testing-library/react";
-import { describe, expect, it } from "vitest";
+import userEvent from "@testing-library/user-event";
+import { HttpResponse, http } from "msw";
+import { describe, expect, it, vi } from "vitest";
 
 import { buildCommunity, buildUser } from "@/__tests__/factories";
+import { server } from "@/__tests__/helpers/msw-server";
 import { renderPage } from "@/__tests__/helpers/render";
+import { toast } from "@/lib/mascotToast";
 
 import { DemoBannerOrTabs } from "./DemoBanner";
+
+vi.mock("@/lib/mascotToast", () => ({ toast: { success: vi.fn(), error: vi.fn() } }));
+
+const PITCH = "/api/v1/c/:communityId/demo/pitch";
+
+/** The server's bootstrap answer, saying whether it is the demo. */
+const onServer = (demo: boolean) => {
+  const asked = vi.fn();
+  server.use(
+    http.get("/api/v1/auth/bootstrap", () => {
+      asked();
+      return HttpResponse.json({ has_users: true, public_registration_enabled: true, demo });
+    })
+  );
+  return asked;
+};
+
+/** Signed in to a community, at `role`, that the pitch handler answers for. */
+const inCommunity = (role: string) => {
+  const community = buildCommunity({ id: 3, role });
+  return {
+    auth: { user: buildUser({ demo_expires_at: null }) },
+    communities: { communities: [community], activeCommunityId: 3, activeCommunity: community },
+  };
+};
 
 const TopRow = () => (
   <DemoBannerOrTabs>
@@ -27,8 +57,13 @@ describe("DemoBannerOrTabs", () => {
     // A little under 3 h 12 m, so the minutes round up to 12.
     const expiresAt = new Date(Date.now() + (192 * 60 - 20) * 1000).toISOString();
     await mount({
-      auth: { user: buildUser({ demo_expires_at: expiresAt }) },
-      communities: { communities: [buildCommunity({ name: "Rosie's Bakery" })] },
+      auth: { user: buildUser({ demo_expires_at: expiresAt, demo_community_id: 4 }) },
+      communities: {
+        communities: [
+          buildCommunity({ name: "Elsewhere" }),
+          buildCommunity({ id: 4, name: "Rosie's Bakery" }),
+        ],
+      },
     });
 
     expect(
@@ -46,5 +81,89 @@ describe("DemoBannerOrTabs", () => {
 
     expect(await screen.findByText("recent tabs")).toBeInTheDocument();
     expect(screen.queryByText(/demo copy/)).not.toBeInTheDocument();
+  });
+
+  it("takes an email for a follow-up from a demo account, and thanks them", async () => {
+    const sent: unknown[] = [];
+    server.use(
+      http.post("/api/v1/demo/lead", async ({ request }) => {
+        sent.push(await request.json());
+        return new HttpResponse(null, { status: 204 });
+      })
+    );
+    const expiresAt = new Date(Date.now() + 60 * 60_000).toISOString();
+    await mount({
+      auth: { user: buildUser({ demo_expires_at: expiresAt, demo_community_id: 1 }) },
+    });
+
+    const user = userEvent.setup();
+    await user.click(await screen.findByRole("button", { name: "Leave your email" }));
+    expect(screen.getByText("Liked what you saw?")).toBeInTheDocument();
+    await user.type(screen.getByLabelText("Email"), "pat@example.com");
+    await user.click(screen.getByRole("button", { name: "Send" }));
+
+    expect(await screen.findByText("Thanks. Someone will be in touch soon.")).toBeInTheDocument();
+    expect(sent).toEqual([{ email: "pat@example.com" }]);
+  });
+
+  it("shows a pitch's admin when visitors' version was published, and publishes", async () => {
+    onServer(true);
+    const read = vi.fn();
+    const published = vi.fn();
+    const lastPublishedAt = new Date(Date.now() - 5 * 60_000).toISOString();
+    server.use(
+      http.get(PITCH, ({ params }) => {
+        read(params.communityId);
+        return HttpResponse.json({ is_pitch: true, last_published_at: lastPublishedAt });
+      }),
+      http.post("/api/v1/c/:communityId/demo/publish", ({ params }) => {
+        published(params.communityId);
+        return new HttpResponse(null, { status: 202 });
+      })
+    );
+    await mount(inCommunity("admin"));
+
+    expect(
+      await screen.findByText("Visitors get the version you last published 5 minutes ago.")
+    ).toBeInTheDocument();
+    expect(screen.queryByText("recent tabs")).not.toBeInTheDocument();
+
+    await userEvent.setup().click(screen.getByRole("button", { name: "Publish" }));
+    await waitFor(() => expect(published).toHaveBeenCalledWith("3"));
+    expect(toast.success).toHaveBeenCalledWith(
+      "Publishing now. Visitors get this version once it's ready."
+    );
+    await waitFor(() => expect(read).toHaveBeenCalledTimes(2));
+  });
+
+  it("keeps the tabs for a pitch's members", async () => {
+    onServer(true);
+    const read = vi.fn();
+    server.use(
+      http.get(PITCH, () => {
+        read();
+        return HttpResponse.json({ is_pitch: true, last_published_at: null });
+      })
+    );
+    await mount(inCommunity("member"));
+
+    expect(await screen.findByText("recent tabs")).toBeInTheDocument();
+    expect(read).not.toHaveBeenCalled();
+  });
+
+  it("asks nothing about pitches on a server that is not the demo", async () => {
+    const bootstrap = onServer(false);
+    const read = vi.fn();
+    server.use(
+      http.get(PITCH, () => {
+        read();
+        return HttpResponse.json({ is_pitch: true, last_published_at: null });
+      })
+    );
+    await mount(inCommunity("admin"));
+
+    await waitFor(() => expect(bootstrap).toHaveBeenCalled());
+    expect(await screen.findByText("recent tabs")).toBeInTheDocument();
+    expect(read).not.toHaveBeenCalled();
   });
 });

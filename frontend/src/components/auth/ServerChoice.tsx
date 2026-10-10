@@ -3,7 +3,6 @@ import { Check, ChevronDown } from "lucide-react";
 import { type FormEvent, type ReactNode, useState } from "react";
 import { Trans, useTranslation } from "react-i18next";
 
-import { useBootstrapStatus } from "@/api/generated/auth/auth";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import {
@@ -21,6 +20,7 @@ import {
   SelectValue,
 } from "@/components/ui/select";
 import { useAuth } from "@/hooks/useAuth";
+import { useIsDemoServer } from "@/hooks/useDemoCopy";
 import { normalizeServerUrl, useServer } from "@/hooks/useServer";
 import { getSelfHostedAddress, setSelfHostedAddress } from "@/lib/serverStorage";
 import { clearStart } from "@/lib/startFlow";
@@ -34,17 +34,13 @@ import AppEnvironment from "@/plugins/appEnvironment";
  */
 export const ServerChip = () => {
   const { t } = useTranslation("auth");
-  const kind = useIsDemo() ? t("server.demo") : t("server.selfHosted");
+  const kind = useIsDemoServer() ? t("server.demo") : t("server.selfHosted");
   return (
     <Badge className="hover:bg-primary" aria-label={`${t("server.label")}: ${kind}`}>
       {kind}
     </Badge>
   );
 };
-
-/** Whether this server is the demo deployment, which names itself "Demo". */
-const useIsDemo = (): boolean =>
-  useBootstrapStatus({ query: { staleTime: 60_000 } }).data?.demo === true;
 
 /**
  * Where signing in or up goes, inside its card. In the app a self-hosted
@@ -99,7 +95,7 @@ export const ServerSubtitle = () => {
   const { t } = useTranslation("auth");
   const { isNativePlatform, getServerOrigin } = useServer();
   const host = hostOf(getServerOrigin());
-  const demo = useIsDemo();
+  const demo = useIsDemoServer();
   const [editing, setEditing] = useState(false);
 
   if (!isNativePlatform) return <ServerChip />;

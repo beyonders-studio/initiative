@@ -1,11 +1,19 @@
 import { Link } from "@tanstack/react-router";
-import { Hourglass } from "lucide-react";
-import type { ReactNode } from "react";
+import { Hourglass, Presentation } from "lucide-react";
+import { type ReactNode, useId, useState } from "react";
 import { useTranslation } from "react-i18next";
 
-import { type DemoCopy, useDemoCopy } from "@/hooks/useDemoCopy";
-import { useLiveClockValue } from "@/hooks/useRelativeTime";
+import { useLeaveDemoLead, usePublishDemoPitch, useReadDemoPitch } from "@/api/generated/demo/demo";
+import { Button } from "@/components/ui/button";
+import { Input } from "@/components/ui/input";
+import { Label } from "@/components/ui/label";
+import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
+import { useCommunities } from "@/hooks/useCommunities";
+import { type DemoCopy, useDemoCopy, useIsDemoServer } from "@/hooks/useDemoCopy";
+import { useLiveClockValue, useRelativeTime } from "@/hooks/useRelativeTime";
+import { getErrorMessage } from "@/lib/errorMessage";
 import { listFormat, numberFormat } from "@/lib/intl";
+import { toast } from "@/lib/mascotToast";
 
 const hours = numberFormat(undefined, { style: "unit", unit: "hour", unitDisplay: "narrow" });
 const minutes = numberFormat(undefined, { style: "unit", unit: "minute", unitDisplay: "narrow" });
@@ -19,6 +27,74 @@ const timeLeft = (expiresAt: number, now: number): string => {
   return whole > 0 ? parts.format([hours.format(whole), rest]) : rest;
 };
 
+/** The row both banners share: an icon, what it says, and what can be done. */
+const BannerRow = ({
+  icon,
+  message,
+  children,
+}: {
+  icon: ReactNode;
+  message: ReactNode;
+  children: ReactNode;
+}) => (
+  <div className="flex min-h-12 items-center gap-3 border-b px-4 py-2 text-sm md:border-b-0">
+    {icon}
+    <p className="min-w-0 flex-1">{message}</p>
+    <div className="flex shrink-0 items-center gap-3">{children}</div>
+  </div>
+);
+
+/** "Leave your email": a small form that leaves an address for a follow-up. */
+const LeadPopover = () => {
+  const { t } = useTranslation("auth");
+  const emailId = useId();
+  const [email, setEmail] = useState("");
+  const lead = useLeaveDemoLead();
+
+  return (
+    <Popover>
+      <PopoverTrigger className="text-primary underline-offset-4 hover:underline">
+        {t("demo.lead.action")}
+      </PopoverTrigger>
+      <PopoverContent align="end" className="w-80">
+        {lead.isSuccess ? (
+          <p role="status">{t("demo.lead.thanks")}</p>
+        ) : (
+          <form
+            className="space-y-3"
+            onSubmit={(event) => {
+              event.preventDefault();
+              lead.mutate({ data: { email: email.trim() } });
+            }}
+          >
+            <p className="font-medium">{t("demo.lead.title")}</p>
+            <p className="text-muted-foreground text-sm">{t("demo.lead.pitch")}</p>
+            <div className="space-y-2">
+              <Label htmlFor={emailId}>{t("demo.lead.label")}</Label>
+              <Input
+                id={emailId}
+                type="email"
+                autoComplete="email"
+                required
+                value={email}
+                onChange={(event) => setEmail(event.target.value)}
+              />
+            </div>
+            {lead.isError ? (
+              <p className="text-destructive text-sm" role="alert">
+                {getErrorMessage(lead.error, "auth:demo.lead.failed")}
+              </p>
+            ) : null}
+            <Button type="submit" className="w-full" disabled={lead.isPending}>
+              {t("demo.lead.send")}
+            </Button>
+          </form>
+        )}
+      </PopoverContent>
+    </Popover>
+  );
+};
+
 /**
  * A demo visitor's copy, and how long it has left, in the row the recents tabs
  * use for everyone else.
@@ -29,25 +105,83 @@ export const DemoBanner = ({ copy }: { copy: DemoCopy }) => {
   const remaining = useLiveClockValue((now) => timeLeft(expiresAt, now));
 
   return (
-    <div className="flex min-h-12 items-center gap-3 border-b px-4 py-2 text-sm md:border-b-0">
-      <Hourglass className="h-4 w-4 shrink-0 text-primary" aria-hidden="true" />
-      <p className="min-w-0 flex-1">
-        {t("demo.banner.message", { community: copy.community?.name ?? "", remaining })}
-      </p>
-      <div className="flex shrink-0 items-center gap-3">
-        <Link to="/welcome" className="text-primary underline-offset-4 hover:underline">
-          {t("demo.banner.mainSite")}
-        </Link>
-      </div>
-    </div>
+    <BannerRow
+      icon={<Hourglass className="h-4 w-4 shrink-0 text-primary" aria-hidden="true" />}
+      message={t("demo.banner.message", { community: copy.community?.name ?? "", remaining })}
+    >
+      <LeadPopover />
+      <Link to="/welcome" className="text-primary underline-offset-4 hover:underline">
+        {t("demo.banner.mainSite")}
+      </Link>
+    </BannerRow>
   );
 };
 
 /**
- * The first row of the app's top bar: a demo visitor's banner, or `children`
- * (the recents tabs) for every other account.
+ * A pitch's admins see which version visitors get, and publish the one they
+ * have now. `onPublished` reads the pitch again.
+ */
+const PitchBanner = ({
+  communityId,
+  lastPublishedAt,
+  onPublished,
+}: {
+  communityId: number;
+  lastPublishedAt: string | null;
+  onPublished: () => void;
+}) => {
+  const { t } = useTranslation("auth");
+  const when = useRelativeTime(lastPublishedAt);
+  const publish = usePublishDemoPitch({
+    mutation: {
+      onSuccess: () => {
+        toast.success(t("demo.pitch.published"));
+        onPublished();
+      },
+      onError: (error) => toast.error(getErrorMessage(error, "auth:demo.pitch.failed")),
+    },
+  });
+
+  return (
+    <BannerRow
+      icon={<Presentation className="h-4 w-4 shrink-0 text-primary" aria-hidden="true" />}
+      message={when ? t("demo.pitch.message", { when }) : t("demo.pitch.unpublished")}
+    >
+      <Button
+        size="sm"
+        disabled={publish.isPending}
+        onClick={() => publish.mutate({ communityId })}
+      >
+        {t("demo.pitch.publish")}
+      </Button>
+    </BannerRow>
+  );
+};
+
+/**
+ * The first row of the app's top bar: a demo visitor's banner, a pitch's
+ * Publish banner for its admins on the demo server, or `children` (the recents
+ * tabs) for everyone else.
  */
 export const DemoBannerOrTabs = ({ children }: { children: ReactNode }) => {
   const copy = useDemoCopy();
-  return copy ? <DemoBanner copy={copy} /> : children;
+  const { activeCommunity } = useCommunities();
+  const administers = !copy && activeCommunity?.can.administer === true;
+  const demo = useIsDemoServer(administers);
+  const communityId = activeCommunity?.id ?? 0;
+  const pitch = useReadDemoPitch(communityId, {
+    query: { enabled: administers && demo, staleTime: 60_000 },
+  });
+
+  if (copy) return <DemoBanner copy={copy} />;
+  if (administers && pitch.data?.is_pitch) {
+    return (
+      <PitchBanner
+        communityId={communityId}
+        lastPublishedAt={pitch.data.last_published_at ?? null}
+        onPublished={() => void pitch.refetch()}
+      />
+    );
+  }
+  return children;
 };

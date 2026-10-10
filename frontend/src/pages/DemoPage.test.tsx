@@ -1,7 +1,8 @@
 /**
  * A demo link, `/demo#<token>`, through the router the app ships: the page
- * takes the token out of the address, trades it for a signed-in copy, and
- * lands there; a visitor whose copy is still live goes straight back to it.
+ * takes the token out of the address, trades it for a signed-in copy, waits
+ * for the copy to be filled and lands there; a visitor whose copy is still
+ * live goes straight back to it.
  */
 import { createRouter } from "@tanstack/react-router";
 import { screen, waitFor } from "@testing-library/react";
@@ -33,6 +34,7 @@ vi.mock("@/components/auth/CaptchaWidget", () => ({
 
 const ROUTE_ID = "/_serverRequired/demo";
 const REDEEM = "/api/v1/demo/redeem";
+const COPY = "/api/v1/demo/copy";
 const router = createRouter({ routeTree, context: buildRouterContext() });
 
 const openLink = async (
@@ -52,6 +54,7 @@ beforeEach(() => {
 });
 
 afterEach(() => {
+  vi.useRealTimers();
   window.history.replaceState(null, "", "/");
 });
 
@@ -79,13 +82,45 @@ describe("the demo page", () => {
     const start = await screen.findByRole("button", { name: "Start the demo" });
     expect(start).toBeDisabled();
     await user.click(screen.getByRole("button", { name: "solve captcha" }));
+    await user.type(screen.getByLabelText("Email (optional)"), "pat@example.com");
     await user.click(start);
 
     await waitFor(() => expect(mounted.state.location.pathname).toBe("/c/7"));
-    expect(sent).toEqual([{ token: "tok-1", captcha_token: "solved" }]);
+    expect(sent).toEqual([{ token: "tok-1", captcha_token: "solved", email: "pat@example.com" }]);
     expect(applySignIn).toHaveBeenCalledWith(
       expect.objectContaining({ access_token: "demo-token", community_id: 7 })
     );
+  });
+
+  it("waits for the copy to be filled before going in, and says when that takes too long", async () => {
+    vi.useFakeTimers({ shouldAdvanceTime: true });
+    let ready = false;
+    server.use(http.get(COPY, () => HttpResponse.json({ community_id: 7, ready })));
+    const { router: mounted } = await openLink("tok-1");
+
+    const user = userEvent.setup({ advanceTimers: vi.advanceTimersByTime });
+    await user.click(await screen.findByRole("button", { name: "Start the demo" }));
+
+    expect(await screen.findByText("Setting up your demo…")).toBeInTheDocument();
+    await vi.advanceTimersByTimeAsync(120_000);
+    expect(await screen.findByRole("alert")).toHaveTextContent(
+      "Your demo is taking longer than it should to set up."
+    );
+    expect(mounted.state.location.pathname).toBe("/demo");
+
+    ready = true;
+    await user.click(screen.getByRole("button", { name: "Check again" }));
+    await waitFor(() => expect(mounted.state.location.pathname).toBe("/c/7"));
+  });
+
+  it("tells someone signed in to their own account that starting signs them out of it", async () => {
+    await openLink("tok-1", { auth: { user: buildUser({ demo_expires_at: null }) } });
+
+    expect(
+      await screen.findByText(
+        "You're signed in. Starting the demo signs you out of your account and into a demo one."
+      )
+    ).toBeInTheDocument();
   });
 
   it("says when every copy is taken, and starts on a retry", async () => {
@@ -130,8 +165,9 @@ describe("the demo page", () => {
       })
     );
     const expiresAt = new Date(Date.now() + 60 * 60_000).toISOString();
+    server.use(http.get(COPY, () => HttpResponse.json({ community_id: 9, ready: true })));
     const { router: mounted } = await openLink("tok-2", {
-      auth: { user: buildUser({ demo_expires_at: expiresAt }) },
+      auth: { user: buildUser({ demo_expires_at: expiresAt, demo_community_id: 9 }) },
       communities: { communities: [buildCommunity({ id: 9 })] },
     });
 
