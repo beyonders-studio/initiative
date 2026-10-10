@@ -60,6 +60,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Fixed
 
+- **Repeats keep their days when a template or listing moves its dates.** A project made from a template, or a listing installed on a start date, moved a repeat by a set number of days, which could leave a Monday series' skipped and edited occurrences on Tuesdays. A repeat now lands on its own days nearest the move: a Monday series stays on Mondays, one on the 15th stays on the 15th, and its skipped and edited occurrences stay matched.
 - **Your recently opened items, favorite projects and project order are yours alone.** Nobody else in the community can read or change them, admins included.
 - **Only you can answer a poll or mark a notice read as yourself.** Admins can't change your answer either. Others still see the counts and who answered, as before.
 - **Only a comment's author can change or delete it, and only you can add or take off your reactions.** Comments, posts and reactions always carry the person who wrote them as their author. Moderators still take comments down and clear reactions, and an import still keeps the authors it maps.

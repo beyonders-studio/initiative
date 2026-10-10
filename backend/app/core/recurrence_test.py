@@ -178,6 +178,51 @@ def test_a_repeat_moves_with_its_start():
     assert recurrence.restarted(rule, 1440, EAST, noon, None)[1] == 1440
 
 
+@pytest.mark.parametrize(
+    ("rule", "start", "days", "new_start"),
+    [
+        # Mondays and Wednesdays from a Monday: a Monday again, the nearest.
+        (
+            "FREQ=WEEKLY;BYDAY=MO,WE",
+            datetime(2026, 10, 5, 9),
+            10,
+            datetime(2026, 10, 12, 9),
+        ),
+        # The second Tuesday, and the 15th: the nearest of each.
+        (
+            "FREQ=MONTHLY;BYDAY=2TU",
+            datetime(2026, 10, 13, 9),
+            20,
+            datetime(2026, 11, 10, 9),
+        ),
+        ("FREQ=MONTHLY", datetime(2026, 10, 15, 9), 40, datetime(2026, 11, 15, 9)),
+        # Every day: exactly as far.
+        ("FREQ=DAILY", datetime(2026, 10, 5, 9), 3, datetime(2026, 10, 8, 9)),
+    ],
+)
+def test_a_moved_series_keeps_its_days_and_its_exceptions(rule, start, days, new_start):
+    """Its start lands on its rule nearest the move, and what it skipped, where
+    it ends and an occurrence of its own stay on the occurrence they named."""
+    start, new_start = start.replace(tzinfo=UTC), new_start.replace(tzinfo=UTC)
+    second, third, fourth = recurrence.first(rule, start, 0, 4)[1:]
+    text = recurrence.skipped(f"RRULE:{rule};UNTIL={fourth:%Y%m%dT%H%M%SZ}", 0, second)
+
+    series = recurrence.moved(text, start, 0, timedelta(days=days), occurrences=[third])
+
+    assert series.start == new_start
+    new_second, new_third, new_fourth = recurrence.first(
+        f"RRULE:{rule}", new_start, 0, 4
+    )[1:]
+    assert series.occurrences == {third: new_third}
+    assert recurrence.between(series.text, new_start, 0, new_start, new_fourth) == [
+        new_start,
+        new_third,
+        new_fourth,
+    ]
+    assert not recurrence.occurs(series.text, new_start, 0, new_second)
+    assert recurrence.last_start(series.text, new_start, 0) == new_fourth
+
+
 def test_imports_read_either_shape():
     """A rule string comes with its shift; the JSON shape older exports carried
     was picked in a zone, which the importer's stands in for."""

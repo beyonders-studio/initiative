@@ -414,8 +414,8 @@ async def apply_backup(
     ``heartbeat`` is called after each asset and each entry, so the job can
     show it is still being applied. ``fetched`` is as for
     :func:`zip_bounds.open_zip`. ``anchor``, when given, moves every date the
-    envelopes carry by the whole weeks nearest from it to now, so a bundle
-    reads as if it had been exported this week."""
+    envelopes carry by the whole days from it to now, so a bundle reads as if
+    it had been exported today (a repeat by its own rule, :func:`shift_dates`)."""
     from app.api.deps import establish_guild_access
     from app.services.import_engine.importers import IMPORTERS
     from app.models.platform.guild import CommunityRole
@@ -426,9 +426,8 @@ async def apply_backup(
         manifest = await asyncio.to_thread(read_manifest, archive, fetched=fetched)
         max_json_bytes = json_cap(fetched=fetched)
         result = BackupImportResult()
-        # Whole weeks, so a repeat lands on the weekdays its rule names.
         shift_days = (
-            7 * round((datetime.now(timezone.utc) - anchor) / timedelta(weeks=1))
+            round((datetime.now(timezone.utc) - anchor) / timedelta(days=1))
             if anchor is not None
             else 0
         )

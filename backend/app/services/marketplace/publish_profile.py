@@ -37,7 +37,7 @@ stored, so the stored form has to be a fixed point.
 from __future__ import annotations
 
 from collections.abc import Callable, Iterator
-from datetime import date, datetime, timedelta
+from datetime import date, datetime, timedelta, timezone
 from typing import Any
 
 from app.core import recurrence
@@ -420,13 +420,80 @@ def shift_dates(tool: Tool, envelope: dict[str, Any], days: int) -> dict[str, An
     if days == 0:
         return shifted
     delta = timedelta(days=days)
+    done = _move_series(tool, shifted, delta)
     for owner, key in [*_date_slots(tool, shifted), *_history_slots(tool, shifted)]:
         parsed = _parse(owner.get(key))
-        if parsed is not None:
+        if parsed is not None and (id(owner), key) not in done:
             owner[key] = (parsed + delta).isoformat()
-    for owner in _repeating(tool, shifted):
-        owner["recurrence"] = recurrence.moved(owner["recurrence"], delta)
     return shifted
+
+
+def _move_series(
+    tool: Tool, env: dict[str, Any], delta: timedelta
+) -> set[tuple[int, str]]:
+    """Move each repeating item by about ``delta`` on its own rule
+    (:func:`recurrence.moved`), with the occurrences of its that have items of
+    their own; the dates it moved, by owner and key."""
+    done: set[tuple[int, str]] = set()
+    items = env.get("tasks" if tool is Tool.project else "events") or []
+    keys = (
+        ("due_date", "start_date") if tool is Tool.project else ("start_at", "end_at")
+    )
+    for item in _repeating(tool, env):
+        key = next((k for k in keys if _instant(item.get(k)) is not None), None)
+        start = _instant(item.get(key)) if key else None
+        if start is None:
+            continue
+        ref = item.get("external_ref")
+        rows = [
+            (other, was)
+            for other in items
+            if ref
+            and isinstance(other, dict)
+            and other.get("series_ref") == ref
+            and (was := _instant(other.get("original_start"))) is not None
+        ]
+        series = recurrence.moved(
+            item["recurrence"],
+            start,
+            int(item.get("recurrence_shift") or 0),
+            delta,
+            occurrences=[was for _, was in rows],
+        )
+        item["recurrence"] = series.text
+        done |= _moved_by(item, keys, series.start - start)
+        for row, was in rows:
+            by = series.occurrences[was] - was
+            done |= _moved_by(row, (*keys, "original_start"), by)
+    return done
+
+
+def _moved_by(
+    owner: dict[str, Any], keys: tuple[str, ...], by: timedelta
+) -> set[tuple[int, str]]:
+    """``owner``'s dates at ``keys`` moved by ``by``; the slots it moved."""
+    moved: set[tuple[int, str]] = set()
+    for key in keys:
+        parsed = _parse(owner.get(key))
+        if parsed is not None:
+            owner[key] = (
+                parsed + by
+                if isinstance(parsed, datetime)
+                else parsed + timedelta(days=round(by / timedelta(days=1)))
+            ).isoformat()
+            moved.add((id(owner), key))
+    return moved
+
+
+def _instant(value: Any) -> datetime | None:
+    """A date the envelope keeps, as an instant: a date at midnight UTC, as is
+    a time without a zone. None for anything that is not a date."""
+    parsed = _parse(value)
+    if isinstance(parsed, datetime):
+        return parsed if parsed.tzinfo else parsed.replace(tzinfo=timezone.utc)
+    if parsed is None:
+        return None
+    return datetime.combine(parsed, datetime.min.time(), timezone.utc)
 
 
 def anchor_dates(tool: Tool, envelope: dict[str, Any]) -> dict[str, Any]:

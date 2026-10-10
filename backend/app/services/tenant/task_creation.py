@@ -376,9 +376,17 @@ async def copy_tasks(
             source.recurrence,
         )
         if date_shift is not None:
-            start_date = start_date + date_shift if start_date else None
-            due_date = due_date + date_shift if due_date else None
-            repeat = recurrence.moved(repeat, date_shift) if repeat else None
+            shift = date_shift
+            if repeat and (due_date or start_date):
+                # A series moves on its own rule, from its due date or its
+                # start without one, and its dates move with its start.
+                start = due_date or start_date
+                series = recurrence.moved(
+                    repeat, start, source.recurrence_shift, date_shift
+                )
+                repeat, shift = series.text, series.start - start
+            start_date = start_date + shift if start_date else None
+            due_date = due_date + shift if due_date else None
         copy = Task(
             project_id=target.id,
             title=copy_name(source.title) if beside else source.title,

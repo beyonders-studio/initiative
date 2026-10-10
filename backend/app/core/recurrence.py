@@ -349,10 +349,7 @@ def _walk(
         step = parts.get("INTERVAL", [1])[0] * (12 if freq == "YEARLY" else 1)
         month = first.year * 12 + first.month - 1
         if ahead := (lower.year * 12 + lower.month - 1 - month) // step * step:
-            if not parts.keys() & {"BYWEEKNO", "BYYEARDAY", "BYMONTHDAY", "BYDAY"}:
-                parts["BYMONTHDAY"] = [first.day]
-                if freq == "YEARLY":
-                    parts.setdefault("BYMONTH", [first.month])
+            parts = _pinned(parts, first)
             parts.setdefault("BYHOUR", [first.hour])
             parts["BYMINUTE"], parts["BYSECOND"] = [first.minute], [first.second]
             first = datetime((month + ahead) // 12, (month + ahead) % 12 + 1, 1)
@@ -389,6 +386,26 @@ def _walk(
     for value, _ in groupby(merge(own(), extra)):
         if value not in skipped:
             yield (value - offset).replace(tzinfo=timezone.utc)
+
+
+def _pinned(parts: dict[str, list], at: datetime) -> dict[str, list]:
+    """``parts`` with the days the rule otherwise takes from its start written
+    in, from ``at``, the start where its days were picked: a week's weekday, a
+    month's day, a year's day and month."""
+    parts = dict(parts)
+    freq = parts["FREQ"][0]
+    if freq == "WEEKLY":
+        parts.setdefault("BYDAY", [_WEEKDAYS[at.weekday()]])
+    elif freq in ("MONTHLY", "YEARLY") and not parts.keys() & {
+        "BYWEEKNO",
+        "BYYEARDAY",
+        "BYMONTHDAY",
+        "BYDAY",
+    }:
+        parts["BYMONTHDAY"] = [at.day]
+        if freq == "YEARLY":
+            parts.setdefault("BYMONTH", [at.month])
+    return parts
 
 
 def first(text: str, start: datetime, shift: int, n: int) -> list[datetime]:
@@ -658,18 +675,122 @@ def split(
     return head, tail
 
 
-def moved(text: str, delta: timedelta) -> str:
-    """The same repeat with its end, skipped and extra dates moved by ``delta``,
-    for a template whose dates move to where it is used."""
+def _slot(parts: dict[str, list], at: datetime) -> tuple[int, ...]:
+    """Which of the days and hours ``parts`` name ``at`` falls on."""
+    slot: list[int] = []
+    if "BYMONTH" in parts:
+        slot.append(at.month)
+    if "BYMONTHDAY" in parts:
+        slot.append(at.day)
+    if "BYDAY" in parts:
+        slot.append(at.weekday())
+        if any(day[:-2] for day in map(str, parts["BYDAY"])):
+            slot.append((at.day - 1) // 7)
+    if "BYHOUR" in parts:
+        slot.append(at.hour)
+    return tuple(slot)
+
+
+@dataclass(frozen=True)
+class Moved:
+    """A series moved along the calendar: its repeat, its new start, and the
+    new start of each old occurrence it was asked about."""
+
+    text: str
+    start: datetime
+    occurrences: dict[datetime, datetime]
+
+
+def moved(
+    text: str,
+    start: datetime,
+    shift: int,
+    delta: timedelta,
+    *,
+    occurrences: Iterable[datetime] = (),
+) -> Moved:
+    """The series starting at ``start``, moved by about ``delta`` without
+    leaving its days: it starts on the occurrence of its rule nearest
+    ``start + delta``, so a series of Mondays stays on Mondays and one on the
+    second Tuesday of the month stays there.
+
+    Its skipped starts, its end and each of ``occurrences`` go to the new
+    occurrence of the same number, so they name the same occurrence as
+    before. An extra start, or a value the rule never made, moves as far as
+    the series start did."""
+    start = start.astimezone(timezone.utc)
+    asked = tuple(value.astimezone(timezone.utc) for value in occurrences)
+    if not delta:
+        return Moved(text, start, {value: value for value in asked})
     repeat = parse(text)
+    offset = timedelta(minutes=shift)
+    at = (start + offset).time()
+    own = {key: v for key, v in repeat.rule.items() if key not in ("COUNT", "UNTIL")}
+    pinned = _pinned(own, (start + offset).replace(tzinfo=None))
+    days = Recurrence({key: v for key, v in pinned.items() if key != "INTERVAL"})
+
+    target = start + delta
+    span = _steps(days.rule, 1)
+    near = list(_walk(days, start, shift, target - span, target + span))
+    near = near or list(islice(_walk(days, start, shift, target), 1))
+    # Among them, the ones on the start's own day of the rule's, so a series
+    # of Mondays and Wednesdays that began on a Monday begins on one again.
+    here = _slot(pinned, (start + offset).replace(tzinfo=None))
+    alike = [
+        v for v in near if _slot(pinned, (v + offset).replace(tzinfo=None)) == here
+    ]
+    new_start = min(alike or near, key=lambda v: (abs(v - target), v), default=target)
+    along = new_start - start
+
+    def instant(value: date | datetime) -> datetime:
+        if isinstance(value, datetime):
+            return value.astimezone(timezone.utc)
+        return datetime.combine(value, at, timezone.utc) - offset
+
+    until = repeat.rule.get("UNTIL")
+    end = instant(until[0]) if until else None
+    skipped = [instant(value) for value in repeat.exdates]
+    through = max([*skipped, *asked, *([end] if end else [])], default=start)
+    old = list(
+        islice(_walk(Recurrence(own), start, shift, start, through), MAX_EXPANDED)
+    )
+    number = {value: n for n, value in enumerate(old)}
+    last = max((v for v in old if v <= end), default=None) if end else None
+    named = [*skipped, *asked, *([last] if last else [])]
+    wanted = max((number[v] for v in named if v in number), default=-1)
+    new = list(islice(_walk(Recurrence(own), new_start, shift, new_start), wanted + 1))
+
+    def going(value: datetime) -> datetime:
+        n = number.get(value)
+        return new[n] if n is not None and n < len(new) else value + along
+
+    def by_days(value: date, by: timedelta) -> date:
+        return value + timedelta(days=round(by / timedelta(days=1)))
+
     rule = dict(repeat.rule)
-    if until := rule.get("UNTIL"):
-        rule["UNTIL"] = [until[0] + delta]
-    return Recurrence(
-        rule,
-        tuple(value + delta for value in repeat.exdates),
-        tuple(value + delta for value in repeat.rdates),
-    ).to_lines()
+    if until:
+        # The end keeps its distance past the last occurrence before it.
+        by = going(last) - last if last else along
+        rule["UNTIL"] = [
+            until[0] + by if isinstance(until[0], datetime) else by_days(until[0], by)
+        ]
+    return Moved(
+        Recurrence(
+            rule,
+            tuple(
+                going(instant(v))
+                if isinstance(v, datetime)
+                else (going(instant(v)) + offset).date()
+                for v in repeat.exdates
+            ),
+            tuple(
+                v + along if isinstance(v, datetime) else by_days(v, along)
+                for v in repeat.rdates
+            ),
+        ).to_lines(),
+        new_start,
+        {value: going(value) for value in asked},
+    )
 
 
 # ---------------------------------------------------------------------------

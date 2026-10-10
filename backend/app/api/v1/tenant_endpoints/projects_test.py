@@ -544,7 +544,8 @@ async def test_create_from_template_shifts_task_dates(
     """Template task dates are re-anchored to the new project's start date.
 
     A task due three weeks after the template's start lands three weeks after
-    the new start, keeping its time of day.
+    the new start, keeping its time of day; one repeating on the 15th stays
+    on the 15th.
     """
     admin = await acting_user(guild_role=CommunityRole.admin, initiative=True)
     template = await create_project(
@@ -568,6 +569,13 @@ async def test_create_from_template_shifts_task_dates(
         template,
         title="Three weeks in",
         due_date=datetime(2026, 1, 26, 12, 0, tzinfo=timezone.utc),
+    )
+    await create_task(
+        session,
+        template,
+        title="Invoices",
+        due_date=datetime(2026, 1, 15, 12, 0, tzinfo=timezone.utc),
+        recurrence="RRULE:FREQ=MONTHLY",
     )
 
     response = await client.post(
@@ -593,6 +601,9 @@ async def test_create_from_template_shifts_task_dates(
     )
     assert _as_utc(tasks["Three weeks in"]["due_date"]) == datetime(
         2026, 4, 27, 12, 0, tzinfo=timezone.utc
+    )
+    assert _as_utc(tasks["Invoices"]["due_date"]) == datetime(
+        2026, 4, 15, 12, 0, tzinfo=timezone.utc
     )
 
 

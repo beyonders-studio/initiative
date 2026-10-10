@@ -211,6 +211,41 @@ class TestDates:
         assert anchored["events"][0]["start_at"].startswith("2000-01-03")
         assert anchored["events"][1]["start_at"].startswith("2000-01-05")
 
+    def test_a_repeat_keeps_its_weekday_and_its_edited_occurrence(self):
+        """Mondays from 3 January moved five days: Mondays from the 10th, and
+        the second Monday's edit, an hour later, on the new second Monday."""
+        calendar = {
+            "type": "initiative-calendar",
+            "name": "Rota",
+            "events": [
+                {
+                    "title": "Standup",
+                    "start_at": "2000-01-03T09:00:00+00:00",
+                    "end_at": "2000-01-03T09:15:00+00:00",
+                    "recurrence": "RRULE:FREQ=WEEKLY;BYDAY=MO",
+                    "external_ref": "event:1",
+                },
+                {
+                    "title": "Standup",
+                    "start_at": "2000-01-10T10:00:00+00:00",
+                    "end_at": "2000-01-10T10:15:00+00:00",
+                    "series_ref": "event:1",
+                    "original_start": "2000-01-10T09:00:00+00:00",
+                },
+                {
+                    "title": "Retro",
+                    "start_at": "2000-01-04T15:00:00+00:00",
+                    "end_at": "2000-01-04T16:00:00+00:00",
+                },
+            ],
+        }
+        series, edit, once = shift_dates(Tool.calendar, calendar, 5)["events"]
+        assert series["start_at"].startswith("2000-01-10T09:00")
+        assert series["end_at"].startswith("2000-01-10T09:15")
+        assert edit["original_start"].startswith("2000-01-17T09:00")
+        assert edit["start_at"].startswith("2000-01-17T10:00")
+        assert once["start_at"].startswith("2000-01-09T15:00")
+
     def test_an_item_with_no_dates_is_unchanged(self):
         counters = {"type": "initiative-counter-group", "name": "HP", "counters": []}
         assert anchor_dates(Tool.counter_group, counters) == counters
