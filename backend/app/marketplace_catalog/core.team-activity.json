@@ -4,12 +4,12 @@
   "kind": "dashboard",
   "name": "Team activity",
   "publisher": "Initiative",
-  "description": "Who is doing what, and when it gets done.",
-  "long_description": "A read-only pulse of the initiative's people. How the work spreads across the team, the daily rhythm of what gets finished, and how the open pile leans by priority — with the finished total as the headline.\n\nNothing here needs setting up — every widget reads the initiative the dashboard lives on.",
+  "description": "Who has how much, and when it is due.",
+  "long_description": "A read-only picture of the initiative's workload. How much each person is carrying and how urgent it is, what lands on whom week by week, the daily rhythm of what gets finished, and who is carrying what — with the finished and open totals as the headline.\n\nWork past its due date counts in the current week, because that is when it still has to be done.\n\nNothing here needs setting up — every widget reads the initiative the dashboard lives on.",
   "avatar_url": "/marketplace/core-team-activity.svg",
   "images": [],
-  "version": "1.2.0",
-  "release_notes": "Counts only live work: archived tasks, and tasks in template projects, no longer reach anybody's column or the figures above them.",
+  "version": "1.3.0",
+  "release_notes": "Open work by person is split by priority, and a new chart shows what each person has due week by week over the next eight weeks, with overdue work in the current week. It replaces Open work by priority, which the first chart now shows.",
   "definition": {
     "schema_version": 1,
     "kind": "dashboard",
@@ -73,17 +73,18 @@
         },
         "binding": {
           "source": "query",
-          "sql": "SELECT assignee.display_name AS person, count(*) AS open FROM tasks WHERE completed_at IS NULL AND tasks.archived_at IS NULL AND project.is_template = false GROUP BY assignee.display_name ORDER BY count(*) DESC"
+          "sql": "SELECT assignee.display_name AS person, priority, count(*) AS open FROM tasks WHERE completed_at IS NULL AND tasks.archived_at IS NULL AND project.is_template = false GROUP BY assignee.display_name, priority ORDER BY assignee.display_name, priority"
         },
         "title": "Open work by person",
         "options": {
           "mark": "bar",
+          "stacked": "true",
           "orientation": "bars",
-          "values": "end"
+          "sort": "value_desc"
         }
       },
       {
-        "id": "priority",
+        "id": "due",
         "type": "chart",
         "grid": {
           "x": 6,
@@ -93,11 +94,12 @@
         },
         "binding": {
           "source": "query",
-          "sql": "SELECT priority, count(*) AS tasks FROM tasks WHERE completed_at IS NULL AND tasks.archived_at IS NULL AND project.is_template = false GROUP BY priority"
+          "sql": "SELECT date_trunc('week', greatest(due_date, now())) AS week, assignee.display_name AS person, count(*) AS due FROM tasks WHERE completed_at IS NULL AND tasks.archived_at IS NULL AND project.is_template = false AND due_date IS NOT NULL AND due_date < now() + CAST('56 days' AS interval) GROUP BY 1, 2 ORDER BY 1, 2"
         },
-        "title": "Open work by priority",
+        "title": "Due each week, by person",
         "options": {
-          "mark": "bar"
+          "mark": "bar",
+          "stacked": "true"
         }
       },
       {

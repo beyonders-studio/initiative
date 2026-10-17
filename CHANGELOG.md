@@ -38,6 +38,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Changed
 
+- **Ready-made dashboards use the new charts.** Team activity shows workload: open work by person split by priority, and what each person has due week by week, with overdue work in the current week. Delivery timeline adds a **Finished so far** burn-up, Project health splits open work by person by project, and Event planner adds **Coming up, week by week**, stacked by calendar. Dashboards installed from them offer the update.
 - **The iPhone and iPad app needs iOS 16 or later.**
 - **A plug-in your server provides follows your community's choices.** It is still installed in every community and placed in each initiative it has. From then on the community's admins decide where it appears and what it may do: it no longer adds itself to initiatives created later, and its permissions are not reset on restart.
 - **Breaking changes**

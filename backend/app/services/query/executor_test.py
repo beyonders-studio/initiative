@@ -78,6 +78,19 @@ async def test_an_aggregate_answers_without_shipping_the_rows(guild):
     assert result.rows == ((0,),)
 
 
+async def test_every_shipped_dashboard_asks_something_postgres_plans(guild):
+    """The validator reads a statement; only Postgres can say it groups what
+    it shows and that its types meet. A shipped tile it refuses is an error in
+    every community that installed the dashboard."""
+    from app.services.marketplace.builtin import load_builtin_manifests
+
+    for manifest in load_builtin_manifests():
+        if manifest.get("kind") != "dashboard":
+            continue
+        for widget in manifest["definition"]["widgets"]:
+            await describe(widget["binding"]["sql"], context=_context(guild))
+
+
 async def test_it_reports_what_the_planner_expected(guild):
     result = await run("SELECT title FROM tasks", context=_context(guild))
     assert result.cost > 0

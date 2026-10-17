@@ -5,11 +5,11 @@
   "name": "Event planner",
   "publisher": "Initiative",
   "description": "Everything on the calendar, read as a plan.",
-  "long_description": "The initiative's events laid out the way an organizer thinks: every scheduled event on a weekly timeline, with the full list underneath for the details a bar can't carry.\n\nNothing here needs setting up — every widget reads the calendars of the initiative the dashboard lives on.",
+  "long_description": "The initiative's events laid out the way an organizer thinks: the next eight weeks stacked by calendar, every scheduled event on a weekly timeline, with the full list underneath for the details a bar can't carry.\n\nNothing here needs setting up — every widget reads the calendars of the initiative the dashboard lives on.",
   "avatar_url": "/marketplace/core-event-planner.svg",
   "images": [],
-  "version": "1.2.0",
-  "release_notes": "Counts only live calendars: one that has been archived no longer appears among the events per calendar.",
+  "version": "1.3.0",
+  "release_notes": "Adds Coming up, week by week: the next eight weeks of events, stacked by calendar.",
   "definition": {
     "schema_version": 1,
     "kind": "dashboard",
@@ -52,11 +52,30 @@
         }
       },
       {
+        "id": "weeks",
+        "type": "chart",
+        "grid": {
+          "x": 0,
+          "y": 4,
+          "w": 12,
+          "h": 4
+        },
+        "binding": {
+          "source": "query",
+          "sql": "SELECT date_trunc('week', start_at) AS week, calendar.name AS calendar, count(*) AS events FROM calendar_events WHERE start_at >= now() AND start_at < now() + CAST('56 days' AS interval) AND calendar.archived_at IS NULL GROUP BY 1, 2 ORDER BY 1, 2"
+        },
+        "title": "Coming up, week by week",
+        "options": {
+          "mark": "bar",
+          "stacked": "true"
+        }
+      },
+      {
         "id": "schedule",
         "type": "gantt",
         "grid": {
           "x": 0,
-          "y": 4,
+          "y": 8,
           "w": 12,
           "h": 5
         },
@@ -71,7 +90,7 @@
         "type": "table",
         "grid": {
           "x": 0,
-          "y": 9,
+          "y": 13,
           "w": 12,
           "h": 4
         },

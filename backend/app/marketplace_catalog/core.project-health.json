@@ -5,11 +5,11 @@
   "name": "Project health",
   "publisher": "Initiative",
   "description": "Whether the work is moving, how far along each project is, and who is carrying what.",
-  "long_description": "The dashboard to open before a check-in. The top row answers the three questions somebody always asks — how much is open, how much is late, how much got finished lately — and says how far along the whole thing is.\n\nUnderneath, each project's finished and remaining work sits side by side, so a project that has stopped moving is visible next to one that has not. The board deals every open task into a column per person, each card led by its project, which is the fastest way to see who is carrying what and where it came from.\n\nNothing here needs setting up — every widget reads the initiative the dashboard lives on. Read-only, like every dashboard: it shows the work, and the work is changed where it lives.",
+  "long_description": "The dashboard to open before a check-in. The top row answers the three questions somebody always asks — how much is open, how much is late, how much got finished lately — and says how far along the whole thing is.\n\nUnderneath, each project's finished and remaining work sits side by side, so a project that has stopped moving is visible next to one that has not. Beside them, each person's open work is split by project, so somebody spread across many shows as many colours. The board deals every open task into a column per person, each card led by its project, which is the fastest way to see who is carrying what and where it came from.\n\nNothing here needs setting up — every widget reads the initiative the dashboard lives on. Read-only, like every dashboard: it shows the work, and the work is changed where it lives.",
   "avatar_url": "/marketplace/core-project-health.svg",
   "images": [],
-  "version": "1.2.0",
-  "release_notes": "Counts only live work: archived projects and tasks, and anything inside a template project, no longer reach the figures, the per-project bars or the board.",
+  "version": "1.3.0",
+  "release_notes": "Open work by person is split by project, showing who is spread across which projects.",
   "definition": {
     "schema_version": 1,
     "kind": "dashboard",
@@ -108,13 +108,14 @@
         },
         "binding": {
           "source": "query",
-          "sql": "SELECT assignee.display_name AS person, count(*) AS open FROM tasks WHERE completed_at IS NULL AND tasks.archived_at IS NULL AND project.is_template = false GROUP BY assignee.display_name ORDER BY count(*) DESC"
+          "sql": "SELECT assignee.display_name AS person, project.name AS project, count(*) AS open FROM tasks WHERE completed_at IS NULL AND tasks.archived_at IS NULL AND project.is_template = false GROUP BY assignee.display_name, project.name ORDER BY assignee.display_name, project.name"
         },
-        "title": "Open work by person",
+        "title": "Open work by person and project",
         "options": {
           "mark": "bar",
+          "stacked": "true",
           "orientation": "bars",
-          "values": "end"
+          "sort": "value_desc"
         }
       },
       {

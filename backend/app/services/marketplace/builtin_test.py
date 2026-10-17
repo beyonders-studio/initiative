@@ -127,7 +127,8 @@ class TestShippedManifests:
                         f"{public_id}/{widget['id']}: {widget['type']} has no "
                         f"option {key!r}"
                     )
-                    assert value in offered.values, (
+                    # A number or a day (a target) has no list to be on.
+                    assert offered.kind != "choice" or value in offered.values, (
                         f"{public_id}/{widget['id']}: {widget['type']}.{key} "
                         f"={value!r}, not one of {list(offered.values)}"
                     )
