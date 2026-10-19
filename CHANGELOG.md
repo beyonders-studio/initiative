@@ -7,6 +7,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.76.0] - 2026-10-19
+
 ### Added
 
 - **Contracts for operators.** On servers connected to a billing service, **Operator dashboard → Billing** opens billing's contracts console: the customers invoiced by hand, their terms and invoices, and a dedicated deployment's registration key file. It opens no community. The new `billing.contracts` capability gates it, held by operators and owners.
