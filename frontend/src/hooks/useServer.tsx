@@ -37,6 +37,9 @@ interface ServerContextValue {
   getServerOrigin: () => string | null;
 }
 
+/** How long a server has to answer the connection check before it counts as unreachable. */
+const CONNECTION_TIMEOUT_MS = 10_000;
+
 export const ServerContext = createContext<ServerContextValue | undefined>(undefined);
 
 /**
@@ -112,6 +115,8 @@ export const ServerProvider = ({ children }: { children: ReactNode }) => {
 
   const testServerConnection = useCallback(
     async (url: string): Promise<{ valid: boolean; error?: string }> => {
+      const controller = new AbortController();
+      const timer = setTimeout(() => controller.abort(), CONNECTION_TIMEOUT_MS);
       try {
         const normalizedUrl = normalizeServerUrl(url);
 
@@ -119,6 +124,7 @@ export const ServerProvider = ({ children }: { children: ReactNode }) => {
         const response = await fetch(`${normalizedUrl}/version`, {
           method: "GET",
           headers: { Accept: "application/json" },
+          signal: controller.signal,
         });
 
         if (!response.ok) {
@@ -139,6 +145,8 @@ export const ServerProvider = ({ children }: { children: ReactNode }) => {
           return { valid: false, error: "Could not connect to server" };
         }
         return { valid: false, error: "Connection failed" };
+      } finally {
+        clearTimeout(timer);
       }
     },
     []
