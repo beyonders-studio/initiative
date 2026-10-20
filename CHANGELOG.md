@@ -35,6 +35,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Changed
 
+- **The phone and desktop apps sign in to Initiative Cloud** ([initiativetasks.com](https://initiativetasks.com)) unless you give them a server of your own. **Your own server** is still one tap away in the server menu on the sign-in page, and an app already connected to a server stays on it.
 - **AI connections name their model.** After saving a connection, pick a model from its provider's list; a connection without one, including any that relied on a default, is not used until somebody picks one. Changing a connection's provider or address clears its key unless you enter it again.
 - **New versions no longer interrupt you.** A small message offers **Reload** when a new version is ready, and **What's new** shows what changed.
 - **Release notes show what changed.** The version window opens the newest release, with pictures of what is new, and folds older releases away until you open them.

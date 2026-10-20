@@ -22,10 +22,50 @@ import {
 import { useAuth } from "@/hooks/useAuth";
 import { useIsDemoServer } from "@/hooks/useDemoCopy";
 import { normalizeServerUrl, useServer } from "@/hooks/useServer";
-import { getSelfHostedAddress, setSelfHostedAddress } from "@/lib/serverStorage";
+import {
+  CLOUD_ORIGIN,
+  CLOUD_SERVER_URL,
+  getSelfHostedAddress,
+  setSelfHostedAddress,
+} from "@/lib/serverStorage";
 import { clearStart } from "@/lib/startFlow";
 import { cn } from "@/lib/utils";
 import AppEnvironment from "@/plugins/appEnvironment";
+
+/** Whether the server a sign-in goes to is Initiative Cloud. */
+const useIsCloudServer = (): boolean => useServer().getServerOrigin() === CLOUD_ORIGIN;
+
+/**
+ * Leaving a server: a sign-up begun on it stays there, and leaving signs out
+ * of it. The draft goes first: if it cannot, nothing has changed.
+ */
+const useLeaveServer = () => {
+  const { user, logout } = useAuth();
+  return async () => {
+    await clearStart();
+    if (user) await logout();
+  };
+};
+
+/** Moves the app to Initiative Cloud, signed out of the server it leaves. */
+const useSwitchToCloud = () => {
+  const { t } = useTranslation("auth");
+  const { setServerUrl } = useServer();
+  const leaveServer = useLeaveServer();
+  const [error, setError] = useState<string | null>(null);
+  const switchToCloud = async () => {
+    setError(null);
+    try {
+      await leaveServer();
+      await setServerUrl(CLOUD_SERVER_URL);
+      return true;
+    } catch {
+      setError(t("server.connectError"));
+      return false;
+    }
+  };
+  return { switchToCloud, error };
+};
 
 /**
  * The kind of server a sign-in goes to, where it cannot be changed: in a
@@ -34,7 +74,9 @@ import AppEnvironment from "@/plugins/appEnvironment";
  */
 export const ServerChip = () => {
   const { t } = useTranslation("auth");
-  const kind = useIsDemoServer() ? t("server.demo") : t("server.selfHosted");
+  const demo = useIsDemoServer();
+  const cloud = useIsCloudServer();
+  const kind = demo ? t("server.demo") : cloud ? t("server.cloud") : t("server.selfHosted");
   return (
     <Badge className="hover:bg-primary" aria-label={`${t("server.label")}: ${kind}`}>
       {kind}
@@ -54,23 +96,30 @@ export const ServerPicker = ({ className }: { className?: string }) => {
 
 const AppServerPicker = ({ className }: { className?: string }) => {
   const { t } = useTranslation("auth");
-  // Initiative Cloud is not open yet, so self-hosted is the only choice.
-  const [where, setWhere] = useState("selfHosted");
+  const { serverUrl } = useServer();
+  const cloud = useIsCloudServer();
+  // An app with no server of its own starts on Initiative Cloud.
+  const [where, setWhere] = useState(serverUrl === null || cloud ? "cloud" : "selfHosted");
+  const { switchToCloud, error } = useSwitchToCloud();
+
+  const choose = async (next: string) => {
+    if (next === "cloud" && !cloud && !(await switchToCloud())) return;
+    setWhere(next);
+  };
 
   return (
     <div className={cn("space-y-2", className)}>
-      <Select value={where} onValueChange={setWhere}>
+      <Select value={where} onValueChange={choose}>
         <SelectTrigger aria-label={t("server.label")} className="h-8 w-auto gap-2">
           <SelectValue />
         </SelectTrigger>
         <SelectContent>
-          <SelectItem value="cloud" disabled>
-            {t("server.cloud")} · {t("server.cloudSoon")}
-          </SelectItem>
+          <SelectItem value="cloud">{t("server.cloud")}</SelectItem>
           <SelectItem value="selfHosted">{t("server.selfHosted")}</SelectItem>
         </SelectContent>
       </Select>
       {where === "selfHosted" ? <ServerAddressForm /> : null}
+      {error ? <p className="text-destructive text-sm">{error}</p> : null}
     </div>
   );
 };
@@ -88,15 +137,17 @@ const hostOf = (origin: string | null): string | null => {
 /**
  * Where a sign-in goes, under the sign-in card's title. A browser is on its
  * server already, so there it is only the chip; in the app it is "Sign in to
- * <server>" with the server as a small menu, and choosing your own server
- * opens its address beneath.
+ * <server>" with the server as a small menu: Initiative Cloud, or your own
+ * server, which opens its address beneath.
  */
 export const ServerSubtitle = () => {
   const { t } = useTranslation("auth");
   const { isNativePlatform, getServerOrigin } = useServer();
   const host = hostOf(getServerOrigin());
   const demo = useIsDemoServer();
+  const cloud = useIsCloudServer();
   const [editing, setEditing] = useState(false);
+  const { switchToCloud, error } = useSwitchToCloud();
 
   if (!isNativePlatform) return <ServerChip />;
 
@@ -109,22 +160,36 @@ export const ServerSubtitle = () => {
             i18nKey="login.signInTo"
             values={{ server: demo ? t("server.demo") : (host ?? t("server.selfHosted")) }}
             components={{
-              server: <ServerMenu onChooseOwn={() => setEditing(true)} />,
+              server: (
+                <ServerMenu
+                  cloud={cloud}
+                  onChooseCloud={async () => {
+                    setEditing(false);
+                    if (!cloud) await switchToCloud();
+                  }}
+                  onChooseOwn={() => setEditing(true)}
+                />
+              ),
             }}
           />
         </p>
         {host || demo ? <ServerChip /> : null}
       </div>
       {editing ? <ServerAddressForm onConnected={() => setEditing(false)} /> : null}
+      {error ? <p className="text-destructive text-sm">{error}</p> : null}
     </div>
   );
 };
 
 const ServerMenu = ({
   children,
+  cloud,
+  onChooseCloud,
   onChooseOwn,
 }: {
   children?: ReactNode;
+  cloud: boolean;
+  onChooseCloud: () => void;
   onChooseOwn: () => void;
 }) => {
   const { t } = useTranslation("auth");
@@ -138,13 +203,13 @@ const ServerMenu = ({
         <ChevronDown className="h-3.5 w-3.5 text-muted-foreground" aria-hidden />
       </DropdownMenuTrigger>
       <DropdownMenuContent align="start">
-        <DropdownMenuItem disabled>
+        <DropdownMenuItem onSelect={onChooseCloud}>
           <span className="flex-1">{t("server.cloud")}</span>
-          <span className="text-muted-foreground text-xs">{t("server.cloudSoon")}</span>
+          {cloud ? <Check aria-hidden /> : null}
         </DropdownMenuItem>
         <DropdownMenuItem onSelect={onChooseOwn}>
           <span className="flex-1">{t("server.ownServer")}</span>
-          <Check aria-hidden />
+          {cloud ? null : <Check aria-hidden />}
         </DropdownMenuItem>
       </DropdownMenuContent>
     </DropdownMenu>
@@ -155,8 +220,12 @@ const ServerMenu = ({
 const ServerAddressForm = ({ onConnected }: { onConnected?: () => void }) => {
   const { t } = useTranslation("auth");
   const { serverUrl, setServerUrl, testServerConnection, getServerOrigin } = useServer();
-  const { user, logout } = useAuth();
-  const [address, setAddress] = useState(() => getSelfHostedAddress() ?? getServerOrigin() ?? "");
+  const leaveServer = useLeaveServer();
+  // Initiative Cloud's address is not one to fill in for your own server.
+  const [address, setAddress] = useState(() => {
+    const origin = getServerOrigin();
+    return getSelfHostedAddress() ?? (origin === CLOUD_ORIGIN ? null : origin) ?? "";
+  });
   const [error, setError] = useState<string | null>(null);
   const [connecting, setConnecting] = useState(false);
 
@@ -188,10 +257,7 @@ const ServerAddressForm = ({ onConnected }: { onConnected?: () => void }) => {
         setError(await failure(result.error ?? t("server.connectError")));
         return;
       }
-      // A sign-up begun on one server stays there, and leaving a server signs
-      // out of it. The draft goes first: if it cannot, nothing has changed.
-      await clearStart();
-      if (user) await logout();
+      await leaveServer();
       setSelfHostedAddress(trimmed);
       await setServerUrl(trimmed);
       onConnected?.();

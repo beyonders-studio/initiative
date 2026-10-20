@@ -23,7 +23,7 @@ import { ThemeProvider } from "@/hooks/useTheme";
 import { prepareOfflineCache } from "@/lib/offlineBoot";
 import { bindOnlineManagerToDevice } from "@/lib/onlineStatus";
 import { queryClient } from "@/lib/queryClient";
-import { getStoredServerUrl } from "@/lib/serverStorage";
+import { adoptStoredServerUrl } from "@/lib/serverStorage";
 import { initStorage } from "@/lib/storage";
 import { sellsOnThisDevice } from "@/lib/storeSelling";
 import { router } from "@/router";
@@ -90,10 +90,7 @@ async function bootstrap() {
       console.debug("SplashScreen.hide failed (plugin unavailable):", error);
     }
 
-    const storedUrl = getStoredServerUrl();
-    if (storedUrl) {
-      setApiBaseUrl(storedUrl);
-    }
+    setApiBaseUrl(adoptStoredServerUrl());
 
     // Ask the store early, so plan wording and buttons are settled by the time
     // anything shows them. Not awaited: nothing waits on it to render.
