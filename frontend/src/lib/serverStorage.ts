@@ -6,8 +6,8 @@ const SERVER_URL_KEY = "initiative-server-url";
 const SELF_HOSTED_ADDRESS_KEY = "initiative-self-hosted-address";
 
 /** Initiative Cloud, the server the app signs in to until it is given another. */
-export const CLOUD_SERVER_URL = "https://initiativetasks.com/api/v1";
-export const CLOUD_ORIGIN = new URL(CLOUD_SERVER_URL).origin;
+export const CLOUD_ORIGIN = "https://initiativetasks.com";
+export const CLOUD_SERVER_URL = `${CLOUD_ORIGIN}/api/v1`;
 
 // Server URL storage
 export function getStoredServerUrl(): string | null {

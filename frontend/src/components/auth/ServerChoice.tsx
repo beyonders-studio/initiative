@@ -53,8 +53,10 @@ const useSwitchToCloud = () => {
   const { setServerUrl } = useServer();
   const leaveServer = useLeaveServer();
   const [error, setError] = useState<string | null>(null);
+  const [switching, setSwitching] = useState(false);
   const switchToCloud = async () => {
     setError(null);
+    setSwitching(true);
     try {
       await leaveServer();
       await setServerUrl(CLOUD_SERVER_URL);
@@ -62,9 +64,11 @@ const useSwitchToCloud = () => {
     } catch {
       setError(t("server.connectError"));
       return false;
+    } finally {
+      setSwitching(false);
     }
   };
-  return { switchToCloud, error };
+  return { switchToCloud, switching, error };
 };
 
 /**
@@ -100,7 +104,10 @@ const AppServerPicker = ({ className }: { className?: string }) => {
   const cloud = useIsCloudServer();
   // An app with no server of its own starts on Initiative Cloud.
   const [where, setWhere] = useState(serverUrl === null || cloud ? "cloud" : "selfHosted");
-  const { switchToCloud, error } = useSwitchToCloud();
+  const { switchToCloud, switching, error } = useSwitchToCloud();
+  // The choice holds while a server is being reached, so the one shown is the
+  // one the app ends up on.
+  const [connecting, setConnecting] = useState(false);
 
   const choose = async (next: string) => {
     if (next === "cloud" && !cloud && !(await switchToCloud())) return;
@@ -109,7 +116,7 @@ const AppServerPicker = ({ className }: { className?: string }) => {
 
   return (
     <div className={cn("space-y-2", className)}>
-      <Select value={where} onValueChange={choose}>
+      <Select value={where} onValueChange={choose} disabled={connecting || switching}>
         <SelectTrigger aria-label={t("server.label")} className="h-8 w-auto gap-2">
           <SelectValue />
         </SelectTrigger>
@@ -118,7 +125,7 @@ const AppServerPicker = ({ className }: { className?: string }) => {
           <SelectItem value="selfHosted">{t("server.selfHosted")}</SelectItem>
         </SelectContent>
       </Select>
-      {where === "selfHosted" ? <ServerAddressForm /> : null}
+      {where === "selfHosted" ? <ServerAddressForm onBusyChange={setConnecting} /> : null}
       {error ? <p className="text-destructive text-sm">{error}</p> : null}
     </div>
   );
@@ -147,7 +154,8 @@ export const ServerSubtitle = () => {
   const demo = useIsDemoServer();
   const cloud = useIsCloudServer();
   const [editing, setEditing] = useState(false);
-  const { switchToCloud, error } = useSwitchToCloud();
+  const { switchToCloud, switching, error } = useSwitchToCloud();
+  const [connecting, setConnecting] = useState(false);
 
   if (!isNativePlatform) return <ServerChip />;
 
@@ -163,6 +171,7 @@ export const ServerSubtitle = () => {
               server: (
                 <ServerMenu
                   cloud={cloud}
+                  disabled={connecting || switching}
                   onChooseCloud={async () => {
                     setEditing(false);
                     if (!cloud) await switchToCloud();
@@ -175,7 +184,9 @@ export const ServerSubtitle = () => {
         </p>
         {host || demo ? <ServerChip /> : null}
       </div>
-      {editing ? <ServerAddressForm onConnected={() => setEditing(false)} /> : null}
+      {editing ? (
+        <ServerAddressForm onConnected={() => setEditing(false)} onBusyChange={setConnecting} />
+      ) : null}
       {error ? <p className="text-destructive text-sm">{error}</p> : null}
     </div>
   );
@@ -184,11 +195,13 @@ export const ServerSubtitle = () => {
 const ServerMenu = ({
   children,
   cloud,
+  disabled,
   onChooseCloud,
   onChooseOwn,
 }: {
   children?: ReactNode;
   cloud: boolean;
+  disabled?: boolean;
   onChooseCloud: () => void;
   onChooseOwn: () => void;
 }) => {
@@ -197,6 +210,7 @@ const ServerMenu = ({
     <DropdownMenu>
       <DropdownMenuTrigger
         aria-label={t("server.label")}
+        disabled={disabled}
         className="inline-flex items-center gap-0.5 rounded-sm font-medium text-foreground underline-offset-4 outline-none hover:underline focus-visible:ring-2 focus-visible:ring-ring"
       >
         {children}
@@ -217,7 +231,14 @@ const ServerMenu = ({
 };
 
 /** A self-hosted server's address, which the app keeps for next time. */
-const ServerAddressForm = ({ onConnected }: { onConnected?: () => void }) => {
+const ServerAddressForm = ({
+  onConnected,
+  onBusyChange,
+}: {
+  onConnected?: () => void;
+  /** Whether a connection is under way, for a choice that must hold meanwhile. */
+  onBusyChange?: (busy: boolean) => void;
+}) => {
   const { t } = useTranslation("auth");
   const { serverUrl, setServerUrl, testServerConnection, getServerOrigin } = useServer();
   const leaveServer = useLeaveServer();
@@ -250,6 +271,7 @@ const ServerAddressForm = ({ onConnected }: { onConnected?: () => void }) => {
     event.preventDefault();
     if (!trimmed || isCurrent) return;
     setConnecting(true);
+    onBusyChange?.(true);
     setError(null);
     try {
       const result = await testServerConnection(trimmed);
@@ -265,6 +287,7 @@ const ServerAddressForm = ({ onConnected }: { onConnected?: () => void }) => {
       setError(await failure(t("server.connectError")));
     } finally {
       setConnecting(false);
+      onBusyChange?.(false);
     }
   };
 

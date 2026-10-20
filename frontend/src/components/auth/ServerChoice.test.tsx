@@ -245,6 +245,31 @@ describe("ServerPicker", () => {
     }
   );
 
+  it("holds the server choice while an address is being reached", async () => {
+    const user = userEvent.setup();
+    let answer: (result: { valid: boolean }) => void = () => {};
+    const testServerConnection = vi.fn(
+      () => new Promise<{ valid: boolean }>((resolve) => (answer = resolve))
+    );
+    renderWithProviders(<ServerPicker />, {
+      server: {
+        isNativePlatform: true,
+        serverUrl: "https://home.example.com/api/v1",
+        testServerConnection,
+      },
+    });
+
+    const choice = screen.getByRole("combobox", { name: /^server$/i });
+    const address = screen.getByRole("textbox", { name: /server address/i });
+    await user.clear(address);
+    await user.type(address, "https://new.example.com");
+    await user.click(screen.getByRole("button", { name: /^connect$/i }));
+
+    expect(choice).toBeDisabled();
+    answer({ valid: false });
+    await waitFor(() => expect(choice).toBeEnabled());
+  });
+
   it("says the app is connected to the address it shows", () => {
     setSelfHostedAddress("https://home.example.com");
     renderWithProviders(<ServerPicker />, {
