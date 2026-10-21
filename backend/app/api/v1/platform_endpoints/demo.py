@@ -2,11 +2,12 @@
 runs as the demo (``DEMO_MODE``).
 
 * ``POST /demo/redeem`` — opening a demo link, with an address to leave.
+* ``GET /demo/samples`` — the sample accounts the sign-in page lists.
 * ``POST /demo/lead`` and ``GET /demo/copy`` — a visitor's own copy: leaving
   an address, and whether the copy is ready.
 * ``POST /c/{community_id}/demo/publish`` and ``GET …/demo/pitch`` — a pitch's
   admins publishing it, and what the page needs to offer that.
-* ``POST /c/{community_id}/demo/personas``, ``…/pitches``,
+* ``POST /c/{community_id}/demo/personas``, ``…/samples``, ``…/pitches``,
   ``…/pitches/find``, ``…/pitches/delete``, ``…/links``, ``…/links/read`` and ``…/links/revoke``
   — the demo plug-in's API, answered only to an installation token from the
   operations community holding the community-admin standing there. As on
@@ -33,17 +34,23 @@ from fastapi.exceptions import RequestValidationError
 from pydantic import ValidationError
 from sqlmodel.ext.asyncio.session import AsyncSession
 
-from app.api.deps import GuildContextDep, SystemSessionDep, get_current_active_user
+from app.api.deps import (
+    GuildContextDep,
+    SessionDep,
+    SystemSessionDep,
+    get_current_active_user,
+)
 from app.api.v1.platform_endpoints.plugin_installation import InstallationDep
 from app.api.v1.platform_endpoints.session_opening import open_session
 from app.core import audit_context, webhook_events
 from app.core.body_limit import MULTIPART_SLACK_BYTES, max_body
 from app.core.config import settings
+from app.core.login_methods import LoginMethod
 from app.core.messages import DemoMessages, ImportEngineMessages, PluginMessages
 from app.db.holds import HoldsInForce
 from app.db.request_context import Unattributed
 from app.db.session import set_rls_context
-from app.demo import accounts, copies, pitches, sales
+from app.demo import accounts, copies, pitches, sales, samples
 from app.models.platform.guild import CommunityRole
 from app.models.platform.guild_image import IMAGE_SPECS, GuildImageVariant
 from app.models.platform.identity_ref import IdentityEntity
@@ -70,10 +77,15 @@ from app.schemas.platform.demo import (
     DemoPitchRead,
     DemoRedeem,
     DemoRedemption,
+    DemoSampleRead,
+    DemoSamplesKeep,
+    DemoSamplesKept,
 )
 from app.services import captcha as captcha_service
 from app.services.import_engine import limits as import_limits
 from app.services.import_engine.engine import spooled_upload
+from app.services.content_sockets import sockets as content_sockets
+from app.services.platform import auth_posture
 from app.services.platform.intake import configured_operations_guild_id
 
 router = APIRouter()
@@ -145,6 +157,26 @@ async def _own_copy(user: User) -> copies.AccountCopy:
     if copy is None:
         raise _not_found(DemoMessages.DEMO_COPY_NOT_FOUND)
     return copy
+
+
+@router.get("/samples", response_model=list[DemoSampleRead])
+async def list_demo_samples(
+    session: SessionDep, _demo: DemoOnly
+) -> list[DemoSampleRead]:
+    """The sample accounts anyone may sign in to, with the address and
+    password of each, for the sign-in page. None while the deployment does not
+    sign people in with passwords."""
+    if not await auth_posture.login_method_allowed(session, LoginMethod.password):
+        return []
+    return [
+        DemoSampleRead(
+            display_name=sample.display_name,
+            email=sample.email,
+            password=sample.password,
+            about=sample.about,
+        )
+        for sample in await samples.listed()
+    ]
 
 
 @router.get("/copy", response_model=DemoCopyRead)
@@ -272,6 +304,49 @@ async def ensure_demo_personas(
             )
     await session.commit()
     return DemoPersonasEnsured(handles=[persona.handle for persona in payload.personas])
+
+
+@sales_router.post("/samples", response_model=DemoSamplesKept)
+async def keep_demo_samples(
+    payload: DemoSamplesKeep, _install: SalesInstallDep, session: SystemSessionDep
+) -> DemoSamplesKept:
+    """Make each sample account that is missing and put each back as it is
+    named: its address and password, nothing else to sign in with, nobody
+    signed in, a bare profile. Every sample not named becomes a persona again.
+    409 ``DEMO_PERSONA_TAKEN`` for a handle that is an account somebody signs
+    in to and not a sample, or ``DEMO_SAMPLE_ADDRESS_TAKEN`` for an address
+    another account signs in with, and nothing is changed."""
+    await set_rls_context(session, Unattributed())
+    try:
+        ended = await samples.keep(
+            session,
+            [
+                samples.Sample(
+                    handle=sample.handle,
+                    display_name=sample.display_name,
+                    email=str(sample.email),
+                    password=sample.password,
+                    about=sample.about,
+                )
+                for sample in payload.samples
+            ],
+        )
+    except accounts.HandleTaken:
+        await session.rollback()
+        raise HTTPException(
+            status_code=status.HTTP_409_CONFLICT,
+            detail=DemoMessages.DEMO_PERSONA_TAKEN,
+        )
+    except samples.AddressTaken:
+        await session.rollback()
+        raise HTTPException(
+            status_code=status.HTTP_409_CONFLICT,
+            detail=DemoMessages.DEMO_SAMPLE_ADDRESS_TAKEN,
+        )
+    await session.commit()
+    for user_id in ended:
+        await content_sockets.revoke_user_everywhere(user_id)
+    return DemoSamplesKept(handles=[sample.handle for sample in payload.samples])
 
 
 def _directory_card(raw: str | None) -> DemoDirectoryCard | None:

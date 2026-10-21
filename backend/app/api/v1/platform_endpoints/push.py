@@ -2,7 +2,12 @@ from typing import Annotated
 
 from fastapi import APIRouter, Depends, HTTPException, Request, status
 
-from app.api.deps import UserSessionDep, CurrentUser, require_first_party_session
+from app.api.deps import (
+    UserSessionDep,
+    CurrentUser,
+    require_first_party_session,
+    NotDemoSample,
+)
 from app.core import auth_context
 from app.core.rate_limit import limiter
 from app.schemas.platform.push import (
@@ -16,7 +21,9 @@ from app.services.platform import app_settings, push_tokens
 router = APIRouter()
 
 
-@router.post("/register", response_model=PushTokenResponse)
+@router.post(
+    "/register", response_model=PushTokenResponse, dependencies=[NotDemoSample]
+)
 @limiter.limit("30/hour")
 async def register_push_token(
     request: Request,

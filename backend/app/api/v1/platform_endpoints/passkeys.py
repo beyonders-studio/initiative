@@ -26,6 +26,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from webauthn.helpers import bytes_to_base64url
 
 from app.api.deps import (
+    NotDemoSample,
     FactorExemptUser,
     require_first_party_session,
     SystemSessionDep,
@@ -146,7 +147,11 @@ async def list_passkeys(
     )
 
 
-@router.post("/passkeys/register/begin", response_model=PasskeyRegistrationOptions)
+@router.post(
+    "/passkeys/register/begin",
+    response_model=PasskeyRegistrationOptions,
+    dependencies=[NotDemoSample],
+)
 @limiter.limit("10/15minutes")
 async def begin_passkey_registration(
     request: Request,
@@ -205,6 +210,7 @@ async def begin_passkey_registration(
     "/passkeys/register/finish",
     response_model=PasskeyRead,
     status_code=status.HTTP_201_CREATED,
+    dependencies=[NotDemoSample],
 )
 @limiter.limit("10/15minutes")
 async def finish_passkey_registration(
@@ -268,7 +274,9 @@ async def finish_passkey_registration(
     return read
 
 
-@router.patch("/passkeys/{passkey_id}", response_model=PasskeyRead)
+@router.patch(
+    "/passkeys/{passkey_id}", response_model=PasskeyRead, dependencies=[NotDemoSample]
+)
 @limiter.limit("30/15minutes")
 async def rename_passkey(
     request: Request,
@@ -299,6 +307,7 @@ async def rename_passkey(
     "/passkeys/{passkey_id}/remove",
     response_model=HeldChangeOutcome,
     responses=HELD_OUTCOME,
+    dependencies=[NotDemoSample],
 )
 @limiter.limit("10/15minutes")
 async def remove_passkey(

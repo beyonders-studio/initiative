@@ -273,6 +273,14 @@ async def send_email(
 ) -> None:
     if not recipients:
         raise ValueError("At least one recipient email is required")
+    from app.demo import samples as demo_samples
+
+    # The demo's sample accounts sign in with addresses nobody reads.
+    shared = await demo_samples.addresses_of(recipients)
+    if shared:
+        recipients = [address for address in recipients if address not in shared]
+        if not recipients:
+            return
     if settings_obj is None:
         settings_obj = await app_settings_service.get_app_settings(session)
     # Built before the password is read: an install with no mail server raises

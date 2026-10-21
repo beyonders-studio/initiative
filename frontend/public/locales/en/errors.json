@@ -769,5 +769,7 @@
   "DEMO_PITCH_HELD": "This pitch holds content under review, so it can't be deleted yet.",
   "DEMO_PERSONA_TAKEN": "That handle belongs to a real account.",
   "DEMO_LINK_EXPIRY_INVALID": "A demo link can't end in the past.",
+  "DEMO_SAMPLE_ACCOUNT": "This is a shared sample account, so its sign-in, devices and sessions can't be changed. Create your own account to do that.",
+  "DEMO_SAMPLE_ADDRESS_TAKEN": "That address already signs in to another account.",
   "INVALID_RECURRENCE_LIMIT": "A daily maximum requires an hourly repeat after completion and a due date. Enter a whole maximum from 1 to 24, or leave it blank."
 }

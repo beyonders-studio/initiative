@@ -4581,6 +4581,16 @@ export interface DemoRedemption {
   import_job_id: number;
 }
 
+/**
+ * A sample account as the demo's sign-in page lists it.
+ */
+export interface DemoSampleRead {
+  display_name: string;
+  email: string;
+  password: string;
+  about?: string | null;
+}
+
 export type TaskDetailFieldId = (typeof TaskDetailFieldId)[keyof typeof TaskDetailFieldId];
 
 export const TaskDetailFieldId = {
@@ -7935,6 +7945,7 @@ export interface OperatorUserRead {
   password_required: boolean;
   demo_expires_at: string | null;
   demo_community_id: number | null;
+  demo_sample: boolean;
   initiative_roles: UserInitiativeRole[];
   purge_at: string | null;
   sign_in_locked_until: string | null;
@@ -10900,6 +10911,7 @@ export interface UserRead {
   password_required: boolean;
   demo_expires_at: string | null;
   demo_community_id: number | null;
+  demo_sample: boolean;
   initiative_roles: UserInitiativeRole[];
   readonly can_create_communities: boolean;
   /**

@@ -55,6 +55,7 @@ from app.core.security import (
     password_needs_rehash,
     verify_sign_in_password,
 )
+from app.demo import samples as demo_samples
 from app.models.platform.auth_session import AuthSession
 from app.models.platform.user import User, may_sign_in
 from app.schemas.platform.token import Token
@@ -259,7 +260,10 @@ async def refuse_if_locked(system_session: AsyncSession, user_id: int) -> None:
 
 async def count_wrong_answer(system_session: AsyncSession, user_id: int) -> None:
     """Count a wrong password or code against the account, commit it, and tell
-    the holder if that placed a lock."""
+    the holder if that placed a lock. A demo sample account, which everyone
+    signs in to, is never locked."""
+    if await demo_samples.is_sample(user_id):
+        return
     failure = await sign_in_locks.record_failure(system_session, user_id)
     await system_session.commit()
     if failure.lock_for is None:
@@ -317,7 +321,10 @@ async def prove_password(
     attempt pays the same work.
     """
     await require_login_method(session, LoginMethod.password)
-    if not await SIGN_IN_FAILURES.left(email):
+    # A demo sample's password is shown on the sign-in page, so a wrong one
+    # holds nobody else back from it.
+    shared = bool(await demo_samples.addresses_of([email]))
+    if not shared and not await SIGN_IN_FAILURES.left(email):
         raise HTTPException(
             status_code=status.HTTP_429_TOO_MANY_REQUESTS,
             detail=AuthMessages.SIGN_IN_LOCKED,
@@ -341,7 +348,8 @@ async def prove_password(
     if not user or not password_matches:
         # Recorded whether or not the address resolved; the record keeps no
         # identity when there was none to keep.
-        await SIGN_IN_FAILURES.take(email)
+        if not shared:
+            await SIGN_IN_FAILURES.take(email)
         await record_sign_in_failure(
             system_session, user, method="password", reason="bad_password"
         )

@@ -1175,12 +1175,14 @@ async def to_self_read(session: AsyncSession, user: User) -> "UserRead":
     payload.has_password = has_usable_password(user.hashed_password)
     payload.password_required = await auth_posture.password_confirms(session, user)
     if settings.DEMO_MODE:
+        from app.demo import samples
         from app.demo.copies import account_copy
 
         copy = await account_copy(user.id)
         if copy is not None:
             payload.demo_community_id = copy.guild_id
             payload.demo_expires_at = copy.expires_at
+        payload.demo_sample = await samples.is_sample(user.id)
     return payload
 
 

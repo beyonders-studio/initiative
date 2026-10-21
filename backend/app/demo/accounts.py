@@ -3,7 +3,8 @@ and each visitor's account.
 
 All are made with no password and no address, so nothing can sign in to one
 but the session the demo opens for it, and every notification that would
-leave the app is off.
+leave the app is off. A sample account (``app.demo.samples``) is a persona
+given an address and a password that the sign-in page shows.
 """
 
 from __future__ import annotations
@@ -16,7 +17,7 @@ from sqlmodel.ext.asyncio.session import AsyncSession
 
 from app.core.audit_events import AuditEventType
 from app.core.notification_categories import CATEGORY_SPECS, Channel
-from app.models.platform.demo import DemoSandbox
+from app.models.platform.demo import DemoSample, DemoSandbox
 from app.models.platform.guild import GuildMembership
 from app.models.platform.user import User
 from app.models.platform.user_email import UserEmail
@@ -29,7 +30,7 @@ from app.services.platform.notification_prefs import save_prefs
 HOST_HANDLE = "demo-host#0001"
 
 #: Nothing leaves the app.
-_SILENT = {
+SILENT = {
     "categories": {
         category.value: {
             channel.value: False
@@ -47,6 +48,11 @@ def unloginable() -> ColumnElement[bool]:
         User.hashed_password.is_(None),
         ~exists().where(UserEmail.user_id == User.id),
     )
+
+
+def sample() -> ColumnElement[bool]:
+    """Sample accounts: personas anyone may sign in to."""
+    return exists().where(DemoSample.user_id == User.id)
 
 
 def visitor() -> ColumnElement[bool]:
@@ -130,7 +136,7 @@ async def create(session: AsyncSession, *, handle: str | None = None) -> User:
     session.add(user)
     await session.flush()
     await dm_settings_service.seed_for_new_account(session, user_id=user.id)
-    await save_prefs(session, user.id, _SILENT)
+    await save_prefs(session, user.id, SILENT)
     await audit_service.record(
         session,
         event_type=AuditEventType.USER_CREATED,

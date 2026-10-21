@@ -19,6 +19,8 @@ from sqlmodel import select
 
 from app.api.actor_route import ActorRoute
 from app.api.deps import (
+    NotDemoSample,
+    refuse_demo_sample,
     ActorContext,
     ActorSessionDep,
     plugin_scope,
@@ -1325,6 +1327,7 @@ async def list_my_addresses(
     "/emails",
     response_model=VerificationSendResponse,
     status_code=status.HTTP_202_ACCEPTED,
+    dependencies=[NotDemoSample],
 )
 @limiter.limit("5/15minutes")
 async def add_my_address(
@@ -1392,6 +1395,7 @@ async def add_my_address(
     "/emails/{address_id}/remove",
     response_model=HeldChangeOutcome,
     responses=HELD_OUTCOME,
+    dependencies=[NotDemoSample],
 )
 @limiter.limit("10/15minutes")
 async def remove_my_address(
@@ -1429,7 +1433,10 @@ async def remove_my_address(
 
 
 @me_router.put(
-    "/emails/{address_id}/primary", response_model=UserEmailRead, responses=HELD
+    "/emails/{address_id}/primary",
+    response_model=UserEmailRead,
+    responses=HELD,
+    dependencies=[NotDemoSample],
 )
 @limiter.limit("10/15minutes")
 async def make_my_address_primary(
@@ -1478,6 +1485,7 @@ async def update_me(
     update_data = user_in.model_dump(exclude_unset=True)
     password = update_data.get("password")
     if password:
+        await refuse_demo_sample(current_user)
         # Re-authenticate with the current password before changing it. An
         # account that holds none answers with a recent sign-in instead.
         password_proved = await require_password_or_recent_proof(
@@ -1637,7 +1645,11 @@ async def check_deletion_eligibility(
     )
 
 
-@me_router.post("/delete-account", response_model=AccountDeletionResponse)
+@me_router.post(
+    "/delete-account",
+    response_model=AccountDeletionResponse,
+    dependencies=[NotDemoSample],
+)
 async def delete_own_account(
     http_request: Request,
     request: AccountDeletionRequest,
@@ -1739,6 +1751,7 @@ async def list_my_api_keys(
     "/api-keys",
     response_model=ApiKeyCreateResponse,
     status_code=status.HTTP_201_CREATED,
+    dependencies=[NotDemoSample],
 )
 async def create_my_api_key(
     payload: ApiKeyCreateRequest,

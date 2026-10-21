@@ -16,6 +16,7 @@ from fastapi import APIRouter, Depends, HTTPException, Request, Response, status
 from fastapi.responses import JSONResponse
 
 from app.api.deps import (
+    NotDemoSample,
     FactorExemptUser,
     require_first_party_session,
     SystemSessionDep,
@@ -118,7 +119,9 @@ async def read_second_factor(
     )
 
 
-@router.post("/totp/enroll", response_model=SecondFactorEnrolment)
+@router.post(
+    "/totp/enroll", response_model=SecondFactorEnrolment, dependencies=[NotDemoSample]
+)
 @limiter.limit("10/hour")
 async def begin_second_factor(
     request: Request,
@@ -163,7 +166,9 @@ async def begin_second_factor(
     return SecondFactorEnrolment(secret=enrolment.secret, otpauth_uri=enrolment.uri)
 
 
-@router.post("/totp/confirm", response_model=RecoveryCodes)
+@router.post(
+    "/totp/confirm", response_model=RecoveryCodes, dependencies=[NotDemoSample]
+)
 @limiter.limit("10/15minutes")
 async def confirm_second_factor(
     request: Request,
@@ -223,6 +228,7 @@ async def confirm_second_factor(
     "/totp/disable",
     response_model=HeldChangeOutcome,
     responses=HELD_OUTCOME,
+    dependencies=[NotDemoSample],
 )
 @limiter.limit("10/15minutes")
 async def disable_second_factor(
@@ -318,7 +324,11 @@ async def step_up_with_factor(
     )
 
 
-@router.post("/recovery-codes/regenerate", response_model=RecoveryCodes)
+@router.post(
+    "/recovery-codes/regenerate",
+    response_model=RecoveryCodes,
+    dependencies=[NotDemoSample],
+)
 @limiter.limit("5/hour")
 async def regenerate_recovery_codes(
     request: Request,

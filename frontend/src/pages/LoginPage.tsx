@@ -7,6 +7,7 @@ import { useTranslation } from "react-i18next";
 
 import { useBootstrapStatus } from "@/api/generated/auth/auth";
 import type { LoginProviderEntry } from "@/api/generated/initiativeAPI.schemas";
+import { DemoSamples } from "@/components/auth/DemoSamples";
 import { EmailOtpCard } from "@/components/auth/EmailOtpCard";
 import { PasskeyRelayCard } from "@/components/auth/PasskeyRelayCard";
 import { ProviderMark } from "@/components/auth/ProviderMark";
@@ -587,6 +588,15 @@ const SignInCard = () => {
                 <p className="text-muted-foreground text-sm">{t("login.nothingOffered")}</p>
               ) : null}
               {error ? <p className="text-destructive text-sm">{error}</p> : null}
+              {bootstrap.data?.demo && passwordLoginEnabled ? (
+                <DemoSamples
+                  onUse={(sampleEmail, samplePassword) => {
+                    setEmail(sampleEmail);
+                    setPassword(samplePassword);
+                    setError(null);
+                  }}
+                />
+              ) : null}
             </form>
           )}
         </CardContent>

@@ -7,7 +7,7 @@ from app.core import usernames
 from app.models.platform.demo import LinkState
 from app.models.platform.guild import MEMBER_DISPLAY_NAME_MAX_LENGTH, CommunityCategory
 from app.models.tenant.initiative import InitiativeJoinPolicy
-from app.schemas.base import SanitizedBaseModel, TitleStr
+from app.schemas.base import RawTextStr, SanitizedBaseModel, TitleStr
 from app.schemas.platform.token import Token
 
 
@@ -81,6 +81,46 @@ class DemoPersonasEnsure(SanitizedBaseModel):
 class DemoPersonasEnsured(SanitizedBaseModel):
     #: The handles ensured, as stored.
     handles: list[str]
+
+
+class DemoSampleKeep(DemoPersona):
+    """A sample account: a persona anyone may sign in to with ``email`` and
+    ``password``, which the demo's sign-in page shows."""
+
+    email: EmailStr
+    #: Shown on the sign-in page as it is, so kept exactly as sent.
+    password: RawTextStr = Field(min_length=8, max_length=128)
+    #: A line the sign-in page shows under its name, such as who it is.
+    about: Optional[TitleStr] = Field(default=None, max_length=200)
+
+
+class DemoSamplesKeep(SanitizedBaseModel):
+    #: Every sample account there is to be, in the order the sign-in page
+    #: lists them. A sample not named here becomes a persona again.
+    samples: list[DemoSampleKeep] = Field(max_length=50)
+
+    @field_validator("samples")
+    @classmethod
+    def _each_once(cls, value: list[DemoSampleKeep]) -> list[DemoSampleKeep]:
+        handles = {sample.handle.lower() for sample in value}
+        emails = {sample.email.lower() for sample in value}
+        if len(handles) != len(value) or len(emails) != len(value):
+            raise ValueError("each sample has its own handle and address")
+        return value
+
+
+class DemoSamplesKept(SanitizedBaseModel):
+    #: The handles kept, as stored.
+    handles: list[str]
+
+
+class DemoSampleRead(SanitizedBaseModel):
+    """A sample account as the demo's sign-in page lists it."""
+
+    display_name: str
+    email: str
+    password: RawTextStr
+    about: Optional[str] = None
 
 
 class DemoDirectoryCard(SanitizedBaseModel):

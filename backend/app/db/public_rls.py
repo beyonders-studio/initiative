@@ -671,6 +671,7 @@ SHARED_TABLE_REGISTRY: dict[str, SharedTable] = {
     # the sales plug-in, all on the system engine. No request role reaches them.
     "demo_leads": SharedTable(rls=FORCED_NO_POLICY, grants=Grants(app_admin=DML)),
     "demo_sandboxes": SharedTable(rls=FORCED_NO_POLICY, grants=Grants(app_admin=DML)),
+    "demo_samples": SharedTable(rls=FORCED_NO_POLICY, grants=Grants(app_admin=DML)),
     # Part of the direct-message transport, per-account and cross-guild (see
     # ``dm_devices``).
     "dm_conversation_members": SharedTable(

@@ -17,6 +17,7 @@ from app.core.plugin_scopes import (
 )
 from app.core.capabilities import Capability, user_has_capability
 from app.core.config import API_V1_STR
+from app.core.config import settings as app_config
 from app.core.login_methods import LoginMethod
 from app.core import auth_context
 from app.services.membership import live_membership_clause
@@ -461,6 +462,24 @@ async def get_active_user_exempt_from_factor(
 
 
 CurrentUser = Annotated[User, Depends(get_current_active_user)]
+
+
+async def refuse_demo_sample(
+    current_user: Annotated[User, Depends(get_current_user)],
+) -> None:
+    """403 ``DEMO_SAMPLE_ACCOUNT`` for one of the demo's sample accounts, on a
+    route that changes how it is signed in to, its devices or its sessions:
+    those are shared by everyone who signs in to it. Asks nothing of anyone
+    else, and nothing at all outside the demo."""
+    if app_config.DEMO_MODE:
+        from app.demo import samples
+
+        await samples.refuse(current_user)
+
+
+#: Route dependency: refuses the demo's sample accounts. See
+#: :func:`refuse_demo_sample`.
+NotDemoSample = Depends(refuse_demo_sample)
 
 
 async def get_age_viewer(request: Request, current_user: CurrentUser) -> AgeViewer:

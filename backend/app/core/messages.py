@@ -212,7 +212,8 @@ class GuildMessages:
     COMMUNITY_CREATION_DISABLED = "COMMUNITY_CREATION_DISABLED"
     FREE_COMMUNITY_ALREADY_HELD = "FREE_COMMUNITY_ALREADY_HELD"
     COMMUNITY_CREATION_LIMIT_REACHED = "COMMUNITY_CREATION_LIMIT_REACHED"
-    #: A demo visitor's account holds its copy and creates no community.
+    #: A demo visitor's account holds its copy and creates no community, nor
+    #: does one of the demo's sample accounts.
     COMMUNITY_CREATION_DEMO_ACCOUNT = "COMMUNITY_CREATION_DEMO_ACCOUNT"
     # Naming another user as a new guild's admin is platform-staff only.
     COMMUNITY_OWNER_REQUIRES_CAPABILITY = "COMMUNITY_OWNER_REQUIRES_CAPABILITY"
@@ -1830,3 +1831,8 @@ class DemoMessages:
     DEMO_PERSONA_TAKEN = "DEMO_PERSONA_TAKEN"
     #: A link's end is in the past.
     DEMO_LINK_EXPIRY_INVALID = "DEMO_LINK_EXPIRY_INVALID"
+    #: A sample account's sign-in, devices and sessions are shared by everyone
+    #: who signs in to it, so it cannot change them.
+    DEMO_SAMPLE_ACCOUNT = "DEMO_SAMPLE_ACCOUNT"
+    #: A sample's address signs in to another account.
+    DEMO_SAMPLE_ADDRESS_TAKEN = "DEMO_SAMPLE_ADDRESS_TAKEN"

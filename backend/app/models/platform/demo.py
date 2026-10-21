@@ -1,10 +1,10 @@
-"""The demo deployment's copies and the addresses visitors leave. A link
-handing a pitch out is a guest invite into the pitch, and the visitor it lets
-in is a guest of their copy.
+"""The demo deployment's copies, the addresses visitors leave, and its sample
+accounts. A link handing a pitch out is a guest invite into the pitch, and the
+visitor it lets in is a guest of their copy.
 
 Only a deployment started with ``DEMO_MODE`` writes these; everywhere else
-they stay empty. Both are the system engine's alone: no request-path role
-reaches either.
+they stay empty. All are the system engine's alone: no request-path role
+reaches any.
 """
 
 from datetime import datetime, timezone
@@ -111,3 +111,29 @@ class DemoLead(SQLModel, table=True):
         default_factory=lambda: datetime.now(timezone.utc),
         sa_column=Column(DateTime(timezone=True), nullable=False, index=True),
     )
+
+
+class DemoSample(SQLModel, table=True):
+    """A sample account: one the demo's sign-in page lists with its address and
+    password, which anyone may sign in to. The demo plug-in names them, and
+    each of its runs puts them back as it says."""
+
+    __tablename__ = "demo_samples"
+
+    user_id: int = Field(
+        sa_column=Column(
+            Integer, ForeignKey("users.id", ondelete="CASCADE"), primary_key=True
+        )
+    )
+    #: What it is called in every community it is in, and on the sign-in page.
+    display_name: str = Field(sa_column=Column(String(64), nullable=False))
+    #: The address it signs in with, as the sign-in page shows it.
+    email: str = Field(sa_column=Column(String(320), nullable=False))
+    #: Its password, as the sign-in page shows it.
+    password: str = Field(sa_column=Column(String(128), nullable=False))
+    #: A line the sign-in page shows under its name, such as who it is.
+    about: Optional[str] = Field(
+        default=None, sa_column=Column(String(200), nullable=True)
+    )
+    #: Where the sign-in page lists it, first at 0.
+    position: int = Field(sa_column=Column(Integer, nullable=False))

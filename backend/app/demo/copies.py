@@ -445,7 +445,7 @@ async def clean_up() -> None:
     for :data:`CLEANUP_AFTER`, with its links (a community nobody ever made a
     link to, such as a seeded one, is left alone), and every account left over
     from an invite: one on the bottom rung that is in no
-    community and that somebody can sign in to."""
+    community and that somebody can sign in to, other than a sample."""
     async with cohorts.system_session(None) as session:
         await set_rls_context(session, Unattributed())
         cutoff = datetime.now(timezone.utc) - CLEANUP_AFTER
@@ -479,6 +479,7 @@ async def clean_up() -> None:
                     User.role == UserRole.member,
                     User.status != UserStatus.anonymized,
                     ~accounts.unloginable(),
+                    ~accounts.sample(),
                     ~exists().where(GuildMembership.user_id == User.id),
                 )
             )

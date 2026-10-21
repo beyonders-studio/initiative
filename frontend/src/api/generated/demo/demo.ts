@@ -26,6 +26,7 @@ import type {
   DemoPitchRead,
   DemoRedeem,
   DemoRedemption,
+  DemoSampleRead,
   HTTPValidationError,
 } from "../initiativeAPI.schemas";
 
@@ -138,6 +139,119 @@ export const useRedeemDemoLink = <TError = ErrorType<HTTPValidationError>, TCont
 > => {
   return useMutation(getRedeemDemoLinkMutationOptions(options), queryClient);
 };
+/**
+ * The sample accounts anyone may sign in to, with the address and
+ * password of each, for the sign-in page. None while the deployment does not
+ * sign people in with passwords.
+ * @summary List Demo Samples
+ */
+export const listDemoSamples = (
+  options?: SecondParameter<typeof apiMutator>,
+  signal?: AbortSignal
+) => {
+  return apiMutator<DemoSampleRead[]>(
+    { url: `/api/v1/demo/samples`, method: "GET", signal },
+    options
+  );
+};
+
+export const getListDemoSamplesQueryKey = () => {
+  return [`/api/v1/demo/samples`] as const;
+};
+
+export const getListDemoSamplesQueryOptions = <
+  TData = Awaited<ReturnType<typeof listDemoSamples>>,
+  TError = ErrorType<unknown>,
+>(options?: {
+  query?: Partial<UseQueryOptions<Awaited<ReturnType<typeof listDemoSamples>>, TError, TData>>;
+  request?: SecondParameter<typeof apiMutator>;
+}) => {
+  const { query: queryOptions, request: requestOptions } = options ?? {};
+
+  const queryKey = queryOptions?.queryKey ?? getListDemoSamplesQueryKey();
+
+  const queryFn: QueryFunction<Awaited<ReturnType<typeof listDemoSamples>>> = ({ signal }) =>
+    listDemoSamples(requestOptions, signal);
+
+  return { queryKey, queryFn, ...queryOptions } as UseQueryOptions<
+    Awaited<ReturnType<typeof listDemoSamples>>,
+    TError,
+    TData
+  > & { queryKey: DataTag<QueryKey, TData, TError> };
+};
+
+export type ListDemoSamplesQueryResult = NonNullable<Awaited<ReturnType<typeof listDemoSamples>>>;
+export type ListDemoSamplesQueryError = ErrorType<unknown>;
+
+export function useListDemoSamples<
+  TData = Awaited<ReturnType<typeof listDemoSamples>>,
+  TError = ErrorType<unknown>,
+>(
+  options: {
+    query: Partial<UseQueryOptions<Awaited<ReturnType<typeof listDemoSamples>>, TError, TData>> &
+      Pick<
+        DefinedInitialDataOptions<
+          Awaited<ReturnType<typeof listDemoSamples>>,
+          TError,
+          Awaited<ReturnType<typeof listDemoSamples>>
+        >,
+        "initialData"
+      >;
+    request?: SecondParameter<typeof apiMutator>;
+  },
+  queryClient?: QueryClient
+): DefinedUseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData, TError> };
+export function useListDemoSamples<
+  TData = Awaited<ReturnType<typeof listDemoSamples>>,
+  TError = ErrorType<unknown>,
+>(
+  options?: {
+    query?: Partial<UseQueryOptions<Awaited<ReturnType<typeof listDemoSamples>>, TError, TData>> &
+      Pick<
+        UndefinedInitialDataOptions<
+          Awaited<ReturnType<typeof listDemoSamples>>,
+          TError,
+          Awaited<ReturnType<typeof listDemoSamples>>
+        >,
+        "initialData"
+      >;
+    request?: SecondParameter<typeof apiMutator>;
+  },
+  queryClient?: QueryClient
+): UseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData, TError> };
+export function useListDemoSamples<
+  TData = Awaited<ReturnType<typeof listDemoSamples>>,
+  TError = ErrorType<unknown>,
+>(
+  options?: {
+    query?: Partial<UseQueryOptions<Awaited<ReturnType<typeof listDemoSamples>>, TError, TData>>;
+    request?: SecondParameter<typeof apiMutator>;
+  },
+  queryClient?: QueryClient
+): UseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData, TError> };
+/**
+ * @summary List Demo Samples
+ */
+
+export function useListDemoSamples<
+  TData = Awaited<ReturnType<typeof listDemoSamples>>,
+  TError = ErrorType<unknown>,
+>(
+  options?: {
+    query?: Partial<UseQueryOptions<Awaited<ReturnType<typeof listDemoSamples>>, TError, TData>>;
+    request?: SecondParameter<typeof apiMutator>;
+  },
+  queryClient?: QueryClient
+): UseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData, TError> } {
+  const queryOptions = getListDemoSamplesQueryOptions(options);
+
+  const query = useQuery(queryOptions, queryClient) as UseQueryResult<TData, TError> & {
+    queryKey: DataTag<QueryKey, TData, TError>;
+  };
+
+  return withQueryKey(query, queryOptions.queryKey);
+}
+
 /**
  * The signed-in visitor's copy, and whether the import filling it has
  * finished, or failed. 404 for an account not made for a copy.

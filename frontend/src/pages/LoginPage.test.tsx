@@ -26,8 +26,10 @@ import { Browser } from "@capacitor/browser";
 import { fireEvent, screen, waitFor } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { AxiosError, AxiosHeaders } from "axios";
+import { HttpResponse, http } from "msw";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
+import { server } from "@/__tests__/helpers/msw-server";
 import { renderPage } from "@/__tests__/helpers/render";
 
 const mocks = vi.hoisted(() => ({
@@ -685,5 +687,56 @@ describe("LoginPage passkey relay", () => {
     expect(await screen.findByText(/you cancelled/i)).toBeInTheDocument();
     expect(screen.getByRole("button", { name: /continue with a passkey/i })).toBeEnabled();
     expect(assign).not.toHaveBeenCalled();
+  });
+});
+
+describe("LoginPage demo samples", () => {
+  beforeEach(resetLoginMocks);
+
+  const onTheDemo = () =>
+    server.use(
+      http.get("/api/v1/auth/bootstrap", () =>
+        HttpResponse.json({ has_users: true, public_registration_enabled: true, demo: true })
+      ),
+      http.get("/api/v1/demo/samples", () =>
+        HttpResponse.json([
+          {
+            display_name: "Rosie Baker",
+            email: "bakery@example.com",
+            password: "password",
+            about: "Owns Rosie's Bakery",
+          },
+        ])
+      )
+    );
+
+  it("lists the samples and puts one's address and password in the form", async () => {
+    const user = userEvent.setup();
+    mocks.login.mockReturnValue(new Promise(() => {}));
+    onTheDemo();
+    renderLogin();
+
+    expect(await screen.findByText("Rosie Baker")).toBeInTheDocument();
+    expect(screen.getByText("bakery@example.com · password")).toBeInTheDocument();
+    await user.click(screen.getByRole("button", { name: /sign in as rosie baker/i }));
+    expect(screen.getByLabelText(/email/i)).toHaveValue("bakery@example.com");
+    expect(screen.getByLabelText(/^password/i)).toHaveValue("password");
+
+    await user.click(screen.getByRole("button", { name: /^sign in$/i }));
+    expect(mocks.login).toHaveBeenCalledWith(
+      expect.objectContaining({ email: "bakery@example.com", password: "password" })
+    );
+  });
+
+  it("lists nothing where passwords are not offered", async () => {
+    onTheDemo();
+    mocks.config = { passwordLoginEnabled: false, passkeyLoginEnabled: true };
+    try {
+      renderLogin();
+      expect(await screen.findByRole("button", { name: /passkey/i })).toBeInTheDocument();
+      expect(screen.queryByText("Rosie Baker")).not.toBeInTheDocument();
+    } finally {
+      mocks.config = { passwordLoginEnabled: true, passkeyLoginEnabled: true };
+    }
   });
 });

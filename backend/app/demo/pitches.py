@@ -80,9 +80,9 @@ async def seat_cast(
     people: list[BackupPlanPerson],
     actor_id: int,
 ) -> dict[str, int]:
-    """Seat as members of the community the personas among ``people``, the
-    people a bundle names, under the names it gives them. Returns their ids by
-    handle, as an import maps people.
+    """Seat as members of the community the personas and sample accounts among
+    ``people``, the people a bundle names, under the names it gives them.
+    Returns their ids by handle, as an import maps people.
 
     A persona is an account nobody signs in to that is not the demo host and
     not a visitor, who is a guest of their copy."""
@@ -96,7 +96,7 @@ async def seat_cast(
     personas = await session.exec(
         select(User).where(
             tuple_(func.lower(User.username), User.discriminator).in_(list(named)),
-            accounts.unloginable(),
+            or_(accounts.unloginable(), accounts.sample()),
             User.id != actor_id,
             ~accounts.visitor(),
         )

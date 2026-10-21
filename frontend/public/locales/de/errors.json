@@ -769,5 +769,7 @@
   "DEMO_PITCH_HELD": "Dieser Pitch enthält Inhalte, die geprüft werden, und kann noch nicht gelöscht werden.",
   "DEMO_PERSONA_TAKEN": "Dieser Handle gehört zu einem echten Konto.",
   "DEMO_LINK_EXPIRY_INVALID": "Ein Demo-Link kann nicht in der Vergangenheit enden.",
+  "DEMO_SAMPLE_ACCOUNT": "Dies ist ein gemeinsames Beispielkonto, daher lassen sich Anmeldung, Geräte und Sitzungen nicht ändern. Erstelle dafür ein eigenes Konto.",
+  "DEMO_SAMPLE_ADDRESS_TAKEN": "Mit dieser Adresse meldet sich bereits ein anderes Konto an.",
   "INVALID_RECURRENCE_LIMIT": "Ein Tagesmaximum erfordert eine stündliche Wiederholung nach Abschluss und ein Fälligkeitsdatum. Gib ein ganzzahliges Maximum von 1 bis 24 ein oder lasse das Feld leer."
 }

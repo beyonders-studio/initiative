@@ -27,6 +27,10 @@ export const authHandlers = [
     return HttpResponse.json({ community_id: 7, ready: true, expires_at: null });
   }),
 
+  http.get("/api/v1/demo/samples", () => {
+    return HttpResponse.json([]);
+  }),
+
   http.get("/api/v1/auth/providers", () => {
     return HttpResponse.json({ providers: [] });
   }),

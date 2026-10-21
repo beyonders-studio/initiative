@@ -19,7 +19,12 @@ from typing import Annotated
 
 from fastapi import APIRouter, Depends, HTTPException, Request, status
 
-from app.api.deps import AccountHolder, require_first_party_session, SystemSessionDep
+from app.api.deps import (
+    AccountHolder,
+    require_first_party_session,
+    SystemSessionDep,
+    NotDemoSample,
+)
 from app.api.v1.platform_endpoints.session_opening import current_session_row
 from app.core.audit_events import AuditEventType
 from app.core.messages import AuthMessages
@@ -38,7 +43,9 @@ router = APIRouter()
 FirstPartyOnly = Annotated[str, Depends(require_first_party_session)]
 
 
-@router.get("/sessions", response_model=list[SignedInSessionInfo])
+@router.get(
+    "/sessions", response_model=list[SignedInSessionInfo], dependencies=[NotDemoSample]
+)
 async def list_my_sessions(
     request: Request,
     system_session: SystemSessionDep,
@@ -96,7 +103,11 @@ async def list_my_sessions(
     ]
 
 
-@router.delete("/sessions/{session_id}", status_code=status.HTTP_204_NO_CONTENT)
+@router.delete(
+    "/sessions/{session_id}",
+    status_code=status.HTTP_204_NO_CONTENT,
+    dependencies=[NotDemoSample],
+)
 async def revoke_my_session(
     system_session: SystemSessionDep,
     current_user: AccountHolder,
@@ -140,7 +151,11 @@ async def revoke_my_session(
     await content_sockets.revoke_user_everywhere(current_user.id)
 
 
-@router.post("/sessions/revoke-others", status_code=status.HTTP_204_NO_CONTENT)
+@router.post(
+    "/sessions/revoke-others",
+    status_code=status.HTTP_204_NO_CONTENT,
+    dependencies=[NotDemoSample],
+)
 async def revoke_my_other_sessions(
     request: Request,
     system_session: SystemSessionDep,

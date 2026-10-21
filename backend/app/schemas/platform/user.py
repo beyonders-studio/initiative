@@ -758,12 +758,20 @@ class UserRead(UserBase):
     #: The demo copy this account was made for; ``None`` for every other
     #: account. Populated with the fields above.
     demo_community_id: Optional[int] = None
+    #: Whether this is one of the demo's sample accounts, which anyone may
+    #: sign in to and whose sign-in, devices and sessions are not its own to
+    #: change. Populated with the fields above.
+    demo_sample: bool = False
     initiative_roles: List["UserInitiativeRole"] = Field(default_factory=list)
 
     @computed_field(return_type=bool)  # type: ignore[misc]
     @property
     def can_create_communities(self) -> bool:
-        if self.status == UserStatus.suspended or self.demo_expires_at is not None:
+        if (
+            self.status == UserStatus.suspended
+            or self.demo_expires_at is not None
+            or self.demo_sample
+        ):
             return False
         if not settings.DISABLE_GUILD_CREATION:
             return True

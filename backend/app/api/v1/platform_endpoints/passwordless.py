@@ -14,6 +14,7 @@ from fastapi import APIRouter, Depends, HTTPException, Request, Response, status
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.api.deps import (
+    NotDemoSample,
     require_first_party_session,
     SystemSessionDep,
     CurrentUser,
@@ -83,7 +84,9 @@ async def _record_recovery_refusal(
     await system_session.commit()
 
 
-@router.post("/password/remove", response_model=RecoveryCodes)
+@router.post(
+    "/password/remove", response_model=RecoveryCodes, dependencies=[NotDemoSample]
+)
 @limiter.limit("5/15minutes")
 async def remove_password(
     request: Request,

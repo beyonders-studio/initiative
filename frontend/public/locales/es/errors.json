@@ -769,5 +769,7 @@
   "DEMO_PITCH_HELD": "Esta presentación tiene contenido en revisión, así que aún no se puede eliminar.",
   "DEMO_PERSONA_TAKEN": "Ese identificador pertenece a una cuenta real.",
   "DEMO_LINK_EXPIRY_INVALID": "Un enlace de demostración no puede terminar en el pasado.",
+  "DEMO_SAMPLE_ACCOUNT": "Esta es una cuenta de ejemplo compartida, así que su inicio de sesión, sus dispositivos y sus sesiones no se pueden cambiar. Crea tu propia cuenta para hacerlo.",
+  "DEMO_SAMPLE_ADDRESS_TAKEN": "Esa dirección ya inicia sesión en otra cuenta.",
   "INVALID_RECURRENCE_LIMIT": "Un máximo diario requiere una repetición por horas después de completar y una fecha de vencimiento. Introduce un máximo entero de 1 a 24, o déjalo en blanco."
 }

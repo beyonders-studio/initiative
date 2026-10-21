@@ -16,6 +16,7 @@ from typing import Annotated
 from fastapi import APIRouter, Depends, status
 
 from app.api.deps import (
+    NotDemoSample,
     GuildContext,
     RLSSessionDep,
     SettingsRLSSessionDep,
@@ -165,7 +166,7 @@ async def get_member_ai(
     return await ai_settings_service.get_member_ai_view(session, user, ctx.guild_id)
 
 
-@router.put("/ai/me/key", response_model=MemberAIView)
+@router.put("/ai/me/key", response_model=MemberAIView, dependencies=[NotDemoSample])
 async def set_member_key(
     payload: MemberAIKeyUpdate,
     session: RLSSessionDep,
