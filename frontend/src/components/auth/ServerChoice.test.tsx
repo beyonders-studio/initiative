@@ -12,7 +12,12 @@ import { describe, expect, it, vi } from "vitest";
 import { buildUser } from "@/__tests__/factories";
 import { server } from "@/__tests__/helpers/msw-server";
 import { renderWithProviders } from "@/__tests__/helpers/render";
-import { getSelfHostedAddress, setSelfHostedAddress } from "@/lib/serverStorage";
+import {
+  CLOUD_ORIGIN,
+  CLOUD_SERVER_URL,
+  getSelfHostedAddress,
+  setSelfHostedAddress,
+} from "@/lib/serverStorage";
 import { freshAnswers, readStartDraft, saveStartDraft } from "@/lib/startFlow";
 
 import { ServerChip, ServerPicker, ServerSubtitle } from "./ServerChoice";
@@ -50,6 +55,12 @@ describe("ServerChip", () => {
     expect(await screen.findByText("Demo")).toBeInTheDocument();
     expect(screen.queryByText(/^self-hosted$/i)).not.toBeInTheDocument();
   });
+
+  it("says Initiative Cloud on Initiative Cloud", () => {
+    renderWithProviders(<ServerChip />, { server: { getServerOrigin: () => CLOUD_ORIGIN } });
+
+    expect(screen.getByLabelText("Server: Initiative Cloud")).toBeInTheDocument();
+  });
 });
 
 describe("ServerSubtitle", () => {
@@ -76,13 +87,62 @@ describe("ServerSubtitle", () => {
     expect(screen.queryByRole("textbox")).not.toBeInTheDocument();
 
     await user.click(menu);
-    expect(screen.getByRole("menuitem", { name: /initiative cloud/i })).toHaveAttribute(
-      "aria-disabled",
-      "true"
+    expect(screen.getByRole("menuitem", { name: /initiative cloud/i })).not.toHaveAttribute(
+      "aria-disabled"
     );
     await user.click(screen.getByRole("menuitem", { name: /your own server/i }));
 
     expect(screen.getByRole("textbox", { name: /server address/i })).toBeInTheDocument();
+  });
+
+  it("signs the app in to Initiative Cloud, with your own server a choice away", async () => {
+    const user = userEvent.setup();
+    const setServerUrl = vi.fn();
+    renderWithProviders(<ServerSubtitle />, {
+      server: {
+        isNativePlatform: true,
+        serverUrl: CLOUD_SERVER_URL,
+        getServerOrigin: () => CLOUD_ORIGIN,
+        setServerUrl,
+      },
+    });
+
+    const menu = screen.getByRole("button", { name: /^server$/i });
+    expect(menu).toHaveTextContent("initiativetasks.com");
+    expect(screen.getByLabelText("Server: Initiative Cloud")).toBeInTheDocument();
+
+    await user.click(menu);
+    await user.click(screen.getByRole("menuitem", { name: /initiative cloud/i }));
+    expect(setServerUrl).not.toHaveBeenCalled();
+
+    await user.click(menu);
+    await user.click(screen.getByRole("menuitem", { name: /your own server/i }));
+    expect(screen.getByRole("textbox", { name: /server address/i })).toHaveValue("");
+  });
+
+  it("moves the app from its own server to Initiative Cloud, signed out of the last", async () => {
+    const user = userEvent.setup();
+    saveStartDraft(freshAnswers("personal"));
+    const logout = vi.fn();
+    const setServerUrl = vi.fn();
+    renderWithProviders(<ServerSubtitle />, {
+      auth: { user: buildUser(), logout },
+      server: {
+        isNativePlatform: true,
+        serverUrl: "https://old.example.com/api/v1",
+        getServerOrigin: () => "https://old.example.com",
+        setServerUrl,
+      },
+    });
+
+    await user.click(screen.getByRole("button", { name: /^server$/i }));
+    await user.click(screen.getByRole("menuitem", { name: /initiative cloud/i }));
+
+    await waitFor(() => expect(setServerUrl).toHaveBeenCalledWith(CLOUD_SERVER_URL));
+    expect(logout.mock.invocationCallOrder[0]).toBeLessThan(
+      setServerUrl.mock.invocationCallOrder[0]
+    );
+    expect(readStartDraft()).toBeNull();
   });
 
   it("signs the app in to Demo on the demo deployment, menu and all", async () => {
@@ -101,6 +161,21 @@ describe("ServerSubtitle", () => {
 });
 
 describe("ServerPicker", () => {
+  it("starts the app on Initiative Cloud, asking for no address", () => {
+    renderWithProviders(<ServerPicker />, {
+      server: {
+        isNativePlatform: true,
+        serverUrl: CLOUD_SERVER_URL,
+        getServerOrigin: () => CLOUD_ORIGIN,
+      },
+    });
+
+    expect(screen.getByRole("combobox", { name: /^server$/i })).toHaveTextContent(
+      "Initiative Cloud"
+    );
+    expect(screen.queryByRole("textbox")).not.toBeInTheDocument();
+  });
+
   it("shows a browser the chip, since it is on its server already", () => {
     renderWithProviders(<ServerPicker />, { server: { isNativePlatform: false } });
 
@@ -156,7 +231,7 @@ describe("ServerPicker", () => {
       renderWithProviders(<ServerPicker />, {
         server: {
           isNativePlatform: true,
-          serverUrl: null,
+          serverUrl: "https://home.example.com/api/v1",
           testServerConnection: vi.fn().mockResolvedValue({ valid: false }),
         },
       });
@@ -169,6 +244,31 @@ describe("ServerPicker", () => {
       expect(await screen.findByText(message)).toBeInTheDocument();
     }
   );
+
+  it("holds the server choice while an address is being reached", async () => {
+    const user = userEvent.setup();
+    let answer: (result: { valid: boolean }) => void = () => {};
+    const testServerConnection = vi.fn(
+      () => new Promise<{ valid: boolean }>((resolve) => (answer = resolve))
+    );
+    renderWithProviders(<ServerPicker />, {
+      server: {
+        isNativePlatform: true,
+        serverUrl: "https://home.example.com/api/v1",
+        testServerConnection,
+      },
+    });
+
+    const choice = screen.getByRole("combobox", { name: /^server$/i });
+    const address = screen.getByRole("textbox", { name: /server address/i });
+    await user.clear(address);
+    await user.type(address, "https://new.example.com");
+    await user.click(screen.getByRole("button", { name: /^connect$/i }));
+
+    expect(choice).toBeDisabled();
+    answer({ valid: false });
+    await waitFor(() => expect(choice).toBeEnabled());
+  });
 
   it("says the app is connected to the address it shows", () => {
     setSelfHostedAddress("https://home.example.com");

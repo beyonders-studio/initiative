@@ -351,6 +351,38 @@ BUILTIN_ANNOUNCEMENTS: tuple[BuiltinAnnouncement, ...] = (
             ),
         ),
     ),
+    BuiltinAnnouncement(
+        slug="0-77-initiative-cloud-is-live",
+        title="Initiative Cloud is live",
+        category=AnnouncementCategory.info,
+        published_at=datetime(2026, 10, 20, tzinfo=timezone.utc),
+        # For the people already here, who will meet the apps' new starting
+        # server the next time they set one up. Worded to read true on the
+        # Cloud too, which upgrades into it like any other deployment.
+        audience_accounts=AnnouncementAudienceAccounts.existing,
+        only_upgrading_from_below="0.77.0",
+        sections=(
+            AnnouncementSection(
+                heading="What's new",
+                body=(
+                    "Initiative now has a hosted service, **Initiative Cloud**, "
+                    "at [initiativetasks.com](https://initiativetasks.com). "
+                    "Sign up and start, and keeping it running, backed up and "
+                    "current is ours.\n\n"
+                    "The phone and desktop apps now start on Initiative Cloud."
+                ),
+            ),
+            AnnouncementSection(
+                heading="If you use your own server",
+                body=(
+                    "Nothing changes for it, and an app already connected stays "
+                    "connected. When you sign in on a new phone or computer, "
+                    "tap the server name on the sign-in page and choose **Your "
+                    "own server**."
+                ),
+            ),
+        ),
+    ),
 )
 
 

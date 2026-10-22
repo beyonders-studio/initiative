@@ -54,6 +54,7 @@ import { toast } from "@/lib/mascotToast";
 import { resolveHeaderlessApiUrl } from "@/lib/uploadUrl";
 import { cn } from "@/lib/utils";
 
+import { BetaBadge } from "../BetaBadge";
 import { LogoIcon } from "../LogoIcon";
 import { CommunityCardFace } from "./CommunityCardFace";
 import { CommunityContextMenu } from "./CommunityContextMenu";
@@ -926,6 +927,7 @@ export const CommunitySidebar = ({ isHomeMode = false }: { isHomeMode?: boolean 
               aria-label={t("nav:home")}
             >
               <LogoIcon className="h-10 w-10" aria-hidden="true" focusable="false" />
+              <BetaBadge className="-mt-1 px-1.5 py-0 text-[0.625rem]" />
               {/* From inside a community this is the only thing pointing home,
                   so it carries the mark that something is waiting there. A dot
                   carries no text, so the count it stands for is written out for

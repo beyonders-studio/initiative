@@ -1,6 +1,7 @@
 import type { ReactNode } from "react";
 import { useTranslation } from "react-i18next";
 
+import { BetaBadge } from "@/components/BetaBadge";
 import { LogoIcon } from "@/components/LogoIcon";
 import { cn } from "@/lib/utils";
 
@@ -44,6 +45,7 @@ export const SignInFrame = ({
         >
           <LogoIcon className="h-12 w-12" aria-hidden="true" focusable="false" />
           <span className="pride-wordmark">{t("appName")}</span>
+          <BetaBadge className="self-center" />
         </div>
         {children}
       </div>

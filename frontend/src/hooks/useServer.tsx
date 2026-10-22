@@ -4,7 +4,12 @@ import { createContext, type ReactNode, useCallback, useContext, useEffect, useS
 import { setApiBaseUrl } from "@/api/client";
 import { releasePushForServerSwitch } from "@/lib/pushRegistration";
 import { queryClient } from "@/lib/queryClient";
-import { clearAllStorage, getStoredServerUrl, setStoredServerUrl } from "@/lib/serverStorage";
+import {
+  adoptStoredServerUrl,
+  CLOUD_SERVER_URL,
+  clearAllStorage,
+  setStoredServerUrl,
+} from "@/lib/serverStorage";
 
 interface ServerContextValue {
   /** The configured server URL (e.g., "https://myserver.com/api/v1") */
@@ -31,6 +36,9 @@ interface ServerContextValue {
    */
   getServerOrigin: () => string | null;
 }
+
+/** How long a server has to answer the connection check before it counts as unreachable. */
+const CONNECTION_TIMEOUT_MS = 10_000;
 
 export const ServerContext = createContext<ServerContextValue | undefined>(undefined);
 
@@ -99,16 +107,16 @@ export const ServerProvider = ({ children }: { children: ReactNode }) => {
       return;
     }
 
-    const stored = getStoredServerUrl();
-    if (stored) {
-      setServerUrlState(stored);
-      setApiBaseUrl(stored);
-    }
+    const stored = adoptStoredServerUrl();
+    setServerUrlState(stored);
+    setApiBaseUrl(stored);
     setLoading(false);
   }, [isNativePlatform]);
 
   const testServerConnection = useCallback(
     async (url: string): Promise<{ valid: boolean; error?: string }> => {
+      const controller = new AbortController();
+      const timer = setTimeout(() => controller.abort(), CONNECTION_TIMEOUT_MS);
       try {
         const normalizedUrl = normalizeServerUrl(url);
 
@@ -116,6 +124,7 @@ export const ServerProvider = ({ children }: { children: ReactNode }) => {
         const response = await fetch(`${normalizedUrl}/version`, {
           method: "GET",
           headers: { Accept: "application/json" },
+          signal: controller.signal,
         });
 
         if (!response.ok) {
@@ -136,6 +145,8 @@ export const ServerProvider = ({ children }: { children: ReactNode }) => {
           return { valid: false, error: "Could not connect to server" };
         }
         return { valid: false, error: "Connection failed" };
+      } finally {
+        clearTimeout(timer);
       }
     },
     []
@@ -155,8 +166,12 @@ export const ServerProvider = ({ children }: { children: ReactNode }) => {
 
   const clearServerUrl = useCallback(async (): Promise<void> => {
     await releasePushForServerSwitch(null).catch(() => undefined);
+    // Disconnecting goes back to where a fresh install starts.
     clearAllStorage();
-    setServerUrlState(null);
+    setStoredServerUrl(CLOUD_SERVER_URL);
+    setApiBaseUrl(CLOUD_SERVER_URL);
+    queryClient.clear();
+    setServerUrlState(CLOUD_SERVER_URL);
   }, []);
 
   const getServerHostname = useCallback((): string | null => {

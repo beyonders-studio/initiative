@@ -23,7 +23,7 @@ import { ThemeProvider } from "@/hooks/useTheme";
 import { prepareOfflineCache } from "@/lib/offlineBoot";
 import { bindOnlineManagerToDevice } from "@/lib/onlineStatus";
 import { queryClient } from "@/lib/queryClient";
-import { getStoredServerUrl } from "@/lib/serverStorage";
+import { adoptStoredServerUrl } from "@/lib/serverStorage";
 import { initStorage } from "@/lib/storage";
 import { sellsOnThisDevice } from "@/lib/storeSelling";
 import { router } from "@/router";
@@ -62,14 +62,19 @@ const InnerApp = () => {
 async function bootstrap() {
   await initStorage();
 
+  // On native, set the API base URL immediately from storage so requests
+  // reach the real backend before React effects run (avoids race condition
+  // where child provider effects fire before ServerProvider's useEffect).
+  // Before the offline cache, which is kept per server.
+  if (Capacitor.isNativePlatform()) {
+    setApiBaseUrl(adoptStoredServerUrl());
+  }
+
   // What this device last loaded, if it is still ours and still fresh. Decided
   // before render so a launch with no signal has its content in hand rather
   // than waiting on a request that will not answer.
   const offlinePersist = await prepareOfflineCache();
 
-  // On native, set the API base URL immediately from storage so requests
-  // reach the real backend before React effects run (avoids race condition
-  // where child provider effects fire before ServerProvider's useEffect).
   if (Capacitor.isNativePlatform()) {
     // Confirm this web bundle booted so the OTA updater doesn't roll it back. If an applied
     // bundle never reaches this point within appReadyTimeout, Capgo reverts to the last-good
@@ -88,11 +93,6 @@ async function bootstrap() {
       await SplashScreen.hide();
     } catch (error) {
       console.debug("SplashScreen.hide failed (plugin unavailable):", error);
-    }
-
-    const storedUrl = getStoredServerUrl();
-    if (storedUrl) {
-      setApiBaseUrl(storedUrl);
     }
 
     // Ask the store early, so plan wording and buttons are settled by the time
