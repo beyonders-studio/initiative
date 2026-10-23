@@ -7,6 +7,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.77.0] - 2026-10-23
+
 ### Added
 
 - **Task types.** Every project starts with **Task**, **Bug**, **Idea** and **Milestone**, each with its own task page and starting content; add more from a shelf of ready-made types in **Project settings → Task types**. Existing tasks become **Task**, keeping any task page you had changed.
