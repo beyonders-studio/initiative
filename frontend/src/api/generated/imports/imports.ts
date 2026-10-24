@@ -269,8 +269,8 @@ export const useImportEnvelopeArchive = <
  */
 export const previewForeignImport = (
   communityId: number,
-  source: BodyType<string>,
-  previewForeignImportBody: string,
+  source: string,
+  previewForeignImportBody: BodyType<string>,
   options?: SecondParameter<typeof apiMutator>,
   signal?: AbortSignal
 ) => {

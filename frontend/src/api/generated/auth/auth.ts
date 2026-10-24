@@ -726,7 +726,7 @@ export const useAnswerSecondFactor = <TError = ErrorType<HTTPValidationError>, T
  * @summary Refresh Access Token
  */
 export const refreshAccessToken = (
-  refreshRequestNull?: BodyType<RefreshRequest | null> | null,
+  refreshRequestNull?: BodyType<RefreshRequest | null>,
   options?: SecondParameter<typeof apiMutator>,
   signal?: AbortSignal
 ) => {
@@ -1091,7 +1091,7 @@ export function useCheckUsernameAvailable<
  * @summary Logout
  */
 export const logout = (
-  refreshRequestNull?: BodyType<RefreshRequest | null> | null,
+  refreshRequestNull?: BodyType<RefreshRequest | null>,
   options?: SecondParameter<typeof apiMutator>,
   signal?: AbortSignal
 ) => {

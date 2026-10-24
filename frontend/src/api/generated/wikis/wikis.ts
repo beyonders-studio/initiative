@@ -1677,7 +1677,7 @@ export const useSetWikiGrants = <TError = ErrorType<HTTPValidationError>, TConte
 export const duplicateWiki = (
   communityId: number,
   wikiId: number,
-  toolDuplicateRequestNull?: BodyType<ToolDuplicateRequest | null> | null,
+  toolDuplicateRequestNull?: BodyType<ToolDuplicateRequest | null>,
   options?: SecondParameter<typeof apiMutator>,
   signal?: AbortSignal
 ) => {

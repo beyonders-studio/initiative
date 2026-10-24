@@ -1601,7 +1601,7 @@ export const useUninstallCommunityPlugin = <
 export const upgradeCommunityPlugin = (
   communityId: number,
   pluginId: number,
-  communityPluginUpgradeNull?: BodyType<CommunityPluginUpgrade | null> | null,
+  communityPluginUpgradeNull?: BodyType<CommunityPluginUpgrade | null>,
   options?: SecondParameter<typeof apiMutator>,
   signal?: AbortSignal
 ) => {

@@ -1648,7 +1648,7 @@ export const useSetCounterGroupGrants = <
 export const duplicateCounterGroup = (
   communityId: number,
   groupId: number,
-  toolDuplicateRequestNull?: BodyType<ToolDuplicateRequest | null> | null,
+  toolDuplicateRequestNull?: BodyType<ToolDuplicateRequest | null>,
   options?: SecondParameter<typeof apiMutator>,
   signal?: AbortSignal
 ) => {

@@ -780,7 +780,7 @@ export const useSetProjectGrants = <TError = ErrorType<HTTPValidationError>, TCo
 export const duplicateProject = (
   communityId: number,
   projectId: number,
-  toolDuplicateRequestNull?: BodyType<ToolDuplicateRequest | null> | null,
+  toolDuplicateRequestNull?: BodyType<ToolDuplicateRequest | null>,
   options?: SecondParameter<typeof apiMutator>,
   signal?: AbortSignal
 ) => {
