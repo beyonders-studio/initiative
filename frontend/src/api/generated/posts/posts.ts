@@ -1908,7 +1908,7 @@ export const useSetPostGrants = <TError = ErrorType<HTTPValidationError>, TConte
 export const duplicatePost = (
   communityId: number,
   postId: number,
-  toolDuplicateRequestNull?: BodyType<ToolDuplicateRequest | null> | null,
+  toolDuplicateRequestNull?: BodyType<ToolDuplicateRequest | null>,
   options?: SecondParameter<typeof apiMutator>,
   signal?: AbortSignal
 ) => {

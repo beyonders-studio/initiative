@@ -85,7 +85,7 @@ const withQueryKey = <T extends object, K>(query: T, queryKey: K): T & { queryKe
  */
 export const claimSessionKeys = (
   userId: number,
-  dmSessionKeysRequestNull?: BodyType<DmSessionKeysRequest | null> | null,
+  dmSessionKeysRequestNull?: BodyType<DmSessionKeysRequest | null>,
   options?: SecondParameter<typeof apiMutator>,
   signal?: AbortSignal
 ) => {

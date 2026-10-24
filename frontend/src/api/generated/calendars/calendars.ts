@@ -711,7 +711,7 @@ export const useSetCalendarGrants = <TError = ErrorType<HTTPValidationError>, TC
 export const duplicateCalendar = (
   communityId: number,
   calendarId: number,
-  toolDuplicateRequestNull?: BodyType<ToolDuplicateRequest | null> | null,
+  toolDuplicateRequestNull?: BodyType<ToolDuplicateRequest | null>,
   options?: SecondParameter<typeof apiMutator>,
   signal?: AbortSignal
 ) => {

@@ -1314,7 +1314,7 @@ export const useSetDashboardGrants = <TError = ErrorType<HTTPValidationError>, T
 export const duplicateDashboard = (
   communityId: number,
   dashboardId: number,
-  toolDuplicateRequestNull?: BodyType<ToolDuplicateRequest | null> | null,
+  toolDuplicateRequestNull?: BodyType<ToolDuplicateRequest | null>,
   options?: SecondParameter<typeof apiMutator>,
   signal?: AbortSignal
 ) => {

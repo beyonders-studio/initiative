@@ -1081,18 +1081,18 @@ export interface BillingPortalHandoffResponse {
 export interface BodyFileTicket {
   /** The ticket, as JSON: a support request, a report, a security problem, feedback or an appeal, told apart by ``stream`` (and an appeal by its ``type``). */
   payload: string;
-  files?: Blob[];
+  files?: (Blob | File)[];
 }
 
 export interface BodyImportEnvelopeArchive {
-  file: Blob;
+  file: Blob | File;
   initiative_id: number;
   /** The envelope type the import was started for; a zip holding another tool's export is refused */
   envelope_type?: string | null;
 }
 
 export interface BodyImportSpreadsheetFile {
-  file: Blob;
+  file: Blob | File;
 }
 
 export interface BodyLoginAccessToken {
@@ -1111,16 +1111,16 @@ export interface BodyNotifyMentions {
 
 export interface BodyReplyToFiledTicket {
   body: string;
-  files?: Blob[];
+  files?: (Blob | File)[];
 }
 
 export interface BodySetCommunityBanner {
-  full: Blob;
-  card: Blob;
+  full: Blob | File;
+  card: Blob | File;
 }
 
 export interface BodySetCommunityIcon {
-  icon: Blob;
+  icon: Blob | File;
 }
 
 /**
@@ -1153,61 +1153,61 @@ export interface BodyShareToMarketplace {
   long_description?: string | null;
   release_notes?: string | null;
   listing_uid?: string | null;
-  images?: Blob[];
+  images?: (Blob | File)[];
 }
 
 export interface BodyStartConfluenceExportImport {
-  file: Blob;
+  file: Blob | File;
   initiative_id: number;
   include_attachments?: boolean;
 }
 
 export interface BodyUploadAnnouncementImage {
-  file: Blob;
+  file: Blob | File;
 }
 
 export interface BodyUploadAttachment {
-  file: Blob;
+  file: Blob | File;
 }
 
 export interface BodyUploadBackup {
-  file: Blob;
+  file: Blob | File;
 }
 
 export interface BodyUploadFile {
   name: string;
   initiative_id: number;
-  file: Blob;
+  file: Blob | File;
 }
 
 export interface BodyUploadFileVersion {
-  file: Blob;
+  file: Blob | File;
 }
 
 export interface BodyUploadGalleryImage {
-  file: Blob;
+  file: Blob | File;
   title?: string | null;
   caption?: string | null;
 }
 
 export interface BodyUploadGalleryImageVersion {
-  file: Blob;
+  file: Blob | File;
 }
 
 export interface BodyUploadListingPicture {
-  file: Blob;
+  file: Blob | File;
 }
 
 export interface BodyUploadMyAvatar {
-  file: Blob;
+  file: Blob | File;
 }
 
 export interface BodyUploadPastedImage {
-  file: Blob;
+  file: Blob | File;
 }
 
 export interface BodyUploadRegistryBundle {
-  file: Blob;
+  file: Blob | File;
 }
 
 export type BreakGlassCreatePasskey = { [key: string]: unknown } | null;
@@ -2318,7 +2318,7 @@ export const ClientKind = {
  * tab leaves: the Yjs update the room has not seen.
  */
 export interface CollaborationHandover {
-  update: Blob;
+  update: string;
 }
 
 /**

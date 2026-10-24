@@ -1388,7 +1388,7 @@ export const useSetFileGrants = <TError = ErrorType<HTTPValidationError>, TConte
 export const duplicateFile = (
   communityId: number,
   fileId: number,
-  toolDuplicateRequestNull?: BodyType<ToolDuplicateRequest | null> | null,
+  toolDuplicateRequestNull?: BodyType<ToolDuplicateRequest | null>,
   options?: SecondParameter<typeof apiMutator>,
   signal?: AbortSignal
 ) => {

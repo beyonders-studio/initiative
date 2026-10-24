@@ -189,9 +189,7 @@ export function useGetLayouts<
  */
 export const putLayout = (
   communityId: number,
-  listLayoutWriteDetailLayoutWrite:
-    | BodyType<ListLayoutWrite | DetailLayoutWrite>
-    | DetailLayoutWrite,
+  listLayoutWriteDetailLayoutWrite: BodyType<ListLayoutWrite | DetailLayoutWrite>,
   params: PutLayoutParams,
   options?: SecondParameter<typeof apiMutator>,
   signal?: AbortSignal

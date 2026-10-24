@@ -3346,7 +3346,7 @@ export const useRestorePlatformCommunity = <
  */
 export const createPlatformCommunityBillingServiceHandoff = (
   communityId: number,
-  secondFactorAnswerNull?: BodyType<SecondFactorAnswer | null> | null,
+  secondFactorAnswerNull?: BodyType<SecondFactorAnswer | null>,
   params?: CreatePlatformCommunityBillingServiceHandoffParams,
   options?: SecondParameter<typeof apiMutator>,
   signal?: AbortSignal
