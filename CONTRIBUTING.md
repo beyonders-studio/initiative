@@ -8,7 +8,7 @@ Thanks for your interest in contributing! This guide covers what you need to kno
 
 The project includes a VS Code task configuration that starts everything with a single command:
 
-1. **Prerequisites**: Docker, Python 3.10+ venv at `backend/.venv/`, Node.js 18+ with pnpm, PostgreSQL client tools (`pg_isready`)
+1. **Prerequisites**: Docker, Python 3.10+ venv at `backend/.venv/`, Node.js 26.12.1+ with pnpm, PostgreSQL client tools (`pg_isready`)
 2. **Configure**: Copy `backend/.env.example` to `backend/.env` and set `DATABASE_URL` / `SECRET_KEY`
 3. **Launch**: Open the VS Code Command Palette (`Ctrl+Shift+P`) and run **Tasks: Run Task** → **`dev:setup`**
 
@@ -44,7 +44,7 @@ If you prefer not to use VS Code tasks, you can start each service by hand.
 #### Prerequisites
 
 - Python 3.11+
-- Node.js 18+ with pnpm
+- Node.js 26.12.1+ with pnpm
 - PostgreSQL 17
 
 #### Backend
