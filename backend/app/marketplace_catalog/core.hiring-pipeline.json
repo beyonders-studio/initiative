@@ -5,11 +5,11 @@
   "name": "Hiring pipeline",
   "publisher": "Initiative",
   "description": "Candidates on a board, so nobody waits three weeks to hear back.",
-  "long_description": "Each candidate is a card that moves from Applied through Screening, Interviewing and Offer to Hired, or to Not moving forward, which is kinder than a column called Rejected.\n\nCards record the role, where the candidate came from, how they would work and when the interview is. Give each card a checklist of your steps, such as phone screen, interviews, references, offer letter and start date, so every candidate gets the same process.\n\nAssign each card to whoever owes the candidate an answer next. That is usually the whole problem.",
+  "long_description": "Each candidate is a card that moves from Applied through Screening, Interviewing and Offer to Hired, or to Not moving forward, which is kinder than a column called Rejected.\n\nCards record the role, where the candidate came from, how they would work and when the interview is. Give each card a checklist of your steps, such as phone screen, interviews, references, offer letter and start date, so every candidate gets the same process.\n\nAssign each card to whoever owes the candidate an answer next. That is usually the whole problem.\n\nVolunteers go through the same columns with a shorter checklist: an intro chat, a background check, an induction and a first shift.",
   "avatar_url": "/marketplace/core-hiring-pipeline.svg",
   "images": [],
-  "version": "1.1.0",
-  "release_notes": "Opens on the board. Each card shows the role and interview date, and a candidate's page keeps their details together.",
+  "version": "1.2.0",
+  "release_notes": "Candidates and volunteers are each their own type, with a page of their own, and each starts with a checklist of its steps.",
   "definition": {
     "type": "initiative-project",
     "schema_version": 1,
@@ -73,6 +73,41 @@
         "color": "#94A3B8",
         "icon": "circle-x",
         "is_default": false
+      }
+    ],
+    "task_types": [
+      {
+        "name": "Candidate",
+        "is_default": true,
+        "color": "#60A5FA",
+        "icon": "user-round",
+        "layout_preset": "checklist",
+        "starting_values": {
+          "checklist": [
+            "Phone screen",
+            "Interviews",
+            "References",
+            "Offer letter",
+            "Start date set"
+          ]
+        },
+        "position": 0
+      },
+      {
+        "name": "Volunteer",
+        "is_default": false,
+        "color": "#F59E0B",
+        "icon": "hand-helping",
+        "layout_preset": "checklist",
+        "starting_values": {
+          "checklist": [
+            "Intro chat",
+            "Background check",
+            "Induction",
+            "First shift booked"
+          ]
+        },
+        "position": 1
       }
     ],
     "property_definitions": [
@@ -164,10 +199,26 @@
                 },
                 "children": [
                   {
-                    "type": "field",
+                    "type": "stack",
                     "props": {
-                      "field": "title"
-                    }
+                      "direction": "row",
+                      "gap": "sm",
+                      "align": "start"
+                    },
+                    "children": [
+                      {
+                        "type": "field",
+                        "props": {
+                          "field": "type"
+                        }
+                      },
+                      {
+                        "type": "field",
+                        "props": {
+                          "field": "title"
+                        }
+                      }
+                    ]
                   },
                   {
                     "type": "field",
@@ -271,6 +322,9 @@
               "field": "priority"
             },
             {
+              "field": "task_type_id"
+            },
+            {
               "field": "assignee_ids"
             },
             {
@@ -311,6 +365,9 @@
               "field": "task_status_id"
             },
             {
+              "field": "task_type_id"
+            },
+            {
               "field": "date_group"
             },
             {
@@ -339,6 +396,7 @@
       },
       {
         "kind": "task",
+        "task_type": 1,
         "definition": {
           "side": [
             {
@@ -347,6 +405,12 @@
                 "title": "Candidate"
               },
               "children": [
+                {
+                  "type": "field",
+                  "props": {
+                    "field": "type"
+                  }
+                },
                 {
                   "type": "status"
                 },
@@ -388,9 +452,84 @@
                 {
                   "type": "field",
                   "props": {
+                    "field": "assignees"
+                  }
+                },
+                {
+                  "type": "dates"
+                },
+                {
+                  "type": "field",
+                  "props": {
+                    "field": "recurrence"
+                  }
+                },
+                {
+                  "type": "field",
+                  "props": {
                     "field": "priority"
                   }
                 },
+                {
+                  "type": "field",
+                  "props": {
+                    "field": "tags"
+                  }
+                },
+                {
+                  "type": "properties"
+                }
+              ]
+            },
+            {
+              "type": "relations"
+            }
+          ]
+        }
+      },
+      {
+        "kind": "task",
+        "task_type": 2,
+        "definition": {
+          "side": [
+            {
+              "type": "section",
+              "props": {
+                "title": "Volunteer"
+              },
+              "children": [
+                {
+                  "type": "field",
+                  "props": {
+                    "field": "type"
+                  }
+                },
+                {
+                  "type": "status"
+                },
+                {
+                  "type": "field",
+                  "props": {
+                    "field": "property:1"
+                  }
+                },
+                {
+                  "type": "field",
+                  "props": {
+                    "field": "property:2"
+                  }
+                },
+                {
+                  "type": "field",
+                  "props": {
+                    "field": "property:4"
+                  }
+                }
+              ]
+            },
+            {
+              "type": "section",
+              "children": [
                 {
                   "type": "field",
                   "props": {
@@ -404,6 +543,12 @@
                   "type": "field",
                   "props": {
                     "field": "recurrence"
+                  }
+                },
+                {
+                  "type": "field",
+                  "props": {
+                    "field": "priority"
                   }
                 },
                 {
@@ -494,6 +639,41 @@
         "color": "#94A3B8",
         "icon": "circle-x",
         "is_default": false
+      }
+    ],
+    "task_types": [
+      {
+        "name": "Candidate",
+        "is_default": true,
+        "color": "#60A5FA",
+        "icon": "user-round",
+        "layout_preset": "checklist",
+        "starting_values": {
+          "checklist": [
+            "Phone screen",
+            "Interviews",
+            "References",
+            "Offer letter",
+            "Start date set"
+          ]
+        },
+        "position": 0
+      },
+      {
+        "name": "Volunteer",
+        "is_default": false,
+        "color": "#F59E0B",
+        "icon": "hand-helping",
+        "layout_preset": "checklist",
+        "starting_values": {
+          "checklist": [
+            "Intro chat",
+            "Background check",
+            "Induction",
+            "First shift booked"
+          ]
+        },
+        "position": 1
       }
     ],
     "property_definitions": [
@@ -620,7 +800,8 @@
             "property_type": "select",
             "value_text": "remote"
           }
-        ]
+        ],
+        "type_name": "Candidate"
       },
       {
         "title": "Ben W.",
@@ -671,7 +852,8 @@
             "property_type": "select",
             "value_text": "on-site"
           }
-        ]
+        ],
+        "type_name": "Candidate"
       },
       {
         "title": "Chloe D.",
@@ -727,7 +909,8 @@
             "property_type": "date",
             "value_text": "2000-01-05"
           }
-        ]
+        ],
+        "type_name": "Candidate"
       },
       {
         "title": "Diego M.",
@@ -783,7 +966,8 @@
             "property_type": "date",
             "value_text": "2000-01-07"
           }
-        ]
+        ],
+        "type_name": "Candidate"
       },
       {
         "title": "Elena V.",
@@ -839,7 +1023,8 @@
             "property_type": "date",
             "value_text": "2000-01-04"
           }
-        ]
+        ],
+        "type_name": "Candidate"
       },
       {
         "title": "Farid H.",
@@ -895,7 +1080,8 @@
             "property_type": "date",
             "value_text": "2000-01-03"
           }
-        ]
+        ],
+        "type_name": "Candidate"
       },
       {
         "title": "Grace L.",
@@ -951,7 +1137,57 @@
             "property_type": "date",
             "value_text": "2000-01-03"
           }
-        ]
+        ],
+        "type_name": "Candidate"
+      },
+      {
+        "title": "Hamish P.",
+        "description": "Wants Saturday mornings. Has a van, which is more than most of us can say.",
+        "priority": "medium",
+        "start_date": null,
+        "due_date": "2000-01-07T12:00:00+00:00",
+        "recurrence": null,
+        "status_name": "Screening",
+        "position": 3.0,
+        "tags": [],
+        "assignee_handles": [],
+        "checklist": [
+          {
+            "text": "Intro chat",
+            "done": true
+          },
+          {
+            "text": "Background check",
+            "done": false
+          },
+          {
+            "text": "Induction",
+            "done": false
+          },
+          {
+            "text": "First shift booked",
+            "done": false
+          }
+        ],
+        "properties": [
+          {
+            "property_name": "Role",
+            "property_type": "text",
+            "value_text": "Weekend driver"
+          },
+          {
+            "property_name": "Source",
+            "property_type": "select",
+            "value_text": "referral"
+          },
+          {
+            "property_name": "Interview date",
+            "property_type": "date",
+            "value_text": "2000-01-07"
+          }
+        ],
+        "type_name": "Volunteer",
+        "completed_at": null
       }
     ],
     "layouts": [
@@ -968,10 +1204,26 @@
                 },
                 "children": [
                   {
-                    "type": "field",
+                    "type": "stack",
                     "props": {
-                      "field": "title"
-                    }
+                      "direction": "row",
+                      "gap": "sm",
+                      "align": "start"
+                    },
+                    "children": [
+                      {
+                        "type": "field",
+                        "props": {
+                          "field": "type"
+                        }
+                      },
+                      {
+                        "type": "field",
+                        "props": {
+                          "field": "title"
+                        }
+                      }
+                    ]
                   },
                   {
                     "type": "field",
@@ -1075,6 +1327,9 @@
               "field": "priority"
             },
             {
+              "field": "task_type_id"
+            },
+            {
               "field": "assignee_ids"
             },
             {
@@ -1115,6 +1370,9 @@
               "field": "task_status_id"
             },
             {
+              "field": "task_type_id"
+            },
+            {
               "field": "date_group"
             },
             {
@@ -1143,6 +1401,7 @@
       },
       {
         "kind": "task",
+        "task_type": 1,
         "definition": {
           "side": [
             {
@@ -1151,6 +1410,12 @@
                 "title": "Candidate"
               },
               "children": [
+                {
+                  "type": "field",
+                  "props": {
+                    "field": "type"
+                  }
+                },
                 {
                   "type": "status"
                 },
@@ -1192,9 +1457,84 @@
                 {
                   "type": "field",
                   "props": {
+                    "field": "assignees"
+                  }
+                },
+                {
+                  "type": "dates"
+                },
+                {
+                  "type": "field",
+                  "props": {
+                    "field": "recurrence"
+                  }
+                },
+                {
+                  "type": "field",
+                  "props": {
                     "field": "priority"
                   }
                 },
+                {
+                  "type": "field",
+                  "props": {
+                    "field": "tags"
+                  }
+                },
+                {
+                  "type": "properties"
+                }
+              ]
+            },
+            {
+              "type": "relations"
+            }
+          ]
+        }
+      },
+      {
+        "kind": "task",
+        "task_type": 2,
+        "definition": {
+          "side": [
+            {
+              "type": "section",
+              "props": {
+                "title": "Volunteer"
+              },
+              "children": [
+                {
+                  "type": "field",
+                  "props": {
+                    "field": "type"
+                  }
+                },
+                {
+                  "type": "status"
+                },
+                {
+                  "type": "field",
+                  "props": {
+                    "field": "property:1"
+                  }
+                },
+                {
+                  "type": "field",
+                  "props": {
+                    "field": "property:2"
+                  }
+                },
+                {
+                  "type": "field",
+                  "props": {
+                    "field": "property:4"
+                  }
+                }
+              ]
+            },
+            {
+              "type": "section",
+              "children": [
                 {
                   "type": "field",
                   "props": {
@@ -1208,6 +1548,12 @@
                   "type": "field",
                   "props": {
                     "field": "recurrence"
+                  }
+                },
+                {
+                  "type": "field",
+                  "props": {
+                    "field": "priority"
                   }
                 },
                 {

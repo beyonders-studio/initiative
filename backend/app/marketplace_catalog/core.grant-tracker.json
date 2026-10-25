@@ -5,11 +5,11 @@
   "name": "Grant tracker",
   "publisher": "Initiative",
   "description": "Every application, its deadline, and what you owe the funder afterwards.",
-  "long_description": "Each grant or appeal is a card that moves from Prospects to Writing to Submitted, then Awarded or Declined. Cards hold the funder, what you asked for, what you got, the deadline and when the report is due, because winning a grant is how you find out you have to write a report about it.\n\nThe deadline is the card's due date, so My Tasks and the calendar remind the right person in time. The amounts have no currency. Rename them if that bothers you.",
+  "long_description": "Each grant or appeal is a card that moves from Prospects to Writing to Submitted, then Awarded or Declined. Cards hold the funder, what you asked for, what you got, the deadline and when the report is due, because winning a grant is how you find out you have to write a report about it.\n\nThe deadline is the card's due date, so My Tasks and the calendar remind the right person in time. The amounts have no currency. Rename them if that bothers you.\n\nGrants, appeals and reports are each their own type. A report has a checklist of what funders ask for, so writing one is filling it in.",
   "avatar_url": "/marketplace/core-grant-tracker.svg",
   "images": [],
-  "version": "1.1.0",
-  "release_notes": "Opens on the board. Each card shows its funder, amount and deadline, and a grant's page keeps its details together.",
+  "version": "1.2.0",
+  "release_notes": "Grants, appeals and reports are each their own type, with a page of their own, and each starts with a checklist of its steps.",
   "definition": {
     "type": "initiative-project",
     "schema_version": 1,
@@ -65,6 +65,60 @@
         "color": "#94A3B8",
         "icon": "circle-x",
         "is_default": false
+      }
+    ],
+    "task_types": [
+      {
+        "name": "Grant",
+        "is_default": true,
+        "color": "#34D399",
+        "icon": "landmark",
+        "layout_preset": "dates",
+        "starting_values": {
+          "checklist": [
+            "Eligibility checked",
+            "Budget",
+            "Narrative",
+            "Letters of support",
+            "Proof of registration",
+            "Submitted"
+          ]
+        },
+        "position": 0
+      },
+      {
+        "name": "Appeal",
+        "is_default": false,
+        "color": "#F472B6",
+        "icon": "heart-handshake",
+        "layout_preset": "dates",
+        "starting_values": {
+          "checklist": [
+            "Goal set",
+            "Letter written",
+            "Mailing list checked",
+            "Sent",
+            "Thank-you letters"
+          ]
+        },
+        "position": 1
+      },
+      {
+        "name": "Report",
+        "is_default": false,
+        "color": "#A78BFA",
+        "icon": "file-text",
+        "layout_preset": "checklist",
+        "starting_values": {
+          "checklist": [
+            "What the money paid for",
+            "Who it reached",
+            "Photos and a quote",
+            "Budget against spending",
+            "Sent, and a copy filed"
+          ]
+        },
+        "position": 2
       }
     ],
     "property_definitions": [
@@ -147,10 +201,26 @@
                 },
                 "children": [
                   {
-                    "type": "field",
+                    "type": "stack",
                     "props": {
-                      "field": "title"
-                    }
+                      "direction": "row",
+                      "gap": "sm",
+                      "align": "start"
+                    },
+                    "children": [
+                      {
+                        "type": "field",
+                        "props": {
+                          "field": "type"
+                        }
+                      },
+                      {
+                        "type": "field",
+                        "props": {
+                          "field": "title"
+                        }
+                      }
+                    ]
                   },
                   {
                     "type": "field",
@@ -260,6 +330,9 @@
               "field": "priority"
             },
             {
+              "field": "task_type_id"
+            },
+            {
               "field": "assignee_ids"
             },
             {
@@ -298,6 +371,9 @@
               "field": "task_status_id"
             },
             {
+              "field": "task_type_id"
+            },
+            {
               "field": "date_group"
             },
             {
@@ -323,6 +399,7 @@
       },
       {
         "kind": "task",
+        "task_type": 1,
         "definition": {
           "side": [
             {
@@ -331,6 +408,15 @@
                 "title": "Grant"
               },
               "children": [
+                {
+                  "type": "field",
+                  "props": {
+                    "field": "type"
+                  }
+                },
+                {
+                  "type": "dates"
+                },
                 {
                   "type": "status"
                 },
@@ -378,9 +464,138 @@
                 {
                   "type": "field",
                   "props": {
+                    "field": "assignees"
+                  }
+                },
+                {
+                  "type": "field",
+                  "props": {
                     "field": "priority"
                   }
                 },
+                {
+                  "type": "field",
+                  "props": {
+                    "field": "tags"
+                  }
+                },
+                {
+                  "type": "properties"
+                }
+              ]
+            }
+          ]
+        }
+      },
+      {
+        "kind": "task",
+        "task_type": 2,
+        "definition": {
+          "side": [
+            {
+              "type": "section",
+              "props": {
+                "title": "Appeal"
+              },
+              "children": [
+                {
+                  "type": "field",
+                  "props": {
+                    "field": "type"
+                  }
+                },
+                {
+                  "type": "dates"
+                },
+                {
+                  "type": "status"
+                },
+                {
+                  "type": "field",
+                  "props": {
+                    "field": "property:3"
+                  }
+                },
+                {
+                  "type": "field",
+                  "props": {
+                    "field": "property:4"
+                  }
+                },
+                {
+                  "type": "field",
+                  "props": {
+                    "field": "property:5"
+                  }
+                }
+              ]
+            },
+            {
+              "type": "section",
+              "children": [
+                {
+                  "type": "field",
+                  "props": {
+                    "field": "assignees"
+                  }
+                },
+                {
+                  "type": "field",
+                  "props": {
+                    "field": "priority"
+                  }
+                },
+                {
+                  "type": "field",
+                  "props": {
+                    "field": "tags"
+                  }
+                },
+                {
+                  "type": "properties"
+                }
+              ]
+            }
+          ]
+        }
+      },
+      {
+        "kind": "task",
+        "task_type": 3,
+        "definition": {
+          "side": [
+            {
+              "type": "section",
+              "props": {
+                "title": "Report"
+              },
+              "children": [
+                {
+                  "type": "field",
+                  "props": {
+                    "field": "type"
+                  }
+                },
+                {
+                  "type": "status"
+                },
+                {
+                  "type": "field",
+                  "props": {
+                    "field": "property:1"
+                  }
+                },
+                {
+                  "type": "field",
+                  "props": {
+                    "field": "property:6"
+                  }
+                }
+              ]
+            },
+            {
+              "type": "section",
+              "children": [
                 {
                   "type": "field",
                   "props": {
@@ -394,6 +609,12 @@
                   "type": "field",
                   "props": {
                     "field": "recurrence"
+                  }
+                },
+                {
+                  "type": "field",
+                  "props": {
+                    "field": "priority"
                   }
                 },
                 {
@@ -476,6 +697,60 @@
         "color": "#94A3B8",
         "icon": "circle-x",
         "is_default": false
+      }
+    ],
+    "task_types": [
+      {
+        "name": "Grant",
+        "is_default": true,
+        "color": "#34D399",
+        "icon": "landmark",
+        "layout_preset": "dates",
+        "starting_values": {
+          "checklist": [
+            "Eligibility checked",
+            "Budget",
+            "Narrative",
+            "Letters of support",
+            "Proof of registration",
+            "Submitted"
+          ]
+        },
+        "position": 0
+      },
+      {
+        "name": "Appeal",
+        "is_default": false,
+        "color": "#F472B6",
+        "icon": "heart-handshake",
+        "layout_preset": "dates",
+        "starting_values": {
+          "checklist": [
+            "Goal set",
+            "Letter written",
+            "Mailing list checked",
+            "Sent",
+            "Thank-you letters"
+          ]
+        },
+        "position": 1
+      },
+      {
+        "name": "Report",
+        "is_default": false,
+        "color": "#A78BFA",
+        "icon": "file-text",
+        "layout_preset": "checklist",
+        "starting_values": {
+          "checklist": [
+            "What the money paid for",
+            "Who it reached",
+            "Photos and a quote",
+            "Budget against spending",
+            "Sent, and a copy filed"
+          ]
+        },
+        "position": 2
       }
     ],
     "property_definitions": [
@@ -602,7 +877,8 @@
             "property_type": "date",
             "value_text": "2000-02-12"
           }
-        ]
+        ],
+        "type_name": "Grant"
       },
       {
         "title": "Library outreach partnership",
@@ -662,7 +938,8 @@
             "property_type": "date",
             "value_text": "2000-03-03"
           }
-        ]
+        ],
+        "type_name": "Grant"
       },
       {
         "title": "Youth program operating grant",
@@ -722,7 +999,8 @@
             "property_type": "date",
             "value_text": "2000-01-17"
           }
-        ]
+        ],
+        "type_name": "Grant"
       },
       {
         "title": "Equipment match",
@@ -782,7 +1060,8 @@
             "property_type": "date",
             "value_text": "2000-01-05"
           }
-        ]
+        ],
+        "type_name": "Grant"
       },
       {
         "title": "Spring appeal",
@@ -852,7 +1131,8 @@
             "property_type": "date",
             "value_text": "2000-02-02"
           }
-        ]
+        ],
+        "type_name": "Appeal"
       },
       {
         "title": "Capital improvements",
@@ -912,7 +1192,61 @@
             "property_type": "date",
             "value_text": "2000-01-03"
           }
-        ]
+        ],
+        "type_name": "Grant"
+      },
+      {
+        "title": "Spring appeal report",
+        "description": "What the money did, with photos. Donors who hear back give again.",
+        "priority": "medium",
+        "start_date": null,
+        "due_date": "2000-02-02T12:00:00+00:00",
+        "recurrence": null,
+        "status_name": "Writing",
+        "position": 3.0,
+        "tags": [],
+        "assignee_handles": [],
+        "checklist": [
+          {
+            "text": "What the money paid for",
+            "done": true
+          },
+          {
+            "text": "Who it reached",
+            "done": false
+          },
+          {
+            "text": "Photos and a quote",
+            "done": false
+          },
+          {
+            "text": "Budget against spending",
+            "done": false
+          },
+          {
+            "text": "Sent, and a copy filed",
+            "done": false
+          }
+        ],
+        "properties": [
+          {
+            "property_name": "Funder",
+            "property_type": "text",
+            "value_text": "Individual donors"
+          },
+          {
+            "property_name": "Funder type",
+            "property_type": "select",
+            "value_text": "individual"
+          },
+          {
+            "property_name": "Report due",
+            "property_type": "date",
+            "value_text": "2000-02-02"
+          }
+        ],
+        "type_name": "Report",
+        "completed_at": null
       }
     ],
     "layouts": [
@@ -929,10 +1263,26 @@
                 },
                 "children": [
                   {
-                    "type": "field",
+                    "type": "stack",
                     "props": {
-                      "field": "title"
-                    }
+                      "direction": "row",
+                      "gap": "sm",
+                      "align": "start"
+                    },
+                    "children": [
+                      {
+                        "type": "field",
+                        "props": {
+                          "field": "type"
+                        }
+                      },
+                      {
+                        "type": "field",
+                        "props": {
+                          "field": "title"
+                        }
+                      }
+                    ]
                   },
                   {
                     "type": "field",
@@ -1042,6 +1392,9 @@
               "field": "priority"
             },
             {
+              "field": "task_type_id"
+            },
+            {
               "field": "assignee_ids"
             },
             {
@@ -1080,6 +1433,9 @@
               "field": "task_status_id"
             },
             {
+              "field": "task_type_id"
+            },
+            {
               "field": "date_group"
             },
             {
@@ -1105,6 +1461,7 @@
       },
       {
         "kind": "task",
+        "task_type": 1,
         "definition": {
           "side": [
             {
@@ -1113,6 +1470,15 @@
                 "title": "Grant"
               },
               "children": [
+                {
+                  "type": "field",
+                  "props": {
+                    "field": "type"
+                  }
+                },
+                {
+                  "type": "dates"
+                },
                 {
                   "type": "status"
                 },
@@ -1160,9 +1526,138 @@
                 {
                   "type": "field",
                   "props": {
+                    "field": "assignees"
+                  }
+                },
+                {
+                  "type": "field",
+                  "props": {
                     "field": "priority"
                   }
                 },
+                {
+                  "type": "field",
+                  "props": {
+                    "field": "tags"
+                  }
+                },
+                {
+                  "type": "properties"
+                }
+              ]
+            }
+          ]
+        }
+      },
+      {
+        "kind": "task",
+        "task_type": 2,
+        "definition": {
+          "side": [
+            {
+              "type": "section",
+              "props": {
+                "title": "Appeal"
+              },
+              "children": [
+                {
+                  "type": "field",
+                  "props": {
+                    "field": "type"
+                  }
+                },
+                {
+                  "type": "dates"
+                },
+                {
+                  "type": "status"
+                },
+                {
+                  "type": "field",
+                  "props": {
+                    "field": "property:3"
+                  }
+                },
+                {
+                  "type": "field",
+                  "props": {
+                    "field": "property:4"
+                  }
+                },
+                {
+                  "type": "field",
+                  "props": {
+                    "field": "property:5"
+                  }
+                }
+              ]
+            },
+            {
+              "type": "section",
+              "children": [
+                {
+                  "type": "field",
+                  "props": {
+                    "field": "assignees"
+                  }
+                },
+                {
+                  "type": "field",
+                  "props": {
+                    "field": "priority"
+                  }
+                },
+                {
+                  "type": "field",
+                  "props": {
+                    "field": "tags"
+                  }
+                },
+                {
+                  "type": "properties"
+                }
+              ]
+            }
+          ]
+        }
+      },
+      {
+        "kind": "task",
+        "task_type": 3,
+        "definition": {
+          "side": [
+            {
+              "type": "section",
+              "props": {
+                "title": "Report"
+              },
+              "children": [
+                {
+                  "type": "field",
+                  "props": {
+                    "field": "type"
+                  }
+                },
+                {
+                  "type": "status"
+                },
+                {
+                  "type": "field",
+                  "props": {
+                    "field": "property:1"
+                  }
+                },
+                {
+                  "type": "field",
+                  "props": {
+                    "field": "property:6"
+                  }
+                }
+              ]
+            },
+            {
+              "type": "section",
+              "children": [
                 {
                   "type": "field",
                   "props": {
@@ -1176,6 +1671,12 @@
                   "type": "field",
                   "props": {
                     "field": "recurrence"
+                  }
+                },
+                {
+                  "type": "field",
+                  "props": {
+                    "field": "priority"
                   }
                 },
                 {

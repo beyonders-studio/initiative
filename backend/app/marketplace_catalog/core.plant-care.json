@@ -1,0 +1,1521 @@
+{
+  "uid": "1T3PA73X6FBHR8",
+  "public_id": "core.plant-care",
+  "kind": "project",
+  "name": "Plant care",
+  "publisher": "Initiative",
+  "description": "Every plant watered before it wilts, and not so often that it drowns.",
+  "long_description": "Each plant gets its own jobs: watering, fertilizing and repotting, each a type with a page of its own. Watering and fertilizing repeat from when you last did them, not from a calendar, so a week away does not leave you three waterings behind.\n\nEvery job says which plant, which room and how much light it gets. The table opens grouped by room, which is the order you walk round the house in. A plant that looks unwell goes in Needs a look until somebody works out what it wants.\n\nRepotting starts with a checklist, because the step everyone skips is the week out of direct sun afterwards.",
+  "avatar_url": "/marketplace/core-plant-care.svg",
+  "images": [],
+  "version": "1.0.0",
+  "release_notes": "Watering, fertilizing and repotting, each with a page of its own.",
+  "definition": {
+    "type": "initiative-project",
+    "schema_version": 1,
+    "app_version": "0.77.0",
+    "exported_at": "2000-01-03T00:00:00",
+    "project": {
+      "name": "Plant care",
+      "icon": "🪴",
+      "description": "Watering, feeding and repotting, each on its own clock. Finish one and the next comes round when the plant will want it.",
+      "is_template": false,
+      "start_date": null,
+      "end_date": null,
+      "properties": []
+    },
+    "tags": [],
+    "task_statuses": [
+      {
+        "name": "To do",
+        "category": "todo",
+        "position": 0,
+        "color": null,
+        "icon": null,
+        "is_default": true
+      },
+      {
+        "name": "Needs a look",
+        "category": "in_progress",
+        "position": 1,
+        "color": "#F97316",
+        "icon": "circle-alert",
+        "is_default": false
+      },
+      {
+        "name": "Done",
+        "category": "done",
+        "position": 2,
+        "color": null,
+        "icon": null,
+        "is_default": false
+      }
+    ],
+    "task_types": [
+      {
+        "name": "Watering",
+        "is_default": true,
+        "color": "#38BDF8",
+        "icon": "droplets",
+        "layout_preset": "repeat",
+        "starting_values": {
+          "recurrence": "RRULE:FREQ=WEEKLY",
+          "recurrence_strategy": "rolling"
+        },
+        "position": 0
+      },
+      {
+        "name": "Fertilizing",
+        "is_default": false,
+        "color": "#84CC16",
+        "icon": "sprout",
+        "layout_preset": "repeat",
+        "starting_values": {
+          "recurrence": "RRULE:FREQ=MONTHLY",
+          "recurrence_strategy": "rolling",
+          "description": "Half strength is plenty. Skip it in winter, when nothing is growing."
+        },
+        "position": 1
+      },
+      {
+        "name": "Repotting",
+        "is_default": false,
+        "color": "#B45309",
+        "icon": "shovel",
+        "layout_preset": "checklist",
+        "starting_values": {
+          "checklist": [
+            "A pot one size up, with a hole in the bottom",
+            "Fresh soil",
+            "Loosen the roots",
+            "Water it in",
+            "A week out of direct sun"
+          ]
+        },
+        "position": 2
+      }
+    ],
+    "property_definitions": [
+      {
+        "name": "Plant",
+        "type": "text",
+        "position": 0.0,
+        "color": null,
+        "options": null
+      },
+      {
+        "name": "Room",
+        "type": "select",
+        "position": 1.0,
+        "color": null,
+        "options": [
+          {
+            "value": "living-room",
+            "label": "Living room",
+            "color": "#10B981"
+          },
+          {
+            "value": "kitchen",
+            "label": "Kitchen",
+            "color": "#F59E0B"
+          },
+          {
+            "value": "bedroom",
+            "label": "Bedroom",
+            "color": "#8B5CF6"
+          },
+          {
+            "value": "bathroom",
+            "label": "Bathroom",
+            "color": "#06B6D4"
+          },
+          {
+            "value": "office",
+            "label": "Office",
+            "color": "#3B82F6"
+          },
+          {
+            "value": "outside",
+            "label": "Outside",
+            "color": "#84CC16"
+          }
+        ]
+      },
+      {
+        "name": "Light",
+        "type": "select",
+        "position": 2.0,
+        "color": null,
+        "options": [
+          {
+            "value": "bright",
+            "label": "Bright, direct",
+            "color": "#FACC15"
+          },
+          {
+            "value": "indirect",
+            "label": "Bright, indirect",
+            "color": "#FB923C"
+          },
+          {
+            "value": "low",
+            "label": "Low light",
+            "color": "#64748B"
+          }
+        ]
+      },
+      {
+        "name": "Fertilizer",
+        "type": "text",
+        "position": 3.0,
+        "color": null,
+        "options": null
+      },
+      {
+        "name": "Pot size",
+        "type": "text",
+        "position": 4.0,
+        "color": null,
+        "options": null
+      }
+    ],
+    "tasks": [],
+    "layouts": [
+      {
+        "kind": "board",
+        "definition": {
+          "card": {
+            "type": "card",
+            "children": [
+              {
+                "type": "stack",
+                "props": {
+                  "align": "start"
+                },
+                "children": [
+                  {
+                    "type": "stack",
+                    "props": {
+                      "direction": "row",
+                      "gap": "sm",
+                      "align": "start"
+                    },
+                    "children": [
+                      {
+                        "type": "field",
+                        "props": {
+                          "field": "type"
+                        }
+                      },
+                      {
+                        "type": "field",
+                        "props": {
+                          "field": "title"
+                        }
+                      }
+                    ]
+                  },
+                  {
+                    "type": "field",
+                    "props": {
+                      "field": "description"
+                    }
+                  },
+                  {
+                    "type": "stack",
+                    "props": {
+                      "tone": "muted"
+                    },
+                    "children": [
+                      {
+                        "type": "field",
+                        "props": {
+                          "field": "property:1"
+                        }
+                      },
+                      {
+                        "type": "field",
+                        "props": {
+                          "field": "property:2"
+                        }
+                      },
+                      {
+                        "type": "field",
+                        "props": {
+                          "field": "assignees"
+                        }
+                      },
+                      {
+                        "type": "field",
+                        "props": {
+                          "field": "dueDate"
+                        }
+                      },
+                      {
+                        "type": "field",
+                        "props": {
+                          "field": "recurrence"
+                        }
+                      }
+                    ]
+                  },
+                  {
+                    "type": "field",
+                    "props": {
+                      "field": "checklist"
+                    }
+                  }
+                ]
+              },
+              {
+                "type": "stack",
+                "props": {
+                  "direction": "row",
+                  "gap": "sm",
+                  "wrap": true
+                },
+                "children": [
+                  {
+                    "type": "field",
+                    "props": {
+                      "field": "comments"
+                    }
+                  },
+                  {
+                    "type": "field",
+                    "props": {
+                      "field": "tags"
+                    }
+                  }
+                ]
+              }
+            ]
+          },
+          "groupings": [
+            {
+              "field": "date_group"
+            },
+            {
+              "field": "task_type_id"
+            },
+            {
+              "field": "property:2"
+            },
+            {
+              "field": "assignee_ids"
+            }
+          ]
+        }
+      },
+      {
+        "kind": "table",
+        "definition": {
+          "columns": [
+            "title",
+            "property:1",
+            "property:2",
+            "dueDate",
+            "assignees",
+            "comments"
+          ],
+          "groupings": [
+            {
+              "field": "task_status_id"
+            },
+            {
+              "field": "task_type_id"
+            },
+            {
+              "field": "date_group"
+            },
+            {
+              "field": "property:2"
+            },
+            {
+              "field": "assignee_ids"
+            }
+          ],
+          "group_by": "property:2"
+        }
+      },
+      {
+        "kind": "task",
+        "task_type": 1,
+        "definition": {
+          "side": [
+            {
+              "type": "section",
+              "props": {
+                "title": "Watering"
+              },
+              "children": [
+                {
+                  "type": "field",
+                  "props": {
+                    "field": "type"
+                  }
+                },
+                {
+                  "type": "field",
+                  "props": {
+                    "field": "recurrence"
+                  }
+                },
+                {
+                  "type": "dates"
+                },
+                {
+                  "type": "status"
+                },
+                {
+                  "type": "field",
+                  "props": {
+                    "field": "property:1"
+                  }
+                },
+                {
+                  "type": "field",
+                  "props": {
+                    "field": "property:2"
+                  }
+                },
+                {
+                  "type": "field",
+                  "props": {
+                    "field": "property:3"
+                  }
+                }
+              ]
+            },
+            {
+              "type": "section",
+              "children": [
+                {
+                  "type": "field",
+                  "props": {
+                    "field": "assignees"
+                  }
+                },
+                {
+                  "type": "field",
+                  "props": {
+                    "field": "priority"
+                  }
+                },
+                {
+                  "type": "field",
+                  "props": {
+                    "field": "tags"
+                  }
+                },
+                {
+                  "type": "properties"
+                }
+              ]
+            },
+            {
+              "type": "relations"
+            }
+          ]
+        }
+      },
+      {
+        "kind": "task",
+        "task_type": 2,
+        "definition": {
+          "side": [
+            {
+              "type": "section",
+              "props": {
+                "title": "Feeding"
+              },
+              "children": [
+                {
+                  "type": "field",
+                  "props": {
+                    "field": "type"
+                  }
+                },
+                {
+                  "type": "field",
+                  "props": {
+                    "field": "recurrence"
+                  }
+                },
+                {
+                  "type": "dates"
+                },
+                {
+                  "type": "status"
+                },
+                {
+                  "type": "field",
+                  "props": {
+                    "field": "property:1"
+                  }
+                },
+                {
+                  "type": "field",
+                  "props": {
+                    "field": "property:4"
+                  }
+                }
+              ]
+            },
+            {
+              "type": "section",
+              "children": [
+                {
+                  "type": "field",
+                  "props": {
+                    "field": "assignees"
+                  }
+                },
+                {
+                  "type": "field",
+                  "props": {
+                    "field": "priority"
+                  }
+                },
+                {
+                  "type": "field",
+                  "props": {
+                    "field": "tags"
+                  }
+                },
+                {
+                  "type": "properties"
+                }
+              ]
+            },
+            {
+              "type": "relations"
+            }
+          ]
+        }
+      },
+      {
+        "kind": "task",
+        "task_type": 3,
+        "definition": {
+          "side": [
+            {
+              "type": "section",
+              "props": {
+                "title": "Repotting"
+              },
+              "children": [
+                {
+                  "type": "field",
+                  "props": {
+                    "field": "type"
+                  }
+                },
+                {
+                  "type": "status"
+                },
+                {
+                  "type": "field",
+                  "props": {
+                    "field": "property:1"
+                  }
+                },
+                {
+                  "type": "field",
+                  "props": {
+                    "field": "property:5"
+                  }
+                },
+                {
+                  "type": "field",
+                  "props": {
+                    "field": "property:2"
+                  }
+                }
+              ]
+            },
+            {
+              "type": "section",
+              "children": [
+                {
+                  "type": "field",
+                  "props": {
+                    "field": "assignees"
+                  }
+                },
+                {
+                  "type": "dates"
+                },
+                {
+                  "type": "field",
+                  "props": {
+                    "field": "recurrence"
+                  }
+                },
+                {
+                  "type": "field",
+                  "props": {
+                    "field": "priority"
+                  }
+                },
+                {
+                  "type": "field",
+                  "props": {
+                    "field": "tags"
+                  }
+                },
+                {
+                  "type": "properties"
+                }
+              ]
+            },
+            {
+              "type": "relations"
+            }
+          ]
+        }
+      },
+      {
+        "kind": "default",
+        "definition": {
+          "kind": "table"
+        }
+      }
+    ]
+  },
+  "example": {
+    "type": "initiative-project",
+    "schema_version": 1,
+    "app_version": "0.77.0",
+    "exported_at": "2000-01-03T00:00:00",
+    "project": {
+      "name": "Plant care",
+      "icon": "🪴",
+      "description": "Watering, feeding and repotting, each on its own clock. Finish one and the next comes round when the plant will want it.",
+      "is_template": false,
+      "start_date": null,
+      "end_date": null,
+      "properties": []
+    },
+    "tags": [],
+    "task_statuses": [
+      {
+        "name": "To do",
+        "category": "todo",
+        "position": 0,
+        "color": null,
+        "icon": null,
+        "is_default": true
+      },
+      {
+        "name": "Needs a look",
+        "category": "in_progress",
+        "position": 1,
+        "color": "#F97316",
+        "icon": "circle-alert",
+        "is_default": false
+      },
+      {
+        "name": "Done",
+        "category": "done",
+        "position": 2,
+        "color": null,
+        "icon": null,
+        "is_default": false
+      }
+    ],
+    "task_types": [
+      {
+        "name": "Watering",
+        "is_default": true,
+        "color": "#38BDF8",
+        "icon": "droplets",
+        "layout_preset": "repeat",
+        "starting_values": {
+          "recurrence": "RRULE:FREQ=WEEKLY",
+          "recurrence_strategy": "rolling"
+        },
+        "position": 0
+      },
+      {
+        "name": "Fertilizing",
+        "is_default": false,
+        "color": "#84CC16",
+        "icon": "sprout",
+        "layout_preset": "repeat",
+        "starting_values": {
+          "recurrence": "RRULE:FREQ=MONTHLY",
+          "recurrence_strategy": "rolling",
+          "description": "Half strength is plenty. Skip it in winter, when nothing is growing."
+        },
+        "position": 1
+      },
+      {
+        "name": "Repotting",
+        "is_default": false,
+        "color": "#B45309",
+        "icon": "shovel",
+        "layout_preset": "checklist",
+        "starting_values": {
+          "checklist": [
+            "A pot one size up, with a hole in the bottom",
+            "Fresh soil",
+            "Loosen the roots",
+            "Water it in",
+            "A week out of direct sun"
+          ]
+        },
+        "position": 2
+      }
+    ],
+    "property_definitions": [
+      {
+        "name": "Plant",
+        "type": "text",
+        "position": 0.0,
+        "color": null,
+        "options": null
+      },
+      {
+        "name": "Room",
+        "type": "select",
+        "position": 1.0,
+        "color": null,
+        "options": [
+          {
+            "value": "living-room",
+            "label": "Living room",
+            "color": "#10B981"
+          },
+          {
+            "value": "kitchen",
+            "label": "Kitchen",
+            "color": "#F59E0B"
+          },
+          {
+            "value": "bedroom",
+            "label": "Bedroom",
+            "color": "#8B5CF6"
+          },
+          {
+            "value": "bathroom",
+            "label": "Bathroom",
+            "color": "#06B6D4"
+          },
+          {
+            "value": "office",
+            "label": "Office",
+            "color": "#3B82F6"
+          },
+          {
+            "value": "outside",
+            "label": "Outside",
+            "color": "#84CC16"
+          }
+        ]
+      },
+      {
+        "name": "Light",
+        "type": "select",
+        "position": 2.0,
+        "color": null,
+        "options": [
+          {
+            "value": "bright",
+            "label": "Bright, direct",
+            "color": "#FACC15"
+          },
+          {
+            "value": "indirect",
+            "label": "Bright, indirect",
+            "color": "#FB923C"
+          },
+          {
+            "value": "low",
+            "label": "Low light",
+            "color": "#64748B"
+          }
+        ]
+      },
+      {
+        "name": "Fertilizer",
+        "type": "text",
+        "position": 3.0,
+        "color": null,
+        "options": null
+      },
+      {
+        "name": "Pot size",
+        "type": "text",
+        "position": 4.0,
+        "color": null,
+        "options": null
+      }
+    ],
+    "tasks": [
+      {
+        "title": "Water the herbs",
+        "description": "A sunny windowsill dries them out fast. Water at the base, not the leaves.",
+        "priority": "medium",
+        "start_date": null,
+        "due_date": "2000-01-03T12:00:00+00:00",
+        "recurrence": "RRULE:FREQ=DAILY;INTERVAL=2",
+        "status_name": "To do",
+        "position": 0.0,
+        "tags": [],
+        "assignee_handles": [],
+        "checklist": [],
+        "properties": [
+          {
+            "property_name": "Plant",
+            "property_type": "text",
+            "value_text": "Basil, parsley and mint"
+          },
+          {
+            "property_name": "Room",
+            "property_type": "select",
+            "value_text": "kitchen"
+          },
+          {
+            "property_name": "Light",
+            "property_type": "select",
+            "value_text": "bright"
+          }
+        ],
+        "type_name": "Watering",
+        "recurrence_strategy": "rolling"
+      },
+      {
+        "title": "Water the fern",
+        "description": "Keep the soil damp, never soggy. The steam from the shower does half the work.",
+        "priority": "medium",
+        "start_date": null,
+        "due_date": "2000-01-04T12:00:00+00:00",
+        "recurrence": "RRULE:FREQ=DAILY;INTERVAL=3",
+        "status_name": "To do",
+        "position": 1.0,
+        "tags": [],
+        "assignee_handles": [],
+        "checklist": [],
+        "properties": [
+          {
+            "property_name": "Plant",
+            "property_type": "text",
+            "value_text": "Boston fern"
+          },
+          {
+            "property_name": "Room",
+            "property_type": "select",
+            "value_text": "bathroom"
+          },
+          {
+            "property_name": "Light",
+            "property_type": "select",
+            "value_text": "indirect"
+          }
+        ],
+        "type_name": "Watering",
+        "recurrence_strategy": "rolling"
+      },
+      {
+        "title": "Water the monstera",
+        "description": "When the top few centimetres of soil are dry. Not before.",
+        "priority": "medium",
+        "start_date": null,
+        "due_date": "2000-01-05T12:00:00+00:00",
+        "recurrence": "RRULE:FREQ=WEEKLY",
+        "status_name": "To do",
+        "position": 2.0,
+        "tags": [],
+        "assignee_handles": [],
+        "checklist": [],
+        "properties": [
+          {
+            "property_name": "Plant",
+            "property_type": "text",
+            "value_text": "Monstera"
+          },
+          {
+            "property_name": "Room",
+            "property_type": "select",
+            "value_text": "living-room"
+          },
+          {
+            "property_name": "Light",
+            "property_type": "select",
+            "value_text": "indirect"
+          }
+        ],
+        "type_name": "Watering",
+        "recurrence_strategy": "rolling"
+      },
+      {
+        "title": "Soak the orchid",
+        "description": "Ten minutes in a bowl of water, then let it drain. Never leave it standing in water.",
+        "priority": "medium",
+        "start_date": null,
+        "due_date": "2000-01-06T12:00:00+00:00",
+        "recurrence": "RRULE:FREQ=WEEKLY",
+        "status_name": "To do",
+        "position": 3.0,
+        "tags": [],
+        "assignee_handles": [],
+        "checklist": [],
+        "properties": [
+          {
+            "property_name": "Plant",
+            "property_type": "text",
+            "value_text": "Moth orchid"
+          },
+          {
+            "property_name": "Room",
+            "property_type": "select",
+            "value_text": "office"
+          },
+          {
+            "property_name": "Light",
+            "property_type": "select",
+            "value_text": "indirect"
+          }
+        ],
+        "type_name": "Watering",
+        "recurrence_strategy": "rolling"
+      },
+      {
+        "title": "Water the snake plant",
+        "description": "It would rather be forgotten than drowned.",
+        "priority": "low",
+        "start_date": null,
+        "due_date": "2000-01-10T12:00:00+00:00",
+        "recurrence": "RRULE:FREQ=WEEKLY;INTERVAL=3",
+        "status_name": "To do",
+        "position": 4.0,
+        "tags": [],
+        "assignee_handles": [],
+        "checklist": [],
+        "properties": [
+          {
+            "property_name": "Plant",
+            "property_type": "text",
+            "value_text": "Snake plant"
+          },
+          {
+            "property_name": "Room",
+            "property_type": "select",
+            "value_text": "bedroom"
+          },
+          {
+            "property_name": "Light",
+            "property_type": "select",
+            "value_text": "low"
+          }
+        ],
+        "type_name": "Watering",
+        "recurrence_strategy": "rolling"
+      },
+      {
+        "title": "Feed the herbs",
+        "description": "Half strength. Herbs you eat get a feed you would be happy to eat after.",
+        "priority": "medium",
+        "start_date": null,
+        "due_date": "2000-01-08T12:00:00+00:00",
+        "recurrence": "RRULE:FREQ=WEEKLY;INTERVAL=2",
+        "status_name": "To do",
+        "position": 5.0,
+        "tags": [],
+        "assignee_handles": [],
+        "checklist": [],
+        "properties": [
+          {
+            "property_name": "Plant",
+            "property_type": "text",
+            "value_text": "Basil, parsley and mint"
+          },
+          {
+            "property_name": "Room",
+            "property_type": "select",
+            "value_text": "kitchen"
+          },
+          {
+            "property_name": "Fertilizer",
+            "property_type": "text",
+            "value_text": "Liquid seaweed"
+          }
+        ],
+        "type_name": "Fertilizing",
+        "recurrence_strategy": "rolling"
+      },
+      {
+        "title": "Feed the monstera",
+        "description": "Half strength is plenty. Skip it in winter, when nothing is growing.",
+        "priority": "medium",
+        "start_date": null,
+        "due_date": "2000-01-12T12:00:00+00:00",
+        "recurrence": "RRULE:FREQ=MONTHLY",
+        "status_name": "To do",
+        "position": 6.0,
+        "tags": [],
+        "assignee_handles": [],
+        "checklist": [],
+        "properties": [
+          {
+            "property_name": "Plant",
+            "property_type": "text",
+            "value_text": "Monstera"
+          },
+          {
+            "property_name": "Room",
+            "property_type": "select",
+            "value_text": "living-room"
+          },
+          {
+            "property_name": "Fertilizer",
+            "property_type": "text",
+            "value_text": "Balanced houseplant feed"
+          }
+        ],
+        "type_name": "Fertilizing",
+        "recurrence_strategy": "rolling"
+      },
+      {
+        "title": "Feed the orchid",
+        "description": "Orchid feed only, and only while it is putting out new leaves or roots.",
+        "priority": "medium",
+        "start_date": null,
+        "due_date": "2000-01-13T12:00:00+00:00",
+        "recurrence": "RRULE:FREQ=MONTHLY",
+        "status_name": "To do",
+        "position": 7.0,
+        "tags": [],
+        "assignee_handles": [],
+        "checklist": [],
+        "properties": [
+          {
+            "property_name": "Plant",
+            "property_type": "text",
+            "value_text": "Moth orchid"
+          },
+          {
+            "property_name": "Room",
+            "property_type": "select",
+            "value_text": "office"
+          },
+          {
+            "property_name": "Fertilizer",
+            "property_type": "text",
+            "value_text": "Orchid feed"
+          }
+        ],
+        "type_name": "Fertilizing",
+        "recurrence_strategy": "rolling"
+      },
+      {
+        "title": "Repot the monstera",
+        "description": "Roots coming out of the bottom means it is time. Spring is best.",
+        "priority": "medium",
+        "start_date": null,
+        "due_date": "2000-03-06T12:00:00+00:00",
+        "recurrence": null,
+        "status_name": "To do",
+        "position": 8.0,
+        "tags": [],
+        "assignee_handles": [],
+        "checklist": [
+          {
+            "text": "A pot one size up, with a hole in the bottom",
+            "done": false
+          },
+          {
+            "text": "Fresh soil",
+            "done": false
+          },
+          {
+            "text": "Loosen the roots",
+            "done": false
+          },
+          {
+            "text": "Water it in",
+            "done": false
+          },
+          {
+            "text": "A week out of direct sun",
+            "done": false
+          }
+        ],
+        "properties": [
+          {
+            "property_name": "Plant",
+            "property_type": "text",
+            "value_text": "Monstera"
+          },
+          {
+            "property_name": "Pot size",
+            "property_type": "text",
+            "value_text": "30 cm"
+          },
+          {
+            "property_name": "Room",
+            "property_type": "select",
+            "value_text": "living-room"
+          }
+        ],
+        "type_name": "Repotting"
+      },
+      {
+        "title": "Repot the snake plant",
+        "description": "It likes being cramped. Every couple of years is plenty, and a cactus mix drains best.",
+        "priority": "low",
+        "start_date": null,
+        "due_date": "2000-04-03T12:00:00+00:00",
+        "recurrence": "RRULE:FREQ=YEARLY;INTERVAL=2",
+        "status_name": "To do",
+        "position": 9.0,
+        "tags": [],
+        "assignee_handles": [],
+        "checklist": [
+          {
+            "text": "A pot one size up, with a hole in the bottom",
+            "done": false
+          },
+          {
+            "text": "Fresh soil",
+            "done": false
+          },
+          {
+            "text": "Loosen the roots",
+            "done": false
+          },
+          {
+            "text": "Water it in",
+            "done": false
+          },
+          {
+            "text": "A week out of direct sun",
+            "done": false
+          }
+        ],
+        "properties": [
+          {
+            "property_name": "Plant",
+            "property_type": "text",
+            "value_text": "Snake plant"
+          },
+          {
+            "property_name": "Pot size",
+            "property_type": "text",
+            "value_text": "20 cm"
+          },
+          {
+            "property_name": "Room",
+            "property_type": "select",
+            "value_text": "bedroom"
+          }
+        ],
+        "type_name": "Repotting",
+        "recurrence_strategy": "fixed"
+      }
+    ],
+    "layouts": [
+      {
+        "kind": "board",
+        "definition": {
+          "card": {
+            "type": "card",
+            "children": [
+              {
+                "type": "stack",
+                "props": {
+                  "align": "start"
+                },
+                "children": [
+                  {
+                    "type": "stack",
+                    "props": {
+                      "direction": "row",
+                      "gap": "sm",
+                      "align": "start"
+                    },
+                    "children": [
+                      {
+                        "type": "field",
+                        "props": {
+                          "field": "type"
+                        }
+                      },
+                      {
+                        "type": "field",
+                        "props": {
+                          "field": "title"
+                        }
+                      }
+                    ]
+                  },
+                  {
+                    "type": "field",
+                    "props": {
+                      "field": "description"
+                    }
+                  },
+                  {
+                    "type": "stack",
+                    "props": {
+                      "tone": "muted"
+                    },
+                    "children": [
+                      {
+                        "type": "field",
+                        "props": {
+                          "field": "property:1"
+                        }
+                      },
+                      {
+                        "type": "field",
+                        "props": {
+                          "field": "property:2"
+                        }
+                      },
+                      {
+                        "type": "field",
+                        "props": {
+                          "field": "assignees"
+                        }
+                      },
+                      {
+                        "type": "field",
+                        "props": {
+                          "field": "dueDate"
+                        }
+                      },
+                      {
+                        "type": "field",
+                        "props": {
+                          "field": "recurrence"
+                        }
+                      }
+                    ]
+                  },
+                  {
+                    "type": "field",
+                    "props": {
+                      "field": "checklist"
+                    }
+                  }
+                ]
+              },
+              {
+                "type": "stack",
+                "props": {
+                  "direction": "row",
+                  "gap": "sm",
+                  "wrap": true
+                },
+                "children": [
+                  {
+                    "type": "field",
+                    "props": {
+                      "field": "comments"
+                    }
+                  },
+                  {
+                    "type": "field",
+                    "props": {
+                      "field": "tags"
+                    }
+                  }
+                ]
+              }
+            ]
+          },
+          "groupings": [
+            {
+              "field": "date_group"
+            },
+            {
+              "field": "task_type_id"
+            },
+            {
+              "field": "property:2"
+            },
+            {
+              "field": "assignee_ids"
+            }
+          ]
+        }
+      },
+      {
+        "kind": "table",
+        "definition": {
+          "columns": [
+            "title",
+            "property:1",
+            "property:2",
+            "dueDate",
+            "assignees",
+            "comments"
+          ],
+          "groupings": [
+            {
+              "field": "task_status_id"
+            },
+            {
+              "field": "task_type_id"
+            },
+            {
+              "field": "date_group"
+            },
+            {
+              "field": "property:2"
+            },
+            {
+              "field": "assignee_ids"
+            }
+          ],
+          "group_by": "property:2"
+        }
+      },
+      {
+        "kind": "task",
+        "task_type": 1,
+        "definition": {
+          "side": [
+            {
+              "type": "section",
+              "props": {
+                "title": "Watering"
+              },
+              "children": [
+                {
+                  "type": "field",
+                  "props": {
+                    "field": "type"
+                  }
+                },
+                {
+                  "type": "field",
+                  "props": {
+                    "field": "recurrence"
+                  }
+                },
+                {
+                  "type": "dates"
+                },
+                {
+                  "type": "status"
+                },
+                {
+                  "type": "field",
+                  "props": {
+                    "field": "property:1"
+                  }
+                },
+                {
+                  "type": "field",
+                  "props": {
+                    "field": "property:2"
+                  }
+                },
+                {
+                  "type": "field",
+                  "props": {
+                    "field": "property:3"
+                  }
+                }
+              ]
+            },
+            {
+              "type": "section",
+              "children": [
+                {
+                  "type": "field",
+                  "props": {
+                    "field": "assignees"
+                  }
+                },
+                {
+                  "type": "field",
+                  "props": {
+                    "field": "priority"
+                  }
+                },
+                {
+                  "type": "field",
+                  "props": {
+                    "field": "tags"
+                  }
+                },
+                {
+                  "type": "properties"
+                }
+              ]
+            },
+            {
+              "type": "relations"
+            }
+          ]
+        }
+      },
+      {
+        "kind": "task",
+        "task_type": 2,
+        "definition": {
+          "side": [
+            {
+              "type": "section",
+              "props": {
+                "title": "Feeding"
+              },
+              "children": [
+                {
+                  "type": "field",
+                  "props": {
+                    "field": "type"
+                  }
+                },
+                {
+                  "type": "field",
+                  "props": {
+                    "field": "recurrence"
+                  }
+                },
+                {
+                  "type": "dates"
+                },
+                {
+                  "type": "status"
+                },
+                {
+                  "type": "field",
+                  "props": {
+                    "field": "property:1"
+                  }
+                },
+                {
+                  "type": "field",
+                  "props": {
+                    "field": "property:4"
+                  }
+                }
+              ]
+            },
+            {
+              "type": "section",
+              "children": [
+                {
+                  "type": "field",
+                  "props": {
+                    "field": "assignees"
+                  }
+                },
+                {
+                  "type": "field",
+                  "props": {
+                    "field": "priority"
+                  }
+                },
+                {
+                  "type": "field",
+                  "props": {
+                    "field": "tags"
+                  }
+                },
+                {
+                  "type": "properties"
+                }
+              ]
+            },
+            {
+              "type": "relations"
+            }
+          ]
+        }
+      },
+      {
+        "kind": "task",
+        "task_type": 3,
+        "definition": {
+          "side": [
+            {
+              "type": "section",
+              "props": {
+                "title": "Repotting"
+              },
+              "children": [
+                {
+                  "type": "field",
+                  "props": {
+                    "field": "type"
+                  }
+                },
+                {
+                  "type": "status"
+                },
+                {
+                  "type": "field",
+                  "props": {
+                    "field": "property:1"
+                  }
+                },
+                {
+                  "type": "field",
+                  "props": {
+                    "field": "property:5"
+                  }
+                },
+                {
+                  "type": "field",
+                  "props": {
+                    "field": "property:2"
+                  }
+                }
+              ]
+            },
+            {
+              "type": "section",
+              "children": [
+                {
+                  "type": "field",
+                  "props": {
+                    "field": "assignees"
+                  }
+                },
+                {
+                  "type": "dates"
+                },
+                {
+                  "type": "field",
+                  "props": {
+                    "field": "recurrence"
+                  }
+                },
+                {
+                  "type": "field",
+                  "props": {
+                    "field": "priority"
+                  }
+                },
+                {
+                  "type": "field",
+                  "props": {
+                    "field": "tags"
+                  }
+                },
+                {
+                  "type": "properties"
+                }
+              ]
+            },
+            {
+              "type": "relations"
+            }
+          ]
+        }
+      },
+      {
+        "kind": "default",
+        "definition": {
+          "kind": "table"
+        }
+      }
+    ]
+  }
+}
