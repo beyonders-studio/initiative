@@ -49,7 +49,9 @@ When the publisher ships a newer version, the dashboard shows **Version X availa
 
 ### Adding a project
 
-Somebody has already worked out what a hiring pipeline needs as columns. A few listings ship with Initiative: a sales pipeline, a hiring pipeline, a bug tracker, a content calendar, a grant tracker, a product launch and facility maintenance.
+Somebody has already worked out what a hiring pipeline needs as columns. A few listings ship with Initiative: a sales pipeline, a hiring pipeline, a bug tracker, a content calendar, a grant tracker, a product launch, facility maintenance and plant care.
+
+Each comes with [task types](projects-and-tasks.md#task-types) of its own in place of the usual four, each with its own page: the bug tracker has bugs, feature requests and chores, and plant care has watering, fertilizing and repotting.
 
 1. Open the listing. **Blank** and **Example** show it both ways: the empty board you'd get, and the same board with some made-up work moving through it.
 2. Choose **Add to an initiative**, and pick the initiative and a name.

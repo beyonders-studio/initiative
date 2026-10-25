@@ -7,6 +7,14 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Added
+
+- **A plant care project in the marketplace.** Watering, fertilizing and repotting are each their own type. Watering and fertilizing repeat from when you last did them, and repotting starts with a checklist.
+
+### Changed
+
+- **Marketplace projects bring their own task types.** Each ready-made project has its own types in place of Task, Bug, Idea and Milestone, such as candidates and volunteers, or deals and renewals. Each type has its own task page, and cards show the type beside the title.
+
 ## [0.77.1] - 2026-10-23
 
 ### Added

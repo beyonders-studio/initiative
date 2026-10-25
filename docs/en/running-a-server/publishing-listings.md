@@ -119,6 +119,8 @@ What installs is a new project of the installer's own, called whatever the listi
 
 Writing `layouts` by hand? A layout names a status or a property by its place in the file's own lists, counting from 1: a status id of `2` is the second of `task_statuses`, and `property:3` the third of `property_definitions`.
 
+Give the project its own `task_types`, or it installs with the four every new project starts with. Each type has a shape (`layout_preset`: `plain`, `fix`, `discussion`, `dates`, `repeat` or `checklist`) and can bring `starting_values`, such as a checklist or a repeat, for the tasks people add later. A task names its type with `type_name`. Each type can have its own task page: a `task` layout whose `task_type` is the type's place in `task_types`, counting from 1. A page that leaves out `main` keeps its shape's.
+
 `example` is optional, and is a second export of the same project with some work filled in: a few tasks moving through the board, so the shape makes sense at a glance. The listing's page then shows **Blank** and **Example** side by side, and the installer chooses which to start from.
 
 ## A home layout listing

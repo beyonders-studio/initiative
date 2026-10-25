@@ -5,11 +5,11 @@
   "name": "Product launch",
   "publisher": "Initiative",
   "description": "Six weeks from kickoff to launch day, and one more to learn from it.",
-  "long_description": "A countdown that starts on the day you install it: the brief, a beta, the docs, the announcement, support, a go or no-go call, launch day itself and a retrospective two weeks after. Pick the kickoff date when you install, and every task lands in the right week.\n\nEach task belongs to product, engineering, marketing or support, so each team can filter to its own part. Move the launch and the rest is yours to drag. The template does not know about your holidays.",
+  "long_description": "A countdown that starts on the day you install it: the brief, a beta, the docs, the announcement, support, a go or no-go call, launch day itself and a retrospective two weeks after. Pick the kickoff date when you install, and every task lands in the right week.\n\nEach task belongs to product, engineering, marketing or support, so each team can filter to its own part. Move the launch and the rest is yours to drag. The template does not know about your holidays.\n\nLaunch day is a milestone, and the go or no-go call and the retrospective are meetings, which start with room for what was decided and who does what next.",
   "avatar_url": "/marketplace/core-product-launch.svg",
   "images": [],
-  "version": "1.1.0",
-  "release_notes": "The table is grouped by workstream, and each card shows its workstream.",
+  "version": "1.2.0",
+  "release_notes": "Tasks, milestones and meetings are each their own type, with a page of their own that shows the workstream. A new meeting starts with room for what was decided.",
   "definition": {
     "type": "initiative-project",
     "schema_version": 1,
@@ -57,6 +57,35 @@
         "color": null,
         "icon": null,
         "is_default": false
+      }
+    ],
+    "task_types": [
+      {
+        "name": "Task",
+        "is_default": true,
+        "color": "#94A3B8",
+        "icon": "square-check",
+        "layout_preset": "plain",
+        "position": 0
+      },
+      {
+        "name": "Milestone",
+        "is_default": false,
+        "color": "#A78BFA",
+        "icon": "flag",
+        "layout_preset": "dates",
+        "position": 1
+      },
+      {
+        "name": "Meeting",
+        "is_default": false,
+        "color": "#60A5FA",
+        "icon": "users",
+        "layout_preset": "dates",
+        "starting_values": {
+          "description": "**To decide**\n\n\n**Decided**\n\n\n**Who does what next**\n\n"
+        },
+        "position": 2
       }
     ],
     "property_definitions": [
@@ -125,7 +154,8 @@
             "property_type": "select",
             "value_text": "product"
           }
-        ]
+        ],
+        "type_name": "Task"
       },
       {
         "title": "Set the launch date",
@@ -145,7 +175,8 @@
             "property_type": "select",
             "value_text": "product"
           }
-        ]
+        ],
+        "type_name": "Task"
       },
       {
         "title": "Recruit beta testers",
@@ -165,7 +196,8 @@
             "property_type": "select",
             "value_text": "marketing"
           }
-        ]
+        ],
+        "type_name": "Task"
       },
       {
         "title": "Run the beta",
@@ -185,7 +217,8 @@
             "property_type": "select",
             "value_text": "engineering"
           }
-        ]
+        ],
+        "type_name": "Task"
       },
       {
         "title": "Fix what the beta found",
@@ -205,7 +238,8 @@
             "property_type": "select",
             "value_text": "engineering"
           }
-        ]
+        ],
+        "type_name": "Task"
       },
       {
         "title": "Write the help articles",
@@ -225,7 +259,8 @@
             "property_type": "select",
             "value_text": "support"
           }
-        ]
+        ],
+        "type_name": "Task"
       },
       {
         "title": "Draft the announcement",
@@ -262,7 +297,8 @@
             "property_type": "select",
             "value_text": "marketing"
           }
-        ]
+        ],
+        "type_name": "Task"
       },
       {
         "title": "Prepare support",
@@ -295,7 +331,8 @@
             "property_type": "select",
             "value_text": "support"
           }
-        ]
+        ],
+        "type_name": "Task"
       },
       {
         "title": "Go or no-go",
@@ -315,7 +352,8 @@
             "property_type": "select",
             "value_text": "product"
           }
-        ]
+        ],
+        "type_name": "Meeting"
       },
       {
         "title": "Launch day",
@@ -356,7 +394,8 @@
             "property_type": "select",
             "value_text": "product"
           }
-        ]
+        ],
+        "type_name": "Milestone"
       },
       {
         "title": "Collect feedback",
@@ -376,7 +415,8 @@
             "property_type": "select",
             "value_text": "support"
           }
-        ]
+        ],
+        "type_name": "Task"
       },
       {
         "title": "Retrospective",
@@ -396,7 +436,8 @@
             "property_type": "select",
             "value_text": "product"
           }
-        ]
+        ],
+        "type_name": "Meeting"
       }
     ],
     "layouts": [
@@ -413,10 +454,26 @@
                 },
                 "children": [
                   {
-                    "type": "field",
+                    "type": "stack",
                     "props": {
-                      "field": "title"
-                    }
+                      "direction": "row",
+                      "gap": "sm",
+                      "align": "start"
+                    },
+                    "children": [
+                      {
+                        "type": "field",
+                        "props": {
+                          "field": "type"
+                        }
+                      },
+                      {
+                        "type": "field",
+                        "props": {
+                          "field": "title"
+                        }
+                      }
+                    ]
                   },
                   {
                     "type": "field",
@@ -514,6 +571,9 @@
               "field": "priority"
             },
             {
+              "field": "task_type_id"
+            },
+            {
               "field": "assignee_ids"
             },
             {
@@ -547,6 +607,9 @@
               "field": "task_status_id"
             },
             {
+              "field": "task_type_id"
+            },
+            {
               "field": "date_group"
             },
             {
@@ -569,6 +632,195 @@
             }
           ],
           "group_by": "property:1"
+        }
+      },
+      {
+        "kind": "task",
+        "task_type": 1,
+        "definition": {
+          "side": [
+            {
+              "type": "section",
+              "props": {
+                "title": "Task"
+              },
+              "children": [
+                {
+                  "type": "field",
+                  "props": {
+                    "field": "type"
+                  }
+                },
+                {
+                  "type": "status"
+                },
+                {
+                  "type": "field",
+                  "props": {
+                    "field": "property:1"
+                  }
+                }
+              ]
+            },
+            {
+              "type": "section",
+              "children": [
+                {
+                  "type": "field",
+                  "props": {
+                    "field": "priority"
+                  }
+                },
+                {
+                  "type": "field",
+                  "props": {
+                    "field": "assignees"
+                  }
+                },
+                {
+                  "type": "dates"
+                },
+                {
+                  "type": "field",
+                  "props": {
+                    "field": "recurrence"
+                  }
+                },
+                {
+                  "type": "field",
+                  "props": {
+                    "field": "tags"
+                  }
+                },
+                {
+                  "type": "properties"
+                }
+              ]
+            },
+            {
+              "type": "relations"
+            }
+          ]
+        }
+      },
+      {
+        "kind": "task",
+        "task_type": 2,
+        "definition": {
+          "side": [
+            {
+              "type": "section",
+              "props": {
+                "title": "Milestone"
+              },
+              "children": [
+                {
+                  "type": "field",
+                  "props": {
+                    "field": "type"
+                  }
+                },
+                {
+                  "type": "dates"
+                },
+                {
+                  "type": "status"
+                },
+                {
+                  "type": "field",
+                  "props": {
+                    "field": "property:1"
+                  }
+                }
+              ]
+            },
+            {
+              "type": "section",
+              "children": [
+                {
+                  "type": "field",
+                  "props": {
+                    "field": "assignees"
+                  }
+                },
+                {
+                  "type": "field",
+                  "props": {
+                    "field": "priority"
+                  }
+                },
+                {
+                  "type": "field",
+                  "props": {
+                    "field": "tags"
+                  }
+                },
+                {
+                  "type": "properties"
+                }
+              ]
+            }
+          ]
+        }
+      },
+      {
+        "kind": "task",
+        "task_type": 3,
+        "definition": {
+          "side": [
+            {
+              "type": "section",
+              "props": {
+                "title": "Meeting"
+              },
+              "children": [
+                {
+                  "type": "field",
+                  "props": {
+                    "field": "type"
+                  }
+                },
+                {
+                  "type": "dates"
+                },
+                {
+                  "type": "status"
+                },
+                {
+                  "type": "field",
+                  "props": {
+                    "field": "property:1"
+                  }
+                }
+              ]
+            },
+            {
+              "type": "section",
+              "children": [
+                {
+                  "type": "field",
+                  "props": {
+                    "field": "assignees"
+                  }
+                },
+                {
+                  "type": "field",
+                  "props": {
+                    "field": "priority"
+                  }
+                },
+                {
+                  "type": "field",
+                  "props": {
+                    "field": "tags"
+                  }
+                },
+                {
+                  "type": "properties"
+                }
+              ]
+            }
+          ]
         }
       }
     ]

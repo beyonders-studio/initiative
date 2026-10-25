@@ -5,11 +5,11 @@
   "name": "Sales pipeline",
   "publisher": "Initiative",
   "description": "Every deal on one board, from first hello to signed.",
-  "long_description": "Each deal is a card, and each stage is a column: Lead, Contacted, Demo sent, Trial, Negotiating, Won and Lost. Cards carry the company, the person you are talking to, what the deal is worth, where it came from and the date of the next step, so the board doubles as a to-do list.\n\nInstall one per salesperson and everyone works their own pipeline with the usual board, filters and due dates. A manager in the same initiative sees them all.\n\nValue is a plain number with the currency in its name. Rename the field if you sell in something other than dollars.",
+  "long_description": "Each deal is a card, and each stage is a column: Lead, Contacted, Demo sent, Trial, Negotiating, Won and Lost. Cards carry the company, the person you are talking to, what the deal is worth, where it came from and the date of the next step, so the board doubles as a to-do list.\n\nInstall one per salesperson and everyone works their own pipeline with the usual board, filters and due dates. A manager in the same initiative sees them all.\n\nValue is a plain number with the currency in its name. Rename the field if you sell in something other than dollars.\n\nA customer who signed for a year comes back as a renewal, which repeats every year from the day you set it.",
   "avatar_url": "/marketplace/core-sales-pipeline.svg",
   "images": [],
-  "version": "1.1.0",
-  "release_notes": "Opens on the board. Each card shows its company, value and next step, and a deal's page keeps its details together.",
+  "version": "1.2.0",
+  "release_notes": "Deals and renewals are each their own type, with a page of their own. A new renewal repeats every year, and a card shows its type beside its title.",
   "definition": {
     "type": "initiative-project",
     "schema_version": 1,
@@ -81,6 +81,27 @@
         "color": "#94A3B8",
         "icon": "circle-x",
         "is_default": false
+      }
+    ],
+    "task_types": [
+      {
+        "name": "Deal",
+        "is_default": true,
+        "color": "#34D399",
+        "icon": "handshake",
+        "layout_preset": "plain",
+        "position": 0
+      },
+      {
+        "name": "Renewal",
+        "is_default": false,
+        "color": "#60A5FA",
+        "icon": "refresh-cw",
+        "layout_preset": "repeat",
+        "starting_values": {
+          "recurrence": "RRULE:FREQ=YEARLY"
+        },
+        "position": 1
       }
     ],
     "property_definitions": [
@@ -161,10 +182,26 @@
                 },
                 "children": [
                   {
-                    "type": "field",
+                    "type": "stack",
                     "props": {
-                      "field": "title"
-                    }
+                      "direction": "row",
+                      "gap": "sm",
+                      "align": "start"
+                    },
+                    "children": [
+                      {
+                        "type": "field",
+                        "props": {
+                          "field": "type"
+                        }
+                      },
+                      {
+                        "type": "field",
+                        "props": {
+                          "field": "title"
+                        }
+                      }
+                    ]
                   },
                   {
                     "type": "field",
@@ -274,6 +311,9 @@
               "field": "priority"
             },
             {
+              "field": "task_type_id"
+            },
+            {
               "field": "assignee_ids"
             },
             {
@@ -311,6 +351,9 @@
               "field": "task_status_id"
             },
             {
+              "field": "task_type_id"
+            },
+            {
               "field": "date_group"
             },
             {
@@ -336,6 +379,7 @@
       },
       {
         "kind": "task",
+        "task_type": 1,
         "definition": {
           "side": [
             {
@@ -344,6 +388,12 @@
                 "title": "Deal"
               },
               "children": [
+                {
+                  "type": "field",
+                  "props": {
+                    "field": "type"
+                  }
+                },
                 {
                   "type": "status"
                 },
@@ -401,6 +451,93 @@
                   "type": "field",
                   "props": {
                     "field": "recurrence"
+                  }
+                },
+                {
+                  "type": "field",
+                  "props": {
+                    "field": "tags"
+                  }
+                },
+                {
+                  "type": "properties"
+                }
+              ]
+            },
+            {
+              "type": "relations"
+            }
+          ]
+        }
+      },
+      {
+        "kind": "task",
+        "task_type": 2,
+        "definition": {
+          "side": [
+            {
+              "type": "section",
+              "props": {
+                "title": "Renewal"
+              },
+              "children": [
+                {
+                  "type": "field",
+                  "props": {
+                    "field": "type"
+                  }
+                },
+                {
+                  "type": "field",
+                  "props": {
+                    "field": "recurrence"
+                  }
+                },
+                {
+                  "type": "dates"
+                },
+                {
+                  "type": "status"
+                },
+                {
+                  "type": "field",
+                  "props": {
+                    "field": "property:1"
+                  }
+                },
+                {
+                  "type": "field",
+                  "props": {
+                    "field": "property:2"
+                  }
+                },
+                {
+                  "type": "field",
+                  "props": {
+                    "field": "property:3"
+                  }
+                },
+                {
+                  "type": "field",
+                  "props": {
+                    "field": "property:4"
+                  }
+                }
+              ]
+            },
+            {
+              "type": "section",
+              "children": [
+                {
+                  "type": "field",
+                  "props": {
+                    "field": "assignees"
+                  }
+                },
+                {
+                  "type": "field",
+                  "props": {
+                    "field": "priority"
                   }
                 },
                 {
@@ -499,6 +636,27 @@
         "color": "#94A3B8",
         "icon": "circle-x",
         "is_default": false
+      }
+    ],
+    "task_types": [
+      {
+        "name": "Deal",
+        "is_default": true,
+        "color": "#34D399",
+        "icon": "handshake",
+        "layout_preset": "plain",
+        "position": 0
+      },
+      {
+        "name": "Renewal",
+        "is_default": false,
+        "color": "#60A5FA",
+        "icon": "refresh-cw",
+        "layout_preset": "repeat",
+        "starting_values": {
+          "recurrence": "RRULE:FREQ=YEARLY"
+        },
+        "position": 1
       }
     ],
     "property_definitions": [
@@ -603,7 +761,8 @@
             "property_type": "select",
             "value_text": "website"
           }
-        ]
+        ],
+        "type_name": "Deal"
       },
       {
         "title": "Ridgeline Climbing Gym",
@@ -643,7 +802,8 @@
             "property_type": "select",
             "value_text": "event"
           }
-        ]
+        ],
+        "type_name": "Deal"
       },
       {
         "title": "Bluebird Preschool",
@@ -692,7 +852,8 @@
             "property_type": "select",
             "value_text": "referral"
           }
-        ]
+        ],
+        "type_name": "Deal"
       },
       {
         "title": "Halvorsen Freight",
@@ -745,7 +906,8 @@
             "property_type": "select",
             "value_text": "outbound"
           }
-        ]
+        ],
+        "type_name": "Deal"
       },
       {
         "title": "Marigold Yoga",
@@ -785,7 +947,8 @@
             "property_type": "select",
             "value_text": "website"
           }
-        ]
+        ],
+        "type_name": "Deal"
       },
       {
         "title": "Northwind Bicycles",
@@ -838,7 +1001,8 @@
             "property_type": "select",
             "value_text": "partner"
           }
-        ]
+        ],
+        "type_name": "Deal"
       },
       {
         "title": "Tidewater Brewing",
@@ -891,7 +1055,8 @@
             "property_type": "select",
             "value_text": "referral"
           }
-        ]
+        ],
+        "type_name": "Deal"
       },
       {
         "title": "Larkspur Dental",
@@ -931,7 +1096,8 @@
             "property_type": "select",
             "value_text": "event"
           }
-        ]
+        ],
+        "type_name": "Deal"
       },
       {
         "title": "Juniper & Co. Florists",
@@ -971,7 +1137,45 @@
             "property_type": "select",
             "value_text": "outbound"
           }
-        ]
+        ],
+        "type_name": "Deal"
+      },
+      {
+        "title": "Larkspur Dental renewal",
+        "description": "Their year is up next month. Ask about the second clinic while we are at it.",
+        "priority": "medium",
+        "start_date": null,
+        "due_date": "2000-01-11T12:00:00+00:00",
+        "recurrence": null,
+        "status_name": "Contacted",
+        "position": 3.0,
+        "tags": [],
+        "assignee_handles": [],
+        "checklist": [],
+        "properties": [
+          {
+            "property_name": "Company",
+            "property_type": "text",
+            "value_text": "Larkspur Dental"
+          },
+          {
+            "property_name": "Contact",
+            "property_type": "text",
+            "value_text": "Dr. Reyes"
+          },
+          {
+            "property_name": "Value (USD)",
+            "property_type": "number",
+            "value_number": 3600.0
+          },
+          {
+            "property_name": "Next step",
+            "property_type": "date",
+            "value_text": "2000-01-11"
+          }
+        ],
+        "type_name": "Renewal",
+        "completed_at": null
       }
     ],
     "layouts": [
@@ -988,10 +1192,26 @@
                 },
                 "children": [
                   {
-                    "type": "field",
+                    "type": "stack",
                     "props": {
-                      "field": "title"
-                    }
+                      "direction": "row",
+                      "gap": "sm",
+                      "align": "start"
+                    },
+                    "children": [
+                      {
+                        "type": "field",
+                        "props": {
+                          "field": "type"
+                        }
+                      },
+                      {
+                        "type": "field",
+                        "props": {
+                          "field": "title"
+                        }
+                      }
+                    ]
                   },
                   {
                     "type": "field",
@@ -1101,6 +1321,9 @@
               "field": "priority"
             },
             {
+              "field": "task_type_id"
+            },
+            {
               "field": "assignee_ids"
             },
             {
@@ -1138,6 +1361,9 @@
               "field": "task_status_id"
             },
             {
+              "field": "task_type_id"
+            },
+            {
               "field": "date_group"
             },
             {
@@ -1163,6 +1389,7 @@
       },
       {
         "kind": "task",
+        "task_type": 1,
         "definition": {
           "side": [
             {
@@ -1171,6 +1398,12 @@
                 "title": "Deal"
               },
               "children": [
+                {
+                  "type": "field",
+                  "props": {
+                    "field": "type"
+                  }
+                },
                 {
                   "type": "status"
                 },
@@ -1228,6 +1461,93 @@
                   "type": "field",
                   "props": {
                     "field": "recurrence"
+                  }
+                },
+                {
+                  "type": "field",
+                  "props": {
+                    "field": "tags"
+                  }
+                },
+                {
+                  "type": "properties"
+                }
+              ]
+            },
+            {
+              "type": "relations"
+            }
+          ]
+        }
+      },
+      {
+        "kind": "task",
+        "task_type": 2,
+        "definition": {
+          "side": [
+            {
+              "type": "section",
+              "props": {
+                "title": "Renewal"
+              },
+              "children": [
+                {
+                  "type": "field",
+                  "props": {
+                    "field": "type"
+                  }
+                },
+                {
+                  "type": "field",
+                  "props": {
+                    "field": "recurrence"
+                  }
+                },
+                {
+                  "type": "dates"
+                },
+                {
+                  "type": "status"
+                },
+                {
+                  "type": "field",
+                  "props": {
+                    "field": "property:1"
+                  }
+                },
+                {
+                  "type": "field",
+                  "props": {
+                    "field": "property:2"
+                  }
+                },
+                {
+                  "type": "field",
+                  "props": {
+                    "field": "property:3"
+                  }
+                },
+                {
+                  "type": "field",
+                  "props": {
+                    "field": "property:4"
+                  }
+                }
+              ]
+            },
+            {
+              "type": "section",
+              "children": [
+                {
+                  "type": "field",
+                  "props": {
+                    "field": "assignees"
+                  }
+                },
+                {
+                  "type": "field",
+                  "props": {
+                    "field": "priority"
                   }
                 },
                 {
