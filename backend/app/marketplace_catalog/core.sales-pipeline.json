@@ -1146,7 +1146,7 @@
         "priority": "medium",
         "start_date": null,
         "due_date": "2000-01-11T12:00:00+00:00",
-        "recurrence": null,
+        "recurrence": "RRULE:FREQ=YEARLY",
         "status_name": "Contacted",
         "position": 3.0,
         "tags": [],
@@ -1175,7 +1175,8 @@
           }
         ],
         "type_name": "Renewal",
-        "completed_at": null
+        "completed_at": null,
+        "recurrence_strategy": "fixed"
       }
     ],
     "layouts": [

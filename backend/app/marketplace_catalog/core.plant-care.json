@@ -932,6 +932,11 @@
             "value_text": "Basil, parsley and mint"
           },
           {
+            "property_name": "Room",
+            "property_type": "select",
+            "value_text": "kitchen"
+          },
+          {
             "property_name": "Fertilizer",
             "property_type": "text",
             "value_text": "Liquid seaweed"
@@ -959,6 +964,11 @@
             "value_text": "Monstera"
           },
           {
+            "property_name": "Room",
+            "property_type": "select",
+            "value_text": "living-room"
+          },
+          {
             "property_name": "Fertilizer",
             "property_type": "text",
             "value_text": "Balanced houseplant feed"
@@ -984,6 +994,11 @@
             "property_name": "Plant",
             "property_type": "text",
             "value_text": "Moth orchid"
+          },
+          {
+            "property_name": "Room",
+            "property_type": "select",
+            "value_text": "office"
           },
           {
             "property_name": "Fertilizer",
