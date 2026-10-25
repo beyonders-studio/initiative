@@ -178,6 +178,10 @@ jobs:
     env:
       PACKAGE_FORMAT: ${{ matrix.format }}
       PACKAGE_ARCH: ${{ matrix.arch }}
+      # Android updaters such as Obtainium take any release asset ending in .apk
+      # for the phone app. apk add reads a package by its contents, so the Alpine
+      # package is tested and shipped under a name of its own.
+      PACKAGE_SUFFIX: ${{ matrix.format == 'apk' && 'alpine' || matrix.format }}
       BUILD_IMAGE: ${{ matrix.image }}
       BUILD_CHANNEL: ${{ inputs.image && 'release' || 'dev' }}
     steps:
@@ -257,6 +261,12 @@ jobs:
           sudo chown -R --no-dereference "$(id -u):$(id -g)" \
             "$RUNNER_TEMP/server-dependency-cache" "$RUNNER_TEMP/server-output"
           chmod -R u+rwX "$RUNNER_TEMP/server-dependency-cache" "$RUNNER_TEMP/server-output"
+      - name: Give the packages their release names
+        if: matrix.format == 'apk'
+        run: |
+          for package in "$RUNNER_TEMP"/server-output/*.apk "$RUNNER_TEMP"/server-output/upgrade/*.apk; do
+            mv "$package" "${package%.apk}.$PACKAGE_SUFFIX"
+          done
       - name: Save target dependency cache
         # PRs may restore trusted caches but never save their own. A successful
         # dependency/package build is reusable even if the runtime smoke fails.
@@ -279,7 +289,7 @@ jobs:
           docker run --rm \
             -v "$PWD/packaging/server/smoke-test.sh:/smoke-test.sh:ro" \
             -v "$RUNNER_TEMP/server-output:/packages:ro" \
-            -e PACKAGE_FORMAT \
+            -e PACKAGE_FORMAT -e PACKAGE_SUFFIX \
             "$BUILD_IMAGE" sh -euc '
               if [ "$PACKAGE_FORMAT" = deb ]; then
                 apt-get update
@@ -287,10 +297,10 @@ jobs:
               else
                 apk add --no-cache bash
               fi
-              set -- /packages/*."$PACKAGE_FORMAT"
+              set -- /packages/*."$PACKAGE_SUFFIX"
               test "$#" -eq 1 && test -f "$1"
               package=$1
-              set -- /packages/upgrade/*."$PACKAGE_FORMAT"
+              set -- /packages/upgrade/*."$PACKAGE_SUFFIX"
               test "$#" -eq 1 && test -f "$1"
               if [ "$PACKAGE_FORMAT" = apk ]; then
                 export APK_TRUSTED_KEY=/packages/initiative-server.rsa.pub
@@ -301,7 +311,7 @@ jobs:
         run: |
           cd "$RUNNER_TEMP/server-output"
           # Only package files and their public verification key are archived.
-          files=( *."$PACKAGE_FORMAT" )
+          files=( *."$PACKAGE_SUFFIX" )
           if [[ "$PACKAGE_FORMAT" == apk ]]; then
             files+=( initiative-server.rsa.pub )
           fi
@@ -311,7 +321,7 @@ jobs:
         with:
           name: ${{ needs.assets.outputs.artifact }}-${{ matrix.format }}-${{ matrix.arch }}
           path: |
-            ${{ runner.temp }}/server-output/*.${{ matrix.format }}
+            ${{ runner.temp }}/server-output/*.${{ env.PACKAGE_SUFFIX }}
             ${{ runner.temp }}/server-output/*.pub
             ${{ runner.temp }}/server-output/*.sha256
           if-no-files-found: error

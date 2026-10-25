@@ -15,6 +15,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 - **Marketplace projects bring their own task types.** Each ready-made project has its own types in place of Task, Bug, Idea and Milestone, such as candidates and volunteers, or deals and renewals. Each type has its own task page, and cards show the type beside the title.
 
+### Fixed
+
+- **Updating the Android app from Obtainium.** Releases name the Alpine server package `.alpine` instead of `.apk`, so Obtainium no longer downloads it in place of the app and fails to extract it. On Alpine, install it with `apk add` as before.
+
 ## [0.77.1] - 2026-10-23
 
 ### Added
