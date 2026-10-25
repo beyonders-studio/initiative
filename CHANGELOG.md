@@ -7,6 +7,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Fixed
+
+- **Updating the Android app from Obtainium.** Releases name the Alpine server package `.alpine` instead of `.apk`, so Obtainium no longer downloads it in place of the app and fails to extract it. On Alpine, install it with `apk add` as before.
+
 ## [0.77.1] - 2026-10-23
 
 ### Added

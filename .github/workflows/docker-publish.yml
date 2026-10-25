@@ -541,7 +541,7 @@ jobs:
           $DESKTOP_SECTION
 
           ### Native Server Packages
-          Install the \`initiative-server\` .deb on Debian 13 or the .apk on Alpine 3.24, for amd64 or arm64.
+          Install the \`initiative-server\` .deb on Debian 13 or the .alpine package on Alpine 3.24 (with \`apk add\`), for amd64 or arm64.
           These packages run the server and are separate from the desktop .deb and Android APK above.
           The assets include SHA-256 checksums and the Alpine package public signing key.
           See [native server installation](https://github.com/${GITHUB_REPOSITORY}/blob/main/docs/en/running-a-server/native-packages.md) for configuration and service instructions.
