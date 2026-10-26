@@ -30,7 +30,7 @@ A summary writes itself in as you watch, from the page as it reads right now, in
 
 ### Writing help
 
-Select some text and the sparkle in the formatting bar offers **Rewrite**, **Shorten**, **Fix spelling and grammar** and **Translate**. Type `/` on an empty line for **Continue writing**, which picks up where the paragraph above left off.
+Select some text and the sparkle in the formatting bar offers **Rewrite**, **Shorten**, **Fix spelling and grammar** and **Translate**. Type `/` for **Continue writing**, which picks up from wherever your cursor is.
 
 The answer appears in a small box under your text, and nothing in the document changes until you pick **Replace** or **Insert below**. **Discard** makes it as if you never asked. Only the selection and the paragraphs either side of it are sent.
 

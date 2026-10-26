@@ -1,4 +1,5 @@
 import { $createLinkNode, $isLinkNode, LinkNode } from "@lexical/link";
+import { $createListItemNode, $createListNode, ListItemNode, ListNode } from "@lexical/list";
 import { LexicalComposer } from "@lexical/react/LexicalComposer";
 import { useLexicalComposerContext } from "@lexical/react/LexicalComposerContext";
 import { ContentEditable } from "@lexical/react/LexicalContentEditable";
@@ -46,7 +47,7 @@ function Harness() {
     <LexicalComposer
       initialConfig={{
         namespace: "ai-writing-test",
-        nodes: [LinkNode, HorizontalRuleNode],
+        nodes: [LinkNode, HorizontalRuleNode, ListNode, ListItemNode],
         onError: (error) => {
           throw error;
         },
@@ -207,7 +208,44 @@ describe("AIWritingPlugin", () => {
       selection.focus.set(below.getKey(), 6, "text");
     });
 
-    expect(await screen.findByText(/can't carry back/)).toBeInTheDocument();
+    expect(await screen.findByText(/can't put this selection back whole/)).toBeInTheDocument();
     expect(asked).toEqual([]);
+  });
+
+  it("asks nothing about list items it would run together", async () => {
+    content = () => {
+      $getRoot().append(
+        $createListNode("bullet").append(
+          $createListItemNode().append($createTextNode("First.")),
+          $createListItemNode().append($createTextNode("Second."))
+        )
+      );
+    };
+    await ask(() => {
+      const [first, second] = $getRoot().getAllTextNodes();
+      const selection = first.select(0, 0);
+      selection.focus.set(second.getKey(), 7, "text");
+    });
+
+    expect(await screen.findByText(/can't put this selection back whole/)).toBeInTheDocument();
+    expect(asked).toEqual([]);
+  });
+
+  it("continues from the cursor, and writes there", async () => {
+    asked = [];
+    render(<Harness />);
+    await waitFor(() => expect(editor).not.toBeNull());
+    act(() => {
+      editor?.update(() => {
+        const node = $getRoot().getFirstDescendant();
+        if ($isTextNode(node)) node.select(8, 8);
+        editor?.dispatchCommand(AI_WRITE_COMMAND, { action: AIWriteAction.continue });
+      });
+    });
+    await screen.findByText("list");
+
+    expect(asked[0]).toMatchObject({ text: "", before: "The rota", after: " is sorted." });
+    fireEvent.click(screen.getByRole("button", { name: "Insert" }));
+    await waitFor(() => expect(text()).toBe("The rotalist is sorted."));
   });
 });

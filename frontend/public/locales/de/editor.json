@@ -233,7 +233,7 @@
     "insertBelow": "Darunter einfügen",
     "replace": "Ersetzen",
     "changed": "Der Text wurde während des Schreibens geändert. Füge dies stattdessen darunter ein oder verwirf es.",
-    "cannotKeep": "Diese Auswahl enthält etwas, das die Schreibhilfe nicht zurückbringen kann, etwa ein Bild oder eine Einbettung. Wähle stattdessen den Text drumherum aus.",
+    "cannotKeep": "Die Schreibhilfe kann diese Auswahl nicht unverändert zurücksetzen: Sie reicht über Listenpunkte oder eine Überschrift oder enthält etwa ein Bild. Wähle stattdessen Text innerhalb eines davon aus.",
     "error": "Das konnte nicht geschrieben werden. Bitte versuche es erneut."
   }
 }

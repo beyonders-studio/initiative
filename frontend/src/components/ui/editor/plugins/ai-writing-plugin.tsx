@@ -1,6 +1,7 @@
 import { $isLinkNode } from "@lexical/link";
 import { $convertFromMarkdownString, type TextMatchTransformer } from "@lexical/markdown";
 import { useLexicalComposerContext } from "@lexical/react/LexicalComposerContext";
+import { $findMatchingParent } from "@lexical/utils";
 import {
   $createParagraphNode,
   $createRangeSelection,
@@ -86,18 +87,27 @@ const $ends = (selection: RangeSelection): [PointType, PointType] =>
     ? [selection.focus, selection.anchor]
     : [selection.anchor, selection.focus];
 
+/** The block a node is written in: its paragraph, heading or list item. */
+const $blockOf = (node: LexicalNode) =>
+  $findMatchingParent(node, (parent) => $isElementNode(parent) && !parent.isInline());
+
 /** The selection as markdown: its text, with the formatting a rewrite keeps
  *  and its mentions and references as they are written. Null when it holds
- *  something markdown cannot carry back, which a rewrite would lose. */
+ *  something markdown cannot carry back, which a rewrite would lose: a node
+ *  with no markdown of its own, or more than one block that is not a plain
+ *  paragraph (list items, a heading and what follows it). */
 const $selectionMarkdown = (selection: RangeSelection): string | null => {
   const [start, end] = $ends(selection);
   let markdown = "";
-  let block: LexicalNode | null = null;
+  const blocks: LexicalNode[] = [];
   for (const node of selection.getNodes()) {
     if ($isElementNode(node)) continue;
-    const top = node.getTopLevelElement();
-    if (block && top && !top.is(block)) markdown += "\n\n";
-    block = top;
+    const block = $blockOf(node);
+    const last = blocks.at(-1);
+    if (block && !block.is(last)) {
+      if (last) markdown += "\n\n";
+      blocks.push(block);
+    }
     if ($isLineBreakNode(node)) {
       markdown += "\n";
       continue;
@@ -124,6 +134,7 @@ const $selectionMarkdown = (selection: RangeSelection): string | null => {
     const link = node.getParent();
     markdown += $isLinkNode(link) ? `[${text}](${link.getURL()})` : text;
   }
+  if (blocks.length > 1 && !blocks.every($isParagraphNode)) return null;
   return markdown;
 };
 
@@ -211,18 +222,17 @@ export function AIWritingPlugin({
               action,
               language,
               text: original ?? "",
-              // The sentence the selection sits in, then the paragraphs about it.
-              before: continuing
-                ? around($textBefore(block, CONTINUE_FROM_CHARS), block.getTextContent())
-                : around(
-                    first.getPreviousSibling()?.getTextContent(),
-                    $partOf(first, start, "before")
-                  ),
-              after: continuing
-                ? (block.getNextSibling()?.getTextContent() ?? "")
-                : `${$partOf(block, end, "after")}${
-                    block.getNextSibling() ? `\n\n${block.getNextSibling()?.getTextContent()}` : ""
-                  }`,
+              // The words either side of the selection, or of the cursor to
+              // continue from, then the paragraphs about them.
+              before: around(
+                continuing
+                  ? $textBefore(first, CONTINUE_FROM_CHARS)
+                  : first.getPreviousSibling()?.getTextContent(),
+                $partOf(first, start, "before")
+              ),
+              after: `${$partOf(block, end, "after")}${
+                block.getNextSibling() ? `\n\n${block.getNextSibling()?.getTextContent()}` : ""
+              }`,
             };
             return {
               body,
@@ -286,8 +296,10 @@ export function AIWritingPlugin({
     setWriting(false);
   };
 
-  const replace = () => {
-    if (!asked) return;
+  /** Put the answer where the selection was, or at the cursor to continue
+   *  from. True when that text changed meanwhile, and nothing was put. */
+  const putInPlace = (): boolean => {
+    if (!asked) return true;
     let changed = false;
     editor.update(() => {
       const selection = $createRangeSelection();
@@ -314,8 +326,21 @@ export function AIWritingPlugin({
       $setSelection(selection);
       selection.insertNodes(nodes);
     });
-    if (changed) {
+    return changed;
+  };
+
+  const replace = () => {
+    if (putInPlace()) {
       setError(t("writing.changed"));
+    } else {
+      close();
+    }
+  };
+
+  /** A continuation goes at the cursor, or below if its paragraph has gone. */
+  const insert = () => {
+    if (putInPlace()) {
+      insertBelow();
     } else {
       close();
     }
@@ -327,18 +352,6 @@ export function AIWritingPlugin({
       const blocks = $markdownBlocks(answer);
       let below = $getNodeByKey(asked.blockKey);
       if (!below?.isAttached()) below = $getRoot().getLastChild();
-      // Continuing from an empty line writes on that line.
-      if (
-        asked.action === AIWriteAction.continue &&
-        $isParagraphNode(below) &&
-        below.getTextContent() === "" &&
-        blocks.length > 0
-      ) {
-        const [first, ...rest] = blocks;
-        below.replace(first);
-        below = first;
-        blocks.splice(0, blocks.length, ...rest);
-      }
       for (const block of blocks) {
         if (below) {
           below.insertAfter(block);
@@ -380,7 +393,7 @@ export function AIWritingPlugin({
           size="sm"
           variant={continuing ? "default" : "outline"}
           disabled={writing || !answer}
-          onClick={insertBelow}
+          onClick={continuing ? insert : insertBelow}
         >
           {continuing ? t("writing.insert") : t("writing.insertBelow")}
         </Button>

@@ -233,7 +233,7 @@
     "insertBelow": "Insérer en dessous",
     "replace": "Remplacer",
     "changed": "Le texte a changé pendant l'écriture. Insérez ceci en dessous ou ignorez-le.",
-    "cannotKeep": "Cette sélection contient quelque chose que l'aide à la rédaction ne peut pas conserver, comme une image ou un contenu intégré. Sélectionnez plutôt le texte autour.",
+    "cannotKeep": "L'aide à la rédaction ne peut pas remettre cette sélection telle quelle : elle couvre plusieurs éléments de liste ou un titre, ou contient par exemple une image. Sélectionnez plutôt du texte à l'intérieur de l'un d'eux.",
     "error": "Impossible d'écrire cela. Veuillez réessayer."
   }
 }
