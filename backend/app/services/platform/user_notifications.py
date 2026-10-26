@@ -1,5 +1,5 @@
 from datetime import datetime, timedelta, timezone
-from typing import Any, Mapping, Optional
+from typing import Any, Mapping, Optional, Sequence
 
 from sqlalchemy import delete, func, tuple_, update
 from sqlmodel import select
@@ -414,13 +414,25 @@ async def mark_all_notifications_read(
 
 
 async def unread_count(session: AsyncSession, *, user_id: int) -> int:
-    stmt = select(func.count()).where(
-        Notification.user_id == user_id,
-        Notification.read_at.is_(None),
+    return (await unread_counts(session, [user_id])).get(user_id, 0)
+
+
+async def unread_counts(
+    session: AsyncSession, user_ids: Sequence[int]
+) -> dict[int, int]:
+    """Each account's unread count, in one statement. An account with nothing
+    unread is absent."""
+    if not user_ids:
+        return {}
+    result = await session.exec(
+        select(Notification.user_id, func.count())
+        .where(
+            Notification.user_id.in_(list(user_ids)),
+            Notification.read_at.is_(None),
+        )
+        .group_by(Notification.user_id)
     )
-    result = await session.exec(stmt)
-    row = result.one()
-    return row[0] if isinstance(row, tuple) else row
+    return {user_id: count for user_id, count in result.all()}
 
 
 #: How long a notification is kept once it has been read. Unread ones are never
