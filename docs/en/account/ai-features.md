@@ -15,6 +15,7 @@ When AI is switched on, you'll see **Generate** options in a few places:
 - Drafting or improving a **task description**.
 - Suggesting a **checklist** to break something down.
 - Producing a **summary** of a file or a wiki page.
+- **Catch me up**, on a community's front page or a project: what changed while you were away.
 - **Writing help** in any document, wiki page or post.
 
 You ask each time. Nothing writes itself while you're making tea.
@@ -24,6 +25,8 @@ A task's description and checklist are written from the whole task, not just its
 Nothing is saved until you say so. Checklist suggestions arrive ticked, and you untick what you don't want. A written description lands in your draft, and **Undo suggestion** puts back whatever you had before.
 
 A summary writes itself in as you watch, from the page as it reads right now, including whatever a colleague typed into it ten seconds ago. A very long document may not all fit, in which case the summary says how far in it got. The constitution's appendices will survive being left out.
+
+**Catch me up** reads the same cards as the activity feed, from your last visit to that page on this device, and only the ones you can open. Away for a fortnight? It covers the last week, because that's as far back as the feed goes, and it tells you where it started. If nothing happened, it says so and sends nothing anywhere, which is the cheapest answer AI will ever give you.
 
 ### Writing help
 

@@ -39,6 +39,8 @@ Three circles sit on top of it:
 
 It isn't strictly newest first. Something recent comes higher, so does something lots of people are busy with, and so does anything that's yours: the task you're on, the project you [subscribed to](your-space.md#subscribing) or bookmarked, the file you opened yesterday. Anything that changed since you last looked here is marked **New**. That's remembered on this device, so your phone and your laptop each keep their own count.
 
+Back from a week off and facing forty cards? Where [AI is switched on](../account/ai-features.md), **Catch me up** above them writes you a few lines on what changed since your last visit. A project has the same button beside its name.
+
 A few things never make a card. Your own changes, because you were there. Reactions, though a thing that's drawn a pile of them rises a little. And reading a post, voting in a poll or answering an invitation, which are your business, not the community's.
 
 Below that are the community's initiatives, the ones you're in and the ones you could join, and then **Coming up**: everything with a date in the next seven days.

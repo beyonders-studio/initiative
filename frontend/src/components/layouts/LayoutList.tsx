@@ -1,4 +1,5 @@
-import { Star } from "lucide-react";
+import { Star, Trash2 } from "lucide-react";
+import { useState } from "react";
 import { useTranslation } from "react-i18next";
 
 import type {
@@ -8,6 +9,8 @@ import type {
   ListLayoutRead,
 } from "@/api/generated/initiativeAPI.schemas";
 import { layoutLook } from "@/components/projects/projectTasksConfig";
+import { TaskTypeDeleteDialog } from "@/components/projects/TaskTypeDeleteDialog";
+import { Button } from "@/components/ui/button";
 import { Switch } from "@/components/ui/switch";
 import { useSaveLayouts } from "@/hooks/useToolLayouts";
 import { formatDateTime } from "@/lib/formatDate";
@@ -28,7 +31,8 @@ const setOf = (definition: ListLayoutRead["definition"]) =>
  * and its pages, a project's one per task type, each named for its type.
  *
  * Given its `target` by someone who may change it, each view is shown in its
- * layout menu or hidden from here, one at least staying shown.
+ * layout menu or hidden from here, one at least staying shown, and each task
+ * type deleted with its page, one at least staying.
  */
 export const LayoutList = ({
   layouts,
@@ -39,22 +43,25 @@ export const LayoutList = ({
   target?: GetLayoutsParams;
 }) => {
   const { t } = useTranslation(["projects", "layouts", "common"]);
+  const [deleting, setDeleting] = useState<number | null>(null);
   const views = layouts.filter(isList);
   const pages = layouts.filter((layout) => !isList(layout));
   const shown = views.filter((view) => !view.hidden);
-  const typedPages = pages.some((page) => "task_type_id" in page && page.task_type_id);
+  const typed = pages.filter((page) => "task_type_id" in page && page.task_type_id).length;
+  // Only a project's pages are typed, so a typed page's target names it.
+  const projectId = target?.tool_id ?? null;
 
   const row = (layout: Layout) => {
     const { icon: Icon, labelKey } = layoutLook(layout.kind);
-    const typed = "task_type_id" in layout ? layout.task_type_id : null;
+    const typeId = "task_type_id" in layout ? layout.task_type_id : null;
     const name =
-      typed && "task_type_name" in layout
+      typeId && "task_type_name" in layout
         ? t("layouts:typedTaskLayout", { name: layout.task_type_name })
         : t(labelKey as never);
     const view = isList(layout) ? layout : null;
     return (
       <li
-        key={typed ? `${layout.kind}:${typed}` : layout.kind}
+        key={typeId ? `${layout.kind}:${typeId}` : layout.kind}
         className="flex items-center justify-between gap-3 px-3 py-2"
       >
         <span className="flex min-w-0 items-center gap-2">
@@ -90,6 +97,21 @@ export const LayoutList = ({
               label={t("layouts:showView", { name })}
             />
           ) : null}
+          {typeId && projectId !== null ? (
+            <Button
+              variant="ghost"
+              size="icon"
+              className="h-7 w-7"
+              // A project keeps at least one task type.
+              disabled={typed <= 1}
+              onClick={() => setDeleting(typeId)}
+              aria-label={t("layouts:deleteTaskType", {
+                name: "task_type_name" in layout ? layout.task_type_name : "",
+              })}
+            >
+              <Trash2 className="h-4 w-4" />
+            </Button>
+          ) : null}
         </span>
       </li>
     );
@@ -102,15 +124,25 @@ export const LayoutList = ({
     </section>
   );
 
-  // One kind of layout alone needs no heading over it.
-  if (views.length === 0 || pages.length === 0) {
-    return <ul className="divide-y rounded-md border text-sm">{layouts.map(row)}</ul>;
-  }
   return (
-    <div className="space-y-4">
-      {group(t("layouts:views"), views)}
-      {group(t(typedPages ? "layouts:taskPages" : "layouts:pages"), pages)}
-    </div>
+    <>
+      {/* One kind of layout alone needs no heading over it. */}
+      {views.length === 0 || pages.length === 0 ? (
+        <ul className="divide-y rounded-md border text-sm">{layouts.map(row)}</ul>
+      ) : (
+        <div className="space-y-4">
+          {group(t("layouts:views"), views)}
+          {group(t(typed > 0 ? "layouts:taskPages" : "layouts:pages"), pages)}
+        </div>
+      )}
+      {projectId !== null && typed > 0 ? (
+        <TaskTypeDeleteDialog
+          projectId={projectId}
+          typeId={deleting}
+          onClose={() => setDeleting(null)}
+        />
+      ) : null}
+    </>
   );
 };
 

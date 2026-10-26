@@ -105,6 +105,7 @@
   "pages": "Pages",
   "hidden": "Masquée",
   "showView": "Afficher {{name}} dans le menu des dispositions",
+  "deleteTaskType": "Supprimer le type de tâche {{name}}",
   "asShipped": "D'origine",
   "saveError": "Impossible d'enregistrer les dispositions",
   "listHelp": {

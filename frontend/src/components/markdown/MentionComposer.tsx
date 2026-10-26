@@ -2,7 +2,6 @@ import { AtSign, Hash } from "lucide-react";
 import {
   type ComponentProps,
   type KeyboardEvent,
-  type ReactNode,
   type RefObject,
   useCallback,
   useEffect,
@@ -55,16 +54,24 @@ function detectMentionTrigger(text: string, cursorPosition: number): MentionTrig
  * It resolves its own mentions rather than borrowing a page's: the names a
  * draft points at are, by definition, ones nothing saved has asked about.
  */
-const DraftPreview = ({ content }: { content: string }) => {
+const DraftPreview = ({
+  content,
+  onChange,
+}: {
+  content: string;
+  onChange?: (content: string) => void;
+}) => {
   const contents = useMemo(() => [content], [content]);
   return (
     <CommentReferences contents={contents}>
-      <CommentContent content={content} />
+      <CommentContent content={content} onChange={onChange} />
     </CommentReferences>
   );
 };
 
-const renderDraft = (draft: string) => <DraftPreview content={draft} />;
+const renderDraft = (draft: string, onChange?: (draft: string) => void) => (
+  <DraftPreview content={draft} onChange={onChange} />
+);
 
 type MarkdownComposerProps = ComponentProps<typeof MarkdownComposer>;
 
@@ -77,7 +84,7 @@ interface MentionComposerProps
   subject?: string | null;
   /** What the preview tab shows. Defaults to the comment renderer, which
    *  reads mentions. */
-  renderPreview?: (value: string) => ReactNode;
+  renderPreview?: MarkdownComposerProps["renderPreview"];
   textareaRef?: RefObject<HTMLTextAreaElement | null>;
 }
 

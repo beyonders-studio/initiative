@@ -135,5 +135,15 @@
       "projectEnd": "Fin du projet",
       "pollCloses": "Fin du sondage"
     }
+  },
+  "catchUp": {
+    "button": "Mettez-moi au courant",
+    "title": "Mettez-moi au courant",
+    "intro": "Un court résumé de ce qui a changé et que vous pouvez voir depuis votre dernière visite.",
+    "action": "Mettez-moi au courant",
+    "writing": "Mise à jour en cours…",
+    "cut": "Rédigé à partir des {{percent}} % de changements les plus susceptibles de vous concerner. Le reste ne tenait pas.",
+    "since": "Depuis le {{date}}",
+    "empty": "Rien de nouveau depuis votre dernière visite."
   }
 }

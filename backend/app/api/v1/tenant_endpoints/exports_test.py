@@ -2057,13 +2057,16 @@ async def test_task_detailed_pdf_is_one_page_per_task_with_full_detail(
         title="Boss fight",
         # Markdown, as the app treats descriptions: formatting must RENDER
         # (no literal ** in the PDF), paragraphs stay separate.
-        description="Balance the **encounter**.\n\n- Check the second phase",
+        description="Balance the **encounter**.\n\n- Check the second phase"
+        "\n\n* [x] Scout the arena",
         checklist=[
             *checklist_items("Tune the HP", done=True),
             *checklist_items("Write the dialogue"),
         ],
     )
-    root = await create_comment(session, a.user, task=t1, content="Started already.")
+    root = await create_comment(
+        session, a.user, task=t1, content="Started **already**."
+    )
     # A reply must render nested under its parent, not appended chronologically
     # — even though it was created after the later root comment below.
     await create_task(session, a.project, title="Loot table")
@@ -2077,8 +2080,7 @@ async def test_task_detailed_pdf_is_one_page_per_task_with_full_detail(
         content="Replying to the first.",
         parent_comment_id=root.id,
     )
-    # An empty-content comment must not abort the compile (the payload guards
-    # it to "" so the template's multiline() never sees null).
+    # An empty-content comment must not abort the compile.
     await create_comment(session, a.user, task=t1, content="")
     assert later_root.id
 
@@ -2091,6 +2093,7 @@ async def test_task_detailed_pdf_is_one_page_per_task_with_full_detail(
             "Loot table",
             "Balance the encounter",  # markdown RENDERS: words in, syntax out
             "Check the second phase",  # the list item
+            "Scout the arena",  # a checklist in the description
             "Tune the HP",
             "Write the dialogue",  # checklist
             "Started already",  # comment body
@@ -2101,6 +2104,7 @@ async def test_task_detailed_pdf_is_one_page_per_task_with_full_detail(
         ),
     )
     assert "**" not in text  # bold markers consumed, not printed
+    assert "[x]" not in text  # the task box draws as a box
     assert len(_pdf_pages(resp)) == 2  # one page per task
     # Threaded order: a reply renders directly under its parent, before the
     # later root comment — not in flat creation order. (Compare on the

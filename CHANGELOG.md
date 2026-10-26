@@ -9,6 +9,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Added
 
+- **Catch me up.** Where AI is switched on, a community's front page and each project have a **Catch me up** button. It writes a short account of what changed since your last visit there, from the activity you can see, going back a week at most. With nothing new it says so and sends nothing to the AI provider.
 - **Writing help in the editor.** Select text in a document, wiki page or post to rewrite, shorten, fix the spelling and grammar of, or translate it, or type `/` for **Continue writing**. The answer is previewed under the text and goes in only with **Replace** or **Insert below**; text somebody else changed while it was written is not replaced.
 - **Summaries for wiki pages, written as you watch.** A wiki page can be summarized like a file, and a summary of either arrives as it is written, from the page as it reads now, live edits included. A document too long to fit says how much of it the summary covers.
 - **A plant care project in the marketplace.** Watering, fertilizing and repotting are each their own type. Watering and fertilizing repeat from when you last did them, and repotting starts with a checklist.
@@ -17,6 +18,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 - **A smaller Create task dialog.** It opens with the title, the type and the type's main column. Status, priority, people, dates and the rest wait under **More options**.
 - **Marketplace projects bring their own task types.** Each ready-made project has its own types in place of Task, Bug, Idea and Milestone, such as candidates and volunteers, or deals and renewals. Each type has its own task page, and cards show the type beside the title.
+- **Delete a task type from a project's layouts.** Each type's page under **Settings › Layouts** has a delete button that asks where its tasks go, as **Task types** does.
 
 ### Removed
 
@@ -24,6 +26,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Fixed
 
+- **Checklists in descriptions and comments.** A `- [ ]` item shows its box in place of the bullet, and ticking it in **Preview** ticks it in the text (#2989). PDF task reports draw a description's checklist with boxes too, and print comments with their formatting rather than as raw markdown.
+- **Making a subtask from a checklist line that mentions something.** The new task's title no longer keeps the mention's markup.
 - **Updating the Android app from Obtainium.** Releases name the Alpine server package `.alpine` instead of `.apk`, so Obtainium no longer downloads it in place of the app and fails to extract it. On Alpine, install it with `apk add` as before.
 
 ## [0.77.1] - 2026-10-23

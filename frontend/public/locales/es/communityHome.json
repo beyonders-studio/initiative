@@ -135,5 +135,15 @@
       "projectEnd": "Termina el proyecto",
       "pollCloses": "Cierra la encuesta"
     }
+  },
+  "catchUp": {
+    "button": "Ponme al día",
+    "title": "Ponme al día",
+    "intro": "Un breve resumen de lo que ha cambiado y puedes ver desde tu última visita.",
+    "action": "Ponme al día",
+    "writing": "Poniéndote al día…",
+    "cut": "Escrito a partir del {{percent}} % de los cambios que más probablemente te importan. El resto no cabía.",
+    "since": "Desde {{date}}",
+    "empty": "Nada nuevo desde tu última visita."
   }
 }
