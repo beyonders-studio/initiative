@@ -233,6 +233,7 @@
     "insertBelow": "Insert below",
     "replace": "Replace",
     "changed": "The text changed while writing. Insert this below it instead, or discard it.",
+    "cannotKeep": "This selection holds something writing help can't carry back, such as a picture or an embed. Select the text around it instead.",
     "error": "Couldn't write that. Please try again."
   }
 }

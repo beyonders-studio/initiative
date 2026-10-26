@@ -1,5 +1,5 @@
 import { $isLinkNode } from "@lexical/link";
-import { $convertFromMarkdownString } from "@lexical/markdown";
+import { $convertFromMarkdownString, type TextMatchTransformer } from "@lexical/markdown";
 import { useLexicalComposerContext } from "@lexical/react/LexicalComposerContext";
 import {
   $createParagraphNode,
@@ -7,6 +7,8 @@ import {
   $getNodeByKey,
   $getRoot,
   $getSelection,
+  $isElementNode,
+  $isLineBreakNode,
   $isParagraphNode,
   $isRangeSelection,
   $isTextNode,
@@ -58,7 +60,7 @@ interface Asked {
   action: AIWriteAction;
   anchor: Saved;
   focus: Saved;
-  /** The selection's text as it was sent, to tell whether it has changed. */
+  /** The selection as it was sent, to tell whether it has changed. */
   original: string;
   /** The block the selection ends in, which an answer is inserted below. */
   blockKey: string;
@@ -72,18 +74,46 @@ const saved = (point: PointType): Saved => ({
   type: point.type,
 });
 
-/** The selection as markdown: its text, with the formatting a rewrite keeps. */
-const $selectionMarkdown = (selection: RangeSelection): string => {
-  const [start, end] = selection.isBackward()
+/** The markdown the editor writes inline nodes as: mentions, references and
+ *  smart chips, which read back as themselves. */
+const INLINE_EXPORTS = MARKDOWN_TRANSFORMERS.filter(
+  (transformer): transformer is TextMatchTransformer => transformer.type === "text-match"
+);
+
+/** The selection's points, start first. */
+const $ends = (selection: RangeSelection): [PointType, PointType] =>
+  selection.isBackward()
     ? [selection.focus, selection.anchor]
     : [selection.anchor, selection.focus];
+
+/** The selection as markdown: its text, with the formatting a rewrite keeps
+ *  and its mentions and references as they are written. Null when it holds
+ *  something markdown cannot carry back, which a rewrite would lose. */
+const $selectionMarkdown = (selection: RangeSelection): string | null => {
+  const [start, end] = $ends(selection);
   let markdown = "";
-  let block: ElementNode | null = null;
+  let block: LexicalNode | null = null;
   for (const node of selection.getNodes()) {
-    if (!$isTextNode(node)) continue;
+    if ($isElementNode(node)) continue;
     const top = node.getTopLevelElement();
     if (block && top && !top.is(block)) markdown += "\n\n";
     block = top;
+    if ($isLineBreakNode(node)) {
+      markdown += "\n";
+      continue;
+    }
+    if (!$isTextNode(node)) {
+      const written = INLINE_EXPORTS.map((transformer) =>
+        transformer.export?.(
+          node,
+          () => "",
+          (_node, text) => text
+        )
+      ).find(Boolean);
+      if (!written) return null;
+      markdown += written;
+      continue;
+    }
     let text = node.getTextContent();
     if (end.type === "text" && node.is(end.getNode())) text = text.slice(0, end.offset);
     if (start.type === "text" && node.is(start.getNode())) text = text.slice(start.offset);
@@ -102,6 +132,20 @@ const $markdownBlocks = (markdown: string): LexicalNode[] => {
   const holder = $createParagraphNode();
   $convertFromMarkdownString(markdown, MARKDOWN_TRANSFORMERS, holder, false);
   return holder.getChildren();
+};
+
+/** The text of ``block`` from its start to ``point``, or from ``point`` to
+ *  its end. */
+const $partOf = (block: ElementNode, point: PointType, side: "before" | "after"): string => {
+  const range = $createRangeSelection();
+  if (side === "before") {
+    range.anchor.set(block.getKey(), 0, "element");
+    range.focus.set(point.key, point.offset, point.type);
+  } else {
+    range.anchor.set(point.key, point.offset, point.type);
+    range.focus.set(block.getKey(), block.getChildrenSize(), "element");
+  }
+  return range.getTextContent();
 };
 
 /** The text of the blocks before ``block``, nearest last, as far as ``limit``
@@ -155,31 +199,41 @@ export function AIWritingPlugin({
             const selection = $getSelection();
             if (!$isRangeSelection(selection)) return null;
             const continuing = action === AIWriteAction.continue;
-            const block = selection.focus.getNode().getTopLevelElement();
-            const first = (selection.isBackward() ? selection.focus : selection.anchor)
-              .getNode()
-              .getTopLevelElement();
+            const [start, end] = $ends(selection);
+            // The answer goes below where the selection ends, however it was drawn.
+            const block = end.getNode().getTopLevelElement();
+            const first = start.getNode().getTopLevelElement();
             if (!block || !first) return null;
+            const original = continuing ? "" : $selectionMarkdown(selection);
+            const around = (...parts: Array<string | undefined>) =>
+              parts.filter(Boolean).join("\n\n");
             const body: AIWriteRequest = {
               action,
               language,
-              text: continuing ? "" : $selectionMarkdown(selection),
+              text: original ?? "",
+              // The sentence the selection sits in, then the paragraphs about it.
               before: continuing
-                ? [$textBefore(block, CONTINUE_FROM_CHARS), block.getTextContent()]
-                    .filter(Boolean)
-                    .join("\n\n")
-                : (first.getPreviousSibling()?.getTextContent() ?? ""),
-              after: block.getNextSibling()?.getTextContent() ?? "",
+                ? around($textBefore(block, CONTINUE_FROM_CHARS), block.getTextContent())
+                : around(
+                    first.getPreviousSibling()?.getTextContent(),
+                    $partOf(first, start, "before")
+                  ),
+              after: continuing
+                ? (block.getNextSibling()?.getTextContent() ?? "")
+                : `${$partOf(block, end, "after")}${
+                    block.getNextSibling() ? `\n\n${block.getNextSibling()?.getTextContent()}` : ""
+                  }`,
             };
             return {
               body,
               anchor: saved(selection.anchor),
               focus: saved(selection.focus),
-              original: selection.getTextContent(),
+              original,
               blockKey: block.getKey(),
             };
           })();
           if (!asking || !anchorElem) return false;
+          const keeps = asking.original !== null;
           const range = window.getSelection()?.rangeCount
             ? window.getSelection()?.getRangeAt(0).getBoundingClientRect()
             : null;
@@ -191,14 +245,15 @@ export function AIWritingPlugin({
             action,
             anchor: asking.anchor,
             focus: asking.focus,
-            original: asking.original,
+            original: asking.original ?? "",
             blockKey: asking.blockKey,
             top: range ? range.bottom - frame.top + 8 : 0,
             left: range ? Math.max(0, range.left - frame.left) : 0,
           });
           setAnswer("");
-          setError(null);
-          setWriting(true);
+          setError(keeps ? null : t("writing.cannotKeep"));
+          setWriting(keeps);
+          if (!keeps) return true;
           let written = "";
           void readAIStream(writeRef.current(asking.body), controller.signal, (event) => {
             if (event.error) {
@@ -220,7 +275,7 @@ export function AIWritingPlugin({
         },
         COMMAND_PRIORITY_EDITOR
       ),
-    [editor, anchorElem]
+    [editor, anchorElem, t]
   );
 
   const close = () => {
@@ -245,7 +300,9 @@ export function AIWritingPlugin({
       selection.anchor.set(asked.anchor.key, asked.anchor.offset, asked.anchor.type);
       selection.focus.set(asked.focus.key, asked.focus.offset, asked.focus.type);
       try {
-        changed = selection.getTextContent() !== asked.original;
+        // Its words, formatting, links and mentions, any of which another
+        // writer may have changed.
+        changed = $selectionMarkdown(selection) !== asked.original;
       } catch {
         changed = true;
       }

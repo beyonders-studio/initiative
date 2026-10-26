@@ -233,6 +233,7 @@
     "insertBelow": "Insertar debajo",
     "replace": "Reemplazar",
     "changed": "El texto cambió mientras se escribía. Insértalo debajo o descártalo.",
+    "cannotKeep": "Esta selección contiene algo que la ayuda de escritura no puede conservar, como una imagen o un elemento insertado. Selecciona el texto que lo rodea.",
     "error": "No se pudo escribir. Por favor intenta de nuevo."
   }
 }
