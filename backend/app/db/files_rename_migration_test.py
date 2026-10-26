@@ -69,8 +69,11 @@ _PLUGIN_BINDING = {"source": "plugin", "params": {"document_id": 5}}
 
 
 def _guild_runner(schema: str):
-    """Revision 0464 one way or the other, on one guild's schema only."""
+    """Revision 0464 one way or the other, on one guild's schema only. The
+    catalogs rename (20261026_0538) comes off first and goes back last: the
+    checks 0464 restates name the permissions as they were then."""
     files = _load("20261006_0464_documents_are_files.py")
+    catalogs = _load("20261026_0538_galleries_are_catalogs.py")
 
     def run(forward: bool):
         def apply(sync_session) -> None:
@@ -84,7 +87,12 @@ def _guild_runner(schema: str):
                 step()
 
             with Operations.context(MigrationContext.configure(bind)):
-                files._convert(bind, forward, in_schema)
+                if forward:
+                    files._convert(bind, True, in_schema)
+                    catalogs._convert(bind, True, in_schema)
+                else:
+                    catalogs._convert(bind, False, in_schema)
+                    files._convert(bind, False, in_schema)
 
         return apply
 
