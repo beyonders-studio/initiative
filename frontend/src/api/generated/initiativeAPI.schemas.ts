@@ -110,7 +110,8 @@ export interface AIModelsResponse {
 }
 
 /**
- * How much of what was asked about was read: the first ``percent`` of it.
+ * How much of what was asked about was read: ``percent`` of it, from its
+ * start (a document) or from the top of its order (a catch-up).
  */
 export interface AIStreamCut {
   percent: number;
@@ -118,10 +119,13 @@ export interface AIStreamCut {
 
 /**
  * One line of an answer streamed as it is written. Exactly one field is
- * set: ``cut`` first, when only part of what was asked about fit; ``text``,
- * the next piece of the answer; or ``error``, the code it ended on.
+ * set: ``since`` first on a catch-up, where the changes it read start;
+ * ``cut`` next, when only part of what was asked about fit; ``text``, the
+ * next piece of the answer; or ``error``, the code it ended on. A catch-up
+ * with nothing to read ends after ``since``.
  */
 export interface AIStreamEvent {
+  since?: string | null;
   cut?: AIStreamCut | null;
   text?: string | null;
   error?: string | null;
@@ -2247,6 +2251,16 @@ export interface CaseMessageRead {
   from_requester: boolean;
   content: string;
   created_at: string;
+}
+
+/**
+ * What a catch-up covers: what changed since ``since`` (the change log's
+ * whole window without one), in the community or in one tool.
+ */
+export interface CatchUpRequest {
+  since?: string | null;
+  tool?: Tool | null;
+  tool_id?: number | null;
 }
 
 export type CategoryGroup = (typeof CategoryGroup)[keyof typeof CategoryGroup];

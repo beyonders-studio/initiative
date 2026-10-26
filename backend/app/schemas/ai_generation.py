@@ -1,5 +1,6 @@
 """AI Generation request and response schemas."""
 
+from datetime import datetime
 from typing import Optional
 
 from pydantic import ConfigDict
@@ -32,16 +33,20 @@ class GenerateDescriptionResponse(_WrittenFromComments):
 
 
 class AIStreamCut(SanitizedBaseModel):
-    """How much of what was asked about was read: the first ``percent`` of it."""
+    """How much of what was asked about was read: ``percent`` of it, from its
+    start (a document) or from the top of its order (a catch-up)."""
 
     percent: int
 
 
 class AIStreamEvent(SanitizedBaseModel):
     """One line of an answer streamed as it is written. Exactly one field is
-    set: ``cut`` first, when only part of what was asked about fit; ``text``,
-    the next piece of the answer; or ``error``, the code it ended on."""
+    set: ``since`` first on a catch-up, where the changes it read start;
+    ``cut`` next, when only part of what was asked about fit; ``text``, the
+    next piece of the answer; or ``error``, the code it ended on. A catch-up
+    with nothing to read ends after ``since``."""
 
+    since: Optional[datetime] = None
     cut: Optional[AIStreamCut] = None
     text: Optional[RawTextStr] = None
     error: Optional[str] = None

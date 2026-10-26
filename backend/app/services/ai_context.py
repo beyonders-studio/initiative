@@ -1,4 +1,5 @@
-"""What an AI feature tells the model about the task it is asked about.
+"""What an AI feature tells the model: about a task, or about what changed in
+a community while a member was away.
 
 Everything is read on the member's own session, so what they cannot read never
 reaches a prompt. The reads are the app's own read shapes, trimmed as the MCP
@@ -7,14 +8,15 @@ JSON.
 
 The task, its project and the open tasks linked to it always go in. Its
 comments fill what is left of the budget, newest first; when they do not all
-fit, the result says how many were read.
+fit, the result says how many were read. A catch-up is the activity feed's
+entries since a moment, in the feed's own order, as many as the budget holds.
 """
 
 from __future__ import annotations
 
 import json
 from dataclasses import dataclass
-from datetime import datetime
+from datetime import datetime, timezone
 from types import SimpleNamespace
 from typing import Any
 
@@ -25,6 +27,7 @@ from sqlmodel.ext.asyncio.session import AsyncSession
 
 from app.core.identity_boundary import STORED_MENTION
 from app.core.search import SearchEntityType
+from app.core.tools import Tool
 from app.core.user_display import display_name
 from app.models.platform.user_profile_view import MemberProfile
 from app.models.tenant.comment import Comment, in_thread
@@ -33,6 +36,7 @@ from app.models.tenant.task import Task, TaskStatus, TaskStatusCategory
 from app.schemas.tenant.property import PropertySummary
 from app.schemas.tenant.task import TaskRead
 from app.services import compact
+from app.services.tenant import activity_feed
 from app.services.tenant import relationships as relationships_service
 from app.services.tenant import task_queries
 
@@ -89,6 +93,69 @@ async def task_context(
     parts["comments"] = comments
     data = await _named(session, _dumps(compact.trim(parts, _FREE_FORM)))
     return TaskContext(data=data, comments_read=len(comments), comments_total=total)
+
+
+@dataclass(frozen=True)
+class ActivityContext:
+    """What changed, as the prompt carries it."""
+
+    #: One compact JSON line per item, as many as fit.
+    data: str
+    #: Where the changes read start: the moment asked for, or where the change
+    #: log's window begins when that is later.
+    since: datetime
+    entries_read: int
+    entries_total: int
+
+
+async def activity_context(
+    session: AsyncSession,
+    *,
+    reader_id: int,
+    since: datetime | None,
+    tool: Tool | None,
+    tool_id: int | None,
+    budget: int,
+) -> ActivityContext:
+    """The items people changed since ``since`` that the reader can see, in
+    the whole community or in one tool, within about ``budget`` tokens."""
+    window = datetime.now(timezone.utc) - activity_feed.WINDOW
+    start = max(since, window) if since else window
+    entries, _ = await activity_feed.feed(
+        session,
+        reader_id=reader_id,
+        tool=tool,
+        tool_id=tool_id,
+        since=start,
+        page_size=activity_feed.CANDIDATE_CHANGES,
+    )
+    room = budget * _CHARS_PER_TOKEN
+    lines: list[str] = []
+    for entry in entries:
+        line = _dumps(
+            compact.trim(
+                {
+                    "item": entry.title,
+                    "kind": entry.entity_type,
+                    "in": entry.tool_title,
+                    "initiative": entry.initiative_name,
+                    "did": entry.verbs,
+                    "by": [display_name(person) for person in entry.actors],
+                    "others": entry.actor_count - len(entry.actors),
+                    "at": entry.latest.isoformat(timespec="minutes"),
+                }
+            )
+        )
+        room -= len(line) + 1
+        if room < 0:
+            break
+        lines.append(line)
+    return ActivityContext(
+        data=await _named(session, "\n".join(lines)),
+        since=start,
+        entries_read=len(lines),
+        entries_total=len(entries),
+    )
 
 
 def _shown(field: PropertySummary) -> Any:

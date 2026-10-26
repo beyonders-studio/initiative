@@ -3,11 +3,16 @@ import { useMemo } from "react";
 import { useTranslation } from "react-i18next";
 
 import { type ProjectRead, Tool } from "@/api/generated/initiativeAPI.schemas";
+import { CatchUpButton } from "@/components/activity/CatchUpButton";
 import { Markdown } from "@/components/Markdown";
 import { ToolChest, ToolChestSegment } from "@/components/tools/ToolChest";
 import { ToolPageHeader } from "@/components/tools/ToolPageHeader";
 import { Progress } from "@/components/ui/progress";
+import { useActiveCommunityId } from "@/hooks/useActiveCommunityId";
+import { useAuth } from "@/hooks/useAuth";
+import { useLastVisit } from "@/hooks/useLastVisit";
 import { useUpdateProject } from "@/hooks/useProjects";
+import { activityLastVisitKey } from "@/lib/activityLastVisit";
 import { formatDate } from "@/lib/formatDate";
 import { toolSettingsRoute } from "@/lib/tools";
 
@@ -20,6 +25,11 @@ export const ProjectHeader = ({ project, projectIsArchived }: ProjectHeaderProps
   const { t } = useTranslation(["projects", "common"]);
   const updateProject = useUpdateProject(project.id);
   const canEdit = project.can.edit;
+  const { user } = useAuth();
+  const communityId = useActiveCommunityId();
+  const lastVisit = useLastVisit(
+    user ? activityLastVisitKey(user.id, communityId, `project:${project.id}`) : null
+  );
 
   // Dates are optional and independent. With neither set the header shows
   // nothing at all — an empty schedule is not worth a line of its own.
@@ -48,6 +58,9 @@ export const ProjectHeader = ({ project, projectIsArchived }: ProjectHeaderProps
       }
       mark={project.icon ? <span className="text-3xl leading-none">{project.icon}</span> : null}
       title={project.name}
+      titleExtras={
+        <CatchUpButton since={lastVisit} scope={{ tool: Tool.project, toolId: project.id }} />
+      }
       onRename={
         canEdit && !projectIsArchived ? (name) => updateProject.mutateAsync({ name }) : undefined
       }

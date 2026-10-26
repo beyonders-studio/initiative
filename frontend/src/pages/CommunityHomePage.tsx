@@ -15,6 +15,7 @@ import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { useTranslation } from "react-i18next";
 
 import { FeedView } from "@/api/generated/initiativeAPI.schemas";
+import { CatchUpButton } from "@/components/activity/CatchUpButton";
 import { CommunityLocationLine } from "@/components/communities/CommunityLocationLine";
 import { CommunityActivityFeed } from "@/components/communityHome/CommunityActivityFeed";
 import { CommunityBannerBadges } from "@/components/communityHome/CommunityBannerBadges";
@@ -31,11 +32,11 @@ import { useAuth } from "@/hooks/useAuth";
 import { useCommunities } from "@/hooks/useCommunities";
 import { liveInitiatives, useInitiativeAccess } from "@/hooks/useInitiativeAccess";
 import { useInitiativeDirectory, useInitiatives } from "@/hooks/useInitiatives";
+import { useLastVisit } from "@/hooks/useLastVisit";
 import { activityLastVisitKey } from "@/lib/activityLastVisit";
 import { renderableBanner } from "@/lib/banner";
 import { useCommunityPath } from "@/lib/communityUrl";
 import { readableTextShadow } from "@/lib/contrastColor";
-import { getItem, setItem } from "@/lib/storage";
 import { cn } from "@/lib/utils";
 
 /** The rail's circles, in order; the first is the default. All and Yours are
@@ -48,22 +49,6 @@ const FEED_NODES = [
 
 const isFeedView = (value: unknown): value is FeedView =>
   FEED_NODES.some((node) => node.view === value);
-
-/**
- * When the reader last opened this community's front page, read once as the
- * page opens, then moved to now. Kept on the device, per account: it orders
- * nothing and nobody else needs it.
- */
-const useLastVisit = (userId: number | undefined, communityId: number): string | null => {
-  const key = userId === undefined ? null : activityLastVisitKey(userId, communityId);
-  // Read again only for another account or community: moving it to now must
-  // not take the marks off the entries this visit is showing.
-  const lastVisit = useMemo(() => (key ? getItem(key) : null), [key]);
-  useEffect(() => {
-    if (key) void setItem(key, new Date().toISOString());
-  }, [key]);
-  return lastVisit;
-};
 
 export function CommunityHomePage() {
   const { t } = useTranslation("communityHome");
@@ -78,7 +63,7 @@ export function CommunityHomePage() {
   const view = isFeedView(search.node) ? search.node : FeedView.all;
   const communityId = useActiveCommunityId();
   const { user } = useAuth();
-  const lastVisit = useLastVisit(user?.id, communityId);
+  const lastVisit = useLastVisit(user ? activityLastVisitKey(user.id, communityId) : null);
 
   const initiativesQuery = useInitiatives();
   const directoryQuery = useInitiativeDirectory();
@@ -191,7 +176,12 @@ export function CommunityHomePage() {
                 {view === FeedView.comments ? (
                   <CommunityRecentComments />
                 ) : (
-                  <CommunityActivityFeed view={view} lastVisit={lastVisit} />
+                  <>
+                    <div className="mb-2 flex justify-end">
+                      <CatchUpButton since={lastVisit} />
+                    </div>
+                    <CommunityActivityFeed view={view} lastVisit={lastVisit} />
+                  </>
                 )}
               </div>
             </div>

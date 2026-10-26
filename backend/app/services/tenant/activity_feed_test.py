@@ -1,14 +1,22 @@
 """The activity feed: one entry per item people changed lately, gated and
-ordered for the reader."""
+ordered for the reader, and the catch-up written from it."""
+
+import json
+import math
+from datetime import datetime, timedelta, timezone
 
 from sqlalchemy import text
 from sqlmodel.ext.asyncio.session import AsyncSession
 
+from app.core.audit_events import AuditEventType
 from app.core.tools import Tool
+from app.core.user_display import handle_of
 from app.db.request_context import SystemGuild
 from app.db.session import clear_rls_context, set_rls_context
 from app.models.platform.guild import CommunityRole
 from app.models.tenant.task import TaskStatusCategory
+from app.schemas.ai_settings import AIProvider, ConnectionScope, ResolvedAISettings
+from app.services import ai_context, ai_generation, ai_provider
 from app.services.tenant import activity_feed, personal_items
 from app.services.tenant.activity_feed import FeedView
 from app.services.tenant.personal_items import Mark
@@ -17,6 +25,7 @@ from app.testing import (
     create_project,
     create_resource_grant,
     create_task,
+    emitted,
 )
 
 
@@ -204,3 +213,133 @@ async def test_the_endpoint_narrows_to_a_tool_only_with_its_id(client, acting_us
         "page_size": 20,
         "has_next": False,
     }
+
+
+async def test_a_feed_since_a_moment_reads_the_changes_after_it(
+    session, acting_user, reading_as
+):
+    """A moment before the change log's window reads the whole window."""
+    a, b = await _start(session, acting_user)
+    old = await create_task(session, a.project, title="Old news")
+    await _log(
+        session,
+        a.guild.id,
+        "UPDATE event_outbox SET occurred_at = now() - interval '3 days'",
+    )
+    new = await create_task(session, a.project, title="Fresh")
+    await _by(session, a.guild.id, a.user.id)
+
+    def ids(entries):
+        return {e.entity_id for e in entries if e.entity_type == "task"}
+
+    yesterday = datetime.now(timezone.utc) - timedelta(days=1)
+    assert ids(await _feed(reading_as, b, since=yesterday)) == {new.id}
+    long_ago = datetime.now(timezone.utc) - timedelta(days=30)
+    assert ids(await _feed(reading_as, b, since=long_ago)) == {old.id, new.id}
+
+
+def _answering(monkeypatch, text: str) -> list[tuple]:
+    """A connection that answers ``text``; keeps the prompts it was sent."""
+    resolved = ResolvedAISettings(
+        enabled=True,
+        provider=AIProvider.openai,
+        api_key="sk-not-a-real-key",
+        model="m",
+        scope=ConnectionScope.platform,
+        connection_id=1,
+        source="platform",
+    )
+    asked: list[tuple] = []
+
+    async def resolve(*args, **kwargs):
+        return resolved
+
+    async def record_health(*args):
+        pass
+
+    async def stream_text(target, job, prompt, *, guild_id):
+        asked.append(prompt)
+        yield text
+
+    monkeypatch.setattr(ai_generation, "resolve_ai_settings", resolve)
+    monkeypatch.setattr(ai_generation, "record_health", record_health)
+    monkeypatch.setattr(ai_provider, "stream_text", stream_text)
+    return asked
+
+
+async def test_a_catch_up_tells_only_what_the_reader_can_see(
+    client, session, acting_user, monkeypatch, capfd
+):
+    a, b = await _start(session, acting_user)
+    elsewhere = await acting_user(
+        guild_role=CommunityRole.member, guild=a.guild, initiative=True, project=True
+    )
+    await create_task(session, a.project, title="Book the hall")
+    await create_task(session, elsewhere.project, title="Plan the surprise")
+    await _by(session, a.guild.id, a.user.id)
+    asked = _answering(monkeypatch, "The hall is being booked.")
+    capfd.readouterr()
+
+    response = await client.post(b.g("/activity/catch-up"), headers=b.headers, json={})
+
+    assert response.status_code == 200, response.text
+    since, *rest = (json.loads(line) for line in response.text.splitlines())
+    assert "since" in since
+    assert rest == [{"text": "The hall is being booked."}]
+    ((_system, data),) = asked
+    # An initiative the reader is not in tells them nothing.
+    assert "Book the hall" in data and "Plan the surprise" not in data
+    (row,) = emitted(capfd, AuditEventType.AI_REQUEST_SENT)
+    assert row["target"] == {"type": "community", "id": a.guild.id}
+    assert row["detail"]["purpose"] == "catch_up"
+
+
+async def test_a_catch_up_with_nothing_new_sends_nothing(
+    client, session, acting_user, monkeypatch, capfd
+):
+    """It says where it looked from, a week back at the most, and stops."""
+    a, b = await _start(session, acting_user)
+    asked = _answering(monkeypatch, "Unused.")
+    capfd.readouterr()
+    asked_from = datetime.now(timezone.utc) - timedelta(days=30)
+
+    response = await client.post(
+        b.g("/activity/catch-up"),
+        headers=b.headers,
+        json={
+            "since": asked_from.isoformat(),
+            "tool": Tool.project.value,
+            "tool_id": a.project.id,
+        },
+    )
+
+    assert response.status_code == 200, response.text
+    (line,) = (json.loads(line) for line in response.text.splitlines())
+    since = datetime.fromisoformat(line["since"])
+    assert since - asked_from > timedelta(days=22)
+    assert asked == []
+    assert emitted(capfd, AuditEventType.AI_REQUEST_SENT) == []
+
+
+async def test_a_catch_up_tells_as_much_as_its_budget_holds(
+    session, acting_user, reading_as
+):
+    a, b = await _start(session, acting_user)
+    await create_task(session, a.project, title="Book the hall")
+    await create_task(session, a.project, title="Order the chairs")
+    await _by(session, a.guild.id, a.user.id)
+    s = await reading_as(b.user.id, b.guild.id)
+
+    async def told(budget: int) -> ai_context.ActivityContext:
+        return await ai_context.activity_context(
+            s, reader_id=b.user.id, since=None, tool=None, tool_id=None, budget=budget
+        )
+
+    whole = await told(6000)
+    assert (whole.entries_read, whole.entries_total) == (2, 2)
+    first = whole.data.splitlines()[0]
+    assert json.loads(first)["by"] == [handle_of(a.user)]
+
+    one = await told(math.ceil((len(first) + 1) / 4))
+    assert (one.entries_read, one.entries_total) == (1, 2)
+    assert one.data == first

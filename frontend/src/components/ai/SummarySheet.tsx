@@ -12,8 +12,24 @@ import { getItem, setItem } from "@/lib/storage";
 /** A summary as it has been written so far. */
 export interface AISummary {
   text: string;
-  /** How much of the document it was written from, when not all of it fit. */
+  /** How much of what it was asked about it was written from, when not all
+   *  of it fit. */
   cutPercent: number | null;
+  /** Where the changes it read start, for a catch-up. */
+  since: string | null;
+}
+
+/** What the sheet says about what it summarizes. */
+export interface SummaryWords {
+  title: string;
+  intro: string;
+  action: string;
+  writing: string;
+  cut: (percent: number) => string;
+  /** Where the changes read start, for an answer that says. */
+  since?: (since: string) => string;
+  /** Said when the answer ends with nothing to tell. */
+  empty?: string;
 }
 
 interface SummarySheetProps {
@@ -24,6 +40,8 @@ interface SummarySheetProps {
   /** Kept by the page, so closing the sheet does not lose it. */
   summary: AISummary | null;
   onSummaryChange: (summary: AISummary | null) => void;
+  /** What it says, where it is not a document's summary. */
+  words?: SummaryWords;
 }
 
 /** Whether the sheet is open, remembered on the device under ``key``. */
@@ -36,8 +54,15 @@ export const useSummarySheet = (key: string) => {
 };
 
 /** A document's AI summary, in a sheet beside it, written in as it arrives. */
-export const SummarySheet = ({ open, onOpenChange, ...body }: SummarySheetProps) => {
+export const SummarySheet = ({ open, onOpenChange, words, ...body }: SummarySheetProps) => {
   const { t } = useTranslation("editor");
+  const said = words ?? {
+    title: t("summary.title"),
+    intro: t("summary.generateDescription"),
+    action: t("summary.generateButton"),
+    writing: t("summary.generating"),
+    cut: (percent: number) => t("summary.cut", { percent }),
+  };
   return (
     <Sheet open={open} onOpenChange={onOpenChange}>
       <SheetContent side="right" className="flex w-full flex-col overflow-hidden p-0 sm:max-w-md">
@@ -48,10 +73,10 @@ export const SummarySheet = ({ open, onOpenChange, ...body }: SummarySheetProps)
             paddingBottom: "0.75rem",
           }}
         >
-          <SheetTitle className="text-base">{t("summary.title")}</SheetTitle>
+          <SheetTitle className="text-base">{said.title}</SheetTitle>
         </SheetHeader>
         <div className="flex-1 overflow-y-auto p-4">
-          <SummaryBody {...body} />
+          <SummaryBody {...body} words={said} />
         </div>
       </SheetContent>
     </Sheet>
@@ -62,7 +87,8 @@ const SummaryBody = ({
   request,
   summary,
   onSummaryChange,
-}: Omit<SummarySheetProps, "open" | "onOpenChange">) => {
+  words,
+}: Omit<SummarySheetProps, "open" | "onOpenChange" | "words"> & { words: SummaryWords }) => {
   const { t } = useTranslation("editor");
   const { isEnabled, isLoading } = useAIEnabled();
   const [writing, setWriting] = useState(false);
@@ -77,7 +103,7 @@ const SummaryBody = ({
     const controller = new AbortController();
     reading.current = controller;
     // The one before stays until the new one starts arriving.
-    let written: AISummary = { text: "", cutPercent: null };
+    let written: AISummary = { text: "", cutPercent: null, since: null };
     setWriting(true);
     setError(null);
     try {
@@ -89,6 +115,7 @@ const SummaryBody = ({
         written = {
           text: written.text + (event.text ?? ""),
           cutPercent: event.cut?.percent ?? written.cutPercent,
+          since: event.since ?? written.since,
         };
         onSummaryChange(written);
       });
@@ -113,6 +140,10 @@ const SummaryBody = ({
   };
 
   const failed = error ? <p className="text-destructive text-sm">{error}</p> : null;
+  const since =
+    summary?.since && words.since ? (
+      <p className="text-muted-foreground text-xs">{words.since(summary.since)}</p>
+    ) : null;
 
   if (isLoading) {
     return (
@@ -131,20 +162,29 @@ const SummaryBody = ({
     );
   }
 
-  if (!summary) {
-    return writing ? (
-      <div className="space-y-4 py-8 text-center">
-        <Loader2 className="mx-auto h-8 w-8 animate-spin text-muted-foreground" />
-        <p className="text-muted-foreground text-sm">{t("summary.generating")}</p>
-      </div>
-    ) : (
+  if (!summary?.text) {
+    if (writing) {
+      return (
+        <div className="space-y-4 py-8 text-center">
+          <Loader2 className="mx-auto h-8 w-8 animate-spin text-muted-foreground" />
+          <p className="text-muted-foreground text-sm">{words.writing}</p>
+        </div>
+      );
+    }
+    // Asked, and answered with nothing to tell.
+    const nothing = summary !== null && !error && words.empty;
+    return (
       <div className="space-y-4 py-4 text-center">
         <Sparkles className="mx-auto h-8 w-8 text-muted-foreground" />
-        <p className="text-muted-foreground text-sm">{t("summary.generateDescription")}</p>
-        <Button onClick={() => void write()}>
-          <Sparkles className="h-4 w-4" />
-          {t("summary.generateButton")}
-        </Button>
+        <p className="text-muted-foreground text-sm">{nothing ? words.empty : words.intro}</p>
+        {nothing ? (
+          since
+        ) : (
+          <Button onClick={() => void write()}>
+            <Sparkles className="h-4 w-4" />
+            {words.action}
+          </Button>
+        )}
         {failed}
       </div>
     );
@@ -178,13 +218,12 @@ const SummaryBody = ({
           )}
         </Button>
       </div>
+      {since}
       <div className="rounded-lg bg-muted/50 p-4">
         <p className="whitespace-pre-wrap text-sm">{summary.text}</p>
       </div>
       {summary.cutPercent !== null ? (
-        <p className="text-muted-foreground text-xs">
-          {t("summary.cut", { percent: summary.cutPercent })}
-        </p>
+        <p className="text-muted-foreground text-xs">{words.cut(summary.cutPercent)}</p>
       ) : null}
       {failed}
     </div>

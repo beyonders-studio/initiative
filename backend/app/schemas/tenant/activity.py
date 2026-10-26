@@ -32,6 +32,21 @@ class ActivityQuery(BaseModel):
         return self
 
 
+class CatchUpRequest(BaseModel):
+    """What a catch-up covers: what changed since ``since`` (the change log's
+    whole window without one), in the community or in one tool."""
+
+    since: Optional[datetime] = None
+    tool: Optional[Tool] = None
+    tool_id: Optional[int] = None
+
+    @model_validator(mode="after")
+    def _tool_with_its_id(self) -> "CatchUpRequest":
+        if (self.tool is None) != (self.tool_id is None):
+            raise ValueError("tool and tool_id come together")
+        return self
+
+
 class ActivityEntry(SanitizedBaseModel):
     """One item, and what people did to it lately."""
 
