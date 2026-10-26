@@ -5,6 +5,8 @@ import { useRouter } from "@tanstack/react-router";
 import { useEffect, useState } from "react";
 
 import { useAuth } from "@/hooks/useAuth";
+import { useNotificationStreamConnected } from "@/hooks/useNotificationStream";
+import { useNotifications } from "@/hooks/useNotifications";
 import { useServer } from "@/hooks/useServer";
 import { syncFirebaseProject } from "@/lib/firebaseProject";
 import { type ApnsEnvironment, registerDeviceForPush } from "@/lib/pushRegistration";
@@ -217,4 +219,38 @@ export const usePushNotifications = (): UsePushNotificationsReturn => {
     requestPermission,
     isSupported: pushPlatform && fcmEnabled,
   };
+};
+
+/**
+ * Empties the phone's notification tray once the bell has nothing unread,
+ * which takes the number off the app icon too: an iPhone shows the count the
+ * last push carried until the tray is cleared, and an Android launcher counts
+ * what is in the tray.
+ */
+export const usePushTray = () => {
+  const phone = ["ios", "android"].includes(Capacitor.getPlatform());
+  const streamConnected = useNotificationStreamConnected();
+  const { data, dataUpdatedAt } = useNotifications({
+    enabled: phone,
+    refetchInterval: streamConnected ? false : 30_000,
+  });
+  const unread = data?.unread_count;
+
+  // Every fetch that says zero, not only the change to it: a count read on
+  // another device leaves the cache at zero while the tray filled.
+  useEffect(() => {
+    if (phone && dataUpdatedAt && unread === 0) {
+      void PushNotifications.removeAllDeliveredNotifications().catch(() => {});
+    }
+  }, [phone, dataUpdatedAt, unread]);
+
+  // Signing out takes the count with it.
+  useEffect(() => {
+    if (!phone) {
+      return;
+    }
+    return () => {
+      void PushNotifications.removeAllDeliveredNotifications().catch(() => {});
+    };
+  }, [phone]);
 };

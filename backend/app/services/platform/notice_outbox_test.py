@@ -33,15 +33,24 @@ from app.testing.sockets import settle
 @pytest.fixture
 def fcm(monkeypatch):
     """FCM, answering however the test says, and what was put on the wire:
-    each title, and each data payload under ``answer["data"]``."""
+    each title, and each data payload and badge under ``answer["data"]`` and
+    ``answer["badge"]``."""
     calls: list[str] = []
-    answer: dict = {"now": (True, False), "data": []}
+    answer: dict = {"now": (True, False), "data": [], "badge": []}
 
     async def _send(
-        client, push_token, title, body, data=None, channel_id=None, platform=None
+        client,
+        push_token,
+        title,
+        body,
+        data=None,
+        channel_id=None,
+        platform=None,
+        badge=None,
     ):
         calls.append(title)
         answer["data"].append(data)
+        answer["badge"].append(badge)
         return answer["now"]
 
     monkeypatch.setattr(push_notifications, "send_push_notification", _send)
@@ -83,7 +92,7 @@ async def _waiting(session: AsyncSession) -> list[NoticeOutboxItem]:
 async def test_a_notice_is_delivered_once_and_only_if_its_request_commits(
     session: AsyncSession, fcm, monkeypatch
 ):
-    pushed, _answer = fcm
+    pushed, answer = fcm
     mailed: list[tuple[int, int | None]] = []
 
     async def _mail(_session, recipient, *, notification_id=None, **_rest):
@@ -116,6 +125,8 @@ async def test_a_notice_is_delivered_once_and_only_if_its_request_commits(
     [line] = await _lines(session, recipient.id)
     assert mailed == [(recipient.id, line.id)]
     assert pushed == ["You were mentioned"]
+    # The badge counts the line the push announces.
+    assert answer["badge"] == [1]
     assert await _waiting(session) == []
 
 

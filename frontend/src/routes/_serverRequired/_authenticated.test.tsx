@@ -20,7 +20,10 @@ vi.mock("@/hooks/useVersionCheck", () => ({
 }));
 vi.mock("@/hooks/useRealtimeUpdates", () => ({ useRealtimeUpdates: () => undefined }));
 vi.mock("@/hooks/useNotificationStream", () => ({ useNotificationStream: () => undefined }));
-vi.mock("@/hooks/usePushNotifications", () => ({ usePushNotifications: () => undefined }));
+vi.mock("@/hooks/usePushNotifications", () => ({
+  usePushNotifications: () => undefined,
+  usePushTray: () => undefined,
+}));
 vi.mock("@/hooks/useDesktopApp", () => ({ useDesktopApp: () => undefined }));
 vi.mock("@/hooks/useBackButton", () => ({ useBackButton: () => undefined }));
 vi.mock("@/hooks/useShareTarget", () => ({ useResumePendingShare: () => undefined }));

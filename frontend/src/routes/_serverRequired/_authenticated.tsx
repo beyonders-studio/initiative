@@ -58,7 +58,7 @@ import {
   useClearRecentViews,
   useRecents,
 } from "@/hooks/usePersonalItems";
-import { usePushNotifications } from "@/hooks/usePushNotifications";
+import { usePushNotifications, usePushTray } from "@/hooks/usePushNotifications";
 import { useRealtimeUpdates } from "@/hooks/useRealtimeUpdates";
 import { useResumePendingShare } from "@/hooks/useShareTarget";
 import { useVersionCheck } from "@/hooks/useVersionCheck";
@@ -147,6 +147,7 @@ export function AppLayout() {
   // survives the bell unmounting with a collapsed sidebar.
   useNotificationStream();
   usePushNotifications();
+  usePushTray();
   useDesktopApp();
   useBackButton();
   // A share that arrived signed out is waiting at the end of signing in.

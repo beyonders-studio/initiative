@@ -15,7 +15,7 @@ from app.models.platform.notification import NotificationType
 from app.models.platform.push_token import PushToken
 from app.services.platform import push_tokens
 
-from app.services.platform import push_config, push_relay
+from app.services.platform import push_config, push_relay, user_notifications
 from app.services.platform.push_config import ResolvedPushConfig
 
 logger = logging.getLogger(__name__)
@@ -149,6 +149,7 @@ async def send_push_notification(
     data: Optional[Dict[str, Any]] = None,
     channel_id: Optional[str] = None,
     platform: str = "android",
+    badge: Optional[int] = None,
 ) -> tuple[bool, bool]:
     """Send a push notification to one device with FCM's HTTP v1 API.
 
@@ -173,6 +174,8 @@ async def send_push_notification(
         data: Optional data payload (must be string key-value pairs)
         channel_id: Android notification channel to deliver on
         platform: The device's platform, ``android`` or ``ios``
+        badge: The number an iPhone puts on the app icon. An Android launcher
+            counts the notifications in the tray instead, one each.
 
     Returns:
         Tuple of (success, should_delete_token):
@@ -242,6 +245,9 @@ async def send_push_notification(
                 "channel_id": channel_id,
             }
         }
+
+    if badge is not None and platform == "ios":
+        fcm_message["apns"] = {"payload": {"aps": {"badge": badge}}}
 
     # Add data payload if provided (convert all values to strings)
     if data:
@@ -314,6 +320,7 @@ async def _send_to_devices(
     body: str,
     data: Optional[Dict[str, Any]],
     channel_id: str,
+    badge: Optional[int] = None,
     gate: AsyncContextManager[Any] | None = None,
 ) -> _Outcome:
     """Send one push to each of these devices. ``gate`` bounds how many sends
@@ -329,6 +336,7 @@ async def _send_to_devices(
                 data=data,
                 channel_id=channel_id,
                 platform=token.platform,
+                badge=badge,
             )
 
     results = await asyncio.gather(*(one(token) for token in tokens))
@@ -370,8 +378,10 @@ async def send_pushes(session: AsyncSession, pushes: Sequence[Push]) -> list[boo
     The one way a push leaves the app. Its caller has already applied the
     deployment's and the community's switches and each recipient's settings:
     this only finds each person's devices, keeps those a push names, sends,
-    and records what FCM said. One HTTP client serves the batch and
-    :data:`CONCURRENT_SENDS` calls are in flight at a time.
+    and records what FCM said. Each push carries its recipient's unread count
+    for the app icon, read after the lines it announces were written. One HTTP
+    client serves the batch and :data:`CONCURRENT_SENDS` calls are in flight at
+    a time.
 
     Returns, for each push in order, whether it should be tried again: no device
     took it, and a send failed short of an answer. Does not commit.
@@ -391,6 +401,14 @@ async def send_pushes(session: AsyncSession, pushes: Sequence[Push]) -> list[boo
         except Exception:
             logger.exception("Could not read the devices of user %s", user_id)
             devices[user_id] = None
+    # Without the count a push still goes, and leaves the badge as it was.
+    unread: dict[int, int] | None
+    try:
+        async with session.begin_nested():
+            unread = await user_notifications.unread_counts(session, list(devices))
+    except Exception:
+        logger.exception("Could not read the unread counts for a batch of pushes")
+        unread = None
     gate = asyncio.Semaphore(CONCURRENT_SENDS)
     async with httpx.AsyncClient(timeout=10.0) as client:
         outcomes = await asyncio.gather(
@@ -407,6 +425,7 @@ async def send_pushes(session: AsyncSession, pushes: Sequence[Push]) -> list[boo
                     body=push.body,
                     data=push.data,
                     channel_id=channel_for(push.notification_type),
+                    badge=None if unread is None else unread.get(push.user_id, 0),
                     gate=gate,
                 )
                 for push in pushes
