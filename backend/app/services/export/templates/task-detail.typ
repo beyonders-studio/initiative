@@ -48,18 +48,6 @@
 )
 #set text(font: "Outfit", size: 10pt)
 
-// Preserve author-entered line breaks in free text (description, comments):
-// the string arrives as data, so split and re-emit hard breaks.
-#let multiline(s) = {
-  // Guard none defensively: a null free-text value must not abort the compile.
-  let s = if s == none { "" } else { s }
-  let lines = s.split("\n")
-  for (i, line) in lines.enumerate() {
-    line
-    if i < lines.len() - 1 { linebreak() }
-  }
-}
-
 // ── Markdown-description blocks (same schema as the document template) ──────
 #let render_runs(runs) = {
   runs
@@ -82,12 +70,15 @@
   // Per-item rendering keeps nested lists directly beneath their parent item;
   // enum(start:) preserves ordered numbering across single-item calls.
   set block(above: 3pt, below: 3pt)
+  let checklist = lst.at("checklist", default: false)
   let ordered = lst.at("ordered", default: false)
   let index = 1
   for item in lst.at("items", default: ()) {
     let body = render_runs(item.at("runs", default: ()))
     pad(left: depth * 1em)[
-      #if ordered [ #enum(start: index, body) ] else [ #list(body) ]
+      #if checklist [
+        #box(if item.at("checked", default: false) [☑] else [☐]) #body
+      ] else if ordered [ #enum(start: index, body) ] else [ #list(body) ]
     ]
     index += 1
     for nested in item.at("children", default: ()) {
@@ -223,7 +214,7 @@
         pad(left: c.at("depth", default: 0) * 1.4em)[
           #text(size: 9pt, fill: luma(110))[#strong(c.at("author", default: "")) · #c.at("date", default: "")]
           #linebreak()
-          #multiline(c.at("content", default: ""))
+          #render_blocks(c.at("blocks", default: ()))
         ]
         v(5pt)
       }

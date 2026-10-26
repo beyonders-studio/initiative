@@ -585,7 +585,9 @@ const readDescriptionDraft = (key: string): DescriptionDraft | null => {
 };
 
 /** The preview of a description being edited reads the way the saved one will. */
-const renderDescription = (draft: string) => <TaskDescription content={draft} />;
+const renderDescription = (draft: string, onChange?: (draft: string) => void) => (
+  <TaskDescription content={draft} onChange={onChange} />
+);
 
 /**
  * An item's description, in a composer that opens on its preview, saved only

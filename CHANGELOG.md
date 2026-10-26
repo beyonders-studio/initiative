@@ -23,6 +23,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Fixed
 
+- **Checklists in descriptions and comments.** A `- [ ]` item shows its box in place of the bullet, and ticking it in **Preview** ticks it in the text (#2989). PDF task reports draw a description's checklist with boxes too, and print comments with their formatting rather than as raw markdown.
+- **Making a subtask from a checklist line that mentions something.** The new task's title no longer keeps the mention's markup.
 - **Updating the Android app from Obtainium.** Releases name the Alpine server package `.alpine` instead of `.apk`, so Obtainium no longer downloads it in place of the app and fails to extract it. On Alpine, install it with `apk add` as before.
 
 ## [0.77.1] - 2026-10-23

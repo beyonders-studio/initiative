@@ -16,7 +16,6 @@ from operator import attrgetter
 from typing import Any, Final, List, Optional
 
 from fastapi import HTTPException, status
-from markdown_it import MarkdownIt
 from sqlalchemy import and_, exists, func, or_
 from sqlalchemy.orm import defer, joinedload, selectinload
 from sqlmodel import select
@@ -24,8 +23,6 @@ from sqlmodel.ext.asyncio.session import AsyncSession
 
 from app.core import recurrence
 from app.core.messages import CalendarEventMessages, QueryMessages
-from app.core.identity_boundary import STORED_MENTION
-from app.core.references import TEXT_REFERENCE, kind_for_trigger
 from app.core.relationships import RelationshipType
 from app.core.search import SearchEntityType
 from app.core.tools import Tool
@@ -59,6 +56,7 @@ from app.schemas.tenant.task import TaskListRead
 from app.services import fields as fields_registry
 from app.services import permissions as permissions_service
 from app.services.cross_guild import gather_across_guilds, member_guild_ids
+from app.services.export.markdown import blocks_from_markdown, runs_of
 from app.services.fields.spec import FieldContext, SortContext
 from app.services.permissions import with_tool
 from app.services.tenant import plugin_metadata
@@ -346,19 +344,12 @@ _DESCRIPTION_COLUMNS = (
     func.coalesce(Task.description != "", False).label("has_description"),
 )
 
-#: Descriptions are the markdown the web UI renders (CommonMark plus GFM
-#: strikethrough and tables), parsed here only for the words they show.
-_MARKDOWN = MarkdownIt("commonmark").enable(["strikethrough", "table"])
-
 #: A link, picture or mention the head ends inside: an opening ``[`` whose
 #: text, or whose ``](`` address, has not closed by the end.
 _UNFINISHED_LINK = re.compile(r"(?:[!@]|#[\w-]+)?\[[^\]]*(?:\]\([^)]*)?$")
 
-#: The task box GFM puts at the start of a checklist item.
-_TASK_BOX = re.compile(r"^\[[ xX]\]\s+")
-
-#: A mention held through the parse as a word of its own, its id between two
-#: private-use characters, and the end of one the excerpt's cut goes through.
+#: A mention held as a word of its own while the excerpt is cut, its id
+#: between two private-use characters, and the end of one the cut goes through.
 _HELD_MENTION = re.compile("\ue000(\\d*)(\ue001)?")
 
 
@@ -368,9 +359,10 @@ def _description_excerpt(head: str | None) -> str | None:
     ``head`` is the first :data:`_DESCRIPTION_SOURCE_CHARS` + 1 characters of
     the markdown; one past the source length means the description goes on, so
     the excerpt is cut even when the text read so far is short. The excerpt is
-    the text of each block's inline content: pictures, HTML and code blocks
-    drop out, a link keeps the words it shows, and a mention of somebody stays
-    its markdown, ``@[](42)``, which the client names.
+    the words of the description's blocks (:func:`blocks_from_markdown`):
+    pictures and code blocks drop out, a link keeps the words it shows, a
+    thing mentioned reads as its name, and a mention of somebody stays its
+    markdown, ``@[](42)``, which the client names.
     """
     if not head:
         return None
@@ -379,19 +371,13 @@ def _description_excerpt(head: str | None) -> str | None:
     if source_cut:
         # A link, picture or mention the cut goes through is left out whole.
         source = _UNFINISHED_LINK.sub("", source)
-    source = STORED_MENTION.sub(lambda m: f"\ue000{m.group(2)}\ue001", source)
-    source = TEXT_REFERENCE.sub(
-        lambda m: m.group(2) if kind_for_trigger(m.group(1)) else m.group(0), source
-    )
     words: list[str] = []
-    for token in _MARKDOWN.parse(source):
-        for index, child in enumerate(token.children or ()):
-            if child.type in ("text", "code_inline"):
-                words.append(
-                    _TASK_BOX.sub("", child.content) if index == 0 else child.content
-                )
-            elif child.type in ("softbreak", "hardbreak"):
-                words.append(" ")
+    for runs in runs_of(blocks_from_markdown(source)):
+        for run in runs:
+            if "mention" in run:
+                words.append(f"\ue000{run['mention']}\ue001")
+            elif not run.get("picture"):
+                words.append(run["text"])
         words.append(" ")
     text = " ".join("".join(words).split())
     if not source_cut and len(text) <= _DESCRIPTION_EXCERPT_CHARS:

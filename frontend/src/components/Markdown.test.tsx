@@ -190,6 +190,30 @@ describe("Markdown", () => {
     expect(await screen.findByRole("dialog")).toBeInTheDocument();
   });
 
+  it("ticks a checklist item in text being edited, wherever the item sits", async () => {
+    const content = "- [ ] **Book** the room\n  1) [x] nested\n\n> - [ ] quoted";
+    const onChange = vi.fn();
+    render(<Markdown content={content} onChange={onChange} />);
+
+    const [book, nested, quoted] = screen.getAllByRole("checkbox");
+    await userEvent.click(book);
+    expect(onChange).toHaveBeenLastCalledWith(content.replace("- [ ] **Book**", "- [x] **Book**"));
+    await userEvent.click(nested);
+    expect(onChange).toHaveBeenLastCalledWith(content.replace("1) [x]", "1) [ ]"));
+    await userEvent.click(quoted);
+    expect(onChange).toHaveBeenLastCalledWith(content.replace("> - [ ]", "> - [x]"));
+  });
+
+  it("draws a checklist's boxes in place of its bullets, ticked only where it is edited", () => {
+    const { container } = render(<Markdown content={"- [x] done\n- [ ] not yet"} />);
+
+    expect(root(container).className).toContain("[&_.task-list-item]:list-none");
+    expect(screen.getAllByRole("checkbox").map((box) => box.hasAttribute("disabled"))).toEqual([
+      true,
+      true,
+    ]);
+  });
+
   it("keeps a lone picture, or one beside text, in its paragraph", () => {
     render(
       <Markdown

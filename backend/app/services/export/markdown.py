@@ -9,10 +9,12 @@ render both through one vocabulary:
 
 * ``paragraph``/``heading``/``quote`` — ``runs`` of ``{text, bold, italic,
   strike, code, link}``; hard breaks are ``{"text": "\\n"}`` runs (softbreaks
-  collapse to a space, matching react-markdown's default).
+  collapse to a space, matching react-markdown's default). A picture's run
+  carries ``picture``, and a mention reads as the app shows it: a person's as
+  ``@Name`` carrying ``mention``, their id; a thing's as its name.
 * ``list`` — ``ordered`` flag and ``items`` of ``{runs, children}`` (nested
-  lists recurse), ``checklist`` always false (GFM task-list markers need a
-  plugin; they stay literal text, same as unsupported syntax anywhere).
+  lists recurse). A list whose every item opens with a GFM task box is a
+  ``checklist``, each item ``checked`` or not.
 * ``code`` — fenced/indented blocks with the info string as ``language``.
 * ``table`` — rows of cells, each cell a runs list.
 * ``hr``.
@@ -24,20 +26,56 @@ from __future__ import annotations
 
 from typing import Any
 
+from collections.abc import Iterator
+
 from markdown_it import MarkdownIt
+from markdown_it.rules_core import StateCore
 from markdown_it.tree import SyntaxTreeNode
 
+from app.core.references import kind_for_trigger
+
 _parser = MarkdownIt("commonmark").enable(["strikethrough", "table"])
+
+
+def _newlines_break(state: StateCore) -> None:
+    for token in state.tokens:
+        for child in token.children or ():
+            if child.type == "softbreak":
+                child.type = "hardbreak"
+
+
+#: Prose typed in a box — a comment — where a newline is a line break, as the
+#: app shows it.
+_line_parser = MarkdownIt("commonmark").enable(["strikethrough", "table"])
+_line_parser.core.ruler.push("newlines_break", _newlines_break)
 
 _HEADING_LEVELS = {"h1": 1, "h2": 2, "h3": 3, "h4": 4, "h5": 5, "h6": 6}
 
 
-def blocks_from_markdown(text: str | None) -> list[dict[str, Any]]:
-    """Parse Markdown into export blocks; empty/whitespace input → []."""
+def blocks_from_markdown(
+    text: str | None, *, line_breaks: bool = False
+) -> list[dict[str, Any]]:
+    """Parse Markdown into export blocks; empty/whitespace input → [].
+    ``line_breaks`` reads every newline as a line break, as a comment's is."""
     if not text or not text.strip():
         return []
-    tree = SyntaxTreeNode(_parser.parse(text))
-    return _blocks(tree)
+    parser = _line_parser if line_breaks else _parser
+    return _blocks(SyntaxTreeNode(parser.parse(text)))
+
+
+def runs_of(blocks: list[dict[str, Any]]) -> Iterator[list[dict[str, Any]]]:
+    """The runs of each paragraph, heading, quote, list item and table cell in
+    ``blocks``, in reading order. A code block has none."""
+    for block in blocks:
+        if block["type"] == "list":
+            for item in block["items"]:
+                yield item["runs"]
+                yield from runs_of(item.get("children", []))
+        elif block["type"] == "table":
+            for row in block["rows"]:
+                yield from row
+        elif "runs" in block:
+            yield block["runs"]
 
 
 def _blocks(parent: SyntaxTreeNode) -> list[dict[str, Any]]:
@@ -118,12 +156,33 @@ def _list_block(node: SyntaxTreeNode) -> dict[str, Any]:
         if children:
             entry["children"] = children
         items.append(entry)
+    boxes = [_task_box(item["runs"]) for item in items]
+    checklist = all(box is not None for box in boxes)
+    if checklist:
+        for item, box in zip(items, boxes):
+            item["checked"] = box
+            rest = item["runs"][0]["text"][4:]
+            if rest:
+                item["runs"][0]["text"] = rest
+            else:
+                del item["runs"][0]
     return {
         "type": "list",
         "ordered": node.type == "ordered_list",
-        "checklist": False,
+        "checklist": checklist,
         "items": items,
     }
+
+
+def _task_box(runs: list[dict[str, Any]]) -> bool | None:
+    """Whether a list item opens with a GFM task box, ``[ ]`` or ``[x]`` and a
+    space, and the box is ticked; ``None`` where it does not."""
+    first = runs[0] if runs else {}
+    text = first.get("text", "") if first.keys() == {"text"} else ""
+    if text[:1] == "[" and text[2:3] == "]" and text[1:2] in (" ", "x", "X"):
+        if text[3:4] in (" ", "\t"):
+            return text[1:2] != " "
+    return None
 
 
 def _table_rows(node: SyntaxTreeNode) -> list[list[list[dict[str, Any]]]]:
@@ -145,9 +204,24 @@ def _runs(
     node: SyntaxTreeNode, flags: frozenset[str], link: str | None
 ) -> list[dict[str, Any]]:
     runs: list[dict[str, Any]] = []
-    for child in node.children:
+    children = node.children
+    folded = -1
+    for index, child in enumerate(children):
+        if index == folded:
+            continue
         kind = child.type
-        if kind == "text":
+        following = children[index + 1] if index + 1 < len(children) else None
+        mention = _mention(child.content, following) if kind == "text" else None
+        if mention is not None:
+            before, label, person = mention
+            if before:
+                runs.append(_run(before, flags, link))
+            if person is None:
+                runs.append(_run(label, flags, link))
+            else:
+                runs.append(_run(f"@{label}", flags, link) | person)
+            folded = index + 1
+        elif kind == "text":
             if child.content:
                 runs.append(_run(child.content, flags, link))
         elif kind == "code_inline":
@@ -171,7 +245,7 @@ def _runs(
             # linked to the source URL.
             alt = child.content or str(child.attrs.get("alt") or "") or "[image]"
             src = str(child.attrs.get("src") or "")
-            runs.append(_run(alt, flags, src or link))
+            runs.append(_run(alt, flags, src or link) | {"picture": True})
         elif kind == "html_inline":
             runs.append(_run(child.content, flags, link))  # literal, not markup
         elif child.children:
@@ -179,6 +253,38 @@ def _runs(
         elif child.content:
             runs.append(_run(child.content, flags, link))
     return runs
+
+
+def _mention(
+    text: str, following: SyntaxTreeNode | None
+) -> tuple[str, str, dict[str, Any] | None] | None:
+    """A text ending in a trigger and the link after it, read as the app reads
+    a mention: ``@[Ada](42)`` a person, ``#task[Fix it](12)`` a thing. The
+    trigger counts at a word's start, so ``email@[x](1)`` stays a link.
+
+    The text before the trigger, the mention's name, and for a person what
+    their run carries (their id, where the mention has one); ``None`` where
+    the two are no mention.
+    """
+    if following is None or following.type != "link":
+        return None
+    href = str(following.attrs.get("href") or "")
+    label = "".join(node.content for node in following.walk() if not node.children)
+    if text.endswith("@"):
+        if href and not (href.isascii() and href.isdigit()):
+            return None
+        trigger, person = "@", {"mention": int(href)} if href else {}
+    else:
+        _, sign, word = text.rpartition("#")
+        if not (sign and kind_for_trigger(word) and label):
+            return None
+        if not (href.isascii() and href.isdigit()):
+            return None
+        trigger, person = sign + word, None
+    before = text[: -len(trigger)]
+    if before and not (before[-1].isspace() or before[-1] in "([{"):
+        return None
+    return before, label, person
 
 
 def _run(text: str, flags: frozenset[str], link: str | None) -> dict[str, Any]:

@@ -5,7 +5,7 @@ import type {
   MouseEvent,
   Ref,
 } from "react";
-import { useContext } from "react";
+import { createContext, useContext } from "react";
 import ReactMarkdown, { type ExtraProps, type Options } from "react-markdown";
 import rehypeSlug from "rehype-slug";
 import remarkGfm from "remark-gfm";
@@ -24,6 +24,8 @@ import { cn } from "@/lib/utils";
 type AnchorProps = ComponentPropsWithoutRef<"a"> & { node?: unknown };
 type ImageProps = ComponentProps<"img"> & ExtraProps;
 type ParagraphProps = ComponentPropsWithoutRef<"p"> & ExtraProps;
+type ListItemProps = ComponentPropsWithoutRef<"li"> & ExtraProps;
+type InputProps = ComponentPropsWithoutRef<"input"> & ExtraProps;
 
 function handleHashClick(e: MouseEvent<HTMLAnchorElement>) {
   const href = e.currentTarget.getAttribute("href");
@@ -166,10 +168,41 @@ function ReleaseParagraph({ node, children, ...props }: ParagraphProps) {
   );
 }
 
+/** Ticks or unticks the checklist item that starts at an offset in the text. */
+const TaskToggleContext = createContext<((itemStart: number) => void) | null>(null);
+/** Where in the text the list item a box sits in starts. */
+const ListItemStartContext = createContext<number | undefined>(undefined);
+
+/** A list item, telling a checklist box inside it where the item starts. */
+function ListItem({ node, ...props }: ListItemProps) {
+  return (
+    <ListItemStartContext.Provider value={node?.position?.start.offset}>
+      <li {...props} />
+    </ListItemStartContext.Provider>
+  );
+}
+
+/** A checklist box that ticks, in text that can be changed. */
+function TaskBox({ node: _node, disabled, className, ...props }: InputProps) {
+  const toggle = useContext(TaskToggleContext);
+  const itemStart = useContext(ListItemStartContext);
+  if (props.type !== "checkbox" || !toggle || itemStart === undefined) {
+    return <input {...props} className={className} disabled={disabled} />;
+  }
+  return (
+    <input
+      {...props}
+      className={cn("cursor-pointer", className)}
+      onChange={() => toggle(itemStart)}
+    />
+  );
+}
+
 /** What every surface shares. Anything that can be wider than its container
- *  is wrapped or scrolled, so rendered markdown never stretches its card. */
+ *  is wrapped or scrolled, so rendered markdown never stretches its card. A
+ *  checklist item's box sits where its bullet would. */
 const BASE_CLASS =
-  "wrap-break-word [&_a:hover]:underline [&_a]:break-all [&_blockquote]:border-l-2 [&_code]:rounded [&_code]:px-1 [&_code]:py-0.5 [&_code]:text-xs [&_h1]:font-semibold [&_h2]:font-semibold [&_h3]:font-semibold [&_h4]:font-semibold [&_h6]:font-semibold [&_ol]:list-decimal [&_pre]:overflow-x-auto [&_pre]:rounded [&_pre]:p-2 [&_pre_code]:bg-transparent [&_pre_code]:p-0 [&_strong]:font-semibold [&_table]:block [&_table]:w-fit [&_table]:overflow-x-auto [&_td]:border [&_td]:px-2 [&_td]:py-1 [&_th]:border [&_th]:px-2 [&_th]:py-1 [&_th]:font-semibold [&_ul]:list-disc";
+  "[&_.task-list-item]:list-none [&_.task-list-item_input]:-ml-5 [&_.task-list-item_input]:mr-1 [&_.task-list-item_input]:align-middle wrap-break-word[&_a:hover]:underline [&_a]:break-all [&_blockquote]:border-l-2 [&_code]:rounded [&_code]:px-1 [&_code]:py-0.5 [&_code]:text-xs [&_h1]:font-semibold [&_h2]:font-semibold [&_h3]:font-semibold [&_h4]:font-semibold [&_h6]:font-semibold [&_ol]:list-decimal [&_pre]:overflow-x-auto [&_pre]:rounded [&_pre]:p-2 [&_pre_code]:bg-transparent [&_pre_code]:p-0 [&_strong]:font-semibold [&_table]:block [&_table]:w-fit [&_table]:overflow-x-auto [&_td]:border [&_td]:px-2 [&_td]:py-1 [&_th]:border [&_th]:px-2 [&_th]:py-1 [&_th]:font-semibold [&_ul]:list-disc";
 
 /** The app's own colours, for prose on a page rather than in a bubble. */
 const PAGE_TONE_CLASS =
@@ -251,6 +284,9 @@ interface MarkdownProps {
   /** Renders links and mentions as plain text. Set it when the body itself
    *  sits inside a link, which cannot legally contain one. */
   disableLinks?: boolean;
+  /** Makes checklist boxes tick: a click hands back the content with that
+   *  item ticked or unticked. For text being edited. */
+  onChange?: (content: string) => void;
   ref?: Ref<HTMLDivElement>;
 }
 
@@ -263,6 +299,7 @@ export const Markdown = ({
   remoteImages = false,
   compact = false,
   disableLinks = false,
+  onChange,
   ref,
 }: MarkdownProps) => {
   if (!content) {
@@ -286,17 +323,28 @@ export const Markdown = ({
     img: compact || !preset.picture ? ImageName : preset.picture,
     ...(mentions ? { span: disableLinks ? PlainMentionSpan : LinkedMentionSpan } : {}),
     ...(preset.paragraph && !compact ? { p: preset.paragraph } : {}),
+    ...(onChange ? { li: ListItem, input: TaskBox } : {}),
   };
+  // A checklist item's box is the first `[` after its list marker.
+  const toggleTask =
+    onChange &&
+    ((itemStart: number) => {
+      const box = content.indexOf("[", itemStart) + 1;
+      if (box === 0) return;
+      onChange(content.slice(0, box) + (content[box] === " " ? "x" : " ") + content.slice(box + 1));
+    });
 
   const rendered = (
     <div ref={ref} className={cn(BASE_CLASS, preset.prose, !compact && preset.spacing, className)}>
-      <ReactMarkdown
-        remarkPlugins={remarkPlugins}
-        rehypePlugins={preset.headingIds ? HEADING_ID_PLUGINS : undefined}
-        components={components}
-      >
-        {content}
-      </ReactMarkdown>
+      <TaskToggleContext.Provider value={toggleTask ?? null}>
+        <ReactMarkdown
+          remarkPlugins={remarkPlugins}
+          rehypePlugins={preset.headingIds ? HEADING_ID_PLUGINS : undefined}
+          components={components}
+        >
+          {content}
+        </ReactMarkdown>
+      </TaskToggleContext.Provider>
     </div>
   );
   // A body that sits inside a link leaves the click to it.
