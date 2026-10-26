@@ -88,6 +88,46 @@
           <string>NSPrivacyCollectedDataTypePurposeAppFunctionality</string>
         </array>
       </dict>
+      <!-- Analytics, once the person allows it in their cookie preferences, with no account
+           attached: the pages opened, by kind of page (src/lib/analytics.ts). -->
+      <dict>
+        <key>NSPrivacyCollectedDataType</key>
+        <string>NSPrivacyCollectedDataTypeProductInteraction</string>
+        <key>NSPrivacyCollectedDataTypeLinked</key>
+        <false/>
+        <key>NSPrivacyCollectedDataTypeTracking</key>
+        <false/>
+        <key>NSPrivacyCollectedDataTypePurposes</key>
+        <array>
+          <string>NSPrivacyCollectedDataTypePurposeAnalytics</string>
+        </array>
+      </dict>
+      <!-- Analytics: how quickly pages load and respond. -->
+      <dict>
+        <key>NSPrivacyCollectedDataType</key>
+        <string>NSPrivacyCollectedDataTypePerformanceData</string>
+        <key>NSPrivacyCollectedDataTypeLinked</key>
+        <false/>
+        <key>NSPrivacyCollectedDataTypeTracking</key>
+        <false/>
+        <key>NSPrivacyCollectedDataTypePurposes</key>
+        <array>
+          <string>NSPrivacyCollectedDataTypePurposeAnalytics</string>
+        </array>
+      </dict>
+      <!-- Analytics: errors in the app, without their message. -->
+      <dict>
+        <key>NSPrivacyCollectedDataType</key>
+        <string>NSPrivacyCollectedDataTypeOtherDiagnosticData</string>
+        <key>NSPrivacyCollectedDataTypeLinked</key>
+        <false/>
+        <key>NSPrivacyCollectedDataTypeTracking</key>
+        <false/>
+        <key>NSPrivacyCollectedDataTypePurposes</key>
+        <array>
+          <string>NSPrivacyCollectedDataTypePurposeAnalytics</string>
+        </array>
+      </dict>
     </array>
     <key>NSPrivacyAccessedAPITypes</key>
     <array>
