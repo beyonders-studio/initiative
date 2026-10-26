@@ -1967,7 +1967,7 @@ async def test_a_catalog_exports_as_a_zip_of_its_envelope_and_pictures(
     [envelope_name] = [n for n in archive.namelist() if n.endswith(".json")]
     assert envelope_name.endswith(".initiative-catalog.json")
     envelope = json.loads(archive.read(envelope_name))
-    assert {image["storage_key"] for image in envelope["images"]} == {
+    assert {image["storage_key"] for image in envelope["items"]} == {
         kept_key,
         gone_key,
     }

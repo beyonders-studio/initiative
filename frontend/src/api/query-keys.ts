@@ -478,9 +478,11 @@ const catalogItems = (catalogId: number): Spec => ({
   communityPrefix: [`/api/v1/catalogs/${catalogId}/items`, "/api/v1/catalog-items"],
 });
 
-/** One item's own read. */
+/** One item's own read and every read under its address — its history. The
+ *  trailing slash keeps item 1 from reaching item 10. */
 const catalogItem = (itemId: number): Spec => ({
   communityExact: [`/api/v1/catalog-items/${itemId}`],
+  communityPrefix: [`/api/v1/catalog-items/${itemId}/`],
 });
 
 const counter = (counterId: number): Spec => ({

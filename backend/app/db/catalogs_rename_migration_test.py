@@ -58,13 +58,19 @@ async def _rows(session, sql: str, **params: Any) -> list[tuple]:
 # A statement's quoted values and its output aliases are left as written; the
 # names it reads move, quoted or not.
 _OLD_STATEMENT = (
-    'SELECT i.title AS "galleries", i."gallery_id" FROM "gallery_images" i '
-    "JOIN galleries g ON g.id = i.gallery_id WHERE g.name <> 'galleries'"
+    'SELECT i.title AS "galleries", i."gallery_id", gallery.name '
+    'FROM "gallery_images" i JOIN galleries g ON g.id = i.gallery_id '
+    "WHERE g.name <> 'galleries'"
 )
 _NEW_STATEMENT = (
-    'SELECT i.title AS "galleries", i."catalog_id" FROM "catalog_items" i '
-    "JOIN catalogs g ON g.id = i.catalog_id WHERE g.name <> 'galleries'"
+    'SELECT i.title AS "galleries", i."catalog_id", catalog.name '
+    'FROM "catalog_items" i JOIN catalogs g ON g.id = i.catalog_id '
+    "WHERE g.name <> 'galleries'"
 )
+# A relation read through moves with the dataset; an alias somebody chose
+# that happens to say ``gallery`` is theirs.
+_ALIASED_OLD = "SELECT gallery.name FROM galleries gallery"
+_ALIASED_NEW = "SELECT gallery.name FROM catalogs gallery"
 
 
 def _guild_runner(schema: str):
@@ -179,6 +185,7 @@ async def test_guild_values_say_catalog_and_back(session) -> None:
             "widgets": [
                 {"id": "w1", "binding": {"source": "query", "sql": _OLD_STATEMENT}},
                 {"id": "w2", "binding": {"entity": "gallery"}},
+                {"id": "w3", "binding": {"source": "query", "sql": _ALIASED_OLD}},
             ]
         },
     )
@@ -269,6 +276,10 @@ async def test_guild_values_say_catalog_and_back(session) -> None:
                             "binding": {"source": "query", "sql": _NEW_STATEMENT},
                         },
                         {"id": "w2", "binding": {"entity": "catalog"}},
+                        {
+                            "id": "w3",
+                            "binding": {"source": "query", "sql": _ALIASED_NEW},
+                        },
                     ]
                 },
             )

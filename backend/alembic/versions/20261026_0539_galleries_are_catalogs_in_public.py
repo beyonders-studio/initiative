@@ -89,6 +89,8 @@ _DATASET_WORDS = {
     "gallery_id": "catalog_id",
     "cover_image_id": "cover_item_id",
 }
+#: Relations a dashboard listing's statements read through (``gallery.name``).
+_RELATIONS = {"gallery": "catalog"}
 #: What a statement quotes. A string value (single- or dollar-quoted) is left
 #: as written, and so is a double-quoted name right after ``AS`` — a column
 #: name the statement answers with is its author's. Any other quoted name is a
@@ -223,10 +225,26 @@ def _scope_ceilings(bind: Connection, forward: bool) -> None:
     _writable(bind, "public.plugin_service_registrations", run)
 
 
-def _statement(sql: str, words: Mapping[str, str]) -> str:
+def _declared(sql: str, name: str) -> bool:
+    """Whether the statement names something ``name`` itself — an alias after
+    ``AS``, or after the dataset in ``FROM``/``JOIN`` — read with its string
+    values blanked."""
+    bare = _QUOTED.sub(lambda m: m.group(0) if m.group(2) is not None else "''", sql)
+    alias = rf'(?:\bAS\s+|\b(?:FROM|JOIN)\s+"?\w+"?\s+)"?{re.escape(name)}"?(?![\w"])'
+    return re.search(alias, bare, re.I) is not None
+
+
+def _statement(sql: str, words: Mapping[str, str], relations: Mapping[str, str]) -> str:
+    """``sql`` reading the respelled datasets and columns, and the respelled
+    relations (``gallery.name``) unless the statement uses the old name as an
+    alias of its own."""
+    relations = {old: new for old, new in relations.items() if not _declared(sql, old)}
+
     def respell(part: str) -> str:
         for old, new in words.items():
             part = re.sub(rf"\b{re.escape(old)}\b", new, part)
+        for old, new in relations.items():
+            part = re.sub(rf"\b{re.escape(old)}(?=\s*\.)", new, part)
         return part
 
     parts: list[str] = []
@@ -236,6 +254,8 @@ def _statement(sql: str, words: Mapping[str, str]) -> str:
         kept = quoted.group(0)
         if name in words and not _ALIAS.search(sql[: quoted.start()]):
             kept = f'"{words[name]}"'
+        elif name in relations and sql[quoted.end() :].lstrip().startswith("."):
+            kept = f'"{relations[name]}"'
         parts += [respell(sql[last : quoted.start()]), kept]
         last = quoted.end()
     return "".join(parts) + respell(sql[last:])
@@ -251,6 +271,7 @@ def _envelope_respeller(forward: bool, dashboard: bool) -> Callable[[Any], Any]:
     permissions = _flip(_PERMISSIONS, forward)
     catalog_type = "initiative-catalog" if forward else "initiative-gallery"
     words = _flip(_DATASET_WORDS, forward)
+    relations = _flip(_RELATIONS, forward)
 
     def respell(value: Any) -> Any:
         if isinstance(value, list):
@@ -277,7 +298,7 @@ def _envelope_respeller(forward: bool, dashboard: bool) -> Callable[[Any], Any]:
                 for key, item in out["permissions"].items()
             }
         if dashboard and isinstance(out.get("sql"), str):
-            out["sql"] = _statement(out["sql"], words)
+            out["sql"] = _statement(out["sql"], words, relations)
         return out
 
     return respell

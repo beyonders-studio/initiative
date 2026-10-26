@@ -332,9 +332,9 @@ async def test_a_real_export_converts_its_macros():
     ]
     assert [item["checked"] for item in _children(checklists[-1])] == [True]
 
-    catalog = _texts(pages["Macros Catalog"]["content"]["root"])
+    gallery = _texts(pages["Macros Gallery"]["content"]["root"])
     # The attachments macro's upload form is not the page's content.
-    assert "Drag and drop" not in catalog and "Upload file" not in catalog
+    assert "Drag and drop" not in gallery and "Upload file" not in gallery
 
     emoji = _texts(pages["Émojis & Ünïcode 🚀 日本語 العربية"]["content"]["root"])
     assert "🎉" in emoji and "content.emoticon" not in emoji

@@ -153,6 +153,8 @@ _DATASET_WORDS = {
     "gallery_id": "catalog_id",
     "cover_image_id": "cover_item_id",
 }
+#: Relations a dashboard's statement reads through (``gallery.name``).
+_RELATIONS = {"gallery": "catalog"}
 #: Keys a queued export or import names the tool by.
 _JOB_KEYS = {"gallery": "catalog", "gallery_ids": "catalog_ids"}
 _ENVELOPE_TYPES = {"initiative-gallery": "initiative-catalog"}
@@ -456,10 +458,26 @@ _QUOTED = re.compile(r"'(?:[^']|'')*'|\$(\w*)\$.*?\$\1\$|\"((?:[^\"]|\"\")*)\"",
 _ALIAS = re.compile(r"\bAS\s*$", re.I)
 
 
-def _statement(sql: str, words: Mapping[str, str]) -> str:
+def _declared(sql: str, name: str) -> bool:
+    """Whether the statement names something ``name`` itself — an alias after
+    ``AS``, or after the dataset in ``FROM``/``JOIN`` — read with its string
+    values blanked."""
+    bare = _QUOTED.sub(lambda m: m.group(0) if m.group(2) is not None else "''", sql)
+    alias = rf'(?:\bAS\s+|\b(?:FROM|JOIN)\s+"?\w+"?\s+)"?{re.escape(name)}"?(?![\w"])'
+    return re.search(alias, bare, re.I) is not None
+
+
+def _statement(sql: str, words: Mapping[str, str], relations: Mapping[str, str]) -> str:
+    """``sql`` reading the respelled datasets and columns, and the respelled
+    relations (``gallery.name``) unless the statement uses the old name as an
+    alias of its own."""
+    relations = {old: new for old, new in relations.items() if not _declared(sql, old)}
+
     def respell(part: str) -> str:
         for old, new in words.items():
             part = re.sub(rf"\b{re.escape(old)}\b", new, part)
+        for old, new in relations.items():
+            part = re.sub(rf"\b{re.escape(old)}(?=\s*\.)", new, part)
         return part
 
     parts: list[str] = []
@@ -469,6 +487,8 @@ def _statement(sql: str, words: Mapping[str, str]) -> str:
         kept = quoted.group(0)
         if name in words and not _ALIAS.search(sql[: quoted.start()]):
             kept = f'"{words[name]}"'
+        elif name in relations and sql[quoted.end() :].lstrip().startswith("."):
+            kept = f'"{relations[name]}"'
         parts += [respell(sql[last : quoted.start()]), kept]
         last = quoted.end()
     return "".join(parts) + respell(sql[last:])
@@ -479,6 +499,7 @@ def _definition_respeller(forward: bool) -> Callable[[Any], Any]:
     and the kinds it names."""
     scopes = _flip(_SCOPES, forward)
     words = _flip(_DATASET_WORDS, forward)
+    relations = _flip(_RELATIONS, forward)
     kinds = _flip(_KIND, forward)
 
     def respell(value: Any) -> Any:
@@ -491,7 +512,7 @@ def _definition_respeller(forward: bool) -> Callable[[Any], Any]:
         out: dict[str, Any] = {}
         for key, item in value.items():
             if key == "sql" and isinstance(item, str):
-                out[key] = _statement(item, words)
+                out[key] = _statement(item, words, relations)
             elif key in _KIND_KEYS and isinstance(item, str):
                 out[key] = kinds.get(item, item)
             elif key in _KIND_KEYS and isinstance(item, list):

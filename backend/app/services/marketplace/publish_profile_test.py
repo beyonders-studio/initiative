@@ -307,8 +307,8 @@ class TestPictures:
             "type": "initiative-catalog",
             "name": "Moodboard",
             "cover": "abc.png",
-            "images": [{"storage_key": kept}, {"storage_key": "abc.png"}],
+            "items": [{"storage_key": kept}, {"storage_key": "abc.png"}],
         }
         stripped = strip_for_listing(Tool.catalog, catalog)
-        assert stripped["images"] == [{"storage_key": kept}]
+        assert stripped["items"] == [{"storage_key": kept}]
         assert stripped["cover"] is None
