@@ -20,7 +20,12 @@ import {
   readCalendarEvent,
 } from "@/api/generated/calendar-events/calendar-events";
 import { getReadCalendarQueryKey, readCalendar } from "@/api/generated/calendars/calendars";
-import { getReadCatalogQueryKey, readCatalog } from "@/api/generated/catalogs/catalogs";
+import {
+  getReadCatalogItemQueryKey,
+  getReadCatalogQueryKey,
+  readCatalog,
+  readCatalogItem,
+} from "@/api/generated/catalogs/catalogs";
 import { getReadCommentQueryKey, readComment } from "@/api/generated/comments/comments";
 import { getReadCounterGroupQueryKey, readCounterGroup } from "@/api/generated/counters/counters";
 import { getReadDashboardQueryKey, readDashboard } from "@/api/generated/dashboards/dashboards";
@@ -42,6 +47,7 @@ import {
   readWikiPage,
 } from "@/api/generated/wikis/wikis";
 import {
+  catalogItemRoute,
   eventRoute,
   initiativeRoute,
   type PARENT_TOOL,
@@ -121,10 +127,9 @@ type Resolve = (read: Read, communityId: number, id: number) => Promise<string>;
 
 /**
  * The kinds that live inside a tool and can be read by their own id, keyed by
- * the child-kind registry ({@link PARENT_TOOL}). A catalog item and a counter
- * are read by id (`/catalog-items/{id}`, `/counters/{id}`), but nothing links
- * to either yet. A queue item opens its queue: a moderation case
- * about one links to it.
+ * the child-kind registry ({@link PARENT_TOOL}). A counter is read by id
+ * (`/counters/{id}`), but nothing links to one yet. A queue item opens its
+ * queue: a moderation case about one links to it.
  */
 const CHILD_RESOLVERS: Partial<Record<keyof typeof PARENT_TOOL, Resolve>> = {
   task: async (read, communityId, id) => {
@@ -151,6 +156,13 @@ const CHILD_RESOLVERS: Partial<Record<keyof typeof PARENT_TOOL, Resolve>> = {
       await toolInitiative(read, communityId, Tool.queue, item.queue_id),
       item.queue_id
     );
+  },
+  catalog_item: async (read, communityId, id) => {
+    const item = await read(getReadCatalogItemQueryKey(communityId, id), () =>
+      readCatalogItem(communityId, id)
+    );
+    const initiativeId = await toolInitiative(read, communityId, Tool.catalog, item.catalog_id);
+    return catalogItemRoute(initiativeId, item.catalog_id, id);
   },
   wiki_page: async (read, communityId, id) => {
     const page = await read(getReadWikiPageQueryKey(communityId, id), () =>

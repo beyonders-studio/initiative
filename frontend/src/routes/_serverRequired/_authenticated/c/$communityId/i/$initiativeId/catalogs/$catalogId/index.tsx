@@ -1,11 +1,9 @@
-import { createFileRoute, lazyRouteComponent } from "@tanstack/react-router";
+import { createFileRoute } from "@tanstack/react-router";
+
+import { LazyCatalogDetailPage } from "@/lib/initiativeDetailRoute";
 
 export const Route = createFileRoute(
   "/_serverRequired/_authenticated/c/$communityId/i/$initiativeId/catalogs/$catalogId/"
 )({
-  component: lazyRouteComponent(() =>
-    import("@/pages/initiativeTools/catalogs/CatalogDetailPage").then((m) => ({
-      default: m.CatalogDetailPage,
-    }))
-  ),
+  component: LazyCatalogDetailPage,
 });

@@ -25,6 +25,7 @@ import {
 import type { SearchHit } from "@/api/generated/initiativeAPI.schemas";
 import { SearchEntityType, Tool, ViewSource } from "@/api/generated/initiativeAPI.schemas";
 import {
+  catalogItemRoute,
   counterRoute,
   eventRoute,
   TOOL_ICONS,
@@ -68,12 +69,7 @@ const TOOL_CHILDREN: Partial<Record<SearchEntityType, ToolChild>> = {
     icon: Ticket,
     path: (initiativeId, queueId) => toolDetailRoute(Tool.queue, initiativeId, queueId),
   },
-  // A picture is browsed in its catalog rather than on a page of its own, so
-  // a hit lands on the catalog.
-  [SearchEntityType.catalog_item]: {
-    icon: Image,
-    path: (initiativeId, catalogId) => toolDetailRoute(Tool.catalog, initiativeId, catalogId),
-  },
+  [SearchEntityType.catalog_item]: { icon: Image, path: catalogItemRoute },
   // A wiki page IS read on a page of its own, inside its wiki — so unlike the
   // rest of these it keeps its own id in the address. Without an entry here it
   // would fall through to the tool rule and be addressed as if the page id

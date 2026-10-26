@@ -1,8 +1,9 @@
-import { useParams } from "@tanstack/react-router";
+import { useNavigate, useParams } from "@tanstack/react-router";
 import { Clock, Info, LayoutGrid, Loader2, Plus, Tags } from "lucide-react";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { useTranslation } from "react-i18next";
 
+import { useReadCatalogItem } from "@/api/generated/catalogs/catalogs";
 import type {
   CatalogItemRead,
   TagSummary,
@@ -64,7 +65,7 @@ import { useCommunityPath } from "@/lib/communityUrl";
 import { formatPeriod } from "@/lib/formatDate";
 import { toast } from "@/lib/mascotToast";
 import { browserTimezone } from "@/lib/timezones";
-import { toolListRoute, toolSettingsRoute } from "@/lib/tools";
+import { catalogItemRoute, toolDetailRoute, toolListRoute, toolSettingsRoute } from "@/lib/tools";
 
 type ViewMode = "masonry" | "grid" | "timeline";
 
@@ -121,7 +122,11 @@ const isViewMode = (value: unknown): value is ViewMode =>
  */
 export function CatalogDetailPage() {
   const { t } = useTranslation(["catalogs", "common"]);
-  const { catalogId } = useParams({ strict: false }) as { catalogId: string };
+  // An item's address is the catalog's with the item open beside it.
+  const { catalogId, itemId } = useParams({ strict: false }) as {
+    catalogId: string;
+    itemId?: string;
+  };
   const parsedId = Number(catalogId);
   const gp = useCommunityPath();
 
@@ -241,7 +246,21 @@ export function CatalogDetailPage() {
   const [openId, setOpenId] = useState<number | null>(null);
   // An image opens in the lightbox.
   useRecordOpen("catalog_item", openId ?? undefined, { source: ViewSource.direct });
-  const [detailsId, setDetailsId] = useState<number | null>(null);
+  const detailsId = itemId === undefined ? null : Number(itemId);
+  const navigate = useNavigate();
+  const setDetailsId = useCallback(
+    (id: number | null) =>
+      void navigate({
+        to: gp(
+          id === null
+            ? toolDetailRoute(Tool.catalog, initiativeId, parsedId)
+            : catalogItemRoute(initiativeId, parsedId, id)
+        ),
+        // The wall stays where it was under the item.
+        resetScroll: false,
+      }),
+    [navigate, gp, initiativeId, parsedId]
+  );
   const openIndex = openId === null ? -1 : images.findIndex((image) => image.id === openId);
   const lightboxItems = useMemo<LightboxItem[]>(
     () =>
@@ -262,7 +281,14 @@ export function CatalogDetailPage() {
   const onNearEnd = useCallback(() => {
     if (hasNextPage && !isFetchingNextPage) void fetchNextPage();
   }, [hasNextPage, isFetchingNextPage, fetchNextPage]);
-  const detailsImage = detailsId === null ? null : (images.find((i) => i.id === detailsId) ?? null);
+  const listedDetails =
+    detailsId === null ? null : (images.find((i) => i.id === detailsId) ?? null);
+  // An item opened by its address may not be on a page loaded yet.
+  const linkedItem = useReadCatalogItem(communityId, detailsId ?? 0, {
+    query: { enabled: Number.isFinite(detailsId) && listedDetails === null },
+  });
+  const detailsImage =
+    listedDetails ?? (linkedItem.data?.catalog_id === parsedId ? linkedItem.data : null);
 
   const setCover = useUpdateCatalog(parsedId, {
     onSuccess: () => toast.success(t("sheet.coverSet")),

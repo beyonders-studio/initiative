@@ -221,9 +221,10 @@ async def _channels(
 Ref = tuple[str, int]
 
 #: The kinds the client opens by their own address (``/go/{kind}/{id}``) —
-#: every commentable kind, and a calendar event. Mirrors the client resolver in
-#: ``lib/entityResolver.ts``. Any other kind opens the tool that governs it.
-_ADDRESSABLE = frozenset((*COMMENT_TARGETS, "calendar_event"))
+#: every commentable kind, a calendar event and a catalog item. Mirrors the
+#: client resolver in ``lib/entityResolver.ts``. Any other kind opens the tool
+#: that governs it.
+_ADDRESSABLE = frozenset((*COMMENT_TARGETS, "calendar_event", "catalog_item"))
 
 #: ``recipients`` for news about a thing nobody asked for — it was shared with
 #: you: everybody its sharing reaches, taken from the thing itself.

@@ -59,6 +59,11 @@ describe("searchHitPath", () => {
         target({ entity_type: "counter", entity_id: 9, tool: Tool.counter_group, tool_id: 6 })
       )
     ).toBe("/i/5/counter-groups/6/counter/9");
+    expect(
+      searchHitPath(
+        target({ entity_type: "catalog_item", entity_id: 12, tool: Tool.catalog, tool_id: 3 })
+      )
+    ).toBe("/i/5/catalogs/3/items/12");
   });
 
   it("keeps a wiki page's own id in its address", () => {
