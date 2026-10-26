@@ -320,6 +320,14 @@ async def test_a_catch_up_with_nothing_new_sends_nothing(
     assert asked == []
     assert emitted(capfd, AuditEventType.AI_REQUEST_SENT) == []
 
+    # A moment with no zone names no moment.
+    unzoned = await client.post(
+        b.g("/activity/catch-up"),
+        headers=b.headers,
+        json={"since": asked_from.replace(tzinfo=None).isoformat()},
+    )
+    assert unzoned.status_code == 422
+
 
 async def test_a_catch_up_tells_as_much_as_its_budget_holds(
     session, acting_user, reading_as

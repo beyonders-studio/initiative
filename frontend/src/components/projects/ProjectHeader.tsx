@@ -59,7 +59,12 @@ export const ProjectHeader = ({ project, projectIsArchived }: ProjectHeaderProps
       mark={project.icon ? <span className="text-3xl leading-none">{project.icon}</span> : null}
       title={project.name}
       titleExtras={
-        <CatchUpButton since={lastVisit} scope={{ tool: Tool.project, toolId: project.id }} />
+        <CatchUpButton
+          // Another project's answer is not this one's.
+          key={`${project.community_id}:${project.id}`}
+          since={lastVisit}
+          scope={{ tool: Tool.project, toolId: project.id }}
+        />
       }
       onRename={
         canEdit && !projectIsArchived ? (name) => updateProject.mutateAsync({ name }) : undefined

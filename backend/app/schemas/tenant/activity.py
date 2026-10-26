@@ -5,7 +5,7 @@ from __future__ import annotations
 from datetime import datetime
 from typing import List, Optional
 
-from pydantic import BaseModel, ConfigDict, Field, model_validator
+from pydantic import AwareDatetime, BaseModel, ConfigDict, Field, model_validator
 
 from app.core.search import SearchEntityType
 from app.core.tools import Tool
@@ -36,7 +36,7 @@ class CatchUpRequest(BaseModel):
     """What a catch-up covers: what changed since ``since`` (the change log's
     whole window without one), in the community or in one tool."""
 
-    since: Optional[datetime] = None
+    since: Optional[AwareDatetime] = None
     tool: Optional[Tool] = None
     tool_id: Optional[int] = None
 

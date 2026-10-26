@@ -17,6 +17,8 @@ export interface AISummary {
   cutPercent: number | null;
   /** Where the changes it read start, for a catch-up. */
   since: string | null;
+  /** The answer ended, rather than being stopped part-way. */
+  finished: boolean;
 }
 
 /** What the sheet says about what it summarizes. */
@@ -103,7 +105,7 @@ const SummaryBody = ({
     const controller = new AbortController();
     reading.current = controller;
     // The one before stays until the new one starts arriving.
-    let written: AISummary = { text: "", cutPercent: null, since: null };
+    let written: AISummary = { text: "", cutPercent: null, since: null, finished: false };
     setWriting(true);
     setError(null);
     try {
@@ -113,12 +115,14 @@ const SummaryBody = ({
           return;
         }
         written = {
+          ...written,
           text: written.text + (event.text ?? ""),
           cutPercent: event.cut?.percent ?? written.cutPercent,
           since: event.since ?? written.since,
         };
         onSummaryChange(written);
       });
+      onSummaryChange({ ...written, finished: true });
     } catch (err) {
       if (!controller.signal.aborted) {
         setError(getErrorMessage(err, "editor:summary.generateError"));
@@ -172,7 +176,7 @@ const SummaryBody = ({
       );
     }
     // Asked, and answered with nothing to tell.
-    const nothing = summary !== null && !error && words.empty;
+    const nothing = summary?.finished && !error && words.empty;
     return (
       <div className="space-y-4 py-4 text-center">
         <Sparkles className="mx-auto h-8 w-8 text-muted-foreground" />
