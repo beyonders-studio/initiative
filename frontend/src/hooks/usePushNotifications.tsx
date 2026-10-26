@@ -2,7 +2,7 @@ import type { PluginListenerHandle } from "@capacitor/core";
 import { Capacitor } from "@capacitor/core";
 import { type PermissionStatus, PushNotifications } from "@capacitor/push-notifications";
 import { useRouter } from "@tanstack/react-router";
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 
 import { useAuth } from "@/hooks/useAuth";
 import { useNotificationStreamConnected } from "@/hooks/useNotificationStream";
@@ -230,19 +230,23 @@ export const usePushNotifications = (): UsePushNotificationsReturn => {
 export const usePushTray = () => {
   const phone = ["ios", "android"].includes(Capacitor.getPlatform());
   const streamConnected = useNotificationStreamConnected();
-  const { data, dataUpdatedAt } = useNotifications({
+  const { data, isFetching } = useNotifications({
     enabled: phone,
     refetchInterval: streamConnected ? false : 30_000,
   });
-  const unread = data?.unread_count;
+  const fetching = useRef(false);
 
   // Every fetch that says zero, not only the change to it: a count read on
-  // another device leaves the cache at zero while the tray filled.
+  // another device leaves the cache at zero while the tray filled. Only a
+  // fetch, because marking read lowers the cached count before the server
+  // has agreed, and an emptied tray does not come back.
   useEffect(() => {
-    if (phone && dataUpdatedAt && unread === 0) {
+    const fetched = fetching.current && !isFetching;
+    fetching.current = isFetching;
+    if (phone && fetched && data?.unread_count === 0) {
       void PushNotifications.removeAllDeliveredNotifications().catch(() => {});
     }
-  }, [phone, dataUpdatedAt, unread]);
+  }, [phone, isFetching, data]);
 
   // Signing out takes the count with it.
   useEffect(() => {

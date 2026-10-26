@@ -6,6 +6,7 @@ import { buildNotification } from "@/__tests__/factories";
 import { server } from "@/__tests__/helpers/msw-server";
 import { renderWithProviders } from "@/__tests__/helpers/render";
 
+import { useMarkNotificationRead } from "./useNotifications";
 import { usePushTray } from "./usePushNotifications";
 
 const clearTray = vi.hoisted(() => vi.fn(async () => {}));
@@ -18,21 +19,30 @@ vi.mock("@capacitor/push-notifications", () => ({
   PushNotifications: { removeAllDeliveredNotifications: clearTray },
 }));
 
+let markRead: (id: number) => void = () => {};
+
 const Probe = () => {
   usePushTray();
+  markRead = useMarkNotificationRead().mutate;
   return null;
 };
 
-const serveUnread = (count: number) =>
+const line = buildNotification({ id: 7, read_at: null });
+
+const serveUnread = (count: number) => {
+  const fetched = vi.fn();
   server.use(
-    http.get("/api/v1/notifications/", () =>
-      HttpResponse.json({
-        notifications: count ? [buildNotification()] : [],
+    http.get("/api/v1/notifications/", () => {
+      fetched();
+      return HttpResponse.json({
+        notifications: count ? [line] : [],
         unread_count: count,
         next_cursor: null,
-      })
-    )
+      });
+    })
   );
+  return fetched;
+};
 
 describe("usePushTray", () => {
   beforeEach(() => {
@@ -54,5 +64,36 @@ describe("usePushTray", () => {
     expect(clearTray).not.toHaveBeenCalled();
     unmount();
     expect(clearTray).toHaveBeenCalledOnce();
+  });
+
+  it("keeps the tray when marking the last line read fails", async () => {
+    const fetched = serveUnread(1);
+    let answer = () => {};
+    server.use(
+      http.post(
+        "/api/v1/notifications/7/read",
+        () =>
+          new Promise<Response>((resolve) => {
+            answer = () => resolve(new HttpResponse(null, { status: 500 }));
+          })
+      )
+    );
+    const { queryClient } = renderWithProviders(<Probe />);
+    await waitFor(() => expect(fetched).toHaveBeenCalledOnce());
+
+    markRead(7);
+    // The bell shows the read before the server has answered.
+    await waitFor(() =>
+      expect(queryClient.getQueryData(["/api/v1/notifications/", { limit: 50 }])).toMatchObject({
+        unread_count: 0,
+      })
+    );
+    await new Promise((resolve) => setTimeout(resolve, 50));
+    answer();
+
+    // The failure refetches the count the server still holds.
+    await waitFor(() => expect(fetched).toHaveBeenCalledTimes(2));
+    await new Promise((resolve) => setTimeout(resolve, 50));
+    expect(clearTray).not.toHaveBeenCalled();
   });
 });
