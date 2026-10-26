@@ -1111,7 +1111,6 @@ async def _apply_file_entry(
                 routed_guild_id(session),
                 storage_key,
                 filename=filename,
-                hint=upload.content_type,
             )
             if upload is not None
             else None

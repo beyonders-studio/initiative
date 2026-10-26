@@ -2,9 +2,12 @@ from __future__ import annotations
 
 import asyncio
 import hashlib
+import io
 import json
 import logging
 import re
+import unicodedata
+import zipfile
 from contextlib import asynccontextmanager
 from datetime import datetime, timedelta, timezone
 from pathlib import Path
@@ -795,93 +798,103 @@ async def purge_initiative_uploads(session, initiative_ids: Iterable[int]) -> Se
     return dropped
 
 
-def detect_mime_type(content: bytes, filename: str | None = None) -> str | None:
-    """Detect MIME type using python-magic, with fallback to extension.
+#: What the bytes of a text file say whatever kind of text it is; its name says
+#: which (Markdown, HTML, plain).
+_PLAIN_TEXT = frozenset({"text/plain", "text/x-markdown"})
+#: Office formats whose bytes are a zip package; the name says which.
+_OFFICE_PACKAGES = frozenset(
+    {
+        "application/vnd.openxmlformats-officedocument.wordprocessingml.document",
+        "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+        "application/vnd.openxmlformats-officedocument.presentationml.presentation",
+    }
+)
+#: Older Office formats, whose bytes are a compound-document container.
+_OFFICE_CONTAINERS = frozenset(
+    {"application/msword", "application/vnd.ms-excel", "application/vnd.ms-powerpoint"}
+)
+_CONTAINER_TYPES = frozenset({"application/CDFV2", "application/x-ole-storage"})
 
-    Returns the detected MIME type or None if detection fails.
-    """
+
+def detect_mime_type(content: bytes) -> str | None:
+    """The type ``content``'s bytes say it is, or ``None`` where they can't be
+    read."""
     try:
         import magic
 
-        detected = magic.from_buffer(content, mime=True)
-        if detected:
-            return detected
-    except Exception as exc:
-        logger.warning("Failed to detect MIME type with magic: %s", exc)
-
-    # Fallback to extension-based detection
-    if filename:
-        ext = Path(filename).suffix.lower()
-        if ext in EXTENSION_TO_MIME:
-            return EXTENSION_TO_MIME[ext]
-
-    return None
+        return magic.from_buffer(content, mime=True) or None
+    except Exception:
+        logger.exception("upload_type_detection_failed")
+        return None
 
 
-def validate_file(
-    content: bytes,
-    filename: str | None,
-    content_type: str | None,
-) -> Tuple[str, str]:
-    """Validate an uploaded file.
+def _is_office_package(content: bytes) -> bool:
+    try:
+        with zipfile.ZipFile(io.BytesIO(content)) as package:
+            return "[Content_Types].xml" in package.namelist()
+    except zipfile.BadZipFile:
+        return False
 
-    Args:
-        content: File content bytes
-        filename: Original filename
-        content_type: Content-Type header from upload
 
-    Returns:
-        Tuple of (validated_mime_type, extension)
+def _name_settles(detected: str, named: str, content: bytes) -> bool:
+    """Whether a file's name may make it ``named`` where its bytes said
+    ``detected``: only where the bytes say no more than the family."""
+    if detected in _PLAIN_TEXT:
+        return named.startswith("text/")
+    if named in _OFFICE_PACKAGES:
+        return _is_office_package(content)
+    return named in _OFFICE_CONTAINERS and detected in _CONTAINER_TYPES
 
-    Raises:
-        ValueError: If validation fails
+
+def validate_file(content: bytes, filename: str | None) -> Tuple[str, str]:
+    """The type and stored extension of an uploaded file, read from its bytes.
+
+    The name only narrows what the bytes allow (:func:`_name_settles`); the
+    type the client sent is never asked. Raises ``ValueError`` for a file that
+    is empty, too large, unreadable, or of a type a file can't be.
     """
     if len(content) > MAX_FILE_SIZE:
         raise ValueError(
             f"File exceeds maximum size of {MAX_FILE_SIZE // (1024 * 1024)} MB"
         )
-
     if not content:
         raise ValueError("Uploaded file is empty")
 
-    # Detect actual MIME type
-    detected_mime = detect_mime_type(content, filename)
+    detected = detect_mime_type(content)
+    if detected is None:
+        raise ValueError("Unable to determine file type")
+    suffix = Path(filename).suffix.lower() if filename else ""
+    named = EXTENSION_TO_MIME.get(suffix)
+    mime = detected
+    if (
+        named is not None
+        and named in ALLOWED_FILE_MIME_TYPES
+        and named != detected
+        and _name_settles(detected, named, content)
+    ):
+        mime = named
+    if mime not in ALLOWED_FILE_MIME_TYPES:
+        raise ValueError(f"Unsupported file type: {detected}")
+    return mime, suffix if named == mime else ALLOWED_FILE_MIME_TYPES[mime]
 
-    if detected_mime and detected_mime not in ALLOWED_FILE_MIME_TYPES:
-        # Magic returned an unrecognized type — fall back to extension if it
-        # maps to an allowed type (e.g. magic returns text/x-markdown for .md)
-        if filename:
-            file_ext = Path(filename).suffix.lower()
-            ext_mime = EXTENSION_TO_MIME.get(file_ext)
-            if ext_mime and ext_mime in ALLOWED_FILE_MIME_TYPES:
-                detected_mime = ext_mime
-            else:
-                raise ValueError(f"Unsupported file type: {detected_mime}")
-        else:
-            raise ValueError(f"Unsupported file type: {detected_mime}")
 
-    # If we couldn't detect the MIME type, fall back to Content-Type header
-    if not detected_mime:
-        if content_type and content_type in ALLOWED_FILE_MIME_TYPES:
-            detected_mime = content_type
-        else:
-            raise ValueError(
-                "Unable to determine file type. Supported types: PDF, Word, Excel, PowerPoint, TXT, HTML, images, Markdown"
-            )
+#: The longest name a file keeps; most filesystems stop at 255.
+MAX_DISPLAY_NAME = 255
 
-    # Get extension for the detected MIME type
-    extension = ALLOWED_FILE_MIME_TYPES.get(detected_mime, "")
 
-    # If we have a filename, prefer its extension if it matches
-    if filename:
-        file_ext = Path(filename).suffix.lower()
-        if (
-            file_ext in EXTENSION_TO_MIME
-            and EXTENSION_TO_MIME[file_ext] == detected_mime
-        ):
-            extension = file_ext
-
-    return detected_mime, extension
+def display_filename(name: str | None) -> str | None:
+    """``name`` as a file shows it and downloads under it: without control or
+    formatting characters, which never belong in a name, trimmed of the
+    spaces and dots a desktop drops, and cut to 255 characters, keeping its
+    extension."""
+    if name is None:
+        return None
+    kept = "".join(c for c in name if unicodedata.category(c) not in ("Cc", "Cf"))
+    kept = kept.strip().rstrip(". ")
+    if len(kept) > MAX_DISPLAY_NAME:
+        suffix = Path(kept).suffix[:16]
+        kept = kept[: MAX_DISPLAY_NAME - len(suffix)] + suffix
+    return kept or None
 
 
 def new_upload_filename(extension: str, *, prefix: str = "") -> str:

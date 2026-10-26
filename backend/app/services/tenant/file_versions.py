@@ -69,20 +69,17 @@ def _allowed(model: type) -> Collection[str]:
     }[model]
 
 
-def file_type(
-    model: type, data: bytes, *, filename: str | None, hint: str | None
-) -> str | None:
+def file_type(model: type, data: bytes, *, filename: str | None) -> str | None:
     """The type ``data`` takes as a ``model`` row's file, read from its bytes
-    by the rule an upload of one follows (``filename`` and ``hint`` are what
-    that rule falls back on), or ``None`` where it is not a file the row may
-    hold."""
+    by the rule an upload of one follows (``filename`` narrows it), or
+    ``None`` where it is not a file the row may hold."""
     from app.models.tenant.catalog import CatalogItem
     from app.services.tenant import catalogs
 
     try:
         if model is CatalogItem:
             return catalogs.validate_image(data)[0].content_type
-        return attachments_service.validate_file(data, filename, hint)[0]
+        return attachments_service.validate_file(data, filename)[0]
     except ValueError:
         return None
 
@@ -93,7 +90,6 @@ async def stored_file_type(
     key: str,
     *,
     filename: str | None = None,
-    hint: str | None = None,
 ) -> str | None:
     """:func:`file_type` for a file already stored in the community under
     ``key``, or ``None`` where nothing is stored there."""
@@ -102,7 +98,7 @@ async def stored_file_type(
     data = await asyncio.to_thread(read_payload, guild_id, key)
     if data is None:
         return None
-    return file_type(model, data, filename=filename, hint=hint)
+    return file_type(model, data, filename=filename)
 
 
 def _make_current(parent: Any, version: Any) -> None:
@@ -117,6 +113,10 @@ def _new_version(session: AsyncSession, parent: Any, fields: dict[str, Any]) -> 
     if content_type not in _allowed(type(parent)):
         raise ValueError(f"Unsupported file type: {content_type}")
     model, _ = _history(parent)
+    if "original_filename" in fields:
+        fields["original_filename"] = attachments_service.display_filename(
+            fields["original_filename"]
+        )
     version = model(**fields)
     session.add(version)
     _make_current(parent, version)

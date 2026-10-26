@@ -88,7 +88,7 @@ ENV PYTHONDONTWRITEBYTECODE=1 PYTHONUNBUFFERED=1
 ARG APT_REFRESH=
 RUN apt-get update \
     && apt-get dist-upgrade -y \
-    && apt-get install -y --no-install-recommends gosu \
+    && apt-get install -y --no-install-recommends gosu libmagic1t64 \
     && remaining="$(apt-get --simulate dist-upgrade | grep '^Inst ' || true)" \
     && if [ -n "$remaining" ]; then \
          echo "packages still upgradable after dist-upgrade:" >&2; \
@@ -107,6 +107,9 @@ RUN apt-get update \
 # every build. Anything that wrote to /app before it would give /app a new
 # time, and the 340 MB layer a new digest, on every build.
 COPY --from=backend-deps /app /app
+# An upload's type is read from its bytes by libmagic (python-magic). Without
+# the library every upload is refused, so a build that loses it fails here.
+RUN /app/.venv/bin/python -c "import magic; assert magic.from_buffer(b'%PDF-1.4', mime=True) == 'application/pdf'"
 WORKDIR /app
 COPY backend/ .
 # Put the synced venv on PATH so uvicorn/alembic/python resolve to it

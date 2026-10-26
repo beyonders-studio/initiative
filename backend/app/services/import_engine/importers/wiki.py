@@ -511,7 +511,6 @@ async def _upload_file(
         routed_guild_id(session),
         key,
         filename=filename,
-        hint=stored.content_type,
     )
     if content_type is None:
         return None, (0, 0)

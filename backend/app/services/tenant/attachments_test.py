@@ -143,3 +143,84 @@ def test_a_new_upload_name_is_random_and_keeps_its_extension(extension, prefix, 
     from app.services.tenant.attachments import new_upload_filename
 
     assert re.fullmatch(shape, new_upload_filename(extension, prefix=prefix))
+
+
+def _word_document() -> bytes:
+    import io
+
+    import docx
+
+    buffer = io.BytesIO()
+    docx.Document().save(buffer)
+    return buffer.getvalue()
+
+
+def _zip_of_text() -> bytes:
+    import io
+    import zipfile
+
+    buffer = io.BytesIO()
+    with zipfile.ZipFile(buffer, "w") as archive:
+        archive.writestr("notes.txt", "hello")
+    return buffer.getvalue()
+
+
+@pytest.mark.parametrize(
+    ("content", "filename", "expected"),
+    [
+        (b"%PDF-1.4 body", "report.pdf", ("application/pdf", ".pdf")),
+        # Plain text takes the kind of text its name says.
+        (b"# Title\n\nSome text\n", "notes.md", ("text/markdown", ".md")),
+        # A package libmagic reads only as bytes is an Office file when it
+        # holds one.
+        (
+            _word_document(),
+            "brief.docx",
+            (
+                "application/vnd.openxmlformats-officedocument.wordprocessingml.document",
+                ".docx",
+            ),
+        ),
+        # The bytes win over a name they contradict.
+        (
+            b"<!doctype html><html><body>x</body></html>",
+            "invoice.pdf",
+            ("text/html", ".html"),
+        ),
+    ],
+    ids=["pdf", "markdown", "office-package", "html-named-pdf"],
+)
+def test_an_upload_s_type_is_read_from_its_bytes(content, filename, expected):
+    from app.services.tenant.attachments import validate_file
+
+    assert validate_file(content, filename) == expected
+
+
+@pytest.mark.parametrize(
+    ("content", "filename"),
+    [
+        (b"MZ\x90\x00" + b"\x00" * 60 + b"PE\x00\x00", "invoice.pdf"),
+        (_zip_of_text(), "brief.docx"),
+    ],
+    ids=["program-named-pdf", "zip-named-docx"],
+)
+def test_a_name_never_makes_bytes_what_they_are_not(content, filename):
+    from app.services.tenant.attachments import validate_file
+
+    with pytest.raises(ValueError):
+        validate_file(content, filename)
+
+
+@pytest.mark.parametrize(
+    ("name", "shown"),
+    [
+        ("report‮gnp.exe", "reportgnp.exe"),
+        ("  notes.txt. ", "notes.txt"),
+        ("​", None),
+        ("a" * 300 + ".pdf", "a" * 251 + ".pdf"),
+    ],
+)
+def test_a_file_name_is_kept_as_it_can_be_shown(name, shown):
+    from app.services.tenant.attachments import display_filename
+
+    assert display_filename(name) == shown
