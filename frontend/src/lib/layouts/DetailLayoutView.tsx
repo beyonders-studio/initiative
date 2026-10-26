@@ -246,10 +246,13 @@ const MoreOptions = ({ children }: { children: ReactNode }) => {
   );
 };
 
+// A change of type changes how many parts come before the fold, so the fold is
+// keyed by its type: it stays open, and what it holds stays drawn.
 const drawChildren = <I,>(node: LayoutNode, item: I, view: LayoutContext, parts: Parts<I>) =>
   node.children?.map((child, index) => (
-    // biome-ignore lint/suspicious/noArrayIndexKey: a tree is fixed for the life of a view
-    <Fragment key={index}>{renderNode(child, item, view, parts)}</Fragment>
+    <Fragment key={child.type === "more" ? "more" : index}>
+      {renderNode(child, item, view, parts)}
+    </Fragment>
   ));
 
 /** What an item being added on one column is laid out with (`addingTree`). */

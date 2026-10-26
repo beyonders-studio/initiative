@@ -201,6 +201,27 @@ describe("adding a task", () => {
     expect(screen.getAllByRole("combobox", { name: "Type" })).toHaveLength(1);
   });
 
+  it("keeps More options open when the type changes the page", async () => {
+    renderPage(() => (
+      <AddingTask
+        types={[
+          buildTaskType({ name: "Feature" }),
+          buildTaskType({ name: "Milestone", layout_preset: "dates" }),
+        ]}
+        create={vi.fn()}
+      />
+    ));
+    const user = userEvent.setup();
+
+    await screen.findByRole("combobox", { name: "Type" });
+    await user.click(screen.getByRole("button", { name: "More options" }));
+    await pickType(user, "Milestone");
+    expect(screen.getByRole("button", { name: "More options" })).toHaveAttribute(
+      "aria-expanded",
+      "true"
+    );
+  });
+
   it("starts with what its type starts with, and follows the type until it is changed", async () => {
     const create = vi.fn(async () => ({ id: 5 }));
     renderPage(() => (
