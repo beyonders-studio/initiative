@@ -105,6 +105,7 @@
   "pages": "Seiten",
   "hidden": "Ausgeblendet",
   "showView": "{{name}} im Layout-Menü anzeigen",
+  "deleteTaskType": "Aufgabentyp {{name}} löschen",
   "asShipped": "Wie ausgeliefert",
   "saveError": "Layouts konnten nicht gespeichert werden",
   "listHelp": {

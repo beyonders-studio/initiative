@@ -105,6 +105,7 @@
   "pages": "Pages",
   "hidden": "Hidden",
   "showView": "Show {{name}} in the layout menu",
+  "deleteTaskType": "Delete the {{name}} task type",
   "asShipped": "As shipped",
   "saveError": "Couldn't save the layouts",
   "listHelp": {

@@ -15,6 +15,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 - **A smaller Create task dialog.** It opens with the title, the type and the type's main column. Status, priority, people, dates and the rest wait under **More options**.
 - **Marketplace projects bring their own task types.** Each ready-made project has its own types in place of Task, Bug, Idea and Milestone, such as candidates and volunteers, or deals and renewals. Each type has its own task page, and cards show the type beside the title.
+- **Delete a task type from a project's layouts.** Each type's page under **Settings › Layouts** has a delete button that asks where its tasks go, as **Task types** does.
 
 ### Removed
 
