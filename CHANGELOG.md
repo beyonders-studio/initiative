@@ -13,6 +13,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Changed
 
+- **A smaller Create task dialog.** It opens with the title, the type and the type's main column. Status, priority, people, dates and the rest wait under **More options**.
 - **Marketplace projects bring their own task types.** Each ready-made project has its own types in place of Task, Bug, Idea and Milestone, such as candidates and volunteers, or deals and renewals. Each type has its own task page, and cards show the type beside the title.
 
 ### Fixed

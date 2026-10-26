@@ -729,6 +729,8 @@ export const TASK_DETAIL: DetailKind<TaskRead, TaskLayoutContext, TaskUpdate> = 
   }),
   taskRoute: (task, context, taskId) => taskRoute(context.initiativeId, task.project_id, taskId),
   addingParts: ["status", "dates"],
+  // The type picks the page the rest is laid out as.
+  addingUpFront: ["type"],
 };
 
 /** A task not yet added to `projectId`, in `status` and of `type`, as its

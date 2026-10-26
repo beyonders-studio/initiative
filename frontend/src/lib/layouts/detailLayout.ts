@@ -209,3 +209,35 @@ export const detailLayoutSpec = ({
     },
   };
 };
+
+/**
+ * A detail as an item being added draws it, on one column: its header, the
+ * fields named up front wherever its side places them, then its main column,
+ * with the rest of its side folded under `more`. A group the fields up front
+ * leave empty goes with them.
+ */
+export const addingTree = (tree: LayoutNode, upFront: readonly string[]): LayoutNode => {
+  const region = (type: Region) =>
+    tree.children?.find((each) => each.type === type)?.children ?? [];
+  const pulled: LayoutNode[] = [];
+  const without = (nodes: LayoutNode[]): LayoutNode[] =>
+    nodes.flatMap((node) => {
+      if (node.type === "field" && upFront.includes(String(node.props?.field))) {
+        pulled.push(node);
+        return [];
+      }
+      if (!node.children?.length) return [node];
+      const children = without(node.children);
+      return children.length === 0 ? [] : [{ ...node, children }];
+    });
+  const rest = without(region("side"));
+  return {
+    type: "adding",
+    children: [
+      ...region("header"),
+      ...pulled,
+      ...region("main"),
+      ...(rest.length > 0 ? [{ type: "more", children: rest }] : []),
+    ],
+  };
+};
