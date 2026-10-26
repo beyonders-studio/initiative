@@ -85,8 +85,6 @@ export const TOOL_PALETTE: Record<Tool, ToolPaletteSource> = {
       return (query.data?.items ?? []).map((doc) => {
         const { Icon: DocIcon, colorClass } = fileIcon({
           file_type: doc.file_type,
-          mime_type: doc.file_content_type,
-          original_filename: doc.original_filename,
           smart_link_url: doc.smart_link_url,
         });
         return {

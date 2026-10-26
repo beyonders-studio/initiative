@@ -164,7 +164,7 @@ export function buildToolRows(
         initiativeId: file.initiative_id,
         tags: file.tags,
         updatedAt: file.updated_at,
-        detail: <Badge variant="secondary">{t(`detail.fileType.${file.file_type}`)}</Badge>,
+        detail: <Badge variant="secondary">{t(`detail.fileKind.${file.kind}`)}</Badge>,
       }));
     case Tool.queue:
       return (data[Tool.queue]?.items ?? []).map((queue) => ({

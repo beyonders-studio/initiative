@@ -158,7 +158,7 @@ describe("files filed under pages", () => {
       kind: WikiPageKind.file,
       parent_page_id: 11,
       title: "Rulebook.pdf",
-      file_type: "file",
+      file_type: "pdf",
       file_content_type: "application/pdf",
       original_filename: "Rulebook.pdf",
     });

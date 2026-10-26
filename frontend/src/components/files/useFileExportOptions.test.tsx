@@ -91,7 +91,7 @@ describe("a file's export card", () => {
         });
       })
     );
-    renderWithProviders(<FileExportCard fileId={9} fileType="spreadsheet" title="Budget" />);
+    renderWithProviders(<FileExportCard fileId={9} fileType="sheet" title="Budget" />);
 
     await userEvent.click(screen.getByRole("button", { name: /export/i }));
     await userEvent.click(await screen.findByRole("button", { name: /csv/i }));
@@ -116,7 +116,7 @@ describe("a file's export card", () => {
           })
       )
     );
-    renderWithProviders(<FileExportCard fileId={5} fileType="native" title="Notes" />);
+    renderWithProviders(<FileExportCard fileId={5} fileType="lexical" title="Notes" />);
 
     await userEvent.click(screen.getByRole("button", { name: /export/i }));
     await userEvent.click(await screen.findByRole("button", { name: /json/i }));
@@ -138,7 +138,7 @@ describe("a file's export card", () => {
     renderWithProviders(
       <FileExportCard
         fileId={4}
-        fileType="whiteboard"
+        fileType="excalidraw"
         title="Board"
         whiteboardScene={{ elements: [], appState: {}, files: {} }}
       />
@@ -164,7 +164,7 @@ describe("a file's export card", () => {
           })
       )
     );
-    renderWithProviders(<FileExportCard fileId={2} fileType="file" title="Upload" />);
+    renderWithProviders(<FileExportCard fileId={2} fileType="pdf" title="Upload" />);
 
     // One format: nothing to choose, so the wizard opens on it.
     await userEvent.click(screen.getByRole("button", { name: /export/i }));

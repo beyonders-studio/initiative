@@ -1,6 +1,7 @@
 import { useLexicalComposerContext } from "@lexical/react/LexicalComposerContext";
 import { UploadIcon } from "lucide-react";
 
+import { FileType } from "@/api/generated/initiativeAPI.schemas";
 import { Button } from "@/components/ui/button";
 import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip";
 
@@ -10,17 +11,19 @@ import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip
 // editor state under `content`, discriminated by `type` — or `kind`, the
 // field's name in early exports), the same envelope under its earlier
 // initiative-document name, and the legacy @lexical/file .lexical shape
-// (editor state under `editorState`).
+// (editor state under `editorState`). A text file's type is `lexical`, and was
+// `native` in exports made before types took their formats' names.
 function extractEditorState(parsed: unknown): unknown | null {
   if (typeof parsed !== "object" || parsed === null) {
     return null;
   }
   const record = parsed as Record<string, unknown>;
   const isEnvelope = (name: string): boolean => record.type === name || record.kind === name;
-  const native =
-    (isEnvelope("initiative-file") && record.file_type === "native") ||
+  const lexical =
+    (isEnvelope("initiative-file") &&
+      (record.file_type === FileType.lexical || record.file_type === "native")) ||
     (isEnvelope("initiative-document") && record.document_type === "native");
-  if (native && typeof record.content === "object" && record.content !== null) {
+  if (lexical && typeof record.content === "object" && record.content !== null) {
     return record.content;
   }
   if (typeof record.editorState === "object" && record.editorState !== null) {

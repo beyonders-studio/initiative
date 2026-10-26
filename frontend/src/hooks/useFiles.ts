@@ -17,7 +17,6 @@ import type {
   BodyUploadFileVersion,
   FileCreate,
   FileRead,
-  FileType,
   FileVersionRead,
   ResourceGrantSchema,
 } from "@/api/generated/initiativeAPI.schemas";
@@ -27,6 +26,7 @@ import { relate } from "@/api/relationships";
 import { TOOL_HOOKS } from "@/hooks/toolHooks";
 import { useActiveCommunityId } from "@/hooks/useActiveCommunityId";
 import { getErrorMessage } from "@/lib/errorMessage";
+import type { EditorFileType } from "@/lib/fileTypes";
 import { toast } from "@/lib/mascotToast";
 import type { MutationOpts } from "@/types/mutation";
 import type { QueryOpts } from "@/types/query";
@@ -88,9 +88,9 @@ type CreateFileInput = {
   is_template?: boolean;
   template_id?: number;
   project_id?: number;
-  /** Omit for native (text) files; file uploads go through useUploadFile instead. */
-  file_type?: Exclude<FileType, "file">;
-  /** Required for smart_link ({ url: "..." }). Optional/unused for other types. */
+  /** Omit for a text file; uploads go through useUploadFile instead. */
+  file_type?: EditorFileType;
+  /** Required for a link ({ url: "..." }). Optional/unused for other types. */
   content?: Record<string, unknown>;
   /** Full non-owner sharing state for the new file. */
   grants?: ResourceGrantSchema[];

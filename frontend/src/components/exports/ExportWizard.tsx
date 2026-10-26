@@ -83,7 +83,7 @@ export interface ExportWizardProps {
 type AggregateScope = Exclude<ExportWizardScope, { kind: "entities" }>;
 type EntitiesScope = Extract<ExportWizardScope, { kind: "entities" }>;
 
-const DEFAULT_FILE_FORMATS = { native: "pdf", spreadsheet: "xlsx" };
+const DEFAULT_FILE_FORMATS = { lexical: "pdf", sheet: "xlsx" };
 
 /** An export's `archived`: omitted exports live and archived alike. */
 const ARCHIVED_FOR: Record<ToolArchiveChoice, boolean | undefined> = {
@@ -838,10 +838,10 @@ function AggregateExportWizard({
                   )}
                   {included(tool) && isFiles && (
                     <div className="space-y-2">
-                      {(["native", "spreadsheet"] as const).map((docType) => (
+                      {(["lexical", "sheet"] as const).map((docType) => (
                         <div key={docType} className="space-y-1">
                           <p className="text-muted-foreground text-xs">
-                            {docType === "native"
+                            {docType === "lexical"
                               ? t("wizard.report.fileNative")
                               : t("wizard.report.fileSpreadsheet")}
                           </p>

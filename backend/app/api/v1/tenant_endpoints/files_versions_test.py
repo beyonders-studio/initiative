@@ -64,7 +64,7 @@ async def test_upload_and_duplicate_each_start_at_version_one(
     )
     assert duplicate.status_code == 201, duplicate.text
     copy = duplicate.json()
-    assert copy["file_type"] == "file"
+    assert copy["file_type"] == "pdf"
     assert copy["file_url"] != doc["file_url"]
 
     for file in (doc, copy):
@@ -92,8 +92,7 @@ async def test_a_plugin_copies_a_uploaded_file_under_its_uploader(
     scopes = ["files:read", "files:write"]
     installed = await install_plugin(session, acting_user, role_session, granted=scopes)
     # Uploaded files are shared with the initiative the install is placed
-    # in, and read is enough to copy a template. A picture is its own
-    # featured image.
+    # in, and read is enough to copy a template.
     doc = await _upload_initial_file_doc(
         client,
         installed.seat,
@@ -102,7 +101,6 @@ async def test_a_plugin_copies_a_uploaded_file_under_its_uploader(
         filename="v1.png",
         content_type="image/png",
     )
-    assert doc["featured_image_url"] == doc["file_url"]
     template = await session.get(File, doc["id"])
     assert template is not None
     template.is_template = True
@@ -116,7 +114,7 @@ async def test_a_plugin_copies_a_uploaded_file_under_its_uploader(
 
     assert response.status_code == 201, response.text
     copy = response.json()
-    assert (copy["file_url"], copy["featured_image_url"]) == ("", "")
+    assert (copy["file_url"], copy["featured_image_url"]) == ("", None)
     assert "/uploads/" not in response.text
     person = await client.get(
         installed.seat.g(f"/files/{copy['id']}"), headers=installed.seat.headers
@@ -143,13 +141,13 @@ async def test_a_plugin_copies_a_uploaded_file_under_its_uploader(
     assert {
         item["id"]: (item["file_url"], item["featured_image_url"])
         for item in listed.json()["items"]
-    } == {doc["id"]: ("", ""), copy["id"]: ("", cover), pdf["id"]: ("", None)}
+    } == {doc["id"]: ("", None), copy["id"]: ("", cover), pdf["id"]: ("", None)}
     read = await client.get(
         installed.seat.g(f"/files/{doc['id']}"),
         headers=install_headers(installed, scopes),
     )
     assert read.status_code == 200, read.text
-    assert (read.json()["file_url"], read.json()["featured_image_url"]) == ("", "")
+    assert (read.json()["file_url"], read.json()["featured_image_url"]) == ("", None)
     version = (
         await session.exec(select(FileVersion).where(FileVersion.file_id == copy["id"]))
     ).one()
@@ -231,7 +229,7 @@ async def test_upload_version_read_user_forbidden(
 async def test_upload_version_type_mismatch_rejected(
     client: AsyncClient, acting_user
 ) -> None:
-    """A new version must match the original file type."""
+    """A new version must be the same kind of file as the one it replaces."""
     owner = await acting_user(guild_role=CommunityRole.admin, initiative=True)
     doc = await _upload_initial_file_doc(client, owner, initiative=owner.initiative)
 
@@ -242,6 +240,36 @@ async def test_upload_version_type_mismatch_rejected(
     )
     assert resp.status_code == 400
     assert resp.json()["detail"] == "FILE_VERSION_TYPE_MISMATCH"
+
+
+async def test_a_new_version_may_change_format_within_its_kind(
+    client: AsyncClient, acting_user
+) -> None:
+    """A picture stays a picture, though a PNG may become a JPEG. The file's
+    type follows its current version, and a picture features no image."""
+    owner = await acting_user(guild_role=CommunityRole.admin, initiative=True)
+    doc = await _upload_initial_file_doc(
+        client,
+        owner,
+        initiative=owner.initiative,
+        content=_TINY_PNG,
+        filename="site.png",
+        content_type="image/png",
+    )
+    assert (doc["file_type"], doc["kind"], doc["featured_image_url"]) == (
+        "png",
+        "image",
+        None,
+    )
+
+    resp = await client.post(
+        owner.g(f"/files/{doc['id']}/versions"),
+        headers=owner.headers,
+        files={"file": ("site.jpg", b"\xff\xd8\xff\xe0\x00\x10JFIF\x00", "image/jpeg")},
+    )
+    assert resp.status_code == 201, resp.text
+    read = await client.get(owner.g(f"/files/{doc['id']}"), headers=owner.headers)
+    assert read.json()["file_type"] == "jpeg"
 
 
 async def test_upload_version_non_uploaded_file_rejected(
@@ -709,10 +737,10 @@ async def test_upload_file_as_any_author(
 ) -> None:
     """Anybody who may make files can upload one, not only a guild admin.
 
-    Everything the upload writes after the files row — its version, a
-    picture's featured image — is the owner's to write, and the uploader is
+    Everything the upload writes after the files row — its version — is
+    the owner's to write, and the uploader is
     the owner only once their grant exists. A guild admin passes regardless,
-    which is how the order went unnoticed. A picture is its own featured image.
+    which is how the order went unnoticed. A picture features no image.
     """
     if uploader_role == "guild_admin":
         uploader = await acting_user(guild_role=CommunityRole.admin, initiative=True)
@@ -729,8 +757,7 @@ async def test_upload_file_as_any_author(
     assert resp.status_code == 201, resp.text
     body = resp.json()
     assert body["file_content_type"] == content_type
-    expected_featured = body["file_url"] if content_type.startswith("image/") else None
-    assert body["featured_image_url"] == expected_featured
+    assert body["featured_image_url"] is None
 
     versions = (
         await session.exec(select(FileVersion).where(FileVersion.file_id == body["id"]))

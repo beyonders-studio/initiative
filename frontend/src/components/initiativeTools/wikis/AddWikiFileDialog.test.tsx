@@ -13,16 +13,16 @@ describe("AddWikiFileDialog", () => {
   it("offers every kind of file, and leaves out what the wiki already holds", async () => {
     let asked = null as URLSearchParams | null;
     const items = [
-      buildFileSummary({ id: 1, name: "Minutes", file_type: "native" }),
+      buildFileSummary({ id: 1, name: "Minutes", file_type: "lexical" }),
       buildFileSummary({
         id: 2,
         name: "proof.pdf",
-        file_type: "file",
+        file_type: "pdf",
         original_filename: "proof.pdf",
         file_content_type: "application/pdf",
       }),
-      buildFileSummary({ id: 3, name: "Budget", file_type: "spreadsheet" }),
-      buildFileSummary({ id: 4, name: "Already there", file_type: "whiteboard" }),
+      buildFileSummary({ id: 3, name: "Budget", file_type: "sheet" }),
+      buildFileSummary({ id: 4, name: "Already there", file_type: "excalidraw" }),
     ];
     server.use(
       communityHttp.get("/files/", ({ request }) => {

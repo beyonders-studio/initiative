@@ -103,12 +103,19 @@
     "tasksDone": "{{completed}} of {{total}} tasks",
     "fromMarketplace": "Marketplace",
     "builtHere": "Built here",
-    "fileType": {
-      "native": "Text document",
-      "file": "File",
+    "fileKind": {
+      "document": "Document",
+      "spreadsheet": "Spreadsheet",
+      "presentation": "Presentation",
       "whiteboard": "Whiteboard",
-      "smart_link": "Link",
-      "spreadsheet": "Spreadsheet"
+      "pdf": "PDF",
+      "image": "Image",
+      "video": "Video",
+      "audio": "Audio",
+      "text": "Text",
+      "archive": "Archive",
+      "link": "Link",
+      "other": "Other"
     }
   },
   "recentComments": {

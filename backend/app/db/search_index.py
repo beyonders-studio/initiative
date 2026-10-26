@@ -24,6 +24,7 @@ from dataclasses import dataclass, replace
 from sqlalchemy import JSON, DateTime, Enum, MetaData
 from sqlmodel import SQLModel
 
+from app.core.file_types import FileType
 from app.core.identity_boundary import STORED_MENTION
 from app.core.search import SearchEntityType
 from app.core.tools import KINDS, Tool
@@ -182,7 +183,7 @@ def _with_words(expr: str) -> str:
 def _post_text(row: str) -> str:
     """A post's searchable text: every word in its Lexical body.
 
-    The same recursive ``text`` path a native file uses — a text node, a
+    The same recursive ``text`` path a lexical file uses — a text node, a
     mention, and a smart chip's label all keep their words in a field of that
     name — read from ``body`` rather than ``content``, which is what a post
     calls the column. A post whose body is only a picture indexes on its
@@ -194,7 +195,7 @@ def _post_text(row: str) -> str:
 def _wiki_page_text(row: str) -> str:
     """A wiki page's searchable text: every word in its Lexical body.
 
-    The same recursive ``text`` path a post and a native file use. A page
+    The same recursive ``text`` path a post and a lexical file use. A page
     needs no branch of its own — a page is always prose, where a file's
     ``content`` holds a different shape per type.
     """
@@ -221,7 +222,7 @@ def _file_text(row: str) -> str:
     """A file's searchable text, by what kind of file it is.
 
     ``content`` holds a different shape per type, so there is no single
-    expression. ``native`` and ``whiteboard`` share one: a Lexical text node
+    expression. ``lexical`` and ``excalidraw`` share one: a Lexical text node
     and an Excalidraw text or label element both keep their text in a field
     named ``text``, and the recursive path reaches nested cases — a mention, a
     wikilink, an image caption's own editor state.
@@ -241,10 +242,10 @@ def _file_text(row: str) -> str:
     url = _with_words(f"coalesce({row}.content ->> 'url', '')")
     return (
         f"(CASE {row}.file_type::text"
-        f" WHEN 'native' THEN {leaves}"
-        f" WHEN 'whiteboard' THEN {leaves}"
-        f" WHEN 'spreadsheet' THEN {cells}"
-        f" WHEN 'smart_link' THEN {url}"
+        f" WHEN '{FileType.lexical.value}' THEN {leaves}"
+        f" WHEN '{FileType.excalidraw.value}' THEN {leaves}"
+        f" WHEN '{FileType.sheet.value}' THEN {cells}"
+        f" WHEN '{FileType.url.value}' THEN {url}"
         " ELSE '' END)"
         " || ' ' || " + _with_words(_current_filename(row, "file_versions"))
     )
@@ -507,7 +508,7 @@ SEARCH_SOURCES: dict[str, SearchSource] = {
         body_sql=_catalog_item_text,
     ),
     # A page is found by its title and by what is written on it. Its body is a
-    # Lexical state, the same shape a native file's is, so it is read by the
+    # Lexical state, the same shape a lexical file's is, so it is read by the
     # same extractor rather than a second one.
     "wiki_pages": _inside(
         SearchEntityType.wiki_page,

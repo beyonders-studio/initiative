@@ -1,5 +1,4 @@
 from datetime import datetime, timezone
-from enum import Enum
 from typing import List, Optional, TYPE_CHECKING
 
 from sqlalchemy import (
@@ -17,8 +16,9 @@ from sqlalchemy import (
 )
 from sqlalchemy.dialects.postgresql import JSONB
 from sqlalchemy.orm import column_property, deferred
-from sqlmodel import Enum as SQLEnum, Field, Relationship
+from sqlmodel import Field, Relationship
 
+from app.core.file_types import FileType
 from app.core.tools import Tool
 from app.models.tenant._mixins import (
     ArchiveMixin,
@@ -34,16 +34,6 @@ from app.models.tenant._mixins import (
 if TYPE_CHECKING:  # pragma: no cover
     from app.models.tenant.initiative import Initiative
     from app.models.tenant.resource_grant import ResourceGrant
-
-
-class FileType(str, Enum):
-    """Discriminator for file type."""
-
-    native = "native"  # Lexical editor file
-    file = "file"  # Uploaded file (PDF, DOCX, etc.)
-    whiteboard = "whiteboard"  # Excalidraw scene stored in content JSONB
-    smart_link = "smart_link"  # URL-backed iframe embed (Figma, YouTube, …)
-    spreadsheet = "spreadsheet"  # Sparse cell map; collaborative via yjs
 
 
 #: The body, in its two views. Both are deferred so a list or an access check
@@ -102,18 +92,11 @@ class File(
         default=None,
         sa_column=Column(DateTime(timezone=True), nullable=True),
     )
-    # Uploaded file fields
+    #: The file's format (:mod:`app.core.file_types`); an uploaded file's is
+    #: its current version's.
     file_type: FileType = Field(
-        default=FileType.native,
-        sa_column=Column(
-            SQLEnum(
-                FileType,
-                name="file_type",
-                create_type=False,
-            ),
-            nullable=False,
-            server_default=text("'native'"),
-        ),
+        default=FileType.lexical,
+        sa_column=Column(String, nullable=False, server_default=text("'lexical'")),
     )
     #: An uploaded file's current version; ``NULL`` for every other type. The
     #: two tables point at each other, so the key is added once both exist
@@ -221,7 +204,7 @@ File.__mapper__.add_property(  # type: ignore[attr-defined]
     column_property(
         case(
             (
-                File.__table__.c.file_type == FileType.smart_link,
+                File.__table__.c.file_type == FileType.url.value,
                 _CONTENT["url"].astext,
             )
         ),

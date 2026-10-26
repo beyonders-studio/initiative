@@ -59,7 +59,9 @@ const shared = (key: string) => translate(key, { ns: "common" });
  */
 const CARD_FIELDS: Partial<Record<Tool, Record<string, unknown>>> = {
   file: {
-    file_type: "native",
+    file_type: "lexical",
+    kind: "document",
+    file_url: null,
     featured_image_url: null,
     is_template: false,
     properties: [],
@@ -531,15 +533,15 @@ describe("the file index page", () => {
 
     renderIndex(Tool.file);
     await screen.findByText(copy(Tool.file, "emptyTitle"));
-    expect(requests.at(-1)?.get("file_type")).toBeNull();
+    expect(requests.at(-1)?.get("kind")).toBeNull();
 
     await userEvent.click(screen.getByRole("button", { name: shared("toolbar.filters") }));
     await userEvent.click(screen.getByRole("combobox", { name: files("filters.type") }));
     await userEvent.click(
-      await screen.findByRole("option", { name: files("filters.types.whiteboard") })
+      await screen.findByRole("option", { name: files("filters.kinds.whiteboard") })
     );
 
-    await waitFor(() => expect(requests.at(-1)?.get("file_type")).toBe("whiteboard"));
+    await waitFor(() => expect(requests.at(-1)?.get("kind")).toBe("whiteboard"));
     expect(requests.at(-1)?.get("is_template")).toBe("false");
   });
 

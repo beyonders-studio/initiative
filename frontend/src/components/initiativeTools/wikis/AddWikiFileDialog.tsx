@@ -86,8 +86,6 @@ export const AddWikiFileDialog = ({
               {candidates.map((file) => {
                 const { Icon, colorClass } = fileIcon({
                   file_type: file.file_type,
-                  mime_type: file.file_content_type,
-                  original_filename: file.original_filename,
                   smart_link_url: file.smart_link_url,
                 });
                 return (

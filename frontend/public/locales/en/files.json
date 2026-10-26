@@ -350,12 +350,16 @@
     "noMatchingFiles": "No files match your filters.",
     "type": "Filter by type",
     "allTypes": "All types",
-    "types": {
-      "native": "Text document",
-      "file": "File",
+    "kinds": {
+      "document": "Document",
+      "spreadsheet": "Spreadsheet",
+      "presentation": "Presentation",
       "whiteboard": "Whiteboard",
-      "smart_link": "Smart link",
-      "spreadsheet": "Spreadsheet"
+      "pdf": "PDF",
+      "image": "Image",
+      "text": "Text",
+      "link": "Link",
+      "other": "Other"
     }
   }
 }

@@ -35,7 +35,7 @@ from app.core.user_display import handle_of
 from app.models.platform.guild import Guild, CommunityRole, CommunityStatus
 from app.models.platform.guild_image import GuildImage, GuildImageVariant
 from app.models.platform.notification import Notification, NotificationType
-from app.models.tenant.file import FileType
+from app.core.file_types import FileType
 from app.models.tenant.export_job import ExportJob, ExportJobStatus
 from app.models.tenant.initiative import Initiative, InitiativeMember
 from app.models.tenant.property import PropertyType
@@ -309,7 +309,6 @@ async def _uploaded_file(
         a.initiative,
         a.user,
         name=name,
-        file_type=FileType.file,
         file_url=f"/uploads/{a.guild.id}/{key}",
         original_filename=filename,
         file_content_type=content_type,
@@ -940,20 +939,20 @@ _SHEET_CONTENT = {
 
 # One file per type, holding the payload that type stores.
 _FILE_KINDS: dict[str, dict[str, Any]] = {
-    "native": {"name": "Notes", "content": {"root": {"children": [], "type": "root"}}},
-    "whiteboard": {
+    "lexical": {"name": "Notes", "content": {"root": {"children": [], "type": "root"}}},
+    "excalidraw": {
         "name": "Board",
-        "file_type": FileType.whiteboard,
+        "file_type": FileType.excalidraw,
         "content": {"elements": [{"type": "rectangle"}], "appState": {}, "files": {}},
     },
-    "smart_link": {
+    "url": {
         "name": "Design doc",
-        "file_type": FileType.smart_link,
+        "file_type": FileType.url,
         "content": {"url": "https://example.com/spec"},
     },
-    "spreadsheet": {
+    "sheet": {
         "name": "Budget: Q3",
-        "file_type": FileType.spreadsheet,
+        "file_type": FileType.sheet,
         "content": _SHEET_CONTENT,
     },
 }
@@ -974,7 +973,7 @@ def _native_envelope_carries_the_editor_state(resp: Response, subject: Any) -> N
     """The raw editor state rides as ``content`` (the editor toolbar's import
     unwraps it)."""
     envelope = _file_envelope(resp)
-    assert envelope["file_type"] == "native"
+    assert envelope["file_type"] == "lexical"
     assert envelope["content"]["root"]["type"] == "root"
     assert envelope["tags"] == [] and envelope["properties"] == []
 
@@ -982,20 +981,20 @@ def _native_envelope_carries_the_editor_state(resp: Response, subject: Any) -> N
 def _whiteboard_envelope_wraps_a_scene(resp: Response, subject: Any) -> None:
     """Unwrapping ``content`` yields a file any Excalidraw opens."""
     envelope = _file_envelope(resp)
-    assert envelope["file_type"] == "whiteboard"
+    assert envelope["file_type"] == "excalidraw"
     scene = envelope["content"]
     assert scene["type"] == "excalidraw"
     assert scene["elements"] == [{"type": "rectangle"}]
 
 
 _TYPE_EXPORTS: dict[str, dict[str, Any]] = {
-    "native": {
+    "lexical": {
         "fmt": "json",
         "disposition": (".json",),
         "extra": _native_envelope_carries_the_editor_state,
     },
-    "whiteboard": {"fmt": "json", "extra": _whiteboard_envelope_wraps_a_scene},
-    "smart_link": {
+    "excalidraw": {"fmt": "json", "extra": _whiteboard_envelope_wraps_a_scene},
+    "url": {
         "fmt": "md",
         "present": ("# Design doc", "<https://example.com/spec>"),
     },
@@ -1022,10 +1021,10 @@ async def test_each_file_type_exports_its_own_payload(
 @pytest.mark.parametrize(
     "kind,fmt",
     [
-        ("native", "csv"),
-        ("whiteboard", "md"),
-        ("smart_link", "xlsx"),
-        ("smart_link", "pdf"),
+        ("lexical", "csv"),
+        ("excalidraw", "md"),
+        ("url", "xlsx"),
+        ("url", "pdf"),
     ],
 )
 async def test_file_export_refuses_a_format_its_type_cannot_render(
@@ -1051,12 +1050,12 @@ async def test_smart_link_exports_the_importable_file_envelope(
     a = await acting_user(
         guild_role=CommunityRole.member, initiative=True, project=True
     )
-    link = await _file(session, a, "smart_link")
+    link = await _file(session, a, "url")
     resp = await _export(client, a, "file", ids=[link.id], format="json")
     assert json.loads(_assert_export(resp, "json")) == {
         "type": "initiative-file",
         "schema_version": 1,
-        "file_type": "smart_link",
+        "file_type": "url",
         "name": "Design doc",
         "content": {"url": "https://example.com/spec"},
         "tags": [],
@@ -1188,7 +1187,7 @@ def _envelope_round_trips_the_snapshot(resp: Response, subject: Any) -> None:
     """json is the canonical snapshot: cells, styles, frozen panes and
     schema_version come back verbatim inside the importable envelope."""
     envelope = _file_envelope(resp)
-    assert envelope["file_type"] == "spreadsheet"
+    assert envelope["file_type"] == "sheet"
     assert envelope["name"] == "Budget: Q3"
     assert envelope["content"] == subject.content
 
@@ -1214,7 +1213,7 @@ async def test_spreadsheet_file_renders_to_every_grid_format(
     a = await acting_user(
         guild_role=CommunityRole.member, initiative=True, project=True
     )
-    doc = await _file(session, a, "spreadsheet")
+    doc = await _file(session, a, "sheet")
     resp = await _export(client, a, "file", ids=[doc.id], format=fmt)
     _assert_export(resp, fmt, subject=doc, **_SHEET_RENDERS[fmt])
 
@@ -1233,7 +1232,7 @@ async def test_file_export_spreadsheet_survives_corrupt_snapshot(
         a.initiative,
         a.user,
         name="Odd",
-        file_type=FileType.spreadsheet,
+        file_type=FileType.sheet,
         content={
             "schema_version": 2,
             "dimensions": {"rows": 1, "cols": 1},
@@ -1339,7 +1338,7 @@ async def test_file_envelope_carries_tags_and_properties(
     a = await acting_user(
         guild_role=CommunityRole.member, initiative=True, project=True
     )
-    doc = await _file(session, a, "native")
+    doc = await _file(session, a, "lexical")
     tag = await create_tag(session, a.guild, name="worldbuilding")
     await assign_tag(session, doc, tag)
     await session.commit()
@@ -1820,7 +1819,7 @@ async def _wiki_with_filed_files(session, a, acting_user):
         a.initiative,
         a.user,
         name="Loot",
-        file_type=FileType.spreadsheet,
+        file_type=FileType.sheet,
         content={},
     )
     other = await acting_user(
@@ -2186,7 +2185,7 @@ async def test_bulk_file_selection_exports_as_zip(
         a.initiative,
         a.user,
         name="Budget",
-        file_type=FileType.spreadsheet,
+        file_type=FileType.sheet,
         content={"schema_version": 2, "cells": {"0:0": "x"}},
     )
     twin = await create_file(session, a.initiative, a.user, name="Session Notes")
@@ -2209,7 +2208,7 @@ async def test_bulk_file_selection_exports_as_zip(
     assert len(set(names)) == 3  # the twin "Session Notes" title deduped
     envelopes = _zip_json(resp)
     assert all(e["type"] == "initiative-file" for e in envelopes)
-    assert {e["file_type"] for e in envelopes} == {"native", "spreadsheet"}
+    assert {e["file_type"] for e in envelopes} == {"lexical", "sheet"}
     assert {e["name"] for e in envelopes} == {"Session Notes", "Budget"}
 
 
@@ -2222,8 +2221,8 @@ async def test_bulk_file_selection_rejects_format_not_shared_by_all(
     a = await acting_user(
         guild_role=CommunityRole.member, initiative=True, project=True
     )
-    native = await _file(session, a, "native")
-    board = await _file(session, a, "whiteboard")
+    native = await _file(session, a, "lexical")
+    board = await _file(session, a, "excalidraw")
     ids = [native.id, board.id]
 
     resp = await _export(client, a, "file", ids=ids, format="pdf")
@@ -3121,7 +3120,7 @@ async def test_report_mode_mixed_formats_zip(
                 "queue": "csv",
                 "counter_group": "xlsx",
                 "calendar": "ics",
-                "file": {"native": "md"},
+                "file": {"lexical": "md"},
             }
         ),
     )
@@ -3144,7 +3143,7 @@ _INVALID_SELECTORS: list[tuple[dict[str, Any], str]] = [
     ({"include": "not json"}, "EXPORT_INVALID_PARAMS"),
     ({"mode": "report", "formats": '{"queue": "wav"}'}, "EXPORT_INVALID_FORMAT"),
     (
-        {"mode": "report", "formats": '{"file": {"native": "xlsx"}}'},
+        {"mode": "report", "formats": '{"file": {"lexical": "xlsx"}}'},
         "EXPORT_INVALID_FORMAT",
     ),
     ({"include": '{"wands": true}'}, "EXPORT_INVALID_PARAMS"),

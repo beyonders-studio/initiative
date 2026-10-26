@@ -169,4 +169,4 @@ export const activeMention = (text: string): ActiveMention | null => {
  * caret in it for a trigger to be typed into.
  */
 export const supportsEntityMentions = (type: FileType | null | undefined): boolean =>
-  type === FileType.native;
+  type === FileType.lexical;

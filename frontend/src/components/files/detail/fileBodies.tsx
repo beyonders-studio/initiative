@@ -21,6 +21,7 @@ import type { UseCollaborationResult } from "@/hooks/useCollaboration";
 import { useCommunities, useSelfInCommunity } from "@/hooks/useCommunities";
 import { useCommunityPath } from "@/lib/communityUrl";
 import { normalizeEditorState } from "@/lib/editorState";
+import { type EditorFileType, isStoredFileType } from "@/lib/fileTypes";
 import { supportsEntityMentions } from "@/lib/mentions";
 import { referenceRef } from "@/lib/smartChips";
 import type { SpreadsheetSheetContent } from "@/lib/spreadsheet/content";
@@ -340,9 +341,9 @@ const rawContent = (file: FileRead): unknown => file.content ?? {};
 const lexicalContent = (file: FileRead): unknown =>
   normalizeEditorState(file.content as unknown as SerializedEditorState | null | undefined);
 
-/** Every file type's body. A new type is one entry here. */
-export const FILE_BODIES: Record<FileType, FileTypeBody> = {
-  native: {
+/** The body of each type the editor keeps. A new one is one entry here. */
+const EDITOR_BODIES: Record<EditorFileType, FileTypeBody> = {
+  lexical: {
     Body: NativeBody,
     saved: lexicalContent,
     framed: true,
@@ -350,14 +351,14 @@ export const FILE_BODIES: Record<FileType, FileTypeBody> = {
     roomSyncMs: 10_000,
     prose: true,
   },
-  whiteboard: {
+  excalidraw: {
     Body: WhiteboardBody,
     saved: rawContent,
     framed: true,
     editable: true,
     roomSyncMs: 2000,
   },
-  spreadsheet: {
+  sheet: {
     Body: SpreadsheetBody,
     saved: rawContent,
     framed: true,
@@ -366,11 +367,16 @@ export const FILE_BODIES: Record<FileType, FileTypeBody> = {
   },
   // Nothing on this page edits the link: a save echoes the content back so a
   // rename or a featured-image change does not rewrite the URL.
-  smart_link: {
+  url: {
     Body: SmartLinkBody,
     saved: (file) => file.content,
     Actions: SmartLinkActions,
     framed: true,
   },
-  file: { Body: FileBody, saved: lexicalContent },
 };
+
+/** Every stored type's body: the uploaded file's viewer. */
+const STORED_BODY: FileTypeBody = { Body: FileBody, saved: lexicalContent };
+
+export const fileBody = (type: FileType): FileTypeBody =>
+  isStoredFileType(type) ? STORED_BODY : EDITOR_BODIES[type];

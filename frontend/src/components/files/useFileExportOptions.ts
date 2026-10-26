@@ -1,8 +1,8 @@
 import { useRef } from "react";
 import { useTranslation } from "react-i18next";
 
-import type { FileType } from "@/api/generated/initiativeAPI.schemas";
-import { FILE_TYPE_FORMATS } from "@/components/exports/formats";
+import { FileType } from "@/api/generated/initiativeAPI.schemas";
+import { fileTypeFormats } from "@/components/exports/formats";
 import type { WhiteboardScene } from "@/components/files/WhiteboardFileEditor";
 import type { ToolExportOptions } from "@/components/tools/settings/ToolSettingsContext";
 import { downloadBlob } from "@/lib/csv";
@@ -60,9 +60,9 @@ export function useFileExportOptions(
   };
 
   return {
-    formats: FILE_TYPE_FORMATS[fileType] ?? [],
+    formats: fileTypeFormats(fileType),
     extraActions:
-      fileType === "whiteboard" && whiteboardScene
+      fileType === FileType.excalidraw && whiteboardScene
         ? [
             { labelKey: "export.formatPng", onSelect: () => void exportScene("png") },
             { labelKey: "export.formatSvg", onSelect: () => void exportScene("svg") },

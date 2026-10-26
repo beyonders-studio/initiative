@@ -1,7 +1,7 @@
 import { Capacitor } from "@capacitor/core";
 
 import { createFile, uploadFile } from "@/api/generated/files/files";
-import { Tool } from "@/api/generated/initiativeAPI.schemas";
+import { FileType, Tool } from "@/api/generated/initiativeAPI.schemas";
 import { createPost } from "@/api/generated/posts/posts";
 import { createTask } from "@/api/generated/tasks/tasks";
 import { uploadAttachment, uploadPastedImage } from "@/lib/attachmentUtils";
@@ -151,7 +151,7 @@ export async function landShare(input: LandShareInput): Promise<string> {
     const file = await createFile(communityId, {
       name: title,
       initiative_id: initiativeId,
-      file_type: "native",
+      file_type: FileType.lexical,
       content: { ...body },
     });
     return communityPath(communityId, toolDetailRoute(Tool.file, initiativeId, file.id));

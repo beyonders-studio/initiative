@@ -1,7 +1,7 @@
 import { Link } from "@tanstack/react-router";
 import { useTranslation } from "react-i18next";
 
-import { type FileSummary, Tool } from "@/api/generated/initiativeAPI.schemas";
+import { FileKind, type FileSummary, FileType, Tool } from "@/api/generated/initiativeAPI.schemas";
 import { PropertyValueCell } from "@/components/properties/PropertyValueCell";
 import { nonEmptyPropertySummaries } from "@/components/properties/propertyHelpers";
 import { LazyImage } from "@/components/shared/LazyImage";
@@ -11,6 +11,7 @@ import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/comp
 import { useRelativeTime } from "@/hooks/useRelativeTime";
 import { useCommunityPath } from "@/lib/communityUrl";
 import { fileIcon } from "@/lib/fileIcon";
+import { isStoredFileType } from "@/lib/fileTypes";
 import { getFileTypeLabel } from "@/lib/fileUtils";
 import { matchSmartLinkProvider } from "@/lib/smartLinkProviders";
 import { toolDetailRoute } from "@/lib/tools";
@@ -28,7 +29,7 @@ export const FileCard = ({ file, className }: FileCardProps) => {
   const gp = useCommunityPath();
   // A file with comments off shows no thread anywhere, so it shows no count.
   const commentCount = file.comments_enabled ? (file.comment_count ?? 0) : null;
-  const isUploadedFile = file.file_type === "file";
+  const isUploadedFile = isStoredFileType(file.file_type);
   const fileTypeLabel = isUploadedFile
     ? getFileTypeLabel(file.file_content_type, file.original_filename)
     : null;
@@ -37,12 +38,12 @@ export const FileCard = ({ file, className }: FileCardProps) => {
   // the relations card so the two cannot drift apart.
   const { Icon: FileIcon, colorClass: fileIconColor } = fileIcon({
     file_type: file.file_type,
-    mime_type: file.file_content_type,
-    original_filename: file.original_filename,
     smart_link_url: file.smart_link_url,
   });
+  // A picture is shown as itself; any other file by its featured image.
+  const picture = file.kind === FileKind.image ? file.file_url : file.featured_image_url;
   const smartLinkMatch =
-    file.file_type === "smart_link" && file.smart_link_url
+    file.file_type === FileType.url && file.smart_link_url
       ? matchSmartLinkProvider(file.smart_link_url)
       : null;
 
@@ -58,9 +59,9 @@ export const FileCard = ({ file, className }: FileCardProps) => {
       {/* Squarer thumbnails cost a phone most of a card each while showing, for
           the usual file, one centred icon. Shorter below `sm`. */}
       <div className="relative aspect-4/3 overflow-hidden border-b bg-muted sm:aspect-square">
-        {file.featured_image_url ? (
+        {picture ? (
           <LazyImage
-            src={resolveUploadUrl(file.featured_image_url)}
+            src={resolveUploadUrl(picture)}
             alt=""
             className="h-full w-full"
             imgClassName="transition duration-300 group-hover:scale-105"
@@ -79,10 +80,10 @@ export const FileCard = ({ file, className }: FileCardProps) => {
           {isUploadedFile && fileTypeLabel ? (
             <Badge variant="secondary">{fileTypeLabel}</Badge>
           ) : null}
-          {file.file_type === "whiteboard" ? (
+          {file.file_type === FileType.excalidraw ? (
             <Badge variant="secondary">{t("card.whiteboardLabel")}</Badge>
           ) : null}
-          {file.file_type === "spreadsheet" ? (
+          {file.file_type === FileType.sheet ? (
             <Badge variant="secondary">{t("card.spreadsheetLabel")}</Badge>
           ) : null}
           {smartLinkMatch ? <Badge variant="secondary">{smartLinkMatch.label}</Badge> : null}

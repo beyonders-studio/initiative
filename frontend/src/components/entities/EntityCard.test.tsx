@@ -27,7 +27,7 @@ const end = (overrides: Partial<RelatedEnd> = {}): RelatedEnd => ({
   image_urls: [],
   icon: null,
   color: null,
-  file_type: "native",
+  file_type: "lexical",
   mime_type: null,
   original_filename: null,
   smart_link_url: null,

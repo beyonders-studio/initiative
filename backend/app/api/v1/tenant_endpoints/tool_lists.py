@@ -73,7 +73,8 @@ from app.models.platform.user import User
 from app.models.tenant.calendar import Calendar
 from app.models.tenant.counter import CounterGroup
 from app.models.tenant.dashboard import Dashboard
-from app.models.tenant.file import File, FileType
+from app.core.file_types import FileKind, FileType
+from app.models.tenant.file import File
 from app.models.tenant.catalog import Catalog
 from app.models.tenant.post import Post
 from app.models.tenant.project import Project
@@ -595,6 +596,7 @@ async def _file_conditions(spec: ToolListSpec, req: ListRequest) -> list:
         untagged=values.get("untagged"),
         is_template=values.get("is_template"),
         file_type=values.get("file_type"),
+        kind=values.get("kind"),
     )
     conditions.append(
         archive_service.archive_filter_clause(File, values.get("archived"))
@@ -760,6 +762,11 @@ TOOL_LISTS: dict[Tool, ToolListSpec] = {
                 "file_type",
                 Optional[FileType],
                 Query(default=None, description="Filter by file type"),
+            ),
+            ListParam(
+                "kind",
+                Optional[FileKind],
+                Query(default=None, description="Filter by kind of file"),
             ),
             page_param(),
             page_size_param(20, ge=0, le=100),
@@ -1205,7 +1212,7 @@ async def get_tool_counts(
     filters: Optional[str] = Query(
         default=None,
         description="JSON object of the tool's own list filters, as its list "
-        'route takes them (``{"search": "notes", "file_type": "native"}``), '
+        'route takes them (``{"search": "notes", "kind": "document"}``), '
         "that the tag counts are for",
     ),
     include_tags: bool = Query(

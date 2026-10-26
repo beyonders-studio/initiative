@@ -1054,7 +1054,8 @@ async def _apply_file_entry(
     """An uploaded file: its content is the restored ``assets/`` blob. A table
     of text, which an uploaded file cannot hold, becomes a spreadsheet read
     from the zip instead."""
-    from app.models.tenant.file import File, FileType
+    from app.core.file_types import FileType, type_of_media
+    from app.models.tenant.file import File
     from app.models.tenant.upload import Upload
     from app.schemas.tenant.import_envelopes import EnvelopePropertyValue
     from app.services.import_engine.importers._base import (
@@ -1093,7 +1094,7 @@ async def _apply_file_entry(
             return EntryResult(**base, status="failed", error=exc.code)
         file = File(
             name=entry.title,
-            file_type=FileType.spreadsheet,
+            file_type=FileType.sheet,
             content={"schema_version": 3, "kind": "spreadsheet", "sheets": sheets},
             initiative_id=initiative.id,
             created_by=user.id,
@@ -1126,7 +1127,7 @@ async def _apply_file_entry(
             )
         file = File(
             name=entry.title,
-            file_type=FileType.file,
+            file_type=type_of_media(content_type),
             content={},
             initiative_id=initiative.id,
             created_by=user.id,

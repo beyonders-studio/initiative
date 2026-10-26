@@ -439,7 +439,7 @@ describe("tool surfaces are wired, not just typed", () => {
 
 describe("tool exports", () => {
   it("every bulk-export tool has a format source, and only those", async () => {
-    const { FILE_TYPE_FORMATS, TOOL_EXPORT_FORMATS } = await import("@/components/exports/formats");
+    const { fileTypeFormats, TOOL_EXPORT_FORMATS } = await import("@/components/exports/formats");
     const { FileType } = await import("@/api/generated/initiativeAPI.schemas");
     const { BULK_EXPORT_TOOLS } = await import("@/lib/tools");
 
@@ -453,9 +453,7 @@ describe("tool exports", () => {
       ).toBeGreaterThan(0);
     }
     for (const type of Object.values(FileType)) {
-      expect(FILE_TYPE_FORMATS[type]?.length, `missing FILE_TYPE_FORMATS.${type}`).toBeGreaterThan(
-        0
-      );
+      expect(fileTypeFormats(type).length, `missing formats for ${type}`).toBeGreaterThan(0);
     }
     // Exact coverage: a formats entry for a non-export tool is drift too.
     for (const tool of TOOLS) {

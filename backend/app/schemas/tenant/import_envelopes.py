@@ -14,10 +14,11 @@ lines (``app.core.recurrence.imported``).
 
 from __future__ import annotations
 
-from typing import Any, Literal, Optional
+from typing import Annotated, Any, Literal, Optional
 
-from pydantic import ConfigDict, Field, model_validator
+from pydantic import BeforeValidator, ConfigDict, Field, model_validator
 
+from app.core.file_types import type_named
 from app.models.tenant.property import PropertyType
 from app.models.tenant.wiki import WikiPageOrder, WikiReadingWidth
 from app.schemas.base import SanitizedBaseModel
@@ -56,7 +57,9 @@ class EnvelopePropertyValue(SanitizedBaseModel):
 
 class FileEnvelope(_EnvelopeBase):
     type: Literal["initiative-file"]
-    file_type: str  # native | spreadsheet | smart_link | whiteboard
+    #: One of the editor's types; an older envelope's name for one is read as
+    #: the type it now is.
+    file_type: Annotated[str, BeforeValidator(type_named)]
     name: str
     content: dict[str, Any] = {}
     tags: list[str] = []

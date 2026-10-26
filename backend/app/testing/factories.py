@@ -61,7 +61,8 @@ from app.models.tenant.guild_plugin_user_connection import GuildPluginUserConnec
 from app.models.tenant.calendar_event import CalendarEvent, CalendarEventAttendee
 from app.models.tenant.comment import Comment
 from app.models.tenant.counter import Counter, CounterGroup
-from app.models.tenant.file import File, FileType
+from app.core.file_types import FileType, type_of_media
+from app.models.tenant.file import File
 from app.models.platform.access_grant import AccessGrant
 from app.models.platform.guild import Guild, GuildMembership, CommunityRole
 from app.core.guild_auth_options import CommunityAuthOption
@@ -2001,18 +2002,22 @@ async def create_file(
 ) -> File:
     """Create a test file with sensible defaults.
 
-    Defaults to a ``native`` (editor) file with empty content and an
+    Defaults to a ``lexical`` (editor) file with empty content and an
     owner grant for ``creator``, mirroring the create endpoint's DAC setup.
     File overrides (``file_url``, …) make its first version, as an upload does,
-    typed ``application/pdf`` unless one is given.
+    typed ``application/pdf`` unless one is given; the file takes its type.
     """
     await route_session_to_guild(session, guild_of(initiative))
 
     stored = _file_overrides(overrides)
+    if stored:
+        stored.setdefault("file_content_type", "application/pdf")
     defaults = {
         "initiative_id": initiative.id,
         "name": name or f"Test File {datetime.now(timezone.utc).timestamp()}",
-        "file_type": FileType.native,
+        "file_type": (
+            type_of_media(stored["file_content_type"]) if stored else FileType.lexical
+        ),
         "created_by": creator.id,
     }
     file = File(**{**defaults, **overrides})
@@ -2029,7 +2034,6 @@ async def create_file(
         session, file, level=ResourceAccessLevel.owner, user=creator, commit=commit
     )
     if stored:
-        stored.setdefault("file_content_type", "application/pdf")
         await file_versions.add_version(session, file, created_by=creator.id, **stored)
         await (session.commit() if commit else session.flush())
 
