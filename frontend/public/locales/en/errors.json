@@ -332,6 +332,7 @@
   "AI_OUT_OF_CREDIT": "The AI provider's account is out of credit or has a payment problem. Whoever manages AI here can sort it out with the provider.",
   "AI_SPEND_LIMIT_REACHED": "A spending limit on the AI provider's account has been reached. It lifts on its own, or whoever manages AI here can raise it with the provider.",
   "AI_RATE_LIMITED": "The AI provider is getting too many requests right now. Try again in a moment.",
+  "AI_SELECTION_TOO_LONG": "That selection is too long to work on at once. Try a shorter part of it.",
   "CALENDAR_COMMUNITY_PLUGIN_REQUIRED": "The community calendar plug-in isn't installed, so there's nowhere to put a community calendar",
   "CALENDAR_PLUGIN_INITIATIVE_REQUIRED": "A plug-in creates a calendar in an initiative. Choose the initiative it belongs to.",
   "CALENDAR_EVENT_ENDS_BEFORE_START": "An event can't end before it starts",

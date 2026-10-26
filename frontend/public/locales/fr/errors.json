@@ -332,6 +332,7 @@
   "AI_OUT_OF_CREDIT": "Le compte du fournisseur d'IA n'a plus de crédit ou a un problème de paiement. La personne qui gère l'IA ici peut régler cela avec le fournisseur.",
   "AI_SPEND_LIMIT_REACHED": "Une limite de dépenses du compte du fournisseur d'IA est atteinte. Elle se lève d'elle-même, ou la personne qui gère l'IA ici peut la relever auprès du fournisseur.",
   "AI_RATE_LIMITED": "Le fournisseur d'IA reçoit trop de demandes en ce moment. Réessayez dans un instant.",
+  "AI_SELECTION_TOO_LONG": "Cette sélection est trop longue pour être traitée d'un coup. Essayez avec une partie plus courte.",
   "CALENDAR_COMMUNITY_PLUGIN_REQUIRED": "Le plug-in calendrier de la communauté n'est pas installé, il n'y a donc nulle part où placer un calendrier de communauté",
   "CALENDAR_PLUGIN_INITIATIVE_REQUIRED": "Un plug-in crée un calendrier dans une initiative. Choisissez l'initiative à laquelle il appartient.",
   "CALENDAR_EVENT_ENDS_BEFORE_START": "Un événement ne peut pas se terminer avant de commencer",

@@ -12,6 +12,7 @@ import httpx
 import pytest
 
 from app.core.messages import AIMessages
+from app.schemas.ai_generation import AIWriteAction, AIWriteRequest
 from app.schemas.ai_settings import AIProvider, ConnectionScope, ResolvedAISettings
 from app.services import ai_generation, ai_provider, safe_http
 from app.services.ai_context import TaskContext
@@ -198,3 +199,43 @@ async def test_an_empty_document_is_not_sent(monkeypatch):
     with pytest.raises(AIRequestError) as refused:
         await _summary(monkeypatch, "  ")
     assert refused.value.code == AIMessages.DOCUMENT_EMPTY
+
+
+async def test_writing_help_sends_the_selection_whole_and_trims_around_it(
+    monkeypatch,
+):
+    _resolving_to(monkeypatch)
+    asked = _streaming(monkeypatch, "Shorter.")
+    recorded: list[dict] = []
+
+    async def record_request(session, **kwargs):
+        recorded.append(kwargs)
+
+    monkeypatch.setattr(ai_generation, "record_request", record_request)
+    monkeypatch.setattr(ai_generation, "_WRITING_BUDGET", 5)
+
+    def write(text: str):
+        request = AIWriteRequest(
+            action=AIWriteAction.shorten,
+            text=text,
+            before="a" * 20 + "<end of before>",
+            after="<start of after>" + "b" * 20,
+        )
+        return ai_generation.write(None, _User(), 1, request)
+
+    lines = await write("The rota")
+    assert [json.loads(line) async for line in lines] == [{"text": "Shorter."}]
+    # Twenty characters, less the selection's eight, shared from either side
+    # of it: the six nearest it on each.
+    data = asked[0][1]
+    assert "\nThe rota\n" in data
+    assert "\nefore&gt;\n</before>" in data and "<after>\n&lt;start\n" in data
+    assert recorded == [
+        {"user": recorded[0]["user"], "guild_id": 1, "purpose": "writing"}
+    ]
+
+    # A selection that does not fit is refused before anything is recorded.
+    with pytest.raises(AIRequestError) as refused:
+        await write("x" * 21)
+    assert refused.value.code == AIMessages.SELECTION_TOO_LONG
+    assert len(recorded) == 1

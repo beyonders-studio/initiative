@@ -23,6 +23,7 @@ from app.api.v1.tenant_endpoints import (
     query,
     smart_chips,
     search as guild_search,
+    ai,
     ai_settings,
     plugin_data,
     attachments,
@@ -300,6 +301,7 @@ guild_router.include_router(reactions.router, prefix="/reactions", tags=["reacti
 guild_router.include_router(
     ai_settings.router, prefix="/settings", tags=["ai-settings"]
 )
+guild_router.include_router(ai.router, prefix="/ai", tags=["ai"])
 guild_router.include_router(
     initiatives.router, prefix="/initiatives", tags=["initiatives"]
 )

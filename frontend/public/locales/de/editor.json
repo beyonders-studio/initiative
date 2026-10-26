@@ -218,5 +218,22 @@
     "copy": "Zusammenfassung kopieren",
     "regenerate": "Zusammenfassung neu generieren",
     "cut": "Aus den ersten {{percent}} % geschrieben. Der Rest passte nicht hinein."
+  },
+  "writing": {
+    "menu": "Schreibhilfe",
+    "rewrite": "Umformulieren",
+    "shorten": "Kürzen",
+    "fix": "Rechtschreibung und Grammatik korrigieren",
+    "translate": "Übersetzen…",
+    "continue": "Weiterschreiben",
+    "preview": "Vorgeschlagener Text",
+    "writing": "Wird geschrieben…",
+    "discard": "Verwerfen",
+    "insert": "Einfügen",
+    "insertBelow": "Darunter einfügen",
+    "replace": "Ersetzen",
+    "changed": "Der Text wurde während des Schreibens geändert. Füge dies stattdessen darunter ein oder verwirf es.",
+    "cannotKeep": "Die Schreibhilfe kann diese Auswahl nicht unverändert zurücksetzen: Sie reicht über Listenpunkte oder eine Überschrift oder enthält etwa ein Bild. Wähle stattdessen Text innerhalb eines davon aus.",
+    "error": "Das konnte nicht geschrieben werden. Bitte versuche es erneut."
   }
 }
