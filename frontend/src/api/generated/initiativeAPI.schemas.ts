@@ -128,6 +128,34 @@ export interface AIStreamEvent {
 }
 
 /**
+ * What writing help is asked to do with a selection.
+ */
+export type AIWriteAction = (typeof AIWriteAction)[keyof typeof AIWriteAction];
+
+export const AIWriteAction = {
+  rewrite: "rewrite",
+  shorten: "shorten",
+  fix: "fix",
+  translate: "translate",
+  continue: "continue",
+} as const;
+
+/**
+ * Writing help for a selection in a document, with the text either side
+ * of it. Only this text is read; nothing is looked up.
+ */
+export interface AIWriteRequest {
+  action: AIWriteAction;
+  /** @maxLength 100000 */
+  text?: string;
+  /** @maxLength 100000 */
+  before?: string;
+  /** @maxLength 100000 */
+  after?: string;
+  language?: string | null;
+}
+
+/**
  * Approval payload. The approver may shorten/extend the window, still
  * subject to the server-side cap.
  */

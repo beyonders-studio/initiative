@@ -18,7 +18,7 @@ from app.core.audit_events import AuditEventType
 from app.core.messages import AIMessages
 from app.models.platform.guild import CommunityRole
 from app.schemas.ai_settings import AIProvider, ConnectionScope, ResolvedAISettings
-from app.services import ai_generation
+from app.services import ai_generation, ai_provider
 from app.services.ai_context import TaskContext
 from app.testing import (
     create_file,
@@ -44,7 +44,7 @@ def _wire_ai(monkeypatch) -> None:
         source="platform",
     )
 
-    async def _resolve(session, guild_id=None):
+    async def _resolve(session, guild_id=None, **kwargs):
         return resolved
 
     monkeypatch.setattr(ai_generation, "resolve_ai_settings", _resolve)
@@ -142,6 +142,41 @@ async def test_a_summary_records_the_document_it_sent(
     assert row["target"] == {"type": kind, "id": document.id}
     assert row["detail"]["purpose"] == "summary"
     assert row["detail"]["initiative_id"] == a.initiative.id
+
+
+async def test_writing_help_records_its_purpose_and_no_target(
+    client: AsyncClient, session: AsyncSession, acting_user, monkeypatch, capfd
+):
+    """It sends only text the member sent, so it names nothing in the
+    community; a selection too long to send is refused unrecorded."""
+    a = await acting_user(guild_role=CommunityRole.member)
+    _wire_ai(monkeypatch)
+
+    async def stream_text(*args, **kwargs):
+        yield "Shorter."
+
+    monkeypatch.setattr(ai_provider, "stream_text", stream_text)
+    capfd.readouterr()
+
+    response = await client.post(
+        a.g("/ai/write"),
+        headers=a.headers,
+        json={"action": "shorten", "text": "The rota is sorted for March."},
+    )
+    assert response.status_code == 200, response.text
+    assert response.text == '{"text":"Shorter."}\n'
+    (row,) = emitted(capfd, AuditEventType.AI_REQUEST_SENT)
+    assert row["detail"]["purpose"] == "writing"
+    assert row["target"] is None
+
+    too_long = await client.post(
+        a.g("/ai/write"),
+        headers=a.headers,
+        json={"action": "fix", "text": "x" * 7000},
+    )
+    assert too_long.status_code == 400
+    assert too_long.json()["detail"] == AIMessages.SELECTION_TOO_LONG
+    assert emitted(capfd, AuditEventType.AI_REQUEST_SENT) == []
 
 
 async def test_a_deployment_with_no_ai_sends_nothing_and_records_nothing(

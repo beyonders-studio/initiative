@@ -218,5 +218,21 @@
     "copy": "Copiar resumen",
     "regenerate": "Regenerar resumen",
     "cut": "Escrito a partir del primer {{percent}} %. El resto no cabía."
+  },
+  "writing": {
+    "menu": "Ayuda para escribir",
+    "rewrite": "Reescribir",
+    "shorten": "Acortar",
+    "fix": "Corregir ortografía y gramática",
+    "translate": "Traducir…",
+    "continue": "Seguir escribiendo",
+    "preview": "Texto sugerido",
+    "writing": "Escribiendo…",
+    "discard": "Descartar",
+    "insert": "Insertar",
+    "insertBelow": "Insertar debajo",
+    "replace": "Reemplazar",
+    "changed": "El texto cambió mientras se escribía. Insértalo debajo o descártalo.",
+    "error": "No se pudo escribir. Por favor intenta de nuevo."
   }
 }

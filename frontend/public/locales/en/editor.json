@@ -218,5 +218,21 @@
     "copy": "Copy summary",
     "regenerate": "Regenerate summary",
     "cut": "Written from the first {{percent}}% of it. The rest did not fit."
+  },
+  "writing": {
+    "menu": "Writing help",
+    "rewrite": "Rewrite",
+    "shorten": "Shorten",
+    "fix": "Fix spelling and grammar",
+    "translate": "Translate…",
+    "continue": "Continue writing",
+    "preview": "Suggested text",
+    "writing": "Writing…",
+    "discard": "Discard",
+    "insert": "Insert",
+    "insertBelow": "Insert below",
+    "replace": "Replace",
+    "changed": "The text changed while writing. Insert this below it instead, or discard it.",
+    "error": "Couldn't write that. Please try again."
   }
 }

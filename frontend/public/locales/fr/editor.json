@@ -218,5 +218,21 @@
     "copy": "Copier le résumé",
     "regenerate": "Régénérer le résumé",
     "cut": "Rédigé à partir des premiers {{percent}} %. Le reste ne tenait pas."
+  },
+  "writing": {
+    "menu": "Aide à l'écriture",
+    "rewrite": "Reformuler",
+    "shorten": "Raccourcir",
+    "fix": "Corriger l'orthographe et la grammaire",
+    "translate": "Traduire…",
+    "continue": "Continuer à écrire",
+    "preview": "Texte suggéré",
+    "writing": "Écriture…",
+    "discard": "Ignorer",
+    "insert": "Insérer",
+    "insertBelow": "Insérer en dessous",
+    "replace": "Remplacer",
+    "changed": "Le texte a changé pendant l'écriture. Insérez ceci en dessous ou ignorez-le.",
+    "error": "Impossible d'écrire cela. Veuillez réessayer."
   }
 }

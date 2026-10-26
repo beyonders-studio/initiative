@@ -41,3 +41,6 @@ export const listFormat = (locale?: Locale, options?: Intl.ListFormatOptions) =>
 export const collator = (locale?: Locale, options?: Intl.CollatorOptions) =>
   // biome-ignore lint/plugin: built here, once per locale and options
   once("collator", locale, options, () => new Intl.Collator(locale, options));
+
+export const displayNames = (locale: Locale, options: Intl.DisplayNamesOptions) =>
+  once("names", locale, options, () => new Intl.DisplayNames(locale, options));

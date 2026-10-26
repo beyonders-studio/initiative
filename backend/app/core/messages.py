@@ -1706,6 +1706,8 @@ class AIMessages:
     SPEND_LIMIT_REACHED = "AI_SPEND_LIMIT_REACHED"
     #: The provider kept refusing for too many requests.
     RATE_LIMITED = "AI_RATE_LIMITED"
+    #: A selection too long for writing help to take at once.
+    SELECTION_TOO_LONG = "AI_SELECTION_TOO_LONG"
 
 
 class NativeMessages:

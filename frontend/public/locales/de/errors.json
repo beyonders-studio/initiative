@@ -332,6 +332,7 @@
   "AI_OUT_OF_CREDIT": "Das Konto beim KI-Anbieter hat kein Guthaben mehr oder ein Zahlungsproblem. Wer hier die KI verwaltet, kann das beim Anbieter klären.",
   "AI_SPEND_LIMIT_REACHED": "Ein Ausgabelimit des Kontos beim KI-Anbieter ist erreicht. Es endet von selbst, oder wer hier die KI verwaltet, kann es beim Anbieter erhöhen.",
   "AI_RATE_LIMITED": "Der KI-Anbieter erhält gerade zu viele Anfragen. Versuche es gleich noch einmal.",
+  "AI_SELECTION_TOO_LONG": "Diese Auswahl ist zu lang, um sie auf einmal zu bearbeiten. Versuche es mit einem kürzeren Teil.",
   "CALENDAR_COMMUNITY_PLUGIN_REQUIRED": "Das Community-Kalender-Plug-in ist nicht installiert, daher gibt es keinen Ort für einen Community-Kalender",
   "CALENDAR_PLUGIN_INITIATIVE_REQUIRED": "Ein Plug-in erstellt einen Kalender in einer Initiative. Wähle die Initiative, zu der er gehört.",
   "CALENDAR_EVENT_ENDS_BEFORE_START": "Ein Termin kann nicht enden, bevor er beginnt",

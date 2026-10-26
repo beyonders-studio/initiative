@@ -4,7 +4,7 @@ icon: lucide/sparkles
 
 # AI features
 
-Initiative has optional AI help for the boring parts — drafting a task description, breaking a task into a checklist, summarising a file or a wiki page.
+Initiative has optional AI help for the boring parts — drafting a task description, breaking a task into a checklist, summarising a file or a wiki page, and tidying the sentence you have rewritten four times.
 
 Optional, off unless somebody deliberately switches it on, and never quietly running in the background while you weren't looking.
 
@@ -15,6 +15,7 @@ When AI is switched on, you'll see **Generate** options in a few places:
 - Drafting or improving a **task description**.
 - Suggesting a **checklist** to break something down.
 - Producing a **summary** of a file or a wiki page.
+- **Writing help** in any document, wiki page or post.
 
 You ask each time. Nothing writes itself while you're making tea.
 
@@ -23,6 +24,14 @@ A task's description and checklist are written from the whole task, not just its
 Nothing is saved until you say so. Checklist suggestions arrive ticked, and you untick what you don't want. A written description lands in your draft, and **Undo suggestion** puts back whatever you had before.
 
 A summary writes itself in as you watch, from the page as it reads right now, including whatever a colleague typed into it ten seconds ago. A very long document may not all fit, in which case the summary says how far in it got. The constitution's appendices will survive being left out.
+
+### Writing help
+
+Select some text and the sparkle in the formatting bar offers **Rewrite**, **Shorten**, **Fix spelling and grammar** and **Translate**. Type `/` on an empty line for **Continue writing**, which picks up where the paragraph above left off.
+
+The answer appears in a small box under your text, and nothing in the document changes until you pick **Replace** or **Insert below**. **Discard** makes it as if you never asked. Only the selection and the paragraphs either side of it are sent.
+
+If somebody else edits that same sentence while the answer is being written, **Replace** declines rather than flatten their change. **Insert below** works either way, and the two of you can sort it out from there.
 
 ## Who sets it up
 
