@@ -207,5 +207,16 @@
     "taskPriority": "Task priority",
     "taskStatus": "Task status",
     "whichFact": "Which fact should the chip show?"
+  },
+  "summary": {
+    "title": "Summary",
+    "aiNotEnabled": "AI features are not enabled. Configure AI settings to generate summaries.",
+    "generateDescription": "Generate an AI-powered summary of this document.",
+    "generateButton": "Generate Summary",
+    "generateError": "Failed to generate summary. Please try again.",
+    "generating": "Generating summary…",
+    "copy": "Copy summary",
+    "regenerate": "Regenerate summary",
+    "cut": "Written from the first {{percent}}% of it. The rest did not fit."
   }
 }

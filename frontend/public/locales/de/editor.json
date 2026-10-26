@@ -207,5 +207,16 @@
     "taskPriority": "Priorität",
     "taskStatus": "Aufgabenstatus",
     "whichFact": "Welchen Wert soll der Chip anzeigen?"
+  },
+  "summary": {
+    "title": "Zusammenfassung",
+    "aiNotEnabled": "KI-Funktionen sind nicht aktiviert. Konfiguriere die KI-Einstellungen, um Zusammenfassungen zu generieren.",
+    "generateDescription": "Generiere eine KI-gestützte Zusammenfassung dieses Dokuments.",
+    "generateButton": "Zusammenfassung generieren",
+    "generateError": "Zusammenfassung konnte nicht generiert werden. Bitte versuche es erneut.",
+    "generating": "Zusammenfassung wird generiert…",
+    "copy": "Zusammenfassung kopieren",
+    "regenerate": "Zusammenfassung neu generieren",
+    "cut": "Aus den ersten {{percent}} % geschrieben. Der Rest passte nicht hinein."
   }
 }

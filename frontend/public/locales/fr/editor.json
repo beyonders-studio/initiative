@@ -207,5 +207,16 @@
     "taskPriority": "Priorité",
     "taskStatus": "Statut de la tâche",
     "whichFact": "Quelle information la puce doit-elle afficher ?"
+  },
+  "summary": {
+    "title": "Résumé",
+    "aiNotEnabled": "Les fonctionnalités IA ne sont pas activées. Configurez les paramètres IA pour générer des résumés.",
+    "generateDescription": "Générer un résumé alimenté par l'IA pour ce document.",
+    "generateButton": "Générer un résumé",
+    "generateError": "Échec de la génération du résumé. Veuillez réessayer.",
+    "generating": "Génération du résumé…",
+    "copy": "Copier le résumé",
+    "regenerate": "Régénérer le résumé",
+    "cut": "Rédigé à partir des premiers {{percent}} %. Le reste ne tenait pas."
   }
 }

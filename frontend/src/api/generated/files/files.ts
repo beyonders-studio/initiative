@@ -21,6 +21,7 @@ import type {
 } from "@tanstack/react-query";
 
 import type {
+  AIStreamEvent,
   BodyImportSpreadsheetFile,
   BodyNotifyMentions,
   BodyUploadFile,
@@ -30,7 +31,6 @@ import type {
   FileRead,
   FileUpdate,
   FileVersionRead,
-  GenerateFileSummaryResponse,
   HTTPValidationError,
   ListFilesParams,
   ReadFileParams,
@@ -1091,7 +1091,7 @@ export const useNotifyMentions = <TError = ErrorType<HTTPValidationError>, TCont
   return useMutation(getNotifyMentionsMutationOptions(options), queryClient);
 };
 /**
- * Generate an AI summary of a file.
+ * A summary of a file, streamed as it is written.
  *
  * Requires read access to the file. Only works for native (editor)
  * files.
@@ -1103,7 +1103,7 @@ export const generateSummary = (
   options?: SecondParameter<typeof apiMutator>,
   signal?: AbortSignal
 ) => {
-  return apiMutator<GenerateFileSummaryResponse>(
+  return apiMutator<AIStreamEvent>(
     { url: `/api/v1/c/${communityId}/files/${fileId}/ai/summary`, method: "POST", signal },
     options
   );

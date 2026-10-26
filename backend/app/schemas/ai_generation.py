@@ -1,5 +1,7 @@
 """AI Generation request and response schemas."""
 
+from typing import Optional
+
 from pydantic import ConfigDict
 
 from app.schemas.base import RawTextStr, SanitizedBaseModel
@@ -29,9 +31,17 @@ class GenerateDescriptionResponse(_WrittenFromComments):
     description: RawTextStr
 
 
-class GenerateFileSummaryResponse(SanitizedBaseModel):
-    """Response schema for file summarization."""
+class AIStreamCut(SanitizedBaseModel):
+    """How much of what was asked about was read: the first ``percent`` of it."""
 
-    model_config = ConfigDict(json_schema_serialization_defaults_required=True)
+    percent: int
 
-    summary: RawTextStr
+
+class AIStreamEvent(SanitizedBaseModel):
+    """One line of an answer streamed as it is written. Exactly one field is
+    set: ``cut`` first, when only part of what was asked about fit; ``text``,
+    the next piece of the answer; or ``error``, the code it ended on."""
+
+    cut: Optional[AIStreamCut] = None
+    text: Optional[RawTextStr] = None
+    error: Optional[str] = None

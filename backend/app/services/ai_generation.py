@@ -1,31 +1,36 @@
-"""AI work on a task or a file: checklist steps, a description, a summary.
+"""AI work on a task or a document: checklist steps, a description, a summary.
 
 Each asks the connection the community resolves to (``ai_settings``), through
-the one request path in ``ai_provider``.
+the one request path in ``ai_provider``. A summary is streamed as it is
+written, as JSON lines (:func:`summarize`).
 """
 
 from __future__ import annotations
 
 import html
-from collections.abc import Awaitable, Callable
-from typing import TypeVar
+from collections.abc import AsyncIterator, Awaitable, Callable
+from typing import Any, TypeVar
 
+from fastapi.responses import StreamingResponse
 from pydantic import BaseModel, ConfigDict
 from sqlmodel.ext.asyncio.session import AsyncSession
 
+from app.core.audit_events import AuditEventType
 from app.core.messages import AIMessages
 from app.models.tenant.task import Task
 from app.models.platform.user import User
 from app.services import ai_provider
+from app.services import audit as audit_service
 from app.services.ai_context import TaskContext, task_context
 from app.services.ai_provider import AIRequestError, Job
+from app.schemas.ai_generation import AIStreamEvent
+from app.schemas.ai_settings import ResolvedAISettings
 from app.services.ai_settings import record_health, resolve_ai_settings
 from app.services.export.lexical import editor_markdown
 
 # Maximum output lengths to prevent excessive LLM responses
 _MAX_CHECKLIST_ITEM_LENGTH = 200
 _MAX_DESCRIPTION_LENGTH = 2000
-_MAX_SUMMARY_LENGTH = 5000
 
 _CHECKLIST_JOB = Job(purpose="checklist", max_tokens=8000, timeout=120.0)
 _DESCRIPTION_JOB = Job(purpose="description", max_tokens=8000, timeout=120.0)
@@ -33,6 +38,11 @@ _SUMMARY_JOB = Job(purpose="summary", max_tokens=16000, timeout=180.0)
 #: How much of a task's surroundings a checklist or description is told, in
 #: tokens; the task itself always goes in.
 _TASK_BUDGET = 3000
+#: How much of a document a summary is written from, in tokens. A longer one
+#: is summarized as far as this reaches, and the summary says how far.
+_SUMMARY_BUDGET = 100_000
+#: Roughly how many characters a token holds.
+_CHARS_PER_TOKEN = 4
 
 
 Answer = TypeVar("Answer")
@@ -89,30 +99,78 @@ async def generate_description(
     return _truncate_output(description, _MAX_DESCRIPTION_LENGTH), context
 
 
-async def generate_file_summary(
+async def record_request(
     session: AsyncSession,
+    *,
     user: User,
-    guild_id: int | None,
-    file_content: dict | None,
-    file_name: str,
-) -> str:
-    """Generate a summary of a file using configured AI provider."""
-    # The editor state as markdown, which a model reads better than JSON
-    markdown_content = editor_markdown(file_content, reading=True)
-    if not markdown_content.strip():
-        raise AIRequestError(AIMessages.DOCUMENT_EMPTY)
+    guild_id: int,
+    purpose: str,
+    target_type: str,
+    target_id: int,
+    initiative_id: int | None,
+) -> None:
+    """Write down that something is about to be sent to an AI provider.
 
-    prompt = _build_summary_prompt(
-        file_name, markdown_content, locale=user.locale or "en"
+    What, which connection and which provider — never any of the text.
+    Committed before the request goes out, since the disclosure does not wait
+    on the reply. A configuration that sends nothing records nothing.
+    """
+    resolved = await resolve_ai_settings(session, guild_id)
+    if not resolved.enabled or resolved.provider is None:
+        return
+    await audit_service.record(
+        session,
+        event_type=AuditEventType.AI_REQUEST_SENT,
+        actor_user_id=user.id,
+        guild_id=guild_id,
+        target_type=target_type,
+        target_id=target_id,
+        detail={
+            "purpose": purpose,
+            "initiative_id": initiative_id,
+            "scope": resolved.scope.value if resolved.scope else None,
+            "connection_id": resolved.connection_id,
+            "provider": resolved.provider.value,
+        },
     )
-    content = await _ask(
+    await session.commit()
+
+
+async def summarize(
+    session: AsyncSession, user: User, guild_id: int, *, title: str, content: dict
+) -> AsyncIterator[str]:
+    """A summary of a document's ``content``, as JSON lines.
+
+    ``{"cut": {"percent": n}}`` first when only the first ``n`` per cent of
+    the document fit, then ``{"text": ...}`` as the summary is written. A
+    failure before any of it is written raises; one part-way ends the lines
+    with ``{"error": code}``.
+    """
+    # The editor state as markdown, which a model reads better than JSON.
+    markdown = editor_markdown(content, reading=True)
+    if not markdown.strip():
+        raise AIRequestError(AIMessages.DOCUMENT_EMPTY)
+    read = _fitted(markdown, _SUMMARY_BUDGET * _CHARS_PER_TOKEN)
+    cut = len(read) < len(markdown)
+    prompt = _build_summary_prompt(title, read, cut=cut, locale=user.locale or "en")
+    head = [{"cut": {"percent": len(read) * 100 // len(markdown)}}] if cut else []
+    return await _streamed(
         session,
         guild_id,
-        lambda target: ai_provider.complete_text(
+        lambda target: ai_provider.stream_text(
             target, _SUMMARY_JOB, prompt, guild_id=guild_id
         ),
+        head,
     )
-    return _truncate_output(content, _MAX_SUMMARY_LENGTH)
+
+
+def _fitted(text: str, limit: int) -> str:
+    """``text``, or as much of it as fits in ``limit`` characters, ending
+    where a paragraph does when one ends far enough in."""
+    if len(text) <= limit:
+        return text
+    end = text.rfind("\n\n", 0, limit)
+    return text[: end if end > limit // 2 else limit]
 
 
 def _locale_instruction(locale: str) -> str:
@@ -154,13 +212,20 @@ def _truncate_output(text: str, max_length: int) -> str:
 
 
 def _build_summary_prompt(
-    title: str, content: str, *, locale: str = "en"
+    title: str, content: str, *, cut: bool, locale: str = "en"
 ) -> tuple[str, str]:
-    """Build system/user prompt pair for file summarization."""
+    """Build system/user prompt pair for a document's summary."""
     lang_instruction = _locale_instruction(locale)
+    part = (
+        "Only the beginning of the document is given. Summarize that, and do "
+        "not guess at the rest.\n"
+        if cut
+        else ""
+    )
     system_prompt = (
-        "Summarize the provided file in 2-4 paragraphs, focusing on the key points.\n"
+        "Summarize the provided document in 2-4 paragraphs, focusing on the key points.\n"
         "Write a clear, concise summary that captures the main ideas and important details.\n"
+        f"{part}"
         f"{lang_instruction}"
         "Return ONLY the summary text, no other commentary."
     )
@@ -232,26 +297,94 @@ async def _ask(
 ) -> Answer:
     """``ask`` the connection a request in ``guild_id`` goes through, with its
     key, and write down on the connection how the provider answered."""
+    resolved, target = await _target(session, guild_id)
+    try:
+        answer = await ask(target)
+    except AIRequestError as exc:
+        await _record(resolved, guild_id, exc.code)
+        raise
+    await _record(resolved, guild_id, None)
+    return answer
+
+
+async def _streamed(
+    session: AsyncSession,
+    guild_id: int,
+    open_stream: Callable[[ai_provider.Target], AsyncIterator[str]],
+    head: list[dict[str, Any]],
+) -> AsyncIterator[str]:
+    """``open_stream`` on the connection a request in ``guild_id`` goes
+    through, as JSON lines after ``head``. The first text is waited for
+    here, so a request the provider refuses fails before anything is sent."""
+    resolved, target = await _target(session, guild_id)
+    stream = open_stream(target)
+    try:
+        first = await anext(stream, "")
+    except AIRequestError as exc:
+        await _record(resolved, guild_id, exc.code)
+        raise
+
+    async def lines() -> AsyncIterator[str]:
+        try:
+            for event in head:
+                yield _line(event)
+            if first:
+                yield _line({"text": first})
+            async for text in stream:
+                yield _line({"text": text})
+        except AIRequestError as exc:
+            await _record(resolved, guild_id, exc.code)
+            yield _line({"error": exc.code})
+            return
+        finally:
+            await stream.aclose()
+        await _record(resolved, guild_id, None)
+
+    return lines()
+
+
+def _line(event: dict[str, Any]) -> str:
+    return AIStreamEvent.model_validate(event).model_dump_json(exclude_none=True) + "\n"
+
+
+class AIStreamResponse(StreamingResponse):
+    """An answer streamed as :class:`AIStreamEvent` lines. Each line is sent
+    as it is written, past any proxy that would hold it back."""
+
+    media_type = "application/jsonl"
+
+    def __init__(self, content: AsyncIterator[str], status_code: int = 200) -> None:
+        super().__init__(
+            content,
+            status_code=status_code,
+            headers={"Cache-Control": "no-cache", "X-Accel-Buffering": "no"},
+        )
+
+
+async def _target(
+    session: AsyncSession, guild_id: int | None
+) -> tuple[ResolvedAISettings, ai_provider.Target]:
+    """The connection a request in ``guild_id`` goes through, with its key."""
     resolved = await resolve_ai_settings(session, guild_id, with_key=True)
     if not resolved.enabled or resolved.provider is None:
         raise AIRequestError(
             AIMessages.NOT_CONFIGURED if resolved.provider else AIMessages.NOT_ENABLED
         )
-    assert resolved.scope is not None and resolved.connection_id is not None
-    target = ai_provider.Target(
+    return resolved, ai_provider.Target(
         provider=resolved.provider,
         model=resolved.model,
         api_key=resolved.api_key,
         base_url=resolved.base_url,
         allow_private=resolved.allow_private,
     )
-    try:
-        answer = await ask(target)
-    except AIRequestError as exc:
-        if exc.code in ai_provider.PROVIDER_CODES:
-            await record_health(
-                resolved.scope, resolved.connection_id, guild_id, exc.code
-            )
-        raise
-    await record_health(resolved.scope, resolved.connection_id, guild_id, None)
-    return answer
+
+
+async def _record(
+    resolved: ResolvedAISettings, guild_id: int | None, code: str | None
+) -> None:
+    """Write down on the connection how the provider answered: well, or with
+    a code that is its health rather than the request's."""
+    if code is not None and code not in ai_provider.PROVIDER_CODES:
+        return
+    assert resolved.scope is not None and resolved.connection_id is not None
+    await record_health(resolved.scope, resolved.connection_id, guild_id, code)

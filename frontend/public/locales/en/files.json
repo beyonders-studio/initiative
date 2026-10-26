@@ -122,9 +122,6 @@
     "dangerDescription": "Deleted files go to the trash and can be restored before the community's retention period ends.",
     "deleting": "Deleting…"
   },
-  "sidePanel": {
-    "summaryTab": "Summary"
-  },
   "smartLink": {
     "missingUrl": "This smart link has no URL.",
     "openInNewTab": "Open in new tab",
@@ -295,15 +292,6 @@
       "replaced_one": "{{count}} cell replaced",
       "replaced_other": "{{count}} cells replaced"
     }
-  },
-  "summary": {
-    "aiNotEnabled": "AI features are not enabled. Configure AI settings to generate file summaries.",
-    "generateDescription": "Generate an AI-powered summary of this file.",
-    "generateButton": "Generate Summary",
-    "generateError": "Failed to generate summary. Please try again.",
-    "generating": "Generating summary…",
-    "copy": "Copy summary",
-    "regenerate": "Regenerate summary"
   },
   "type": {
     "template": "Template",

@@ -126,8 +126,75 @@ async def test_a_connection_that_cannot_answer_says_why(monkeypatch, overrides, 
     assert refused.value.code == code
 
 
-async def test_an_empty_file_is_not_sent(monkeypatch):
+def _streaming(monkeypatch, *pieces: str, then: str | None = None) -> list[tuple]:
+    """Answer with ``pieces`` as they are written, then fail with ``then``;
+    keep the prompts asked."""
+    asked: list[tuple] = []
+
+    async def stream_text(target, job, prompt, *, guild_id):
+        asked.append(prompt)
+        for piece in pieces:
+            yield piece
+        if then:
+            raise AIRequestError(then)
+
+    monkeypatch.setattr(ai_provider, "stream_text", stream_text)
+    return asked
+
+
+async def _summary(monkeypatch, markdown: str) -> list[dict]:
+    monkeypatch.setattr(ai_generation, "editor_markdown", lambda *a, **k: markdown)
+    lines = await ai_generation.summarize(
+        None, _User(), 1, title="Notes", content={"root": {}}
+    )
+    return [json.loads(line) async for line in lines]
+
+
+async def test_a_summary_streams_as_it_is_written(monkeypatch):
+    health = _resolving_to(monkeypatch)
+    asked = _streaming(monkeypatch, "A ", "summary")
+
+    assert await _summary(monkeypatch, "The rota") == [
+        {"text": "A "},
+        {"text": "summary"},
+    ]
+    assert "The rota" in asked[0][1]
+    assert health == [(ConnectionScope.community, 3, 1, None)]
+
+
+async def test_a_long_document_is_summarized_as_far_as_it_fits(monkeypatch):
+    _resolving_to(monkeypatch)
+    asked = _streaming(monkeypatch, "Short")
+    monkeypatch.setattr(ai_generation, "_SUMMARY_BUDGET", 10)
+
+    lines = await _summary(monkeypatch, "a" * 30 + "\n\n" + "b" * 50)
+
+    # It ends where the first paragraph does, a third of the way in.
+    assert lines == [{"cut": {"percent": 36}}, {"text": "Short"}]
+    system, data = asked[0]
+    assert "Only the beginning" in system
+    assert "b" not in data.split("<content>")[1]
+
+
+async def test_a_failure_says_why_before_or_part_way(monkeypatch):
+    health = _resolving_to(monkeypatch)
+
+    _streaming(monkeypatch, then=AIMessages.RATE_LIMITED)
+    with pytest.raises(AIRequestError) as refused:
+        await _summary(monkeypatch, "The rota")
+    assert refused.value.code == AIMessages.RATE_LIMITED
+
+    # Once text has gone out, the lines end with the code instead.
+    _streaming(monkeypatch, "A ", then=AIMessages.RATE_LIMITED)
+    assert await _summary(monkeypatch, "The rota") == [
+        {"text": "A "},
+        {"error": AIMessages.RATE_LIMITED},
+    ]
+    assert [code for *_, code in health] == [AIMessages.RATE_LIMITED] * 2
+
+
+async def test_an_empty_document_is_not_sent(monkeypatch):
     _resolving_to(monkeypatch)
     with pytest.raises(AIRequestError) as refused:
-        await ai_generation.generate_file_summary(None, _User(), 1, None, "Notes")
+        await _summary(monkeypatch, "  ")
     assert refused.value.code == AIMessages.DOCUMENT_EMPTY

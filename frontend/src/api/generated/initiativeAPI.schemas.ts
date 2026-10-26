@@ -110,6 +110,24 @@ export interface AIModelsResponse {
 }
 
 /**
+ * How much of what was asked about was read: the first ``percent`` of it.
+ */
+export interface AIStreamCut {
+  percent: number;
+}
+
+/**
+ * One line of an answer streamed as it is written. Exactly one field is
+ * set: ``cut`` first, when only part of what was asked about fit; ``text``,
+ * the next piece of the answer; or ``error``, the code it ended on.
+ */
+export interface AIStreamEvent {
+  cut?: AIStreamCut | null;
+  text?: string | null;
+  error?: string | null;
+}
+
+/**
  * Approval payload. The approver may shorten/extend the window, still
  * subject to the server-side cap.
  */
@@ -6050,13 +6068,6 @@ export interface GenerateDescriptionResponse {
   comments_read: number;
   comments_total: number;
   description: string;
-}
-
-/**
- * Response schema for file summarization.
- */
-export interface GenerateFileSummaryResponse {
-  summary: string;
 }
 
 /**

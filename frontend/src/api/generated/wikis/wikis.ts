@@ -21,6 +21,7 @@ import type {
 } from "@tanstack/react-query";
 
 import type {
+  AIStreamEvent,
   HTTPValidationError,
   ListWikisParams,
   ResourceGrantSchema,
@@ -1393,6 +1394,90 @@ export const useDeleteWikiPage = <TError = ErrorType<HTTPValidationError>, TCont
   TContext
 > => {
   return useMutation(getDeleteWikiPageMutationOptions(options), queryClient);
+};
+/**
+ * A summary of a page, streamed as it is written. Requires read access
+ * to the page.
+ * @summary Summarize Wiki Page
+ */
+export const summarizeWikiPage = (
+  communityId: number,
+  pageId: number,
+  options?: SecondParameter<typeof apiMutator>,
+  signal?: AbortSignal
+) => {
+  return apiMutator<AIStreamEvent>(
+    { url: `/api/v1/c/${communityId}/wiki-pages/${pageId}/ai/summary`, method: "POST", signal },
+    options
+  );
+};
+
+export const getSummarizeWikiPageMutationKey = () => ["summarizeWikiPage"] as const;
+
+export const getSummarizeWikiPageMutationOptions = <
+  TError = ErrorType<HTTPValidationError>,
+  TContext = unknown,
+>(options?: {
+  mutation?: UseMutationOptions<
+    Awaited<ReturnType<typeof summarizeWikiPage>>,
+    TError,
+    SummarizeWikiPageMutationVariables,
+    TContext
+  >;
+  request?: SecondParameter<typeof apiMutator>;
+}): UseMutationOptions<
+  Awaited<ReturnType<typeof summarizeWikiPage>>,
+  TError,
+  SummarizeWikiPageMutationVariables,
+  TContext
+> => {
+  const mutationKey = getSummarizeWikiPageMutationKey();
+  const { mutation: mutationOptions, request: requestOptions } = options
+    ? options.mutation && "mutationKey" in options.mutation && options.mutation.mutationKey
+      ? options
+      : { ...options, mutation: { ...options.mutation, mutationKey } }
+    : { mutation: { mutationKey }, request: undefined };
+
+  const mutationFn: MutationFunction<
+    Awaited<ReturnType<typeof summarizeWikiPage>>,
+    SummarizeWikiPageMutationVariables
+  > = (props) => {
+    const { communityId, pageId } = props ?? {};
+
+    return summarizeWikiPage(communityId, pageId, requestOptions);
+  };
+
+  return { mutationFn, ...mutationOptions };
+};
+
+export type SummarizeWikiPageMutationResult = NonNullable<
+  Awaited<ReturnType<typeof summarizeWikiPage>>
+>;
+
+export type SummarizeWikiPageMutationError = ErrorType<HTTPValidationError>;
+export type SummarizeWikiPageMutationVariables = { communityId: number; pageId: number };
+
+/**
+ * @summary Summarize Wiki Page
+ */
+export const useSummarizeWikiPage = <TError = ErrorType<HTTPValidationError>, TContext = unknown>(
+  options?: {
+    mutation?: UseMutationOptions<
+      Awaited<ReturnType<typeof summarizeWikiPage>>,
+      TError,
+      SummarizeWikiPageMutationVariables,
+      TContext
+    >;
+    request?: SecondParameter<typeof apiMutator>;
+  },
+  queryClient?: QueryClient
+): UseMutationResult<
+  Awaited<ReturnType<typeof summarizeWikiPage>>,
+  TError,
+  SummarizeWikiPageMutationVariables,
+  TContext
+> => {
+  return useMutation(getSummarizeWikiPageMutationOptions(options), queryClient);
 };
 /**
  * Copy the page, without the pages under it, to the end of where it is

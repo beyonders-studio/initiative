@@ -20,7 +20,6 @@ from sqlalchemy import text
 from sqlmodel import select
 from sqlmodel.ext.asyncio.session import AsyncSession
 
-from app.core.audit_events import AuditEventType
 from app.core.search import SearchEntityType
 from app.core.body_limit import max_document_body
 from app.services.permissions import Action
@@ -67,7 +66,7 @@ from app.schemas.tenant.file import (
     SpreadsheetImportRead,
 )
 from app.schemas.tenant.resource_grant import initiative_readable
-from app.schemas.ai_generation import GenerateFileSummaryResponse
+from app.schemas.ai_generation import AIStreamEvent
 from app.services.tenant import attachments as attachments_service
 from app.services.tenant import file_versions
 from app.services import storage_config
@@ -84,13 +83,12 @@ from app.services.tenant.names import ensure_name_free
 from app.services.tenant import tool_listing
 from app.services import notifications as notifications_service
 from app.services import reachability
-from app.services import audit as audit_service
-from app.services.ai_generation import generate_file_summary
-from app.services.ai_settings import resolve_ai_settings
+from app.services import ai_generation
 from app.services.tenant import spreadsheet_import
 from app.services.tenant.collaboration import (
     collaboration_manager,
     content_version,
+    current_content,
     versioned,
     written_into,
 )
@@ -746,14 +744,18 @@ async def notify_mentions(
     await session.commit()
 
 
-@router.post("/{file_id}/ai/summary", response_model=GenerateFileSummaryResponse)
+@router.post(
+    "/{file_id}/ai/summary",
+    response_class=ai_generation.AIStreamResponse,
+    responses={200: {"model": AIStreamEvent}},
+)
 async def generate_summary(
     file_id: int,
     session: RLSSessionDep,
     current_user: Annotated[User, Depends(get_current_active_user)],
     guild_context: GuildContextDep,
-) -> GenerateFileSummaryResponse:
-    """Generate an AI summary of a file.
+) -> ai_generation.AIStreamResponse:
+    """A summary of a file, streamed as it is written.
 
     Requires read access to the file. Only works for native (editor)
     files.
@@ -767,37 +769,27 @@ async def generate_summary(
             detail=FileMessages.AI_NATIVE_ONLY,
         )
     await session.refresh(file, ["content"])
-
-    # Written down before the request goes out, since the disclosure does not
-    # wait on the reply: which file, which connection, which provider, and
-    # none of the text. A configuration that sends nothing records nothing.
-    resolved = await resolve_ai_settings(session, guild_context.guild_id)
-    if resolved.enabled and resolved.provider is not None:
-        await audit_service.record(
-            session,
-            event_type=AuditEventType.AI_REQUEST_SENT,
-            actor_user_id=current_user.id,
-            guild_id=guild_context.guild_id,
-            target_type="file",
-            target_id=file.id,
-            detail={
-                "purpose": "summary",
-                "initiative_id": file.initiative_id,
-                "scope": resolved.scope.value if resolved.scope else None,
-                "connection_id": resolved.connection_id,
-                "provider": resolved.provider.value,
-            },
-        )
-        await session.commit()
-
-    summary = await generate_file_summary(
-        session=session,
+    content = await current_content(
+        guild_context.guild_id, SearchEntityType.file.value, file.id, file.content
+    )
+    await ai_generation.record_request(
+        session,
         user=current_user,
         guild_id=guild_context.guild_id,
-        file_content=file.content,
-        file_name=file.name,
+        purpose="summary",
+        target_type="file",
+        target_id=file.id,
+        initiative_id=file.initiative_id,
     )
-    return GenerateFileSummaryResponse(summary=summary)
+    return ai_generation.AIStreamResponse(
+        await ai_generation.summarize(
+            session,
+            current_user,
+            guild_context.guild_id,
+            title=file.name,
+            content=content,
+        )
+    )
 
 
 async def read_after_write(

@@ -24,7 +24,6 @@ from app.api.deps import (
     GuildContextDep,
 )
 from app.core import recurrence
-from app.core.audit_events import AuditEventType
 from app.core.messages import ChecklistMessages, QueryMessages, TaskMessages
 from app.db.query import build_paginated_response, paginated_query
 from app.db.session import routed_guild_id
@@ -55,9 +54,7 @@ from app.schemas.tenant.task import (
 )
 from app.schemas.platform.user import UserPublic
 from app.services import ai_generation as ai_generation_service
-from app.services import audit as audit_service
 from app.services import notifications as notifications_service
-from app.services.ai_settings import resolve_ai_settings
 from app.services.fields.grouping import GroupingError, group_rows
 from app.services.tenant import archive as archive_service
 from app.services.tenant import attachments as attachments_service
@@ -1295,42 +1292,6 @@ async def promote_checklist_item(
     return await _response(session, task.id)
 
 
-async def _record_ai_request(
-    session: SessionDep,
-    *,
-    user: User,
-    guild_id: int,
-    purpose: str,
-    task_id: int,
-    initiative_id: Optional[int],
-) -> None:
-    """Write down that a task is about to be sent to an AI provider.
-
-    Which task, which connection and which provider — never any of the text.
-    Committed before the request goes out, since the disclosure does not wait
-    on the reply. A configuration that sends nothing records nothing.
-    """
-    resolved = await resolve_ai_settings(session, guild_id)
-    if not resolved.enabled or resolved.provider is None:
-        return
-    await audit_service.record(
-        session,
-        event_type=AuditEventType.AI_REQUEST_SENT,
-        actor_user_id=user.id,
-        guild_id=guild_id,
-        target_type="task",
-        target_id=task_id,
-        detail={
-            "purpose": purpose,
-            "initiative_id": initiative_id,
-            "scope": resolved.scope.value if resolved.scope else None,
-            "connection_id": resolved.connection_id,
-            "provider": resolved.provider.value,
-        },
-    )
-    await session.commit()
-
-
 # AI Generation endpoints
 @router.post("/{task_id}/ai/checklist", response_model=GenerateChecklistResponse)
 async def generate_task_checklist(
@@ -1343,12 +1304,13 @@ async def generate_task_checklist(
     task = await resource_access.load_child(session, Task, task_id, access="write")
     project = task.project
 
-    await _record_ai_request(
+    await ai_generation_service.record_request(
         session,
         user=current_user,
         guild_id=guild_context.guild_id,
         purpose="checklist",
-        task_id=task.id,
+        target_type="task",
+        target_id=task.id,
         initiative_id=project.initiative_id,
     )
 
@@ -1373,12 +1335,13 @@ async def generate_task_description(
     task = await resource_access.load_child(session, Task, task_id, access="write")
     project = task.project
 
-    await _record_ai_request(
+    await ai_generation_service.record_request(
         session,
         user=current_user,
         guild_id=guild_context.guild_id,
         purpose="description",
-        task_id=task.id,
+        target_type="task",
+        target_id=task.id,
         initiative_id=project.initiative_id,
     )
 

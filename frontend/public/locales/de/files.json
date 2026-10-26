@@ -122,9 +122,6 @@
     "dangerDescription": "Gelöschte Dateien landen im Papierkorb und können vor Ablauf der Aufbewahrungsfrist der Community wiederhergestellt werden.",
     "deleting": "Wird gelöscht…"
   },
-  "sidePanel": {
-    "summaryTab": "Zusammenfassung"
-  },
   "smartLink": {
     "missingUrl": "Dieser Smart-Link hat keine URL.",
     "openInNewTab": "In neuem Tab öffnen",
@@ -295,15 +292,6 @@
       "replaced_one": "{{count}} Zelle ersetzt",
       "replaced_other": "{{count}} Zellen ersetzt"
     }
-  },
-  "summary": {
-    "aiNotEnabled": "KI-Funktionen sind nicht aktiviert. Konfiguriere die KI-Einstellungen, um Dateizusammenfassungen zu generieren.",
-    "generateDescription": "Generiere eine KI-gestützte Zusammenfassung dieser Datei.",
-    "generateButton": "Zusammenfassung generieren",
-    "generateError": "Zusammenfassung konnte nicht generiert werden. Bitte versuche es erneut.",
-    "generating": "Zusammenfassung wird generiert…",
-    "copy": "Zusammenfassung kopieren",
-    "regenerate": "Zusammenfassung neu generieren"
   },
   "type": {
     "template": "Vorlage",
