@@ -1,7 +1,0 @@
-<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 48 48" width="48" height="48"
-     role="presentation">
-  <title>Bahá'í</title>
-  <circle cx="24" cy="24" r="23" fill="#1B2036"/>
-  <circle cx="24" cy="24" r="21" fill="none" stroke="#C8A45C" stroke-width="2"/>
-  <g transform="translate(24 24) scale(0.07939) translate(-200.05 -199.95)" fill="#B98CE0"><path fill="none" stroke="#B98CE0" stroke-linecap="round" stroke-width="20.007" d="M200.318-.98l35.534 96.013 89.608-50.829-34.495 96.391 101.316 18.662-88.384 51.667 65.617 79.42-100.916-17.233-.785 103.017-66.23-78.069-66.82 78.411-.552-102.376L32.622 291.21l65.383-78.78-88.823-52.188 100.725-18.322L75.41 44.847l88.937 50.71z" transform="matrix(.8747 0 0 .87465 24.419 35.79)"/></g>
-</svg>

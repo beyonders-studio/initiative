@@ -188,17 +188,14 @@ Artwork for your profile, and by far the least serious part of Initiative.
 
 Each pack is built around one thing a group of people has in common, and carries banners, frames and trophies you wear in whatever combination pleases you.
 
-Twenty-three packs ship with Initiative:
+Sixteen packs ship with Initiative:
 
 | | |
 |---|---|
-| **People and identity** | Pride, Multicultural, Disability, First Nations, Black heritage, Faith and Belief, Family |
 | **What you do** | Sports, Gaming, Drama, Cinema, Soundcheck, Observatory, Education |
 | **What you love** | Pets, Plants, Books, Tea, Travel, Nature, Winter, Zen, Spooky |
 
-Some run deep. Pride flies a flag, a turning ring and a heart for each of seven identities. Multicultural carries seventy flags. Disability has a trophy for eleven of the things people are, and a flag for all of them.
-
-The banners move, too: a playhead lights the notes it passes, a curtain runs in and out, skeletons dance until sunrise, a typewriter types a line at a time, a lake changes color the whole way down as the sun sets into it, and the view from a train window keeps going past.
+The banners move: a playhead lights the notes it passes, a curtain runs in and out, skeletons dance until sunrise, a typewriter types a line at a time, a lake changes color the whole way down as the sun sets into it, and the view from a train window keeps going past.
 
 What you take here is yours, not your community's. Download a pack in one community and you're wearing it in all of them, because your profile belongs to you.
 
@@ -210,7 +207,11 @@ Downloading a pack puts nothing on you. It just hands you the pieces — you cho
 
 Giving one back is the same click in reverse — open the pack's card and remove it. Its pieces leave your collection, and anything from it you were wearing comes off with them.
 
-![Decoration packs](../images/marketplace/decoration-packs.png)
+!!! screenshot "Decoration packs"
+    **Show:** the decoration packs shelf, a row of pack cards with their banners running.
+
+    Save as `en/images/marketplace/decoration-packs.png`, then replace this box with:
+    `![Decoration packs](../images/marketplace/decoration-packs.png)`
 
 ## Where listings come from
 
