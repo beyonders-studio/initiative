@@ -188,6 +188,7 @@ def _zip_of_text() -> bytes:
             ("text/html", ".html"),
         ),
     ],
+    ids=["pdf", "markdown", "office-package", "html-named-pdf"],
 )
 def test_an_upload_s_type_is_read_from_its_bytes(content, filename, expected):
     from app.services.tenant.attachments import validate_file
@@ -201,6 +202,7 @@ def test_an_upload_s_type_is_read_from_its_bytes(content, filename, expected):
         (b"MZ\x90\x00" + b"\x00" * 60 + b"PE\x00\x00", "invoice.pdf"),
         (_zip_of_text(), "brief.docx"),
     ],
+    ids=["program-named-pdf", "zip-named-docx"],
 )
 def test_a_name_never_makes_bytes_what_they_are_not(content, filename):
     from app.services.tenant.attachments import validate_file
