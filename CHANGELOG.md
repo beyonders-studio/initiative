@@ -16,6 +16,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - **A smaller Create task dialog.** It opens with the title, the type and the type's main column. Status, priority, people, dates and the rest wait under **More options**.
 - **Marketplace projects bring their own task types.** Each ready-made project has its own types in place of Task, Bug, Idea and Milestone, such as candidates and volunteers, or deals and renewals. Each type has its own task page, and cards show the type beside the title.
 
+### Removed
+
+- **Seven decoration packs.** Pride, Disability, Faith and Belief, Black heritage, First Nations, Multicultural and Family leave the marketplace. Their pieces come off every profile wearing them and out of every collection.
+
 ### Fixed
 
 - **Updating the Android app from Obtainium.** Releases name the Alpine server package `.alpine` instead of `.apk`, so Obtainium no longer downloads it in place of the app and fails to extract it. On Alpine, install it with `apk add` as before.

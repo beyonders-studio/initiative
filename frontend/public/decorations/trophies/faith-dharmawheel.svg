@@ -1,7 +1,0 @@
-<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 48 48" width="48" height="48"
-     role="presentation">
-  <title>Buddhist</title>
-  <circle cx="24" cy="24" r="23" fill="#1B2036"/>
-  <circle cx="24" cy="24" r="21" fill="none" stroke="#C8A45C" stroke-width="2"/>
-  <g transform="translate(24 24) scale(0.37179) translate(-40.00 -40.00)" fill="#E8C46A"><g stroke="#E8C46A" stroke-width="8" fill="none">  <circle cx="40" cy="40" r="7.4" stroke-width="5"/> <circle cx="40" cy="40" r="28"/> <path stroke-linecap="round" stroke-dasharray="0,5.5" d="M5,40h0m13,0h13m20,0h13m11,0h0M40,5v0m0,13v13m0,20v13m0 11v0M15.3,15.3h0m9,9l10,10m13.5,13.5 10,10m7,7h0 m0-49.5 0,0m-9,9-10,10m-13.5,13.5-10,10m-7,7 0,0"/> </g></g>
-</svg>
