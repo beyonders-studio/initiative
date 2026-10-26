@@ -13,7 +13,7 @@ A connection always names its model; nothing here picks one.
 from __future__ import annotations
 
 import logging
-from collections.abc import Callable, Iterator
+from collections.abc import AsyncIterator, Callable, Iterator
 from contextlib import contextmanager
 from dataclasses import dataclass
 from enum import Enum
@@ -466,6 +466,113 @@ async def complete_json(
             if attempt == 2:
                 raise AIRequestError(AIMessages.PROVIDER_ERROR) from None
     raise AssertionError("unreachable")
+
+
+async def _anthropic_stream(
+    target: Target, job: Job, prompt: tuple[str, str], used: list[int]
+) -> AsyncIterator[str]:
+    system, user = prompt
+    async with _anthropic_client(target, job.timeout) as client:
+        async with client.messages.stream(
+            model=target.model or "",
+            max_tokens=job.max_tokens,
+            system=system,
+            messages=[{"role": "user", "content": user}],
+        ) as stream:
+            # Only the text: a model that thinks first streams that apart.
+            async for text in stream.text_stream:
+                yield text
+            usage = (await stream.get_final_message()).usage
+    used[:] = [
+        usage.input_tokens,
+        usage.output_tokens,
+        usage.cache_read_input_tokens or 0,
+    ]
+
+
+async def _responses_stream(
+    target: Target, job: Job, prompt: tuple[str, str], used: list[int]
+) -> AsyncIterator[str]:
+    system, user = prompt
+    async with _openai_client(target, job.timeout) as client:
+        stream = await client.responses.create(
+            model=target.model or "",
+            instructions=system,
+            input=user,
+            max_output_tokens=job.max_tokens,
+            store=False,
+            stream=True,
+        )
+        async for event in stream:
+            if event.type == "response.output_text.delta":
+                yield event.delta
+            elif event.type == "response.completed" and event.response.usage:
+                usage = event.response.usage
+                used[:] = [
+                    usage.input_tokens,
+                    usage.output_tokens,
+                    usage.input_tokens_details.cached_tokens,
+                ]
+            elif event.type in ("response.failed", "error"):
+                raise AIRequestError(AIMessages.PROVIDER_ERROR)
+
+
+async def _chat_stream(
+    target: Target, job: Job, prompt: tuple[str, str], used: list[int]
+) -> AsyncIterator[str]:
+    system, user = prompt
+    async with _openai_client(target, job.timeout) as client:
+        stream = await client.chat.completions.create(
+            model=target.model or "",
+            messages=[
+                {"role": "system", "content": system},
+                {"role": "user", "content": user},
+            ],
+            max_tokens=job.max_tokens,
+            stream=True,
+            # The counts come on a last chunk of their own.
+            stream_options={"include_usage": True},
+        )
+        async for chunk in stream:
+            if chunk.choices and chunk.choices[0].delta.content:
+                yield chunk.choices[0].delta.content
+            if chunk.usage:
+                details = chunk.usage.prompt_tokens_details
+                used[:] = [
+                    chunk.usage.prompt_tokens,
+                    chunk.usage.completion_tokens,
+                    (details.cached_tokens if details else None) or 0,
+                ]
+
+
+_STREAMERS: dict[Shape, Callable[..., AsyncIterator[str]]] = {
+    Shape.anthropic: _anthropic_stream,
+    Shape.responses: _responses_stream,
+    Shape.chat: _chat_stream,
+}
+
+
+async def stream_text(
+    target: Target, job: Job, prompt: tuple[str, str], *, guild_id: int | None
+) -> AsyncIterator[str]:
+    """The model's answer to ``prompt``, as it is written. The community's
+    request is held open until the answer ends or the reader stops reading."""
+    _check(target)
+    if not target.model:
+        raise AIRequestError(AIMessages.MODEL_REQUIRED)
+    stream = _STREAMERS[PRESETS[target.provider].shape]
+    used = [0, 0, 0]
+    with _slot(guild_id):
+        try:
+            async for text in stream(target, job, prompt, used):
+                yield text
+        except AIRequestError:
+            raise
+        except Exception as exc:
+            raise AIRequestError(
+                _failure_code(exc, target.provider, sent_key=bool(target.api_key))
+            ) from exc
+    _log_usage(target, job, guild_id, (used[0], used[1], used[2]))
 
 
 def _json_object(text: str) -> str:

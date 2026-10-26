@@ -207,5 +207,16 @@
     "taskPriority": "Prioridad",
     "taskStatus": "Estado de la tarea",
     "whichFact": "¿Qué dato debe mostrar el chip?"
+  },
+  "summary": {
+    "title": "Resumen",
+    "aiNotEnabled": "Las funciones de IA no están habilitadas. Configura los ajustes de IA para generar resúmenes.",
+    "generateDescription": "Genera un resumen de este documento con inteligencia artificial.",
+    "generateButton": "Generar resumen",
+    "generateError": "No se pudo generar el resumen. Por favor intenta de nuevo.",
+    "generating": "Generando resumen…",
+    "copy": "Copiar resumen",
+    "regenerate": "Regenerar resumen",
+    "cut": "Escrito a partir del primer {{percent}} %. El resto no cabía."
   }
 }

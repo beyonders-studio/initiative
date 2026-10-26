@@ -5,7 +5,6 @@ import {
   createFile,
   deleteFileVersion,
   duplicateFile,
-  generateSummary,
   getListFileVersionsQueryKey,
   getReadFileQueryKey,
   listFileVersions,
@@ -20,7 +19,6 @@ import type {
   FileRead,
   FileType,
   FileVersionRead,
-  GenerateFileSummaryResponse,
   ResourceGrantSchema,
 } from "@/api/generated/initiativeAPI.schemas";
 import { SearchEntityType, Tool } from "@/api/generated/initiativeAPI.schemas";
@@ -28,7 +26,6 @@ import { invalidate, q } from "@/api/query-keys";
 import { relate } from "@/api/relationships";
 import { TOOL_HOOKS } from "@/hooks/toolHooks";
 import { useActiveCommunityId } from "@/hooks/useActiveCommunityId";
-import { useCommunityMutation } from "@/hooks/useApiMutation";
 import { getErrorMessage } from "@/lib/errorMessage";
 import { toast } from "@/lib/mascotToast";
 import type { MutationOpts } from "@/types/mutation";
@@ -297,16 +294,3 @@ export const useDeleteFileVersion = (
     onSettled,
   });
 };
-
-// ── File-scoped mutations ───────────────────────────────────────────────────
-
-export const useGenerateFileSummary = (
-  fileId: number,
-  options?: MutationOpts<GenerateFileSummaryResponse, void>
-) =>
-  useCommunityMutation<GenerateFileSummaryResponse, void>(
-    {
-      mutationFn: (communityId) => generateSummary(communityId, fileId),
-    },
-    options
-  );

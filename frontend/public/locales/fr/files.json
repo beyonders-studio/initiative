@@ -122,9 +122,6 @@
     "dangerDescription": "Les fichiers supprimés vont à la corbeille et peuvent être restaurés avant la fin de la période de rétention de la communauté.",
     "deleting": "Suppression en cours…"
   },
-  "sidePanel": {
-    "summaryTab": "Résumé"
-  },
   "smartLink": {
     "missingUrl": "Ce lien intelligent n'a pas d'URL.",
     "openInNewTab": "Ouvrir dans un nouvel onglet",
@@ -295,15 +292,6 @@
       "replaced_one": "{{count}} cellule remplacée",
       "replaced_other": "{{count}} cellules remplacées"
     }
-  },
-  "summary": {
-    "aiNotEnabled": "Les fonctionnalités IA ne sont pas activées. Configurez les paramètres IA pour générer des résumés de fichiers.",
-    "generateDescription": "Générer un résumé alimenté par l'IA pour ce fichier.",
-    "generateButton": "Générer un résumé",
-    "generateError": "Échec de la génération du résumé. Veuillez réessayer.",
-    "generating": "Génération du résumé…",
-    "copy": "Copier le résumé",
-    "regenerate": "Régénérer le résumé"
   },
   "type": {
     "template": "Modèle",

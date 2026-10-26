@@ -45,6 +45,7 @@ from app.core.search import SearchEntityType
 from app.core.tools import KINDS, Tool
 from app.models.platform.user import User
 from app.models.tenant.wiki import Wiki, WikiPage
+from app.schemas.ai_generation import AIStreamEvent
 from app.schemas.tenant.wiki import (
     WikiCreate,
     WikiPageCreate,
@@ -59,11 +60,13 @@ from app.schemas.tenant.wiki import (
     serialize_wiki_page_summary,
 )
 from app.schemas.tenant.tool import serialize_tool
+from app.services import ai_generation
 from app.services.tenant import attachments as attachments_service
 from app.services.tenant import body_states
 from app.services.tenant.collaboration import (
     collaboration_manager,
     content_version,
+    current_content,
     versioned,
     written_into,
 )
@@ -488,6 +491,43 @@ async def read_wiki_page(
     stored notification names."""
     page = await resource_access.load_child(session, WikiPage, page_id)
     return await _serialized_page(session, page, guild_context)
+
+
+@pages_router.post(
+    "/wiki-pages/{page_id}/ai/summary",
+    response_class=ai_generation.AIStreamResponse,
+    responses={200: {"model": AIStreamEvent}},
+)
+async def summarize_wiki_page(
+    page_id: int,
+    session: RLSSessionDep,
+    current_user: CurrentUserDep,
+    guild_context: GuildContextDep,
+) -> ai_generation.AIStreamResponse:
+    """A summary of a page, streamed as it is written. Requires read access
+    to the page."""
+    page = await resource_access.load_child(session, WikiPage, page_id)
+    content = await current_content(
+        guild_context.guild_id, SearchEntityType.wiki_page.value, page.id, page.content
+    )
+    await ai_generation.record_request(
+        session,
+        user=current_user,
+        guild_id=guild_context.guild_id,
+        purpose="summary",
+        target_type="wiki_page",
+        target_id=page.id,
+        initiative_id=page.wiki.initiative_id,
+    )
+    return ai_generation.AIStreamResponse(
+        await ai_generation.summarize(
+            session,
+            current_user,
+            guild_context.guild_id,
+            title=page.title,
+            content=content,
+        )
+    )
 
 
 @pages_router.post(

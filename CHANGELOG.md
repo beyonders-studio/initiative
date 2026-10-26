@@ -9,6 +9,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Added
 
+- **Summaries for wiki pages, written as you watch.** A wiki page can be summarized like a file, and a summary of either arrives as it is written, from the page as it reads now, live edits included. A document too long to fit says how much of it the summary covers.
 - **A plant care project in the marketplace.** Watering, fertilizing and repotting are each their own type. Watering and fertilizing repeat from when you last did them, and repotting starts with a checklist.
 
 ### Changed

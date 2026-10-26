@@ -7,6 +7,16 @@ message the check printed, under a `## After <release>` heading naming the
 release it breaks from. Once the next release ships, its entries no longer
 matter and can be deleted.
 
+## After 0.77.1
+
+### A summary is streamed
+
+A file's summary arrives as it is written, as JSON lines (`AIStreamEvent`:
+`cut`, then `text` pieces, or an `error` code part-way), rather than as one
+`{summary}` object at the end.
+
+- POST /api/v1/c/{community_id}/files/{file_id}/ai/summary removed the media type `application/json` for the response with the status `200`
+
 ## After 0.76.0
 
 ### New values in a response's enums

@@ -1,6 +1,6 @@
 import { useLocation, useNavigate, useParams, useSearch } from "@tanstack/react-router";
 import type { SerializedEditorState } from "lexical";
-import { SlidersHorizontal } from "lucide-react";
+import { SlidersHorizontal, Sparkles } from "lucide-react";
 import { lazy, Suspense, useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { useTranslation } from "react-i18next";
 
@@ -12,6 +12,8 @@ import {
   WikiPageKind,
   WikiReadingWidth,
 } from "@/api/generated/initiativeAPI.schemas";
+import { summarizeWikiPage } from "@/api/generated/wikis/wikis";
+import { type AISummary, SummarySheet } from "@/components/ai/SummarySheet";
 import { ToolCommentsPanel } from "@/components/comments/ToolCommentsPanel";
 import { WikiChrome } from "@/components/initiativeTools/wikis/WikiChrome";
 import {
@@ -27,6 +29,8 @@ import { Card, CardHeader, CardTitle } from "@/components/ui/card";
 import { Sheet, SheetContent, SheetHeader, SheetTitle } from "@/components/ui/sheet";
 import { Skeleton } from "@/components/ui/skeleton";
 import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip";
+import { useActiveCommunityId } from "@/hooks/useActiveCommunityId";
+import { useAIEnabled } from "@/hooks/useAIEnabled";
 import { useCollaboration } from "@/hooks/useCollaboration";
 import { useDebouncedValue } from "@/hooks/useDebouncedValue";
 import { useInitiative } from "@/hooks/useInitiatives";
@@ -70,7 +74,8 @@ const PageBodySkeleton = () => (
  * below are the edges the server reads back out of them on save.
  */
 export const WikiPageView = () => {
-  const { t } = useTranslation(["wikis", "common", "properties"]);
+  const { t } = useTranslation(["wikis", "common", "properties", "editor"]);
+  const communityId = useActiveCommunityId();
   const gp = useCommunityPath();
   const {
     wikiId: wikiIdParam,
@@ -315,6 +320,10 @@ export const WikiPageView = () => {
   // The conversation is a drawer: a wiki is browsed, and talking about a page
   // is a different activity from reading it.
   const [commentsOpen, setCommentsOpen] = useState(false);
+  const { isEnabled: aiEnabled } = useAIEnabled();
+  const [summaryOpen, setSummaryOpen] = useState(false);
+  // One page's summary; reading another page starts afresh.
+  const [summary, setSummary] = useState<{ pageId: number; written: AISummary } | null>(null);
   // A page's properties are about the page rather than part of reading it, so
   // they wait in a drawer of their own too.
   const [propertiesOpen, setPropertiesOpen] = useState(false);
@@ -428,6 +437,22 @@ export const WikiPageView = () => {
               ) : null}
               {page && page.id === pageId && page.kind === WikiPageKind.page ? (
                 <>
+                  {aiEnabled ? (
+                    <Tooltip>
+                      <TooltipTrigger asChild>
+                        <Button
+                          variant="ghost"
+                          size="icon"
+                          className="size-8"
+                          onClick={() => setSummaryOpen(true)}
+                          aria-label={t("editor:summary.title")}
+                        >
+                          <Sparkles className="size-4" aria-hidden />
+                        </Button>
+                      </TooltipTrigger>
+                      <TooltipContent>{t("editor:summary.title")}</TooltipContent>
+                    </Tooltip>
+                  ) : null}
                   <ReportButton
                     targetType={SearchEntityType.wiki_page}
                     targetId={page.id}
@@ -573,6 +598,14 @@ export const WikiPageView = () => {
           </div>
         </SheetContent>
       </Sheet>
+
+      <SummarySheet
+        open={summaryOpen}
+        onOpenChange={setSummaryOpen}
+        request={(options, signal) => summarizeWikiPage(communityId, pageId, options, signal)}
+        summary={summary?.pageId === pageId ? summary.written : null}
+        onSummaryChange={(written) => setSummary(written ? { pageId, written } : null)}
+      />
 
       {/* Hidden until asked for: browsing a wiki is reading it, and the
           conversation about it is a different activity. */}

@@ -5,14 +5,13 @@ import { Suspense, useCallback, useEffect, useMemo, useRef, useState } from "rea
 import { useTranslation } from "react-i18next";
 
 import { API_BASE_URL } from "@/api/client";
-import { notifyMentions } from "@/api/generated/files/files";
+import { generateSummary, notifyMentions } from "@/api/generated/files/files";
 import { Tool } from "@/api/generated/initiativeAPI.schemas";
+import { type AISummary, SummarySheet, useSummarySheet } from "@/components/ai/SummarySheet";
 import { ToolCommentsPanel } from "@/components/comments/ToolCommentsPanel";
 import { ToolRelationsPanel } from "@/components/entities/ToolRelationsPanel";
 import { FILE_BODIES } from "@/components/files/detail/fileBodies";
-import { FileAISummary } from "@/components/files/FileAISummary";
 import { FileFeaturedImage } from "@/components/files/FileFeaturedImage";
-import { FileSidePanel, useFileSidePanel } from "@/components/files/FileSidePanel";
 import { clearWhiteboardSceneCache } from "@/components/files/whiteboardSceneCache";
 import { FileDetailSkeleton } from "@/components/skeletons/PageSkeletons";
 import { ToolAccessStatus } from "@/components/ToolAccessStatus";
@@ -60,10 +59,10 @@ export const FileDetailPage = () => {
   const { activeCommunityId } = useCommunities();
   const communityId = Number(communityIdParam);
   const gp = useCommunityPath();
-  const sidePanel = useFileSidePanel();
+  const sidePanel = useSummarySheet("file-side-panel-open");
   const outline = useDocumentOutline();
   const { isEnabled: isAIEnabled } = useAIEnabled();
-  const [aiSummary, setAiSummary] = useState<string | null>(null);
+  const [aiSummary, setAiSummary] = useState<AISummary | null>(null);
   const [featuredImageUrl, setFeaturedImageUrl] = useState<string | null>(null);
   const [isUploadingFeaturedImage, setIsUploadingFeaturedImage] = useState(false);
   // What the body last reported, and for which file: the page's copy of
@@ -795,12 +794,12 @@ export const FileDetailPage = () => {
 
       {/* Side panel for the AI summary */}
       {showSummaryTab && (
-        <FileSidePanel
-          isOpen={sidePanel.isOpen}
+        <SummarySheet
+          open={sidePanel.isOpen}
           onOpenChange={sidePanel.setIsOpen}
-          summaryContent={
-            <FileAISummary fileId={parsedId} summary={aiSummary} onSummaryChange={setAiSummary} />
-          }
+          request={(options, signal) => generateSummary(communityId, parsedId, options, signal)}
+          summary={aiSummary}
+          onSummaryChange={setAiSummary}
         />
       )}
     </div>

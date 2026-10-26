@@ -4,7 +4,7 @@ icon: lucide/sparkles
 
 # AI features
 
-Initiative has optional AI help for the boring parts — drafting a task description, breaking a task into a checklist, summarising a file.
+Initiative has optional AI help for the boring parts — drafting a task description, breaking a task into a checklist, summarising a file or a wiki page.
 
 Optional, off unless somebody deliberately switches it on, and never quietly running in the background while you weren't looking.
 
@@ -14,13 +14,15 @@ When AI is switched on, you'll see **Generate** options in a few places:
 
 - Drafting or improving a **task description**.
 - Suggesting a **checklist** to break something down.
-- Producing a **summary** of a file.
+- Producing a **summary** of a file or a wiki page.
 
 You ask each time. Nothing writes itself while you're making tea.
 
 A task's description and checklist are written from the whole task, not just its title. That means its existing checklist (so you aren't offered "Book the hall" twice), the project it's in, the unfinished tasks linked to it, and its comments, newest first. A thread that has run to forty comments may not all fit. When that happens you're told how many were read, so the suggestion that ignores what Priya said on Tuesday comes with a reason.
 
 Nothing is saved until you say so. Checklist suggestions arrive ticked, and you untick what you don't want. A written description lands in your draft, and **Undo suggestion** puts back whatever you had before.
+
+A summary writes itself in as you watch, from the page as it reads right now, including whatever a colleague typed into it ten seconds ago. A very long document may not all fit, in which case the summary says how far in it got. The constitution's appendices will survive being left out.
 
 ## Who sets it up
 

@@ -122,9 +122,6 @@
     "dangerDescription": "Los archivos eliminados van a la papelera y pueden restaurarse antes de que finalice el período de retención de la comunidad.",
     "deleting": "Eliminando…"
   },
-  "sidePanel": {
-    "summaryTab": "Resumen"
-  },
   "smartLink": {
     "missingUrl": "Este enlace inteligente no tiene URL.",
     "openInNewTab": "Abrir en nueva pestaña",
@@ -295,15 +292,6 @@
       "replaced_one": "{{count}} celda reemplazada",
       "replaced_other": "{{count}} celdas reemplazadas"
     }
-  },
-  "summary": {
-    "aiNotEnabled": "Las funciones de IA no están habilitadas. Configura los ajustes de IA para generar resúmenes de archivos.",
-    "generateDescription": "Genera un resumen del archivo con inteligencia artificial.",
-    "generateButton": "Generar resumen",
-    "generateError": "No se pudo generar el resumen. Por favor intenta de nuevo.",
-    "generating": "Generando resumen…",
-    "copy": "Copiar resumen",
-    "regenerate": "Regenerar resumen"
   },
   "type": {
     "template": "Plantilla",

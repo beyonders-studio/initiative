@@ -10,6 +10,7 @@ from __future__ import annotations
 
 import json
 
+import pytest
 from httpx import AsyncClient
 from sqlmodel.ext.asyncio.session import AsyncSession
 
@@ -17,14 +18,21 @@ from app.core.audit_events import AuditEventType
 from app.core.messages import AIMessages
 from app.models.platform.guild import CommunityRole
 from app.schemas.ai_settings import AIProvider, ConnectionScope, ResolvedAISettings
+from app.services import ai_generation
 from app.services.ai_context import TaskContext
-from app.testing import create_file, create_task, emitted
+from app.testing import (
+    create_file,
+    create_task,
+    create_wiki,
+    create_wiki_page,
+    emitted,
+)
 
 
 CONNECTION_ID = 41
 
 
-def _wire_ai(monkeypatch, module) -> None:
+def _wire_ai(monkeypatch) -> None:
     """A resolved connection for the endpoint's own look at the settings."""
     resolved = ResolvedAISettings(
         enabled=True,
@@ -39,20 +47,17 @@ def _wire_ai(monkeypatch, module) -> None:
     async def _resolve(session, guild_id=None):
         return resolved
 
-    monkeypatch.setattr(module, "resolve_ai_settings", _resolve)
+    monkeypatch.setattr(ai_generation, "resolve_ai_settings", _resolve)
 
 
 async def test_a_checklist_request_records_what_carried_it(
     client: AsyncClient, session: AsyncSession, acting_user, monkeypatch, capfd
 ):
-    from app.api.v1.tenant_endpoints import tasks as tasks_endpoints
-    from app.services import ai_generation
-
     a = await acting_user(
         guild_role=CommunityRole.member, initiative=True, project=True
     )
     task = await create_task(session, a.project, title="Ship it")
-    _wire_ai(monkeypatch, tasks_endpoints)
+    _wire_ai(monkeypatch)
 
     async def _generate(*args, **kwargs):
         return ["Step one"], TaskContext("{}", 0, 0)
@@ -82,14 +87,11 @@ async def test_a_checklist_request_records_what_carried_it(
 async def test_a_description_request_records_its_own_purpose(
     client: AsyncClient, session: AsyncSession, acting_user, monkeypatch, capfd
 ):
-    from app.api.v1.tenant_endpoints import tasks as tasks_endpoints
-    from app.services import ai_generation
-
     a = await acting_user(
         guild_role=CommunityRole.member, initiative=True, project=True
     )
     task = await create_task(session, a.project)
-    _wire_ai(monkeypatch, tasks_endpoints)
+    _wire_ai(monkeypatch)
 
     async def _generate(*args, **kwargs):
         return "A description", TaskContext("{}", 0, 0)
@@ -107,27 +109,37 @@ async def test_a_description_request_records_its_own_purpose(
     assert row["target"] == {"type": "task", "id": task.id}
 
 
-async def test_a_file_summary_records_the_file_it_sent(
-    client: AsyncClient, session: AsyncSession, acting_user, monkeypatch, capfd
+@pytest.mark.parametrize("kind", ["file", "wiki_page"])
+async def test_a_summary_records_the_document_it_sent(
+    client: AsyncClient, session: AsyncSession, acting_user, monkeypatch, capfd, kind
 ):
-    from app.api.v1.tenant_endpoints import files as files_endpoints
-
     a = await acting_user(guild_role=CommunityRole.member, initiative=True)
-    file = await create_file(session, a.initiative, a.user)
-    _wire_ai(monkeypatch, files_endpoints)
+    if kind == "file":
+        document = await create_file(session, a.initiative, a.user)
+        path = f"/files/{document.id}/ai/summary"
+    else:
+        wiki = await create_wiki(session, a.initiative, a.user)
+        document = await create_wiki_page(session, wiki, a.user)
+        path = f"/wiki-pages/{document.id}/ai/summary"
+    _wire_ai(monkeypatch)
 
-    async def _summarize(**kwargs):
-        return "A summary"
+    async def _summarize(*args, **kwargs):
+        async def lines():
+            yield '{"text":"A summary"}\n'
 
-    monkeypatch.setattr(files_endpoints, "generate_file_summary", _summarize)
+        return lines()
+
+    monkeypatch.setattr(ai_generation, "summarize", _summarize)
     capfd.readouterr()
 
-    response = await client.post(a.g(f"/files/{file.id}/ai/summary"), headers=a.headers)
+    response = await client.post(a.g(path), headers=a.headers)
     assert response.status_code == 200, response.text
+    assert response.headers["content-type"].startswith("application/jsonl")
+    assert response.text == '{"text":"A summary"}\n'
 
     (row,) = emitted(capfd, AuditEventType.AI_REQUEST_SENT)
     assert row["actor_user_id"] == a.user.id
-    assert row["target"] == {"type": "file", "id": file.id}
+    assert row["target"] == {"type": kind, "id": document.id}
     assert row["detail"]["purpose"] == "summary"
     assert row["detail"]["initiative_id"] == a.initiative.id
 
