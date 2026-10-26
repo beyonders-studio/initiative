@@ -220,7 +220,7 @@ describe("comparing sets of links", () => {
     it("reads a file or a picture as something attached", () => {
       expect(defaultGroupFor(SearchEntityType.task, SearchEntityType.file)).toBe("attached");
       expect(defaultGroupFor(SearchEntityType.file, SearchEntityType.task)).toBe("attached");
-      expect(defaultGroupFor(SearchEntityType.project, SearchEntityType.gallery_image)).toBe(
+      expect(defaultGroupFor(SearchEntityType.project, SearchEntityType.catalog_item)).toBe(
         "attached"
       );
     });

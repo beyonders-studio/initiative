@@ -7,7 +7,7 @@
  * Every list keeps its view here, in one shape:
  *
  * - `layout`: which way they were last looking at it, where it offers several
- *   (a project's list layouts; a queue's list or on-deck; a gallery's
+ *   (a project's list layouts; a queue's list or on-deck; a catalog's
  *   masonry, grid or timeline);
  * - `mode`: a calendar's month, week, day or list, or a Gantt's scale;
  * - `parts`: for each layout (one, `LIST`, where there is only one), their

@@ -27,7 +27,7 @@ from app.models.platform.guild import CommunityRole
 from app.models.tenant.calendar_event import CalendarEvent
 from app.models.tenant.comment import Comment
 from app.models.tenant.counter import Counter
-from app.models.tenant.gallery import GalleryImage
+from app.models.tenant.catalog import CatalogItem
 from app.models.tenant.queue import QueueItem
 from app.models.tenant.task import Task
 from app.models.tenant.wiki import WikiPage
@@ -235,8 +235,8 @@ CHILDREN = {
         "wiki-pages",
         lambda s, tool, user, name: create_wiki_page(s, tool, user, title=name),
     ),
-    # Copied with its gallery, not on its own.
-    GalleryImage: None,
+    # Copied with its catalog, not on its own.
+    CatalogItem: None,
 }
 
 

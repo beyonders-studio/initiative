@@ -19,7 +19,7 @@ The [user guide](https://beyonders-studio.github.io/initiative/) covers using In
 
 - Projects and tasks, with board, table and calendar views
 - Files with real-time editing, including documents, spreadsheets and whiteboards
-- Calendars, posts, wikis, galleries, queues, counters and dashboards
+- Calendars, posts, wikis, catalogs, queues, counters and dashboards
 - Communities with initiatives inside them, and sharing down to a single project or file
 - A marketplace of plug-ins, dashboards and ready-made projects, fed by the Initiative registry
 - Apps for iPhone, Android, Windows, Mac and Linux, and an installable web app

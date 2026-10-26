@@ -422,10 +422,10 @@
       "this": "diesen Beitrag",
       "plural": "Beiträge"
     },
-    "gallery": {
-      "name": "Galerie",
-      "this": "diese Galerie",
-      "plural": "Galerien"
+    "catalog": {
+      "name": "Katalog",
+      "this": "dieser Katalog",
+      "plural": "Kataloge"
     },
     "wiki": {
       "name": "Wiki",
@@ -452,7 +452,7 @@
       "this": "diesen Zähler",
       "plural": "Zähler"
     },
-    "gallery_image": {
+    "catalog_item": {
       "name": "Bild",
       "this": "dieses Bild",
       "plural": "Bilder"

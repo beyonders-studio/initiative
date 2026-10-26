@@ -228,10 +228,10 @@
   },
   "tab": "Layouts",
   "settingsDescription": "Wie es anordnet, was es enthält: jedes Layout, wann es zuletzt geändert wurde, und der Weg in den Editor. Alle, die es öffnen können, sehen sie; was jede Person filtert und sortiert, gehört ihr.",
-  "galleryImageDetail": {
+  "catalogItemDetail": {
     "name": "Bild-Detailansicht",
-    "help": "Wie jedes Bild dieser Galerie beim Öffnen angezeigt wird. Was es weglässt, ist ausgeblendet.",
-    "shipped": "Das ist das Layout wie ausgeliefert. Eine Änderung macht es zum Layout der Galerie.",
+    "help": "Wie jedes Bild dieses Katalogs beim Öffnen angezeigt wird. Was es weglässt, ist ausgeblendet.",
+    "shipped": "Das ist das Layout wie ausgeliefert. Eine Änderung macht es zum Layout des Katalogs.",
     "titleHelp": "Jedes Bild zeigt seinen Titel.",
     "hiddenHelp": "Jedes Bild kann dies zeigen. Entfernt ist es ausgeblendet, und Hinzufügen bringt es zurück.",
     "parts": {
@@ -248,7 +248,7 @@
       "about": "Wer es wann hinzugefügt hat, und seine Datei.",
       "versions": "Jede hochgeladene Version, und eine neue hochladen."
     },
-    "noItems": "Füge der Galerie ein Bild hinzu, um hier sein Layout zu sehen."
+    "noItems": "Füge dem Katalog ein Bild hinzu, um hier sein Layout zu sehen."
   },
   "counterDetail": {
     "name": "Zähler-Detailansicht",

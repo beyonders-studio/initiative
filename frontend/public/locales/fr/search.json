@@ -36,8 +36,8 @@
     "tag": "Étiquette",
     "comment": "Commentaire",
     "post": "Publication",
-    "gallery": "Galerie",
-    "gallery_image": "Image"
+    "catalog": "Catalogue",
+    "catalog_item": "Image"
   },
   "switchHint": "Tab pour changer",
   "closeMatches": "Rien ne correspond exactement à « {{query}} ». Voici ce qui s’en rapproche le plus.",

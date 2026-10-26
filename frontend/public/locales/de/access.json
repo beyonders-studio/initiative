@@ -112,8 +112,8 @@
     "resource_dashboard_other": "Dashboards",
     "resource_post_one": "Beitrag",
     "resource_post_other": "Beiträge",
-    "resource_gallery_one": "Galerie",
-    "resource_gallery_other": "Galerien",
+    "resource_catalog_one": "Katalog",
+    "resource_catalog_other": "Kataloge",
     "resource_wiki_one": "Wiki",
     "resource_wiki_other": "Wikis"
   }

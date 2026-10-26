@@ -45,7 +45,7 @@ export const INSTANCE_LAYOUT_TOOLS: ReadonlySet<Tool> = new Set([
   Tool.project,
   Tool.queue,
   Tool.counter_group,
-  Tool.gallery,
+  Tool.catalog,
 ]);
 
 /** The layouts one instance of a tool keeps as its own: a project's, a queue's. */

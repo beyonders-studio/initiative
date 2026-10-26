@@ -20,11 +20,11 @@ import {
   readCalendarEvent,
 } from "@/api/generated/calendar-events/calendar-events";
 import { getReadCalendarQueryKey, readCalendar } from "@/api/generated/calendars/calendars";
+import { getReadCatalogQueryKey, readCatalog } from "@/api/generated/catalogs/catalogs";
 import { getReadCommentQueryKey, readComment } from "@/api/generated/comments/comments";
 import { getReadCounterGroupQueryKey, readCounterGroup } from "@/api/generated/counters/counters";
 import { getReadDashboardQueryKey, readDashboard } from "@/api/generated/dashboards/dashboards";
 import { getReadFileQueryKey, readFile } from "@/api/generated/files/files";
-import { getReadGalleryQueryKey, readGallery } from "@/api/generated/galleries/galleries";
 import { SearchEntityType, Tool } from "@/api/generated/initiativeAPI.schemas";
 import { getReadPostQueryKey, readPost } from "@/api/generated/posts/posts";
 import { getReadProjectQueryKey, readProject } from "@/api/generated/projects/projects";
@@ -95,9 +95,9 @@ const TOOL_READS: Record<
     key: getReadPostQueryKey,
     read: readPost,
   },
-  [Tool.gallery]: {
-    key: getReadGalleryQueryKey,
-    read: readGallery,
+  [Tool.catalog]: {
+    key: getReadCatalogQueryKey,
+    read: readCatalog,
   },
   [Tool.wiki]: {
     key: getReadWikiQueryKey,

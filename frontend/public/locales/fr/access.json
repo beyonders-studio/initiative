@@ -112,8 +112,8 @@
     "resource_dashboard_other": "tableaux de bord",
     "resource_post_one": "publication",
     "resource_post_other": "publications",
-    "resource_gallery_one": "galerie",
-    "resource_gallery_other": "galeries",
+    "resource_catalog_one": "catalogue",
+    "resource_catalog_other": "catalogues",
     "resource_wiki_one": "wiki",
     "resource_wiki_other": "wikis"
   }

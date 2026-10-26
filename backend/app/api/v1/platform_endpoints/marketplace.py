@@ -525,7 +525,7 @@ async def upload_listing_picture(
     """Upload a picture for a listing file (``config.manage``).
 
     Returns the path the marketplace serves it from, for the manifest to name —
-    as the listing's artwork, or as a picture in its content (a gallery's, an
+    as the listing's artwork, or as a picture in its content (a catalog's, an
     image in a document). A listing's pictures are only ever uploaded like
     this; none is taken from a community.
     """

@@ -63,12 +63,12 @@ describe("EntityCard", () => {
   });
 
   it("draws every picture a thing offers, not just the first", async () => {
-    // A gallery nobody picked a cover for stands for itself with its newest
+    // A catalog nobody picked a cover for stands for itself with its newest
     // few, the way it does everywhere else in the app.
     const { container } = renderCard({
       end: end({
-        type: SearchEntityType.gallery,
-        tool: Tool.gallery,
+        type: SearchEntityType.catalog,
+        tool: Tool.catalog,
         image_urls: ["/uploads/3/a.webp", "/uploads/3/b.webp", "/uploads/3/c.webp"],
       }),
     });
@@ -79,8 +79,8 @@ describe("EntityCard", () => {
   it("draws the one picture a thing chose on its own", async () => {
     const { container } = renderCard({
       end: end({
-        type: SearchEntityType.gallery,
-        tool: Tool.gallery,
+        type: SearchEntityType.catalog,
+        tool: Tool.catalog,
         image_urls: ["/uploads/3/cover.webp"],
       }),
     });

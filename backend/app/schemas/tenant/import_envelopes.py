@@ -192,12 +192,12 @@ class WikiEnvelope(_EnvelopeBase):
     files: list[WikiFiledFile] = []
 
 
-class GalleryImageEnvelope(SanitizedBaseModel):
+class CatalogItemEnvelope(SanitizedBaseModel):
     """One picture: what the row says about it, and the key naming its bytes.
 
     ``storage_key`` is the blob's name under ``assets/`` in the backup zip. A
     picture whose bytes did not travel is skipped on apply and counted — a
-    gallery row pointing at a file that is not there would render as a broken
+    catalog row pointing at a file that is not there would render as a broken
     tile forever.
     """
 
@@ -218,21 +218,21 @@ class GalleryImageEnvelope(SanitizedBaseModel):
     external_ref: Optional[str] = None
 
 
-class GalleryEnvelope(_EnvelopeBase):
-    """A gallery and its pictures.
+class CatalogEnvelope(_EnvelopeBase):
+    """A catalog and its pictures.
 
     Only meaningful inside a backup: the bytes ride under ``assets/`` and the
-    images name them by key. Thumbnails are not carried — the app makes those
+    items name them by key. Thumbnails are not carried — the app makes those
     from the picture.
     """
 
-    type: Literal["initiative-gallery"]
+    type: Literal["initiative-catalog"]
     name: str
     description: Optional[str] = None
     cover: Optional[str] = None
     tags: list[str] = []
     properties: list[EnvelopePropertyValue] = []
-    images: list[GalleryImageEnvelope] = []
+    items: list[CatalogItemEnvelope] = []
 
 
 class QueueEnvelopeItem(SanitizedBaseModel):

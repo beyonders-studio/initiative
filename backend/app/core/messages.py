@@ -1199,10 +1199,10 @@ class PostMessages:
     POLL_NOT_PUBLISHED = "POST_POLL_NOT_PUBLISHED"
 
 
-class GalleryMessages:
-    IMAGE_TOO_LARGE = "GALLERY_IMAGE_TOO_LARGE"
-    #: A cover has to be one of the gallery's own pictures.
-    COVER_NOT_IN_GALLERY = "GALLERY_COVER_NOT_IN_GALLERY"
+class CatalogMessages:
+    IMAGE_TOO_LARGE = "CATALOG_ITEM_TOO_LARGE"
+    #: A cover has to be one of the catalog's own pictures.
+    COVER_NOT_IN_CATALOG = "CATALOG_COVER_NOT_IN_CATALOG"
 
 
 class WikiMessages:

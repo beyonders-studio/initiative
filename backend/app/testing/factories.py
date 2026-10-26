@@ -51,7 +51,7 @@ from app.models.platform.marketplace import (
 )
 from app.models.tenant.dashboard import Dashboard
 from app.models.tenant.post import Post
-from app.models.tenant.gallery import Gallery, GalleryImage
+from app.models.tenant.catalog import Catalog, CatalogItem
 from app.models.tenant.wiki import Wiki, WikiPage
 from app.models.tenant.post_poll import PostPoll, PostPollOption
 from app.models.tenant.guild_plugin import GuildPlugin
@@ -1841,7 +1841,7 @@ def png_bytes(
     )
 
 
-async def create_gallery(
+async def create_catalog(
     session: AsyncSession,
     initiative: Initiative,
     creator: User,
@@ -1849,42 +1849,42 @@ async def create_gallery(
     name: str | None = None,
     commit: bool = True,
     **overrides: Any,
-) -> Gallery:
-    """Create a test gallery with sensible defaults.
+) -> Catalog:
+    """Create a test catalog with sensible defaults.
 
     Mirrors the create endpoint's default sharing: the creator owns it and
     every initiative member can read it. The initiative is expected to be
-    galleries-enabled.
+    catalogs-enabled.
     """
     await route_session_to_guild(session, guild_of(initiative))
 
     defaults = {
         "initiative_id": initiative.id,
         "created_by": creator.id,
-        "name": name or f"Gallery {datetime.now(timezone.utc).timestamp()}",
+        "name": name or f"Catalog {datetime.now(timezone.utc).timestamp()}",
     }
-    gallery = Gallery(**{**defaults, **overrides})
-    session.add(gallery)
+    catalog = Catalog(**{**defaults, **overrides})
+    session.add(catalog)
 
     if commit:
         await session.commit()
-        await session.refresh(gallery)
+        await session.refresh(catalog)
 
         await create_resource_grant(
             session,
-            gallery,
+            catalog,
             level=ResourceAccessLevel.owner,
             user=creator,
             commit=False,
         )
-        await create_resource_grant(session, gallery, all_initiative_members=True)
+        await create_resource_grant(session, catalog, all_initiative_members=True)
 
-    return gallery
+    return catalog
 
 
-async def create_gallery_image(
+async def create_catalog_item(
     session: AsyncSession,
-    gallery: Gallery,
+    catalog: Catalog,
     uploader: User,
     *,
     title: str | None = None,
@@ -1893,8 +1893,8 @@ async def create_gallery_image(
     write_blob: bool = True,
     commit: bool = True,
     **overrides: Any,
-) -> GalleryImage:
-    """Create a test picture in a gallery, with its first version and its
+) -> CatalogItem:
+    """Create a test picture in a catalog, with its first version and its
     ``uploads`` row. File overrides (``thumbnail_url``, …) go on the version.
 
     ``write_blob`` puts a real PNG in the guild's storage under the version's
@@ -1903,13 +1903,13 @@ async def create_gallery_image(
     """
     from app.services.storage import get_guild_storage
 
-    await route_session_to_guild(session, guild_of(gallery))
+    await route_session_to_guild(session, guild_of(catalog))
 
     data = png_bytes(width, height)
     filename = f"{uuid.uuid4().hex}.png"
-    file_url = f"/uploads/{guild_of(gallery)}/{filename}"
+    file_url = f"/uploads/{guild_of(catalog)}/{filename}"
     if write_blob:
-        get_guild_storage(guild_of(gallery)).write(
+        get_guild_storage(guild_of(catalog)).write(
             filename, data, content_type="image/png"
         )
     session.add(
@@ -1930,8 +1930,8 @@ async def create_gallery_image(
         "height": height,
         **_file_overrides(overrides),
     }
-    defaults = {"gallery_id": gallery.id, "created_by": uploader.id, "title": title}
-    image = GalleryImage(**{**defaults, **overrides})
+    defaults = {"catalog_id": catalog.id, "created_by": uploader.id, "title": title}
+    image = CatalogItem(**{**defaults, **overrides})
     session.add(image)
     await session.flush()
     await file_versions.add_version(session, image, created_by=uploader.id, **picture)
@@ -2066,7 +2066,7 @@ async def create_comment(
     calendar: Calendar | None = None,
     dashboard: Dashboard | None = None,
     post: Post | None = None,
-    gallery: Gallery | None = None,
+    catalog: Catalog | None = None,
     content: str = "A test comment",
     commit: bool = True,
     **overrides: Any,
@@ -2083,7 +2083,7 @@ async def create_comment(
         Tool.calendar.value: calendar,
         Tool.dashboard.value: dashboard,
         Tool.post.value: post,
-        Tool.gallery.value: gallery,
+        Tool.catalog.value: catalog,
         Tool.wiki.value: wiki,
     }
     # Keyed by the enum rather than by string literals, and checked against it:
@@ -2612,7 +2612,7 @@ TOOL_FACTORIES: dict[Tool, Any] = {
     Tool.calendar: create_calendar,
     Tool.dashboard: create_dashboard,
     Tool.post: create_post,
-    Tool.gallery: create_gallery,
+    Tool.catalog: create_catalog,
     Tool.wiki: create_wiki,
 }
 
@@ -2648,7 +2648,7 @@ CHILD_FACTORIES: dict[str, Any] = {
     "counter": lambda session, group, creator, **kw: create_counter(
         session, group, **kw
     ),
-    "gallery_image": create_gallery_image,
+    "catalog_item": create_catalog_item,
     "wiki_page": create_wiki_page,
 }
 

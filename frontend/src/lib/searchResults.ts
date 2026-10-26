@@ -68,11 +68,11 @@ const TOOL_CHILDREN: Partial<Record<SearchEntityType, ToolChild>> = {
     icon: Ticket,
     path: (initiativeId, queueId) => toolDetailRoute(Tool.queue, initiativeId, queueId),
   },
-  // A picture is browsed in its gallery rather than on a page of its own, so
-  // a hit lands on the gallery.
-  [SearchEntityType.gallery_image]: {
+  // A picture is browsed in its catalog rather than on a page of its own, so
+  // a hit lands on the catalog.
+  [SearchEntityType.catalog_item]: {
     icon: Image,
-    path: (initiativeId, galleryId) => toolDetailRoute(Tool.gallery, initiativeId, galleryId),
+    path: (initiativeId, catalogId) => toolDetailRoute(Tool.catalog, initiativeId, catalogId),
   },
   // A wiki page IS read on a page of its own, inside its wiki — so unlike the
   // rest of these it keeps its own id in the address. Without an entry here it

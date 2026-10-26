@@ -333,7 +333,7 @@ async def _tool_with_a_row(session, a, tool):
         "queue",
         "counter_group",
         "calendar",
-        "gallery",
+        "catalog",
         "wiki",
         "dashboard",
         "post",
@@ -3556,39 +3556,39 @@ async def _import_archive(client, actor, zip_bytes, initiative_id, envelope_type
     return await client.post(
         actor.g("/imports/envelope/archive"),
         headers=actor.headers,
-        files={"file": ("gallery.zip", zip_bytes, "application/zip")},
+        files={"file": ("catalog.zip", zip_bytes, "application/zip")},
         data=data,
     )
 
 
-async def test_a_gallery_zip_imports_with_its_pictures_into_another_community(
+async def test_a_catalog_zip_imports_with_its_pictures_into_another_community(
     client, acting_user, session, monkeypatch, tmp_path
 ):
-    """A gallery exported on its own is a zip of its envelope and its pictures,
+    """A catalog exported on its own is a zip of its envelope and its pictures,
     and importing that zip somewhere the pictures have never been stored brings
     them along: each lands in the community's storage under its key, and the
-    gallery shows it."""
+    catalog shows it."""
     from sqlmodel import select
 
     from app.api.v1.tenant_endpoints.exports_test import _all_tools_enabled
     from app.core.config import settings
-    from app.models.tenant.gallery import Gallery, GalleryImage
+    from app.models.tenant.catalog import Catalog, CatalogItem
     from app.testing import route_session_to_guild
-    from app.testing.factories import create_gallery, create_gallery_image
+    from app.testing.factories import create_catalog, create_catalog_item
 
     monkeypatch.setattr(settings, "UPLOADS_DIR", str(tmp_path))
     a = await acting_user(
         guild_role=CommunityRole.member, initiative=True, project=True
     )
     await _all_tools_enabled(session, a.initiative)
-    gallery = await create_gallery(session, a.initiative, a.user, name="Barovia maps")
-    picture = await create_gallery_image(session, gallery, a.user, title="Village")
+    catalog = await create_catalog(session, a.initiative, a.user, name="Barovia maps")
+    picture = await create_catalog_item(session, catalog, a.user, title="Village")
     key = picture.current_version.file_url.rsplit("/", 1)[-1]
 
     exported = await client.get(
-        a.g("/exports/gallery"),
+        a.g("/exports/catalog"),
         headers=a.headers,
-        params={"ids": [gallery.id], "format": "json"},
+        params={"ids": [catalog.id], "format": "json"},
     )
     assert exported.status_code == 200, exported.text
 
@@ -3596,7 +3596,7 @@ async def test_a_gallery_zip_imports_with_its_pictures_into_another_community(
     await _all_tools_enabled(session, b.initiative)
     assert get_guild_storage(b.guild.id).exists(key) is False
     resp = await _import_archive(
-        client, b, exported.content, b.initiative.id, "initiative-gallery"
+        client, b, exported.content, b.initiative.id, "initiative-catalog"
     )
     assert resp.status_code == 201, resp.text
     assert resp.json()["result"]["created"]["images"] == 1
@@ -3605,12 +3605,12 @@ async def test_a_gallery_zip_imports_with_its_pictures_into_another_community(
     await route_session_to_guild(session, b.guild.id)
     restored = (
         await session.exec(
-            select(Gallery).where(Gallery.initiative_id == b.initiative.id)
+            select(Catalog).where(Catalog.initiative_id == b.initiative.id)
         )
     ).one()
     [image] = (
         await session.exec(
-            select(GalleryImage).where(GalleryImage.gallery_id == restored.id)
+            select(CatalogItem).where(CatalogItem.catalog_id == restored.id)
         )
     ).all()
     # The picture is its version 1, typed from its bytes.
@@ -3742,11 +3742,11 @@ async def test_a_wiki_zip_brings_its_filed_files_back_where_they_were(
     ).all()
 
 
-async def test_a_gallery_zip_leaves_out_what_is_not_a_picture(
+async def test_a_catalog_zip_leaves_out_what_is_not_a_picture(
     client, acting_user, session
 ):
     """The zip says what its files are; the bytes decide. A file that is not a
-    picture a gallery can show is not stored, and the import says so."""
+    picture a catalog can show is not stored, and the import says so."""
     from app.api.v1.tenant_endpoints.exports_test import _all_tools_enabled
 
     a = await acting_user(
@@ -3754,7 +3754,7 @@ async def test_a_gallery_zip_leaves_out_what_is_not_a_picture(
     )
     await _all_tools_enabled(session, a.initiative)
     envelope = {
-        "type": "initiative-gallery",
+        "type": "initiative-catalog",
         "schema_version": 1,
         "name": "Handouts",
         "images": [
@@ -3763,7 +3763,7 @@ async def test_a_gallery_zip_leaves_out_what_is_not_a_picture(
     }
     buffer = io.BytesIO()
     with zipfile.ZipFile(buffer, "w") as archive:
-        archive.writestr("handouts.initiative-gallery.json", json.dumps(envelope))
+        archive.writestr("handouts.initiative-catalog.json", json.dumps(envelope))
         archive.writestr("assets/note.png", b"<svg onload='x'></svg>")
 
     resp = await _import_archive(client, a, buffer.getvalue(), a.initiative.id)
@@ -3793,7 +3793,7 @@ async def test_a_zip_is_refused_from_the_wrong_tool_or_without_an_export(
 
     queue = json.dumps({"type": "initiative-queue", "schema_version": 1, "name": "Q"})
     wrong = await _import_archive(
-        client, a, zipped(**{"q.json": queue}), a.initiative.id, "initiative-gallery"
+        client, a, zipped(**{"q.json": queue}), a.initiative.id, "initiative-catalog"
     )
     assert wrong.status_code == 400
     assert wrong.json()["detail"] == "IMPORT_WRONG_TOOL"

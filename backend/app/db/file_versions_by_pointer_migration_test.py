@@ -17,8 +17,8 @@ from sqlalchemy import text
 from app.models.tenant.file import FileType
 from app.testing import (
     create_file,
-    create_gallery,
-    create_gallery_image,
+    create_catalog,
+    create_catalog_item,
     create_guild,
     create_initiative,
     create_user,
@@ -61,8 +61,8 @@ async def test_old_files_get_versions_types_and_pointers(
     )
     named = await create_file(session, initiative, user)
     nameless = await create_file(session, initiative, user)
-    picture = await create_gallery_image(
-        session, await create_gallery(session, initiative, user), user
+    picture = await create_catalog_item(
+        session, await create_catalog(session, initiative, user), user
     )
     migration = _load()
     files = _load(_FILES)
@@ -93,13 +93,13 @@ async def test_old_files_get_versions_types_and_pointers(
             ),
             {"url": url, "name": filename, "id": document.id},
         )
-    # A picture an import stored under a type its gallery does not show.
+    # A picture an import stored under a type its catalog does not show.
     await (await session.connection()).execute(
         text(
-            f"UPDATE {schema}.gallery_image_versions"
+            f"UPDATE {schema}.catalog_item_versions"
             " SET file_content_type = 'application/octet-stream',"
             " original_filename = 'foo.bin', file_url = '/uploads/1/foo.bin'"
-            " WHERE gallery_image_id = :id"
+            " WHERE catalog_item_id = :id"
         ),
         {"id": picture.id},
     )
@@ -129,8 +129,8 @@ async def test_old_files_get_versions_types_and_pointers(
     shown = (
         await (await session.connection()).execute(
             text(
-                f"SELECT v.file_content_type FROM {schema}.gallery_images i"
-                f" JOIN {schema}.gallery_image_versions v ON v.id = i.current_version_id"
+                f"SELECT v.file_content_type FROM {schema}.catalog_items i"
+                f" JOIN {schema}.catalog_item_versions v ON v.id = i.current_version_id"
                 " WHERE i.id = :id"
             ),
             {"id": picture.id},
@@ -142,7 +142,7 @@ async def test_old_files_get_versions_types_and_pointers(
             text(
                 "SELECT count(*) FROM information_schema.columns"
                 " WHERE table_schema = :schema"
-                " AND table_name IN ('documents', 'gallery_images')"
+                " AND table_name IN ('documents', 'catalog_items')"
                 " AND column_name IN ('file_url', 'file_content_type')"
             ),
             {"schema": schema},

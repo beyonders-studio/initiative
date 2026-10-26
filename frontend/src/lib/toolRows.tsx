@@ -15,10 +15,10 @@ import type { ReactNode } from "react";
 
 import type {
   CalendarListResponse,
+  CatalogListResponse,
   CounterGroupListResponse,
   DashboardListResponse,
   FileListResponse,
-  GalleryListResponse,
   PostListResponse,
   ProjectListResponse,
   QueueListResponse,
@@ -63,7 +63,7 @@ export const TOOL_HAS_DETAIL: Record<Tool, boolean> = {
   [Tool.calendar]: true,
   [Tool.dashboard]: true,
   [Tool.post]: true,
-  [Tool.gallery]: false,
+  [Tool.catalog]: false,
   [Tool.wiki]: false,
 };
 
@@ -86,7 +86,7 @@ export type ToolResponses = {
   [Tool.calendar]: CalendarListResponse | undefined;
   [Tool.dashboard]: DashboardListResponse | undefined;
   [Tool.post]: PostListResponse | undefined;
-  [Tool.gallery]: GalleryListResponse | undefined;
+  [Tool.catalog]: CatalogListResponse | undefined;
   [Tool.wiki]: WikiListResponse | undefined;
 };
 
@@ -232,16 +232,16 @@ export function buildToolRows(
         // with the people it mentions left in for the table to name.
         detail: post.excerpt,
       }));
-    case Tool.gallery:
-      return (data[Tool.gallery]?.items ?? []).map((gallery) => ({
-        id: gallery.id,
-        communityId: gallery.community_id ?? fallbackCommunityId,
-        name: gallery.name,
-        href: href(gallery.id, gallery.initiative_id),
+    case Tool.catalog:
+      return (data[Tool.catalog]?.items ?? []).map((catalog) => ({
+        id: catalog.id,
+        communityId: catalog.community_id ?? fallbackCommunityId,
+        name: catalog.name,
+        href: href(catalog.id, catalog.initiative_id),
         glyph: null,
-        initiativeId: gallery.initiative_id,
-        tags: gallery.tags,
-        updatedAt: gallery.updated_at,
+        initiativeId: catalog.initiative_id,
+        tags: catalog.tags,
+        updatedAt: catalog.updated_at,
       }));
     case Tool.wiki:
       return (data[Tool.wiki]?.items ?? []).map((wiki) => ({

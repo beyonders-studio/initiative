@@ -255,7 +255,7 @@ def _without_location(data: bytes, content_type: str) -> bytes:
         return data
     from PIL import Image, UnidentifiedImageError
 
-    from app.services.tenant.galleries import MAX_IMAGE_PIXELS
+    from app.services.tenant.catalogs import MAX_IMAGE_PIXELS
 
     try:
         with warnings.catch_warnings():

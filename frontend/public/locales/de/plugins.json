@@ -285,9 +285,9 @@
         "read": "Beiträge lesen",
         "write": "Beiträge lesen und ändern"
       },
-      "galleries": {
-        "read": "Galerien lesen",
-        "write": "Galerien lesen und ändern"
+      "catalogs": {
+        "read": "Kataloge lesen",
+        "write": "Kataloge lesen und ändern"
       },
       "wikis": {
         "read": "Wikis lesen",

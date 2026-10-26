@@ -158,7 +158,7 @@ type Held<I> = I & { [OVER]?: I };
 /**
  * An item as the page passed it, or as a save of it answered over that same
  * copy, with saves not yet answered shown over either: for an item with no
- * read of its own (one the queue's or the gallery's read carries), whose save
+ * read of its own (one the queue's or the catalog's read carries), whose save
  * kind's read key is {@link heldKey}. An answer stands until the page passes
  * a newer copy: the one it was answered over (a dialog opened again on what it
  * held) does not undo it. For a kind with a read of its own, it is `item`.

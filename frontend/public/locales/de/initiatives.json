@@ -98,7 +98,7 @@
     "dashboards": "Dashboards",
     "counterGroups": "Zähler",
     "posts": "Beiträge",
-    "galleries": "Galerien",
+    "catalogs": "Kataloge",
     "wikis": "Wikis"
   },
   "settings": {
@@ -227,7 +227,7 @@
       "dashboards": "Dashboards",
       "counterGroups": "Zähler",
       "posts": "Beiträge",
-      "galleries": "Galerien",
+      "catalogs": "Kataloge",
       "wikis": "Wikis"
     },
     "permissions": {
@@ -245,8 +245,8 @@
       "createCounterGroups": "Zähler erstellen",
       "viewPosts": "Beiträge anzeigen",
       "createPosts": "Beiträge erstellen",
-      "viewGalleries": "Galerien anzeigen",
-      "createGalleries": "Galerien erstellen",
+      "viewCatalogs": "Kataloge anzeigen",
+      "createCatalogs": "Kataloge erstellen",
       "viewShort": "Ansehen",
       "createShort": "Erstellen",
       "viewWikis": "Wikis ansehen",
@@ -294,8 +294,8 @@
   "counterGroupsFeatureDescription": "Zahlen, die sich bewegen. Striche, Summen, Punkte, freie Plätze, Trefferpunkte — eine Zahl, auf die sich alle im Raum einigen.",
   "postsFeature": "Beiträge",
   "postsFeatureDescription": "Ein schwarzes Brett. Ankündigungen, Umfragen, wer sie gelesen hat — die wichtige oben angepinnt, damit sie nicht vier Leute verpassen.",
-  "galleriesFeature": "Galerien",
-  "galleriesFeatureDescription": "Eine Wand voller Bilder. Mockups, Screenshots, die vier Logos, die es nicht wurden.",
+  "catalogsFeature": "Kataloge",
+  "catalogsFeatureDescription": "Eine Wand voller Bilder. Mockups, Screenshots, die vier Logos, die es nicht wurden.",
   "projectsFeature": "Projekte",
   "projectsFeatureDescription": "Boards voller To-dos: wer dran ist, in welchem Stadium es steckt, was noch fehlt. Als Tabelle, Kanban-Board oder Kalender — dieselben Aufgaben, deine Wahl.",
   "filesFeature": "Dateien",

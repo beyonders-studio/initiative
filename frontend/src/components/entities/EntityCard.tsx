@@ -115,7 +115,7 @@ export const EntityCard = ({
         imgClassName="transition duration-300 group-hover:scale-105"
       />
     ) : (
-      // Several, because nobody picked one: a wall of them says what a gallery
+      // Several, because nobody picked one: a wall of them says what a catalog
       // is better than any single picture would.
       <div
         className={cn(

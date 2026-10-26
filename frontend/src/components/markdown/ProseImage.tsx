@@ -102,7 +102,7 @@ interface ProseImageProps {
 
 /**
  * A picture in rendered prose. It loads as it nears the screen and fades in,
- * as a gallery's do, and inside an `ImageLightboxScope` it opens full size.
+ * as a catalog's do, and inside an `ImageLightboxScope` it opens full size.
  * Outside a scope, or inside a link, it is just the picture.
  *
  * Its size is not known ahead, so no space is reserved: it keeps its own

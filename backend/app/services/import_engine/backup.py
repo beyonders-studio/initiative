@@ -126,18 +126,30 @@ _ATTACH_RELATIONSHIPS: dict[str, RelationshipType] = {
     "wiki": RelationshipType.part_of,
 }
 
-#: How an archive written before files were called files names them: the
+#: How an archive written by an older build names files (once documents) and
+#: catalogs (once galleries): the
 #: manifest's tool, its tool switches and envelope type, the keys holding a file's type and the
 #: files filed in a wiki or attached to an item, the refs naming one, and the
 #: role permissions for the tool. Read on restore and rewritten to this build's names before
 #: anything else looks at the archive; nothing writes them.
-_LEGACY_ENVELOPE_TYPES = {"initiative-document": tool_envelope_type(Tool.file)}
-_LEGACY_TOOLS = {"document": Tool.file.value}
-_LEGACY_KEYS = {"documents": "files", "document_type": "file_type"}
+_LEGACY_ENVELOPE_TYPES = {
+    "initiative-document": tool_envelope_type(Tool.file),
+    "initiative-gallery": tool_envelope_type(Tool.catalog),
+}
+_LEGACY_TOOLS = {"document": Tool.file.value, "gallery": Tool.catalog.value}
+_LEGACY_KEYS = {
+    "documents": "files",
+    "document_type": "file_type",
+    "galleries": "catalogs",
+}
+#: The keys only a gallery's envelope spelled differently: its pictures.
+_LEGACY_CATALOG_KEYS = {"images": "items"}
 _LEGACY_REF_KEYS = ("external_ref", SOURCE_REF)
 _LEGACY_PERMISSIONS = {
     "documents_enabled": Tool.file.view_permission,
     "create_documents": Tool.file.create_permission,
+    "galleries_enabled": Tool.catalog.view_permission,
+    "create_galleries": Tool.catalog.create_permission,
 }
 
 
@@ -157,6 +169,10 @@ def _current_shape(value: Any) -> Any:
             _LEGACY_TOOLS.get(key, key): item for key, item in tools.items()
         }
     kind = shaped.get("type")
+    if kind == "initiative-gallery":
+        shaped = {
+            _LEGACY_CATALOG_KEYS.get(key, key): item for key, item in shaped.items()
+        }
     if isinstance(kind, str) and kind in _LEGACY_ENVELOPE_TYPES:
         shaped["type"] = _LEGACY_ENVELOPE_TYPES[kind]
     tool = shaped.get("tool")
@@ -387,7 +403,7 @@ def _manifest_tool_flags(tools: dict[str, str] | None) -> dict[str, bool]:
     the source's configuration rather than what this import was asked to carry.
 
     Spelled through the enum rather than ``tool + "s"``, which is wrong for
-    ``gallery``. A manifest also names things that are not tools — a backup
+    ``catalog``. A manifest also names things that are not tools — a backup
     written by a newer version, or a sub-resource like ``calendar_event`` — and
     those name no switch, so they are skipped rather than raising on an
     initiative that is otherwise importable.

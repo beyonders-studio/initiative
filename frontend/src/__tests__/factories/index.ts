@@ -6,6 +6,7 @@ export {
   resetCounter as resetCalendarEventCounter,
 } from "./calendarEvent.factory";
 export { ownerCan, readerCan, writerCan } from "./can";
+export { buildCatalog, buildCatalogItem } from "./catalog.factory";
 export {
   buildComment,
   buildReactionGroup,
@@ -25,7 +26,6 @@ export {
   resetCounter as resetDmCounter,
 } from "./dm.factory";
 export { buildFileSummary, resetCounter as resetFileCounter } from "./file.factory";
-export { buildGallery, buildGalleryImage } from "./gallery.factory";
 export {
   buildInitiative,
   buildInitiativeDirectoryEntry,
@@ -110,11 +110,11 @@ export {
 export { buildWiki, buildWikiPage } from "./wiki.factory";
 
 import { resetCounter as resetCalendarEventCounter } from "./calendarEvent.factory";
+import { resetCounter as resetCatalogCounter } from "./catalog.factory";
 import { resetCounter as resetCommentCounter } from "./comment.factory";
 import { resetCounter as resetCommunityCounter } from "./community.factory";
 import { resetCounter as resetDmCounter } from "./dm.factory";
 import { resetCounter as resetFileCounter } from "./file.factory";
-import { resetCounter as resetGalleryCounter } from "./gallery.factory";
 import { resetCounter as resetInitiativeCounter } from "./initiative.factory";
 import { resetCounter as resetMarketplaceCounter } from "./marketplace.factory";
 import { resetCounter as resetNotificationCounter } from "./notification.factory";
@@ -152,7 +152,7 @@ export function resetFactories(): void {
   resetSearchCounter();
   resetDmCounter();
   resetPostCounter();
-  resetGalleryCounter();
+  resetCatalogCounter();
   resetWikiCounter();
   resetCalendarEventCounter();
 }

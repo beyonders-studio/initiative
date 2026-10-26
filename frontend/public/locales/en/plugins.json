@@ -285,9 +285,9 @@
         "read": "Read posts",
         "write": "Read and change posts"
       },
-      "galleries": {
-        "read": "Read galleries",
-        "write": "Read and change galleries"
+      "catalogs": {
+        "read": "Read catalogs",
+        "write": "Read and change catalogs"
       },
       "wikis": {
         "read": "Read wikis",

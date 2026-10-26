@@ -422,10 +422,10 @@
       "this": "esta publicación",
       "plural": "publicaciones"
     },
-    "gallery": {
-      "name": "Galería",
-      "this": "esta galería",
-      "plural": "galerías"
+    "catalog": {
+      "name": "Catálogo",
+      "this": "este catálogo",
+      "plural": "catálogos"
     },
     "wiki": {
       "name": "Wiki",
@@ -452,7 +452,7 @@
       "this": "este contador",
       "plural": "contadores"
     },
-    "gallery_image": {
+    "catalog_item": {
       "name": "Imagen",
       "this": "esta imagen",
       "plural": "imágenes"

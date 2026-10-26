@@ -24,7 +24,7 @@ const initiative = buildInitiative({
     moderate: false,
     roster: true,
     view: [],
-    create: [Tool.queue, Tool.file, Tool.project, Tool.gallery],
+    create: [Tool.queue, Tool.file, Tool.project, Tool.catalog],
   },
 });
 
@@ -115,7 +115,7 @@ describe("EnvelopeImportDialog", () => {
       })
     );
 
-    renderWithProviders(<EnvelopeImportDialog tool={Tool.gallery} open onOpenChange={() => {}} />);
+    renderWithProviders(<EnvelopeImportDialog tool={Tool.catalog} open onOpenChange={() => {}} />);
 
     const input = screen.getByLabelText(/export file/i) as HTMLInputElement;
     const file = new File(["PK"], "barovia.zip", { type: "application/zip" });
@@ -130,7 +130,7 @@ describe("EnvelopeImportDialog", () => {
     await waitFor(() => expect(sent).not.toBeNull());
     // Multipart: the zip itself, the initiative, and the tool it is for.
     expect(sent).toMatch(/name="file"/);
-    expect(sent).toContain("initiative-gallery");
+    expect(sent).toContain("initiative-catalog");
     expect(sent).toMatch(/name="initiative_id"\r?\n\r?\n7/);
     await waitFor(() =>
       expect(toast.success).toHaveBeenCalledWith(expect.stringContaining("Barovia maps"))

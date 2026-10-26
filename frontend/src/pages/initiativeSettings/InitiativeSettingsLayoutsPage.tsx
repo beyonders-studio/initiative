@@ -1,7 +1,7 @@
 /**
  * `/settings/layouts` — how each tool in this initiative draws what it holds,
  * in the sidebar's order: the calendar's and the notices' details, and each
- * project's, queue's, gallery's and counter group's layouts. Each layout says when it was last changed, and a project which list
+ * project's, queue's, catalog's and counter group's layouts. Each layout says when it was last changed, and a project which list
  * it opens on; each has a way into its layout editor.
  */
 

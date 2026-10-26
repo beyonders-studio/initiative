@@ -1,4 +1,4 @@
-"""A file kept as numbered versions: an uploaded file's, a gallery picture's.
+"""A file kept as numbered versions: an uploaded file's, a catalog picture's.
 
 The parent row names the version it shows (``current_version_id``) and the
 version rows are its history. Both tools take the same steps through here:
@@ -60,12 +60,12 @@ def _allowed(model: type) -> Collection[str]:
     """The types a ``model`` row's file may be: what an upload of one accepts,
     which is what decides how the file is shown."""
     from app.models.tenant.file import File
-    from app.models.tenant.gallery import GalleryImage
-    from app.services.tenant.galleries import PICTURE_EXTENSIONS
+    from app.models.tenant.catalog import CatalogItem
+    from app.services.tenant.catalogs import PICTURE_EXTENSIONS
 
     return {
         File: attachments_service.ALLOWED_FILE_MIME_TYPES,
-        GalleryImage: PICTURE_EXTENSIONS,
+        CatalogItem: PICTURE_EXTENSIONS,
     }[model]
 
 
@@ -76,12 +76,12 @@ def file_type(
     by the rule an upload of one follows (``filename`` and ``hint`` are what
     that rule falls back on), or ``None`` where it is not a file the row may
     hold."""
-    from app.models.tenant.gallery import GalleryImage
-    from app.services.tenant import galleries
+    from app.models.tenant.catalog import CatalogItem
+    from app.services.tenant import catalogs
 
     try:
-        if model is GalleryImage:
-            return galleries.validate_image(data)[0].content_type
+        if model is CatalogItem:
+            return catalogs.validate_image(data)[0].content_type
         return attachments_service.validate_file(data, filename, hint)[0]
     except ValueError:
         return None

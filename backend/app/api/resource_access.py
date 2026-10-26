@@ -35,7 +35,7 @@ from app.db.initiative_rls import governing_path
 from app.db.session import require_actor_context
 from app.models.tenant.calendar_event import CalendarEvent
 from app.models.tenant.counter import Counter
-from app.models.tenant.gallery import GalleryImage
+from app.models.tenant.catalog import CatalogItem
 from app.models.tenant.initiative import Initiative, PermissionKey
 from app.models.tenant.queue import QueueItem
 from app.models.tenant.wiki import WikiPage
@@ -54,7 +54,7 @@ from app.services.tenant import calendars as calendars_service
 from app.services.tenant import counters as counters_service
 from app.services.tenant import dashboards as dashboards_service
 from app.services.tenant import files as files_service
-from app.services.tenant import galleries as galleries_service
+from app.services.tenant import catalogs as catalogs_service
 from app.services.tenant import initiatives as initiatives_service
 from app.services.tenant import wikis as wikis_service
 from app.services.tenant import posts as posts_service
@@ -132,10 +132,10 @@ RESOURCE_ACCESS: dict[Tool, ResourceAccessConfig] = {
         hydrated_loader=dashboards_service.get_dashboard_hydrated,
     ),
     Tool.post: ResourceAccessConfig(Tool.post, posts_service.get_post),
-    Tool.gallery: ResourceAccessConfig(
-        Tool.gallery,
-        galleries_service.get_gallery,
-        hydrated_loader=galleries_service.get_gallery_hydrated,
+    Tool.catalog: ResourceAccessConfig(
+        Tool.catalog,
+        catalogs_service.get_catalog,
+        hydrated_loader=catalogs_service.get_catalog_hydrated,
     ),
     Tool.wiki: ResourceAccessConfig(
         Tool.wiki,
@@ -494,7 +494,7 @@ SUB_TOOLS: dict[type, SubTool] = {
         wikis_service.get_page,
         copy_resets={"yjs_state": None, "yjs_updated_at": None},
     ),
-    GalleryImage: SubTool(galleries_service.get_image),
+    CatalogItem: SubTool(catalogs_service.get_item),
 }
 
 

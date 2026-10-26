@@ -308,19 +308,19 @@ class TestPictures:
     async def test_nothing_is_read_from_the_communitys_storage(
         self, client, acting_user, session
     ):
-        from app.testing import create_gallery, create_gallery_image
+        from app.testing import create_catalog, create_catalog_item
 
         member = await acting_user(guild_role=CommunityRole.member, initiative=True)
         owner = await acting_user("owner")
-        member.initiative.galleries_enabled = True
+        member.initiative.catalogs_enabled = True
         session.add(member.initiative)
         await session.commit()
-        gallery = await create_gallery(session, member.initiative, member.user)
-        await create_gallery_image(session, gallery, member.user)
+        catalog = await create_catalog(session, member.initiative, member.user)
+        await create_catalog_item(session, catalog, member.user)
         before = await self._media_count(session)
 
         shared = await _share(
-            client, member, kind="gallery", entity_id=gallery.id, name="Moodboard"
+            client, member, kind="catalog", entity_id=catalog.id, name="Moodboard"
         )
 
         assert shared.status_code == 201, shared.text
@@ -409,7 +409,7 @@ class TestPictures:
         assert shared.status_code == 422
         assert shared.json()["detail"] == MarketplaceMessages.SHARE_IMAGE_INVALID
 
-    async def test_an_owner_published_gallery_installs_with_its_pictures(
+    async def test_an_owner_published_catalog_installs_with_its_pictures(
         self, client, acting_user, session
     ):
         from sqlmodel import select
@@ -431,14 +431,14 @@ class TestPictures:
                 "manifest": {
                     "uid": "GA11ERY0000001",
                     "public_id": "ours.tiles",
-                    "kind": "gallery",
+                    "kind": "catalog",
                     "name": "Tiles",
                     "publisher": "Our deployment",
                     "description": "Some tiles.",
                     "version": "1.0.0",
                     "images": [path],
                     "definition": {
-                        "type": "initiative-gallery",
+                        "type": "initiative-catalog",
                         "name": "Tiles",
                         "images": [{"storage_key": path, "title": "A tile"}],
                     },
@@ -449,7 +449,7 @@ class TestPictures:
         assert published.status_code == 201, published.text
 
         member = await acting_user(guild_role=CommunityRole.member, initiative=True)
-        member.initiative.galleries_enabled = True
+        member.initiative.catalogs_enabled = True
         session.add(member.initiative)
         await session.commit()
         installed = await client.post(

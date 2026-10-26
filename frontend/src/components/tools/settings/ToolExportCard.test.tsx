@@ -36,7 +36,7 @@ const renderCard = (tool: Tool) =>
 
 describe("ToolExportCard", () => {
   it("opens the export wizard on the tool's one format, with nothing to choose", async () => {
-    renderCard(Tool.gallery);
+    renderCard(Tool.catalog);
 
     await userEvent.click(await screen.findByRole("button", { name: "Export" }));
 

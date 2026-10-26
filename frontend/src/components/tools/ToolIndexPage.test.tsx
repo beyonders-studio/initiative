@@ -67,7 +67,7 @@ const CARD_FIELDS: Partial<Record<Tool, Record<string, unknown>>> = {
     original_filename: null,
     smart_link_url: null,
   },
-  gallery: { cover: null, preview: [] },
+  catalog: { cover: null, preview: [] },
   project: {
     icon: null,
     is_template: false,
@@ -341,10 +341,10 @@ describe("the queue index page", () => {
   });
 });
 
-describe("the gallery index page", () => {
-  it("draws the newest four pictures of a gallery nobody chose a cover for", async () => {
+describe("the catalog index page", () => {
+  it("draws the newest four pictures of a catalog nobody chose a cover for", async () => {
     const preview = [1, 2, 3, 4].map((id) => ({
-      image_id: id,
+      item_id: id,
       file_url: `/uploads/picture-${id}.png`,
       thumbnail_url: null,
       width: null,
@@ -352,12 +352,12 @@ describe("the gallery index page", () => {
     }));
     // The list carries the pictures only when it is asked for them.
     server.use(
-      communityHttp.get(`/${toolRouteSegment(Tool.gallery)}/`, ({ request }) => {
+      communityHttp.get(`/${toolRouteSegment(Tool.catalog)}/`, ({ request }) => {
         const asked = new URL(request.url).searchParams.get("include_preview") === "true";
         return HttpResponse.json({
           items: [
             {
-              ...row(Tool.gallery, { id: 1, name: "Store assets" }),
+              ...row(Tool.catalog, { id: 1, name: "Store assets" }),
               preview: asked ? preview : [],
             },
           ],
@@ -369,7 +369,7 @@ describe("the gallery index page", () => {
       })
     );
 
-    const { container } = renderIndex(Tool.gallery);
+    const { container } = renderIndex(Tool.catalog);
     await screen.findByText("Store assets");
 
     await waitFor(() =>

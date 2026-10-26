@@ -21,11 +21,11 @@ import { resolveInitiativeColor } from "@/lib/initiativeColors";
 import { initiativeRoute, TOOLS, toolCamelPlural, toolListRoute } from "@/lib/tools";
 import { cn } from "@/lib/utils";
 
+import { CatalogsView } from "./initiativeTools/catalogs/CatalogsPage";
 import { CounterGroupsView } from "./initiativeTools/counters/CounterGroupsPage";
 import { DashboardsView } from "./initiativeTools/dashboards/DashboardsPage";
 import { CalendarsView } from "./initiativeTools/events/CalendarsPage";
 import { FilesView } from "./initiativeTools/files/FilesPage";
-import { GalleriesView } from "./initiativeTools/galleries/GalleriesPage";
 import { PostsView } from "./initiativeTools/posts/PostsPage";
 import { ProjectsView } from "./initiativeTools/projects/ProjectsPage";
 import { QueuesView } from "./initiativeTools/queues/QueuesPage";
@@ -45,7 +45,7 @@ const TOOL_VIEWS: Record<Tool, ComponentType<ToolViewProps>> = {
   [Tool.calendar]: CalendarsView,
   [Tool.dashboard]: DashboardsView,
   [Tool.post]: PostsView,
-  [Tool.gallery]: GalleriesView,
+  [Tool.catalog]: CatalogsView,
   [Tool.wiki]: WikisView,
 };
 
