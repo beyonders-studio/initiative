@@ -60,6 +60,27 @@ def is_flat_storage_key(key: str) -> bool:
     return bool(key) and Path(key).name == key
 
 
+#: Stored types a served upload is rendered inline as. Raster pictures only:
+#: an ``<img>`` draws these and nothing about them is markup. Anything else —
+#: an SVG, an uploaded file, a type nothing recognizes — is handed over as a
+#: download in its own sandbox (:data:`USER_CONTENT_CSP`).
+INLINE_UPLOAD_TYPES = frozenset(
+    {
+        "image/png",
+        "image/jpeg",
+        "image/gif",
+        "image/webp",
+        "image/tiff",
+        "image/x-icon",
+        "image/vnd.microsoft.icon",
+    }
+)
+
+#: How a stored file is served wherever a browser could render it as a page:
+#: in a sandbox of its own, loading nothing but its own inline styles.
+USER_CONTENT_CSP = "sandbox; default-src 'none'; style-src 'unsafe-inline'"
+
+
 def content_disposition_attachment(filename: str) -> str:
     """Build a safe ``attachment`` Content-Disposition value.
 

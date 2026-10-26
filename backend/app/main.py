@@ -71,22 +71,6 @@ configure_logging()
 
 logger = logging.getLogger(__name__)
 
-#: Stored types a served upload is rendered inline as. Raster pictures only:
-#: an ``<img>`` draws these and nothing about them is markup. Anything else —
-#: an SVG, an uploaded file, a type nothing recognizes — is handed over as a
-#: download with scripts disabled.
-INLINE_UPLOAD_TYPES = frozenset(
-    {
-        "image/png",
-        "image/jpeg",
-        "image/gif",
-        "image/webp",
-        "image/tiff",
-        "image/x-icon",
-        "image/vnd.microsoft.icon",
-    }
-)
-
 #: The same question for a row written before the type column existed: its
 #: stored name is the only thing that describes it.
 NAMED_AS_MARKUP = (".svg", ".html", ".htm")
@@ -568,7 +552,12 @@ async def serve_upload_file(
 
     from sqlalchemy import text
 
-    from app.services.storage import build_upload_response, get_guild_storage
+    from app.services.storage import (
+        INLINE_UPLOAD_TYPES,
+        USER_CONTENT_CSP,
+        build_upload_response,
+        get_guild_storage,
+    )
 
     # Media is referenced by pages inside a guild, and ``<img>``/iframe can't
     # send headers, so the guild rides in the URL (and a cookie is per-browser,
@@ -623,7 +612,7 @@ async def serve_upload_file(
     )
     if not inline:
         headers["Content-Disposition"] = "attachment"
-        headers["Content-Security-Policy"] = "script-src 'none'"
+        headers["Content-Security-Policy"] = USER_CONTENT_CSP
     logger.info("upload_served filename=%s user=%d", filename, current_user.id)
     return build_upload_response(blob, media_type=stored_type, headers=headers)
 

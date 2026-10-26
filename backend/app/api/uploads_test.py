@@ -9,6 +9,7 @@ from sqlmodel.ext.asyncio.session import AsyncSession
 from app.testing.schema_harness import route_session_to_guild
 from app.core.config import settings
 from app.core.security import create_upload_token
+from app.services.storage import USER_CONTENT_CSP
 from app.testing.factories import (
     create_access_grant,
     create_auth_provider,
@@ -554,7 +555,7 @@ async def test_a_served_upload_is_typed_from_its_row(
     assert response.status_code == 200
     assert response.headers["content-type"].startswith("image/svg+xml")
     assert response.headers["content-disposition"] == "attachment"
-    assert response.headers["content-security-policy"] == "script-src 'none'"
+    assert response.headers["content-security-policy"] == USER_CONTENT_CSP
     assert response.headers["x-content-type-options"] == "nosniff"
 
 
@@ -618,7 +619,7 @@ async def test_a_row_without_a_recorded_type_falls_back_to_its_name(
     markup = await client.get(f"/uploads/{guild.id}/legacy.svg", headers=headers)
     assert markup.status_code == 200
     assert markup.headers["content-disposition"] == "attachment"
-    assert markup.headers["content-security-policy"] == "script-src 'none'"
+    assert markup.headers["content-security-policy"] == USER_CONTENT_CSP
 
 
 async def test_an_upload_is_reached_through_the_initiative_that_shows_it(

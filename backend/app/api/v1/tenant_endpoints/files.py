@@ -70,7 +70,12 @@ from app.schemas.ai_generation import AIStreamEvent
 from app.services.tenant import attachments as attachments_service
 from app.services.tenant import file_versions
 from app.services import storage_config
-from app.services.storage import build_upload_response, get_guild_storage
+from app.services.storage import (
+    INLINE_UPLOAD_TYPES,
+    USER_CONTENT_CSP,
+    build_upload_response,
+    get_guild_storage,
+)
 from app.api import resource_access
 from app.core.tools import Tool
 from app.services.tenant import body_states
@@ -103,15 +108,28 @@ FilesRead = Annotated[ActorContext, Depends(plugin_scope("files:read"))]
 FilesWrite = Annotated[ActorContext, Depends(plugin_scope("files:write"))]
 
 
+def _shown_as_is(content_type: str | None) -> bool:
+    """Whether the browser draws a file of this type itself, with nothing in
+    it acting as a page: a picture, a PDF in its own viewer, audio, video."""
+    media = (content_type or "").lower()
+    return (
+        media in INLINE_UPLOAD_TYPES
+        or media == "application/pdf"
+        or media.startswith(("audio/", "video/"))
+    )
+
+
 def _file_download_response(
-    *, guild_id: int, version: FileVersion, inline: bool
+    *, guild_id: int, version: FileVersion, inline: bool, fetch_dest: str | None
 ) -> Response:
     """Build a hardened download response for one version's stored file.
 
-    Shared by the current-file download and the per-version download so
-    the filename checks and SVG/HTML response hardening can't drift
-    between the two endpoints. Serves through the guild's storage backend
-    (local FileResponse or S3 streaming proxy) via :func:`build_upload_response`.
+    Shared by the current-file download and the per-version download so the
+    response hardening can't drift between the two endpoints. A type the
+    browser would render as a page is sandboxed (:data:`USER_CONTENT_CSP`),
+    framed only by the in-app viewer, and downloaded rather than opened when
+    its link is followed as a page (``Sec-Fetch-Dest: document``). Serves
+    through the guild's storage backend via :func:`build_upload_response`.
     """
     content_type = version.file_content_type
     original_filename = version.original_filename
@@ -121,27 +139,15 @@ def _file_download_response(
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND)
 
     headers: dict[str, str] = {"X-Content-Type-Options": "nosniff"}
-    ext = (original_filename or filename).rsplit(".", 1)[-1].lower()
-    normalized_type = (content_type or "").lower()
-    if (
-        ext in ("svg", "html", "htm")
-        or "svg" in normalized_type
-        or "html" in normalized_type
-    ):
+    if not _shown_as_is(content_type):
+        inline = inline and fetch_dest != "document"
+        headers["Content-Security-Policy"] = USER_CONTENT_CSP
         if inline:
-            # Shown as a static page: sandboxed, with no scripts and no forms,
-            # and framed only by the in-app file viewer on this origin.
             # X-Frame-Options set here overrides the SecurityHeadersMiddleware
-            # global DENY (it uses setdefault); frame-ancestors 'self' is the
-            # CSP equivalent.
-            headers["Content-Security-Policy"] = (
-                "sandbox; script-src 'none'; form-action 'none'; frame-ancestors 'self'"
-            )
+            # global DENY (it uses setdefault); frame-ancestors is the CSP
+            # equivalent.
+            headers["Content-Security-Policy"] += "; frame-ancestors 'self'"
             headers["X-Frame-Options"] = "SAMEORIGIN"
-        else:
-            # Non-inline downloads are sent as attachments; keep the strict
-            # script-src and let the global X-Frame-Options: DENY stand.
-            headers["Content-Security-Policy"] = "script-src 'none'"
 
     if inline:
         return build_upload_response(blob, media_type=content_type, headers=headers)
@@ -393,9 +399,7 @@ async def _store_file(
         )
     try:
         mime_type, extension = attachments_service.validate_file(
-            content=contents,
-            filename=upload.filename,
-            content_type=upload.content_type,
+            content=contents, filename=upload.filename
         )
     except ValueError:
         raise HTTPException(
@@ -903,7 +907,12 @@ async def download_file(
         current_user.id,
         inline,
     )
-    return _file_download_response(guild_id=guild_id, version=version, inline=inline)
+    return _file_download_response(
+        guild_id=guild_id,
+        version=version,
+        inline=inline,
+        fetch_dest=request.headers.get("sec-fetch-dest"),
+    )
 
 
 @router.get("/{file_id}/versions/{version_id}/download", include_in_schema=False)
@@ -955,7 +964,12 @@ async def download_file_version(
         current_user.id,
         inline,
     )
-    return _file_download_response(guild_id=guild_id, version=version, inline=inline)
+    return _file_download_response(
+        guild_id=guild_id,
+        version=version,
+        inline=inline,
+        fetch_dest=request.headers.get("sec-fetch-dest"),
+    )
 
 
 @router.post(

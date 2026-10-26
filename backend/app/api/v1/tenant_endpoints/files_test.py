@@ -2,6 +2,7 @@
 Integration tests for file endpoints — create with permissions.
 """
 
+from pathlib import Path
 from types import SimpleNamespace
 import pytest
 from httpx import AsyncClient
@@ -18,6 +19,7 @@ from app.models.tenant.initiative import InitiativeRoleModel
 from app.models.tenant.resource_grant import ResourceAccessLevel
 from app.core.search import SearchEntityType
 from app.services import editor_engine
+from app.services.storage import USER_CONTENT_CSP
 from app.services.tenant.collaboration import collaboration_manager
 from app.testing import (
     guild_of,
@@ -44,6 +46,9 @@ async def _create_uploaded_file(
     from app.services.storage import get_guild_storage
 
     get_guild_storage(guild_of(initiative)).write(filename, b"%PDF-1.4 test")
+    content_type = {".html": "text/html", ".svg": "image/svg+xml"}.get(
+        Path(filename).suffix, "application/pdf"
+    )
 
     return await create_file(
         session,
@@ -53,7 +58,7 @@ async def _create_uploaded_file(
         file_type=FileType.file,
         file_url=f"/uploads/{guild_of(initiative)}/{filename}",
         original_filename=filename,
-        file_content_type="application/pdf",
+        file_content_type=content_type,
         file_size=13,
     )
 
@@ -370,10 +375,11 @@ async def test_download_inline_returns_no_attachment_header(
     )
     response = await client.get(
         owner.g(f"/files/{doc.id}/download?inline=1"),
-        headers=owner.headers,
+        headers={**owner.headers, "Sec-Fetch-Dest": "document"},
     )
     assert response.status_code == 200
     assert "attachment" not in response.headers.get("content-disposition", "")
+    assert "sandbox" not in response.headers.get("content-security-policy", "")
 
 
 @pytest.mark.parametrize("filename", ["dl_inline.html", "dl_inline.svg"])
@@ -393,13 +399,16 @@ async def test_download_inline_html_svg_is_same_origin_framable_but_scriptless(
     assert response.status_code == 200
     # Same-origin framing allowed (overrides the global DENY middleware)
     assert response.headers.get("x-frame-options") == "SAMEORIGIN"
-    csp = response.headers.get("content-security-policy", "")
-    assert "frame-ancestors 'self'" in csp
-    # Shown as a static page: sandboxed, with no scripts and no forms.
-    assert "sandbox" in csp
-    assert "script-src 'none'" in csp
-    assert "form-action 'none'" in csp
+    assert response.headers.get("content-security-policy") == (
+        f"{USER_CONTENT_CSP}; frame-ancestors 'self'"
+    )
     assert "attachment" not in response.headers.get("content-disposition", "")
+
+    opened = await client.get(
+        owner.g(f"/files/{doc.id}/download?inline=1"),
+        headers={**owner.headers, "Sec-Fetch-Dest": "document"},
+    )
+    assert "attachment" in opened.headers.get("content-disposition", "")
 
 
 @pytest.mark.parametrize("filename", ["dl_attach.html", "dl_attach.svg"])
@@ -419,9 +428,7 @@ async def test_download_non_inline_html_svg_keeps_global_deny(
     # Served as an attachment; the framing relaxation must not apply here
     assert "attachment" in response.headers.get("content-disposition", "")
     assert response.headers.get("x-frame-options") != "SAMEORIGIN"
-    csp = response.headers.get("content-security-policy", "")
-    assert "script-src 'none'" in csp
-    assert "frame-ancestors" not in csp
+    assert response.headers.get("content-security-policy") == USER_CONTENT_CSP
 
 
 async def test_download_native_file_returns_404(

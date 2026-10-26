@@ -96,9 +96,7 @@ def _detect(asset: ArchiveAsset, data: bytes) -> tuple[str | None, str | None]:
         if image_type is not None:
             return image_type, None
     try:
-        content_type, _extension = validate_file(
-            data, asset.original_filename, asset.content_type
-        )
+        content_type, _extension = validate_file(data, asset.original_filename)
     except ValueError:
         return None, f"unsupported_file:{asset.key}"
     return content_type, None
