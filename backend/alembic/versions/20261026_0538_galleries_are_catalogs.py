@@ -11,6 +11,11 @@ item. In ``guild_template`` and every ``guild_<id>``:
   ``catalog_items.gallery_id`` and ``comments.gallery_id`` are ``catalog_id``,
   ``catalog_item_versions.gallery_image_id`` is ``catalog_item_id`` and
   ``initiatives.galleries_enabled`` is ``catalogs_enabled``.
+* **Row security** — every policy on the three tables, and on ``comments``
+  and ``initiatives`` (whose columns are renamed), is dropped and row security
+  disabled before the DDL, then enabled and forced again; with no policies the
+  tables admit only the system engine until the next start renders them from
+  the registries, before any request is served. The downgrade does the same.
 * **Triggers** — the owner-row trigger names the kind ``catalog``. The rest a
   start renders from the registries, so they are dropped here and the next
   boot renders them again under the new names, before any request is served;
@@ -127,6 +132,9 @@ _SEQUENCES = (
     ("gallery_image_versions_id_seq", "catalog_item_versions_id_seq"),
 )
 _OWNS_TRIGGERS = ("tr_galleries_install_owns", "tr_catalogs_install_owns")
+#: The tables outside ``_TABLES`` that have a column renamed, so their
+#: policies come off for the DDL too.
+_ALSO_LIFTED = ("comments", "initiatives")
 
 #: The value each name takes; the downgrade reads them the other way.
 _KIND = {"gallery": "catalog", "gallery_image": "catalog_item"}
@@ -240,9 +248,59 @@ def _has_constraint(bind: Connection, table: str, name: str) -> bool:
 # --- structure ---------------------------------------------------------------
 
 
+def _lift_row_security(bind: Connection, tables: tuple[str, ...]) -> dict[str, tuple]:
+    """Drop every policy on ``tables`` and disable their row security, ahead
+    of renaming them, returning each one's (enabled, forced) to restore."""
+    held: dict[str, tuple] = {}
+    for table in tables:
+        state = bind.execute(
+            text(
+                "SELECT relrowsecurity, relforcerowsecurity FROM pg_class "
+                "WHERE oid = to_regclass(:t)"
+            ),
+            {"t": table},
+        ).first()
+        if state is None:
+            continue
+        names = bind.execute(
+            text("SELECT polname FROM pg_policy WHERE polrelid = to_regclass(:t)"),
+            {"t": table},
+        ).scalars()
+        for name in list(names):
+            bind.exec_driver_sql(f'DROP POLICY IF EXISTS "{name}" ON {table}')
+        bind.exec_driver_sql(f"ALTER TABLE {table} DISABLE ROW LEVEL SECURITY")
+        held[table] = tuple(state)
+    return held
+
+
+def _restore_row_security(
+    bind: Connection, held: dict[str, tuple], renamed: dict
+) -> None:
+    """Enable and force each table's row security again, under its new name.
+    It has no policies until the next start renders them from the registries,
+    which admits nobody but the system engine meanwhile."""
+    for table, (enabled, forced) in held.items():
+        table = renamed.get(table, table)
+        if enabled:
+            bind.exec_driver_sql(f"ALTER TABLE {table} ENABLE ROW LEVEL SECURITY")
+        if forced:
+            bind.exec_driver_sql(f"ALTER TABLE {table} FORCE ROW LEVEL SECURITY")
+
+
 def _rename_structure(bind: Connection, forward: bool) -> None:
-    """Tables, columns, keys, indexes and sequences, in the current schema."""
+    """Tables, columns, keys, indexes and sequences, in the current schema,
+    with their policies dropped and row security lifted for the DDL."""
     tables = _TABLES if forward else tuple((new, old) for old, new in _TABLES)
+    renamed = dict(tables)
+    held = _lift_row_security(
+        bind,
+        tuple(old for old, _new in tables)
+        + tuple(
+            dict.fromkeys(
+                table for table, _old, _new in _COLUMNS if table in _ALSO_LIFTED
+            )
+        ),
+    )
     for old, new in tables:
         if _table_exists(bind, old):
             bind.exec_driver_sql(f"ALTER TABLE {old} RENAME TO {new}")
@@ -269,6 +327,7 @@ def _rename_structure(bind: Connection, forward: bool) -> None:
     for old, new in _SEQUENCES:
         old, new = (old, new) if forward else (new, old)
         bind.exec_driver_sql(f"ALTER SEQUENCE IF EXISTS {old} RENAME TO {new}")
+    _restore_row_security(bind, held, renamed)
 
 
 def _replace_triggers(bind: Connection, forward: bool) -> None:

@@ -19,6 +19,7 @@ from sqlalchemy import text
 
 from app.core.relationships import RelationshipType
 from app.core.search import SearchEntityType
+from app.db.schema_provisioning import apply_guild_rls
 from app.models.platform.notification import NotificationType
 from app.services.platform import notice_outbox, user_notifications
 from app.testing import (
@@ -240,6 +241,36 @@ async def test_guild_values_say_catalog_and_back(session) -> None:
             ("catalog_items",),
             ("catalogs",),
         ]
+        # Row security comes back on and forced, with the policies the next
+        # start renders from the registries not yet there.
+        assert await _rows(
+            session,
+            "SELECT c.relname, c.relrowsecurity, c.relforcerowsecurity, "
+            "(SELECT count(*) FROM pg_policy p WHERE p.polrelid = c.oid) "
+            "FROM pg_class c WHERE c.relnamespace = CAST(:schema AS regnamespace) "
+            "AND c.relname IN ('catalogs', 'catalog_items', 'catalog_item_versions', "
+            "'comments', 'initiatives') ORDER BY 1",
+            schema=schema,
+        ) == [
+            ("catalog_item_versions", True, True, 0),
+            ("catalog_items", True, True, 0),
+            ("catalogs", True, True, 0),
+            ("comments", True, True, 0),
+            ("initiatives", True, True, 0),
+        ]
+        # What a start applies puts them back under the new names.
+        await apply_guild_rls(await session.connection(), schema)
+        assert (
+            await _rows(
+                session,
+                "SELECT c.relname FROM pg_class c WHERE c.relnamespace = "
+                "CAST(:schema AS regnamespace) AND c.relname IN ('catalogs', "
+                "'catalog_items', 'catalog_item_versions', 'comments', 'initiatives') "
+                "AND NOT EXISTS (SELECT 1 FROM pg_policy p WHERE p.polrelid = c.oid)",
+                schema=schema,
+            )
+            == []
+        )
         assert new["grants"] == [("catalog",)]
         assert new["property"] == [("catalog_item",)]
         ((source, target, *nodes),) = new["edge"]
