@@ -1,4 +1,4 @@
-import { type AxiosRequestConfig, isAxiosError } from "axios";
+import type { AxiosRequestConfig } from "axios";
 
 import type { AIStreamEvent } from "@/api/generated/initiativeAPI.schemas";
 
@@ -9,16 +9,22 @@ export type AIStreamRequest = (
   signal: AbortSignal
 ) => Promise<unknown>;
 
+const succeeded = (status: number | undefined) =>
+  status !== undefined && status >= 200 && status < 300;
+
 /**
  * Send ``request`` and hand each line of the answer to ``onEvent`` as it is
- * written. A refusal throws as any request's would, with its body read as
- * JSON, so {@link getErrorMessage} finds its code.
+ * written. A refusal reads as any request's would: its body is JSON by the
+ * time the shared interceptors see it, so a sign-in step it asks for opens,
+ * and {@link getErrorMessage} finds its code.
  */
 export const readAIStream = async (
   request: AIStreamRequest,
   signal: AbortSignal,
   onEvent: (event: AIStreamEvent) => void
 ): Promise<void> => {
+  // A retried request, after a session renewal say, is read from its start.
+  let attempt: XMLHttpRequest | undefined;
   let read = 0;
   let pending = "";
   // The answer so far, of which the lines not yet handed on are read.
@@ -31,28 +37,30 @@ export const readAIStream = async (
       if (line.trim()) onEvent(JSON.parse(line) as AIStreamEvent);
     }
   };
-  let answer: unknown;
-  try {
-    answer = await request(
-      {
-        responseType: "text",
-        // The browser's request holds the answer as far as it has arrived.
-        onDownloadProgress: ({ event }) => {
-          const sent = (event?.target as XMLHttpRequest | undefined)?.responseText;
-          if (sent) take(sent, false);
-        },
+  const answer = await request(
+    {
+      responseType: "text",
+      transformResponse: (data: unknown, _headers, status) => {
+        if (succeeded(status) || typeof data !== "string") return data;
+        try {
+          return JSON.parse(data);
+        } catch {
+          return data;
+        }
       },
-      signal
-    );
-  } catch (error) {
-    if (isAxiosError(error) && typeof error.response?.data === "string") {
-      try {
-        error.response.data = JSON.parse(error.response.data);
-      } catch {
-        // Not a JSON body: the message falls back to the caller's own.
-      }
-    }
-    throw error;
-  }
+      // The browser's request holds the answer as far as it has arrived.
+      onDownloadProgress: ({ event }) => {
+        const xhr = event?.target as XMLHttpRequest | undefined;
+        if (!xhr || !succeeded(xhr.status)) return;
+        if (xhr !== attempt) {
+          attempt = xhr;
+          read = 0;
+          pending = "";
+        }
+        take(xhr.responseText, false);
+      },
+    },
+    signal
+  );
   take(String(answer ?? ""), true);
 };
