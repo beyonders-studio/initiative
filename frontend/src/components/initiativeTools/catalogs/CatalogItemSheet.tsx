@@ -47,7 +47,8 @@ interface CatalogItemSheetProps {
  * One picture, beside the wall it is on, drawn as its catalog lays its
  * pictures out, each field saved on its own.
  *
- * A side panel rather than a page: a picture has no address of its own.
+ * A side panel rather than a page: its address is the catalog's with the
+ * item open (`catalogItemRoute`).
  */
 export const CatalogItemSheet = ({ image, ...props }: CatalogItemSheetProps) =>
   image ? <PictureSheet listed={image} {...props} /> : null;

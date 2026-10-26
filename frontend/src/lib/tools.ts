@@ -341,6 +341,13 @@ export const counterRoute = (
   counterId: number
 ): string => `${toolDetailRoute(Tool.counter_group, initiativeId, groupId)}/counter/${counterId}`;
 
+/** e.g. "/i/1/catalogs/5/items/12": the catalog, with that item open beside it. */
+export const catalogItemRoute = (
+  initiativeId: number | null,
+  catalogId: number,
+  itemId: number
+): string => `${toolDetailRoute(Tool.catalog, initiativeId, catalogId)}/items/${itemId}`;
+
 /** e.g. "/i/1/wikis/4/pages/11". */
 export const wikiPageRoute = (
   initiativeId: number | null,

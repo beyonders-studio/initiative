@@ -14,3 +14,14 @@ import { lazyRouteComponent } from "@tanstack/react-router";
 export const LazyInitiativeDetailPage = lazyRouteComponent(() =>
   import("@/pages/InitiativeDetailPage").then((m) => ({ default: m.InitiativeDetailPage }))
 );
+
+/**
+ * The catalog page, shared by the catalog's own route and an item's
+ * (`/catalogs/{id}/items/{itemId}`), so opening and closing an item keeps the
+ * wall where it was rather than drawing it again.
+ */
+export const LazyCatalogDetailPage = lazyRouteComponent(() =>
+  import("@/pages/initiativeTools/catalogs/CatalogDetailPage").then((m) => ({
+    default: m.CatalogDetailPage,
+  }))
+);
