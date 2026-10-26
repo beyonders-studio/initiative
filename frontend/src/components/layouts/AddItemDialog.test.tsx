@@ -181,6 +181,26 @@ describe("adding a task", () => {
     await user.click(await screen.findByRole("option", { name }));
   };
 
+  it("shows its title, type and main column, with the rest folded until asked for", async () => {
+    renderPage(() => (
+      <AddingTask types={[bug(), buildTaskType({ name: "Feature" })]} create={vi.fn()} />
+    ));
+    const user = userEvent.setup();
+
+    expect(await screen.findByRole("combobox", { name: "Type" })).toBeInTheDocument();
+    expect(screen.getByPlaceholderText(/task title/i)).toBeInTheDocument();
+    expect(document.getElementById("task-description")).toBeInTheDocument();
+    expect(screen.queryByRole("combobox", { name: "Priority" })).not.toBeInTheDocument();
+
+    const more = screen.getByRole("button", { name: "More options" });
+    expect(more).toHaveAttribute("aria-expanded", "false");
+    await user.click(more);
+    expect(more).toHaveAttribute("aria-expanded", "true");
+    expect(screen.getByRole("combobox", { name: "Priority" })).toBeInTheDocument();
+    // The type is drawn up front, not again in the fold.
+    expect(screen.getAllByRole("combobox", { name: "Type" })).toHaveLength(1);
+  });
+
   it("starts with what its type starts with, and follows the type until it is changed", async () => {
     const create = vi.fn(async () => ({ id: 5 }));
     renderPage(() => (
@@ -239,7 +259,8 @@ describe("adding a task", () => {
     renderPage(() => <AddingTask types={[feature, chore]} create={create} />);
     const user = userEvent.setup();
 
-    await user.click(await screen.findByRole("combobox", { name: "Priority" }));
+    await user.click(await screen.findByRole("button", { name: "More options" }));
+    await user.click(screen.getByRole("combobox", { name: "Priority" }));
     await user.click(await screen.findByRole("option", { name: /Urgent/ }));
     await pickType(user, "Chore");
     await user.click(screen.getByRole("button", { name: "Create task" }));
@@ -367,6 +388,7 @@ describe("naming somebody in a task's title", () => {
     const read = screen.getByRole("list", { name: "Read from the title" });
     expect(read).toHaveTextContent("Sam Vimes");
     // The task's own Assignees field shows them too.
+    await user.click(screen.getByRole("button", { name: "More options" }));
     expect(await screen.findByRole("button", { name: /remove sam vimes/i })).toBeInTheDocument();
     await user.click(screen.getByRole("button", { name: "Create task" }));
 

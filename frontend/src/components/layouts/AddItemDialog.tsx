@@ -23,6 +23,7 @@ import { AddingLinks, type DetailKind, DetailLayoutView } from "@/lib/layouts/De
 import type { StoredRegions } from "@/lib/layouts/detailLayout";
 import type { PluginItem } from "@/lib/layouts/plugins";
 import type { LinkedRef } from "@/lib/relationships";
+import { cn } from "@/lib/utils";
 import type { DialogProps } from "@/types/dialog";
 
 type Item = PluginItem & { properties: PropertySummary[] };
@@ -75,7 +76,11 @@ export const AddItemDialog = <I extends Item, C, P, R extends { id: number }>({
           width rather than the screen's, as they follow the page area's on
           the item's own page. */}
       <DialogContent
-        className="@container w-full rounded-2xl border bg-card shadow-2xl sm:max-w-5xl"
+        className={cn(
+          "@container w-full rounded-2xl border bg-card shadow-2xl",
+          // One column needs no room for a second.
+          props.detail.addingUpFront ? "sm:max-w-2xl" : "sm:max-w-5xl"
+        )}
         onInteractOutside={(event) => {
           if (changed.current) event.preventDefault();
         }}
