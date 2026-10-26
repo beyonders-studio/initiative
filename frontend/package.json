@@ -133,7 +133,7 @@
     "react-day-picker": "^10.0.2",
     "react-dom": "^19.3.1",
     "react-grid-layout": "^2.3.0",
-    "react-i18next": "^17.1.4",
+    "react-i18next": "^17.1.5",
     "react-markdown": "^10.1.0",
     "react-pdf": "^11.0.0",
     "recharts": "3.10.1",
