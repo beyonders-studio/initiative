@@ -104,11 +104,11 @@ def _rekey_catalog(envelope: dict[str, Any], keys: dict[str, str]) -> dict[str, 
     """A catalog with each picture's key and its cover mapped through ``keys``,
     and anything unmapped left blank for the importer to count as missing."""
     rekeyed = dict(envelope)
-    rekeyed["images"] = [
-        {**image, "storage_key": keys.get(image.get("storage_key") or "", "")}
-        if isinstance(image, dict)
-        else image
-        for image in envelope.get("images") or []
+    rekeyed["items"] = [
+        {**item, "storage_key": keys.get(item.get("storage_key") or "", "")}
+        if isinstance(item, dict)
+        else item
+        for item in envelope.get("items") or []
     ]
     rekeyed["cover"] = keys.get(envelope.get("cover") or "")
     return rekeyed

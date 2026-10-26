@@ -150,11 +150,11 @@ def _envelope(catalog: Catalog, items: list[CatalogItem]) -> dict[str, Any]:
         ),
         "tags": sorted(tag.name for tag in annotated_tags(catalog)),
         "properties": exported_properties(catalog),
-        "images": [_image_envelope(item) for item in items],
+        "items": [_item_envelope(item) for item in items],
     }
 
 
-def _image_envelope(item: CatalogItem) -> dict[str, Any]:
+def _item_envelope(item: CatalogItem) -> dict[str, Any]:
     version = item.current_version
     return {
         "title": item.title,

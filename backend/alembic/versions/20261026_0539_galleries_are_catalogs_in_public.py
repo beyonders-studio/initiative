@@ -15,7 +15,9 @@ The shared half of 20261026_0538:
   what its versions store (its envelope and its example) names it the way an
   export now does: ``initiative-catalog``, its pictures under ``items``, a
   ``catalog:N`` or ``catalog_item:N`` ref and the tool's two permissions. A
-  plug-in's own manifest is not rewritten: one still asking for
+  dashboard listing's statements read ``catalogs``, ``catalog_items`` and
+  ``catalog_item_versions`` and their renamed columns (string values left as
+  written). A plug-in's own manifest is not rewritten: one still asking for
   ``galleries:*`` is refused until its publisher republishes it.
 * **View preferences** — the ones saved for the gallery views are removed;
   those views are the catalog views now and start from their defaults.
@@ -35,6 +37,7 @@ Create Date: 2026-10-26
 from __future__ import annotations
 
 import json
+import re
 from collections.abc import Callable, Mapping
 from typing import Any
 
@@ -77,6 +80,21 @@ _PERMISSIONS = {
     "galleries_enabled": "catalogs_enabled",
     "create_galleries": "create_catalogs",
 }
+#: What a dashboard listing's statements name: datasets and their columns.
+_DATASET_WORDS = {
+    "gallery_image_versions": "catalog_item_versions",
+    "gallery_images": "catalog_items",
+    "galleries": "catalogs",
+    "gallery_image_id": "catalog_item_id",
+    "gallery_id": "catalog_id",
+    "cover_image_id": "cover_item_id",
+}
+#: What a statement quotes. A string value (single- or dollar-quoted) is left
+#: as written, and so is a double-quoted name right after ``AS`` — a column
+#: name the statement answers with is its author's. Any other quoted name is a
+#: reference, respelled as a bare one is.
+_QUOTED = re.compile(r"'(?:[^']|'')*'|\$(\w*)\$.*?\$\1\$|\"((?:[^\"]|\"\")*)\"", re.S)
+_ALIAS = re.compile(r"\bAS\s*$", re.I)
 
 
 def _flip(mapping: Mapping[str, str], forward: bool) -> dict[str, str]:
@@ -205,15 +223,34 @@ def _scope_ceilings(bind: Connection, forward: bool) -> None:
     _writable(bind, "public.plugin_service_registrations", run)
 
 
-def _envelope_respeller(forward: bool) -> Callable[[Any], Any]:
+def _statement(sql: str, words: Mapping[str, str]) -> str:
+    def respell(part: str) -> str:
+        for old, new in words.items():
+            part = re.sub(rf"\b{re.escape(old)}\b", new, part)
+        return part
+
+    parts: list[str] = []
+    last = 0
+    for quoted in _QUOTED.finditer(sql):
+        name = quoted.group(2)
+        kept = quoted.group(0)
+        if name in words and not _ALIAS.search(sql[: quoted.start()]):
+            kept = f'"{words[name]}"'
+        parts += [respell(sql[last : quoted.start()]), kept]
+        last = quoted.end()
+    return "".join(parts) + respell(sql[last:])
+
+
+def _envelope_respeller(forward: bool, dashboard: bool) -> Callable[[Any], Any]:
     """A tool listing's envelope, spelled the way an export of this build
-    spells it."""
+    spells it. A dashboard's also has its statements."""
     keys = _flip(_ENVELOPE_KEYS, forward)
     catalog_keys = _flip(_CATALOG_KEYS, forward)
     kinds = _flip(_KIND, forward)
     types = _flip(_ENVELOPE_TYPES, forward)
     permissions = _flip(_PERMISSIONS, forward)
     catalog_type = "initiative-catalog" if forward else "initiative-gallery"
+    words = _flip(_DATASET_WORDS, forward)
 
     def respell(value: Any) -> Any:
         if isinstance(value, list):
@@ -239,6 +276,8 @@ def _envelope_respeller(forward: bool) -> Callable[[Any], Any]:
                 permissions.get(key, key): item
                 for key, item in out["permissions"].items()
             }
+        if dashboard and isinstance(out.get("sql"), str):
+            out["sql"] = _statement(out["sql"], words)
         return out
 
     return respell
@@ -246,7 +285,6 @@ def _envelope_respeller(forward: bool) -> Callable[[Any], Any]:
 
 def _listings(bind: Connection, forward: bool) -> None:
     kinds = _flip(_KIND, forward)
-    respell = _envelope_respeller(forward)
 
     def run_kinds() -> None:
         for old, new in kinds.items():
@@ -260,14 +298,15 @@ def _listings(bind: Connection, forward: bool) -> None:
     def run_versions() -> None:
         rows = bind.execute(
             text(
-                "SELECT v.id, v.definition, v.example "
+                "SELECT v.id, l.kind, v.definition, v.example "
                 "FROM public.marketplace_listing_versions v "
                 "JOIN public.marketplace_listings l ON l.id = v.listing_id "
                 "WHERE l.kind <> ALL(:skip)"
             ),
             {"skip": list(_NOT_TOOL_LISTINGS)},
         ).all()
-        for version_id, definition, example in rows:
+        for version_id, kind, definition, example in rows:
+            respell = _envelope_respeller(forward, kind == "dashboard")
             changed = {}
             for column, value in (("definition", definition), ("example", example)):
                 if value is None:

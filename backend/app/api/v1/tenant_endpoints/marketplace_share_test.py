@@ -329,7 +329,7 @@ class TestPictures:
         [waiting] = [
             item for item in pending.json() if item["uid"] == shared.json()["uid"]
         ]
-        assert waiting["definition"]["images"] == []
+        assert waiting["definition"]["items"] == []
         assert waiting["definition"]["cover"] is None
 
     async def test_a_files_picture_stays_behind(self, client, acting_user, session):
@@ -440,7 +440,7 @@ class TestPictures:
                     "definition": {
                         "type": "initiative-catalog",
                         "name": "Tiles",
-                        "images": [{"storage_key": path, "title": "A tile"}],
+                        "items": [{"storage_key": path, "title": "A tile"}],
                     },
                 }
             },
@@ -459,7 +459,7 @@ class TestPictures:
         )
 
         assert installed.status_code == 201, installed.text
-        assert installed.json()["result"]["created"]["images"] == 1
+        assert installed.json()["result"]["created"]["items"] == 1
         await route_session_to_guild(session, member.guild.id)
         uploads = (
             await session.exec(

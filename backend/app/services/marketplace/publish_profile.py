@@ -245,10 +245,10 @@ def _strip_queue(env: dict[str, Any]) -> None:
 
 
 def _strip_catalog(env: dict[str, Any]) -> None:
-    env["images"] = [
-        image
-        for image in env.get("images") or []
-        if isinstance(image, dict) and _in_marketplace(image.get("storage_key"))
+    env["items"] = [
+        item
+        for item in env.get("items") or []
+        if isinstance(item, dict) and _in_marketplace(item.get("storage_key"))
     ]
     if not _in_marketplace(env.get("cover")):
         env["cover"] = None

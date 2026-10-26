@@ -453,13 +453,13 @@ async def test_adds_pictures_to_a_catalog_it_may_write(
         json={"name": "Shots", "initiative_id": installed.placed.id},
     )
     assert catalog.status_code == 201, catalog.text
-    images = guild_url(guild_id, f"/catalogs/{catalog.json()['id']}/items")
+    items = guild_url(guild_id, f"/catalogs/{catalog.json()['id']}/items")
 
     def picture() -> dict:
         return {"file": ("shot.png", io.BytesIO(png_bytes()), "image/png")}
 
     uploaded = await client.post(
-        images, headers=headers, files=picture(), data={"title": "Harbour"}
+        items, headers=headers, files=picture(), data={"title": "Harbour"}
     )
     assert uploaded.status_code == 201, uploaded.text
     body = uploaded.json()
@@ -468,14 +468,14 @@ async def test_adds_pictures_to_a_catalog_it_may_write(
         None,
         "",
     )
-    image_path = f"{images}/{body['id']}"
+    item_path = guild_url(guild_id, f"/catalog-items/{body['id']}")
 
     version = await client.post(
-        f"{image_path}/versions", headers=headers, files=picture()
+        f"{item_path}/versions", headers=headers, files=picture()
     )
     assert version.status_code == 201, version.text
     assert (version.json()["version_number"], version.json()["file_url"]) == (2, "")
-    updated = await client.patch(image_path, headers=headers, json={"caption": "Dawn"})
+    updated = await client.patch(item_path, headers=headers, json={"caption": "Dawn"})
     assert updated.status_code == 200, updated.text
     assert updated.json()["version_count"] == 2
     for response in (uploaded, version, updated):

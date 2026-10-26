@@ -2,29 +2,29 @@
 icon: lucide/images
 ---
 
-# Galleries
+# Catalogs
 
-A **gallery** is a wall of pictures with a name on it. Mockups. Screenshots. The logo, and the four other logos that lost. Store art. The photo of the hall layout that somebody drew on a napkin and then, wisely, photographed.
+A **catalog** is a wall of pictures with a name on it. Mockups. Screenshots. The logo, and the four other logos that lost. Store art. The photo of the hall layout that somebody drew on a napkin and then, wisely, photographed.
 
-A document will hold pictures, and that works right up until there are forty of them and you're paging through a carousel one at a time looking for the blue one. A gallery shows you the whole wall at once, and the blue one is just *there*.
+A document will hold pictures, and that works right up until there are forty of them and you're paging through a carousel one at a time looking for the blue one. A catalog shows you the whole wall at once, and the blue one is just *there*.
 
 ## Making one
 
-**New Gallery** on the initiative's **Galleries** tab. Name it, describe it if you like, and it's an empty wall.
+**New Catalog** on the initiative's **Catalogs** tab. Name it, describe it if you like, and it's an empty wall.
 
-One gallery per *thing*: "Store assets", "Live screen, round 4", "Fete 2026 photos". Galleries are cheap and the list of them is itself visual — each card shows its cover — so a gallery with six pictures in it is a perfectly good gallery.
+One catalog per *thing*: "Store assets", "Live screen, round 4", "Fete 2026 photos". Catalogs are cheap and the list of them is itself visual — each card shows its cover — so a catalog with six pictures in it is a perfectly good catalog.
 
-!!! tip "Galleries are off until you turn them on"
+!!! tip "Catalogs are off until you turn them on"
     Like every tool that isn't projects or files, an initiative's manager switches them on in the **Tools** card under **Initiative settings → Details**. Nothing appears in the sidebar until then.
 
 ## Putting pictures in
 
-Drag files from a folder and drop them **anywhere on the gallery's page**. Or **Add pictures** and pick them. Forty at once is fine; they go up a few at a time, and a strip at the top says how it's going.
+Drag files from a folder and drop them **anywhere on the catalog's page**. Or **Add pictures** and pick them. Forty at once is fine; they go up a few at a time, and a strip at the top says how it's going.
 
 PNG, JPEG, WebP or GIF, up to 25 MB each. Anything else is left out, by name, so you know which one it was.
 
 !!! screenshot
-    Capture a gallery in the masonry view with a couple of dozen pictures of mixed shapes, the toolbar showing the three views and the group-by-tag toggle. Save as `docs/en/images/tools/galleries.png`.
+    Capture a catalog in the masonry view with a couple of dozen pictures of mixed shapes, the toolbar showing the three views and the group-by-tag toggle. Save as `docs/en/images/tools/catalogs.png`.
 
 ## Three ways to look at it
 
@@ -44,7 +44,7 @@ Tap a picture and it opens full size. Arrow keys page through the wall; on a pho
 
 - **Title and caption it.** Untitled pictures go by their filename, which is at least what somebody called it.
 - **Tag it.** The same tags as everything else in the community.
-- **Set it as the cover.** Otherwise the newest picture stands for the gallery in the list.
+- **Set it as the cover.** Otherwise the newest picture stands for the catalog in the list.
 - **Upload a new version.** The earlier ones are kept, so a canvas that went through four rounds is one picture with a history rather than four pictures and a naming convention.
 - **Remove it.** It goes to the trash with its versions, and comes back from there if you change your mind.
 
@@ -53,13 +53,13 @@ Tap a picture and it opens full size. Arrow keys page through the wall; on a pho
 
 ## Sharing and comments
 
-Galleries share exactly like everything else: **Viewer**, **Editor** or **Owner** per gallery, or open to the whole initiative. Adding, replacing and removing pictures takes Editor. Deleting a stored version — the history, not the picture — takes Owner.
+Catalogs share exactly like everything else: **Viewer**, **Editor** or **Owner** per catalog, or open to the whole initiative. Adding, replacing and removing pictures takes Editor. Deleting a stored version — the history, not the picture — takes Owner.
 
-Every gallery has its own comment thread, under the wall. Switch it off under **Settings → Details** for the gallery that's a reference shelf rather than a conversation.
+Every catalog has its own comment thread, under the wall. Switch it off under **Settings → Details** for the catalog that's a reference shelf rather than a conversation.
 
 ## Taking a copy
 
-**Settings → Advanced** on the gallery exports it, for whoever could also delete it, as a zip: the gallery and every picture in it. Import that zip from the galleries list — **Import from file** in **More actions** — and the gallery arrives with its pictures, even on another server.
+**Settings → Advanced** on the catalog exports it, for whoever could also delete it, as a zip: the catalog and every picture in it. Import that zip from the catalogs list — **Import from file** in **More actions** — and the catalog arrives with its pictures, even on another server.
 
 ## Related
 

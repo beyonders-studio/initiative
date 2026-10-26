@@ -20,7 +20,7 @@ Arrow keys move through results. ++enter++ jumps. For more than a quick jump, hi
 
 Everything in the community you're in:
 
-- **Tools** — projects, queues, counter groups, calendars, dashboards, posts, galleries, wikis.
+- **Tools** — projects, queues, counter groups, calendars, dashboards, posts, catalogs, wikis.
 - **What's inside them** — tasks, queue items, counters, calendar events, pictures, wiki pages.
 - **Files, and their actual contents.** Not just titles: the words inside a text document, the text on a whiteboard, the cells and sheet names in a spreadsheet.
 - **Comments** on any of the above.

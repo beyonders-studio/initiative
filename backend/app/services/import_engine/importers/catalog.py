@@ -56,7 +56,7 @@ class CatalogImporter(NamesPeopleInPassing):
         """The pictures an exported catalog's zip carries beside it, as the
         envelope names them: each one's ``storage_key`` is its file under
         ``assets/``."""
-        items = envelope.get("images")
+        items = envelope.get("items")
         if not isinstance(items, list):
             return []
         return [(item, "picture") for item in items if isinstance(item, dict)]
@@ -159,12 +159,12 @@ class CatalogImporter(NamesPeopleInPassing):
             entity_title=catalog.name,
             created={
                 Tool.catalog.plural: 1,
-                "images": created,
+                "items": created,
                 "tags": tags.created,
                 "properties": props.created,
             },
             matched={"tags": tags.matched, "properties": props.matched},
-            failed={"images": missing} if missing else {},
+            failed={"items": missing} if missing else {},
             unmatched_handles=await props.settle(catalog),
             warnings=warnings,
         )

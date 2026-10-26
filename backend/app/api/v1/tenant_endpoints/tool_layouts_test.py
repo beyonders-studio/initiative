@@ -500,8 +500,8 @@ async def test_tools_lay_out_their_items(
     assert pictures.status_code == 200, pictures.text
     assert [layout["kind"] for layout in pictures.json()["layouts"]] == ["catalog_item"]
     assert sorted((each["tool"], each["name"]) for each in listed.json()) == [
-        ("counter_group", "Tally"),
         ("catalog", "Wall"),
+        ("counter_group", "Tally"),
         ("queue", "Turns"),
     ]
 

@@ -1,7 +1,7 @@
 """Migration 20261005_0459 points file documents and pictures at the version
 they show. Loaded by path and run on a guild the test builds, the way
 ``upload_initiative_backfill_test`` runs its revision: down to the old shape
-(20261006_0464's rename first), rows written as an older release wrote them,
+(20261026_0538's and 20261006_0464's renames first), rows written as an older release wrote them,
 and up again."""
 
 from __future__ import annotations
@@ -27,6 +27,7 @@ from app.testing import (
 _VERSIONS = Path(__file__).resolve().parents[2] / "alembic" / "versions"
 _MIGRATION = _VERSIONS / "20261005_0459_file_versions_by_pointer.py"
 _FILES = _VERSIONS / "20261006_0464_documents_are_files.py"
+_CATALOGS = _VERSIONS / "20261026_0538_galleries_are_catalogs.py"
 
 
 def _load(path: Path = _MIGRATION) -> ModuleType:
@@ -66,6 +67,7 @@ async def test_old_files_get_versions_types_and_pointers(
     )
     migration = _load()
     files = _load(_FILES)
+    catalogs = _load(_CATALOGS)
 
     def run(step):
         def apply(sync_session) -> None:
@@ -79,6 +81,7 @@ async def test_old_files_get_versions_types_and_pointers(
 
         return apply
 
+    await session.run_sync(run(lambda: catalogs._apply(False)))
     await session.run_sync(run(lambda: files._apply(False)))
     await session.run_sync(run(migration._apply_downgrade))
     # Written as an import used to write them: a file and no version.
@@ -93,13 +96,13 @@ async def test_old_files_get_versions_types_and_pointers(
             ),
             {"url": url, "name": filename, "id": document.id},
         )
-    # A picture an import stored under a type its catalog does not show.
+    # A picture an import stored under a type its gallery does not show.
     await (await session.connection()).execute(
         text(
-            f"UPDATE {schema}.catalog_item_versions"
+            f"UPDATE {schema}.gallery_image_versions"
             " SET file_content_type = 'application/octet-stream',"
             " original_filename = 'foo.bin', file_url = '/uploads/1/foo.bin'"
-            " WHERE catalog_item_id = :id"
+            " WHERE gallery_image_id = :id"
         ),
         {"id": picture.id},
     )
@@ -129,8 +132,8 @@ async def test_old_files_get_versions_types_and_pointers(
     shown = (
         await (await session.connection()).execute(
             text(
-                f"SELECT v.file_content_type FROM {schema}.catalog_items i"
-                f" JOIN {schema}.catalog_item_versions v ON v.id = i.current_version_id"
+                f"SELECT v.file_content_type FROM {schema}.gallery_images i"
+                f" JOIN {schema}.gallery_image_versions v ON v.id = i.current_version_id"
                 " WHERE i.id = :id"
             ),
             {"id": picture.id},
@@ -142,7 +145,7 @@ async def test_old_files_get_versions_types_and_pointers(
             text(
                 "SELECT count(*) FROM information_schema.columns"
                 " WHERE table_schema = :schema"
-                " AND table_name IN ('documents', 'catalog_items')"
+                " AND table_name IN ('documents', 'gallery_images')"
                 " AND column_name IN ('file_url', 'file_content_type')"
             ),
             {"schema": schema},
@@ -150,3 +153,4 @@ async def test_old_files_get_versions_types_and_pointers(
     ).scalar()
     assert leftover == 0
     await session.run_sync(run(lambda: files._apply(True)))
+    await session.run_sync(run(lambda: catalogs._apply(True)))

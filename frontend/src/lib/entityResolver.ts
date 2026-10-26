@@ -121,9 +121,9 @@ type Resolve = (read: Read, communityId: number, id: number) => Promise<string>;
 
 /**
  * The kinds that live inside a tool and can be read by their own id, keyed by
- * the child-kind registry ({@link PARENT_TOOL}). A picture has no read by id
- * alone, so a link never names one. A counter does (`/counters/{id}`), but
- * nothing links to one yet. A queue item opens its queue: a moderation case
+ * the child-kind registry ({@link PARENT_TOOL}). A catalog item and a counter
+ * are read by id (`/catalog-items/{id}`, `/counters/{id}`), but nothing links
+ * to either yet. A queue item opens its queue: a moderation case
  * about one links to it.
  */
 const CHILD_RESOLVERS: Partial<Record<keyof typeof PARENT_TOOL, Resolve>> = {
