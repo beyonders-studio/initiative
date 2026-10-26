@@ -16,6 +16,7 @@ reader cannot open is not there: the relationships policy clears both ends.
 from __future__ import annotations
 
 import re
+
 from typing import Any, Iterable, Optional
 
 from fastapi import HTTPException, status
@@ -24,7 +25,6 @@ from sqlalchemy.orm import aliased
 from sqlmodel import select
 from sqlmodel.ext.asyncio.session import AsyncSession
 
-from app.core.identity_boundary import STORED_MENTION
 from app.core.messages import TaskMessages
 from app.core.relationships import RelationshipType, node_id
 from app.core.search import SearchEntityType
@@ -250,16 +250,16 @@ async def groups(session: AsyncSession, ids: list[int]) -> dict[int, list[Any]]:
     return found
 
 
-#: A mention or a reference as a body stores it, ``@[](42)``, ``#[](task:12)``.
-_STORED_LINK = re.compile(r"[@#]\[[^\]]*\]\([^)]*\)")
+#: A mention or a reference as text stores it: ``@[](42)``, ``@[Ada]()`` for
+#: somebody with no account, ``#task[Fix it](12)``.
+_STORED_LINK = re.compile(r"(?:@|#[\w-]*)\[[^\]]*\]\([^)]*\)")
 
 
 def title_from_line(text: str) -> tuple[str, bool]:
     """A task title for a checklist line, and whether it says less than the
     line did: a title names no one and nothing (no ``@`` or ``#``) and fits on
     a line, where a checklist line may do both."""
-    cleaned = STORED_MENTION.sub("", text)
-    cleaned = _STORED_LINK.sub("", cleaned)
+    cleaned = _STORED_LINK.sub("", text)
     cleaned = "".join(ch for ch in cleaned if ch not in RESERVED_SIGILS)
     cleaned = " ".join(cleaned.split())
     if len(cleaned) > MAX_TITLE_LENGTH:

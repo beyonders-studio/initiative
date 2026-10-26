@@ -4,7 +4,7 @@ import { Markdown } from "@/components/Markdown";
 
 type CommentContentProps = Pick<
   ComponentProps<typeof Markdown>,
-  "content" | "compact" | "disableLinks" | "className" | "ref"
+  "content" | "compact" | "disableLinks" | "onChange" | "className" | "ref"
 >;
 
 /** A comment's body, with the mentions its composer writes read as chips. A

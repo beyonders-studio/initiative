@@ -34,7 +34,7 @@ describe("Markdown", () => {
     const { container } = render(<Markdown content="`inline` and text" />);
 
     const classes = root(container).className;
-    expect(classes).toContain("wrap-break-word");
+    expect(root(container)).toHaveClass("wrap-break-word", "[&_a:hover]:underline");
     expect(classes).toContain("[&_code]:wrap-break-word");
     expect(classes).toContain("[&_a]:break-all");
     expect(classes).toContain("[&_img]:max-w-full");
@@ -188,6 +188,30 @@ describe("Markdown", () => {
 
     await user.click(screen.getByRole("button", { name: /A board showing each type/ }));
     expect(await screen.findByRole("dialog")).toBeInTheDocument();
+  });
+
+  it("ticks a checklist item in text being edited, wherever the item sits", async () => {
+    const content = "- [ ] **Book** the room\n  1) [x] nested\n\n> - [ ] quoted";
+    const onChange = vi.fn();
+    render(<Markdown content={content} onChange={onChange} />);
+
+    const [book, nested, quoted] = screen.getAllByRole("checkbox");
+    await userEvent.click(book);
+    expect(onChange).toHaveBeenLastCalledWith(content.replace("- [ ] **Book**", "- [x] **Book**"));
+    await userEvent.click(nested);
+    expect(onChange).toHaveBeenLastCalledWith(content.replace("1) [x]", "1) [ ]"));
+    await userEvent.click(quoted);
+    expect(onChange).toHaveBeenLastCalledWith(content.replace("> - [ ]", "> - [x]"));
+  });
+
+  it("draws a checklist's boxes in place of its bullets, ticked only where it is edited", () => {
+    const { container } = render(<Markdown content={"- [x] done\n- [ ] not yet"} />);
+
+    expect(root(container).className).toContain("[&_.task-list-item]:list-none");
+    expect(screen.getAllByRole("checkbox").map((box) => box.hasAttribute("disabled"))).toEqual([
+      true,
+      true,
+    ]);
   });
 
   it("keeps a lone picture, or one beside text, in its paragraph", () => {

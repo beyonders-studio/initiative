@@ -25,10 +25,8 @@ from typing import Any, Optional
 from sqlmodel import select
 from sqlmodel.ext.asyncio.session import AsyncSession
 
-import re
 
 from app.core.identity_boundary import STORED_MENTION
-from app.core.references import TEXT_REFERENCE, kind_for_trigger
 from app.models.platform.user import User
 from app.models.tenant.guild_plugin import GuildPlugin
 from app.models.tenant.task import TaskStatusCategory
@@ -53,26 +51,11 @@ from app.services.export import limits as export_limits
 from app.services.tenant import properties as properties_service
 from app.services.tenant import task_queries
 
-# Mentions reach a report as ``@[Display Name](id)`` / ``#kind[Text](id)`` —
-# in a comment and in a task's description alike, a person's with the name
-# written in as the report was made (``mention_namer``). A printed report
-# shows ``@Display Name`` / the display text, not the reference markup. The
-# ``#`` half reads through the reference vocabulary the app writes with, so
-# every kind that can be mentioned flattens; a ``#`` word naming no kind stays
-# literal, as it does on screen.
-
-#: A picture in a comment — a pasted screenshot — prints as its alt text,
-#: the way the description's Markdown blocks print one.
-_IMAGE_RE = re.compile(r"!\[([^\]]*)\]\([^)]*\)")
-
-
-def _flatten_mentions(content: str) -> str:
-    content = _IMAGE_RE.sub(lambda m: m.group(1) or "[image]", content)
-    content = STORED_MENTION.sub(lambda m: f"@{m.group(1)}", content)
-    return TEXT_REFERENCE.sub(
-        lambda m: m.group(2) if kind_for_trigger(m.group(1)) else m.group(0),
-        content,
-    )
+# A person's mention reaches a report as ``@[Display Name](id)``, the name
+# written in as the report was made (``mention_namer``). A description or a
+# comment prints through its Markdown blocks, which read it as ``@Display
+# Name`` and a thing's as its name; the description column holds the list's
+# plain-text excerpt, where only the person's markup is left to flatten.
 
 
 #: How each field of a task's layout fills a table export's column: the field
@@ -240,9 +223,7 @@ class TasksTableAdapter:
                 out: list[dict[str, Any]] = []
                 for part in detail:
                     if part == "description":
-                        section: Any = blocks_from_markdown(
-                            _flatten_mentions(named(description or ""))
-                        )
+                        section: Any = blocks_from_markdown(named(description or ""))
                         out.append(
                             {
                                 "kind": part,
@@ -266,9 +247,9 @@ class TasksTableAdapter:
                             {
                                 "author": display_name(c.author) if c.author else "",
                                 "date": c.created_at.strftime("%Y-%m-%d"),
-                                # A null body would abort the compile; mention markup
-                                # flattens to its display text.
-                                "content": _flatten_mentions(named(c.content or "")),
+                                "blocks": blocks_from_markdown(
+                                    named(c.content or ""), line_breaks=True
+                                ),
                                 # A reply indents under its parent, as on screen.
                                 "depth": depth,
                             }
@@ -411,8 +392,8 @@ async def task_columns(
             field, read = entry
             title = values.label(field, locale)
             if name == TaskFieldId.description:
-                cell = lambda t, read=read: _flatten_mentions(  # noqa: E731
-                    named(read(t, locale) or "")
+                cell = lambda t, read=read: STORED_MENTION.sub(  # noqa: E731
+                    lambda m: f"@{m.group(1)}", named(read(t, locale) or "")
                 )
             else:
                 cell = lambda t, read=read: read(t, locale)  # noqa: E731

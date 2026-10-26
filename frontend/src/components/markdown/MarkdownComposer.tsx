@@ -38,8 +38,9 @@ interface MarkdownComposerProps {
   value: string;
   onChange: (value: string) => void;
   /** What the preview tab shows. Defaults to the same markdown renderer the
-   *  rest of the product reads prose with. */
-  renderPreview?: (value: string) => ReactNode;
+   *  rest of the product reads prose with. `onChange` is there for a
+   *  checklist box ticked in the preview. */
+  renderPreview?: (value: string, onChange?: (value: string) => void) => ReactNode;
   id?: string;
   placeholder?: string;
   rows?: number;
@@ -304,7 +305,13 @@ export const MarkdownComposer = ({
     apply(transform);
   };
 
-  const preview = renderPreview ? renderPreview(value) : <Markdown content={value} />;
+  // A box ticked in the preview edits the text, but leaves the reader there.
+  const tick = disabled ? undefined : onChange;
+  const preview = renderPreview ? (
+    renderPreview(value, tick)
+  ) : (
+    <Markdown content={value} onChange={tick} />
+  );
   // Nothing in the toolbar acts on text that is not on screen.
   const toolbarDisabled = disabled || mode === "preview";
 

@@ -52,6 +52,10 @@ def test_quote_flattens_to_runs():
     assert quote["type"] == "quote"
     text = "".join(r["text"] for r in quote["runs"])
     assert "wise words" in text and "more words" in text
+    # A list in a quote keeps its items' words.
+    (listed,) = blocks_from_markdown("> - Bring passport\n> - Bring ticket")
+    text = "".join(r["text"] for r in listed["runs"])
+    assert text == "Bring passport\nBring ticket"
 
 
 def test_table_rows_of_run_cells():
@@ -68,11 +72,51 @@ def test_soft_break_is_space_and_hard_break_is_newline_run():
     assert {"text": "\n"} not in soft["runs"]
     (hard,) = blocks_from_markdown("line one  \nline two")
     assert {"text": "\n"} in hard["runs"]
+    # A comment is typed in a box, where a newline is a line break.
+    (typed,) = blocks_from_markdown("line one\nline two", line_breaks=True)
+    assert {"text": "\n"} in typed["runs"]
 
 
 def test_image_degrades_to_linked_alt_text():
     (para,) = blocks_from_markdown("![alt text](https://img.example/x.png)")
-    assert {"text": "alt text", "link": "https://img.example/x.png"} in para["runs"]
+    assert {
+        "text": "alt text",
+        "link": "https://img.example/x.png",
+        "picture": True,
+    } in para["runs"]
+
+
+def test_task_list_is_a_checklist():
+    (lst,) = blocks_from_markdown("- [ ] one\n- [x] **two**\n  - [X] nested")
+    assert lst["checklist"] is True
+    assert [(i["checked"], i["runs"]) for i in lst["items"]] == [
+        (False, [{"text": "one"}]),
+        (True, [{"text": "two", "bold": True}]),
+    ]
+    assert lst["items"][1]["children"][0]["items"][0]["checked"] is True
+    # A list with an item that has no box keeps its brackets as text.
+    (mixed,) = blocks_from_markdown("- [ ] one\n- two\n- **[x] three**")
+    assert mixed["checklist"] is False
+    assert mixed["items"][0]["runs"] == [{"text": "[ ] one"}]
+
+
+def test_mentions_read_as_the_app_shows_them():
+    (para,) = blocks_from_markdown(
+        "Ask @[Ada](42) about #task[Fix it](12), not @[Bo]() or"
+        " mail@[x](1) or #nothing[y](2) or `@[](3)`"
+    )
+    runs = para["runs"]
+    assert {"text": "@Ada", "mention": 42} in runs
+    assert {"text": "Fix it"} in runs
+    # Every kind the app can mention, and the word it once wrote for a file.
+    (kinds,) = blocks_from_markdown(
+        "#counter-group[Q1](9), #wiki-page[Home](2), #doc[Map](3)"
+    )
+    assert "".join(r["text"] for r in kinds["runs"]) == "Q1, Home, Map"
+    assert {"text": "@Bo"} in runs
+    assert {"text": "x", "link": "1"} in runs
+    assert {"text": "y", "link": "2"} in runs
+    assert {"text": "@[](3)", "code": True} in runs
 
 
 def test_html_stays_literal_text():

@@ -24,7 +24,6 @@ import type {
   TaskTypeRead,
 } from "@/api/generated/initiativeAPI.schemas";
 import { defaultsForCategory } from "@/lib/taskStatusDefaults";
-import { markdownExcerpt } from "@/lib/text";
 
 export interface ProjectListingStatus {
   name: string;
@@ -264,7 +263,8 @@ export const projectListingBoard = (
       recurrence_anchor: shifted(task.recurrence_anchor, shift),
       recurrence_anchor_count: task.recurrence_anchor_count ?? 0,
       recurrence_until: null,
-      description_excerpt: task.description ? markdownExcerpt(task.description) : null,
+      // A list row's excerpt is the server's, and a listing has none.
+      description_excerpt: null,
       has_description: Boolean(task.description),
       task_status_id: status.id,
       task_status: status,
