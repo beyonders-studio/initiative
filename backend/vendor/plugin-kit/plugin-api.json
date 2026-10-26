@@ -4,8 +4,8 @@
     "title": "Initiative plug-in API",
     "version": "8.1.0",
     "x-initiative-source": {
-      "version": "0.76.0",
-      "commit": "4aa7e82158a2d07a8b19690e6c7a99c7159600ac"
+      "version": "0.77.1",
+      "commit": "2c94995612f0f25c9954c1743461baf2bdf2d13e"
     }
   },
   "servers": [
@@ -63,11 +63,11 @@
           "per": "event_type",
           "any_of": [
             "calendars:read",
+            "catalogs:read",
             "comments:read",
             "counter_groups:read",
             "dashboards:read",
             "files:read",
-            "galleries:read",
             "initiatives:read",
             "posts:read",
             "projects:read",
@@ -128,11 +128,11 @@
           "per": "event_type",
           "any_of": [
             "calendars:read",
+            "catalogs:read",
             "comments:read",
             "counter_groups:read",
             "dashboards:read",
             "files:read",
-            "galleries:read",
             "initiatives:read",
             "posts:read",
             "projects:read",
@@ -1973,14 +1973,14 @@
         ]
       }
     },
-    "/galleries/": {
+    "/catalogs/": {
       "get": {
         "tags": [
-          "galleries"
+          "catalogs"
         ],
-        "summary": "List Galleries",
-        "description": "List galleries visible to the current user (guild admins see all).",
-        "operationId": "list_galleries",
+        "summary": "List Catalogs",
+        "description": "List catalogs visible to the current user (guild admins see all).",
+        "operationId": "list_catalogs",
         "security": [
           {
             "PluginToken": []
@@ -1992,7 +1992,7 @@
             "content": {
               "application/json": {
                 "schema": {
-                  "$ref": "#/components/schemas/GalleryListResponse"
+                  "$ref": "#/components/schemas/CatalogListResponse"
                 }
               }
             }
@@ -2008,7 +2008,7 @@
             }
           }
         },
-        "x-plugin-scope": "galleries:read",
+        "x-plugin-scope": "catalogs:read",
         "parameters": [
           {
             "name": "initiative_id",
@@ -2039,10 +2039,10 @@
                   "type": "null"
                 }
               ],
-              "description": "Full-text match over the gallery's name and description, through the same index the search page reads.",
+              "description": "Full-text match over the catalog's name and description, through the same index the search page reads.",
               "title": "Search"
             },
-            "description": "Full-text match over the gallery's name and description, through the same index the search page reads."
+            "description": "Full-text match over the catalog's name and description, through the same index the search page reads."
           },
           {
             "name": "sort_by",
@@ -2096,10 +2096,10 @@
                   "type": "null"
                 }
               ],
-              "description": "Only galleries carrying any of these tags.",
+              "description": "Only catalogs carrying any of these tags.",
               "title": "Tag Ids"
             },
-            "description": "Only galleries carrying any of these tags."
+            "description": "Only catalogs carrying any of these tags."
           },
           {
             "name": "property_filters",
@@ -2192,11 +2192,11 @@
       },
       "post": {
         "tags": [
-          "galleries"
+          "catalogs"
         ],
-        "summary": "Create Gallery",
-        "description": "Create a gallery. Requires create_galleries permission on the\ninitiative (or guild admin); the creator gets the owner grant.",
-        "operationId": "create_gallery",
+        "summary": "Create Catalog",
+        "description": "Create a catalog. Requires create_catalogs permission on the\ninitiative (or guild admin); the creator gets the owner grant.",
+        "operationId": "create_catalog",
         "security": [
           {
             "PluginToken": []
@@ -2207,7 +2207,7 @@
           "content": {
             "application/json": {
               "schema": {
-                "$ref": "#/components/schemas/GalleryCreate"
+                "$ref": "#/components/schemas/CatalogCreate"
               }
             }
           }
@@ -2218,7 +2218,7 @@
             "content": {
               "application/json": {
                 "schema": {
-                  "$ref": "#/components/schemas/GalleryRead"
+                  "$ref": "#/components/schemas/CatalogRead"
                 }
               }
             }
@@ -2234,7 +2234,7 @@
             }
           }
         },
-        "x-plugin-scope": "galleries:write",
+        "x-plugin-scope": "catalogs:write",
         "parameters": [
           {
             "name": "session_token",
@@ -3809,6 +3809,80 @@
         ]
       }
     },
+    "/tasks/{task_id}/checklist/{item_id}/promote": {
+      "post": {
+        "tags": [
+          "tasks"
+        ],
+        "summary": "Promote Checklist Item",
+        "description": "Make one checklist item a task of its own, part of this one.\n\nThe new task is in the same project, titled with the item's words (in a\ndone column if the item was ticked), and the item leaves the checklist:\nthe task is where the work is tracked from now on. A line that names\npeople or things, or runs past a title's length, keeps its whole words in\nthe new task's description.",
+        "operationId": "promote_checklist_item",
+        "security": [
+          {
+            "PluginToken": []
+          }
+        ],
+        "responses": {
+          "201": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/TaskRead"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        },
+        "x-plugin-scope": "projects:write",
+        "parameters": [
+          {
+            "name": "task_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "integer",
+              "title": "Task Id"
+            }
+          },
+          {
+            "name": "item_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "title": "Item Id"
+            }
+          },
+          {
+            "name": "session_token",
+            "in": "cookie",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Session Token"
+            }
+          }
+        ]
+      }
+    },
     "/comments/": {
       "post": {
         "tags": [
@@ -4091,7 +4165,7 @@
             }
           },
           {
-            "name": "gallery_id",
+            "name": "catalog_id",
             "in": "query",
             "required": false,
             "schema": {
@@ -4104,7 +4178,7 @@
                   "type": "null"
                 }
               ],
-              "title": "Gallery Id"
+              "title": "Catalog Id"
             }
           },
           {
@@ -6677,13 +6751,13 @@
         ]
       }
     },
-    "/galleries/{gallery_id}": {
+    "/catalogs/{catalog_id}": {
       "get": {
         "tags": [
-          "galleries"
+          "catalogs"
         ],
-        "summary": "Read Gallery",
-        "operationId": "read_gallery",
+        "summary": "Read Catalog",
+        "operationId": "read_catalog",
         "security": [
           {
             "PluginToken": []
@@ -6695,7 +6769,7 @@
             "content": {
               "application/json": {
                 "schema": {
-                  "$ref": "#/components/schemas/GalleryRead"
+                  "$ref": "#/components/schemas/CatalogRead"
                 }
               }
             }
@@ -6711,15 +6785,15 @@
             }
           }
         },
-        "x-plugin-scope": "galleries:read",
+        "x-plugin-scope": "catalogs:read",
         "parameters": [
           {
-            "name": "gallery_id",
+            "name": "catalog_id",
             "in": "path",
             "required": true,
             "schema": {
               "type": "integer",
-              "title": "Gallery Id"
+              "title": "Catalog Id"
             }
           },
           {
@@ -6754,11 +6828,11 @@
       },
       "patch": {
         "tags": [
-          "galleries"
+          "catalogs"
         ],
-        "summary": "Update Gallery",
+        "summary": "Update Catalog",
         "description": "Rename, describe, or choose the cover. Requires write access.",
-        "operationId": "update_gallery",
+        "operationId": "update_catalog",
         "security": [
           {
             "PluginToken": []
@@ -6769,7 +6843,7 @@
           "content": {
             "application/json": {
               "schema": {
-                "$ref": "#/components/schemas/GalleryUpdate"
+                "$ref": "#/components/schemas/CatalogUpdate"
               }
             }
           }
@@ -6780,7 +6854,7 @@
             "content": {
               "application/json": {
                 "schema": {
-                  "$ref": "#/components/schemas/GalleryRead"
+                  "$ref": "#/components/schemas/CatalogRead"
                 }
               }
             }
@@ -6796,15 +6870,15 @@
             }
           }
         },
-        "x-plugin-scope": "galleries:write",
+        "x-plugin-scope": "catalogs:write",
         "parameters": [
           {
-            "name": "gallery_id",
+            "name": "catalog_id",
             "in": "path",
             "required": true,
             "schema": {
               "type": "integer",
-              "title": "Gallery Id"
+              "title": "Catalog Id"
             }
           },
           {
@@ -6826,14 +6900,14 @@
         ]
       }
     },
-    "/galleries/{gallery_id}/images": {
+    "/catalogs/{catalog_id}/items": {
       "get": {
         "tags": [
-          "galleries"
+          "catalogs"
         ],
-        "summary": "List Gallery Images",
-        "description": "One page of a gallery's pictures, newest first.\n\nReaching the gallery is the whole gate: its pictures are its content, so\nthere is no per-picture sharing to consult.",
-        "operationId": "list_gallery_images",
+        "summary": "List Catalog Items",
+        "description": "One page of a catalog's pictures, newest first.\n\nReaching the catalog is the whole gate: its pictures are its content, so\nthere is no per-picture sharing to consult.",
+        "operationId": "list_catalog_items",
         "security": [
           {
             "PluginToken": []
@@ -6845,7 +6919,7 @@
             "content": {
               "application/json": {
                 "schema": {
-                  "$ref": "#/components/schemas/GalleryImageListResponse"
+                  "$ref": "#/components/schemas/CatalogItemListResponse"
                 }
               }
             }
@@ -6861,15 +6935,15 @@
             }
           }
         },
-        "x-plugin-scope": "galleries:read",
+        "x-plugin-scope": "catalogs:read",
         "parameters": [
           {
-            "name": "gallery_id",
+            "name": "catalog_id",
             "in": "path",
             "required": true,
             "schema": {
               "type": "integer",
-              "title": "Gallery Id"
+              "title": "Catalog Id"
             }
           },
           {
@@ -6917,11 +6991,11 @@
             "required": false,
             "schema": {
               "type": "boolean",
-              "description": "Read the gallery in the order it was filled rather than newest first.",
+              "description": "Read the catalog in the order it was filled rather than newest first.",
               "default": false,
               "title": "Oldest First"
             },
-            "description": "Read the gallery in the order it was filled rather than newest first."
+            "description": "Read the catalog in the order it was filled rather than newest first."
           },
           {
             "name": "until",
@@ -6985,11 +7059,11 @@
       },
       "post": {
         "tags": [
-          "galleries"
+          "catalogs"
         ],
-        "summary": "Upload Gallery Image",
-        "description": "Add one picture to a gallery. Requires write access.\n\nOne picture per request, so a drop of forty files is forty requests the\nclient can run a few at a time and report on one by one — and one that\nfails does not take the other thirty-nine with it.",
-        "operationId": "upload_gallery_image",
+        "summary": "Upload Catalog Item",
+        "description": "Add one picture to a catalog. Requires write access.\n\nOne picture per request, so a drop of forty files is forty requests the\nclient can run a few at a time and report on one by one — and one that\nfails does not take the other thirty-nine with it.",
+        "operationId": "upload_catalog_item",
         "security": [
           {
             "PluginToken": []
@@ -7000,7 +7074,7 @@
           "content": {
             "multipart/form-data": {
               "schema": {
-                "$ref": "#/components/schemas/Body_upload_gallery_image"
+                "$ref": "#/components/schemas/Body_upload_catalog_item"
               }
             }
           }
@@ -7011,7 +7085,7 @@
             "content": {
               "application/json": {
                 "schema": {
-                  "$ref": "#/components/schemas/GalleryImageRead"
+                  "$ref": "#/components/schemas/CatalogItemRead"
                 }
               }
             }
@@ -7027,15 +7101,15 @@
             }
           }
         },
-        "x-plugin-scope": "galleries:write",
+        "x-plugin-scope": "catalogs:write",
         "parameters": [
           {
-            "name": "gallery_id",
+            "name": "catalog_id",
             "in": "path",
             "required": true,
             "schema": {
               "type": "integer",
-              "title": "Gallery Id"
+              "title": "Catalog Id"
             }
           },
           {
@@ -7057,14 +7131,14 @@
         ]
       }
     },
-    "/galleries/{gallery_id}/images/timeline": {
+    "/catalogs/{catalog_id}/items/timeline": {
       "get": {
         "tags": [
-          "galleries"
+          "catalogs"
         ],
-        "summary": "Get Gallery Image Timeline",
-        "description": "The months this gallery has pictures in, newest first — what the\ntimeline rail is drawn from. Takes the same filters the list does, so the\nrail is a picture of the list as it currently stands.",
-        "operationId": "get_gallery_image_timeline",
+        "summary": "Get Catalog Item Timeline",
+        "description": "The months this catalog has pictures in, newest first — what the\ntimeline rail is drawn from. Takes the same filters the list does, so the\nrail is a picture of the list as it currently stands.",
+        "operationId": "get_catalog_item_timeline",
         "security": [
           {
             "PluginToken": []
@@ -7092,15 +7166,15 @@
             }
           }
         },
-        "x-plugin-scope": "galleries:read",
+        "x-plugin-scope": "catalogs:read",
         "parameters": [
           {
-            "name": "gallery_id",
+            "name": "catalog_id",
             "in": "path",
             "required": true,
             "schema": {
               "type": "integer",
-              "title": "Gallery Id"
+              "title": "Catalog Id"
             }
           },
           {
@@ -7175,13 +7249,13 @@
         ]
       }
     },
-    "/galleries/{gallery_id}/images/{image_id}": {
+    "/catalog-items/{item_id}": {
       "get": {
         "tags": [
-          "galleries"
+          "catalogs"
         ],
-        "summary": "Read Gallery Image",
-        "operationId": "read_gallery_image",
+        "summary": "Read Catalog Item",
+        "operationId": "read_catalog_item",
         "security": [
           {
             "PluginToken": []
@@ -7193,7 +7267,7 @@
             "content": {
               "application/json": {
                 "schema": {
-                  "$ref": "#/components/schemas/GalleryImageRead"
+                  "$ref": "#/components/schemas/CatalogItemRead"
                 }
               }
             }
@@ -7209,24 +7283,15 @@
             }
           }
         },
-        "x-plugin-scope": "galleries:read",
+        "x-plugin-scope": "catalogs:read",
         "parameters": [
           {
-            "name": "gallery_id",
+            "name": "item_id",
             "in": "path",
             "required": true,
             "schema": {
               "type": "integer",
-              "title": "Gallery Id"
-            }
-          },
-          {
-            "name": "image_id",
-            "in": "path",
-            "required": true,
-            "schema": {
-              "type": "integer",
-              "title": "Image Id"
+              "title": "Item Id"
             }
           },
           {
@@ -7249,11 +7314,11 @@
       },
       "patch": {
         "tags": [
-          "galleries"
+          "catalogs"
         ],
-        "summary": "Update Gallery Image",
-        "description": "Retitle, caption, retag or set the properties of a picture. Requires\nwrite access on the gallery.",
-        "operationId": "update_gallery_image",
+        "summary": "Update Catalog Item",
+        "description": "Retitle, caption, retag or set the properties of a picture. Requires\nwrite access on the catalog.",
+        "operationId": "update_catalog_item",
         "security": [
           {
             "PluginToken": []
@@ -7264,7 +7329,7 @@
           "content": {
             "application/json": {
               "schema": {
-                "$ref": "#/components/schemas/GalleryImageUpdate"
+                "$ref": "#/components/schemas/CatalogItemUpdate"
               }
             }
           }
@@ -7275,7 +7340,7 @@
             "content": {
               "application/json": {
                 "schema": {
-                  "$ref": "#/components/schemas/GalleryImageRead"
+                  "$ref": "#/components/schemas/CatalogItemRead"
                 }
               }
             }
@@ -7291,24 +7356,15 @@
             }
           }
         },
-        "x-plugin-scope": "galleries:write",
+        "x-plugin-scope": "catalogs:write",
         "parameters": [
           {
-            "name": "gallery_id",
+            "name": "item_id",
             "in": "path",
             "required": true,
             "schema": {
               "type": "integer",
-              "title": "Gallery Id"
-            }
-          },
-          {
-            "name": "image_id",
-            "in": "path",
-            "required": true,
-            "schema": {
-              "type": "integer",
-              "title": "Image Id"
+              "title": "Item Id"
             }
           },
           {
@@ -7330,14 +7386,14 @@
         ]
       }
     },
-    "/galleries/{gallery_id}/images/{image_id}/versions": {
+    "/catalog-items/{item_id}/versions": {
       "post": {
         "tags": [
-          "galleries"
+          "catalogs"
         ],
-        "summary": "Upload Gallery Image Version",
-        "description": "Replace a picture with a new rendition, keeping the old one as history.\nRequires write access on the gallery.",
-        "operationId": "upload_gallery_image_version",
+        "summary": "Upload Catalog Item Version",
+        "description": "Replace a picture with a new rendition, keeping the old one as history.\nRequires write access on the catalog.",
+        "operationId": "upload_catalog_item_version",
         "security": [
           {
             "PluginToken": []
@@ -7348,7 +7404,7 @@
           "content": {
             "multipart/form-data": {
               "schema": {
-                "$ref": "#/components/schemas/Body_upload_gallery_image_version"
+                "$ref": "#/components/schemas/Body_upload_catalog_item_version"
               }
             }
           }
@@ -7359,7 +7415,7 @@
             "content": {
               "application/json": {
                 "schema": {
-                  "$ref": "#/components/schemas/GalleryImageVersionRead"
+                  "$ref": "#/components/schemas/CatalogItemVersionRead"
                 }
               }
             }
@@ -7375,24 +7431,15 @@
             }
           }
         },
-        "x-plugin-scope": "galleries:write",
+        "x-plugin-scope": "catalogs:write",
         "parameters": [
           {
-            "name": "gallery_id",
+            "name": "item_id",
             "in": "path",
             "required": true,
             "schema": {
               "type": "integer",
-              "title": "Gallery Id"
-            }
-          },
-          {
-            "name": "image_id",
-            "in": "path",
-            "required": true,
-            "schema": {
-              "type": "integer",
-              "title": "Image Id"
+              "title": "Item Id"
             }
           },
           {
@@ -7415,11 +7462,11 @@
       },
       "get": {
         "tags": [
-          "galleries"
+          "catalogs"
         ],
-        "summary": "List Gallery Image Versions",
+        "summary": "List Catalog Item Versions",
         "description": "Every stored rendition of a picture, newest first.",
-        "operationId": "list_gallery_image_versions",
+        "operationId": "list_catalog_item_versions",
         "security": [
           {
             "PluginToken": []
@@ -7433,9 +7480,9 @@
                 "schema": {
                   "type": "array",
                   "items": {
-                    "$ref": "#/components/schemas/GalleryImageVersionRead"
+                    "$ref": "#/components/schemas/CatalogItemVersionRead"
                   },
-                  "title": "Response List Gallery Image Versions"
+                  "title": "Response List Catalog Item Versions"
                 }
               }
             }
@@ -7451,24 +7498,15 @@
             }
           }
         },
-        "x-plugin-scope": "galleries:read",
+        "x-plugin-scope": "catalogs:read",
         "parameters": [
           {
-            "name": "gallery_id",
+            "name": "item_id",
             "in": "path",
             "required": true,
             "schema": {
               "type": "integer",
-              "title": "Gallery Id"
-            }
-          },
-          {
-            "name": "image_id",
-            "in": "path",
-            "required": true,
-            "schema": {
-              "type": "integer",
-              "title": "Image Id"
+              "title": "Item Id"
             }
           },
           {
@@ -7490,14 +7528,14 @@
         ]
       }
     },
-    "/galleries/{gallery_id}/images/{image_id}/versions/{version_id}": {
+    "/catalog-items/{item_id}/versions/{version_id}": {
       "delete": {
         "tags": [
-          "galleries"
+          "catalogs"
         ],
-        "summary": "Delete Gallery Image Version",
+        "summary": "Delete Catalog Item Version",
         "description": "Delete one rendition of a picture. Owner only. Deleting the current\none promotes the previous; deleting the last is refused — remove the\npicture instead.",
-        "operationId": "delete_gallery_image_version",
+        "operationId": "delete_catalog_item_version",
         "security": [
           {
             "PluginToken": []
@@ -7518,24 +7556,15 @@
             }
           }
         },
-        "x-plugin-scope": "galleries:write",
+        "x-plugin-scope": "catalogs:write",
         "parameters": [
           {
-            "name": "gallery_id",
+            "name": "item_id",
             "in": "path",
             "required": true,
             "schema": {
               "type": "integer",
-              "title": "Gallery Id"
-            }
-          },
-          {
-            "name": "image_id",
-            "in": "path",
-            "required": true,
-            "schema": {
-              "type": "integer",
-              "title": "Image Id"
+              "title": "Item Id"
             }
           },
           {
@@ -9453,14 +9482,14 @@
         ]
       }
     },
-    "/galleries/{gallery_id}/grants": {
+    "/catalogs/{catalog_id}/grants": {
       "put": {
         "tags": [
-          "galleries"
+          "catalogs"
         ],
-        "summary": "Set Gallery Grants",
-        "description": "Replace the gallery's entire sharing state in one call — the body is the\nfull list of grants (all-initiative-members / per-user / per-role). Every\nnon-owner grant is rebuilt from it; the owner is always preserved.\n\nAnyone the new sharing no longer lets open the gallery is taken off\nwhatever in it names them.",
-        "operationId": "set_gallery_grants",
+        "summary": "Set Catalog Grants",
+        "description": "Replace the catalog's entire sharing state in one call — the body is the\nfull list of grants (all-initiative-members / per-user / per-role). Every\nnon-owner grant is rebuilt from it; the owner is always preserved.\n\nAnyone the new sharing no longer lets open the catalog is taken off\nwhatever in it names them.",
+        "operationId": "set_catalog_grants",
         "security": [
           {
             "PluginToken": []
@@ -9486,7 +9515,7 @@
             "content": {
               "application/json": {
                 "schema": {
-                  "$ref": "#/components/schemas/GalleryRead"
+                  "$ref": "#/components/schemas/CatalogRead"
                 }
               }
             }
@@ -9505,12 +9534,12 @@
         "x-plugin-scope": "sharing:write",
         "parameters": [
           {
-            "name": "gallery_id",
+            "name": "catalog_id",
             "in": "path",
             "required": true,
             "schema": {
               "type": "integer",
-              "title": "Gallery Id"
+              "title": "Catalog Id"
             }
           },
           {
@@ -10103,14 +10132,14 @@
         ]
       }
     },
-    "/galleries/{gallery_id}/duplicate": {
+    "/catalogs/{catalog_id}/duplicate": {
       "post": {
         "tags": [
-          "galleries"
+          "catalogs"
         ],
-        "summary": "Duplicate Gallery",
+        "summary": "Duplicate Catalog",
         "description": "Copy it, with everything inside it, into an initiative: its own unless the body names another. Read is enough to copy a template; anything else needs write. The copy is shared as its source is while it stays in the same initiative, and carries the tags its maker may set: an installed plug-in's copy carries them only when it holds the scope to tag.",
-        "operationId": "duplicate_gallery",
+        "operationId": "duplicate_catalog",
         "security": [
           {
             "PluginToken": []
@@ -10139,7 +10168,7 @@
             "content": {
               "application/json": {
                 "schema": {
-                  "$ref": "#/components/schemas/GalleryRead"
+                  "$ref": "#/components/schemas/CatalogRead"
                 }
               }
             }
@@ -10155,15 +10184,15 @@
             }
           }
         },
-        "x-plugin-scope": "galleries:write",
+        "x-plugin-scope": "catalogs:write",
         "parameters": [
           {
-            "name": "gallery_id",
+            "name": "catalog_id",
             "in": "path",
             "required": true,
             "schema": {
               "type": "integer",
-              "title": "Gallery Id"
+              "title": "Catalog Id"
             }
           },
           {
@@ -10310,11 +10339,11 @@
           "per": "entity_type",
           "any_of": [
             "calendars:read",
+            "catalogs:read",
             "comments:read",
             "counter_groups:read",
             "dashboards:read",
             "files:read",
-            "galleries:read",
             "posts:read",
             "projects:read",
             "queues:read",
@@ -10351,10 +10380,10 @@
                   "type": "null"
                 }
               ],
-              "description": "Restrict to these entity types. Omit for the default scope (calendar, calendar_event, counter, counter_group, dashboard, file, gallery, gallery_image, post, project, queue, queue_item, tag, task, wiki, wiki_page); naming a type reaches it explicitly.",
+              "description": "Restrict to these entity types. Omit for the default scope (calendar, calendar_event, catalog, catalog_item, counter, counter_group, dashboard, file, post, project, queue, queue_item, tag, task, wiki, wiki_page); naming a type reaches it explicitly.",
               "title": "Types"
             },
-            "description": "Restrict to these entity types. Omit for the default scope (calendar, calendar_event, counter, counter_group, dashboard, file, gallery, gallery_image, post, project, queue, queue_item, tag, task, wiki, wiki_page); naming a type reaches it explicitly."
+            "description": "Restrict to these entity types. Omit for the default scope (calendar, calendar_event, catalog, catalog_item, counter, counter_group, dashboard, file, post, project, queue, queue_item, tag, task, wiki, wiki_page); naming a type reaches it explicitly."
           },
           {
             "name": "initiative_id",
@@ -10483,10 +10512,10 @@
           "per": "tool",
           "any_of": [
             "calendars:read",
+            "catalogs:read",
             "counter_groups:read",
             "dashboards:read",
             "files:read",
-            "galleries:read",
             "posts:read",
             "projects:read",
             "properties:read",
@@ -10779,12 +10808,12 @@
           "scopes": {
             "calendar": "calendars:write",
             "calendar_event": "calendars:write",
+            "catalog": "catalogs:write",
+            "catalog_item": "catalogs:write",
             "counter": "counter_groups:write",
             "counter_group": "counter_groups:write",
             "dashboard": "dashboards:write",
             "file": "files:write",
-            "gallery": "galleries:write",
-            "gallery_image": "galleries:write",
             "post": "posts:write",
             "project": "projects:write",
             "queue": "queues:write",
@@ -10870,10 +10899,10 @@
           "by": "entity_type",
           "scopes": {
             "calendar": "calendars:write",
+            "catalog": "catalogs:write",
             "counter_group": "counter_groups:write",
             "dashboard": "dashboards:write",
             "file": "files:write",
-            "gallery": "galleries:write",
             "post": "posts:write",
             "project": "projects:write",
             "queue": "queues:write",
@@ -11186,7 +11215,7 @@
           "calendar",
           "dashboard",
           "post",
-          "gallery",
+          "catalog",
           "wiki",
           "task",
           "initiative"
@@ -11224,7 +11253,7 @@
         "title": "ArchiveResponse",
         "description": "What archiving or unarchiving answers with.\n\nThe stamp, not the entity: one endpoint serves ten kinds, and a caller that\nwants the whole row reads it back from the route that already serves it."
       },
-      "Body_upload_gallery_image": {
+      "Body_upload_catalog_item": {
         "properties": {
           "file": {
             "type": "string",
@@ -11260,9 +11289,9 @@
         "required": [
           "file"
         ],
-        "title": "Body_upload_gallery_image"
+        "title": "Body_upload_catalog_item"
       },
-      "Body_upload_gallery_image_version": {
+      "Body_upload_catalog_item_version": {
         "properties": {
           "file": {
             "type": "string",
@@ -11274,7 +11303,7 @@
         "required": [
           "file"
         ],
-        "title": "Body_upload_gallery_image_version"
+        "title": "Body_upload_catalog_item_version"
       },
       "CalendarCreate": {
         "properties": {
@@ -12286,6 +12315,959 @@
         "type": "object",
         "title": "CalendarUpdate"
       },
+      "CatalogCover": {
+        "properties": {
+          "item_id": {
+            "type": "integer",
+            "title": "Item Id"
+          },
+          "file_url": {
+            "type": "string",
+            "title": "File Url",
+            "x-upload": true,
+            "description": "A stored file comes as an empty string, without its path. A URL from elsewhere comes as it is."
+          },
+          "thumbnail_url": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Thumbnail Url",
+            "x-upload": true,
+            "description": "A stored file comes as an empty string, without its path. A URL from elsewhere comes as it is."
+          },
+          "width": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Width"
+          },
+          "height": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Height"
+          }
+        },
+        "type": "object",
+        "required": [
+          "item_id",
+          "file_url",
+          "thumbnail_url",
+          "width",
+          "height"
+        ],
+        "title": "CatalogCover",
+        "description": "What a list draws for a catalog: one picture, at whichever size it has."
+      },
+      "CatalogCreate": {
+        "properties": {
+          "properties": {
+            "items": {
+              "$ref": "#/components/schemas/PropertyValueInput"
+            },
+            "type": "array",
+            "title": "Properties"
+          },
+          "name": {
+            "type": "string",
+            "maxLength": 255,
+            "minLength": 1,
+            "title": "Name"
+          },
+          "description": {
+            "anyOf": [
+              {
+                "type": "string",
+                "maxLength": 2000,
+                "x-mentions": "markdown",
+                "description": "A person is mentioned as `@[](<reference>)`, by your reference for them, with no name: read who they are from the members search (`members:read`). Write a mention the same way. A stored file comes without its path: `![alt]()`, `[name]()`."
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Description"
+          },
+          "initiative_id": {
+            "type": "integer",
+            "title": "Initiative Id"
+          },
+          "tag_ids": {
+            "anyOf": [
+              {
+                "items": {
+                  "type": "integer"
+                },
+                "type": "array"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Tag Ids"
+          },
+          "grants": {
+            "items": {
+              "$ref": "#/components/schemas/ResourceGrantSchema"
+            },
+            "type": "array",
+            "title": "Grants"
+          }
+        },
+        "type": "object",
+        "required": [
+          "name",
+          "initiative_id"
+        ],
+        "title": "CatalogCreate"
+      },
+      "CatalogItemListResponse": {
+        "properties": {
+          "total_count": {
+            "type": "integer",
+            "title": "Total Count"
+          },
+          "page": {
+            "type": "integer",
+            "title": "Page"
+          },
+          "page_size": {
+            "type": "integer",
+            "title": "Page Size"
+          },
+          "has_next": {
+            "type": "boolean",
+            "title": "Has Next"
+          },
+          "has_prev": {
+            "type": "boolean",
+            "title": "Has Prev"
+          },
+          "items": {
+            "items": {
+              "$ref": "#/components/schemas/CatalogItemRead"
+            },
+            "type": "array",
+            "title": "Items"
+          }
+        },
+        "type": "object",
+        "required": [
+          "total_count",
+          "page",
+          "page_size",
+          "has_next",
+          "has_prev",
+          "items"
+        ],
+        "title": "CatalogItemListResponse"
+      },
+      "CatalogItemRead": {
+        "properties": {
+          "id": {
+            "type": "integer",
+            "title": "Id"
+          },
+          "catalog_id": {
+            "type": "integer",
+            "title": "Catalog Id"
+          },
+          "community_id": {
+            "title": "Community Id",
+            "type": "string",
+            "x-identity": "community"
+          },
+          "title": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Title"
+          },
+          "caption": {
+            "anyOf": [
+              {
+                "type": "string",
+                "x-mentions": "markdown",
+                "description": "A person is mentioned as `@[](<reference>)`, by your reference for them, with no name: read who they are from the members search (`members:read`). Write a mention the same way. A stored file comes without its path: `![alt]()`, `[name]()`."
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Caption"
+          },
+          "file_url": {
+            "type": "string",
+            "title": "File Url",
+            "x-upload": true,
+            "description": "A stored file comes as an empty string, without its path. A URL from elsewhere comes as it is."
+          },
+          "thumbnail_url": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Thumbnail Url",
+            "x-upload": true,
+            "description": "A stored file comes as an empty string, without its path. A URL from elsewhere comes as it is."
+          },
+          "file_content_type": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "File Content Type"
+          },
+          "file_size": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "File Size"
+          },
+          "original_filename": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Original Filename"
+          },
+          "width": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Width"
+          },
+          "height": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Height"
+          },
+          "created_by": {
+            "anyOf": [
+              {
+                "type": "string",
+                "x-identity": "person"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Created By"
+          },
+          "uploader": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/PluginPerson"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "created_at": {
+            "type": "string",
+            "format": "date-time",
+            "title": "Created At"
+          },
+          "updated_at": {
+            "type": "string",
+            "format": "date-time",
+            "title": "Updated At"
+          },
+          "version_count": {
+            "type": "integer",
+            "title": "Version Count",
+            "default": 1
+          },
+          "tags": {
+            "items": {
+              "$ref": "#/components/schemas/TagSummary"
+            },
+            "type": "array",
+            "title": "Tags"
+          },
+          "properties": {
+            "items": {
+              "$ref": "#/components/schemas/PropertySummary"
+            },
+            "type": "array",
+            "title": "Properties"
+          },
+          "plugin_values": {
+            "items": {
+              "$ref": "#/components/schemas/PluginValueSummary"
+            },
+            "type": "array",
+            "title": "Plugin Values"
+          }
+        },
+        "type": "object",
+        "required": [
+          "id",
+          "catalog_id",
+          "community_id",
+          "title",
+          "caption",
+          "file_url",
+          "thumbnail_url",
+          "file_content_type",
+          "file_size",
+          "original_filename",
+          "width",
+          "height",
+          "created_by",
+          "uploader",
+          "created_at",
+          "updated_at",
+          "version_count",
+          "tags",
+          "properties",
+          "plugin_values"
+        ],
+        "title": "CatalogItemRead"
+      },
+      "CatalogItemUpdate": {
+        "properties": {
+          "properties": {
+            "anyOf": [
+              {
+                "items": {
+                  "$ref": "#/components/schemas/PropertyValueInput"
+                },
+                "type": "array"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Properties"
+          },
+          "title": {
+            "anyOf": [
+              {
+                "type": "string",
+                "maxLength": 255
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Title"
+          },
+          "caption": {
+            "anyOf": [
+              {
+                "type": "string",
+                "maxLength": 2000,
+                "x-mentions": "markdown",
+                "description": "A person is mentioned as `@[](<reference>)`, by your reference for them, with no name: read who they are from the members search (`members:read`). Write a mention the same way. A stored file comes without its path: `![alt]()`, `[name]()`."
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Caption"
+          },
+          "tag_ids": {
+            "anyOf": [
+              {
+                "items": {
+                  "type": "integer"
+                },
+                "type": "array"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Tag Ids"
+          },
+          "caption_base": {
+            "anyOf": [
+              {
+                "type": "string",
+                "x-mentions": "markdown",
+                "description": "A person is mentioned as `@[](<reference>)`, by your reference for them, with no name: read who they are from the members search (`members:read`). Write a mention the same way. A stored file comes without its path: `![alt]()`, `[name]()`."
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Caption Base"
+          }
+        },
+        "type": "object",
+        "title": "CatalogItemUpdate"
+      },
+      "CatalogItemVersionRead": {
+        "properties": {
+          "id": {
+            "type": "integer",
+            "title": "Id"
+          },
+          "version_number": {
+            "type": "integer",
+            "title": "Version Number"
+          },
+          "file_url": {
+            "type": "string",
+            "title": "File Url",
+            "x-upload": true,
+            "description": "A stored file comes as an empty string, without its path. A URL from elsewhere comes as it is."
+          },
+          "thumbnail_url": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Thumbnail Url",
+            "x-upload": true,
+            "description": "A stored file comes as an empty string, without its path. A URL from elsewhere comes as it is."
+          },
+          "file_content_type": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "File Content Type"
+          },
+          "file_size": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "File Size"
+          },
+          "original_filename": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Original Filename"
+          },
+          "width": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Width"
+          },
+          "height": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Height"
+          },
+          "created_by": {
+            "anyOf": [
+              {
+                "type": "string",
+                "x-identity": "person"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Created By"
+          },
+          "created_at": {
+            "type": "string",
+            "format": "date-time",
+            "title": "Created At"
+          },
+          "is_current": {
+            "type": "boolean",
+            "title": "Is Current",
+            "default": false
+          }
+        },
+        "type": "object",
+        "required": [
+          "id",
+          "version_number",
+          "file_url",
+          "thumbnail_url",
+          "file_content_type",
+          "file_size",
+          "original_filename",
+          "width",
+          "height",
+          "created_by",
+          "created_at",
+          "is_current"
+        ],
+        "title": "CatalogItemVersionRead",
+        "description": "One stored rendition of a picture."
+      },
+      "CatalogListResponse": {
+        "properties": {
+          "total_count": {
+            "type": "integer",
+            "title": "Total Count"
+          },
+          "page": {
+            "type": "integer",
+            "title": "Page"
+          },
+          "page_size": {
+            "type": "integer",
+            "title": "Page Size"
+          },
+          "has_next": {
+            "type": "boolean",
+            "title": "Has Next"
+          },
+          "has_prev": {
+            "type": "boolean",
+            "title": "Has Prev"
+          },
+          "items": {
+            "items": {
+              "$ref": "#/components/schemas/CatalogSummary"
+            },
+            "type": "array",
+            "title": "Items"
+          }
+        },
+        "type": "object",
+        "required": [
+          "total_count",
+          "page",
+          "page_size",
+          "has_next",
+          "has_prev",
+          "items"
+        ],
+        "title": "CatalogListResponse"
+      },
+      "CatalogRead": {
+        "properties": {
+          "archived_at": {
+            "anyOf": [
+              {
+                "type": "string",
+                "format": "date-time"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Archived At"
+          },
+          "can": {
+            "$ref": "#/components/schemas/ToolCan"
+          },
+          "id": {
+            "type": "integer",
+            "title": "Id"
+          },
+          "initiative_id": {
+            "type": "integer",
+            "title": "Initiative Id"
+          },
+          "community_id": {
+            "title": "Community Id",
+            "type": "string",
+            "x-identity": "community"
+          },
+          "created_by": {
+            "anyOf": [
+              {
+                "type": "string",
+                "x-identity": "person"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Created By"
+          },
+          "created_at": {
+            "type": "string",
+            "format": "date-time",
+            "title": "Created At"
+          },
+          "updated_at": {
+            "type": "string",
+            "format": "date-time",
+            "title": "Updated At"
+          },
+          "comments_enabled": {
+            "type": "boolean",
+            "title": "Comments Enabled",
+            "default": true
+          },
+          "tags": {
+            "items": {
+              "$ref": "#/components/schemas/TagSummary"
+            },
+            "type": "array",
+            "title": "Tags"
+          },
+          "properties": {
+            "items": {
+              "$ref": "#/components/schemas/PropertySummary"
+            },
+            "type": "array",
+            "title": "Properties"
+          },
+          "grants": {
+            "items": {
+              "$ref": "#/components/schemas/ResourceGrantSchema"
+            },
+            "type": "array",
+            "title": "Grants"
+          },
+          "name": {
+            "type": "string",
+            "maxLength": 255,
+            "minLength": 1,
+            "title": "Name"
+          },
+          "description": {
+            "anyOf": [
+              {
+                "type": "string",
+                "maxLength": 2000,
+                "x-mentions": "markdown",
+                "description": "A person is mentioned as `@[](<reference>)`, by your reference for them, with no name: read who they are from the members search (`members:read`). Write a mention the same way. A stored file comes without its path: `![alt]()`, `[name]()`."
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Description"
+          },
+          "cover_item_id": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Cover Item Id"
+          },
+          "cover": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/CatalogCover"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "preview": {
+            "items": {
+              "$ref": "#/components/schemas/CatalogCover"
+            },
+            "type": "array",
+            "title": "Preview"
+          },
+          "comment_count": {
+            "type": "integer",
+            "title": "Comment Count",
+            "default": 0
+          }
+        },
+        "type": "object",
+        "required": [
+          "archived_at",
+          "can",
+          "id",
+          "initiative_id",
+          "community_id",
+          "created_by",
+          "created_at",
+          "updated_at",
+          "comments_enabled",
+          "tags",
+          "properties",
+          "grants",
+          "name",
+          "description",
+          "cover_item_id",
+          "cover",
+          "preview",
+          "comment_count"
+        ],
+        "title": "CatalogRead",
+        "description": "A catalog on its own page. The same shape as its summary: the pictures\nare paged separately, because a catalog is browsed rather than read."
+      },
+      "CatalogSummary": {
+        "properties": {
+          "archived_at": {
+            "anyOf": [
+              {
+                "type": "string",
+                "format": "date-time"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Archived At"
+          },
+          "can": {
+            "$ref": "#/components/schemas/ToolCan"
+          },
+          "id": {
+            "type": "integer",
+            "title": "Id"
+          },
+          "initiative_id": {
+            "type": "integer",
+            "title": "Initiative Id"
+          },
+          "community_id": {
+            "title": "Community Id",
+            "type": "string",
+            "x-identity": "community"
+          },
+          "created_by": {
+            "anyOf": [
+              {
+                "type": "string",
+                "x-identity": "person"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Created By"
+          },
+          "created_at": {
+            "type": "string",
+            "format": "date-time",
+            "title": "Created At"
+          },
+          "updated_at": {
+            "type": "string",
+            "format": "date-time",
+            "title": "Updated At"
+          },
+          "comments_enabled": {
+            "type": "boolean",
+            "title": "Comments Enabled",
+            "default": true
+          },
+          "tags": {
+            "items": {
+              "$ref": "#/components/schemas/TagSummary"
+            },
+            "type": "array",
+            "title": "Tags"
+          },
+          "properties": {
+            "items": {
+              "$ref": "#/components/schemas/PropertySummary"
+            },
+            "type": "array",
+            "title": "Properties"
+          },
+          "grants": {
+            "items": {
+              "$ref": "#/components/schemas/ResourceGrantSchema"
+            },
+            "type": "array",
+            "title": "Grants"
+          },
+          "name": {
+            "type": "string",
+            "maxLength": 255,
+            "minLength": 1,
+            "title": "Name"
+          },
+          "description": {
+            "anyOf": [
+              {
+                "type": "string",
+                "maxLength": 2000,
+                "x-mentions": "markdown",
+                "description": "A person is mentioned as `@[](<reference>)`, by your reference for them, with no name: read who they are from the members search (`members:read`). Write a mention the same way. A stored file comes without its path: `![alt]()`, `[name]()`."
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Description"
+          },
+          "cover_item_id": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Cover Item Id"
+          },
+          "cover": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/CatalogCover"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "preview": {
+            "items": {
+              "$ref": "#/components/schemas/CatalogCover"
+            },
+            "type": "array",
+            "title": "Preview"
+          },
+          "comment_count": {
+            "type": "integer",
+            "title": "Comment Count",
+            "default": 0
+          }
+        },
+        "type": "object",
+        "required": [
+          "archived_at",
+          "can",
+          "id",
+          "initiative_id",
+          "community_id",
+          "created_by",
+          "created_at",
+          "updated_at",
+          "comments_enabled",
+          "tags",
+          "properties",
+          "grants",
+          "name",
+          "description",
+          "cover_item_id",
+          "cover",
+          "preview",
+          "comment_count"
+        ],
+        "title": "CatalogSummary"
+      },
+      "CatalogUpdate": {
+        "properties": {
+          "name": {
+            "anyOf": [
+              {
+                "type": "string",
+                "maxLength": 255,
+                "minLength": 1
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Name"
+          },
+          "description": {
+            "anyOf": [
+              {
+                "type": "string",
+                "maxLength": 2000,
+                "x-mentions": "markdown",
+                "description": "A person is mentioned as `@[](<reference>)`, by your reference for them, with no name: read who they are from the members search (`members:read`). Write a mention the same way. A stored file comes without its path: `![alt]()`, `[name]()`."
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Description"
+          },
+          "cover_item_id": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Cover Item Id"
+          }
+        },
+        "type": "object",
+        "title": "CatalogUpdate"
+      },
       "ChecklistItem": {
         "properties": {
           "id": {
@@ -12536,7 +13518,7 @@
             ],
             "title": "Post Id"
           },
-          "gallery_id": {
+          "catalog_id": {
             "anyOf": [
               {
                 "type": "integer",
@@ -12546,7 +13528,7 @@
                 "type": "null"
               }
             ],
-            "title": "Gallery Id"
+            "title": "Catalog Id"
           },
           "wiki_id": {
             "anyOf": [
@@ -12731,7 +13713,7 @@
             ],
             "title": "Post Id"
           },
-          "gallery_id": {
+          "catalog_id": {
             "anyOf": [
               {
                 "type": "integer"
@@ -12740,7 +13722,7 @@
                 "type": "null"
               }
             ],
-            "title": "Gallery Id"
+            "title": "Catalog Id"
           },
           "wiki_id": {
             "anyOf": [
@@ -12868,7 +13850,7 @@
           "calendar_id",
           "dashboard_id",
           "post_id",
-          "gallery_id",
+          "catalog_id",
           "wiki_id",
           "id",
           "created_by",
@@ -14559,959 +15541,6 @@
         "title": "FilterOp",
         "description": "Comparison operators for filter conditions.\n\nNegation is handled by the ``negate`` flag on FilterCondition,\nnot by separate operators."
       },
-      "GalleryCover": {
-        "properties": {
-          "image_id": {
-            "type": "integer",
-            "title": "Image Id"
-          },
-          "file_url": {
-            "type": "string",
-            "title": "File Url",
-            "x-upload": true,
-            "description": "A stored file comes as an empty string, without its path. A URL from elsewhere comes as it is."
-          },
-          "thumbnail_url": {
-            "anyOf": [
-              {
-                "type": "string"
-              },
-              {
-                "type": "null"
-              }
-            ],
-            "title": "Thumbnail Url",
-            "x-upload": true,
-            "description": "A stored file comes as an empty string, without its path. A URL from elsewhere comes as it is."
-          },
-          "width": {
-            "anyOf": [
-              {
-                "type": "integer"
-              },
-              {
-                "type": "null"
-              }
-            ],
-            "title": "Width"
-          },
-          "height": {
-            "anyOf": [
-              {
-                "type": "integer"
-              },
-              {
-                "type": "null"
-              }
-            ],
-            "title": "Height"
-          }
-        },
-        "type": "object",
-        "required": [
-          "image_id",
-          "file_url",
-          "thumbnail_url",
-          "width",
-          "height"
-        ],
-        "title": "GalleryCover",
-        "description": "What a list draws for a gallery: one picture, at whichever size it has."
-      },
-      "GalleryCreate": {
-        "properties": {
-          "properties": {
-            "items": {
-              "$ref": "#/components/schemas/PropertyValueInput"
-            },
-            "type": "array",
-            "title": "Properties"
-          },
-          "name": {
-            "type": "string",
-            "maxLength": 255,
-            "minLength": 1,
-            "title": "Name"
-          },
-          "description": {
-            "anyOf": [
-              {
-                "type": "string",
-                "maxLength": 2000,
-                "x-mentions": "markdown",
-                "description": "A person is mentioned as `@[](<reference>)`, by your reference for them, with no name: read who they are from the members search (`members:read`). Write a mention the same way. A stored file comes without its path: `![alt]()`, `[name]()`."
-              },
-              {
-                "type": "null"
-              }
-            ],
-            "title": "Description"
-          },
-          "initiative_id": {
-            "type": "integer",
-            "title": "Initiative Id"
-          },
-          "tag_ids": {
-            "anyOf": [
-              {
-                "items": {
-                  "type": "integer"
-                },
-                "type": "array"
-              },
-              {
-                "type": "null"
-              }
-            ],
-            "title": "Tag Ids"
-          },
-          "grants": {
-            "items": {
-              "$ref": "#/components/schemas/ResourceGrantSchema"
-            },
-            "type": "array",
-            "title": "Grants"
-          }
-        },
-        "type": "object",
-        "required": [
-          "name",
-          "initiative_id"
-        ],
-        "title": "GalleryCreate"
-      },
-      "GalleryImageListResponse": {
-        "properties": {
-          "total_count": {
-            "type": "integer",
-            "title": "Total Count"
-          },
-          "page": {
-            "type": "integer",
-            "title": "Page"
-          },
-          "page_size": {
-            "type": "integer",
-            "title": "Page Size"
-          },
-          "has_next": {
-            "type": "boolean",
-            "title": "Has Next"
-          },
-          "has_prev": {
-            "type": "boolean",
-            "title": "Has Prev"
-          },
-          "items": {
-            "items": {
-              "$ref": "#/components/schemas/GalleryImageRead"
-            },
-            "type": "array",
-            "title": "Items"
-          }
-        },
-        "type": "object",
-        "required": [
-          "total_count",
-          "page",
-          "page_size",
-          "has_next",
-          "has_prev",
-          "items"
-        ],
-        "title": "GalleryImageListResponse"
-      },
-      "GalleryImageRead": {
-        "properties": {
-          "id": {
-            "type": "integer",
-            "title": "Id"
-          },
-          "gallery_id": {
-            "type": "integer",
-            "title": "Gallery Id"
-          },
-          "community_id": {
-            "title": "Community Id",
-            "type": "string",
-            "x-identity": "community"
-          },
-          "title": {
-            "anyOf": [
-              {
-                "type": "string"
-              },
-              {
-                "type": "null"
-              }
-            ],
-            "title": "Title"
-          },
-          "caption": {
-            "anyOf": [
-              {
-                "type": "string",
-                "x-mentions": "markdown",
-                "description": "A person is mentioned as `@[](<reference>)`, by your reference for them, with no name: read who they are from the members search (`members:read`). Write a mention the same way. A stored file comes without its path: `![alt]()`, `[name]()`."
-              },
-              {
-                "type": "null"
-              }
-            ],
-            "title": "Caption"
-          },
-          "file_url": {
-            "type": "string",
-            "title": "File Url",
-            "x-upload": true,
-            "description": "A stored file comes as an empty string, without its path. A URL from elsewhere comes as it is."
-          },
-          "thumbnail_url": {
-            "anyOf": [
-              {
-                "type": "string"
-              },
-              {
-                "type": "null"
-              }
-            ],
-            "title": "Thumbnail Url",
-            "x-upload": true,
-            "description": "A stored file comes as an empty string, without its path. A URL from elsewhere comes as it is."
-          },
-          "file_content_type": {
-            "anyOf": [
-              {
-                "type": "string"
-              },
-              {
-                "type": "null"
-              }
-            ],
-            "title": "File Content Type"
-          },
-          "file_size": {
-            "anyOf": [
-              {
-                "type": "integer"
-              },
-              {
-                "type": "null"
-              }
-            ],
-            "title": "File Size"
-          },
-          "original_filename": {
-            "anyOf": [
-              {
-                "type": "string"
-              },
-              {
-                "type": "null"
-              }
-            ],
-            "title": "Original Filename"
-          },
-          "width": {
-            "anyOf": [
-              {
-                "type": "integer"
-              },
-              {
-                "type": "null"
-              }
-            ],
-            "title": "Width"
-          },
-          "height": {
-            "anyOf": [
-              {
-                "type": "integer"
-              },
-              {
-                "type": "null"
-              }
-            ],
-            "title": "Height"
-          },
-          "created_by": {
-            "anyOf": [
-              {
-                "type": "string",
-                "x-identity": "person"
-              },
-              {
-                "type": "null"
-              }
-            ],
-            "title": "Created By"
-          },
-          "uploader": {
-            "anyOf": [
-              {
-                "$ref": "#/components/schemas/PluginPerson"
-              },
-              {
-                "type": "null"
-              }
-            ]
-          },
-          "created_at": {
-            "type": "string",
-            "format": "date-time",
-            "title": "Created At"
-          },
-          "updated_at": {
-            "type": "string",
-            "format": "date-time",
-            "title": "Updated At"
-          },
-          "version_count": {
-            "type": "integer",
-            "title": "Version Count",
-            "default": 1
-          },
-          "tags": {
-            "items": {
-              "$ref": "#/components/schemas/TagSummary"
-            },
-            "type": "array",
-            "title": "Tags"
-          },
-          "properties": {
-            "items": {
-              "$ref": "#/components/schemas/PropertySummary"
-            },
-            "type": "array",
-            "title": "Properties"
-          },
-          "plugin_values": {
-            "items": {
-              "$ref": "#/components/schemas/PluginValueSummary"
-            },
-            "type": "array",
-            "title": "Plugin Values"
-          }
-        },
-        "type": "object",
-        "required": [
-          "id",
-          "gallery_id",
-          "community_id",
-          "title",
-          "caption",
-          "file_url",
-          "thumbnail_url",
-          "file_content_type",
-          "file_size",
-          "original_filename",
-          "width",
-          "height",
-          "created_by",
-          "uploader",
-          "created_at",
-          "updated_at",
-          "version_count",
-          "tags",
-          "properties",
-          "plugin_values"
-        ],
-        "title": "GalleryImageRead"
-      },
-      "GalleryImageUpdate": {
-        "properties": {
-          "properties": {
-            "anyOf": [
-              {
-                "items": {
-                  "$ref": "#/components/schemas/PropertyValueInput"
-                },
-                "type": "array"
-              },
-              {
-                "type": "null"
-              }
-            ],
-            "title": "Properties"
-          },
-          "title": {
-            "anyOf": [
-              {
-                "type": "string",
-                "maxLength": 255
-              },
-              {
-                "type": "null"
-              }
-            ],
-            "title": "Title"
-          },
-          "caption": {
-            "anyOf": [
-              {
-                "type": "string",
-                "maxLength": 2000,
-                "x-mentions": "markdown",
-                "description": "A person is mentioned as `@[](<reference>)`, by your reference for them, with no name: read who they are from the members search (`members:read`). Write a mention the same way. A stored file comes without its path: `![alt]()`, `[name]()`."
-              },
-              {
-                "type": "null"
-              }
-            ],
-            "title": "Caption"
-          },
-          "tag_ids": {
-            "anyOf": [
-              {
-                "items": {
-                  "type": "integer"
-                },
-                "type": "array"
-              },
-              {
-                "type": "null"
-              }
-            ],
-            "title": "Tag Ids"
-          },
-          "caption_base": {
-            "anyOf": [
-              {
-                "type": "string",
-                "x-mentions": "markdown",
-                "description": "A person is mentioned as `@[](<reference>)`, by your reference for them, with no name: read who they are from the members search (`members:read`). Write a mention the same way. A stored file comes without its path: `![alt]()`, `[name]()`."
-              },
-              {
-                "type": "null"
-              }
-            ],
-            "title": "Caption Base"
-          }
-        },
-        "type": "object",
-        "title": "GalleryImageUpdate"
-      },
-      "GalleryImageVersionRead": {
-        "properties": {
-          "id": {
-            "type": "integer",
-            "title": "Id"
-          },
-          "version_number": {
-            "type": "integer",
-            "title": "Version Number"
-          },
-          "file_url": {
-            "type": "string",
-            "title": "File Url",
-            "x-upload": true,
-            "description": "A stored file comes as an empty string, without its path. A URL from elsewhere comes as it is."
-          },
-          "thumbnail_url": {
-            "anyOf": [
-              {
-                "type": "string"
-              },
-              {
-                "type": "null"
-              }
-            ],
-            "title": "Thumbnail Url",
-            "x-upload": true,
-            "description": "A stored file comes as an empty string, without its path. A URL from elsewhere comes as it is."
-          },
-          "file_content_type": {
-            "anyOf": [
-              {
-                "type": "string"
-              },
-              {
-                "type": "null"
-              }
-            ],
-            "title": "File Content Type"
-          },
-          "file_size": {
-            "anyOf": [
-              {
-                "type": "integer"
-              },
-              {
-                "type": "null"
-              }
-            ],
-            "title": "File Size"
-          },
-          "original_filename": {
-            "anyOf": [
-              {
-                "type": "string"
-              },
-              {
-                "type": "null"
-              }
-            ],
-            "title": "Original Filename"
-          },
-          "width": {
-            "anyOf": [
-              {
-                "type": "integer"
-              },
-              {
-                "type": "null"
-              }
-            ],
-            "title": "Width"
-          },
-          "height": {
-            "anyOf": [
-              {
-                "type": "integer"
-              },
-              {
-                "type": "null"
-              }
-            ],
-            "title": "Height"
-          },
-          "created_by": {
-            "anyOf": [
-              {
-                "type": "string",
-                "x-identity": "person"
-              },
-              {
-                "type": "null"
-              }
-            ],
-            "title": "Created By"
-          },
-          "created_at": {
-            "type": "string",
-            "format": "date-time",
-            "title": "Created At"
-          },
-          "is_current": {
-            "type": "boolean",
-            "title": "Is Current",
-            "default": false
-          }
-        },
-        "type": "object",
-        "required": [
-          "id",
-          "version_number",
-          "file_url",
-          "thumbnail_url",
-          "file_content_type",
-          "file_size",
-          "original_filename",
-          "width",
-          "height",
-          "created_by",
-          "created_at",
-          "is_current"
-        ],
-        "title": "GalleryImageVersionRead",
-        "description": "One stored rendition of a picture."
-      },
-      "GalleryListResponse": {
-        "properties": {
-          "total_count": {
-            "type": "integer",
-            "title": "Total Count"
-          },
-          "page": {
-            "type": "integer",
-            "title": "Page"
-          },
-          "page_size": {
-            "type": "integer",
-            "title": "Page Size"
-          },
-          "has_next": {
-            "type": "boolean",
-            "title": "Has Next"
-          },
-          "has_prev": {
-            "type": "boolean",
-            "title": "Has Prev"
-          },
-          "items": {
-            "items": {
-              "$ref": "#/components/schemas/GallerySummary"
-            },
-            "type": "array",
-            "title": "Items"
-          }
-        },
-        "type": "object",
-        "required": [
-          "total_count",
-          "page",
-          "page_size",
-          "has_next",
-          "has_prev",
-          "items"
-        ],
-        "title": "GalleryListResponse"
-      },
-      "GalleryRead": {
-        "properties": {
-          "archived_at": {
-            "anyOf": [
-              {
-                "type": "string",
-                "format": "date-time"
-              },
-              {
-                "type": "null"
-              }
-            ],
-            "title": "Archived At"
-          },
-          "can": {
-            "$ref": "#/components/schemas/ToolCan"
-          },
-          "id": {
-            "type": "integer",
-            "title": "Id"
-          },
-          "initiative_id": {
-            "type": "integer",
-            "title": "Initiative Id"
-          },
-          "community_id": {
-            "title": "Community Id",
-            "type": "string",
-            "x-identity": "community"
-          },
-          "created_by": {
-            "anyOf": [
-              {
-                "type": "string",
-                "x-identity": "person"
-              },
-              {
-                "type": "null"
-              }
-            ],
-            "title": "Created By"
-          },
-          "created_at": {
-            "type": "string",
-            "format": "date-time",
-            "title": "Created At"
-          },
-          "updated_at": {
-            "type": "string",
-            "format": "date-time",
-            "title": "Updated At"
-          },
-          "comments_enabled": {
-            "type": "boolean",
-            "title": "Comments Enabled",
-            "default": true
-          },
-          "tags": {
-            "items": {
-              "$ref": "#/components/schemas/TagSummary"
-            },
-            "type": "array",
-            "title": "Tags"
-          },
-          "properties": {
-            "items": {
-              "$ref": "#/components/schemas/PropertySummary"
-            },
-            "type": "array",
-            "title": "Properties"
-          },
-          "grants": {
-            "items": {
-              "$ref": "#/components/schemas/ResourceGrantSchema"
-            },
-            "type": "array",
-            "title": "Grants"
-          },
-          "name": {
-            "type": "string",
-            "maxLength": 255,
-            "minLength": 1,
-            "title": "Name"
-          },
-          "description": {
-            "anyOf": [
-              {
-                "type": "string",
-                "maxLength": 2000,
-                "x-mentions": "markdown",
-                "description": "A person is mentioned as `@[](<reference>)`, by your reference for them, with no name: read who they are from the members search (`members:read`). Write a mention the same way. A stored file comes without its path: `![alt]()`, `[name]()`."
-              },
-              {
-                "type": "null"
-              }
-            ],
-            "title": "Description"
-          },
-          "cover_image_id": {
-            "anyOf": [
-              {
-                "type": "integer"
-              },
-              {
-                "type": "null"
-              }
-            ],
-            "title": "Cover Image Id"
-          },
-          "cover": {
-            "anyOf": [
-              {
-                "$ref": "#/components/schemas/GalleryCover"
-              },
-              {
-                "type": "null"
-              }
-            ]
-          },
-          "preview": {
-            "items": {
-              "$ref": "#/components/schemas/GalleryCover"
-            },
-            "type": "array",
-            "title": "Preview"
-          },
-          "comment_count": {
-            "type": "integer",
-            "title": "Comment Count",
-            "default": 0
-          }
-        },
-        "type": "object",
-        "required": [
-          "archived_at",
-          "can",
-          "id",
-          "initiative_id",
-          "community_id",
-          "created_by",
-          "created_at",
-          "updated_at",
-          "comments_enabled",
-          "tags",
-          "properties",
-          "grants",
-          "name",
-          "description",
-          "cover_image_id",
-          "cover",
-          "preview",
-          "comment_count"
-        ],
-        "title": "GalleryRead",
-        "description": "A gallery on its own page. The same shape as its summary: the pictures\nare paged separately, because a gallery is browsed rather than read."
-      },
-      "GallerySummary": {
-        "properties": {
-          "archived_at": {
-            "anyOf": [
-              {
-                "type": "string",
-                "format": "date-time"
-              },
-              {
-                "type": "null"
-              }
-            ],
-            "title": "Archived At"
-          },
-          "can": {
-            "$ref": "#/components/schemas/ToolCan"
-          },
-          "id": {
-            "type": "integer",
-            "title": "Id"
-          },
-          "initiative_id": {
-            "type": "integer",
-            "title": "Initiative Id"
-          },
-          "community_id": {
-            "title": "Community Id",
-            "type": "string",
-            "x-identity": "community"
-          },
-          "created_by": {
-            "anyOf": [
-              {
-                "type": "string",
-                "x-identity": "person"
-              },
-              {
-                "type": "null"
-              }
-            ],
-            "title": "Created By"
-          },
-          "created_at": {
-            "type": "string",
-            "format": "date-time",
-            "title": "Created At"
-          },
-          "updated_at": {
-            "type": "string",
-            "format": "date-time",
-            "title": "Updated At"
-          },
-          "comments_enabled": {
-            "type": "boolean",
-            "title": "Comments Enabled",
-            "default": true
-          },
-          "tags": {
-            "items": {
-              "$ref": "#/components/schemas/TagSummary"
-            },
-            "type": "array",
-            "title": "Tags"
-          },
-          "properties": {
-            "items": {
-              "$ref": "#/components/schemas/PropertySummary"
-            },
-            "type": "array",
-            "title": "Properties"
-          },
-          "grants": {
-            "items": {
-              "$ref": "#/components/schemas/ResourceGrantSchema"
-            },
-            "type": "array",
-            "title": "Grants"
-          },
-          "name": {
-            "type": "string",
-            "maxLength": 255,
-            "minLength": 1,
-            "title": "Name"
-          },
-          "description": {
-            "anyOf": [
-              {
-                "type": "string",
-                "maxLength": 2000,
-                "x-mentions": "markdown",
-                "description": "A person is mentioned as `@[](<reference>)`, by your reference for them, with no name: read who they are from the members search (`members:read`). Write a mention the same way. A stored file comes without its path: `![alt]()`, `[name]()`."
-              },
-              {
-                "type": "null"
-              }
-            ],
-            "title": "Description"
-          },
-          "cover_image_id": {
-            "anyOf": [
-              {
-                "type": "integer"
-              },
-              {
-                "type": "null"
-              }
-            ],
-            "title": "Cover Image Id"
-          },
-          "cover": {
-            "anyOf": [
-              {
-                "$ref": "#/components/schemas/GalleryCover"
-              },
-              {
-                "type": "null"
-              }
-            ]
-          },
-          "preview": {
-            "items": {
-              "$ref": "#/components/schemas/GalleryCover"
-            },
-            "type": "array",
-            "title": "Preview"
-          },
-          "comment_count": {
-            "type": "integer",
-            "title": "Comment Count",
-            "default": 0
-          }
-        },
-        "type": "object",
-        "required": [
-          "archived_at",
-          "can",
-          "id",
-          "initiative_id",
-          "community_id",
-          "created_by",
-          "created_at",
-          "updated_at",
-          "comments_enabled",
-          "tags",
-          "properties",
-          "grants",
-          "name",
-          "description",
-          "cover_image_id",
-          "cover",
-          "preview",
-          "comment_count"
-        ],
-        "title": "GallerySummary"
-      },
-      "GalleryUpdate": {
-        "properties": {
-          "name": {
-            "anyOf": [
-              {
-                "type": "string",
-                "maxLength": 255,
-                "minLength": 1
-              },
-              {
-                "type": "null"
-              }
-            ],
-            "title": "Name"
-          },
-          "description": {
-            "anyOf": [
-              {
-                "type": "string",
-                "maxLength": 2000,
-                "x-mentions": "markdown",
-                "description": "A person is mentioned as `@[](<reference>)`, by your reference for them, with no name: read who they are from the members search (`members:read`). Write a mention the same way. A stored file comes without its path: `![alt]()`, `[name]()`."
-              },
-              {
-                "type": "null"
-              }
-            ],
-            "title": "Description"
-          },
-          "cover_image_id": {
-            "anyOf": [
-              {
-                "type": "integer"
-              },
-              {
-                "type": "null"
-              }
-            ],
-            "title": "Cover Image Id"
-          }
-        },
-        "type": "object",
-        "title": "GalleryUpdate"
-      },
       "GroupRead": {
         "properties": {
           "key": {
@@ -15677,9 +15706,9 @@
             "title": "Posts Enabled",
             "default": false
           },
-          "galleries_enabled": {
+          "catalogs_enabled": {
             "type": "boolean",
-            "title": "Galleries Enabled",
+            "title": "Catalogs Enabled",
             "default": false
           },
           "wikis_enabled": {
@@ -15797,7 +15826,7 @@
           "calendars_enabled",
           "dashboards_enabled",
           "posts_enabled",
-          "galleries_enabled",
+          "catalogs_enabled",
           "wikis_enabled",
           "name",
           "description",
@@ -17556,13 +17585,13 @@
           "calendar",
           "dashboard",
           "post",
-          "gallery",
+          "catalog",
           "wiki",
           "task",
           "queue_item",
           "calendar_event",
           "counter",
-          "gallery_image",
+          "catalog_item",
           "wiki_page"
         ],
         "title": "PropertyTarget",
@@ -18617,13 +18646,13 @@
         "enum": [
           "calendar",
           "calendar_event",
+          "catalog",
+          "catalog_item",
           "comment",
           "counter",
           "counter_group",
           "dashboard",
           "file",
-          "gallery",
-          "gallery_image",
           "post",
           "project",
           "queue",
@@ -18875,12 +18904,12 @@
           "calendar",
           "dashboard",
           "post",
-          "gallery",
+          "catalog",
           "wiki",
           "task",
           "queue_item",
           "calendar_event",
-          "gallery_image",
+          "catalog_item",
           "wiki_page"
         ],
         "title": "TagTarget",
@@ -19030,6 +19059,17 @@
             },
             "type": "array",
             "title": "Checklist"
+          },
+          "parent_task_id": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Parent Task Id"
           }
         },
         "type": "object",
@@ -19326,6 +19366,26 @@
               }
             ]
           },
+          "parent": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/TaskParentSummary"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "subtask_progress": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/ChecklistProgress"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
           "tags": {
             "items": {
               "$ref": "#/components/schemas/TagSummary"
@@ -19389,6 +19449,8 @@
           "initiative_name",
           "initiative_color",
           "checklist_progress",
+          "parent",
+          "subtask_progress",
           "tags",
           "properties",
           "plugin_values"
@@ -19462,6 +19524,25 @@
           "target_project_id"
         ],
         "title": "TaskMoveRequest"
+      },
+      "TaskParentSummary": {
+        "properties": {
+          "id": {
+            "type": "integer",
+            "title": "Id"
+          },
+          "title": {
+            "type": "string",
+            "title": "Title"
+          }
+        },
+        "type": "object",
+        "required": [
+          "id",
+          "title"
+        ],
+        "title": "TaskParentSummary",
+        "description": "The task a task is part of: the target of its ``part_of`` edge."
       },
       "TaskPriority": {
         "type": "string",
@@ -19810,6 +19891,26 @@
               }
             ]
           },
+          "parent": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/TaskParentSummary"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "subtask_progress": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/ChecklistProgress"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
           "tags": {
             "items": {
               "$ref": "#/components/schemas/TagSummary"
@@ -19871,6 +19972,8 @@
           "project",
           "checklist",
           "checklist_progress",
+          "parent",
+          "subtask_progress",
           "tags",
           "properties",
           "plugin_values"
@@ -20412,6 +20515,17 @@
             ],
             "title": "Checklist"
           },
+          "parent_task_id": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Parent Task Id"
+          },
           "scope": {
             "anyOf": [
               {
@@ -20489,7 +20603,7 @@
           "calendar",
           "dashboard",
           "post",
-          "gallery",
+          "catalog",
           "wiki"
         ],
         "title": "Tool"

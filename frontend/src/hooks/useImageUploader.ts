@@ -1,8 +1,8 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 
-import { invalidateImages, useUploadGalleryImage } from "@/hooks/useGalleries";
+import { invalidateImages, useUploadCatalogItem } from "@/hooks/useCatalogs";
+import { type FileRefusal, refuseFile } from "@/lib/catalogs";
 import { getErrorMessage } from "@/lib/errorMessage";
-import { type FileRefusal, refuseFile } from "@/lib/galleries";
 
 export type UploadStatus = "queued" | "uploading" | "done" | "failed";
 
@@ -27,7 +27,7 @@ const REFRESH_EVERY = 10;
 let nextId = 1;
 
 /**
- * A queue of pictures on their way into a gallery.
+ * A queue of pictures on their way into a catalog.
  *
  * One request per file, a few at a time, so a bad file fails on its own and
  * the rest go up. Files the server would refuse — the wrong type, too big —
@@ -38,9 +38,9 @@ let nextId = 1;
  * The wall is refetched once, when the queue drains, rather than after each
  * picture: forty refetches mid-drop would reflow the wall forty times.
  */
-export function useImageUploader(galleryId: number) {
+export function useImageUploader(catalogId: number) {
   const [jobs, setJobs] = useState<UploadJob[]>([]);
-  const upload = useUploadGalleryImage(galleryId);
+  const upload = useUploadCatalogItem(catalogId);
   const uploadRef = useRef(upload);
   uploadRef.current = upload;
   const running = useRef(0);
@@ -80,7 +80,7 @@ export function useImageUploader(galleryId: number) {
           setJobs((current) =>
             current.map((j) =>
               j.id === job.id
-                ? { ...j, status: "failed", error: getErrorMessage(error, "galleries:error") }
+                ? { ...j, status: "failed", error: getErrorMessage(error, "catalogs:error") }
                 : j
             )
           );
@@ -108,7 +108,7 @@ export function useImageUploader(galleryId: number) {
   useEffect(() => {
     const refresh = () => {
       refreshedAt.current = counts.done;
-      void invalidateImages(galleryId);
+      void invalidateImages(catalogId);
     };
     if (counts.active) {
       wasActive.current = true;
@@ -118,7 +118,7 @@ export function useImageUploader(galleryId: number) {
       if (counts.done !== refreshedAt.current) refresh();
       refreshedAt.current = 0;
     }
-  }, [counts.active, counts.done, galleryId]);
+  }, [counts.active, counts.done, catalogId]);
 
   const dismiss = useCallback(() => setJobs([]), []);
 

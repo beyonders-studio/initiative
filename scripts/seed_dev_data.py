@@ -59,7 +59,7 @@ from seed import (  # noqa: E402
     dashboards,
     directory,
     files,
-    galleries,
+    catalogs,
     guilds,
     initiatives,
     operations,
@@ -93,7 +93,7 @@ AREAS = (
     calendars,
     properties,
     posts,
-    galleries,
+    catalogs,
     wikis,
 )
 
@@ -180,9 +180,9 @@ async def seed() -> None:
         f"{len(ids['calendar_event_attendees'])} attendees"
     )
     print(
-        f"  {len(ids['galleries'])} galleries, "
-        f"{len(ids['gallery_images'])} pictures "
-        f"({len(ids['gallery_image_versions'])} versions)"
+        f"  {len(ids['catalogs'])} catalogs, "
+        f"{len(ids['catalog_items'])} pictures "
+        f"({len(ids['catalog_item_versions'])} versions)"
     )
     print(
         f"  {len(ids['posts'])} posts "

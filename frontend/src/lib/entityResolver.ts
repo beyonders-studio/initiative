@@ -20,11 +20,11 @@ import {
   readCalendarEvent,
 } from "@/api/generated/calendar-events/calendar-events";
 import { getReadCalendarQueryKey, readCalendar } from "@/api/generated/calendars/calendars";
+import { getReadCatalogQueryKey, readCatalog } from "@/api/generated/catalogs/catalogs";
 import { getReadCommentQueryKey, readComment } from "@/api/generated/comments/comments";
 import { getReadCounterGroupQueryKey, readCounterGroup } from "@/api/generated/counters/counters";
 import { getReadDashboardQueryKey, readDashboard } from "@/api/generated/dashboards/dashboards";
 import { getReadFileQueryKey, readFile } from "@/api/generated/files/files";
-import { getReadGalleryQueryKey, readGallery } from "@/api/generated/galleries/galleries";
 import { SearchEntityType, Tool } from "@/api/generated/initiativeAPI.schemas";
 import { getReadPostQueryKey, readPost } from "@/api/generated/posts/posts";
 import { getReadProjectQueryKey, readProject } from "@/api/generated/projects/projects";
@@ -95,9 +95,9 @@ const TOOL_READS: Record<
     key: getReadPostQueryKey,
     read: readPost,
   },
-  [Tool.gallery]: {
-    key: getReadGalleryQueryKey,
-    read: readGallery,
+  [Tool.catalog]: {
+    key: getReadCatalogQueryKey,
+    read: readCatalog,
   },
   [Tool.wiki]: {
     key: getReadWikiQueryKey,
@@ -121,9 +121,9 @@ type Resolve = (read: Read, communityId: number, id: number) => Promise<string>;
 
 /**
  * The kinds that live inside a tool and can be read by their own id, keyed by
- * the child-kind registry ({@link PARENT_TOOL}). A picture has no read by id
- * alone, so a link never names one. A counter does (`/counters/{id}`), but
- * nothing links to one yet. A queue item opens its queue: a moderation case
+ * the child-kind registry ({@link PARENT_TOOL}). A catalog item and a counter
+ * are read by id (`/catalog-items/{id}`, `/counters/{id}`), but nothing links
+ * to either yet. A queue item opens its queue: a moderation case
  * about one links to it.
  */
 const CHILD_RESOLVERS: Partial<Record<keyof typeof PARENT_TOOL, Resolve>> = {

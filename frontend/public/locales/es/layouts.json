@@ -228,10 +228,10 @@
   },
   "tab": "Diseños",
   "settingsDescription": "Cómo dispone lo que contiene: cada diseño, cuándo cambió por última vez y el acceso al editor. Todos los que pueden abrirlo los ven; lo que cada persona filtra y ordena es suyo.",
-  "galleryImageDetail": {
+  "catalogItemDetail": {
     "name": "Detalle de la imagen",
-    "help": "Cómo se muestra cada imagen de esta galería al abrirla. Lo que deja fuera queda oculto.",
-    "shipped": "Este es el diseño tal como viene. Cambiarlo lo convierte en el de la galería.",
+    "help": "Cómo se muestra cada imagen de este catálogo al abrirla. Lo que deja fuera queda oculto.",
+    "shipped": "Este es el diseño tal como viene. Cambiarlo lo convierte en el del catálogo.",
     "titleHelp": "Cada imagen muestra su título.",
     "hiddenHelp": "Cada imagen puede mostrar esto. Si se quita, queda oculto, y Añadir lo vuelve a poner.",
     "parts": {
@@ -248,7 +248,7 @@
       "about": "Quién la añadió y cuándo, y su archivo.",
       "versions": "Cada versión subida, y subir una nueva."
     },
-    "noItems": "Añade una imagen a la galería para ver aquí su diseño."
+    "noItems": "Añade una imagen al catálogo para ver aquí su diseño."
   },
   "counterDetail": {
     "name": "Detalle del contador",

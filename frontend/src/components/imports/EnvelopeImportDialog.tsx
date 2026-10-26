@@ -75,7 +75,7 @@ export interface EnvelopeImportDialogProps {
  * to /imports/envelope. Generalizes the old ProjectImportDialog for every
  * importable tool.
  *
- * An export that travels with its files — a gallery and its pictures — is a
+ * An export that travels with its files — a catalog and its pictures — is a
  * zip. That is sent as it is to /imports/envelope/archive, which reads it and
  * says whether it belongs to this tool; there is nothing to preview in the
  * browser without unpacking it.

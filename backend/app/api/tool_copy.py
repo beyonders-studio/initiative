@@ -39,7 +39,7 @@ from app.models.tenant._mixins import (
 from app.models.tenant.calendar import Calendar
 from app.models.tenant.calendar_event import CalendarEvent, CalendarEventAttendee
 from app.models.tenant.counter import Counter
-from app.models.tenant.gallery import Gallery, GalleryImage
+from app.models.tenant.catalog import Catalog, CatalogItem
 from app.models.tenant.post import Post
 from app.models.tenant.post_poll import PostPoll, PostPollOption
 from app.models.tenant.project import Project
@@ -377,12 +377,12 @@ def _rows_inside(model: type, *carried: str) -> Contents:
     return contents
 
 
-async def _gallery_contents(
-    session: AsyncSession, source: Gallery, copy: Gallery, actor: ActorContext
+async def _catalog_contents(
+    session: AsyncSession, source: Catalog, copy: Catalog, actor: ActorContext
 ) -> list[Any]:
     images = (
         await session.exec(
-            select(GalleryImage).where(GalleryImage.gallery_id == source.id)
+            select(CatalogItem).where(CatalogItem.catalog_id == source.id)
         )
     ).all()
     # Each picture starts again at version 1, authored by whoever copied it; a
@@ -392,7 +392,7 @@ async def _gallery_contents(
         images,
         beside=_beside(source, copy),
         values=lambda image: {
-            "gallery_id": copy.id,
+            "catalog_id": copy.id,
             "created_by": actor.user_id or image.created_by,
         },
     )
@@ -403,7 +403,7 @@ async def _gallery_contents(
         for image, clone in pairs
         if image.current_version is not None
     ]
-    copy.cover_image_id = {s.id: c.id for s, c in pairs}.get(source.cover_image_id)
+    copy.cover_item_id = {s.id: c.id for s, c in pairs}.get(source.cover_item_id)
     # The versions name the files, so they are what is claimed for the copy.
     return [*(clone for _, clone in pairs), *versions]
 
@@ -654,8 +654,8 @@ TOOL_COPIERS: dict[Tool, ToolCopier] = {
         # A copy starts its rotation from the top.
         reset={"is_active": False, "current_round": 1},
     ),
-    Tool.gallery: ToolCopier(
-        copies=frozenset({GalleryImage}), contents=_gallery_contents
+    Tool.catalog: ToolCopier(
+        copies=frozenset({CatalogItem}), contents=_catalog_contents
     ),
     Tool.dashboard: ToolCopier(),
     Tool.calendar: ToolCopier(

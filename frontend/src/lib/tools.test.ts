@@ -274,11 +274,11 @@ describe("tool routes", () => {
   });
 
   it("pluralizes and singularizes by one rule, not by adding or chopping an s", () => {
-    expect(toolPlural(Tool.gallery)).toBe("galleries");
-    expect(toolRouteSegment(Tool.gallery)).toBe("galleries");
-    expect(toolCamelPlural(Tool.gallery)).toBe("galleries");
-    expect(toolPascalPlural(Tool.gallery)).toBe("Galleries");
-    expect(singularOf("galleries")).toBe("gallery");
+    expect(toolPlural(Tool.catalog)).toBe("catalogs");
+    expect(toolRouteSegment(Tool.catalog)).toBe("catalogs");
+    expect(toolCamelPlural(Tool.catalog)).toBe("catalogs");
+    expect(toolPascalPlural(Tool.catalog)).toBe("Catalogs");
+    expect(singularOf("catalogs")).toBe("catalog");
     expect(singularOf("counter_groups")).toBe("counter_group");
     expect(singularOf("tasks")).toBe("task");
   });
@@ -378,8 +378,8 @@ describe("tool relations", () => {
     expect(Object.values(PARENT_TOOL).every((tool) => TOOLS.includes(tool))).toBe(true);
     expect(Object.keys(PARENT_TOOL).sort()).toEqual([
       "calendar_event",
+      "catalog_item",
       "counter",
-      "gallery_image",
       "queue_item",
       "task",
       "wiki_page",

@@ -174,7 +174,7 @@ export const ASSERTABLE_GROUPS: RelationGroup[] = RELATION_GROUP_ORDER.map(
  */
 const FILE_LIKE: ReadonlySet<SearchEntityType> = new Set([
   SearchEntityTypeValues.file,
-  SearchEntityTypeValues.gallery_image,
+  SearchEntityTypeValues.catalog_item,
 ]);
 
 /**
@@ -295,7 +295,7 @@ export const groupEdges = <T extends Pick<RelationshipRead, "relationship_type" 
  *
  * `hitIcon` and `searchHitPath` already know how every kind is drawn and
  * addressed — including that a task is reached through its project and a picture
- * through its gallery. An edge's far end carries the same five facts under its
+ * through its catalog. An edge's far end carries the same five facts under its
  * own names, so it is adapted rather than having that knowledge restated here.
  */
 export const relatedTarget = (end: RelatedEnd): SearchTarget => ({

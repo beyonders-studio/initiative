@@ -17,6 +17,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Changed
 
+- **Galleries are now called Catalogs.** A catalog's pictures are its items, which plug-ins, automations and webhooks reach by their own id rather than through the catalog. Upgrading moves what is already stored, including plug-in grants, webhook subscriptions and the SQL in dashboards. Links to the old `/galleries/…` pages and `/go/gallery/…` no longer open, and saved views of a catalog start fresh. Backups made before the rename still restore.
 - **A smaller Create task dialog.** It opens with the title, the type and the type's main column. Status, priority, people, dates and the rest wait under **More options**.
 - **Marketplace projects bring their own task types.** Each ready-made project has its own types in place of Task, Bug, Idea and Milestone, such as candidates and volunteers, or deals and renewals. Each type has its own task page, and cards show the type beside the title.
 - **Delete a task type from a project's layouts.** Each type's page under **Settings › Layouts** has a delete button that asks where its tasks go, as **Task types** does.

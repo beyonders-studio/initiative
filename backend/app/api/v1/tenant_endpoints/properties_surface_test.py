@@ -38,8 +38,8 @@ from app.testing import (
     create_calendar,
     create_calendar_event,
     create_file,
-    create_gallery,
-    create_gallery_image,
+    create_catalog,
+    create_catalog_item,
     create_guild,
     create_guild_membership,
     create_initiative,
@@ -708,19 +708,17 @@ async def test_every_tool_and_its_sub_tools_read_back_what_they_carry(
     assert _values(page_read.json()["properties"]) == {defn.id: "wiki_page"}
 
     # A picture's own update carries them, and its read returns them.
-    gallery = await create_gallery(session, a.initiative, a.user)
-    image = await create_gallery_image(session, gallery, a.user)
+    catalog = await create_catalog(session, a.initiative, a.user)
+    image = await create_catalog_item(session, catalog, a.user)
     edited = await client.patch(
-        a.g(f"/galleries/{gallery.id}/images/{image.id}"),
+        a.g(f"/catalog-items/{image.id}"),
         headers=a.headers,
-        json={"properties": [{"property_id": defn.id, "value": "gallery_image"}]},
+        json={"properties": [{"property_id": defn.id, "value": "catalog_item"}]},
     )
     assert edited.status_code == 200, edited.text
-    assert _values(edited.json()["properties"]) == {defn.id: "gallery_image"}
-    image_read = await client.get(
-        a.g(f"/galleries/{gallery.id}/images/{image.id}"), headers=a.headers
-    )
-    assert _values(image_read.json()["properties"]) == {defn.id: "gallery_image"}
+    assert _values(edited.json()["properties"]) == {defn.id: "catalog_item"}
+    image_read = await client.get(a.g(f"/catalog-items/{image.id}"), headers=a.headers)
+    assert _values(image_read.json()["properties"]) == {defn.id: "catalog_item"}
 
 
 async def test_a_create_writes_its_values_with_the_row(

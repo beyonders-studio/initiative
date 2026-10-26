@@ -33,8 +33,8 @@
     "counter": "Counter",
     "dashboard": "Dashboard",
     "post": "Post",
-    "gallery": "Gallery",
-    "gallery_image": "Picture",
+    "catalog": "Catalog",
+    "catalog_item": "Picture",
     "wiki": "Wiki",
     "wiki_page": "Page"
   }

@@ -228,7 +228,7 @@
   },
   "envelope": {
     "title": "Import from file",
-    "description": "Import a file exported from Initiative: a JSON file, or a zip when the export came with its files, like a gallery's pictures. Its contents are created in the initiative you choose.",
+    "description": "Import a file exported from Initiative: a JSON file, or a zip when the export came with its files, like a catalog's pictures. Its contents are created in the initiative you choose.",
     "selectFile": "Export file",
     "parseError": "This file isn't a recognized Initiative export.",
     "wrongTool": "This file is a {{type}} export — import it from that tool's page.",
@@ -274,7 +274,7 @@
       "initiative-calendar": "Calendar",
       "initiative-post": "Post",
       "initiative-wiki": "Wiki",
-      "initiative-gallery": "Gallery",
+      "initiative-catalog": "Catalog",
       "initiative-counter-group": "Counter group",
       "initiative-dashboard": "Dashboard"
     },

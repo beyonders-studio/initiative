@@ -471,8 +471,18 @@ const calendarEvent = (eventId: number): Spec => ({
   communityExact: [`/api/v1/calendar-events/${eventId}`],
 });
 
-const galleryImage = (galleryId: number, imageId: number): Spec => ({
-  communityExact: [`/api/v1/galleries/${galleryId}/images/${imageId}`],
+/** A catalog's items — its list and each item's own read — without the
+ *  catalog row itself. An item is read by its own id (`/catalog-items/{id}`),
+ *  which names no catalog, so every item read goes too. */
+const catalogItems = (catalogId: number): Spec => ({
+  communityPrefix: [`/api/v1/catalogs/${catalogId}/items`, "/api/v1/catalog-items"],
+});
+
+/** One item's own read and every read under its address — its history. The
+ *  trailing slash keeps item 1 from reaching item 10. */
+const catalogItem = (itemId: number): Spec => ({
+  communityExact: [`/api/v1/catalog-items/${itemId}`],
+  communityPrefix: [`/api/v1/catalog-items/${itemId}/`],
 });
 
 const counter = (counterId: number): Spec => ({
@@ -565,12 +575,12 @@ const toolLists = (which: Tool): Spec => {
     communityPrefix: [`/api/v1/tools/${which}/counts`],
   });
   if (which === Tool.calendar) return compose(lists, allCalendarEvents());
-  // An initiative's list of layouts names its projects, queues, galleries and
+  // An initiative's list of layouts names its projects, queues, catalogs and
   // counter groups,
   // by name. The entries carry projects by their dates and posts by their
   // polls' closing.
   if (which === Tool.project) return compose(lists, initiativeLayouts(), allCalendarEntries());
-  if (which === Tool.queue || which === Tool.gallery || which === Tool.counter_group) {
+  if (which === Tool.queue || which === Tool.catalog || which === Tool.counter_group) {
     return compose(lists, initiativeLayouts());
   }
   if (which === Tool.post) return compose(lists, allCalendarEntries());
@@ -587,7 +597,7 @@ const toolEntity = (which: Tool, id: number): Spec => ({
 });
 
 /**
- * One tool entity's own read and every read under its address — a gallery's
+ * One tool entity's own read and every read under its address — a catalog's
  * pictures, a wiki's pages, a project's activity and statuses. What a change
  * inside it makes stale. The trailing slash keeps project 1 from reaching
  * project 10.
@@ -614,8 +624,8 @@ const allDashboards = (): Spec => toolList(Tool.dashboard);
 const dashboard = (id: number): Spec => toolEntity(Tool.dashboard, id);
 const allPosts = (): Spec => toolList(Tool.post);
 const post = (id: number): Spec => toolEntity(Tool.post, id);
-const allGalleries = (): Spec => toolList(Tool.gallery);
-const gallery = (id: number): Spec => toolEntity(Tool.gallery, id);
+const allCatalogs = (): Spec => toolList(Tool.catalog);
+const catalog = (id: number): Spec => toolEntity(Tool.catalog, id);
 const allWikis = (): Spec => toolList(Tool.wiki);
 const wiki = (id: number): Spec => toolEntity(Tool.wiki, id);
 
@@ -656,7 +666,7 @@ export const q = {
   allCounterGroups,
   allDashboards,
   allFiles,
-  allGalleries,
+  allCatalogs,
   allCommunities,
   allInitiatives,
   allPosts,
@@ -682,7 +692,8 @@ export const q = {
   calendarEvent,
   queueItem,
   counter,
-  galleryImage,
+  catalogItem,
+  catalogItems,
   communitySettings,
   notificationSettings,
   platformAuthSettings,
@@ -719,7 +730,7 @@ export const q = {
   platformAIConnections,
   platformAIMode,
   platformCommunities,
-  gallery,
+  catalog,
   post,
   postTimeline,
   project,

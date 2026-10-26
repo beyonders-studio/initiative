@@ -23,7 +23,7 @@ with one ``initiatives/`` entry, so ONE import path serves both)::
     initiatives/{id}-{slug}/calendars/{id}-{slug}.initiative-calendar.json
     initiatives/{id}-{slug}/posts/{id}-{slug}.initiative-post.json
     initiatives/{id}-{slug}/wikis/{id}-{slug}.initiative-wiki.json
-    initiatives/{id}-{slug}/galleries/{id}-{slug}.initiative-gallery.json
+    initiatives/{id}-{slug}/catalogs/{id}-{slug}.initiative-catalog.json
     initiatives/{id}-{slug}/dashboards/{id}-{slug}.initiative-dashboard.json
     initiatives/{id}-{slug}/structure.json          (backup mode)
     initiatives/{id}-{slug}/properties.json         (backup mode)
@@ -488,7 +488,7 @@ def _initiative_tool_states(params: dict, initiative) -> dict[str, str]:
     states: dict[str, str] = {}
     for tool in _TOOLS:
         # The switch column via the enum, not `tool + "s"`: the naive spelling
-        # is wrong for `gallery`, and every tool now carries a column, so a
+        # is wrong for `catalog`, and every tool now carries a column, so a
         # missing-attribute default would hide a real mismatch rather than
         # cover for the two that used to have none.
         flag = getattr(initiative, Tool(tool).view_permission)
@@ -795,25 +795,25 @@ class _ScopeBuilder:
                 referenced_by=entry_path,
             )
 
-    # -- section hooks: galleries ----------------------------------------------
+    # -- section hooks: catalogs ----------------------------------------------
 
-    def _skip_gallery_without_uploads(self, loaded, initiative, path_stem: str) -> bool:
-        """A gallery is mostly blobs, so it obeys the uploads toggle the way a
+    def _skip_catalog_without_uploads(self, loaded, initiative, path_stem: str) -> bool:
+        """A catalog is mostly blobs, so it obeys the uploads toggle the way a
         uploaded file does — excluded uploads means the pictures do not
-        travel, and a gallery of captions without them is not worth writing,
-        so the whole gallery is recorded as skipped instead."""
+        travel, and a catalog of captions without them is not worth writing,
+        so the whole catalog is recorded as skipped instead."""
         if _include_uploads(self.params):
             return False
-        gallery, _images = loaded
+        catalog, _images = loaded
         self._skip(
-            Tool.gallery, gallery.id, gallery.name, initiative, "uploads_excluded"
+            Tool.catalog, catalog.id, catalog.name, initiative, "uploads_excluded"
         )
         return True
 
-    async def _register_gallery_pictures(self, loaded, path: str) -> None:
-        """Each picture's bytes, registered as an asset of the gallery's
+    async def _register_catalog_pictures(self, loaded, path: str) -> None:
+        """Each picture's bytes, registered as an asset of the catalog's
         entry."""
-        _gallery, images = loaded
+        _catalog, images = loaded
         for image in images:
             version = image.current_version
             key = storage_key_of(version.file_url)
@@ -1508,10 +1508,10 @@ _SECTIONS: tuple[BackupSection, ...] = (
     BackupSection(Tool.post, in_reports=False),
     BackupSection(Tool.wiki, in_reports=False, fetch=_fetch_wiki_pages),
     BackupSection(
-        Tool.gallery,
+        Tool.catalog,
         in_reports=False,
-        write_apart=_ScopeBuilder._skip_gallery_without_uploads,
-        before_envelope=_ScopeBuilder._register_gallery_pictures,
+        write_apart=_ScopeBuilder._skip_catalog_without_uploads,
+        before_envelope=_ScopeBuilder._register_catalog_pictures,
     ),
     # A dashboard is a live canvas, not a document, so a report carries its
     # envelope too.

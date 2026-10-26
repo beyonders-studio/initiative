@@ -577,42 +577,27 @@ def via_post_poll(fk: str = "poll_id") -> InitiativePath:
     )
 
 
-def via_gallery_image(fk: str = "gallery_image_id") -> InitiativePath:
-    """Two hops: ``table.<fk> -> gallery_images -> galleries.initiative_id``."""
+def via_catalog_item(fk: str = "catalog_item_id") -> InitiativePath:
+    """Two hops: ``table.<fk> -> catalog_items -> catalogs.initiative_id``."""
     return InitiativePath(
         predicate=lambda t, w: (
-            f"EXISTS (SELECT 1 FROM gallery_images gi "
-            f"JOIN galleries ga ON ga.id = gi.gallery_id "
-            f"WHERE gi.id = {t}.{fk} "
-            f"AND {_access('ga.initiative_id', w)})"
+            f"EXISTS (SELECT 1 FROM catalog_items ci "
+            f"JOIN catalogs cat ON cat.id = ci.catalog_id "
+            f"WHERE ci.id = {t}.{fk} "
+            f"AND {_access('cat.initiative_id', w)})"
         ),
         initiative_expr=lambda r: (
-            f"(SELECT ga.initiative_id FROM gallery_images gi "  # noqa: S608
-            f"JOIN galleries ga ON ga.id = gi.gallery_id WHERE gi.id = {r}.{fk})"
+            f"(SELECT cat.initiative_id FROM catalog_items ci "  # noqa: S608
+            f"JOIN catalogs cat ON cat.id = ci.catalog_id WHERE ci.id = {r}.{fk})"
         ),
-        # A picture has no route of its own — the gallery is the addressable
-        # thing, and re-reading it brings the picture back — so the chain
-        # skips straight to it.
         parents=lambda r: _parent_chain(
-            "gallery_images gi", "gi.id", f"{r}.{fk}", ("galleries", "gi.gallery_id")
+            "catalog_items ci",
+            "ci.id",
+            f"{r}.{fk}",
+            ("catalog_items", "ci.id"),
+            ("catalogs", "ci.catalog_id"),
         ),
-        dac=_dac_two_hop("gallery_images", "gallery_id", "galleries", fk),
-    )
-
-
-def gallery_images_path() -> InitiativePath:
-    """One hop to ``galleries``, reporting the gallery as the only parent.
-
-    :func:`via` does the same join; what differs is the chain. A picture is
-    read through its gallery rather than at an address of its own, so the
-    gallery is the whole of what an event about one names.
-    """
-    hop = via("galleries", "gallery_id")
-    return InitiativePath(
-        predicate=hop.predicate,
-        initiative_expr=hop.initiative_expr,
-        parents=lambda r: _one_parent("galleries", f"{r}.gallery_id"),
-        dac=hop.dac,
+        dac=_dac_two_hop("catalog_items", "catalog_id", "catalogs", fk),
     )
 
 
@@ -1519,10 +1504,10 @@ INITIATIVE_PATHS: dict[str, InitiativePath] = {
     # One hop -> dashboards
     # One hop -> posts
     "post_reads": via("posts", "post_id"),
-    # One hop -> galleries
-    "gallery_images": gallery_images_path(),
-    # Two hops -> gallery_images -> galleries
-    "gallery_image_versions": via_gallery_image("gallery_image_id"),
+    # One hop -> catalogs
+    "catalog_items": via("catalogs", "catalog_id"),
+    # Two hops -> catalog_items -> catalogs
+    "catalog_item_versions": via_catalog_item("catalog_item_id"),
     "post_polls": via("posts", "post_id"),
     # Two hops -> tasks -> projects
     "task_assignees": via_task_project("task_id"),
@@ -1805,8 +1790,8 @@ def _reported_as(table: str) -> tuple[str, Callable[[str], str]]:
     """The resource an event about a row of ``table`` names, and how to reach
     its id.
 
-    A row is not always a thing a subscriber fetches: a picture has no route of
-    its own, and its own table says so by reporting against its gallery. A row
+    A row is not always a thing a subscriber fetches: a file's version has no
+    route of its own, and its own table says so by reporting against its file. A row
     naming one (an edge end, a property value) has to name what that table
     names, or the event would carry an id nothing can re-read — so the answer
     comes from the table's own registry entry rather than from a second
@@ -1882,7 +1867,7 @@ def values_report_on_their_target(kinds: Iterable[str], facet: str) -> ReportsAs
     a plug-in's value — is a facet OF what it is on: report it there.
 
     Whatever that thing itself reports as: a task's values as the task, a
-    picture's as its gallery. The subscriber re-reads it, and its read carries
+    property definition's as its initiative. The subscriber re-reads it, and its read carries
     the current values. A pair naming none of ``kinds`` resolves to nothing,
     and the row is skipped.
     """
@@ -1940,23 +1925,6 @@ def poll_options_report_on_their_post() -> ReportsAs:
             f"WHERE post_polls.id = {r}.poll_id)"
         ),
         facet="poll",
-    )
-
-
-def gallery_facets_report_on_their_gallery() -> ReportsAs:
-    """A picture's tags and versions are facets of the gallery it is in.
-
-    The picture itself has no route — the gallery is what a subscriber
-    re-reads, and it carries the pictures back — so these rows report one hop
-    further out, the way a poll option reports as its notice.
-    """
-    return ReportsAs(
-        resource_types=frozenset({"galleries"}),
-        id_expr=lambda r: (
-            f"(SELECT gallery_images.gallery_id FROM gallery_images "  # noqa: S608
-            f"WHERE gallery_images.id = {r}.gallery_image_id)"
-        ),
-        facet="images",
     )
 
 
@@ -2105,14 +2073,12 @@ EVENT_SOURCES: dict[str, Emit | Silent] = {
         reports_as=reports_as("calendar_events", "calendar_event_id", "answers")
     ),
     "file_versions": Emit(reports_as=reports_as("files", "file_id", "versions")),
-    # A picture is read through its gallery rather than at an address of its
-    # own, so every change to one reports as the gallery it is in — its tags
-    # and its history one hop further out.
-    "gallery_images": Emit(reports_as=reports_as("galleries", "gallery_id", "images")),
     # A draft page is read only by the wiki's writers, so like an unpublished
     # notice it is not news until it is finished.
     "wiki_pages": Emit(quiet_when=lambda r: f"{r}.is_draft"),
-    "gallery_image_versions": Emit(reports_as=gallery_facets_report_on_their_gallery()),
+    "catalog_item_versions": Emit(
+        reports_as=reports_as("catalog_items", "catalog_item_id", "versions")
+    ),
     "resource_grants": Emit(reports_as=grants_report_on_their_resource()),
     "post_polls": Emit(reports_as=reports_as("posts", "post_id", "poll")),
     "post_poll_options": Emit(reports_as=poll_options_report_on_their_post()),

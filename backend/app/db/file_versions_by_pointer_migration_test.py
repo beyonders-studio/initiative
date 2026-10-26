@@ -1,7 +1,7 @@
 """Migration 20261005_0459 points file documents and pictures at the version
 they show. Loaded by path and run on a guild the test builds, the way
 ``upload_initiative_backfill_test`` runs its revision: down to the old shape
-(20261006_0464's rename first), rows written as an older release wrote them,
+(20261026_0538's and 20261006_0464's renames first), rows written as an older release wrote them,
 and up again."""
 
 from __future__ import annotations
@@ -17,8 +17,8 @@ from sqlalchemy import text
 from app.models.tenant.file import FileType
 from app.testing import (
     create_file,
-    create_gallery,
-    create_gallery_image,
+    create_catalog,
+    create_catalog_item,
     create_guild,
     create_initiative,
     create_user,
@@ -27,6 +27,7 @@ from app.testing import (
 _VERSIONS = Path(__file__).resolve().parents[2] / "alembic" / "versions"
 _MIGRATION = _VERSIONS / "20261005_0459_file_versions_by_pointer.py"
 _FILES = _VERSIONS / "20261006_0464_documents_are_files.py"
+_CATALOGS = _VERSIONS / "20261026_0538_galleries_are_catalogs.py"
 
 
 def _load(path: Path = _MIGRATION) -> ModuleType:
@@ -61,11 +62,12 @@ async def test_old_files_get_versions_types_and_pointers(
     )
     named = await create_file(session, initiative, user)
     nameless = await create_file(session, initiative, user)
-    picture = await create_gallery_image(
-        session, await create_gallery(session, initiative, user), user
+    picture = await create_catalog_item(
+        session, await create_catalog(session, initiative, user), user
     )
     migration = _load()
     files = _load(_FILES)
+    catalogs = _load(_CATALOGS)
 
     def run(step):
         def apply(sync_session) -> None:
@@ -79,6 +81,7 @@ async def test_old_files_get_versions_types_and_pointers(
 
         return apply
 
+    await session.run_sync(run(lambda: catalogs._apply(False)))
     await session.run_sync(run(lambda: files._apply(False)))
     await session.run_sync(run(migration._apply_downgrade))
     # Written as an import used to write them: a file and no version.
@@ -150,3 +153,4 @@ async def test_old_files_get_versions_types_and_pointers(
     ).scalar()
     assert leftover == 0
     await session.run_sync(run(lambda: files._apply(True)))
+    await session.run_sync(run(lambda: catalogs._apply(True)))

@@ -1,6 +1,6 @@
 /**
  * THE index page a tool's entities are browsed from — one initiative's shelf of
- * projects, files, wikis, galleries, queues, counter groups or dashboards.
+ * projects, files, wikis, catalogs, queues, counter groups or dashboards.
  *
  * Each of those pages carried its own copy of the same thing: the view toggle,
  * the filter panel, the create button and its dialog, the loading, error,
@@ -45,9 +45,9 @@ import { CreateFileDialog } from "@/components/files/CreateFileDialog";
 import { FileCard } from "@/components/files/FileCard";
 import { useFileColumns } from "@/components/files/fileColumns";
 import { ToolImportAction, useToolImportAction } from "@/components/imports/ToolImportAction";
+import { CatalogCard } from "@/components/initiativeTools/catalogs/CatalogCard";
 import { CounterGroupCard } from "@/components/initiativeTools/counters/CounterGroupCard";
 import { DashboardCard } from "@/components/initiativeTools/dashboards/DashboardCard";
-import { GalleryCard } from "@/components/initiativeTools/galleries/GalleryCard";
 import { QueueCard } from "@/components/initiativeTools/queues/QueueCard";
 import { CreateToolDialog } from "@/components/initiativeTools/shared/CreateToolDialog";
 import { ToolFilterPanel } from "@/components/initiativeTools/shared/ToolFilterPanel";
@@ -402,18 +402,18 @@ const TOOL_INDEX: Record<Tool, ToolIndexEntry | ToolIndexOwnPage> = {
     },
   },
 
-  [Tool.gallery]: {
+  [Tool.catalog]: {
     useList: makeRows(
-      TOOL_HOOKS[Tool.gallery].useList,
-      (gallery) => <GalleryCard gallery={gallery} />,
+      TOOL_HOOKS[Tool.catalog].useList,
+      (catalog) => <CatalogCard catalog={catalog} />,
       WITH_PREVIEW
     ),
     text: {
-      create: "createGallery",
-      createDescription: "createGalleryDescription",
-      noMatches: "filters.noMatchingGalleries",
-      emptyTitle: "noGalleries",
-      emptyBody: "noGalleriesDescription",
+      create: "createCatalog",
+      createDescription: "createCatalogDescription",
+      noMatches: "filters.noMatchingCatalogs",
+      emptyTitle: "noCatalogs",
+      emptyBody: "noCatalogsDescription",
     },
   },
 

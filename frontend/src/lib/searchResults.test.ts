@@ -185,10 +185,10 @@ describe("hitIcon", () => {
   it("marks a tool from its kind when nobody filled in the tool", () => {
     // A relation being composed knows what kind it points at and not the tool
     // that governs it — which for a tool's own row is the same thing. Falling
-    // through to the tag mark made every queue and gallery look like a label.
+    // through to the tag mark made every queue and catalog look like a label.
     expect(hitIcon(target({ entity_type: SearchEntityType.queue }))).toBe(TOOL_ICONS[Tool.queue]);
-    expect(hitIcon(target({ entity_type: SearchEntityType.gallery }))).toBe(
-      TOOL_ICONS[Tool.gallery]
+    expect(hitIcon(target({ entity_type: SearchEntityType.catalog }))).toBe(
+      TOOL_ICONS[Tool.catalog]
     );
     expect(hitIcon(target({ entity_type: SearchEntityType.file }))).toBe(TOOL_ICONS[Tool.file]);
   });

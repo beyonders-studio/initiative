@@ -38,7 +38,7 @@ export const UNSHELVED_KINDS = [
   ListingKind.counter_group,
   ListingKind.calendar,
   ListingKind.post,
-  ListingKind.gallery,
+  ListingKind.catalog,
   ListingKind.wiki,
 ] as const;
 

@@ -56,7 +56,7 @@ _WRITE_EXCEPTIONS = {
     # own row, never through the upload route.
     "app/services/platform/evidence.py::store",
     # Test data.
-    "app/testing/factories.py::create_gallery_image",
+    "app/testing/factories.py::create_catalog_item",
 }
 
 

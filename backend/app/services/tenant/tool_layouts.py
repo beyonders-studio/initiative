@@ -53,7 +53,7 @@ from app.schemas.tenant.tool_layout import (
     DetailStackPart,
     CounterDetailFieldId,
     EventDetailFieldId,
-    GalleryImageDetailFieldId,
+    CatalogItemDetailFieldId,
     PostDetailFieldId,
     QueueItemDetailFieldId,
     ListLayoutDefinition,
@@ -90,7 +90,7 @@ DETAIL_PARTS: dict[str, frozenset[str]] = {
     "calendar_event": _LAYOUT_PARTS
     | {"plugin", "dates", "rsvp", "actions", "relations"},
     "queue_item": _LAYOUT_PARTS | {"plugin", "actions", "relations"},
-    "gallery_image": _LAYOUT_PARTS
+    "catalog_item": _LAYOUT_PARTS
     | {"plugin", "actions", "relations", "picture", "about", "versions"},
     "counter": _LAYOUT_PARTS | {"plugin", "actions", "relations", "count"},
     "post": _LAYOUT_PARTS
@@ -111,7 +111,7 @@ DETAIL_FIELDS: dict[str, frozenset[str]] = {
     "task": frozenset(field.value for field in TaskDetailFieldId),
     "calendar_event": frozenset(field.value for field in EventDetailFieldId),
     "queue_item": frozenset(field.value for field in QueueItemDetailFieldId),
-    "gallery_image": frozenset(field.value for field in GalleryImageDetailFieldId),
+    "catalog_item": frozenset(field.value for field in CatalogItemDetailFieldId),
     "counter": frozenset(field.value for field in CounterDetailFieldId),
     "post": frozenset(field.value for field in PostDetailFieldId),
 }

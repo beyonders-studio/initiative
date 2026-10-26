@@ -49,7 +49,7 @@ from app.models.platform.notification import NotificationType
 from app.models.tenant.counter import CounterGroup
 from app.models.tenant.dashboard import Dashboard
 from app.models.tenant.post import Post
-from app.models.tenant.gallery import Gallery
+from app.models.tenant.catalog import Catalog
 from app.models.tenant.file import File
 from app.models.tenant.initiative import Initiative
 from app.models.tenant.project import Project
@@ -114,7 +114,7 @@ _REGISTERED = (
     CounterGroup,
     Dashboard,
     File,
-    Gallery,
+    Catalog,
     Post,
     Project,
     Queue,

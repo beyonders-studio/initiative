@@ -22,14 +22,14 @@ from app.db.session import set_rls_context
 from app.models.platform.guild import CommunityRole
 from app.models.tenant.comment import Comment
 from app.models.tenant.content_hold import ContentHold
-from app.models.tenant.gallery import GalleryImage
+from app.models.tenant.catalog import CatalogItem
 from app.models.tenant.intake import IntakeCase
 from app.models.tenant.task import Task
 from app.services.platform import holds as holds_service
 from app.testing import (
     create_comment,
-    create_gallery,
-    create_gallery_image,
+    create_catalog,
+    create_catalog_item,
     create_user,
 )
 from app.testing.factories import create_access_grant, get_auth_headers
@@ -374,18 +374,18 @@ async def _release(client, moderator, guild, hold_id: int, outcome: str):
     )
 
 
-async def test_a_picture_and_its_gallery_can_be_held(
+async def test_a_picture_and_its_catalog_can_be_held(
     client, session, scene, operations
 ):
     owner = scene["mod"]
-    gallery = await create_gallery(session, scene["initiative"], owner.user)
-    image = await create_gallery_image(session, gallery, owner.user)
+    catalog = await create_catalog(session, scene["initiative"], owner.user)
+    image = await create_catalog_item(session, catalog, owner.user)
     await set_rls_context(session, Unattributed())
     moderator = await _moderator(session, scene["guild"])
-    await _platform_hold(client, moderator, scene["guild"], "gallery", gallery.id)
+    await _platform_hold(client, moderator, scene["guild"], "catalog", catalog.id)
     await _system(session, scene["guild"].id)
     held = (
-        await session.exec(select(GalleryImage).where(GalleryImage.id == image.id))
+        await session.exec(select(CatalogItem).where(CatalogItem.id == image.id))
     ).one()
     assert held.held_at is not None
 

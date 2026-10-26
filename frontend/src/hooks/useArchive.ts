@@ -21,7 +21,7 @@ export type ArchiveTarget = { entityType: ArchivableType; entityId: number };
 // cascades, so an initiative going away takes every tool in it and a project
 // takes its tasks, and the row's own detail changes state as well as its list.
 // The hand-written four this used to name predated archiving reaching every
-// tool, so a queue or a gallery kept showing the state it had before the call.
+// tool, so a queue or a catalog kept showing the state it had before the call.
 const refresh = () => invalidate(q.communityContent());
 
 export const useArchiveEntity = (options?: MutationOpts<ArchiveResponse, ArchiveTarget>) =>

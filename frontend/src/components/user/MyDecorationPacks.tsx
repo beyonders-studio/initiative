@@ -38,7 +38,7 @@ const PackRow = ({
   return (
     <li className="flex items-center gap-3 px-3 py-2">
       {/* The pieces at a glance. Small on purpose: this is a list you scan for
-          one name, not a gallery — the gallery is the marketplace. */}
+          one name, not a catalog — the catalog is the marketplace. */}
       <ul className="flex shrink-0 items-center gap-2">
         {pieces(entry.contents).map((decoration) => (
           <li key={decoration.id} className="flex size-8 items-center justify-center">

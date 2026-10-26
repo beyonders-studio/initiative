@@ -31,7 +31,7 @@ UPLOADS_URL_PREFIX = "/uploads/"
 #: description, a comment — starts with. The server chooses every stored name,
 #: so this is how an upload says it was pasted, and only an upload that says so
 #: is ever deleted because the text stopped showing it. An image copied in from
-#: a file or a gallery keeps its own name and is never touched.
+#: a file or a catalog keeps its own name and is never touched.
 PASTED_IMAGE_PREFIX = "pasted-"
 
 #: An upload's address inside markdown: ``/uploads/{community_id}/{filename}``,
@@ -199,7 +199,7 @@ async def purge_file_uploads(session, files: Iterable[Any]) -> Set[str]:
     return removed | await release_uploads(session, shown, leaving={File: doomed_ids})
 
 
-async def purge_gallery_image_uploads(session, images: Iterable[Any]) -> Set[str]:
+async def purge_catalog_item_uploads(session, images: Iterable[Any]) -> Set[str]:
     """Delete Upload rows + blobs for pictures about to be hard-purged.
 
     A picture's blobs back exactly one picture by construction — the file and
@@ -212,14 +212,14 @@ async def purge_gallery_image_uploads(session, images: Iterable[Any]) -> Set[str
     """
     from sqlmodel import select
 
-    from app.models.tenant.gallery import GalleryImageVersion
+    from app.models.tenant.catalog import CatalogItemVersion
 
     doomed = list(images)
     if not doomed:
         return set()
     versions = await session.exec(
-        select(GalleryImageVersion.file_url, GalleryImageVersion.thumbnail_url).where(
-            GalleryImageVersion.gallery_image_id.in_({i.id for i in doomed})
+        select(CatalogItemVersion.file_url, CatalogItemVersion.thumbnail_url).where(
+            CatalogItemVersion.catalog_item_id.in_({i.id for i in doomed})
         )
     )
     urls = [u for row in versions.all() for u in row]
@@ -253,7 +253,7 @@ def _upload_columns() -> tuple[tuple[type, str], ...]:
     an uploaded file or a picture."""
     from app.db.search_index import written_columns
     from app.models.tenant.file import File, FileVersion
-    from app.models.tenant.gallery import GalleryImageVersion
+    from app.models.tenant.catalog import CatalogItemVersion
 
     return (
         *(
@@ -263,8 +263,8 @@ def _upload_columns() -> tuple[tuple[type, str], ...]:
         ),
         (File, "featured_image_url"),
         (FileVersion, "file_url"),
-        (GalleryImageVersion, "file_url"),
-        (GalleryImageVersion, "thumbnail_url"),
+        (CatalogItemVersion, "file_url"),
+        (CatalogItemVersion, "thumbnail_url"),
     )
 
 
@@ -1055,7 +1055,7 @@ def detect_document_image_type(contents: bytes) -> str | None:
     """Identify a document image from its bytes, or ``None`` if it is not one.
 
     The client's ``Content-Type`` and filename are not consulted — the rule the
-    gallery, avatar, guild-image and announcement paths already follow, and a
+    catalog, avatar, guild-image and announcement paths already follow, and a
     mislabelled PNG is still a PNG. What comes back is what the stored row, the
     stored name and the served response all describe the file as.
     """

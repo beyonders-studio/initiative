@@ -46,7 +46,7 @@ Worth knowing:
 
 - It's **off unless whoever runs your server turns it on**.
 - Every action runs **as you**, scoped by your key. An assistant reaches only what *you* could reach.
-- The surface is **curated** — any key can read the communities it can reach, the initiatives you belong to and every kind of tool they hold (projects and tasks, files, wikis, queues, counters, calendars, galleries, notices and dashboards), the comments on any of them, and what any of them is linked to. It can also run the same **search** the app's own search page runs, ranked across the lot.
+- The surface is **curated** — any key can read the communities it can reach, the initiatives you belong to and every kind of tool they hold (projects and tasks, files, wikis, queues, counters, calendars, catalogs, notices and dashboards), the comments on any of them, and what any of them is linked to. It can also run the same **search** the app's own search page runs, ranked across the lot.
 - A **full-access** key can create and edit those same things, link two of them together, move a task between statuses, and tick a checklist item off. It can say who a new thing is shared with as it creates it, but never change who an existing one is shared with. Deleting (a link included), archiving, bulk edits and AI generation are never exposed, and a read-only key can't write at all.
 
 !!! tip "Read-only, single-community, for assistants"
@@ -85,7 +85,7 @@ Webhooks are set up through the API, with a key that isn't **Read-only**. A read
 
     `hmac_secret` is returned **once**, on create. Lost it? Delete the subscription and make a new one. `initiative_id` narrows it to one initiative; left out, it covers the community. `target_url` must be `https` and resolve to a public address (`WEBHOOK_INVALID_TARGET_URL`, `WEBHOOK_PRIVATE_TARGET_URL`).
 
-    **Event types** are `<resource>.created`, `.updated` and `.deleted`. Resources include `tasks`, `projects`, `files`, `wikis`, `wiki_pages`, `calendars`, `calendar_events`, `queues`, `queue_items`, `counter_groups`, `counters`, `galleries`, `posts`, `dashboards`, `comments`, `tags`, `initiatives` and `plugins`. Moving something to the trash sends `deleted`, and restoring it sends `created`. A plug-in in the community can declare events of its own, named `plugin.<plug-in id>.<event>`. An unknown name is refused with `WEBHOOK_UNKNOWN_EVENT_TYPE`.
+    **Event types** are `<resource>.created`, `.updated` and `.deleted`. Resources include `tasks`, `projects`, `files`, `wikis`, `wiki_pages`, `calendars`, `calendar_events`, `queues`, `queue_items`, `counter_groups`, `counters`, `catalogs`, `catalog_items`, `posts`, `dashboards`, `comments`, `tags`, `initiatives` and `plugins`. Moving something to the trash sends `deleted`, and restoring it sends `created`. A plug-in in the community can declare events of its own, named `plugin.<plug-in id>.<event>`. An unknown name is refused with `WEBHOOK_UNKNOWN_EVENT_TYPE`.
 
     **`fields`** narrows `updated` events to changes in those names: a resource's own fields, plus what changes beside it, such as `tags`, `assignees`, `checklist`, `attachments` or `properties` on a task. It doesn't apply to `created` or `deleted`. A name none of the chosen events can report is refused with `WEBHOOK_UNKNOWN_FIELD`.
 

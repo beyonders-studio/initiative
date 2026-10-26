@@ -61,7 +61,7 @@ from app.api.v1.tenant_endpoints import calendars as calendars_endpoints
 from app.api.v1.tenant_endpoints import counters as counters_endpoints
 from app.api.v1.tenant_endpoints import dashboards as dashboards_endpoints
 from app.api.v1.tenant_endpoints import files as files_endpoints
-from app.api.v1.tenant_endpoints import galleries as galleries_endpoints
+from app.api.v1.tenant_endpoints import catalogs as catalogs_endpoints
 from app.api.v1.tenant_endpoints import posts as posts_endpoints
 from app.api.v1.tenant_endpoints import projects as projects_endpoints
 from app.api.v1.tenant_endpoints import queues as queues_endpoints
@@ -74,7 +74,7 @@ from app.models.tenant.calendar import Calendar
 from app.models.tenant.counter import CounterGroup
 from app.models.tenant.dashboard import Dashboard
 from app.models.tenant.file import File, FileType
-from app.models.tenant.gallery import Gallery
+from app.models.tenant.catalog import Catalog
 from app.models.tenant.post import Post
 from app.models.tenant.project import Project
 from app.models.tenant.personal_item import PersonalItem
@@ -100,10 +100,10 @@ from app.schemas.tenant.file import (
     FileListResponse,
     FileRead,
 )
-from app.schemas.tenant.gallery import (
-    GalleryListResponse,
-    GalleryRead,
-    GallerySummary,
+from app.schemas.tenant.catalog import (
+    CatalogListResponse,
+    CatalogRead,
+    CatalogSummary,
 )
 from app.schemas.tenant.initiative import (
     ToolCountsByInitiativeResponse,
@@ -129,7 +129,7 @@ from app.services.tenant import calendars as calendars_service
 from app.services.tenant import counters as counters_service
 from app.services.tenant import dashboards as dashboards_service
 from app.services.tenant import files as files_service
-from app.services.tenant import galleries as galleries_service
+from app.services.tenant import catalogs as catalogs_service
 from app.services.tenant import posts as posts_service
 from app.services.tenant import properties as properties_service
 from app.services.tenant import queues as queues_service
@@ -984,38 +984,38 @@ TOOL_LISTS: dict[Tool, ToolListSpec] = {
             "could edit it; for everyone else the board starts when it goes up."
         ),
     ),
-    Tool.gallery: ToolListSpec(
-        tool=Tool.gallery,
-        read_model=GalleryRead,
-        read_row=galleries_endpoints.read_after_write,
-        model=Gallery,
-        response_model=GalleryListResponse,
-        loader_options=_loads(galleries_service.list_loader_options),
-        default_order=_order(Gallery.updated_at.desc(), Gallery.id.desc()),
+    Tool.catalog: ToolListSpec(
+        tool=Tool.catalog,
+        read_model=CatalogRead,
+        read_row=catalogs_endpoints.read_after_write,
+        model=Catalog,
+        response_model=CatalogListResponse,
+        loader_options=_loads(catalogs_service.list_loader_options),
+        default_order=_order(Catalog.updated_at.desc(), Catalog.id.desc()),
         serialize=_summaries(
-            GallerySummary,
-            preview=lambda session, _guild_id, rows: galleries_service.list_previews(
+            CatalogSummary,
+            preview=lambda session, _guild_id, rows: catalogs_service.list_previews(
                 session, rows
             ),
         ),
         params=(
             _initiative_id(),
             search_param(
-                "Full-text match over the gallery's name and description, "
+                "Full-text match over the catalog's name and description, "
                 "through the same index the search page reads."
             ),
             sort_by_param(
                 "Order by one of: name, initiative, updated_at. Omit for newest first."
             ),
             sort_dir_param(),
-            _tag_ids(Tool.gallery),
+            _tag_ids(Tool.catalog),
             _property_filters(),
             _archived(),
             _include_preview(),
             page_param(),
             page_size_param(100, ge=0, le=500),
         ),
-        list_doc="List galleries visible to the current user (guild admins see all).",
+        list_doc="List catalogs visible to the current user (guild admins see all).",
     ),
     Tool.wiki: ToolListSpec(
         tool=Tool.wiki,

@@ -9,7 +9,7 @@ from app.services.import_engine.importers.calendar import CalendarImporter
 from app.services.import_engine.importers.counter_group import CounterGroupImporter
 from app.services.import_engine.importers.dashboard import DashboardImporter
 from app.services.import_engine.importers.file import FileImporter
-from app.services.import_engine.importers.gallery import GalleryImporter
+from app.services.import_engine.importers.catalog import CatalogImporter
 from app.services.import_engine.importers.post import PostImporter
 from app.services.import_engine.importers.project import ProjectImporter
 from app.services.import_engine.importers.queue import QueueImporter
@@ -26,7 +26,7 @@ IMPORTERS = {
         CalendarImporter(),
         PostImporter(),
         WikiImporter(),
-        GalleryImporter(),
+        CatalogImporter(),
     )
 }
 

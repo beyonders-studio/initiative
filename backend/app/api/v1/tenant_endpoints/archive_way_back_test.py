@@ -26,7 +26,7 @@ _TOOL_LISTS = {
     "calendar": "calendars",
     "dashboard": "dashboards",
     "post": "posts",
-    "gallery": "galleries",
+    "catalog": "catalogs",
     "wiki": "wikis",
 }
 

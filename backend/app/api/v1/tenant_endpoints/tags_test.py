@@ -242,7 +242,7 @@ async def test_every_tag_target_is_bulk_tagged_and_listed_on_its_tag(
     from app.core.tools import TAGGABLE_EXTRAS, Tool
     from app.testing import (
         create_calendar_event,
-        create_gallery_image,
+        create_catalog_item,
         create_queue_item,
         create_tool_entity,
         create_wiki_page,
@@ -262,8 +262,8 @@ async def test_every_tag_target_is_bulk_tagged_and_listed_on_its_tag(
         "calendar_event": await create_calendar_event(
             session, tools[Tool.calendar], a.user
         ),
-        "gallery_image": await create_gallery_image(
-            session, tools[Tool.gallery], a.user, write_blob=False
+        "catalog_item": await create_catalog_item(
+            session, tools[Tool.catalog], a.user, write_blob=False
         ),
         "wiki_page": await create_wiki_page(session, tools[Tool.wiki], a.user),
     }

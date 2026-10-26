@@ -145,7 +145,7 @@ describe("resolveEntityPath", () => {
     expect(isEntityRefType("counter_group")).toBe(false);
     expect(isEntityRefType("user")).toBe(false);
     // A picture has no read by its own id, so nothing links to one.
-    expect(isEntityRefType("gallery-image")).toBe(false);
+    expect(isEntityRefType("catalog-item")).toBe(false);
   });
 });
 

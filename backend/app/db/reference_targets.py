@@ -69,10 +69,10 @@ def id_column(entity_type: SearchEntityType):
 
 @dataclass(frozen=True)
 class Preview:
-    """Pictures that live on another table — a gallery's are its own images.
+    """Pictures that live on another table — a catalog's are its own images.
 
     The chosen one stands alone; with none chosen, the newest few stand in for
-    it. That is what a gallery shows of itself everywhere else, and a gallery
+    it. That is what a catalog shows of itself everywhere else, and a catalog
     nobody has picked a cover for is the usual kind.
     """
 
@@ -99,7 +99,7 @@ class Visual:
     which is the honest answer for a thing with no look of its own rather than a
     blank where a picture would go.
 
-    ``image`` names columns coalesced in preference order, because a gallery
+    ``image`` names columns coalesced in preference order, because a catalog
     thumbnail is absent whenever the source was already small enough not to need
     one — so the full picture is the fallback, decided here rather than by every
     surface that draws one.
@@ -140,12 +140,12 @@ VISUALS: dict[str, Visual] = {
         filename="current_version_id.original_filename",
         link_in_json=("content", "url"),
     ),
-    "gallery_images": Visual(image=_PICTURE),
-    "galleries": Visual(
+    "catalog_items": Visual(image=_PICTURE),
+    "catalogs": Visual(
         preview=Preview(
-            table="gallery_images",
-            parent_fk="gallery_id",
-            chosen_fk="cover_image_id",
+            table="catalog_items",
+            parent_fk="catalog_id",
+            chosen_fk="cover_item_id",
             columns=_PICTURE,
             newest_by="created_at",
         )
@@ -421,7 +421,7 @@ class Resolved:
     tool_title: str | None = None
     #: What the row shows of itself beside its name — see :class:`Visual`. At
     #: most one of the three is set, and most kinds set none. A picture is a
-    #: list because a gallery shows several when nobody picked one.
+    #: list because a catalog shows several when nobody picked one.
     image_urls: list[str] = field(default_factory=list)
     icon: str | None = None
     color: str | None = None

@@ -40,7 +40,7 @@ from seed.common import NOW, Community, share, tag
 _DUNGEON_AREAS = [
     "Entrance Hall",
     "Crypt of Whispers",
-    "The Bone Gallery",
+    "The Bone Catalog",
     "Flooded Caverns",
     "Shadow Forge",
     "Hall of Mirrors",
