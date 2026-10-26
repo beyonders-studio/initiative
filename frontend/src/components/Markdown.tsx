@@ -202,7 +202,7 @@ function TaskBox({ node: _node, disabled, className, ...props }: InputProps) {
  *  is wrapped or scrolled, so rendered markdown never stretches its card. A
  *  checklist item's box sits where its bullet would. */
 const BASE_CLASS =
-  "[&_.task-list-item]:list-none [&_.task-list-item_input]:-ml-5 [&_.task-list-item_input]:mr-1 [&_.task-list-item_input]:align-middle wrap-break-word[&_a:hover]:underline [&_a]:break-all [&_blockquote]:border-l-2 [&_code]:rounded [&_code]:px-1 [&_code]:py-0.5 [&_code]:text-xs [&_h1]:font-semibold [&_h2]:font-semibold [&_h3]:font-semibold [&_h4]:font-semibold [&_h6]:font-semibold [&_ol]:list-decimal [&_pre]:overflow-x-auto [&_pre]:rounded [&_pre]:p-2 [&_pre_code]:bg-transparent [&_pre_code]:p-0 [&_strong]:font-semibold [&_table]:block [&_table]:w-fit [&_table]:overflow-x-auto [&_td]:border [&_td]:px-2 [&_td]:py-1 [&_th]:border [&_th]:px-2 [&_th]:py-1 [&_th]:font-semibold [&_ul]:list-disc";
+  "[&_.task-list-item]:list-none [&_.task-list-item_input]:-ml-5 [&_.task-list-item_input]:mr-1 [&_.task-list-item_input]:align-middle wrap-break-word [&_a:hover]:underline [&_a]:break-all [&_blockquote]:border-l-2 [&_code]:rounded [&_code]:px-1 [&_code]:py-0.5 [&_code]:text-xs [&_h1]:font-semibold [&_h2]:font-semibold [&_h3]:font-semibold [&_h4]:font-semibold [&_h6]:font-semibold [&_ol]:list-decimal [&_pre]:overflow-x-auto [&_pre]:rounded [&_pre]:p-2 [&_pre_code]:bg-transparent [&_pre_code]:p-0 [&_strong]:font-semibold [&_table]:block [&_table]:w-fit [&_table]:overflow-x-auto [&_td]:border [&_td]:px-2 [&_td]:py-1 [&_th]:border [&_th]:px-2 [&_th]:py-1 [&_th]:font-semibold [&_ul]:list-disc";
 
 /** The app's own colours, for prose on a page rather than in a bubble. */
 const PAGE_TONE_CLASS =

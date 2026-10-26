@@ -387,5 +387,6 @@ def test_title_from_line():
         True,
     )
     assert title_from_line("@[](4)") == ("", True)
+    assert title_from_line("Ask @[Ada]()") == ("Ask", True)
     long, shortened = title_from_line("word " * 100)
     assert shortened and len(long) <= 255 and long.endswith("…")

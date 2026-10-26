@@ -101,10 +101,13 @@ def _blocks(parent: SyntaxTreeNode) -> list[dict[str, Any]]:
             # boundaries become hard breaks) — the templates render quotes as
             # a single styled block, mirroring the Lexical converter.
             runs: list[dict[str, Any]] = []
-            for i, inner in enumerate(_blocks(node)):
-                if i > 0:
-                    runs.append({"text": "\n"})
-                runs.extend(inner.get("runs") or [{"text": inner.get("text", "")}])
+            for inner in _blocks(node):
+                for part in list(runs_of([inner])) or [
+                    [{"text": inner.get("text", "")}]
+                ]:
+                    if runs:
+                        runs.append({"text": "\n"})
+                    runs.extend(part)
             out.append({"type": "quote", "runs": runs})
         elif kind in ("fence", "code_block"):
             out.append(

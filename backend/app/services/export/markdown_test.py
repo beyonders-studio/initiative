@@ -52,6 +52,10 @@ def test_quote_flattens_to_runs():
     assert quote["type"] == "quote"
     text = "".join(r["text"] for r in quote["runs"])
     assert "wise words" in text and "more words" in text
+    # A list in a quote keeps its items' words.
+    (listed,) = blocks_from_markdown("> - Bring passport\n> - Bring ticket")
+    text = "".join(r["text"] for r in listed["runs"])
+    assert text == "Bring passport\nBring ticket"
 
 
 def test_table_rows_of_run_cells():

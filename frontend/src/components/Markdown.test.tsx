@@ -34,7 +34,7 @@ describe("Markdown", () => {
     const { container } = render(<Markdown content="`inline` and text" />);
 
     const classes = root(container).className;
-    expect(classes).toContain("wrap-break-word");
+    expect(root(container)).toHaveClass("wrap-break-word", "[&_a:hover]:underline");
     expect(classes).toContain("[&_code]:wrap-break-word");
     expect(classes).toContain("[&_a]:break-all");
     expect(classes).toContain("[&_img]:max-w-full");
