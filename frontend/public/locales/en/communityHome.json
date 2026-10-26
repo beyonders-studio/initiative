@@ -135,5 +135,15 @@
       "projectEnd": "Project ends",
       "pollCloses": "Poll closes"
     }
+  },
+  "catchUp": {
+    "button": "Catch me up",
+    "title": "Catch me up",
+    "intro": "A short summary of what changed that you can see since you were last here.",
+    "action": "Catch me up",
+    "writing": "Catching you up…",
+    "cut": "Written from the {{percent}}% of changes most likely to matter to you. The rest did not fit.",
+    "since": "Since {{date}}",
+    "empty": "Nothing new since you were last here."
   }
 }

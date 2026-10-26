@@ -135,5 +135,15 @@
       "projectEnd": "Projekt endet",
       "pollCloses": "Umfrage endet"
     }
+  },
+  "catchUp": {
+    "button": "Bring mich auf den Stand",
+    "title": "Bring mich auf den Stand",
+    "intro": "Eine kurze Zusammenfassung dessen, was sich seit deinem letzten Besuch geändert hat und was du sehen kannst.",
+    "action": "Bring mich auf den Stand",
+    "writing": "Wird zusammengefasst…",
+    "cut": "Aus den {{percent}} % der Änderungen geschrieben, die dich am ehesten betreffen. Der Rest passte nicht hinein.",
+    "since": "Seit {{date}}",
+    "empty": "Nichts Neues seit deinem letzten Besuch."
   }
 }

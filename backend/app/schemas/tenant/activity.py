@@ -5,7 +5,7 @@ from __future__ import annotations
 from datetime import datetime
 from typing import List, Optional
 
-from pydantic import BaseModel, ConfigDict, Field, model_validator
+from pydantic import AwareDatetime, BaseModel, ConfigDict, Field, model_validator
 
 from app.core.search import SearchEntityType
 from app.core.tools import Tool
@@ -27,6 +27,21 @@ class ActivityQuery(BaseModel):
 
     @model_validator(mode="after")
     def _tool_with_its_id(self) -> "ActivityQuery":
+        if (self.tool is None) != (self.tool_id is None):
+            raise ValueError("tool and tool_id come together")
+        return self
+
+
+class CatchUpRequest(BaseModel):
+    """What a catch-up covers: what changed since ``since`` (the change log's
+    whole window without one), in the community or in one tool."""
+
+    since: Optional[AwareDatetime] = None
+    tool: Optional[Tool] = None
+    tool_id: Optional[int] = None
+
+    @model_validator(mode="after")
+    def _tool_with_its_id(self) -> "CatchUpRequest":
         if (self.tool is None) != (self.tool_id is None):
             raise ValueError("tool and tool_id come together")
         return self

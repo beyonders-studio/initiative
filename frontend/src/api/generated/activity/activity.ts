@@ -4,27 +4,32 @@
  * Initiative API
  * OpenAPI spec version: 0.77.1
  */
-import { useQuery } from "@tanstack/react-query";
+import { useMutation, useQuery } from "@tanstack/react-query";
 import type {
   DataTag,
   DefinedInitialDataOptions,
   DefinedUseQueryResult,
+  MutationFunction,
   QueryClient,
   QueryFunction,
   QueryKey,
   UndefinedInitialDataOptions,
+  UseMutationOptions,
+  UseMutationResult,
   UseQueryOptions,
   UseQueryResult,
 } from "@tanstack/react-query";
 
 import type {
+  AIStreamEvent,
   ActivityFeedPage,
+  CatchUpRequest,
   HTTPValidationError,
   ReadActivityParams,
 } from "../initiativeAPI.schemas";
 
 import { apiMutator } from "../../mutator";
-import type { ErrorType } from "../../mutator";
+import type { ErrorType, BodyType } from "../../mutator";
 
 type SecondParameter<T extends (...args: never) => unknown> = Parameters<T>[1];
 
@@ -171,3 +176,92 @@ export function useReadActivity<
 
   return withQueryKey(query, queryOptions.queryKey);
 }
+
+/**
+ * What changed that the reader can see since they were last here, in the
+ * community or in one tool, streamed as it is written.
+ * @summary Catch Up
+ */
+export const catchUp = (
+  communityId: number,
+  catchUpRequest: BodyType<CatchUpRequest>,
+  options?: SecondParameter<typeof apiMutator>,
+  signal?: AbortSignal
+) => {
+  return apiMutator<AIStreamEvent>(
+    {
+      url: `/api/v1/c/${communityId}/activity/catch-up`,
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      data: catchUpRequest,
+      signal,
+    },
+    options
+  );
+};
+
+export const getCatchUpMutationKey = () => ["catchUp"] as const;
+
+export const getCatchUpMutationOptions = <
+  TError = ErrorType<HTTPValidationError>,
+  TContext = unknown,
+>(options?: {
+  mutation?: UseMutationOptions<
+    Awaited<ReturnType<typeof catchUp>>,
+    TError,
+    CatchUpMutationVariables,
+    TContext
+  >;
+  request?: SecondParameter<typeof apiMutator>;
+}): UseMutationOptions<
+  Awaited<ReturnType<typeof catchUp>>,
+  TError,
+  CatchUpMutationVariables,
+  TContext
+> => {
+  const mutationKey = getCatchUpMutationKey();
+  const { mutation: mutationOptions, request: requestOptions } = options
+    ? options.mutation && "mutationKey" in options.mutation && options.mutation.mutationKey
+      ? options
+      : { ...options, mutation: { ...options.mutation, mutationKey } }
+    : { mutation: { mutationKey }, request: undefined };
+
+  const mutationFn: MutationFunction<
+    Awaited<ReturnType<typeof catchUp>>,
+    CatchUpMutationVariables
+  > = (props) => {
+    const { communityId, data } = props ?? {};
+
+    return catchUp(communityId, data, requestOptions);
+  };
+
+  return { mutationFn, ...mutationOptions };
+};
+
+export type CatchUpMutationResult = NonNullable<Awaited<ReturnType<typeof catchUp>>>;
+export type CatchUpMutationBody = BodyType<CatchUpRequest>;
+export type CatchUpMutationError = ErrorType<HTTPValidationError>;
+export type CatchUpMutationVariables = { communityId: number; data: BodyType<CatchUpRequest> };
+
+/**
+ * @summary Catch Up
+ */
+export const useCatchUp = <TError = ErrorType<HTTPValidationError>, TContext = unknown>(
+  options?: {
+    mutation?: UseMutationOptions<
+      Awaited<ReturnType<typeof catchUp>>,
+      TError,
+      CatchUpMutationVariables,
+      TContext
+    >;
+    request?: SecondParameter<typeof apiMutator>;
+  },
+  queryClient?: QueryClient
+): UseMutationResult<
+  Awaited<ReturnType<typeof catchUp>>,
+  TError,
+  CatchUpMutationVariables,
+  TContext
+> => {
+  return useMutation(getCatchUpMutationOptions(options), queryClient);
+};
