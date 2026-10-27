@@ -84,6 +84,7 @@ from app.services.storage import (
     USER_CONTENT_CSP,
     build_upload_response,
     get_guild_storage,
+    requested_range,
 )
 from app.api import resource_access
 from app.core.tools import Tool
@@ -129,7 +130,7 @@ def _shown_as_is(content_type: str | None) -> bool:
 
 
 def _file_download_response(
-    *, guild_id: int, version: FileVersion, inline: bool, fetch_dest: str | None
+    *, guild_id: int, version: FileVersion, inline: bool, request: Request
 ) -> Response:
     """Build a hardened download response for one version's stored file.
 
@@ -138,12 +139,16 @@ def _file_download_response(
     browser would render as a page is sandboxed (:data:`USER_CONTENT_CSP`),
     framed only by the in-app viewer, and downloaded rather than opened when
     its link is followed as a page (``Sec-Fetch-Dest: document``). Serves
-    through the guild's storage backend via :func:`build_upload_response`.
+    through the guild's storage backend via :func:`build_upload_response`, the
+    range of bytes the request asks for where it asks for one.
     """
+    fetch_dest = request.headers.get("sec-fetch-dest")
     content_type = version.file_content_type
     original_filename = version.original_filename
     filename = version.file_url.split("/")[-1]
-    blob = get_guild_storage(guild_id).open_readable(filename)
+    blob = get_guild_storage(guild_id).open_readable(
+        filename, byte_range=requested_range(request.headers.get("range"))
+    )
     if blob is None:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND)
 
@@ -513,6 +518,9 @@ async def put_video_thumbnail(
             select(FileVersion)
             .where(FileVersion.id == version_id, FileVersion.file_id == file.id)
             .with_for_update()
+            # Read as it stands once the lock is held: a frame another editor
+            # sent first counts.
+            .execution_options(populate_existing=True)
         )
     ).first()
     if version is None:
@@ -985,7 +993,7 @@ async def download_file(
         guild_id=guild_id,
         version=version,
         inline=inline,
-        fetch_dest=request.headers.get("sec-fetch-dest"),
+        request=request,
     )
 
 
@@ -1042,7 +1050,7 @@ async def download_file_version(
         guild_id=guild_id,
         version=version,
         inline=inline,
-        fetch_dest=request.headers.get("sec-fetch-dest"),
+        request=request,
     )
 
 

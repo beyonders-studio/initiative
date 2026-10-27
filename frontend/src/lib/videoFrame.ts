@@ -1,28 +1,44 @@
 /** The longest side of a frame drawn for a video's thumbnail. */
 const FRAME_EDGE = 640;
 
+/** How long the video may take to reach the frame before it is given up. */
+const FRAME_TIMEOUT_MS = 30_000;
+
 /**
  * One frame of the video at `url`, a second in (or a tenth of the way through
  * a shorter one), drawn no larger than the thumbnail edge: a WebP where the
  * browser writes one, otherwise a PNG.
  *
- * Rejects where the video cannot be read, and where the browser keeps its
- * pixels from the page (a video served from another origin).
+ * Rejects where the video cannot be read, where the browser keeps its pixels
+ * from the page (a video served from another origin), when `signal` aborts,
+ * and when the frame takes longer than {@link FRAME_TIMEOUT_MS}. The video
+ * stops loading whichever way it ends.
  */
-export const drawVideoFrame = (url: string): Promise<Blob> =>
+export const drawVideoFrame = (url: string, signal?: AbortSignal): Promise<Blob> =>
   new Promise((resolve, reject) => {
     const video = document.createElement("video");
-    const done = () => {
+    const stop = () => {
+      clearTimeout(timeout);
+      signal?.removeEventListener("abort", abandon);
       video.removeAttribute("src");
       video.load();
     };
+    const fail = (error: unknown) => {
+      stop();
+      reject(error);
+    };
+    const abandon = () => fail(new Error("the frame was abandoned"));
+    const timeout = setTimeout(abandon, FRAME_TIMEOUT_MS);
+    if (signal?.aborted) {
+      abandon();
+      return;
+    }
+    signal?.addEventListener("abort", abandon);
+
     video.muted = true;
     video.playsInline = true;
     video.preload = "auto";
-    video.onerror = () => {
-      done();
-      reject(new Error("the video could not be read"));
-    };
+    video.onerror = () => fail(new Error("the video could not be read"));
     video.onloadedmetadata = () => {
       video.currentTime = Math.min(1, (video.duration || 0) / 10);
     };
@@ -41,7 +57,7 @@ export const drawVideoFrame = (url: string): Promise<Blob> =>
       } catch (error) {
         reject(error);
       } finally {
-        done();
+        stop();
       }
     };
     video.src = url;
