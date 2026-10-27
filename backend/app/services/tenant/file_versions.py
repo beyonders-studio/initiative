@@ -24,7 +24,7 @@ from sqlalchemy.exc import DataError, IntegrityError
 from sqlmodel import select
 from sqlmodel.ext.asyncio.session import AsyncSession
 
-from app.core.file_types import is_refused, type_of_media
+from app.core.file_types import is_refused, spec_of, type_of_media
 from app.core.messages import CommonMessages
 from app.schemas.tenant.tool import from_row
 from app.services.tenant import attachments as attachments_service
@@ -113,10 +113,19 @@ def _make_current(parent: Any, version: Any) -> None:
 
 def _new_version(session: AsyncSession, parent: Any, fields: dict[str, Any]) -> Any:
     """Add a version of ``parent``'s file and make it current. Its type is one
-    ``parent`` may show; anything else raises ``ValueError``."""
+    ``parent`` may show; anything else raises ``ValueError``. A picture's
+    version waits for the ``thumbnails`` sweep to draw it smaller."""
+    from app.models.tenant.file import File
+
     content_type = fields.get("file_content_type")
     if not _may_hold(type(parent), content_type):
         raise ValueError(f"Unsupported file type: {content_type}")
+    if (
+        isinstance(parent, File)
+        and fields.get("thumbnail_url") is None
+        and spec_of(type_of_media(content_type)).picture_format
+    ):
+        fields["thumbnail_state"] = "pending"
     model, _ = _history(parent)
     if "original_filename" in fields:
         fields["original_filename"] = attachments_service.display_filename(
@@ -152,13 +161,18 @@ async def add_version(session: AsyncSession, parent: Any, **fields: Any) -> Any:
 
 def copy_version(session: AsyncSession, version: Any, copy: Any, **values: Any) -> Any:
     """Version 1 of ``copy``, carrying ``version``'s file, made current.
-    ``values`` set what differs from it: the copy's author, a copied file."""
+    ``values`` set what differs from it: the copy's author, a copied file. A
+    file version's thumbnail is its own, so the copy's is drawn again."""
+    from app.models.tenant.file import FileVersion
+
     model, column = _history(copy)
+    left = {"version_number", "created_at"}
+    if model is FileVersion:
+        left |= {"thumbnail_url", "thumbnail_state"}
     carried = {
         c.name: getattr(version, c.name)
         for c in model.__table__.columns
-        if not (c.primary_key or c.foreign_keys)
-        and c.name not in ("version_number", "created_at")
+        if not (c.primary_key or c.foreign_keys) and c.name not in left
     }
     return _new_version(
         session,

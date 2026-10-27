@@ -5799,6 +5799,7 @@ export interface FileSummary {
   file_content_type: string | null;
   file_size: number | null;
   original_filename: string | null;
+  thumbnail_url: string | null;
   smart_link_url: string | null;
   /** How the file is shown, which follows from its type. */
   readonly kind: FileKind;
@@ -5840,6 +5841,7 @@ export interface FileRead {
   file_content_type: string | null;
   file_size: number | null;
   original_filename: string | null;
+  thumbnail_url: string | null;
   smart_link_url: string | null;
   content: FileReadContent;
   content_version: string | null;

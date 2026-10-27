@@ -161,6 +161,7 @@ def sweeps() -> tuple[Sweep, ...]:
         plugin_updates,
         post_publication,
         subscription_notices,
+        thumbnails,
         trash_purge,
     )
     from app.services.tenant.attachments import (
@@ -431,6 +432,22 @@ def sweeps() -> tuple[Sweep, ...]:
                     "{row}.created_at",
                     after=UNCLAIMED_PASTED_IMAGE_GRACE,
                     when=f"NEW.filename LIKE '{PASTED_IMAGE_PREFIX}%'",
+                ),
+            ),
+        ),
+        # Uploaded pictures drawn smaller, as they arrive.
+        Sweep(
+            kind="thumbnails",
+            scope=Scope.ACTIVE,
+            every=minute,
+            visit=thumbnails.draw_pending,
+            next_due=thumbnails.next_due,
+            sources=(
+                on_row(
+                    "file_versions",
+                    "now()",
+                    events="INSERT OR UPDATE OF thumbnail_state",
+                    when="NEW.thumbnail_state = 'pending'",
                 ),
             ),
         ),
