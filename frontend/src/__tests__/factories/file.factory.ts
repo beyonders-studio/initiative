@@ -38,6 +38,7 @@ export function buildFileSummary(overrides: Partial<FileSummary> = {}): FileSumm
     file_content_type: null,
     file_size: null,
     original_filename: null,
+    thumbnail_url: null,
     smart_link_url: null,
     ...overrides,
   };

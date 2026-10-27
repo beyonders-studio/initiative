@@ -89,10 +89,11 @@ OUTBOX_CHANNEL = "event_outbox"
 CAPTURE_FUNCTION = "public.capture_change"
 
 #: Columns whose changes are not worth reporting. ``updated_at`` moves on every
-#: write, and search vectors / denormalized counters churn on their own, so
-#: leaving them in would make every column filter match constantly.
+#: write, search vectors / denormalized counters churn on their own, and a
+#: thumbnail is drawn by the app after the upload, so leaving them in would
+#: make every column filter match constantly.
 HOUSEKEEPING_COLUMNS: frozenset[str] = frozenset(
-    {"updated_at", "created_at", "search_vector"}
+    {"updated_at", "created_at", "search_vector", "thumbnail_url", "thumbnail_state"}
 )
 
 #: Same idea, by suffix, for generated text-search columns.
