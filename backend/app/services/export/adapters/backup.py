@@ -1155,7 +1155,7 @@ class _ScopeBuilder:
         rows = list(
             await self.session.exec(
                 select(PropertyDefinition)
-                .where(PropertyDefinition.initiative_id == initiative.id)
+                .where(PropertyDefinition.of_initiative(initiative.id))
                 .order_by(PropertyDefinition.position.asc())
             )
         )
@@ -1172,6 +1172,7 @@ class _ScopeBuilder:
                     "position": float(row.position),
                     "color": row.color,
                     "options": list(row.options or []),
+                    "currency": row.currency,
                 }
                 for row in rows
             ],
@@ -1190,8 +1191,9 @@ class _ScopeBuilder:
 
     async def _add_initiative_collections(self, initiative, folder: str) -> None:
         """The initiative's collections the creator can see, each under the id
-        it has here, holding its files by theirs: an import puts each one
-        together from the files it made of them."""
+        it has here, holding its files by theirs, with its own fields and each
+        file's values of them: an import puts each one together from the files
+        it made of them."""
         if self.mode != "backup" or not _included(self.params, Tool.file.value):
             return
         from sqlmodel import col, select
@@ -1199,6 +1201,8 @@ class _ScopeBuilder:
         from app.db.query import ids_in
         from app.models.tenant.collection import Collection, CollectionFile
         from app.models.tenant.file import File
+        from app.services.export.property_values import property_export_dict
+        from app.services.tenant import collections as collections_service
         from app.services.tenant import properties as properties_service
         from app.services.tenant import tags as tags_service
 
@@ -1221,6 +1225,18 @@ class _ScopeBuilder:
             held.setdefault(collection_id, []).append(file_id)
         await tags_service.annotate_tags(self.session, rows)
         await properties_service.annotate_properties(self.session, rows)
+        fields = await collections_service.fields_of(
+            self.session, [row.id for row in rows]
+        )
+        values = {
+            row.id: await properties_service.summaries_by_id(
+                self.session,
+                Tool.file.value,
+                held.get(row.id, []),
+                collection_id=row.id,
+            )
+            for row in rows
+        }
         payload = {
             "type": "initiative-collections",
             "schema_version": 1,
@@ -1235,10 +1251,26 @@ class _ScopeBuilder:
                     else None,
                     "file_ids": held.get(row.id, []),
                     **_file_metadata(row),
+                    "fields": [
+                        {
+                            "name": field.name,
+                            "type": field.type.value,
+                            "position": float(field.position),
+                            "color": field.color,
+                            "options": list(field.options or []),
+                            "currency": field.currency,
+                        }
+                        for field in fields.get(row.id, [])
+                    ],
+                    "values": {
+                        str(file_id): [property_export_dict(v) for v in summaries]
+                        for file_id, summaries in values[row.id].items()
+                    },
                 }
                 for row in rows
             ],
         }
+        self._record_property_people(payload)
         path = f"{folder}/collections.json"
         await self._append_backup(
             RenderItem(key=path, data=payload, filename=path, format="json"),
