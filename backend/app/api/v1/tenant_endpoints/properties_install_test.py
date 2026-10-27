@@ -333,3 +333,49 @@ async def test_a_file_list_filter_that_names_a_person_is_refused(
         params=_filters("eq", installed.seat.user.id),
     )
     assert as_person.status_code == 200, as_person.text
+
+
+async def test_a_collections_fields_are_written_with_the_files_scope(
+    client, session, acting_user, role_session
+):
+    scopes = ["files:write", "properties:write"]
+    installed = await install_plugin(session, acting_user, role_session, granted=scopes)
+    files = install_headers(installed, ["files:write"])
+    file_id = await _file(client, session, installed, files)
+    collection = await client.post(
+        guild_url(installed.guild.id, "/collections/"),
+        headers=files,
+        json={
+            "initiative_id": installed.placed.id,
+            "name": "The plug-in's",
+            "file_ids": [file_id],
+        },
+    )
+    assert collection.status_code == 201, collection.text
+    collection_id = collection.json()["id"]
+    url = guild_url(installed.guild.id, "/property-definitions/")
+    body = {
+        "initiative_id": installed.placed.id,
+        "collection_id": collection_id,
+        "name": "Score",
+        "type": "rating",
+    }
+
+    refused = await client.post(
+        url, headers=install_headers(installed, ["properties:write"]), json=body
+    )
+    assert refused.status_code == 403, refused.text
+    assert refused.json()["detail"] == PluginMessages.SCOPE_REQUIRED
+
+    created = await client.post(url, headers=files, json=body)
+    assert created.status_code == 201, created.text
+    written = await client.put(
+        guild_url(
+            installed.guild.id,
+            f"/collections/{collection_id}/files/{file_id}/fields",
+        ),
+        headers=files,
+        json={"values": [{"property_id": created.json()["id"], "value": 42}]},
+    )
+    assert written.status_code == 200, written.text
+    assert [v["value"] for v in written.json()] == [42]

@@ -1054,24 +1054,38 @@ def _entity_readable(t: str, kinds: Iterable[str]) -> str:
 
 
 def property_values_path() -> InitiativePath:
-    """A property value is read by whoever can read the thing it is on, and
-    written by whoever can edit that thing.
+    """A property value is read by whoever can read the thing it is on and its
+    definition, and written by whoever can edit that thing.
 
     Polymorphic over ``(entity_type, entity_id)``. A read is one ``EXISTS`` per
-    kind (:func:`_entity_readable`); a write is one
-    :data:`ENTITY_ACCESS_FN` call, since a write touches a row at a time. A write also asks that the definition belongs to the thing's own
-    initiative: definitions are initiative-level, so a value from another
-    initiative's definition — or on a thing that belongs to none — is refused.
+    kind (:func:`_entity_readable`) and one into the definition, whose own
+    policy answers for it; a write is one :data:`ENTITY_ACCESS_FN` call, since
+    a write touches a row at a time. A write also asks that the definition
+    belongs to the thing's own initiative: definitions are initiative-level, so
+    a value from another initiative's definition — or on a thing that belongs
+    to none — is refused.
+
+    A collection's own field is the collection's: its value is on a file in
+    the collection, and written by whoever may change the collection, with no
+    edit on the file asked.
     """
 
     def build(t: str, w: bool) -> str:
+        definition = f"EXISTS (SELECT 1 FROM property_definitions pd WHERE pd.id = {t}.property_id"  # noqa: S608
         if not w:
-            return _entity_readable(t, PROPERTY_TARGETS)
+            return f"({_entity_readable(t, PROPERTY_TARGETS)} AND {definition}))"
         reach = _entity_call(f"{t}.entity_type", f"{t}.entity_id", w, w)
+        field = (
+            f"{t}.entity_type = '{Tool.file.value}' AND EXISTS (SELECT 1 "  # noqa: S608
+            f"FROM collection_files cf WHERE cf.collection_id = pd.collection_id "
+            f"AND cf.file_id = {t}.entity_id) AND {_access('pd.initiative_id', True)}"
+            f" AND {_collection_writer('pd.initiative_id')}"
+        )
         return (
-            f"({_P.system} OR ({reach} AND EXISTS (SELECT 1 FROM property_definitions pd "  # noqa: S608
-            f"WHERE pd.id = {t}.property_id AND pd.initiative_id = "
-            f"{ENTITY_INITIATIVE_FN}({t}.entity_type, {t}.entity_id))))"
+            f"({_P.system} OR {definition} AND (CASE WHEN pd.collection_id IS NULL"
+            f" THEN ({reach} AND pd.initiative_id = "
+            f"{ENTITY_INITIATIVE_FN}({t}.entity_type, {t}.entity_id))"
+            f" ELSE ({field}) END)))"
         )
 
     return InitiativePath(
@@ -1444,6 +1458,28 @@ def _collection_writer(initiative: str) -> str:
     )
 
 
+def property_definitions_path() -> InitiativePath:
+    """An initiative's property is read and written by its members. A
+    collection's own field is also read only by whoever sees the collection —
+    one ``EXISTS`` into it, whose own policy answers — and written only by
+    whoever may change it (:func:`_collection_writer`)."""
+
+    def predicate(t: str, w: bool) -> str:
+        seen = f"EXISTS (SELECT 1 FROM collections c WHERE c.id = {t}.collection_id)"  # noqa: S608
+        if w:
+            seen = f"({seen} AND {_collection_writer(f'{t}.initiative_id')})"
+        return (
+            f"({_access(f'{t}.initiative_id', w)}"
+            f" AND ({t}.collection_id IS NULL OR {seen}))"
+        )
+
+    return InitiativePath(
+        predicate=predicate,
+        initiative_expr=lambda r: f"{r}.initiative_id",
+        parents=_no_parents,
+    )
+
+
 def collections_path() -> InitiativePath:
     """A collection is seen through its files and changed by the initiative's
     file makers.
@@ -1533,7 +1569,7 @@ INITIATIVE_PATHS: dict[str, InitiativePath] = {
         tool.plural: direct_or_guild() if tool is Tool.calendar else direct()
         for tool in Tool
     },
-    "property_definitions": direct(),
+    "property_definitions": property_definitions_path(),
     # Sharing itself. It carries no sharing leg of its own: resource_access
     # reads this table, so a policy here that called it would not resolve.
     # ``direct()`` derives none, because the table is no tool's own.
@@ -1814,6 +1850,14 @@ class ReportsAs:
     #: chain needs no counterpart — it already resolves from the resource the
     #: report names.
     initiative_expr: RowLocator | None = None
+    #: The label a row going away reports under, where it differs from the one
+    #: a row arriving reports under (``facet``): a junction whose direction is
+    #: the news. ``None`` where one label says both.
+    facet_on_delete: str | None = None
+    #: The chain this report carries, read off the row, where the resource it
+    #: names is not where the row hangs: a file reported as added to a
+    #: collection names that collection. ``None`` borrows the resource's own.
+    parents: ParentsLocator | None = None
 
 
 def reports_as(parent: str, fk: str, facet: str) -> ReportsAs:
@@ -2142,9 +2186,18 @@ EVENT_SOURCES: dict[str, Emit | Silent] = {
     "task_statuses": Emit(reports_as=reports_as("projects", "project_id", "statuses")),
     "task_types": Emit(reports_as=reports_as("projects", "project_id", "types")),
     # A property definition is read in its initiative's list, not at an
-    # address of its own, so a change to one reports as that initiative.
+    # address of its own, so a change to one reports as that initiative; a
+    # collection's own field is read with the collection, and reports as it.
     "property_definitions": Emit(
-        reports_as=reports_as("initiatives", "initiative_id", "properties")
+        reports_as=ReportsAs(
+            resource_types=frozenset({"initiatives", "collections"}),
+            id_expr=lambda r: f"COALESCE({r}.collection_id, {r}.initiative_id)",
+            facet="properties",
+            type_expr=lambda r: (
+                f"(CASE WHEN {r}.collection_id IS NULL THEN 'initiatives'"
+                " ELSE 'collections' END)"
+            ),
+        )
     ),
     # A layout is read in its instance's set, or its initiative's for a shared
     # tool, so a change reports as that.
@@ -2154,6 +2207,22 @@ EVENT_SOURCES: dict[str, Emit | Silent] = {
         reports_as=reports_as("calendar_events", "calendar_event_id", "answers")
     ),
     "file_versions": Emit(reports_as=reports_as("files", "file_id", "versions")),
+    # A file going into a collection or out of one changes the collection's
+    # list, and is news about the file too: which file, which collection, and
+    # which way, the collection in the file's chain.
+    "collection_files": Emit(
+        reports_as=(
+            reports_as("collections", "collection_id", "files"),
+            ReportsAs(
+                resource_types=frozenset({"files"}),
+                id_expr=lambda r: f"{r}.file_id",
+                facet="added_to_collection",
+                facet_on_delete="removed_from_collection",
+                parents=lambda r: _one_parent("collections", f"{r}.collection_id"),
+                label="file",
+            ),
+        )
+    ),
     # A draft page is read only by the wiki's writers, so like an unpublished
     # notice it is not news until it is finished.
     "wiki_pages": Emit(quiet_when=lambda r: f"{r}.is_draft"),

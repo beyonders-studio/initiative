@@ -1031,6 +1031,7 @@ async def create_property_definition(
     options: list[dict] | None = None,
     color: str | None = None,
     position: float = 0.0,
+    collection: Collection | None = None,
     commit: bool = True,
     **overrides: Any,
 ) -> PropertyDefinition:
@@ -1039,7 +1040,8 @@ async def create_property_definition(
 
     Auto-generates a unique name if not provided. When ``type`` is a
     select/multi_select and ``options`` is None, seeds a default option
-    list so the definition is valid.
+    list so the definition is valid; money is in US dollars. With
+    ``collection``, it is that collection's own field.
 
     Args:
         session: Database session
@@ -1071,11 +1073,13 @@ async def create_property_definition(
 
     defaults = {
         "initiative_id": initiative.id,
+        "collection_id": collection.id if collection is not None else None,
         "name": name,
         "type": type,
         "position": position,
         "color": color,
         "options": options,
+        "currency": "USD" if type is PropertyType.currency else None,
     }
 
     data = {**defaults, **overrides}
@@ -1849,10 +1853,13 @@ async def create_collection(
     *,
     files: Sequence[File] = (),
     name: str | None = None,
+    shape: str | None = None,
     commit: bool = True,
     **overrides: Any,
 ) -> Collection:
-    """Create a test collection holding ``files``, each added by ``creator``.
+    """Create a test collection holding ``files``, each added by ``creator``,
+    made as the ready-made ``shape`` of that key (its words in English) when
+    one is named.
 
     A collection is seen through its files, so one made with none reads as
     absent to everyone but the community's admins.
@@ -1877,6 +1884,11 @@ async def create_collection(
         for file in files
     )
     await session.flush()
+    if shape is not None:
+        from app.core.collection_shapes import SHAPES_BY_KEY
+        from app.services.tenant.collections import apply_shape
+
+        await apply_shape(session, collection, SHAPES_BY_KEY[shape], locale="en")
     if commit:
         await session.commit()
         await session.refresh(collection)

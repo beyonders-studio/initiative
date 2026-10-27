@@ -11,11 +11,13 @@ from sqlalchemy import (
     Date,
     DateTime,
     ForeignKey,
+    ForeignKeyConstraint,
     Index,
     Integer,
     Numeric,
     String,
     Text,
+    and_,
     text,
 )
 from sqlalchemy.dialects.postgresql import JSONB
@@ -43,6 +45,11 @@ class PropertyType(str, Enum):
     select = "select"
     multi_select = "multi_select"
     user_reference = "user_reference"
+    #: An amount of money in the currency its definition names.
+    currency = "currency"
+    #: 1 to 100, which a layout shows as a number, stars or a bar. Only a
+    #: collection's own fields are ratings.
+    rating = "rating"
 
 
 class PropertyDefinition(CreatedByMixin, table=True):
@@ -50,11 +57,32 @@ class PropertyDefinition(CreatedByMixin, table=True):
 
     A definition belongs to one initiative and applies to everything in it:
     any tool or sub-tool there may carry a value for it (``PropertyValue``).
+
+    One with a ``collection_id`` is that collection's own field instead: its
+    values sit on the collection's files, it is never one of the initiative's
+    properties, and it goes with the collection. ``initiative_id`` is the
+    collection's, which the key holds.
     """
 
     __tablename__ = "property_definitions"
     __allow_unmapped__ = True
     model_config = ConfigDict(arbitrary_types_allowed=True)
+    __table_args__ = (
+        ForeignKeyConstraint(
+            ["collection_id", "initiative_id"],
+            ["collections.id", "collections.initiative_id"],
+            ondelete="CASCADE",
+            name="fk_property_definitions_collection",
+        ),
+        CheckConstraint(
+            "type <> 'rating' OR collection_id IS NOT NULL",
+            name="ck_property_definitions_rating_in_collection",
+        ),
+        CheckConstraint(
+            "(type = 'currency') = (currency IS NOT NULL)",
+            name="ck_property_definitions_currency",
+        ),
+    )
 
     id: Optional[int] = Field(default=None, primary_key=True)
     initiative_id: int = Field(
@@ -64,6 +92,9 @@ class PropertyDefinition(CreatedByMixin, table=True):
             nullable=False,
             index=True,
         ),
+    )
+    collection_id: Optional[int] = Field(
+        default=None, sa_column=Column(Integer, nullable=True, index=True)
     )
     name: str = Field(
         sa_column=Column(String(length=100), nullable=False),
@@ -97,6 +128,11 @@ class PropertyDefinition(CreatedByMixin, table=True):
         default=None,
         sa_column=Column(JSONB, nullable=True),
     )
+    #: The ISO 4217 code a ``currency`` definition's amounts are in; None for
+    #: every other type.
+    currency: Optional[str] = Field(
+        default=None, sa_column=Column(String(length=3), nullable=True)
+    )
     created_at: datetime = Field(
         default_factory=lambda: datetime.now(timezone.utc),
         sa_column=Column(DateTime(timezone=True), nullable=False),
@@ -107,6 +143,14 @@ class PropertyDefinition(CreatedByMixin, table=True):
     )
 
     initiative: Optional["Initiative"] = Relationship()
+
+    @classmethod
+    def of_initiative(cls, initiative_id: int) -> Any:
+        """The initiative's properties, which are no collection's fields."""
+        return and_(
+            cls.initiative_id == initiative_id,
+            cls.__table__.c.collection_id.is_(None),
+        )
 
 
 _TARGET_VALUES = ", ".join(f"'{target}'" for target in PROPERTY_TARGETS)
@@ -141,6 +185,10 @@ class PropertyValue(SQLModel, table=True):
     its values explicitly (the purge, a move across initiatives) rather than by
     cascade. Who may read or write a value is what may be asked of the thing,
     through ``entity_access``.
+
+    A value of a collection's field is on a file in that collection: read by
+    whoever sees the collection and can open the file, and written by whoever
+    may change the collection.
     """
 
     __tablename__ = "property_values"

@@ -1,23 +1,29 @@
 from __future__ import annotations
 
 from datetime import datetime
+from enum import Enum
 from typing import Annotated, List, Optional, TYPE_CHECKING
 
-from pydantic import AliasChoices, ConfigDict, Field
+from pydantic import AliasChoices, ConfigDict, Field, model_validator
 
+from app.core.collection_shapes import SHAPES, RatingDisplay
 from app.core.file_types import FileType
 from app.core.identity_boundary import UPLOAD_PATH, GuildId, PersonId
 from app.schemas.base import MentionStr, SanitizedBaseModel, TitleStr
 from app.schemas.query import PageMeta
 from app.schemas.tenant.archive import ContentCan
 from app.schemas.tenant.file import FileSummary
+from app.models.tenant.property import PropertyType
 from app.schemas.tenant.property import (
+    CurrencyCode,
     PropertiesOnCreate,
     PropertiesOnUpdate,
+    PropertyDefinitionRead,
     PropertySummary,
     annotated_properties,
 )
 from app.schemas.tenant.tag import TagSummary, annotated_tags
+from app.schemas.tenant.tool_layout import ListLayoutKind
 from app.schemas.tenant.tool import from_row
 
 if TYPE_CHECKING:  # pragma: no cover
@@ -35,14 +41,32 @@ class CollectionFiles(SanitizedBaseModel):
     file_ids: List[int] = Field(min_length=1, max_length=MAX_FILES_PER_CHANGE)
 
 
+#: A ready-made shape, by its key (``app.core.collection_shapes``).
+CollectionShapeKey = Enum(
+    "CollectionShapeKey", {shape.key: shape.key for shape in SHAPES}, type=str
+)
+CollectionShapeKey.__doc__ = "A ready-made shape a collection can start as."
+
+
 class CollectionCreate(CollectionFiles, PropertiesOnCreate):
     """A new collection, made with the files it starts with: a collection is
-    never empty."""
+    never empty. It starts blank (its grid and table, and no fields of its
+    own), as a ready-made ``shape``, or with the fields and lists of another
+    collection in the initiative (``shape_from``), none of its values."""
 
     initiative_id: int
     name: TitleStr = Field(..., min_length=1, max_length=255)
     description: Optional[MentionStr] = Field(default=None, max_length=2000)
     tag_ids: Optional[List[int]] = None
+    shape: Optional[CollectionShapeKey] = None
+    #: The collection whose shape this one starts with.
+    shape_from: Optional[int] = None
+
+    @model_validator(mode="after")
+    def _one_shape(self) -> "CollectionCreate":
+        if self.shape is not None and self.shape_from is not None:
+            raise ValueError("a collection starts as a shape or as another's")
+        return self
 
 
 class CollectionUpdate(PropertiesOnUpdate):
@@ -94,9 +118,11 @@ def collection_cover(file: Optional["File"]) -> Optional[CollectionCover]:
 
 
 class CollectionFileSummary(FileSummary):
-    """A file as its collection lists it: with when it was added there."""
+    """A file as its collection lists it: with when it was added there, and
+    its values of the collection's own fields."""
 
     added_at: datetime
+    fields: List[PropertySummary] = Field(default_factory=list)
 
 
 class CollectionFileListResponse(PageMeta):
@@ -137,8 +163,42 @@ class CollectionRead(SanitizedBaseModel):
     comment_count: int = 0
     tags: List[TagSummary] = Field(default_factory=list)
     properties: List[PropertySummary] = Field(default_factory=list)
+    #: Its own fields, in order, whose values its files carry here.
+    fields: List[PropertyDefinitionRead] = Field(default_factory=list)
     #: Whether the reader may rename it, change what is in it, or trash it.
     can: CollectionCan = Field(default_factory=CollectionCan)
+
+
+class CollectionShapeField(SanitizedBaseModel):
+    """A field a ready-made shape brings, in the reader's language."""
+
+    model_config = ConfigDict(json_schema_serialization_defaults_required=True)
+
+    name: str
+    type: PropertyType
+    #: For a rating, how the shape's lists show it.
+    display: Optional[RatingDisplay] = None
+    #: For money, the currency it starts in.
+    currency: Optional[CurrencyCode] = None
+
+
+class CollectionShapeEntry(SanitizedBaseModel):
+    model_config = ConfigDict(json_schema_serialization_defaults_required=True)
+
+    key: CollectionShapeKey
+    name: str
+    hint: str
+    #: The lists it shows, in order; it opens on the first.
+    lists: List[ListLayoutKind]
+    fields: List[CollectionShapeField]
+
+
+class CollectionShapeGroup(SanitizedBaseModel):
+    model_config = ConfigDict(json_schema_serialization_defaults_required=True)
+
+    key: str
+    name: str
+    entries: List[CollectionShapeEntry]
 
 
 class CollectionListResponse(SanitizedBaseModel):

@@ -1312,11 +1312,15 @@ async def _collection_file_conditions(spec: ToolListSpec, req: ListRequest) -> l
 async def _serialize_collection_files(
     spec: ToolListSpec, req: ListRequest, rows: list
 ) -> list:
-    added = await collections_service.added_at_of(
-        req.session, req.values["collection_id"], [row.id for row in rows]
+    collection_id = req.values["collection_id"]
+    ids = [row.id for row in rows]
+    added = await collections_service.added_at_of(req.session, collection_id, ids)
+    fields = await properties_service.summaries_by_id(
+        req.session, Tool.file.value, ids, collection_id=collection_id
     )
     for row in rows:
         object.__setattr__(row, "added_at", added[row.id])
+        object.__setattr__(row, "fields", fields.get(row.id, []))
     return await files_endpoints.serialize_file_page(
         req.session, req.user_id, rows, CollectionFileSummary
     )
