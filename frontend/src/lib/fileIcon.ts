@@ -9,6 +9,10 @@
  */
 
 import {
+  BookOpen,
+  Box,
+  Camera,
+  DraftingCompass,
   FileArchive,
   FileAudio,
   FileCode,
@@ -16,10 +20,12 @@ import {
   FileText,
   FileVideo,
   ImageIcon,
+  Palette,
   PenTool,
   Presentation,
   ScrollText,
   Sheet,
+  Type,
 } from "lucide-react";
 import type { ComponentType } from "react";
 
@@ -59,7 +65,14 @@ const KIND_MARKS: Partial<Record<FileKind, Mark>> = {
   [FileKind.image]: { Icon: ImageIcon, colorClass: "text-emerald-500" },
   [FileKind.video]: { Icon: FileVideo, colorClass: "text-rose-500" },
   [FileKind.audio]: { Icon: FileAudio, colorClass: "text-sky-500" },
-  [FileKind.archive]: { Icon: FileArchive, colorClass: "text-amber-600" },
+  [FileKind.compressed]: { Icon: FileArchive, colorClass: "text-amber-600" },
+  [FileKind.design]: { Icon: Palette, colorClass: "text-pink-500" },
+  [FileKind["3d"]]: { Icon: Box, colorClass: "text-cyan-600" },
+  [FileKind.font]: { Icon: Type, colorClass: "text-stone-500" },
+  [FileKind.raw]: { Icon: Camera, colorClass: "text-teal-600" },
+  [FileKind.code]: { Icon: FileCode, colorClass: "text-violet-500" },
+  [FileKind.ebook]: { Icon: BookOpen, colorClass: "text-yellow-700" },
+  [FileKind.cad]: { Icon: DraftingCompass, colorClass: "text-slate-600" },
   [FileKind.text]: { Icon: FileText, colorClass: "text-gray-500" },
   [FileKind.link]: PLAIN,
 };

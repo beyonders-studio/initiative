@@ -389,7 +389,17 @@
       "whiteboard": "Pizarra",
       "pdf": "PDF",
       "image": "Imagen",
+      "video": "Vídeo",
+      "audio": "Audio",
       "text": "Texto",
+      "compressed": "Comprimido",
+      "design": "Diseño",
+      "3d": "3D",
+      "font": "Fuente",
+      "raw": "RAW de cámara",
+      "code": "Código",
+      "ebook": "Libro electrónico",
+      "cad": "CAD",
       "link": "Enlace",
       "other": "Otro"
     }

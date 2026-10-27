@@ -113,7 +113,14 @@
       "video": "Video",
       "audio": "Audio",
       "text": "Text",
-      "archive": "Archive",
+      "compressed": "Compressed",
+      "design": "Design",
+      "3d": "3D",
+      "font": "Font",
+      "raw": "Camera raw",
+      "code": "Code",
+      "ebook": "E-book",
+      "cad": "CAD",
       "link": "Link",
       "other": "Other"
     }

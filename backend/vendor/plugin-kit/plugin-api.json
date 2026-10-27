@@ -5,7 +5,7 @@
     "version": "8.1.0",
     "x-initiative-source": {
       "version": "0.77.1",
-      "commit": "4ea24fd7e4ec975f9e38d307e74695747e573543"
+      "commit": "1a62d88cd3a0c85e71e391e2e6890f80a6fe277a"
     }
   },
   "servers": [
@@ -5166,6 +5166,66 @@
         ]
       }
     },
+    "/collections/shapes": {
+      "get": {
+        "tags": [
+          "files"
+        ],
+        "summary": "List Collection Shapes",
+        "description": "The ready-made shapes a new collection can start as, grouped, in the\nreader's language: the lists each shows and opens on, and its fields.",
+        "operationId": "list_collection_shapes",
+        "security": [
+          {
+            "PluginToken": []
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "array",
+                  "items": {
+                    "$ref": "#/components/schemas/CollectionShapeGroup"
+                  },
+                  "title": "Response List Collection Shapes"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        },
+        "x-plugin-scope": "files:read",
+        "parameters": [
+          {
+            "name": "session_token",
+            "in": "cookie",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Session Token"
+            }
+          }
+        ]
+      }
+    },
     "/collections/": {
       "get": {
         "tags": [
@@ -5253,7 +5313,7 @@
           "files"
         ],
         "summary": "Create Collection",
-        "description": "Make a collection of files. It starts with the files named, each one a\nfile of the initiative the reader can open. Takes the initiative role's\nright to create files.",
+        "description": "Make a collection of files. It starts with the files named, each one a\nfile of the initiative the reader can open. Takes the initiative role's\nright to create files. It starts blank, as a ready-made ``shape`` with\nits words in the maker's language, or with the fields and lists of\n``shape_from``, a collection of the same initiative the maker sees.",
         "operationId": "create_collection",
         "security": [
           {
@@ -5485,6 +5545,170 @@
             "schema": {
               "type": "integer",
               "title": "Collection Id"
+            }
+          },
+          {
+            "name": "session_token",
+            "in": "cookie",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Session Token"
+            }
+          }
+        ]
+      }
+    },
+    "/collections/{collection_id}/files/{file_id}/fields": {
+      "get": {
+        "tags": [
+          "files"
+        ],
+        "summary": "Get Collection File Fields",
+        "description": "One file's values of the collection's own fields, for a file in the\ncollection the reader can open.",
+        "operationId": "get_collection_file_fields",
+        "security": [
+          {
+            "PluginToken": []
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "array",
+                  "items": {
+                    "$ref": "#/components/schemas/PropertySummary"
+                  },
+                  "title": "Response Get Collection File Fields"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        },
+        "x-plugin-scope": "files:read",
+        "parameters": [
+          {
+            "name": "collection_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "integer",
+              "title": "Collection Id"
+            }
+          },
+          {
+            "name": "file_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "integer",
+              "title": "File Id"
+            }
+          },
+          {
+            "name": "session_token",
+            "in": "cookie",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Session Token"
+            }
+          }
+        ]
+      },
+      "put": {
+        "tags": [
+          "files"
+        ],
+        "summary": "Set Collection File Fields",
+        "description": "Replace one file's values of the collection's own fields, or with\n``merge`` write only the ones named, as ``PUT /properties`` does for a\nproperty. The file is one in the collection the reader can open, and the\nvalues are the collection's: they take the right to change the\ncollection, not to edit the file. An empty list clears them all.",
+        "operationId": "set_collection_file_fields",
+        "security": [
+          {
+            "PluginToken": []
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/PropertyValuesSetRequest"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "array",
+                  "items": {
+                    "$ref": "#/components/schemas/PropertySummary"
+                  },
+                  "title": "Response Set Collection File Fields"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        },
+        "x-plugin-scope": "files:write",
+        "parameters": [
+          {
+            "name": "collection_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "integer",
+              "title": "Collection Id"
+            }
+          },
+          {
+            "name": "file_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "integer",
+              "title": "File Id"
             }
           },
           {
@@ -10376,7 +10600,7 @@
           "property-definitions"
         ],
         "summary": "List Property Definitions",
-        "description": "List property definitions.\n\nWith ``initiative_id``, returns definitions for that initiative only\n(filtered explicitly and subject to RLS). Without it, RLS returns the\nunion across every initiative the caller can see — used by global\nviews (My Tasks, Created Tasks, global Files list).",
+        "description": "List property definitions.\n\nWith ``initiative_id``, returns definitions for that initiative only\n(filtered explicitly and subject to RLS). Without it, RLS returns the\nunion across every initiative the caller can see — used by global\nviews (My Tasks, Created Tasks, global Files list). A collection's own\nfields are listed only with its ``collection_id``, and only to whoever\nsees the collection.",
         "operationId": "list_property_definitions",
         "security": [
           {
@@ -10441,6 +10665,24 @@
             }
           },
           {
+            "name": "collection_id",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "integer"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "description": "List this collection's own fields instead of properties.",
+              "title": "Collection Id"
+            },
+            "description": "List this collection's own fields instead of properties."
+          },
+          {
             "name": "session_token",
             "in": "cookie",
             "required": false,
@@ -10463,7 +10705,7 @@
           "property-definitions"
         ],
         "summary": "Create Property Definition",
-        "description": "Create a new property definition on an initiative.\n\nRequires the caller to be in the target initiative (or a guild admin);\nan installed plug-in also needs ``properties:write``.",
+        "description": "Create a new property definition on an initiative, or with\n``collection_id`` a field of that collection's own.\n\nA property requires the caller to be in the target initiative (or a guild\nadmin); an installed plug-in also needs ``properties:write``. A\ncollection's field requires the right to change the collection (and\n``files:write`` of a plug-in). A rating is a collection's field only.",
         "operationId": "create_property_definition",
         "security": [
           {
@@ -10502,7 +10744,13 @@
             }
           }
         },
-        "x-plugin-scope": "properties:write",
+        "x-plugin-scope": {
+          "per": "property_scope",
+          "any_of": [
+            "files:write",
+            "properties:write"
+          ]
+        },
         "parameters": [
           {
             "name": "session_token",
@@ -10529,7 +10777,7 @@
           "property-definitions"
         ],
         "summary": "Update Property Definition",
-        "description": "Update a property definition.\n\nType changes are not allowed via this endpoint; callers should\ndelete the definition and re-create. Changing the option list on a\nselect / multi_select definition returns ``orphaned_value_count`` so\nthe SPA can warn about dangling values.",
+        "description": "Update a property definition.\n\nType changes are not allowed via this endpoint; callers should\ndelete the definition and re-create. Changing the option list on a\nselect / multi_select definition returns ``orphaned_value_count`` so\nthe SPA can warn about dangling values. A collection's field is changed\nby whoever may change the collection.",
         "operationId": "update_property_definition",
         "security": [
           {
@@ -10568,7 +10816,13 @@
             }
           }
         },
-        "x-plugin-scope": "properties:write",
+        "x-plugin-scope": {
+          "per": "property_scope",
+          "any_of": [
+            "files:write",
+            "properties:write"
+          ]
+        },
         "parameters": [
           {
             "name": "definition_id",
@@ -10602,7 +10856,7 @@
           "property-definitions"
         ],
         "summary": "Delete Property Definition",
-        "description": "Delete a property definition. Cascades to remove all attached values.",
+        "description": "Delete a property definition. Cascades to remove all attached values.\nA collection's field is removed by whoever may change the collection.",
         "operationId": "delete_property_definition",
         "security": [
           {
@@ -10624,7 +10878,13 @@
             }
           }
         },
-        "x-plugin-scope": "properties:write",
+        "x-plugin-scope": {
+          "per": "property_scope",
+          "any_of": [
+            "files:write",
+            "properties:write"
+          ]
+        },
         "parameters": [
           {
             "name": "definition_id",
@@ -12491,6 +12751,27 @@
               }
             ],
             "title": "Tag Ids"
+          },
+          "shape": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/CollectionShapeKey"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "shape_from": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Shape From"
           }
         },
         "type": "object",
@@ -12500,7 +12781,7 @@
           "name"
         ],
         "title": "CollectionCreate",
-        "description": "A new collection, made with the files it starts with: a collection is\nnever empty."
+        "description": "A new collection, made with the files it starts with: a collection is\nnever empty. It starts blank (its grid and table, and no fields of its\nown), as a ready-made ``shape``, or with the fields and lists of another\ncollection in the initiative (``shape_from``), none of its values."
       },
       "CollectionFileListResponse": {
         "properties": {
@@ -12779,6 +13060,13 @@
             "format": "date-time",
             "title": "Added At"
           },
+          "fields": {
+            "items": {
+              "$ref": "#/components/schemas/PropertySummary"
+            },
+            "type": "array",
+            "title": "Fields"
+          },
           "kind": {
             "$ref": "#/components/schemas/FileKind",
             "description": "How the file is shown, which follows from its type.",
@@ -12816,10 +13104,11 @@
           "height",
           "smart_link_url",
           "added_at",
+          "fields",
           "kind"
         ],
         "title": "CollectionFileSummary",
-        "description": "A file as its collection lists it: with when it was added there."
+        "description": "A file as its collection lists it: with when it was added there, and\nits values of the collection's own fields."
       },
       "CollectionFiles": {
         "properties": {
@@ -12914,6 +13203,9 @@
             "title": "File Count",
             "default": 0
           },
+          "hidden_files": {
+            "$ref": "#/components/schemas/HiddenFiles"
+          },
           "created_by": {
             "anyOf": [
               {
@@ -12984,6 +13276,13 @@
             "type": "array",
             "title": "Properties"
           },
+          "fields": {
+            "items": {
+              "$ref": "#/components/schemas/PropertyDefinitionRead"
+            },
+            "type": "array",
+            "title": "Fields"
+          },
           "can": {
             "$ref": "#/components/schemas/CollectionCan"
           }
@@ -12998,6 +13297,7 @@
           "cover_file_id",
           "cover",
           "file_count",
+          "hidden_files",
           "created_by",
           "created_at",
           "updated_at",
@@ -13007,10 +13307,140 @@
           "comment_count",
           "tags",
           "properties",
+          "fields",
           "can"
         ],
         "title": "CollectionRead",
         "description": "A collection as its reader sees it: only the files they can open are\ncounted, and the cover is one of those."
+      },
+      "CollectionShapeEntry": {
+        "properties": {
+          "key": {
+            "$ref": "#/components/schemas/CollectionShapeKey"
+          },
+          "name": {
+            "type": "string",
+            "title": "Name"
+          },
+          "hint": {
+            "type": "string",
+            "title": "Hint"
+          },
+          "lists": {
+            "items": {
+              "type": "string",
+              "enum": [
+                "table",
+                "board",
+                "gantt",
+                "calendar",
+                "masonry",
+                "grid",
+                "timeline"
+              ]
+            },
+            "type": "array",
+            "title": "Lists"
+          },
+          "fields": {
+            "items": {
+              "$ref": "#/components/schemas/CollectionShapeField"
+            },
+            "type": "array",
+            "title": "Fields"
+          }
+        },
+        "type": "object",
+        "required": [
+          "key",
+          "name",
+          "hint",
+          "lists",
+          "fields"
+        ],
+        "title": "CollectionShapeEntry"
+      },
+      "CollectionShapeField": {
+        "properties": {
+          "name": {
+            "type": "string",
+            "title": "Name"
+          },
+          "type": {
+            "$ref": "#/components/schemas/PropertyType"
+          },
+          "display": {
+            "anyOf": [
+              {
+                "type": "string",
+                "enum": [
+                  "number",
+                  "stars",
+                  "bar"
+                ]
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Display"
+          },
+          "currency": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/CurrencyCode"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          }
+        },
+        "type": "object",
+        "required": [
+          "name",
+          "type",
+          "display",
+          "currency"
+        ],
+        "title": "CollectionShapeField",
+        "description": "A field a ready-made shape brings, in the reader's language."
+      },
+      "CollectionShapeGroup": {
+        "properties": {
+          "key": {
+            "type": "string",
+            "title": "Key"
+          },
+          "name": {
+            "type": "string",
+            "title": "Name"
+          },
+          "entries": {
+            "items": {
+              "$ref": "#/components/schemas/CollectionShapeEntry"
+            },
+            "type": "array",
+            "title": "Entries"
+          }
+        },
+        "type": "object",
+        "required": [
+          "key",
+          "name",
+          "entries"
+        ],
+        "title": "CollectionShapeGroup"
+      },
+      "CollectionShapeKey": {
+        "type": "string",
+        "enum": [
+          "gallery",
+          "catalog",
+          "log"
+        ],
+        "title": "CollectionShapeKey",
+        "description": "A ready-made shape a collection can start as."
       },
       "CollectionUpdate": {
         "properties": {
@@ -14516,6 +14946,168 @@
         ],
         "title": "CounterViewMode"
       },
+      "CurrencyCode": {
+        "type": "string",
+        "enum": [
+          "AED",
+          "AFN",
+          "ALL",
+          "AMD",
+          "AOA",
+          "ARS",
+          "AUD",
+          "AWG",
+          "AZN",
+          "BAM",
+          "BBD",
+          "BDT",
+          "BHD",
+          "BIF",
+          "BMD",
+          "BND",
+          "BOB",
+          "BRL",
+          "BSD",
+          "BTN",
+          "BWP",
+          "BYN",
+          "BZD",
+          "CAD",
+          "CDF",
+          "CHF",
+          "CLP",
+          "CNY",
+          "COP",
+          "CRC",
+          "CUP",
+          "CVE",
+          "CZK",
+          "DJF",
+          "DKK",
+          "DOP",
+          "DZD",
+          "EGP",
+          "ERN",
+          "ETB",
+          "EUR",
+          "FJD",
+          "FKP",
+          "GBP",
+          "GEL",
+          "GHS",
+          "GIP",
+          "GMD",
+          "GNF",
+          "GTQ",
+          "GYD",
+          "HKD",
+          "HNL",
+          "HTG",
+          "HUF",
+          "IDR",
+          "ILS",
+          "INR",
+          "IQD",
+          "IRR",
+          "ISK",
+          "JMD",
+          "JOD",
+          "JPY",
+          "KES",
+          "KGS",
+          "KHR",
+          "KMF",
+          "KPW",
+          "KRW",
+          "KWD",
+          "KYD",
+          "KZT",
+          "LAK",
+          "LBP",
+          "LKR",
+          "LRD",
+          "LSL",
+          "LYD",
+          "MAD",
+          "MDL",
+          "MGA",
+          "MKD",
+          "MMK",
+          "MNT",
+          "MOP",
+          "MRU",
+          "MUR",
+          "MVR",
+          "MWK",
+          "MXN",
+          "MYR",
+          "MZN",
+          "NAD",
+          "NGN",
+          "NIO",
+          "NOK",
+          "NPR",
+          "NZD",
+          "OMR",
+          "PAB",
+          "PEN",
+          "PGK",
+          "PHP",
+          "PKR",
+          "PLN",
+          "PYG",
+          "QAR",
+          "RON",
+          "RSD",
+          "RUB",
+          "RWF",
+          "SAR",
+          "SBD",
+          "SCR",
+          "SDG",
+          "SEK",
+          "SGD",
+          "SHP",
+          "SLE",
+          "SOS",
+          "SRD",
+          "SSP",
+          "STN",
+          "SVC",
+          "SYP",
+          "SZL",
+          "THB",
+          "TJS",
+          "TMT",
+          "TND",
+          "TOP",
+          "TRY",
+          "TTD",
+          "TWD",
+          "TZS",
+          "UAH",
+          "UGX",
+          "USD",
+          "UYU",
+          "UZS",
+          "VED",
+          "VES",
+          "VND",
+          "VUV",
+          "WST",
+          "XAF",
+          "XCD",
+          "XCG",
+          "XOF",
+          "XPF",
+          "YER",
+          "ZAR",
+          "ZMW",
+          "ZWG"
+        ],
+        "title": "CurrencyCode",
+        "description": "The ISO 4217 code a money property's amounts are in."
+      },
       "DateBucket": {
         "type": "string",
         "enum": [
@@ -14613,7 +15205,14 @@
           "video",
           "audio",
           "text",
-          "archive",
+          "compressed",
+          "design",
+          "3d",
+          "font",
+          "raw",
+          "code",
+          "ebook",
+          "cad",
           "link",
           "other"
         ],
@@ -14920,6 +15519,18 @@
             "$ref": "#/components/schemas/FileKind",
             "description": "How the file is shown, which follows from its type.",
             "readOnly": true
+          },
+          "converts_to": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/FileType"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "The editor's own type this uploaded file becomes when somebody\nconverts it to edit it (``POST /files/{id}/convert``), or ``None``.",
+            "readOnly": true
           }
         },
         "type": "object",
@@ -14955,7 +15566,8 @@
           "content",
           "collection_ids",
           "content_version",
-          "kind"
+          "kind",
+          "converts_to"
         ],
         "title": "FileRead"
       },
@@ -15273,6 +15885,63 @@
           "tar",
           "gz",
           "7z",
+          "rar",
+          "ai",
+          "psd",
+          "eps",
+          "indd",
+          "xcf",
+          "kra",
+          "procreate",
+          "clip",
+          "sketch",
+          "fig",
+          "afdesign",
+          "afphoto",
+          "afpub",
+          "cdr",
+          "blend",
+          "fbx",
+          "obj",
+          "stl",
+          "glb",
+          "gltf",
+          "3mf",
+          "usdz",
+          "ttf",
+          "otf",
+          "woff",
+          "woff2",
+          "dng",
+          "cr2",
+          "cr3",
+          "nef",
+          "arw",
+          "raf",
+          "orf",
+          "py",
+          "js",
+          "ts",
+          "css",
+          "sql",
+          "yaml",
+          "xml",
+          "toml",
+          "c",
+          "cpp",
+          "cs",
+          "java",
+          "go",
+          "rs",
+          "rb",
+          "php",
+          "swift",
+          "kt",
+          "epub",
+          "mobi",
+          "dwg",
+          "dxf",
+          "step",
           "other"
         ],
         "title": "FileType"
@@ -15565,6 +16234,23 @@
         },
         "type": "object",
         "title": "HTTPValidationError"
+      },
+      "HiddenFiles": {
+        "properties": {
+          "count": {
+            "type": "integer",
+            "title": "Count",
+            "default": 0
+          },
+          "requested": {
+            "type": "integer",
+            "title": "Requested",
+            "default": 0
+          }
+        },
+        "type": "object",
+        "title": "HiddenFiles",
+        "description": "The files of a collection or a wiki the reader knows are there and\ncan't open, and how many of those they have asked for."
       },
       "InitiativeCan": {
         "properties": {
@@ -17255,9 +17941,30 @@
             ],
             "title": "Options"
           },
+          "currency": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/CurrencyCode"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
           "initiative_id": {
             "type": "integer",
             "title": "Initiative Id"
+          },
+          "collection_id": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Collection Id"
           }
         },
         "type": "object",
@@ -17310,6 +18017,16 @@
             ],
             "title": "Options"
           },
+          "currency": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/CurrencyCode"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
           "id": {
             "type": "integer",
             "title": "Id"
@@ -17317,6 +18034,17 @@
           "initiative_id": {
             "type": "integer",
             "title": "Initiative Id"
+          },
+          "collection_id": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Collection Id"
           },
           "created_at": {
             "type": "string",
@@ -17336,8 +18064,10 @@
           "position",
           "color",
           "options",
+          "currency",
           "id",
           "initiative_id",
+          "collection_id",
           "created_at",
           "updated_at"
         ],
@@ -17394,6 +18124,16 @@
               }
             ],
             "title": "Options"
+          },
+          "currency": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/CurrencyCode"
+              },
+              {
+                "type": "null"
+              }
+            ]
           }
         },
         "type": "object",
@@ -17512,6 +18252,16 @@
             ],
             "title": "Options"
           },
+          "currency": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/CurrencyCode"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
           "value": {
             "title": "Value",
             "description": "Shaped by the property's type. For user_reference, a person: id, username, discriminator, display_name and avatar_url, or an PluginPerson when the reader is an installed plug-in."
@@ -17523,6 +18273,7 @@
           "name",
           "type",
           "options",
+          "currency",
           "value"
         ],
         "title": "PropertySummary",
@@ -17560,7 +18311,9 @@
           "url",
           "select",
           "multi_select",
-          "user_reference"
+          "user_reference",
+          "currency",
+          "rating"
         ],
         "title": "PropertyType",
         "description": "Supported value types for a property definition."
@@ -21717,6 +22470,9 @@
             "type": "integer",
             "title": "Comment Count",
             "default": 0
+          },
+          "hidden_files": {
+            "$ref": "#/components/schemas/HiddenFiles"
           }
         },
         "type": "object",
@@ -21743,10 +22499,11 @@
           "reading_width",
           "accent_color",
           "template_page_id",
-          "comment_count"
+          "comment_count",
+          "hidden_files"
         ],
         "title": "WikiRead",
-        "description": "A wiki on its own page. The same shape as its summary: the pages are\nfetched as a tree of their own, because a wiki is navigated rather than\nread end to end."
+        "description": "A wiki on its own page: its summary, and the files filed in it the\nreader knows are there and can't open. The pages are fetched as a tree of\ntheir own, because a wiki is navigated rather than read end to end."
       },
       "WikiReadingWidth": {
         "type": "string",

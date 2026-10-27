@@ -214,18 +214,8 @@ const QueueFilterFields = ({
 /** "All" is a sentinel: the underlying filter is absent, not a value. */
 const ALL_FILE_KINDS = "all";
 
-/** The kinds a files list offers to narrow by. */
-const FILE_FILTER_KINDS = [
-  FileKind.document,
-  FileKind.spreadsheet,
-  FileKind.presentation,
-  FileKind.whiteboard,
-  FileKind.pdf,
-  FileKind.image,
-  FileKind.text,
-  FileKind.link,
-  FileKind.other,
-] as const;
+/** The kinds a files list offers to narrow by: every one there is. */
+const FILE_FILTER_KINDS = Object.values(FileKind);
 
 /** A files list is also narrowed to one type of file. */
 const FileFilterFields = ({

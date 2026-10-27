@@ -28,7 +28,13 @@ from uuid import uuid4
 from fastapi import UploadFile
 
 from app.core.errors import CodedError
-from app.core.file_types import is_refused, spec_of, type_of_media, type_of_name
+from app.core.file_types import (
+    FileType,
+    is_refused,
+    spec_of,
+    type_of_media,
+    type_of_name,
+)
 from app.core.identity_boundary import UPLOAD_PATH_SHAPE
 from app.core.messages import AttachmentMessages
 from app.core.image_headers import read_image_header
@@ -805,9 +811,12 @@ def _is_app_package(source: BinaryIO) -> bool:
     )
 
 
-def _name_settles(detected: str, named: str, source: BinaryIO) -> bool:
-    """Whether a file's name may make it ``named`` where its bytes said
+def _name_settles(detected: str, named_type: FileType, source: BinaryIO) -> bool:
+    """Whether a file's name may make it ``named_type`` where its bytes said
     ``detected``: only where the bytes say no more than the family."""
+    if detected in spec_of(named_type).containers:
+        return True
+    named = spec_of(named_type).media_types[0]
     if detected in _PLAIN_TEXT:
         return named.startswith("text/") or named == "application/json"
     if named in _OFFICE_PACKAGES:
@@ -871,9 +880,8 @@ def _type_of(
     named_type = type_of_name(filename)
     mime = detected
     if named_type is not None and named_type is not type_of_media(detected):
-        named = spec_of(named_type).media_types[0]
-        if _name_settles(detected, named, source):
-            mime = named
+        if _name_settles(detected, named_type, source):
+            mime = spec_of(named_type).media_types[0]
     extensions = spec_of(type_of_media(mime)).extensions
     suffix = Path(filename).suffix.lower() if filename else ""
     return mime, suffix if suffix in extensions else next(iter(extensions), "")

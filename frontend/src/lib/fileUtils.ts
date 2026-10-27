@@ -107,7 +107,8 @@ export function getFileTypeLabel(
     return mimeLabels[mimeType];
   }
 
-  return "File";
+  // Any other format is named by its extension: PSD, BLEND, ZIP.
+  return ext ? ext.toUpperCase() : "File";
 }
 
 /**

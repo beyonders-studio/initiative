@@ -1,12 +1,10 @@
 import {
   Download,
   ExternalLink,
-  FileSpreadsheet,
   FileText,
   History,
   Loader2,
   Pencil,
-  Presentation,
   Trash2,
   Upload,
   ZoomIn,
@@ -17,7 +15,7 @@ import { type ChangeEvent, useEffect, useMemo, useRef, useState } from "react";
 import { useTranslation } from "react-i18next";
 import { Document, Page, pdfjs } from "react-pdf";
 
-import { FileType, type FileVersionRead } from "@/api/generated/initiativeAPI.schemas";
+import { FileKind, FileType, type FileVersionRead } from "@/api/generated/initiativeAPI.schemas";
 import { Markdown } from "@/components/Markdown";
 import { Lightbox } from "@/components/shared/Lightbox";
 import { Badge } from "@/components/ui/badge";
@@ -32,6 +30,8 @@ import {
   useUploadFileVersion,
 } from "@/hooks/useFiles";
 import { useRelativeTime } from "@/hooks/useRelativeTime";
+import { fileIcon } from "@/lib/fileIcon";
+import { FILE_TYPE_KINDS } from "@/lib/fileTypes";
 import { formatBytes, getFileExtension, getFileTypeLabel } from "@/lib/fileUtils";
 import { numberFormat } from "@/lib/intl";
 import { resolveFileDownloadUrl, resolveFileVersionDownloadUrl } from "@/lib/uploadUrl";
@@ -73,7 +73,7 @@ interface UploadedFileViewerProps {
   thumbnailUrl?: string | null;
   /** The file's type, and the type it becomes when converted to edit it
    *  (`null` for one that does not convert). */
-  fileType?: FileType;
+  fileType: FileType;
   convertsTo?: FileType | null;
 }
 
@@ -189,18 +189,18 @@ export const UploadedFileViewer = ({
   const [markdownContent, setMarkdownContent] = useState<string | null>(null);
   const [showRendered, setShowRendered] = useState(true);
 
-  // Determine file type for rendering strategy
-  const isPdf = extension === "pdf" || contentType === "application/pdf";
+  // How the file is shown follows from its kind. An Illustrator file is
+  // usually a PDF inside, so it is shown as one until it turns out not to be.
+  const kind = FILE_TYPE_KINDS[fileType];
+  const isPdf = kind === FileKind.pdf || (fileType === FileType.ai && !pdfError);
   const isText = extension === "txt" || contentType === "text/plain";
   const isHtml = extension === "html" || extension === "htm" || contentType === "text/html";
-  const isImage =
-    contentType?.startsWith("image/") ||
-    ["png", "jpg", "jpeg", "gif", "webp", "svg"].includes(extension);
+  const isImage = kind === FileKind.image;
   const isMarkdown =
     extension === "md" || extension === "markdown" || contentType === "text/markdown";
   // Played by the browser's own player; one it cannot play offers the download.
-  const isVideo = contentType?.startsWith("video/") ?? false;
-  const isAudio = contentType?.startsWith("audio/") ?? false;
+  const isVideo = kind === FileKind.video;
+  const isAudio = kind === FileKind.audio;
 
   // Measure toolbar width once on mount for PDF sizing
   useEffect(() => {
@@ -363,9 +363,8 @@ export const UploadedFileViewer = ({
     );
   }
 
-  // Get the appropriate icon for Office files
-  const OfficeIcon = isExcel ? FileSpreadsheet : isPowerPoint ? Presentation : FileText;
-  const iconColor = isExcel ? "text-green-600" : isPowerPoint ? "text-orange-500" : "text-blue-600";
+  // A file shown only as a card is drawn by its kind's mark.
+  const { Icon: KindIcon, colorClass: kindColor } = fileIcon({ file_type: fileType });
 
   return (
     <div className="space-y-4">
@@ -708,7 +707,7 @@ export const UploadedFileViewer = ({
             className="flex flex-col items-center justify-center bg-muted/50"
             style={{ height: "70vh", minHeight: 500 }}
           >
-            <OfficeIcon className={`h-24 w-24 ${iconColor} mb-6`} />
+            <KindIcon className={cn("mb-6 h-24 w-24", kindColor)} />
             <h3 className="mb-2 font-semibold text-xl tracking-tight">
               {originalFilename || t("viewer.file")}
             </h3>
@@ -740,7 +739,7 @@ export const UploadedFileViewer = ({
             className="flex flex-col items-center justify-center bg-muted/50"
             style={{ height: "70vh", minHeight: 500 }}
           >
-            <FileText className="mb-6 h-24 w-24 text-muted-foreground" />
+            <KindIcon className={cn("mb-6 h-24 w-24", kindColor)} />
             <h3 className="mb-2 font-semibold text-xl tracking-tight">
               {originalFilename || t("viewer.file")}
             </h3>

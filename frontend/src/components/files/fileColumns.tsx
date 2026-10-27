@@ -1,9 +1,9 @@
-import { FileSpreadsheet, FileText, Presentation } from "lucide-react";
 import { useMemo } from "react";
 import { useTranslation } from "react-i18next";
 
-import { FileKind, type FileSummary } from "@/api/generated/initiativeAPI.schemas";
+import type { FileSummary } from "@/api/generated/initiativeAPI.schemas";
 import { Badge } from "@/components/ui/badge";
+import { fileIcon } from "@/lib/fileIcon";
 import { isStoredFileType } from "@/lib/fileTypes";
 import { getFileTypeLabel } from "@/lib/fileUtils";
 import type { AppColumnDef } from "@/lib/table";
@@ -15,12 +15,7 @@ export const FileTypeBadge = ({ file }: { file: FileSummary }) => {
   const { t } = useTranslation("files");
   if (isStoredFileType(file.file_type)) {
     const fileTypeLabel = getFileTypeLabel(file.file_content_type, file.original_filename);
-    const Icon =
-      file.kind === FileKind.spreadsheet
-        ? FileSpreadsheet
-        : file.kind === FileKind.presentation
-          ? Presentation
-          : FileText;
+    const { Icon } = fileIcon(file);
     return (
       <Badge variant="secondary" className="flex w-fit items-center gap-1">
         <Icon className="h-3 w-3" />

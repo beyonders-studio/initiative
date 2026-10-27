@@ -20,6 +20,10 @@ No emailing versions round. No `final_v3_ACTUAL_final.docx`. No wondering whethe
 | **Smart link** | An embedded view of something that lives somewhere else — a video, a shared file. |
 | **Upload** | Something from your computer: PDF, Word, Excel, PowerPoint, images, and more. |
 
+An upload can be any format but a program. Each one wears its category's icon and its format on a badge (**PSD**, **BLEND**, **ZIP**), so the poster's layered artwork stops looking like the minutes. Pictures, PDFs, video and audio open right on the page. Everything else has a **Download** button, and anyone who can see the file can use it.
+
+**Filter by type** narrows the list to one category: design files, 3D models, fonts, camera raw, code, e-books, CAD drawings, compressed files, and the usual documents, spreadsheets and pictures.
+
 Got the file on your desktop already? Drag it anywhere onto the files
 page — any view — and **New file** opens on the **Upload file** tab with it
 ready to go. Or drop it on the box in that tab instead of hunting for it in a
