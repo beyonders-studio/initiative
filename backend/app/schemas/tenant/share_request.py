@@ -22,8 +22,11 @@ def _askable(level: ResourceAccessLevel | None) -> ResourceAccessLevel | None:
 
 
 class ShareStanding(SanitizedBaseModel):
-    """Where the reader stands on one thing they can open, or know is there."""
+    """Where the reader stands on one thing they can open, or know is there:
+    on the tool whose sharing decides it, which is what to ask for."""
 
+    resource_type: Tool
+    resource_id: int
     initiative_id: int
     #: The rung they hold, or ``None`` where they can't open it.
     level: Optional[ResourceAccessLevel] = None

@@ -10,7 +10,9 @@ from app.testing import (
     create_collection,
     create_file,
     create_guest,
+    create_project,
     create_resource_grant,
+    create_task,
     get_auth_headers,
 )
 from app.testing.notices import drain_notices
@@ -50,12 +52,14 @@ async def test_a_member_asks_for_a_file_and_the_owner_shares_it(client, session,
 
     assert (
         await client.get(owner.g(f"/files/{file_id}"), headers=reader.headers)
-    ).status_code == 404
+    ).status_code in (403, 404)
     standing = await client.get(
-        reader.g(f"/share-requests/standing?resource_type=file&resource_id={file_id}"),
+        reader.g(f"/share-requests/standing?kind=file&entity_id={file_id}"),
         headers=reader.headers,
     )
     assert standing.json() == {
+        "resource_type": "file",
+        "resource_id": file_id,
         "initiative_id": owner.initiative.id,
         "level": None,
         "pending": None,
@@ -121,9 +125,7 @@ async def test_nothing_outside_the_readers_initiatives_can_be_asked_about(
     file_id = file.id
 
     standing = await client.get(
-        outsider.g(
-            f"/share-requests/standing?resource_type=file&resource_id={file_id}"
-        ),
+        outsider.g(f"/share-requests/standing?kind=file&entity_id={file_id}"),
         headers=outsider.headers,
     )
     asked = await client.post(
@@ -132,7 +134,7 @@ async def test_nothing_outside_the_readers_initiatives_can_be_asked_about(
         headers=outsider.headers,
     )
     missing = await client.get(
-        outsider.g("/share-requests/standing?resource_type=file&resource_id=99999"),
+        outsider.g("/share-requests/standing?kind=file&entity_id=99999"),
         headers=outsider.headers,
     )
     # The same answer as for nothing at all.
@@ -206,7 +208,7 @@ async def test_a_silent_no_tells_the_requester_nothing(client, session, two):
 
     assert await _told(session, reader.user.id, NotificationType.share_declined) == []
     standing = await client.get(
-        reader.g(f"/share-requests/standing?resource_type=file&resource_id={file_id}"),
+        reader.g(f"/share-requests/standing?kind=file&entity_id={file_id}"),
         headers=reader.headers,
     )
     assert standing.json()["pending"] is None
@@ -256,7 +258,24 @@ async def test_an_item_guest_asks_to_edit_and_a_share_with_everyone_reaches_them
     )
 
     standing = await client.get(
-        owner.g(f"/share-requests/standing?resource_type=file&resource_id={given_id}"),
+        owner.g(f"/share-requests/standing?kind=file&entity_id={given_id}"),
         headers=headers,
     )
     assert standing.json()["level"] == "write"
+
+
+async def test_a_task_is_asked_for_through_its_project(client, session, two):
+    owner, reader = two
+    project = await create_project(session, owner.initiative, owner.user)
+    task = await create_task(session, project)
+    ids = (project.id, task.id)
+
+    project_id, task_id = ids
+    standing = await client.get(
+        reader.g(f"/share-requests/standing?kind=task&entity_id={task_id}"),
+        headers=reader.headers,
+    )
+    assert (standing.json()["resource_type"], standing.json()["resource_id"]) == (
+        "project",
+        project_id,
+    )

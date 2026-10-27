@@ -33,6 +33,8 @@ from __future__ import annotations
 
 from dataclasses import dataclass
 
+from sqlalchemy import Boolean, Integer, String, column, table
+
 from app.db import gucs
 from app.db.authorization import IN_POLICY
 
@@ -40,6 +42,18 @@ VIEW = "entity_presence"
 POLICY = "presence_read"
 #: The role that owns the view. Created by migration ``20261027_0547``.
 READER = "app_presence_reader"
+
+#: The view, for queries: what is present to the request, out of the trash
+#: or in it, and the tool whose sharing decides it.
+entity_presence = table(
+    VIEW,
+    column("kind", String),
+    column("id", Integer),
+    column("initiative_id", Integer),
+    column("trashed", Boolean),
+    column("tool", String),
+    column("tool_id", Integer),
+)
 
 
 def present_to_member(initiative_expr: str) -> str:
@@ -156,11 +170,11 @@ def render_presence_policies() -> str:
         "-- request's standing (app.db.presence).",
         "-- " + "=" * 75,
     ]
-    for table in sorted({arm.table for arm in arms()}):
-        initiative = INITIATIVE_PATHS[table].initiative_expr(table)
+    for name in sorted({arm.table for arm in arms()}):
+        initiative = INITIATIVE_PATHS[name].initiative_expr(name)
         lines += [
-            f"DROP POLICY IF EXISTS {POLICY} ON {table};",
-            f"CREATE POLICY {POLICY} ON {table} FOR SELECT TO {READER}",
+            f"DROP POLICY IF EXISTS {POLICY} ON {name};",
+            f"CREATE POLICY {POLICY} ON {name} FOR SELECT TO {READER}",
             f"  USING {present_to_member(initiative)};",
         ]
     return "\n".join(lines)

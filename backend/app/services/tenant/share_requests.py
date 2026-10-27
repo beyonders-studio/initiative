@@ -21,7 +21,7 @@ from datetime import datetime, timezone
 from uuid import UUID, uuid4
 
 from fastapi import HTTPException, status
-from sqlalchemy import func, text
+from sqlalchemy import exists, func
 from sqlmodel import select
 from sqlmodel.ext.asyncio.session import AsyncSession
 
@@ -31,10 +31,13 @@ from app.core.search import SearchEntityType
 from app.core.tools import Tool
 from app.db.authorization import standing_arg
 from app.db.base import MODELS_BY_TABLE
-from app.db.presence import VIEW as PRESENCE_VIEW
+from app.db.presence import entity_presence
 from app.models.platform.notification import NotificationType
 from app.models.platform.user import User
+from app.models.tenant.collection import CollectionFile
+from app.models.tenant.file import File
 from app.models.tenant.initiative import InitiativeMember
+from app.models.tenant.relationship import EntityRelationship
 from app.models.tenant.resource_grant import ResourceAccessLevel, ResourceGrant
 from app.models.tenant.share_request import (
     ShareRequest,
@@ -53,6 +56,10 @@ ASKABLE = (ResourceAccessLevel.read, ResourceAccessLevel.write)
 class Standing:
     """Where the reader stands on one thing they can open or know is there."""
 
+    #: The thing whose sharing decides it: itself for a tool's row, the tool
+    #: above it for a task, an event or a wiki page.
+    tool: Tool
+    resource_id: int
     initiative_id: int
     #: The rung they hold, or ``None`` where they can't open it.
     level: ResourceAccessLevel | None
@@ -70,24 +77,24 @@ async def standing_on(
     """The reader's standing on one thing, or ``None`` when they can neither
     open it nor know it is there — the answer for something in an initiative
     they are not in, as for something that does not exist."""
-    readable = (
+    initiative_id = (
         await session.exec(select(func.entity_initiative(tool.value, resource_id)))
     ).one()
-    if readable is None:
-        present = (
+    readable = initiative_id is not None
+    if not readable:
+        initiative_id = (
             await session.exec(
-                text(
-                    f"SELECT initiative_id FROM {PRESENCE_VIEW}"  # noqa: S608
-                    " WHERE kind = :kind AND id = :id AND NOT trashed"
-                ),
-                params={"kind": tool.value, "id": resource_id},
+                select(entity_presence.c.initiative_id).where(
+                    entity_presence.c.kind == tool.value,
+                    entity_presence.c.id == resource_id,
+                    entity_presence.c.trashed.is_(False),
+                )
             )
-        ).scalar()
-        if present is None:
+        ).first()
+        if initiative_id is None:
             return None
-    initiative_id = readable if readable is not None else present
     level = None
-    if readable is not None:
+    if readable:
         held = (
             await session.exec(
                 select(
@@ -109,9 +116,67 @@ async def standing_on(
         )
     ).first()
     return Standing(
+        tool=tool,
+        resource_id=resource_id,
         initiative_id=initiative_id,
         level=level,
         pending=ResourceAccessLevel(pending) if pending is not None else None,
+    )
+
+
+async def standing_on_kind(
+    session: AsyncSession, *, kind: str, entity_id: int, user_id: int
+) -> Standing | None:
+    """:func:`standing_on` the tool whose sharing decides ``(kind,
+    entity_id)`` — the project a task is in — where the reader can open it or
+    know it is there."""
+    found = (
+        await session.exec(
+            select(entity_presence.c.tool, entity_presence.c.tool_id).where(
+                entity_presence.c.kind == kind,
+                entity_presence.c.id == entity_id,
+                entity_presence.c.trashed.is_(False),
+            )
+        )
+    ).first()
+    if found is None:
+        return None
+    return await standing_on(
+        session, tool=Tool(found[0]), resource_id=found[1], user_id=user_id
+    )
+
+
+def _entries(*, collection: bool):
+    """A collection's or a wiki's files, as ``(place, file)`` columns."""
+    if collection:
+        return CollectionFile.collection_id, CollectionFile.file_id, ()
+    return (
+        EntityRelationship.target_id,
+        EntityRelationship.source_id,
+        (
+            EntityRelationship.target_type == "wiki",
+            EntityRelationship.source_type == "file",
+            EntityRelationship.relationship_type == RelationshipType.part_of.value,
+            EntityRelationship.removed_at.is_(None),  # type: ignore[union-attr]
+        ),
+    )
+
+
+def _hidden(place, file_id, conditions, place_ids: list[int]):
+    """The entries of ``place_ids`` whose file is present to the reader, out
+    of the trash, and can't be opened."""
+    return (
+        select(place, file_id)
+        .join(
+            entity_presence,
+            (entity_presence.c.kind == "file") & (entity_presence.c.id == file_id),
+        )
+        .where(
+            place.in_(place_ids),
+            entity_presence.c.trashed.is_(False),
+            ~exists().where(File.id == file_id),
+            *conditions,
+        )
     )
 
 
@@ -123,29 +188,12 @@ async def hidden_files(
 ) -> list[int]:
     """The files in a collection or a wiki that the reader knows are there,
     out of the trash, and can't open."""
-    if collection_id is not None:
-        sql = (
-            "SELECT cf.file_id FROM collection_files cf"
-            f" JOIN {PRESENCE_VIEW} ep ON ep.kind = 'file' AND ep.id = cf.file_id"
-            " AND NOT ep.trashed"
-            " WHERE cf.collection_id = :place"
-            " AND NOT EXISTS (SELECT 1 FROM files f WHERE f.id = cf.file_id)"
-        )
-        place = collection_id
-    else:
-        sql = (
-            "SELECT r.source_id FROM relationships r"
-            f" JOIN {PRESENCE_VIEW} ep ON ep.kind = 'file' AND ep.id = r.source_id"
-            " AND NOT ep.trashed"
-            " WHERE r.target_type = 'wiki' AND r.target_id = :place"
-            " AND r.source_type = 'file'"
-            f" AND r.relationship_type = '{RelationshipType.part_of.value}'"
-            " AND r.removed_at IS NULL"
-            " AND NOT EXISTS (SELECT 1 FROM files f WHERE f.id = r.source_id)"
-        )
-        place = wiki_id
-    rows = await session.exec(text(sql), params={"place": place})  # noqa: S608
-    return sorted({row[0] for row in rows.all()})
+    collection = collection_id is not None
+    place, file_id, conditions = _entries(collection=collection)
+    rows = await session.exec(
+        _hidden(place, file_id, conditions, [collection_id if collection else wiki_id])
+    )
+    return sorted({row[1] for row in rows.all()})
 
 
 async def hidden_file_counts(
@@ -158,34 +206,24 @@ async def hidden_file_counts(
     """For each collection or wiki, how many of its files the reader knows
     are there and can't open, and how many of those they have asked for — what
     the card offering to ask for them says."""
-    ids = collection_ids if collection_ids is not None else wiki_ids
+    collection = collection_ids is not None
+    ids = collection_ids if collection else wiki_ids
     if not ids:
         return {}
-    if collection_ids is not None:
-        place, file_id, frm = "cf.collection_id", "cf.file_id", "collection_files cf"
-        where = "cf.collection_id = ANY(:ids)"
-    else:
-        place, file_id, frm = "r.target_id", "r.source_id", "relationships r"
-        where = (
-            "r.target_type = 'wiki' AND r.target_id = ANY(:ids)"
-            " AND r.source_type = 'file'"
-            f" AND r.relationship_type = '{RelationshipType.part_of.value}'"
-            " AND r.removed_at IS NULL"
-        )
-    sql = (
-        f"SELECT {place}, count(*), count(*) FILTER (WHERE EXISTS ("
-        "SELECT 1 FROM share_requests sr WHERE sr.resource_type = 'file'"
-        f" AND sr.resource_id = {file_id} AND sr.user_id = :user"
-        " AND sr.status = 'pending'))"
-        f" FROM {frm}"
-        f" JOIN {PRESENCE_VIEW} ep ON ep.kind = 'file' AND ep.id = {file_id}"
-        " AND NOT ep.trashed"
-        f" WHERE {where}"
-        f" AND NOT EXISTS (SELECT 1 FROM files f WHERE f.id = {file_id})"
-        f" GROUP BY {place}"
+    place, file_id, conditions = _entries(collection=collection)
+    hidden = _hidden(place, file_id, conditions, list(ids)).subquery()
+    asked = exists().where(
+        ShareRequest.resource_type == Tool.file.value,
+        ShareRequest.resource_id == hidden.c[1],
+        ShareRequest.user_id == user_id,
+        ShareRequest.status == ShareRequestStatus.pending.value,
     )
-    rows = await session.exec(text(sql), params={"ids": list(ids), "user": user_id})  # noqa: S608
-    return {place_id: (count, asked) for place_id, count, asked in rows.all()}
+    rows = await session.exec(
+        select(hidden.c[0], func.count(), func.count().filter(asked)).group_by(
+            hidden.c[0]
+        )
+    )
+    return {place_id: (count, requested) for place_id, count, requested in rows.all()}
 
 
 async def ask(
@@ -312,6 +350,8 @@ async def tell_answerers(
                     "title": called.get(about, ""),
                 },
                 data={
+                    # Opens on the requests themselves, to answer them there.
+                    "target_path": f"/share-requests/{first.batch_id}",
                     "batch_id": str(first.batch_id),
                     "requester_id": requester.id,
                     "requester_name": name,

@@ -15,6 +15,7 @@ from sqlmodel import select
 
 from app.api.deps import GuildContextDep, RLSSessionDep, get_current_active_user
 from app.core.messages import ShareRequestMessages
+from app.core.search import SearchEntityType
 from app.core.tools import Tool
 from app.models.platform.guild import GuildMembership
 from app.models.platform.user import User
@@ -37,17 +38,18 @@ CurrentUserDep = Annotated[User, Depends(get_current_active_user)]
 
 @router.get("/standing", response_model=ShareStanding)
 async def read_share_standing(
-    resource_type: Annotated[Tool, Query()],
-    resource_id: Annotated[int, Query()],
+    kind: Annotated[SearchEntityType, Query()],
+    entity_id: Annotated[int, Query()],
     session: RLSSessionDep,
     current_user: CurrentUserDep,
     guild_context: GuildContextDep,
 ) -> ShareStanding:
-    """Where the reader stands on one thing: the rung they hold, and what
-    they asked for that is unanswered. 404 for something they can neither
-    open nor know is there — the same answer as for nothing at all."""
-    found = await share_requests_service.standing_on(
-        session, tool=resource_type, resource_id=resource_id, user_id=current_user.id
+    """Where the reader stands on one thing — a tool's row, or a task, an
+    event or a wiki page, answered for the tool above it: the rung they hold,
+    and what they asked for that is unanswered. 404 for something they can
+    neither open nor know is there — the same answer as for nothing at all."""
+    found = await share_requests_service.standing_on_kind(
+        session, kind=kind.value, entity_id=entity_id, user_id=current_user.id
     )
     if found is None:
         raise HTTPException(
@@ -55,7 +57,11 @@ async def read_share_standing(
             detail=ShareRequestMessages.NOT_FOUND,
         )
     return ShareStanding(
-        initiative_id=found.initiative_id, level=found.level, pending=found.pending
+        resource_type=found.tool,
+        resource_id=found.resource_id,
+        initiative_id=found.initiative_id,
+        level=found.level,
+        pending=found.pending,
     )
 
 
@@ -78,7 +84,7 @@ async def create_share_request(
         place = (
             ("collection", payload.collection_id)
             if payload.collection_id is not None
-            else ("wiki", payload.wiki_id)  # type: ignore[assignment]
+            else ("wiki", payload.wiki_id or 0)
         )
     made = await share_requests_service.ask(
         session,

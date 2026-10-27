@@ -2098,6 +2098,9 @@ EVENT_SOURCES: dict[str, Emit | Silent] = {
     ),
     "intake_bindings": Silent("routing config; it reports on no content"),
     "guest_invite_grants": Silent("an invite's terms; redeeming it is recorded"),
+    "share_requests": Silent(
+        "a person asking; the sharing an answer writes is what changes"
+    ),
     "moderation_reports": Silent("who reported whom is not an automation signal"),
     "moderation_report_reporters": Silent("the reporters behind one report"),
     "moderation_actions": Silent("the moderation log, read on its own surface"),
