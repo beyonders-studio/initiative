@@ -39,6 +39,10 @@ _ROW_EXCEPTIONS = {
     # A copy of a file the guild already stores; its row carries the source's
     # size, type and hash, and no new bytes arrive.
     "app/services/tenant/attachments.py::copy_uploads",
+    # A file that arrived in parts (``app.services.resumable``), recorded where
+    # it was staged once its type is checked; ``store_upload`` records through
+    # it too.
+    "app/services/tenant/attachments.py::record_upload",
     # Test data.
     "app/testing/factories.py",
 }
