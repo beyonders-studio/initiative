@@ -1,15 +1,11 @@
-import { FileSpreadsheet, FileText, Presentation } from "lucide-react";
 import { useMemo } from "react";
 import { useTranslation } from "react-i18next";
 
-import {
-  type CollectionFileSummary,
-  FileKind,
-  type FileSummary,
-} from "@/api/generated/initiativeAPI.schemas";
+import type { CollectionFileSummary, FileSummary } from "@/api/generated/initiativeAPI.schemas";
 import { SortHeader } from "@/components/SortIcon";
 import { Badge } from "@/components/ui/badge";
 import { RelativeTime } from "@/components/ui/relative-time";
+import { fileIcon } from "@/lib/fileIcon";
 import { isStoredFileType } from "@/lib/fileTypes";
 import { getFileTypeLabel } from "@/lib/fileUtils";
 import type { AppColumnDef } from "@/lib/table";
@@ -45,12 +41,7 @@ export const useFileColumns = (): AppColumnDef<FileSummary>[] => {
           const doc = row.original;
           if (isStoredFileType(doc.file_type)) {
             const fileTypeLabel = getFileTypeLabel(doc.file_content_type, doc.original_filename);
-            const Icon =
-              doc.kind === FileKind.spreadsheet
-                ? FileSpreadsheet
-                : doc.kind === FileKind.presentation
-                  ? Presentation
-                  : FileText;
+            const { Icon } = fileIcon(doc);
             return (
               <Badge variant="secondary" className="flex w-fit items-center gap-1">
                 <Icon className="h-3 w-3" />

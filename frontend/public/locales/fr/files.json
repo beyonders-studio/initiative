@@ -388,7 +388,17 @@
       "whiteboard": "Tableau blanc",
       "pdf": "PDF",
       "image": "Image",
+      "video": "Vidéo",
+      "audio": "Audio",
       "text": "Texte",
+      "compressed": "Compressé",
+      "design": "Design",
+      "3d": "3D",
+      "font": "Police",
+      "raw": "Photo RAW",
+      "code": "Code",
+      "ebook": "Livre numérique",
+      "cad": "CAO",
       "link": "Lien",
       "other": "Autre"
     }

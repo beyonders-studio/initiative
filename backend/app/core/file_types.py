@@ -59,6 +59,63 @@ class FileType(str, Enum):
     tar = "tar"
     gz = "gz"
     seven_zip = "7z"
+    rar = "rar"
+    ai = "ai"
+    psd = "psd"
+    eps = "eps"
+    indd = "indd"
+    xcf = "xcf"
+    kra = "kra"
+    procreate = "procreate"
+    clip = "clip"
+    sketch = "sketch"
+    fig = "fig"
+    afdesign = "afdesign"
+    afphoto = "afphoto"
+    afpub = "afpub"
+    cdr = "cdr"
+    blend = "blend"
+    fbx = "fbx"
+    obj = "obj"
+    stl = "stl"
+    glb = "glb"
+    gltf = "gltf"
+    three_mf = "3mf"
+    usdz = "usdz"
+    ttf = "ttf"
+    otf = "otf"
+    woff = "woff"
+    woff2 = "woff2"
+    dng = "dng"
+    cr2 = "cr2"
+    cr3 = "cr3"
+    nef = "nef"
+    arw = "arw"
+    raf = "raf"
+    orf = "orf"
+    py = "py"
+    js = "js"
+    ts = "ts"
+    css = "css"
+    sql = "sql"
+    yaml = "yaml"
+    xml = "xml"
+    toml = "toml"
+    c = "c"
+    cpp = "cpp"
+    cs = "cs"
+    java = "java"
+    go = "go"
+    rs = "rs"
+    rb = "rb"
+    php = "php"
+    swift = "swift"
+    kt = "kt"
+    epub = "epub"
+    mobi = "mobi"
+    dwg = "dwg"
+    dxf = "dxf"
+    step = "step"
     other = "other"
 
 
@@ -72,7 +129,14 @@ class FileKind(str, Enum):
     video = "video"
     audio = "audio"
     text = "text"
-    archive = "archive"
+    compressed = "compressed"
+    design = "design"
+    three_d = "3d"
+    font = "font"
+    raw = "raw"
+    code = "code"
+    ebook = "ebook"
+    cad = "cad"
     link = "link"
     other = "other"
 
@@ -94,6 +158,10 @@ class FileTypeSpec:
     #: The editor's own type an uploaded file of this type becomes when
     #: somebody converts it to edit it (``app.services.tenant.file_conversion``).
     converts_to: FileType | None = None
+    #: What a file of this type's bytes may read as when they say no more
+    #: than the family (a zip, plain text, a PDF): a file whose bytes say one
+    #: of these and whose name says this type is this type.
+    containers: tuple[str, ...] = ()
 
     @property
     def stored(self) -> bool:
@@ -108,6 +176,7 @@ def _stored(
     *extensions: str,
     picture_format: str | None = None,
     converts_to: FileType | None = None,
+    containers: tuple[str, ...] = (),
 ) -> FileTypeSpec:
     return FileTypeSpec(
         kind,
@@ -115,11 +184,19 @@ def _stored(
         extensions,
         picture_format=picture_format,
         converts_to=converts_to,
+        containers=containers,
     )
 
 
 _OOXML = "application/vnd.openxmlformats-officedocument"
 _ODF = "application/vnd.oasis.opendocument"
+#: What the bytes of a file in a format of its own often say instead.
+_ZIP = ("application/zip",)
+_BINARY = ("application/octet-stream",)
+_TEXT = ("text/plain",)
+_TIFF = ("image/tiff",)
+#: What libmagic calls source in languages it does not tell apart.
+_C_LIKE = ("text/plain", "text/x-c", "text/x-c++")
 
 SPECS: dict[FileType, FileTypeSpec] = {
     FileType.lexical: FileTypeSpec(
@@ -213,11 +290,181 @@ SPECS: dict[FileType, FileTypeSpec] = {
     ),
     FileType.json: _stored(FileKind.text, ("application/json",), ".json"),
     FileType.html: _stored(FileKind.text, ("text/html",), ".html", ".htm"),
-    FileType.zip: _stored(FileKind.archive, ("application/zip",), ".zip"),
-    FileType.tar: _stored(FileKind.archive, ("application/x-tar",), ".tar"),
-    FileType.gz: _stored(FileKind.archive, ("application/gzip",), ".gz", ".tgz"),
+    FileType.zip: _stored(FileKind.compressed, ("application/zip",), ".zip"),
+    FileType.tar: _stored(FileKind.compressed, ("application/x-tar",), ".tar"),
+    FileType.gz: _stored(FileKind.compressed, ("application/gzip",), ".gz", ".tgz"),
     FileType.seven_zip: _stored(
-        FileKind.archive, ("application/x-7z-compressed",), ".7z"
+        FileKind.compressed, ("application/x-7z-compressed",), ".7z"
+    ),
+    FileType.rar: _stored(
+        FileKind.compressed, ("application/vnd.rar", "application/x-rar"), ".rar"
+    ),
+    FileType.ai: _stored(
+        FileKind.design,
+        ("application/illustrator",),
+        ".ai",
+        containers=("application/pdf", "application/postscript"),
+    ),
+    FileType.psd: _stored(
+        FileKind.design, ("image/vnd.adobe.photoshop",), ".psd", ".psb"
+    ),
+    FileType.eps: _stored(
+        FileKind.design,
+        ("application/postscript", "image/x-eps"),
+        ".eps",
+        ".ps",
+    ),
+    FileType.indd: _stored(
+        FileKind.design, ("application/x-indesign",), ".indd", containers=_BINARY
+    ),
+    FileType.xcf: _stored(FileKind.design, ("image/x-xcf",), ".xcf"),
+    FileType.kra: _stored(
+        FileKind.design, ("application/x-krita",), ".kra", containers=_ZIP
+    ),
+    FileType.procreate: _stored(
+        FileKind.design, ("application/x-procreate",), ".procreate", containers=_ZIP
+    ),
+    FileType.clip: _stored(
+        FileKind.design, ("application/x-clip-studio",), ".clip", containers=_BINARY
+    ),
+    FileType.sketch: _stored(
+        FileKind.design, ("application/x-sketch",), ".sketch", containers=_ZIP
+    ),
+    FileType.fig: _stored(
+        FileKind.design, ("application/x-fig",), ".fig", containers=_BINARY
+    ),
+    FileType.afdesign: _stored(
+        FileKind.design, ("application/x-afdesign",), ".afdesign", containers=_BINARY
+    ),
+    FileType.afphoto: _stored(
+        FileKind.design, ("application/x-afphoto",), ".afphoto", containers=_BINARY
+    ),
+    FileType.afpub: _stored(
+        FileKind.design, ("application/x-afpub",), ".afpub", containers=_BINARY
+    ),
+    FileType.cdr: _stored(FileKind.design, ("application/vnd.corel-draw",), ".cdr"),
+    FileType.blend: _stored(
+        FileKind.three_d, ("application/x-blender",), ".blend", containers=_BINARY
+    ),
+    FileType.fbx: _stored(
+        FileKind.three_d, ("application/x-fbx",), ".fbx", containers=_BINARY
+    ),
+    FileType.obj: _stored(FileKind.three_d, ("model/obj",), ".obj", containers=_TEXT),
+    FileType.stl: _stored(
+        FileKind.three_d, ("model/stl",), ".stl", containers=_TEXT + _BINARY
+    ),
+    FileType.glb: _stored(FileKind.three_d, ("model/gltf-binary",), ".glb"),
+    FileType.gltf: _stored(
+        FileKind.three_d,
+        ("model/gltf+json",),
+        ".gltf",
+        containers=("application/json",),
+    ),
+    FileType.three_mf: _stored(
+        FileKind.three_d, ("model/3mf",), ".3mf", containers=_ZIP
+    ),
+    FileType.usdz: _stored(
+        FileKind.three_d, ("model/vnd.usdz+zip",), ".usdz", containers=_ZIP
+    ),
+    FileType.ttf: _stored(FileKind.font, ("font/ttf", "font/sfnt"), ".ttf"),
+    FileType.otf: _stored(
+        FileKind.font,
+        ("font/otf", "application/vnd.ms-opentype"),
+        ".otf",
+        containers=("font/sfnt",),
+    ),
+    FileType.woff: _stored(FileKind.font, ("font/woff",), ".woff", containers=_BINARY),
+    FileType.woff2: _stored(
+        FileKind.font, ("font/woff2",), ".woff2", containers=_BINARY
+    ),
+    FileType.dng: _stored(
+        FileKind.raw, ("image/x-adobe-dng",), ".dng", containers=_TIFF
+    ),
+    FileType.cr2: _stored(
+        FileKind.raw, ("image/x-canon-cr2",), ".cr2", containers=_TIFF
+    ),
+    FileType.cr3: _stored(
+        FileKind.raw, ("image/x-canon-cr3",), ".cr3", containers=_BINARY
+    ),
+    FileType.nef: _stored(
+        FileKind.raw, ("image/x-nikon-nef",), ".nef", containers=_TIFF
+    ),
+    FileType.arw: _stored(
+        FileKind.raw, ("image/x-sony-arw",), ".arw", containers=_TIFF
+    ),
+    FileType.raf: _stored(FileKind.raw, ("image/x-fuji-raf",), ".raf"),
+    FileType.orf: _stored(FileKind.raw, ("image/x-olympus-orf",), ".orf"),
+    FileType.py: _stored(
+        FileKind.code,
+        ("text/x-python", "text/x-script.python"),
+        ".py",
+        containers=_TEXT,
+    ),
+    FileType.js: _stored(
+        FileKind.code,
+        ("text/javascript", "application/javascript"),
+        ".js",
+        ".mjs",
+        ".cjs",
+        containers=_TEXT,
+    ),
+    FileType.ts: _stored(
+        FileKind.code, ("text/x-typescript",), ".ts", ".tsx", containers=_TEXT
+    ),
+    FileType.css: _stored(FileKind.code, ("text/css",), ".css", containers=_TEXT),
+    FileType.sql: _stored(
+        FileKind.code, ("application/sql",), ".sql", containers=_TEXT
+    ),
+    FileType.yaml: _stored(
+        FileKind.code,
+        ("application/yaml", "text/yaml"),
+        ".yaml",
+        ".yml",
+        containers=_TEXT,
+    ),
+    FileType.xml: _stored(
+        FileKind.code, ("text/xml", "application/xml"), ".xml", containers=_TEXT
+    ),
+    FileType.toml: _stored(
+        FileKind.code, ("application/toml",), ".toml", containers=_TEXT
+    ),
+    FileType.c: _stored(FileKind.code, ("text/x-c",), ".c", ".h", containers=_TEXT),
+    FileType.cpp: _stored(
+        FileKind.code,
+        ("text/x-c++",),
+        ".cpp",
+        ".cc",
+        ".cxx",
+        ".hpp",
+        containers=_C_LIKE,
+    ),
+    FileType.cs: _stored(FileKind.code, ("text/x-csharp",), ".cs", containers=_C_LIKE),
+    FileType.java: _stored(
+        FileKind.code, ("text/x-java",), ".java", containers=_C_LIKE
+    ),
+    FileType.go: _stored(FileKind.code, ("text/x-go",), ".go", containers=_C_LIKE),
+    FileType.rs: _stored(FileKind.code, ("text/x-rust",), ".rs", containers=_C_LIKE),
+    FileType.rb: _stored(FileKind.code, ("text/x-ruby",), ".rb", containers=_TEXT),
+    FileType.php: _stored(FileKind.code, ("text/x-php",), ".php", containers=_TEXT),
+    FileType.swift: _stored(
+        FileKind.code, ("text/x-swift",), ".swift", containers=_C_LIKE
+    ),
+    FileType.kt: _stored(
+        FileKind.code, ("text/x-kotlin",), ".kt", ".kts", containers=_C_LIKE
+    ),
+    FileType.epub: _stored(FileKind.ebook, ("application/epub+zip",), ".epub"),
+    FileType.mobi: _stored(
+        FileKind.ebook,
+        ("application/x-mobipocket-ebook",),
+        ".mobi",
+        containers=_BINARY,
+    ),
+    FileType.dwg: _stored(FileKind.cad, ("image/vnd.dwg",), ".dwg"),
+    FileType.dxf: _stored(
+        FileKind.cad, ("image/vnd.dxf", "application/x-dxf"), ".dxf", containers=_TEXT
+    ),
+    FileType.step: _stored(
+        FileKind.cad, ("model/step",), ".step", ".stp", containers=_TEXT
     ),
     FileType.other: _stored(FileKind.other, ("application/octet-stream",)),
 }

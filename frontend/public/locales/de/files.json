@@ -388,7 +388,17 @@
       "whiteboard": "Whiteboard",
       "pdf": "PDF",
       "image": "Bild",
+      "video": "Video",
+      "audio": "Audio",
       "text": "Text",
+      "compressed": "Komprimiert",
+      "design": "Design",
+      "3d": "3D",
+      "font": "Schrift",
+      "raw": "Kamera-RAW",
+      "code": "Code",
+      "ebook": "E-Book",
+      "cad": "CAD",
       "link": "Link",
       "other": "Sonstiges"
     }

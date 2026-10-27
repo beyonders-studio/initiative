@@ -66,6 +66,7 @@ const renderViewer = (props: Partial<Parameters<typeof UploadedFileViewer>[0]> =
       fileUrl="/uploads/doc.pdf"
       contentType="application/pdf"
       originalFilename="doc.pdf"
+      fileType={FileType.pdf}
       fileSize={100}
       {...props}
     />
@@ -126,6 +127,7 @@ describe("UploadedFileViewer media", () => {
     name: string,
     props: Partial<Parameters<typeof UploadedFileViewer>[0]> = {}
   ) => {
+    const fileType = contentType.startsWith("video/") ? FileType.mp4 : FileType.mp3;
     mockVersions = [
       buildVersion({
         id: 2,
@@ -136,6 +138,7 @@ describe("UploadedFileViewer media", () => {
     ];
     return renderViewer({
       contentType,
+      fileType,
       originalFilename: name,
       fileUrl: `/uploads/${name}`,
       ...props,
@@ -184,6 +187,7 @@ describe("UploadedFileViewer media", () => {
     ];
     renderViewer({
       contentType: "audio/mpeg",
+      fileType: FileType.mp3,
       originalFilename: "take-2.mp3",
       fileUrl: "/uploads/take-2.mp3",
     });
@@ -205,6 +209,23 @@ describe("UploadedFileViewer media", () => {
 
     await new Promise((settle) => setTimeout(settle, 0));
     expect(putThumbnail).not.toHaveBeenCalled();
+  });
+});
+
+describe("UploadedFileViewer cards", () => {
+  it("offers a design file for download rather than drawing it as a picture", () => {
+    mockVersions = [];
+    const { container } = renderViewer({
+      contentType: "image/vnd.adobe.photoshop",
+      fileType: FileType.psd,
+      originalFilename: "poster.psd",
+      fileUrl: "/uploads/poster.psd",
+    });
+
+    expect(container.querySelector("img")).toBeNull();
+    expect(screen.getByRole("heading", { name: "poster.psd" })).toBeInTheDocument();
+    expect(screen.getByText("PSD")).toBeInTheDocument();
+    expect(screen.getAllByRole("button", { name: /download/i }).length).toBeGreaterThan(0);
   });
 });
 

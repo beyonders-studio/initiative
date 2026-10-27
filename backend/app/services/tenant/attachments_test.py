@@ -194,6 +194,36 @@ def _zip_of(*names: str) -> bytes:
         # A format the registry doesn't name is still taken, and stored
         # without an extension of its own.
         (b"\x00\x01\x02\x03" * 64, "dump.bin", ("application/octet-stream", "")),
+        # A format whose bytes borrow a family's is named by its name, within
+        # what its bytes may read as.
+        (b"%PDF-1.6\n" + b"\x00" * 64, "logo.ai", ("application/illustrator", ".ai")),
+        (
+            _zip_of("document.json"),
+            "poster.sketch",
+            ("application/x-sketch", ".sketch"),
+        ),
+        (b"import os\nprint(os.name)\n", "build.py", ("text/x-python", ".py")),
+        (b"package main\n\nfunc main() {}\n", "main.go", ("text/x-go", ".go")),
+        (
+            b"II*\x00\x08\x00\x00\x00" + b"\x00" * 64,
+            "shot.dng",
+            ("image/x-adobe-dng", ".dng"),
+        ),
+        # ... and never past it: an HTML page named as script is still HTML.
+        (
+            b"<!doctype html><html><body>x</body></html>",
+            "app.js",
+            ("text/html", ".html"),
+        ),
+        # A format its bytes name is that format whatever it is called.
+        (
+            b"8BPS\x00\x01"
+            + b"\x00" * 6
+            + b"\x00\x03\x00\x00\x01\x00\x00\x00\x01\x00\x00\x08\x00\x03"
+            + b"\x00" * 64,
+            "poster.bin",
+            ("image/vnd.adobe.photoshop", ".psd"),
+        ),
     ],
     ids=[
         "pdf",
@@ -204,6 +234,13 @@ def _zip_of(*names: str) -> bytes:
         "csv",
         "json",
         "unknown",
+        "pdf-named-ai",
+        "zip-named-sketch",
+        "text-named-py",
+        "c-like-named-go",
+        "tiff-named-dng",
+        "html-named-js",
+        "psd-by-bytes",
     ],
 )
 def test_an_upload_s_type_is_read_from_its_bytes(content, filename, expected):
