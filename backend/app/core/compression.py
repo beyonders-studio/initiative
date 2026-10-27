@@ -41,6 +41,25 @@ def compressible(content_type: str) -> bool:
     )
 
 
+def takes_gzip(accept_encoding: str) -> bool:
+    """Whether an ``Accept-Encoding`` header takes gzip: named, or covered by
+    ``*``, with a quality above zero."""
+    qualities: dict[str, float] = {}
+    for part in accept_encoding.split(","):
+        name, *params = (piece.strip() for piece in part.split(";"))
+        quality = 1.0
+        for param in params:
+            key, _, value = param.partition("=")
+            if key.strip().lower() == "q":
+                try:
+                    quality = float(value)
+                except ValueError:
+                    quality = 0.0
+        if name:
+            qualities[name.lower()] = quality
+    return qualities.get("gzip", qualities.get("*", 0.0)) > 0
+
+
 class _TextResponder(GZipResponder):
     async def send_with_compression(self, message: Message) -> None:
         await super().send_with_compression(message)
@@ -55,8 +74,8 @@ class TextCompressionMiddleware(GZipMiddleware):
     """``GZipMiddleware`` for text-like responses only."""
 
     async def __call__(self, scope: Scope, receive: Receive, send: Send) -> None:
-        if scope["type"] == "http" and "gzip" in Headers(scope=scope).get(
-            "accept-encoding", ""
+        if scope["type"] == "http" and takes_gzip(
+            Headers(scope=scope).get("accept-encoding", "")
         ):
             responder = _TextResponder(
                 self.app, self.minimum_size, compresslevel=self.compresslevel

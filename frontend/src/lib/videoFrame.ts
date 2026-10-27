@@ -10,23 +10,27 @@ const FRAME_TIMEOUT_MS = 30_000;
  * browser writes one, otherwise a PNG.
  *
  * Rejects where the video cannot be read, where the browser keeps its pixels
- * from the page (a video served from another origin), when `signal` aborts,
- * and when the frame takes longer than {@link FRAME_TIMEOUT_MS}. The video
- * stops loading whichever way it ends.
+ * from the page (a video served from another origin), when `signal` aborts
+ * before the frame is ready, and when it takes longer than
+ * {@link FRAME_TIMEOUT_MS}. The video stops loading whichever way it ends.
  */
 export const drawVideoFrame = (url: string, signal?: AbortSignal): Promise<Blob> =>
   new Promise((resolve, reject) => {
     const video = document.createElement("video");
-    const stop = () => {
-      clearTimeout(timeout);
-      signal?.removeEventListener("abort", abandon);
+    let settled = false;
+    const unload = () => {
       video.removeAttribute("src");
       video.load();
     };
-    const fail = (error: unknown) => {
-      stop();
-      reject(error);
+    const settle = (finish: () => void) => {
+      if (settled) return;
+      settled = true;
+      clearTimeout(timeout);
+      signal?.removeEventListener("abort", abandon);
+      unload();
+      finish();
     };
+    const fail = (error: unknown) => settle(() => reject(error));
     const abandon = () => fail(new Error("the frame was abandoned"));
     const timeout = setTimeout(abandon, FRAME_TIMEOUT_MS);
     if (signal?.aborted) {
@@ -49,15 +53,15 @@ export const drawVideoFrame = (url: string, signal?: AbortSignal): Promise<Blob>
       canvas.height = Math.max(1, Math.round(video.videoHeight * scale));
       try {
         canvas.getContext("2d")?.drawImage(video, 0, 0, canvas.width, canvas.height);
+        // The frame is on the canvas; the video need load no further.
+        unload();
         canvas.toBlob(
-          (frame) => (frame ? resolve(frame) : reject(new Error("no frame was drawn"))),
+          (frame) => (frame ? settle(() => resolve(frame)) : fail(new Error("no frame was drawn"))),
           "image/webp",
           0.85
         );
       } catch (error) {
-        reject(error);
-      } finally {
-        stop();
+        fail(error);
       }
     };
     video.src = url;

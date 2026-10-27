@@ -267,6 +267,7 @@ def test_s3_open_readable_reads_the_range_asked_for():
         ("bytes=-", False),
         ("items=0-1", False),
         ("bytes=٠-1", False),
+        ("bytes=" + "9" * 4301 + "-9", False),
         (None, False),
     ],
 )
