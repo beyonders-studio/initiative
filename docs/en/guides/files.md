@@ -243,7 +243,7 @@ On a collection's page, drop files anywhere to upload them straight in, or **Add
 
 ### A collection's fields
 
-A collection can have **fields** of its own: a price, a rating, the day a photo was taken. Make one in the layout editor, with **Add** wherever a field can go, and it lands right there. The values belong to the collection, not the file, so the same photo can be "£40, four stars" in the shop catalogue and just a picture in the fete gallery. Open a file from the collection to fill them in; until the file detail is changed, it shows every field the collection has.
+A collection can have **fields** of its own: a price, a rating, the day a photo was taken. Make one in the layout editor, with **Add** wherever a field can go, and it lands right there. The values belong to the collection, not the file, so the same photo can be "£40, four stars" in the shop catalogue and just a picture in the fete gallery. Open a file from the collection to fill them in; until the file detail is changed, it shows every field the collection has. To rename, reorder or delete one, use the initiative's [properties](initiatives.md#custom-properties) settings, where each collection with fields has its own card.
 
 Lists can also show the initiative's own [properties](initiatives.md#custom-properties), which a file carries wherever it goes. Fields are for what only makes sense in this collection.
 

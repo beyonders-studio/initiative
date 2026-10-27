@@ -192,7 +192,7 @@ const WORDS = {
  * individual values on files and tasks.
  *
  * Given a ``collectionId``, it manages that collection's own fields instead,
- * which whoever may change the collection adds, renames, orders and removes.
+ * listed after the initiative's on the same page.
  */
 export const InitiativeSettingsPropertiesTab = ({
   initiativeId,
@@ -470,8 +470,8 @@ export const InitiativeSettingsPropertiesTab = ({
 
   return (
     <div className="space-y-6">
-      {/* A collection's fields are managed in a dialog of their own, which
-          is the frame a card would be. */}
+      {/* A collection's fields sit in the card the properties page draws
+          for that collection. */}
       {collectionId === undefined ? (
         <Card>
           <CardHeader className="flex flex-row items-start justify-between gap-4">
