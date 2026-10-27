@@ -563,7 +563,9 @@ async def convert_file(
     file = await resource_access.load_authorized(
         session, Tool.file, file_id, current_user, guild_context, access="write"
     )
-    gone = await file_conversion.convert(session, guild_context.guild_id, file)
+    gone = await file_conversion.convert(
+        session, guild_context.guild_id, file, user_id=current_user.id
+    )
     await session.commit()
     for version in gone:
         await file_versions.release_files(guild_context.guild_id, version)

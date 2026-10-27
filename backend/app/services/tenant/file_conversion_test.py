@@ -2,8 +2,14 @@
 
 from __future__ import annotations
 
+import io
+import zipfile
+
 import pytest
+from docx import Document
+from docx.shared import Inches
 from httpx import AsyncClient
+from PIL import Image
 from sqlmodel import select
 
 from app.models.platform.guild import CommunityRole
@@ -79,6 +85,55 @@ async def test_text_becomes_a_document(
     (top, *_) = document["content"]["root"]["children"]
     assert top["type"] == first
     assert "\ufffd" not in str(top)
+
+
+async def test_a_word_file_becomes_a_document_and_its_pictures_uploads(
+    client: AsyncClient, acting_user, session
+):
+    owner = await acting_user(guild_role=CommunityRole.admin, initiative=True)
+    picture = io.BytesIO()
+    Image.new("RGB", (40, 20), "red").save(picture, "PNG")
+    word = Document()
+    word.add_heading("Minutes", 1)
+    word.add_picture(io.BytesIO(picture.getvalue()), width=Inches(1))
+    saved = io.BytesIO()
+    word.save(saved)
+    uploaded = await _upload(client, owner, "minutes.docx", saved.getvalue())
+    assert uploaded["converts_to"] == "lexical"
+
+    converted = await _convert(client, owner, uploaded["id"])
+
+    assert converted.status_code == 200, converted.text
+    heading, shown = converted.json()["content"]["root"]["children"]
+    assert heading["tag"] == "h1"
+    (image,) = shown["children"]
+    await route_session_to_guild(session, owner.guild.id)
+    (stored,) = (await session.exec(select(Upload))).all()
+    assert image["src"] == f"/uploads/{owner.guild.id}/{stored.filename}"
+    assert (stored.initiative_id, stored.content_type) == (
+        owner.initiative.id,
+        "image/png",
+    )
+    assert await attachments.get_guild_storage_usage(owner.guild.id) == len(
+        picture.getvalue()
+    )
+
+
+async def test_a_word_file_that_does_not_read_stays_as_it_was(
+    client: AsyncClient, acting_user
+):
+    owner = await acting_user(guild_role=CommunityRole.admin, initiative=True)
+    broken = io.BytesIO()
+    with zipfile.ZipFile(broken, "w") as package:
+        package.writestr("word/document.xml", "<w:document")
+    uploaded = await _upload(client, owner, "minutes.docx", broken.getvalue())
+
+    refused = await _convert(client, owner, uploaded["id"])
+
+    assert refused.status_code == 400
+    assert refused.json()["detail"] == "FILE_INVALID_FILE"
+    kept = await client.get(owner.g(f"/files/{uploaded['id']}"), headers=owner.headers)
+    assert kept.json()["file_type"] == "docx"
 
 
 async def test_a_file_that_converts_to_nothing_is_refused(

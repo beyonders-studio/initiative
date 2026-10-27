@@ -84,6 +84,8 @@ const CONVERT_NOTES = {
   [FileType.ods]: "convert.toSheet.ods",
   [FileType.csv]: "convert.toSheet.table",
   [FileType.tsv]: "convert.toSheet.table",
+  [FileType.docx]: "convert.toDocument.word",
+  [FileType.odt]: "convert.toDocument.word",
   [FileType.md]: "convert.toDocument.markdown",
   [FileType.txt]: "convert.toDocument.text",
 } as const;

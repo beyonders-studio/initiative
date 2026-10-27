@@ -331,7 +331,8 @@
     },
     "toDocument": {
       "markdown": "Daraus wird ein Dokument, das du hier bearbeiten kannst. Überschriften, Listen, Tabellen, Links und Textformatierung kommen mit.",
-      "text": "Daraus wird ein Dokument, das du hier bearbeiten kannst, mit dem Text als Absätze."
+      "text": "Daraus wird ein Dokument, das du hier bearbeiten kannst, mit dem Text als Absätze.",
+      "word": "Daraus wird ein Dokument, das du hier bearbeiten kannst. Überschriften, Textformatierung, Listen, Tabellen, Links und Bilder kommen mit. Seitenlayout, Kopf- und Fußzeilen, Fußnoten, Kommentare und Textfelder bleiben zurück, und nachverfolgte Änderungen kommen angenommen an."
     },
     "replaces": "Die hochgeladene Datei und ihre früheren Versionen werden ersetzt. Über den Export bekommst du jederzeit wieder eine Datei.",
     "confirm": "Umwandeln",

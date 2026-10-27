@@ -331,7 +331,8 @@
     },
     "toDocument": {
       "markdown": "It becomes a document you can edit here. Headings, lists, tables, links and text formatting come over.",
-      "text": "It becomes a document you can edit here, its text as paragraphs."
+      "text": "It becomes a document you can edit here, its text as paragraphs.",
+      "word": "It becomes a document you can edit here. Headings, text formatting, lists, tables, links and pictures come over. Page layout, headers and footers, footnotes, comments and text boxes don't, and tracked changes come over accepted."
     },
     "replaces": "The uploaded file and its earlier versions are replaced. Export gets a file back out whenever you need one.",
     "confirm": "Convert",
