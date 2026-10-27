@@ -53,7 +53,7 @@ from app.core.messages import (
 from app.db.advisory_locks import LockNamespace, advisory_lock
 from app.models.platform.user import User
 from app.models.tenant.pending_upload import PendingUpload
-from app.services.storage import get_guild_storage
+from app.services.storage import STAGING_PREFIX, get_guild_storage
 from app.services.tenant import attachments
 
 logger = logging.getLogger(__name__)
@@ -78,7 +78,6 @@ _STANDING_SECONDS = 30
 _RENEW_SECONDS = 20
 #: The largest size Postgres keeps (``bigint``).
 _MAX_BYTES = 2**63 - 1
-_STAGING_PREFIX = "resumable-"
 
 
 @dataclass(frozen=True)
@@ -90,6 +89,9 @@ class Purpose:
     #: Refuses a person who may not write there; answers the initiative the
     #: file will be kept for.
     admit: Callable[[AsyncSession, Any, User, dict[str, str]], Awaitable[int | None]]
+    #: Whether it becomes a stored file, and so holds room in the community's
+    #: storage while it arrives. An import's zip is read and thrown away.
+    stored: bool = True
 
 
 async def _admit_file(
@@ -163,9 +165,14 @@ PURPOSES: dict[str, Purpose] = {
     # A file's size is bounded by the community's storage alone.
     "file": Purpose(cap=lambda: None, admit=_admit_file),
     # Imports keep the bound a single upload of them has.
-    "backup": Purpose(cap=_import_cap, admit=_admit_backup),
-    "atlassian_export": Purpose(cap=_import_cap, admit=_admit_atlassian_export),
+    "backup": Purpose(cap=_import_cap, admit=_admit_backup, stored=False),
+    "atlassian_export": Purpose(
+        cap=_import_cap, admit=_admit_atlassian_export, stored=False
+    ),
 }
+
+#: The purposes whose uploads hold room in the community's storage.
+STORED_PURPOSES = frozenset(name for name, p in PURPOSES.items() if p.stored)
 
 
 def _refuse(code: int, detail: str) -> HTTPException:
@@ -265,12 +272,13 @@ async def create(
     )
     if (live or 0) >= MAX_LIVE_PER_PERSON:
         raise _refuse(status.HTTP_429_TOO_MANY_REQUESTS, ResumableMessages.TOO_MANY)
-    await attachments.enforce_storage_quota(
-        session, guild_id=guild_id, incoming_bytes=length
-    )
+    if purpose.stored:
+        await attachments.enforce_storage_quota(
+            session, guild_id=guild_id, incoming_bytes=length
+        )
 
     upload_id = secrets.token_urlsafe(16)
-    key = f"{_STAGING_PREFIX}{upload_id}"
+    key = f"{STAGING_PREFIX}{upload_id}"
     storage = get_guild_storage(guild_id)
     part_bytes = max(PART_BYTES, math.ceil(length / _MAX_PARTS))
     state = await asyncio.to_thread(storage.start_parts, key, part_bytes=part_bytes)

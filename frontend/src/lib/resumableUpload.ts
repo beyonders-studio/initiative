@@ -100,7 +100,7 @@ export const uploadInPieces = async <T>(
     ...("initiativeId" in target ? { initiative_id: String(target.initiativeId) } : {}),
     ...("fileId" in target ? { file_id: String(target.fileId) } : {}),
   };
-  const where = [target.purpose, ...Object.values(ids)].join("-");
+  const where = [target.purpose, ...Object.entries(ids).flat()].join("-");
   const changed = file instanceof File ? file.lastModified : 0;
   const remembered = `resumable-upload:${communityId}:${where}:${filename}:${file.size}:${changed}`;
 

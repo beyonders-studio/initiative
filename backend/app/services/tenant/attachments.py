@@ -1002,21 +1002,25 @@ async def get_guild_storage_usage(guild_id: int) -> int:
     """Total stored blob bytes for the guild — ``SUM(uploads.size_bytes)`` over
     every upload it stores but the thumbnails the app made
     (:data:`THUMBNAIL_PREFIX`), plus the declared length of every file still
-    arriving (``pending_uploads``), read on :func:`guild_wide`."""
+    arriving to be kept (``pending_uploads`` of a stored purpose), read on
+    :func:`guild_wide`."""
     from sqlalchemy import func
     from sqlmodel import col, select
 
     from app.models.tenant.pending_upload import PendingUpload
     from app.models.tenant.upload import Upload
+    from app.services.resumable import STORED_PURPOSES
 
     stored = (
         select(func.coalesce(func.sum(Upload.size_bytes), 0))
         .where(~col(Upload.filename).startswith(THUMBNAIL_PREFIX))
         .scalar_subquery()
     )
-    arriving = select(
-        func.coalesce(func.sum(PendingUpload.length), 0)
-    ).scalar_subquery()
+    arriving = (
+        select(func.coalesce(func.sum(PendingUpload.length), 0))
+        .where(col(PendingUpload.purpose).in_(STORED_PURPOSES))
+        .scalar_subquery()
+    )
     async with guild_wide(guild_id) as session:
         return int((await session.exec(select(stored + arriving))).one())
 

@@ -1598,6 +1598,38 @@ async def test_only_the_seat_may_send_a_backup_in_pieces(client, acting_user):
     assert refused.json()["detail"] == "IMPORT_SUPERADMIN_REQUIRED"
 
 
+async def test_a_backup_on_its_way_needs_no_room_in_the_communitys_storage(
+    client, acting_user, session
+):
+    from sqlmodel import select
+
+    from app.models.platform.guild_administration import GuildAdministration
+    from app.services.tenant import attachments
+    from app.testing.resumable import send_in_pieces
+
+    a = await acting_user(guild_role=CommunityRole.superadmin, initiative=True)
+    administration = (
+        await session.exec(
+            select(GuildAdministration).where(
+                GuildAdministration.guild_id == a.guild.id
+            )
+        )
+    ).one()
+    administration.max_storage_bytes = 0
+    session.add(administration)
+    await session.commit()
+
+    await send_in_pieces(
+        client,
+        a,
+        _make_backup_zip(_minimal_manifest()),
+        purpose="backup",
+        filename="backup.zip",
+    )
+
+    assert await attachments.get_guild_storage_usage(a.guild.id) == 0
+
+
 async def test_backup_staged_expiry_and_cancel(
     client, acting_user, session, monkeypatch
 ):
