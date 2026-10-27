@@ -55,6 +55,8 @@ from app.schemas.tenant.tool_layout import (
     DetailStackPart,
     CounterDetailFieldId,
     EventDetailFieldId,
+    FieldPart,
+    FileFieldId,
     PostDetailFieldId,
     QueueItemDetailFieldId,
     ListLayoutDefinition,
@@ -64,6 +66,7 @@ from app.schemas.tenant.tool_layout import (
     SectionPart,
     StackPart,
     TaskDetailFieldId,
+    TaskFieldId,
     TaskFilterSpec,
     ToolLayoutDefaultWrite,
     ToolLayoutRead,
@@ -371,10 +374,7 @@ def check(target: Target, write: ToolLayoutWrite) -> dict[str, Any]:
     else:
         _require(write.kind, LIST_LAYOUTS.get(target.tool, ()))
         assert isinstance(definition, ListLayoutDefinition)
-        if target.tool in LAYOUT_KIND_TARGETS and set(stored) - {"hidden"}:
-            # What a collection lists is files, drawn as each list draws them:
-            # a list is shown or hidden, and holds nothing else.
-            raise _bad_request(ToolLayoutMessages.KIND_NOT_ALLOWED)
+        _check_list_fields(target, write.kind, stored, definition)
         _check_presets(target.tool, write.kind, stored.get("presets") or [])
         if write.kind not in GROUPED_LISTS and (
             "groupings" in stored or "group_by" in stored
@@ -389,6 +389,49 @@ def check(target: Target, write: ToolLayoutWrite) -> dict[str, Any]:
             len(definition.columns or ()),
         )
     return stored
+
+
+#: The built-in fields a list may show, by what it lists: a collection's files,
+#: and every other list's tasks.
+_FILE_FIELDS = frozenset(field.value for field in FileFieldId)
+_TASK_FIELDS = frozenset(field.value for field in TaskFieldId)
+#: The parts a collection's card is made of. A plug-in's parts and fields are
+#: drawn on items, which a file is not.
+_FILE_CARD_PARTS = frozenset({"card", "stack", "field", "properties"})
+
+
+def _check_list_fields(
+    target: Target, kind: str, stored: dict[str, Any], definition: ListLayoutDefinition
+) -> None:
+    """Each built-in field a list shows one of what it lists. A collection's
+    list holds whether it is shown and what it shows of each file — its table
+    its columns, its other lists a card — and how its ratings are drawn."""
+    cards = [definition.card] if definition.card is not None else []
+    parts = [part for root in cards for part, _ in _parts(root, 1)]
+    shown = [
+        getattr(field, "value", field)
+        for field in (
+            *(definition.columns or ()),
+            *(part.props.field for part in parts if isinstance(part, FieldPart)),
+        )
+    ]
+    builtin = {
+        field
+        for field in shown
+        if not field.startswith((PROPERTY_FIELD_PREFIX, PLUGIN_FIELD_PREFIX))
+    }
+    if target.tool not in LAYOUT_KIND_TARGETS:
+        if builtin - _TASK_FIELDS:
+            raise _bad_request(ToolLayoutMessages.KIND_NOT_ALLOWED)
+        return
+    held = {"hidden", "displays", "columns" if kind == "table" else "card"}
+    if (
+        set(stored) - held
+        or builtin - _FILE_FIELDS
+        or any(field.startswith(PLUGIN_FIELD_PREFIX) for field in shown)
+        or any(part.type not in _FILE_CARD_PARTS for part in parts)
+    ):
+        raise _bad_request(ToolLayoutMessages.KIND_NOT_ALLOWED)
 
 
 #: The lists that group their tasks: a project's table, board and Gantt.
@@ -507,6 +550,42 @@ async def _keep(
         row.definition = definition
         row.updated_at = datetime.now(timezone.utc)
         session.add(row)
+    await session.flush()
+
+
+async def start(
+    session: AsyncSession,
+    target: Target,
+    lists: Mapping[str, dict[str, Any]],
+    default: str,
+) -> None:
+    """Lay out a target made in this transaction: each of ``lists`` as its
+    definition, held to what a write of it would be, opening on ``default``.
+    Nothing else can have laid it out yet, so nothing is read first."""
+    for kind, definition in lists.items():
+        stored = check(
+            target,
+            ListLayoutWrite.model_validate({"kind": kind, "definition": definition}),
+        )
+        session.add(
+            ToolLayout(
+                initiative_id=target.initiative_id,
+                tool=target.tool,
+                tool_id=target.tool_id,
+                kind=kind,
+                definition=stored,
+            )
+        )
+    _require(default, shown_lists(target.tool, lists))
+    session.add(
+        ToolLayout(
+            initiative_id=target.initiative_id,
+            tool=target.tool,
+            tool_id=target.tool_id,
+            kind=LAYOUT_DEFAULT,
+            definition={"kind": default},
+        )
+    )
     await session.flush()
 
 
@@ -677,6 +756,12 @@ def remapped_definition(definition: dict[str, Any], remap: Remap) -> dict[str, A
         copy["columns"] = [
             mapped for column in definition["columns"] if (mapped := field(column))
         ]
+    if isinstance(definition.get("displays"), dict):
+        copy["displays"] = {
+            mapped: display
+            for key, display in definition["displays"].items()
+            if (mapped := field(key))
+        }
     if isinstance(definition.get("limits"), list):
         copy["limits"] = [
             {**entry, "status_id": mapped}
@@ -720,9 +805,13 @@ async def copy_layouts(
     *,
     status_mapping: dict[int, int],
     type_mapping: dict[int, int],
+    fields: Optional[Mapping[int, int]] = None,
 ) -> None:
     """Give ``copy`` what ``source`` stored, its presets' statuses and its
-    pages' types its own."""
+    pages' types its own, and a collection's own fields (``fields``, by the
+    source's field id) the copy's."""
+    same = copy.initiative_id == source.initiative_id
+    fields = fields or {}
     for row in await list_rows(session, source):
         if row.task_type_id is not None and row.task_type_id not in type_mapping:
             continue
@@ -741,10 +830,8 @@ async def copy_layouts(
                     row.definition,
                     Remap(
                         statuses=status_mapping.get,
-                        properties=(
-                            None
-                            if copy.initiative_id == source.initiative_id
-                            else lambda _id: None
+                        properties=lambda property_id: fields.get(
+                            property_id, property_id if same else None
                         ),
                         types=type_mapping.get,
                     ),

@@ -116,7 +116,7 @@ async def unique_property_name(
     session: AsyncSession, *, initiative_id: int, desired_name: str
 ) -> str:
     stmt = select(PropertyDefinition.name).where(
-        PropertyDefinition.initiative_id == initiative_id
+        PropertyDefinition.of_initiative(initiative_id)
     )
     existing = {row for row in (await session.exec(stmt)).all()}
     if desired_name not in existing:
@@ -178,7 +178,7 @@ async def load_initiative_properties(
     session: AsyncSession, *, initiative_id: int
 ) -> dict[str, PropertyDefinition]:
     stmt = select(PropertyDefinition).where(
-        PropertyDefinition.initiative_id == initiative_id
+        PropertyDefinition.of_initiative(initiative_id)
     )
     return {pd.name: pd for pd in (await session.exec(stmt)).all()}
 
@@ -212,7 +212,7 @@ def decode_property_value(
     t = pv.property_type
     if t in (PropertyType.text, PropertyType.url, PropertyType.select):
         return {"value_text": pv.value_text}
-    if t == PropertyType.number:
+    if t in (PropertyType.number, PropertyType.currency, PropertyType.rating):
         return {"value_number": pv.value_number}
     if t == PropertyType.checkbox:
         return {"value_boolean": pv.value_boolean}

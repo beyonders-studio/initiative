@@ -5,6 +5,10 @@ changed — renamed, described, tagged, filled, emptied, trashed — by whoever'
 role creates files in its initiative. Adding a file also takes being able to
 open it. What is in a collection is listed by the Files list itself
 (``GET /collections/{id}/files``, in ``tool_lists``).
+
+A collection's own fields are property definitions of its own
+(``/property-definitions`` with ``collection_id``); their values on its files
+are written here, by whoever may change the collection.
 """
 
 from datetime import datetime, timezone
@@ -24,10 +28,13 @@ from app.api.deps import (
     GuildContext,
     plugin_scope,
 )
+from app.core.collection_shapes import SHAPES_BY_KEY
+from app.core.errors import CodedError
 from app.core.messages import CollectionMessages
 from app.core.tools import KINDS, Tool
 from app.db.frozen import row_is_frozen
 from app.models.tenant.collection import Collection
+from app.models.tenant.file import File
 from app.models.tenant.initiative import Initiative
 from app.schemas.tenant.share_request import HiddenFiles
 from app.schemas.tenant.collection import (
@@ -37,9 +44,11 @@ from app.schemas.tenant.collection import (
     CollectionFiles,
     CollectionListResponse,
     CollectionRead,
+    CollectionShapeGroup,
     CollectionUpdate,
     serialize_collection,
 )
+from app.schemas.tenant.property import PropertySummary, PropertyValuesSetRequest
 from app.services.permissions import Action
 from app.services.tenant import archive as archive_service
 from app.services.tenant import collections as collections_service
@@ -130,6 +139,16 @@ async def _read(
     return read
 
 
+@router.get("/shapes", response_model=List[CollectionShapeGroup])
+async def list_collection_shapes(
+    current_user: ActorUserDep,
+    guild_context: FilesRead,
+) -> List[CollectionShapeGroup]:
+    """The ready-made shapes a new collection can start as, grouped, in the
+    reader's language: the lists each shows and opens on, and its fields."""
+    return collections_service.shapes(getattr(current_user, "locale", None) or "en")
+
+
 @router.get("/", response_model=CollectionListResponse)
 async def list_collections(
     session: ActorSessionDep,
@@ -170,11 +189,20 @@ async def create_collection(
 ) -> CollectionRead:
     """Make a collection of files. It starts with the files named, each one a
     file of the initiative the reader can open. Takes the initiative role's
-    right to create files."""
+    right to create files. It starts blank, as a ready-made ``shape`` with
+    its words in the maker's language, or with the fields and lists of
+    ``shape_from``, a collection of the same initiative the maker sees."""
     initiative = await resource_access.prepare_create(
         session, Tool.file, payload.initiative_id, current_user, guild_context
     )
     await _require_readable(session, initiative.id, payload.file_ids)
+    source = None
+    if payload.shape_from is not None:
+        source = await resource_access.load_child(
+            session, Collection, payload.shape_from
+        )
+        if source.initiative_id != initiative.id:
+            raise KINDS["collection"].not_found()
     collection = Collection(
         initiative_id=initiative.id,
         name=payload.name.strip(),
@@ -186,6 +214,15 @@ async def create_collection(
     await collections_service.add_files(
         session, collection, payload.file_ids, added_by=guild_context.user_id
     )
+    if payload.shape is not None:
+        await collections_service.apply_shape(
+            session,
+            collection,
+            SHAPES_BY_KEY[payload.shape.value],
+            locale=getattr(current_user, "locale", None) or "en",
+        )
+    elif source is not None:
+        await collections_service.copy_shape(session, source, collection)
     if payload.tag_ids:
         await tags_service.set_entity_tags(
             session,
@@ -289,6 +326,73 @@ async def add_collection_files(
     )
     await session.commit()
     return await _read(session, collection_id, guild_context)
+
+
+@router.get(
+    "/{collection_id}/files/{file_id}/fields", response_model=List[PropertySummary]
+)
+async def get_collection_file_fields(
+    collection_id: int,
+    file_id: int,
+    session: ActorSessionDep,
+    guild_context: FilesRead,
+) -> List[PropertySummary]:
+    """One file's values of the collection's own fields, for a file in the
+    collection the reader can open."""
+    collection = await resource_access.load_child(session, Collection, collection_id)
+    if not await collections_service.holds(session, collection.id, file_id):
+        raise Tool.file.not_found()
+    summaries = await properties_service.summaries_by_id(
+        session, Tool.file.value, [file_id], collection_id=collection.id
+    )
+    return summaries.get(file_id, [])
+
+
+@router.put(
+    "/{collection_id}/files/{file_id}/fields", response_model=List[PropertySummary]
+)
+async def set_collection_file_fields(
+    collection_id: int,
+    file_id: int,
+    payload: PropertyValuesSetRequest,
+    session: ActorSessionDep,
+    current_user: ActorUserDep,
+    guild_context: FilesWrite,
+) -> List[PropertySummary]:
+    """Replace one file's values of the collection's own fields, or with
+    ``merge`` write only the ones named, as ``PUT /properties`` does for a
+    property. The file is one in the collection the reader can open, and the
+    values are the collection's: they take the right to change the
+    collection, not to edit the file. An empty list clears them all."""
+    collection = await resource_access.load_child(
+        session, Collection, collection_id, access="write"
+    )
+    file = None
+    if await collections_service.holds(session, collection.id, file_id):
+        file = (await session.exec(select(File).where(File.id == file_id))).first()
+    if file is None:
+        raise HTTPException(
+            status_code=status.HTTP_422_UNPROCESSABLE_CONTENT,
+            detail=CollectionMessages.FILE_NOT_IN_COLLECTION,
+        )
+    try:
+        await properties_service.set_values(
+            session,
+            file,
+            payload.values,
+            initiative_id=collection.initiative_id,
+            removed=payload.removed if payload.merge else None,
+            options=payload.options,
+            collection_id=collection.id,
+        )
+    except (HTTPException, CodedError):
+        await session.rollback()
+        raise
+    await session.commit()
+    summaries = await properties_service.summaries_by_id(
+        session, Tool.file.value, [file_id], collection_id=collection_id
+    )
+    return summaries.get(file_id, [])
 
 
 @router.delete("/{collection_id}/files", status_code=status.HTTP_204_NO_CONTENT)

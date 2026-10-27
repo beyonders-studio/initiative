@@ -23,6 +23,8 @@ export function buildPropertyDefinition(
     position: 0,
     color: null,
     options: null,
+    currency: null,
+    collection_id: null,
     created_at: "2026-04-22T00:00:00.000Z",
     updated_at: "2026-04-22T00:00:00.000Z",
     ...overrides,
@@ -45,6 +47,7 @@ export function buildPropertySummary(overrides: Partial<PropertySummary> = {}): 
     name: `Property ${counter}`,
     type: PropertyType.text,
     options: null,
+    currency: null,
     value: "",
     ...overrides,
   };

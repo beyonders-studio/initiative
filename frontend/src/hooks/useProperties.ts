@@ -35,12 +35,19 @@ import type { MutationOpts } from "@/types/mutation";
  * - ``initiativeId`` omitted: returns the union across every initiative the
  *   caller is a member of — used by global views (My Tasks, Files list,
  *   events list) so property columns and filters aggregate across initiatives.
+ * - ``collectionId`` bound: that collection's own fields instead, which are
+ *   never among an initiative's properties.
  */
-export const useProperties = (options?: { initiativeId?: number; enabled?: boolean }) => {
+export const useProperties = (options?: {
+  initiativeId?: number;
+  collectionId?: number;
+  enabled?: boolean;
+}) => {
   const communityId = useActiveCommunityId();
   const initiativeId = options?.initiativeId;
-  const params: { initiative_id?: number } = {};
+  const params: { initiative_id?: number; collection_id?: number } = {};
   if (initiativeId !== undefined) params.initiative_id = initiativeId;
+  if (options?.collectionId !== undefined) params.collection_id = options.collectionId;
   const hasParams = Object.keys(params).length > 0;
   return useQuery<PropertyDefinitionRead[]>({
     queryKey: getListPropertyDefinitionsQueryKey(communityId, hasParams ? params : undefined),
@@ -58,7 +65,9 @@ export const useCreateProperty = (
   useCommunityMutation<PropertyDefinitionRead, PropertyDefinitionCreate>(
     {
       mutationFn: (communityId, data) => createPropertyDefinition(communityId, data),
-      invalidate: () => invalidate(q.allProperties()),
+      // A collection's field is listed with the collection, and its lists.
+      invalidate: (created) =>
+        invalidate(q.allProperties(), ...(created.collection_id ? [q.allCollections()] : [])),
       errorKey: "properties:manager.createError",
     },
     options
@@ -78,8 +87,8 @@ export const useUpdateProperty = (
       mutationFn: (communityId, { propertyId, data }) =>
         updatePropertyDefinition(communityId, propertyId, data),
       // Every row's embedded summaries carry the definition's name, options
-      // and color.
-      invalidate: () => invalidate(q.allProperties(), q.allPropertyHolders()),
+      // and color, as a collection's files carry its fields'.
+      invalidate: () => invalidate(q.allProperties(), q.allPropertyHolders(), q.allCollections()),
       errorKey: "properties:manager.updateError",
     },
     options
@@ -89,7 +98,7 @@ export const useDeleteProperty = (options?: MutationOpts<void, number>) =>
   useCommunityMutation<void, number>(
     {
       mutationFn: (communityId, propertyId) => deletePropertyDefinition(communityId, propertyId),
-      invalidate: () => invalidate(q.allProperties(), q.allPropertyHolders()),
+      invalidate: () => invalidate(q.allProperties(), q.allPropertyHolders(), q.allCollections()),
       errorKey: "properties:manager.deleteError",
     },
     options

@@ -1145,6 +1145,13 @@ def _plugin_predicates(table: str) -> dict[str, str]:
     write = (
         plugin_scope(access.resource, True, IN_POLICY) if access.writable else refused
     )
+    if table == "property_definitions":
+        # A collection's own field is part of Files, written with its scope.
+        files = plugin_scope(tool_resource(Tool.file), True, IN_POLICY)
+        write = (
+            f"(CASE WHEN property_definitions.collection_id IS NULL"
+            f" THEN {write} ELSE {files} END)"
+        )
     return {"SELECT": read, "INSERT": write, "UPDATE": write, "DELETE": write}
 
 

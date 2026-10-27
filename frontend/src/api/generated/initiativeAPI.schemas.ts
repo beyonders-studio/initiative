@@ -1368,6 +1368,8 @@ export const PropertyType = {
   select: "select",
   multi_select: "multi_select",
   user_reference: "user_reference",
+  currency: "currency",
+  rating: "rating",
 } as const;
 
 /**
@@ -1389,6 +1391,169 @@ export interface PropertyOption {
 }
 
 /**
+ * The ISO 4217 code a money property's amounts are in.
+ */
+export type CurrencyCode = (typeof CurrencyCode)[keyof typeof CurrencyCode];
+
+export const CurrencyCode = {
+  AED: "AED",
+  AFN: "AFN",
+  ALL: "ALL",
+  AMD: "AMD",
+  AOA: "AOA",
+  ARS: "ARS",
+  AUD: "AUD",
+  AWG: "AWG",
+  AZN: "AZN",
+  BAM: "BAM",
+  BBD: "BBD",
+  BDT: "BDT",
+  BHD: "BHD",
+  BIF: "BIF",
+  BMD: "BMD",
+  BND: "BND",
+  BOB: "BOB",
+  BRL: "BRL",
+  BSD: "BSD",
+  BTN: "BTN",
+  BWP: "BWP",
+  BYN: "BYN",
+  BZD: "BZD",
+  CAD: "CAD",
+  CDF: "CDF",
+  CHF: "CHF",
+  CLP: "CLP",
+  CNY: "CNY",
+  COP: "COP",
+  CRC: "CRC",
+  CUP: "CUP",
+  CVE: "CVE",
+  CZK: "CZK",
+  DJF: "DJF",
+  DKK: "DKK",
+  DOP: "DOP",
+  DZD: "DZD",
+  EGP: "EGP",
+  ERN: "ERN",
+  ETB: "ETB",
+  EUR: "EUR",
+  FJD: "FJD",
+  FKP: "FKP",
+  GBP: "GBP",
+  GEL: "GEL",
+  GHS: "GHS",
+  GIP: "GIP",
+  GMD: "GMD",
+  GNF: "GNF",
+  GTQ: "GTQ",
+  GYD: "GYD",
+  HKD: "HKD",
+  HNL: "HNL",
+  HTG: "HTG",
+  HUF: "HUF",
+  IDR: "IDR",
+  ILS: "ILS",
+  INR: "INR",
+  IQD: "IQD",
+  IRR: "IRR",
+  ISK: "ISK",
+  JMD: "JMD",
+  JOD: "JOD",
+  JPY: "JPY",
+  KES: "KES",
+  KGS: "KGS",
+  KHR: "KHR",
+  KMF: "KMF",
+  KPW: "KPW",
+  KRW: "KRW",
+  KWD: "KWD",
+  KYD: "KYD",
+  KZT: "KZT",
+  LAK: "LAK",
+  LBP: "LBP",
+  LKR: "LKR",
+  LRD: "LRD",
+  LSL: "LSL",
+  LYD: "LYD",
+  MAD: "MAD",
+  MDL: "MDL",
+  MGA: "MGA",
+  MKD: "MKD",
+  MMK: "MMK",
+  MNT: "MNT",
+  MOP: "MOP",
+  MRU: "MRU",
+  MUR: "MUR",
+  MVR: "MVR",
+  MWK: "MWK",
+  MXN: "MXN",
+  MYR: "MYR",
+  MZN: "MZN",
+  NAD: "NAD",
+  NGN: "NGN",
+  NIO: "NIO",
+  NOK: "NOK",
+  NPR: "NPR",
+  NZD: "NZD",
+  OMR: "OMR",
+  PAB: "PAB",
+  PEN: "PEN",
+  PGK: "PGK",
+  PHP: "PHP",
+  PKR: "PKR",
+  PLN: "PLN",
+  PYG: "PYG",
+  QAR: "QAR",
+  RON: "RON",
+  RSD: "RSD",
+  RUB: "RUB",
+  RWF: "RWF",
+  SAR: "SAR",
+  SBD: "SBD",
+  SCR: "SCR",
+  SDG: "SDG",
+  SEK: "SEK",
+  SGD: "SGD",
+  SHP: "SHP",
+  SLE: "SLE",
+  SOS: "SOS",
+  SRD: "SRD",
+  SSP: "SSP",
+  STN: "STN",
+  SVC: "SVC",
+  SYP: "SYP",
+  SZL: "SZL",
+  THB: "THB",
+  TJS: "TJS",
+  TMT: "TMT",
+  TND: "TND",
+  TOP: "TOP",
+  TRY: "TRY",
+  TTD: "TTD",
+  TWD: "TWD",
+  TZS: "TZS",
+  UAH: "UAH",
+  UGX: "UGX",
+  USD: "USD",
+  UYU: "UYU",
+  UZS: "UZS",
+  VED: "VED",
+  VES: "VES",
+  VND: "VND",
+  VUV: "VUV",
+  WST: "WST",
+  XAF: "XAF",
+  XCD: "XCD",
+  XCG: "XCG",
+  XOF: "XOF",
+  XPF: "XPF",
+  YER: "YER",
+  ZAR: "ZAR",
+  ZMW: "ZMW",
+  ZWG: "ZWG",
+} as const;
+
+/**
  * Lightweight property value for embedding in entity reads.
  *
  * ``value`` is rehydrated from the correct typed column by the service
@@ -1400,6 +1565,7 @@ export interface PropertySummary {
   name: string;
   type: PropertyType;
   options: PropertyOption[] | null;
+  currency: CurrencyCode | null;
   /** Shaped by the property's type. For user_reference, a person: id, username, discriminator, display_name and avatar_url, or an PluginPerson when the reader is an installed plug-in. */
   value: unknown;
 }
@@ -2198,8 +2364,21 @@ export const TaskFieldId = {
   tags: "tags",
 } as const;
 
+/**
+ * A file's own fields, as a collection's lists show them.
+ */
+export type FileFieldId = (typeof FileFieldId)[keyof typeof FileFieldId];
+
+export const FileFieldId = {
+  name: "name",
+  type: "type",
+  size: "size",
+  added: "added",
+  created: "created",
+} as const;
+
 export interface FieldProps {
-  field: TaskFieldId | string;
+  field: TaskFieldId | FileFieldId | string;
 }
 
 export interface FieldPart {
@@ -2446,8 +2625,21 @@ export interface CollectionCover {
 }
 
 /**
+ * A ready-made shape a collection can start as.
+ */
+export type CollectionShapeKey = (typeof CollectionShapeKey)[keyof typeof CollectionShapeKey];
+
+export const CollectionShapeKey = {
+  gallery: "gallery",
+  catalog: "catalog",
+  log: "log",
+} as const;
+
+/**
  * A new collection, made with the files it starts with: a collection is
- * never empty.
+ * never empty. It starts blank (its grid and table, and no fields of its
+ * own), as a ready-made ``shape``, or with the fields and lists of another
+ * collection in the initiative (``shape_from``), none of its values.
  */
 export interface CollectionCreate {
   properties?: PropertyValueInput[];
@@ -2464,6 +2656,8 @@ export interface CollectionCreate {
   name: string;
   description?: string | null;
   tag_ids?: number[] | null;
+  shape?: CollectionShapeKey | null;
+  shape_from?: number | null;
 }
 
 export type FileKind = (typeof FileKind)[keyof typeof FileKind];
@@ -2484,7 +2678,8 @@ export const FileKind = {
 } as const;
 
 /**
- * A file as its collection lists it: with when it was added there.
+ * A file as its collection lists it: with when it was added there, and
+ * its values of the collection's own fields.
  */
 export interface CollectionFileSummary {
   archived_at: string | null;
@@ -2516,6 +2711,7 @@ export interface CollectionFileSummary {
   height: number | null;
   smart_link_url: string | null;
   added_at: string;
+  fields: PropertySummary[];
   /** How the file is shown, which follows from its type. */
   readonly kind: FileKind;
 }
@@ -2549,6 +2745,24 @@ export interface HiddenFiles {
   requested?: number;
 }
 
+export interface PropertyDefinitionRead {
+  /**
+   * @minLength 1
+   * @maxLength 100
+   */
+  name: string;
+  type: PropertyType;
+  position: number;
+  color: string | null;
+  options: PropertyOption[] | null;
+  currency: CurrencyCode | null;
+  id: number;
+  initiative_id: number;
+  collection_id: number | null;
+  created_at: string;
+  updated_at: string;
+}
+
 /**
  * A collection as its reader sees it: only the files they can open are
  * counted, and the cover is one of those.
@@ -2572,11 +2786,59 @@ export interface CollectionRead {
   comment_count: number;
   tags: TagSummary[];
   properties: PropertySummary[];
+  fields: PropertyDefinitionRead[];
   can: CollectionCan;
 }
 
 export interface CollectionListResponse {
   items: CollectionRead[];
+}
+
+export type CollectionShapeEntryListsItem =
+  (typeof CollectionShapeEntryListsItem)[keyof typeof CollectionShapeEntryListsItem];
+
+export const CollectionShapeEntryListsItem = {
+  table: "table",
+  board: "board",
+  gantt: "gantt",
+  calendar: "calendar",
+  masonry: "masonry",
+  grid: "grid",
+  timeline: "timeline",
+} as const;
+
+export type CollectionShapeFieldDisplay =
+  | (typeof CollectionShapeFieldDisplay)[keyof typeof CollectionShapeFieldDisplay]
+  | null;
+
+export const CollectionShapeFieldDisplay = {
+  number: "number",
+  stars: "stars",
+  bar: "bar",
+} as const;
+
+/**
+ * A field a ready-made shape brings, in the reader's language.
+ */
+export interface CollectionShapeField {
+  name: string;
+  type: PropertyType;
+  display: CollectionShapeFieldDisplay;
+  currency: CurrencyCode | null;
+}
+
+export interface CollectionShapeEntry {
+  key: CollectionShapeKey;
+  name: string;
+  hint: string;
+  lists: CollectionShapeEntryListsItem[];
+  fields: CollectionShapeField[];
+}
+
+export interface CollectionShapeGroup {
+  key: string;
+  name: string;
+  entries: CollectionShapeEntry[];
 }
 
 export interface CollectionUpdate {
@@ -6873,6 +7135,10 @@ export interface LayoutGrouping {
   hidden?: string[];
 }
 
+export type ListLayoutDefinitionOutputDisplays = {
+  [key: string]: "number" | "stars" | "bar";
+} | null;
+
 /**
  * How a list draws its items, and the presets and groupings it offers.
  * What it leaves out is drawn as shipped: a board with no ``card`` draws the
@@ -6882,12 +7148,13 @@ export interface LayoutGrouping {
  */
 export interface ListLayoutDefinitionOutput {
   card?: CardPartOutput | null;
-  columns?: (TaskColumnFieldId | string)[] | null;
+  columns?: (TaskColumnFieldId | FileFieldId | string)[] | null;
   presets?: LayoutPreset[] | null;
   groupings?: LayoutGrouping[] | null;
   group_by?: string | null;
   limits?: ColumnLimit[] | null;
   hidden?: boolean | null;
+  displays?: ListLayoutDefinitionOutputDisplays;
 }
 
 /**
@@ -7125,6 +7392,10 @@ export interface LinkedTaskRead {
   done: boolean;
 }
 
+export type ListLayoutDefinitionInputDisplays = {
+  [key: string]: "number" | "stars" | "bar";
+} | null;
+
 /**
  * How a list draws its items, and the presets and groupings it offers.
  * What it leaves out is drawn as shipped: a board with no ``card`` draws the
@@ -7134,12 +7405,13 @@ export interface LinkedTaskRead {
  */
 export interface ListLayoutDefinitionInput {
   card?: CardPartInput | null;
-  columns?: (TaskColumnFieldId | string)[] | null;
+  columns?: (TaskColumnFieldId | FileFieldId | string)[] | null;
   presets?: LayoutPreset[] | null;
   groupings?: LayoutGrouping[] | null;
   group_by?: string | null;
   limits?: ColumnLimit[] | null;
   hidden?: boolean | null;
+  displays?: ListLayoutDefinitionInputDisplays;
 }
 
 export type ListLayoutWriteKind = (typeof ListLayoutWriteKind)[keyof typeof ListLayoutWriteKind];
@@ -9369,23 +9641,9 @@ export interface PropertyDefinitionCreate {
   position?: number;
   color?: string | null;
   options?: PropertyOption[] | null;
+  currency?: CurrencyCode | null;
   initiative_id: number;
-}
-
-export interface PropertyDefinitionRead {
-  /**
-   * @minLength 1
-   * @maxLength 100
-   */
-  name: string;
-  type: PropertyType;
-  position: number;
-  color: string | null;
-  options: PropertyOption[] | null;
-  id: number;
-  initiative_id: number;
-  created_at: string;
-  updated_at: string;
+  collection_id?: number | null;
 }
 
 /**
@@ -9400,6 +9658,7 @@ export interface PropertyDefinitionUpdate {
   position?: number | null;
   color?: string | null;
   options?: PropertyOption[] | null;
+  currency?: CurrencyCode | null;
 }
 
 /**
@@ -13731,6 +13990,10 @@ export type SuggestCommunityParams = {
 
 export type ListPropertyDefinitionsParams = {
   initiative_id?: number | null;
+  /**
+   * List this collection's own fields instead of properties.
+   */
+  collection_id?: number | null;
 };
 
 export type ListCommunityTrashParams = {

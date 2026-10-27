@@ -20,6 +20,8 @@ interface CollectionFileTileProps {
   selected?: boolean;
   /** `shape` keeps the file's own shape; `square` crops it to a tile. */
   fit?: "shape" | "square";
+  /** The card under it names it, so hovering it does not. */
+  named?: boolean;
   className?: string;
   style?: CSSProperties;
 }
@@ -44,6 +46,7 @@ const CollectionFileTileInner = ({
   selecting = false,
   selected = false,
   fit = "shape",
+  named = false,
   className,
   style,
 }: CollectionFileTileProps) => {
@@ -97,7 +100,7 @@ const CollectionFileTileInner = ({
           <Check className="size-3.5" />
         </span>
       )}
-      {picture && !selecting && (
+      {picture && !selecting && !named && (
         <span className="pointer-events-none absolute inset-x-0 bottom-0 truncate bg-gradient-to-t from-black/70 to-transparent px-2 pt-6 pb-1.5 text-white text-xs opacity-0 transition-opacity group-hover:opacity-100 group-focus-visible:opacity-100">
           {file.name}
         </span>

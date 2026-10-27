@@ -23,10 +23,19 @@ import userEvent from "@testing-library/user-event";
 import { HttpResponse } from "msw";
 import { describe, expect, it } from "vitest";
 
-import { buildCollection, buildFileSummary, buildToolLayoutSet } from "@/__tests__/factories";
+import {
+  buildCollection,
+  buildCollectionFile,
+  buildFileSummary,
+  buildPropertyDefinition,
+  buildPropertySummary,
+  buildToolLayoutSet,
+} from "@/__tests__/factories";
 import { communityHttp } from "@/__tests__/helpers/communityHttp";
 import { server } from "@/__tests__/helpers/msw-server";
 import { renderPage } from "@/__tests__/helpers/render";
+import { type PropertyDefinitionCreate, PropertyType } from "@/api/generated/initiativeAPI.schemas";
+import { numberFormat } from "@/lib/intl";
 
 import { CollectionPage } from "./CollectionPage";
 
@@ -117,6 +126,197 @@ describe("a collection's page", () => {
     await user.click((await screen.findAllByRole("checkbox", { name: "Select row" }))[0]);
     await user.click(screen.getByRole("button", { name: "Remove from collection" }));
     await waitFor(() => expect(removed).toEqual(["4"]));
+  });
+
+  it("draws its table's columns as its layout names them, its own fields among them", async () => {
+    const price = buildPropertyDefinition({
+      id: 22,
+      name: "Price",
+      type: PropertyType.currency,
+      currency: "EUR",
+      collection_id: 5,
+    });
+    const files = [
+      buildCollectionFile({
+        id: 4,
+        name: "Lamp",
+        file_size: 2048,
+        fields: [
+          buildPropertySummary({
+            property_id: 22,
+            name: "Price",
+            type: PropertyType.currency,
+            currency: "EUR",
+            value: 12.5,
+          }),
+        ],
+      }),
+    ];
+    server.use(
+      communityHttp.get("/collections/:id", () =>
+        HttpResponse.json(buildCollection({ id: 5, fields: [price] }))
+      ),
+      communityHttp.get("/collections/:id/files", () =>
+        HttpResponse.json({
+          items: files,
+          total_count: 1,
+          page: 1,
+          page_size: 60,
+          has_next: false,
+          has_prev: false,
+        })
+      ),
+      communityHttp.get("/layouts/", () =>
+        HttpResponse.json(
+          buildToolLayoutSet({
+            tool: "collection",
+            hidden: ["masonry", "grid", "timeline"],
+            layouts: [
+              {
+                kind: "table",
+                is_default: true,
+                hidden: false,
+                definition: { columns: ["name", "property:22", "size"] },
+                updated_at: "2026-10-01T12:00:00.000Z",
+              },
+            ],
+          })
+        )
+      ),
+      communityHttp.get("/property-definitions/", () => HttpResponse.json([])),
+      communityHttp.get("/relationships/", () => HttpResponse.json([]))
+    );
+    renderPage(CollectionPage, {
+      initialRoute: "/c/$communityId/i/$initiativeId/files/collections/$collectionId",
+      routeParams: { communityId: "1", initiativeId: "1", collectionId: "5" },
+    });
+
+    await waitFor(() =>
+      expect(screen.getAllByRole("columnheader").map((header) => header.textContent)).toEqual([
+        "Name",
+        "Price",
+        "Size",
+      ])
+    );
+    expect(screen.getByRole("link", { name: "Lamp" })).toBeInTheDocument();
+    const euros = numberFormat(undefined, { style: "currency", currency: "EUR" }).format(12.5);
+    expect(screen.getByText(euros)).toBeInTheDocument();
+  });
+
+  it("opens a file that is not a picture beside its table, with its values there", async () => {
+    let propertiesServed = false;
+    const caption = buildPropertyDefinition({ id: 21, name: "Caption", collection_id: 5 });
+    server.use(
+      communityHttp.get("/collections/:id", () =>
+        HttpResponse.json(buildCollection({ id: 5, fields: [caption] }))
+      ),
+      communityHttp.get("/collections/:id/files", () =>
+        HttpResponse.json({
+          items: [
+            buildCollectionFile({
+              id: 4,
+              name: "Price list",
+              fields: [buildPropertySummary({ property_id: 21, name: "Caption", value: "Spring" })],
+            }),
+          ],
+          total_count: 1,
+          page: 1,
+          page_size: 60,
+          has_next: false,
+          has_prev: false,
+        })
+      ),
+      communityHttp.get("/layouts/", () =>
+        HttpResponse.json(
+          buildToolLayoutSet({
+            tool: "collection",
+            hidden: ["masonry", "grid", "timeline"],
+            layouts: [
+              {
+                kind: "table",
+                is_default: true,
+                hidden: false,
+                definition: { columns: ["name", "property:21"] },
+                updated_at: "2026-10-01T12:00:00.000Z",
+              },
+            ],
+          })
+        )
+      ),
+      communityHttp.get("/property-definitions/", () => {
+        propertiesServed = true;
+        return HttpResponse.json([]);
+      }),
+      communityHttp.get("/relationships/", () => HttpResponse.json([]))
+    );
+    const user = userEvent.setup();
+    renderPage(CollectionPage, {
+      initialRoute: "/c/$communityId/i/$initiativeId/files/collections/$collectionId",
+      routeParams: { communityId: "1", initiativeId: "1", collectionId: "5" },
+    });
+
+    // The table is drawn again as the initiative's properties arrive; the name
+    // is clicked once they have.
+    await waitFor(() => expect(propertiesServed).toBe(true));
+    await screen.findByRole("columnheader", { name: "Caption" });
+    await user.click(screen.getByRole("link", { name: "Price list" }));
+
+    const beside = await screen.findByRole("dialog", { name: "Price list" });
+    expect(within(beside).getByDisplayValue("Spring")).toBeInTheDocument();
+    expect(within(beside).getByRole("link", { name: "Open file" })).toBeInTheDocument();
+  });
+
+  it("makes a field of its own for whoever may change it", async () => {
+    let created: PropertyDefinitionCreate | null = null;
+    server.use(
+      communityHttp.get("/collections/:id", () =>
+        HttpResponse.json(buildCollection({ id: 5, initiative_id: 1 }))
+      ),
+      communityHttp.get("/collections/:id/files", () =>
+        HttpResponse.json({
+          items: [buildCollectionFile({ id: 4 })],
+          total_count: 1,
+          page: 1,
+          page_size: 60,
+          has_next: false,
+          has_prev: false,
+        })
+      ),
+      communityHttp.get("/layouts/", () =>
+        HttpResponse.json(buildToolLayoutSet({ tool: "collection" }))
+      ),
+      communityHttp.get("/property-definitions/", () => HttpResponse.json([])),
+      communityHttp.post("/property-definitions/", async ({ request }) => {
+        created = (await request.json()) as PropertyDefinitionCreate;
+        return HttpResponse.json(buildPropertyDefinition({ ...created, id: 30 }), { status: 201 });
+      }),
+      communityHttp.get("/relationships/", () => HttpResponse.json([]))
+    );
+    const user = userEvent.setup();
+    renderPage(CollectionPage, {
+      initialRoute: "/c/$communityId/i/$initiativeId/files/collections/$collectionId",
+      routeParams: { communityId: "1", initiativeId: "1", collectionId: "5" },
+    });
+
+    await screen.findByRole("heading", { name: "Collection 1" });
+    await user.click(screen.getByRole("button", { name: "More actions" }));
+    await user.click(await screen.findByRole("menuitem", { name: "Fields" }));
+    const dialog = await screen.findByRole("dialog", { name: "Fields" });
+    await user.click(within(dialog).getByRole("button", { name: "New field" }));
+    const form = await screen.findByRole("dialog", { name: "New field" });
+    await user.type(within(form).getByLabelText("Name"), "Rating");
+    await user.click(within(form).getByRole("combobox", { name: "Type" }));
+    await user.click(await screen.findByRole("option", { name: "Rating" }));
+    await user.click(within(form).getByRole("button", { name: "Save" }));
+
+    await waitFor(() =>
+      expect(created).toMatchObject({
+        name: "Rating",
+        type: PropertyType.rating,
+        initiative_id: 1,
+        collection_id: 5,
+      })
+    );
   });
 
   it("offers to take an archived collection out of the archive when the reader may", async () => {

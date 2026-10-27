@@ -42,7 +42,7 @@ from pydantic import AnyHttpUrl, TypeAdapter, ValidationError
 from pydantic_core import PydanticCustomError
 from sqlalchemy import Integer, column, exists, func, insert, literal, true, values
 from sqlalchemy.orm import selectinload
-from sqlmodel import SQLModel, delete, select
+from sqlmodel import SQLModel, col, delete, select
 from sqlmodel.ext.asyncio.session import AsyncSession
 
 from app.core.identity_boundary import current_install_boundary
@@ -176,6 +176,25 @@ def _of(target: str, entity_ids: Iterable[int]) -> Any:
     )
 
 
+def _fields_of(collection_id: Optional[int]) -> Any:
+    """The value rows of one collection's own fields, or with ``None`` those
+    of the initiative's properties."""
+    return col(PropertyValue.property_id).in_(
+        select(PropertyDefinition.id).where(
+            col(PropertyDefinition.collection_id).is_not_distinct_from(collection_id)
+        )
+    )
+
+
+#: The types whose value is ``value_number``.
+_NUMBER_TYPES = frozenset(
+    {PropertyType.number, PropertyType.currency, PropertyType.rating}
+)
+
+#: The range of a rating.
+RATING_RANGE = range(1, 101)
+
+
 # ---------------------------------------------------------------------------
 # Validation
 # ---------------------------------------------------------------------------
@@ -212,6 +231,12 @@ def _coerce_number(raw: Any) -> Decimal:
     except (InvalidOperation, ValueError) as exc:
         raise _bad_value() from exc
     raise _bad_value()
+
+
+def _coerce_rating(raw: Any) -> Decimal:
+    if isinstance(raw, bool) or not isinstance(raw, int) or raw not in RATING_RANGE:
+        raise _bad_value()
+    return Decimal(raw)
 
 
 def _coerce_bool(raw: Any) -> bool:
@@ -328,6 +353,13 @@ def _validate_value_for_type(
         cols["value_text"] = _coerce_text(raw_value)
     elif ptype is PropertyType.number:
         cols["value_number"] = _coerce_number(raw_value)
+    elif ptype is PropertyType.currency:
+        amount = _coerce_number(raw_value)
+        if not amount.is_finite():
+            raise _bad_value()
+        cols["value_number"] = amount
+    elif ptype is PropertyType.rating:
+        cols["value_number"] = _coerce_rating(raw_value)
     elif ptype is PropertyType.checkbox:
         cols["value_boolean"] = _coerce_bool(raw_value)
     elif ptype is PropertyType.date:
@@ -384,6 +416,7 @@ async def write_values(
     initiative_id: Optional[int],
     removed: Optional[Sequence[int]] = None,
     options: Sequence[PropertyOptionsChange] = (),
+    collection_id: Optional[int] = None,
 ) -> None:
     """Replace every property value on ``row`` with ``values``. Given
     ``removed``, write only the properties ``values`` names and take off the
@@ -394,11 +427,13 @@ async def write_values(
 
     Each value's definition must belong to ``initiative_id`` — the row's own
     initiative — and a person a value names must be able to open the tool row
-    that governs ``row``. The caller has authorized the write and owns the
-    commit.
+    that governs ``row``. The values are the initiative's properties, or with
+    ``collection_id`` that collection's own fields on ``row``, a file in it;
+    neither write touches the other's. The caller has authorized the write and
+    owns the commit.
     """
     spec = link_for(row)
-    held = _of(spec.target, [row.id])
+    held = _of(spec.target, [row.id]) & _fields_of(collection_id)
     named_ids = [
         *(removed or ()),
         *(entry.property_id for entry in values),
@@ -430,7 +465,12 @@ async def write_values(
 
     def definition(property_id: int) -> PropertyDefinition:
         defn = definitions.get(property_id)
-        if defn is None or initiative_id is None or defn.initiative_id != initiative_id:
+        if (
+            defn is None
+            or initiative_id is None
+            or defn.initiative_id != initiative_id
+            or defn.collection_id != collection_id
+        ):
             raise HTTPException(
                 status_code=status.HTTP_404_NOT_FOUND,
                 detail=PropertyMessages.DEFINITION_NOT_FOUND,
@@ -528,12 +568,13 @@ async def set_values(
     initiative_id: Optional[int],
     removed: Optional[Sequence[int]] = None,
     options: Sequence[PropertyOptionsChange] = (),
+    collection_id: Optional[int] = None,
 ) -> None:
     """The whole write a person or a plug-in makes: resolve a plug-in's person
     references, write the values (all of them, or with ``removed`` only those
-    named, as :func:`write_values`), mark the row changed, and let a target
-    whose own shape reacts (a repeating event) do so. Authorization is the
-    caller's."""
+    named, as :func:`write_values`; a collection's own fields with
+    ``collection_id``), mark the row changed, and let a target whose own shape
+    reacts (a repeating event) do so. Authorization is the caller's."""
     await write_values(
         session,
         row,
@@ -541,8 +582,11 @@ async def set_values(
         initiative_id=initiative_id,
         removed=removed,
         options=options,
+        collection_id=collection_id,
     )
-    if hasattr(row, "updated_at"):
+    # A collection's fields are the collection's, so they leave the file as
+    # it was.
+    if collection_id is None and hasattr(row, "updated_at"):
         row.updated_at = datetime.now(timezone.utc)
         session.add(row)
     await session.flush()
@@ -602,7 +646,8 @@ async def copy_values(
 
     For a duplicate or an occurrence: the same definitions apply, so each pair
     must share an initiative — a caller copying across initiatives copies
-    nothing instead.
+    nothing instead. A collection's own fields stay with the files in it: a
+    copy is in no collection.
     """
     if not copies:
         return
@@ -610,7 +655,9 @@ async def copy_values(
     # The copies' pending changes first (a series' override takes its calendar
     # just before), so their values are held to where they now sit.
     await session.flush()
-    await session.exec(delete(PropertyValue).where(_of(target, copies.values())))
+    await session.exec(
+        delete(PropertyValue).where(_of(target, copies.values()), _fields_of(None))
+    )
     pairs = values(
         column("source_id", Integer), column("copy_id", Integer), name="pairs"
     ).data(list(copies.items()))
@@ -627,7 +674,7 @@ async def copy_values(
                 literal(now),
             )
             .join(pairs, PropertyValue.entity_id == pairs.c.source_id)
-            .where(_of(target, copies.keys())),
+            .where(_of(target, copies.keys()), _fields_of(None)),
         )
     )
 
@@ -640,6 +687,20 @@ async def drop_values(
     ids = list(entity_ids)
     if ids:
         await session.exec(delete(PropertyValue).where(_of(target, ids)))
+
+
+async def drop_collection_values(
+    session: AsyncSession, collection_id: int, file_ids: Iterable[int]
+) -> None:
+    """Remove the values of a collection's own fields on these files, which
+    are leaving it."""
+    ids = list(file_ids)
+    if ids:
+        await session.exec(
+            delete(PropertyValue).where(
+                _of(Tool.file.value, ids), _fields_of(collection_id)
+            )
+        )
 
 
 async def property_values_by_row_id(
@@ -699,8 +760,10 @@ def _rehydrate_value(
     ptype = defn.type
     if ptype in {PropertyType.text, PropertyType.url, PropertyType.select}:
         return row.value_text
-    if ptype is PropertyType.number:
+    if ptype in {PropertyType.number, PropertyType.currency}:
         return _number_to_json(row.value_number)
+    if ptype is PropertyType.rating:
+        return int(row.value_number) if row.value_number is not None else None
     if ptype is PropertyType.checkbox:
         return row.value_boolean
     if ptype is PropertyType.date:
@@ -738,6 +801,7 @@ def summaries_from_rows(rows: Iterable[PropertyValue]) -> List[PropertySummary]:
                 name=defn.name,
                 type=defn.type,
                 options=_parsed_options(defn) or None,
+                currency=defn.currency,
                 value=_rehydrate_value(defn, row, row.value_user),
             )
         )
@@ -746,16 +810,22 @@ def summaries_from_rows(rows: Iterable[PropertyValue]) -> List[PropertySummary]:
 
 
 async def summaries_by_id(
-    session: AsyncSession, target: str, entity_ids: Iterable[int]
+    session: AsyncSession,
+    target: str,
+    entity_ids: Iterable[int],
+    *,
+    collection_id: Optional[int] = None,
 ) -> dict[int, List[PropertySummary]]:
-    """Every value on these ``target`` rows, as summaries, by row id."""
+    """Every value of the initiative's properties on these ``target`` rows, or
+    with ``collection_id`` of that collection's own fields, as summaries, by
+    row id."""
     ids = list(dict.fromkeys(entity_ids))
     if not ids:
         return {}
     rows = (
         await session.exec(
             select(PropertyValue)
-            .where(_of(target, ids))
+            .where(_of(target, ids), _fields_of(collection_id))
             .options(
                 selectinload(PropertyValue.property_definition),
                 selectinload(PropertyValue.value_user),
@@ -829,7 +899,7 @@ def typed_column_for_property(property_type: PropertyType) -> Any:
     """The value column a property of this type is stored in."""
     if property_type in {PropertyType.text, PropertyType.url, PropertyType.select}:
         return PropertyValue.value_text
-    if property_type is PropertyType.number:
+    if property_type in _NUMBER_TYPES:
         return PropertyValue.value_number
     if property_type is PropertyType.checkbox:
         return PropertyValue.value_boolean
@@ -856,7 +926,7 @@ def _coerce_filter_scalar(property_type: PropertyType, raw: Any) -> Any:
     if raw is None:
         return None
     try:
-        if property_type is PropertyType.number:
+        if property_type in _NUMBER_TYPES:
             if isinstance(raw, bool):
                 return None
             if isinstance(raw, Decimal):

@@ -194,6 +194,8 @@ A property is a field your initiative needs and Initiative didn't think of: "Bud
 | **Select** | One option from a list you set, each with a colour. |
 | **Multi-select** | Several options from that list. |
 | **Person** | Somebody who can open the thing it's on. |
+| **Money** | An amount, in the one currency the property names. |
+| **Rating** | 1 to 100. A layout draws it as the number, stars or a bar. |
 
 Typing a new option into a select adds it to the list. Deleting a property deletes every value set for it in the initiative, so it asks first.
 

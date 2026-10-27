@@ -1,8 +1,9 @@
 import { useMemo } from "react";
 import { useTranslation } from "react-i18next";
 
-import type { FileSummary } from "@/api/generated/initiativeAPI.schemas";
+import type { CollectionFileSummary, FileSummary } from "@/api/generated/initiativeAPI.schemas";
 import { CollectionFileTile } from "@/components/files/collections/CollectionFileTile";
+import type { CollectionCard } from "@/components/files/collections/collectionLists";
 import { type MasonryEntry, MasonryWall } from "@/components/files/collections/MasonryWall";
 import { TagBadge } from "@/components/tags/TagBadge";
 import type { GridToggleOptions } from "@/hooks/useGridSelection";
@@ -10,7 +11,9 @@ import { useWidthClass } from "@/hooks/useWidthClass";
 import { fileRatio, groupByTag } from "@/lib/collections";
 
 interface CollectionMasonryViewProps {
-  files: FileSummary[];
+  files: CollectionFileSummary[];
+  /** What each file shows under its picture, as the layout says. */
+  card?: CollectionCard;
   groupByTags: boolean;
   onActivate: (file: FileSummary, options: GridToggleOptions) => void;
   selecting?: boolean;
@@ -33,6 +36,7 @@ const COLUMN_WIDTH_COMPACT = 150;
  */
 export const CollectionMasonryView = ({
   files,
+  card,
   groupByTags,
   onActivate,
   selecting = false,
@@ -42,18 +46,23 @@ export const CollectionMasonryView = ({
   const compact = useWidthClass() === "base";
   const minColumnWidth = compact ? COLUMN_WIDTH_COMPACT : COLUMN_WIDTH;
 
-  const entriesOf = (items: FileSummary[]): MasonryEntry[] =>
+  const entriesOf = (items: CollectionFileSummary[]): MasonryEntry[] =>
     items.map((file) => ({
       key: file.id,
       aspectRatio: fileRatio(file),
+      below: card?.height(file),
       render: () => (
-        <CollectionFileTile
-          file={file}
-          onActivate={(options) => onActivate(file, options)}
-          selecting={selecting}
-          selected={isSelected?.(file) ?? false}
-          fit="shape"
-        />
+        <>
+          <CollectionFileTile
+            file={file}
+            onActivate={(options) => onActivate(file, options)}
+            selecting={selecting}
+            selected={isSelected?.(file) ?? false}
+            named={card?.names}
+            fit="shape"
+          />
+          {card?.render(file)}
+        </>
       ),
     }));
 

@@ -15,7 +15,9 @@
     "url": "URL",
     "select": "Sélection",
     "multi_select": "Sélection multiple",
-    "user_reference": "Personne"
+    "user_reference": "Personne",
+    "currency": "Montant",
+    "rating": "Note"
   },
   "picker": {
     "placeholder": "Rechercher des propriétés…",
@@ -41,11 +43,13 @@
     "searchOptions": "Rechercher ou créer une option…",
     "createOption": "Créer « {{label}} »",
     "optionAdded": "Option ajoutée",
-    "optionAddFailed": "Impossible d'ajouter l'option"
+    "optionAddFailed": "Impossible d'ajouter l'option",
+    "ratingPlaceholder": "1–100"
   },
   "cell": {
     "emptyValue": "—",
-    "none": "Aucun"
+    "none": "Aucun",
+    "rating": "Noté {{value}} sur 100"
   },
   "manager": {
     "title": "Propriétés personnalisées",
@@ -66,7 +70,9 @@
     "createError": "Échec de la création de la propriété",
     "updateError": "Échec de la mise à jour de la propriété",
     "deleteError": "Échec de la suppression de la propriété",
-    "setValuesError": "Échec de l'enregistrement de la valeur de la propriété"
+    "setValuesError": "Échec de l'enregistrement de la valeur de la propriété",
+    "moveUp": "Monter {{name}}",
+    "moveDown": "Descendre {{name}}"
   },
   "filter": {
     "addFilter": "Ajouter un filtre de propriété",
@@ -83,5 +89,10 @@
       "ilike": "contient",
       "is_null": "est vide"
     }
+  },
+  "currency": {
+    "label": "Devise",
+    "none": "Aucune devise ne correspond",
+    "default": "EUR"
   }
 }

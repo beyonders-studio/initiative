@@ -121,7 +121,7 @@ async def gallery_fields(
         (
             await session.exec(
                 select(PropertyDefinition).where(
-                    PropertyDefinition.initiative_id == initiative_id
+                    PropertyDefinition.of_initiative(initiative_id)
                 )
             )
         ).all()

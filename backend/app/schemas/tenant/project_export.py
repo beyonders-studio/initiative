@@ -97,6 +97,8 @@ class ProjectExportPropertyDefinition(SanitizedBaseModel):
     position: float = 0.0
     color: Optional[str] = None
     options: Optional[List[dict]] = None
+    #: A money property's currency.
+    currency: Optional[str] = None
 
 
 class ProjectExportChecklistItem(SanitizedBaseModel):

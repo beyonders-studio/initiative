@@ -12,6 +12,7 @@ from pydantic import (
     model_validator,
 )
 
+from app.core.currencies import CURRENCY_CODES
 from app.core.identity_boundary import responding_to_install
 from app.core.messages import PropertyMessages
 from app.core.tools import PROPERTY_TARGETS
@@ -34,6 +35,9 @@ PropertyTarget.__doc__ = (
     "What can carry custom property values: every tool and sub-tool."
 )
 
+CurrencyCode = Enum("CurrencyCode", {code: code for code in CURRENCY_CODES}, type=str)
+CurrencyCode.__doc__ = "The ISO 4217 code a money property's amounts are in."
+
 
 class PropertyOption(SanitizedBaseModel):
     """One option entry for select / multi_select property definitions."""
@@ -49,6 +53,9 @@ class PropertyDefinitionBase(SanitizedBaseModel):
     position: float = 0.0
     color: Optional[str] = Field(default=None, pattern=_HEX_COLOR_PATTERN)
     options: Optional[List[PropertyOption]] = None
+    #: The currency a money property's amounts are in; required for one, and
+    #: dropped for every other type.
+    currency: Optional[CurrencyCode] = None
 
     @field_validator("name")
     def _strip_name(cls, v: str) -> str:
@@ -69,11 +76,19 @@ class PropertyDefinitionBase(SanitizedBaseModel):
             # Silently coerce away options on non-select types so create
             # calls from the client don't trip confusing errors.
             self.options = None
+        if self.type is not PropertyType.currency:
+            self.currency = None
+        elif self.currency is None:
+            raise ValueError(PropertyMessages.CURRENCY_REQUIRED)
         return self
 
 
 class PropertyDefinitionCreate(PropertyDefinitionBase):
     initiative_id: int
+    #: Make it this collection's own field rather than one of the
+    #: initiative's properties: shown only with the collection, its values
+    #: on the collection's files. The collection is in ``initiative_id``.
+    collection_id: Optional[int] = None
 
 
 class PropertyDefinitionUpdate(SanitizedBaseModel):
@@ -88,6 +103,9 @@ class PropertyDefinitionUpdate(SanitizedBaseModel):
     position: Optional[float] = None
     color: Optional[str] = Field(default=None, pattern=_HEX_COLOR_PATTERN)
     options: Optional[List[PropertyOption]] = None
+    #: A money property's currency. Its amounts stay as they are: nothing is
+    #: converted.
+    currency: Optional[CurrencyCode] = None
 
     @field_validator("name")
     def _strip_name(cls, v: Optional[str]) -> Optional[str]:
@@ -117,6 +135,9 @@ class PropertyDefinitionRead(PropertyDefinitionBase):
 
     id: int
     initiative_id: int
+    #: The collection it is the own field of; None for an initiative's
+    #: property.
+    collection_id: Optional[int] = None
     created_at: datetime
     updated_at: datetime
 
@@ -216,6 +237,8 @@ class PropertySummary(SanitizedBaseModel):
     name: str
     type: PropertyType
     options: Optional[List[PropertyOption]] = None
+    #: A money property's currency.
+    currency: Optional[CurrencyCode] = None
     value: Any = Field(
         default=None,
         description=(

@@ -3,7 +3,9 @@ import type { SortingState } from "@tanstack/react-table";
 import {
   ExternalLink,
   LayoutList as LayoutsIcon,
+  ListPlus,
   Loader2,
+  Pencil,
   Plus,
   Tags,
   Trash2,
@@ -16,7 +18,7 @@ import {
   type CollectionFileSummary,
   FileKind,
   type FileSummary,
-  type ListLayoutReadKind,
+  type ListLayoutDefinitionInput,
   PropertyTarget,
   SearchEntityType,
   type TimelineBucket,
@@ -30,12 +32,16 @@ import {
   CollectionDropzone,
   type CollectionDropzoneHandle,
 } from "@/components/files/collections/CollectionDropzone";
-import { CollectionGridView } from "@/components/files/collections/CollectionGridView";
-import { CollectionMasonryView } from "@/components/files/collections/CollectionMasonryView";
-import { CollectionTimelineView } from "@/components/files/collections/CollectionTimelineView";
+import { CollectionFileFields } from "@/components/files/collections/CollectionFileFields";
+import { CollectionLayoutEditor } from "@/components/files/collections/CollectionLayoutEditor";
+import {
+  type CollectionList,
+  CollectionListView,
+} from "@/components/files/collections/collectionLists";
 import { UploadProgress } from "@/components/files/collections/UploadProgress";
 import { FileChooserDialog } from "@/components/files/FileChooserDialog";
-import { COLLECTION_SORT_FIELDS, useCollectionFileColumns } from "@/components/files/fileColumns";
+import { COLLECTION_SORT_FIELDS } from "@/components/files/fileColumns";
+import { InitiativeSettingsPropertiesTab } from "@/components/initiatives/settings/InitiativeSettingsPropertiesTab";
 import { ToolFilterPanel } from "@/components/initiativeTools/shared/ToolFilterPanel";
 import { ToolListToolbar } from "@/components/initiativeTools/shared/ToolListToolbar";
 import { LayoutList } from "@/components/layouts/LayoutList";
@@ -63,6 +69,7 @@ import {
   Dialog,
   DialogContent,
   DialogDescription,
+  DialogFooter,
   DialogHeader,
   DialogTitle,
 } from "@/components/ui/dialog";
@@ -76,6 +83,7 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
+import { Sheet, SheetContent, SheetHeader, SheetTitle } from "@/components/ui/sheet";
 import { useActiveCommunityId } from "@/hooks/useActiveCommunityId";
 import { useCanonicalInitiativeId } from "@/hooks/useCanonicalInitiativeId";
 import {
@@ -94,13 +102,14 @@ import { type GridToggleOptions, useGridSelection } from "@/hooks/useGridSelecti
 import { type ListViewSpec, NO_PART_VIEW, useListView, viewKey } from "@/hooks/useListView";
 import { useReadOnOpen } from "@/hooks/useNotifications";
 import { useRecordOpen } from "@/hooks/usePersonalItems";
-import { propertySaves } from "@/hooks/useProperties";
+import { propertySaves, useProperties } from "@/hooks/useProperties";
 import { useKnownTagIds } from "@/hooks/useTags";
 import { instanceTarget, listLayouts, useInstanceLayouts } from "@/hooks/useToolLayouts";
 import { useCommunityPath } from "@/lib/communityUrl";
 import { formatPeriod } from "@/lib/formatDate";
+import { withDisplays } from "@/lib/layouts/fields";
+import { collectionFileFields } from "@/lib/layouts/files";
 import { toast } from "@/lib/mascotToast";
-import type { AppColumnDef } from "@/lib/table";
 import { browserTimezone } from "@/lib/timezones";
 import { toolDetailRoute, toolListRoute } from "@/lib/tools";
 import { resolveUploadUrl } from "@/lib/uploadUrl";
@@ -110,9 +119,6 @@ type FileRow = CollectionFileSummary & { card: null };
 
 /** What the Files list is narrowed by, which a collection's files are too. */
 type FileFilters = ToolListFilters<typeof Tool.file>;
-
-/** The lists a collection may lay its files out as. */
-type CollectionList = Extract<ListLayoutReadKind, "masonry" | "grid" | "timeline" | "table">;
 
 /** Oldest added first, as the walls' order; newest first is the order with
  *  none. */
@@ -185,11 +191,27 @@ export function CollectionPage() {
     [communityId, parsedId]
   );
   const view = useListView(viewSpec);
-  const list = (
+  const listLayout =
     shown.find((layout) => layout.kind === view.layout) ??
     shown.find((layout) => layout.is_default) ??
-    shown[0]
-  )?.kind as CollectionList | undefined;
+    shown[0];
+  const list = listLayout?.kind as CollectionList | undefined;
+  const definition = (listLayout?.definition ?? {}) as ListLayoutDefinitionInput;
+
+  // What the list can show of each file: its own fields, the collection's
+  // fields and the initiative's properties, each rating as the list says.
+  const { data: properties = [] } = useProperties({
+    initiativeId: collection?.initiative_id,
+    enabled: collection !== undefined,
+  });
+  const allFields = useMemo(
+    () => collectionFileFields(collection?.fields ?? [], properties),
+    [collection?.fields, properties]
+  );
+  const fields = useMemo(
+    () => withDisplays(allFields, definition.displays),
+    [allFields, definition.displays]
+  );
   const wall = list !== undefined && list !== "table";
   const groupByTags = view.grouping.includes("tags");
   const { setGrouping, setFilters: keepFilters, setSorting } = view;
@@ -302,6 +324,8 @@ export function CollectionPage() {
     },
   });
   const [layoutsOpen, setLayoutsOpen] = useState(false);
+  const [editingLayouts, setEditingLayouts] = useState(false);
+  const [fieldsOpen, setFieldsOpen] = useState(false);
 
   // Selecting files. The same click either opens a file or takes it into the
   // selection, depending which the list is doing.
@@ -334,14 +358,23 @@ export function CollectionPage() {
     (file: FileSummary) => gp(toolDetailRoute(Tool.file, file.initiative_id, file.id)),
     [gp]
   );
+  // Any other file, where the collection has fields, opens beside the wall
+  // with its values there, and from there on its own page.
+  const [besideId, setBesideId] = useState<number | null>(null);
+  const besideFile = rows.find((row) => row.id === besideId);
+  const hasFields = (collection?.fields.length ?? 0) > 0;
   const onActivate = useCallback(
     (file: FileSummary, options: GridToggleOptions) => {
       if (selection.active) selection.toggle(file as FileRow, options);
       else if (file.kind === FileKind.image) setOpenId(file.id);
+      else if (hasFields) setBesideId(file.id);
       else void navigate({ to: fileRoute(file) });
     },
-    [selection.active, selection.toggle, navigate, fileRoute]
+    [selection.active, selection.toggle, navigate, fileRoute, hasFields]
   );
+  // A table row's name opens it as the walls do, once the collection has
+  // fields of its own; until then it goes to the file's page.
+  const openRow = useCallback((row: ToolIndexRow) => onActivate(row as FileRow, {}), [onActivate]);
   const lightboxItems = useMemo<LightboxItem[]>(
     () =>
       pictures.map((file) => ({
@@ -362,9 +395,9 @@ export function CollectionPage() {
   }, [hasNextPage, isFetchingNextPage, fetchNextPage]);
   const lightboxFile = openIndex >= 0 ? pictures[openIndex] : undefined;
 
-  const { property_filters: propertyFilters, ...fields } = filters;
+  const { property_filters: propertyFilters, ...narrowedBy } = filters;
   const activeFilterCount =
-    Object.values(fields).filter((value) =>
+    Object.values(narrowedBy).filter((value) =>
       Array.isArray(value)
         ? value.length > 0
         : typeof value === "string"
@@ -468,6 +501,12 @@ export function CollectionPage() {
                 <DropdownMenuItem onSelect={() => dropzoneRef.current?.open()}>
                   <Upload className="h-4 w-4" />
                   {t("collections.uploadFiles")}
+                </DropdownMenuItem>
+              ) : null}
+              {canEdit ? (
+                <DropdownMenuItem onSelect={() => setFieldsOpen(true)}>
+                  <ListPlus className="h-4 w-4" />
+                  {t("collections.fields.title")}
                 </DropdownMenuItem>
               ) : null}
               {layoutsQuery.data?.can_configure ? (
@@ -609,45 +648,34 @@ export function CollectionPage() {
               </>
             ) : null}
           </div>
-        ) : list === "table" ? (
-          <ToolIndexTable
-            tool={Tool.file}
-            initiativeId={initiativeId ?? 0}
-            rows={rows}
-            // The rows are files, which is what these columns read.
-            useColumns={useCollectionFileColumns as unknown as () => AppColumnDef<ToolIndexRow>[]}
-            selection={selection}
-            sorting={view.sorting}
-            onSortingChange={setSorting}
-            columnVisibility={view.columns}
-            onColumnVisibilityChange={view.setColumns}
-          />
-        ) : list === "timeline" ? (
-          <CollectionTimelineView
+        ) : list ? (
+          <CollectionListView
+            kind={list}
+            definition={definition}
+            fields={fields}
             files={rows}
-            buckets={timelineQuery.data?.buckets ?? []}
-            onActivate={onActivate}
-            selecting={selecting}
-            isSelected={isSelected}
+            groupByTags={groupByTags}
+            buckets={timelineQuery.data?.buckets}
             onJump={onJump}
-          />
-        ) : list === "masonry" ? (
-          <CollectionMasonryView
-            files={rows}
-            groupByTags={groupByTags}
             onActivate={onActivate}
             selecting={selecting}
             isSelected={isSelected}
+            table={(columns) => (
+              <ToolIndexTable
+                tool={Tool.file}
+                initiativeId={initiativeId ?? 0}
+                rows={rows}
+                laidOut={columns}
+                onOpen={hasFields ? openRow : undefined}
+                selection={selection}
+                sorting={view.sorting}
+                onSortingChange={setSorting}
+                columnVisibility={view.columns}
+                onColumnVisibilityChange={view.setColumns}
+              />
+            )}
           />
-        ) : (
-          <CollectionGridView
-            files={rows}
-            groupByTags={groupByTags}
-            onActivate={onActivate}
-            selecting={selecting}
-            isSelected={isSelected}
-          />
-        )}
+        ) : null}
         <div ref={sentinelRef} className="h-px" />
         {isFetchingNextPage ? (
           <div className="flex justify-center py-4">
@@ -683,6 +711,11 @@ export function CollectionPage() {
         index={Math.max(openIndex, 0)}
         onIndexChange={(index) => setOpenId(pictures[index]?.id ?? null)}
         onNearEnd={onNearEnd}
+        panel={
+          collection && lightboxFile && collection.fields.length > 0 ? (
+            <CollectionFileFields collection={collection} file={lightboxFile} />
+          ) : undefined
+        }
         actions={
           lightboxFile ? (
             <Button
@@ -699,6 +732,30 @@ export function CollectionPage() {
           ) : null
         }
       />
+
+      <Sheet
+        open={besideFile !== undefined}
+        onOpenChange={(next) => {
+          if (!next) setBesideId(null);
+        }}
+      >
+        <SheetContent className="w-full overflow-y-auto sm:max-w-md" aria-describedby={undefined}>
+          <SheetHeader>
+            <SheetTitle className="truncate">{besideFile?.name}</SheetTitle>
+          </SheetHeader>
+          {collection && besideFile ? (
+            <div className="space-y-4 px-4 pb-4">
+              <CollectionFileFields collection={collection} file={besideFile} />
+              <Button asChild variant="outline" size="sm">
+                <Link to={fileRoute(besideFile)}>
+                  <ExternalLink className="size-4" />
+                  {t("collections.openFile")}
+                </Link>
+              </Button>
+            </div>
+          ) : null}
+        </SheetContent>
+      </Sheet>
 
       {collection ? (
         <FileChooserDialog
@@ -726,6 +783,41 @@ export function CollectionPage() {
             <LayoutList
               layouts={layoutsQuery.data.layouts}
               target={instanceTarget("collection", validId)}
+            />
+          ) : null}
+          <DialogFooter>
+            <Button
+              variant="outline"
+              onClick={() => {
+                setLayoutsOpen(false);
+                setEditingLayouts(true);
+              }}
+            >
+              <Pencil className="h-4 w-4" />
+              {t("collections.editLayouts")}
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      {editingLayouts && collection && layoutsQuery.data ? (
+        <CollectionLayoutEditor
+          collection={collection}
+          set={layoutsQuery.data}
+          files={rows}
+          onClose={() => setEditingLayouts(false)}
+        />
+      ) : null}
+
+      <Dialog open={fieldsOpen} onOpenChange={setFieldsOpen}>
+        <DialogContent className="sm:max-w-3xl" aria-describedby={undefined}>
+          <DialogHeader>
+            <DialogTitle>{t("collections.fields.title")}</DialogTitle>
+          </DialogHeader>
+          {collection ? (
+            <InitiativeSettingsPropertiesTab
+              initiativeId={collection.initiative_id}
+              collectionId={collection.id}
             />
           ) : null}
         </DialogContent>

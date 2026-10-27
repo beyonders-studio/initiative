@@ -27,10 +27,11 @@ from __future__ import annotations
 
 from datetime import datetime
 from enum import Enum
-from typing import Annotated, Any, List, Literal, Optional, Union, get_args
+from typing import Annotated, Any, Dict, List, Literal, Optional, Union, get_args
 
 from pydantic import AfterValidator, ConfigDict, Field, field_validator, model_validator
 
+from app.core.collection_shapes import RatingDisplay
 from app.core.tools import LAYOUT_KIND_TARGETS, Tool
 from app.models.tenant.task import TaskPriority, TaskStatusCategory
 from app.schemas.base import SanitizedBaseModel
@@ -190,6 +191,18 @@ class TaskFieldId(str, Enum):
     tags = "tags"
 
 
+class FileFieldId(str, Enum):
+    """A file's own fields, as a collection's lists show them."""
+
+    name = "name"
+    #: What kind of file it is.
+    type = "type"
+    size = "size"
+    #: When it was added to the collection.
+    added = "added"
+    created = "created"
+
+
 class EventDetailFieldId(str, Enum):
     """What an event's detail edits as a field. Its dates, its properties and
     your answer are parts of their own."""
@@ -272,8 +285,18 @@ def _named_field(value: str) -> str:
     )
 
 
+def _property_field(value: str) -> str:
+    """``property:<definition id>``."""
+    if value.startswith(PROPERTY_FIELD_PREFIX) and _is_row_id(
+        value.removeprefix(PROPERTY_FIELD_PREFIX)
+    ):
+        return value
+    raise ValueError("a property's field is 'property:<id>'")
+
+
 NamedFieldId = Annotated[str, AfterValidator(_named_field)]
-CardFieldId = Union[TaskFieldId, NamedFieldId]
+PropertyFieldId = Annotated[str, AfterValidator(_property_field)]
+CardFieldId = Union[TaskFieldId, FileFieldId, NamedFieldId]
 
 
 #: The characters a built-in field's name is written in.
@@ -333,7 +356,7 @@ TaskDetailFieldId = Enum(
     {f.name: f.value for f in TaskFieldId if f.value in _PAGE},
     type=str,
 )
-ColumnFieldId = Union[TaskColumnFieldId, NamedFieldId]
+ColumnFieldId = Union[TaskColumnFieldId, FileFieldId, NamedFieldId]
 DetailFieldId = Union[
     TaskDetailFieldId,
     EventDetailFieldId,
@@ -580,6 +603,11 @@ class ListLayoutDefinition(_Strict):
     )
     #: Left out of the list's menu; none keeps what its tool ships.
     hidden: Optional[bool] = None
+    #: How each rating it shows is drawn, by the field's ``property:<id>``. A
+    #: rating with none is drawn as a number.
+    displays: Optional[Dict[PropertyFieldId, RatingDisplay]] = Field(
+        default=None, max_length=MAX_NODES
+    )
 
     @model_validator(mode="after")
     def _offers_what_it_starts_on(self) -> "ListLayoutDefinition":

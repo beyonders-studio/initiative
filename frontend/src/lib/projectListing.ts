@@ -12,6 +12,7 @@
  */
 
 import type {
+  CurrencyCode,
   PropertyDefinitionRead,
   PropertyOption,
   PropertySummary,
@@ -49,6 +50,7 @@ export interface ProjectListingPropertyDefinition {
   position: number;
   color?: string | null;
   options?: PropertyOption[] | null;
+  currency?: CurrencyCode | null;
 }
 
 export interface ProjectListingTask {
@@ -216,6 +218,8 @@ export const projectListingBoard = (
       position: definition.position,
       color: definition.color ?? null,
       options: definition.options ?? null,
+      currency: definition.currency ?? null,
+      collection_id: null,
       created_at: "",
       updated_at: "",
     })
@@ -230,6 +234,7 @@ export const projectListingBoard = (
         name: definition.name,
         type: definition.type,
         options: definition.options,
+        currency: definition.currency,
         value: DATE_PROPERTY_TYPES.has(value.property_type)
           ? shifted(value.value_text, shift)
           : (value.value_text ?? value.value_number ?? value.value_boolean ?? value.value_json),

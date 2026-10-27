@@ -143,6 +143,9 @@ class CaptureSpec:
     #: to, where the table's own answer is not this report's. ``None`` leaves
     #: the table's registry entry to answer, which is the ordinary case.
     initiative_expr: str | None = None
+    #: The chain this report carries, read off the row, where it is not the
+    #: resource's own. ``None`` borrows the resource's.
+    own_parents: str | None = None
 
     @property
     def trigger_name(self) -> str:
@@ -173,6 +176,8 @@ class CaptureSpec:
         Empty for the tool tables and everything reporting against one, so
         those pay nothing for the column.
         """
+        if self.own_parents is not None:
+            return self.own_parents
         return _parents_expr(
             table=self.table,
             facet=self.facet,
@@ -323,6 +328,17 @@ def build_specs() -> list[CaptureSpec]:
             # each, so the capture function itself needs to know nothing about
             # the case: it is the same per-table arguments, twice.
             for report in declared if isinstance(declared, tuple) else (declared,):
+                facet_expr = (
+                    report.facet_expr(ROW) if report.facet_expr is not None else None
+                )
+                facet_values = report.facet_values
+                if report.facet_on_delete is not None:
+                    # The operation reaches the facet's lookup as $2.
+                    facet_expr = (
+                        f"(CASE $2 WHEN 'DELETE' THEN '{report.facet_on_delete}'"
+                        f" ELSE '{report.facet}' END)"
+                    )
+                    facet_values = frozenset({report.facet, report.facet_on_delete})
                 specs.append(
                     CaptureSpec(
                         table=table_name,
@@ -335,16 +351,15 @@ def build_specs() -> list[CaptureSpec]:
                             else None
                         ),
                         label=report.label,
-                        facet_expr=(
-                            report.facet_expr(ROW)
-                            if report.facet_expr is not None
-                            else None
-                        ),
-                        facet_values=report.facet_values,
+                        facet_expr=facet_expr,
+                        facet_values=facet_values,
                         initiative_expr=(
                             report.initiative_expr(ROW)
                             if report.initiative_expr is not None
                             else None
+                        ),
+                        own_parents=(
+                            report.parents(ROW) if report.parents is not None else None
                         ),
                     )
                 )
@@ -404,7 +419,8 @@ _GOVERNING_TOOLS = ", ".join(f"('{tool.plural}', '{tool.value}')" for tool in To
 #:   7 — expression resolving the resource's parent chain, or '' when it has none
 #:   8 — expression that is true while the row is not news yet, or '' for none
 #:   9 — 'anonymous' when this table's events name no actor
-#:  10 — expression resolving the facet label, or '' when arg 3 is the answer
+#:  10 — expression resolving the facet label, or '' when arg 3 is the answer;
+#:       it reads the row as ``$1`` and the operation (``TG_OP``) as ``$2``
 CAPTURE_FUNCTION_SQL = f"""
 CREATE OR REPLACE FUNCTION {CAPTURE_FUNCTION}() RETURNS trigger
     LANGUAGE plpgsql AS $capture$
@@ -533,7 +549,7 @@ BEGIN
     -- A facet whose label the row decides. Resolved here rather than passed as
     -- a literal, for a table whose rows are facets of different things.
     IF COALESCE(TG_ARGV[10], '') <> '' THEN
-        EXECUTE 'SELECT ' || TG_ARGV[10] INTO v_facet USING v_row;
+        EXECUTE 'SELECT ' || TG_ARGV[10] INTO v_facet USING v_row, TG_OP;
         v_facet := COALESCE(v_facet, '');
     END IF;
 

@@ -531,6 +531,9 @@ class PropertyMessages:
     NOT_INITIATIVE_MEMBER = "PROPERTY_NOT_INITIATIVE_MEMBER"
     OPTIONS_REQUIRED = "PROPERTY_OPTIONS_REQUIRED"
     DUPLICATE_OPTION_VALUE = "PROPERTY_DUPLICATE_OPTION_VALUE"
+    #: A money property names the currency its amounts are in.
+    CURRENCY_REQUIRED = "PROPERTY_CURRENCY_REQUIRED"
+    #: A rating is a collection's own field, never an initiative's property.
 
 
 class AttachmentMessages:
@@ -1234,6 +1237,8 @@ class CollectionMessages:
     FILE_NOT_AVAILABLE = "COLLECTION_FILE_NOT_AVAILABLE"
     #: A cover has to be one of the collection's own files.
     COVER_NOT_IN_COLLECTION = "COLLECTION_COVER_NOT_IN_COLLECTION"
+    #: A collection's fields hold values for its own files only.
+    FILE_NOT_IN_COLLECTION = "COLLECTION_FILE_NOT_IN_COLLECTION"
 
 
 class WikiMessages:

@@ -1,4 +1,5 @@
 import {
+  type ListLayoutDefinitionInputDisplays,
   type PropertyDefinitionRead,
   type PropertyOption,
   type PropertySummary,
@@ -20,6 +21,19 @@ export const slugify = (raw: string): string =>
     .replace(/[^a-z0-9_-]+/g, "_")
     .replace(/^_+|_+$/g, "")
     .slice(0, 64);
+
+/** How a list draws a rating: a number, five stars, or a bar. */
+export type RatingDisplay = NonNullable<ListLayoutDefinitionInputDisplays>[string];
+
+/** The amount a money or number value holds, or null where it holds none. */
+export const numericValue = (raw: unknown): number | null => {
+  if (typeof raw === "number") return Number.isFinite(raw) ? raw : null;
+  if (typeof raw === "string" && raw.trim() !== "") {
+    const parsed = Number(raw);
+    return Number.isFinite(parsed) ? parsed : null;
+  }
+  return null;
+};
 
 export const typeRequiresOptions = (type: PropertyType): boolean =>
   type === PropertyType.select || type === PropertyType.multi_select;
@@ -124,5 +138,6 @@ export const propertyStubFromDefinition = (
   name: definition.name,
   type: definition.type,
   options: definition.options ?? null,
+  currency: definition.currency ?? null,
   value: null,
 });

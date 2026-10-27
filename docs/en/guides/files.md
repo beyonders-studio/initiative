@@ -216,7 +216,7 @@ Converting replaces the upload and its version history, and the dialog says so b
 
 A **collection** is a handful of files that belong together. The fete photos. The logo, and the four other logos that lost. Everything the new treasurer needs, which is somehow eleven files and one of them is a spreadsheet called `REAL one`.
 
-Select files in the list, then **Add to collection** in **More actions**, and name a new one or pick one you already have. A file can sit in as many collections as it suits. It stays in Files the whole time, so nothing goes missing because somebody filed it somewhere clever.
+Select files in the list, then **Add to collection** in **More actions**, and name a new one or pick one you already have. A new one can start from a shape: **Gallery** for looking, **Catalog** with a price and a rating, **Log** for things with a date, blank, or the shape of another collection. A file can sit in as many collections as it suits. It stays in Files the whole time, so nothing goes missing because somebody filed it somewhere clever.
 
 On a collection's page, drop files anywhere to upload them straight in, or **Add files** to bring in ones that are already here.
 
@@ -227,7 +227,13 @@ On a collection's page, drop files anywhere to upload them straight in, or **Add
 | **Masonry** | Every picture at its own shape, packed into columns. For *looking*. |
 | **Timeline** | A row per day, by when each file joined, with a rail for jumping months. |
 
-**Layouts** in the collection's menu picks which views it offers and the one it opens on.
+**Layouts** in the collection's menu picks which views it offers and the one it opens on, and **Edit what the lists show** picks the table's columns and what each card shows under the picture.
+
+### A collection's fields
+
+A collection can have **fields** of its own, from **Fields** in its menu: a price, a rating, the day a photo was taken. The values belong to the collection, not the file, so the same photo can be "£40, four stars" in the shop catalogue and just a picture in the fete gallery. Open a file from the collection to fill them in.
+
+Lists can also show the initiative's own [properties](initiatives.md#custom-properties), which a file carries wherever it goes. Fields are for what only makes sense in this collection.
 
 !!! tip "A collection doesn't change who sees a file"
     Each file keeps its own sharing. Somebody opening a collection sees the files in it they could already open, and nothing else. If they can't open any of them, the collection doesn't show up for them at all.

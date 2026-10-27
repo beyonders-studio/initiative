@@ -6,7 +6,7 @@ export {
   resetCounter as resetCalendarEventCounter,
 } from "./calendarEvent.factory";
 export { ownerCan, readerCan, writerCan } from "./can";
-export { buildCollection } from "./collection.factory";
+export { buildCollection, buildCollectionFile } from "./collection.factory";
 export {
   buildComment,
   buildReactionGroup,

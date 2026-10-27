@@ -15,7 +15,9 @@
     "url": "URL",
     "select": "Auswahl",
     "multi_select": "Mehrfachauswahl",
-    "user_reference": "Person"
+    "user_reference": "Person",
+    "currency": "Geldbetrag",
+    "rating": "Bewertung"
   },
   "picker": {
     "placeholder": "Eigenschaften suchen…",
@@ -41,11 +43,13 @@
     "searchOptions": "Option suchen oder erstellen…",
     "createOption": "„{{label}}“ erstellen",
     "optionAdded": "Option hinzugefügt",
-    "optionAddFailed": "Option konnte nicht hinzugefügt werden"
+    "optionAddFailed": "Option konnte nicht hinzugefügt werden",
+    "ratingPlaceholder": "1–100"
   },
   "cell": {
     "emptyValue": "—",
-    "none": "Keine"
+    "none": "Keine",
+    "rating": "Mit {{value}} von 100 bewertet"
   },
   "manager": {
     "title": "Benutzerdefinierte Eigenschaften",
@@ -66,7 +70,9 @@
     "createError": "Eigenschaft konnte nicht erstellt werden",
     "updateError": "Eigenschaft konnte nicht aktualisiert werden",
     "deleteError": "Eigenschaft konnte nicht gelöscht werden",
-    "setValuesError": "Eigenschaftswert konnte nicht gespeichert werden"
+    "setValuesError": "Eigenschaftswert konnte nicht gespeichert werden",
+    "moveUp": "{{name}} nach oben verschieben",
+    "moveDown": "{{name}} nach unten verschieben"
   },
   "filter": {
     "addFilter": "Eigenschaftsfilter hinzufügen",
@@ -83,5 +89,10 @@
       "ilike": "enthält",
       "is_null": "ist leer"
     }
+  },
+  "currency": {
+    "label": "Währung",
+    "none": "Keine Währung passt",
+    "default": "EUR"
   }
 }
