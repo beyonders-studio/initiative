@@ -366,9 +366,17 @@ def _finishing(upload: PendingUpload) -> bool:
     return upload.completed_at is None and bool(upload.blob_state.get("finishing"))
 
 
+def _gone_if_moved(storage: Any, upload: PendingUpload) -> None:
+    """Refuse an upload started in a store the community no longer uses, as
+    one past its expiry is refused: the client starts it again."""
+    if not storage.holds_parts(upload.blob_state):
+        raise _refuse(status.HTTP_410_GONE, ResumableMessages.EXPIRED)
+
+
 async def head(session: AsyncSession, guild_id: int, upload_id: str) -> Response:
     """Where an upload stands. One a request left finishing is finished."""
     upload = await _live(session, upload_id)
+    _gone_if_moved(get_guild_storage(guild_id), upload)
     if _finishing(upload):
         lease = _Lease(session, upload_id, _nothing)
         try:
@@ -440,6 +448,7 @@ async def patch(
         if declared is not None and offset + _number(declared) > upload.length:
             raise _refuse(status.HTTP_400_BAD_REQUEST, ResumableMessages.PAST_LENGTH)
         storage = get_guild_storage(guild_id)
+        _gone_if_moved(storage, upload)
         if _finishing(upload):
             await _finish(lease, storage, upload)
             return Response(
@@ -508,13 +517,13 @@ async def patch(
 async def terminate(session: AsyncSession, guild_id: int, upload_id: str) -> Response:
     """Throw an upload away, staged bytes and all."""
     lease = _Lease(session, upload_id, _nothing)
+    storage = get_guild_storage(guild_id)
     try:
         upload = await lease.take()
-        await asyncio.to_thread(
-            get_guild_storage(guild_id).drop_parts,
-            upload.staging_key,
-            upload.blob_state,
-        )
+        if storage.holds_parts(upload.blob_state):
+            await asyncio.to_thread(
+                storage.drop_parts, upload.staging_key, upload.blob_state
+            )
         await session.exec(
             delete(PendingUpload).where(col(PendingUpload.id) == upload_id)
         )
@@ -529,6 +538,7 @@ async def terminate(session: AsyncSession, guild_id: int, upload_id: str) -> Res
 
 async def take(
     session: AsyncSession,
+    guild_id: int,
     upload_id: str,
     *,
     purpose: str,
@@ -558,6 +568,7 @@ async def take(
         raise HTTPException(
             status_code=status.HTTP_404_NOT_FOUND, detail=ResumableMessages.NOT_FOUND
         )
+    _gone_if_moved(get_guild_storage(guild_id), upload)
     return upload
 
 
@@ -582,6 +593,8 @@ async def expire(session: AsyncSession, guild_id: int) -> None:
     )
     await session.commit()
     for upload in expired:
+        if not storage.holds_parts(upload.blob_state):
+            continue
         try:
             await asyncio.to_thread(
                 storage.drop_parts, upload.staging_key, upload.blob_state

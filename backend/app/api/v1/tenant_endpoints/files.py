@@ -403,6 +403,7 @@ async def _store_file(
         if upload_id is not None:
             staged = await resumable.take(
                 session,
+                guild_id,
                 upload_id,
                 purpose="file",
                 user_id=guild_context.user_id,

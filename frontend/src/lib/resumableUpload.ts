@@ -50,6 +50,28 @@ const wait = (ms: number, signal?: AbortSignal) =>
   });
 
 /**
+ * Throw an upload away, trying again while the request it stopped still holds
+ * it. It is forgotten once it is gone; until then, picking the same file again
+ * finds it.
+ */
+const discard = async (address: string, remembered: string) => {
+  for (const delay of [0, ...RETRY_DELAYS_MS]) {
+    await wait(delay);
+    try {
+      await apiClient.delete(address, { headers: TUS });
+    } catch (error) {
+      const gone = isAxiosError(error) && [404, 410].includes(error.response?.status ?? 0);
+      if (!gone) {
+        if (retryable(error)) continue;
+        return;
+      }
+    }
+    await removeItem(remembered);
+    return;
+  }
+};
+
+/**
  * Send `file` to the community a piece at a time, then hand its upload id to
  * `take`, the endpoint that keeps it, and answer what that answers.
  *
@@ -107,9 +129,16 @@ export const uploadInPieces = async <T>(
     }
     const uploadId = id;
     let failures = 0;
-    while (offset < file.size) {
-      const from: number = offset;
+    // `null` while where the upload stands is to be asked again.
+    let at: number | null = offset;
+    while (at === null || at < file.size) {
       try {
+        if (at === null) {
+          at = await standing(uploadId);
+          if (at === null) throw new Error("the upload is gone");
+          continue;
+        }
+        const from: number = at;
         const answer = await apiClient.patch(
           `${base}/${uploadId}`,
           file.slice(from, from + PIECE_BYTES),
@@ -123,16 +152,14 @@ export const uploadInPieces = async <T>(
             onUploadProgress: ({ loaded }) => onProgress?.(from + loaded, file.size),
           }
         );
-        offset = Number(answer.headers["upload-offset"]);
+        at = Number(answer.headers["upload-offset"]);
         failures = 0;
       } catch (error) {
         if (signal?.aborted || !retryable(error) || failures >= RETRY_DELAYS_MS.length) {
           throw error;
         }
         await wait(RETRY_DELAYS_MS[failures++], signal);
-        const found = await standing(uploadId);
-        if (found === null) throw error;
-        offset = found;
+        at = null;
       }
     }
     onProgress?.(file.size, file.size);
@@ -140,10 +167,7 @@ export const uploadInPieces = async <T>(
     await removeItem(remembered);
     return taken;
   } catch (error) {
-    if (signal?.aborted && id) {
-      await removeItem(remembered);
-      void apiClient.delete(`${base}/${id}`, { headers: TUS }).catch(() => undefined);
-    }
+    if (signal?.aborted && id) void discard(`${base}/${id}`, remembered);
     throw error;
   }
 };

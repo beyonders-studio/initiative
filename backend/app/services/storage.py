@@ -171,9 +171,15 @@ class StorageBackend(Protocol):
     # --- A file staged in parts (``app.services.resumable``) -----------------
     # ``state`` is the backend's own record of the parts, kept by the caller
     # between requests; each call returns it updated. ``stored`` in it counts
-    # the bytes kept as parts, and ``tail`` those kept apart until the next.
+    # the bytes kept as parts, ``tail`` those kept apart until the next, and
+    # ``store`` the kind of store that holds them.
 
     def start_parts(self, key: str, *, part_bytes: int) -> dict: ...
+
+    def holds_parts(self, state: dict) -> bool:
+        """Whether this backend holds the parts ``state`` records: not when
+        the community's storage moved since they were started."""
+        ...
 
     def add_part(self, key: str, state: dict, data: bytes) -> dict:
         """Keep ``data`` as the next part."""
@@ -341,7 +347,10 @@ class LocalFilesystemStorage:
         if target is None:
             raise ValueError(f"Invalid storage key: {key!r}")
         target.write_bytes(b"")
-        return {"stored": 0, "tail": 0, "part_bytes": part_bytes}
+        return {"store": "local", "stored": 0, "tail": 0, "part_bytes": part_bytes}
+
+    def holds_parts(self, state: dict) -> bool:
+        return state.get("store") == "local"
 
     def add_part(self, key: str, state: dict, data: bytes) -> dict:
         target = self._safe_path(key)
@@ -550,12 +559,16 @@ class S3Storage:
             Bucket=self._bucket, Key=self._object_key(key)
         )
         return {
+            "store": "s3",
             "upload_id": upload["UploadId"],
             "parts": [],
             "stored": 0,
             "tail": 0,
             "part_bytes": part_bytes,
         }
+
+    def holds_parts(self, state: dict) -> bool:
+        return state.get("store") == "s3"
 
     def add_part(self, key: str, state: dict, data: bytes) -> dict:
         number = len(state["parts"]) + 1
@@ -729,20 +742,28 @@ class DualReadStorage:
     def start_parts(self, key: str, *, part_bytes: int) -> dict:
         return self._primary.start_parts(key, part_bytes=part_bytes)
 
+    def _staging(self, state: dict) -> StorageBackend:
+        """The store an upload's parts were started in, so one begun before
+        the move carries on where it began."""
+        return self._fallback if self._fallback.holds_parts(state) else self._primary
+
+    def holds_parts(self, state: dict) -> bool:
+        return self._staging(state).holds_parts(state)
+
     def add_part(self, key: str, state: dict, data: bytes) -> dict:
-        return self._primary.add_part(key, state, data)
+        return self._staging(state).add_part(key, state, data)
 
     def keep_tail(self, key: str, state: dict, data: bytes) -> dict:
-        return self._primary.keep_tail(key, state, data)
+        return self._staging(state).keep_tail(key, state, data)
 
     def take_tail(self, key: str, state: dict) -> tuple[bytes, dict]:
-        return self._primary.take_tail(key, state)
+        return self._staging(state).take_tail(key, state)
 
     def finish_parts(self, key: str, state: dict) -> None:
-        self._primary.finish_parts(key, state)
+        self._staging(state).finish_parts(key, state)
 
     def drop_parts(self, key: str, state: dict) -> None:
-        self._primary.drop_parts(key, state)
+        self._staging(state).drop_parts(key, state)
 
     def presign_get(
         self, key: str, *, ttl: int, filename: str | None = None

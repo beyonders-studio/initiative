@@ -24,10 +24,11 @@ describe("uploadInPieces", () => {
     expect(progress.at(-1)).toBe(8);
   });
 
-  it("carries on from where the server stands after a piece is lost", async () => {
+  it("carries on from where the server stands once the connection is back", async () => {
     vi.useFakeTimers({ shouldAdvanceTime: true });
     const offsets: string[] = [];
     let dropped = false;
+    let asked = 0;
     server.use(
       communityHttp.patch("/resumable-uploads/:id", ({ request }) => {
         offsets.push(request.headers.get("upload-offset") ?? "");
@@ -37,9 +38,11 @@ describe("uploadInPieces", () => {
         }
         return new HttpResponse(null, { status: 204, headers: { "Upload-Offset": "8" } });
       }),
-      communityHttp.head(
-        "/resumable-uploads/:id",
-        () => new HttpResponse(null, { headers: { "Upload-Offset": "0" } })
+      // Still down the first time it asks where the upload stands.
+      communityHttp.head("/resumable-uploads/:id", () =>
+        asked++ === 0
+          ? HttpResponse.error()
+          : new HttpResponse(null, { headers: { "Upload-Offset": "0" } })
       )
     );
 
@@ -50,14 +53,16 @@ describe("uploadInPieces", () => {
       { initiativeId: 4 },
       async (uploadId) => uploadId
     );
-    await vi.advanceTimersByTimeAsync(1_000);
+    await vi.advanceTimersByTimeAsync(4_000);
 
     await expect(sending).resolves.toMatch(/^up-/);
     expect(offsets).toEqual(["0", "0"]);
+    expect(asked).toBe(2);
     vi.useRealTimers();
   });
 
-  it("throws the upload away when it is stopped", async () => {
+  it("throws the upload away when it is stopped, once the piece lets go of it", async () => {
+    vi.useFakeTimers({ shouldAdvanceTime: true });
     const thrownAway = vi.fn();
     const stop = new AbortController();
     server.use(
@@ -65,9 +70,10 @@ describe("uploadInPieces", () => {
         stop.abort();
         return new HttpResponse(null, { status: 204, headers: { "Upload-Offset": "2" } });
       }),
+      // The stopped piece still holds it the first time.
       communityHttp.delete("/resumable-uploads/:id", () => {
         thrownAway();
-        return new HttpResponse(null, { status: 204 });
+        return new HttpResponse(null, { status: thrownAway.mock.calls.length === 1 ? 423 : 204 });
       })
     );
 
@@ -81,6 +87,8 @@ describe("uploadInPieces", () => {
         { signal: stop.signal }
       )
     ).rejects.toBeDefined();
-    await vi.waitFor(() => expect(thrownAway).toHaveBeenCalled());
+    await vi.advanceTimersByTimeAsync(2_000);
+    await vi.waitFor(() => expect(thrownAway).toHaveBeenCalledTimes(2));
+    vi.useRealTimers();
   });
 });

@@ -637,6 +637,19 @@ def test_dualread_delete_prefix_sums_both(tmp_path):
     assert dual.delete_prefix() == 3
 
 
+def test_dualread_finishes_an_upload_where_it_was_started(tmp_path):
+    client, s3, local, dual = _dual(tmp_path)
+    begun = local.start_parts("resumable-a", part_bytes=8)
+
+    state = dual.add_part("resumable-a", begun, b"before the move")
+    dual.finish_parts("resumable-a", state)
+
+    assert dual.holds_parts(state) and not s3.holds_parts(state)
+    assert local.open_readable("resumable-a").path.read_bytes() == b"before the move"
+    assert client.multipart_open is False
+    assert s3.holds_parts(dual.start_parts("resumable-b", part_bytes=8))
+
+
 def test_dualread_copy_cross_store(tmp_path):
     client, _, local, dual = _dual(tmp_path)
     # Source only on local (not yet backfilled): copy reads local, writes to S3.

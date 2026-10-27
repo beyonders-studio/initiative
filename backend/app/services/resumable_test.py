@@ -333,3 +333,26 @@ async def test_a_program_sent_in_pieces_is_refused_and_left_to_cancel(
     assert refused.json()["detail"] == "FILE_TYPE_NOT_ALLOWED"
     await route_session_to_guild(session, owner.guild.id)
     assert (await session.exec(select(PendingUpload))).one().id == upload_id
+
+
+async def test_an_upload_from_a_store_left_behind_reads_as_expired(
+    client: AsyncClient, acting_user, session
+):
+    owner = await acting_user(guild_role=CommunityRole.admin, initiative=True)
+    created = await _create(client, owner, 8)
+    location = _path(created.headers["location"])
+    await route_session_to_guild(session, owner.guild.id)
+    upload = (await session.exec(select(PendingUpload))).one()
+    upload.blob_state = {**upload.blob_state, "store": "s3"}
+    session.add(upload)
+    await session.commit()
+
+    where = await client.head(location, headers={**owner.headers, **TUS})
+    sent = await _append(client, owner, location, 0, b"abc")
+    cancelled = await client.delete(location, headers={**owner.headers, **TUS})
+
+    assert (where.status_code, sent.status_code) == (410, 410)
+    assert cancelled.status_code == 204
+    session.expunge_all()
+    await route_session_to_guild(session, owner.guild.id)
+    assert (await session.exec(select(PendingUpload))).first() is None
