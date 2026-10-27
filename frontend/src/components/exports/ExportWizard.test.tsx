@@ -170,7 +170,7 @@ describe("ExportWizard", () => {
     expect(params.get("mode")).toBe("report");
     const formats = JSON.parse(params.get("formats")!);
     expect(formats.project).toBe("csv");
-    expect(formats.file).toEqual({ native: "pdf", spreadsheet: "xlsx" });
+    expect(formats.file).toEqual({ lexical: "pdf", sheet: "xlsx" });
     expect(formats.calendar).toBe("ics");
     expect(params.get("include_uploads")).toBeNull();
   });
