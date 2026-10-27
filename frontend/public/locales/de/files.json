@@ -105,9 +105,16 @@
   "featuredImage": {
     "label": "Beitragsbild",
     "upload": "Bild hochladen",
+    "fromFiles": "Aus Dateien",
     "replace": "Ersetzen",
     "remove": "Entfernen",
     "uploading": "Wird hochgeladen…"
+  },
+  "imageChooser": {
+    "title": "Bild aus Dateien wählen",
+    "description": "Es wird so eingefügt, wie es jetzt ist: Eine neuere Version der Datei ändert es nicht.",
+    "none": "Hier gibt es keine Bilder.",
+    "more": "Mehr anzeigen"
   },
   "outline": {
     "show": "Inhalt anzeigen",

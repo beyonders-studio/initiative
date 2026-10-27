@@ -29,9 +29,11 @@ from app.services.tenant.soft_delete import (
     soft_delete_entity,
 )
 from app.testing.factories import (
+    create_file,
     create_guild,
     create_initiative,
     create_project,
+    create_upload,
     create_user,
 )
 
@@ -350,6 +352,38 @@ async def test_purge_file_uploads_escapes_like_wildcards(session: AsyncSession):
         await session.exec(select(Upload).where(Upload.filename == "file_v2.png"))
     ).one_or_none()
     assert remaining is None
+
+
+async def test_purging_a_file_keeps_a_version_a_page_shows(session: AsyncSession):
+    """A picture picked from Files into a page of the same initiative is the
+    version's own stored file, so purging the file leaves it to the page."""
+    from app.services.tenant import file_versions
+    from app.services.tenant.attachments import purge_file_uploads
+
+    user = await create_user(session)
+    guild = await create_guild(session, creator=user)
+    initiative = await create_initiative(session, guild, user)
+    for name in ("shown.png", "alone.png"):
+        await create_upload(session, guild, user, filename=name)
+    doomed = await create_file(
+        session,
+        initiative,
+        user,
+        file_url=f"/uploads/{guild.id}/shown.png",
+        file_content_type="image/png",
+    )
+    await file_versions.add_version(
+        session,
+        doomed,
+        created_by=user.id,
+        file_url=f"/uploads/{guild.id}/alone.png",
+        file_content_type="image/png",
+    )
+    await create_file(
+        session, initiative, user, content={"src": f"/uploads/{guild.id}/shown.png"}
+    )
+
+    assert await purge_file_uploads(session, [doomed]) == {"alone.png"}
 
 
 async def test_trash_listing_dedupes_nested_comment_replies(

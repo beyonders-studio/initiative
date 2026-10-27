@@ -75,9 +75,11 @@ Pictures keep their captions. Click a picture to see it full size, and zoom in w
 
 Pictures in a text document belong to its initiative, and open for anybody in it. Paste a picture from another initiative's file and this one keeps its own copy.
 
+The logo is already in Files, three versions deep, and the right one is the third. **Insert › Image › Files** shows the pictures in Files, narrowed by initiative, collection or name, so nobody has to download it and upload it again. What goes in is the picture as it is right now. Upload a fourth version tomorrow and this page keeps the third; anyone who can read the page sees it, whoever the file itself is shared with.
+
 ### The featured image
 
-A file can lead with a **featured image**, running across the top. Anyone who can edit the file can **Replace** or **Remove** it, and a file without one has a row at the top to add one with **Upload image**.
+A file can lead with a **featured image**, running across the top. Anyone who can edit the file can **Replace** or **Remove** it, and a file without one has a row at the top to add one with **Upload image**, or **From Files** for a picture that's already there.
 
 Already have the picture in the page? Select it and choose **Make this the featured image**. Uploading a picture with **Insert › Image** offers a box that does the same.
 
@@ -171,7 +173,7 @@ Open a file's **Comments** to talk about it without touching the actual content.
 
 To pull somebody in, type `@`. To point at a *thing* rather than a person, type `#` and pick anything in the initiative. See [Mentions & links](mentions-and-links.md).
 
-A screenshot says it faster than three paragraphs. Paste or drag one into a comment, or tap the picture button — on the app it offers your camera. Take it back out and it's gone from storage too. A picture linked from some other website shows up as a link you click, not an image that loads itself.
+A screenshot says it faster than three paragraphs. Paste or drag one into a comment, or tap the picture button — on the app it offers your camera, and **From Files** picks one somebody already uploaded. Take it back out and it's gone from storage too. A picture linked from some other website shows up as a link you click, not an image that loads itself.
 
 ### Reactions
 

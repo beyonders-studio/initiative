@@ -1,4 +1,10 @@
-import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
+import {
+  keepPreviousData,
+  useInfiniteQuery,
+  useMutation,
+  useQuery,
+  useQueryClient,
+} from "@tanstack/react-query";
 import { useTranslation } from "react-i18next";
 
 import {
@@ -6,8 +12,10 @@ import {
   createFile,
   deleteFileVersion,
   duplicateFile,
+  getListFilesQueryKey,
   getListFileVersionsQueryKey,
   getReadFileQueryKey,
+  listFiles,
   listFileVersions,
   putVideoThumbnail,
   setFileGrants,
@@ -16,8 +24,10 @@ import {
 } from "@/api/generated/files/files";
 import type {
   FileCreate,
+  FileListResponse,
   FileRead,
   FileVersionRead,
+  ListFilesParams,
   ResourceGrantSchema,
 } from "@/api/generated/initiativeAPI.schemas";
 import { SearchEntityType, Tool } from "@/api/generated/initiativeAPI.schemas";
@@ -47,6 +57,30 @@ export const useUpdateFile = files.useUpdate;
  */
 export const useDeleteFile = files.useDelete;
 export const useSetFileGrants = files.useSetGrants;
+
+const FEED_PAGE_SIZE = 60;
+
+/**
+ * Files page by page, as somebody scrolls a grid of them — the image
+ * chooser's pictures. `keepPreviousData` keeps the grid on screen while a
+ * changed filter loads rather than blanking it.
+ */
+export const useFilesFeed = (
+  params: Omit<ListFilesParams, "page" | "page_size">,
+  options?: { enabled?: boolean }
+) => {
+  const communityId = useActiveCommunityId();
+  return useInfiniteQuery({
+    // Its own key beside the list's: pages of the feed are a different shape.
+    queryKey: [...getListFilesQueryKey(communityId, params), "feed"],
+    queryFn: ({ pageParam }) =>
+      listFiles(communityId, { ...params, page: pageParam, page_size: FEED_PAGE_SIZE }),
+    initialPageParam: 1,
+    getNextPageParam: (last: FileListResponse) => (last.has_next ? last.page + 1 : undefined),
+    placeholderData: keepPreviousData,
+    enabled: options?.enabled ?? true,
+  });
+};
 
 // ── Cache helpers ───────────────────────────────────────────────────────────
 
