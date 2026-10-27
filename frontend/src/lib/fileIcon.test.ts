@@ -48,7 +48,7 @@ describe("fileIcon", () => {
   });
 
   it("gives every category but the plain one a mark of its own", () => {
-    const plain = [FileKind.text, FileKind.link, FileKind.other];
+    const plain: FileKind[] = [FileKind.text, FileKind.link, FileKind.other];
     const marked = Object.values(FileType).filter(
       (type) => !plain.includes(FILE_TYPE_KINDS[type]) && type !== FileType.lexical
     );
