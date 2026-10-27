@@ -18,6 +18,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - **Unread count on the phone app's icon.** On an iPhone the icon shows how many notifications are unread, as the desktop app's does, and each push brings it up to date. An Android launcher counts the notifications in the tray. On both, the tray and the icon clear once nothing in the bell is unread.
 - **A plant care project in the marketplace.** Watering, fertilizing and repotting are each their own type. Watering and fertilizing repeat from when you last did them, and repotting starts with a checklist.
 - **Plug-ins can upload files.** With `files:write`, a plug-in can upload a file or a new version of one, and add files to collections.
+- **A collection's own fields, and shapes to start from.** A collection can have fields that belong to it rather than to its files, such as a price or a rating, so the same file can be priced in one collection and plain in another. Its table picks its columns and its cards pick what shows under each picture, from the file's own details, the collection's fields and the initiative's properties. A new collection can start as a Gallery, a Catalog, a Log, blank, or the shape of another collection. Webhooks are told which file joined or left a collection (`files.updated` with `added_to_collection` or `removed_from_collection`).
+- **Money and ratings as property types.** A money property holds an amount in the one currency it names; a rating holds 1 to 100, drawn by each list as the number, stars or a bar. Either can be one of the initiative's properties or a collection's own field.
 
 ### Changed
 
