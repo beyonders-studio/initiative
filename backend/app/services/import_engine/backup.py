@@ -353,9 +353,11 @@ async def stage_backup_job(
     anchor: datetime | None = None,
     people_map: dict[str, int] | None = None,
     join: list[int] | None = None,
+    payload_ref: str | None = None,
 ) -> ImportJob:
     """Plan the backup zip at ``payload``, stage it in the community's storage
     and add its job, created by ``user``, to ``session`` without committing.
+    ``payload_ref`` names it where it is already there (a resumable upload).
 
     ``session`` is routed into the community, and the plan suggests who each
     name in the archive is from the roster it reads there. A ``staged`` job
@@ -372,9 +374,10 @@ async def stage_backup_job(
         member_ids_by_handle=roster,
     )
     await import_engine.count_active_jobs_locked(session, user=user)
-    payload_ref = await asyncio.to_thread(
-        import_engine.stage_payload_file, guild_id, payload, suffix="zip"
-    )
+    if payload_ref is None:
+        payload_ref = await asyncio.to_thread(
+            import_engine.stage_payload_file, guild_id, payload, suffix="zip"
+        )
     params: dict[str, Any] = {}
     if anchor is not None:
         params["anchor"] = anchor.isoformat()

@@ -15,7 +15,7 @@ describe("uploadInPieces", () => {
       3,
       new File(["a report"], "report.pdf"),
       "report.pdf",
-      { initiativeId: 4 },
+      { purpose: "file", initiativeId: 4 },
       take,
       { onProgress: (sent) => progress.push(sent) }
     );
@@ -50,7 +50,7 @@ describe("uploadInPieces", () => {
       3,
       new File(["a report"], "minutes.pdf"),
       "minutes.pdf",
-      { initiativeId: 4 },
+      { purpose: "file", initiativeId: 4 },
       async (uploadId) => uploadId
     );
     await vi.advanceTimersByTimeAsync(4_000);
@@ -85,7 +85,7 @@ describe("uploadInPieces", () => {
         3,
         new File(["a report"], "draft.pdf", { lastModified: 1 }),
         "draft.pdf",
-        { fileId: 9 },
+        { purpose: "file", fileId: 9 },
         async (uploadId) => uploadId,
         { signal }
       );

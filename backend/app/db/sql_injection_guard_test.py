@@ -109,6 +109,9 @@ ALLOWED_DYNAMIC_SQL: dict[str, str] = {
     "app/db/backfill_uploads_to_s3.py::_guild_upload_meta": (
         "admin backfill job; schema name is int-derived guild_<id>"
     ),
+    "app/db/backfill_uploads_to_s3.py::_guild_import_payloads": (
+        "admin backfill job; schema name is int-derived guild_<id>"
+    ),
     "app/db/bootstrap.py::_revoke_former_set_config_holders": (
         "startup on the owner connection: role names read from pg_roles, "
         "quoted; the function signature is a module constant"
