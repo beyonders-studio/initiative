@@ -49,13 +49,18 @@ const wait = (ms: number, signal?: AbortSignal) =>
     );
   });
 
+/** Forget a remembered upload. The app reads it from memory, which forgets
+ *  it at once; a failure to also forget it on the device changes nothing
+ *  about what happens next. */
+const forget = (remembered: string) => removeItem(remembered).catch(() => undefined);
+
 /**
  * Throw an upload away, trying again while the request it stopped still holds
  * it. Forgotten first, so picking the same file again starts afresh rather
  * than carrying on with the upload being thrown away.
  */
 const discard = async (address: string, remembered: string) => {
-  await removeItem(remembered);
+  await forget(remembered);
   for (const delay of [0, ...RETRY_DELAYS_MS]) {
     await wait(delay);
     try {
@@ -161,7 +166,7 @@ export const uploadInPieces = async <T>(
     }
     onProgress?.(file.size, file.size);
     const taken = await take(uploadId);
-    await removeItem(remembered);
+    await forget(remembered);
     return taken;
   } catch (error) {
     if (signal?.aborted && id) void discard(`${base}/${id}`, remembered);
