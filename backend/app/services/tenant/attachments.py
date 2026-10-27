@@ -832,6 +832,8 @@ def validate_file(content: bytes, filename: str | None) -> Tuple[str, str]:
     if not content:
         raise ValueError("Uploaded file is empty")
 
+    # Read as the name the file is kept and downloaded under.
+    filename = display_filename(filename)
     detected = detect_mime_type(content) or "application/octet-stream"
     if is_refused(detected, filename) or (
         detected == "application/zip" and _is_app_package(content)

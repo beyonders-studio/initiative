@@ -171,9 +171,11 @@ SPECS: dict[FileType, FileTypeSpec] = {
 #: The types the editor creates and keeps as a body.
 EDITOR_TYPES = tuple(t for t, spec in SPECS.items() if not spec.stored)
 
-#: Programs, by what their bytes are, whatever they are named.
+#: Programs, and the scripts whose bytes say so, whatever they are named.
 REFUSED_MEDIA_TYPES = frozenset(
     {
+        "text/x-shellscript",
+        "text/x-msdos-batch",
         "application/x-dosexec",
         "application/x-msdownload",
         "application/vnd.microsoft.portable-executable",
@@ -187,7 +189,7 @@ REFUSED_MEDIA_TYPES = frozenset(
         "application/vnd.android.package-archive",
     }
 )
-#: Programs and scripts by name: a script's bytes are only text.
+#: Programs and scripts by name: most scripts' bytes are only text.
 REFUSED_EXTENSIONS = frozenset(
     {
         ".exe", ".dll", ".msi", ".jar", ".apk", ".ipa",

@@ -218,9 +218,22 @@ def test_an_upload_s_type_is_read_from_its_bytes(content, filename, expected):
         (b"MZ\x90\x00" + b"\x00" * 60 + b"PE\x00\x00", "invoice.pdf"),
         (b"\x7fELF\x02\x01\x01" + b"\x00" * 9 + b"\x02\x00>\x00" + b"\x00" * 64, "run"),
         (b"echo hello\n", "setup.sh"),
+        (b"#!/bin/sh\necho hello\n", "notes.txt"),
+        (b"@echo off\r\necho hello\r\n", "notes.txt"),
+        (b"echo hello\n", "setup.bat. "),
+        (b"echo hello\n", "setup.b\u200bat"),
         (_zip_of("AndroidManifest.xml", "classes.dex"), "photos.zip"),
     ],
-    ids=["program-named-pdf", "linux-program", "script", "android-app"],
+    ids=[
+        "program-named-pdf",
+        "linux-program",
+        "script",
+        "shell-script-named-txt",
+        "batch-file-named-txt",
+        "trailing-dot-and-space",
+        "hidden-character",
+        "android-app",
+    ],
 )
 def test_a_program_is_refused_whatever_it_is_named(content, filename):
     from app.services.tenant.attachments import RefusedFileTypeError, validate_file
