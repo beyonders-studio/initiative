@@ -24,13 +24,14 @@ is configured.
 
 from __future__ import annotations
 
+import io
 import logging
 import mimetypes
 import os
 import shutil
 from dataclasses import dataclass
 from pathlib import Path
-from typing import TYPE_CHECKING, Iterator, Protocol, runtime_checkable
+from typing import TYPE_CHECKING, Any, BinaryIO, Iterator, Protocol, runtime_checkable
 from urllib.parse import quote
 
 from fastapi.responses import FileResponse, Response, StreamingResponse
@@ -48,6 +49,8 @@ logger = logging.getLogger(__name__)
 
 # Streaming proxy chunk size for S3 GetObject bodies.
 _STREAM_CHUNK = 64 * 1024
+#: How much :func:`open_seekable` fetches at a time.
+_RANGE_READ = 256 * 1024
 
 # S3 error codes that mean "object/bucket not here" rather than a real failure.
 _S3_MISSING_CODES = {"404", "NoSuchKey", "NoSuchBucket", "NotFound"}
@@ -749,6 +752,53 @@ class DualReadStorage:
         if self._primary.exists(key):
             return self._primary.presign_get(key, ttl=ttl, filename=filename)
         return None
+
+
+class _RangeReader(io.RawIOBase):
+    """A stored object read a range at a time, as a caller seeks about it."""
+
+    def __init__(self, backend: StorageBackend, key: str, size: int) -> None:
+        self._backend, self._key, self._size, self._at = backend, key, size, 0
+
+    def readable(self) -> bool:
+        return True
+
+    def seekable(self) -> bool:
+        return True
+
+    def tell(self) -> int:
+        return self._at
+
+    def seek(self, offset: int, whence: int = io.SEEK_SET) -> int:
+        base = {io.SEEK_SET: 0, io.SEEK_CUR: self._at, io.SEEK_END: self._size}
+        self._at = max(0, base[whence] + offset)
+        return self._at
+
+    def readinto(self, buffer: Any) -> int:
+        end = min(self._at + len(buffer), self._size)
+        if end <= self._at:
+            return 0
+        blob = self._backend.open_readable(
+            self._key, byte_range=f"bytes={self._at}-{end - 1}"
+        )
+        data = b"".join(blob.stream) if blob is not None and blob.stream else b""
+        buffer[: len(data)] = data
+        self._at += len(data)
+        return len(data)
+
+
+def open_seekable(backend: StorageBackend, key: str, size: int) -> BinaryIO | None:
+    """``key``'s ``size`` bytes as a seekable file, ``None`` when it is
+    missing: the file itself where the backend keeps one on disk, otherwise
+    read a range at a time, so reading a few places in a large object fetches
+    only those."""
+    probe = backend.open_readable(key, byte_range="bytes=0-0")
+    if probe is None:
+        return None
+    if probe.path is not None:
+        return probe.path.open("rb")
+    b"".join(probe.stream or ())
+    return io.BufferedReader(_RangeReader(backend, key, size), buffer_size=_RANGE_READ)
 
 
 def build_upload_response(

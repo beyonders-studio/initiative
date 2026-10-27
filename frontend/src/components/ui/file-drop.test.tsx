@@ -9,8 +9,6 @@
 import { fireEvent, render, screen } from "@testing-library/react";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 
-import { useFileDrop } from "@/hooks/useFileDrop";
-
 import { FileDropArea } from "./file-drop";
 
 const toastError = vi.fn();
@@ -62,35 +60,5 @@ describe("FileDropArea", () => {
     fireEvent.drop(area, drag([pdf()]));
 
     expect(onFile).not.toHaveBeenCalled();
-  });
-});
-
-describe("useFileDrop", () => {
-  const Target = ({ onFiles }: { onFiles: (files: File[]) => void }) => {
-    const drop = useFileDrop(true, onFiles, { accept: ".pdf", maxBytes: 4 });
-    return <div {...drop.handlers}>Target</div>;
-  };
-
-  it("says so when everything dropped is bigger than the server takes", () => {
-    const onFiles = vi.fn();
-    render(<Target onFiles={onFiles} />);
-
-    fireEvent.drop(screen.getByText("Target"), drag([new File(["%PDF-1.4"], "big.pdf")]));
-
-    expect(onFiles).not.toHaveBeenCalled();
-    expect(toastError).toHaveBeenCalledWith("That file is larger than this server accepts.");
-  });
-
-  it("hands on only the files that fit", () => {
-    const onFiles = vi.fn();
-    render(<Target onFiles={onFiles} />);
-
-    fireEvent.drop(
-      screen.getByText("Target"),
-      drag([new File(["%PDF-1.4"], "big.pdf"), new File(["%PDF"], "small.pdf")])
-    );
-
-    expect(onFiles).toHaveBeenCalledWith([expect.objectContaining({ name: "small.pdf" })]);
-    expect(toastError).not.toHaveBeenCalled();
   });
 });

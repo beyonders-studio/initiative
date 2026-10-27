@@ -94,8 +94,9 @@ class AppConfig(BaseModel):
     # Whether the SPA reports each page it opens to ``/page-views``. True only
     # where Prometheus reads the counts (``METRICS_TOKEN`` is set).
     count_page_views: bool = False
-    # The upload size cap the server enforces on file endpoints. The SPA reads
-    # it for pre-flight checks so the number lives in exactly one place.
+    # The most a file sent with one request may be. The SPA reads it before
+    # reading an import file in the browser; a file sent in pieces has no cap
+    # but the community's storage.
     max_upload_bytes: int
     # Whether this deployment runs a community directory (owner-set, default
     # off). The SPA hides every way into it when false — the way in from the

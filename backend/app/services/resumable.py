@@ -10,8 +10,8 @@ and ``expiration`` are spoken; the official JS client needs no more.
 An upload only stages a file. Its ``purpose`` names the endpoint that will
 take it (:data:`PURPOSES`), which decides at creation whether the person may
 write there and how large the file may be. Once complete, the client calls
-that endpoint with the upload's id in place of a multipart file, and the
-endpoint checks the file as it checks any other.
+that endpoint with the upload's id in place of a multipart file; the endpoint
+takes it (:func:`take`) and checks the file as it checks any other.
 
 The bytes are written to the guild's storage as they arrive, a part at a time
 (``StorageBackend.start_parts`` and the methods beside it), so a request holds
@@ -263,6 +263,14 @@ async def _live(session: AsyncSession, upload_id: str) -> PendingUpload:
     return upload
 
 
+def _free() -> Any:
+    """No request holds the upload."""
+    return or_(
+        col(PendingUpload.lease_until).is_(None),
+        col(PendingUpload.lease_until) < func.now(),
+    )
+
+
 class _Lease:
     """One request's hold on an upload: taken and committed before anything
     else is read, with no transaction left open after it, renewed while the
@@ -282,10 +290,7 @@ class _Lease:
             update(PendingUpload)
             .where(
                 col(PendingUpload.id) == self.upload_id,
-                or_(
-                    col(PendingUpload.lease_until).is_(None),
-                    col(PendingUpload.lease_until) < func.now(),
-                ),
+                _free(),
             )
             .values(lease_token=token, lease_until=func.now() + LEASE)
             .returning(PendingUpload.id)
@@ -522,35 +527,69 @@ async def terminate(session: AsyncSession, guild_id: int, upload_id: str) -> Res
     )
 
 
+async def take(
+    session: AsyncSession,
+    upload_id: str,
+    *,
+    purpose: str,
+    user_id: int,
+    initiative_id: int,
+) -> PendingUpload:
+    """Take a finished upload for the endpoint ``purpose`` names, by the
+    person who sent it, for ``initiative_id``: its row is deleted in the
+    caller's transaction, which then records the staged object as its own.
+    Until that commits, nothing else can take, cancel or expire it, and if it
+    does not, the upload is still there to try again."""
+    taken = await session.exec(
+        delete(PendingUpload)
+        .where(
+            col(PendingUpload.id) == upload_id,
+            col(PendingUpload.purpose) == purpose,
+            col(PendingUpload.created_by) == user_id,
+            col(PendingUpload.initiative_id) == initiative_id,
+            col(PendingUpload.completed_at).is_not(None),
+            col(PendingUpload.expires_at) > func.now(),
+            _free(),
+        )
+        .returning(PendingUpload)
+    )
+    upload = taken.scalars().first()
+    if upload is None:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND, detail=ResumableMessages.NOT_FOUND
+        )
+    return upload
+
+
 # --- the sweep ---------------------------------------------------------------
 
 
 async def expire(session: AsyncSession, guild_id: int) -> None:
     """The ``resumable_uploads`` sweep's visit: throw away every upload past
-    its expiry that no request is appending to."""
+    its expiry that no request is appending to. Each row goes before its
+    bytes, so an upload being taken at that moment is never thrown away."""
     storage = get_guild_storage(guild_id)
     expired = (
-        await session.exec(
-            select(PendingUpload).where(
-                PendingUpload.expires_at <= func.now(),
-                or_(
-                    col(PendingUpload.lease_until).is_(None),
-                    col(PendingUpload.lease_until) < func.now(),
-                ),
+        (
+            await session.exec(
+                delete(PendingUpload)
+                .where(PendingUpload.expires_at <= func.now(), _free())
+                .returning(PendingUpload)
             )
         )
-    ).all()
+        .scalars()
+        .all()
+    )
+    await session.commit()
     for upload in expired:
         try:
             await asyncio.to_thread(
                 storage.drop_parts, upload.staging_key, upload.blob_state
             )
         except Exception:
-            # The row goes; staged bytes left behind cost storage and nothing
-            # else, and go with the community's storage when it is deleted.
+            # Staged bytes left behind cost storage and nothing else, and go
+            # with the community's storage when it is deleted.
             logger.exception("resumable_upload_drop_failed upload=%s", upload.id)
-        await session.delete(upload)
-        await session.commit()
 
 
 def next_due(_now: Any) -> Any:

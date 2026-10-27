@@ -7,6 +7,9 @@ SSE params, and the serve adapter. Integration against a real S3-compatible
 endpoint (e.g. a Garage instance) is left to manual/CI runs.
 """
 
+import io
+import zipfile
+
 import pytest
 from botocore.exceptions import ClientError
 from fastapi.responses import FileResponse, StreamingResponse
@@ -23,6 +26,7 @@ from app.services.storage import (
     requested_range,
     get_guild_storage,
     get_storage,
+    open_seekable,
 )
 
 
@@ -376,6 +380,24 @@ def test_build_upload_response_stream_answers_a_range_partially():
     assert resp.status_code == 206
     assert resp.headers["Content-Range"] == "bytes 6-10/11"
     assert resp.headers["Accept-Ranges"] == "bytes"
+
+
+def test_s3_open_seekable_reads_a_zips_list_without_the_whole_object():
+    client, storage = _s3()
+    packed = io.BytesIO()
+    with zipfile.ZipFile(packed, "w") as package:
+        package.writestr("AndroidManifest.xml", "x" * 300_000)
+    storage.write("app.zip", packed.getvalue())
+    reads = []
+    get_object = client.get_object
+    client.get_object = lambda **params: reads.append(params) or get_object(**params)
+
+    source = open_seekable(storage, "app.zip", len(packed.getvalue()))
+    assert source is not None
+    assert zipfile.ZipFile(source).namelist() == ["AndroidManifest.xml"]
+
+    assert all("Range" in params for params in reads)
+    assert open_seekable(storage, "nope.zip", 10) is None
 
 
 def test_s3_open_readable_missing_returns_none():

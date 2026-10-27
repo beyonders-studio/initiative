@@ -11,6 +11,7 @@ from sqlmodel import select
 
 from app.models.platform.guild import CommunityRole
 from app.models.tenant.pending_upload import PendingUpload
+from app.models.tenant.upload import Upload
 from app.services import resumable
 from app.services.storage import get_guild_storage
 from app.services.tenant import attachments
@@ -241,3 +242,94 @@ async def test_a_held_upload_leaves_no_transaction_open_while_bytes_arrive(
     assert upload.offset == 0
     assert not session.in_transaction()
     await lease.let_go()
+
+
+async def _send(client: AsyncClient, actor, body: bytes, **metadata: str) -> str:
+    """A whole file sent in pieces; its upload id."""
+    created = await _create(client, actor, len(body), **metadata)
+    location = _path(created.headers["location"])
+    sent = await _append(client, actor, location, 0, body)
+    assert sent.status_code == 204, sent.text
+    return location.rsplit("/", 1)[1]
+
+
+async def test_a_file_sent_in_pieces_is_kept_where_it_arrived(
+    client: AsyncClient, acting_user, session
+):
+    owner = await acting_user(guild_role=CommunityRole.admin, initiative=True)
+    body = b"%PDF-1.4 a report sent in pieces"
+    upload_id = await _send(client, owner, body, filename="report.pdf")
+    before = await attachments.get_guild_storage_usage(owner.guild.id)
+    form = {"name": "Report", "initiative_id": str(owner.initiative.id)}
+
+    taken = await client.post(
+        owner.g("/files/upload"),
+        headers=owner.headers,
+        data={**form, "upload_id": upload_id},
+    )
+
+    assert taken.status_code == 201, taken.text
+    await route_session_to_guild(session, owner.guild.id)
+    upload = (
+        await session.exec(select(Upload).where(Upload.size_bytes == len(body)))
+    ).one()
+    assert upload.content_type == "application/pdf"
+    staged = get_guild_storage(owner.guild.id).open_readable(upload.filename)
+    assert staged.path.read_bytes() == body
+    assert (await session.exec(select(PendingUpload))).first() is None
+    # The room it held is now the file's.
+    assert await attachments.get_guild_storage_usage(owner.guild.id) == before
+    again = await client.post(
+        owner.g("/files/upload"),
+        headers=owner.headers,
+        data={**form, "name": "Again", "upload_id": upload_id},
+    )
+    assert again.status_code == 404
+    assert again.json()["detail"] == "RESUMABLE_NOT_FOUND"
+
+
+async def test_a_new_version_can_arrive_in_pieces(client: AsyncClient, acting_user):
+    owner = await acting_user(guild_role=CommunityRole.admin, initiative=True)
+    first = await client.post(
+        owner.g("/files/upload"),
+        headers=owner.headers,
+        data={"name": "Report", "initiative_id": str(owner.initiative.id)},
+        files={"file": ("report.pdf", b"%PDF-1.4 first", "application/pdf")},
+    )
+    file_id = first.json()["id"]
+    upload_id = await _send(
+        client, owner, b"%PDF-1.4 second", filename="v2.pdf", file_id=str(file_id)
+    )
+
+    version = await client.post(
+        owner.g(f"/files/{file_id}/versions"),
+        headers=owner.headers,
+        data={"upload_id": upload_id},
+    )
+
+    assert version.status_code == 201, version.text
+    assert version.json()["version_number"] == 2
+
+
+async def test_a_program_sent_in_pieces_is_refused_and_left_to_cancel(
+    client: AsyncClient, acting_user, session
+):
+    owner = await acting_user(guild_role=CommunityRole.admin, initiative=True)
+    upload_id = await _send(
+        client, owner, b"MZ\x90\x00" + b"\x00" * 60 + b"PE\x00\x00", filename="a.pdf"
+    )
+
+    refused = await client.post(
+        owner.g("/files/upload"),
+        headers=owner.headers,
+        data={
+            "name": "Not a report",
+            "initiative_id": str(owner.initiative.id),
+            "upload_id": upload_id,
+        },
+    )
+
+    assert refused.status_code == 400
+    assert refused.json()["detail"] == "FILE_TYPE_NOT_ALLOWED"
+    await route_session_to_guild(session, owner.guild.id)
+    assert (await session.exec(select(PendingUpload))).one().id == upload_id

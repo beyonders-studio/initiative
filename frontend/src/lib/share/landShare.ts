@@ -7,6 +7,7 @@ import { createTask } from "@/api/generated/tasks/tasks";
 import { uploadAttachment, uploadPastedImage } from "@/lib/attachmentUtils";
 import { communityPath } from "@/lib/communityUrl";
 import { nameWithoutExtension } from "@/lib/fileUtils";
+import { uploadInPieces } from "@/lib/resumableUpload";
 import type { SharedFile } from "@/lib/share/pendingShare";
 import { shareBody, shareMarkdown } from "@/lib/share/shareContent";
 import { taskRoute, toolDetailRoute, toolListRoute } from "@/lib/tools";
@@ -94,11 +95,14 @@ async function landUploads(
   let last: number | null = null;
   for (const upload of uploads) {
     const file = await readSharedFile(upload.file);
-    const created = await uploadFile(communityId, {
-      name: upload.name,
-      initiative_id: initiativeId,
+    const created = await uploadInPieces(
+      communityId,
       file,
-    });
+      file.name,
+      { initiativeId },
+      (upload_id) =>
+        uploadFile(communityId, { name: upload.name, initiative_id: initiativeId, upload_id })
+    );
     last = created.id;
     onUploaded?.(upload);
   }

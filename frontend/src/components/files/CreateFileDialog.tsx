@@ -10,7 +10,7 @@ import {
   Upload,
   X,
 } from "lucide-react";
-import { useCallback, useEffect, useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { useTranslation } from "react-i18next";
 
 import type { ResourceGrantSchema } from "@/api/generated/initiativeAPI.schemas";
@@ -30,6 +30,7 @@ import {
 import { FileDropArea } from "@/components/ui/file-drop";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
+import { Progress } from "@/components/ui/progress";
 import {
   Select,
   SelectContent,
@@ -39,12 +40,12 @@ import {
 } from "@/components/ui/select";
 import { Switch } from "@/components/ui/switch";
 import { Tabs, TabsBar, TabsContent, TabsTrigger } from "@/components/ui/tabs";
-import { useAppConfig } from "@/hooks/useAppConfig";
 import { useCreateFile, useUploadFile } from "@/hooks/useFiles";
 import { useInitiative } from "@/hooks/useInitiatives";
 import { useCommunityPickerSuggestions } from "@/hooks/useSearch";
 import type { EditorFileType } from "@/lib/fileTypes";
 import { formatBytes, getFileTypeLabel, nameWithoutExtension } from "@/lib/fileUtils";
+import { numberFormat } from "@/lib/intl";
 import { toast } from "@/lib/mascotToast";
 import { matchSmartLinkProvider, SUPPORTED_PROVIDER_BADGES } from "@/lib/smartLinkProviders";
 import type { DialogProps } from "@/types/dialog";
@@ -72,8 +73,11 @@ export const CreateFileDialog = ({
   onSuccess,
   initialFile = null,
 }: CreateFileDialogProps) => {
-  const { t } = useTranslation(["files", "common"]);
-  const { maxUploadBytes } = useAppConfig();
+  const { t, i18n } = useTranslation(["files", "common"]);
+  const percent = numberFormat(i18n.resolvedLanguage ?? i18n.language, {
+    style: "percent",
+    maximumFractionDigits: 0,
+  });
 
   const [createDialogTab, setCreateDialogTab] = useState<"new" | "upload" | "smartLink">("new");
   const [newTitle, setNewTitle] = useState("");
@@ -87,6 +91,9 @@ export const CreateFileDialog = ({
   const [selectedFile, setSelectedFile] = useState<File | null>(null);
   const [smartLinkUrl, setSmartLinkUrl] = useState("");
   const [grants, setGrants] = useState<ResourceGrantSchema[]>([...DEFAULT_GRANTS]);
+  // How much of the file being uploaded has arrived, and how to stop it.
+  const [sent, setSent] = useState(0);
+  const sending = useRef<AbortController | null>(null);
 
   const initiative = useInitiative(open ? initiativeId : null).data;
 
@@ -123,6 +130,10 @@ export const CreateFileDialog = ({
         setNewTitle(nameWithoutExtension(initialFile.name));
       }
     } else {
+      // Closing the dialog stops an upload still under way.
+      sending.current?.abort();
+      sending.current = null;
+      setSent(0);
       setNewTitle("");
       clearTemplate();
       setIsTemplateFile(false);
@@ -164,10 +175,6 @@ export const CreateFileDialog = ({
   });
 
   const handleFileSelect = (file: File) => {
-    if (maxUploadBytes !== null && file.size > maxUploadBytes) {
-      toast.error(t("create.fileTooLarge"));
-      return;
-    }
     setSelectedFile(file);
     if (!newTitle.trim()) {
       setNewTitle(nameWithoutExtension(file.name));
@@ -420,6 +427,10 @@ export const CreateFileDialog = ({
           defaultOpen={false}
         />
 
+        {uploadFile.isPending ? (
+          <Progress value={sent * 100} aria-label={t("create.uploadingFile")} />
+        ) : null}
+
         <DialogFooter>
           {createDialogTab === "new" ? (
             <Button
@@ -454,12 +465,16 @@ export const CreateFileDialog = ({
               onClick={() => {
                 const trimmedTitle = newTitle.trim();
                 if (!selectedFile || !trimmedTitle) return;
+                sending.current = new AbortController();
+                setSent(0);
                 uploadFile.mutate({
                   file: selectedFile,
                   name: trimmedTitle,
                   initiative_id: initiativeId,
                   project_id: projectId,
                   grants,
+                  signal: sending.current.signal,
+                  onProgress: (arrived, total) => setSent(total ? arrived / total : 1),
                 });
               }}
               disabled={!canSubmitUpload}
@@ -467,7 +482,7 @@ export const CreateFileDialog = ({
               {uploadFile.isPending ? (
                 <>
                   <Loader2 className="h-4 w-4 animate-spin" />
-                  {t("create.uploadingFile")}
+                  {t("create.uploadingProgress", { percent: percent.format(sent) })}
                 </>
               ) : (
                 t("create.uploadFile")

@@ -292,8 +292,7 @@
   },
   "fileDrop": {
     "release": "Suéltalo aquí",
-    "unsupported": "Ese tipo de archivo no se puede subir aquí.",
-    "tooLarge": "Ese archivo es más grande de lo que acepta este servidor."
+    "unsupported": "Ese tipo de archivo no se puede subir aquí."
   },
   "archiveError": "No se pudo archivar. Inténtalo de nuevo.",
   "unarchiveError": "No se pudo desarchivar. Inténtalo de nuevo.",
