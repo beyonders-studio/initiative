@@ -107,5 +107,13 @@ export const useAnswerShareRequests = (options?: MutationOpts<void, ShareRequest
         ),
       errorKey: "access:answer.error",
     },
-    options
+    {
+      ...options,
+      // A large batch answered in turns may stop part way: what went through
+      // leaves the list, so asking again carries on with the rest.
+      onError: (...args) => {
+        void invalidate(q.shareRequests());
+        options?.onError?.(...args);
+      },
+    }
   );
