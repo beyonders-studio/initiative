@@ -59,7 +59,12 @@ import {
   withCard,
 } from "@/lib/layouts/draft";
 import { type FieldDef, withDisplays } from "@/lib/layouts/fields";
-import { pluginFields, shippedPluginParts, usePluginsOnItems } from "@/lib/layouts/plugins";
+import {
+  pluginFields,
+  pluginKindOf,
+  shippedPluginParts,
+  usePluginsOnItems,
+} from "@/lib/layouts/plugins";
 import { taskFields } from "@/lib/layouts/tasks";
 import type { LayoutNode } from "@/lib/layouts/tree";
 import { toast } from "@/lib/mascotToast";
@@ -294,7 +299,11 @@ export const LayoutEditor = ({
       };
   const stored = openDetail ? (draft.details[detailKey(openDetail)] ?? null) : null;
   // The plug-ins that draw on what is open: a list's tasks, or a detail's item.
-  const plugins = usePluginsOnItems(initiativeId, !lists, openDetail?.spec.kind ?? "task");
+  const plugins = usePluginsOnItems(
+    initiativeId,
+    !lists,
+    openDetail ? pluginKindOf(openDetail.spec.kind) : "task"
+  );
   const detail = useMemo(
     () =>
       openDetail
@@ -324,9 +333,10 @@ export const LayoutEditor = ({
   }
 
   const { data: definitions = [] } = useProperties({ initiativeId });
+  // A detail's fields are its own; a list's are its target's.
   const fields = useMemo(
     () =>
-      lists?.fields ??
+      (!openDetail && lists?.fields) ||
       (openDetail?.fields ?? taskFields)(definitions, pluginFields(plugins, i18n.language)),
     [lists, openDetail, definitions, plugins, i18n.language]
   );

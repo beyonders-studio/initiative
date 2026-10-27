@@ -13,6 +13,7 @@ import { useTranslation } from "react-i18next";
 import {
   type CommunityPluginRead,
   type DetailLayoutReadKind,
+  ItemKind,
   type PluginValueSummary,
   PropertyType,
 } from "@/api/generated/initiativeAPI.schemas";
@@ -121,9 +122,13 @@ export type PluginOnItems = {
   settings: Record<string, unknown>;
 };
 
-/** The kinds of item whose pages draw plug-ins, as the manifest names them:
- *  every kind with a detail layout. */
-export type PluginItemKind = DetailLayoutReadKind;
+/** The kinds of item whose pages draw plug-ins, as the manifest names them. */
+export type PluginItemKind = ItemKind;
+
+/** The kind of item plug-ins draw on that a detail lays out, or null for one
+ *  they draw nothing on (a file opened from a collection). */
+export const pluginKindOf = (kind: DetailLayoutReadKind): PluginItemKind | null =>
+  Object.hasOwn(ItemKind, kind) ? (kind as PluginItemKind) : null;
 
 /** What a block declares on one kind of item, of what the server offers the
  *  reader. */
@@ -211,16 +216,21 @@ export const pluginsOnItems = (
 
 const NO_PLUGINS: ReadonlyMap<number, PluginOnItems> = new Map();
 
-/** {@link pluginsOnItems} for the community's installs, once they load. */
+/** {@link pluginsOnItems} for the community's installs, once they load. A
+ *  kind plug-ins draw nothing on (null) has none. */
 export const usePluginsOnItems = (
   initiativeId: number | null | undefined,
   enabled = true,
-  kind: PluginItemKind = "task"
+  kind: PluginItemKind | null = "task"
 ): ReadonlyMap<number, PluginOnItems> => {
-  const { data } = useCommunityPlugins({ enabled: enabled && initiativeId != null });
+  const { data } = useCommunityPlugins({
+    enabled: enabled && initiativeId != null && kind !== null,
+  });
   return useMemo(
     () =>
-      data && initiativeId != null ? pluginsOnItems(data.items, initiativeId, kind) : NO_PLUGINS,
+      data && initiativeId != null && kind !== null
+        ? pluginsOnItems(data.items, initiativeId, kind)
+        : NO_PLUGINS,
     [data, initiativeId, kind]
   );
 };

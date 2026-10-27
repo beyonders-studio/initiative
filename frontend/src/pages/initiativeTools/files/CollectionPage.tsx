@@ -3,9 +3,7 @@ import type { SortingState } from "@tanstack/react-table";
 import {
   ExternalLink,
   LayoutList as LayoutsIcon,
-  ListPlus,
   Loader2,
-  Pencil,
   Plus,
   Tags,
   Trash2,
@@ -32,8 +30,6 @@ import {
   CollectionDropzone,
   type CollectionDropzoneHandle,
 } from "@/components/files/collections/CollectionDropzone";
-import { CollectionFileFields } from "@/components/files/collections/CollectionFileFields";
-import { CollectionLayoutEditor } from "@/components/files/collections/CollectionLayoutEditor";
 import {
   type CollectionList,
   CollectionListView,
@@ -41,10 +37,8 @@ import {
 import { UploadProgress } from "@/components/files/collections/UploadProgress";
 import { FileChooserDialog } from "@/components/files/FileChooserDialog";
 import { COLLECTION_SORT_FIELDS } from "@/components/files/fileColumns";
-import { InitiativeSettingsPropertiesTab } from "@/components/initiatives/settings/InitiativeSettingsPropertiesTab";
 import { ToolFilterPanel } from "@/components/initiativeTools/shared/ToolFilterPanel";
 import { ToolListToolbar } from "@/components/initiativeTools/shared/ToolListToolbar";
-import { LayoutList } from "@/components/layouts/LayoutList";
 import { useRegisterPrimaryCreateAction } from "@/components/navigation/CreateActionContext";
 import { listLayoutLooks } from "@/components/projects/projectTasksConfig";
 import { Lightbox, type LightboxItem } from "@/components/shared/Lightbox";
@@ -65,14 +59,6 @@ import { TABLE_SORT_FIELDS, ToolIndexTable } from "@/components/tools/ToolIndexT
 import { ToolPageHeader } from "@/components/tools/ToolPageHeader";
 import { Button } from "@/components/ui/button";
 import { ConfirmDialog } from "@/components/ui/confirm-dialog";
-import {
-  Dialog,
-  DialogContent,
-  DialogDescription,
-  DialogFooter,
-  DialogHeader,
-  DialogTitle,
-} from "@/components/ui/dialog";
 import { DropdownMenuItem } from "@/components/ui/dropdown-menu";
 import { Label } from "@/components/ui/label";
 import { RelativeTime } from "@/components/ui/relative-time";
@@ -104,14 +90,17 @@ import { useReadOnOpen } from "@/hooks/useNotifications";
 import { useRecordOpen } from "@/hooks/usePersonalItems";
 import { propertySaves, useProperties } from "@/hooks/useProperties";
 import { useKnownTagIds } from "@/hooks/useTags";
-import { instanceTarget, listLayouts, useInstanceLayouts } from "@/hooks/useToolLayouts";
+import { detailLayoutOf, listLayouts, useInstanceLayouts } from "@/hooks/useToolLayouts";
 import { useCommunityPath } from "@/lib/communityUrl";
 import { formatPeriod } from "@/lib/formatDate";
+import { DetailLayoutView } from "@/lib/layouts/DetailLayoutView";
+import type { StoredRegions } from "@/lib/layouts/detailLayout";
 import { withDisplays } from "@/lib/layouts/fields";
+import { FILE_DETAIL } from "@/lib/layouts/fileLayout";
 import { collectionFileFields } from "@/lib/layouts/files";
 import { toast } from "@/lib/mascotToast";
 import { browserTimezone } from "@/lib/timezones";
-import { toolDetailRoute, toolListRoute } from "@/lib/tools";
+import { collectionRoute, toolDetailRoute, toolListRoute } from "@/lib/tools";
 import { resolveUploadUrl } from "@/lib/uploadUrl";
 
 /** A file as the wall and the table both list it. */
@@ -323,9 +312,6 @@ export function CollectionPage() {
       void navigate({ to: filesRoute });
     },
   });
-  const [layoutsOpen, setLayoutsOpen] = useState(false);
-  const [editingLayouts, setEditingLayouts] = useState(false);
-  const [fieldsOpen, setFieldsOpen] = useState(false);
 
   // Selecting files. The same click either opens a file or takes it into the
   // selection, depending which the list is doing.
@@ -363,6 +349,21 @@ export function CollectionPage() {
   const [besideId, setBesideId] = useState<number | null>(null);
   const besideFile = rows.find((row) => row.id === besideId);
   const hasFields = (collection?.fields.length ?? 0) > 0;
+  // A file beside the wall, or under a picture, is drawn as the collection's
+  // file detail lays it out, measured against where it is drawn.
+  const fileLayout = detailLayoutOf(layoutsQuery.data, "file") as StoredRegions | null;
+  const fileContext = useMemo(() => (collection ? { collection } : null), [collection]);
+  const drawFile = (file: FileRow) =>
+    fileContext ? (
+      <div className="@container">
+        <DetailLayoutView
+          detail={FILE_DETAIL}
+          item={file}
+          layout={fileLayout}
+          context={fileContext}
+        />
+      </div>
+    ) : null;
   const onActivate = useCallback(
     (file: FileSummary, options: GridToggleOptions) => {
       if (selection.active) selection.toggle(file as FileRow, options);
@@ -503,14 +504,14 @@ export function CollectionPage() {
                   {t("collections.uploadFiles")}
                 </DropdownMenuItem>
               ) : null}
-              {canEdit ? (
-                <DropdownMenuItem onSelect={() => setFieldsOpen(true)}>
-                  <ListPlus className="h-4 w-4" />
-                  {t("collections.fields.title")}
-                </DropdownMenuItem>
-              ) : null}
-              {layoutsQuery.data?.can_configure ? (
-                <DropdownMenuItem onSelect={() => setLayoutsOpen(true)}>
+              {layoutsQuery.data?.can_configure && collection ? (
+                <DropdownMenuItem
+                  onSelect={() =>
+                    void navigate({
+                      to: gp(`${collectionRoute(collection.initiative_id, collection.id)}/layouts`),
+                    })
+                  }
+                >
                   <LayoutsIcon className="h-4 w-4" />
                   {t("layouts:tab")}
                 </DropdownMenuItem>
@@ -711,11 +712,7 @@ export function CollectionPage() {
         index={Math.max(openIndex, 0)}
         onIndexChange={(index) => setOpenId(pictures[index]?.id ?? null)}
         onNearEnd={onNearEnd}
-        panel={
-          collection && lightboxFile && collection.fields.length > 0 ? (
-            <CollectionFileFields collection={collection} file={lightboxFile} />
-          ) : undefined
-        }
+        panel={lightboxFile && hasFields ? drawFile(lightboxFile) : undefined}
         actions={
           lightboxFile ? (
             <Button
@@ -740,12 +737,14 @@ export function CollectionPage() {
         }}
       >
         <SheetContent className="w-full overflow-y-auto sm:max-w-md" aria-describedby={undefined}>
-          <SheetHeader>
-            <SheetTitle className="truncate">{besideFile?.name}</SheetTitle>
+          {/* The detail draws the file's name where its layout puts it. */}
+          <SheetHeader className="sr-only">
+            <SheetTitle>{besideFile?.name}</SheetTitle>
           </SheetHeader>
-          {collection && besideFile ? (
-            <div className="space-y-4 px-4 pb-4">
-              <CollectionFileFields collection={collection} file={besideFile} />
+          {besideFile ? (
+            // Below the close button, which the name would otherwise run under.
+            <div className="space-y-4 pt-6">
+              {drawFile(besideFile)}
               <Button asChild variant="outline" size="sm">
                 <Link to={fileRoute(besideFile)}>
                   <ExternalLink className="size-4" />
@@ -772,56 +771,6 @@ export function CollectionPage() {
           }}
         />
       ) : null}
-
-      <Dialog open={layoutsOpen} onOpenChange={setLayoutsOpen}>
-        <DialogContent className="sm:max-w-md">
-          <DialogHeader>
-            <DialogTitle>{t("layouts:tab")}</DialogTitle>
-            <DialogDescription>{t("collections.layoutsDescription")}</DialogDescription>
-          </DialogHeader>
-          {layoutsQuery.data && validId !== null ? (
-            <LayoutList
-              layouts={layoutsQuery.data.layouts}
-              target={instanceTarget("collection", validId)}
-            />
-          ) : null}
-          <DialogFooter>
-            <Button
-              variant="outline"
-              onClick={() => {
-                setLayoutsOpen(false);
-                setEditingLayouts(true);
-              }}
-            >
-              <Pencil className="h-4 w-4" />
-              {t("collections.editLayouts")}
-            </Button>
-          </DialogFooter>
-        </DialogContent>
-      </Dialog>
-
-      {editingLayouts && collection && layoutsQuery.data ? (
-        <CollectionLayoutEditor
-          collection={collection}
-          set={layoutsQuery.data}
-          files={rows}
-          onClose={() => setEditingLayouts(false)}
-        />
-      ) : null}
-
-      <Dialog open={fieldsOpen} onOpenChange={setFieldsOpen}>
-        <DialogContent className="sm:max-w-3xl" aria-describedby={undefined}>
-          <DialogHeader>
-            <DialogTitle>{t("collections.fields.title")}</DialogTitle>
-          </DialogHeader>
-          {collection ? (
-            <InitiativeSettingsPropertiesTab
-              initiativeId={collection.initiative_id}
-              collectionId={collection.id}
-            />
-          ) : null}
-        </DialogContent>
-      </Dialog>
 
       <ConfirmDialog
         open={trashing}

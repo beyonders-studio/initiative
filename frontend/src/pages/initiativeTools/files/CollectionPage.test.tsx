@@ -34,7 +34,7 @@ import {
 import { communityHttp } from "@/__tests__/helpers/communityHttp";
 import { server } from "@/__tests__/helpers/msw-server";
 import { renderPage } from "@/__tests__/helpers/render";
-import { type PropertyDefinitionCreate, PropertyType } from "@/api/generated/initiativeAPI.schemas";
+import { PropertyType } from "@/api/generated/initiativeAPI.schemas";
 import { numberFormat } from "@/lib/intl";
 
 import { CollectionPage } from "./CollectionPage";
@@ -266,8 +266,7 @@ describe("a collection's page", () => {
     expect(within(beside).getByRole("link", { name: "Open file" })).toBeInTheDocument();
   });
 
-  it("makes a field of its own for whoever may change it", async () => {
-    let created: PropertyDefinitionCreate | null = null;
+  it("leads whoever may lay it out to its layouts, where its fields are made", async () => {
     server.use(
       communityHttp.get("/collections/:id", () =>
         HttpResponse.json(buildCollection({ id: 5, initiative_id: 1 }))
@@ -285,37 +284,22 @@ describe("a collection's page", () => {
       communityHttp.get("/layouts/", () =>
         HttpResponse.json(buildToolLayoutSet({ tool: "collection" }))
       ),
-      communityHttp.get("/property-definitions/", () => HttpResponse.json([])),
-      communityHttp.post("/property-definitions/", async ({ request }) => {
-        created = (await request.json()) as PropertyDefinitionCreate;
-        return HttpResponse.json(buildPropertyDefinition({ ...created, id: 30 }), { status: 201 });
-      }),
       communityHttp.get("/relationships/", () => HttpResponse.json([]))
     );
     const user = userEvent.setup();
-    renderPage(CollectionPage, {
+    const { router } = renderPage(CollectionPage, {
       initialRoute: "/c/$communityId/i/$initiativeId/files/collections/$collectionId",
       routeParams: { communityId: "1", initiativeId: "1", collectionId: "5" },
     });
 
     await screen.findByRole("heading", { name: "Collection 1" });
     await user.click(screen.getByRole("button", { name: "More actions" }));
-    await user.click(await screen.findByRole("menuitem", { name: "Fields" }));
-    const dialog = await screen.findByRole("dialog", { name: "Fields" });
-    await user.click(within(dialog).getByRole("button", { name: "New field" }));
-    const form = await screen.findByRole("dialog", { name: "New field" });
-    await user.type(within(form).getByLabelText("Name"), "Rating");
-    await user.click(within(form).getByRole("combobox", { name: "Type" }));
-    await user.click(await screen.findByRole("option", { name: "Rating" }));
-    await user.click(within(form).getByRole("button", { name: "Save" }));
+    expect(await screen.findByRole("menuitem", { name: "Layouts" })).toBeInTheDocument();
+    expect(screen.queryByRole("menuitem", { name: "Fields" })).not.toBeInTheDocument();
+    await user.click(screen.getByRole("menuitem", { name: "Layouts" }));
 
     await waitFor(() =>
-      expect(created).toMatchObject({
-        name: "Rating",
-        type: PropertyType.rating,
-        initiative_id: 1,
-        collection_id: 5,
-      })
+      expect(router.state.location.pathname).toBe("/c/1/i/1/files/collections/5/layouts")
     );
   });
 

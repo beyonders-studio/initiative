@@ -459,7 +459,6 @@
       "dismiss": "Ausblenden",
       "tooLarge": "größer, als dieser Server annimmt"
     },
-    "layoutsDescription": "Welche Listen diese Sammlung zeigt und mit welcher sie öffnet. Jede Person wählt unter den gezeigten.",
     "backToFiles": "Zurück zu Dateien",
     "notFound": "Sammlung nicht gefunden",
     "notFoundDescription": "Die gesuchte Sammlung existiert nicht, oder du kannst keine ihrer Dateien öffnen.",
@@ -467,7 +466,6 @@
     "noAccessDescription": "Du hast keine Berechtigung, diese Sammlung anzusehen.",
     "error": "Die Sammlung konnte nicht geändert werden",
     "fields": {
-      "title": "Felder",
       "description": "Was jede Datei in dieser Sammlung hier tragen kann: Die Werte gehören zur Sammlung, nicht zur Datei.",
       "create": "Neues Feld",
       "edit": "Feld bearbeiten",
@@ -481,7 +479,6 @@
     },
     "addedOn": "Hinzugefügt {{date}}",
     "createdOn": "Erstellt {{date}}",
-    "editLayouts": "Bearbeiten, was die Listen zeigen",
     "listHelp": {
       "masonry": "Jede Datei in ihrer eigenen Form, in Spalten gepackt: was ihre Karte unter dem Bild zeigt.",
       "grid": "Jede Datei als quadratische Kachel: was ihre Karte unter dem Bild zeigt.",

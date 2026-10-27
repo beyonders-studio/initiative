@@ -246,6 +246,14 @@
     },
     "noItems": "Add a counter to the group to see its layout here."
   },
+  "fileDetail": {
+    "name": "File detail",
+    "help": "How a file opened from this collection is shown beside it. What it leaves out is hidden.",
+    "shipped": "This is the layout as shipped. Changing it makes it the collection's own.",
+    "titleHelp": "Every file shows its name.",
+    "hiddenHelp": "Every file can show this. Taken off, it is hidden, and Add puts it back.",
+    "noItems": "Add a file to the collection to see its layout here."
+  },
   "postDetail": {
     "name": "Notice detail",
     "help": "How every notice in this initiative is shown on its own page. What it leaves out is hidden.",

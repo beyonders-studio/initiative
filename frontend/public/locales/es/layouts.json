@@ -246,6 +246,14 @@
     },
     "noItems": "Añade un contador al grupo para ver aquí su diseño."
   },
+  "fileDetail": {
+    "name": "Detalle del archivo",
+    "help": "Cómo se muestra junto a la colección un archivo abierto desde ella. Lo que deja fuera queda oculto.",
+    "shipped": "Este es el diseño tal como viene. Cambiarlo lo convierte en el de la colección.",
+    "titleHelp": "Cada archivo muestra su nombre.",
+    "hiddenHelp": "Cada archivo puede mostrar esto. Si se quita, queda oculto, y Añadir lo vuelve a poner.",
+    "noItems": "Añade un archivo a la colección para ver aquí su diseño."
+  },
   "postDetail": {
     "name": "Detalle del aviso",
     "help": "Cómo se muestra cada aviso de esta iniciativa en su propia página. Lo que deja fuera queda oculto.",

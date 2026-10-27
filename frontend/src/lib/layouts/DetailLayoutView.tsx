@@ -47,6 +47,7 @@ import {
   PluginFieldOnDetail,
   type PluginItem,
   pluginFields,
+  pluginKindOf,
   shippedPluginParts,
   usePluginsOnItems,
 } from "./plugins";
@@ -328,7 +329,7 @@ const ItemDetail = <I extends Item, C, P>({
     [taskRoute, gp, item, context]
   );
   const env = useProjectLayoutEnv(taskHref);
-  const plugins = usePluginsOnItems(home.initiativeId, true, spec.kind);
+  const plugins = usePluginsOnItems(home.initiativeId, true, pluginKindOf(spec.kind));
   const adding = useContext(ItemDraftContext) !== null;
   const upFront = adding ? detail.addingUpFront : undefined;
   const tree = useMemo(() => {

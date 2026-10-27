@@ -14,6 +14,7 @@ import {
   nonEmptyPropertySummaries,
 } from "@/components/properties/propertyHelpers";
 
+import { at, detailLayoutSpec, type Region } from "./detailLayout";
 import type { ListShape } from "./draft";
 import { type FieldDef, type FieldKind, isEmptyValue, type LayoutItem } from "./fields";
 import { propertyFields } from "./tasks";
@@ -63,6 +64,31 @@ export const FILE_LIST_SHAPE: ListShape = {
   columns: ["name", "type", "size", "added"],
   columnFields: new Set(Object.keys(FILE_FIELDS)),
 };
+
+const field = (id: string): LayoutNode => ({ type: "field", props: { field: id } });
+
+/** A file opened from a collection as shipped: its name, then every field of
+ *  the collection's and the properties it holds. */
+const FILE_DETAIL_REGIONS: Record<Region, LayoutNode[]> = {
+  header: [field("name")],
+  main: [at(1, { type: "section", children: [{ type: "properties" }] })],
+  side: [],
+};
+
+/** A file opened from a collection: its own fields, which it does not edit,
+ *  can be placed beside the collection's fields and the initiative's
+ *  properties. */
+export const FILE_LAYOUT = detailLayoutSpec({
+  kind: "file",
+  shipped: FILE_DETAIL_REGIONS,
+  fieldParts: ["field", "properties"],
+  knows: {
+    ...FILE_DETAIL_REGIONS,
+    side: Object.keys(FILE_FIELDS)
+      .filter((id) => id !== "name")
+      .map(field),
+  },
+});
 
 const heldValue = (summaries: PropertySummary[] | undefined, id: number) => {
   const summary = summaries?.find((each) => each.property_id === id);

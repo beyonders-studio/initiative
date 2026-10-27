@@ -4,12 +4,16 @@ import { useTranslation } from "react-i18next";
 
 import type { CollectionRead, FileRead } from "@/api/generated/initiativeAPI.schemas";
 import { AddToCollectionButton } from "@/components/files/collections/AddToCollectionButton";
-import { CollectionFileFields } from "@/components/files/collections/CollectionFileFields";
 import { badgeVariants } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
-import { useCollectionFileFields, useCollections } from "@/hooks/useCollections";
+import {
+  collectionFieldSaves,
+  useCollectionFileFields,
+  useCollections,
+} from "@/hooks/useCollections";
 import { useCommunityPath } from "@/lib/communityUrl";
+import { PlacedPropertyField } from "@/lib/layouts/fieldEditors";
 import { collectionRoute } from "@/lib/tools";
 
 /**
@@ -83,13 +87,28 @@ const FieldsInCollection = ({
   );
 };
 
-/** Read only once opened. */
+/** Read only once opened, each saved on its own. Whoever may change the
+ *  collection edits them; anyone else reads those that hold a value. */
 const Values = ({ collection, fileId }: { collection: CollectionRead; fileId: number }) => {
   const { t } = useTranslation("files");
   const values = useCollectionFileFields(collection.id, fileId);
   if (values.isError) return <p className="text-destructive text-sm">{t("loadError")}</p>;
   if (!values.data) return <Loader2 className="h-4 w-4 animate-spin text-muted-foreground" />;
   return (
-    <CollectionFileFields collection={collection} file={{ id: fileId, fields: values.data }} />
+    <section aria-label={t("collections.fields.heading")} className="space-y-3">
+      <h2 className="font-medium text-sm">{t("collections.fields.heading")}</h2>
+      {collection.fields.map((field) => (
+        <PlacedPropertyField
+          key={field.id}
+          kind={collectionFieldSaves(collection.id)}
+          id={fileId}
+          properties={values.data}
+          readOnly={!collection.can.edit}
+          initiativeId={collection.initiative_id}
+          propertyId={field.id}
+          definitions={collection.fields}
+        />
+      ))}
+    </section>
   );
 };

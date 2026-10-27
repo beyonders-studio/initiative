@@ -3,6 +3,7 @@ import {
   CalendarDays,
   ChartGantt,
   Clock,
+  FileImage,
   FileText,
   Hash,
   Kanban,
@@ -62,6 +63,7 @@ export const detailLayoutLooks: Record<DetailLayoutRead["kind"], Look> = {
   queue_item: { icon: ListOrdered, labelKey: "layouts:queueItemDetail.name" },
   counter: { icon: Hash, labelKey: "layouts:counterDetail.name" },
   post: { icon: Megaphone, labelKey: "layouts:postDetail.name" },
+  file: { icon: FileImage, labelKey: "layouts:fileDetail.name" },
 };
 
 /** Any layout's icon and name. */

@@ -246,6 +246,14 @@
     },
     "noItems": "Füge der Gruppe einen Zähler hinzu, um hier sein Layout zu sehen."
   },
+  "fileDetail": {
+    "name": "Datei-Detailansicht",
+    "help": "Wie eine aus dieser Sammlung geöffnete Datei daneben angezeigt wird. Was es weglässt, ist ausgeblendet.",
+    "shipped": "Das ist das Layout wie ausgeliefert. Eine Änderung macht es zum Layout der Sammlung.",
+    "titleHelp": "Jede Datei zeigt ihren Namen.",
+    "hiddenHelp": "Jede Datei kann dies zeigen. Entfernt ist es ausgeblendet, und Hinzufügen bringt es zurück.",
+    "noItems": "Füge der Sammlung eine Datei hinzu, um hier ihr Layout zu sehen."
+  },
   "postDetail": {
     "name": "Mitteilungs-Detailansicht",
     "help": "Wie jede Mitteilung dieser Initiative auf ihrer eigenen Seite angezeigt wird. Was es weglässt, ist ausgeblendet.",

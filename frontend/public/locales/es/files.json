@@ -459,7 +459,6 @@
       "dismiss": "Descartar",
       "tooLarge": "más grande de lo que acepta este servidor"
     },
-    "layoutsDescription": "Qué listas muestra esta colección y con cuál se abre. Cada persona elige entre las que se muestran.",
     "backToFiles": "Volver a Archivos",
     "notFound": "Colección no encontrada",
     "notFoundDescription": "La colección que buscas no existe, o ninguno de sus archivos es uno que puedas abrir.",
@@ -467,7 +466,6 @@
     "noAccessDescription": "No tienes permiso para ver esta colección.",
     "error": "No se pudo cambiar la colección",
     "fields": {
-      "title": "Campos",
       "description": "Lo que cada archivo de esta colección puede tener aquí: sus valores pertenecen a la colección, no al archivo.",
       "create": "Nuevo campo",
       "edit": "Editar campo",
@@ -481,7 +479,6 @@
     },
     "addedOn": "Añadido {{date}}",
     "createdOn": "Creado {{date}}",
-    "editLayouts": "Editar lo que muestran las listas",
     "listHelp": {
       "masonry": "Cada archivo con su propia forma, agrupado en columnas: lo que su tarjeta muestra bajo la imagen.",
       "grid": "Cada archivo como un mosaico cuadrado: lo que su tarjeta muestra bajo la imagen.",

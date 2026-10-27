@@ -459,7 +459,6 @@
       "dismiss": "Dismiss",
       "tooLarge": "larger than this server takes"
     },
-    "layoutsDescription": "Which lists this collection shows, and the one it opens on. Each person picks among those shown.",
     "backToFiles": "Back to Files",
     "notFound": "Collection not found",
     "notFoundDescription": "The collection you're looking for doesn't exist, or none of its files are ones you can open.",
@@ -467,7 +466,6 @@
     "noAccessDescription": "You don't have permission to view this collection.",
     "error": "Couldn't change the collection",
     "fields": {
-      "title": "Fields",
       "description": "What each file in this collection can hold here: its values belong to this collection, not to the file.",
       "create": "New field",
       "edit": "Edit field",
@@ -481,7 +479,6 @@
     },
     "addedOn": "Added {{date}}",
     "createdOn": "Created {{date}}",
-    "editLayouts": "Edit what the lists show",
     "listHelp": {
       "masonry": "Each file at its own shape, packed into columns: what its card shows under the picture.",
       "grid": "Each file as a square tile: what its card shows under the picture.",

@@ -246,6 +246,14 @@
     },
     "noItems": "Ajoutez un compteur au groupe pour voir sa mise en page ici."
   },
+  "fileDetail": {
+    "name": "Détail du fichier",
+    "help": "Comment un fichier ouvert depuis cette collection s'affiche à côté d'elle. Ce qu'il laisse de côté est masqué.",
+    "shipped": "Voici la mise en page d'origine. La modifier en fait celle de la collection.",
+    "titleHelp": "Chaque fichier affiche son nom.",
+    "hiddenHelp": "Chaque fichier peut afficher ceci. Retiré, il est masqué, et Ajouter le remet.",
+    "noItems": "Ajoutez un fichier à la collection pour voir sa mise en page ici."
+  },
   "postDetail": {
     "name": "Détail de l'annonce",
     "help": "Comment chaque annonce de cette initiative s'affiche sur sa propre page. Ce qu'il laisse de côté est masqué.",

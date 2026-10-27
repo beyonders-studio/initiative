@@ -459,7 +459,6 @@
       "dismiss": "Fermer",
       "tooLarge": "plus volumineux que ce que ce serveur accepte"
     },
-    "layoutsDescription": "Les listes que cette collection affiche, et celle sur laquelle elle s’ouvre. Chacun choisit parmi celles affichées.",
     "backToFiles": "Retour aux fichiers",
     "notFound": "Collection introuvable",
     "notFoundDescription": "La collection que vous cherchez n’existe pas, ou aucun de ses fichiers ne vous est accessible.",
@@ -467,7 +466,6 @@
     "noAccessDescription": "Vous n’avez pas la permission de voir cette collection.",
     "error": "Impossible de modifier la collection",
     "fields": {
-      "title": "Champs",
       "description": "Ce que chaque fichier de cette collection peut porter ici : ses valeurs appartiennent à la collection, pas au fichier.",
       "create": "Nouveau champ",
       "edit": "Modifier le champ",
@@ -481,7 +479,6 @@
     },
     "addedOn": "Ajouté {{date}}",
     "createdOn": "Créé {{date}}",
-    "editLayouts": "Modifier ce que montrent les listes",
     "listHelp": {
       "masonry": "Chaque fichier dans sa propre forme, rangé en colonnes : ce que sa carte montre sous l'image.",
       "grid": "Chaque fichier en vignette carrée : ce que sa carte montre sous l'image.",
