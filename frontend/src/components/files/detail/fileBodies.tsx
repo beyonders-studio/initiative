@@ -331,6 +331,7 @@ const FileBody = ({ file, canEdit }: FileBodyProps) =>
       fileSize={file.file_size}
       canEdit={canEdit}
       canDeleteVersions={file.can.delete}
+      thumbnailUrl={file.thumbnail_url}
     />
   ) : null;
 

@@ -24,12 +24,18 @@ import { Button } from "@/components/ui/button";
 import { ConfirmDialog } from "@/components/ui/confirm-dialog";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
 import { useAppConfig } from "@/hooks/useAppConfig";
-import { useDeleteFileVersion, useFileVersions, useUploadFileVersion } from "@/hooks/useFiles";
+import {
+  useDeleteFileVersion,
+  useFileVersions,
+  usePutVideoThumbnail,
+  useUploadFileVersion,
+} from "@/hooks/useFiles";
 import { useRelativeTime } from "@/hooks/useRelativeTime";
 import { formatBytes, getFileExtension, getFileTypeLabel } from "@/lib/fileUtils";
 import { toast } from "@/lib/mascotToast";
 import { resolveFileDownloadUrl, resolveFileVersionDownloadUrl } from "@/lib/uploadUrl";
 import { cn } from "@/lib/utils";
+import { drawVideoFrame } from "@/lib/videoFrame";
 
 import "react-pdf/dist/Page/AnnotationLayer.css";
 import "react-pdf/dist/Page/TextLayer.css";
@@ -61,6 +67,9 @@ interface UploadedFileViewerProps {
   canEdit?: boolean;
   /** Whether the current user owns the file (can delete versions). */
   canDeleteVersions?: boolean;
+  /** The current version's thumbnail. A video without one is given a frame
+   *  of itself when somebody who can edit it opens it. */
+  thumbnailUrl?: string | null;
 }
 
 /**
@@ -82,6 +91,7 @@ export const UploadedFileViewer = ({
   fileSize,
   canEdit = false,
   canDeleteVersions = false,
+  thumbnailUrl = null,
 }: UploadedFileViewerProps) => {
   const { t } = useTranslation(["files", "common"]);
   const { maxUploadBytes } = useAppConfig();
@@ -90,6 +100,7 @@ export const UploadedFileViewer = ({
   const { data: versions } = useFileVersions(fileId);
   const uploadVersion = useUploadFileVersion();
   const deleteVersion = useDeleteFileVersion();
+  const { mutate: putVideoThumbnail } = usePutVideoThumbnail();
   const versionInputRef = useRef<HTMLInputElement>(null);
   const [selectedVersionId, setSelectedVersionId] = useState<number | null>(null);
   const [versionsOpen, setVersionsOpen] = useState(false);
@@ -170,6 +181,22 @@ export const UploadedFileViewer = ({
     const timeoutId = setTimeout(measureWidth, 50);
     return () => clearTimeout(timeoutId);
   }, []);
+
+  // A video with no thumbnail gets a frame of itself from the first editor to
+  // open it. Where the browser keeps the frame from the page, it gets none.
+  const frameVersionId = selectedVersion?.is_current ? selectedVersion.id : null;
+  useEffect(() => {
+    if (!isVideo || !canEdit || thumbnailUrl || frameVersionId == null || !inlineUrl) return;
+    let cancelled = false;
+    drawVideoFrame(inlineUrl)
+      .then((frame) => {
+        if (!cancelled) putVideoThumbnail({ fileId, versionId: frameVersionId, frame });
+      })
+      .catch(() => {});
+    return () => {
+      cancelled = true;
+    };
+  }, [isVideo, canEdit, thumbnailUrl, frameVersionId, inlineUrl, fileId, putVideoThumbnail]);
 
   // Fetch markdown content for rendering
   useEffect(() => {
