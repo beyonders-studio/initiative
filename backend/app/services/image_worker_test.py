@@ -34,7 +34,7 @@ def test_a_transparent_palette_picture_stays_transparent(tmp_path):
 
     thumbnail = Image.open(io.BytesIO(base64.b64decode(reply["thumbnail"])))
     assert thumbnail.mode == "RGBA"
-    assert thumbnail.getpixel((10, 10))[3] == 0
+    assert thumbnail.getchannel("A").getpixel((10, 10)) == 0
 
 
 def test_a_small_picture_is_its_own_thumbnail(tmp_path):
