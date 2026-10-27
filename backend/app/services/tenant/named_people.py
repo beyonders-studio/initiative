@@ -31,7 +31,7 @@ from dataclasses import dataclass
 from typing import Any, Optional
 
 from fastapi import HTTPException, status
-from sqlalchemy import and_, exists, false, or_, true
+from sqlalchemy import and_, exists, false, or_, true, tuple_
 from sqlalchemy import Select
 from sqlalchemy import delete as sa_delete
 from sqlalchemy import update as sa_update
@@ -90,10 +90,15 @@ class Governing:
 
     @classmethod
     def of_collection(cls, row: Any) -> "Governing":
+        """Whoever can open a file in the collection that is not in the
+        trash."""
         from app.models.tenant.collection import CollectionFile
+        from app.models.tenant.file import File
 
-        files = select(CollectionFile.file_id).where(
-            CollectionFile.collection_id == row.id
+        files = (
+            select(CollectionFile.file_id)
+            .join(File, File.id == CollectionFile.file_id)
+            .where(CollectionFile.collection_id == row.id, File.deleted_at.is_(None))
         )
         return cls(Tool.file, None, row.initiative_id, resource_ids=files)
 
@@ -349,10 +354,13 @@ PERSON_REFS: dict[Tool, tuple[PersonRef, ...]] = {
 
 def _property_ref(tool: Tool) -> PersonRef | None:
     """A person-valued property on anything ``tool`` governs: the tool row
-    itself and every sub-tool row inside it, read from the properties seam."""
+    itself and every sub-tool row inside it, read from the properties seam. A
+    collection is governed by no one row, so it is not among them."""
     from app.services.tenant.properties import PROPERTY_LINKS
 
-    specs = [spec for spec in PROPERTY_LINKS.values() if spec.tool is tool]
+    specs = [
+        spec for spec in PROPERTY_LINKS.values() if spec.tool is tool and spec.shared
+    ]
     if not specs:
         return None
 
@@ -396,6 +404,53 @@ async def named_on(session: AsyncSession, governing: Governing) -> set[int]:
             ).all()
         )
     return named
+
+
+async def sweep_collections(
+    session: AsyncSession, collections: Iterable[Any]
+) -> set[int]:
+    """Take everyone who can open no file in a collection off its values, and
+    answer who that was. A collection is governed by its files rather than one
+    row (:meth:`Governing.of_collection`), so the whole set is read at once."""
+    from app.models.tenant.collection import Collection
+    from app.services.tenant.properties import link_for
+
+    rows = list(collections)
+    if not rows:
+        return set()
+    guild_id = routed_guild_id(session)
+    if guild_id is None:
+        raise RuntimeError("people are named on content inside a community")
+    on = PropertyValue.entity_type == link_for(Collection).target
+    unreadable = or_(
+        *(
+            and_(
+                PropertyValue.entity_id == row.id,
+                PropertyValue.value_user_id.not_in(
+                    readers_of(Governing.of_collection(row), guild_id)
+                ),
+            )
+            for row in rows
+        )
+    )
+    async with roster_session(session) as reader:
+        gone = (
+            await reader.exec(
+                select(PropertyValue.entity_id, PropertyValue.value_user_id).where(
+                    on, PropertyValue.value_user_id.is_not(None), unreadable
+                )
+            )
+        ).all()
+    if gone:
+        await session.exec(
+            sa_update(PropertyValue)
+            .where(
+                on,
+                tuple_(PropertyValue.entity_id, PropertyValue.value_user_id).in_(gone),
+            )
+            .values(value_user_id=None)
+        )
+    return {user_id for _, user_id in gone}
 
 
 async def sweep(session: AsyncSession, governing: Governing) -> set[int]:

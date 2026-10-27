@@ -28,6 +28,7 @@ from app.db.soft_delete_filter import select_including_deleted
 from app.models.tenant.collection import Collection, CollectionFile
 from app.models.tenant.file import File
 from app.services.tenant import comments as comments_service
+from app.services.tenant import named_people
 from app.services.tenant import properties as properties_service
 from app.services.tenant import tags as tags_service
 
@@ -303,8 +304,8 @@ def settle_after_commit(
     restored_files: Iterable[int] = (),
 ) -> None:
     """Settle collections once ``session`` commits (:func:`settle`): these
-    collections, the ones these files left, and the ones these restored files
-    are in. Asked of the community as a whole, since whether a collection
+    collections, the ones these files left or are in when their sharing
+    changed, and the ones these restored files are in. Asked of the community as a whole, since whether a collection
     still holds a file is not one reader's answer."""
     guild_id = routed_guild_id(session)
     if guild_id is None:
@@ -355,8 +356,9 @@ async def settle(
     actor_id: Optional[int],
 ) -> None:
     """Trash the named collections, and those holding ``file_ids``, that hold
-    no live file; bring back the trashed collections a restored file is in
-    that held no other. Run on a session that sees the whole community."""
+    no live file, and take anybody who can open none of the files of the rest
+    off them; bring back the trashed collections a restored file is in that
+    held no other. Run on a session that sees the whole community."""
     from app.services.tenant.soft_delete import restore_entity, trash
 
     candidates = set(collection_ids)
@@ -394,6 +396,9 @@ async def settle(
         for collection in locked:
             if collection.id not in live:
                 await trash(session, collection, deleted_by_user_id=actor_id)
+        await named_people.sweep_collections(
+            session, [collection for collection in locked if collection.id in live]
+        )
 
     if restored_files:
         holding = select_including_deleted(CollectionFile.collection_id).where(

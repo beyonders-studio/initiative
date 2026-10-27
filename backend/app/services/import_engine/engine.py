@@ -76,21 +76,59 @@ _LEGACY_PERMISSIONS = {
 }
 
 
+#: Where an archive or an envelope holds what an older build may have written
+#: a reference in, as the stored columns hold it: an editor body (a Lexical
+#: state, or a comment's markdown), and running text, each string of it (a
+#: description, a task's checklist, what a repeat carries over, a type's
+#: starting values). Any other string is left as written, and so is any other
+#: body: a spreadsheet's cells and a whiteboard's text are what was typed.
+_BODY_KEYS = frozenset({"content", "body"})
+_TEXT_KEYS = frozenset(
+    {
+        "description",
+        "location",
+        "notes",
+        "checklist",
+        "recurrence_carry",
+        "starting_values",
+    }
+)
+
+
+def _rewrite_strings(value: Any) -> Any:
+    if isinstance(value, str):
+        return rewrite_text(value, {})
+    if isinstance(value, list):
+        return [_rewrite_strings(item) for item in value]
+    if isinstance(value, dict):
+        return {key: _rewrite_strings(item) for key, item in value.items()}
+    return value
+
+
 def current_shape(value: Any) -> Any:
     """``value``, read from an archive or an envelope, with the names an
     older build gave files spelled as this one spells them, and every
-    reference in a body as well. A gallery's pictures are restored with no id
-    to name them by, so a reference to one is its words."""
-    if isinstance(value, str):
-        return rewrite_text(value, {})
+    reference in its bodies and running text as well. A gallery's pictures
+    are restored with no id to name them by, so a reference to one is its
+    words."""
     if isinstance(value, list):
         return [current_shape(item) for item in value]
     if not isinstance(value, dict):
         return value
-    value = rewrite_body(value, {})
-    shaped = {
-        _LEGACY_KEYS.get(key, key): current_shape(item) for key, item in value.items()
-    }
+    shaped: dict[str, Any] = {}
+    for key, item in value.items():
+        key = _LEGACY_KEYS.get(key, key)
+        if key in _BODY_KEYS:
+            item = (
+                rewrite_text(item, {})
+                if isinstance(item, str)
+                else rewrite_body(item, {})
+            )
+        elif key in _TEXT_KEYS:
+            item = _rewrite_strings(item)
+        else:
+            item = current_shape(item)
+        shaped[key] = item
     tools = shaped.get("tools")
     if isinstance(tools, dict):
         shaped["tools"] = {

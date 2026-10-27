@@ -1238,7 +1238,10 @@ async def _apply_gallery_entry(
                 )
                 await tags.attach(collection, gallery.tags)
                 await props.attach(collection, gallery.properties)
-            unmatched_handles = await props.settle(collection) if collection else []
+            unmatched: set[str] = set()
+            for row in [*files, *([collection] if collection else [])]:
+                unmatched.update(await props.settle(row))
+            unmatched_handles = sorted(unmatched)
     except Exception:
         logger.exception("backup gallery entry failed path=%s", entry.path)
         return EntryResult(

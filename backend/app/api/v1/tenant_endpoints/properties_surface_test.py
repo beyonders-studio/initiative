@@ -706,9 +706,11 @@ async def test_every_tool_and_its_sub_tools_read_back_what_they_carry(
     assert page_read.status_code == 200, page_read.text
     assert _values(page_read.json()["properties"]) == {defn.id: "wiki_page"}
 
-    # A collection's own update carries them, and its read returns them.
+    # A collection is written as itself, not as the file of its id, and its
+    # own update carries them too; its read returns them.
     file = await create_file(session, a.initiative, a.user)
     collection = await create_collection(session, a.initiative, a.user, files=[file])
+    await write("collection", collection.id)
     edited = await client.patch(
         a.g(f"/collections/{collection.id}"),
         headers=a.headers,

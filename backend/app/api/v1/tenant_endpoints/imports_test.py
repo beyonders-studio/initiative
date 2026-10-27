@@ -1508,6 +1508,117 @@ async def test_restored_collections_keep_their_own_files_and_cover(
     ]
 
 
+async def test_a_restored_collection_names_only_who_can_open_a_file_in_it(
+    client, acting_user, session, monkeypatch, role_session
+):
+    """A collection has no sharing: a person its values name who cannot open a
+    file in it is taken off it, and nothing is shared with them — least of all
+    a file that happens to have the collection's id."""
+    from sqlmodel import select
+
+    from app.models.tenant.collection import Collection
+    from app.models.tenant.property import PropertyValue
+    from app.models.tenant.resource_grant import ResourceGrant
+
+    a = await acting_user(
+        guild_role=CommunityRole.superadmin, initiative=True, project=True
+    )
+    b = await acting_user(guild_role=CommunityRole.member, guild=a.guild)
+    secret = await create_file(session, a.initiative, a.user, name="Secret")
+    folder = "initiatives/1-restored"
+    file_entry = {
+        "path": f"{folder}/files/5-notes.initiative-file.json",
+        "tool": "file",
+        "type": "initiative-file",
+        "schema_version": 1,
+        "entity_id": 5,
+        "title": "Notes",
+        "initiative_id": 1,
+        "asset": None,
+    }
+    collections_entry = {
+        "path": f"{folder}/collections.json",
+        "tool": "initiative",
+        "type": "initiative-collections",
+        "schema_version": 1,
+        "entity_id": 1,
+        "title": "Restored",
+        "initiative_id": 1,
+        "asset": None,
+    }
+    collections = {
+        "type": "initiative-collections",
+        "schema_version": 1,
+        "collections": [
+            {
+                "id": 3,
+                "name": "Shelf",
+                "file_ids": [5],
+                "properties": [
+                    {
+                        "property_name": "Owner",
+                        "property_type": "user_reference",
+                        "value_handle": "stranger#4321",
+                        "value_name": "Bea",
+                    }
+                ],
+            }
+        ],
+    }
+    file_envelope = {
+        "type": "initiative-file",
+        "schema_version": 1,
+        "file_type": "lexical",
+        "name": "Notes",
+        "content": _editor_state(),
+    }
+    manifest = _minimal_manifest(entries=[file_entry, collections_entry])
+    manifest["people"] = [
+        {"handle": "stranger#4321", "name": "Bea", "comment_count": 0}
+    ]
+    resp = await _upload_backup(
+        client,
+        a,
+        _make_backup_zip(
+            manifest,
+            {
+                file_entry["path"]: json.dumps(file_envelope).encode(),
+                collections_entry["path"]: json.dumps(collections).encode(),
+            },
+        ),
+    )
+    assert resp.status_code == 201, resp.text
+    job_id = resp.json()["id"]
+    confirmed = await client.post(
+        a.g(f"/imports/jobs/{job_id}/confirm"),
+        headers=a.headers,
+        json={"people_map": {"stranger#4321": b.user.id}},
+    )
+    assert confirmed.status_code == 200, confirmed.text
+    await _run_import_worker(monkeypatch, role_session)
+    job = (await client.get(a.g(f"/imports/jobs/{job_id}"), headers=a.headers)).json()
+    assert job["status"] == ImportJobStatus.done.value, job.get("error")
+
+    await route_session_to_guild(session, a.guild.id)
+    shelf = (
+        await session.exec(select(Collection).where(Collection.name == "Shelf"))
+    ).one()
+    assert shelf.id == secret.id
+    assert (
+        await session.exec(
+            select(PropertyValue.value_user_id).where(
+                PropertyValue.entity_type == "collection",
+                PropertyValue.entity_id == shelf.id,
+            )
+        )
+    ).all() == [None]
+    assert (
+        await session.exec(
+            select(ResourceGrant).where(ResourceGrant.user_id == b.user.id)
+        )
+    ).all() == []
+
+
 async def test_backup_corrupt_entry_fails_alone(
     client, acting_user, session, monkeypatch, role_session
 ):
@@ -3407,7 +3518,8 @@ async def test_an_older_envelopes_wikilink_is_imported_as_a_reference(
     client, acting_user, session
 ):
     """A ``[[ ]]`` link in an envelope an older build wrote comes in as the
-    reference to its file it always was, as a restore reads one."""
+    reference to its file it always was, as a restore reads one. A
+    spreadsheet's cells are what was typed, and come in as written."""
     from sqlmodel import select
 
     from app.models.tenant.file import File
@@ -3443,6 +3555,33 @@ async def test_an_older_envelopes_wikilink_is_imported_as_a_reference(
         "file",
         spec.id,
     )
+
+    cells = {"0:0": "#doc[Spec](7)", "0:1": "#gallery-image[Sample](12)"}
+    resp = await _import_envelope(
+        client,
+        a,
+        {
+            "type": "initiative-file",
+            "schema_version": 1,
+            "file_type": "sheet",
+            "name": "Budget",
+            "content": {
+                "schema_version": 3,
+                "kind": "spreadsheet",
+                "sheets": [{"id": "s1", "name": "Sheet 1", "cells": cells}],
+            },
+        },
+        target.id,
+    )
+    assert resp.status_code == 201, resp.text
+    sheet = (
+        await session.exec(
+            select(File)
+            .where(File.initiative_id == target.id, File.name == "Budget")
+            .options(undefer(File.content))
+        )
+    ).one()
+    assert sheet.content["sheets"][0]["cells"] == cells
 
 
 def _reference_node(entity_type: str, entity_id: int, text: str) -> dict:

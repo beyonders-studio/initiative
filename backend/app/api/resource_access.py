@@ -680,6 +680,9 @@ async def set_resource_grants(
     )
     refuse_install_community_share(guild_context, row.initiative_id)
     settled = named_people.Governing.of(kind, row)
+    if kind is Tool.file:
+        # Who a collection may name is whoever can open a file in it.
+        collections_service.settle_after_commit(session, left_files=[row.id])
     await permissions_service.replace_resource_grants(
         session,
         resource_type=kind,
