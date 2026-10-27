@@ -79,7 +79,8 @@ MAX_IMPORT_XLSX_BYTES: int = 100 * 1024 * 1024
 TEXT_TABLE_SUFFIXES = (".csv", ".tsv")
 
 #: Workbooks read by calamine (:mod:`app.services.sheet_worker`), in a
-#: process of their own. It reads values and not formulas or formatting, so a
+#: process of their own. It reads values and not formatting; an ``.ods``
+#: file's formulas are read from its XML beside it, and an ``.xls`` file's
 #: formula arrives as the value it last showed.
 CALAMINE_SUFFIXES = (".xls", ".ods")
 

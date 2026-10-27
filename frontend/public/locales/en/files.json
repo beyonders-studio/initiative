@@ -316,6 +316,7 @@
     "title": "Convert to edit?",
     "toSheet": {
       "xlsx": "It becomes a spreadsheet you can edit here. Its sheets, values, formulas, fills, borders and number formats come over; charts, pictures and macros don't.",
+      "ods": "It becomes a spreadsheet you can edit here. Its sheets, values and formulas come over; formatting stays behind.",
       "values": "It becomes a spreadsheet you can edit here. Its sheets and values come over. Formulas come over as the values they show, and formatting stays behind.",
       "table": "It becomes a spreadsheet you can edit here, its rows and columns as one sheet."
     },

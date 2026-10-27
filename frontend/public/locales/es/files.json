@@ -316,6 +316,7 @@
     "title": "¿Convertir para editar?",
     "toSheet": {
       "xlsx": "Se convierte en una hoja de cálculo que puedes editar aquí. Se conservan sus hojas, valores, fórmulas, rellenos, bordes y formatos de número; los gráficos, imágenes y macros no.",
+      "ods": "Se convierte en una hoja de cálculo que puedes editar aquí. Se conservan sus hojas, valores y fórmulas; el formato no.",
       "values": "Se convierte en una hoja de cálculo que puedes editar aquí. Se conservan sus hojas y valores. Las fórmulas pasan como los valores que muestran y el formato no se conserva.",
       "table": "Se convierte en una hoja de cálculo que puedes editar aquí, con sus filas y columnas en una sola hoja."
     },

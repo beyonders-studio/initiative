@@ -356,6 +356,13 @@ def _ods(rows: list[list[str]], *, name: str = "Budget") -> bytes:
     import zipfile
 
     def cell(value: str) -> str:
+        if value.startswith("of:="):
+            return (
+                f'<table:table-cell table:formula="{value}" office:value-type="float" '
+                'office:value="0"><text:p>0</text:p></table:table-cell>'
+            )
+        if value == "":
+            return '<table:table-cell table:number-columns-repeated="2"/>'
         if value.replace(".", "", 1).isdigit():
             return (
                 f'<table:table-cell office:value-type="float" '
@@ -406,6 +413,15 @@ def test_an_ods_is_read_in_a_worker_as_its_values() -> None:
 
     assert sheet["name"] == "Budget"
     assert sheet["cells"] == {"0:0": "Item", "0:1": "Cost", "1:0": "Tea", "1:1": 3}
+
+
+def test_an_ods_keeps_its_formulas_where_they_were() -> None:
+    # Two empty cells, written as one repeated, put the formula in column C.
+    rows = [["2", "3"], ["", "of:=SUM([.A1:.B1])"]]
+
+    (sheet,) = parse_spreadsheet_file("budget.ods", _ods(rows))
+
+    assert sheet["cells"]["1:2"] == "=SUM(A1:B1)"
 
 
 def test_a_file_calamine_cannot_read_is_refused() -> None:

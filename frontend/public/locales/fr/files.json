@@ -316,6 +316,7 @@
     "title": "Convertir pour modifier ?",
     "toSheet": {
       "xlsx": "Il devient une feuille de calcul que vous pouvez modifier ici. Ses feuilles, valeurs, formules, remplissages, bordures et formats de nombre sont conservés ; les graphiques, images et macros ne le sont pas.",
+      "ods": "Il devient une feuille de calcul que vous pouvez modifier ici. Ses feuilles, valeurs et formules sont conservées ; la mise en forme ne l'est pas.",
       "values": "Il devient une feuille de calcul que vous pouvez modifier ici. Ses feuilles et ses valeurs sont conservées. Les formules deviennent les valeurs qu'elles affichent, et la mise en forme n'est pas conservée.",
       "table": "Il devient une feuille de calcul que vous pouvez modifier ici, ses lignes et colonnes formant une seule feuille."
     },

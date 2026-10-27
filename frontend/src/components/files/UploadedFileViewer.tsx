@@ -81,7 +81,7 @@ interface UploadedFileViewerProps {
 const CONVERT_NOTES = {
   [FileType.xlsx]: "convert.toSheet.xlsx",
   [FileType.xls]: "convert.toSheet.values",
-  [FileType.ods]: "convert.toSheet.values",
+  [FileType.ods]: "convert.toSheet.ods",
   [FileType.csv]: "convert.toSheet.table",
   [FileType.tsv]: "convert.toSheet.table",
   [FileType.md]: "convert.toDocument.markdown",

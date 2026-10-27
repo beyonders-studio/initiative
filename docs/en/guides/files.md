@@ -201,7 +201,8 @@ The budget arrived as an Excel file, and now three people need to change it. Ope
 | Uploaded as | Becomes | What comes over |
 |---|---|---|
 | Excel (`.xlsx`) | Spreadsheet | Sheets, values, formulas, fills, borders and number formats. Charts, pictures and macros stay behind. |
-| Older Excel (`.xls`), OpenDocument (`.ods`) | Spreadsheet | Sheets and values. A formula arrives as the number it showed. |
+| OpenDocument (`.ods`) | Spreadsheet | Sheets, values and formulas. Formatting stays behind. |
+| Older Excel (`.xls`) | Spreadsheet | Sheets and values. A formula arrives as the number it showed. |
 | CSV, TSV | Spreadsheet | The rows and columns, as one sheet. |
 | Markdown (`.md`) | Text document | Headings, lists, tables, links and formatting. |
 | Plain text (`.txt`) | Text document | The text, as paragraphs. |

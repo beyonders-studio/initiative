@@ -316,6 +316,7 @@
     "title": "Zum Bearbeiten umwandeln?",
     "toSheet": {
       "xlsx": "Daraus wird eine Tabelle, die du hier bearbeiten kannst. Blätter, Werte, Formeln, Füllungen, Rahmen und Zahlenformate kommen mit; Diagramme, Bilder und Makros nicht.",
+      "ods": "Daraus wird eine Tabelle, die du hier bearbeiten kannst. Blätter, Werte und Formeln kommen mit; die Formatierung bleibt zurück.",
       "values": "Daraus wird eine Tabelle, die du hier bearbeiten kannst. Blätter und Werte kommen mit. Formeln kommen als die Werte mit, die sie anzeigen, und die Formatierung bleibt zurück.",
       "table": "Daraus wird eine Tabelle, die du hier bearbeiten kannst, mit den Zeilen und Spalten als ein Blatt."
     },
