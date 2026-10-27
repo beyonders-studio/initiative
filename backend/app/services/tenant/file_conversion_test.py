@@ -61,8 +61,9 @@ async def test_a_csv_becomes_a_spreadsheet_and_lets_its_upload_go(
     [
         ("notes.md", b"# Minutes\n\nTea was **late**.\n", "heading"),
         ("notes.txt", b"# not a heading\nsecond line\n", "paragraph"),
+        ("notes.txt", "caf\u00e9 au lait\n".encode("cp1252"), "paragraph"),
     ],
-    ids=["markdown", "plain-text"],
+    ids=["markdown", "plain-text", "windows-1252"],
 )
 async def test_text_becomes_a_document(
     client: AsyncClient, acting_user, filename, body, first
@@ -75,7 +76,9 @@ async def test_text_becomes_a_document(
     assert converted.status_code == 200, converted.text
     document = converted.json()
     assert document["file_type"] == "lexical"
-    assert document["content"]["root"]["children"][0]["type"] == first
+    (top, *_) = document["content"]["root"]["children"]
+    assert top["type"] == first
+    assert "\ufffd" not in str(top)
 
 
 async def test_a_file_that_converts_to_nothing_is_refused(

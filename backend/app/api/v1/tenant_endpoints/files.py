@@ -500,6 +500,15 @@ async def upload_file_version(
     file = await resource_access.load_authorized(
         session, Tool.file, file_id, current_user, guild_context, access="write"
     )
+    # Held until the version commits and read fresh once held, so a file
+    # converted meanwhile takes no version, and a conversion that starts now
+    # waits and converts this one.
+    await session.exec(
+        select(File)
+        .where(File.id == file.id)
+        .with_for_update()
+        .execution_options(populate_existing=True)
+    )
     if not is_stored(file.file_type):
         raise HTTPException(
             status_code=status.HTTP_400_BAD_REQUEST,

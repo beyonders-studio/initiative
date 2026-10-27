@@ -102,16 +102,18 @@ async def _content(
             spreadsheet_import.parse_spreadsheet_file,
             f"{stem}{spec_of(source).extensions[0]}",
             data,
+            strict=True,
         )
         return normalize_file_content(
             {"schema_version": 3, "kind": "spreadsheet", "sheets": sheets},
             file_type=FileType.sheet,
         )
+    # Read whole or not at all: the original goes once this converts.
+    text = spreadsheet_import.decode_text(data)
+    if text is None:
+        raise _refuse(status.HTTP_400_BAD_REQUEST, FileMessages.UNREADABLE_TEXT)
     try:
-        content = await editor_engine.from_markdown(
-            data.decode("utf-8-sig", errors="replace"),
-            plain=source == FileType.txt,
-        )
+        content = await editor_engine.from_markdown(text, plain=source == FileType.txt)
     except editor_engine.EditorError as exc:
         raise _refuse(status.HTTP_400_BAD_REQUEST, FileMessages.INVALID_FILE) from exc
     return normalize_file_content(content, file_type=FileType.lexical)

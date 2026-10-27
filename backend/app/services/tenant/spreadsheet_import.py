@@ -15,6 +15,7 @@ in step with the first.
 from __future__ import annotations
 
 import atexit
+import codecs
 import csv
 import io
 import math
@@ -85,8 +86,12 @@ TEXT_TABLE_SUFFIXES = (".csv", ".tsv")
 CALAMINE_SUFFIXES = (".xls", ".ods")
 
 
-def parse_spreadsheet_file(filename: str, data: bytes) -> list[dict[str, Any]]:
-    """The sheets a file holds, in canonical workbook form.
+def parse_spreadsheet_file(
+    filename: str, data: bytes, *, strict: bool = False
+) -> list[dict[str, Any]]:
+    """The sheets a file holds, in canonical workbook form. ``strict``
+    refuses a text table whose encoding isn't read whole, rather than
+    reading what it can of it.
 
     Raises :class:`FileContentError` for anything that is not a
     spreadsheet this can read.
@@ -96,7 +101,7 @@ def parse_spreadsheet_file(filename: str, data: bytes) -> list[dict[str, Any]]:
     base = name.rsplit("/", 1)[-1].rsplit(".", 1)[0] or "Imported"
 
     if lower.endswith(TEXT_TABLE_SUFFIXES):
-        raw = [_parse_csv(data, base, tab=lower.endswith(".tsv"))]
+        raw = [_parse_csv(data, base, tab=lower.endswith(".tsv"), strict=strict)]
     elif lower.endswith(".xlsx") or lower.endswith(".xlsm"):
         raw = _parse_xlsx(data)
     elif lower.endswith(CALAMINE_SUFFIXES):
@@ -118,20 +123,32 @@ def parse_spreadsheet_file(filename: str, data: bytes) -> list[dict[str, Any]]:
 # ── CSV ──────────────────────────────────────────────────────────────────────
 
 
-def _decode(data: bytes) -> str:
-    """Text from bytes, preferring UTF-8 and never failing on a file that
-    is not. A spreadsheet exported by an older tool is often cp1252, and a
-    mangled accent is a better outcome than a refused import."""
-    for encoding in ("utf-8-sig", "utf-8", "cp1252"):
+def decode_text(data: bytes) -> str | None:
+    """Text from bytes in an encoding read whole: UTF-8, UTF-16 where the
+    file starts with its mark, or cp1252, which a file exported by an older
+    tool often is. ``None`` for bytes none of them reads as text."""
+    if data.startswith((codecs.BOM_UTF16_LE, codecs.BOM_UTF16_BE)):
+        encodings: tuple[str, ...] = ("utf-16",)
+    else:
+        encodings = ("utf-8-sig", "cp1252")
+    for encoding in encodings:
         try:
-            return data.decode(encoding)
+            text = data.decode(encoding)
         except UnicodeDecodeError:
             continue
-    return data.decode("utf-8", errors="replace")
+        return None if "\x00" in text else text
+    return None
 
 
-def _parse_csv(data: bytes, name: str, *, tab: bool) -> dict[str, Any]:
-    text = _decode(data)
+def _parse_csv(data: bytes, name: str, *, tab: bool, strict: bool) -> dict[str, Any]:
+    text = decode_text(data)
+    if text is None:
+        # Into a workbook that keeps the original, a mangled accent is a
+        # better outcome than a refused import; a conversion keeps nothing
+        # else, so it refuses.
+        if strict:
+            raise FileContentError(FileMessages.SPREADSHEET_UNREADABLE_FILE)
+        text = data.decode("utf-8", errors="replace")
     delimiter = "\t" if tab else ","
     reader = csv.reader(io.StringIO(text, newline=""), delimiter=delimiter)
     cells: dict[str, Any] = {}

@@ -13,7 +13,7 @@ from app.services.tenant.files_spreadsheet import (
     FileContentError,
     normalize_spreadsheet_content,
 )
-from app.services.tenant.spreadsheet_import import parse_spreadsheet_file
+from app.services.tenant.spreadsheet_import import decode_text, parse_spreadsheet_file
 
 
 def workbook(**sheet) -> dict:
@@ -427,5 +427,27 @@ def test_an_ods_keeps_its_formulas_where_they_were() -> None:
 def test_a_file_calamine_cannot_read_is_refused() -> None:
     with pytest.raises(FileContentError) as refused:
         parse_spreadsheet_file("broken.xls", b"not a workbook")
+
+    assert refused.value.code == FileMessages.SPREADSHEET_UNREADABLE_FILE
+
+
+@pytest.mark.parametrize(
+    ("data", "text"),
+    [
+        ("café".encode(), "café"),
+        ("café".encode("cp1252"), "café"),
+        ("café".encode("utf-16"), "café"),
+        (b"caf\x81", None),
+        (b"a\x00b", None),
+    ],
+    ids=["utf-8", "cp1252", "utf-16", "no-encoding", "binary"],
+)
+def test_text_is_read_whole_or_not_at_all(data, text) -> None:
+    assert decode_text(data) == text
+
+
+def test_a_strict_read_refuses_a_table_it_cannot_read_whole() -> None:
+    with pytest.raises(FileContentError) as refused:
+        parse_spreadsheet_file("broken.csv", b"a,b\nc\x00,d\n", strict=True)
 
     assert refused.value.code == FileMessages.SPREADSHEET_UNREADABLE_FILE

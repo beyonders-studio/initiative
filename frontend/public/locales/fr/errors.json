@@ -173,6 +173,7 @@
   "FILE_THUMBNAIL_NOT_WANTED": "Cette version a déjà une miniature ou n'est pas une vidéo.",
   "FILE_NOT_CONVERTIBLE": "Ce fichier ne peut pas être converti pour être modifié ici.",
   "FILE_TOO_LARGE_TO_CONVERT": "Ce fichier est trop volumineux pour être converti. Téléchargez-le et modifiez-le dans son application.",
+  "FILE_UNREADABLE_TEXT": "Le texte de ce fichier n'est pas dans un encodage que l'application lit, il reste donc tel quel.",
   "COMMENT_NOT_FOUND": "Commentaire introuvable",
   "COMMENT_PERMISSION_DENIED": "Vous n'êtes pas autorisé à commenter",
   "COMMENT_PARENT_NOT_FOUND": "Commentaire parent introuvable",
