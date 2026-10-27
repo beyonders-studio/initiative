@@ -41,7 +41,7 @@ from app.core.references import (
     reference_as_text,
     reference_node_kind,
 )
-from app.core.file_types import FileType, type_named
+from app.core.file_types import FileType
 from app.core.search import SearchEntityType
 from app.core.tools import Tool, tool_envelope_type
 
@@ -125,7 +125,7 @@ def _editor_holders(data: dict[str, Any]) -> list[tuple[dict[str, Any], str]]:
     kind = data.get("type")
     if (
         kind == tool_envelope_type(Tool.file)
-        and type_named(data.get("file_type")) == FileType.lexical
+        and data.get("file_type") == FileType.lexical
     ):
         return [(data, "content")]
     if kind == tool_envelope_type(Tool.post):

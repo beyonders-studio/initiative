@@ -77,7 +77,7 @@ def _case(expression: str, pairs: tuple[tuple[str, str], ...], otherwise: str) -
 
 def _writable(bind: Connection, statements: tuple[str, ...]) -> None:
     """Run ``statements`` against ``files`` with its row security unforced and
-    its user triggers held, then restore both."""
+    its user triggers held, both restored either way."""
     forced = bool(
         bind.execute(
             text(
@@ -88,11 +88,13 @@ def _writable(bind: Connection, statements: tuple[str, ...]) -> None:
     if forced:
         bind.exec_driver_sql("ALTER TABLE files NO FORCE ROW LEVEL SECURITY")
     bind.exec_driver_sql("ALTER TABLE files DISABLE TRIGGER USER")
-    for statement in statements:
-        bind.exec_driver_sql(statement)
-    bind.exec_driver_sql("ALTER TABLE files ENABLE TRIGGER USER")
-    if forced:
-        bind.exec_driver_sql("ALTER TABLE files FORCE ROW LEVEL SECURITY")
+    try:
+        for statement in statements:
+            bind.exec_driver_sql(statement)
+    finally:
+        bind.exec_driver_sql("ALTER TABLE files ENABLE TRIGGER USER")
+        if forced:
+            bind.exec_driver_sql("ALTER TABLE files FORCE ROW LEVEL SECURITY")
 
 
 def _drop_dependent_triggers(bind: Connection) -> None:

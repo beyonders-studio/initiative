@@ -11,8 +11,7 @@ import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip
 // editor state under `content`, discriminated by `type` — or `kind`, the
 // field's name in early exports), the same envelope under its earlier
 // initiative-document name, and the legacy @lexical/file .lexical shape
-// (editor state under `editorState`). A text file's type is `lexical`, and was
-// `native` in exports made before types took their formats' names.
+// (editor state under `editorState`).
 function extractEditorState(parsed: unknown): unknown | null {
   if (typeof parsed !== "object" || parsed === null) {
     return null;
@@ -20,8 +19,7 @@ function extractEditorState(parsed: unknown): unknown | null {
   const record = parsed as Record<string, unknown>;
   const isEnvelope = (name: string): boolean => record.type === name || record.kind === name;
   const lexical =
-    (isEnvelope("initiative-file") &&
-      (record.file_type === FileType.lexical || record.file_type === "native")) ||
+    (isEnvelope("initiative-file") && record.file_type === FileType.lexical) ||
     (isEnvelope("initiative-document") && record.document_type === "native");
   if (lexical && typeof record.content === "object" && record.content !== null) {
     return record.content;

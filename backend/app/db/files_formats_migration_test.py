@@ -6,6 +6,7 @@ older release wrote, rows written that way, then up again, the way
 from __future__ import annotations
 
 import importlib.util
+import json
 from pathlib import Path
 from types import ModuleType
 from typing import Any
@@ -123,3 +124,85 @@ async def test_a_file_s_type_becomes_its_format(session, tmp_path, monkeypatch) 
         picture.id: ("jpeg", None),
         archive.id: ("other", None),
     }
+
+
+async def test_a_listed_file_names_its_format(session) -> None:
+    """A file a listing carries, filed in a wiki or on its own, takes the new
+    name; the downgrade gives the old one back. A saved files view drops its
+    type filter."""
+    from app.testing import create_marketplace_listing
+
+    user = await create_user(session)
+    listing = await create_marketplace_listing(session)
+    filed = {"type": "initiative-file", "file_type": "smart_link", "name": "Spec"}
+    body = {
+        "type": "initiative-wiki",
+        "files": [{"envelope": filed}],
+        "file": {"type": "initiative-file", "file_type": "native", "name": "Notes"},
+    }
+    connection = await session.connection()
+    await connection.execute(
+        text("UPDATE public.marketplace_listings SET kind = 'wiki' WHERE id = :id"),
+        {"id": listing.id},
+    )
+    await connection.execute(
+        text(
+            "UPDATE public.marketplace_listing_versions "
+            "SET definition = CAST(:d AS jsonb) WHERE listing_id = :id"
+        ),
+        {"d": json.dumps(body), "id": listing.id},
+    )
+    await connection.execute(
+        text(
+            "INSERT INTO public.user_view_preferences (user_id, scope_key, value, updated_at) "
+            "VALUES (:u, 'view:1:initiative:1:files', CAST(:v AS json), now())"
+        ),
+        {
+            "u": user.id,
+            "v": json.dumps({"filters": {"file_type": "native", "search": "x"}}),
+        },
+    )
+    await session.commit()
+    public = _load("20261026_0541_files_take_their_formats_in_public.py")
+
+    def run(step):
+        def apply(sync_session) -> None:
+            with Operations.context(
+                MigrationContext.configure(sync_session.connection())
+            ):
+                step()
+
+        return apply
+
+    async def types() -> tuple[str, str]:
+        definition = (
+            await (await session.connection()).execute(
+                text(
+                    "SELECT definition FROM public.marketplace_listing_versions "
+                    "WHERE listing_id = :id"
+                ),
+                {"id": listing.id},
+            )
+        ).scalar_one()
+        return (
+            definition["files"][0]["envelope"]["file_type"],
+            definition["file"]["file_type"],
+        )
+
+    await session.run_sync(run(public.upgrade))
+    await session.commit()
+    assert await types() == ("url", "lexical")
+    saved = (
+        await (await session.connection()).execute(
+            text("SELECT value FROM public.user_view_preferences WHERE user_id = :u"),
+            {"u": user.id},
+        )
+    ).scalar_one()
+    assert saved == {"filters": {"search": "x"}}
+    try:
+        await session.run_sync(run(public.downgrade))
+        await session.commit()
+        assert await types() == ("smart_link", "native")
+    finally:
+        await session.run_sync(run(public.upgrade))
+        await session.commit()

@@ -13,7 +13,6 @@ from __future__ import annotations
 
 from dataclasses import dataclass
 from enum import Enum
-from typing import Any
 
 
 class FileType(str, Enum):
@@ -110,25 +109,9 @@ SPECS: dict[FileType, FileTypeSpec] = {
 #: The types the editor creates and keeps as a body.
 EDITOR_TYPES = tuple(t for t, spec in SPECS.items() if not spec.stored)
 
-#: What the editor's types were called before they took their formats' names.
-#: Backups and listings made then still say so.
-_FORMER_NAMES = {
-    "native": FileType.lexical,
-    "whiteboard": FileType.excalidraw,
-    "spreadsheet": FileType.sheet,
-    "smart_link": FileType.url,
-}
-
 _BY_MEDIA_TYPE = {
     media: file_type for file_type, spec in SPECS.items() for media in spec.media_types
 }
-
-
-def type_named(name: Any) -> Any:
-    """The type an envelope's ``file_type`` names, under either name it has
-    had; anything else is returned as it is, for its reader to refuse."""
-    former = _FORMER_NAMES.get(name) if isinstance(name, str) else None
-    return former.value if former is not None else name
 
 
 def spec_of(file_type: FileType | str) -> FileTypeSpec:

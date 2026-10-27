@@ -552,7 +552,7 @@ async def test_envelope_import_authorization_gates(client, acting_user, session)
     doc_envelope = {
         "type": "initiative-file",
         "schema_version": 1,
-        "file_type": "smart_link",
+        "file_type": "url",
         "name": "Doc",
         "content": {"url": "https://example.com"},
         "tags": [],
@@ -1325,7 +1325,7 @@ async def test_an_archive_from_before_files_restores_its_documents(
     envelope = {
         "type": "initiative-document",
         "schema_version": 1,
-        "document_type": "smart_link",
+        "document_type": "url",
         "name": "Old link",
         "content": {"url": "https://example.com"},
         "tags": [],
@@ -2766,7 +2766,7 @@ async def test_a_file_naming_somebody_in_a_property_asks_first(
     envelope = {
         "type": "initiative-file",
         "schema_version": 1,
-        "file_type": "smart_link",
+        "file_type": "url",
         "name": "Spec",
         "content": {"url": "https://example.com"},
         "tags": [],
@@ -3302,7 +3302,7 @@ async def test_a_mention_nobody_places_is_restored_as_a_name(
     envelope = {
         "type": "initiative-file",
         "schema_version": 1,
-        "file_type": "native",
+        "file_type": "lexical",
         "name": "Minutes",
         "content": _editor_state(
             {**_mention_node("Bea", None), "mentionHandle": "stranger#4321"}
