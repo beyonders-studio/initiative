@@ -140,6 +140,13 @@ class FileRead(FileSummary):
     #: nobody has changed it since. ``null`` when the body was left out.
     content_version: Optional[str] = None
 
+    @computed_field
+    @property
+    def converts_to(self) -> Optional[FileType]:
+        """The editor's own type this uploaded file becomes when somebody
+        converts it to edit it (``POST /files/{id}/convert``), or ``None``."""
+        return spec_of(self.file_type).converts_to
+
 
 class FileVersionRead(SanitizedBaseModel):
     """A single stored version of an uploaded file. The binary is fetched

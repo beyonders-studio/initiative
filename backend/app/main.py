@@ -233,11 +233,12 @@ async def lifespan(app: FastAPI):
         # editor and the image worker, if any started.
         from app.services import editor_engine
         from app.services.marketplace import expressions
-        from app.services.tenant import thumbnails
+        from app.services.tenant import spreadsheet_import, thumbnails
 
         expressions.shutdown()
         editor_engine.shutdown()
         thumbnails.shutdown()
+        spreadsheet_import.shutdown()
 
 
 # docs_url is left None: the default route would inherit the app-wide CSP and

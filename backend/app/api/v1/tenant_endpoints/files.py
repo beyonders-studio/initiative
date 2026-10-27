@@ -78,7 +78,7 @@ from app.schemas.ai_generation import AIStreamEvent
 from app.services import resumable
 from app.services.tenant import attachments as attachments_service
 from app.services.tenant import thumbnails
-from app.services.tenant import file_versions
+from app.services.tenant import file_conversion, file_versions
 from app.services import storage_config
 from app.services.storage import (
     INLINE_UPLOAD_TYPES,
@@ -525,6 +525,27 @@ async def upload_file_version(
         conflict=True,
     )
     return file_versions.read(FileVersionRead, version, file)
+
+
+@router.post("/{file_id}/convert", response_model=FileRead)
+async def convert_file(
+    session: RLSSessionDep,
+    current_user: Annotated[User, Depends(get_current_active_user)],
+    guild_context: GuildContextDep,
+    file_id: int,
+) -> FileRead:
+    """Convert an uploaded file to edit it: it becomes the editor's own type
+    its type converts to (``converts_to``), keeping its id, name, sharing,
+    tags, comments and links, and its uploaded versions go. Requires write
+    access."""
+    file = await resource_access.load_authorized(
+        session, Tool.file, file_id, current_user, guild_context, access="write"
+    )
+    gone = await file_conversion.convert(session, guild_context.guild_id, file)
+    await session.commit()
+    for version in gone:
+        await file_versions.release_files(guild_context.guild_id, version)
+    return await read_after_write(session, file.id, current_user, guild_context)
 
 
 #: The largest frame a browser may send as a video's thumbnail.

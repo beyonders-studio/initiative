@@ -171,6 +171,8 @@
   "RESUMABLE_LOCKED": "Esta subida ya se está enviando desde otro lugar.",
   "RESUMABLE_TOO_MANY": "Tienes demasiadas subidas en curso. Espera a que termine una.",
   "FILE_THUMBNAIL_NOT_WANTED": "Esta versión ya tiene una miniatura o no es un vídeo.",
+  "FILE_NOT_CONVERTIBLE": "Este archivo no se puede convertir para editarlo aquí.",
+  "FILE_TOO_LARGE_TO_CONVERT": "Este archivo es demasiado grande para convertirlo. Descárgalo y edítalo en su propia aplicación.",
   "COMMENT_NOT_FOUND": "Comentario no encontrado",
   "COMMENT_PERMISSION_DENIED": "No autorizado para comentar",
   "COMMENT_PARENT_NOT_FOUND": "Comentario padre no encontrado",

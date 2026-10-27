@@ -173,6 +173,8 @@
   "RESUMABLE_LOCKED": "Dieser Upload wird bereits von anderswo gesendet.",
   "RESUMABLE_TOO_MANY": "Du hast zu viele laufende Uploads. Warte, bis einer fertig ist.",
   "FILE_THUMBNAIL_NOT_WANTED": "Diese Version hat bereits ein Vorschaubild oder ist kein Video.",
+  "FILE_NOT_CONVERTIBLE": "Diese Datei lässt sich hier nicht zum Bearbeiten umwandeln.",
+  "FILE_TOO_LARGE_TO_CONVERT": "Diese Datei ist zu groß zum Umwandeln. Lade sie herunter und bearbeite sie in ihrer eigenen App.",
   "COMMENT_NOT_FOUND": "Kommentar nicht gefunden",
   "COMMENT_PERMISSION_DENIED": "Nicht berechtigt zu kommentieren",
   "COMMENT_PARENT_NOT_FOUND": "Übergeordneter Kommentar nicht gefunden",

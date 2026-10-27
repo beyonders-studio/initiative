@@ -171,6 +171,8 @@
   "RESUMABLE_LOCKED": "Ce téléversement est déjà envoyé depuis un autre endroit.",
   "RESUMABLE_TOO_MANY": "Vous avez trop de téléversements en cours. Attendez qu'un se termine.",
   "FILE_THUMBNAIL_NOT_WANTED": "Cette version a déjà une miniature ou n'est pas une vidéo.",
+  "FILE_NOT_CONVERTIBLE": "Ce fichier ne peut pas être converti pour être modifié ici.",
+  "FILE_TOO_LARGE_TO_CONVERT": "Ce fichier est trop volumineux pour être converti. Téléchargez-le et modifiez-le dans son application.",
   "COMMENT_NOT_FOUND": "Commentaire introuvable",
   "COMMENT_PERMISSION_DENIED": "Vous n'êtes pas autorisé à commenter",
   "COMMENT_PARENT_NOT_FOUND": "Commentaire parent introuvable",

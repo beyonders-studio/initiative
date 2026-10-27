@@ -311,6 +311,24 @@
     "uploadError": "Échec du téléversement de la nouvelle version",
     "deleteError": "Échec de la suppression de la version"
   },
+  "convert": {
+    "edit": "Modifier",
+    "title": "Convertir pour modifier ?",
+    "toSheet": {
+      "xlsx": "Il devient une feuille de calcul que vous pouvez modifier ici. Ses feuilles, valeurs, formules, remplissages, bordures et formats de nombre sont conservés ; les graphiques, images et macros ne le sont pas.",
+      "values": "Il devient une feuille de calcul que vous pouvez modifier ici. Ses feuilles et ses valeurs sont conservées. Les formules deviennent les valeurs qu'elles affichent, et la mise en forme n'est pas conservée.",
+      "table": "Il devient une feuille de calcul que vous pouvez modifier ici, ses lignes et colonnes formant une seule feuille."
+    },
+    "toDocument": {
+      "markdown": "Il devient un document que vous pouvez modifier ici. Les titres, listes, tableaux, liens et la mise en forme du texte sont conservés.",
+      "text": "Il devient un document que vous pouvez modifier ici, son texte en paragraphes."
+    },
+    "replaces": "Le fichier téléversé et ses versions précédentes sont remplacés. L'export vous redonne un fichier quand vous en avez besoin.",
+    "confirm": "Convertir",
+    "converting": "Conversion…",
+    "success": "Converti. Vous pouvez le modifier.",
+    "error": "Impossible de convertir ce fichier."
+  },
   "viewer": {
     "loadError": "Impossible de charger le fichier",
     "openNewTab": "Ouvrir dans un nouvel onglet",

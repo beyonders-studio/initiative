@@ -311,6 +311,24 @@
     "uploadError": "Hochladen der neuen Version fehlgeschlagen",
     "deleteError": "Löschen der Version fehlgeschlagen"
   },
+  "convert": {
+    "edit": "Bearbeiten",
+    "title": "Zum Bearbeiten umwandeln?",
+    "toSheet": {
+      "xlsx": "Daraus wird eine Tabelle, die du hier bearbeiten kannst. Blätter, Werte, Formeln, Füllungen, Rahmen und Zahlenformate kommen mit; Diagramme, Bilder und Makros nicht.",
+      "values": "Daraus wird eine Tabelle, die du hier bearbeiten kannst. Blätter und Werte kommen mit. Formeln kommen als die Werte mit, die sie anzeigen, und die Formatierung bleibt zurück.",
+      "table": "Daraus wird eine Tabelle, die du hier bearbeiten kannst, mit den Zeilen und Spalten als ein Blatt."
+    },
+    "toDocument": {
+      "markdown": "Daraus wird ein Dokument, das du hier bearbeiten kannst. Überschriften, Listen, Tabellen, Links und Textformatierung kommen mit.",
+      "text": "Daraus wird ein Dokument, das du hier bearbeiten kannst, mit dem Text als Absätze."
+    },
+    "replaces": "Die hochgeladene Datei und ihre früheren Versionen werden ersetzt. Über den Export bekommst du jederzeit wieder eine Datei.",
+    "confirm": "Umwandeln",
+    "converting": "Wird umgewandelt…",
+    "success": "Umgewandelt. Jetzt kannst du sie bearbeiten.",
+    "error": "Diese Datei konnte nicht umgewandelt werden."
+  },
   "viewer": {
     "loadError": "Datei kann nicht geladen werden",
     "openNewTab": "In neuem Tab öffnen",

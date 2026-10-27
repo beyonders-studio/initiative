@@ -5,6 +5,7 @@ import {
   FileText,
   History,
   Loader2,
+  Pencil,
   Presentation,
   Trash2,
   Upload,
@@ -16,7 +17,7 @@ import { type ChangeEvent, useEffect, useMemo, useRef, useState } from "react";
 import { useTranslation } from "react-i18next";
 import { Document, Page, pdfjs } from "react-pdf";
 
-import type { FileVersionRead } from "@/api/generated/initiativeAPI.schemas";
+import { FileType, type FileVersionRead } from "@/api/generated/initiativeAPI.schemas";
 import { Markdown } from "@/components/Markdown";
 import { Lightbox } from "@/components/shared/Lightbox";
 import { Badge } from "@/components/ui/badge";
@@ -24,6 +25,7 @@ import { Button } from "@/components/ui/button";
 import { ConfirmDialog } from "@/components/ui/confirm-dialog";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
 import {
+  useConvertFile,
   useDeleteFileVersion,
   useFileVersions,
   usePutVideoThumbnail,
@@ -69,7 +71,22 @@ interface UploadedFileViewerProps {
   /** The current version's thumbnail. A video without one is given a frame
    *  of itself when somebody who can edit it opens it. */
   thumbnailUrl?: string | null;
+  /** The file's type, and the type it becomes when converted to edit it
+   *  (`null` for one that does not convert). */
+  fileType?: FileType;
+  convertsTo?: FileType | null;
 }
+
+/** What converting a file of each type keeps, said before it is converted. */
+const CONVERT_NOTES = {
+  [FileType.xlsx]: "convert.toSheet.xlsx",
+  [FileType.xls]: "convert.toSheet.values",
+  [FileType.ods]: "convert.toSheet.values",
+  [FileType.csv]: "convert.toSheet.table",
+  [FileType.tsv]: "convert.toSheet.table",
+  [FileType.md]: "convert.toDocument.markdown",
+  [FileType.txt]: "convert.toDocument.text",
+} as const;
 
 /**
  * Live "Version N · M ago" label for one version row. A component (not an inline
@@ -91,6 +108,8 @@ export const UploadedFileViewer = ({
   canEdit = false,
   canDeleteVersions = false,
   thumbnailUrl = null,
+  fileType,
+  convertsTo = null,
 }: UploadedFileViewerProps) => {
   const { t, i18n } = useTranslation(["files", "common"]);
   const percent = numberFormat(i18n.resolvedLanguage ?? i18n.language, {
@@ -103,6 +122,12 @@ export const UploadedFileViewer = ({
   const uploadVersion = useUploadFileVersion();
   const deleteVersion = useDeleteFileVersion();
   const { mutate: putVideoThumbnail } = usePutVideoThumbnail();
+  const convert = useConvertFile({ onSuccess: () => setConvertOpen(false) });
+  const [convertOpen, setConvertOpen] = useState(false);
+  const convertNote =
+    fileType && fileType in CONVERT_NOTES
+      ? CONVERT_NOTES[fileType as keyof typeof CONVERT_NOTES]
+      : undefined;
   const versionInputRef = useRef<HTMLInputElement>(null);
   // How much of a new version has arrived, and how to stop it on leaving.
   const [versionSent, setVersionSent] = useState(0);
@@ -440,6 +465,12 @@ export const UploadedFileViewer = ({
               </PopoverContent>
             </Popover>
           )}
+          {canEdit && convertsTo && isViewingCurrent && (
+            <Button size="sm" onClick={() => setConvertOpen(true)}>
+              <Pencil className="h-4 w-4" />
+              {t("convert.edit")}
+            </Button>
+          )}
           <Button variant="outline" size="sm" onClick={handleOpenInNewTab}>
             <ExternalLink className="h-4 w-4" />
             {t("viewer.openNewTab")}
@@ -450,6 +481,19 @@ export const UploadedFileViewer = ({
           </Button>
         </div>
       </div>
+      <ConfirmDialog
+        open={convertOpen}
+        onOpenChange={setConvertOpen}
+        title={t("convert.title")}
+        description={convertNote ? t(convertNote) : undefined}
+        confirmLabel={t("convert.confirm")}
+        loadingLabel={t("convert.converting")}
+        cancelLabel={t("common:cancel")}
+        onConfirm={() => convert.mutate(fileId)}
+        isLoading={convert.isPending}
+      >
+        <p className="text-muted-foreground text-sm">{t("convert.replaces")}</p>
+      </ConfirmDialog>
       {!isViewingCurrent && (
         <div className="rounded-md border border-amber-500/40 bg-amber-500/10 px-3 py-2 text-amber-700 text-sm dark:text-amber-400">
           {t(canEdit ? "versions.viewingOldCanEdit" : "versions.viewingOld")}

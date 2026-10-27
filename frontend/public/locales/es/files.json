@@ -311,6 +311,24 @@
     "uploadError": "No se pudo subir la nueva versión",
     "deleteError": "No se pudo eliminar la versión"
   },
+  "convert": {
+    "edit": "Editar",
+    "title": "¿Convertir para editar?",
+    "toSheet": {
+      "xlsx": "Se convierte en una hoja de cálculo que puedes editar aquí. Se conservan sus hojas, valores, fórmulas, rellenos, bordes y formatos de número; los gráficos, imágenes y macros no.",
+      "values": "Se convierte en una hoja de cálculo que puedes editar aquí. Se conservan sus hojas y valores. Las fórmulas pasan como los valores que muestran y el formato no se conserva.",
+      "table": "Se convierte en una hoja de cálculo que puedes editar aquí, con sus filas y columnas en una sola hoja."
+    },
+    "toDocument": {
+      "markdown": "Se convierte en un documento que puedes editar aquí. Se conservan los títulos, listas, tablas, enlaces y el formato del texto.",
+      "text": "Se convierte en un documento que puedes editar aquí, con su texto en párrafos."
+    },
+    "replaces": "El archivo subido y sus versiones anteriores se reemplazan. La exportación te devuelve un archivo cuando lo necesites.",
+    "confirm": "Convertir",
+    "converting": "Convirtiendo…",
+    "success": "Convertido. Ya puedes editarlo.",
+    "error": "No se pudo convertir este archivo."
+  },
   "viewer": {
     "loadError": "No se pudo cargar el archivo",
     "openNewTab": "Abrir en nueva pestaña",

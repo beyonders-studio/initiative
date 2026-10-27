@@ -171,6 +171,8 @@
   "RESUMABLE_LOCKED": "This upload is already being sent from somewhere else.",
   "RESUMABLE_TOO_MANY": "You have too many uploads in progress. Wait for one to finish.",
   "FILE_THUMBNAIL_NOT_WANTED": "This version already has a thumbnail, or isn't a video.",
+  "FILE_NOT_CONVERTIBLE": "This file can't be converted to edit here.",
+  "FILE_TOO_LARGE_TO_CONVERT": "This file is too large to convert. Download it and edit it in its own app instead.",
   "FILE_TOO_LARGE": "File is too large (max 50 MB)",
   "COMMENT_NOT_FOUND": "Comment not found",
   "COMMENT_PERMISSION_DENIED": "Not authorized to comment",

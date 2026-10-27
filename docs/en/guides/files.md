@@ -194,6 +194,20 @@ An upload keeps a **version history**. **Upload new version** and the older ones
 
 The file's owner can delete a version, for good. Delete the newest and the one before it becomes the file again. The last one left always stays.
 
+### Editing an uploaded spreadsheet or text file
+
+The budget arrived as an Excel file, and now three people need to change it. Open it and choose **Edit**. It's converted into a spreadsheet you edit right here: same file, same name, same comments and links, just one you can type into.
+
+| Uploaded as | Becomes | What comes over |
+|---|---|---|
+| Excel (`.xlsx`) | Spreadsheet | Sheets, values, formulas, fills, borders and number formats. Charts, pictures and macros stay behind. |
+| Older Excel (`.xls`), OpenDocument (`.ods`) | Spreadsheet | Sheets and values. A formula arrives as the number it showed. |
+| CSV, TSV | Spreadsheet | The rows and columns, as one sheet. |
+| Markdown (`.md`) | Text document | Headings, lists, tables, links and formatting. |
+| Plain text (`.txt`) | Text document | The text, as paragraphs. |
+
+Converting replaces the upload and its version history, and the dialog says so before anything happens. Need the file back out? **Export** it as Excel, CSV, Word, PDF or Markdown whenever you like.
+
 ## Attaching files to a project
 
 A file can be **attached** to a project so the relevant reference sits right next to the work. Add it from the project's **Connections** section, where it sits under **Attached** — or drop something from your computer there and it becomes a new file, already attached. See [Mentions & links](mentions-and-links.md#connections).
