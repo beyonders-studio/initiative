@@ -5,7 +5,7 @@
     "version": "8.1.0",
     "x-initiative-source": {
       "version": "0.77.1",
-      "commit": "2c94995612f0f25c9954c1743461baf2bdf2d13e"
+      "commit": "c7307c6aa63e0ff56bf93da149be427f65c44148"
     }
   },
   "servers": [
@@ -6980,10 +6980,10 @@
                   "type": "null"
                 }
               ],
-              "description": "Match on title, caption or filename.",
+              "description": "Match on title, description or filename.",
               "title": "Search"
             },
-            "description": "Match on title, caption or filename."
+            "description": "Match on title, description or filename."
           },
           {
             "name": "oldest_first",
@@ -7011,10 +7011,10 @@
                   "type": "null"
                 }
               ],
-              "description": "Start the list at this instant, inclusive, measured by upload time — which is what the list is ordered by. This is how a timeline jumps to a month without paging through everything since. It follows the list's own direction: newest first it is a ceiling and the page walks back from it, oldest first a floor and the page walks forward, so pair it with the matching end of the timeline bucket.",
+              "description": "Start the list at this day, inclusive, measured by each item's date — which is what the list is ordered by. This is how a timeline jumps to a month without paging through everything since. It follows the list's own direction: newest first it is a ceiling and the page walks back from it, oldest first a floor and the page walks forward, so pair it with the matching end of the timeline bucket.",
               "title": "Until"
             },
-            "description": "Start the list at this instant, inclusive, measured by upload time — which is what the list is ordered by. This is how a timeline jumps to a month without paging through everything since. It follows the list's own direction: newest first it is a ceiling and the page walks back from it, oldest first a floor and the page walks forward, so pair it with the matching end of the timeline bucket."
+            "description": "Start the list at this day, inclusive, measured by each item's date — which is what the list is ordered by. This is how a timeline jumps to a month without paging through everything since. It follows the list's own direction: newest first it is a ceiling and the page walks back from it, oldest first a floor and the page walks forward, so pair it with the matching end of the timeline bucket."
           },
           {
             "name": "page",
@@ -7137,7 +7137,7 @@
           "catalogs"
         ],
         "summary": "Get Catalog Item Timeline",
-        "description": "The months this catalog has pictures in, newest first — what the\ntimeline rail is drawn from. Takes the same filters the list does, so the\nrail is a picture of the list as it currently stands.",
+        "description": "The months this catalog has items in, by each item's date, newest\nfirst — what the timeline rail is drawn from. Takes the same filters the\nlist does, so the rail is a picture of the list as it currently stands. A\ndate is a day, so its month is the same wherever it is read.",
         "operationId": "get_catalog_item_timeline",
         "security": [
           {
@@ -7211,24 +7211,6 @@
               ],
               "title": "Search"
             }
-          },
-          {
-            "name": "tz",
-            "in": "query",
-            "required": false,
-            "schema": {
-              "anyOf": [
-                {
-                  "type": "string"
-                },
-                {
-                  "type": "null"
-                }
-              ],
-              "description": "IANA zone the month boundaries are cut in, e.g. Pacific/Auckland. Defaults to UTC.",
-              "title": "Tz"
-            },
-            "description": "IANA zone the month boundaries are cut in, e.g. Pacific/Auckland. Defaults to UTC."
           },
           {
             "name": "session_token",
@@ -7317,7 +7299,7 @@
           "catalogs"
         ],
         "summary": "Update Catalog Item",
-        "description": "Retitle, caption, retag or set the properties of a picture. Requires\nwrite access on the catalog.",
+        "description": "Retitle, describe, date, retag or set the properties of a picture.\nRequires write access on the catalog.",
         "operationId": "update_catalog_item",
         "security": [
           {
@@ -11271,7 +11253,7 @@
             ],
             "title": "Title"
           },
-          "caption": {
+          "description": {
             "anyOf": [
               {
                 "type": "string",
@@ -11282,7 +11264,20 @@
                 "type": "null"
               }
             ],
-            "title": "Caption"
+            "title": "Description"
+          },
+          "occurred_on": {
+            "anyOf": [
+              {
+                "type": "string",
+                "format": "date"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Occurred On",
+            "description": "The day the item is about. Defaults to today, in UTC."
           }
         },
         "type": "object",
@@ -12503,7 +12498,7 @@
             ],
             "title": "Title"
           },
-          "caption": {
+          "description": {
             "anyOf": [
               {
                 "type": "string",
@@ -12514,7 +12509,12 @@
                 "type": "null"
               }
             ],
-            "title": "Caption"
+            "title": "Description"
+          },
+          "occurred_on": {
+            "type": "string",
+            "format": "date",
+            "title": "Occurred On"
           },
           "file_url": {
             "type": "string",
@@ -12655,7 +12655,8 @@
           "catalog_id",
           "community_id",
           "title",
-          "caption",
+          "description",
+          "occurred_on",
           "file_url",
           "thumbnail_url",
           "file_content_type",
@@ -12702,11 +12703,10 @@
             ],
             "title": "Title"
           },
-          "caption": {
+          "description": {
             "anyOf": [
               {
                 "type": "string",
-                "maxLength": 2000,
                 "x-mentions": "markdown",
                 "description": "A person is mentioned as `@[](<reference>)`, by your reference for them, with no name: read who they are from the members search (`members:read`). Write a mention the same way. A stored file comes without its path: `![alt]()`, `[name]()`."
               },
@@ -12714,7 +12714,19 @@
                 "type": "null"
               }
             ],
-            "title": "Caption"
+            "title": "Description"
+          },
+          "occurred_on": {
+            "anyOf": [
+              {
+                "type": "string",
+                "format": "date"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Occurred On"
           },
           "tag_ids": {
             "anyOf": [
@@ -12730,7 +12742,7 @@
             ],
             "title": "Tag Ids"
           },
-          "caption_base": {
+          "description_base": {
             "anyOf": [
               {
                 "type": "string",
@@ -12741,7 +12753,7 @@
                 "type": "null"
               }
             ],
-            "title": "Caption Base"
+            "title": "Description Base"
           }
         },
         "type": "object",
