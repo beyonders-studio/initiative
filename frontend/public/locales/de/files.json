@@ -363,5 +363,68 @@
       "link": "Link",
       "other": "Sonstiges"
     }
+  },
+  "collections": {
+    "heading": "Sammlungen",
+    "fileCount_one": "{{count}} Datei",
+    "fileCount_other": "{{count}} Dateien",
+    "addTo": "Zur Sammlung hinzufügen",
+    "addToDescription_one": "Lege diese Datei in eine Sammlung. Sie bleibt in Dateien, und wer sie öffnen kann, ändert sich nicht.",
+    "addToDescription_other": "Lege diese {{count}} Dateien in eine Sammlung. Sie bleiben in Dateien, und wer sie öffnen kann, ändert sich nicht.",
+    "noneToAddTo": "Noch keine Sammlung, zu der du hinzufügen kannst. Benenne unten eine neue.",
+    "namePlaceholder": "Name der neuen Sammlung",
+    "addToNew": "Zu neuer Sammlung hinzufügen",
+    "added_one": "Zu {{name}} hinzugefügt",
+    "added_other": "{{count}} Dateien zu {{name}} hinzugefügt",
+    "created": "{{name}} erstellt",
+    "addFiles": "Dateien hinzufügen",
+    "pickFile": "Welche Datei?",
+    "noFilesToAdd": "Keine Dateien zum Hinzufügen",
+    "fileAdded": "Datei zur Sammlung hinzugefügt",
+    "uploadFiles": "Dateien hochladen",
+    "dropPrompt": "Dateien ablegen, um sie in diese Sammlung hochzuladen",
+    "removeFrom": "Aus der Sammlung entfernen",
+    "removed_one": "{{count}} Datei aus der Sammlung entfernt",
+    "removed_other": "{{count}} Dateien aus der Sammlung entfernt",
+    "emptied": "Ihre letzte Datei ist draußen, also liegt die Sammlung jetzt im Papierkorb",
+    "trash": "In den Papierkorb",
+    "trashTitle": "Diese Sammlung in den Papierkorb legen?",
+    "trashDescription": "Ihre Dateien bleiben, wo sie sind. Bis zum Ende der Aufbewahrungsfrist kann sie aus dem Papierkorb wiederhergestellt werden.",
+    "trashed": "Sammlung in den Papierkorb gelegt",
+    "noFiles": "Noch keine Dateien in dieser Sammlung",
+    "noFilesDescription": "Füge Dateien aus dieser Initiative hinzu oder lege Dateien irgendwo auf dieser Seite ab, um sie hochzuladen.",
+    "loadingFiles": "Dateien werden geladen...",
+    "openFile": "Datei öffnen",
+    "filter": "Sammlung",
+    "anyCollection": "Jede Sammlung",
+    "groupByTag": "Nach Tag gruppieren",
+    "order": "Reihenfolge",
+    "newestFirst": "Neueste zuerst",
+    "oldestFirst": "Älteste zuerst",
+    "views": {
+      "label": "Ansicht",
+      "masonry": "Mauerwerk",
+      "timeline": "Zeitleiste"
+    },
+    "groups": {
+      "untagged": "Ohne Tag",
+      "count_one": "{{count}} Datei",
+      "count_other": "{{count}} Dateien"
+    },
+    "upload": {
+      "progress": "{{done}} von {{total}} werden hochgeladen...",
+      "finished_one": "{{count}} Datei hinzugefügt",
+      "finished_other": "{{count}} Dateien hinzugefügt",
+      "finishedWithFailures": "{{done}} hinzugefügt, {{failed}} nicht möglich",
+      "dismiss": "Ausblenden",
+      "tooLarge": "größer, als dieser Server annimmt"
+    },
+    "layoutsDescription": "Welche Listen diese Sammlung zeigt und mit welcher sie öffnet. Jede Person wählt unter den gezeigten.",
+    "backToFiles": "Zurück zu Dateien",
+    "notFound": "Sammlung nicht gefunden",
+    "notFoundDescription": "Die gesuchte Sammlung existiert nicht, oder du kannst keine ihrer Dateien öffnen.",
+    "noAccess": "Zugriff verweigert",
+    "noAccessDescription": "Du hast keine Berechtigung, diese Sammlung anzusehen.",
+    "error": "Die Sammlung konnte nicht geändert werden"
   }
 }

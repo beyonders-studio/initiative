@@ -11,7 +11,7 @@ import { useMemo, useState } from "react";
 import { useTranslation } from "react-i18next";
 
 import { Tool, WikiPageKind, type WikiPageSummary } from "@/api/generated/initiativeAPI.schemas";
-import { AddWikiFileDialog } from "@/components/initiativeTools/wikis/AddWikiFileDialog";
+import { FileChooserDialog } from "@/components/files/FileChooserDialog";
 import { WikiPageActions } from "@/components/initiativeTools/wikis/WikiPageActions";
 import {
   useWikiTreeExpansion,
@@ -31,6 +31,7 @@ import {
 } from "@/components/ui/sidebar";
 import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip";
 import {
+  useAddWikiFile,
   useAddWikiPage,
   useMoveWikiFile,
   useMoveWikiPage,
@@ -81,11 +82,22 @@ export const WikiSidebarContent = ({
   const createPage = useAddWikiPage(wikiId, initiativeId);
   // Putting a file in the wiki, and taking one back out.
   const [addingFile, setAddingFile] = useState(false);
+  const addFile = useAddWikiFile(wikiId, {
+    onSuccess: () => {
+      toast.success(t("files.added"));
+      setAddingFile(false);
+    },
+  });
   const removeFile = useRemoveWikiFile(wikiId);
   const movePage = useMoveWikiPage(wikiId);
   const moveFile = useMoveWikiFile(wikiId);
 
   const pages = pagesQuery.data?.items ?? [];
+  // A file already in the wiki is not offered again.
+  const filed = useMemo(
+    () => new Set(pages.filter((page) => page.kind === WikiPageKind.file).map((page) => page.id)),
+    [pages]
+  );
 
   // Which rows are open. Held here rather than inside the tree because the
   // button over it acts on the same set the rows do.
@@ -278,12 +290,14 @@ export const WikiSidebarContent = ({
         </SidebarGroup>
       </SidebarContent>
 
-      <AddWikiFileDialog
-        wikiId={wikiId}
+      <FileChooserDialog
         initiativeId={initiativeId}
-        pages={pages}
+        exclude={filed}
         open={addingFile}
         onOpenChange={setAddingFile}
+        onPick={(fileId) => addFile.mutate(fileId)}
+        pending={addFile.isPending}
+        text={{ title: t("files.addFile"), description: t("files.pick"), none: t("files.none") }}
       />
     </>
   );

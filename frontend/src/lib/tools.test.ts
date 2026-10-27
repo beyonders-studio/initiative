@@ -274,11 +274,12 @@ describe("tool routes", () => {
   });
 
   it("pluralizes and singularizes by one rule, not by adding or chopping an s", () => {
-    expect(toolPlural(Tool.library)).toBe("libraries");
-    expect(toolRouteSegment(Tool.library)).toBe("libraries");
-    expect(toolCamelPlural(Tool.library)).toBe("libraries");
-    expect(toolPascalPlural(Tool.library)).toBe("Libraries");
-    expect(singularOf("libraries")).toBe("library");
+    expect(toolPlural(Tool.counter_group)).toBe("counter_groups");
+    expect(toolRouteSegment(Tool.counter_group)).toBe("counter-groups");
+    expect(toolCamelPlural(Tool.counter_group)).toBe("counterGroups");
+    expect(toolPascalPlural(Tool.counter_group)).toBe("CounterGroups");
+    expect(toolPlural("calendar_entry" as Tool)).toBe("calendar_entries");
+    expect(singularOf("calendar_entries")).toBe("calendar_entry");
     expect(singularOf("counter_groups")).toBe("counter_group");
     expect(singularOf("tasks")).toBe("task");
   });
@@ -378,8 +379,8 @@ describe("tool relations", () => {
     expect(Object.values(PARENT_TOOL).every((tool) => TOOLS.includes(tool))).toBe(true);
     expect(Object.keys(PARENT_TOOL).sort()).toEqual([
       "calendar_event",
+      "collection",
       "counter",
-      "library_item",
       "queue_item",
       "task",
       "wiki_page",

@@ -69,7 +69,6 @@ const CARD_FIELDS: Partial<Record<Tool, Record<string, unknown>>> = {
     original_filename: null,
     smart_link_url: null,
   },
-  library: { cover: null, preview: [] },
   project: {
     icon: null,
     is_template: false,
@@ -340,45 +339,6 @@ describe("the queue index page", () => {
     await waitFor(() => expect(requests.at(-1)?.get("is_active")).toBe("true"));
     await pick("filters.allStatuses");
     await waitFor(() => expect(requests.at(-1)?.has("is_active")).toBe(false));
-  });
-});
-
-describe("the library index page", () => {
-  it("draws the newest four pictures of a library nobody chose a cover for", async () => {
-    const preview = [1, 2, 3, 4].map((id) => ({
-      item_id: id,
-      file_url: `/uploads/picture-${id}.png`,
-      thumbnail_url: null,
-      width: null,
-      height: null,
-    }));
-    // The list carries the pictures only when it is asked for them.
-    server.use(
-      communityHttp.get(`/${toolRouteSegment(Tool.library)}/`, ({ request }) => {
-        const asked = new URL(request.url).searchParams.get("include_preview") === "true";
-        return HttpResponse.json({
-          items: [
-            {
-              ...row(Tool.library, { id: 1, name: "Store assets" }),
-              preview: asked ? preview : [],
-            },
-          ],
-          total_count: 1,
-          page: 1,
-          page_size: 100,
-          has_next: false,
-        });
-      })
-    );
-
-    const { container } = renderIndex(Tool.library);
-    await screen.findByText("Store assets");
-
-    await waitFor(() =>
-      expect(
-        Array.from(container.querySelectorAll("img"), (img) => img.getAttribute("src"))
-      ).toEqual(preview.map((picture) => expect.stringContaining(picture.file_url)))
-    );
   });
 });
 

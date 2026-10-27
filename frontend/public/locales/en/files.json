@@ -363,5 +363,68 @@
       "link": "Link",
       "other": "Other"
     }
+  },
+  "collections": {
+    "heading": "Collections",
+    "fileCount_one": "{{count}} file",
+    "fileCount_other": "{{count}} files",
+    "addTo": "Add to collection",
+    "addToDescription_one": "Put this file in a collection. It stays in Files, and who can open it doesn't change.",
+    "addToDescription_other": "Put these {{count}} files in a collection. They stay in Files, and who can open them doesn't change.",
+    "noneToAddTo": "No collections to add to yet. Name a new one below.",
+    "namePlaceholder": "New collection name",
+    "addToNew": "Add to new collection",
+    "added_one": "Added to {{name}}",
+    "added_other": "{{count}} files added to {{name}}",
+    "created": "{{name}} created",
+    "addFiles": "Add files",
+    "pickFile": "Which file?",
+    "noFilesToAdd": "No files to add",
+    "fileAdded": "File added to the collection",
+    "uploadFiles": "Upload files",
+    "dropPrompt": "Drop files to upload them into this collection",
+    "removeFrom": "Remove from collection",
+    "removed_one": "{{count}} file removed from the collection",
+    "removed_other": "{{count}} files removed from the collection",
+    "emptied": "Its last file is out, so the collection went to the trash",
+    "trash": "Move to trash",
+    "trashTitle": "Move this collection to the trash?",
+    "trashDescription": "Its files stay where they are. It can be restored from the trash before the retention period ends.",
+    "trashed": "Collection moved to the trash",
+    "noFiles": "No files in this collection yet",
+    "noFilesDescription": "Add files from this initiative, or drop files anywhere on this page to upload them.",
+    "loadingFiles": "Loading files...",
+    "openFile": "Open file",
+    "filter": "Collection",
+    "anyCollection": "Any collection",
+    "groupByTag": "Group by tag",
+    "order": "Order",
+    "newestFirst": "Newest first",
+    "oldestFirst": "Oldest first",
+    "views": {
+      "label": "View",
+      "masonry": "Masonry",
+      "timeline": "Timeline"
+    },
+    "groups": {
+      "untagged": "Untagged",
+      "count_one": "{{count}} file",
+      "count_other": "{{count}} files"
+    },
+    "upload": {
+      "progress": "Uploading {{done}} of {{total}}...",
+      "finished_one": "{{count}} file added",
+      "finished_other": "{{count}} files added",
+      "finishedWithFailures": "{{done}} added, {{failed}} could not be",
+      "dismiss": "Dismiss",
+      "tooLarge": "larger than this server takes"
+    },
+    "layoutsDescription": "Which lists this collection shows, and the one it opens on. Each person picks among those shown.",
+    "backToFiles": "Back to Files",
+    "notFound": "Collection not found",
+    "notFoundDescription": "The collection you're looking for doesn't exist, or none of its files are ones you can open.",
+    "noAccess": "Access denied",
+    "noAccessDescription": "You don't have permission to view this collection.",
+    "error": "Couldn't change the collection"
   }
 }

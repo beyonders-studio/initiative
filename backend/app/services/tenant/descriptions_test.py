@@ -192,7 +192,7 @@ async def test_a_description_s_hash_becomes_the_task_s_reference(
     response = await client.patch(
         writer.g(f"/tasks/{task.id}"),
         headers=writer.headers,
-        json={"description": f"Spec: #doc[Spec]({doc.id})"},
+        json={"description": f"Spec: #file[Spec]({doc.id})"},
     )
     assert response.status_code == 200, response.text
     assert await _references(
@@ -223,7 +223,7 @@ async def test_a_duplicate_points_where_its_original_does_and_tells_nobody(
     task = await create_task(
         session,
         writer.project,
-        description=f"@[Tea M]({teammate.user.id}) see #doc[Spec]({doc.id})",
+        description=f"@[Tea M]({teammate.user.id}) see #file[Spec]({doc.id})",
     )
     await session.commit()
 

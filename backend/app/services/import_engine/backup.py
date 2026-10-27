@@ -41,7 +41,8 @@ from sqlmodel.ext.asyncio.session import AsyncSession
 
 from app.db import gucs
 from app.db.session import raise_flag, routed_guild_id
-from app.core.references import format_ref, parse_ref
+from app.core.legacy_references import rewrite_body, rewrite_ref, rewrite_text
+from app.core.references import format_ref
 from app.core.relationships import RelationshipType
 from app.core.search import SearchEntityType
 from app.core.tools import BULK_EXPORT_TOOLS, Tool, tool_envelope_type
@@ -90,7 +91,7 @@ from app.services.import_engine.context import (
     exported_from_here,
 )
 from app.services.import_engine.links import resolve_page_links
-from app.services.import_engine.references import SOURCE_REF, resolve_references
+from app.services.import_engine.references import resolve_references
 from app.services.marketplace.publish_profile import shift_dates
 from app.services.import_engine.zip_bounds import (
     json_cap,
@@ -143,7 +144,6 @@ _LEGACY_ENVELOPE_TYPES = {"initiative-document": tool_envelope_type(Tool.file)}
 _LEGACY_TOOLS = {"document": Tool.file.value}
 _LEGACY_ENTRY_TOOLS = {**_LEGACY_TOOLS, "gallery": Tool.file.value}
 _LEGACY_KEYS = {"documents": "files", "document_type": "file_type"}
-_LEGACY_REF_KEYS = ("external_ref", SOURCE_REF)
 _LEGACY_PERMISSIONS = {
     "documents_enabled": Tool.file.view_permission,
     "create_documents": Tool.file.create_permission,
@@ -154,11 +154,16 @@ _GALLERY_TYPE = "initiative-gallery"
 
 def _current_shape(value: Any) -> Any:
     """``value``, read from an archive, with the names an older build gave
-    files spelled as this one spells them."""
+    files spelled as this one spells them, and every reference in a body as
+    well. A gallery's pictures are restored with no id to name them by, so a
+    reference to one is its words."""
+    if isinstance(value, str):
+        return rewrite_text(value, {})
     if isinstance(value, list):
         return [_current_shape(item) for item in value]
     if not isinstance(value, dict):
         return value
+    value = rewrite_body(value, {})
     shaped = {
         _LEGACY_KEYS.get(key, key): _current_shape(item) for key, item in value.items()
     }
@@ -173,11 +178,9 @@ def _current_shape(value: Any) -> Any:
     tool = shaped.get("tool")
     if isinstance(tool, str) and tool in _LEGACY_ENTRY_TOOLS:
         shaped["tool"] = _LEGACY_ENTRY_TOOLS[tool]
-    for key in _LEGACY_REF_KEYS:
-        ref = shaped.get(key)
-        parsed = parse_ref(ref) if isinstance(ref, str) else None
-        if parsed is not None:
-            shaped[key] = format_ref(*parsed)
+    ref = shaped.get("external_ref")
+    if isinstance(ref, str):
+        shaped["external_ref"] = rewrite_ref(ref, {}) or ref
     permissions = shaped.get("permissions")
     if isinstance(permissions, list):
         shaped["permissions"] = [

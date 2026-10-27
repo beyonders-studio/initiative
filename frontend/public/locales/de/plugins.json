@@ -285,10 +285,6 @@
         "read": "Beiträge lesen",
         "write": "Beiträge lesen und ändern"
       },
-      "libraries": {
-        "read": "Bibliotheken lesen",
-        "write": "Bibliotheken lesen und ändern"
-      },
       "wikis": {
         "read": "Wikis lesen",
         "write": "Wikis lesen und ändern"

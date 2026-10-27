@@ -8,7 +8,7 @@ emitter (python-docx, images embedded), and the ``document`` Typst template
 (images staged into the compile root by the backend).
 
 Degradation contract: any unknown node with ``text`` renders as text (this
-covers mentions, wikilinks, hashtags, emojis, keywords — all TextNode
+covers mentions, references, hashtags, emojis, keywords — all TextNode
 subclasses); unknown containers recurse into their children; embeds
 (YouTube/Tweet) degrade to a link; a reference embed (``![[ ]]``) to a note
 callout holding its name; anything else is dropped silently. A new

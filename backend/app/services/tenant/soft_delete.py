@@ -427,7 +427,7 @@ async def hard_purge_entities(
     stored names returned include the evidence objects of doomed cases and
     reports, which live in the same storage.
     """
-    from app.services.tenant.files import unresolve_wikilinks_to_file
+    from app.services.tenant.files import unlink_references_to_file
     from app.services.tenant.attachments import (
         purge_file_uploads,
         purge_initiative_uploads,
@@ -440,7 +440,7 @@ async def hard_purge_entities(
     await session.flush()
 
     # Purge is the one lifecycle step that writes frozen content instead of only
-    # removing it — the wikilink unresolve below reaches files that are
+    # removing it — unlinking the references below reaches files that are
     # themselves in the trash. Transaction-local (see app.db.gucs.PURGING).
     await raise_flag(session, gucs.PURGING)
 
@@ -484,12 +484,12 @@ async def hard_purge_entities(
 
     if loaded.get(File):
         released |= await purge_file_uploads(session, loaded[File])
-        # Links in surviving files that point at a doomed one are blanked
-        # before the row disappears, so they render as unresolved rather than
-        # pointing at nothing. Runs before the DELETEs, while the edges naming
-        # it are still there to find the files carrying those links.
+        # References in surviving files that point at a doomed one become
+        # their words before the row disappears, rather than pointing at
+        # nothing. Runs before the DELETEs, while the edges naming it are
+        # still there to find the files carrying those references.
         for doc in loaded[File]:
-            await unresolve_wikilinks_to_file(session, deleted_file_id=doc.id)
+            await unlink_references_to_file(session, deleted_file_id=doc.id)
 
     # What is left of an initiative's files goes with it.
     if doomed.get(Initiative):

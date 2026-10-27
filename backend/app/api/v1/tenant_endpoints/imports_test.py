@@ -3411,16 +3411,6 @@ def _chip_node(chip_kind: str, entity_id: int, text: str) -> dict:
     }
 
 
-def _wikilink_node(file_id: int, title: str) -> dict:
-    return {
-        "type": "wikilink",
-        "version": 1,
-        "documentId": file_id,
-        "documentTitle": title,
-        "text": title,
-    }
-
-
 async def _referencing_initiative(session, a) -> dict:
     """An initiative whose bodies name each other: a task naming a task, a
     file and a file in another initiative; a comment naming a wiki
@@ -3467,7 +3457,7 @@ async def _referencing_initiative(session, a) -> dict:
             _reference_node("task", fix.id, "Fix the bug"),
             _chip_node("task:status", fix.id, "To do"),
             _chip_node("counter:value", counter.id, "3"),
-            _wikilink_node(spec.id, "Spec"),
+            _reference_node("file", spec.id, "Spec"),
         ),
     )
     ship = await create_task(
@@ -3475,7 +3465,7 @@ async def _referencing_initiative(session, a) -> dict:
         a.project,
         title="Ship it",
         description=(
-            f"After #task[Fix the bug]({fix.id}), per #doc[Spec]({spec.id}) "
+            f"After #task[Fix the bug]({fix.id}), per #file[Spec]({spec.id}) "
             f"and #file[Elsewhere]({outside.id})"
         ),
     )
@@ -3623,15 +3613,15 @@ async def test_a_restored_reference_points_at_the_restored_copy(
     spec, plan = r["files"]["Spec"], r["files"]["Plan"]
 
     assert ship.description == (
-        f"After #task[Fix the bug]({fix.id}), per #doc[Spec]({spec.id}) "
+        f"After #task[Fix the bug]({fix.id}), per #file[Spec]({spec.id}) "
         f"and #file[Elsewhere]({outside.id})"
     )
     assert r["comment"].content == f"Written up in #wiki-page[Start]({r['page'].id})"
-    mention, status, value, wikilink = _nodes(plan.content)
+    mention, status, value, link = _nodes(plan.content)
     assert mention["entityId"] == fix.id
     assert status["entityId"] == fix.id
     assert value["entityId"] == r["counter"].id
-    assert wikilink["documentId"] == spec.id
+    assert link["entityId"] == spec.id
     [project_mention] = _nodes(r["post"].body)
     assert project_mention["entityId"] == r["project"].id
     [post_mention] = _nodes(r["page"].content)
@@ -3688,7 +3678,7 @@ async def test_a_reference_restored_elsewhere_to_something_left_behind_is_its_ti
 
     assert ship.description == (
         f"After #task[Fix the bug]({fix.id}), "
-        f"per #doc[Spec]({r['files']['Spec'].id}) and Elsewhere"
+        f"per #file[Spec]({r['files']['Spec'].id}) and Elsewhere"
     )
 
 
@@ -3878,7 +3868,7 @@ async def test_a_lone_envelope_resolves_what_it_carries(client, acting_user, ses
         session,
         a.project,
         title="Ship it",
-        description=f"After #task[Fix the bug]({fix.id}), per #doc[Spec]({spec.id})",
+        description=f"After #task[Fix the bug]({fix.id}), per #file[Spec]({spec.id})",
         # What an edit of just this task kept back is placed the same way.
         recurrence_carry={"description": f"Once #task[Fix the bug]({fix.id})"},
     )
@@ -3906,7 +3896,7 @@ async def test_a_lone_envelope_resolves_what_it_carries(client, acting_user, ses
         }
 
     (here_fix, here), (there_fix, there) = descriptions
-    assert here == f"After #task[Fix the bug]({here_fix}), per #doc[Spec]({spec.id})"
+    assert here == f"After #task[Fix the bug]({here_fix}), per #file[Spec]({spec.id})"
     assert there == f"After #task[Fix the bug]({there_fix}), per Spec"
 
 

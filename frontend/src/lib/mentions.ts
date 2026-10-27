@@ -12,7 +12,6 @@
  */
 
 import { FileType, SearchEntityType } from "@/api/generated/initiativeAPI.schemas";
-import { EARLIER_KINDS } from "@/lib/smartChips";
 
 /** People. A separate trigger because they are read from the roster, not the
  *  index — identity is shared across communities, content is not. */
@@ -49,17 +48,9 @@ export const typeTrigger = (type: SearchEntityType): string => type.replaceAll("
  * Trigger word -> type. Longest first, so `#counter-group` is not read as
  * `#counter` with a stray suffix.
  */
-const TRIGGER_TYPES: [string, SearchEntityType][] = [
-  ...MENTIONABLE_TYPES.map((type): [string, SearchEntityType] => [typeTrigger(type), type]),
-  // Written by every composer before the type words were derived, and still
-  // sitting in stored comments, so it is read as well as the derived spelling.
-  ["doc", SearchEntityType.file] as [string, SearchEntityType],
-  // A kind's earlier spelling, still sitting in stored text.
-  ...Object.entries(EARLIER_KINDS).map(([kind, type]): [string, SearchEntityType] => [
-    kind.replaceAll("_", "-"),
-    type,
-  ]),
-].sort((a, b) => b[0].length - a[0].length);
+const TRIGGER_TYPES: [string, SearchEntityType][] = MENTIONABLE_TYPES.map(
+  (type): [string, SearchEntityType] => [typeTrigger(type), type]
+).sort((a, b) => b[0].length - a[0].length);
 
 /** The type a trigger word names, or `undefined` if it names none. */
 export const typeForTrigger = (word: string): SearchEntityType | undefined =>

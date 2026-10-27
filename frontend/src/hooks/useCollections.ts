@@ -1,0 +1,185 @@
+import { keepPreviousData, useInfiniteQuery, useQuery } from "@tanstack/react-query";
+
+import {
+  addCollectionFiles,
+  createCollection,
+  deleteCollection,
+  getListCollectionFilesQueryKey,
+  getListCollectionsQueryKey,
+  getReadCollectionQueryKey,
+  listCollectionFiles,
+  listCollections,
+  readCollection,
+  removeCollectionFiles,
+  updateCollection,
+  uploadFile,
+} from "@/api/generated/files/files";
+import type {
+  CollectionCreate,
+  CollectionListResponse,
+  CollectionRead,
+  CollectionUpdate,
+  FileListResponse,
+  FileRead,
+  ListCollectionFilesParams,
+} from "@/api/generated/initiativeAPI.schemas";
+import { invalidate, q } from "@/api/query-keys";
+import { useActiveCommunityId } from "@/hooks/useActiveCommunityId";
+import { useCommunityMutation } from "@/hooks/useApiMutation";
+import { nameWithoutExtension } from "@/lib/fileUtils";
+import type { MutationOpts } from "@/types/mutation";
+
+/** How many files a page of a collection's wall brings. */
+const PAGE_SIZE = 60;
+
+/** What a change to what is in a collection makes stale: every collection's
+ *  card and list, and every file's read, which names its collections. */
+export const invalidateCollectionContents = () => invalidate(q.allCollections(), q.allFiles());
+
+/** An initiative's collections the reader can see, most recently changed
+ *  first. */
+export const useCollections = (initiativeId: number | null) => {
+  const communityId = useActiveCommunityId();
+  const params = { initiative_id: initiativeId ?? 0 };
+  return useQuery<CollectionListResponse>({
+    queryKey: getListCollectionsQueryKey(communityId, params),
+    queryFn: () => listCollections(communityId, params),
+    enabled: initiativeId !== null,
+  });
+};
+
+export const useCollection = (collectionId: number | null) => {
+  const communityId = useActiveCommunityId();
+  return useQuery<CollectionRead>({
+    queryKey: getReadCollectionQueryKey(communityId, collectionId ?? 0),
+    queryFn: () => readCollection(communityId, collectionId ?? 0),
+    enabled: collectionId !== null && Number.isFinite(collectionId),
+  });
+};
+
+/** The filters a collection's file list takes, without the page. */
+export type CollectionFilesParams = Omit<ListCollectionFilesParams, "page" | "page_size">;
+
+/**
+ * A collection's files, page by page, as somebody scrolls the wall.
+ *
+ * An infinite query rather than a page in the URL: a wall is scrolled, not
+ * paged through, and what a page bounds is how much is fetched ahead of the
+ * reader. `keepPreviousData` keeps the wall on screen while a changed filter
+ * loads rather than blanking it.
+ */
+export const useCollectionFilesFeed = (
+  collectionId: number | null,
+  params?: CollectionFilesParams
+) => {
+  const communityId = useActiveCommunityId();
+  return useInfiniteQuery({
+    queryKey: getListCollectionFilesQueryKey(communityId, collectionId ?? 0, params),
+    queryFn: ({ pageParam }) =>
+      listCollectionFiles(communityId, collectionId ?? 0, {
+        ...params,
+        page: pageParam as number,
+        page_size: PAGE_SIZE,
+      }),
+    initialPageParam: 1,
+    getNextPageParam: (last: FileListResponse) => (last.has_next ? last.page + 1 : undefined),
+    placeholderData: keepPreviousData,
+    enabled: collectionId !== null && Number.isFinite(collectionId),
+  });
+};
+
+/** Make a collection of the files named: a collection never starts empty. */
+export const useCreateCollection = (options?: MutationOpts<CollectionRead, CollectionCreate>) =>
+  useCommunityMutation<CollectionRead, CollectionCreate>(
+    {
+      mutationFn: (communityId, body) => createCollection(communityId, body),
+      invalidate: invalidateCollectionContents,
+      errorKey: "files:collections.error",
+    },
+    options
+  );
+
+export const useUpdateCollection = (
+  collectionId: number,
+  options?: MutationOpts<CollectionRead, CollectionUpdate>
+) =>
+  useCommunityMutation<CollectionRead, CollectionUpdate>(
+    {
+      mutationFn: (communityId, body) => updateCollection(communityId, collectionId, body),
+      invalidate: () => invalidate(q.allCollections()),
+      errorKey: "files:collections.error",
+    },
+    options
+  );
+
+/** Send a collection to the trash. Its files stay where they are. */
+export const useDeleteCollection = (options?: MutationOpts<void, number>) =>
+  useCommunityMutation<void, number>(
+    {
+      mutationFn: (communityId, collectionId) => deleteCollection(communityId, collectionId),
+      invalidate: invalidateCollectionContents,
+      errorKey: "files:collections.error",
+    },
+    options
+  );
+
+/** Put files in a collection. One already in it stays as it is. */
+export const useAddCollectionFiles = (
+  collectionId: number,
+  options?: MutationOpts<CollectionRead, number[]>
+) =>
+  useCommunityMutation<CollectionRead, number[]>(
+    {
+      mutationFn: (communityId, fileIds) =>
+        addCollectionFiles(communityId, collectionId, { file_ids: fileIds }),
+      invalidate: invalidateCollectionContents,
+      errorKey: "files:collections.error",
+    },
+    options
+  );
+
+/** Take files out of a collection. The files stay where they are, and a
+ *  collection left with none goes to the trash. */
+export const useRemoveCollectionFiles = (
+  collectionId: number,
+  options?: MutationOpts<void, number[]>
+) =>
+  useCommunityMutation<void, number[]>(
+    {
+      mutationFn: (communityId, fileIds) =>
+        removeCollectionFiles(communityId, collectionId, { file_ids: fileIds }),
+      invalidate: invalidateCollectionContents,
+      errorKey: "files:collections.error",
+    },
+    options
+  );
+
+/**
+ * Upload one file into the collection's initiative and put it in the
+ * collection. One pair of requests per file — a drop of forty is forty of
+ * these, run a few at a time by the uploader, so one failure does not take the
+ * rest with it.
+ *
+ * Deliberately invalidates nothing and toasts nothing: the uploader refreshes
+ * the wall a few times over a drop rather than once per file, and reports
+ * failures per file.
+ */
+export const useUploadToCollection = (
+  collection: Pick<CollectionRead, "id" | "initiative_id"> | undefined,
+  options?: MutationOpts<FileRead, File>
+) =>
+  useCommunityMutation<FileRead, File>(
+    {
+      mutationFn: async (communityId, file) => {
+        if (!collection) throw new Error("no collection to upload into");
+        const uploaded = await uploadFile(communityId, {
+          file,
+          name: nameWithoutExtension(file.name),
+          initiative_id: collection.initiative_id,
+        });
+        await addCollectionFiles(communityId, collection.id, { file_ids: [uploaded.id] });
+        return uploaded;
+      },
+    },
+    options
+  );

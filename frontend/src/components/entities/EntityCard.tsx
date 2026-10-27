@@ -115,8 +115,8 @@ export const EntityCard = ({
         imgClassName="transition duration-300 group-hover:scale-105"
       />
     ) : (
-      // Several, because nobody picked one: a wall of them says what a library
-      // is better than any single picture would.
+      // Several, because nobody picked one: a wall of them says what a
+      // collection is better than any single picture would.
       <div
         className={cn(
           "grid h-full w-full gap-0.5",

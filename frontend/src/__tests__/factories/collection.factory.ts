@@ -1,0 +1,34 @@
+import type { CollectionRead } from "@/api/generated/initiativeAPI.schemas";
+
+let counter = 0;
+
+export function resetCounter(): void {
+  counter = 0;
+}
+
+/** A collection in Files, which the reader may change, holding one file they
+ *  can open. */
+export function buildCollection(overrides: Partial<CollectionRead> = {}): CollectionRead {
+  counter++;
+  return {
+    id: counter,
+    initiative_id: 1,
+    community_id: 1,
+    name: `Collection ${counter}`,
+    description: null,
+    cover_file_id: null,
+    cover: null,
+    file_count: 1,
+    created_by: 1,
+    created_at: "2026-01-15T00:00:00.000Z",
+    updated_at: "2026-01-15T00:00:00.000Z",
+    archived_at: null,
+    comments_enabled: true,
+    comments_locked_at: null,
+    comment_count: 0,
+    tags: [],
+    properties: [],
+    can: { edit: true },
+    ...overrides,
+  };
+}

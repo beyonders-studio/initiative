@@ -22,7 +22,9 @@ describe("ToolRelationsPanel", () => {
   it("names itself after the tool it sits on", async () => {
     noLinks();
     renderPage(
-      () => <ToolRelationsPanel tool={Tool.library} entity={{ id: 3, initiative_id: 7 }} canEdit />,
+      () => (
+        <ToolRelationsPanel tool={Tool.dashboard} entity={{ id: 3, initiative_id: 7 }} canEdit />
+      ),
       { initialRoute: "/c/1" }
     );
 

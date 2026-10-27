@@ -228,28 +228,6 @@
   },
   "tab": "Mises en page",
   "settingsDescription": "Comment il dispose ce qu'il contient : chaque mise en page, sa dernière modification et l'accès à l'éditeur. Tous ceux qui peuvent l'ouvrir les voient ; ce que chacun filtre et trie lui appartient.",
-  "libraryItemDetail": {
-    "name": "Détail de l'image",
-    "help": "Comment chaque image de cette bibliothèque s'affiche quand on l'ouvre. Ce qu'il laisse de côté est masqué.",
-    "shipped": "Voici la mise en page d'origine. La modifier en fait celle de la bibliothèque.",
-    "titleHelp": "Chaque image affiche son titre.",
-    "hiddenHelp": "Chaque image peut afficher ceci. Retiré, il est masqué, et Ajouter le remet.",
-    "parts": {
-      "actions": "Menu",
-      "relations": "Relations",
-      "picture": "Image",
-      "about": "Provenance",
-      "versions": "Versions"
-    },
-    "partHelp": {
-      "actions": "Ce qu'on peut faire d'autre avec l'image : signaler, télécharger, utiliser comme couverture et retirer.",
-      "relations": "Ce à quoi l'image est liée.",
-      "picture": "L'image elle-même.",
-      "about": "Qui l'a ajoutée et quand, et son fichier.",
-      "versions": "Chaque version envoyée, et en envoyer une nouvelle."
-    },
-    "noItems": "Ajoutez une image à la bibliothèque pour voir sa mise en page ici."
-  },
   "counterDetail": {
     "name": "Détail du compteur",
     "help": "Comment chaque compteur de ce groupe s'affiche quand on l'ouvre pour le modifier. Ce qu'il laisse de côté est masqué.",
@@ -294,5 +272,6 @@
     },
     "noItems": "Écrivez une annonce dans cette initiative pour voir sa mise en page ici."
   },
-  "calendarNote": "Un calendrier n’a ni carte ni colonnes à disposer. Son affichage, et le fait que le projet s’ouvre dessus, se règlent à droite."
+  "calendarNote": "Un calendrier n’a ni carte ni colonnes à disposer. Son affichage, et le fait que le projet s’ouvre dessus, se règlent à droite.",
+  "makeOpensFirst": "Ouvrir d’abord sur {{name}}"
 }

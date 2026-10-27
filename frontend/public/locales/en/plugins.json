@@ -285,10 +285,6 @@
         "read": "Read posts",
         "write": "Read and change posts"
       },
-      "libraries": {
-        "read": "Read libraries",
-        "write": "Read and change libraries"
-      },
       "wikis": {
         "read": "Read wikis",
         "write": "Read and change wikis"

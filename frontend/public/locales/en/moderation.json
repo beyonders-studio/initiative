@@ -45,15 +45,14 @@
     "project": "A project",
     "queue": "A queue",
     "queue_item": "A queue item",
-    "library": "A library",
-    "library_item": "A picture",
     "calendar": "A calendar",
     "calendar_event": "An event",
     "counter": "A counter",
     "counter_group": "A counter group",
     "dashboard": "A dashboard",
     "wiki": "A wiki",
-    "wiki_page": "A wiki page"
+    "wiki_page": "A wiki page",
+    "collection": "A collection"
   },
   "paging": {
     "newer": "Newer",

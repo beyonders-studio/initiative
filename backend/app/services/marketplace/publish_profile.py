@@ -67,11 +67,6 @@ _DATE_PROPERTY_TYPES = frozenset({"date", "datetime"})
 #: Editor nodes that name a person.
 _MENTION_NODES = frozenset({"mention", "custom-mention"})
 
-#: Editor nodes that name something else in the community by id. A wikilink is
-#: not among them: it names a page by title, and a link between two pages of
-#: the same wiki is part of the wiki.
-_REFERENCE_NODES = REFERENCE_NODES.keys() - {"wikilink"}
-
 #: Editor nodes that carry a picture.
 _IMAGE_NODES = frozenset({"image"})
 
@@ -103,7 +98,7 @@ def _clean_editor_state(content: Any) -> Any:
         kind = node.get("type")
         if kind in _MENTION_NODES:
             return text_node(_mention_text(node), node.get("format") or 0)
-        if kind in _REFERENCE_NODES:
+        if kind in REFERENCE_NODES:
             return reference_as_text(node)
         children = node.get("children")
         if isinstance(children, list):

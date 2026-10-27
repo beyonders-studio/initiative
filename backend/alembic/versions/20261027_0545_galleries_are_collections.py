@@ -66,12 +66,26 @@ saved gallery view preferences go.
 The picture → file map lives in a temporary table for the length of the
 revision (``pg_temp._gallery_picture_files``).
 
-Stored editor content is left as it was written.
+**Links in stored content** are written the way this build writes them, in
+every schema, while the map is there (``app.core.legacy_references``): a
+reference to a picture names its file, or is its words when the picture had no
+file; one to a gallery names its collection; one to a ``document`` names the
+file; a ``[[ ]]`` link (a ``wikilink`` node) is a reference to its file, or its
+words; and ``#doc``, ``#gallery`` and ``#gallery-image`` in running text are
+``#file``, ``#collection`` and ``#file``. That covers a Lexical file's and a
+wiki page's body, a post's, and the markdown in every description, a task's
+checklist and what an edit of it kept back, a task type's starting values,
+queue item notes, event locations and comments. A body with a Yjs state that
+holds an old spelling is read from that state through the editor, rewritten,
+and written back into it as a change, so an editor still holding the document
+merges with it; its JSON is the rewritten reading. A state the editor refuses
+is cleared, and its JSON rewritten.
 
 The downgrade puts back empty gallery tables, ``comments.gallery_id`` and
 ``initiatives.galleries_enabled``, removes every row that names a collection
 (the comments on one included) and restates the CHECKs the old way. It does not
-turn files back into pictures, and nothing it removed comes back.
+turn files back into pictures or links back into their old spellings, and
+nothing it removed comes back.
 
 Revision ID: 20261027_0545
 Revises: 20261027_0544
@@ -87,10 +101,14 @@ from contextlib import contextmanager
 from typing import Any
 
 from alembic import op
+from pycrdt import Doc, Map, Text, XmlText
 from sqlalchemy import text
 from sqlalchemy.engine import Connection
+from sqlalchemy.util import await_only
 
+from app.core.legacy_references import rewrite_body, rewrite_text
 from app.db.guild_migrations import run_for_each_guild_schema
+import app.services.editor_engine as editor_engine
 
 revision = "20261027_0545"
 down_revision = "20261027_0544"
@@ -850,6 +868,259 @@ def _forget(bind: Connection) -> None:
     )
 
 
+# --- links in stored content ----------------------------------------------
+
+#: Bodies an editor session edits, each with a Yjs state beside its JSON, and
+#: which of their rows hold a Lexical body.
+_LIVE_BODIES = (("files", "file_type = 'lexical'"), ("wiki_pages", "true"))
+#: Lexical bodies with no Yjs state.
+_STATE_BODIES = (("posts", "body"),)
+#: Markdown: a text column, or every string in a JSON one.
+_MARKDOWN = (
+    ("initiatives", "description"),
+    ("projects", "description"),
+    ("queues", "description"),
+    ("counter_groups", "description"),
+    ("calendars", "description"),
+    ("dashboards", "description"),
+    ("wikis", "description"),
+    ("collections", "description"),
+    ("tasks", "description"),
+    ("tasks", "checklist"),
+    ("tasks", "recurrence_carry"),
+    ("task_types", "starting_values"),
+    ("queue_items", "notes"),
+    ("calendar_events", "description"),
+    ("calendar_events", "location"),
+    ("comments", "content"),
+)
+_LINK_TABLES = tuple(
+    dict.fromkeys(t for t, *_ in (*_LIVE_BODIES, *_STATE_BODIES, *_MARKDOWN))
+)
+#: An old spelling in a Lexical body's JSON, and in running text.
+_OLD_IN_STATE = r'"(wikilink|document|gallery|gallery_image)[":]'
+_OLD_IN_TEXT = r"#(doc|document|gallery)"
+#: An old spelling in a Yjs state: a ``wikilink`` node, a kind or chip that
+#: says ``document``, or anything that says ``gallery``. The node type and a
+#: kind are each stored as a whole string value, its length before it.
+_OLD_IN_YJS = (b"wikilink", b"\x77\x08document", b"document:", b"gallery")
+#: The style a ``wikilink`` is read under while it is a plain text node, with
+#: its place among the document's wikilinks after it.
+_WIKILINK_MARK = "initiative-wikilink:"
+
+
+def _retype_wikilinks(doc: Doc) -> list[dict[str, Any]]:
+    """Each ``wikilink`` node in a Yjs state made a text node carrying its
+    place in ``_WIKILINK_MARK``, for an editor that reads no ``wikilink``; and
+    what each one named, in that order."""
+    found: list[dict[str, Any]] = []
+
+    def walk(shared: Any) -> None:
+        for raw, _attrs in shared.diff():
+            child = shared._maybe_as_type_or_doc(raw)
+            if isinstance(child, (Text, XmlText)):
+                walk(child)
+            elif isinstance(child, Map) and child.get("__type") == "wikilink":
+                found.append(
+                    {
+                        "documentId": child.get("__documentId"),
+                        "documentTitle": child.get("__documentTitle"),
+                    }
+                )
+                with doc.transaction():
+                    child["__type"] = "text"
+                    child["__style"] = f"{_WIKILINK_MARK}{len(found) - 1}"
+                    for key in ("__documentId", "__documentTitle"):
+                        if key in child:
+                            del child[key]
+
+    walk(doc.get("root", type=Text))
+    return found
+
+
+def _whole(value: Any) -> Any:
+    return int(value) if isinstance(value, float) and value.is_integer() else value
+
+
+def _with_wikilinks(content: Any, found: list[dict[str, Any]]) -> Any:
+    """The editor's reading with each marked text node its ``wikilink`` again."""
+    if isinstance(content, list):
+        return [_with_wikilinks(item, found) for item in content]
+    if not isinstance(content, dict):
+        return content
+    style = content.get("style")
+    if content.get("type") == "text" and isinstance(style, str):
+        place = style.removeprefix(_WIKILINK_MARK)
+        if place != style and place.isdecimal() and int(place) < len(found):
+            link = found[int(place)]
+            return {
+                "type": "wikilink",
+                "version": 1,
+                "text": content.get("text", ""),
+                "documentId": _whole(link["documentId"]),
+                "documentTitle": link["documentTitle"],
+            }
+    return {key: _with_wikilinks(item, found) for key, item in content.items()}
+
+
+def _nameless(value: Any) -> Any:
+    """A Lexical body as it is stored: a mention of somebody by id carries no
+    name."""
+    if isinstance(value, list):
+        return [_nameless(item) for item in value]
+    if not isinstance(value, dict):
+        return value
+    out = {key: _nameless(item) for key, item in value.items()}
+    if out.get("mentionUserId") is None:
+        return out
+    return {**out, "mentionName": "", "text": ""}
+
+
+def _rewrite_live(state: bytes, files: Mapping[int, int]) -> tuple[Any, bytes] | None:
+    """A body's JSON and Yjs state with its links rewritten, read and written
+    through the editor; ``None`` when its state says nothing to rewrite.
+    Raises :class:`editor_engine.EditorError` for a state the editor refuses."""
+    doc = Doc()
+    doc.apply_update(state)
+    found = _retype_wikilinks(doc)
+    readable = bytes(doc.get_update()) if found else state
+    reading = await_only(editor_engine.render(readable))
+    rewritten = rewrite_body(_with_wikilinks(reading, found), files)
+    if not found and rewritten == reading:
+        return None
+    update = await_only(editor_engine.apply(readable, rewritten))
+    doc.apply_update(update)
+    return _nameless(rewritten), bytes(doc.get_update())
+
+
+def _is_json(bind: Connection, table: str, column: str) -> bool:
+    return (
+        bind.execute(
+            text(
+                "SELECT format_type(atttypid, atttypmod) IN ('json', 'jsonb') "
+                "FROM pg_attribute WHERE attrelid = to_regclass(:t) AND attname = :c"
+            ),
+            {"t": table, "c": column},
+        ).scalar()
+        is True
+    )
+
+
+def _strings(value: Any, files: Mapping[int, int]) -> Any:
+    if isinstance(value, str):
+        return rewrite_text(value, files)
+    if isinstance(value, list):
+        return [_strings(item, files) for item in value]
+    if isinstance(value, dict):
+        return {key: _strings(item, files) for key, item in value.items()}
+    return value
+
+
+def _write(
+    bind: Connection,
+    table: str,
+    row_id: int,
+    values: dict[str, Any],
+    json_columns: set[str],
+) -> None:
+    sets = ", ".join(
+        f"{column} = CAST(:{column} AS jsonb)"
+        if column in json_columns
+        else f"{column} = :{column}"
+        for column in values
+    )
+    bind.execute(
+        text(f"UPDATE {table} SET {sets} WHERE id = :row_id"),
+        {
+            **{
+                column: json.dumps(value) if column in json_columns else value
+                for column, value in values.items()
+            },
+            "row_id": row_id,
+        },
+    )
+
+
+def _rewrite_links(bind: Connection) -> None:
+    files = dict(
+        bind.execute(
+            text(f"SELECT image_id, file_id FROM {_MAP} m WHERE {_IN_SCHEMA}")
+        ).all()
+    )
+    in_yjs = " OR ".join(
+        f"position(CAST(:n{i} AS bytea) IN yjs_state) > 0"
+        for i in range(len(_OLD_IN_YJS))
+    )
+    needles = {f"n{i}": needle for i, needle in enumerate(_OLD_IN_YJS)}
+    editor_runs = False
+    for table, lexical in _LIVE_BODIES:
+        if not _table_exists(bind, table):
+            continue
+        rows = bind.execute(
+            text(
+                f"SELECT id, content, yjs_state FROM {table} WHERE {lexical} AND "
+                f"((yjs_state IS NOT NULL AND ({in_yjs})) "
+                "OR CAST(content AS text) ~ :old)"
+            ),
+            {**needles, "old": _OLD_IN_STATE},
+        ).all()
+        for row_id, content, state in rows:
+            content = _as_json(content)
+            live = None
+            if state is not None and any(n in bytes(state) for n in _OLD_IN_YJS):
+                if not editor_runs:
+                    # An editor that cannot start fails the revision here.
+                    await_only(editor_engine.bootstrap(None))
+                    editor_runs = True
+                try:
+                    live = _rewrite_live(bytes(state), files)
+                except editor_engine.EditorError:
+                    # A state the editor refuses opens nowhere: the body is its
+                    # JSON, and the next session makes a state from it.
+                    live = (rewrite_body(content, files), None)
+            if live is not None:
+                bind.execute(
+                    text(
+                        f"UPDATE {table} SET content = CAST(:c AS jsonb), "
+                        "yjs_state = :s, yjs_updated_at = now() WHERE id = :id"
+                    ),
+                    {"c": json.dumps(live[0]), "s": live[1], "id": row_id},
+                )
+                continue
+            rewritten = rewrite_body(content, files)
+            if rewritten != content:
+                _write(bind, table, row_id, {"content": rewritten}, {"content"})
+    for table, column in _STATE_BODIES:
+        if not _table_exists(bind, table):
+            continue
+        rows = bind.execute(
+            text(
+                f"SELECT id, {column} FROM {table} WHERE CAST({column} AS text) ~ :old"
+            ),
+            {"old": _OLD_IN_STATE},
+        ).all()
+        for row_id, body in rows:
+            body = _as_json(body)
+            rewritten = rewrite_body(body, files)
+            if rewritten != body:
+                _write(bind, table, row_id, {column: rewritten}, {column})
+    for table, column in _MARKDOWN:
+        if not _table_exists(bind, table):
+            continue
+        json_columns = {column} if _is_json(bind, table, column) else set()
+        rows = bind.execute(
+            text(
+                f"SELECT id, {column} FROM {table} WHERE CAST({column} AS text) ~ :old"
+            ),
+            {"old": _OLD_IN_TEXT},
+        ).all()
+        for row_id, value in rows:
+            value = _as_json(value) if json_columns else value
+            rewritten = _strings(value, files)
+            if rewritten != value:
+                _write(bind, table, row_id, {column: rewritten}, json_columns)
+
+
 def _upgrade_schema(bind: Connection) -> None:
     checks = _drop_checks(bind, _GALLERY_CHECK, (_SYMMETRIC_CHECK,))
     if _table_exists(bind, "galleries"):
@@ -865,6 +1136,8 @@ def _upgrade_schema(bind: Connection) -> None:
             _settle_plugins_and_hooks(bind)
             _forget(bind)
             _drop_gallery_structure(bind)
+    with _held(bind, _LINK_TABLES):
+        _rewrite_links(bind)
     _restore_checks(bind, checks, _forward_check)
     bind.exec_driver_sql(_CLEAR_SEARCH_GENERATION)
 

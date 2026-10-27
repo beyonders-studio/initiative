@@ -219,7 +219,7 @@ def _file_text(row: str) -> str:
     expression. ``lexical`` and ``excalidraw`` share one: a Lexical text node
     and an Excalidraw text or label element both keep their text in a field
     named ``text``, and the recursive path reaches nested cases — a mention, a
-    wikilink, an image caption's own editor state.
+    reference, an image caption's own editor state.
 
     An uploaded file contributes nothing here: its bytes live in ``uploads``,
     so its name, description and uploaded filename are all there is to index.

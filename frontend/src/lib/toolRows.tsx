@@ -15,7 +15,6 @@ import type { ReactNode } from "react";
 
 import type {
   CalendarListResponse,
-  LibraryListResponse,
   CounterGroupListResponse,
   DashboardListResponse,
   FileListResponse,
@@ -63,7 +62,6 @@ export const TOOL_HAS_DETAIL: Record<Tool, boolean> = {
   [Tool.calendar]: true,
   [Tool.dashboard]: true,
   [Tool.post]: true,
-  [Tool.library]: false,
   [Tool.wiki]: false,
 };
 
@@ -86,7 +84,6 @@ export type ToolResponses = {
   [Tool.calendar]: CalendarListResponse | undefined;
   [Tool.dashboard]: DashboardListResponse | undefined;
   [Tool.post]: PostListResponse | undefined;
-  [Tool.library]: LibraryListResponse | undefined;
   [Tool.wiki]: WikiListResponse | undefined;
 };
 
@@ -231,17 +228,6 @@ export function buildToolRows(
         // of them — the server derives this from the body for exactly here,
         // with the people it mentions left in for the table to name.
         detail: post.excerpt,
-      }));
-    case Tool.library:
-      return (data[Tool.library]?.items ?? []).map((library) => ({
-        id: library.id,
-        communityId: library.community_id ?? fallbackCommunityId,
-        name: library.name,
-        href: href(library.id, library.initiative_id),
-        glyph: null,
-        initiativeId: library.initiative_id,
-        tags: library.tags,
-        updatedAt: library.updated_at,
       }));
     case Tool.wiki:
       return (data[Tool.wiki]?.items ?? []).map((wiki) => ({

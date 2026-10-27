@@ -36,11 +36,11 @@ const renderCard = (tool: Tool) =>
 
 describe("ToolExportCard", () => {
   it("opens the export wizard on the tool's one format, with nothing to choose", async () => {
-    renderCard(Tool.library);
+    renderCard(Tool.dashboard);
 
     await userEvent.click(await screen.findByRole("button", { name: "Export" }));
 
-    expect(await screen.findByText("Importable file with pictures (.zip)")).toBeInTheDocument();
+    expect(await screen.findByText("Importable file (.json)")).toBeInTheDocument();
     expect(screen.getByRole("button", { name: /start export/i })).toBeInTheDocument();
   });
 

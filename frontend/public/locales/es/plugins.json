@@ -285,10 +285,6 @@
         "read": "Leer publicaciones",
         "write": "Leer y cambiar publicaciones"
       },
-      "libraries": {
-        "read": "Leer bibliotecas",
-        "write": "Leer y cambiar bibliotecas"
-      },
       "wikis": {
         "read": "Leer wikis",
         "write": "Leer y cambiar wikis"

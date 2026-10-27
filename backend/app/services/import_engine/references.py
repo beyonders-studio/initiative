@@ -2,7 +2,7 @@
 
 Inside the app a reference names what it points at by id: ``#task[Fix the
 bug](41)`` in markdown (a task's description, a comment), and an
-``entity-mention``, ``wikilink``, ``smart-chip`` or ``reference-embed`` node in
+``entity-mention``, ``smart-chip`` or ``reference-embed`` node in
 an editor state (a file, a post, a wiki page). An id means nothing where an export is
 restored — on another instance, or in a community where 41 is something else,
 and even in the same community a restore makes new rows — so the export writes
@@ -12,7 +12,7 @@ each reference as the **ref** of what it named where it was written
 * markdown: ``#task[Fix the bug](41)`` becomes ``#task[Fix the bug](task:41)``,
   which no reader takes for a reference until the restore puts an id back.
 * editor state: the node keeps its text, carries ``importSourceRef`` and holds
-  no id (``0``, or ``None`` for a wikilink) until it is placed.
+  no id (``0``) until it is placed.
 
 Every row a restore creates registers itself with the job's link collector
 under the ref it had (``task:41``, ``file:7``), so once the last entry has
@@ -34,6 +34,7 @@ from sqlmodel.ext.asyncio.session import AsyncSession
 
 from app.core.references import (
     REFERENCE_NODES,
+    SOURCE_REF,
     TEXT_REFERENCE,
     format_ref,
     kind_for_trigger,
@@ -48,18 +49,8 @@ from app.core.tools import Tool, tool_envelope_type
 if TYPE_CHECKING:  # pragma: no cover - typing only
     from app.services.import_engine.context import ImportContext
 
-#: The placeholder an exported reference node carries in place of its id.
-SOURCE_REF = "importSourceRef"
-
 #: An exported reference in markdown: the id's place holds the ref instead.
 _EXPORTED_TEXT_REFERENCE = re.compile(r"#([\w-]+)\[([^\]]*)\]\(([a-z_]+:\d+)\)")
-
-
-def _waiting(node_type: str) -> int | None:
-    """What a reference node's id field holds while it waits to be placed. A
-    wikilink with no file is one the editor already draws as unlinked; the
-    others keep a number, as a Confluence mention waiting on its page does."""
-    return None if node_type == "wikilink" else 0
 
 
 def _is_id(value: Any) -> bool:
@@ -106,11 +97,9 @@ def detach_editor_references(content: Any) -> Any:
         if field is not None:
             kind = reference_node_kind(node)
             if kind is not None and _is_id(node.get(field)):
-                return {
-                    **node,
-                    field: _waiting(node["type"]),
-                    SOURCE_REF: format_ref(kind, node[field]),
-                }
+                # A number while it waits, as a Confluence mention waiting on
+                # its page holds.
+                return {**node, field: 0, SOURCE_REF: format_ref(kind, node[field])}
             return node
         children = node.get("children")
         if isinstance(children, list):
@@ -211,9 +200,7 @@ def place_markdown_references(
 
 def place_editor_references(content: Any, resolve: Callable[[str], int | None]) -> Any:
     """``content`` with each exported reference node placed through
-    ``resolve``. One that resolves to nothing is its text again; a wikilink
-    stays a wikilink with no file, which is how the editor draws one
-    whose file is gone."""
+    ``resolve``. One that resolves to nothing is its text again."""
     if not isinstance(content, dict) or not isinstance(content.get("root"), dict):
         return content
 
@@ -227,9 +214,6 @@ def place_editor_references(content: Any, resolve: Callable[[str], int | None]) 
             target = resolve(ref)
             if target is not None:
                 placed[field] = target
-                return placed
-            if node.get("type") == "wikilink":
-                placed[field] = None
                 return placed
             return reference_as_text(node)
         children = node.get("children")

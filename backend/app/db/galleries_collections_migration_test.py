@@ -14,9 +14,12 @@ from typing import Any
 
 from alembic.migration import MigrationContext
 from alembic.operations import Operations
+from pycrdt import Doc, Map, Text
 from sqlalchemy import text
 
+from app.services import editor_engine
 from app.testing import (
+    create_file,
     create_guild,
     create_initiative,
     create_project,
@@ -68,6 +71,54 @@ def _runner(schema: str):
     return run
 
 
+def _paragraph(*children: dict) -> dict:
+    return {
+        "root": {
+            "type": "root",
+            "version": 1,
+            "children": [
+                {"type": "paragraph", "version": 1, "children": list(children)}
+            ],
+        }
+    }
+
+
+def _words(words: str, fmt: int = 0) -> dict:
+    return {
+        "type": "text",
+        "version": 1,
+        "text": words,
+        "format": fmt,
+        "mode": "normal",
+    }
+
+
+async def _state_with_wikilink(body: dict, words: str, file_id: int) -> bytes:
+    """``body``'s Yjs state with the text node reading ``words`` stored as a
+    ``[[ ]]`` link to ``file_id``, as an editor before references were one
+    thing wrote it."""
+    doc = Doc()
+    doc.apply_update(await editor_engine.bootstrap(body))
+    root = doc.get("root", type=Text)
+    paragraph = root._maybe_as_type_or_doc(root.diff()[0][0])
+    pieces = [content for content, _ in paragraph.diff()]
+    node = paragraph._maybe_as_type_or_doc(pieces[pieces.index(words) - 1])
+    assert isinstance(node, Map)
+    with doc.transaction():
+        node["__type"] = "wikilink"
+        node["__documentId"] = file_id
+        node["__documentTitle"] = words
+    return bytes(doc.get_update())
+
+
+def _references(body: dict) -> list[tuple]:
+    return [
+        (node["type"], node.get("entityType"), node.get("entityId"))
+        for node in body["root"]["children"][0]["children"]
+        if node["type"] != "text"
+    ]
+
+
 async def test_a_gallery_becomes_a_collection_of_files(session) -> None:
     owner = await create_user(session)
     reader = await create_user(session)
@@ -77,6 +128,9 @@ async def test_a_gallery_becomes_a_collection_of_files(session) -> None:
     initiative = await create_initiative(session, guild, owner)
     project = await create_project(session, initiative, owner)
     tag = await create_tag(session, guild)
+    elsewhere = await create_initiative(session, guild, owner)
+    spec = await create_file(session, elsewhere, owner, name="Spec")
+    page = await create_file(session, elsewhere, owner)
     await session.commit()
     run = _runner(schema)
     await session.run_sync(run(False))
@@ -154,9 +208,35 @@ async def test_a_gallery_becomes_a_collection_of_files(session) -> None:
     comment = await _one(
         session,
         f"INSERT INTO {s}.comments (content, created_by, gallery_id, created_at) "
-        "VALUES ('Lovely', :u, :g, now()) RETURNING id",
+        "VALUES (:c, :u, :g, now()) RETURNING id",
+        c=f"Lovely, as #doc[Spec]({spec.id}) says of #gallery-image[it]({sunset})",
         u=reader.id,
         g=gallery,
+    )
+    # A page whose editor state names a picture, and links a file the way
+    # `[[ ]]` once did.
+    body = _paragraph(
+        _words("See "),
+        {
+            "type": "entity-mention",
+            "version": 1,
+            "entityType": "gallery_image",
+            "entityId": sunset,
+            "text": "Sunset",
+        },
+        _words(" and "),
+        # Bold, so the editor keeps it a node of its own.
+        _words("Spec", 1),
+    )
+    await connection.execute(
+        text(
+            f"UPDATE {s}.files SET content = CAST(:c AS jsonb), yjs_state = :y WHERE id = :f"
+        ),
+        {
+            "c": json.dumps(body),
+            "y": await _state_with_wikilink(body, "Spec", spec.id),
+            "f": page.id,
+        },
     )
     for source, relationship, target in (
         (("gallery", gallery), "tagged_with", ("tag", tag.id)),
@@ -240,7 +320,8 @@ async def test_a_gallery_becomes_a_collection_of_files(session) -> None:
     assert await _rows(
         session,
         f"SELECT resource_type, resource_id, user_id, level FROM {s}.resource_grants "
-        "WHERE resource_type IN ('gallery', 'file') AND resource_id IN (:a, :b, :g) "
+        "WHERE (resource_type = 'gallery' AND resource_id = :g) "
+        "OR (resource_type = 'file' AND resource_id IN (:a, :b)) "
         "ORDER BY 2, 3",
         a=sunset_file,
         b=dunes_file,
@@ -254,8 +335,30 @@ async def test_a_gallery_becomes_a_collection_of_files(session) -> None:
         key=lambda row: (row[1], row[2]),
     )
     assert await _rows(
-        session, f"SELECT collection_id FROM {s}.comments WHERE id = :c", c=comment
-    ) == [(gallery,)]
+        session,
+        f"SELECT collection_id, content FROM {s}.comments WHERE id = :c",
+        c=comment,
+    ) == [
+        (
+            gallery,
+            f"Lovely, as #file[Spec]({spec.id}) says of #file[it]({sunset_file})",
+        )
+    ]
+    # The page's links name the file each became, in its JSON and in the Yjs
+    # state an editor opens.
+    content, state = (
+        await _rows(
+            session,
+            f"SELECT content, yjs_state FROM {s}.files WHERE id = :f",
+            f=page.id,
+        )
+    )[0]
+    expected = [
+        ("entity-mention", "file", sunset_file),
+        ("entity-mention", "file", spec.id),
+    ]
+    assert _references(content) == expected
+    assert _references(await editor_engine.render(bytes(state))) == expected
     assert sorted(
         await _rows(
             session,

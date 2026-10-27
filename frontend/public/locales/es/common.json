@@ -422,11 +422,6 @@
       "this": "esta publicación",
       "plural": "publicaciones"
     },
-    "library": {
-      "name": "Biblioteca",
-      "this": "esta biblioteca",
-      "plural": "bibliotecas"
-    },
     "wiki": {
       "name": "Wiki",
       "this": "este wiki",
@@ -452,11 +447,6 @@
       "this": "este contador",
       "plural": "contadores"
     },
-    "library_item": {
-      "name": "Imagen",
-      "this": "esta imagen",
-      "plural": "imágenes"
-    },
     "wiki_page": {
       "name": "Página",
       "this": "esta página",
@@ -466,6 +456,11 @@
       "name": "Etiqueta",
       "this": "esta etiqueta",
       "plural": "etiquetas"
+    },
+    "collection": {
+      "name": "Colección",
+      "this": "esta colección",
+      "plural": "colecciones"
     }
   }
 }

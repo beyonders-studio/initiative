@@ -10,6 +10,7 @@ import { FileKind, Tool } from "@/api/generated/initiativeAPI.schemas";
 import { type AISummary, SummarySheet, useSummarySheet } from "@/components/ai/SummarySheet";
 import { ToolCommentsPanel } from "@/components/comments/ToolCommentsPanel";
 import { ToolRelationsPanel } from "@/components/entities/ToolRelationsPanel";
+import { FileCollections } from "@/components/files/collections/FileCollections";
 import { fileBody } from "@/components/files/detail/fileBodies";
 import { FileFeaturedImage } from "@/components/files/FileFeaturedImage";
 import { clearWhiteboardSceneCache } from "@/components/files/whiteboardSceneCache";
@@ -569,6 +570,9 @@ export const FileDetailPage = () => {
           >
             <ToolChestSegment label={t("detail.updatedLabel")}>
               <span>{relativeUpdatedAt}</span>
+            </ToolChestSegment>
+            <ToolChestSegment label={t("collections.heading")}>
+              <FileCollections file={file} />
             </ToolChestSegment>
             {showSummaryTab ? (
               <ToolChestSegment>

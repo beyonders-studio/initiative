@@ -27,14 +27,20 @@ def _url(a) -> str:
     return a.g("/relationships/")
 
 
-def _wikilink_body(file_id: int) -> dict:
+def _linking_body(file_id: int) -> dict:
     """A file body holding one ``[[ ]]`` link."""
     return {
         "root": {
             "children": [
                 {
                     "type": "paragraph",
-                    "children": [{"type": "wikilink", "documentId": file_id}],
+                    "children": [
+                        {
+                            "type": "entity-mention",
+                            "entityType": "file",
+                            "entityId": file_id,
+                        }
+                    ],
                 }
             ]
         }
@@ -464,7 +470,7 @@ async def test_a_link_read_out_of_a_body_is_not_one_to_unlink_by_hand(
     await content_references.sync_for_entity(
         session,
         Endpoint(SearchEntityType.file, doc.id),
-        body=_wikilink_body(other.id),
+        body=_linking_body(other.id),
         author_id=a.user.id,
     )
     await session.commit()
@@ -500,7 +506,7 @@ async def test_inbound_asks_what_links_here(client: AsyncClient, acting_user, se
     await content_references.sync_for_entity(
         session,
         Endpoint(SearchEntityType.file, doc.id),
-        body=_wikilink_body(other.id),
+        body=_linking_body(other.id),
         author_id=a.user.id,
     )
     await session.commit()

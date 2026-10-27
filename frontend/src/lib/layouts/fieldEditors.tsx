@@ -293,8 +293,10 @@ type PropertiesProps<I extends { properties: PropertySummary[] }, P> = {
   properties: PropertySummary[];
   readOnly: boolean;
   initiativeId: number | null;
-  /** Whose people a person-valued property may name: who can open this tool. */
-  canOpen: { tool: Tool; id: number | null | undefined };
+  /** Whose people a person-valued property may name: who can open this tool.
+   *  Left out (a collection, which has no sharing of its own), the
+   *  initiative's members. */
+  canOpen?: { tool: Tool; id: number | null | undefined };
 };
 
 /** The item's properties with `property` as it reads after `value`, added

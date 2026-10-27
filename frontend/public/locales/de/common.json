@@ -422,11 +422,6 @@
       "this": "diesen Beitrag",
       "plural": "Beiträge"
     },
-    "library": {
-      "name": "Bibliothek",
-      "this": "diese Bibliothek",
-      "plural": "Bibliotheken"
-    },
     "wiki": {
       "name": "Wiki",
       "this": "dieses Wiki",
@@ -452,11 +447,6 @@
       "this": "diesen Zähler",
       "plural": "Zähler"
     },
-    "library_item": {
-      "name": "Bild",
-      "this": "dieses Bild",
-      "plural": "Bilder"
-    },
     "wiki_page": {
       "name": "Seite",
       "this": "diese Seite",
@@ -466,6 +456,11 @@
       "name": "Tag",
       "this": "diesen Tag",
       "plural": "Tags"
+    },
+    "collection": {
+      "name": "Sammlung",
+      "this": "diese Sammlung",
+      "plural": "Sammlungen"
     }
   }
 }

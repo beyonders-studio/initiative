@@ -111,8 +111,6 @@
     "counter_group": "Este grupo",
     "dashboard": "Este panel",
     "file": "Este archivo",
-    "library": "Esta biblioteca",
-    "library_item": "Esta imagen",
     "generic": "Esto",
     "post": "Esta publicación",
     "project": "Este proyecto",
@@ -120,7 +118,8 @@
     "queue_item": "Este elemento",
     "task": "Esta tarea",
     "wiki": "Esta wiki",
-    "wiki_page": "Esta página"
+    "wiki_page": "Esta página",
+    "collection": "Esta colección"
   },
   "blockers": {
     "label_one": "{{count}} cosa está frenando esto",
@@ -132,10 +131,9 @@
   "empty_counter": "Aún no hay nada enlazado. Enlaza la tarea a la que suma, o el proyecto del que informa.",
   "empty_counter_group": "Aún no hay nada enlazado. Enlaza el proyecto del que hablan estos números.",
   "empty_dashboard": "Aún no hay nada enlazado. Enlaza el proyecto del que informa, o el archivo que lo interpreta.",
-  "empty_library": "Aún no hay nada enlazado. Enlaza el proyecto para el que son estas imágenes.",
-  "empty_library_item": "Aún no hay nada enlazado. Enlaza la tarea para la que es esta imagen, o el archivo al que pertenece.",
   "empty_post": "Aún no hay nada enlazado. Enlaza el proyecto que anuncia, o el archivo que hay detrás.",
   "empty_queue": "Aún no hay nada enlazado. Enlaza el proyecto que alimenta esta cola.",
   "empty_queue_item": "Aún no hay nada enlazado. Enlaza la tarea en la que se convirtió, o el archivo del que salió.",
-  "empty_wiki_page": "Aún no hay nada enlazado. Menciona esta página con [[ desde cualquier sitio y aparecerá aquí."
+  "empty_wiki_page": "Aún no hay nada enlazado. Menciona esta página con [[ desde cualquier sitio y aparecerá aquí.",
+  "empty_collection": "Aún no hay nada enlazado. Enlaza el proyecto para el que son estos archivos."
 }

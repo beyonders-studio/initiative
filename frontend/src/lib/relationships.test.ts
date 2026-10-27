@@ -217,10 +217,10 @@ describe("comparing sets of links", () => {
   });
 
   describe("what the dialog proposes once something is picked", () => {
-    it("reads a file or a picture as something attached", () => {
+    it("reads a file or a collection of them as something attached", () => {
       expect(defaultGroupFor(SearchEntityType.task, SearchEntityType.file)).toBe("attached");
       expect(defaultGroupFor(SearchEntityType.file, SearchEntityType.task)).toBe("attached");
-      expect(defaultGroupFor(SearchEntityType.project, SearchEntityType.library_item)).toBe(
+      expect(defaultGroupFor(SearchEntityType.project, SearchEntityType.collection)).toBe(
         "attached"
       );
     });
