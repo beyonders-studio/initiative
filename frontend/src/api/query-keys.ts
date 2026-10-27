@@ -609,8 +609,10 @@ const tool = (which: Tool, id: number): Spec => compose(toolEntity(which, id), t
 // The same two, by name, for the call sites that already know their tool.
 const allProjects = (): Spec => toolList(Tool.project);
 const project = (id: number): Spec => toolEntity(Tool.project, id);
-const allFiles = (): Spec => toolList(Tool.file);
-const file = (id: number): Spec => toolEntity(Tool.file, id);
+// A file shows in the collections it is in (their rows, covers and counts),
+// so a change to one refreshes them too.
+const allFiles = (): Spec => compose(toolList(Tool.file), allCollections());
+const file = (id: number): Spec => compose(toolEntity(Tool.file, id), allCollections());
 const allQueues = (): Spec => toolList(Tool.queue);
 const allCounterGroups = (): Spec => toolList(Tool.counter_group);
 const counterGroup = (id: number): Spec => toolEntity(Tool.counter_group, id);
