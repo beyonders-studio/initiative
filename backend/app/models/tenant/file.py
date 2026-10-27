@@ -209,6 +209,13 @@ class FileVersion(CreatedByMixin, table=True):
         default=None,
         sa_column=Column(Text, nullable=True),
     )
+    #: A picture's size in pixels, as it is shown (turned upright), which a
+    #: wall reserves its space by. Measured by the ``thumbnails`` sweep when it
+    #: draws one; ``NULL`` until then, and for every other type.
+    width: Optional[int] = Field(default=None, sa_column=Column(Integer, nullable=True))
+    height: Optional[int] = Field(
+        default=None, sa_column=Column(Integer, nullable=True)
+    )
     created_at: datetime = Field(
         default_factory=lambda: datetime.now(timezone.utc),
         sa_column=Column(DateTime(timezone=True), nullable=False),

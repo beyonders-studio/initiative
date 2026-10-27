@@ -155,6 +155,34 @@ async def collection_ids_of(
     return found
 
 
+async def added_at_of(
+    session: AsyncSession, collection_id: int, file_ids: Sequence[int]
+) -> dict[int, datetime]:
+    """When each file was added to the collection."""
+    if not file_ids:
+        return {}
+    rows = await session.exec(
+        select(CollectionFile.file_id, CollectionFile.added_at).where(
+            CollectionFile.collection_id == collection_id,
+            ids_in(CollectionFile.file_id, file_ids),
+        )
+    )
+    return dict(rows.all())
+
+
+def added_from(collection_id: int, until: datetime, *, oldest_first: bool) -> Any:
+    """The files added to the collection at or before ``until``, or at or
+    after it read oldest first: where a page that starts at a month of the
+    collection's timeline begins."""
+    added = col(CollectionFile.added_at)
+    return col(File.id).in_(
+        select(CollectionFile.file_id).where(
+            CollectionFile.collection_id == collection_id,
+            added >= until if oldest_first else added <= until,
+        )
+    )
+
+
 async def collection_names_of(
     session: AsyncSession, file_ids: Sequence[int]
 ) -> dict[int, list[str]]:

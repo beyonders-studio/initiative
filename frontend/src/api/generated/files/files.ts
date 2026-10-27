@@ -28,6 +28,7 @@ import type {
   BodyUploadFile,
   BodyUploadFileVersion,
   CollectionCreate,
+  CollectionFileListResponse,
   CollectionFiles,
   CollectionListResponse,
   CollectionRead,
@@ -37,6 +38,7 @@ import type {
   FileRead,
   FileUpdate,
   FileVersionRead,
+  GetCollectionFilesTimelineParams,
   HTTPValidationError,
   ListCollectionFilesParams,
   ListCollectionsParams,
@@ -45,6 +47,7 @@ import type {
   RemoveCollectionFilesParams,
   ResourceGrantSchema,
   SpreadsheetImportRead,
+  TimelineResponse,
   ToolDuplicateRequest,
 } from "../initiativeAPI.schemas";
 
@@ -292,8 +295,8 @@ export const useCreateFile = <TError = ErrorType<HTTPValidationError>, TContext 
 };
 /**
  * The files in one collection the reader can open: the Files list, with
- * its parameters, narrowed to the collection. A collection out of reach is
- * a 404.
+ * its parameters, narrowed to the collection, each with when it was added
+ * to it. A collection out of reach is a 404.
  * @summary List Collection Files
  */
 export const listCollectionFiles = (
@@ -303,7 +306,7 @@ export const listCollectionFiles = (
   options?: SecondParameter<typeof apiMutator>,
   signal?: AbortSignal
 ) => {
-  return apiMutator<FileListResponse>(
+  return apiMutator<CollectionFileListResponse>(
     {
       url: `/api/v1/c/${communityId}/collections/${collectionId}/files`,
       method: "GET",
@@ -652,6 +655,179 @@ export const useRemoveCollectionFiles = <
 > => {
   return useMutation(getRemoveCollectionFilesMutationOptions(options), queryClient);
 };
+/**
+ * The months files were added to this collection in, newest first, each
+ * with how many of them the reader can open and the instants to jump to:
+ * what the timeline rail is drawn from. Takes the same filters the list
+ * does, so the rail is a picture of the list as it stands.
+ * @summary Get Collection Files Timeline
+ */
+export const getCollectionFilesTimeline = (
+  communityId: number,
+  collectionId: number,
+  params?: GetCollectionFilesTimelineParams,
+  options?: SecondParameter<typeof apiMutator>,
+  signal?: AbortSignal
+) => {
+  return apiMutator<TimelineResponse>(
+    {
+      url: `/api/v1/c/${communityId}/collections/${collectionId}/files/timeline`,
+      method: "GET",
+      params,
+      signal,
+    },
+    options
+  );
+};
+
+export const getGetCollectionFilesTimelineQueryKey = (
+  communityId: number,
+  collectionId: number,
+  params?: GetCollectionFilesTimelineParams
+) => {
+  return [
+    `/api/v1/c/${communityId}/collections/${collectionId}/files/timeline`,
+    ...(params ? [params] : []),
+  ] as const;
+};
+
+export const getGetCollectionFilesTimelineQueryOptions = <
+  TData = Awaited<ReturnType<typeof getCollectionFilesTimeline>>,
+  TError = ErrorType<HTTPValidationError>,
+>(
+  communityId: number,
+  collectionId: number,
+  params?: GetCollectionFilesTimelineParams,
+  options?: {
+    query?: Partial<
+      UseQueryOptions<Awaited<ReturnType<typeof getCollectionFilesTimeline>>, TError, TData>
+    >;
+    request?: SecondParameter<typeof apiMutator>;
+  }
+) => {
+  const { query: queryOptions, request: requestOptions } = options ?? {};
+
+  const queryKey =
+    queryOptions?.queryKey ??
+    getGetCollectionFilesTimelineQueryKey(communityId, collectionId, params);
+
+  const queryFn: QueryFunction<Awaited<ReturnType<typeof getCollectionFilesTimeline>>> = ({
+    signal,
+  }) => getCollectionFilesTimeline(communityId, collectionId, params, requestOptions, signal);
+
+  return {
+    queryKey,
+    queryFn,
+    enabled:
+      communityId !== null &&
+      communityId !== undefined &&
+      collectionId !== null &&
+      collectionId !== undefined,
+    ...queryOptions,
+  } as UseQueryOptions<Awaited<ReturnType<typeof getCollectionFilesTimeline>>, TError, TData> & {
+    queryKey: DataTag<QueryKey, TData, TError>;
+  };
+};
+
+export type GetCollectionFilesTimelineQueryResult = NonNullable<
+  Awaited<ReturnType<typeof getCollectionFilesTimeline>>
+>;
+export type GetCollectionFilesTimelineQueryError = ErrorType<HTTPValidationError>;
+
+export function useGetCollectionFilesTimeline<
+  TData = Awaited<ReturnType<typeof getCollectionFilesTimeline>>,
+  TError = ErrorType<HTTPValidationError>,
+>(
+  communityId: number,
+  collectionId: number,
+  params: undefined | GetCollectionFilesTimelineParams,
+  options: {
+    query: Partial<
+      UseQueryOptions<Awaited<ReturnType<typeof getCollectionFilesTimeline>>, TError, TData>
+    > &
+      Pick<
+        DefinedInitialDataOptions<
+          Awaited<ReturnType<typeof getCollectionFilesTimeline>>,
+          TError,
+          Awaited<ReturnType<typeof getCollectionFilesTimeline>>
+        >,
+        "initialData"
+      >;
+    request?: SecondParameter<typeof apiMutator>;
+  },
+  queryClient?: QueryClient
+): DefinedUseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData, TError> };
+export function useGetCollectionFilesTimeline<
+  TData = Awaited<ReturnType<typeof getCollectionFilesTimeline>>,
+  TError = ErrorType<HTTPValidationError>,
+>(
+  communityId: number,
+  collectionId: number,
+  params?: GetCollectionFilesTimelineParams,
+  options?: {
+    query?: Partial<
+      UseQueryOptions<Awaited<ReturnType<typeof getCollectionFilesTimeline>>, TError, TData>
+    > &
+      Pick<
+        UndefinedInitialDataOptions<
+          Awaited<ReturnType<typeof getCollectionFilesTimeline>>,
+          TError,
+          Awaited<ReturnType<typeof getCollectionFilesTimeline>>
+        >,
+        "initialData"
+      >;
+    request?: SecondParameter<typeof apiMutator>;
+  },
+  queryClient?: QueryClient
+): UseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData, TError> };
+export function useGetCollectionFilesTimeline<
+  TData = Awaited<ReturnType<typeof getCollectionFilesTimeline>>,
+  TError = ErrorType<HTTPValidationError>,
+>(
+  communityId: number,
+  collectionId: number,
+  params?: GetCollectionFilesTimelineParams,
+  options?: {
+    query?: Partial<
+      UseQueryOptions<Awaited<ReturnType<typeof getCollectionFilesTimeline>>, TError, TData>
+    >;
+    request?: SecondParameter<typeof apiMutator>;
+  },
+  queryClient?: QueryClient
+): UseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData, TError> };
+/**
+ * @summary Get Collection Files Timeline
+ */
+
+export function useGetCollectionFilesTimeline<
+  TData = Awaited<ReturnType<typeof getCollectionFilesTimeline>>,
+  TError = ErrorType<HTTPValidationError>,
+>(
+  communityId: number,
+  collectionId: number,
+  params?: GetCollectionFilesTimelineParams,
+  options?: {
+    query?: Partial<
+      UseQueryOptions<Awaited<ReturnType<typeof getCollectionFilesTimeline>>, TError, TData>
+    >;
+    request?: SecondParameter<typeof apiMutator>;
+  },
+  queryClient?: QueryClient
+): UseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData, TError> } {
+  const queryOptions = getGetCollectionFilesTimelineQueryOptions(
+    communityId,
+    collectionId,
+    params,
+    options
+  );
+
+  const query = useQuery(queryOptions, queryClient) as UseQueryResult<TData, TError> & {
+    queryKey: DataTag<QueryKey, TData, TError>;
+  };
+
+  return withQueryKey(query, queryOptions.queryKey);
+}
+
 /**
  * Upload a file (PDF, DOCX, etc.).
  * @summary Upload File

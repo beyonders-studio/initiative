@@ -2427,6 +2427,9 @@ export interface CollectionCover {
   file_type: FileType;
   file_url: string | null;
   file_content_type: string | null;
+  thumbnail_url: string | null;
+  width: number | null;
+  height: number | null;
 }
 
 /**
@@ -2448,6 +2451,69 @@ export interface CollectionCreate {
   name: string;
   description?: string | null;
   tag_ids?: number[] | null;
+}
+
+export type FileKind = (typeof FileKind)[keyof typeof FileKind];
+
+export const FileKind = {
+  document: "document",
+  spreadsheet: "spreadsheet",
+  presentation: "presentation",
+  whiteboard: "whiteboard",
+  pdf: "pdf",
+  image: "image",
+  video: "video",
+  audio: "audio",
+  text: "text",
+  archive: "archive",
+  link: "link",
+  other: "other",
+} as const;
+
+/**
+ * A file as its collection lists it: with when it was added there.
+ */
+export interface CollectionFileSummary {
+  archived_at: string | null;
+  can: ToolCan;
+  id: number;
+  initiative_id: number;
+  community_id: number;
+  created_by: number | null;
+  created_at: string;
+  updated_at: string;
+  comments_enabled: boolean;
+  tags: TagSummary[];
+  properties: PropertySummary[];
+  grants: ResourceGrantSchema[];
+  name: string;
+  featured_image_url: string | null;
+  is_template: boolean;
+  initiative: InitiativeSummary | null;
+  owner: UserPublic | null;
+  owner_plugin: OwnerPluginSummary | null;
+  comment_count: number;
+  file_type: FileType;
+  file_url: string | null;
+  file_content_type: string | null;
+  file_size: number | null;
+  original_filename: string | null;
+  thumbnail_url: string | null;
+  width: number | null;
+  height: number | null;
+  smart_link_url: string | null;
+  added_at: string;
+  /** How the file is shown, which follows from its type. */
+  readonly kind: FileKind;
+}
+
+export interface CollectionFileListResponse {
+  total_count: number;
+  page: number;
+  page_size: number;
+  has_next: boolean;
+  has_prev: boolean;
+  items: CollectionFileSummary[];
 }
 
 /**
@@ -5802,23 +5868,6 @@ export interface FileCreate {
   grants?: ResourceGrantSchema[];
 }
 
-export type FileKind = (typeof FileKind)[keyof typeof FileKind];
-
-export const FileKind = {
-  document: "document",
-  spreadsheet: "spreadsheet",
-  presentation: "presentation",
-  whiteboard: "whiteboard",
-  pdf: "pdf",
-  image: "image",
-  video: "video",
-  audio: "audio",
-  text: "text",
-  archive: "archive",
-  link: "link",
-  other: "other",
-} as const;
-
 export interface FileSummary {
   archived_at: string | null;
   can: ToolCan;
@@ -5845,6 +5894,8 @@ export interface FileSummary {
   file_size: number | null;
   original_filename: string | null;
   thumbnail_url: string | null;
+  width: number | null;
+  height: number | null;
   smart_link_url: string | null;
   /** How the file is shown, which follows from its type. */
   readonly kind: FileKind;
@@ -5887,6 +5938,8 @@ export interface FileRead {
   file_size: number | null;
   original_filename: string | null;
   thumbnail_url: string | null;
+  width: number | null;
+  height: number | null;
   smart_link_url: string | null;
   content: FileReadContent;
   collection_ids: number[];
@@ -12660,7 +12713,7 @@ export type ListCollectionFilesParams = {
    */
   page_size?: number;
   /**
-   * Order by one of: name, initiative, updated_at, created_at.
+   * Order by one of: name, initiative, updated_at, created_at, added_at (when each was added to the collection). Omit for added_at, newest first.
    */
   sort_by?: string | null;
   /**
@@ -12671,6 +12724,10 @@ export type ListCollectionFilesParams = {
    * true lists what has been archived instead of what is live. Omit for the live list, which is what every other view shows.
    */
   archived?: boolean | null;
+  /**
+   * Start the list at this instant, measured by when each file was added to the collection. Newest first it is a ceiling and the page walks back from it; oldest first (sort_by=added_at, sort_dir=asc) a floor and the page walks forward. This is how a timeline jumps to a month: pair it with the matching end of the month's bucket.
+   */
+  until?: string | null;
 };
 
 export type RemoveCollectionFilesParams = {
@@ -12679,6 +12736,42 @@ export type RemoveCollectionFilesParams = {
    * @maxItems 500
    */
   file_ids: number[];
+};
+
+export type GetCollectionFilesTimelineParams = {
+  search?: string | null;
+  /**
+   * Filter by tag IDs
+   */
+  tag_ids?: number[] | null;
+  /**
+   * JSON-encoded list of property-value filters, e.g. `[{"property_id": 12, "op": "eq", "value": "live"}]`. Maximum 5 conditions per request.
+   */
+  property_filters?: string | null;
+  /**
+   * Filter to files with no tags
+   */
+  untagged?: boolean | null;
+  /**
+   * Only templates (true) or only files that are not templates (false). Omit for both.
+   */
+  is_template?: boolean | null;
+  /**
+   * Filter by file type
+   */
+  file_type?: FileType | null;
+  /**
+   * Filter by kind of file
+   */
+  kind?: FileKind | null;
+  /**
+   * true lists what has been archived instead of what is live. Omit for the live list, which is what every other view shows.
+   */
+  archived?: boolean | null;
+  /**
+   * IANA zone the month boundaries are cut in, e.g. Pacific/Auckland. Defaults to UTC.
+   */
+  tz?: string | null;
 };
 
 export type ReadProjectParams = {

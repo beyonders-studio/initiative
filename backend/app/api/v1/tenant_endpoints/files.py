@@ -70,9 +70,9 @@ from app.schemas.tenant.file import (
     FileSummary,
     FileUpdate,
     serialize_file,
-    serialize_file_summary,
     SpreadsheetImportRead,
 )
+from app.schemas.tenant.tool import serialize_tool
 from app.schemas.tenant.resource_grant import initiative_readable
 from app.schemas.ai_generation import AIStreamEvent
 from app.services.tenant import attachments as attachments_service
@@ -230,7 +230,10 @@ def visible_file_conditions(
 
 
 async def serialize_file_page(
-    session: AsyncSession, user_id: int | None, files: list[File]
+    session: AsyncSession,
+    user_id: int | None,
+    files: list[File],
+    schema: type[FileSummary] = FileSummary,
 ) -> list[FileSummary]:
     """Serialize one page of files — the rows a file list answers with.
 
@@ -241,7 +244,7 @@ async def serialize_file_page(
 
     Both file lists run this: the guild-wide one through
     ``tool_lists.TOOL_LISTS``, and the cross-guild ``/me/files`` through
-    ``me_tools.MY_TOOL_LISTS``.
+    ``me_tools.MY_TOOL_LISTS``; a collection's, in its own ``schema``.
     """
     await tags_service.annotate_tags(session, files)
     await properties_service.annotate_properties(session, files)
@@ -249,7 +252,7 @@ async def serialize_file_page(
     await ownership_service.annotate_owner_plugins(session, files)
     context = require_actor_context(session)
     return [
-        serialize_file_summary(file, context=context, user_id=user_id) for file in files
+        serialize_tool(schema, file, context=context, user_id=user_id) for file in files
     ]
 
 

@@ -13,8 +13,9 @@ pictures a file. In ``guild_template`` and every ``guild_<id>``:
   filename, and typed by its current version's media type. The caption is
   dropped. A picture in a trashed or held gallery is trashed or held with it.
   Each ``gallery_image_versions`` row is a ``file_versions`` row pointing at
-  the same blob; no bytes move and ``uploads`` is untouched. A version with no
-  author takes the picture's, else the gallery's, else its owner's.
+  the same blob, with the size the gallery measured; no bytes move and
+  ``uploads`` is untouched. A version with no author takes the picture's,
+  else the gallery's, else its owner's.
   A picture's version waits on a thumbnail, as 20261027_0543 left every
   picture uploaded before it, and the gallery's own thumbnails are left for
   nothing to show.
@@ -642,11 +643,12 @@ def _files(bind: Connection) -> None:
     )
     bind.exec_driver_sql(
         "INSERT INTO file_versions (file_id, version_number, file_url, "
-        "file_content_type, file_size, original_filename, created_by, created_at, "
-        "thumbnail_state) "
+        "file_content_type, file_size, original_filename, width, height, "
+        "created_by, created_at, thumbnail_state) "
         "SELECT m.file_id, v.version_number, v.file_url, v.file_content_type, "
-        "v.file_size, v.original_filename, coalesce(v.created_by, m.person), "
-        "v.created_at, CASE WHEN lower(trim(split_part(v.file_content_type, ';', 1))) "
+        "v.file_size, v.original_filename, v.width, v.height, "
+        "coalesce(v.created_by, m.person), v.created_at, "
+        "CASE WHEN lower(trim(split_part(v.file_content_type, ';', 1))) "
         f"IN ({_THUMBNAILED}) THEN 'pending' END "
         f"FROM gallery_image_versions v JOIN {_MAP} m "
         f"ON m.image_id = v.gallery_image_id WHERE {_IN_SCHEMA}"

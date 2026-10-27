@@ -4,7 +4,7 @@ import { type CSSProperties, memo } from "react";
 import { FileKind, type FileSummary } from "@/api/generated/initiativeAPI.schemas";
 import { LazyImage } from "@/components/shared/LazyImage";
 import type { GridToggleOptions } from "@/hooks/useGridSelection";
-import { FILE_TILE_RATIO } from "@/lib/collections";
+import { fileRatio } from "@/lib/collections";
 import { fileIcon } from "@/lib/fileIcon";
 import { filePicture } from "@/lib/fileUtils";
 import { resolveUploadUrl } from "@/lib/uploadUrl";
@@ -18,7 +18,7 @@ interface CollectionFileTileProps {
   /** Whether the wall is in selection mode, and whether this one is in it. */
   selecting?: boolean;
   selected?: boolean;
-  /** `shape` keeps the wall's shape for the file; `square` crops it to a tile. */
+  /** `shape` keeps the file's own shape; `square` crops it to a tile. */
   fit?: "shape" | "square";
   className?: string;
   style?: CSSProperties;
@@ -48,7 +48,7 @@ const CollectionFileTileInner = ({
   style,
 }: CollectionFileTileProps) => {
   const picture = filePicture(file);
-  const ratio = fit === "square" ? 1 : FILE_TILE_RATIO;
+  const ratio = fit === "square" ? 1 : fileRatio(file);
   const { Icon, colorClass } = fileIcon(file);
 
   return (

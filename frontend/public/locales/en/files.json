@@ -10,6 +10,8 @@
   "columns": {
     "owner": "Owner",
     "type": "Type",
+    "created": "Created",
+    "added": "Added",
     "community": "Community",
     "initiative": "Initiative",
     "ownerFallback": "User {{id}}"

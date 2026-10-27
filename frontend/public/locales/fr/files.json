@@ -10,6 +10,8 @@
   "columns": {
     "owner": "Propriétaire",
     "type": "Type",
+    "created": "Créé",
+    "added": "Ajouté",
     "community": "Communauté",
     "initiative": "Initiative",
     "ownerFallback": "Utilisateur {{id}}"

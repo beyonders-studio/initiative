@@ -8,7 +8,9 @@ from pydantic import AliasChoices, ConfigDict, Field
 from app.core.file_types import FileType
 from app.core.identity_boundary import UPLOAD_PATH, GuildId, PersonId
 from app.schemas.base import MentionStr, SanitizedBaseModel, TitleStr
+from app.schemas.query import PageMeta
 from app.schemas.tenant.archive import ContentCan
+from app.schemas.tenant.file import FileSummary
 from app.schemas.tenant.property import (
     PropertiesOnCreate,
     PropertiesOnUpdate,
@@ -61,9 +63,13 @@ class CollectionCover(SanitizedBaseModel):
     file_id: int
     name: str
     file_type: FileType
-    #: The current version's file, for an uploaded file.
+    #: The current version's file, for an uploaded file, and what a file's
+    #: card reads of it: its thumbnail and its size (``FileSummary``'s).
     file_url: Annotated[Optional[str], UPLOAD_PATH] = None
     file_content_type: Optional[str] = None
+    thumbnail_url: Annotated[Optional[str], UPLOAD_PATH] = None
+    width: Optional[int] = None
+    height: Optional[int] = None
 
 
 def collection_cover(file: Optional["File"]) -> Optional[CollectionCover]:
@@ -74,9 +80,27 @@ def collection_cover(file: Optional["File"]) -> Optional[CollectionCover]:
         file_id=file.id,
         name=file.name,
         file_type=file.file_type,
-        file_url=getattr(version, "file_url", None),
-        file_content_type=getattr(version, "file_content_type", None),
+        **{
+            name: getattr(version, name, None)
+            for name in (
+                "file_url",
+                "file_content_type",
+                "thumbnail_url",
+                "width",
+                "height",
+            )
+        },
     )
+
+
+class CollectionFileSummary(FileSummary):
+    """A file as its collection lists it: with when it was added there."""
+
+    added_at: datetime
+
+
+class CollectionFileListResponse(PageMeta):
+    items: List[CollectionFileSummary]
 
 
 class CollectionRead(SanitizedBaseModel):

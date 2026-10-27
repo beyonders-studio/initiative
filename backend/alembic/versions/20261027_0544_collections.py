@@ -13,6 +13,9 @@ number of them. In ``guild_template`` and every ``guild_<id>``:
 * ``comments.collection_id`` — a collection's thread.
 * ``file_versions.created_by`` may be null: a plug-in acting as its community
   uploads with no person to name, as ``20261006_0462`` let it on a picture.
+* ``file_versions`` gains ``width`` and ``height``: a picture's size, which
+  the ``thumbnails`` sweep measures when it draws it, and a collection's wall
+  lays it out by.
 
 The CHECKs that list kinds and parents, and their policies, are not touched
 here; a start renders the policies from the registries.
@@ -106,6 +109,8 @@ def _apply_upgrade() -> None:
     )
     op.create_index("ix_comments_collection_id", "comments", ["collection_id"])
     op.alter_column("file_versions", "created_by", nullable=True)
+    op.add_column("file_versions", sa.Column("width", sa.Integer(), nullable=True))
+    op.add_column("file_versions", sa.Column("height", sa.Integer(), nullable=True))
 
 
 def downgrade() -> None:
@@ -113,6 +118,8 @@ def downgrade() -> None:
 
 
 def _apply_downgrade() -> None:
+    op.drop_column("file_versions", "height")
+    op.drop_column("file_versions", "width")
     op.execute(
         "UPDATE file_versions fv SET created_by = f.created_by FROM files f "
         "WHERE fv.created_by IS NULL AND f.id = fv.file_id"

@@ -93,6 +93,10 @@ class FileSummary(FileBase, ToolSummaryBase):
     #: A smaller picture of an uploaded picture, for a card; ``None`` until
     #: the app has drawn it, and for every other type.
     thumbnail_url: Annotated[Optional[str], UPLOAD_PATH] = None
+    #: An uploaded picture's size in pixels, turned upright; ``None`` until
+    #: the app has drawn its thumbnail, and for every other type.
+    width: Optional[int] = None
+    height: Optional[int] = None
     # Smart-link URL surfaced on the summary so cards can render the
     # provider-specific icon without fetching the full content JSONB.
     # Only populated when file_type == "url".
@@ -126,6 +130,8 @@ _FILE_FIELDS = (
     "file_size",
     "original_filename",
     "thumbnail_url",
+    "width",
+    "height",
 )
 
 
@@ -168,15 +174,6 @@ def smart_link_url(file: Any) -> Optional[str]:
     mark without the content: ``File.smart_link_url``, read in the row's
     own SELECT."""
     return file.smart_link_url or None
-
-
-def serialize_file_summary(
-    file: "File",
-    *,
-    context: ActorContext,
-    user_id: Optional[int] = None,
-) -> FileSummary:
-    return serialize_tool(FileSummary, file, context=context, user_id=user_id)
 
 
 def serialize_file(

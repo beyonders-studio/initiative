@@ -13,11 +13,13 @@ import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { useTranslation } from "react-i18next";
 
 import {
+  type CollectionFileSummary,
   FileKind,
   type FileSummary,
   type ListLayoutReadKind,
   PropertyTarget,
   SearchEntityType,
+  type TimelineBucket,
   Tool,
 } from "@/api/generated/initiativeAPI.schemas";
 import { BulkAccessSection } from "@/components/access/BulkAccessSection";
@@ -32,7 +34,7 @@ import { CollectionMasonryView } from "@/components/files/collections/Collection
 import { CollectionTimelineView } from "@/components/files/collections/CollectionTimelineView";
 import { UploadProgress } from "@/components/files/collections/UploadProgress";
 import { FileChooserDialog } from "@/components/files/FileChooserDialog";
-import { useFileColumns } from "@/components/files/fileColumns";
+import { COLLECTION_SORT_FIELDS, useCollectionFileColumns } from "@/components/files/fileColumns";
 import { ToolFilterPanel } from "@/components/initiativeTools/shared/ToolFilterPanel";
 import { ToolListToolbar } from "@/components/initiativeTools/shared/ToolListToolbar";
 import { LayoutList } from "@/components/layouts/LayoutList";
@@ -80,6 +82,7 @@ import {
   useAddCollectionFiles,
   useCollection,
   useCollectionFilesFeed,
+  useCollectionFilesTimeline,
   useDeleteCollection,
   useRemoveCollectionFiles,
   useUpdateCollection,
@@ -94,13 +97,15 @@ import { propertySaves } from "@/hooks/useProperties";
 import { useKnownTagIds } from "@/hooks/useTags";
 import { instanceTarget, listLayouts, useInstanceLayouts } from "@/hooks/useToolLayouts";
 import { useCommunityPath } from "@/lib/communityUrl";
+import { formatPeriod } from "@/lib/formatDate";
 import { toast } from "@/lib/mascotToast";
 import type { AppColumnDef } from "@/lib/table";
+import { browserTimezone } from "@/lib/timezones";
 import { toolDetailRoute, toolListRoute } from "@/lib/tools";
 import { resolveUploadUrl } from "@/lib/uploadUrl";
 
 /** A file as the wall and the table both list it. */
-type FileRow = FileSummary & { card: null };
+type FileRow = CollectionFileSummary & { card: null };
 
 /** What the Files list is narrowed by, which a collection's files are too. */
 type FileFilters = ToolListFilters<typeof Tool.file>;
@@ -108,8 +113,9 @@ type FileFilters = ToolListFilters<typeof Tool.file>;
 /** The lists a collection may lay its files out as. */
 type CollectionList = Extract<ListLayoutReadKind, "masonry" | "grid" | "timeline" | "table">;
 
-/** Oldest first, as the walls' order; newest first is the order with none. */
-const OLDEST_FIRST: SortingState = [{ id: "created_at", desc: false }];
+/** Oldest added first, as the walls' order; newest first is the order with
+ *  none. */
+const OLDEST_FIRST: SortingState = [{ id: "added_at", desc: false }];
 
 /**
  * Where one person's view of a collection is kept: the list they were last
@@ -203,14 +209,20 @@ export function CollectionPage() {
   const search = useDebouncedValue(filters.search ?? "", 300).trim();
   const tagIds = useKnownTagIds(filters.tag_ids ?? []);
 
-  // The walls read newest or oldest first by when each file arrived; the
-  // table by its own columns, newest first until one is picked.
+  // The walls read newest or oldest first by when each file was added; the
+  // table by its own columns, newest added first until one is picked.
   const [sorted] = view.sorting;
-  const oldestFirst = sorted?.id === "created_at" && !sorted.desc;
+  const oldestFirst = sorted?.id === "added_at" && !sorted.desc;
   const sort =
-    !wall && sorted && TABLE_SORT_FIELDS.has(sorted.id)
+    !wall && sorted && (TABLE_SORT_FIELDS.has(sorted.id) || COLLECTION_SORT_FIELDS.has(sorted.id))
       ? { sort_by: sorted.id, sort_dir: sorted.desc ? "desc" : "asc" }
-      : { sort_by: "created_at", sort_dir: oldestFirst ? "asc" : "desc" };
+      : { sort_by: "added_at", sort_dir: oldestFirst ? "asc" : "desc" };
+
+  // Where the timeline has been jumped to, if anywhere. Setting it re-anchors
+  // the list: a new query, so the reader lands at that month rather than
+  // paging through everything since.
+  const [anchor, setAnchor] = useState<{ period: string; at: string } | null>(null);
+  const anchored = list === "timeline" ? anchor : null;
 
   const { collection_id: _within, search: _typed, tag_ids: _tags, ...narrowing } = filters;
   const params: CollectionFilesParams = {
@@ -219,7 +231,30 @@ export function CollectionPage() {
     ...(tagIds.length > 0 ? { tag_ids: tagIds } : {}),
     ...sort,
   };
-  const feed = useCollectionFilesFeed(validId, params);
+  const feed = useCollectionFilesFeed(validId, {
+    ...params,
+    ...(anchored ? { until: anchored.at } : {}),
+  });
+  // The rail is drawn without the anchor: it is the map.
+  const { sort_by: _sortBy, sort_dir: _sortDir, ...narrowed } = params;
+  const timelineQuery = useCollectionFilesTimeline(
+    validId,
+    { ...narrowed, tz: browserTimezone() },
+    { enabled: list === "timeline" }
+  );
+  const onJump = useCallback(
+    (bucket: TimelineBucket) => {
+      // Which end of the month to land on is the direction the list is read
+      // in: newest first the page walks back from the month's last file,
+      // oldest first it walks forward from its first.
+      setAnchor({
+        period: bucket.period,
+        at: oldestFirst ? bucket.anchor_oldest : bucket.anchor,
+      });
+      document.querySelector<HTMLElement>("[data-app-scroll]")?.scrollTo({ top: 0 });
+    },
+    [oldestFirst]
+  );
   const rows = useMemo<FileRow[]>(
     () =>
       feed.data?.pages.flatMap((page) => page.items.map((file) => ({ ...file, card: null }))) ?? [],
@@ -476,7 +511,12 @@ export function CollectionPage() {
               </Label>
               <Select
                 value={oldestFirst ? "oldest" : "newest"}
-                onValueChange={(next) => setSorting(next === "oldest" ? OLDEST_FIRST : [])}
+                onValueChange={(next) => {
+                  setSorting(next === "oldest" ? OLDEST_FIRST : []);
+                  // An anchor names one end of a month, and which end depends
+                  // on the direction: turning the list around releases it.
+                  setAnchor(null);
+                }}
               >
                 <SelectTrigger id="collection-order">
                   <SelectValue />
@@ -523,6 +563,15 @@ export function CollectionPage() {
         onDismiss={uploader.dismiss}
       />
 
+      {anchored ? (
+        <div className="flex flex-wrap items-center gap-2 text-muted-foreground text-sm">
+          <span>{t("common:timeline.jumpedTo", { period: formatPeriod(anchored.period) })}</span>
+          <Button variant="link" size="sm" className="h-auto p-0" onClick={() => setAnchor(null)}>
+            {t("common:timeline.backToLatest")}
+          </Button>
+        </div>
+      ) : null}
+
       <CollectionDropzone
         ref={dropzoneRef}
         enabled={canEdit && !choosing}
@@ -558,7 +607,7 @@ export function CollectionPage() {
             initiativeId={initiativeId ?? 0}
             rows={rows}
             // The rows are files, which is what these columns read.
-            useColumns={useFileColumns as unknown as () => AppColumnDef<ToolIndexRow>[]}
+            useColumns={useCollectionFileColumns as unknown as () => AppColumnDef<ToolIndexRow>[]}
             selection={selection}
             sorting={view.sorting}
             onSortingChange={setSorting}
@@ -568,9 +617,11 @@ export function CollectionPage() {
         ) : list === "timeline" ? (
           <CollectionTimelineView
             files={rows}
+            buckets={timelineQuery.data?.buckets ?? []}
             onActivate={onActivate}
             selecting={selecting}
             isSelected={isSelected}
+            onJump={onJump}
           />
         ) : list === "masonry" ? (
           <CollectionMasonryView

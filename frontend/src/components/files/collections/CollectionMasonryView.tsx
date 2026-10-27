@@ -7,7 +7,7 @@ import { type MasonryEntry, MasonryWall } from "@/components/files/collections/M
 import { TagBadge } from "@/components/tags/TagBadge";
 import type { GridToggleOptions } from "@/hooks/useGridSelection";
 import { useWidthClass } from "@/hooks/useWidthClass";
-import { FILE_TILE_RATIO, groupByTag } from "@/lib/collections";
+import { fileRatio, groupByTag } from "@/lib/collections";
 
 interface CollectionMasonryViewProps {
   files: FileSummary[];
@@ -23,9 +23,9 @@ const COLUMN_WIDTH = 220;
 const COLUMN_WIDTH_COMPACT = 150;
 
 /**
- * The wall: files packed into columns, each placed where the shortest column
- * ends. Files carry no size of their own yet, so each stands at the wall's one
- * shape.
+ * The wall: files at their own shapes, packed into columns, each placed where
+ * the shortest column ends. A file whose size is not known stands at the
+ * wall's one shape.
  *
  * Grouped by tag, it is one wall per tag with the untagged last — a file
  * carrying two tags stands on both walls, which is what "everything still
@@ -45,7 +45,7 @@ export const CollectionMasonryView = ({
   const entriesOf = (items: FileSummary[]): MasonryEntry[] =>
     items.map((file) => ({
       key: file.id,
-      aspectRatio: FILE_TILE_RATIO,
+      aspectRatio: fileRatio(file),
       render: () => (
         <CollectionFileTile
           file={file}

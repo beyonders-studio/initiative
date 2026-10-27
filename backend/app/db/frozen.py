@@ -85,8 +85,8 @@ FROZEN_PARENT_CONSTRAINT = "frozen_parent_guard"
 
 #: What a frozen row may still change: the columns that describe the freeze
 #: itself (the two lifecycle mixins' fields), the timestamp every write
-#: touches, and a thumbnail the app draws of what is already there.
-#: Everything else is content.
+#: touches, and a thumbnail the app draws of what is already there, with the
+#: size it measured. Everything else is content.
 LIFECYCLE_COLUMNS: tuple[str, ...] = tuple(
     sorted(
         {
@@ -95,6 +95,8 @@ LIFECYCLE_COLUMNS: tuple[str, ...] = tuple(
             "updated_at",
             "thumbnail_url",
             "thumbnail_state",
+            "width",
+            "height",
         }
     )
 )

@@ -4,6 +4,8 @@ import {
   addCollectionFiles,
   createCollection,
   deleteCollection,
+  getCollectionFilesTimeline,
+  getGetCollectionFilesTimelineQueryKey,
   getListCollectionFilesQueryKey,
   getListCollectionsQueryKey,
   getReadCollectionQueryKey,
@@ -16,18 +18,21 @@ import {
 } from "@/api/generated/files/files";
 import type {
   CollectionCreate,
+  CollectionFileListResponse,
   CollectionListResponse,
   CollectionRead,
   CollectionUpdate,
-  FileListResponse,
   FileRead,
+  GetCollectionFilesTimelineParams,
   ListCollectionFilesParams,
+  TimelineResponse,
 } from "@/api/generated/initiativeAPI.schemas";
 import { invalidate, q } from "@/api/query-keys";
 import { useActiveCommunityId } from "@/hooks/useActiveCommunityId";
 import { useCommunityMutation } from "@/hooks/useApiMutation";
 import { nameWithoutExtension } from "@/lib/fileUtils";
 import type { MutationOpts } from "@/types/mutation";
+import type { QueryOpts } from "@/types/query";
 
 /** How many files a page of a collection's wall brings. */
 const PAGE_SIZE = 60;
@@ -82,9 +87,30 @@ export const useCollectionFilesFeed = (
         page_size: PAGE_SIZE,
       }),
     initialPageParam: 1,
-    getNextPageParam: (last: FileListResponse) => (last.has_next ? last.page + 1 : undefined),
+    getNextPageParam: (last: CollectionFileListResponse) =>
+      last.has_next ? last.page + 1 : undefined,
     placeholderData: keepPreviousData,
     enabled: collectionId !== null && Number.isFinite(collectionId),
+  });
+};
+
+/**
+ * The months files were added to a collection in — what the timeline rail is
+ * drawn from. Takes the list's filters, without its anchor: the rail is the
+ * map, whichever month the list was jumped to.
+ */
+export const useCollectionFilesTimeline = (
+  collectionId: number | null,
+  params?: GetCollectionFilesTimelineParams,
+  options?: QueryOpts<TimelineResponse>
+) => {
+  const communityId = useActiveCommunityId();
+  const { enabled = true, ...rest } = options ?? {};
+  return useQuery<TimelineResponse>({
+    queryKey: getGetCollectionFilesTimelineQueryKey(communityId, collectionId ?? 0, params),
+    queryFn: () => getCollectionFilesTimeline(communityId, collectionId ?? 0, params),
+    enabled: collectionId !== null && Number.isFinite(collectionId) && enabled,
+    ...rest,
   });
 };
 

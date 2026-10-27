@@ -15,9 +15,6 @@ interface VirtualRowsProps {
   /** The first row in view, whenever it changes — for a rail that marks
    *  where the reader is. */
   onFirstVisible?: (index: number) => void;
-  /** A row to bring to the top of the view: a new object each time it is
-   *  asked for, so the same row can be asked for twice. */
-  jump?: { index: number } | null;
 }
 
 /** The gap between rows, applied INSIDE each measured element so the
@@ -33,7 +30,7 @@ const ROW_GAP = "pb-3";
  * and offsets by where the list starts; virtualized from the first render,
  * for the reason the board is: turning it on partway down moves the reader.
  */
-export const VirtualRows = ({ rows, overscan = 3, onFirstVisible, jump }: VirtualRowsProps) => {
+export const VirtualRows = ({ rows, overscan = 3, onFirstVisible }: VirtualRowsProps) => {
   const listRef = useRef<HTMLDivElement | null>(null);
   const scrollerRef = useRef<HTMLElement | null>(null);
   const getScrollElement = useCallback(() => {
@@ -95,10 +92,6 @@ export const VirtualRows = ({ rows, overscan = 3, onFirstVisible, jump }: Virtua
     scrollMargin: listOffset,
     getItemKey: (index) => rows[index]?.key ?? index,
   });
-
-  useEffect(() => {
-    if (jump) virtualizer.scrollToIndex(jump.index, { align: "start" });
-  }, [jump, virtualizer]);
 
   const items = virtualizer.getVirtualItems();
   const paddingTop = items.length > 0 ? items[0].start - listOffset : 0;

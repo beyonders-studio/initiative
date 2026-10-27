@@ -118,4 +118,58 @@ describe("a collection's page", () => {
     await user.click(screen.getByRole("button", { name: "Remove from collection" }));
     await waitFor(() => expect(removed).toEqual(["4"]));
   });
+
+  it("jumps the timeline to a month the rail offers", async () => {
+    const files = [{ ...buildFileSummary({ id: 4 }), added_at: "2026-03-20T12:00:00.000Z" }];
+    const anchors: (string | null)[] = [];
+    server.use(
+      communityHttp.get("/collections/:id", () =>
+        HttpResponse.json(buildCollection({ id: 5, file_count: 2 }))
+      ),
+      communityHttp.get("/collections/:id/files/timeline", () =>
+        HttpResponse.json({
+          buckets: [
+            {
+              period: "2026-03",
+              count: 1,
+              anchor: "2026-03-20T12:00:00Z",
+              anchor_oldest: "2026-03-20T12:00:00Z",
+            },
+            {
+              period: "2026-01",
+              count: 1,
+              anchor: "2026-01-12T09:00:00Z",
+              anchor_oldest: "2026-01-02T09:00:00Z",
+            },
+          ],
+        })
+      ),
+      communityHttp.get("/collections/:id/files", ({ request }) => {
+        anchors.push(new URL(request.url).searchParams.get("until"));
+        return HttpResponse.json({
+          items: files,
+          total_count: files.length,
+          page: 1,
+          page_size: 60,
+          has_next: false,
+          has_prev: false,
+        });
+      }),
+      communityHttp.get("/layouts/", () =>
+        HttpResponse.json(
+          buildToolLayoutSet({ tool: "collection", hidden: ["masonry", "grid", "table"] })
+        )
+      ),
+      communityHttp.get("/relationships/", () => HttpResponse.json([]))
+    );
+    const user = userEvent.setup();
+    renderPage(CollectionPage, {
+      initialRoute: "/c/$communityId/i/$initiativeId/files/collections/$collectionId",
+      routeParams: { communityId: "1", initiativeId: "1", collectionId: "5" },
+    });
+
+    await user.click(await screen.findByRole("button", { name: /January 2026/ }));
+    await waitFor(() => expect(anchors).toContain("2026-01-12T09:00:00Z"));
+    expect(screen.getByText(/Showing from January 2026/)).toBeInTheDocument();
+  });
 });

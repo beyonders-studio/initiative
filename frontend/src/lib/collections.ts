@@ -5,21 +5,31 @@
 
 import { Layers } from "lucide-react";
 
-import type { FileSummary, TagSummary } from "@/api/generated/initiativeAPI.schemas";
+import type {
+  CollectionFileSummary,
+  FileSummary,
+  TagSummary,
+} from "@/api/generated/initiativeAPI.schemas";
 import { localDayKey } from "@/lib/formatDate";
 import { dateTimeFormat } from "@/lib/intl";
 
 /** The mark a collection is drawn with, wherever one is named. */
 export const COLLECTION_ICON = Layers;
 
-/** The shape a file stands at on the wall and the timeline: a landscape, the
- *  space a wall can reserve before the file's thumbnail arrives. */
+/** The shape a file stands at on the wall and the timeline when it has no
+ *  size of its own: a landscape, the space a wall can reserve for it. */
 export const FILE_TILE_RATIO = 4 / 3;
 
-/** The day a file arrived, `YYYY-MM-DD` in the reader's zone: what the
- *  timeline files it under. */
-export const arrivalDay = (file: Pick<FileSummary, "created_at">): string =>
-  localDayKey(file.created_at);
+/** Width over height: a picture's own, measured when its thumbnail was
+ *  drawn, else {@link FILE_TILE_RATIO}. What lets a wall reserve a file's
+ *  space before its bytes arrive. */
+export const fileRatio = (file: Pick<FileSummary, "width" | "height">): number =>
+  file.width && file.height ? file.width / file.height : FILE_TILE_RATIO;
+
+/** The day a file was added to its collection, `YYYY-MM-DD` in the reader's
+ *  zone: what the timeline files it under. */
+export const arrivalDay = (file: Pick<CollectionFileSummary, "added_at">): string =>
+  localDayKey(file.added_at);
 
 export interface DayGroup<T> {
   /** `YYYY-MM-DD`. */
@@ -28,14 +38,15 @@ export interface DayGroup<T> {
 }
 
 /**
- * Files grouped by the day they arrived, in the order given.
+ * Files grouped by the day they were added to the collection, in the order
+ * given.
  *
  * The timeline view: files from the same day sit side by side, and a new day
  * starts a new row. Stable — a file is in exactly one group, and groups keep
  * the list's own order — so a list that arrived newest first groups newest
  * day first.
  */
-export const groupByDay = <T extends Pick<FileSummary, "created_at">>(
+export const groupByDay = <T extends Pick<CollectionFileSummary, "added_at">>(
   files: T[]
 ): DayGroup<T>[] => {
   const groups: DayGroup<T>[] = [];
@@ -46,25 +57,6 @@ export const groupByDay = <T extends Pick<FileSummary, "created_at">>(
     else groups.push({ day, items: [file] });
   }
   return groups;
-};
-
-/** One month on the timeline's rail: how many of the files arrived in it. */
-export interface MonthStop {
-  /** `YYYY-MM`. */
-  period: string;
-  count: number;
-}
-
-/** The months the days fall in, in the days' order: the timeline's rail. */
-export const monthStops = <T>(days: DayGroup<T>[]): MonthStop[] => {
-  const stops: MonthStop[] = [];
-  for (const group of days) {
-    const period = group.day.slice(0, 7);
-    const last = stops[stops.length - 1];
-    if (last && last.period === period) last.count += group.items.length;
-    else stops.push({ period, count: group.items.length });
-  }
-  return stops;
 };
 
 export interface TagGroup<T> {

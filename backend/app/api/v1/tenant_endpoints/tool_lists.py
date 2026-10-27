@@ -35,7 +35,7 @@ keep in step. :mod:`app.api.v1.tenant_endpoints.tool_grants` reads it.
 
 import inspect
 from functools import lru_cache
-from dataclasses import dataclass, field
+from dataclasses import dataclass, field, replace
 from datetime import datetime
 from enum import Enum
 from typing import Annotated, Any, Awaitable, Callable, List, Literal, Mapping, Optional
@@ -71,7 +71,7 @@ from app.core.tools import Tool
 from app.db.query import build_paginated_response
 from app.models.platform.user import User
 from app.models.tenant.calendar import Calendar
-from app.models.tenant.collection import Collection
+from app.models.tenant.collection import Collection, CollectionFile
 from app.models.tenant.counter import CounterGroup
 from app.models.tenant.dashboard import Dashboard
 from app.core.file_types import FileKind, FileType
@@ -81,6 +81,10 @@ from app.models.tenant.project import Project
 from app.models.tenant.personal_item import PersonalItem
 from app.models.tenant.queue import Queue
 from app.models.tenant.wiki import Wiki
+from app.schemas.tenant.collection import (
+    CollectionFileListResponse,
+    CollectionFileSummary,
+)
 from app.schemas.tenant.calendar import (
     CalendarListResponse,
     CalendarRead,
@@ -106,6 +110,7 @@ from app.schemas.tenant.initiative import (
     ToolCountsResponse,
 )
 from app.schemas.tenant.post import PostListResponse, PostRead
+from app.schemas.tenant.timeline import TimelineResponse
 from app.schemas.tenant.project import ProjectListResponse, ProjectRead
 from app.schemas.tenant.queue import (
     QueueListResponse,
@@ -122,6 +127,7 @@ from app.services.permissions import Action
 from app.services.tenant import archive as archive_service
 from app.services.tenant import comments as comments_service
 from app.services.tenant import calendars as calendars_service
+from app.services.tenant import collections as collections_service
 from app.services.tenant import counters as counters_service
 from app.services.tenant import dashboards as dashboards_service
 from app.services.tenant import files as files_service
@@ -129,6 +135,7 @@ from app.services.tenant import posts as posts_service
 from app.services.tenant import properties as properties_service
 from app.services.tenant import queues as queues_service
 from app.services.tenant import tags as tags_service
+from app.services.tenant import timeline as timeline_service
 from app.services.tenant import tool_listing
 from app.services.tenant import wikis as wikis_service
 
@@ -1281,28 +1288,174 @@ for _spec in TOOL_LISTS.values():
     _mount_list(_spec)
 
 
+# ---------------------------------------------------------------------------
+# A collection's files
+# ---------------------------------------------------------------------------
+
+
+async def _collection_file_conditions(spec: ToolListSpec, req: ListRequest) -> list:
+    """The Files list's, and where an anchored page starts."""
+    conditions = await _file_conditions(spec, req)
+    values = req.values
+    if values.get("until") is not None:
+        conditions.append(
+            collections_service.added_from(
+                values["collection_id"],
+                values["until"],
+                oldest_first=values.get("sort_by") == "added_at"
+                and values.get("sort_dir") == "asc",
+            )
+        )
+    return conditions
+
+
+async def _serialize_collection_files(
+    spec: ToolListSpec, req: ListRequest, rows: list
+) -> list:
+    added = await collections_service.added_at_of(
+        req.session, req.values["collection_id"], [row.id for row in rows]
+    )
+    for row in rows:
+        object.__setattr__(row, "added_at", added[row.id])
+    return await files_endpoints.serialize_file_page(
+        req.session, req.user_id, rows, CollectionFileSummary
+    )
+
+
+def _collection_files(collection_id: int) -> ToolListSpec:
+    """The Files list narrowed to one collection, which also orders by when
+    each file was added to it, and by that unless told otherwise."""
+    added_at = col(CollectionFile.added_at)
+    return replace(
+        TOOL_LISTS[Tool.file],
+        response_model=CollectionFileListResponse,
+        conditions=_collection_file_conditions,
+        serialize=_serialize_collection_files,
+        refine=lambda _req: (
+            lambda statement: statement.join(
+                CollectionFile,
+                and_(
+                    col(CollectionFile.file_id) == File.id,
+                    col(CollectionFile.collection_id) == collection_id,
+                ),
+            )
+        ),
+        default_order=_order(added_at.desc(), File.id.desc()),
+        extra_sort_fields={"created_at": File.created_at, "added_at": added_at},
+    )
+
+
+_UNTIL_ADDED = ListParam(
+    "until",
+    Optional[datetime],
+    Query(
+        default=None,
+        description=(
+            "Start the list at this instant, measured by when each file was "
+            "added to the collection. Newest first it is a ceiling and the page "
+            "walks back from it; oldest first (sort_by=added_at, sort_dir=asc) "
+            "a floor and the page walks forward. This is how a timeline jumps "
+            "to a month: pair it with the matching end of the month's bucket."
+        ),
+    ),
+)
+#: The Files list's parameters, less the collection filter the path states,
+#: with its own order and the timeline's anchor.
+_COLLECTION_FILES_PARAMS = (
+    *(
+        sort_by_param(
+            "Order by one of: name, initiative, updated_at, created_at, "
+            "added_at (when each was added to the collection). Omit for "
+            "added_at, newest first."
+        )
+        if p.name == "sort_by"
+        else p
+        for p in TOOL_LISTS[Tool.file].params
+        if p is not _COLLECTION_FILTER
+    ),
+    _UNTIL_ADDED,
+)
+
+
 async def list_collection_files(
     session, current_user, guild_context, collection_id, **values
 ):
     """The files in one collection the reader can open: the Files list, with
-    its parameters, narrowed to the collection. A collection out of reach is
-    a 404."""
+    its parameters, narrowed to the collection, each with when it was added
+    to it. A collection out of reach is a 404."""
     await resource_access.load_child(session, Collection, collection_id)
     request = ListRequest(
         session, current_user, guild_context, {**values, "collection_id": collection_id}
     )
-    return await _list(TOOL_LISTS[Tool.file], request)
+    return await _list(_collection_files(collection_id), request)
 
 
 list_collection_files.__signature__ = _signature(
-    tuple(p for p in TOOL_LISTS[Tool.file].params if p is not _COLLECTION_FILTER),
+    _COLLECTION_FILES_PARAMS,
     (*_actor_params(Tool.file), ("collection_id", int)),
 )
 router.add_api_route(
     "/collections/{collection_id}/files",
     list_collection_files,
     methods=["GET"],
-    response_model=TOOL_LISTS[Tool.file].response_model,
+    response_model=CollectionFileListResponse,
     name="list_collection_files",
+    tags=_tags(TOOL_LISTS[Tool.file]),
+)
+
+
+async def get_collection_files_timeline(
+    session, current_user, guild_context, collection_id, tz, **values
+):
+    """The months files were added to this collection in, newest first, each
+    with how many of them the reader can open and the instants to jump to:
+    what the timeline rail is drawn from. Takes the same filters the list
+    does, so the rail is a picture of the list as it stands."""
+    await resource_access.load_child(session, Collection, collection_id)
+    request = ListRequest(
+        session, current_user, guild_context, {**values, "collection_id": collection_id}
+    )
+    conditions = await list_conditions(TOOL_LISTS[Tool.file], request)
+    return TimelineResponse(
+        buckets=await timeline_service.month_buckets(
+            session,
+            date_expr=col(CollectionFile.added_at),
+            conditions=[
+                *conditions,
+                col(CollectionFile.file_id) == File.id,
+                col(CollectionFile.collection_id) == collection_id,
+            ],
+            tz=tz,
+        )
+    )
+
+
+get_collection_files_timeline.__signature__ = _signature(
+    (
+        *(
+            p
+            for p in _COLLECTION_FILES_PARAMS
+            if p.name not in _NOT_FILTERS and p.name != "until"
+        ),
+        ListParam(
+            "tz",
+            Optional[str],
+            Query(
+                default=None,
+                description=(
+                    "IANA zone the month boundaries are cut in, e.g. "
+                    "Pacific/Auckland. Defaults to UTC."
+                ),
+            ),
+        ),
+    ),
+    (*_actor_params(Tool.file), ("collection_id", int)),
+)
+router.add_api_route(
+    "/collections/{collection_id}/files/timeline",
+    get_collection_files_timeline,
+    methods=["GET"],
+    response_model=TimelineResponse,
+    name="get_collection_files_timeline",
     tags=_tags(TOOL_LISTS[Tool.file]),
 )

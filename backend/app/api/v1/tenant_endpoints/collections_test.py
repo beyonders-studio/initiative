@@ -1,12 +1,17 @@
 """Collections: seen through the files in them, changed by the initiative's
 file makers, gone to the trash once their last file leaves."""
 
+from datetime import datetime, timezone
+
 from httpx import AsyncClient
+from sqlmodel import update
+
 from app.core.messages import CollectionMessages
 from app.db import post_commit
 from app.db.soft_delete_filter import select_including_deleted
 from app.models.platform.guild import CommunityRole
-from app.models.tenant.collection import Collection
+from app.models.tenant.collection import Collection, CollectionFile
+from app.models.tenant.file import FileVersion
 from app.testing import (
     create_collection,
     create_file,
@@ -306,3 +311,112 @@ async def test_a_collection_is_an_end_of_a_link_only_for_who_sees_it(
     assert [e["other"]["id"] for e in await edges(maker, f"file:{shared.id}")] == [
         collection.id
     ]
+
+
+async def test_a_collection_lists_its_files_by_when_each_was_added(
+    client: AsyncClient, session, acting_user
+):
+    owner, maker, shared, private = await _scene(session, acting_user)
+    later = await create_file(session, owner.initiative, owner.user, name="Later")
+    await create_resource_grant(session, later, all_initiative_members=True)
+    collection = await create_collection(
+        session, owner.initiative, owner.user, files=[shared, private, later]
+    )
+    # Added in another order than they were made in.
+    await route_session_to_guild(session, owner.guild.id)
+    for file, month in ((shared, 3), (private, 1), (later, 2)):
+        await session.exec(
+            update(CollectionFile)  # type: ignore[arg-type]
+            .where(CollectionFile.file_id == file.id)
+            .values(added_at=datetime(2026, month, 10, tzinfo=timezone.utc))
+        )
+    await session.commit()
+    path = f"/collections/{collection.id}/files"
+
+    async def ids(actor, **params) -> list[int]:
+        response = await client.get(actor.g(path), headers=actor.headers, params=params)
+        assert response.status_code == 200, response.text
+        return [f["id"] for f in response.json()["items"]]
+
+    newest = await client.get(owner.g(path), headers=owner.headers)
+    assert [(f["id"], f["added_at"][:10]) for f in newest.json()["items"]] == [
+        (shared.id, "2026-03-10"),
+        (later.id, "2026-02-10"),
+        (private.id, "2026-01-10"),
+    ]
+    assert await ids(owner, sort_by="added_at", sort_dir="asc") == [
+        private.id,
+        later.id,
+        shared.id,
+    ]
+    assert await ids(owner, sort_by="created_at", sort_dir="desc") == [
+        later.id,
+        private.id,
+        shared.id,
+    ]
+
+    # The rail counts only what its reader can open, by the month each was
+    # added in, and a month's anchors start the list there either way.
+    timeline = await client.get(maker.g(f"{path}/timeline"), headers=maker.headers)
+    assert timeline.status_code == 200, timeline.text
+    buckets = timeline.json()["buckets"]
+    assert [(b["period"], b["count"]) for b in buckets] == [
+        ("2026-03", 1),
+        ("2026-02", 1),
+    ]
+    february = buckets[1]
+    assert await ids(maker, until=february["anchor"]) == [later.id]
+    assert await ids(owner, until=february["anchor"]) == [later.id, private.id]
+    assert await ids(
+        owner,
+        until=february["anchor_oldest"],
+        sort_by="added_at",
+        sort_dir="asc",
+    ) == [later.id, shared.id]
+
+
+async def test_a_collection_shows_its_pictures_at_their_size(
+    client: AsyncClient, session, acting_user
+):
+    owner, _maker, _shared, _private = await _scene(session, acting_user)
+    picture = await create_file(
+        session,
+        owner.initiative,
+        owner.user,
+        file_url=f"/uploads/{owner.guild.id}/wide.png",
+        file_content_type="image/png",
+    )
+    thumbnail = f"/uploads/{owner.guild.id}/thumb-wide.webp"
+    await route_session_to_guild(session, owner.guild.id)
+    await session.exec(
+        update(FileVersion)  # type: ignore[arg-type]
+        .where(FileVersion.file_id == picture.id)
+        .values(
+            thumbnail_url=thumbnail, thumbnail_state="ready", width=1600, height=900
+        )
+    )
+    await session.commit()
+    collection = await create_collection(
+        session, owner.initiative, owner.user, files=[picture]
+    )
+
+    cover = (
+        await client.get(
+            owner.g(f"/collections/{collection.id}"), headers=owner.headers
+        )
+    ).json()["cover"]
+    assert (cover["thumbnail_url"], cover["width"], cover["height"]) == (
+        thumbnail,
+        1600,
+        900,
+    )
+    (item,) = (
+        await client.get(
+            owner.g(f"/collections/{collection.id}/files"), headers=owner.headers
+        )
+    ).json()["items"]
+    assert (item["thumbnail_url"], item["width"], item["height"]) == (
+        thumbnail,
+        1600,
+        900,
+    )

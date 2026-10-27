@@ -1,47 +1,46 @@
 import { useCallback, useMemo, useState } from "react";
 import { useTranslation } from "react-i18next";
 
-import type { FileSummary } from "@/api/generated/initiativeAPI.schemas";
+import type { CollectionFileSummary, TimelineBucket } from "@/api/generated/initiativeAPI.schemas";
 import { CollectionFileTile } from "@/components/files/collections/CollectionFileTile";
 import { type VirtualRow, VirtualRows } from "@/components/files/collections/VirtualRows";
 import { TimelineRail } from "@/components/timeline/TimelineRail";
 import type { GridToggleOptions } from "@/hooks/useGridSelection";
-import {
-  FILE_TILE_RATIO,
-  formatDay,
-  groupByDay,
-  type MonthStop,
-  monthStops,
-} from "@/lib/collections";
+import { fileRatio, formatDay, groupByDay } from "@/lib/collections";
 import { formatPeriod, formatPeriodYear } from "@/lib/formatDate";
 
 interface CollectionTimelineViewProps {
-  files: FileSummary[];
-  onActivate: (file: FileSummary, options: GridToggleOptions) => void;
+  files: CollectionFileSummary[];
+  /** The months files were added in — what the rail is drawn from. */
+  buckets: TimelineBucket[];
+  onActivate: (file: CollectionFileSummary, options: GridToggleOptions) => void;
   selecting?: boolean;
-  isSelected?: (file: FileSummary) => boolean;
+  isSelected?: (file: CollectionFileSummary) => boolean;
+  /** A month was picked on the rail. */
+  onJump: (bucket: TimelineBucket) => void;
 }
 
 /** How tall a file stands in a day's row. Files from the same day sit side
- *  by side at this height. */
+ *  by side at this height, each as wide as its shape makes it. */
 const ROW_HEIGHT = 176;
 const DAY_HEADING = 28;
 
 /**
- * The collection as a record: a row per day each file arrived on, newest
+ * The collection as a record: a row per day files were added on, newest
  * first, and a rail down the side for jumping months.
  *
- * Files that arrived on the same day sit side by side; a new day starts a new
- * row under its date. Which is the view a design round wants — the sequence
- * is the information, and a day's canvases beside each other say what that
- * round looked like. The rail marks the months of the files loaded so far,
- * and the wall loads more as it is scrolled.
+ * Files added on the same day sit side by side; a new day starts a new row
+ * under its date. Which is the view a design round wants — the sequence is
+ * the information, and a day's canvases beside each other say what that round
+ * looked like.
  */
 export const CollectionTimelineView = ({
   files,
+  buckets,
   onActivate,
   selecting = false,
   isSelected,
+  onJump,
 }: CollectionTimelineViewProps) => {
   const { t } = useTranslation("files");
   const days = useMemo(() => groupByDay(files), [files]);
@@ -72,7 +71,7 @@ export const CollectionTimelineView = ({
                   className="max-w-full"
                   style={{
                     height: ROW_HEIGHT,
-                    width: Math.round(ROW_HEIGHT * FILE_TILE_RATIO),
+                    width: Math.round(ROW_HEIGHT * fileRatio(file)),
                   }}
                 />
               ))}
@@ -91,27 +90,15 @@ export const CollectionTimelineView = ({
   );
   const activePeriod = (activeDay ?? days[0]?.day)?.slice(0, 7) ?? null;
 
-  // The rail is the months of the days loaded; picking one brings its first
-  // day to the top.
-  const stops = useMemo(() => monthStops(days), [days]);
-  const [jump, setJump] = useState<{ index: number } | null>(null);
-  const onPick = useCallback(
-    (stop: MonthStop) => {
-      const index = days.findIndex((group) => group.day.startsWith(stop.period));
-      if (index >= 0) setJump({ index });
-    },
-    [days]
-  );
-
   return (
     <div className="flex gap-3">
       <div className="min-w-0 flex-1">
-        <VirtualRows rows={rows} onFirstVisible={onFirstVisible} jump={jump} />
+        <VirtualRows rows={rows} onFirstVisible={onFirstVisible} />
       </div>
       <TimelineRail
-        stops={stops}
+        stops={buckets}
         activePeriod={activePeriod}
-        onPick={onPick}
+        onPick={onJump}
         formatLabel={(stop) => formatPeriod(stop.period)}
         formatGroup={(stop) => formatPeriodYear(stop.period)}
         className="sticky top-4 h-[70vh] self-start"

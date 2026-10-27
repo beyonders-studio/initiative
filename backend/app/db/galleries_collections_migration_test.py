@@ -167,22 +167,24 @@ async def test_a_gallery_becomes_a_collection_of_files(session) -> None:
         )
     sunset, untitled = pictures
     versions = {}
-    for image, number, url, media, filename, author in (
-        (sunset, 1, "sunset-1.png", "image/png", "sunset.png", owner.id),
-        (sunset, 2, "sunset-2.jpg", "image/jpeg", "sunset.jpg", reader.id),
-        (untitled, 1, "dunes.webp", "image/webp", "dunes.webp", None),
+    for image, number, url, media, filename, author, size in (
+        (sunset, 1, "sunset-1.png", "image/png", "sunset.png", owner.id, (800, 600)),
+        (sunset, 2, "sunset-2.jpg", "image/jpeg", "sunset.jpg", reader.id, (900, 1600)),
+        (untitled, 1, "dunes.webp", "image/webp", "dunes.webp", None, (None, None)),
     ):
         versions[(image, number)] = await _one(
             session,
             f"INSERT INTO {s}.gallery_image_versions (gallery_image_id, "
             "version_number, file_url, file_content_type, original_filename, "
-            "created_by, created_at) VALUES (:i, :n, :url, :m, :f, :u, now()) "
-            "RETURNING id",
+            "width, height, created_by, created_at) "
+            "VALUES (:i, :n, :url, :m, :f, :w, :h, :u, now()) RETURNING id",
             i=image,
             n=number,
             url=f"/uploads/{guild.id}/{url}",
             m=media,
             f=filename,
+            w=size[0],
+            h=size[1],
             u=author,
         )
     for image, number in ((sunset, 2), (untitled, 1)):
@@ -294,16 +296,16 @@ async def test_a_gallery_becomes_a_collection_of_files(session) -> None:
     sunset_file, dunes_file = files["Sunset"][0], files["dunes.webp"][0]
     assert await _rows(
         session,
-        "SELECT file_id, version_number, file_url, created_by "
+        "SELECT file_id, version_number, file_url, created_by, width, height "
         f"FROM {s}.file_versions WHERE file_id IN (:a, :b) ORDER BY 1, 2",
         a=sunset_file,
         b=dunes_file,
     ) == sorted(
         [
-            (sunset_file, 1, f"/uploads/{guild.id}/sunset-1.png", owner.id),
-            (sunset_file, 2, f"/uploads/{guild.id}/sunset-2.jpg", reader.id),
+            (sunset_file, 1, f"/uploads/{guild.id}/sunset-1.png", owner.id, 800, 600),
+            (sunset_file, 2, f"/uploads/{guild.id}/sunset-2.jpg", reader.id, 900, 1600),
             # A version with no author takes its picture's.
-            (dunes_file, 1, f"/uploads/{guild.id}/dunes.webp", owner.id),
+            (dunes_file, 1, f"/uploads/{guild.id}/dunes.webp", owner.id, None, None),
         ]
     )
     assert await _rows(
@@ -312,10 +314,17 @@ async def test_a_gallery_becomes_a_collection_of_files(session) -> None:
     ) == [(gallery, "Wall", "Studio shots", sunset_file)]
     assert await _rows(
         session,
-        f"SELECT file_id, added_by FROM {s}.collection_files "
+        f"SELECT file_id, added_by, added_at FROM {s}.collection_files "
         "WHERE collection_id = :g ORDER BY file_id",
         g=gallery,
-    ) == sorted([(sunset_file, owner.id), (dunes_file, owner.id)])
+    ) == sorted(
+        [
+            # Added when the picture was uploaded, as the gallery's timeline
+            # dated it.
+            (sunset_file, owner.id, datetime(2026, 2, 1, tzinfo=timezone.utc)),
+            (dunes_file, owner.id, datetime(2026, 3, 1, tzinfo=timezone.utc)),
+        ]
+    )
     # Each picture takes every grant its gallery gave, and the gallery none.
     assert await _rows(
         session,

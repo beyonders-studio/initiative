@@ -29,7 +29,11 @@ export const CollectionCard = ({ collection, className }: CollectionCardProps) =
   const { t } = useTranslation("files");
   const gp = useCommunityPath();
   const cover = collection.cover;
-  const picture = cover?.file_content_type?.startsWith("image/") ? cover.file_url : null;
+  // Its thumbnail, as every file's card shows; a picture itself until that
+  // is drawn.
+  const picture =
+    cover?.thumbnail_url ??
+    (cover?.file_content_type?.startsWith("image/") ? cover.file_url : null);
   const { Icon, colorClass } = cover
     ? fileIcon({ file_type: cover.file_type })
     : { Icon: COLLECTION_ICON, colorClass: "text-muted-foreground" };

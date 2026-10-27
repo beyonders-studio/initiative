@@ -90,10 +90,18 @@ CAPTURE_FUNCTION = "public.capture_change"
 
 #: Columns whose changes are not worth reporting. ``updated_at`` moves on every
 #: write, search vectors / denormalized counters churn on their own, and a
-#: thumbnail is drawn by the app after the upload, so leaving them in would
-#: make every column filter match constantly.
+#: thumbnail (and the size it measured) is drawn by the app after the upload,
+#: so leaving them in would make every column filter match constantly.
 HOUSEKEEPING_COLUMNS: frozenset[str] = frozenset(
-    {"updated_at", "created_at", "search_vector", "thumbnail_url", "thumbnail_state"}
+    {
+        "updated_at",
+        "created_at",
+        "search_vector",
+        "thumbnail_url",
+        "thumbnail_state",
+        "width",
+        "height",
+    }
 )
 
 #: Same idea, by suffix, for generated text-search columns.
