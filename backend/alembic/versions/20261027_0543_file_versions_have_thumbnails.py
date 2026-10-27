@@ -14,7 +14,7 @@ rendered from them (the sweep's). A thumbnail already stored stays in
 ``uploads`` until nothing shows it.
 
 Revision ID: 20261027_0543
-Revises: 20261026_0542
+Revises: 20261026_0541
 Create Date: 2026-10-27
 """
 
@@ -27,7 +27,7 @@ from sqlalchemy.engine import Connection
 from app.db.guild_migrations import run_for_each_guild_schema
 
 revision = "20261027_0543"
-down_revision = "20261026_0542"
+down_revision = "20261026_0541"
 branch_labels = None
 depends_on = None
 

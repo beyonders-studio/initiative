@@ -7,7 +7,7 @@ trash can with a key to its parent joins the cascade in the same change, and the
 four lifecycles cannot disagree about it.
 
 A key that lets go on delete (``SET NULL``) is a pointer rather than ownership —
-a library's cover picture, a queue's current item, a wiki's home page — so it is
+a collection's cover file, a queue's current item, a wiki's home page — so it is
 not an edge: the thing it points at is filed under the same parent already.
 
 The walk goes a level at a time, one query per edge per level rather than one

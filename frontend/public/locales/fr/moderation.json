@@ -45,15 +45,14 @@
     "project": "Un projet",
     "queue": "Une file",
     "queue_item": "Un élément",
-    "library": "Une bibliothèque",
-    "library_item": "Une image",
     "calendar": "Un calendrier",
     "calendar_event": "Un événement",
     "counter": "Un compteur",
     "counter_group": "Un groupe de compteurs",
     "dashboard": "Un tableau de bord",
     "wiki": "Un wiki",
-    "wiki_page": "Une page de wiki"
+    "wiki_page": "Une page de wiki",
+    "collection": "Une collection"
   },
   "paging": {
     "newer": "Plus récents",

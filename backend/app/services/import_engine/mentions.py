@@ -269,16 +269,14 @@ async def detach_envelope_mentions(session: AsyncSession, data: Any) -> None:
     freshly built envelope dict — the content inside it is never edited, only
     replaced).
 
-    Files, posts and wiki pages carry their bodies as editor states, and a
-    library's items their descriptions as markdown. A project envelope's
-    mentions are markdown too, and are written by ``build_project_export``
-    itself, which is where the text is read.
+    Files, posts and wiki pages carry their bodies as editor states. A project
+    envelope's mentions are markdown, and are written by
+    ``build_project_export`` itself, which is where the text is read.
     """
     if not isinstance(data, dict):
         return
     kind = data.get("type")
     holders: list[tuple[dict[str, Any], str]] = []
-    markdown: list[tuple[dict[str, Any], str]] = []
     if (
         kind == tool_envelope_type(Tool.file)
         and data.get("file_type") == FileType.lexical
@@ -299,29 +297,15 @@ async def detach_envelope_mentions(session: AsyncSession, data: Any) -> None:
             and isinstance(filed.get("envelope"), dict)
             and filed["envelope"].get("file_type") == FileType.lexical
         ]
-    elif kind == tool_envelope_type(Tool.library):
-        markdown = [
-            (item, "description")
-            for item in data.get("items") or []
-            if isinstance(item, dict)
-        ]
     else:
         return
-    wanted = set().union(
-        *(editor_mention_ids(h.get(key)) for h, key in holders),
-        *(markdown_mention_ids(h.get(key)) for h, key in markdown),
-    )
+    wanted = set().union(*(editor_mention_ids(h.get(key)) for h, key in holders))
     if not wanted:
         return
     handles = await load_mention_handles(session, wanted)
     for holder, key in holders:
         content, named = detach_editor_mentions(holder.get(key), handles)
         holder[key] = content
-        if named:
-            holder["mention_handles"] = named
-    for holder, key in markdown:
-        text, named = detach_markdown_mentions(holder.get(key), handles)
-        holder[key] = text
         if named:
             holder["mention_handles"] = named
 

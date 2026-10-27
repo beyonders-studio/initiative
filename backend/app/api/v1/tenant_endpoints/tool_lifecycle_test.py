@@ -27,7 +27,7 @@ from app.models.platform.guild import CommunityRole
 from app.models.tenant.calendar_event import CalendarEvent
 from app.models.tenant.comment import Comment
 from app.models.tenant.counter import Counter
-from app.models.tenant.library import LibraryItem
+from app.models.tenant.collection import Collection
 from app.models.tenant.queue import QueueItem
 from app.models.tenant.task import Task
 from app.models.tenant.wiki import WikiPage
@@ -235,8 +235,8 @@ CHILDREN = {
         "wiki-pages",
         lambda s, tool, user, name: create_wiki_page(s, tool, user, title=name),
     ),
-    # Copied with its library, not on its own.
-    LibraryItem: None,
+    # Not duplicated: a collection is gathered, not copied.
+    Collection: None,
 }
 
 

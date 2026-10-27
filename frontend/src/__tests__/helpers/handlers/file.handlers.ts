@@ -31,4 +31,6 @@ export const fileHandlers = [
       has_next: false,
     });
   }),
+  // An initiative with no collections, so the Files page shows no strip.
+  communityHttp.get("/collections/", () => HttpResponse.json({ items: [] })),
 ];

@@ -124,8 +124,6 @@
       "dashboards:write",
       "posts:read",
       "posts:write",
-      "libraries:read",
-      "libraries:write",
       "wikis:read",
       "wikis:write",
       "comments:read",
@@ -161,7 +159,6 @@
       "calendar_event",
       "queue_item",
       "counter",
-      "library_item",
       "post"
     ],
     "fieldKind": [

@@ -18,7 +18,7 @@ from app.core.messages import CommonMessages, ImportEngineMessages
 from app.main import app
 from app.services.import_engine import limits as import_limits
 from app.services.marketplace import listing_assets, tool_listings
-from app.services.tenant import attachments, libraries
+from app.services.tenant import attachments
 
 
 def _bound(
@@ -75,7 +75,6 @@ def test_a_multipart_upload_gets_room_for_the_largest_file_a_route_takes():
     )
     assert limit == MULTIPART_MAX_REQUEST_BYTES
     assert limit > attachments.MAX_FILE_SIZE
-    assert limit > libraries.MAX_IMAGE_BYTES
     # A listing sends all of its pictures in one request, beside its body.
     listing = (
         listing_assets.MAX_LISTING_IMAGES * listing_assets.MAX_IMAGE_BYTES

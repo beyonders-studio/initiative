@@ -33,6 +33,7 @@ from sqlalchemy.dialects.postgresql import insert as pg_insert
 from sqlmodel import SQLModel, col, delete, select
 from sqlmodel.ext.asyncio.session import AsyncSession
 
+from app.core.tools import KINDS
 from app.db.initiative_rls import CONTENT_KIND_TABLES, NAMED_PEOPLE
 from app.models.tenant.calendar_event import RSVPStatus
 from app.models.tenant.personal_item import TOOL_KINDS, PersonalItem, ViewSource
@@ -468,7 +469,8 @@ async def is_subscribed(
     from app.services.tenant.named_people import governing_of
 
     item = (kind, entity_id)
-    governed = await governing_of(session, item)
+    # A kind in no one instance of its tool has no tool row to follow.
+    governed = None if KINDS[kind].standalone else await governing_of(session, item)
     tool = None if governed is None else (governed[0].value, governed[1].id)
     found = await subscribers_of(session, {item: tool}, user_id=user_id)
     return user_id in found[item]

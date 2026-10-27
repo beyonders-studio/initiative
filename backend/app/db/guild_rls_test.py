@@ -446,6 +446,9 @@ _NO_SINGLE_PARENT = {
     "webhook_subscriptions": "integration config, gated by the initiative",
     "guest_invite_grants": "an invite's terms, the community's administration's",
     "uploads": "a stored file, gated by the initiative whose content shows it",
+    # No sharing: seen through the files in it, changed by file makers.
+    "collections": "seen through its files, changed by the initiative's file makers",
+    "collection_files": "read as its file, written as its collection is changed",
     # Gated on full access rather than sharing: the standing that opens these
     # is the one that already reaches every resource, so there is no per-resource
     # grant left to ask about.

@@ -111,8 +111,6 @@
     "counter_group": "Ce groupe",
     "dashboard": "Ce tableau de bord",
     "file": "Ce fichier",
-    "library": "Cette bibliothèque",
-    "library_item": "Cette image",
     "generic": "Ceci",
     "post": "Ce billet",
     "project": "Ce projet",
@@ -120,7 +118,8 @@
     "queue_item": "Cet élément",
     "task": "Cette tâche",
     "wiki": "Ce wiki",
-    "wiki_page": "Cette page"
+    "wiki_page": "Cette page",
+    "collection": "Cette collection"
   },
   "blockers": {
     "label_one": "{{count}} chose retient ceci",
@@ -132,10 +131,9 @@
   "empty_counter": "Rien n'est encore lié. Lie la tâche à laquelle cela contribue, ou le projet dont cela rend compte.",
   "empty_counter_group": "Rien n'est encore lié. Lie le projet dont ces chiffres parlent.",
   "empty_dashboard": "Rien n'est encore lié. Lie le projet dont ceci rend compte, ou le fichier qui le lit.",
-  "empty_library": "Rien n'est encore lié. Lie le projet auquel ces images sont destinées.",
-  "empty_library_item": "Rien n'est encore lié. Lie la tâche à laquelle cette image sert, ou le fichier auquel elle appartient.",
   "empty_post": "Rien n'est encore lié. Lie le projet annoncé, ou le fichier qui le sous-tend.",
   "empty_queue": "Rien n'est encore lié. Lie le projet que cette file alimente.",
   "empty_queue_item": "Rien n'est encore lié. Lie la tâche qu'il est devenu, ou le fichier dont il vient.",
-  "empty_wiki_page": "Rien n'est encore lié. Mentionnez cette page avec [[ depuis n’importe où et elle apparaîtra ici."
+  "empty_wiki_page": "Rien n'est encore lié. Mentionnez cette page avec [[ depuis n’importe où et elle apparaîtra ici.",
+  "empty_collection": "Rien n'est encore lié. Lie le projet auquel ces fichiers sont destinés."
 }

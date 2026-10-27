@@ -1,4 +1,5 @@
 import { Tool } from "@/api/generated/initiativeAPI.schemas";
+import { CollectionsStrip } from "@/components/files/collections/CollectionsStrip";
 import { ToolIndexPage } from "@/components/tools/ToolIndexPage";
 
 type FilesViewProps = {
@@ -8,5 +9,11 @@ type FilesViewProps = {
   canCreate?: boolean;
 };
 
-/** An initiative's files: cards, a table, or browsed by tag. */
-export const FilesView = (props: FilesViewProps) => <ToolIndexPage tool={Tool.file} {...props} />;
+/** An initiative's files: its collections, then the files themselves as
+ *  cards, a table, or browsed by tag. */
+export const FilesView = (props: FilesViewProps) => (
+  <div className="space-y-6">
+    <CollectionsStrip initiativeId={props.fixedInitiativeId} />
+    <ToolIndexPage tool={Tool.file} {...props} />
+  </div>
+);

@@ -33,9 +33,8 @@
     "counter": "Zähler",
     "dashboard": "Dashboard",
     "post": "Beitrag",
-    "library": "Bibliothek",
-    "library_item": "Bild",
     "wiki": "Wiki",
-    "wiki_page": "Seite"
+    "wiki_page": "Seite",
+    "collection": "Sammlung"
   }
 }

@@ -9,7 +9,9 @@ and disappear the moment the tag is trashed.
 
 from datetime import datetime, timezone
 
+import pytest
 from httpx import AsyncClient
+from sqlalchemy.exc import DBAPIError
 from sqlmodel import select
 from sqlmodel.ext.asyncio.session import AsyncSession
 
@@ -22,7 +24,9 @@ from app.services.tenant import tags as tags_service
 from app.services.tenant.soft_delete import hard_purge_entity
 from app.testing.factories import (
     assign_tag,
+    create_collection,
     create_file,
+    create_resource_grant,
     create_tag,
     create_task,
 )
@@ -240,3 +244,36 @@ async def test_the_endpoint_gate_answers_in_the_schema_the_request_is_routed_to(
 
     assert await reachable(a.guild.id) is True
     assert await reachable(other.guild.id) is False
+
+
+async def test_tagging_a_collection_takes_the_role_that_makes_files(
+    session: AsyncSession, acting_user, role_session
+):
+    """A collection has no sharing of its own, so the gate an edge asks of its
+    source holds it to what its own table does: its initiative's file makers."""
+    owner = await acting_user(guild_role=CommunityRole.member, initiative=True)
+    reader = await acting_user(
+        guild_role=CommunityRole.member,
+        guild=owner.guild,
+        initiative=owner.initiative,
+        initiative_role="member",
+    )
+    shared = await create_file(session, owner.initiative, owner.user)
+    await create_resource_grant(session, shared, all_initiative_members=True)
+    collection_id = (
+        await create_collection(session, owner.initiative, owner.user, files=[shared])
+    ).id
+    tag_id = (await create_tag(session, owner.guild)).id
+    guild_id = owner.guild.id
+    spec = tags_service.TAG_LINKS["collection"]
+    db = await role_session("app_user")
+
+    await route_as(db, user_id=reader.user.id, guild_id=guild_id)
+    db.add(tags_service.tag_edge(spec, collection_id, tag_id))
+    with pytest.raises(DBAPIError, match="row-level security"):
+        await db.flush()
+    await db.rollback()
+
+    await route_as(db, user_id=owner.user.id, guild_id=guild_id)
+    db.add(tags_service.tag_edge(spec, collection_id, tag_id))
+    await db.flush()

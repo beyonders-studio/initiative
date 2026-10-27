@@ -80,6 +80,7 @@ async def test_a_large_picture_gets_a_thumbnail_no_limit_counts(session, stored)
 
     version = await _version(session, file)
     assert version.thumbnail_state == "ready"
+    assert (version.width, version.height) == (1600, 1200)
     name = version.thumbnail_url.rsplit("/", 1)[-1]
     assert name.startswith(attachments.THUMBNAIL_PREFIX)
     upload = (await session.exec(select(Upload).where(Upload.filename == name))).one()
@@ -119,6 +120,7 @@ async def test_a_small_picture_is_its_own_thumbnail(session, stored):
         "ready",
         version.file_url,
     )
+    assert (version.width, version.height) == (200, 120)
 
 
 async def test_a_picture_that_cannot_be_drawn_fails(session, stored):

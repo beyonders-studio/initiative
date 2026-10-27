@@ -98,7 +98,6 @@
     "dashboards": "Dashboards",
     "counterGroups": "Zähler",
     "posts": "Beiträge",
-    "libraries": "Bibliotheken",
     "wikis": "Wikis"
   },
   "settings": {
@@ -227,7 +226,6 @@
       "dashboards": "Dashboards",
       "counterGroups": "Zähler",
       "posts": "Beiträge",
-      "libraries": "Bibliotheken",
       "wikis": "Wikis"
     },
     "permissions": {
@@ -245,8 +243,6 @@
       "createCounterGroups": "Zähler erstellen",
       "viewPosts": "Beiträge anzeigen",
       "createPosts": "Beiträge erstellen",
-      "viewLibraries": "Bibliotheken anzeigen",
-      "createLibraries": "Bibliotheken erstellen",
       "viewShort": "Ansehen",
       "createShort": "Erstellen",
       "viewWikis": "Wikis ansehen",
@@ -294,8 +290,6 @@
   "counterGroupsFeatureDescription": "Zahlen, die sich bewegen. Striche, Summen, Punkte, freie Plätze, Trefferpunkte — eine Zahl, auf die sich alle im Raum einigen.",
   "postsFeature": "Beiträge",
   "postsFeatureDescription": "Ein schwarzes Brett. Ankündigungen, Umfragen, wer sie gelesen hat — die wichtige oben angepinnt, damit sie nicht vier Leute verpassen.",
-  "librariesFeature": "Bibliotheken",
-  "librariesFeatureDescription": "Eine Wand voller Bilder. Mockups, Screenshots, die vier Logos, die es nicht wurden.",
   "projectsFeature": "Projekte",
   "projectsFeatureDescription": "Boards voller To-dos: wer dran ist, in welchem Stadium es steckt, was noch fehlt. Als Tabelle, Kanban-Board oder Kalender — dieselben Aufgaben, deine Wahl.",
   "filesFeature": "Dateien",

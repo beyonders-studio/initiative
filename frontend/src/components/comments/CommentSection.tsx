@@ -37,7 +37,7 @@ export interface CommentWithReplies extends CommentRead {
 /** What a comment can hang off: a tool entity, or one of the content-level
  *  extras that carries a thread of its own. Mirrors the backend's
  *  `COMMENT_TARGETS`. */
-export type CommentEntity = "task" | "wiki_page" | Tool;
+export type CommentEntity = "task" | "wiki_page" | "collection" | Tool;
 
 interface CommentSectionProps {
   entityType: CommentEntity;

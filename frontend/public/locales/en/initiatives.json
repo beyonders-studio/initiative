@@ -98,7 +98,6 @@
     "dashboards": "Dashboards",
     "counterGroups": "Counters",
     "posts": "Posts",
-    "libraries": "Libraries",
     "wikis": "Wikis"
   },
   "settings": {
@@ -227,7 +226,6 @@
       "dashboards": "Dashboards",
       "counterGroups": "Counters",
       "posts": "Posts",
-      "libraries": "Libraries",
       "wikis": "Wikis"
     },
     "permissions": {
@@ -245,8 +243,6 @@
       "createCounterGroups": "Create Counters",
       "viewPosts": "View Posts",
       "createPosts": "Create Posts",
-      "viewLibraries": "View Libraries",
-      "createLibraries": "Create Libraries",
       "viewShort": "View",
       "createShort": "Create",
       "viewWikis": "View Wikis",
@@ -294,8 +290,6 @@
   "counterGroupsFeatureDescription": "Numbers that move. Tallies, totals, scores, seats left, hit points — one number everyone in the room agrees on.",
   "postsFeature": "Posts",
   "postsFeatureDescription": "A noticeboard. Announcements, polls, who's read them — with the important one pinned to the top, so it isn't missed by four people.",
-  "librariesFeature": "Libraries",
-  "librariesFeatureDescription": "A wall of pictures. Mockups, screenshots, the four logos that lost.",
   "projectsFeature": "Projects",
   "projectsFeatureDescription": "Boards of to-dos: who's on it, what stage it's at, what's left. See them as a table, a Kanban board or a calendar — same tasks, your pick.",
   "filesFeature": "Files",

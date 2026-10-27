@@ -53,19 +53,9 @@ def _embed(entity_type: str, entity_id: int, text: str) -> dict:
     return {**_mention(entity_type, entity_id, text), "type": "reference-embed"}
 
 
-def _wikilink(file_id: int, title: str) -> dict:
-    return {
-        "type": "wikilink",
-        "version": 1,
-        "documentId": file_id,
-        "documentTitle": title,
-        "text": title,
-    }
-
-
 def test_a_markdown_reference_crosses_as_the_ref_it_had():
     text = (
-        "See #task[Fix the bug](41), #doc[Spec](7) and #wiki-page[Start](3), "
+        "See #task[Fix the bug](41), #file[Spec](7) and #wiki-page[Start](3), "
         "not #widget[Nope](9) or @[Ada](4)"
     )
 
@@ -74,7 +64,7 @@ def test_a_markdown_reference_crosses_as_the_ref_it_had():
     # Every spelling the composer writes reads as its kind; a word that names
     # no kind, and a person, are not references and are left as they were.
     assert detached == (
-        "See #task[Fix the bug](task:41), #doc[Spec](file:7) and "
+        "See #task[Fix the bug](task:41), #file[Spec](file:7) and "
         "#wiki-page[Start](wiki_page:3), not #widget[Nope](9) or @[Ada](4)"
     )
     # Nothing reads a detached reference as one until it is placed.
@@ -84,7 +74,7 @@ def test_a_markdown_reference_crosses_as_the_ref_it_had():
 
 
 def test_a_markdown_reference_is_placed_or_reduced_to_its_label():
-    detached = "See #task[Fix the bug](task:41) and #doc[Spec](file:7)"
+    detached = "See #task[Fix the bug](task:41) and #file[Spec](file:7)"
 
     placed = place_markdown_references(
         detached, lambda ref: 90 if ref == "task:41" else None
@@ -98,7 +88,6 @@ def test_an_editor_reference_carries_a_ref_instead_of_an_id():
         {"type": "text", "text": "See "},
         _mention("task", 41, "Fix the bug"),
         _chip("task:status", 41, "In progress"),
-        _wikilink(7, "Spec"),
         _mention("task", 0, "Waiting on a page"),
     )
     content["root"]["children"].append(_embed("task", 41, "Fix the bug"))
@@ -113,7 +102,7 @@ def test_an_editor_reference_carries_a_ref_instead_of_an_id():
 
     detached = detach_editor_references(content)
 
-    text, mention, chip, wikilink, waiting = _inline(detached)
+    text, mention, chip, waiting = _inline(detached)
     embed = detached["root"]["children"][1]
     assert (embed["entityId"], embed[SOURCE_REF]) == (0, "task:41")
     label = detached["root"]["children"][2]
@@ -122,7 +111,6 @@ def test_an_editor_reference_carries_a_ref_instead_of_an_id():
     assert text == {"type": "text", "text": "See "}
     assert (mention["entityId"], mention[SOURCE_REF]) == (0, "task:41")
     assert (chip["entityId"], chip[SOURCE_REF]) == (0, "task:41")
-    assert (wikilink["documentId"], wikilink[SOURCE_REF]) == (None, "file:7")
     # A node that names nothing yet is not something to carry.
     assert SOURCE_REF not in waiting
     assert references_in_body(detached) == set()
@@ -136,7 +124,6 @@ def test_an_exported_editor_reference_is_placed_or_left_as_words():
         _mention("task", 41, "Fix the bug"),
         _mention("file", 8, "Gone"),
         _chip("task:status", 42, "Done"),
-        _wikilink(7, "Spec"),
     )
     content["root"]["children"].append(_embed("file", 8, "Gone"))
     detached = detach_editor_references(content)
@@ -145,7 +132,7 @@ def test_an_exported_editor_reference_is_placed_or_left_as_words():
         detached, lambda ref: 90 if ref == "task:41" else None
     )
 
-    mention, gone, chip, wikilink = _inline(placed)
+    mention, gone, chip = _inline(placed)
     assert mention["entityId"] == 90 and SOURCE_REF not in mention
     # A reference to nothing here is its words, never somebody else's row.
     assert gone["type"] == "text" and gone["text"] == "Gone"
@@ -154,9 +141,6 @@ def test_an_exported_editor_reference_is_placed_or_left_as_words():
     embed = placed["root"]["children"][1]
     assert embed["type"] == "paragraph"
     assert [child["text"] for child in embed["children"]] == ["Gone"]
-    # A wikilink stays one, unlinked — how the editor draws a missing page.
-    assert wikilink["type"] == "wikilink"
-    assert wikilink["documentId"] is None and SOURCE_REF not in wikilink
     assert not has_source_references(placed)
 
 

@@ -61,9 +61,7 @@ _BUILDERS: dict[str, Callable[[], Dataset]] = {
     "calendars": tool_datasets.build_calendars,
     "dashboards": tool_datasets.build_dashboards,
     "posts": tool_datasets.build_posts,
-    "libraries": tool_datasets.build_libraries,
-    "library_items": tool_datasets.build_library_items,
-    "library_item_versions": tool_datasets.build_library_item_versions,
+    "collections": tool_datasets.build_collections,
     "wikis": tool_datasets.build_wikis,
     "wiki_pages": tool_datasets.build_wiki_pages,
 }

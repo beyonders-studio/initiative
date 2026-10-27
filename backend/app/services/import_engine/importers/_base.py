@@ -37,7 +37,7 @@ from app.services.import_engine.common import (
 from app.services.import_engine.contract import ImportEngineError
 from app.services.import_engine.people import bring_in_named
 from app.services.tenant import tags as tags_service
-from app.services.tenant.named_people import Governing
+from app.services.tenant import named_people
 from app.services.tenant.properties import link_for
 
 if TYPE_CHECKING:  # pragma: no cover - typing only
@@ -385,13 +385,21 @@ class PropertyRestore:
     async def settle(self, tool_row: Any) -> list[str]:
         """Flush what was written, bring everyone the values name into
         ``tool_row`` — the tool row whose sharing governs them — and return
-        every handle that placed nobody or could not be let in."""
+        every handle that placed nobody or could not be let in.
+
+        A collection has no sharing to bring anybody into: who it may name is
+        whoever can open a file in it, as when its values are written, so
+        anybody else its values name is taken off it."""
         await self._session.flush()
         gone: set[int] = set()
         if self.named:
-            gone = await bring_in_named(
-                self._session,
-                Governing.of(link_for(tool_row).tool, tool_row),
-                initiative_id=self._initiative_id,
-            )
+            link = link_for(tool_row)
+            if link.shared:
+                gone = await bring_in_named(
+                    self._session,
+                    link.governing(tool_row, tool_row.initiative_id),
+                    initiative_id=self._initiative_id,
+                )
+            else:
+                gone = await named_people.sweep_collections(self._session, [tool_row])
         return sorted(self.unmatched | {self.named[user_id] for user_id in gone})

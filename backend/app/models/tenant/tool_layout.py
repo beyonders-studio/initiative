@@ -2,8 +2,8 @@
 layouts.
 
 A row belongs to a target: one instance of a tool (``tool``, ``tool_id``: a
-project), or, for a tool the whole initiative shares, the initiative itself
-(``tool_id`` NULL: the calendar). Its ``kind`` says which layout it is: one way
+project), a collection (``tool`` is ``collection``), or, for a tool the whole
+initiative shares, the initiative itself (``tool_id`` NULL: the calendar). Its ``kind`` says which layout it is: one way
 the target lists what it holds (``table``, ``board``, ``calendar``), its
 detail (``task``), or which list it opens on (``default``). A target has
 at most one of each.
@@ -42,11 +42,11 @@ from sqlalchemy import (
 from sqlalchemy.dialects.postgresql import JSONB
 from sqlmodel import Field
 
-from app.core.tools import LAYOUT_KINDS, LAYOUT_TOOLS, LAYOUTS_SHARED, TYPED_DETAILS
+from app.core.tools import LAYOUT_KINDS, LAYOUT_TARGETS, LAYOUTS_SHARED, TYPED_DETAILS
 from app.db.registry_checks import FROM_REGISTRY
 from app.models.tenant._mixins import CreatedByMixin
 
-_TOOL_VALUES = ", ".join(f"'{tool.value}'" for tool in LAYOUT_TOOLS)
+_TOOL_VALUES = ", ".join(f"'{target}'" for target in LAYOUT_TARGETS)
 _SHARED_VALUES = ", ".join(f"'{tool.value}'" for tool in LAYOUTS_SHARED)
 _KIND_VALUES = ", ".join(f"'{kind}'" for kind in LAYOUT_KINDS)
 _TYPED = " OR ".join(

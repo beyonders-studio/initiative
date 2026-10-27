@@ -39,7 +39,9 @@ def _comment_initiative() -> ColumnElement[Optional[int]]:
 
     lookups = []
     for column, parent in COMMENT_PARENTS.items():
-        tool = MODELS_BY_TABLE.get(parent.governed_by.plural)
+        tool = MODELS_BY_TABLE.get(
+            parent.governed_by.plural if parent.governed_by else parent.table
+        )
         if tool is None:  # pragma: no cover - a tool always has a table
             continue
         if parent.tool_fk is None:

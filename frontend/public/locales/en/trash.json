@@ -33,9 +33,8 @@
     "counter": "Counter",
     "dashboard": "Dashboard",
     "post": "Post",
-    "library": "Library",
-    "library_item": "Picture",
     "wiki": "Wiki",
-    "wiki_page": "Page"
+    "wiki_page": "Page",
+    "collection": "Collection"
   }
 }

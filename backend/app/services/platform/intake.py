@@ -81,7 +81,7 @@ DEFAULT_RECURRENCE_WINDOW = timedelta(hours=1)
 #: without a link. Mirrors ``RESOLVERS`` in the client's ``entityResolver.ts``.
 LINKED_KINDS: frozenset[str] = frozenset(
     {tool.value for tool in Tool}
-    | {"task", "wiki_page", "calendar_event", "queue_item", "comment"}
+    | {"task", "wiki_page", "calendar_event", "queue_item", "comment", "collection"}
 )
 
 

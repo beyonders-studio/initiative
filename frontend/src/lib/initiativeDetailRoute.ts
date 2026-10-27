@@ -14,14 +14,3 @@ import { lazyRouteComponent } from "@tanstack/react-router";
 export const LazyInitiativeDetailPage = lazyRouteComponent(() =>
   import("@/pages/InitiativeDetailPage").then((m) => ({ default: m.InitiativeDetailPage }))
 );
-
-/**
- * The library page, shared by the library's own route and an item's
- * (`/libraries/{id}/items/{itemId}`), so opening and closing an item keeps the
- * wall where it was rather than drawing it again.
- */
-export const LazyLibraryDetailPage = lazyRouteComponent(() =>
-  import("@/pages/initiativeTools/libraries/LibraryDetailPage").then((m) => ({
-    default: m.LibraryDetailPage,
-  }))
-);

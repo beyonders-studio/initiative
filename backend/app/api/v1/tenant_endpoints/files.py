@@ -17,7 +17,7 @@ from fastapi import (
 )
 from fastapi.responses import Response
 from sqlalchemy import text
-from sqlmodel import select
+from sqlmodel import col, select
 from sqlmodel.ext.asyncio.session import AsyncSession
 
 from app.core.search import SearchEntityType
@@ -39,7 +39,6 @@ from app.api.deps import (
     establish_guild_access,
     get_current_active_user,
     GuildAccessError,
-    GuildContext,
     GuildContextDep,
 )
 from app.core.messages import (
@@ -57,6 +56,7 @@ from app.core.file_types import (
     type_of_media,
     types_of_kind,
 )
+from app.models.tenant.collection import CollectionFile
 from app.models.tenant.file import (
     File,
     FileVersion,
@@ -70,9 +70,9 @@ from app.schemas.tenant.file import (
     FileSummary,
     FileUpdate,
     serialize_file,
-    serialize_file_summary,
     SpreadsheetImportRead,
 )
+from app.schemas.tenant.tool import serialize_tool
 from app.schemas.tenant.resource_grant import initiative_readable
 from app.schemas.ai_generation import AIStreamEvent
 from app.services import resumable
@@ -182,6 +182,7 @@ def visible_file_conditions(
     is_template: Optional[bool] = None,
     file_type: Optional[FileType] = None,
     kind: Optional[FileKind] = None,
+    collection_id: Optional[int] = None,
 ):
     """WHERE conditions for visible-file queries — the list and the tag
     counts beside it, so the sidebar's numbers match the rows under them.
@@ -217,11 +218,23 @@ def visible_file_conditions(
             )
         )
 
+    if collection_id is not None:
+        conditions.append(
+            col(File.id).in_(
+                select(CollectionFile.file_id).where(
+                    CollectionFile.collection_id == collection_id
+                )
+            )
+        )
+
     return conditions
 
 
 async def serialize_file_page(
-    session: AsyncSession, user_id: int | None, files: list[File]
+    session: AsyncSession,
+    user_id: int | None,
+    files: list[File],
+    schema: type[FileSummary] = FileSummary,
 ) -> list[FileSummary]:
     """Serialize one page of files — the rows a file list answers with.
 
@@ -232,7 +245,7 @@ async def serialize_file_page(
 
     Both file lists run this: the guild-wide one through
     ``tool_lists.TOOL_LISTS``, and the cross-guild ``/me/files`` through
-    ``me_tools.MY_TOOL_LISTS``.
+    ``me_tools.MY_TOOL_LISTS``; a collection's, in its own ``schema``.
     """
     await tags_service.annotate_tags(session, files)
     await properties_service.annotate_properties(session, files)
@@ -240,7 +253,7 @@ async def serialize_file_page(
     await ownership_service.annotate_owner_plugins(session, files)
     context = require_actor_context(session)
     return [
-        serialize_file_summary(file, context=context, user_id=user_id) for file in files
+        serialize_tool(schema, file, context=context, user_id=user_id) for file in files
     ]
 
 
@@ -315,9 +328,9 @@ async def create_file(
 
 @router.post("/upload", response_model=FileRead, status_code=status.HTTP_201_CREATED)
 async def upload_file(
-    session: RLSSessionDep,
-    current_user: Annotated[User, Depends(get_current_active_user)],
-    guild_context: GuildContextDep,
+    session: ActorSessionDep,
+    current_user: ActorUserDep,
+    guild_context: FilesWrite,
     name: str = Form(...),
     initiative_id: int = Form(...),
     upload: UploadFile | None = FormFile(None, alias="file"),
@@ -349,7 +362,7 @@ async def upload_file(
         name=name,
         initiative_id=initiative.id,
         content={},  # An uploaded file has no content of its own
-        created_by=current_user.id,
+        created_by=guild_context.user_id,
         file_type=type_of_media(stored["file_content_type"]),
     )
     session.add(file)
@@ -371,7 +384,7 @@ async def upload_file(
     await session.flush()
 
     version = await file_versions.add_version(
-        session, file, created_by=current_user.id, **stored
+        session, file, created_by=guild_context.user_id, **stored
     )
     await file_versions.commit_version(session, guild_context.guild_id, version)
     return await read_after_write(session, file.id, current_user, guild_context)
@@ -379,7 +392,7 @@ async def upload_file(
 
 async def _store_file(
     session: AsyncSession,
-    guild_context: GuildContext,
+    guild_context: ActorContext,
     upload: UploadFile | None,
     upload_id: str | None,
     *,
@@ -488,9 +501,9 @@ async def _store_file(
     status_code=status.HTTP_201_CREATED,
 )
 async def upload_file_version(
-    session: RLSSessionDep,
-    current_user: Annotated[User, Depends(get_current_active_user)],
-    guild_context: GuildContextDep,
+    session: ActorSessionDep,
+    current_user: ActorUserDep,
+    guild_context: FilesWrite,
     file_id: int,
     upload: UploadFile | None = FormFile(None, alias="file"),
     upload_id: str | None = Form(None),
@@ -525,7 +538,7 @@ async def upload_file_version(
         keep_kind=spec_of(file.file_type).kind,
     )
     version = await file_versions.add_version(
-        session, file, created_by=current_user.id, **stored
+        session, file, created_by=guild_context.user_id, **stored
     )
     await file_versions.commit_version(
         session,

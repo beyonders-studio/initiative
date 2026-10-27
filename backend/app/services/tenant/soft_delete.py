@@ -48,7 +48,6 @@ from app.db.soft_delete_filter import select_including_deleted
 from app.models.tenant._mixins import SoftDeleteMixin
 from app.models.tenant.comment import Comment
 from app.models.tenant.file import File
-from app.models.tenant.library import LibraryItem
 from app.models.tenant.initiative import Initiative
 from app.models.tenant.task import Task
 from app.services.tenant.held import refuse_if_held
@@ -225,6 +224,19 @@ async def soft_delete_entity(
     levels = await subtree_levels(session, [entity], where=_live_and_not_held)
     for level in reversed(levels):
         await _write_level(session, level, values, park=True)
+    _settle_collections(session, levels, "left_files")
+
+
+def _settle_collections(
+    session: AsyncSession, levels: list[Level], files_did: str
+) -> None:
+    """Files leaving the bin or going into it may empty or refill the
+    collections they are in, which settle once the change commits."""
+    from app.services.tenant.collections import settle_after_commit
+
+    files = [i for level in levels for i in level.get(File, ())]
+    if files:
+        settle_after_commit(session, **{files_did: files})
 
 
 async def restore_entity(
@@ -249,6 +261,7 @@ async def restore_entity(
     cleared = {"deleted_at": None, "deleted_by": None, "purge_at": None}
     for level in levels:
         await _write_level(session, level, cleared)
+    _settle_collections(session, levels, "restored_files")
 
 
 async def _purge_references(session: AsyncSession, doomed: Level) -> None:
@@ -263,7 +276,7 @@ async def _purge_references(session: AsyncSession, doomed: Level) -> None:
     """
     from app.core.reactions import ReactionTarget
     from app.core.relationships import ENDPOINT_KINDS
-    from app.core.tools import ITEM_KINDS, KINDS, LAYOUTS_PER_INSTANCE
+    from app.core.tools import ITEM_KINDS, KINDS, LAYOUT_INSTANCE_TABLES
     from app.db.initiative_rls import CONTENT_KIND_TABLES
     from app.services.tenant import (
         engagement_levels,
@@ -279,7 +292,7 @@ async def _purge_references(session: AsyncSession, doomed: Level) -> None:
     reaction_targets = {target.table: target for target in ReactionTarget}
     content_kinds = {table: kind for kind, table in CONTENT_KIND_TABLES.items()}
     item_kinds = {KINDS[kind].table: kind for kind in ITEM_KINDS}
-    layout_tools = {tool.plural: tool for tool in LAYOUTS_PER_INSTANCE}
+    layout_tools = {table: target for target, table in LAYOUT_INSTANCE_TABLES.items()}
     for model, ids in doomed.items():
         table = getattr(model, "__tablename__", "")
         if not ids:
@@ -303,7 +316,6 @@ async def _purge_references(session: AsyncSession, doomed: Level) -> None:
 #: deferred columns those hooks read.
 _PURGE_LOADS: dict[type, tuple] = {
     Comment: (),
-    LibraryItem: (),
     Task: (),
     File: (undefer(File.content),),
 }
@@ -415,10 +427,9 @@ async def hard_purge_entities(
     stored names returned include the evidence objects of doomed cases and
     reports, which live in the same storage.
     """
-    from app.services.tenant.files import unresolve_wikilinks_to_file
+    from app.services.tenant.files import unlink_references_to_file
     from app.services.tenant.attachments import (
         purge_file_uploads,
-        purge_library_item_uploads,
         purge_initiative_uploads,
         purge_pasted_images,
     )
@@ -429,7 +440,7 @@ async def hard_purge_entities(
     await session.flush()
 
     # Purge is the one lifecycle step that writes frozen content instead of only
-    # removing it — the wikilink unresolve below reaches files that are
+    # removing it — unlinking the references below reaches files that are
     # themselves in the trash. Transaction-local (see app.db.gucs.PURGING).
     await raise_flag(session, gucs.PURGING)
 
@@ -465,11 +476,6 @@ async def hard_purge_entities(
                 ).all()
             )
 
-    # A picture's blobs — every version and its thumbnail — go with it, the
-    # way an uploaded file's do.
-    if loaded.get(LibraryItem):
-        released |= await purge_library_item_uploads(session, loaded[LibraryItem])
-
     # Pictures pasted into a task's description or a comment go with it,
     # unless something that stays still shows them.
     released |= await purge_pasted_images(
@@ -478,12 +484,12 @@ async def hard_purge_entities(
 
     if loaded.get(File):
         released |= await purge_file_uploads(session, loaded[File])
-        # Links in surviving files that point at a doomed one are blanked
-        # before the row disappears, so they render as unresolved rather than
-        # pointing at nothing. Runs before the DELETEs, while the edges naming
-        # it are still there to find the files carrying those links.
+        # References in surviving files that point at a doomed one become
+        # their words before the row disappears, rather than pointing at
+        # nothing. Runs before the DELETEs, while the edges naming it are
+        # still there to find the files carrying those references.
         for doc in loaded[File]:
-            await unresolve_wikilinks_to_file(session, deleted_file_id=doc.id)
+            await unlink_references_to_file(session, deleted_file_id=doc.id)
 
     # What is left of an initiative's files goes with it.
     if doomed.get(Initiative):

@@ -23,10 +23,10 @@ with one ``initiatives/`` entry, so ONE import path serves both)::
     initiatives/{id}-{slug}/calendars/{id}-{slug}.initiative-calendar.json
     initiatives/{id}-{slug}/posts/{id}-{slug}.initiative-post.json
     initiatives/{id}-{slug}/wikis/{id}-{slug}.initiative-wiki.json
-    initiatives/{id}-{slug}/libraries/{id}-{slug}.initiative-library.json
     initiatives/{id}-{slug}/dashboards/{id}-{slug}.initiative-dashboard.json
     initiatives/{id}-{slug}/structure.json          (backup mode)
     initiatives/{id}-{slug}/properties.json         (backup mode)
+    initiatives/{id}-{slug}/collections.json        (backup mode)
     assets/{storage_key}                            (include_uploads only)
 
 Authorization: the initiative source requires the creator to manage the
@@ -487,10 +487,9 @@ async def _build_scope(
 def _initiative_tool_states(params: dict, initiative) -> dict[str, str]:
     states: dict[str, str] = {}
     for tool in _TOOLS:
-        # The switch column via the enum, not `tool + "s"`: the naive spelling
-        # is wrong for `library`, and every tool now carries a column, so a
-        # missing-attribute default would hide a real mismatch rather than
-        # cover for the two that used to have none.
+        # The switch column via the enum, not `tool + "s"`: every tool now
+        # carries a column, so a missing-attribute default would hide a real
+        # mismatch rather than cover for the two that used to have none.
         flag = getattr(initiative, Tool(tool).view_permission)
         if not flag:
             states[tool] = "disabled"
@@ -571,6 +570,7 @@ class _ScopeBuilder:
             await self._add_section(section, initiative, folder)
         await self._add_initiative_structure(initiative, folder)
         await self._add_initiative_properties(initiative, folder)
+        await self._add_initiative_collections(initiative, folder)
         await self._link_wiki_files(initiative)
 
     # -- per-tool sections ---------------------------------------------------
@@ -793,40 +793,6 @@ class _ScopeBuilder:
                 content_type=content_type,
                 size_bytes=size_bytes,
                 referenced_by=entry_path,
-            )
-
-    # -- section hooks: libraries ----------------------------------------------
-
-    def _skip_library_without_uploads(self, loaded, initiative, path_stem: str) -> bool:
-        """A library is mostly blobs, so it obeys the uploads toggle the way a
-        uploaded file does — excluded uploads means the pictures do not
-        travel, and a library of descriptions without them is not worth writing,
-        so the whole library is recorded as skipped instead."""
-        if _include_uploads(self.params):
-            return False
-        library, _images = loaded
-        self._skip(
-            Tool.library, library.id, library.name, initiative, "uploads_excluded"
-        )
-        return True
-
-    async def _register_library_pictures(self, loaded, path: str) -> None:
-        """Each picture's bytes, registered as an asset of the library's
-        entry."""
-        _library, images = loaded
-        for image in images:
-            version = image.current_version
-            key = storage_key_of(version.file_url)
-            if not key:
-                continue
-            # The picture only; a thumbnail is a rendition the app makes
-            # again from it.
-            self._register_asset(
-                key,
-                original_filename=version.original_filename,
-                content_type=version.file_content_type,
-                size_bytes=int(version.file_size or 0),
-                referenced_by=path,
             )
 
     # -- section hooks: dashboards ---------------------------------------------
@@ -1222,6 +1188,69 @@ class _ScopeBuilder:
             initiative_id=initiative.id,
         )
 
+    async def _add_initiative_collections(self, initiative, folder: str) -> None:
+        """The initiative's collections the creator can see, each under the id
+        it has here, holding its files by theirs: an import puts each one
+        together from the files it made of them."""
+        if self.mode != "backup" or not _included(self.params, Tool.file.value):
+            return
+        from sqlmodel import col, select
+
+        from app.db.query import ids_in
+        from app.models.tenant.collection import Collection, CollectionFile
+        from app.models.tenant.file import File
+        from app.services.tenant import properties as properties_service
+        from app.services.tenant import tags as tags_service
+
+        rows = list(
+            await self.session.exec(
+                select(Collection)
+                .where(Collection.initiative_id == initiative.id)
+                .order_by(col(Collection.id))
+            )
+        )
+        if not rows:
+            return
+        held: dict[int, list[int]] = {}
+        for collection_id, file_id in await self.session.exec(
+            select(CollectionFile.collection_id, CollectionFile.file_id)
+            .join(File, col(File.id) == CollectionFile.file_id)
+            .where(ids_in(CollectionFile.collection_id, [row.id for row in rows]))
+            .order_by(col(CollectionFile.added_at), col(CollectionFile.file_id))
+        ):
+            held.setdefault(collection_id, []).append(file_id)
+        await tags_service.annotate_tags(self.session, rows)
+        await properties_service.annotate_properties(self.session, rows)
+        payload = {
+            "type": "initiative-collections",
+            "schema_version": 1,
+            "initiative_id": initiative.id,
+            "collections": [
+                {
+                    "id": row.id,
+                    "name": row.name,
+                    "description": row.description,
+                    "cover_file_id": row.cover_file_id
+                    if row.cover_file_id in held.get(row.id, [])
+                    else None,
+                    "file_ids": held.get(row.id, []),
+                    **_file_metadata(row),
+                }
+                for row in rows
+            ],
+        }
+        path = f"{folder}/collections.json"
+        await self._append_backup(
+            RenderItem(key=path, data=payload, filename=path, format="json"),
+            path=path,
+            tool=_STRUCTURAL_TOOL,
+            type="initiative-collections",
+            schema_version=1,
+            entity_id=initiative.id,
+            title=initiative.name,
+            initiative_id=initiative.id,
+        )
+
     async def add_guild_sections(self, scope_kind: str) -> None:
         """What the community owns outside any initiative.
 
@@ -1508,12 +1537,6 @@ _SECTIONS: tuple[BackupSection, ...] = (
     BackupSection(Tool.calendar, report_formats=frozenset({"ics", "json"})),
     BackupSection(Tool.post, in_reports=False),
     BackupSection(Tool.wiki, in_reports=False, fetch=_fetch_wiki_pages),
-    BackupSection(
-        Tool.library,
-        in_reports=False,
-        write_apart=_ScopeBuilder._skip_library_without_uploads,
-        before_envelope=_ScopeBuilder._register_library_pictures,
-    ),
     # A dashboard is a live canvas, not a document, so a report carries its
     # envelope too.
     BackupSection(Tool.dashboard, finish=_ScopeBuilder._record_foreign_dashboards),

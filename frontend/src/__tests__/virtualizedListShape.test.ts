@@ -14,7 +14,7 @@
  *    still null, and every offset comes out short by the height of the
  *    toolbar and filters above it.
  *
- * The posts board virtualizes in the page; the library's grid and timeline do
+ * The posts board virtualizes in the page; a collection's grid and timeline do
  * it through a shared row component. Both answer to the same two facts, so
  * they are asked together.
  */
@@ -33,8 +33,8 @@ const LISTS = [
     gap: "CARD_GAP",
   },
   {
-    what: "the library wall",
-    source: read("../components/initiativeTools/libraries/VirtualRows.tsx"),
+    what: "a collection's wall",
+    source: read("../components/files/collections/VirtualRows.tsx"),
     gap: "ROW_GAP",
   },
 ];

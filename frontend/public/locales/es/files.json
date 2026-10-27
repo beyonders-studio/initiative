@@ -10,6 +10,8 @@
   "columns": {
     "owner": "Propietario",
     "type": "Tipo",
+    "created": "Creado",
+    "added": "Añadido",
     "community": "Comunidad",
     "initiative": "Iniciativa",
     "ownerFallback": "Usuario {{id}}"
@@ -382,5 +384,68 @@
       "link": "Enlace",
       "other": "Otro"
     }
+  },
+  "collections": {
+    "heading": "Colecciones",
+    "fileCount_one": "{{count}} archivo",
+    "fileCount_other": "{{count}} archivos",
+    "addTo": "Añadir a una colección",
+    "addToDescription_one": "Pon este archivo en una colección. Sigue en Archivos, y quién puede abrirlo no cambia.",
+    "addToDescription_other": "Pon estos {{count}} archivos en una colección. Siguen en Archivos, y quién puede abrirlos no cambia.",
+    "noneToAddTo": "Aún no hay colecciones a las que añadir. Nombra una nueva abajo.",
+    "namePlaceholder": "Nombre de la nueva colección",
+    "addToNew": "Añadir a una nueva colección",
+    "added_one": "Añadido a {{name}}",
+    "added_other": "{{count}} archivos añadidos a {{name}}",
+    "created": "{{name}} creada",
+    "addFiles": "Añadir archivos",
+    "pickFile": "¿Qué archivo?",
+    "noFilesToAdd": "No hay archivos que añadir",
+    "fileAdded": "Archivo añadido a la colección",
+    "uploadFiles": "Subir archivos",
+    "dropPrompt": "Suelta archivos para subirlos a esta colección",
+    "removeFrom": "Quitar de la colección",
+    "removed_one": "{{count}} archivo quitado de la colección",
+    "removed_other": "{{count}} archivos quitados de la colección",
+    "emptied": "Su último archivo ya no está, así que la colección pasó a la papelera",
+    "trash": "Mover a la papelera",
+    "trashTitle": "¿Mover esta colección a la papelera?",
+    "trashDescription": "Sus archivos se quedan donde están. Se puede restaurar desde la papelera antes de que termine el periodo de retención.",
+    "trashed": "Colección movida a la papelera",
+    "noFiles": "Aún no hay archivos en esta colección",
+    "noFilesDescription": "Añade archivos de esta iniciativa, o suelta archivos en cualquier parte de esta página para subirlos.",
+    "loadingFiles": "Cargando archivos...",
+    "openFile": "Abrir archivo",
+    "filter": "Colección",
+    "anyCollection": "Cualquier colección",
+    "groupByTag": "Agrupar por etiqueta",
+    "order": "Orden",
+    "newestFirst": "Más recientes primero",
+    "oldestFirst": "Más antiguos primero",
+    "views": {
+      "label": "Vista",
+      "masonry": "Mosaico",
+      "timeline": "Cronología"
+    },
+    "groups": {
+      "untagged": "Sin etiqueta",
+      "count_one": "{{count}} archivo",
+      "count_other": "{{count}} archivos"
+    },
+    "upload": {
+      "progress": "Subiendo {{done}} de {{total}}...",
+      "finished_one": "{{count}} archivo añadido",
+      "finished_other": "{{count}} archivos añadidos",
+      "finishedWithFailures": "{{done}} añadidos, {{failed}} no se pudieron",
+      "dismiss": "Descartar",
+      "tooLarge": "más grande de lo que acepta este servidor"
+    },
+    "layoutsDescription": "Qué listas muestra esta colección y con cuál se abre. Cada persona elige entre las que se muestran.",
+    "backToFiles": "Volver a Archivos",
+    "notFound": "Colección no encontrada",
+    "notFoundDescription": "La colección que buscas no existe, o ninguno de sus archivos es uno que puedas abrir.",
+    "noAccess": "Acceso denegado",
+    "noAccessDescription": "No tienes permiso para ver esta colección.",
+    "error": "No se pudo cambiar la colección"
   }
 }

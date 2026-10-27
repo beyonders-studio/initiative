@@ -18,7 +18,6 @@
     "formatMd": "Tableau Markdown",
     "formatMdChecklist": "Liste de tâches Markdown",
     "formatJson": "Fichier importable (.json)",
-    "formatJsonWithPictures": "Fichier importable avec les images (.zip)",
     "formatWikiPdf": "PDF (.zip)",
     "formatWikiMarkdown": "Markdown (.zip)",
     "formatWikiDocx": "Word (.zip)",
@@ -169,7 +168,6 @@
       "wiki": "Wiki",
       "initiative": "Initiative",
       "community": "Communauté",
-      "library": "Bibliothèque",
       "counter-group": "Groupe de compteurs",
       "dashboard": "Tableau de bord"
     },

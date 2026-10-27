@@ -4,7 +4,6 @@ import type access from "../../public/locales/en/access.json";
 import type announcements from "../../public/locales/en/announcements.json";
 import type auth from "../../public/locales/en/auth.json";
 import type calendars from "../../public/locales/en/calendars.json";
-import type libraries from "../../public/locales/en/libraries.json";
 import type command from "../../public/locales/en/command.json";
 import type comments from "../../public/locales/en/comments.json";
 import type common from "../../public/locales/en/common.json";
@@ -87,7 +86,6 @@ declare module "i18next" {
       projects: typeof projects;
       properties: typeof properties;
       posts: typeof posts;
-      libraries: typeof libraries;
       wikis: typeof wikis;
       queues: typeof queues;
       relations: typeof relations;

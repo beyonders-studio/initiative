@@ -108,9 +108,9 @@ def test_mentions_read_as_the_app_shows_them():
     runs = para["runs"]
     assert {"text": "@Ada", "mention": 42} in runs
     assert {"text": "Fix it"} in runs
-    # Every kind the app can mention, and the word it once wrote for a file.
+    # Every kind the app can mention.
     (kinds,) = blocks_from_markdown(
-        "#counter-group[Q1](9), #wiki-page[Home](2), #doc[Map](3)"
+        "#counter-group[Q1](9), #wiki-page[Home](2), #file[Map](3)"
     )
     assert "".join(r["text"] for r in kinds["runs"]) == "Q1, Home, Map"
     assert {"text": "@Bo"} in runs

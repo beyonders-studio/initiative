@@ -78,13 +78,12 @@ describe("resolveEntityPath", () => {
     );
   });
 
-  it("opens a library item beside its library", async () => {
+  it("opens a collection in its initiative's Files", async () => {
     server.use(
-      communityHttp.get("/library-items/:id", () => HttpResponse.json({ id: 12, library_id: 5 })),
-      communityHttp.get("/libraries/:id", () => HttpResponse.json({ id: 5, initiative_id: 1 }))
+      communityHttp.get("/collections/:id", () => HttpResponse.json({ id: 12, initiative_id: 1 }))
     );
-    await expect(resolveEntityPath(queryClient, COMMUNITY, "library-item", 12)).resolves.toBe(
-      "/i/1/libraries/5/items/12"
+    await expect(resolveEntityPath(queryClient, COMMUNITY, "collection", 12)).resolves.toBe(
+      "/i/1/files/collections/12"
     );
   });
 
@@ -154,7 +153,7 @@ describe("resolveEntityPath", () => {
     expect(isEntityRefType("calendar-event")).toBe(true);
     expect(isEntityRefType("counter_group")).toBe(false);
     expect(isEntityRefType("user")).toBe(false);
-    expect(isEntityRefType("library-item")).toBe(true);
+    expect(isEntityRefType("collection")).toBe(true);
   });
 });
 

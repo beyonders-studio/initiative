@@ -20,16 +20,15 @@ import {
   readCalendarEvent,
 } from "@/api/generated/calendar-events/calendar-events";
 import { getReadCalendarQueryKey, readCalendar } from "@/api/generated/calendars/calendars";
-import {
-  getReadLibraryItemQueryKey,
-  getReadLibraryQueryKey,
-  readLibrary,
-  readLibraryItem,
-} from "@/api/generated/libraries/libraries";
 import { getReadCommentQueryKey, readComment } from "@/api/generated/comments/comments";
 import { getReadCounterGroupQueryKey, readCounterGroup } from "@/api/generated/counters/counters";
 import { getReadDashboardQueryKey, readDashboard } from "@/api/generated/dashboards/dashboards";
-import { getReadFileQueryKey, readFile } from "@/api/generated/files/files";
+import {
+  getReadCollectionQueryKey,
+  getReadFileQueryKey,
+  readCollection,
+  readFile,
+} from "@/api/generated/files/files";
 import { SearchEntityType, Tool } from "@/api/generated/initiativeAPI.schemas";
 import { getReadPostQueryKey, readPost } from "@/api/generated/posts/posts";
 import { getReadProjectQueryKey, readProject } from "@/api/generated/projects/projects";
@@ -47,7 +46,7 @@ import {
   readWikiPage,
 } from "@/api/generated/wikis/wikis";
 import {
-  libraryItemRoute,
+  collectionRoute,
   eventRoute,
   initiativeRoute,
   type PARENT_TOOL,
@@ -101,10 +100,6 @@ const TOOL_READS: Record<
     key: getReadPostQueryKey,
     read: readPost,
   },
-  [Tool.library]: {
-    key: getReadLibraryQueryKey,
-    read: readLibrary,
-  },
   [Tool.wiki]: {
     key: getReadWikiQueryKey,
     read: readWiki,
@@ -157,12 +152,13 @@ const CHILD_RESOLVERS: Partial<Record<keyof typeof PARENT_TOOL, Resolve>> = {
       item.queue_id
     );
   },
-  library_item: async (read, communityId, id) => {
-    const item = await read(getReadLibraryItemQueryKey(communityId, id), () =>
-      readLibraryItem(communityId, id)
+  // In the initiative's Files rather than in one file, so it names its
+  // initiative itself.
+  collection: async (read, communityId, id) => {
+    const collection = await read(getReadCollectionQueryKey(communityId, id), () =>
+      readCollection(communityId, id)
     );
-    const initiativeId = await toolInitiative(read, communityId, Tool.library, item.library_id);
-    return libraryItemRoute(initiativeId, item.library_id, id);
+    return collectionRoute(collection.initiative_id, id);
   },
   wiki_page: async (read, communityId, id) => {
     const page = await read(getReadWikiPageQueryKey(communityId, id), () =>

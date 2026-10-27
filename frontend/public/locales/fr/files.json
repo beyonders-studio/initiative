@@ -10,6 +10,8 @@
   "columns": {
     "owner": "Propriétaire",
     "type": "Type",
+    "created": "Créé",
+    "added": "Ajouté",
     "community": "Communauté",
     "initiative": "Initiative",
     "ownerFallback": "Utilisateur {{id}}"
@@ -382,5 +384,68 @@
       "link": "Lien",
       "other": "Autre"
     }
+  },
+  "collections": {
+    "heading": "Collections",
+    "fileCount_one": "{{count}} fichier",
+    "fileCount_other": "{{count}} fichiers",
+    "addTo": "Ajouter à une collection",
+    "addToDescription_one": "Placez ce fichier dans une collection. Il reste dans Fichiers, et qui peut l’ouvrir ne change pas.",
+    "addToDescription_other": "Placez ces {{count}} fichiers dans une collection. Ils restent dans Fichiers, et qui peut les ouvrir ne change pas.",
+    "noneToAddTo": "Aucune collection à laquelle ajouter pour l’instant. Nommez-en une nouvelle ci-dessous.",
+    "namePlaceholder": "Nom de la nouvelle collection",
+    "addToNew": "Ajouter à une nouvelle collection",
+    "added_one": "Ajouté à {{name}}",
+    "added_other": "{{count}} fichiers ajoutés à {{name}}",
+    "created": "{{name}} créée",
+    "addFiles": "Ajouter des fichiers",
+    "pickFile": "Quel fichier ?",
+    "noFilesToAdd": "Aucun fichier à ajouter",
+    "fileAdded": "Fichier ajouté à la collection",
+    "uploadFiles": "Envoyer des fichiers",
+    "dropPrompt": "Déposez des fichiers pour les envoyer dans cette collection",
+    "removeFrom": "Retirer de la collection",
+    "removed_one": "{{count}} fichier retiré de la collection",
+    "removed_other": "{{count}} fichiers retirés de la collection",
+    "emptied": "Son dernier fichier en est sorti, la collection est donc passée à la corbeille",
+    "trash": "Mettre à la corbeille",
+    "trashTitle": "Mettre cette collection à la corbeille ?",
+    "trashDescription": "Ses fichiers restent où ils sont. Elle peut être restaurée depuis la corbeille avant la fin de la période de conservation.",
+    "trashed": "Collection mise à la corbeille",
+    "noFiles": "Aucun fichier dans cette collection pour l’instant",
+    "noFilesDescription": "Ajoutez des fichiers de cette initiative, ou déposez des fichiers n’importe où sur cette page pour les envoyer.",
+    "loadingFiles": "Chargement des fichiers...",
+    "openFile": "Ouvrir le fichier",
+    "filter": "Collection",
+    "anyCollection": "Toutes les collections",
+    "groupByTag": "Grouper par étiquette",
+    "order": "Ordre",
+    "newestFirst": "Plus récents d’abord",
+    "oldestFirst": "Plus anciens d’abord",
+    "views": {
+      "label": "Vue",
+      "masonry": "Mosaïque",
+      "timeline": "Chronologie"
+    },
+    "groups": {
+      "untagged": "Sans étiquette",
+      "count_one": "{{count}} fichier",
+      "count_other": "{{count}} fichiers"
+    },
+    "upload": {
+      "progress": "Envoi de {{done}} sur {{total}}...",
+      "finished_one": "{{count}} fichier ajouté",
+      "finished_other": "{{count}} fichiers ajoutés",
+      "finishedWithFailures": "{{done}} ajoutés, {{failed}} en échec",
+      "dismiss": "Fermer",
+      "tooLarge": "plus volumineux que ce que ce serveur accepte"
+    },
+    "layoutsDescription": "Les listes que cette collection affiche, et celle sur laquelle elle s’ouvre. Chacun choisit parmi celles affichées.",
+    "backToFiles": "Retour aux fichiers",
+    "notFound": "Collection introuvable",
+    "notFoundDescription": "La collection que vous cherchez n’existe pas, ou aucun de ses fichiers ne vous est accessible.",
+    "noAccess": "Accès refusé",
+    "noAccessDescription": "Vous n’avez pas la permission de voir cette collection.",
+    "error": "Impossible de modifier la collection"
   }
 }

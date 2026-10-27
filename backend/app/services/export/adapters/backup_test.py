@@ -35,7 +35,6 @@ def test_report_formats_a_section_offers_are_accepted(formats):
         # Tools with no report shape are left out of reports entirely.
         {"post": "json"},
         {"wiki": "pdf"},
-        {"library": "json"},
         # A file's choices are per type, and only for the two with any.
         {"file": "pdf"},
         {"file": {"excalidraw": "json"}},

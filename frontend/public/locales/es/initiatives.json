@@ -98,7 +98,6 @@
     "dashboards": "Paneles",
     "counterGroups": "Contadores",
     "posts": "Publicaciones",
-    "libraries": "Bibliotecas",
     "wikis": "Wikis"
   },
   "settings": {
@@ -227,7 +226,6 @@
       "dashboards": "Paneles",
       "counterGroups": "Contadores",
       "posts": "Publicaciones",
-      "libraries": "Bibliotecas",
       "wikis": "Wikis"
     },
     "permissions": {
@@ -245,8 +243,6 @@
       "createCounterGroups": "Crear contadores",
       "viewPosts": "Ver publicaciones",
       "createPosts": "Crear publicaciones",
-      "viewLibraries": "Ver bibliotecas",
-      "createLibraries": "Crear bibliotecas",
       "viewShort": "Ver",
       "createShort": "Crear",
       "viewWikis": "Ver wikis",
@@ -294,8 +290,6 @@
   "counterGroupsFeatureDescription": "Números que se mueven. Recuentos, totales, puntuaciones, plazas libres, puntos de vida: un número en el que todos en la sala coinciden.",
   "postsFeature": "Publicaciones",
   "postsFeatureDescription": "Un tablón de anuncios. Avisos, encuestas, quién los ha leído — con el importante fijado arriba, para que no se lo pierdan cuatro personas.",
-  "librariesFeature": "Bibliotecas",
-  "librariesFeatureDescription": "Una pared de imágenes. Maquetas, capturas, los cuatro logos que perdieron.",
   "projectsFeature": "Proyectos",
   "projectsFeatureDescription": "Tableros de pendientes: quién lo lleva, en qué fase está, qué falta. Míralos como tabla, tablero Kanban o calendario: las mismas tareas, tú eliges.",
   "filesFeature": "Archivos",

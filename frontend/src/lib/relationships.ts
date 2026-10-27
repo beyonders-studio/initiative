@@ -168,13 +168,13 @@ export const ASSERTABLE_GROUPS: RelationGroup[] = RELATION_GROUP_ORDER.map(
 /**
  * The kinds that are a thing you attach rather than a thing you depend on.
  *
- * A file or a picture is almost always evidence about the work rather than
- * a step in it, so a link touching one reads as "attached" unless somebody says
- * otherwise.
+ * A file, or a collection of them, is almost always evidence about the work
+ * rather than a step in it, so a link touching one reads as "attached" unless
+ * somebody says otherwise.
  */
 const FILE_LIKE: ReadonlySet<SearchEntityType> = new Set([
   SearchEntityTypeValues.file,
-  SearchEntityTypeValues.library_item,
+  SearchEntityTypeValues.collection,
 ]);
 
 /**
@@ -294,8 +294,8 @@ export const groupEdges = <T extends Pick<RelationshipRead, "relationship_type" 
  * A far end as the search helpers take it.
  *
  * `hitIcon` and `searchHitPath` already know how every kind is drawn and
- * addressed — including that a task is reached through its project and a picture
- * through its library. An edge's far end carries the same five facts under its
+ * addressed — including that a task is reached through its project and a page
+ * through its wiki. An edge's far end carries the same five facts under its
  * own names, so it is adapted rather than having that knowledge restated here.
  */
 export const relatedTarget = (end: RelatedEnd): SearchTarget => ({

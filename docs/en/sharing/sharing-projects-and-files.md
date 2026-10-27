@@ -40,7 +40,7 @@ Open the **Access** tab in a project's or file's settings whenever you like — 
 
 Every settings tab has its own web address too, so you can send somebody a link straight to a tool's sharing options instead of describing which three things to click.
 
-You can also **change access on several things at once**. In a list of files, projects, queues, counters, dashboards, libraries or wikis, open **More actions**, choose **Select items**, pick what you want, then **Edit access**. Handy when a new teammate joins a batch of work, and handier when somebody leaves. Archived things keep their sharing as it is, so a selection with one in it says so.
+You can also **change access on several things at once**. In a list of files, projects, queues, counters, dashboards or wikis, open **More actions**, choose **Select items**, pick what you want, then **Edit access**. Handy when a new teammate joins a batch of work, and handier when somebody leaves. Archived things keep their sharing as it is, so a selection with one in it says so.
 
 You don't have to click each card individually, either. Click the first, hold ++shift++, click the last, and everything between comes with it. Shift-clicking away from a card you just unticked clears that run the same way. (++shift+enter++ or ++shift+space++ does it from the keyboard.)
 

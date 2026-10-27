@@ -1,11 +1,11 @@
-"""A file kept as numbered versions: an uploaded file's, a library picture's.
+"""An uploaded file kept as numbered versions.
 
-The parent row names the version it shows (``current_version_id``) and the
-version rows are its history. Both tools take the same steps through here:
-number a new version and make it current, copy one for a duplicate, delete
-one and point back at the newest left, and take back the stored files a
-failed or finished write leaves behind. Every version a row is given has a
-type its tool accepts, since that type decides how the file is shown.
+The file names the version it shows (``current_version_id``) and the version
+rows are its history. Every step on them goes through here: number a new
+version and make it current, copy one for a duplicate, delete one and point
+back at the newest left, and take back the stored files a failed or finished
+write leaves behind. Every version a file is given has a type a file may be,
+since that type decides how the file is shown.
 
 A parent's versions are read off its ``versions`` relationship, so the steps
 work for any model that keeps one.
@@ -52,39 +52,26 @@ def _history(parent: Any) -> tuple[type, Column]:
 
 
 def _stored(version: Any) -> list[str | None]:
-    """The stored files a version names: its file, and a picture's thumbnail."""
-    return [version.file_url, getattr(version, "thumbnail_url", None)]
+    """The stored files a version names: its file, and its thumbnail."""
+    return [version.file_url, version.thumbnail_url]
 
 
-def _may_hold(model: type, content_type: str | None) -> bool:
-    """Whether a ``model`` row's file may be of ``content_type``: what an
-    upload of one accepts. A library item holds a picture; a file holds
-    anything but a program."""
-    from app.models.tenant.library import LibraryItem
-    from app.services.tenant.libraries import PICTURE_EXTENSIONS
-
-    if model is LibraryItem:
-        return content_type in PICTURE_EXTENSIONS
+def _may_hold(content_type: str | None) -> bool:
+    """Whether a file may be of ``content_type``: anything but a program."""
     return content_type is not None and not is_refused(content_type, None)
 
 
-def file_type(model: type, data: bytes, *, filename: str | None) -> str | None:
-    """The type ``data`` takes as a ``model`` row's file, read from its bytes
-    by the rule an upload of one follows (``filename`` narrows it), or
-    ``None`` where it is not a file the row may hold."""
-    from app.models.tenant.library import LibraryItem
-    from app.services.tenant import libraries
-
+def file_type(data: bytes, *, filename: str | None) -> str | None:
+    """The type ``data`` takes as a file, read from its bytes by the rule an
+    upload of one follows (``filename`` narrows it), or ``None`` where it is
+    not a file one may hold."""
     try:
-        if model is LibraryItem:
-            return libraries.validate_image(data)[0].content_type
         return attachments_service.validate_file(data, filename)[0]
     except ValueError:
         return None
 
 
 async def stored_file_type(
-    model: type,
     guild_id: int,
     key: str,
     *,
@@ -97,7 +84,7 @@ async def stored_file_type(
     data = await asyncio.to_thread(read_payload, guild_id, key)
     if data is None:
         return None
-    return file_type(model, data, filename=filename)
+    return file_type(data, filename=filename)
 
 
 def _make_current(parent: Any, version: Any) -> None:
@@ -118,7 +105,7 @@ def _new_version(session: AsyncSession, parent: Any, fields: dict[str, Any]) -> 
     from app.models.tenant.file import File
 
     content_type = fields.get("file_content_type")
-    if not _may_hold(type(parent), content_type):
+    if not _may_hold(content_type):
         raise ValueError(f"Unsupported file type: {content_type}")
     if (
         isinstance(parent, File)

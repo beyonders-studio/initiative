@@ -58,11 +58,22 @@ export interface ToolChestTemplate {
   onChange: (isTemplate: boolean) => Promise<unknown>;
 }
 
+/** A kind inside a tool that keeps its own status, tags and properties (a
+ *  collection, in Files): what it is archived as, and how its properties and
+ *  tags are saved. */
+export interface ToolChestKind {
+  archivable: ArchivableType;
+  properties: (typeof propertySaves)[PropertyTarget];
+  saveTags: (tagIds: number[]) => Promise<unknown>;
+}
+
 export interface ToolChestProps {
   tool: Tool;
   entity: ToolChestEntity;
   /** Adds Template to the status, for a tool that can be one. */
   template?: ToolChestTemplate;
+  /** The page is of a kind inside the tool rather than of the tool itself. */
+  kind?: ToolChestKind;
   /** What only this tool has: its own data and buttons, as `ToolChestSegment`s. */
   children?: ReactNode;
 }
@@ -82,7 +93,7 @@ export const ToolChestSegment = ({
   </div>
 );
 
-export const ToolChest = ({ tool, entity, template, children }: ToolChestProps) => {
+export const ToolChest = ({ tool, entity, template, kind, children }: ToolChestProps) => {
   const { t } = useTranslation(["common", "properties"]);
   const gp = useCommunityPath();
   const [propertiesOpen, setPropertiesOpen] = useState(false);
@@ -107,7 +118,11 @@ export const ToolChest = ({ tool, entity, template, children }: ToolChestProps) 
             )}
           >
             <ToolChestSegment label={t("toolChest.status")}>
-              <ToolStatus tool={tool} entity={entity} template={template} />
+              <ToolStatus
+                archivable={kind?.archivable ?? (tool as ArchivableType)}
+                entity={entity}
+                template={template}
+              />
             </ToolChestSegment>
             {children}
             <ToolChestSegment label={t("toolSettings.tags")}>
@@ -119,10 +134,11 @@ export const ToolChest = ({ tool, entity, template, children }: ToolChestProps) 
                     // Saved on pick, and put back if the write fails.
                     const previous = tags;
                     setTags(next);
-                    setToolTags.mutate(
-                      { id: entity.id, tagIds: next.map((tag) => tag.id) },
-                      { onError: () => setTags(previous) }
-                    );
+                    const tagIds = next.map((tag) => tag.id);
+                    (kind
+                      ? kind.saveTags(tagIds)
+                      : setToolTags.mutateAsync({ id: entity.id, tagIds })
+                    ).catch(() => setTags(previous));
                   }}
                 />
               ) : tags.length > 0 ? (
@@ -165,12 +181,12 @@ export const ToolChest = ({ tool, entity, template, children }: ToolChestProps) 
       {hasProperties && propertiesOpen ? (
         <div className="border-t py-3 pr-[var(--chest-gutter-right,1rem)] pl-[var(--chest-gutter,1rem)]">
           <PropertiesField
-            kind={propertySaves[PropertyTarget[tool]]}
+            kind={kind?.properties ?? propertySaves[PropertyTarget[tool]]}
             id={entity.id}
             properties={entity.properties ?? []}
             readOnly={!canEdit}
             initiativeId={entity.initiative_id as number}
-            canOpen={{ tool, id: entity.id }}
+            canOpen={kind ? undefined : { tool, id: entity.id }}
             hideLabel
           />
         </div>
@@ -202,11 +218,11 @@ const StatusLabel = ({ status }: { status: Status }) => {
  *  ordinary edit, and the way back out is its own permission. An archived
  *  template stays a template, so it reads as archived until it comes back. */
 const ToolStatus = ({
-  tool,
+  archivable,
   entity,
   template,
 }: {
-  tool: Tool;
+  archivable: ArchivableType;
   entity: ToolChestEntity;
   template?: ToolChestTemplate;
 }) => {
@@ -226,7 +242,7 @@ const ToolStatus = ({
 
   const change = async (next: Status) => {
     if (next === status) return;
-    const target = { entityType: tool as ArchivableType, entityId: entity.id };
+    const target = { entityType: archivable, entityId: entity.id };
     setChanging(true);
     try {
       if (next === "archived") {

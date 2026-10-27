@@ -22,14 +22,14 @@ from app.db.session import set_rls_context
 from app.models.platform.guild import CommunityRole
 from app.models.tenant.comment import Comment
 from app.models.tenant.content_hold import ContentHold
-from app.models.tenant.library import LibraryItem
+from app.models.tenant.collection import Collection
 from app.models.tenant.intake import IntakeCase
 from app.models.tenant.task import Task
 from app.services.platform import holds as holds_service
 from app.testing import (
     create_comment,
-    create_library,
-    create_library_item,
+    create_collection,
+    create_file,
     create_user,
 )
 from app.testing.factories import create_access_grant, get_auth_headers
@@ -374,18 +374,18 @@ async def _release(client, moderator, guild, hold_id: int, outcome: str):
     )
 
 
-async def test_a_picture_and_its_library_can_be_held(
-    client, session, scene, operations
-):
+async def test_a_collection_can_be_held(client, session, scene, operations):
     owner = scene["mod"]
-    library = await create_library(session, scene["initiative"], owner.user)
-    image = await create_library_item(session, library, owner.user)
+    file = await create_file(session, scene["initiative"], owner.user)
+    collection = await create_collection(
+        session, scene["initiative"], owner.user, files=[file]
+    )
     await set_rls_context(session, Unattributed())
     moderator = await _moderator(session, scene["guild"])
-    await _platform_hold(client, moderator, scene["guild"], "library", library.id)
+    await _platform_hold(client, moderator, scene["guild"], "collection", collection.id)
     await _system(session, scene["guild"].id)
     held = (
-        await session.exec(select(LibraryItem).where(LibraryItem.id == image.id))
+        await session.exec(select(Collection).where(Collection.id == collection.id))
     ).one()
     assert held.held_at is not None
 

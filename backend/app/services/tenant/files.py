@@ -13,10 +13,11 @@ from app.core.search import SearchEntityType
 from app.core.file_types import FileType, is_stored
 from app.models.tenant.file import File
 from app.models.tenant.resource_grant import ResourceGrant
-from app.core.references import unresolve_wikilinks_to
+from app.core.references import unlink_references
 from app.core.messages import FileMessages
 from app.services.tenant import attachments as attachments_service
 from app.services.tenant import body_states
+from app.services.tenant import collections as collections_service
 from app.services.tenant import comments as comments_service
 from app.services.tenant import content_references
 from app.services.tenant import file_versions
@@ -138,7 +139,7 @@ async def get_file_hydrated(
 ) -> File | None:
     """Load a file with everything a serialized ``FileRead`` or an
     export reads: the list loader's eager loads and the body, plus the tags,
-    comment count and owning plug-in a response carries.
+    comment count, owning plug-in and collections a response carries.
     :func:`get_file_for_grants` carries the list loads alone, which is what
     the access decision needs. Uniform ``(session, id)`` shape, the one ``resource_access``
     registers a loader by.
@@ -160,6 +161,8 @@ async def get_file_hydrated(
             session, [file], column="file_id"
         )
         await ownership_service.annotate_owner_plugins(session, [file])
+        held = await collections_service.collection_ids_of(session, [file.id])
+        object.__setattr__(file, "collection_ids", held.get(file.id, []))
     return file
 
 
@@ -212,21 +215,19 @@ async def copy_contents(
     return []
 
 
-async def unresolve_wikilinks_to_file(
+async def unlink_references_to_file(
     session: AsyncSession,
     *,
     deleted_file_id: int,
 ) -> None:
-    """Blank every ``[[ ]]`` pointing at a file that is being hard-purged.
-
-    The link nodes stay and render as unresolved, which is what the editor shows
-    for a link whose target was never picked. Their ``references`` edges go with
-    the file itself, through the purge path's own sweep.
+    """Make every reference to a file that is being hard-purged, in the files
+    that point at it, the words it was written with. Their ``references``
+    edges go with the file itself, through the purge path's own sweep.
 
     Called by ``hard_purge_entity`` before the DELETEs are issued, while the
     edges naming the file are still there to find the files that carry
-    those links. Trashed ones are included — a file restored after the purge
-    must not come back with a dangling link.
+    those references. Trashed ones are included — a file restored after the
+    purge must not come back with a dangling link.
     """
 
     linking_files = await content_references.referencing_files(session, deleted_file_id)
@@ -238,7 +239,9 @@ async def unresolve_wikilinks_to_file(
     for doc in linking_files:
         if doc.content and isinstance(doc.content, dict):
             updated_content = deepcopy(doc.content)
-            if unresolve_wikilinks_to(updated_content, deleted_file_id):
+            if unlink_references(
+                updated_content, SearchEntityType.file, deleted_file_id
+            ):
                 doc.content = updated_content
                 # A session opens on the Yjs state, so the repair is written
                 # into it too.
@@ -254,7 +257,7 @@ async def unresolve_wikilinks_to_file(
 
     # Invalidate any in-memory collaboration rooms for affected files
     # This prevents a room's save from overwriting our changes when users disconnect
-    # Note: If a room has active collaborators, they'll have stale wikilinks until reload
+    # Note: If a room has active collaborators, they'll have stale references until reload
     # Rooms are keyed by (guild, file), and the files above were read
     # through this session, so the guild it is routed to is theirs. An unrouted
     # session reaches no guild schema and so has no room to invalidate.

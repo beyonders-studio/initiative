@@ -59,8 +59,6 @@ _WRITE_EXCEPTIONS = {
     # Evidence: sealed under a key of its own and reached only through its
     # own row, never through the upload route.
     "app/services/platform/evidence.py::store",
-    # Test data.
-    "app/testing/factories.py::create_library_item",
 }
 
 

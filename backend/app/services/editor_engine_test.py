@@ -152,21 +152,15 @@ async def test_a_document_with_no_content_starts_with_an_empty_paragraph():
 
 
 async def test_legacy_nodes_come_back_as_the_browser_shows_them():
-    wikilink = {
-        **_text("A page nobody wrote"),
-        "type": "wikilink",
-        "documentId": None,
-        "documentTitle": "A page nobody wrote",
-    }
     hashtag = {**_text("#idea"), "type": "hashtag"}
 
     rendered = await editor_engine.render(
-        await editor_engine.bootstrap(_document(_paragraph(wikilink, hashtag)))
+        await editor_engine.bootstrap(_document(_paragraph(_text("An "), hashtag)))
     )
 
     (paragraph,) = rendered["root"]["children"]
     assert [node["type"] for node in paragraph["children"]] == ["text"]
-    assert paragraph["children"][0]["text"] == "A page nobody wrote#idea"
+    assert paragraph["children"][0]["text"] == "An #idea"
 
 
 def _merged(*updates: bytes) -> bytes:

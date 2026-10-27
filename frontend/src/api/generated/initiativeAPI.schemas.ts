@@ -450,13 +450,12 @@ export type SearchEntityType = (typeof SearchEntityType)[keyof typeof SearchEnti
 export const SearchEntityType = {
   calendar: "calendar",
   calendar_event: "calendar_event",
+  collection: "collection",
   comment: "comment",
   counter: "counter",
   counter_group: "counter_group",
   dashboard: "dashboard",
   file: "file",
-  library: "library",
-  library_item: "library_item",
   post: "post",
   project: "project",
   queue: "queue",
@@ -477,7 +476,6 @@ export const Tool = {
   calendar: "calendar",
   dashboard: "dashboard",
   post: "post",
-  library: "library",
   wiki: "wiki",
 } as const;
 
@@ -822,10 +820,10 @@ export const ArchivableType = {
   calendar: "calendar",
   dashboard: "dashboard",
   post: "post",
-  library: "library",
   wiki: "wiki",
   task: "task",
   initiative: "initiative",
+  collection: "collection",
 } as const;
 
 export interface ArchiveDoneResponse {
@@ -1189,7 +1187,6 @@ export const ListingKind = {
   dashboard: "dashboard",
   file: "file",
   home_layout: "home_layout",
-  library: "library",
   plugin: "plugin",
   post: "post",
   profile_pack: "profile_pack",
@@ -1240,18 +1237,6 @@ export interface BodyUploadFile {
 export interface BodyUploadFileVersion {
   file?: Blob | File | null;
   upload_id?: string | null;
-}
-
-export interface BodyUploadLibraryItem {
-  file: Blob | File;
-  title?: string | null;
-  description?: string | null;
-  /** The day the item is about. Defaults to today, in UTC. */
-  occurred_on?: string | null;
-}
-
-export interface BodyUploadLibraryItemVersion {
-  file: Blob | File;
 }
 
 export interface BodyUploadListingPicture {
@@ -2392,6 +2377,208 @@ export interface CollaborationHandover {
 }
 
 /**
+ * What the caller may do to a collection
+ * (``resource_access.may_change``).
+ */
+export interface CollectionCan {
+  edit: boolean;
+  unarchive: boolean;
+}
+
+export type FileType = (typeof FileType)[keyof typeof FileType];
+
+export const FileType = {
+  lexical: "lexical",
+  excalidraw: "excalidraw",
+  sheet: "sheet",
+  url: "url",
+  pdf: "pdf",
+  doc: "doc",
+  docx: "docx",
+  odt: "odt",
+  rtf: "rtf",
+  md: "md",
+  xls: "xls",
+  xlsx: "xlsx",
+  ods: "ods",
+  csv: "csv",
+  tsv: "tsv",
+  ppt: "ppt",
+  pptx: "pptx",
+  odp: "odp",
+  png: "png",
+  jpeg: "jpeg",
+  gif: "gif",
+  webp: "webp",
+  svg: "svg",
+  heic: "heic",
+  tiff: "tiff",
+  mp4: "mp4",
+  webm: "webm",
+  mov: "mov",
+  mp3: "mp3",
+  m4a: "m4a",
+  wav: "wav",
+  ogg: "ogg",
+  flac: "flac",
+  txt: "txt",
+  json: "json",
+  html: "html",
+  zip: "zip",
+  tar: "tar",
+  gz: "gz",
+  "7z": "7z",
+  other: "other",
+} as const;
+
+/**
+ * The file a card shows for a collection.
+ */
+export interface CollectionCover {
+  file_id: number;
+  name: string;
+  file_type: FileType;
+  file_url: string | null;
+  file_content_type: string | null;
+  thumbnail_url: string | null;
+  width: number | null;
+  height: number | null;
+}
+
+/**
+ * A new collection, made with the files it starts with: a collection is
+ * never empty.
+ */
+export interface CollectionCreate {
+  properties?: PropertyValueInput[];
+  /**
+   * @minItems 1
+   * @maxItems 500
+   */
+  file_ids: number[];
+  initiative_id: number;
+  /**
+   * @minLength 1
+   * @maxLength 255
+   */
+  name: string;
+  description?: string | null;
+  tag_ids?: number[] | null;
+}
+
+export type FileKind = (typeof FileKind)[keyof typeof FileKind];
+
+export const FileKind = {
+  document: "document",
+  spreadsheet: "spreadsheet",
+  presentation: "presentation",
+  whiteboard: "whiteboard",
+  pdf: "pdf",
+  image: "image",
+  video: "video",
+  audio: "audio",
+  text: "text",
+  archive: "archive",
+  link: "link",
+  other: "other",
+} as const;
+
+/**
+ * A file as its collection lists it: with when it was added there.
+ */
+export interface CollectionFileSummary {
+  archived_at: string | null;
+  can: ToolCan;
+  id: number;
+  initiative_id: number;
+  community_id: number;
+  created_by: number | null;
+  created_at: string;
+  updated_at: string;
+  comments_enabled: boolean;
+  tags: TagSummary[];
+  properties: PropertySummary[];
+  grants: ResourceGrantSchema[];
+  name: string;
+  featured_image_url: string | null;
+  is_template: boolean;
+  initiative: InitiativeSummary | null;
+  owner: UserPublic | null;
+  owner_plugin: OwnerPluginSummary | null;
+  comment_count: number;
+  file_type: FileType;
+  file_url: string | null;
+  file_content_type: string | null;
+  file_size: number | null;
+  original_filename: string | null;
+  thumbnail_url: string | null;
+  width: number | null;
+  height: number | null;
+  smart_link_url: string | null;
+  added_at: string;
+  /** How the file is shown, which follows from its type. */
+  readonly kind: FileKind;
+}
+
+export interface CollectionFileListResponse {
+  total_count: number;
+  page: number;
+  page_size: number;
+  has_next: boolean;
+  has_prev: boolean;
+  items: CollectionFileSummary[];
+}
+
+/**
+ * Files to put in a collection or take out of it.
+ */
+export interface CollectionFiles {
+  /**
+   * @minItems 1
+   * @maxItems 500
+   */
+  file_ids: number[];
+}
+
+/**
+ * A collection as its reader sees it: only the files they can open are
+ * counted, and the cover is one of those.
+ */
+export interface CollectionRead {
+  id: number;
+  initiative_id: number;
+  community_id: number;
+  name: string;
+  description: string | null;
+  cover_file_id: number | null;
+  cover: CollectionCover | null;
+  file_count: number;
+  created_by: number | null;
+  created_at: string;
+  updated_at: string;
+  archived_at: string | null;
+  comments_enabled: boolean;
+  comments_locked_at: string | null;
+  comment_count: number;
+  tags: TagSummary[];
+  properties: PropertySummary[];
+  can: CollectionCan;
+}
+
+export interface CollectionListResponse {
+  items: CollectionRead[];
+}
+
+export interface CollectionUpdate {
+  properties?: PropertyValueInput[] | null;
+  name?: string | null;
+  description?: string | null;
+  cover_file_id?: number | null;
+  tag_ids?: number[] | null;
+  comments_enabled?: boolean | null;
+}
+
+/**
  * One limited column of a project's board: its limit, and how many open
  * tasks it holds.
  */
@@ -2435,6 +2622,7 @@ export interface CommentCreate {
   content: string;
   task_id?: number | null;
   wiki_page_id?: number | null;
+  collection_id?: number | null;
   project_id?: number | null;
   file_id?: number | null;
   queue_id?: number | null;
@@ -2442,7 +2630,6 @@ export interface CommentCreate {
   calendar_id?: number | null;
   dashboard_id?: number | null;
   post_id?: number | null;
-  library_id?: number | null;
   wiki_id?: number | null;
   parent_comment_id?: number | null;
   audience?: CommentAudience;
@@ -2495,6 +2682,7 @@ export interface CommentRead {
   content: string;
   task_id: number | null;
   wiki_page_id: number | null;
+  collection_id: number | null;
   project_id: number | null;
   file_id: number | null;
   queue_id: number | null;
@@ -2502,7 +2690,6 @@ export interface CommentRead {
   calendar_id: number | null;
   dashboard_id: number | null;
   post_id: number | null;
-  library_id: number | null;
   wiki_id: number | null;
   id: number;
   created_by: number | null;
@@ -4064,14 +4251,13 @@ export const ContentKind = {
   calendar: "calendar",
   dashboard: "dashboard",
   post: "post",
-  library: "library",
   wiki: "wiki",
   task: "task",
   queue_item: "queue_item",
   calendar_event: "calendar_event",
   counter: "counter",
-  library_item: "library_item",
   wiki_page: "wiki_page",
+  collection: "collection",
 } as const;
 
 /**
@@ -4589,9 +4775,7 @@ export const DatasetName = {
   calendars: "calendars",
   dashboards: "dashboards",
   posts: "posts",
-  libraries: "libraries",
-  library_items: "library_items",
-  library_item_versions: "library_item_versions",
+  collections: "collections",
   wikis: "wikis",
   wiki_pages: "wiki_pages",
 } as const;
@@ -4774,21 +4958,6 @@ export const QueueItemDetailFieldId = {
 } as const;
 
 /**
- * What a picture's detail edits as a field. The picture itself, where it
- * came from, its versions, what is linked to it and what can be done with it
- * are parts of their own.
- */
-export type LibraryItemDetailFieldId =
-  (typeof LibraryItemDetailFieldId)[keyof typeof LibraryItemDetailFieldId];
-
-export const LibraryItemDetailFieldId = {
-  title: "title",
-  description: "description",
-  date: "date",
-  tags: "tags",
-} as const;
-
-/**
  * What a notice's detail draws as a field. Its title, tags and properties
  * are its tool's, in its header; what it says, asks and answers, and when it
  * goes up, are parts of their own.
@@ -4804,7 +4973,6 @@ export interface DetailFieldProps {
     | TaskDetailFieldId
     | EventDetailFieldId
     | QueueItemDetailFieldId
-    | LibraryItemDetailFieldId
     | CounterDetailFieldId
     | PostDetailFieldId
     | string;
@@ -4832,9 +5000,6 @@ export const OwnPartType = {
   case: "case",
   comments: "comments",
   rsvp: "rsvp",
-  picture: "picture",
-  about: "about",
-  versions: "versions",
   count: "count",
   body: "body",
   schedule: "schedule",
@@ -4989,7 +5154,6 @@ export const DetailLayoutReadKind = {
   task: "task",
   calendar_event: "calendar_event",
   queue_item: "queue_item",
-  library_item: "library_item",
   counter: "counter",
   post: "post",
 } as const;
@@ -5012,7 +5176,6 @@ export const DetailLayoutWriteKind = {
   task: "task",
   calendar_event: "calendar_event",
   queue_item: "queue_item",
-  library_item: "library_item",
   counter: "counter",
   post: "post",
 } as const;
@@ -5547,14 +5710,13 @@ export const EntityType = {
   calendar: "calendar",
   dashboard: "dashboard",
   post: "post",
-  library: "library",
   wiki: "wiki",
   task: "task",
   queue_item: "queue_item",
   calendar_event: "calendar_event",
   counter: "counter",
-  library_item: "library_item",
   wiki_page: "wiki_page",
+  collection: "collection",
   comment: "comment",
   initiative: "initiative",
   tag: "tag",
@@ -5719,69 +5881,6 @@ export interface FileCreate {
   grants?: ResourceGrantSchema[];
 }
 
-export type FileKind = (typeof FileKind)[keyof typeof FileKind];
-
-export const FileKind = {
-  document: "document",
-  spreadsheet: "spreadsheet",
-  presentation: "presentation",
-  whiteboard: "whiteboard",
-  pdf: "pdf",
-  image: "image",
-  video: "video",
-  audio: "audio",
-  text: "text",
-  archive: "archive",
-  link: "link",
-  other: "other",
-} as const;
-
-export type FileType = (typeof FileType)[keyof typeof FileType];
-
-export const FileType = {
-  lexical: "lexical",
-  excalidraw: "excalidraw",
-  sheet: "sheet",
-  url: "url",
-  pdf: "pdf",
-  doc: "doc",
-  docx: "docx",
-  odt: "odt",
-  rtf: "rtf",
-  md: "md",
-  xls: "xls",
-  xlsx: "xlsx",
-  ods: "ods",
-  csv: "csv",
-  tsv: "tsv",
-  ppt: "ppt",
-  pptx: "pptx",
-  odp: "odp",
-  png: "png",
-  jpeg: "jpeg",
-  gif: "gif",
-  webp: "webp",
-  svg: "svg",
-  heic: "heic",
-  tiff: "tiff",
-  mp4: "mp4",
-  webm: "webm",
-  mov: "mov",
-  mp3: "mp3",
-  m4a: "m4a",
-  wav: "wav",
-  ogg: "ogg",
-  flac: "flac",
-  txt: "txt",
-  json: "json",
-  html: "html",
-  zip: "zip",
-  tar: "tar",
-  gz: "gz",
-  "7z": "7z",
-  other: "other",
-} as const;
-
 export interface FileSummary {
   archived_at: string | null;
   can: ToolCan;
@@ -5808,6 +5907,8 @@ export interface FileSummary {
   file_size: number | null;
   original_filename: string | null;
   thumbnail_url: string | null;
+  width: number | null;
+  height: number | null;
   smart_link_url: string | null;
   /** How the file is shown, which follows from its type. */
   readonly kind: FileKind;
@@ -5850,8 +5951,11 @@ export interface FileRead {
   file_size: number | null;
   original_filename: string | null;
   thumbnail_url: string | null;
+  width: number | null;
+  height: number | null;
   smart_link_url: string | null;
   content: FileReadContent;
+  collection_ids: number[];
   content_version: string | null;
   /** How the file is shown, which follows from its type. */
   readonly kind: FileKind;
@@ -5883,7 +5987,7 @@ export interface FileVersionRead {
   file_content_type: string | null;
   file_size: number | null;
   original_filename: string | null;
-  created_by: number;
+  created_by: number | null;
   created_at: string;
   is_current: boolean;
 }
@@ -6346,7 +6450,6 @@ export interface InitiativeCreate {
   calendars_enabled?: boolean;
   dashboards_enabled?: boolean;
   posts_enabled?: boolean;
-  libraries_enabled?: boolean;
   wikis_enabled?: boolean;
   name: string;
   description?: string | null;
@@ -6515,7 +6618,6 @@ export interface InitiativeRead {
   calendars_enabled: boolean;
   dashboards_enabled: boolean;
   posts_enabled: boolean;
-  libraries_enabled: boolean;
   wikis_enabled: boolean;
   name: string;
   description: string | null;
@@ -6550,8 +6652,6 @@ export const PermissionKey = {
   create_dashboards: "create_dashboards",
   posts_enabled: "posts_enabled",
   create_posts: "create_posts",
-  libraries_enabled: "libraries_enabled",
-  create_libraries: "create_libraries",
   wikis_enabled: "wikis_enabled",
   create_wikis: "create_wikis",
   dashboards_run_as_initiative: "dashboards_run_as_initiative",
@@ -6647,6 +6747,9 @@ export const ListLayoutReadKind = {
   board: "board",
   gantt: "gantt",
   calendar: "calendar",
+  masonry: "masonry",
+  grid: "grid",
+  timeline: "timeline",
 } as const;
 
 export type TaskColumnFieldId = (typeof TaskColumnFieldId)[keyof typeof TaskColumnFieldId];
@@ -6807,7 +6910,6 @@ export interface InitiativeUpdate {
   calendars_enabled?: boolean | null;
   dashboards_enabled?: boolean | null;
   posts_enabled?: boolean | null;
-  libraries_enabled?: boolean | null;
   wikis_enabled?: boolean | null;
   name?: string | null;
   description?: string | null;
@@ -6945,8 +7047,24 @@ export const ItemKind = {
   queue_item: "queue_item",
   calendar_event: "calendar_event",
   counter: "counter",
-  library_item: "library_item",
   post: "post",
+} as const;
+
+/**
+ * What a set of layouts is for.
+ */
+export type LayoutTarget = (typeof LayoutTarget)[keyof typeof LayoutTarget];
+
+export const LayoutTarget = {
+  project: "project",
+  file: "file",
+  queue: "queue",
+  counter_group: "counter_group",
+  calendar: "calendar",
+  dashboard: "dashboard",
+  post: "post",
+  wiki: "wiki",
+  collection: "collection",
 } as const;
 
 /**
@@ -6980,174 +7098,6 @@ export interface LegalDocumentRead {
 export interface LegalIndexRead {
   documents: LegalDocumentRead[];
   required: string[];
-}
-
-/**
- * What a list draws for a library: one picture, at whichever size it has.
- */
-export interface LibraryCover {
-  item_id: number;
-  file_url: string;
-  thumbnail_url: string | null;
-  width: number | null;
-  height: number | null;
-}
-
-export interface LibraryCreate {
-  properties?: PropertyValueInput[];
-  /**
-   * @minLength 1
-   * @maxLength 255
-   */
-  name: string;
-  description?: string | null;
-  initiative_id: number;
-  tag_ids?: number[] | null;
-  grants?: ResourceGrantSchema[];
-}
-
-/**
- * The pictures to send to the trash together — a selection on the wall.
- */
-export interface LibraryItemBulkDelete {
-  /**
-   * @minItems 1
-   * @maxItems 500
-   */
-  item_ids: number[];
-}
-
-export interface LibraryItemBulkDeleteResponse {
-  deleted_count: number;
-}
-
-export interface LibraryItemRead {
-  id: number;
-  library_id: number;
-  community_id: number;
-  title: string | null;
-  description: string | null;
-  occurred_on: string;
-  file_url: string;
-  thumbnail_url: string | null;
-  file_content_type: string | null;
-  file_size: number | null;
-  original_filename: string | null;
-  width: number | null;
-  height: number | null;
-  created_by: number | null;
-  uploader: CommentAuthor | null;
-  created_at: string;
-  updated_at: string;
-  version_count: number;
-  tags: TagSummary[];
-  properties: PropertySummary[];
-  plugin_values: PluginValueSummary[];
-}
-
-export interface LibraryItemListResponse {
-  total_count: number;
-  page: number;
-  page_size: number;
-  has_next: boolean;
-  has_prev: boolean;
-  items: LibraryItemRead[];
-}
-
-export interface LibraryItemUpdate {
-  properties?: PropertyValueInput[] | null;
-  title?: string | null;
-  description?: string | null;
-  occurred_on?: string | null;
-  tag_ids?: number[] | null;
-  description_base?: string | null;
-}
-
-/**
- * One stored rendition of a picture.
- */
-export interface LibraryItemVersionRead {
-  id: number;
-  version_number: number;
-  file_url: string;
-  thumbnail_url: string | null;
-  file_content_type: string | null;
-  file_size: number | null;
-  original_filename: string | null;
-  width: number | null;
-  height: number | null;
-  created_by: number | null;
-  created_at: string;
-  is_current: boolean;
-}
-
-export interface LibrarySummary {
-  archived_at: string | null;
-  can: ToolCan;
-  id: number;
-  initiative_id: number;
-  community_id: number;
-  created_by: number | null;
-  created_at: string;
-  updated_at: string;
-  comments_enabled: boolean;
-  tags: TagSummary[];
-  properties: PropertySummary[];
-  grants: ResourceGrantSchema[];
-  /**
-   * @minLength 1
-   * @maxLength 255
-   */
-  name: string;
-  description: string | null;
-  cover_item_id: number | null;
-  cover: LibraryCover | null;
-  preview: LibraryCover[];
-  comment_count: number;
-}
-
-export interface LibraryListResponse {
-  total_count: number;
-  page: number;
-  page_size: number;
-  has_next: boolean;
-  has_prev: boolean;
-  items: LibrarySummary[];
-}
-
-/**
- * A library on its own page. The same shape as its summary: the pictures
- * are paged separately, because a library is browsed rather than read.
- */
-export interface LibraryRead {
-  archived_at: string | null;
-  can: ToolCan;
-  id: number;
-  initiative_id: number;
-  community_id: number;
-  created_by: number | null;
-  created_at: string;
-  updated_at: string;
-  comments_enabled: boolean;
-  tags: TagSummary[];
-  properties: PropertySummary[];
-  grants: ResourceGrantSchema[];
-  /**
-   * @minLength 1
-   * @maxLength 255
-   */
-  name: string;
-  description: string | null;
-  cover_item_id: number | null;
-  cover: LibraryCover | null;
-  preview: LibraryCover[];
-  comment_count: number;
-}
-
-export interface LibraryUpdate {
-  name?: string | null;
-  description?: string | null;
-  cover_item_id?: number | null;
 }
 
 /**
@@ -7189,6 +7139,9 @@ export const ListLayoutWriteKind = {
   board: "board",
   gantt: "gantt",
   calendar: "calendar",
+  masonry: "masonry",
+  grid: "grid",
+  timeline: "timeline",
 } as const;
 
 export interface ListLayoutWrite {
@@ -9474,14 +9427,13 @@ export const PropertyTarget = {
   calendar: "calendar",
   dashboard: "dashboard",
   post: "post",
-  library: "library",
   wiki: "wiki",
   task: "task",
   queue_item: "queue_item",
   calendar_event: "calendar_event",
   counter: "counter",
-  library_item: "library_item",
   wiki_page: "wiki_page",
+  collection: "collection",
 } as const;
 
 /**
@@ -10509,13 +10461,12 @@ export const TagTarget = {
   calendar: "calendar",
   dashboard: "dashboard",
   post: "post",
-  library: "library",
   wiki: "wiki",
   task: "task",
   queue_item: "queue_item",
   calendar_event: "calendar_event",
-  library_item: "library_item",
   wiki_page: "wiki_page",
+  collection: "collection",
 } as const;
 
 /**
@@ -11007,6 +10958,9 @@ export const ToolLayoutDefaultWriteKind = {
   board: "board",
   gantt: "gantt",
   calendar: "calendar",
+  masonry: "masonry",
+  grid: "grid",
+  timeline: "timeline",
 } as const;
 
 /**
@@ -12466,6 +12420,10 @@ export type ListFilesParams = {
    */
   kind?: FileKind | null;
   /**
+   * Filter to the files in one collection
+   */
+  collection_id?: number | null;
+  /**
    * @minimum 1
    */
   page?: number;
@@ -12699,47 +12657,6 @@ export type ListPostsParams = {
   page_size?: number;
 };
 
-export type ListLibrariesParams = {
-  initiative_id?: number | null;
-  /**
-   * Full-text match over the library's name and description, through the same index the search page reads.
-   */
-  search?: string | null;
-  /**
-   * Order by one of: name, initiative, updated_at. Omit for newest first.
-   */
-  sort_by?: string | null;
-  /**
-   * asc (default) or desc.
-   */
-  sort_dir?: string | null;
-  /**
-   * Only libraries carrying any of these tags.
-   */
-  tag_ids?: number[] | null;
-  /**
-   * JSON-encoded list of property-value filters, e.g. `[{"property_id": 12, "op": "eq", "value": "live"}]`. Maximum 5 conditions per request.
-   */
-  property_filters?: string | null;
-  /**
-   * true lists what has been archived instead of what is live. Omit for the live list, which is what every other view shows.
-   */
-  archived?: boolean | null;
-  /**
-   * Also send what each row's card shows of what is inside it, read for the whole page at once.
-   */
-  include_preview?: boolean;
-  /**
-   * @minimum 1
-   */
-  page?: number;
-  /**
-   * @minimum 0
-   * @maximum 500
-   */
-  page_size?: number;
-};
-
 export type ListWikisParams = {
   initiative_id?: number | null;
   /**
@@ -12777,6 +12694,104 @@ export type ListWikisParams = {
   page_size?: number;
 };
 
+export type ListCollectionFilesParams = {
+  initiative_id?: number | null;
+  search?: string | null;
+  /**
+   * Filter by tag IDs
+   */
+  tag_ids?: number[] | null;
+  /**
+   * JSON-encoded list of property-value filters, e.g. `[{"property_id": 12, "op": "eq", "value": "live"}]`. Maximum 5 conditions per request.
+   */
+  property_filters?: string | null;
+  /**
+   * Filter to files with no tags
+   */
+  untagged?: boolean | null;
+  /**
+   * Only templates (true) or only files that are not templates (false). Omit for both.
+   */
+  is_template?: boolean | null;
+  /**
+   * Filter by file type
+   */
+  file_type?: FileType | null;
+  /**
+   * Filter by kind of file
+   */
+  kind?: FileKind | null;
+  /**
+   * @minimum 1
+   */
+  page?: number;
+  /**
+   * @minimum 0
+   * @maximum 100
+   */
+  page_size?: number;
+  /**
+   * Order by one of: name, initiative, updated_at, created_at, added_at (when each was added to the collection). Omit for added_at, newest first.
+   */
+  sort_by?: string | null;
+  /**
+   * asc (default) or desc.
+   */
+  sort_dir?: string | null;
+  /**
+   * true lists what has been archived instead of what is live. Omit for the live list, which is what every other view shows.
+   */
+  archived?: boolean | null;
+  /**
+   * Start the list at this instant, measured by when each file was added to the collection. Newest first it is a ceiling and the page walks back from it; oldest first (sort_by=added_at, sort_dir=asc) a floor and the page walks forward. This is how a timeline jumps to a month: pair it with the matching end of the month's bucket.
+   */
+  until?: string | null;
+};
+
+export type RemoveCollectionFilesParams = {
+  /**
+   * @minItems 1
+   * @maxItems 500
+   */
+  file_ids: number[];
+};
+
+export type GetCollectionFilesTimelineParams = {
+  search?: string | null;
+  /**
+   * Filter by tag IDs
+   */
+  tag_ids?: number[] | null;
+  /**
+   * JSON-encoded list of property-value filters, e.g. `[{"property_id": 12, "op": "eq", "value": "live"}]`. Maximum 5 conditions per request.
+   */
+  property_filters?: string | null;
+  /**
+   * Filter to files with no tags
+   */
+  untagged?: boolean | null;
+  /**
+   * Only templates (true) or only files that are not templates (false). Omit for both.
+   */
+  is_template?: boolean | null;
+  /**
+   * Filter by file type
+   */
+  file_type?: FileType | null;
+  /**
+   * Filter by kind of file
+   */
+  kind?: FileKind | null;
+  /**
+   * true lists what has been archived instead of what is live. Omit for the live list, which is what every other view shows.
+   */
+  archived?: boolean | null;
+  /**
+   * IANA zone the month boundaries are cut in, e.g. Pacific/Auckland. Defaults to UTC.
+   */
+  tz?: string | null;
+};
+
 export type ReadProjectParams = {
   /**
    * Also return the resource if it is in the trash. For reading a resource back after a deleted event — the row still exists until retention purges it, and access is checked exactly as for a live one.
@@ -12785,13 +12800,13 @@ export type ReadProjectParams = {
 };
 
 export type GetLayoutsParams = {
-  tool: Tool;
+  tool: LayoutTarget;
   tool_id?: number | null;
   initiative_id?: number | null;
 };
 
 export type PutLayoutParams = {
-  tool: Tool;
+  tool: LayoutTarget;
   tool_id?: number | null;
   initiative_id?: number | null;
 };
@@ -12801,13 +12816,13 @@ export type GetInitiativeLayoutsParams = {
 };
 
 export type PutDefaultLayoutParams = {
-  tool: Tool;
+  tool: LayoutTarget;
   tool_id?: number | null;
   initiative_id?: number | null;
 };
 
 export type ResetLayoutParams = {
-  tool: Tool;
+  tool: LayoutTarget;
   tool_id?: number | null;
   initiative_id?: number | null;
   task_type_id?: number | null;
@@ -12933,6 +12948,7 @@ export type ListCommentsParams = {
   cursor?: string | null;
   task_id?: number | null;
   wiki_page_id?: number | null;
+  collection_id?: number | null;
   project_id?: number | null;
   file_id?: number | null;
   queue_id?: number | null;
@@ -12940,7 +12956,6 @@ export type ListCommentsParams = {
   calendar_id?: number | null;
   dashboard_id?: number | null;
   post_id?: number | null;
-  library_id?: number | null;
   wiki_id?: number | null;
 };
 
@@ -13043,6 +13058,14 @@ export type ReadFileParams = {
    * Also return the resource if it is in the trash. For reading a resource back after a deleted event — the row still exists until retention purges it, and access is checked exactly as for a live one.
    */
   include_deleted?: boolean;
+};
+
+export type ListCollectionsParams = {
+  initiative_id: number;
+  /**
+   * true lists what has been archived instead of what is live. Omit for the live list, which is what every other view shows.
+   */
+  archived?: boolean | null;
 };
 
 export type ExportTasksParams = {
@@ -13217,7 +13240,7 @@ export type ExportToolParams = {
    */
   ids?: number[] | null;
   /**
-   * One of the tool's export formats (project: json, pdf, csv, xlsx; file: json, md, pdf, docx, csv, xlsx, file; queue: json, pdf, csv, xlsx, md; counter_group: json, pdf, csv, xlsx, md; calendar: ics, json; dashboard: json; post: json; library: json; wiki: json, pdf, md, docx). ``json`` is the importable envelope. A file's formats depend on its type, so it has no default; a calendar defaults to ``ics``, every other tool to ``json``
+   * One of the tool's export formats (project: json, pdf, csv, xlsx; file: json, md, pdf, docx, csv, xlsx, file; queue: json, pdf, csv, xlsx, md; counter_group: json, pdf, csv, xlsx, md; calendar: ics, json; dashboard: json; post: json; wiki: json, pdf, md, docx). ``json`` is the importable envelope. A file's formats depend on its type, so it has no default; a calendar defaults to ``ics``, every other tool to ``json``
    */
   format?: ExportToolFormat;
   /**
@@ -13315,46 +13338,6 @@ export type ReadPostParams = {
    * Also return the resource if it is in the trash. For reading a resource back after a deleted event — the row still exists until retention purges it, and access is checked exactly as for a live one.
    */
   include_deleted?: boolean;
-};
-
-export type ReadLibraryParams = {
-  /**
-   * Also return the resource if it is in the trash. For reading a resource back after a deleted event — the row still exists until retention purges it, and access is checked exactly as for a live one.
-   */
-  include_deleted?: boolean;
-};
-
-export type ListLibraryItemsParams = {
-  /**
-   * Only pictures carrying ANY of these tags.
-   */
-  tag_ids?: number[] | null;
-  /**
-   * Match on title, description or filename.
-   */
-  search?: string | null;
-  /**
-   * Read the library in the order it was filled rather than newest first.
-   */
-  oldest_first?: boolean;
-  /**
-   * Start the list at this day, inclusive, measured by each item's date — which is what the list is ordered by. This is how a timeline jumps to a month without paging through everything since. It follows the list's own direction: newest first it is a ceiling and the page walks back from it, oldest first a floor and the page walks forward, so pair it with the matching end of the timeline bucket.
-   */
-  until?: string | null;
-  /**
-   * @minimum 1
-   */
-  page?: number;
-  /**
-   * @minimum 1
-   * @maximum 200
-   */
-  page_size?: number;
-};
-
-export type GetLibraryItemTimelineParams = {
-  tag_ids?: number[] | null;
-  search?: string | null;
 };
 
 export type ReadPluginDataParams = {
@@ -13568,7 +13551,7 @@ export type SearchCommunityParams = {
    */
   search: string;
   /**
-   * Restrict to these entity types. Omit for the default scope (calendar, calendar_event, counter, counter_group, dashboard, file, library, library_item, post, project, queue, queue_item, tag, task, wiki, wiki_page); naming a type reaches it explicitly.
+   * Restrict to these entity types. Omit for the default scope (calendar, calendar_event, collection, counter, counter_group, dashboard, file, post, project, queue, queue_item, tag, task, wiki, wiki_page); naming a type reaches it explicitly.
    */
   types?: SearchEntityType[] | null;
   /**
@@ -13596,7 +13579,7 @@ export type SearchCommunityParams = {
 
 export type RecentCommunityParams = {
   /**
-   * Restrict to these entity types. Omit for the default scope (calendar, calendar_event, counter, counter_group, dashboard, file, library, library_item, post, project, queue, queue_item, tag, task, wiki, wiki_page); naming a type reaches it explicitly.
+   * Restrict to these entity types. Omit for the default scope (calendar, calendar_event, collection, counter, counter_group, dashboard, file, post, project, queue, queue_item, tag, task, wiki, wiki_page); naming a type reaches it explicitly.
    */
   types?: SearchEntityType[] | null;
   /**
@@ -13624,7 +13607,7 @@ export type SuggestCommunityParams = {
    */
   search: string;
   /**
-   * Restrict to these entity types. Omit for the default scope (calendar, calendar_event, counter, counter_group, dashboard, file, library, library_item, post, project, queue, queue_item, tag, task, wiki, wiki_page); naming a type reaches it explicitly.
+   * Restrict to these entity types. Omit for the default scope (calendar, calendar_event, collection, counter, counter_group, dashboard, file, post, project, queue, queue_item, tag, task, wiki, wiki_page); naming a type reaches it explicitly.
    */
   types?: SearchEntityType[] | null;
   /**
@@ -13951,32 +13934,6 @@ export type ListMyPostsParams = {
   /**
    * @minimum 0
    * @maximum 50
-   */
-  page_size?: number;
-};
-
-export type ListMyLibrariesParams = {
-  community_ids?: number[] | null;
-  search?: string | null;
-  /**
-   * Narrow to libraries the caller created.
-   */
-  created_by_me?: boolean;
-  /**
-   * Order by one of: name, updated_at, created_at. Omit for this tool's own default order. There is no `initiative` here — a merged cross-guild list is ordered by what the tool's own rows carry, and an initiative name is not one of them.
-   */
-  sort_by?: string | null;
-  /**
-   * asc (default) or desc.
-   */
-  sort_dir?: string | null;
-  /**
-   * @minimum 1
-   */
-  page?: number;
-  /**
-   * @minimum 0
-   * @maximum 100
    */
   page_size?: number;
 };

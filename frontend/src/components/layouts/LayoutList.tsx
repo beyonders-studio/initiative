@@ -31,8 +31,9 @@ const setOf = (definition: ListLayoutRead["definition"]) =>
  * and its pages, a project's one per task type, each named for its type.
  *
  * Given its `target` by someone who may change it, each view is shown in its
- * layout menu or hidden from here, one at least staying shown, and each task
- * type deleted with its page, one at least staying.
+ * layout menu or hidden from here, one at least staying shown, and a shown one
+ * made the one it opens on; and each task type deleted with its page, one at
+ * least staying.
  */
 export const LayoutList = ({
   layouts,
@@ -74,6 +75,12 @@ export const LayoutList = ({
               className="h-3 w-3 shrink-0 fill-current text-muted-foreground"
               aria-label={t("layouts:opensFirst")}
               role="img"
+            />
+          ) : view && target && !view.hidden ? (
+            <OpensFirstButton
+              target={target}
+              view={view}
+              label={t("layouts:makeOpensFirst", { name })}
             />
           ) : null}
           {view?.hidden && !target ? (
@@ -170,5 +177,31 @@ const ViewSwitch = ({
       }
       aria-label={label}
     />
+  );
+};
+
+/** Make a shown view the one its target opens on. */
+const OpensFirstButton = ({
+  target,
+  view,
+  label,
+}: {
+  target: GetLayoutsParams;
+  view: ListLayoutRead;
+  label: string;
+}) => {
+  const save = useSaveLayouts(target);
+  return (
+    <Button
+      variant="ghost"
+      size="icon"
+      className="h-6 w-6 shrink-0 text-muted-foreground"
+      disabled={save.isPending}
+      onClick={() => save.mutate([{ opensOn: view.kind }])}
+      aria-label={label}
+      title={label}
+    >
+      <Star className="h-3 w-3" />
+    </Button>
   );
 };

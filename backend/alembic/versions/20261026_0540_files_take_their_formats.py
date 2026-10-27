@@ -21,7 +21,7 @@ The downgrade spells the editor's types the old way and every other type
 ``file``; cleared featured images stay cleared.
 
 Revision ID: 20261026_0540
-Revises: 20261026_0539
+Revises: 20261026_0537
 Create Date: 2026-10-26
 """
 
@@ -34,7 +34,7 @@ from sqlalchemy.engine import Connection
 from app.db.guild_migrations import run_for_each_guild_schema
 
 revision = "20261026_0540"
-down_revision = "20261026_0539"
+down_revision = "20261026_0537"
 branch_labels = None
 depends_on = None
 

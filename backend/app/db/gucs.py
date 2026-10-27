@@ -254,8 +254,8 @@ FILER_CASES = Guc("app.filer_cases", Kind.IDS, read_once=True)
 #: Transaction-local flag marking a transaction as a purge.
 #:
 #: Purge is the one lifecycle step that writes frozen content rather than only
-#: removing it: a file being purged leaves wikilinks behind in the files
-#: that pointed at it, and those are unresolved before the row goes — including
+#: removing it: a file being purged leaves references behind in the files
+#: that pointed at it, and those are unlinked before the row goes — including
 #: in files that are themselves in the trash, which would otherwise be
 #: restored holding a link to nothing.
 #:

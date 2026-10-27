@@ -167,19 +167,6 @@ export const TOOL_PALETTE: Record<Tool, ToolPaletteSource> = {
       }));
     },
   },
-  [Tool.library]: {
-    useHeading: () => useGroupHeading(Tool.library),
-    useItems: (ctx) => {
-      const query = useToolPaletteList(TOOL_HOOKS[Tool.library].listQuery, BROWSE_PAGE, ctx);
-      return (query.data?.items ?? []).map((library) => ({
-        id: library.id,
-        label: library.name,
-        keywords: [library.description ?? ""],
-        icon: null,
-        path: toolDetailRoute(Tool.library, library.initiative_id, library.id),
-      }));
-    },
-  },
   [Tool.wiki]: {
     useHeading: () => useGroupHeading(Tool.wiki),
     useItems: (ctx) => {

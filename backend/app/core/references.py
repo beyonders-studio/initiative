@@ -16,7 +16,7 @@ sharing gates it — is derived from the search registry in
 
 import re
 from enum import Enum
-from typing import Any, Callable
+from typing import Any
 
 from app.core.search import SearchEntityType
 
@@ -70,22 +70,8 @@ MAX_ENTITY_ID = 2_147_483_647
 _ID_DIGITS = frozenset("0123456789")
 
 
-#: Kinds stored content still names by an older spelling. A body keeps what
-#: was written into it, Yjs state included, so these are read for as long as
-#: such content exists: a file was called a document before it was a file,
-#: and a library a gallery before it was a library.
-_LEGACY_KINDS: dict[str, SearchEntityType] = {
-    "document": SearchEntityType.file,
-    "gallery": SearchEntityType.library,
-    "gallery_image": SearchEntityType.library_item,
-}
-
-
 def _kind(value: str) -> SearchEntityType | None:
     """The kind a reference names, or None if nothing is called that."""
-    legacy = _LEGACY_KINDS.get(value)
-    if legacy is not None:
-        return legacy
     try:
         return SearchEntityType(value)
     except ValueError:
@@ -117,13 +103,10 @@ def parse_ref(ref: str) -> tuple[SearchEntityType, int] | None:
 #: Node types in a Lexical body that name another thing, and the field holding
 #: its id.
 #:
-#: ``wikilink`` is what ``[[ ]]`` wrote before references were one thing;
-#: ``entity-mention`` is what both triggers write now. Both count, which is what
-#: stops "what links here" under-reporting the moment anyone uses ``#``. A
-#: ``smart-chip`` and a ``reference-embed`` (``![[ ]]``) count too: a page
-#: showing a task's status, or the task itself, is about that task.
+#: ``entity-mention`` is what both ``#`` and ``[[ ]]`` write. A ``smart-chip``
+#: and a ``reference-embed`` (``![[ ]]``) count too: a page showing a task's
+#: status, or the task itself, is about that task.
 REFERENCE_NODES: dict[str, str] = {
-    "wikilink": "documentId",
     "entity-mention": "entityId",
     "smart-chip": "entityId",
     "reference-embed": "entityId",
@@ -136,12 +119,17 @@ BLOCK_REFERENCE_NODES = frozenset({"reference-embed"})
 
 def reference_node_kind(node: dict[str, Any]) -> SearchEntityType | None:
     """The kind a reference node names. A chip spells it as the first half of
-    its ``task:status``; a legacy wikilink is a file by construction and
-    carries none."""
+    its ``task:status``."""
     chip_kind = node.get("chipKind")
     if isinstance(chip_kind, str):
         return _kind(chip_kind.split(REF_SEPARATOR)[0])
-    return _kind(node.get("entityType", SearchEntityType.file.value))
+    entity_type = node.get("entityType")
+    return _kind(entity_type) if isinstance(entity_type, str) else None
+
+
+#: What an exported reference node carries in place of its id: the ref of what
+#: it named where it was written (``task:41``), until a restore places it.
+SOURCE_REF = "importSourceRef"
 
 
 def text_node(text: str, fmt: int = 0) -> dict[str, Any]:
@@ -181,20 +169,13 @@ def reference_as_text(node: dict[str, Any]) -> dict[str, Any]:
 #: writes it — see :func:`kind_for_trigger`.
 TEXT_REFERENCE = re.compile(r"#([\w-]+)\[([^\]]*)\]\((\d+)\)")
 
-#: What the composer wrote for a file before the trigger words were
-#: derived from the kinds, and what stored comments still say.
-_LEGACY_TRIGGERS: dict[str, SearchEntityType] = {"doc": SearchEntityType.file}
-
 
 def kind_for_trigger(word: str) -> SearchEntityType | None:
     """The kind the word after a ``#`` names in running text.
 
     The composer writes a kind kebabed — ``#wiki-page``, ``#counter-group`` —
-    and once wrote ``#doc``; the kind's own spelling reads too.
+    and the kind's own spelling reads too.
     """
-    legacy = _LEGACY_TRIGGERS.get(word)
-    if legacy is not None:
-        return legacy
     return _kind(word.replace("-", "_"))
 
 
@@ -240,42 +221,35 @@ def references_in_text(content: str | None) -> set[tuple[SearchEntityType, int]]
     return found
 
 
-def unresolve_missing_wikilinks(
-    content: dict[str, Any], live_file_ids: set[int]
+def unlink_references(
+    content: dict[str, Any], entity_type: SearchEntityType, entity_id: int
 ) -> bool:
-    """Blank the target of every ``[[ ]]`` pointing at a file that is gone.
-
-    The node stays and renders as unresolved, which is what the editor shows for
-    a link whose target was never picked. Returns whether anything changed.
-    """
-    return _blank_wikilinks(content, lambda doc_id: doc_id not in live_file_ids)
-
-
-def unresolve_wikilinks_to(content: dict[str, Any], file_id: int) -> bool:
-    """:func:`unresolve_missing_wikilinks` for one file that is going away."""
-    return _blank_wikilinks(content, lambda doc_id: doc_id == file_id)
-
-
-def _blank_wikilinks(
-    content: dict[str, Any], should_blank: Callable[[int], bool]
-) -> bool:
+    """Make every reference to one thing that is going away the words it was
+    written with, in place. Returns whether anything changed."""
     changed = False
 
     def walk(node: Any) -> None:
         nonlocal changed
         if not isinstance(node, dict):
             return
-        if node.get("type") == "wikilink":
-            doc_id = node.get("documentId")
-            if isinstance(doc_id, int) and doc_id > 0 and should_blank(doc_id):
-                node["documentId"] = None
-                changed = True
         children = node.get("children")
-        if isinstance(children, list):
-            for child in children:
+        if not isinstance(children, list):
+            return
+        for index, child in enumerate(children):
+            field = (
+                REFERENCE_NODES.get(child.get("type"))
+                if isinstance(child, dict)
+                else None
+            )
+            if (
+                field is not None
+                and child.get(field) == entity_id
+                and reference_node_kind(child) is entity_type
+            ):
+                children[index] = reference_as_text(child)
+                changed = True
+            else:
                 walk(child)
 
-    root = content.get("root")
-    if isinstance(root, dict):
-        walk(root)
+    walk(content.get("root"))
     return changed

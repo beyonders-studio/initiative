@@ -32,7 +32,8 @@ from app.models.platform.guild import CommunityRole
 from app.models.platform.user import User
 from app.models.tenant.import_job import ImportJob, ImportJobStatus
 from app.models.tenant.initiative import Initiative
-from app.core.tools import tool_for_create_permission
+from app.core.legacy_references import rewrite_body, rewrite_ref, rewrite_text
+from app.core.tools import Tool, tool_envelope_type, tool_for_create_permission
 from app.schemas.tenant.import_job import BackupPlanPerson, EnvelopeImportPlan
 from app.services.import_engine.common import (
     handle_key,
@@ -55,6 +56,100 @@ _ACTIVE_STATUSES = (
     ImportJobStatus.queued,
     ImportJobStatus.running,
 )
+
+
+#: How an archive or an envelope written by an older build names files (once
+#: documents): the manifest's tool, its tool switches and envelope type, the
+#: keys holding a file's type and the files filed in a wiki or attached to an
+#: item, the refs naming one, and the role permissions for the tool. Read on
+#: restore and on a lone envelope's import, and rewritten to this build's names
+#: before anything else looks at them; nothing writes them. A gallery's backup
+#: entry is filed with the files, since its pictures are restored as files and
+#: a collection.
+_LEGACY_ENVELOPE_TYPES = {"initiative-document": tool_envelope_type(Tool.file)}
+_LEGACY_TOOLS = {"document": Tool.file.value}
+_LEGACY_ENTRY_TOOLS = {**_LEGACY_TOOLS, "gallery": Tool.file.value}
+_LEGACY_KEYS = {"documents": "files", "document_type": "file_type"}
+_LEGACY_PERMISSIONS = {
+    "documents_enabled": Tool.file.view_permission,
+    "create_documents": Tool.file.create_permission,
+}
+
+
+#: Where an archive or an envelope holds what an older build may have written
+#: a reference in, as the stored columns hold it: an editor body (a Lexical
+#: state, or a comment's markdown), and running text, each string of it (a
+#: description, a task's checklist, what a repeat carries over, a type's
+#: starting values). Any other string is left as written, and so is any other
+#: body: a spreadsheet's cells and a whiteboard's text are what was typed.
+_BODY_KEYS = frozenset({"content", "body"})
+_TEXT_KEYS = frozenset(
+    {
+        "description",
+        "location",
+        "notes",
+        "checklist",
+        "recurrence_carry",
+        "starting_values",
+    }
+)
+
+
+def _rewrite_strings(value: Any) -> Any:
+    if isinstance(value, str):
+        return rewrite_text(value, {})
+    if isinstance(value, list):
+        return [_rewrite_strings(item) for item in value]
+    if isinstance(value, dict):
+        return {key: _rewrite_strings(item) for key, item in value.items()}
+    return value
+
+
+def current_shape(value: Any) -> Any:
+    """``value``, read from an archive or an envelope, with the names an
+    older build gave files spelled as this one spells them, and every
+    reference in its bodies and running text as well. A gallery's pictures
+    are restored with no id to name them by, so a reference to one is its
+    words."""
+    if isinstance(value, list):
+        return [current_shape(item) for item in value]
+    if not isinstance(value, dict):
+        return value
+    shaped: dict[str, Any] = {}
+    for key, item in value.items():
+        key = _LEGACY_KEYS.get(key, key)
+        if key in _BODY_KEYS:
+            item = (
+                rewrite_text(item, {})
+                if isinstance(item, str)
+                else rewrite_body(item, {})
+            )
+        elif key in _TEXT_KEYS:
+            item = _rewrite_strings(item)
+        else:
+            item = current_shape(item)
+        shaped[key] = item
+    tools = shaped.get("tools")
+    if isinstance(tools, dict):
+        shaped["tools"] = {
+            _LEGACY_TOOLS.get(key, key): item for key, item in tools.items()
+        }
+    kind = shaped.get("type")
+    if isinstance(kind, str) and kind in _LEGACY_ENVELOPE_TYPES:
+        shaped["type"] = _LEGACY_ENVELOPE_TYPES[kind]
+    tool = shaped.get("tool")
+    if isinstance(tool, str) and tool in _LEGACY_ENTRY_TOOLS:
+        shaped["tool"] = _LEGACY_ENTRY_TOOLS[tool]
+    ref = shaped.get("external_ref")
+    if isinstance(ref, str):
+        shaped["external_ref"] = rewrite_ref(ref, {}) or ref
+    permissions = shaped.get("permissions")
+    if isinstance(permissions, list):
+        shaped["permissions"] = [
+            _LEGACY_PERMISSIONS.get(key, key) if isinstance(key, str) else key
+            for key in permissions
+        ]
+    return shaped
 
 
 def require_writable(guild_context: Any) -> None:
@@ -193,6 +288,7 @@ async def start_envelope_import(
     * **Queued**, above it — the payload is staged and the worker
       re-validates and applies it under the creator's RLS session.
     """
+    envelope = current_shape(envelope)
     envelope_type = envelope.get("type")
     if not isinstance(envelope_type, str):
         raise ImportEngineError(ImportEngineMessages.IMPORT_UNKNOWN_TYPE)
