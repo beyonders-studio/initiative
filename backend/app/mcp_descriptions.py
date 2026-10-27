@@ -298,6 +298,14 @@ TOOL_DESCRIPTIONS: dict[str, str] = {
         "The files in one collection the caller can open. Takes the same "
         "filters as `list_files`."
     ),
+    "list_collection_shapes": (
+        "The ready-made shapes a new collection can start as, with the lists "
+        "each shows and the fields it brings."
+    ),
+    "get_collection_file_fields": (
+        "One file's values of a collection's own fields, for a file in the "
+        "collection the caller can open."
+    ),
     "get_collection_files_timeline": (
         "The months files joined one collection, newest first, with how many "
         "the caller can open in each. Takes the same filters as "

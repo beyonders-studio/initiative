@@ -666,6 +666,8 @@ async def test_a_file_maker_fills_a_collections_fields_without_editing_the_file(
         "Price",
         "Rating",
     }
+    one = await client.get(maker.g(path), headers=maker.headers)
+    assert {v["name"] for v in one.json()} == {"Price", "Rating"}
     opened = await client.get(maker.g(f"/files/{shared.id}"), headers=maker.headers)
     assert opened.json()["properties"] == []
     # Nor written as one.
@@ -684,6 +686,11 @@ async def test_a_file_maker_fills_a_collections_fields_without_editing_the_file(
     )
     assert hidden.status_code == 422
     assert hidden.json()["detail"] == CollectionMessages.FILE_NOT_IN_COLLECTION
+    unseen = await client.get(
+        maker.g(f"/collections/{collection.id}/files/{private.id}/fields"),
+        headers=maker.headers,
+    )
+    assert unseen.status_code == 404
 
 
 async def test_a_file_taken_out_of_a_collection_leaves_its_values_behind(

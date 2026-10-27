@@ -308,6 +308,26 @@ async def add_collection_files(
     return await _read(session, collection_id, guild_context)
 
 
+@router.get(
+    "/{collection_id}/files/{file_id}/fields", response_model=List[PropertySummary]
+)
+async def get_collection_file_fields(
+    collection_id: int,
+    file_id: int,
+    session: ActorSessionDep,
+    guild_context: FilesRead,
+) -> List[PropertySummary]:
+    """One file's values of the collection's own fields, for a file in the
+    collection the reader can open."""
+    collection = await resource_access.load_child(session, Collection, collection_id)
+    if not await collections_service.holds(session, collection.id, file_id):
+        raise Tool.file.not_found()
+    summaries = await properties_service.summaries_by_id(
+        session, Tool.file.value, [file_id], collection_id=collection.id
+    )
+    return summaries.get(file_id, [])
+
+
 @router.put(
     "/{collection_id}/files/{file_id}/fields", response_model=List[PropertySummary]
 )

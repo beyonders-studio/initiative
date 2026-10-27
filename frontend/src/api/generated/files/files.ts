@@ -2606,6 +2606,174 @@ export const useDeleteCollection = <TError = ErrorType<HTTPValidationError>, TCo
   return useMutation(getDeleteCollectionMutationOptions(options), queryClient);
 };
 /**
+ * One file's values of the collection's own fields, for a file in the
+ * collection the reader can open.
+ * @summary Get Collection File Fields
+ */
+export const getCollectionFileFields = (
+  communityId: number,
+  collectionId: number,
+  fileId: number,
+  options?: SecondParameter<typeof apiMutator>,
+  signal?: AbortSignal
+) => {
+  return apiMutator<PropertySummary[]>(
+    {
+      url: `/api/v1/c/${communityId}/collections/${collectionId}/files/${fileId}/fields`,
+      method: "GET",
+      signal,
+    },
+    options
+  );
+};
+
+export const getGetCollectionFileFieldsQueryKey = (
+  communityId: number,
+  collectionId: number,
+  fileId: number
+) => {
+  return [`/api/v1/c/${communityId}/collections/${collectionId}/files/${fileId}/fields`] as const;
+};
+
+export const getGetCollectionFileFieldsQueryOptions = <
+  TData = Awaited<ReturnType<typeof getCollectionFileFields>>,
+  TError = ErrorType<HTTPValidationError>,
+>(
+  communityId: number,
+  collectionId: number,
+  fileId: number,
+  options?: {
+    query?: Partial<
+      UseQueryOptions<Awaited<ReturnType<typeof getCollectionFileFields>>, TError, TData>
+    >;
+    request?: SecondParameter<typeof apiMutator>;
+  }
+) => {
+  const { query: queryOptions, request: requestOptions } = options ?? {};
+
+  const queryKey =
+    queryOptions?.queryKey ?? getGetCollectionFileFieldsQueryKey(communityId, collectionId, fileId);
+
+  const queryFn: QueryFunction<Awaited<ReturnType<typeof getCollectionFileFields>>> = ({
+    signal,
+  }) => getCollectionFileFields(communityId, collectionId, fileId, requestOptions, signal);
+
+  return {
+    queryKey,
+    queryFn,
+    enabled:
+      communityId !== null &&
+      communityId !== undefined &&
+      collectionId !== null &&
+      collectionId !== undefined &&
+      fileId !== null &&
+      fileId !== undefined,
+    ...queryOptions,
+  } as UseQueryOptions<Awaited<ReturnType<typeof getCollectionFileFields>>, TError, TData> & {
+    queryKey: DataTag<QueryKey, TData, TError>;
+  };
+};
+
+export type GetCollectionFileFieldsQueryResult = NonNullable<
+  Awaited<ReturnType<typeof getCollectionFileFields>>
+>;
+export type GetCollectionFileFieldsQueryError = ErrorType<HTTPValidationError>;
+
+export function useGetCollectionFileFields<
+  TData = Awaited<ReturnType<typeof getCollectionFileFields>>,
+  TError = ErrorType<HTTPValidationError>,
+>(
+  communityId: number,
+  collectionId: number,
+  fileId: number,
+  options: {
+    query: Partial<
+      UseQueryOptions<Awaited<ReturnType<typeof getCollectionFileFields>>, TError, TData>
+    > &
+      Pick<
+        DefinedInitialDataOptions<
+          Awaited<ReturnType<typeof getCollectionFileFields>>,
+          TError,
+          Awaited<ReturnType<typeof getCollectionFileFields>>
+        >,
+        "initialData"
+      >;
+    request?: SecondParameter<typeof apiMutator>;
+  },
+  queryClient?: QueryClient
+): DefinedUseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData, TError> };
+export function useGetCollectionFileFields<
+  TData = Awaited<ReturnType<typeof getCollectionFileFields>>,
+  TError = ErrorType<HTTPValidationError>,
+>(
+  communityId: number,
+  collectionId: number,
+  fileId: number,
+  options?: {
+    query?: Partial<
+      UseQueryOptions<Awaited<ReturnType<typeof getCollectionFileFields>>, TError, TData>
+    > &
+      Pick<
+        UndefinedInitialDataOptions<
+          Awaited<ReturnType<typeof getCollectionFileFields>>,
+          TError,
+          Awaited<ReturnType<typeof getCollectionFileFields>>
+        >,
+        "initialData"
+      >;
+    request?: SecondParameter<typeof apiMutator>;
+  },
+  queryClient?: QueryClient
+): UseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData, TError> };
+export function useGetCollectionFileFields<
+  TData = Awaited<ReturnType<typeof getCollectionFileFields>>,
+  TError = ErrorType<HTTPValidationError>,
+>(
+  communityId: number,
+  collectionId: number,
+  fileId: number,
+  options?: {
+    query?: Partial<
+      UseQueryOptions<Awaited<ReturnType<typeof getCollectionFileFields>>, TError, TData>
+    >;
+    request?: SecondParameter<typeof apiMutator>;
+  },
+  queryClient?: QueryClient
+): UseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData, TError> };
+/**
+ * @summary Get Collection File Fields
+ */
+
+export function useGetCollectionFileFields<
+  TData = Awaited<ReturnType<typeof getCollectionFileFields>>,
+  TError = ErrorType<HTTPValidationError>,
+>(
+  communityId: number,
+  collectionId: number,
+  fileId: number,
+  options?: {
+    query?: Partial<
+      UseQueryOptions<Awaited<ReturnType<typeof getCollectionFileFields>>, TError, TData>
+    >;
+    request?: SecondParameter<typeof apiMutator>;
+  },
+  queryClient?: QueryClient
+): UseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData, TError> } {
+  const queryOptions = getGetCollectionFileFieldsQueryOptions(
+    communityId,
+    collectionId,
+    fileId,
+    options
+  );
+
+  const query = useQuery(queryOptions, queryClient) as UseQueryResult<TData, TError> & {
+    queryKey: DataTag<QueryKey, TData, TError>;
+  };
+
+  return withQueryKey(query, queryOptions.queryKey);
+}
+
+/**
  * Replace one file's values of the collection's own fields, or with
  * ``merge`` write only the ones named, as ``PUT /properties`` does for a
  * property. The file is one in the collection the reader can open, and the
