@@ -181,11 +181,13 @@ export const CollectionListView = ({
   editing?: boolean;
 }) => {
   const card = useCollectionCard(cardOf(definition, fields, FILE_LIST_SHAPE), fields, editing);
-  const columns = useCollectionColumns(
-    columnsOf(definition, fields, FILE_LIST_SHAPE),
-    fields,
-    editing
+  // The shipped columns are a fresh list each time: kept, so the table's
+  // columns are made again only when what they show changes.
+  const ids = useMemo(
+    () => columnsOf({ columns: definition.columns }, fields, FILE_LIST_SHAPE),
+    [definition.columns, fields]
   );
+  const columns = useCollectionColumns(ids, fields, editing);
   const walls = { files, card, onActivate, selecting, isSelected };
   if (kind === "table") return table(columns);
   if (kind === "timeline") {
