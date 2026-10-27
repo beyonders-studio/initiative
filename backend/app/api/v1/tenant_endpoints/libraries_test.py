@@ -285,7 +285,9 @@ async def test_a_member_without_a_grant_cannot_see_it(
     detail = await client.get(b.g(f"/libraries/{library.id}"), headers=b.headers)
     assert detail.status_code in (403, 404)
 
-    pictures = await client.get(b.g(f"/libraries/{library.id}/items"), headers=b.headers)
+    pictures = await client.get(
+        b.g(f"/libraries/{library.id}/items"), headers=b.headers
+    )
     assert pictures.status_code in (403, 404)
 
 
