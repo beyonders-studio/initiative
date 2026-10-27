@@ -99,7 +99,7 @@ async function landUploads(
       communityId,
       file,
       file.name,
-      { initiativeId },
+      { purpose: "file", initiativeId },
       (upload_id) =>
         uploadFile(communityId, { name: upload.name, initiative_id: initiativeId, upload_id })
     );

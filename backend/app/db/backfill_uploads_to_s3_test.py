@@ -31,11 +31,18 @@ def test_backfill_copies_with_content_type_from_meta(tmp_path):
     (gd / "resumable-taken").write_bytes(b"whole")
     (gd / "resumable-arriving").write_bytes(b"half")
     dest = _FakeDest()
-    # b.dat has no row; a file still arriving has none until it is taken.
-    meta = {"a.png": ("image/png", None), "resumable-taken": ("video/mp4", None)}
+    meta = {"a.png": ("image/png", None)}  # b.dat has no row
     summary = BackfillSummary()
 
-    backfill_guild_dir(gd, meta, dest, summary, guild_id=5, dry_run=False)
+    backfill_guild_dir(
+        gd,
+        meta,
+        dest,
+        summary,
+        guild_id=5,
+        dry_run=False,
+        arriving=frozenset({"resumable-arriving"}),
+    )
 
     assert summary.copied == 3
     assert summary.failed == 0

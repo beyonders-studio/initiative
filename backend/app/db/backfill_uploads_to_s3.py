@@ -34,12 +34,7 @@ from app.db.advisory_locks import LockNamespace, advisory_lock, advisory_unlock
 from app.db import session as db_session
 from app.db.schema_provisioning import guild_schema_name
 from app.services import storage_config
-from app.services.storage import (
-    STAGING_PREFIX,
-    S3Storage,
-    StorageBackend,
-    build_s3_client,
-)
+from app.services.storage import S3Storage, StorageBackend, build_s3_client
 from app.db.request_context import SystemGuild
 
 logger = logging.getLogger(__name__)
@@ -100,11 +95,13 @@ def backfill_guild_dir(
     *,
     guild_id: int,
     dry_run: bool,
+    arriving: frozenset[str] = frozenset(),
 ) -> None:
     """Copy one guild's local blobs into ``dest`` (S3). Pure of the DB.
 
     ``meta`` maps filename -> (content_type, content_hash) from the ``uploads``
-    rows. Updates ``summary`` in place. Idempotent: an object already in ``dest``
+    rows; ``arriving`` names the files still arriving in parts, which are left
+    for a later run. Updates ``summary`` in place. Idempotent: an object already in ``dest``
     is skipped; a content_hash mismatch is treated as a failure (the blob is NOT
     copied) so corruption isn't propagated. ``dry_run`` skips only the write — the
     ``exists`` check still runs against ``dest``, so a dry run reports the real
@@ -114,9 +111,9 @@ def backfill_guild_dir(
         if not path.is_file():
             continue
         key = path.name
-        # A file still arriving has no row until it is taken; copying it now
-        # would leave a cut-short copy that a later run skips.
-        if key.startswith(STAGING_PREFIX) and key not in meta:
+        # Copied now, a file still arriving would leave a cut-short copy that
+        # a later run skips.
+        if key in arriving:
             continue
         content_type, content_hash = meta.get(key, (None, None))
         if content_type is None:
@@ -177,6 +174,15 @@ async def _guild_upload_meta(
     return {row[0]: (row[1], row[2]) for row in rows if row[0]}
 
 
+async def _guild_arriving(conn: AsyncConnection, schema: str) -> frozenset[str]:
+    """The stored names of a guild's resumable uploads not yet taken."""
+    rows = await conn.execute(
+        # schema = guild_schema_name(int), a digits-only identifier.
+        text(f'SELECT staging_key FROM "{schema}".pending_uploads')  # noqa: S608
+    )
+    return frozenset(rows.scalars().all())
+
+
 async def backfill_uploads_to_s3(
     *,
     dry_run: bool = False,
@@ -223,9 +229,10 @@ async def backfill_uploads_to_s3(
                     continue
                 async with cohorts.system_session(gid) as session:
                     await db_session.set_rls_context(session, SystemGuild(gid))
-                    meta = await _guild_upload_meta(
-                        await session.connection(), guild_schema_name(gid)
-                    )
+                    guild_conn = await session.connection()
+                    schema = guild_schema_name(gid)
+                    meta = await _guild_upload_meta(guild_conn, schema)
+                    arriving = await _guild_arriving(guild_conn, schema)
                 # Always a real S3 backend, even on a dry run, so the exists() skip
                 # check reflects what's already in the bucket.
                 dest = S3Storage(
@@ -234,7 +241,13 @@ async def backfill_uploads_to_s3(
                     prefix=f"guild_{int(gid)}/",
                 )
                 backfill_guild_dir(
-                    guild_dir, meta, dest, summary, guild_id=gid, dry_run=dry_run
+                    guild_dir,
+                    meta,
+                    dest,
+                    summary,
+                    guild_id=gid,
+                    dry_run=dry_run,
+                    arriving=arriving,
                 )
                 if on_progress is not None:
                     await on_progress(summary)

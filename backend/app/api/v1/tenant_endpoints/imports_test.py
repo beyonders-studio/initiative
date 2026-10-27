@@ -1542,6 +1542,62 @@ async def test_backup_quota_exceeded_fails_job(
     assert job["error"] == "IMPORT_QUOTA_EXCEEDED"
 
 
+async def test_a_backup_sent_in_pieces_is_restored_from_where_it_arrived(
+    client, acting_user, session, monkeypatch, role_session
+):
+    from sqlmodel import select
+
+    from app.models.tenant.pending_upload import PendingUpload
+    from app.testing import route_session_to_guild
+    from app.testing.resumable import send_in_pieces
+
+    a = await acting_user(
+        guild_role=CommunityRole.superadmin, initiative=True, project=True
+    )
+    upload_id = await send_in_pieces(
+        client,
+        a,
+        _make_backup_zip(_minimal_manifest()),
+        purpose="backup",
+        filename="backup.zip",
+    )
+
+    staged = await client.post(
+        a.g("/imports/backup"), headers=a.headers, data={"upload_id": upload_id}
+    )
+
+    assert staged.status_code == 201, staged.text
+    await route_session_to_guild(session, a.guild.id)
+    job = await session.get(ImportJob, staged.json()["id"])
+    assert job.payload_ref == f"resumable-{upload_id}"
+    assert (await session.exec(select(PendingUpload))).first() is None
+    await client.post(
+        a.g(f"/imports/jobs/{job.id}/confirm"), headers=a.headers, json={}
+    )
+    await _run_import_worker(monkeypatch, role_session)
+    done = (await client.get(a.g(f"/imports/jobs/{job.id}"), headers=a.headers)).json()
+    assert done["status"] == ImportJobStatus.done.value, done.get("error")
+
+
+async def test_only_the_seat_may_send_a_backup_in_pieces(client, acting_user):
+    from app.testing.resumable import TUS, upload_metadata
+
+    admin = await acting_user(guild_role=CommunityRole.admin, initiative=True)
+
+    refused = await client.post(
+        admin.g("/resumable-uploads"),
+        headers={
+            **admin.headers,
+            **TUS,
+            "Upload-Length": "10",
+            "Upload-Metadata": upload_metadata(purpose="backup", filename="b.zip"),
+        },
+    )
+
+    assert refused.status_code == 403
+    assert refused.json()["detail"] == "IMPORT_SUPERADMIN_REQUIRED"
+
+
 async def test_backup_staged_expiry_and_cancel(
     client, acting_user, session, monkeypatch
 ):
@@ -5989,6 +6045,37 @@ async def test_a_confluence_html_export_becomes_a_wiki(
     ).one()
     assert file.current_version.original_filename == "spec.pdf"
     assert file_parent(wiki, file.id) == pages["Home"].id
+
+
+async def test_a_confluence_export_can_arrive_in_pieces(
+    client, acting_user, monkeypatch, role_session
+):
+    from app.services.import_engine.confluence_export_test import export_bytes
+    from app.testing.resumable import send_in_pieces
+
+    a = await acting_user(guild_role=CommunityRole.member, initiative=True)
+    upload_id = await send_in_pieces(
+        client,
+        a,
+        export_bytes(),
+        purpose="atlassian_export",
+        filename="export.zip",
+        initiative_id=str(a.initiative.id),
+    )
+
+    resp = await client.post(
+        a.g("/imports/atlassian/export"),
+        headers=a.headers,
+        data={"initiative_id": str(a.initiative.id), "upload_id": upload_id},
+    )
+
+    assert resp.status_code == 202, resp.text
+    await _run_import_worker(monkeypatch, role_session)
+    staged = (
+        await client.get(a.g(f"/imports/jobs/{resp.json()['id']}"), headers=a.headers)
+    ).json()
+    assert staged["status"] == ImportJobStatus.staged.value, staged.get("error")
+    assert staged["plan"]["atlassian"]["pages"] == 4
 
 
 async def test_an_upload_that_is_not_an_export_is_refused_up_front(client, acting_user):

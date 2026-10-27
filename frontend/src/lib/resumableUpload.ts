@@ -10,9 +10,14 @@ const TUS = { "Tus-Resumable": "1.0.0" };
  *  last outlasts the hold a dropped request leaves on the upload. */
 const RETRY_DELAYS_MS = [1_000, 3_000, 10_000, 30_000, 60_000];
 
-/** Where a file sent in pieces is going: a new file in an initiative, or a
- *  new version of a file. */
-export type ResumableTarget = { initiativeId: number } | { fileId: number };
+/** What a file sent in pieces is for: a new file in an initiative, a new
+ *  version of a file, a backup to restore, or a wiki export to read into an
+ *  initiative. */
+export type ResumableTarget =
+  | { purpose: "file"; initiativeId: number }
+  | { purpose: "file"; fileId: number }
+  | { purpose: "backup" }
+  | { purpose: "atlassian_export"; initiativeId: number };
 
 export interface ResumableOptions {
   /** Called as bytes arrive, with how many of the file's have. */
@@ -91,7 +96,11 @@ export const uploadInPieces = async <T>(
   { onProgress, signal }: ResumableOptions = {}
 ): Promise<T> => {
   const base = `/c/${communityId}/resumable-uploads`;
-  const where = "fileId" in target ? `file-${target.fileId}` : `in-${target.initiativeId}`;
+  const ids = {
+    ...("initiativeId" in target ? { initiative_id: String(target.initiativeId) } : {}),
+    ...("fileId" in target ? { file_id: String(target.fileId) } : {}),
+  };
+  const where = [target.purpose, ...Object.values(ids)].join("-");
   const changed = file instanceof File ? file.lastModified : 0;
   const remembered = `resumable-upload:${communityId}:${where}:${filename}:${file.size}:${changed}`;
 
@@ -115,13 +124,7 @@ export const uploadInPieces = async <T>(
         headers: {
           ...TUS,
           "Upload-Length": String(file.size),
-          "Upload-Metadata": metadata({
-            purpose: "file",
-            filename,
-            ...("fileId" in target
-              ? { file_id: String(target.fileId) }
-              : { initiative_id: String(target.initiativeId) }),
-          }),
+          "Upload-Metadata": metadata({ purpose: target.purpose, filename, ...ids }),
         },
         signal,
       });

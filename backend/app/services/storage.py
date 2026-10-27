@@ -51,10 +51,6 @@ logger = logging.getLogger(__name__)
 _STREAM_CHUNK = 64 * 1024
 #: How much :func:`open_seekable` fetches at a time.
 _RANGE_READ = 256 * 1024
-#: What a file arriving in parts is stored under until an endpoint takes it
-#: (``app.services.resumable``); taken, it keeps the name and gains an
-#: ``uploads`` row.
-STAGING_PREFIX = "resumable-"
 
 # S3 error codes that mean "object/bucket not here" rather than a real failure.
 _S3_MISSING_CODES = {"404", "NoSuchKey", "NoSuchBucket", "NotFound"}

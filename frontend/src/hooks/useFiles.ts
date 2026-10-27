@@ -191,7 +191,7 @@ export const useUploadFile = (options?: MutationOpts<FileRead, UploadFileInput>)
         communityId,
         file,
         file instanceof File ? file.name : name,
-        { initiativeId: initiative_id },
+        { purpose: "file", initiativeId: initiative_id },
         (upload_id) => uploadFile(communityId, { name, initiative_id, upload_id }),
         sending
       );
@@ -260,7 +260,7 @@ export const useUploadFileVersion = (
         communityId,
         file,
         file instanceof File ? file.name : "file",
-        { fileId },
+        { purpose: "file", fileId },
         (upload_id) => uploadFileVersion(communityId, fileId, { upload_id }),
         sending
       ),

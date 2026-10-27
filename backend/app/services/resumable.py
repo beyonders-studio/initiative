@@ -45,11 +45,15 @@ from sqlmodel.ext.asyncio.session import AsyncSession
 from starlette.requests import ClientDisconnect
 
 from app.core.file_types import is_refused
-from app.core.messages import FileMessages, ResumableMessages
+from app.core.messages import (
+    FileMessages,
+    ImportEngineMessages,
+    ResumableMessages,
+)
 from app.db.advisory_locks import LockNamespace, advisory_lock
 from app.models.platform.user import User
 from app.models.tenant.pending_upload import PendingUpload
-from app.services.storage import STAGING_PREFIX, get_guild_storage
+from app.services.storage import get_guild_storage
 from app.services.tenant import attachments
 
 logger = logging.getLogger(__name__)
@@ -74,6 +78,7 @@ _STANDING_SECONDS = 30
 _RENEW_SECONDS = 20
 #: The largest size Postgres keeps (``bigint``).
 _MAX_BYTES = 2**63 - 1
+_STAGING_PREFIX = "resumable-"
 
 
 @dataclass(frozen=True)
@@ -113,9 +118,53 @@ async def _admit_file(
     return initiative.id
 
 
+async def _admit_backup(
+    session: AsyncSession, guild_context: Any, user: User, metadata: dict[str, str]
+) -> int | None:
+    """A backup to restore: the community's seat, in a community that may
+    change."""
+    from app.api.deps import require_seat
+    from app.services.import_engine import engine as import_engine
+
+    require_seat(guild_context, detail=ImportEngineMessages.IMPORT_SUPERADMIN_REQUIRED)
+    import_engine.require_writable(guild_context)
+    return None
+
+
+async def _admit_atlassian_export(
+    session: AsyncSession, guild_context: Any, user: User, metadata: dict[str, str]
+) -> int | None:
+    """A wiki export to read into ``initiative_id``, by somebody who may make
+    a wiki there."""
+    from app.services.import_engine import atlassian_job
+    from app.services.import_engine import engine as import_engine
+
+    import_engine.require_writable(guild_context)
+    try:
+        initiative_id = int(metadata["initiative_id"])
+    except (KeyError, ValueError):
+        raise _refuse(status.HTTP_400_BAD_REQUEST, ResumableMessages.INVALID_REQUEST)
+    initiative = await atlassian_job.export_initiative(
+        session,
+        user=user,
+        guild_id=guild_context.guild_id,
+        initiative_id=initiative_id,
+    )
+    return initiative.id
+
+
+def _import_cap() -> int:
+    from app.services.import_engine import limits as import_limits
+
+    return import_limits.IMPORT_MAX_BACKUP_UPLOAD_BYTES
+
+
 PURPOSES: dict[str, Purpose] = {
     # A file's size is bounded by the community's storage alone.
     "file": Purpose(cap=lambda: None, admit=_admit_file),
+    # Imports keep the bound a single upload of them has.
+    "backup": Purpose(cap=_import_cap, admit=_admit_backup),
+    "atlassian_export": Purpose(cap=_import_cap, admit=_admit_atlassian_export),
 }
 
 
@@ -221,7 +270,7 @@ async def create(
     )
 
     upload_id = secrets.token_urlsafe(16)
-    key = f"{STAGING_PREFIX}{upload_id}"
+    key = f"{_STAGING_PREFIX}{upload_id}"
     storage = get_guild_storage(guild_id)
     part_bytes = max(PART_BYTES, math.ceil(length / _MAX_PARTS))
     state = await asyncio.to_thread(storage.start_parts, key, part_bytes=part_bytes)
@@ -542,7 +591,7 @@ async def take(
     *,
     purpose: str,
     user_id: int,
-    initiative_id: int,
+    initiative_id: int | None,
 ) -> PendingUpload:
     """Take a finished upload for the endpoint ``purpose`` names, by the
     person who sent it, for ``initiative_id``: its row is deleted in the
@@ -555,7 +604,7 @@ async def take(
             col(PendingUpload.id) == upload_id,
             col(PendingUpload.purpose) == purpose,
             col(PendingUpload.created_by) == user_id,
-            col(PendingUpload.initiative_id) == initiative_id,
+            col(PendingUpload.initiative_id).is_not_distinct_from(initiative_id),
             col(PendingUpload.completed_at).is_not(None),
             col(PendingUpload.expires_at) > func.now(),
             _free(),
