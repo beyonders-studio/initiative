@@ -3649,7 +3649,7 @@ async def _import_archive(client, actor, zip_bytes, initiative_id, envelope_type
 
 
 async def test_a_library_zip_imports_with_its_pictures_into_another_community(
-    client, acting_user, session, monkeypatch, tmp_path
+    client, acting_user, session, monkeypatch, tmp_path, role_session
 ):
     """A library exported on its own is a zip of its envelope and its pictures,
     and importing that zip somewhere the pictures have never been stored brings
@@ -3694,8 +3694,21 @@ async def test_a_library_zip_imports_with_its_pictures_into_another_community(
     resp = await _import_archive(
         client, b, exported.content, b.initiative.id, "initiative-library"
     )
-    assert resp.status_code == 201, resp.text
-    assert resp.json()["result"]["created"]["items"] == 2
+    # The mention names somebody nobody here can place, so the import waits
+    # for the people step.
+    assert resp.status_code == 202, resp.text
+    job = resp.json()
+    assert job["status"] == "staged"
+    confirm = await client.post(
+        b.g(f"/imports/jobs/{job['id']}/confirm"), headers=b.headers, json={}
+    )
+    assert confirm.status_code == 200, confirm.text
+    await _run_import_worker(monkeypatch, role_session)
+    done = (
+        await client.get(b.g(f"/imports/jobs/{job['id']}"), headers=b.headers)
+    ).json()
+    assert done["status"] == "done", done.get("error")
+    assert done["result"]["created"]["items"] == 2
 
     assert get_guild_storage(b.guild.id).exists(key)
     await route_session_to_guild(session, b.guild.id)

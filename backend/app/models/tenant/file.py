@@ -11,6 +11,7 @@ from sqlalchemy import (
     Integer,
     LargeBinary,
     String,
+    Text,
     UniqueConstraint,
     text,
 )
@@ -96,7 +97,7 @@ class File(
     #: its current version's.
     file_type: FileType = Field(
         default=FileType.lexical,
-        sa_column=Column(String, nullable=False, server_default=text("'lexical'")),
+        sa_column=Column(Text, nullable=False, server_default=text("'lexical'")),
     )
     #: An uploaded file's current version; ``NULL`` for every other type. The
     #: two tables point at each other, so the key is added once both exist

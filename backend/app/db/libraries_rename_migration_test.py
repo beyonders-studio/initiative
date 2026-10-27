@@ -103,7 +103,7 @@ async def _guild_values(session, schema: str, ids: dict[str, int]) -> dict:
         "tables": await _rows(
             session,
             "SELECT table_name FROM information_schema.tables "
-            "WHERE table_schema = :schema AND table_name ~ '^(galler|library)' "
+            "WHERE table_schema = :schema AND table_name ~ '^(galler|librar)' "
             "ORDER BY 1",
             schema=schema,
         ),
@@ -124,7 +124,7 @@ async def _guild_values(session, schema: str, ids: dict[str, int]) -> dict:
         "permissions": await _rows(
             session,
             f"SELECT DISTINCT permission_key FROM {s}.initiative_role_permissions "
-            "WHERE permission_key ~ '(library|galler)' ORDER BY 1",
+            "WHERE permission_key ~ '(librar|galler)' ORDER BY 1",
         ),
         "outbox": await _rows(
             session,
@@ -237,9 +237,9 @@ async def test_guild_values_say_library_and_back(session) -> None:
         node = (8 << 32) | item.id
         new = await _guild_values(session, schema, ids)
         assert new["tables"] == [
+            ("libraries",),
             ("library_item_versions",),
             ("library_items",),
-            ("libraries",),
         ]
         # Row security comes back on and forced, with the policies the next
         # start renders from the registries not yet there.
@@ -252,11 +252,11 @@ async def test_guild_values_say_library_and_back(session) -> None:
             "'comments', 'initiatives') ORDER BY 1",
             schema=schema,
         ) == [
-            ("library_item_versions", True, True, 0),
-            ("library_items", True, True, 0),
-            ("libraries", True, True, 0),
             ("comments", True, True, 0),
             ("initiatives", True, True, 0),
+            ("libraries", True, True, 0),
+            ("library_item_versions", True, True, 0),
+            ("library_items", True, True, 0),
         ]
         # What a start applies puts them back under the new names.
         await apply_guild_rls(await session.connection(), schema)
@@ -277,7 +277,7 @@ async def test_guild_values_say_library_and_back(session) -> None:
         assert {source, target} == {"project", "library_item"} and node in nodes
         # The node ids are computed, and the item kind keeps its code.
         assert [edge[2:] for edge in new["edge"]] == [edge[2:] for edge in old["edge"]]
-        assert new["permissions"] == [("libraries_enabled",), ("create_libraries",)]
+        assert new["permissions"] == [("create_libraries",), ("libraries_enabled",)]
         assert new["outbox"] == [
             (
                 "libraries",
@@ -528,7 +528,7 @@ async def test_public_values_say_library_and_back(session) -> None:
                         "entity_type": "library_item",
                         "target_path": "/go/library_item/5",
                         "smart_link": "https://app.test/navigate?community_id=1"
-                        "&target=%2Fgo%2Fcatalog_item%2F5",
+                        "&target=%2Fgo%2Flibrary_item%2F5",
                         "rollup_key": "subscription:library_item:5",
                     },
                 ),
@@ -543,23 +543,11 @@ async def test_public_values_say_library_and_back(session) -> None:
                     {"context_entity_type": "library", "target_path": "/go/library/5"},
                     {"target_path": "/go/library/5"},
                     "library:5",
-                    "https://app.test/navigate?target=%2Fgo%2Fcatalog%2F5",
+                    "https://app.test/navigate?target=%2Fgo%2Flibrary%2F5",
                 )
             ],
             "ceiling": [(["libraries:read", "tasks:read"],)],
             "listings": [
-                (
-                    "rename.library",
-                    "library",
-                    {
-                        "type": "initiative-library",
-                        "name": "Wall",
-                        "items": [
-                            {"storage_key": "a.png", "external_ref": "library_item:4"}
-                        ],
-                        "permissions": {"libraries_enabled": True},
-                    },
-                ),
                 (
                     "rename.dashboard",
                     "dashboard",
@@ -577,6 +565,18 @@ async def test_public_values_say_library_and_back(session) -> None:
                                 }
                             ]
                         },
+                    },
+                ),
+                (
+                    "rename.library",
+                    "library",
+                    {
+                        "type": "initiative-library",
+                        "name": "Wall",
+                        "items": [
+                            {"storage_key": "a.png", "external_ref": "library_item:4"}
+                        ],
+                        "permissions": {"libraries_enabled": True},
                     },
                 ),
                 # A plug-in manifest is its publisher's: refused, not rewritten.

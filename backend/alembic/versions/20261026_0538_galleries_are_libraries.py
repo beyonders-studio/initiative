@@ -36,6 +36,8 @@ item. In ``guild_template`` and every ``guild_<id>``:
   ``library_item_versions`` and their renamed columns (a string value in one is
   left as written); a queued export or import names the tool ``library``. The
   CHECK constraints holding a kind or a permission are restated for the writes.
+* **Role permissions** — a role missing a key gets it at its default, as
+  20261006_0464 did; a built-in manager role holds every key.
 
 ``public.relationship_kind_code`` names the kinds ``library`` (still code 7)
 and ``library_item`` (still code 8). The edges' node columns are computed from
@@ -204,6 +206,54 @@ _KIND_CODES_EITHER = _KIND_CODES_BEFORE + tuple(
 )
 
 _CLEAR_SEARCH_GENERATION = "COMMENT ON TABLE search_entries IS NULL"
+
+
+#: Every role's permissions, for the backfill: the keys as this revision
+#: leaves them, each at its default.
+_ROLE_PERMISSION_DEFAULTS: dict[str, bool] = {
+    "projects_enabled": True,
+    "files_enabled": True,
+    "queues_enabled": False,
+    "counter_groups_enabled": False,
+    "calendars_enabled": False,
+    "dashboards_enabled": False,
+    "posts_enabled": False,
+    "libraries_enabled": False,
+    "wikis_enabled": False,
+    "create_projects": False,
+    "create_files": False,
+    "create_queues": False,
+    "create_counter_groups": False,
+    "create_calendars": False,
+    "create_dashboards": False,
+    "create_posts": False,
+    "create_libraries": False,
+    "create_wikis": False,
+    "dashboards_run_as_initiative": False,
+}
+
+
+def backfill_sql(defaults: dict[str, bool]) -> str:
+    """The INSERT this revision runs, unqualified so it applies in whichever
+    guild schema the search_path names. A built-in manager role holds every
+    key; everything else gets the default."""
+    values = ", ".join(
+        f"('{key}', {'true' if enabled else 'false'})"
+        for key, enabled in sorted(defaults.items())
+    )
+    return f"""
+        INSERT INTO initiative_role_permissions
+            (initiative_role_id, permission_key, enabled)
+        SELECT r.id,
+               k.permission_key,
+               CASE
+                   WHEN r.is_builtin AND r.is_manager THEN true
+                   ELSE k.enabled
+               END
+        FROM initiative_roles AS r
+        CROSS JOIN (VALUES {values}) AS k(permission_key, enabled)
+        ON CONFLICT (initiative_role_id, permission_key) DO NOTHING
+    """
 
 
 def _flip(mapping: Mapping[str, str], forward: bool) -> dict[str, str]:
@@ -700,6 +750,12 @@ def _apply(forward: bool) -> None:
         _rename_structure(bind, forward)
     _respell_values(bind, forward)
     _restore_checks(bind, checks, forward)
+    if forward:
+        _writable(
+            bind,
+            "initiative_role_permissions",
+            lambda: bind.exec_driver_sql(backfill_sql(_ROLE_PERMISSION_DEFAULTS)),
+        )
     bind.exec_driver_sql(_CLEAR_SEARCH_GENERATION)
 
 

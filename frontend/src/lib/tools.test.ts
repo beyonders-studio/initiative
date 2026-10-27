@@ -378,8 +378,8 @@ describe("tool relations", () => {
     expect(Object.values(PARENT_TOOL).every((tool) => TOOLS.includes(tool))).toBe(true);
     expect(Object.keys(PARENT_TOOL).sort()).toEqual([
       "calendar_event",
-      "library_item",
       "counter",
+      "library_item",
       "queue_item",
       "task",
       "wiki_page",

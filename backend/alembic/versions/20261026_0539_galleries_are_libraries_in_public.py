@@ -60,9 +60,9 @@ _ADDRESSES = {
     "/go/gallery_image/": "/go/library_item/",
     "/go/gallery/": "/go/library/",
     "/galleries/": "/libraries/",
-    "%2Fgo%2Fgallery_image%2F": "%2Fgo%2Fcatalog_item%2F",
-    "%2Fgo%2Fgallery%2F": "%2Fgo%2Fcatalog%2F",
-    "%2Fgalleries%2F": "%2Fcatalogs%2F",
+    "%2Fgo%2Fgallery_image%2F": "%2Fgo%2Flibrary_item%2F",
+    "%2Fgo%2Fgallery%2F": "%2Fgo%2Flibrary%2F",
+    "%2Fgalleries%2F": "%2Flibraries%2F",
 }
 _SCOPES = {"galleries:read": "libraries:read", "galleries:write": "libraries:write"}
 _VIEW_PREFERENCES = (
