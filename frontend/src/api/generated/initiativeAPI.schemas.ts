@@ -5959,6 +5959,11 @@ export interface FileRead {
   content_version: string | null;
   /** How the file is shown, which follows from its type. */
   readonly kind: FileKind;
+  /**
+   * The editor's own type this uploaded file becomes when somebody
+   * converts it to edit it (``POST /files/{id}/convert``), or ``None``.
+   */
+  readonly converts_to: FileType | null;
 }
 
 export type FileUpdateContent = { [key: string]: unknown } | null;

@@ -57,6 +57,7 @@ dependencies = [
     "anthropic>=1,<2",                   # Claude connections (app/services/ai_provider.py)
     "openai>=2,<4",                      # OpenAI and OpenAI-compatible connections
     "defusedxml>=0.7.1",                # openpyxl parses uploaded workbooks through it when installed
+    "python-calamine>=0.9.0",           # reads .xls and .ods for Convert; run in a worker process
 ]
 
 [dependency-groups]

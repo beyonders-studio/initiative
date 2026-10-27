@@ -2,6 +2,7 @@ import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { useTranslation } from "react-i18next";
 
 import {
+  convertFile,
   createFile,
   deleteFileVersion,
   duplicateFile,
@@ -276,6 +277,30 @@ export const useUploadFileVersion = (
       // Stopped on purpose: nothing went wrong.
       if (!args[1].signal?.aborted)
         toast.error(getErrorMessage(args[0], "files:versions.uploadError"));
+      onError?.(...args);
+    },
+    onSettled,
+  });
+};
+
+/** Convert an uploaded file to edit it: it becomes a document or a
+ *  spreadsheet the app keeps, and its uploaded versions go. */
+export const useConvertFile = (options?: MutationOpts<FileRead, number>) => {
+  const { t } = useTranslation("files");
+  const communityId = useActiveCommunityId();
+  const { onSuccess, onError, onSettled, ...rest } = options ?? {};
+
+  return useMutation({
+    ...rest,
+    mutationFn: (fileId: number) => convertFile(communityId, fileId),
+    onSuccess: (...args) => {
+      const fileId = args[1];
+      void invalidate(q.file(fileId), q.fileVersions(fileId), q.allFiles());
+      toast.success(t("convert.success"));
+      onSuccess?.(...args);
+    },
+    onError: (...args) => {
+      toast.error(getErrorMessage(args[0], "files:convert.error"));
       onError?.(...args);
     },
     onSettled,

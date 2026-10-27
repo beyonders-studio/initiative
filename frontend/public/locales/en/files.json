@@ -313,6 +313,25 @@
     "uploadError": "Failed to upload new version",
     "deleteError": "Failed to delete version"
   },
+  "convert": {
+    "edit": "Edit",
+    "title": "Convert to edit?",
+    "toSheet": {
+      "xlsx": "It becomes a spreadsheet you can edit here. Its sheets, values, formulas, fills, borders and number formats come over; charts, pictures and macros don't.",
+      "ods": "It becomes a spreadsheet you can edit here. Its sheets, values and formulas come over; formatting stays behind.",
+      "values": "It becomes a spreadsheet you can edit here. Its sheets and values come over. Formulas come over as the values they show, and formatting stays behind.",
+      "table": "It becomes a spreadsheet you can edit here, its rows and columns as one sheet."
+    },
+    "toDocument": {
+      "markdown": "It becomes a document you can edit here. Headings, lists, tables, links and text formatting come over.",
+      "text": "It becomes a document you can edit here, its text as paragraphs."
+    },
+    "replaces": "The uploaded file and its earlier versions are replaced. Export gets a file back out whenever you need one.",
+    "confirm": "Convert",
+    "converting": "Converting…",
+    "success": "Converted. It's yours to edit.",
+    "error": "Couldn't convert this file."
+  },
   "viewer": {
     "loadError": "Unable to load file",
     "openNewTab": "Open in new tab",

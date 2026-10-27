@@ -194,6 +194,21 @@ An upload keeps a **version history**. **Upload new version** and the older ones
 
 The file's owner can delete a version, for good. Delete the newest and the one before it becomes the file again. The last one left always stays.
 
+### Editing an uploaded spreadsheet or text file
+
+The budget arrived as an Excel file, and now three people need to change it. Open it and choose **Edit**. It's converted into a spreadsheet you edit right here: same file, same name, same comments and links, just one you can type into.
+
+| Uploaded as | Becomes | What comes over |
+|---|---|---|
+| Excel (`.xlsx`) | Spreadsheet | Sheets, values, formulas, fills, borders and number formats. Charts, pictures and macros stay behind. |
+| OpenDocument (`.ods`) | Spreadsheet | Sheets, values and formulas. Formatting stays behind. |
+| Older Excel (`.xls`) | Spreadsheet | Sheets and values. A formula arrives as the number it showed. |
+| CSV, TSV | Spreadsheet | The rows and columns, as one sheet. |
+| Markdown (`.md`) | Text document | Headings, lists, tables, links and formatting. |
+| Plain text (`.txt`) | Text document | The text, as paragraphs. |
+
+Converting replaces the upload and its version history, and the dialog says so before anything happens. Need the file back out? **Export** it as Excel, CSV, Word, PDF or Markdown whenever you like.
+
 ## Collections
 
 A **collection** is a handful of files that belong together. The fete photos. The logo, and the four other logos that lost. Everything the new treasurer needs, which is somehow eleven files and one of them is a spreadsheet called `REAL one`.
