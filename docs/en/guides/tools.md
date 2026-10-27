@@ -50,12 +50,6 @@ Everything that lives inside an initiative is a **tool**. There are nine kinds. 
 
     [:octicons-arrow-right-24: Posts](posts.md)
 
--   :material-image-multiple-outline: __Libraries__
-
-    A wall of pictures. Mockups, screenshots, the four logos that lost.
-
-    [:octicons-arrow-right-24: Libraries](libraries.md)
-
 -   :material-book-open-page-variant-outline: __Wikis__
 
     Linked pages, for the things your group knows rather than the things it is doing.
@@ -73,7 +67,6 @@ Most groups run on projects and files for a good long while, and there is nothin
 - **Counters**, when a number needs to be the *same* number for everyone in the room.
 - A **dashboard**, when somebody who isn't doing the work starts asking how the work is going.
 - A **board**, the third time something important was announced in a chat and missed by four people.
-- A **library**, when the mockups are in a folder called `final`, next to a folder called `final2`.
 - A **wiki**, when every answer to "how does the float work?" is "ask Margaret".
 
 Switching one on is not a commitment or a lifestyle change. Switching it off later doesn't delete anything.
@@ -117,7 +110,7 @@ A wiki is laid out differently, because a wiki is for reading. See [Wikis](wikis
 
 ## Lists
 
-Each tool has a tab on the initiative's page listing everything of that kind you can reach. Projects, files, queues, counters, dashboards, libraries and wikis can each be shown three ways, and each remembers the one you picked:
+Each tool has a tab on the initiative's page listing everything of that kind you can reach. Projects, files, queues, counters, dashboards and wikis can each be shown three ways, and each remembers the one you picked:
 
 | View | What it's for |
 |---|---|
@@ -127,7 +120,7 @@ Each tool has a tab on the initiative's page listing everything of that kind you
 
 ![Files shown by tag, with the tag tree beside the cards](../images/tools/list-views.png)
 
-Some cards show what's inside without opening anything: a dashboard's card is a small copy of the dashboard, a counter group's shows its first counters, a queue's shows whose turn it is and who's next, and a library's shows its cover.
+Some cards show what's inside without opening anything: a dashboard's card is a small copy of the dashboard, a counter group's shows its first counters, and a queue's shows whose turn it is and who's next.
 
 ![Dashboard cards, each a small copy of its dashboard](../images/tools/card-previews.png)
 

@@ -114,7 +114,7 @@ Every initiative comes with three: **Manager** (think project lead) and **Modera
 
 Name them after how your group actually talks about itself, not after anything Initiative expects. Nobody has ever introduced themselves at a committee meeting as a view-only contributor.
 
-Permissions are grouped by tool — **Projects**, **Files**, **Queues**, **Counters**, **Events**, **Dashboards**, **Posts**, **Libraries**, **Wikis** — each offering **View** and **Create**. So "Volunteer" might view projects and files but create nothing, while "Coordinator" creates everything.
+Permissions are grouped by tool — **Projects**, **Files**, **Queues**, **Counters**, **Events**, **Dashboards**, **Posts**, **Wikis** — each offering **View** and **Create**. So "Volunteer" might view projects and files but create nothing, while "Coordinator" creates everything.
 
 ![Setting permissions for an initiative role](../images/initiatives/roles.png)
 
