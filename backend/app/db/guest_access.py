@@ -66,6 +66,8 @@ _NAMED: dict[str, GuestAccess] = {
     # before it writes one).
     "timer_marks": GuestAccess.write,
     "personal_items": GuestAccess.write,
+    # Asking to edit what was shared with them, and reading their own asks.
+    "share_requests": GuestAccess.write,
     # How widely what they reach was engaged with, read beside it.
     "engagement_levels": GuestAccess.read,
     "relationships": GuestAccess.write,

@@ -288,6 +288,7 @@ export const TaskEditPage = () => {
         keys="tasks:edit."
         backTo={gp(toolListRoute(Tool.project, initiativeId))}
         backLabel={t("edit.backToProjects")}
+        entity={{ kind: "task", id: parsedTaskId }}
       />
     );
   }

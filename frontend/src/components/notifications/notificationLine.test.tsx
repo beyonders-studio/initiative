@@ -412,3 +412,51 @@ describe("notificationText — something the reader subscribed to", () => {
     expect(notificationLink(one)).toBe("/go/post/5");
   });
 });
+
+describe("notificationText — access requests", () => {
+  it("names who asks, at which level, for what", () => {
+    const one = notice("share_requested", {
+      requester_name: "Ada",
+      level: "write",
+      count: 1,
+      entity_name: "Flight plan",
+    });
+    const many = notice("share_requested", {
+      requester_name: "Ada",
+      level: "read",
+      count: 5,
+      entity_name: "Photos",
+    });
+
+    expect(notificationText(one, t)).toBe(
+      'notifications.shareRequested.write({"requester":"Ada","title":"Flight plan","count":1})'
+    );
+    expect(notificationText(many, t)).toContain("notifications.shareRequested.read");
+    expect(notificationText(many, t)).toContain('"count":5');
+  });
+
+  it("says what was given, and that a request was declined", () => {
+    const granted = notice("share_granted", {
+      answerer_name: "Grace",
+      level: "read",
+      count: 1,
+      entity_name: "Flight plan",
+    });
+    const declined = notice("share_declined", { answerer_name: "Grace", count: 1 });
+
+    expect(notificationText(granted, t)).toContain("notifications.shareGranted.read");
+    expect(notificationText(declined, t)).toContain("notifications.shareDeclined");
+  });
+
+  it("opens the requests, and what was shared", () => {
+    const asked = notice("share_requested", {
+      community_id: 3,
+      target_path: "/share-requests/abc",
+    });
+    const granted = notice("share_granted", { entity_type: "file", entity_id: 8 });
+
+    expect(notificationLink(asked)).toBe("/c/3/share-requests/abc");
+    expect(notificationLink(granted)).toBe("/go/file/8");
+    expect(notificationLink(notice("share_declined", {}))).toBeNull();
+  });
+});

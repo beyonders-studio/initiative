@@ -108,6 +108,7 @@
   "/c/$communityId/settings/trash",
   "/c/$communityId/settings/usage",
   "/c/$communityId/settings/users",
+  "/c/$communityId/share-requests/$batchId",
   "/c/$communityId/tags/$tagId",
   "/communities",
   "/community/$communityId/login",

@@ -798,5 +798,10 @@
   "INVALID_RECURRENCE_LIMIT": "Ein Tagesmaximum erfordert eine stündliche Wiederholung nach Abschluss und ein Fälligkeitsdatum. Gib ein ganzzahliges Maximum von 1 bis 24 ein oder lasse das Feld leer.",
   "TASK_PARENT_IS_PART": "Eine Aufgabe kann nicht Teil von sich selbst oder einer ihrer Unteraufgaben sein.",
   "CHECKLIST_ITEM_UNTITLED": "Dieser Punkt nennt nur Personen oder Links und ergibt daher keinen Aufgabentitel.",
-  "CHECKLIST_ITEM_CHANGED": "Der Punkt wurde geändert, während er zur Aufgabe gemacht wurde. Sieh ihn dir an und versuche es erneut."
+  "CHECKLIST_ITEM_CHANGED": "Der Punkt wurde geändert, während er zur Aufgabe gemacht wurde. Sieh ihn dir an und versuche es erneut.",
+  "SHARE_REQUEST_NOT_FOUND": "Hier gibt es nichts anzufragen",
+  "SHARE_REQUEST_ALREADY_SHARED": "Du hast diesen Zugriff bereits",
+  "SHARE_REQUEST_ALREADY_PENDING": "Du hast schon gefragt, und noch hat niemand geantwortet",
+  "SHARE_REQUEST_NOTHING_TO_ASK": "Du kannst hier bereits alles öffnen",
+  "SHARE_REQUEST_CANNOT_ANSWER": "Diese Anfrage ist bereits beantwortet oder nicht deine zu beantworten"
 }

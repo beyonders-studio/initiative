@@ -798,5 +798,10 @@
   "INVALID_RECURRENCE_LIMIT": "Un maximum quotidien nécessite une répétition horaire après achèvement et une date d’échéance. Saisissez un maximum entier de 1 à 24, ou laissez le champ vide.",
   "TASK_PARENT_IS_PART": "Une tâche ne peut pas faire partie d’elle-même ni de l’une de ses sous-tâches.",
   "CHECKLIST_ITEM_UNTITLED": "Cet élément ne nomme que des personnes ou des liens : il ne laisse aucun titre pour une tâche.",
-  "CHECKLIST_ITEM_CHANGED": "Cet élément a changé pendant qu’il devenait une tâche. Vérifiez-le et réessayez."
+  "CHECKLIST_ITEM_CHANGED": "Cet élément a changé pendant qu’il devenait une tâche. Vérifiez-le et réessayez.",
+  "SHARE_REQUEST_NOT_FOUND": "Il n’y a rien à demander ici",
+  "SHARE_REQUEST_ALREADY_SHARED": "Vous avez déjà cet accès",
+  "SHARE_REQUEST_ALREADY_PENDING": "Vous avez déjà demandé, et personne n’a encore répondu",
+  "SHARE_REQUEST_NOTHING_TO_ASK": "Vous pouvez déjà tout ouvrir ici",
+  "SHARE_REQUEST_CANNOT_ANSWER": "Cette demande a déjà une réponse, ou ce n’est pas à vous d’y répondre"
 }

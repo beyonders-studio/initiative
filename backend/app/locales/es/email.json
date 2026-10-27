@@ -523,5 +523,41 @@
       "title": "Una nueva forma de iniciar sesión en tu cuenta",
       "body": "Ahora se puede iniciar sesión en tu cuenta a través de <strong>{{provider}}</strong>, porque allí se comprobó una de tus direcciones."
     }
+  },
+  "share": {
+    "requested": {
+      "read": {
+        "subject": "Solicitud para ver",
+        "title": "Solicitud para ver",
+        "body_one": "<strong>{{requester}}</strong> pide ver <strong>{{title}}</strong>",
+        "body_other": "<strong>{{requester}}</strong> pide ver {{count}} archivos"
+      },
+      "write": {
+        "subject": "Solicitud para editar",
+        "title": "Solicitud para editar",
+        "body_one": "<strong>{{requester}}</strong> pide editar <strong>{{title}}</strong>",
+        "body_other": "<strong>{{requester}}</strong> pide editar {{count}} archivos"
+      }
+    },
+    "granted": {
+      "read": {
+        "subject": "Ya puedes verlo",
+        "title": "Ya puedes verlo",
+        "body_one": "<strong>{{answerer}}</strong> te dejó ver <strong>{{title}}</strong>",
+        "body_other": "<strong>{{answerer}}</strong> te dejó ver {{count}} archivos"
+      },
+      "write": {
+        "subject": "Ya puedes editarlo",
+        "title": "Ya puedes editarlo",
+        "body_one": "<strong>{{answerer}}</strong> te dejó editar <strong>{{title}}</strong>",
+        "body_other": "<strong>{{answerer}}</strong> te dejó editar {{count}} archivos"
+      }
+    },
+    "declined": {
+      "subject": "Solicitud rechazada",
+      "title": "Solicitud rechazada",
+      "body_one": "<strong>{{answerer}}</strong> rechazó tu solicitud",
+      "body_other": "<strong>{{answerer}}</strong> rechazó tu solicitud de {{count}} archivos"
+    }
   }
 }

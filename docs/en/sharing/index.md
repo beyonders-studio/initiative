@@ -42,6 +42,8 @@ If you're not in an initiative, its projects and files aren't locked doors you c
 
 A direct link comes back "not found" rather than "access denied", because as far as your account is concerned there is genuinely nothing at that address. Nobody has to be told they're excluded from something, and nobody learns that a thing exists by bumping into a wall.
 
+Inside an initiative you *are* in, it's friendlier. A link to something there that wasn't shared with you says **You need access**, and offers to ask whoever owns it. You learn that it exists, and nothing else: not its name, not who made it. See [Asking for access](sharing-projects-and-files.md#asking-for-access).
+
 ## In this section
 
 <div class="grid cards" markdown>

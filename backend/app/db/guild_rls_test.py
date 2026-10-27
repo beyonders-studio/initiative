@@ -433,6 +433,7 @@ _NO_SINGLE_PARENT = {
     "plugin_metadata": "any item, per row, read through its own table, or the install itself",
     "search_entries": "names its tool in dac_tool",
     "tool_layouts": "any viewable tool, per row, or its initiative for a shared tool",
+    "share_requests": "any shareable tool, per row: read by the requester and whoever shares it",
     # One tool, two parents: a link must clear the gate on BOTH files, so
     # there is no single row to authorize against.
     # Two parents of any kind: an edge clears the gate on each end through

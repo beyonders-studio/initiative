@@ -8,6 +8,7 @@ import { initiativeHandlers } from "./initiative.handlers";
 import { notificationHandlers } from "./notification.handlers";
 import { projectHandlers } from "./project.handlers";
 import { propertyHandlers } from "./property.handlers";
+import { shareHandlers } from "./share.handlers";
 import { tagHandlers } from "./tag.handlers";
 import { taskHandlers } from "./task.handlers";
 import { toolCountHandlers } from "./toolCount.handlers";
@@ -31,5 +32,6 @@ export const handlers = [
   ...dmHandlers,
   ...toolCountHandlers,
   ...notificationHandlers,
+  ...shareHandlers,
   ...versionHandlers,
 ];

@@ -523,5 +523,41 @@
       "title": "A new way to sign in to your account",
       "body": "Your account can now be signed in to through <strong>{{provider}}</strong>, because it proved an address of yours."
     }
+  },
+  "share": {
+    "requested": {
+      "read": {
+        "subject": "Asked to view",
+        "title": "Asked to view",
+        "body_one": "<strong>{{requester}}</strong> asks to view <strong>{{title}}</strong>",
+        "body_other": "<strong>{{requester}}</strong> asks to view {{count}} files"
+      },
+      "write": {
+        "subject": "Asked to edit",
+        "title": "Asked to edit",
+        "body_one": "<strong>{{requester}}</strong> asks to edit <strong>{{title}}</strong>",
+        "body_other": "<strong>{{requester}}</strong> asks to edit {{count}} files"
+      }
+    },
+    "granted": {
+      "read": {
+        "subject": "You can view it now",
+        "title": "You can view it now",
+        "body_one": "<strong>{{answerer}}</strong> let you view <strong>{{title}}</strong>",
+        "body_other": "<strong>{{answerer}}</strong> let you view {{count}} files"
+      },
+      "write": {
+        "subject": "You can edit it now",
+        "title": "You can edit it now",
+        "body_one": "<strong>{{answerer}}</strong> let you edit <strong>{{title}}</strong>",
+        "body_other": "<strong>{{answerer}}</strong> let you edit {{count}} files"
+      }
+    },
+    "declined": {
+      "subject": "Request declined",
+      "title": "Request declined",
+      "body_one": "<strong>{{answerer}}</strong> declined your request",
+      "body_other": "<strong>{{answerer}}</strong> declined your request for {{count}} files"
+    }
   }
 }

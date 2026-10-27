@@ -58,6 +58,7 @@ export function DashboardDetailPage() {
         keys="dashboards:"
         backTo={gp(toolListRoute(Tool.dashboard, initiativeId))}
         backLabel={t("backToDashboards")}
+        entity={{ kind: "dashboard", id: parsedId }}
       />
     );
   }
