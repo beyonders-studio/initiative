@@ -449,6 +449,17 @@
       "grid": "Each file as a square tile: what its card shows under the picture.",
       "timeline": "Files by the day they were added: what each card shows under the picture.",
       "table": "The collection's files as a table: which columns, in what order."
+    },
+    "shapes": {
+      "name": "Name",
+      "blank": "Blank",
+      "blankHint": "A grid and a table, and no fields of its own yet.",
+      "lists": "Shows {{lists}}",
+      "fields": "Fields: {{fields}}",
+      "copyLabel": "Or copy the shape of",
+      "copyPlaceholder": "Another collection",
+      "copyHint": "Its fields and what its lists show, without its files or their values.",
+      "create": "Create collection"
     }
   }
 }

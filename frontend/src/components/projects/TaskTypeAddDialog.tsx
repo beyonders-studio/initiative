@@ -8,11 +8,8 @@ import { Loader2 } from "lucide-react";
 import { type FormEvent, useEffect, useState } from "react";
 import { useTranslation } from "react-i18next";
 
-import type {
-  TaskTypeCreate,
-  TaskTypeGalleryEntry,
-  TaskTypeRead,
-} from "@/api/generated/initiativeAPI.schemas";
+import type { TaskTypeCreate, TaskTypeRead } from "@/api/generated/initiativeAPI.schemas";
+import { ReadyMadeGallery } from "@/components/shared/ReadyMadeGallery";
 import { TaskTypeIcon, TaskTypeOption } from "@/components/tasks/TaskTypeOption";
 import { Button } from "@/components/ui/button";
 import {
@@ -34,7 +31,6 @@ import {
 } from "@/components/ui/select";
 import { useTaskTypeGallery } from "@/hooks/useProjects";
 import { listFormat } from "@/lib/intl";
-import { cn } from "@/lib/utils";
 
 /** Where a new type starts: nothing, a ready-made one, or one of the project's. */
 type Start = { kind: "blank" } | { kind: "gallery"; key: string } | { kind: "type"; id: number };
@@ -76,11 +72,6 @@ export const TaskTypeAddDialog = ({
     types.some((type) => type.name.toLocaleLowerCase() === candidate.toLocaleLowerCase());
   const nameTaken = has(trimmed);
 
-  const pick = (entry: TaskTypeGalleryEntry) => {
-    setStart({ kind: "gallery", key: entry.key });
-    setName(entry.name);
-  };
-
   const handleSubmit = (event: FormEvent) => {
     event.preventDefault();
     if (!trimmed || nameTaken) return;
@@ -104,70 +95,43 @@ export const TaskTypeAddDialog = ({
           {/* Positioned, so the hidden inputs Radix adds to form controls
               scroll with the list instead of stretching the dialog. */}
           <div className="relative min-h-0 flex-1 space-y-4 overflow-y-auto pr-1">
-            <button
-              type="button"
-              aria-pressed={start.kind === "blank"}
-              onClick={() => setStart({ kind: "blank" })}
-              className={cn(
-                "w-full rounded-md border px-3 py-2 text-left",
-                start.kind === "blank" ? "border-primary bg-primary/10" : "hover:bg-muted"
-              )}
-            >
-              <span className="block font-medium text-sm">{t("taskTypes.gallery.blank")}</span>
-              <span className="block text-muted-foreground text-xs">
-                {t("taskTypes.gallery.blankHint")}
-              </span>
-            </button>
-
-            {gallery.isLoading ? (
-              <Loader2 className="h-4 w-4 animate-spin text-muted-foreground" />
-            ) : null}
-            {(gallery.data ?? []).map((group) => (
-              <section key={group.key} className="space-y-2">
-                <h3 className="font-semibold text-muted-foreground text-xs uppercase">
-                  {group.name}
-                </h3>
-                <div className="grid grid-cols-fill-56/2 gap-2">
-                  {group.entries.map((entry) => {
-                    const chosen = start.kind === "gallery" && start.key === entry.key;
-                    return (
-                      <button
-                        key={entry.key}
-                        type="button"
-                        aria-pressed={chosen}
-                        onClick={() => pick(entry)}
-                        className={cn(
-                          "flex items-start gap-2 rounded-md border px-3 py-2 text-left",
-                          chosen ? "border-primary bg-primary/10" : "hover:bg-muted"
-                        )}
-                      >
-                        <TaskTypeIcon type={entry} className="mt-0.5 h-4 w-4" />
-                        <span className="min-w-0">
-                          <span className="block font-medium text-sm">
-                            {entry.name}
-                            {has(entry.name) ? (
-                              <span className="ml-1 font-normal text-muted-foreground text-xs">
-                                {t("taskTypes.gallery.alreadyHere")}
-                              </span>
-                            ) : null}
-                          </span>
-                          <span className="block text-muted-foreground text-xs">{entry.hint}</span>
-                          {entry.fields.length > 0 ? (
-                            <span className="block text-muted-foreground text-xs">
-                              {t("taskTypes.gallery.adds", {
-                                fields: listFormat(i18n.language, {
-                                  type: "conjunction",
-                                }).format(entry.fields.map((field) => field.name)),
-                              })}
-                            </span>
-                          ) : null}
-                        </span>
-                      </button>
-                    );
-                  })}
-                </div>
-              </section>
-            ))}
+            <ReadyMadeGallery
+              blank={{
+                name: t("taskTypes.gallery.blank"),
+                hint: t("taskTypes.gallery.blankHint"),
+              }}
+              loading={gallery.isLoading}
+              groups={(gallery.data ?? []).map((group) => ({
+                key: group.key,
+                name: group.name,
+                entries: group.entries.map((entry) => ({
+                  key: entry.key,
+                  name: entry.name,
+                  hint: entry.hint,
+                  icon: <TaskTypeIcon type={entry} className="mt-0.5 h-4 w-4" />,
+                  note: has(entry.name) ? t("taskTypes.gallery.alreadyHere") : undefined,
+                  brings:
+                    entry.fields.length > 0
+                      ? t("taskTypes.gallery.adds", {
+                          fields: listFormat(i18n.language, { type: "conjunction" }).format(
+                            entry.fields.map((field) => field.name)
+                          ),
+                        })
+                      : undefined,
+                })),
+              }))}
+              chosen={
+                start.kind === "blank" ? null : start.kind === "gallery" ? start.key : undefined
+              }
+              onChoose={(entry) => {
+                if (!entry) {
+                  setStart({ kind: "blank" });
+                  return;
+                }
+                setStart({ kind: "gallery", key: entry.key });
+                setName(entry.name);
+              }}
+            />
 
             <div className="space-y-2">
               <Label htmlFor="new-task-type-start-from">{t("taskTypes.startFromLabel")}</Label>

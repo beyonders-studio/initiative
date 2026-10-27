@@ -58,6 +58,7 @@ export const CollectionMasonryView = ({
             onActivate={(options) => onActivate(file, options)}
             selecting={selecting}
             selected={isSelected?.(file) ?? false}
+            named={card?.names}
             fit="shape"
           />
           {card?.render(file)}

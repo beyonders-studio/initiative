@@ -449,6 +449,17 @@
       "grid": "Jede Datei als quadratische Kachel: was ihre Karte unter dem Bild zeigt.",
       "timeline": "Dateien nach dem Tag, an dem sie hinzugefügt wurden: was jede Karte unter dem Bild zeigt.",
       "table": "Die Dateien der Sammlung als Tabelle: welche Spalten, in welcher Reihenfolge."
+    },
+    "shapes": {
+      "name": "Name",
+      "blank": "Leer",
+      "blankHint": "Ein Raster und eine Tabelle, noch ohne eigene Felder.",
+      "lists": "Zeigt {{lists}}",
+      "fields": "Felder: {{fields}}",
+      "copyLabel": "Oder die Form übernehmen von",
+      "copyPlaceholder": "Einer anderen Sammlung",
+      "copyHint": "Ihre Felder und was ihre Listen zeigen, ohne ihre Dateien oder deren Werte.",
+      "create": "Sammlung erstellen"
     }
   }
 }

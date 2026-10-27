@@ -44,9 +44,29 @@ describe("AddToCollectionDialog", () => {
     await waitFor(() => expect(added).toEqual({ id: "2", file_ids: [4, 5] }));
   });
 
-  it("makes a new collection of the files, never an empty one", async () => {
+  it("makes a new collection of the files, never an empty one, as the shape picked", async () => {
     let created: unknown = null;
     server.use(
+      communityHttp.get("/collections/shapes", () =>
+        HttpResponse.json([
+          {
+            key: "starters",
+            name: "Starters",
+            entries: [
+              {
+                key: "catalog",
+                name: "Catalog",
+                hint: "Things to choose from, priced and rated.",
+                lists: ["grid", "table"],
+                fields: [
+                  { name: "Price", type: "currency", display: null, currency: "USD" },
+                  { name: "Rating", type: "rating", display: "stars", currency: null },
+                ],
+              },
+            ],
+          },
+        ])
+      ),
       communityHttp.post("/collections/", async ({ request }) => {
         created = await request.json();
         return HttpResponse.json(buildCollection({ id: 9, name: "Round 4" }), { status: 201 });
@@ -55,12 +75,57 @@ describe("AddToCollectionDialog", () => {
     const user = userEvent.setup();
     mount();
 
-    const create = await screen.findByRole("button", { name: "Add to new collection" });
-    expect(create).toBeDisabled();
+    const next = await screen.findByRole("button", { name: "Add to new collection" });
+    expect(next).toBeDisabled();
     await user.type(screen.getByRole("textbox", { name: "Add to new collection" }), "Round 4");
-    await user.click(create);
+    await user.click(next);
+
+    // Named, it asks how the collection starts: blank until a shape is picked.
+    expect(screen.getByRole("button", { name: /^Blank/ })).toHaveAttribute("aria-pressed", "true");
+    const catalog = await screen.findByRole("button", { name: /^Catalog/ });
+    expect(catalog).toHaveTextContent("Fields: Price and Rating");
+    await user.click(catalog);
+    await user.click(screen.getByRole("button", { name: "Create collection" }));
     await waitFor(() =>
-      expect(created).toEqual({ initiative_id: 1, name: "Round 4", file_ids: [4, 5] })
+      expect(created).toEqual({
+        initiative_id: 1,
+        name: "Round 4",
+        file_ids: [4, 5],
+        shape: "catalog",
+      })
+    );
+  });
+
+  it("starts a new collection with the shape of another", async () => {
+    let created: unknown = null;
+    server.use(
+      communityHttp.get("/collections/", () =>
+        HttpResponse.json({ items: [buildCollection({ id: 2, name: "Store assets" })] })
+      ),
+      communityHttp.get("/collections/shapes", () => HttpResponse.json([])),
+      communityHttp.post("/collections/", async ({ request }) => {
+        created = await request.json();
+        return HttpResponse.json(buildCollection({ id: 9 }), { status: 201 });
+      })
+    );
+    const user = userEvent.setup();
+    mount();
+
+    await user.type(
+      await screen.findByRole("textbox", { name: "Add to new collection" }),
+      "Round 5"
+    );
+    await user.click(screen.getByRole("button", { name: "Add to new collection" }));
+    await user.click(screen.getByRole("combobox", { name: "Or copy the shape of" }));
+    await user.click(await screen.findByRole("option", { name: "Store assets" }));
+    await user.click(screen.getByRole("button", { name: "Create collection" }));
+    await waitFor(() =>
+      expect(created).toEqual({
+        initiative_id: 1,
+        name: "Round 5",
+        file_ids: [4, 5],
+        shape_from: 2,
+      })
     );
   });
 });

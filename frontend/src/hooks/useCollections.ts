@@ -7,9 +7,11 @@ import {
   getCollectionFilesTimeline,
   getGetCollectionFilesTimelineQueryKey,
   getListCollectionFilesQueryKey,
+  getListCollectionShapesQueryKey,
   getListCollectionsQueryKey,
   getReadCollectionQueryKey,
   listCollectionFiles,
+  listCollectionShapes,
   listCollections,
   readCollection,
   removeCollectionFiles,
@@ -22,6 +24,7 @@ import type {
   CollectionFileListResponse,
   CollectionListResponse,
   CollectionRead,
+  CollectionShapeGroup,
   CollectionUpdate,
   FileRead,
   GetCollectionFilesTimelineParams,
@@ -54,6 +57,18 @@ export const useCollections = (initiativeId: number | null) => {
     queryKey: getListCollectionsQueryKey(communityId, params),
     queryFn: () => listCollections(communityId, params),
     enabled: initiativeId !== null,
+  });
+};
+
+/** The ready-made shapes a new collection can start as, in the reader's
+ *  language. They change only with a release. */
+export const useCollectionShapes = (enabled: boolean) => {
+  const communityId = useActiveCommunityId();
+  return useQuery<CollectionShapeGroup[]>({
+    queryKey: getListCollectionShapesQueryKey(communityId),
+    queryFn: () => listCollectionShapes(communityId),
+    staleTime: Number.POSITIVE_INFINITY,
+    enabled,
   });
 };
 

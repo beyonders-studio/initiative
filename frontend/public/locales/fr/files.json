@@ -449,6 +449,17 @@
       "grid": "Chaque fichier en vignette carrée : ce que sa carte montre sous l'image.",
       "timeline": "Les fichiers selon le jour où ils ont été ajoutés : ce que chaque carte montre sous l'image.",
       "table": "Les fichiers de la collection en tableau : quelles colonnes, dans quel ordre."
+    },
+    "shapes": {
+      "name": "Nom",
+      "blank": "Vierge",
+      "blankHint": "Une grille et un tableau, sans champs propres pour l'instant.",
+      "lists": "Affiche {{lists}}",
+      "fields": "Champs : {{fields}}",
+      "copyLabel": "Ou copier la forme de",
+      "copyPlaceholder": "Une autre collection",
+      "copyHint": "Ses champs et ce que montrent ses listes, sans ses fichiers ni leurs valeurs.",
+      "create": "Créer la collection"
     }
   }
 }

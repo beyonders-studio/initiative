@@ -28,7 +28,7 @@ import {
   type LayoutItem,
 } from "@/lib/layouts/fields";
 import { cardLines, FILE_COLUMN_OF, FILE_LIST_SHAPE } from "@/lib/layouts/files";
-import { type LayoutContext, type LayoutNode, LayoutTree } from "@/lib/layouts/tree";
+import { type LayoutContext, type LayoutNode, LayoutTree, namesField } from "@/lib/layouts/tree";
 import type { AppColumnDef } from "@/lib/table";
 import type { TranslateFn } from "@/types/i18n";
 
@@ -37,6 +37,8 @@ import type { TranslateFn } from "@/types/i18n";
 export type CollectionCard = {
   render: (file: CollectionFileSummary) => ReactNode;
   height: (file: CollectionFileSummary) => number;
+  /** It shows each file's name, which its picture then need not on hover. */
+  names: boolean;
 };
 
 /** One line of a card, the space between two, and above the first. */
@@ -86,6 +88,7 @@ export const useCollectionCard = (
     };
     return {
       height,
+      names: namesField(card, "name"),
       render: (file) =>
         editing || linesOf(file) > 0 ? (
           <div

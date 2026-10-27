@@ -86,6 +86,7 @@ export const CollectionGridView = ({
                     onActivate={(options) => onActivate(file, options)}
                     selecting={selecting}
                     selected={isSelected?.(file) ?? false}
+                    named={card?.names}
                   />
                   {card?.render(file)}
                 </div>

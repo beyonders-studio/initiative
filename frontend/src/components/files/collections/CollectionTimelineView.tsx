@@ -74,6 +74,7 @@ export const CollectionTimelineView = ({
                       onActivate={(options) => onActivate(file, options)}
                       selecting={selecting}
                       selected={isSelected?.(file) ?? false}
+                      named={card?.names}
                       className="max-w-full"
                       style={{ height: ROW_HEIGHT, width }}
                     />
