@@ -93,6 +93,22 @@ async def test_a_large_picture_gets_a_thumbnail_no_limit_counts(session, stored)
     assert await session.scalar(thumbnails.next_due(None)) is None
 
 
+async def test_an_archived_picture_gets_its_thumbnail_too(session, stored):
+    """Archived content takes no writes, but a thumbnail of what is already
+    there is not one."""
+    from datetime import datetime, timezone
+
+    guild, file = await _picture(session, _png((1600, 1200)))
+    archived = (await session.exec(select(File).where(File.id == file.id))).one()
+    archived.archived_at = datetime.now(timezone.utc)
+    session.add(archived)
+    await session.commit()
+
+    await thumbnails.draw_pending(session, guild.id)
+
+    assert (await _version(session, file)).thumbnail_state == "ready"
+
+
 async def test_a_small_picture_is_its_own_thumbnail(session, stored):
     guild, file = await _picture(session, _png((200, 120)))
 

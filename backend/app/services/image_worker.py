@@ -33,13 +33,13 @@ def answer(request: dict[str, Any], edge: int) -> dict[str, Any]:
                 picture = ImageOps.exif_transpose(opened) or opened
                 if max(picture.size) <= edge:
                     return {"original": True}
-                picture.thumbnail((edge, edge), Image.Resampling.LANCZOS)
                 # WebP takes RGB or RGBA; palette and greyscale pictures are
-                # converted, and an animation keeps its first frame.
+                # converted first, keeping a palette's transparency, so they
+                # are resampled smoothly. An animation keeps its first frame.
                 if picture.mode not in ("RGB", "RGBA"):
-                    picture = picture.convert(
-                        "RGBA" if "A" in picture.getbands() else "RGB"
-                    )
+                    clear = "A" in picture.getbands() or "transparency" in picture.info
+                    picture = picture.convert("RGBA" if clear else "RGB")
+                picture.thumbnail((edge, edge), Image.Resampling.LANCZOS)
                 out = io.BytesIO()
                 picture.save(out, format="WEBP", quality=80, method=4)
                 width, height = picture.size

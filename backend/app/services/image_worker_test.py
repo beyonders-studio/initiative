@@ -24,6 +24,19 @@ def test_a_large_picture_is_drawn_to_the_edge(tmp_path):
     assert thumbnail.size == (640, 320) == (reply["width"], reply["height"])
 
 
+def test_a_transparent_palette_picture_stays_transparent(tmp_path):
+    path = tmp_path / "clear.png"
+    picture = Image.new("P", (1000, 1000), 0)
+    picture.putpalette([0, 0, 0, 255, 0, 0])
+    picture.save(path, format="PNG", transparency=0)
+
+    reply = answer({"path": str(path), "format": "PNG"}, 640)
+
+    thumbnail = Image.open(io.BytesIO(base64.b64decode(reply["thumbnail"])))
+    assert thumbnail.mode == "RGBA"
+    assert thumbnail.getpixel((10, 10))[3] == 0
+
+
 def test_a_small_picture_is_its_own_thumbnail(tmp_path):
     reply = answer({"path": _picture(tmp_path, (300, 200)), "format": "PNG"}, 640)
 

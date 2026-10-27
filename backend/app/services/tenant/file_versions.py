@@ -162,14 +162,17 @@ async def add_version(session: AsyncSession, parent: Any, **fields: Any) -> Any:
 def copy_version(session: AsyncSession, version: Any, copy: Any, **values: Any) -> Any:
     """Version 1 of ``copy``, carrying ``version``'s file, made current.
     ``values`` set what differs from it: the copy's author, a copied file. A
-    thumbnail is the version's own, so the copy's is drawn again."""
+    file version's thumbnail is its own, so the copy's is drawn again."""
+    from app.models.tenant.file import FileVersion
+
     model, column = _history(copy)
+    left = {"version_number", "created_at"}
+    if model is FileVersion:
+        left |= {"thumbnail_url", "thumbnail_state"}
     carried = {
         c.name: getattr(version, c.name)
         for c in model.__table__.columns
-        if not (c.primary_key or c.foreign_keys)
-        and c.name
-        not in ("version_number", "created_at", "thumbnail_url", "thumbnail_state")
+        if not (c.primary_key or c.foreign_keys) and c.name not in left
     }
     return _new_version(
         session,

@@ -84,16 +84,19 @@ def shutdown() -> None:
 
 def _draw(guild_id: int, key: str, picture_format: str) -> dict[str, Any]:
     """The worker's answer for the stored picture ``key``. Blocks; the worker
-    reads the picture from disk, so one kept elsewhere is copied there
-    first."""
+    reads the picture from disk, so one kept elsewhere is copied there first,
+    within the time drawing it may take."""
     blob = get_guild_storage(guild_id).open_readable(key)
     if blob is None:
         return {"error": "the picture is not stored"}
     request = {"format": picture_format}
     if blob.path is not None:
         return _the_pool().ask({**request, "path": str(blob.path)})
+    deadline = time.monotonic() + TIME_MS / 1000
     with tempfile.NamedTemporaryFile() as copy:
         for chunk in blob.stream or ():
+            if time.monotonic() > deadline:
+                return {"error": "the picture took too long to fetch"}
             copy.write(chunk)
         copy.flush()
         return _the_pool().ask({**request, "path": copy.name})
