@@ -64,9 +64,10 @@ def _value(value: Any) -> Any:
 # ``'Q1 Actuals'!A1``, and separates them with ``,``.
 
 #: One end of a bracketed reference: a sheet (``$`` marks it absolute), a dot,
-#: then a cell, a column or a row.
+#: then a cell, a column or a row, each part ``$`` when it stays put.
 _END = re.compile(
-    r"^\$?(?P<sheet>'(?:[^']|'')*'|[^.']*)\.(?P<cell>\$?[A-Za-z]*\$?[0-9]*)$"
+    r"^\$?(?P<sheet>'(?:[^']|'')*'|[^.']*)\."
+    r"(?P<fixed_col>\$?)(?P<col>[A-Za-z]*)(?P<fixed_row>\$?)(?P<row>[0-9]*)$"
 )
 #: A sheet name the grid writes without quotes; anything else is quoted.
 _BARE = re.compile(r"^[A-Za-z_\u007F-￿][A-Za-z0-9_.\u007F-￿]*$")
@@ -104,35 +105,82 @@ def _ends(inner: str) -> Iterator[str]:
     yield inner[start:]
 
 
-def _reference(inner: str) -> str | None:
-    """A bracketed reference as the grid writes it; ``None`` for one it has no
-    way to write: another file's, an error, a range across sheets."""
+def _column_number(letters: str) -> int:
+    number = 0
+    for letter in letters.upper():
+        number = number * 26 + ord(letter) - ord("A") + 1
+    return number
+
+
+def _column_letters(number: int) -> str:
+    letters = ""
+    while number:
+        number, rest = divmod(number - 1, 26)
+        letters = chr(ord("A") + rest) + letters
+    return letters
+
+
+def _end(match: re.Match[str], down: int, right: int) -> str | None:
+    """One end of a reference, moved ``down`` rows and ``right`` columns
+    unless it is fixed; ``None`` for one moved off the sheet or naming
+    neither a column nor a row."""
+    col, row = match["col"], match["row"]
+    if not col and not row:
+        return None
+    if col and not match["fixed_col"]:
+        moved = _column_number(col) + right
+        if moved < 1:
+            return None
+        col = _column_letters(moved)
+    if row and not match["fixed_row"]:
+        moved = int(row) + down
+        if moved < 1:
+            return None
+        row = str(moved)
+    return f"{match['fixed_col']}{col.upper()}{match['fixed_row']}{row}"
+
+
+def _reference(inner: str, down: int, right: int) -> str | None:
+    """A bracketed reference as the grid writes it, moved for a repeated
+    cell; ``None`` for one it has no way to write: another file's, an error,
+    a range across sheets."""
     sheets, cells = [], []
     for end in _ends(inner):
         match = _END.match(end)
-        if match is None or not match["cell"]:
+        cell = _end(match, down, right) if match is not None else None
+        if match is None or cell is None:
             return None
         sheets.append(match["sheet"])
-        cells.append(match["cell"].upper())
+        cells.append(cell)
     if len(cells) > 2 or any(sheet and sheet != sheets[0] for sheet in sheets[1:]):
         return None
     prefix = _sheet_prefix(sheets[0]) if sheets[0] else ""
     return prefix + ":".join(cells)
 
 
-def grid_formula(formula: str) -> str | None:
+def grid_formula(formula: str, down: int = 0, right: int = 0) -> str | None:
     """An OpenDocument cell's ``table:formula`` as the grid writes one, or
-    ``None`` for one it can't."""
+    ``None`` for one it can't. A cell repeated ``down`` rows and ``right``
+    columns from the one that spells it moves its references as a filled cell
+    does: all but the parts marked ``$``."""
     namespace, _, body = formula.partition(":")
     if namespace == "msoxl" and body.startswith("="):
         return body
     if namespace not in ("of", "oooc") or not body.startswith("="):
         return None
     out: list[str] = []
+    # What lies outside strings and references, where function names are.
+    plain: list[str] = []
+
+    def flush() -> None:
+        out.append(_FUNCTION_PREFIXES.sub("", "".join(plain)))
+        plain.clear()
+
     index = 0
     while index < len(body):
         char = body[index]
         if char == '"':
+            flush()
             # A string, copied as it is, ``""`` and all.
             end = index + 1
             while end < len(body) and not (
@@ -142,16 +190,20 @@ def grid_formula(formula: str) -> str | None:
             out.append(body[index : end + 1])
             index = end + 1
         elif char == "[":
+            flush()
             end = body.find("]", index)
-            reference = _reference(body[index + 1 : end]) if end > 0 else None
+            reference = (
+                _reference(body[index + 1 : end], down, right) if end > 0 else None
+            )
             if reference is None:
                 return None
             out.append(reference)
             index = end + 1
         else:
-            out.append("," if char == ";" else char)
+            plain.append("," if char == ";" else char)
             index += 1
-    return _FUNCTION_PREFIXES.sub("", "".join(out))
+    flush()
+    return "".join(out)
 
 
 _TABLE = "{urn:oasis:names:tc:opendocument:xmlns:table:1.0}"
@@ -159,12 +211,18 @@ _ROW = f"{_TABLE}table-row"
 _CELLS = (f"{_TABLE}table-cell", f"{_TABLE}covered-table-cell")
 
 
-def _ods_formulas(path: str, rows: int, cols: int) -> dict[str, dict[str, str]]:
+def _ods_formulas(
+    path: str, cells: int, rows: int, cols: int
+) -> dict[str, dict[str, str]]:
     """Each sheet's formulas by ``"row:col"``, as the grid writes them, read
-    from the workbook's ``content.xml``; within ``rows`` and ``cols``."""
+    from the workbook's ``content.xml``; within ``rows`` and ``cols``, and no
+    more than ``cells`` of them. A repeated row or cell spells its formula
+    once, for the first; each repeat has it moved to where it sits."""
     found: dict[str, dict[str, str]] = {}
     sheet: dict[str, str] | None = None
     row = col = 0
+    # The current row's formulas: where each starts, how often it repeats.
+    spelled: list[tuple[int, int, str]] = []
     with zipfile.ZipFile(path) as package, package.open("content.xml") as content:
         for event, element in iterparse(content, events=("start", "end")):
             tag = element.tag
@@ -173,20 +231,28 @@ def _ods_formulas(path: str, rows: int, cols: int) -> dict[str, dict[str, str]]:
                     sheet = found.setdefault(element.get(f"{_TABLE}name", ""), {})
                     row = 0
                 elif tag == _ROW:
-                    col = 0
+                    col, spelled = 0, []
                 continue
             if tag in _CELLS:
                 repeat = int(element.get(f"{_TABLE}number-columns-repeated", "1"))
                 formula = element.get(f"{_TABLE}formula")
-                if formula and sheet is not None and row < rows:
-                    written = grid_formula(formula)
-                    if written is not None:
-                        for c in range(col, min(col + repeat, cols)):
-                            sheet[f"{row}:{c}"] = written
+                if formula and col < cols:
+                    spelled.append((col, repeat, formula))
                 col += repeat
                 element.clear()
             elif tag == _ROW:
-                row += int(element.get(f"{_TABLE}number-rows-repeated", "1"))
+                repeat = int(element.get(f"{_TABLE}number-rows-repeated", "1"))
+                for down in range(min(repeat, max(rows - row, 0))):
+                    for start, across, formula in spelled:
+                        for right in range(min(across, cols - start)):
+                            written = grid_formula(formula, down, right)
+                            if written is None or sheet is None:
+                                continue
+                            sheet[f"{row + down}:{start + right}"] = written
+                            cells -= 1
+                            if cells < 0:
+                                raise _TooLarge
+                row += repeat
                 element.clear()
     return found
 
@@ -200,7 +266,7 @@ def answer(
     """The sheets a workbook holds, or why it can't be read."""
     try:
         formulas = (
-            _ods_formulas(request["path"], rows, cols)
+            _ods_formulas(request["path"], cells, rows, cols)
             if request["path"].lower().endswith(".ods")
             else {}
         )

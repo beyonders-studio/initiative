@@ -350,8 +350,9 @@ def test_a_sparse_sheet_with_a_distant_corner_is_refused() -> None:
     assert excinfo.value.code == FileMessages.SPREADSHEET_FILE_TOO_LARGE
 
 
-def _ods(rows: list[list[str]], *, name: str = "Budget") -> bytes:
-    """An OpenDocument spreadsheet holding ``rows`` of text and numbers."""
+def _ods(rows: list[list[str]], *, name: str = "Budget", repeat_last: int = 1) -> bytes:
+    """An OpenDocument spreadsheet holding ``rows`` of text, numbers and
+    formulas, its last row repeated ``repeat_last`` times."""
     import io
     import zipfile
 
@@ -374,8 +375,14 @@ def _ods(rows: list[list[str]], *, name: str = "Budget") -> bytes:
         )
 
     body = "".join(
-        "<table:table-row>" + "".join(cell(v) for v in row) + "</table:table-row>"
-        for row in rows
+        (
+            f'<table:table-row table:number-rows-repeated="{repeat_last}">'
+            if index == len(rows) - 1
+            else "<table:table-row>"
+        )
+        + "".join(cell(v) for v in row)
+        + "</table:table-row>"
+        for index, row in enumerate(rows)
     )
     content = (
         '<?xml version="1.0" encoding="UTF-8"?>'
@@ -422,6 +429,18 @@ def test_an_ods_keeps_its_formulas_where_they_were() -> None:
     (sheet,) = parse_spreadsheet_file("budget.ods", _ods(rows))
 
     assert sheet["cells"]["1:2"] == "=SUM(A1:B1)"
+
+
+def test_a_repeated_row_keeps_its_formula_moved_to_each_row() -> None:
+    rows = [["1", "of:=[.A1]*2"]]
+
+    (sheet,) = parse_spreadsheet_file("budget.ods", _ods(rows, repeat_last=3))
+
+    assert [sheet["cells"][f"{r}:1"] for r in range(3)] == [
+        "=A1*2",
+        "=A2*2",
+        "=A3*2",
+    ]
 
 
 def test_a_file_calamine_cannot_read_is_refused() -> None:
