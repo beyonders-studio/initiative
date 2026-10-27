@@ -23,7 +23,6 @@ import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { ConfirmDialog } from "@/components/ui/confirm-dialog";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
-import { useAppConfig } from "@/hooks/useAppConfig";
 import {
   useDeleteFileVersion,
   useFileVersions,
@@ -32,7 +31,7 @@ import {
 } from "@/hooks/useFiles";
 import { useRelativeTime } from "@/hooks/useRelativeTime";
 import { formatBytes, getFileExtension, getFileTypeLabel } from "@/lib/fileUtils";
-import { toast } from "@/lib/mascotToast";
+import { numberFormat } from "@/lib/intl";
 import { resolveFileDownloadUrl, resolveFileVersionDownloadUrl } from "@/lib/uploadUrl";
 import { cn } from "@/lib/utils";
 import { drawVideoFrame } from "@/lib/videoFrame";
@@ -93,8 +92,11 @@ export const UploadedFileViewer = ({
   canDeleteVersions = false,
   thumbnailUrl = null,
 }: UploadedFileViewerProps) => {
-  const { t } = useTranslation(["files", "common"]);
-  const { maxUploadBytes } = useAppConfig();
+  const { t, i18n } = useTranslation(["files", "common"]);
+  const percent = numberFormat(i18n.resolvedLanguage ?? i18n.language, {
+    style: "percent",
+    maximumFractionDigits: 0,
+  });
 
   // ── Version history ─────────────────────────────────────────────────────
   const { data: versions } = useFileVersions(fileId);
@@ -102,6 +104,10 @@ export const UploadedFileViewer = ({
   const deleteVersion = useDeleteFileVersion();
   const { mutate: putVideoThumbnail } = usePutVideoThumbnail();
   const versionInputRef = useRef<HTMLInputElement>(null);
+  // How much of a new version has arrived, and how to stop it on leaving.
+  const [versionSent, setVersionSent] = useState(0);
+  const sendingVersion = useRef<AbortController | null>(null);
+  useEffect(() => () => sendingVersion.current?.abort(), []);
   const [selectedVersionId, setSelectedVersionId] = useState<number | null>(null);
   const [versionsOpen, setVersionsOpen] = useState(false);
   const [versionPendingDelete, setVersionPendingDelete] = useState<FileVersionRead | null>(null);
@@ -238,12 +244,15 @@ export const UploadedFileViewer = ({
     const file = event.target.files?.[0];
     event.target.value = "";
     if (!file) return;
-    if (maxUploadBytes !== null && file.size > maxUploadBytes) {
-      toast.error(t("create.fileTooLarge"));
-      return;
-    }
+    sendingVersion.current = new AbortController();
+    setVersionSent(0);
     uploadVersion.mutate(
-      { fileId, file },
+      {
+        fileId,
+        file,
+        signal: sendingVersion.current.signal,
+        onProgress: (arrived, total) => setVersionSent(total ? arrived / total : 1),
+      },
       {
         // Show the newly uploaded (now current) version.
         onSuccess: () => {
@@ -352,7 +361,11 @@ export const UploadedFileViewer = ({
                   size="sm"
                   aria-label={t("versions.label")}
                 >
-                  <History className="h-4 w-4" />
+                  {uploadVersion.isPending ? (
+                    <Loader2 className="h-4 w-4 animate-spin" />
+                  ) : (
+                    <History className="h-4 w-4" />
+                  )}
                   {t("versions.label")}
                   {versions.length > 1 && (
                     <Badge variant="secondary" className="px-1.5">
@@ -377,7 +390,9 @@ export const UploadedFileViewer = ({
                       ) : (
                         <Upload className="h-3.5 w-3.5" />
                       )}
-                      {t("versions.uploadNew")}
+                      {uploadVersion.isPending
+                        ? t("create.uploadingProgress", { percent: percent.format(versionSent) })
+                        : t("versions.uploadNew")}
                     </Button>
                   )}
                 </div>

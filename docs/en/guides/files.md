@@ -25,8 +25,8 @@ page — any view — and **New file** opens on the **Upload file** tab with it
 ready to go. Or drop it on the box in that tab instead of hunting for it in a
 file picker.
 
-!!! info "50 MB per uploaded file"
-    Plenty for almost anything that isn't video. For the things that are, use a **Smart link** to point at wherever it already lives instead.
+!!! info "Big files are fine"
+    Video, the forty-minute recording of the AGM, the photo archive somebody finally zipped up. A large file goes up in pieces, so if the Wi-Fi drops halfway, it carries on from where it stopped rather than starting again. Pick the same file again after closing the tab and it does the same. The only limit is your community's storage, if it has one.
 
 ## Making one
 

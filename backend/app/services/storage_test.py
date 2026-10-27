@@ -7,6 +7,9 @@ SSE params, and the serve adapter. Integration against a real S3-compatible
 endpoint (e.g. a Garage instance) is left to manual/CI runs.
 """
 
+import io
+import zipfile
+
 import pytest
 from botocore.exceptions import ClientError
 from fastapi.responses import FileResponse, StreamingResponse
@@ -23,6 +26,7 @@ from app.services.storage import (
     requested_range,
     get_guild_storage,
     get_storage,
+    open_seekable,
 )
 
 
@@ -104,6 +108,9 @@ class _FakeBody:
     def __init__(self, data: bytes) -> None:
         self._data = data
 
+    def read(self) -> bytes:
+        return self._data
+
     def iter_chunks(self, chunk_size: int = 65536):
         for i in range(0, len(self._data), chunk_size):
             yield self._data[i : i + chunk_size]
@@ -117,6 +124,8 @@ class FakeS3Client:
         self.presigned: list[tuple] = []
         # Keys delete_objects should report as failed (not actually removed).
         self.delete_errors: set[str] = set()
+        self.parts: dict[int, bytes] = {}
+        self.multipart_open = False
 
     @staticmethod
     def _missing(op: str) -> ClientError:
@@ -168,6 +177,38 @@ class FakeS3Client:
             answer["ContentRange"] = f"bytes {start}-{end}/{len(body)}"
             body = body[start : end + 1]
         return {**answer, "Body": _FakeBody(body), "ContentLength": len(body)}
+
+    def create_multipart_upload(self, *, Bucket, Key):
+        self.parts, self.multipart_open, self.multipart_key = {}, True, Key
+        return {"UploadId": "up-1"}
+
+    def list_multipart_uploads(self, *, Bucket, Prefix):
+        open_ = self.multipart_open and self.multipart_key.startswith(Prefix)
+        uploads = [{"Key": self.multipart_key, "UploadId": "up-1"}] if open_ else []
+        return {"Uploads": uploads, "IsTruncated": False}
+
+    def upload_part(self, *, Bucket, Key, UploadId, PartNumber, Body):
+        assert UploadId == "up-1" and self.multipart_open
+        self.parts[PartNumber] = Body
+        return {"ETag": f"etag-{PartNumber}"}
+
+    def complete_multipart_upload(self, *, Bucket, Key, UploadId, MultipartUpload):
+        if not self.multipart_open:
+            raise ClientError(
+                {"Error": {"Code": "NoSuchUpload", "Message": "gone"}},
+                "CompleteMultipartUpload",
+            )
+        numbers = [part["PartNumber"] for part in MultipartUpload["Parts"]]
+        self.objects[(Bucket, Key)] = {
+            "Body": b"".join(self.parts[n] for n in numbers),
+            "extra": {},
+        }
+        self.multipart_open = False
+        return {}
+
+    def abort_multipart_upload(self, *, Bucket, Key, UploadId):
+        self.multipart_open = False
+        return {}
 
     def generate_presigned_url(self, op, *, Params, ExpiresIn):
         self.presigned.append((op, Params, ExpiresIn))
@@ -243,6 +284,59 @@ def test_s3_open_readable_round_trip():
     assert b"".join(blob.stream) == b"hello world"
 
 
+def test_s3_stages_a_file_in_parts_with_a_tail_between_requests():
+    client, storage = _s3()
+    state = storage.start_parts("resumable-a", part_bytes=8)
+
+    state = storage.add_part("resumable-a", state, b"first---")
+    # A request's last few bytes wait apart, below S3's least part.
+    state = storage.keep_tail("resumable-a", state, b"sec")
+    assert ("bucket", "guild_7/resumable-a-tail") in client.objects
+    tail, state = storage.take_tail("resumable-a", state)
+    state = storage.add_part("resumable-a", state, tail + b"ond")
+    storage.finish_parts("resumable-a", state)
+
+    blob = storage.open_readable("resumable-a")
+    assert b"".join(blob.stream) == b"first---second"
+    assert ("bucket", "guild_7/resumable-a-tail") not in client.objects
+    assert state["stored"] == 14
+
+
+def test_s3_reads_back_only_the_tail_that_was_recorded():
+    """A tail written by a request whose record did not land starts with the
+    one recorded before it."""
+    _, storage = _s3()
+    state = storage.start_parts("resumable-c", part_bytes=8)
+    recorded = storage.keep_tail("resumable-c", state, b"abc")
+    storage.keep_tail("resumable-c", recorded, b"abcdef")
+
+    tail, _ = storage.take_tail("resumable-c", recorded)
+
+    assert tail == b"abc"
+
+
+def test_s3_finishing_twice_finds_the_object_there():
+    _, storage = _s3()
+    state = storage.start_parts("resumable-d", part_bytes=8)
+    state = storage.add_part("resumable-d", state, b"whole")
+    storage.finish_parts("resumable-d", state)
+
+    storage.finish_parts("resumable-d", state)
+
+    assert b"".join(storage.open_readable("resumable-d").stream) == b"whole"
+
+
+def test_s3_drops_a_staged_file_whole():
+    client, storage = _s3()
+    state = storage.start_parts("resumable-b", part_bytes=8)
+    state = storage.keep_tail("resumable-b", state, b"abc")
+
+    storage.drop_parts("resumable-b", state)
+
+    assert client.multipart_open is False
+    assert not client.objects
+
+
 def test_s3_open_readable_reads_the_range_asked_for():
     _, storage = _s3()
     storage.write("clip.mp4", b"hello world", content_type="video/mp4")
@@ -286,6 +380,24 @@ def test_build_upload_response_stream_answers_a_range_partially():
     assert resp.status_code == 206
     assert resp.headers["Content-Range"] == "bytes 6-10/11"
     assert resp.headers["Accept-Ranges"] == "bytes"
+
+
+def test_s3_open_seekable_reads_a_zips_list_without_the_whole_object():
+    client, storage = _s3()
+    packed = io.BytesIO()
+    with zipfile.ZipFile(packed, "w") as package:
+        package.writestr("AndroidManifest.xml", "x" * 300_000)
+    storage.write("app.zip", packed.getvalue())
+    reads = []
+    get_object = client.get_object
+    client.get_object = lambda **params: reads.append(params) or get_object(**params)
+
+    source = open_seekable(storage, "app.zip", len(packed.getvalue()))
+    assert source is not None
+    assert zipfile.ZipFile(source).namelist() == ["AndroidManifest.xml"]
+
+    assert all("Range" in params for params in reads)
+    assert open_seekable(storage, "nope.zip", 10) is None
 
 
 def test_s3_open_readable_missing_returns_none():
@@ -376,12 +488,14 @@ def test_s3_delete_prefix_sweeps_namespace():
     # An object in a *different* guild's namespace must survive.
     other = S3Storage(bucket="bucket", client=client, prefix="guild_8/")
     other.write("c.bin", b"3")
+    storage.start_parts("resumable-a", part_bytes=8)
 
     removed = storage.delete_prefix()
     assert removed == 2
     assert ("bucket", "guild_7/a.bin") not in client.objects
     assert ("bucket", "guild_7/b.bin") not in client.objects
     assert ("bucket", "guild_8/c.bin") in client.objects  # untouched
+    assert client.multipart_open is False
 
 
 def test_s3_delete_prefix_refuses_empty_prefix():
@@ -521,6 +635,19 @@ def test_dualread_delete_prefix_sums_both(tmp_path):
     s3.write("b", b"2")
     local.write("c", b"3")
     assert dual.delete_prefix() == 3
+
+
+def test_dualread_finishes_an_upload_where_it_was_started(tmp_path):
+    client, s3, local, dual = _dual(tmp_path)
+    begun = local.start_parts("resumable-a", part_bytes=8)
+
+    state = dual.add_part("resumable-a", begun, b"before the move")
+    dual.finish_parts("resumable-a", state)
+
+    assert dual.holds_parts(state) and not s3.holds_parts(state)
+    assert local.open_readable("resumable-a").path.read_bytes() == b"before the move"
+    assert client.multipart_open is False
+    assert s3.holds_parts(dual.start_parts("resumable-b", part_bytes=8))
 
 
 def test_dualread_copy_cross_store(tmp_path):

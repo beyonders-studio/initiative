@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import asyncio
+import functools
 import hashlib
 import io
 import json
@@ -11,7 +12,16 @@ import zipfile
 from contextlib import asynccontextmanager
 from datetime import datetime, timedelta, timezone
 from pathlib import Path
-from typing import Any, AsyncIterator, Dict, Iterable, Mapping, Set, Tuple
+from typing import (
+    Any,
+    AsyncIterator,
+    BinaryIO,
+    Dict,
+    Iterable,
+    Mapping,
+    Set,
+    Tuple,
+)
 from urllib.parse import urlparse
 from uuid import uuid4
 
@@ -25,7 +35,7 @@ from app.core.image_headers import read_image_header
 from app.db.advisory_locks import LockNamespace, advisory_lock
 from app.db.query import ids_in
 from app.services.platform import billing_changes
-from app.services.storage import get_guild_storage
+from app.services.storage import get_guild_storage, open_seekable
 
 logger = logging.getLogger(__name__)
 
@@ -769,30 +779,30 @@ def detect_mime_type(content: bytes) -> str | None:
         return None
 
 
-def _zip_names(content: bytes) -> list[str]:
+def _zip_names(source: BinaryIO) -> list[str]:
     try:
-        with zipfile.ZipFile(io.BytesIO(content)) as package:
+        with zipfile.ZipFile(source) as package:
             return package.namelist()
     except zipfile.BadZipFile:
         return []
 
 
-def _is_app_package(content: bytes) -> bool:
+def _is_app_package(source: BinaryIO) -> bool:
     """Whether a zip is a Java, Android or iOS app."""
     return any(
         name in ("META-INF/MANIFEST.MF", "AndroidManifest.xml")
         or (name.startswith("Payload/") and ".app/" in name)
-        for name in _zip_names(content)
+        for name in _zip_names(source)
     )
 
 
-def _name_settles(detected: str, named: str, content: bytes) -> bool:
+def _name_settles(detected: str, named: str, source: BinaryIO) -> bool:
     """Whether a file's name may make it ``named`` where its bytes said
     ``detected``: only where the bytes say no more than the family."""
     if detected in _PLAIN_TEXT:
         return named.startswith("text/") or named == "application/json"
     if named in _OFFICE_PACKAGES:
-        return "[Content_Types].xml" in _zip_names(content)
+        return "[Content_Types].xml" in _zip_names(source)
     return named in _OFFICE_CONTAINERS and detected in _CONTAINER_TYPES
 
 
@@ -811,19 +821,49 @@ def validate_file(content: bytes, filename: str | None) -> Tuple[str, str]:
         )
     if not content:
         raise ValueError("Uploaded file is empty")
+    return _type_of(detect_mime_type(content), io.BytesIO(content), filename)
 
+
+@functools.cache
+def _head_bytes() -> int:
+    """How much of a file the type library reads to name its type."""
+    import magic
+
+    return magic.Magic(mime=True).getparam(magic.MAGIC_PARAM_BYTES_MAX)
+
+
+def validate_stored(guild_id: int, key: str, size: int, filename: str | None) -> str:
+    """The type of a file already in the guild's storage under ``key``, a
+    finished resumable upload, read as :func:`validate_file` reads one: from
+    its first bytes, and from a zip's own list of what it holds, without
+    fetching the rest. Raises as :func:`validate_file` does."""
+    if not size:
+        raise ValueError("Uploaded file is empty")
+    source = open_seekable(get_guild_storage(guild_id), key, size)
+    if source is None:
+        raise ValueError("Uploaded file is missing")
+    with source:
+        detected = detect_mime_type(source.read(_head_bytes()))
+        return _type_of(detected, source, filename)[0]
+
+
+def _type_of(
+    detected: str | None, source: BinaryIO, filename: str | None
+) -> Tuple[str, str]:
+    """The type and stored extension of a file whose bytes said ``detected``,
+    with ``source`` to read a zip's list from."""
     # Read as the name the file is kept and downloaded under.
     filename = display_filename(filename)
-    detected = detect_mime_type(content) or "application/octet-stream"
+    detected = detected or "application/octet-stream"
     if is_refused(detected, filename) or (
-        detected == "application/zip" and _is_app_package(content)
+        detected == "application/zip" and _is_app_package(source)
     ):
         raise RefusedFileTypeError(f"Refused file type: {detected}")
     named_type = type_of_name(filename)
     mime = detected
     if named_type is not None and named_type is not type_of_media(detected):
         named = spec_of(named_type).media_types[0]
-        if _name_settles(detected, named, content):
+        if _name_settles(detected, named, source):
             mime = named
     extensions = spec_of(type_of_media(mime)).extensions
     suffix = Path(filename).suffix.lower() if filename else ""
@@ -877,21 +917,48 @@ async def store_upload(
     with what shows it is kept for; without it the file waits to be claimed
     (:func:`claim_uploads`).
     """
-    from app.models.tenant.upload import Upload
-
     await asyncio.to_thread(
         get_guild_storage(guild_id).write,
         filename,
         data,
         content_type=content_type or "application/octet-stream",
     )
+    return record_upload(
+        session,
+        guild_id=guild_id,
+        filename=filename,
+        size=len(data),
+        content_type=content_type,
+        content_hash=compute_content_hash(data),
+        created_by=created_by,
+        initiative_id=initiative_id,
+    )
+
+
+def record_upload(
+    session,
+    *,
+    guild_id: int,
+    filename: str,
+    size: int,
+    content_type: str | None,
+    content_hash: str | None,
+    created_by: int | None,
+    initiative_id: int | None,
+) -> str:
+    """Record what is already in the guild's storage as ``filename`` in
+    ``uploads``, as :func:`store_upload` records what it writes, and return
+    its served URL. A finished resumable upload is recorded where it was
+    staged, without its hash, which would mean reading it all again."""
+    from app.models.tenant.upload import Upload
+
     session.add(
         Upload(
             filename=filename,
             created_by=created_by,
-            size_bytes=len(data),
+            size_bytes=size,
             content_type=content_type,
-            content_hash=compute_content_hash(data),
+            content_hash=content_hash,
             initiative_id=initiative_id,
             claimed_at=None if initiative_id is None else datetime.now(timezone.utc),
         )
@@ -904,20 +971,24 @@ async def store_upload(
 async def get_guild_storage_usage(guild_id: int) -> int:
     """Total stored blob bytes for the guild — ``SUM(uploads.size_bytes)`` over
     every upload it stores but the thumbnails the app made
-    (:data:`THUMBNAIL_PREFIX`), read on :func:`guild_wide`."""
+    (:data:`THUMBNAIL_PREFIX`), plus the declared length of every file still
+    arriving (``pending_uploads``), read on :func:`guild_wide`."""
     from sqlalchemy import func
     from sqlmodel import col, select
 
+    from app.models.tenant.pending_upload import PendingUpload
     from app.models.tenant.upload import Upload
 
+    stored = (
+        select(func.coalesce(func.sum(Upload.size_bytes), 0))
+        .where(~col(Upload.filename).startswith(THUMBNAIL_PREFIX))
+        .scalar_subquery()
+    )
+    arriving = select(
+        func.coalesce(func.sum(PendingUpload.length), 0)
+    ).scalar_subquery()
     async with guild_wide(guild_id) as session:
-        return (
-            await session.exec(
-                select(func.coalesce(func.sum(Upload.size_bytes), 0)).where(
-                    ~col(Upload.filename).startswith(THUMBNAIL_PREFIX)
-                )
-            )
-        ).one()
+        return int((await session.exec(select(stored + arriving))).one())
 
 
 async def _storage_limit(guild_id: int) -> int | None:

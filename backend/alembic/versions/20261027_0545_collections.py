@@ -20,8 +20,8 @@ number of them. In ``guild_template`` and every ``guild_<id>``:
 The CHECKs that list kinds and parents, and their policies, are not touched
 here; a start renders the policies from the registries.
 
-Revision ID: 20261027_0544
-Revises: 20261027_0543
+Revision ID: 20261027_0545
+Revises: 20261027_0544
 Create Date: 2026-10-26
 """
 
@@ -30,8 +30,8 @@ from alembic import op
 
 from app.db.guild_migrations import run_for_each_guild_schema
 
-revision = "20261027_0544"
-down_revision = "20261027_0543"
+revision = "20261027_0545"
+down_revision = "20261027_0544"
 branch_labels = None
 depends_on = None
 

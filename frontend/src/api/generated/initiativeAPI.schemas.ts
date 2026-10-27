@@ -1228,11 +1228,13 @@ export interface BodyUploadBackup {
 export interface BodyUploadFile {
   name: string;
   initiative_id: number;
-  file: Blob | File;
+  file?: Blob | File | null;
+  upload_id?: string | null;
 }
 
 export interface BodyUploadFileVersion {
-  file: Blob | File;
+  file?: Blob | File | null;
+  upload_id?: string | null;
 }
 
 export interface BodyUploadListingPicture {

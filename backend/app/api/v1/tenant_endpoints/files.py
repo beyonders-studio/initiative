@@ -75,6 +75,7 @@ from app.schemas.tenant.file import (
 from app.schemas.tenant.tool import serialize_tool
 from app.schemas.tenant.resource_grant import initiative_readable
 from app.schemas.ai_generation import AIStreamEvent
+from app.services import resumable
 from app.services.tenant import attachments as attachments_service
 from app.services.tenant import thumbnails
 from app.services.tenant import file_versions
@@ -332,9 +333,11 @@ async def upload_file(
     guild_context: FilesWrite,
     name: str = Form(...),
     initiative_id: int = Form(...),
-    upload: UploadFile = FormFile(..., alias="file"),
+    upload: UploadFile | None = FormFile(None, alias="file"),
+    upload_id: str | None = Form(None),
 ) -> FileRead:
-    """Upload a file (PDF, DOCX, etc.)."""
+    """Upload a file: sent with the request as ``file``, or sent in pieces
+    before it as a resumable upload, named by ``upload_id``."""
     initiative = await resource_access.prepare_create(
         session, Tool.file, initiative_id, current_user, guild_context
     )
@@ -352,7 +355,7 @@ async def upload_file(
         detail=FileMessages.NAME_ALREADY_EXISTS,
     )
     stored = await _store_file(
-        session, guild_context, upload, initiative_id=initiative.id
+        session, guild_context, upload, upload_id, initiative_id=initiative.id
     )
 
     file = File(
@@ -390,30 +393,58 @@ async def upload_file(
 async def _store_file(
     session: AsyncSession,
     guild_context: ActorContext,
-    upload: UploadFile,
+    upload: UploadFile | None,
+    upload_id: str | None,
     *,
     initiative_id: int,
     keep_kind: FileKind | None = None,
 ) -> dict[str, Any]:
-    """Read an uploaded file, check it and store it, and return the version
-    columns it was stored as. ``keep_kind`` refuses a file of another kind."""
+    """Store the file sent with the request, or take the one sent in pieces
+    before it (``upload_id``, ``app.services.resumable``); check it, and
+    return the version columns it was stored as. ``keep_kind`` refuses a file
+    of another kind."""
+    if (upload is None) == (upload_id is None):
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail=FileMessages.INVALID_FILE,
+        )
     guild_id = guild_context.guild_id
     # Pick up a backend/credential change saved in another worker before writing.
     await storage_config.ensure_storage_config_fresh(session)
-    # Read the body with a hard cap so an over-limit upload is rejected before
-    # the whole payload is buffered into memory.
+    contents = b""
     try:
-        contents = await attachments_service.read_upload_bounded(
-            upload, attachments_service.MAX_FILE_SIZE
-        )
+        if upload_id is not None:
+            staged = await resumable.take(
+                session,
+                guild_id,
+                upload_id,
+                purpose="file",
+                user_id=guild_context.user_id,
+                initiative_id=initiative_id,
+            )
+            mime_type = await asyncio.to_thread(
+                attachments_service.validate_stored,
+                guild_id,
+                staged.staging_key,
+                staged.length,
+                staged.filename,
+            )
+            original_filename, size = staged.filename, staged.length
+        else:
+            assert upload is not None
+            # Read the body with a hard cap so an over-limit upload is
+            # rejected before the whole payload is buffered into memory.
+            contents = await attachments_service.read_upload_bounded(
+                upload, attachments_service.MAX_FILE_SIZE
+            )
+            mime_type, extension = attachments_service.validate_file(
+                content=contents, filename=upload.filename
+            )
+            original_filename, size = upload.filename, len(contents)
     except attachments_service.FileTooLargeError:
         raise HTTPException(
             status_code=status.HTTP_413_CONTENT_TOO_LARGE,
             detail=FileMessages.FILE_TOO_LARGE,
-        )
-    try:
-        mime_type, extension = attachments_service.validate_file(
-            content=contents, filename=upload.filename
         )
     except attachments_service.RefusedFileTypeError:
         raise HTTPException(
@@ -430,23 +461,37 @@ async def _store_file(
             status_code=status.HTTP_400_BAD_REQUEST,
             detail=FileMessages.VERSION_TYPE_MISMATCH,
         )
-    await attachments_service.enforce_storage_quota(
-        session, guild_id=guild_id, incoming_bytes=len(contents)
-    )
-    file_url = await attachments_service.store_upload(
-        session,
-        guild_id=guild_id,
-        filename=attachments_service.new_upload_filename(extension),
-        data=contents,
-        content_type=mime_type,
-        created_by=guild_context.user_id,
-        initiative_id=initiative_id,
-    )
+    if upload_id is not None:
+        # Kept where it was staged; its room was held from the moment the
+        # upload was created.
+        file_url = attachments_service.record_upload(
+            session,
+            guild_id=guild_id,
+            filename=staged.staging_key,
+            size=size,
+            content_type=mime_type,
+            content_hash=None,
+            created_by=guild_context.user_id,
+            initiative_id=initiative_id,
+        )
+    else:
+        await attachments_service.enforce_storage_quota(
+            session, guild_id=guild_id, incoming_bytes=size
+        )
+        file_url = await attachments_service.store_upload(
+            session,
+            guild_id=guild_id,
+            filename=attachments_service.new_upload_filename(extension),
+            data=contents,
+            content_type=mime_type,
+            created_by=guild_context.user_id,
+            initiative_id=initiative_id,
+        )
     return {
         "file_url": file_url,
         "file_content_type": mime_type,
-        "file_size": len(contents),
-        "original_filename": upload.filename,
+        "file_size": size,
+        "original_filename": original_filename,
     }
 
 
@@ -460,9 +505,11 @@ async def upload_file_version(
     current_user: ActorUserDep,
     guild_context: FilesWrite,
     file_id: int,
-    upload: UploadFile = FormFile(..., alias="file"),
+    upload: UploadFile | None = FormFile(None, alias="file"),
+    upload_id: str | None = Form(None),
 ) -> FileVersionRead:
-    """Upload a new version of an uploaded file. Requires write access."""
+    """Upload a new version of an uploaded file, sent as ``file`` or as a
+    resumable upload named by ``upload_id``. Requires write access."""
     file = await resource_access.load_authorized(
         session, Tool.file, file_id, current_user, guild_context, access="write"
     )
@@ -477,6 +524,7 @@ async def upload_file_version(
         session,
         guild_context,
         upload,
+        upload_id,
         initiative_id=file.initiative_id,
         keep_kind=spec_of(file.file_type).kind,
     )

@@ -38,7 +38,7 @@ from app.testing.factories import (
 _VERSIONS = Path(__file__).resolve().parents[2] / "alembic" / "versions"
 _REVISION = _VERSIONS / "20261002_0444_a_mention_keeps_no_name.py"
 _FILES = _VERSIONS / "20261006_0464_documents_are_files.py"
-_COLLECTIONS = _VERSIONS / "20261027_0545_galleries_are_collections.py"
+_COLLECTIONS = _VERSIONS / "20261027_0546_galleries_are_collections.py"
 
 
 def _revision(path: Path = _REVISION) -> ModuleType:

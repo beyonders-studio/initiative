@@ -37,7 +37,7 @@ _VERSIONS = Path(__file__).resolve().parents[2] / "alembic" / "versions"
 _MIGRATION = _VERSIONS / "20260928_0414_an_upload_belongs_to_an_initiative.py"
 _FILE_VERSIONS = _VERSIONS / "20261005_0459_file_versions_by_pointer.py"
 _FILES = _VERSIONS / "20261006_0464_documents_are_files.py"
-_COLLECTIONS = _VERSIONS / "20261027_0545_galleries_are_collections.py"
+_COLLECTIONS = _VERSIONS / "20261027_0546_galleries_are_collections.py"
 
 
 def _load(path: Path = _MIGRATION) -> ModuleType:

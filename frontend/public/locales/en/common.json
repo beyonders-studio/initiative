@@ -292,8 +292,7 @@
   },
   "fileDrop": {
     "release": "Drop it here",
-    "unsupported": "That kind of file can't be uploaded here.",
-    "tooLarge": "That file is larger than this server accepts."
+    "unsupported": "That kind of file can't be uploaded here."
   },
   "archiveError": "Couldn't archive that. Please try again.",
   "unarchiveError": "Couldn't unarchive that. Please try again.",

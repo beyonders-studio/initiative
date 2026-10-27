@@ -40,6 +40,7 @@ from app.api.v1.tenant_endpoints import (
     events,
     exports,
     imports,
+    resumable_uploads,
     initiatives,
     marketplace as guild_marketplace,
     me_tools,
@@ -317,6 +318,7 @@ guild_router.include_router(exports.router, prefix="/exports", tags=["exports"])
 guild_router.include_router(demo.community_router, prefix="/demo", tags=["demo"])
 guild_router.include_router(demo.sales_router, prefix="/demo", tags=["demo"])
 guild_router.include_router(imports.router, prefix="/imports", tags=["imports"])
+guild_router.include_router(resumable_uploads.router, prefix="/resumable-uploads")
 guild_router.include_router(queues.router, **_tool_mount(Tool.queue))
 # Flat read-back routes, at the guild root: an event envelope names a
 # resource by its own id, so every evented resource must resolve from one.

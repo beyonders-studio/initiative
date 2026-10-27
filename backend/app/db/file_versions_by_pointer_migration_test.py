@@ -1,7 +1,7 @@
 """Migration 20261005_0459 points file documents and pictures at the version
 they show. Loaded by path and run on a guild the test builds, the way
 ``upload_initiative_backfill_test`` runs its revision: down to the old shape
-(20261027_0545's conversion and 20261006_0464's rename first), rows written as an older release wrote them,
+(20261027_0546's conversion and 20261006_0464's rename first), rows written as an older release wrote them,
 and up again."""
 
 from __future__ import annotations
@@ -24,7 +24,7 @@ from app.testing import (
 _VERSIONS = Path(__file__).resolve().parents[2] / "alembic" / "versions"
 _MIGRATION = _VERSIONS / "20261005_0459_file_versions_by_pointer.py"
 _FILES = _VERSIONS / "20261006_0464_documents_are_files.py"
-_COLLECTIONS = _VERSIONS / "20261027_0545_galleries_are_collections.py"
+_COLLECTIONS = _VERSIONS / "20261027_0546_galleries_are_collections.py"
 
 
 def _load(path: Path = _MIGRATION) -> ModuleType:

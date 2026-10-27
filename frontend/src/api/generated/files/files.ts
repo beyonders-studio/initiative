@@ -829,7 +829,8 @@ export function useGetCollectionFilesTimeline<
 }
 
 /**
- * Upload a file (PDF, DOCX, etc.).
+ * Upload a file: sent with the request as ``file``, or sent in pieces
+ * before it as a resumable upload, named by ``upload_id``.
  * @summary Upload File
  */
 export const uploadFile = (
@@ -917,13 +918,14 @@ export const useUploadFile = <TError = ErrorType<HTTPValidationError>, TContext 
   return useMutation(getUploadFileMutationOptions(options), queryClient);
 };
 /**
- * Upload a new version of an uploaded file. Requires write access.
+ * Upload a new version of an uploaded file, sent as ``file`` or as a
+ * resumable upload named by ``upload_id``. Requires write access.
  * @summary Upload File Version
  */
 export const uploadFileVersion = (
   communityId: number,
   fileId: number,
-  bodyUploadFileVersion: BodyType<BodyUploadFileVersion>,
+  bodyUploadFileVersion?: BodyType<BodyUploadFileVersion>,
   options?: SecondParameter<typeof apiMutator>,
   signal?: AbortSignal
 ) => {
@@ -981,12 +983,12 @@ export const getUploadFileVersionMutationOptions = <
 export type UploadFileVersionMutationResult = NonNullable<
   Awaited<ReturnType<typeof uploadFileVersion>>
 >;
-export type UploadFileVersionMutationBody = BodyType<BodyUploadFileVersion>;
+export type UploadFileVersionMutationBody = BodyType<BodyUploadFileVersion> | undefined;
 export type UploadFileVersionMutationError = ErrorType<HTTPValidationError>;
 export type UploadFileVersionMutationVariables = {
   communityId: number;
   fileId: number;
-  data: BodyType<BodyUploadFileVersion>;
+  data?: BodyType<BodyUploadFileVersion>;
 };
 
 /**

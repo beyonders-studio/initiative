@@ -29,7 +29,6 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
-import { useAppConfig } from "@/hooks/useAppConfig";
 import { useUploadFile } from "@/hooks/useFiles";
 import { type ToolRef, useRelate } from "@/hooks/useRelationships";
 import { fileIcon } from "@/lib/fileIcon";
@@ -81,7 +80,6 @@ export const AddLinkDialog = ({
   onClose,
 }: AddLinkDialogProps) => {
   const { t } = useTranslation(["relations", "files"]);
-  const { maxUploadBytes } = useAppConfig();
 
   /** Set only once somebody overrides what was proposed for what they picked. */
   const [groupKey, setGroupKey] = useState<RelationGroupKey | null>(null);
@@ -148,10 +146,6 @@ export const AddLinkDialog = ({
   };
 
   const chooseFile = (next: File) => {
-    if (maxUploadBytes !== null && next.size > maxUploadBytes) {
-      toast.error(t("files:create.fileTooLarge"));
-      return;
-    }
     if (farType !== SearchEntityType.file) setGroupKey(null);
     setPicked(null);
     setFile(next);

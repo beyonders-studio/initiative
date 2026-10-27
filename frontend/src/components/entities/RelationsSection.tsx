@@ -37,7 +37,6 @@ import {
 import { DropOverlay } from "@/components/ui/file-drop";
 import { HoverCard, HoverCardContent, HoverCardTrigger } from "@/components/ui/hover-card";
 import { Skeleton } from "@/components/ui/skeleton";
-import { useAppConfig } from "@/hooks/useAppConfig";
 import { useFileDrop } from "@/hooks/useFileDrop";
 import { useInitiatives } from "@/hooks/useInitiatives";
 import { useRelatedStates } from "@/hooks/useRelatedStates";
@@ -183,7 +182,6 @@ export const RelationsSection = ({
   // somebody who has files there and may make one — and only where a link
   // may be made at all. Unknown until the initiative loads, which reads as no.
   const canAdd = canEdit && assertable.length > 0;
-  const { maxUploadBytes } = useAppConfig();
   const initiativesQuery = useInitiatives({ enabled: canAdd && initiativeId != null });
   const initiative = initiativesQuery.data?.find((item) => item.id === initiativeId);
   const canUpload =
@@ -212,14 +210,10 @@ export const RelationsSection = ({
   // The whole section takes a file, not just a box inside the dialog: a file
   // dragged in from the desktop lands wherever the cursor is. Off while the
   // dialog is up — it has a drop target of its own.
-  const drop = useFileDrop(
-    canUpload && !adding,
-    (files) => {
-      const [first] = files;
-      if (first) openDialog(first);
-    },
-    { maxBytes: maxUploadBytes }
-  );
+  const drop = useFileDrop(canUpload && !adding, (files) => {
+    const [first] = files;
+    if (first) openDialog(first);
+  });
 
   const unrelate = useUnrelate(anchorTool, {
     onSuccess: () => toast.success(t("removed")),

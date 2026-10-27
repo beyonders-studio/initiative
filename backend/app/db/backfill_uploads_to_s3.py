@@ -34,7 +34,12 @@ from app.db.advisory_locks import LockNamespace, advisory_lock, advisory_unlock
 from app.db import session as db_session
 from app.db.schema_provisioning import guild_schema_name
 from app.services import storage_config
-from app.services.storage import S3Storage, StorageBackend, build_s3_client
+from app.services.storage import (
+    STAGING_PREFIX,
+    S3Storage,
+    StorageBackend,
+    build_s3_client,
+)
 from app.db.request_context import SystemGuild
 
 logger = logging.getLogger(__name__)
@@ -109,6 +114,10 @@ def backfill_guild_dir(
         if not path.is_file():
             continue
         key = path.name
+        # A file still arriving has no row until it is taken; copying it now
+        # would leave a cut-short copy that a later run skips.
+        if key.startswith(STAGING_PREFIX) and key not in meta:
+            continue
         content_type, content_hash = meta.get(key, (None, None))
         if content_type is None:
             content_type = mimetypes.guess_type(key)[0]

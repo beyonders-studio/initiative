@@ -89,8 +89,8 @@ The downgrade puts back empty gallery tables, ``comments.gallery_id`` and
 turn files back into pictures or links back into their old spellings, and
 nothing it removed comes back.
 
-Revision ID: 20261027_0545
-Revises: 20261027_0544
+Revision ID: 20261027_0546
+Revises: 20261027_0545
 Create Date: 2026-10-26
 """
 
@@ -112,8 +112,8 @@ from app.core.legacy_references import rewrite_body, rewrite_text
 from app.db.guild_migrations import run_for_each_guild_schema
 import app.services.editor_engine as editor_engine
 
-revision = "20261027_0545"
-down_revision = "20261027_0544"
+revision = "20261027_0546"
+down_revision = "20261027_0545"
 branch_labels = None
 depends_on = None
 
