@@ -5,7 +5,7 @@
     "version": "8.1.0",
     "x-initiative-source": {
       "version": "0.77.1",
-      "commit": "e77ecffa2d7173da6f2fdc9fdbbef1af6f1028f1"
+      "commit": "4ea24fd7e4ec975f9e38d307e74695747e573543"
     }
   },
   "servers": [
@@ -2283,7 +2283,7 @@
           "files"
         ],
         "summary": "List Collection Files",
-        "description": "The files in one collection the reader can open: the Files list, with\nits parameters, narrowed to the collection. A collection out of reach is\na 404.",
+        "description": "The files in one collection the reader can open: the Files list, with\nits parameters, narrowed to the collection, each with when it was added\nto it. A collection out of reach is a 404.",
         "operationId": "list_collection_files",
         "security": [
           {
@@ -2296,7 +2296,7 @@
             "content": {
               "application/json": {
                 "schema": {
-                  "$ref": "#/components/schemas/FileListResponse"
+                  "$ref": "#/components/schemas/CollectionFileListResponse"
                 }
               }
             }
@@ -2502,10 +2502,10 @@
                   "type": "null"
                 }
               ],
-              "description": "Order by one of: name, initiative, updated_at, created_at.",
+              "description": "Order by one of: name, initiative, updated_at, created_at, added_at (when each was added to the collection). Omit for added_at, newest first.",
               "title": "Sort By"
             },
-            "description": "Order by one of: name, initiative, updated_at, created_at."
+            "description": "Order by one of: name, initiative, updated_at, created_at, added_at (when each was added to the collection). Omit for added_at, newest first."
           },
           {
             "name": "sort_dir",
@@ -2542,6 +2542,25 @@
               "title": "Archived"
             },
             "description": "true lists what has been archived instead of what is live. Omit for the live list, which is what every other view shows."
+          },
+          {
+            "name": "until",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string",
+                  "format": "date-time"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "description": "Start the list at this instant, measured by when each file was added to the collection. Newest first it is a ceiling and the page walks back from it; oldest first (sort_by=added_at, sort_dir=asc) a floor and the page walks forward. This is how a timeline jumps to a month: pair it with the matching end of the month's bucket.",
+              "title": "Until"
+            },
+            "description": "Start the list at this instant, measured by when each file was added to the collection. Newest first it is a ceiling and the page walks back from it; oldest first (sort_by=added_at, sort_dir=asc) a floor and the page walks forward. This is how a timeline jumps to a month: pair it with the matching end of the month's bucket."
           },
           {
             "name": "session_token",
@@ -2685,6 +2704,234 @@
               "maxItems": 500,
               "title": "File Ids"
             }
+          },
+          {
+            "name": "session_token",
+            "in": "cookie",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Session Token"
+            }
+          }
+        ]
+      }
+    },
+    "/collections/{collection_id}/files/timeline": {
+      "get": {
+        "tags": [
+          "files"
+        ],
+        "summary": "Get Collection Files Timeline",
+        "description": "The months files were added to this collection in, newest first, each\nwith how many of them the reader can open and the instants to jump to:\nwhat the timeline rail is drawn from. Takes the same filters the list\ndoes, so the rail is a picture of the list as it stands.",
+        "operationId": "get_collection_files_timeline",
+        "security": [
+          {
+            "PluginToken": []
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/TimelineResponse"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        },
+        "x-plugin-scope": "files:read",
+        "parameters": [
+          {
+            "name": "collection_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "integer",
+              "title": "Collection Id"
+            }
+          },
+          {
+            "name": "search",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Search"
+            }
+          },
+          {
+            "name": "tag_ids",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "array",
+                  "items": {
+                    "type": "integer"
+                  }
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "description": "Filter by tag IDs",
+              "title": "Tag Ids"
+            },
+            "description": "Filter by tag IDs"
+          },
+          {
+            "name": "property_filters",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "description": "JSON-encoded list of property-value filters, e.g. `[{\"property_id\": 12, \"op\": \"eq\", \"value\": \"live\"}]`. Maximum 5 conditions per request.",
+              "title": "Property Filters"
+            },
+            "description": "JSON-encoded list of property-value filters, e.g. `[{\"property_id\": 12, \"op\": \"eq\", \"value\": \"live\"}]`. Maximum 5 conditions per request."
+          },
+          {
+            "name": "untagged",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "boolean"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "description": "Filter to files with no tags",
+              "title": "Untagged"
+            },
+            "description": "Filter to files with no tags"
+          },
+          {
+            "name": "is_template",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "boolean"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "description": "Only templates (true) or only files that are not templates (false). Omit for both.",
+              "title": "Is Template"
+            },
+            "description": "Only templates (true) or only files that are not templates (false). Omit for both."
+          },
+          {
+            "name": "file_type",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "$ref": "#/components/schemas/FileType"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "description": "Filter by file type",
+              "title": "File Type"
+            },
+            "description": "Filter by file type"
+          },
+          {
+            "name": "kind",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "$ref": "#/components/schemas/FileKind"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "description": "Filter by kind of file",
+              "title": "Kind"
+            },
+            "description": "Filter by kind of file"
+          },
+          {
+            "name": "archived",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "boolean"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "description": "true lists what has been archived instead of what is live. Omit for the live list, which is what every other view shows.",
+              "title": "Archived"
+            },
+            "description": "true lists what has been archived instead of what is live. Omit for the live list, which is what every other view shows."
+          },
+          {
+            "name": "tz",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "description": "IANA zone the month boundaries are cut in, e.g. Pacific/Auckland. Defaults to UTC.",
+              "title": "Tz"
+            },
+            "description": "IANA zone the month boundaries are cut in, e.g. Pacific/Auckland. Defaults to UTC."
           },
           {
             "name": "session_token",
@@ -4625,7 +4872,7 @@
           "files"
         ],
         "summary": "Upload File",
-        "description": "Upload a file (PDF, DOCX, etc.).",
+        "description": "Upload a file: sent with the request as ``file``, or sent in pieces\nbefore it as a resumable upload, named by ``upload_id``.",
         "operationId": "upload_file",
         "security": [
           {
@@ -4691,7 +4938,7 @@
           "files"
         ],
         "summary": "Upload File Version",
-        "description": "Upload a new version of an uploaded file. Requires write access.",
+        "description": "Upload a new version of an uploaded file, sent as ``file`` or as a\nresumable upload named by ``upload_id``. Requires write access.",
         "operationId": "upload_file_version",
         "security": [
           {
@@ -4699,7 +4946,6 @@
           }
         ],
         "requestBody": {
-          "required": true,
           "content": {
             "multipart/form-data": {
               "schema": {
@@ -10917,31 +11163,63 @@
             "title": "Initiative Id"
           },
           "file": {
-            "type": "string",
-            "contentMediaType": "application/octet-stream",
+            "anyOf": [
+              {
+                "type": "string",
+                "contentMediaType": "application/octet-stream"
+              },
+              {
+                "type": "null"
+              }
+            ],
             "title": "File"
+          },
+          "upload_id": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Upload Id"
           }
         },
         "type": "object",
         "required": [
           "name",
-          "initiative_id",
-          "file"
+          "initiative_id"
         ],
         "title": "Body_upload_file"
       },
       "Body_upload_file_version": {
         "properties": {
           "file": {
-            "type": "string",
-            "contentMediaType": "application/octet-stream",
+            "anyOf": [
+              {
+                "type": "string",
+                "contentMediaType": "application/octet-stream"
+              },
+              {
+                "type": "null"
+              }
+            ],
             "title": "File"
+          },
+          "upload_id": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Upload Id"
           }
         },
         "type": "object",
-        "required": [
-          "file"
-        ],
         "title": "Body_upload_file_version"
       },
       "CalendarCreate": {
@@ -12050,6 +12328,27 @@
         ],
         "title": "ChecklistProgress"
       },
+      "CollectionCan": {
+        "properties": {
+          "edit": {
+            "type": "boolean",
+            "title": "Edit",
+            "default": false
+          },
+          "unarchive": {
+            "type": "boolean",
+            "title": "Unarchive",
+            "default": false
+          }
+        },
+        "type": "object",
+        "required": [
+          "edit",
+          "unarchive"
+        ],
+        "title": "CollectionCan",
+        "description": "What the caller may do to a collection\n(``resource_access.may_change``)."
+      },
       "CollectionCover": {
         "properties": {
           "file_id": {
@@ -12086,6 +12385,41 @@
               }
             ],
             "title": "File Content Type"
+          },
+          "thumbnail_url": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Thumbnail Url",
+            "x-upload": true,
+            "description": "A stored file comes as an empty string, without its path. A URL from elsewhere comes as it is."
+          },
+          "width": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Width"
+          },
+          "height": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Height"
           }
         },
         "type": "object",
@@ -12094,7 +12428,10 @@
           "name",
           "file_type",
           "file_url",
-          "file_content_type"
+          "file_content_type",
+          "thumbnail_url",
+          "width",
+          "height"
         ],
         "title": "CollectionCover",
         "description": "The file a card shows for a collection."
@@ -12164,6 +12501,325 @@
         ],
         "title": "CollectionCreate",
         "description": "A new collection, made with the files it starts with: a collection is\nnever empty."
+      },
+      "CollectionFileListResponse": {
+        "properties": {
+          "total_count": {
+            "type": "integer",
+            "title": "Total Count"
+          },
+          "page": {
+            "type": "integer",
+            "title": "Page"
+          },
+          "page_size": {
+            "type": "integer",
+            "title": "Page Size"
+          },
+          "has_next": {
+            "type": "boolean",
+            "title": "Has Next"
+          },
+          "has_prev": {
+            "type": "boolean",
+            "title": "Has Prev"
+          },
+          "items": {
+            "items": {
+              "$ref": "#/components/schemas/CollectionFileSummary"
+            },
+            "type": "array",
+            "title": "Items"
+          }
+        },
+        "type": "object",
+        "required": [
+          "total_count",
+          "page",
+          "page_size",
+          "has_next",
+          "has_prev",
+          "items"
+        ],
+        "title": "CollectionFileListResponse"
+      },
+      "CollectionFileSummary": {
+        "properties": {
+          "archived_at": {
+            "anyOf": [
+              {
+                "type": "string",
+                "format": "date-time"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Archived At"
+          },
+          "can": {
+            "$ref": "#/components/schemas/ToolCan"
+          },
+          "id": {
+            "type": "integer",
+            "title": "Id"
+          },
+          "initiative_id": {
+            "type": "integer",
+            "title": "Initiative Id"
+          },
+          "community_id": {
+            "title": "Community Id",
+            "type": "string",
+            "x-identity": "community"
+          },
+          "created_by": {
+            "anyOf": [
+              {
+                "type": "string",
+                "x-identity": "person"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Created By"
+          },
+          "created_at": {
+            "type": "string",
+            "format": "date-time",
+            "title": "Created At"
+          },
+          "updated_at": {
+            "type": "string",
+            "format": "date-time",
+            "title": "Updated At"
+          },
+          "comments_enabled": {
+            "type": "boolean",
+            "title": "Comments Enabled",
+            "default": true
+          },
+          "tags": {
+            "items": {
+              "$ref": "#/components/schemas/TagSummary"
+            },
+            "type": "array",
+            "title": "Tags"
+          },
+          "properties": {
+            "items": {
+              "$ref": "#/components/schemas/PropertySummary"
+            },
+            "type": "array",
+            "title": "Properties"
+          },
+          "grants": {
+            "items": {
+              "$ref": "#/components/schemas/ResourceGrantSchema"
+            },
+            "type": "array",
+            "title": "Grants"
+          },
+          "name": {
+            "type": "string",
+            "title": "Name"
+          },
+          "featured_image_url": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Featured Image Url",
+            "x-upload": true,
+            "description": "A stored file comes as an empty string, without its path. A URL from elsewhere comes as it is."
+          },
+          "is_template": {
+            "type": "boolean",
+            "title": "Is Template",
+            "default": false
+          },
+          "initiative": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/InitiativeSummary"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "owner": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/PluginPerson"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "owner_plugin": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/OwnerPluginSummary"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "comment_count": {
+            "type": "integer",
+            "title": "Comment Count",
+            "default": 0
+          },
+          "file_type": {
+            "$ref": "#/components/schemas/FileType",
+            "default": "lexical"
+          },
+          "file_url": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "File Url",
+            "x-upload": true,
+            "description": "A stored file comes as an empty string, without its path. A URL from elsewhere comes as it is."
+          },
+          "file_content_type": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "File Content Type"
+          },
+          "file_size": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "File Size"
+          },
+          "original_filename": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Original Filename"
+          },
+          "thumbnail_url": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Thumbnail Url",
+            "x-upload": true,
+            "description": "A stored file comes as an empty string, without its path. A URL from elsewhere comes as it is."
+          },
+          "width": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Width"
+          },
+          "height": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Height"
+          },
+          "smart_link_url": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Smart Link Url"
+          },
+          "added_at": {
+            "type": "string",
+            "format": "date-time",
+            "title": "Added At"
+          },
+          "kind": {
+            "$ref": "#/components/schemas/FileKind",
+            "description": "How the file is shown, which follows from its type.",
+            "readOnly": true
+          }
+        },
+        "type": "object",
+        "required": [
+          "archived_at",
+          "can",
+          "id",
+          "initiative_id",
+          "community_id",
+          "created_by",
+          "created_at",
+          "updated_at",
+          "comments_enabled",
+          "tags",
+          "properties",
+          "grants",
+          "name",
+          "featured_image_url",
+          "is_template",
+          "initiative",
+          "owner",
+          "owner_plugin",
+          "comment_count",
+          "file_type",
+          "file_url",
+          "file_content_type",
+          "file_size",
+          "original_filename",
+          "thumbnail_url",
+          "width",
+          "height",
+          "smart_link_url",
+          "added_at",
+          "kind"
+        ],
+        "title": "CollectionFileSummary",
+        "description": "A file as its collection lists it: with when it was added there."
       },
       "CollectionFiles": {
         "properties": {
@@ -12329,7 +12985,7 @@
             "title": "Properties"
           },
           "can": {
-            "$ref": "#/components/schemas/ContentCan"
+            "$ref": "#/components/schemas/CollectionCan"
           }
         },
         "type": "object",
@@ -14202,6 +14858,28 @@
             "x-upload": true,
             "description": "A stored file comes as an empty string, without its path. A URL from elsewhere comes as it is."
           },
+          "width": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Width"
+          },
+          "height": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Height"
+          },
           "smart_link_url": {
             "anyOf": [
               {
@@ -14271,6 +14949,8 @@
           "file_size",
           "original_filename",
           "thumbnail_url",
+          "width",
+          "height",
           "smart_link_url",
           "content",
           "collection_ids",
@@ -14477,6 +15157,28 @@
             "x-upload": true,
             "description": "A stored file comes as an empty string, without its path. A URL from elsewhere comes as it is."
           },
+          "width": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Width"
+          },
+          "height": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Height"
+          },
           "smart_link_url": {
             "anyOf": [
               {
@@ -14521,6 +15223,8 @@
           "file_size",
           "original_filename",
           "thumbnail_url",
+          "width",
+          "height",
           "smart_link_url",
           "kind"
         ],
@@ -19791,6 +20495,53 @@
         },
         "type": "object",
         "title": "TaskUpdate"
+      },
+      "TimelineBucket": {
+        "properties": {
+          "period": {
+            "type": "string",
+            "title": "Period"
+          },
+          "count": {
+            "type": "integer",
+            "title": "Count"
+          },
+          "anchor": {
+            "type": "string",
+            "format": "date-time",
+            "title": "Anchor"
+          },
+          "anchor_oldest": {
+            "type": "string",
+            "format": "date-time",
+            "title": "Anchor Oldest"
+          }
+        },
+        "type": "object",
+        "required": [
+          "period",
+          "count",
+          "anchor",
+          "anchor_oldest"
+        ],
+        "title": "TimelineBucket",
+        "description": "One period on the rail."
+      },
+      "TimelineResponse": {
+        "properties": {
+          "buckets": {
+            "items": {
+              "$ref": "#/components/schemas/TimelineBucket"
+            },
+            "type": "array",
+            "title": "Buckets"
+          }
+        },
+        "type": "object",
+        "required": [
+          "buckets"
+        ],
+        "title": "TimelineResponse"
       },
       "Tool": {
         "type": "string",
