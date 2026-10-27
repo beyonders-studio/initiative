@@ -146,6 +146,8 @@ GUILD_LEVEL_TABLES: frozenset[str] = frozenset(
         "import_jobs",  # same shape as export_jobs: a backup import spans
         # initiatives, and the row's options/plan/report text plus the staged
         # payload it gates must not be guild-wide-readable.
+        "pending_uploads",  # a file arriving in pieces is its uploader's until
+        # an endpoint takes it; a backup being uploaded spans initiatives.
         # A member's own credentials: their connection to an installed plug-in's
         # vendor (MEMBER_CREDENTIAL_TABLES). No FK to any initiative — a
         # plug-in is community-wide.
@@ -196,6 +198,7 @@ MANAGED_TABLES: dict[str, str] = {
 OWN_ROW_TABLES: dict[str, str] = {
     "export_jobs": "created_by",
     "import_jobs": "created_by",
+    "pending_uploads": "created_by",
     "plugin_member_consents": "user_id",
 }
 

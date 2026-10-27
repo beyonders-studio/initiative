@@ -156,6 +156,8 @@ For any real deployment you'll put Initiative behind a reverse proxy that handle
 
     The one setup that needs more is a proxy on another machine that reaches Initiative over a public address. List it in `FORWARDED_ALLOW_IPS`; the log names the address to add when it sees one.
 
+**Let 50 MB through per request.** A file of any size arrives in pieces of up to 50 MB, so that's the most your proxy ever has to pass in one go. nginx stops at 1 MB unless told otherwise, so add `client_max_body_size 50m;` to the server block. Caddy and Traefik pass it as they are.
+
 ## The app association files
 
 A phone lets an app use a site's passkeys only when the site says, in a file at a fixed address, which apps may. Initiative serves both, built from the project's own app identities (they are the project's to vouch for, not something you configure):

@@ -98,6 +98,9 @@ class LockNamespace(IntEnum):
     #: Writing one property value, keyed by guild, item and property, so a
     #: change of a multi-select's options reads the value in its turn.
     PROPERTY_VALUE = _tag(b"PVAL")
+    #: Creating one person's resumable uploads, keyed by guild and person, so
+    #: two at once count each other.
+    PENDING_UPLOADS = _tag(b"RESU")
     #: Which of one install's values are shown, keyed by guild and install:
     #: shared by each write while it reads the pinned definition, exclusive
     #: while the values are reconciled to a new one.

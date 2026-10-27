@@ -45,9 +45,9 @@ import { CreateFileDialog } from "@/components/files/CreateFileDialog";
 import { FileCard } from "@/components/files/FileCard";
 import { useFileColumns } from "@/components/files/fileColumns";
 import { ToolImportAction, useToolImportAction } from "@/components/imports/ToolImportAction";
-import { LibraryCard } from "@/components/initiativeTools/libraries/LibraryCard";
 import { CounterGroupCard } from "@/components/initiativeTools/counters/CounterGroupCard";
 import { DashboardCard } from "@/components/initiativeTools/dashboards/DashboardCard";
+import { LibraryCard } from "@/components/initiativeTools/libraries/LibraryCard";
 import { QueueCard } from "@/components/initiativeTools/queues/QueueCard";
 import { CreateToolDialog } from "@/components/initiativeTools/shared/CreateToolDialog";
 import { ToolFilterPanel } from "@/components/initiativeTools/shared/ToolFilterPanel";
@@ -84,7 +84,6 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/com
 import { DropOverlay } from "@/components/ui/file-drop";
 import { TOOL_HOOKS } from "@/hooks/toolHooks";
 import { useActiveCommunityId } from "@/hooks/useActiveCommunityId";
-import { useAppConfig } from "@/hooks/useAppConfig";
 import { useCreateFromSearchParam } from "@/hooks/useCreateFromSearchParam";
 import { useDebouncedValue } from "@/hooks/useDebouncedValue";
 import { useFileDrop } from "@/hooks/useFileDrop";
@@ -691,7 +690,6 @@ const ToolIndexBody = ({ tool, entry, fixedInitiativeId, canCreate }: ToolIndexB
   // A file dragged in from the desktop lands wherever the cursor is, in any
   // layout, and opens the create dialog holding it. Off while a dialog is up:
   // those are portalled, and React would carry a drop on one back up to here.
-  const { maxUploadBytes } = useAppConfig();
   const [droppedFile, setDroppedFile] = useState<File | null>(null);
   const drop = useFileDrop(
     Boolean(entry.fileDrop) && canCreateHere && !createOpen && !selection.active,
@@ -699,8 +697,7 @@ const ToolIndexBody = ({ tool, entry, fixedInitiativeId, canCreate }: ToolIndexB
       if (!first) return;
       setDroppedFile(first);
       setCreateOpen(true);
-    },
-    { maxBytes: maxUploadBytes }
+    }
   );
   const onCreateOpenChange = (open: boolean) => {
     if (!open) setDroppedFile(null);

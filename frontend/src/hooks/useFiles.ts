@@ -14,8 +14,6 @@ import {
   uploadFileVersion,
 } from "@/api/generated/files/files";
 import type {
-  BodyUploadFile,
-  BodyUploadFileVersion,
   FileCreate,
   FileRead,
   FileVersionRead,
@@ -29,6 +27,7 @@ import { useActiveCommunityId } from "@/hooks/useActiveCommunityId";
 import { getErrorMessage } from "@/lib/errorMessage";
 import type { EditorFileType } from "@/lib/fileTypes";
 import { toast } from "@/lib/mascotToast";
+import { type ResumableOptions, uploadInPieces } from "@/lib/resumableUpload";
 import type { MutationOpts } from "@/types/mutation";
 import type { QueryOpts } from "@/types/query";
 
@@ -176,7 +175,7 @@ type UploadFileInput = {
   project_id?: number;
   /** Full non-owner sharing state for the uploaded file. */
   grants?: ResourceGrantSchema[];
-};
+} & ResumableOptions;
 
 export const useUploadFile = (options?: MutationOpts<FileRead, UploadFileInput>) => {
   const { t } = useTranslation("files");
@@ -186,14 +185,16 @@ export const useUploadFile = (options?: MutationOpts<FileRead, UploadFileInput>)
   return useMutation({
     ...rest,
     mutationFn: async (data: UploadFileInput) => {
-      const { file, name, initiative_id, project_id, grants = [] } = data;
+      const { file, name, initiative_id, project_id, grants = [], ...sending } = data;
 
-      const uploadBody: BodyUploadFile = {
+      const newFile = await uploadInPieces(
+        communityId,
         file,
-        name,
-        initiative_id,
-      };
-      const newFile = await uploadFile(communityId, uploadBody);
+        file instanceof File ? file.name : name,
+        { initiativeId: initiative_id },
+        (upload_id) => uploadFile(communityId, { name, initiative_id, upload_id }),
+        sending
+      );
 
       // Upload can't carry grants in payload — apply separately
       const failures = await applyFileGrants(communityId, newFile.id, grants);
@@ -221,7 +222,9 @@ export const useUploadFile = (options?: MutationOpts<FileRead, UploadFileInput>)
       onSuccess?.(...args);
     },
     onError: (...args) => {
-      toast.error(getErrorMessage(args[0], "files:create.uploadError"));
+      // Stopped on purpose: nothing went wrong.
+      if (!args[1].signal?.aborted)
+        toast.error(getErrorMessage(args[0], "files:create.uploadError"));
       onError?.(...args);
     },
     onSettled,
@@ -241,8 +244,10 @@ export const useFileVersions = (fileId: number | null, options?: QueryOpts<FileV
   });
 };
 
+type UploadFileVersionInput = { fileId: number; file: Blob } & ResumableOptions;
+
 export const useUploadFileVersion = (
-  options?: MutationOpts<FileVersionRead, { fileId: number; file: Blob }>
+  options?: MutationOpts<FileVersionRead, UploadFileVersionInput>
 ) => {
   const { t } = useTranslation("files");
   const communityId = useActiveCommunityId();
@@ -250,10 +255,15 @@ export const useUploadFileVersion = (
 
   return useMutation({
     ...rest,
-    mutationFn: async ({ fileId, file }: { fileId: number; file: Blob }) => {
-      const body: BodyUploadFileVersion = { file };
-      return uploadFileVersion(communityId, fileId, body);
-    },
+    mutationFn: ({ fileId, file, ...sending }: UploadFileVersionInput) =>
+      uploadInPieces(
+        communityId,
+        file,
+        file instanceof File ? file.name : "file",
+        { fileId },
+        (upload_id) => uploadFileVersion(communityId, fileId, { upload_id }),
+        sending
+      ),
     onSuccess: (...args) => {
       const fileId = args[1].fileId;
       void invalidate(q.fileVersions(fileId));
@@ -263,7 +273,9 @@ export const useUploadFileVersion = (
       onSuccess?.(...args);
     },
     onError: (...args) => {
-      toast.error(getErrorMessage(args[0], "files:versions.uploadError"));
+      // Stopped on purpose: nothing went wrong.
+      if (!args[1].signal?.aborted)
+        toast.error(getErrorMessage(args[0], "files:versions.uploadError"));
       onError?.(...args);
     },
     onSettled,

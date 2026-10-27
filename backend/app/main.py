@@ -535,7 +535,17 @@ app.add_middleware(
     # Export downloads name the file server-side (Content-Disposition); the
     # SPA reads it to name the blob it saves — expose it for the native
     # (cross-origin) app, web is same-origin and sees it regardless.
-    expose_headers=["Content-Disposition"],
+    # A resumable upload's client reads where the upload is and how far it got.
+    expose_headers=[
+        "Content-Disposition",
+        "Location",
+        "Upload-Offset",
+        "Upload-Length",
+        "Upload-Expires",
+        "Tus-Resumable",
+        "Tus-Version",
+        "Tus-Extension",
+    ],
 )
 
 # Added last, so it sits outside the rest: every request gets its id here,

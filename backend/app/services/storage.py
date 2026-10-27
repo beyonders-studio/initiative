@@ -24,13 +24,14 @@ is configured.
 
 from __future__ import annotations
 
+import io
 import logging
 import mimetypes
 import os
 import shutil
 from dataclasses import dataclass
 from pathlib import Path
-from typing import TYPE_CHECKING, Iterator, Protocol, runtime_checkable
+from typing import TYPE_CHECKING, Any, BinaryIO, Iterator, Protocol, runtime_checkable
 from urllib.parse import quote
 
 from fastapi.responses import FileResponse, Response, StreamingResponse
@@ -45,8 +46,15 @@ if TYPE_CHECKING:  # botocore imported lazily at call time; type-only here
 
 logger = logging.getLogger(__name__)
 
+
 # Streaming proxy chunk size for S3 GetObject bodies.
 _STREAM_CHUNK = 64 * 1024
+#: How much :func:`open_seekable` fetches at a time.
+_RANGE_READ = 256 * 1024
+#: What a file arriving in parts is stored under until an endpoint takes it
+#: (``app.services.resumable``); taken, it keeps the name and gains an
+#: ``uploads`` row.
+STAGING_PREFIX = "resumable-"
 
 # S3 error codes that mean "object/bucket not here" rather than a real failure.
 _S3_MISSING_CODES = {"404", "NoSuchKey", "NoSuchBucket", "NotFound"}
@@ -163,6 +171,39 @@ class StorageBackend(Protocol):
     def open_readable(
         self, key: str, *, byte_range: str | None = None
     ) -> ReadableBlob | None: ...
+
+    # --- A file staged in parts (``app.services.resumable``) -----------------
+    # ``state`` is the backend's own record of the parts, kept by the caller
+    # between requests; each call returns it updated. ``stored`` in it counts
+    # the bytes kept as parts, ``tail`` those kept apart until the next, and
+    # ``store`` the kind of store that holds them.
+
+    def start_parts(self, key: str, *, part_bytes: int) -> dict: ...
+
+    def holds_parts(self, state: dict) -> bool:
+        """Whether this backend holds the parts ``state`` records: not when
+        the community's storage moved since they were started."""
+        ...
+
+    def add_part(self, key: str, state: dict, data: bytes) -> dict:
+        """Keep ``data`` as the next part."""
+        ...
+
+    def keep_tail(self, key: str, state: dict, data: bytes) -> dict:
+        """Keep ``data``, the last bytes a request brought, for the next one."""
+        ...
+
+    def take_tail(self, key: str, state: dict) -> tuple[bytes, dict]:
+        """The bytes :meth:`keep_tail` kept, to lead the next part."""
+        ...
+
+    def finish_parts(self, key: str, state: dict) -> None:
+        """Make the parts the object ``key``."""
+        ...
+
+    def drop_parts(self, key: str, state: dict) -> None:
+        """Throw away the parts, the tail and the object."""
+        ...
 
     def presign_get(
         self, key: str, *, ttl: int, filename: str | None = None
@@ -305,6 +346,42 @@ class LocalFilesystemStorage:
             content_length=target.stat().st_size,
         )
 
+    def start_parts(self, key: str, *, part_bytes: int) -> dict:
+        target = self._safe_path(key)
+        if target is None:
+            raise ValueError(f"Invalid storage key: {key!r}")
+        target.write_bytes(b"")
+        return {"store": "local", "stored": 0, "tail": 0, "part_bytes": part_bytes}
+
+    def holds_parts(self, state: dict) -> bool:
+        return state.get("store") == "local"
+
+    def add_part(self, key: str, state: dict, data: bytes) -> dict:
+        target = self._safe_path(key)
+        if target is None:
+            raise ValueError(f"Invalid storage key: {key!r}")
+        with target.open("r+b") as handle:
+            # Bytes past what was recorded are from a request that failed.
+            handle.truncate(state["stored"])
+            handle.seek(state["stored"])
+            handle.write(data)
+            handle.flush()
+            os.fsync(handle.fileno())
+        return {**state, "stored": state["stored"] + len(data)}
+
+    def keep_tail(self, key: str, state: dict, data: bytes) -> dict:
+        # A file on disk takes a part of any size.
+        return self.add_part(key, state, data) if data else state
+
+    def take_tail(self, key: str, state: dict) -> tuple[bytes, dict]:
+        return b"", state
+
+    def finish_parts(self, key: str, state: dict) -> None:
+        return None
+
+    def drop_parts(self, key: str, state: dict) -> None:
+        self.delete(key)
+
     def presign_get(
         self, key: str, *, ttl: int, filename: str | None = None
     ) -> str | None:
@@ -392,9 +469,9 @@ class S3Storage:
     def delete_prefix(self) -> int:
         """Delete every object under this backend's namespace (``self._prefix``).
 
-        Used to tear down a guild's content on deprovision. Refuses an empty
-        prefix so it can never target the whole bucket. Returns the number of
-        objects deleted.
+        Used to tear down a guild's content on deprovision, files still
+        arriving in parts included. Refuses an empty prefix so it can never
+        target the whole bucket. Returns the number of objects deleted.
         """
         if not self._prefix:
             raise ValueError(
@@ -428,6 +505,23 @@ class S3Storage:
                 token = resp.get("NextContinuationToken")
             else:
                 break
+        # A file still arriving in parts is no object yet, so the listing
+        # above does not see it.
+        markers: dict = {}
+        while True:
+            resp = self._client.list_multipart_uploads(
+                Bucket=self._bucket, Prefix=self._prefix, **markers
+            )
+            for upload in resp.get("Uploads", []):
+                self._client.abort_multipart_upload(
+                    Bucket=self._bucket, Key=upload["Key"], UploadId=upload["UploadId"]
+                )
+            if not resp.get("IsTruncated"):
+                break
+            markers = {
+                "KeyMarker": resp["NextKeyMarker"],
+                "UploadIdMarker": resp["NextUploadIdMarker"],
+            }
         return deleted
 
     def exists(self, key: str) -> bool:
@@ -460,6 +554,111 @@ class S3Storage:
             content_length=obj.get("ContentLength"),
             content_range=obj.get("ContentRange"),
         )
+
+    def _tail_key(self, key: str) -> str:
+        return self._object_key(f"{Path(key).name}-tail")
+
+    def start_parts(self, key: str, *, part_bytes: int) -> dict:
+        upload = self._client.create_multipart_upload(
+            Bucket=self._bucket, Key=self._object_key(key)
+        )
+        return {
+            "store": "s3",
+            "upload_id": upload["UploadId"],
+            "parts": [],
+            "stored": 0,
+            "tail": 0,
+            "part_bytes": part_bytes,
+        }
+
+    def holds_parts(self, state: dict) -> bool:
+        return state.get("store") == "s3"
+
+    def add_part(self, key: str, state: dict, data: bytes) -> dict:
+        number = len(state["parts"]) + 1
+        answer = self._client.upload_part(
+            Bucket=self._bucket,
+            Key=self._object_key(key),
+            UploadId=state["upload_id"],
+            PartNumber=number,
+            Body=data,
+        )
+        return {
+            **state,
+            "parts": [*state["parts"], {"n": number, "etag": answer["ETag"]}],
+            "stored": state["stored"] + len(data),
+            "tail": 0,
+        }
+
+    def keep_tail(self, key: str, state: dict, data: bytes) -> dict:
+        # Every part but the last is a whole ``part_bytes``, so the parts stay
+        # within S3's limit; what a request leaves short of one waits as an
+        # object of its own. It starts with the tail it replaces, so reading
+        # only what the caller recorded gets that tail back should the record
+        # of this one not land.
+        if not data:
+            return state
+        self._client.put_object(Bucket=self._bucket, Key=self._tail_key(key), Body=data)
+        return {**state, "tail": len(data)}
+
+    def take_tail(self, key: str, state: dict) -> tuple[bytes, dict]:
+        if not state["tail"]:
+            return b"", state
+        tail = self._client.get_object(Bucket=self._bucket, Key=self._tail_key(key))
+        return tail["Body"].read()[: state["tail"]], {**state, "tail": 0}
+
+    def finish_parts(self, key: str, state: dict) -> None:
+        from botocore.exceptions import ClientError
+
+        if state["parts"]:
+            try:
+                self._client.complete_multipart_upload(
+                    Bucket=self._bucket,
+                    Key=self._object_key(key),
+                    UploadId=state["upload_id"],
+                    MultipartUpload={
+                        "Parts": [
+                            {"PartNumber": part["n"], "ETag": part["etag"]}
+                            for part in state["parts"]
+                        ]
+                    },
+                )
+            except ClientError as exc:
+                # Finished once already, by a request whose record did not
+                # land: the object is there.
+                code = exc.response.get("Error", {}).get("Code")
+                if code != "NoSuchUpload" or not self._head(self._object_key(key)):
+                    raise
+        else:
+            # An empty file has no part to complete.
+            self._abort(key, state)
+            self._client.put_object(
+                Bucket=self._bucket, Key=self._object_key(key), Body=b""
+            )
+        try:
+            self._client.delete_object(Bucket=self._bucket, Key=self._tail_key(key))
+        except ClientError:
+            # A tail left over costs storage and nothing else; dropping the
+            # parts takes it.
+            logger.warning("tail_delete_failed key=%s", key, exc_info=True)
+
+    def _abort(self, key: str, state: dict) -> None:
+        from botocore.exceptions import ClientError
+
+        try:
+            self._client.abort_multipart_upload(
+                Bucket=self._bucket,
+                Key=self._object_key(key),
+                UploadId=state["upload_id"],
+            )
+        except ClientError as exc:
+            if exc.response.get("Error", {}).get("Code") != "NoSuchUpload":
+                raise
+
+    def drop_parts(self, key: str, state: dict) -> None:
+        self._abort(key, state)
+        self._client.delete_object(Bucket=self._bucket, Key=self._tail_key(key))
+        self.delete(key)
 
     def presign_get(
         self, key: str, *, ttl: int, filename: str | None = None
@@ -544,6 +743,32 @@ class DualReadStorage:
             blob = None
         return blob or self._fallback.open_readable(key, byte_range=byte_range)
 
+    def start_parts(self, key: str, *, part_bytes: int) -> dict:
+        return self._primary.start_parts(key, part_bytes=part_bytes)
+
+    def _staging(self, state: dict) -> StorageBackend:
+        """The store an upload's parts were started in, so one begun before
+        the move carries on where it began."""
+        return self._fallback if self._fallback.holds_parts(state) else self._primary
+
+    def holds_parts(self, state: dict) -> bool:
+        return self._staging(state).holds_parts(state)
+
+    def add_part(self, key: str, state: dict, data: bytes) -> dict:
+        return self._staging(state).add_part(key, state, data)
+
+    def keep_tail(self, key: str, state: dict, data: bytes) -> dict:
+        return self._staging(state).keep_tail(key, state, data)
+
+    def take_tail(self, key: str, state: dict) -> tuple[bytes, dict]:
+        return self._staging(state).take_tail(key, state)
+
+    def finish_parts(self, key: str, state: dict) -> None:
+        self._staging(state).finish_parts(key, state)
+
+    def drop_parts(self, key: str, state: dict) -> None:
+        self._staging(state).drop_parts(key, state)
+
     def presign_get(
         self, key: str, *, ttl: int, filename: str | None = None
     ) -> str | None:
@@ -552,6 +777,53 @@ class DualReadStorage:
         if self._primary.exists(key):
             return self._primary.presign_get(key, ttl=ttl, filename=filename)
         return None
+
+
+class _RangeReader(io.RawIOBase):
+    """A stored object read a range at a time, as a caller seeks about it."""
+
+    def __init__(self, backend: StorageBackend, key: str, size: int) -> None:
+        self._backend, self._key, self._size, self._at = backend, key, size, 0
+
+    def readable(self) -> bool:
+        return True
+
+    def seekable(self) -> bool:
+        return True
+
+    def tell(self) -> int:
+        return self._at
+
+    def seek(self, offset: int, whence: int = io.SEEK_SET) -> int:
+        base = {io.SEEK_SET: 0, io.SEEK_CUR: self._at, io.SEEK_END: self._size}
+        self._at = max(0, base[whence] + offset)
+        return self._at
+
+    def readinto(self, buffer: Any) -> int:
+        end = min(self._at + len(buffer), self._size)
+        if end <= self._at:
+            return 0
+        blob = self._backend.open_readable(
+            self._key, byte_range=f"bytes={self._at}-{end - 1}"
+        )
+        data = b"".join(blob.stream) if blob is not None and blob.stream else b""
+        buffer[: len(data)] = data
+        self._at += len(data)
+        return len(data)
+
+
+def open_seekable(backend: StorageBackend, key: str, size: int) -> BinaryIO | None:
+    """``key``'s ``size`` bytes as a seekable file, ``None`` when it is
+    missing: the file itself where the backend keeps one on disk, otherwise
+    read a range at a time, so reading a few places in a large object fetches
+    only those."""
+    probe = backend.open_readable(key, byte_range="bytes=0-0")
+    if probe is None:
+        return None
+    if probe.path is not None:
+        return probe.path.open("rb")
+    b"".join(probe.stream or ())
+    return io.BufferedReader(_RangeReader(backend, key, size), buffer_size=_RANGE_READ)
 
 
 def build_upload_response(

@@ -292,8 +292,7 @@
   },
   "fileDrop": {
     "release": "Dépose-le ici",
-    "unsupported": "Ce type de fichier ne peut pas être envoyé ici.",
-    "tooLarge": "Ce fichier dépasse la taille acceptée par ce serveur."
+    "unsupported": "Ce type de fichier ne peut pas être envoyé ici."
   },
   "archiveError": "Impossible d'archiver cet élément. Veuillez réessayer.",
   "unarchiveError": "Impossible de désarchiver cet élément. Veuillez réessayer.",
