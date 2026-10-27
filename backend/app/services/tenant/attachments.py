@@ -1105,6 +1105,25 @@ def _opens_an_svg(contents: bytes) -> bool:
     return name[:3] == b"svg" and name[3:4] in _ROOT_NAME_ENDS
 
 
+#: The largest document image.
+MAX_IMAGE_BYTES = 10 * 1024 * 1024
+
+#: What a document image may be, and the suffix its stored copy takes. The four
+#: raster formats ``read_image_header`` identifies, plus the three
+#: :func:`detect_document_image_type` allows on top of them: TIFF and ICO, which
+#: it does not read, and SVG, which is markup rather than a raster and so is
+#: served as a download.
+IMAGE_SUFFIXES = {
+    "image/png": ".png",
+    "image/jpeg": ".jpg",
+    "image/gif": ".gif",
+    "image/webp": ".webp",
+    "image/tiff": ".tiff",
+    "image/x-icon": ".ico",
+    "image/svg+xml": ".svg",
+}
+
+
 def detect_document_image_type(contents: bytes) -> str | None:
     """Identify a document image from its bytes, or ``None`` if it is not one.
 

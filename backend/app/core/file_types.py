@@ -131,9 +131,14 @@ SPECS: dict[FileType, FileTypeSpec] = {
     FileType.pdf: _stored(FileKind.pdf, ("application/pdf",), ".pdf"),
     FileType.doc: _stored(FileKind.document, ("application/msword",), ".doc"),
     FileType.docx: _stored(
-        FileKind.document, (f"{_OOXML}.wordprocessingml.document",), ".docx"
+        FileKind.document,
+        (f"{_OOXML}.wordprocessingml.document",),
+        ".docx",
+        converts_to=FileType.lexical,
     ),
-    FileType.odt: _stored(FileKind.document, (f"{_ODF}.text",), ".odt"),
+    FileType.odt: _stored(
+        FileKind.document, (f"{_ODF}.text",), ".odt", converts_to=FileType.lexical
+    ),
     FileType.rtf: _stored(FileKind.document, ("text/rtf", "application/rtf"), ".rtf"),
     FileType.md: _stored(
         FileKind.document,

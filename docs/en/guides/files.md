@@ -196,9 +196,9 @@ An upload keeps a **version history**. **Upload new version** and the older ones
 
 The file's owner can delete a version, for good. Delete the newest and the one before it becomes the file again. The last one left always stays.
 
-### Editing an uploaded spreadsheet or text file
+### Editing an uploaded document or spreadsheet
 
-The budget arrived as an Excel file, and now three people need to change it. Open it and choose **Edit**. It's converted into a spreadsheet you edit right here: same file, same name, same comments and links, just one you can type into.
+The budget arrived as an Excel file, the minutes as a Word file, and now three people need to change both. Open one and choose **Edit**. It's converted into a spreadsheet or document you edit right here: same file, same name, same comments and links, just one you can type into.
 
 | Uploaded as | Becomes | What comes over |
 |---|---|---|
@@ -206,6 +206,7 @@ The budget arrived as an Excel file, and now three people need to change it. Ope
 | OpenDocument (`.ods`) | Spreadsheet | Sheets, values and formulas. Formatting stays behind. |
 | Older Excel (`.xls`) | Spreadsheet | Sheets and values. A formula arrives as the number it showed. |
 | CSV, TSV | Spreadsheet | The rows and columns, as one sheet. |
+| Word (`.docx`), OpenDocument (`.odt`) | Text document | Headings, formatting, lists, tables, links and pictures. Page layout, headers and footers, footnotes, comments and text boxes stay behind. Tracked changes arrive accepted. |
 | Markdown (`.md`) | Text document | Headings, lists, tables, links and formatting. |
 | Plain text (`.txt`) | Text document | The text, as paragraphs. |
 
