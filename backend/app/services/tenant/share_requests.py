@@ -22,6 +22,7 @@ from uuid import UUID, uuid4
 
 from fastapi import HTTPException, status
 from sqlalchemy import exists, func
+from sqlalchemy.exc import IntegrityError
 from sqlmodel import select
 from sqlmodel.ext.asyncio.session import AsyncSession
 
@@ -266,7 +267,15 @@ async def ask(
             level=level.value,
             message=(message or "").strip() or None,
         )
-        session.add(row)
+        # Asked at the same moment from another tab: the open request's key
+        # keeps one, and this one is the request already made.
+        try:
+            async with session.begin_nested():
+                session.add(row)
+                await session.flush()
+        except IntegrityError:
+            refusal = ShareRequestMessages.ALREADY_PENDING
+            continue
         made.append(row)
     if not made:
         code = (
@@ -275,7 +284,6 @@ async def ask(
             else status.HTTP_409_CONFLICT
         )
         raise HTTPException(status_code=code, detail=refusal)
-    await session.flush()
     return made
 
 
@@ -285,15 +293,15 @@ async def tell_answerers(
     requester: User,
     tool: Tool,
     requests: list[ShareRequest],
-    place: tuple[str, int] | None,
 ) -> None:
     """Tell whoever answers these requests, once each: the owner of each
     thing, or the initiative's managers where it has none.
 
     On a system session routed into the community, which can see who that is
     and what the notice names; the requester's session can see neither. A
-    notice about one thing names it; about several, it names the collection
-    or wiki they were asked for from.
+    notice names one of the things it asks the recipient about, which they
+    can open, where the collection or wiki they were asked from may be one
+    they can't.
     """
     from app.db import cohorts
     from app.db.request_context import SystemGuild
@@ -333,11 +341,9 @@ async def tell_answerers(
 
         first = requests[0]
         name = await notifications_service.actor_name(session, requester)
-        called = await names(
-            session, [ref(r) for r in requests] + ([place] if place else [])
-        )
+        called = await names(session, [ref(r) for r in requests])
         for uid, rids in answerers.items():
-            about = (tool.value, rids[0]) if len(rids) == 1 or place is None else place
+            about = (tool.value, rids[0])
             await notifications_service.notify(
                 session,
                 NotificationType.share_requested,
@@ -372,10 +378,17 @@ async def answerable(
     batch_id: UUID | None = None,
     tool: Tool | None = None,
     resource_id: int | None = None,
+    ids: list[int] | None = None,
+    lock: bool = False,
 ) -> list[ShareRequest]:
-    """The pending requests the reader may answer — from one batch, or on one
-    thing — oldest first. Row security keeps a request to its requester and
-    whoever may share its resource; the requester's own are left out."""
+    """The pending requests the reader may answer — from one batch, on one
+    thing, or by id — oldest first. Row security keeps a request to its
+    requester and whoever may share its resource; the requester's own are
+    left out.
+
+    ``lock`` holds them until the caller's transaction ends, so two people
+    answering at once answer each request once: the second finds it no
+    longer pending."""
     stmt = select(ShareRequest).where(
         ShareRequest.status == ShareRequestStatus.pending.value,
         ShareRequest.user_id != user_id,
@@ -389,6 +402,10 @@ async def answerable(
     )
     if batch_id is not None:
         stmt = stmt.where(ShareRequest.batch_id == batch_id)
+    if ids is not None:
+        stmt = stmt.where(ShareRequest.id.in_(ids))  # type: ignore[union-attr]
+    if lock:
+        stmt = stmt.with_for_update()
     if tool is not None and resource_id is not None:
         stmt = stmt.where(
             ShareRequest.resource_type == tool.value,
@@ -442,11 +459,7 @@ async def answer(
     well. A grant already giving that much is left as it is. A no tells the
     requester only where ``tell`` asks. Rides the caller's transaction.
     """
-    found = [
-        r
-        for r in await answerable(session, user_id=answerer.id)
-        if r.id in set(request_ids)
-    ]
+    found = await answerable(session, user_id=answerer.id, ids=request_ids, lock=True)
     if not found:
         raise HTTPException(
             status_code=status.HTTP_404_NOT_FOUND,

@@ -270,12 +270,12 @@
       "read": {
         "title": "Demande de consultation",
         "body_one": "{{requester}} demande à voir {{title}}",
-        "body_other": "{{requester}} demande à voir {{count}} fichiers dans {{title}}"
+        "body_other": "{{requester}} demande à voir {{count}} fichiers"
       },
       "write": {
         "title": "Demande de modification",
         "body_one": "{{requester}} demande à modifier {{title}}",
-        "body_other": "{{requester}} demande à modifier {{count}} fichiers dans {{title}}"
+        "body_other": "{{requester}} demande à modifier {{count}} fichiers"
       }
     },
     "granted": {

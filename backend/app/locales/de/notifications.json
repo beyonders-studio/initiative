@@ -270,12 +270,12 @@
       "read": {
         "title": "Bitte um Ansicht",
         "body_one": "{{requester}} möchte {{title}} ansehen",
-        "body_other": "{{requester}} möchte {{count}} Dateien in {{title}} ansehen"
+        "body_other": "{{requester}} möchte {{count}} Dateien ansehen"
       },
       "write": {
         "title": "Bitte um Bearbeitung",
         "body_one": "{{requester}} möchte {{title}} bearbeiten",
-        "body_other": "{{requester}} möchte {{count}} Dateien in {{title}} bearbeiten"
+        "body_other": "{{requester}} möchte {{count}} Dateien bearbeiten"
       }
     },
     "granted": {

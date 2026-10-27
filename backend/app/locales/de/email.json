@@ -530,13 +530,13 @@
         "subject": "Bitte um Ansicht",
         "title": "Bitte um Ansicht",
         "body_one": "<strong>{{requester}}</strong> möchte <strong>{{title}}</strong> ansehen",
-        "body_other": "<strong>{{requester}}</strong> möchte {{count}} Dateien in <strong>{{title}}</strong> ansehen"
+        "body_other": "<strong>{{requester}}</strong> möchte {{count}} Dateien ansehen"
       },
       "write": {
         "subject": "Bitte um Bearbeitung",
         "title": "Bitte um Bearbeitung",
         "body_one": "<strong>{{requester}}</strong> möchte <strong>{{title}}</strong> bearbeiten",
-        "body_other": "<strong>{{requester}}</strong> möchte {{count}} Dateien in <strong>{{title}}</strong> bearbeiten"
+        "body_other": "<strong>{{requester}}</strong> möchte {{count}} Dateien bearbeiten"
       }
     },
     "granted": {

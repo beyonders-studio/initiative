@@ -530,13 +530,13 @@
         "subject": "Solicitud para ver",
         "title": "Solicitud para ver",
         "body_one": "<strong>{{requester}}</strong> pide ver <strong>{{title}}</strong>",
-        "body_other": "<strong>{{requester}}</strong> pide ver {{count}} archivos de <strong>{{title}}</strong>"
+        "body_other": "<strong>{{requester}}</strong> pide ver {{count}} archivos"
       },
       "write": {
         "subject": "Solicitud para editar",
         "title": "Solicitud para editar",
         "body_one": "<strong>{{requester}}</strong> pide editar <strong>{{title}}</strong>",
-        "body_other": "<strong>{{requester}}</strong> pide editar {{count}} archivos de <strong>{{title}}</strong>"
+        "body_other": "<strong>{{requester}}</strong> pide editar {{count}} archivos"
       }
     },
     "granted": {

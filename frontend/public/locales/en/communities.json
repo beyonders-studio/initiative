@@ -271,9 +271,9 @@
     "initiativeJoinDenied": "Your request to join {{initiativeName}} was declined.",
     "shareRequested": {
       "read_one": "{{requester}} asks to view {{title}}.",
-      "read_other": "{{requester}} asks to view {{count}} files in {{title}}.",
+      "read_other": "{{requester}} asks to view {{count}} files.",
       "write_one": "{{requester}} asks to edit {{title}}.",
-      "write_other": "{{requester}} asks to edit {{count}} files in {{title}}."
+      "write_other": "{{requester}} asks to edit {{count}} files."
     },
     "shareGranted": {
       "read_one": "{{answerer}} gave you view access to {{title}}.",

@@ -270,12 +270,12 @@
       "read": {
         "title": "Asked to view",
         "body_one": "{{requester}} asks to view {{title}}",
-        "body_other": "{{requester}} asks to view {{count}} files in {{title}}"
+        "body_other": "{{requester}} asks to view {{count}} files"
       },
       "write": {
         "title": "Asked to edit",
         "body_one": "{{requester}} asks to edit {{title}}",
-        "body_other": "{{requester}} asks to edit {{count}} files in {{title}}"
+        "body_other": "{{requester}} asks to edit {{count}} files"
       }
     },
     "granted": {

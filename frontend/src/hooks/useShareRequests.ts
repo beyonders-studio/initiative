@@ -76,6 +76,9 @@ export const useCreateShareRequest = (
     options
   );
 
+/** The most requests one answer names (`ShareRequestAnswer.ids`). */
+const ANSWER_CHUNK = 500;
+
 /** An answer to some of the requests the reader may answer, by their rows. */
 export type ShareRequestReply = Omit<ShareRequestAnswer, "ids"> & {
   requests: ShareRequestRead[];
@@ -88,8 +91,13 @@ export type ShareRequestReply = Omit<ShareRequestAnswer, "ids"> & {
 export const useAnswerShareRequests = (options?: MutationOpts<void, ShareRequestReply>) =>
   useCommunityMutation<void, ShareRequestReply>(
     {
-      mutationFn: (communityId, { requests, ...answer }) =>
-        answerShareRequests(communityId, { ...answer, ids: requests.map((row) => row.id) }),
+      mutationFn: async (communityId, { requests, ...answer }) => {
+        // The server takes so many at a time; a larger batch goes in turns.
+        for (let start = 0; start < requests.length; start += ANSWER_CHUNK) {
+          const ids = requests.slice(start, start + ANSWER_CHUNK).map((row) => row.id);
+          await answerShareRequests(communityId, { ...answer, ids });
+        }
+      },
       invalidate: (_, { requests, approve }) =>
         invalidate(
           q.shareRequests(),

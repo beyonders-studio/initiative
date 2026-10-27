@@ -270,12 +270,12 @@
       "read": {
         "title": "Solicitud para ver",
         "body_one": "{{requester}} pide ver {{title}}",
-        "body_other": "{{requester}} pide ver {{count}} archivos de {{title}}"
+        "body_other": "{{requester}} pide ver {{count}} archivos"
       },
       "write": {
         "title": "Solicitud para editar",
         "body_one": "{{requester}} pide editar {{title}}",
-        "body_other": "{{requester}} pide editar {{count}} archivos de {{title}}"
+        "body_other": "{{requester}} pide editar {{count}} archivos"
       }
     },
     "granted": {

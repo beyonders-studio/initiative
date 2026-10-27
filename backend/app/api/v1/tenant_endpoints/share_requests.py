@@ -74,17 +74,11 @@ async def create_share_request(
 ) -> ShareRequestBatch:
     """Ask for one thing, or for the files of a collection or a wiki the
     reader can't open, and tell whoever answers."""
-    place: Optional[tuple[str, int]] = None
     if payload.resource_id is not None:
         ids = [payload.resource_id]
     else:
         ids = await share_requests_service.hidden_files(
             session, collection_id=payload.collection_id, wiki_id=payload.wiki_id
-        )
-        place = (
-            ("collection", payload.collection_id)
-            if payload.collection_id is not None
-            else ("wiki", payload.wiki_id or 0)
         )
     made = await share_requests_service.ask(
         session,
@@ -101,7 +95,6 @@ async def create_share_request(
         requester=current_user,
         tool=payload.resource_type,
         requests=made,
-        place=place,
     )
     return batch
 

@@ -137,7 +137,10 @@ def downgrade() -> None:
 
 
 def _apply_downgrade() -> None:
-    op.execute("DROP VIEW IF EXISTS entity_presence")
+    op.drop_table("share_requests")
+    # The policies provisioning rendered over the view go with it; a start
+    # renders them again from the registry it runs.
+    op.execute("DROP VIEW IF EXISTS entity_presence CASCADE")
     op.execute(
         "DO $$ BEGIN EXECUTE format('REVOKE ALL ON ALL TABLES IN SCHEMA %I FROM "
         f"{READER}; REVOKE ALL ON SCHEMA %I FROM {READER}', current_schema(), "
@@ -145,4 +148,3 @@ def _apply_downgrade() -> None:
     )
     for table in ARM_TABLES:
         op.execute(f"DROP POLICY IF EXISTS presence_read ON {table}")
-    op.drop_table("share_requests")

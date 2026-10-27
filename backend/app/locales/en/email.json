@@ -530,13 +530,13 @@
         "subject": "Asked to view",
         "title": "Asked to view",
         "body_one": "<strong>{{requester}}</strong> asks to view <strong>{{title}}</strong>",
-        "body_other": "<strong>{{requester}}</strong> asks to view {{count}} files in <strong>{{title}}</strong>"
+        "body_other": "<strong>{{requester}}</strong> asks to view {{count}} files"
       },
       "write": {
         "subject": "Asked to edit",
         "title": "Asked to edit",
         "body_one": "<strong>{{requester}}</strong> asks to edit <strong>{{title}}</strong>",
-        "body_other": "<strong>{{requester}}</strong> asks to edit {{count}} files in <strong>{{title}}</strong>"
+        "body_other": "<strong>{{requester}}</strong> asks to edit {{count}} files"
       }
     },
     "granted": {

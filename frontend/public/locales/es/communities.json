@@ -271,9 +271,9 @@
     "initiativeJoinDenied": "Tu solicitud para unirte a {{initiativeName}} fue rechazada.",
     "shareRequested": {
       "read_one": "{{requester}} pide ver {{title}}.",
-      "read_other": "{{requester}} pide ver {{count}} archivos en {{title}}.",
+      "read_other": "{{requester}} pide ver {{count}} archivos.",
       "write_one": "{{requester}} pide editar {{title}}.",
-      "write_other": "{{requester}} pide editar {{count}} archivos en {{title}}."
+      "write_other": "{{requester}} pide editar {{count}} archivos."
     },
     "shareGranted": {
       "read_one": "{{answerer}} te dio acceso para ver {{title}}.",

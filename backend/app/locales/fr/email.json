@@ -530,13 +530,13 @@
         "subject": "Demande de consultation",
         "title": "Demande de consultation",
         "body_one": "<strong>{{requester}}</strong> demande à voir <strong>{{title}}</strong>",
-        "body_other": "<strong>{{requester}}</strong> demande à voir {{count}} fichiers dans <strong>{{title}}</strong>"
+        "body_other": "<strong>{{requester}}</strong> demande à voir {{count}} fichiers"
       },
       "write": {
         "subject": "Demande de modification",
         "title": "Demande de modification",
         "body_one": "<strong>{{requester}}</strong> demande à modifier <strong>{{title}}</strong>",
-        "body_other": "<strong>{{requester}}</strong> demande à modifier {{count}} fichiers dans <strong>{{title}}</strong>"
+        "body_other": "<strong>{{requester}}</strong> demande à modifier {{count}} fichiers"
       }
     },
     "granted": {

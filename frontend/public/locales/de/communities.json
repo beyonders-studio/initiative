@@ -271,9 +271,9 @@
     "initiativeJoinDenied": "Deine Anfrage, {{initiativeName}} beizutreten, wurde abgelehnt.",
     "shareRequested": {
       "read_one": "{{requester}} möchte {{title}} ansehen.",
-      "read_other": "{{requester}} möchte {{count}} Dateien in {{title}} ansehen.",
+      "read_other": "{{requester}} möchte {{count}} Dateien ansehen.",
       "write_one": "{{requester}} möchte {{title}} bearbeiten.",
-      "write_other": "{{requester}} möchte {{count}} Dateien in {{title}} bearbeiten."
+      "write_other": "{{requester}} möchte {{count}} Dateien bearbeiten."
     },
     "shareGranted": {
       "read_one": "{{answerer}} hat dir Lesezugriff auf {{title}} gegeben.",
