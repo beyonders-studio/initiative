@@ -27,14 +27,22 @@ import type {
   BodyPutVideoThumbnail,
   BodyUploadFile,
   BodyUploadFileVersion,
+  CollectionCreate,
+  CollectionFiles,
+  CollectionListResponse,
+  CollectionRead,
+  CollectionUpdate,
   FileCreate,
   FileListResponse,
   FileRead,
   FileUpdate,
   FileVersionRead,
   HTTPValidationError,
+  ListCollectionFilesParams,
+  ListCollectionsParams,
   ListFilesParams,
   ReadFileParams,
+  RemoveCollectionFilesParams,
   ResourceGrantSchema,
   SpreadsheetImportRead,
   ToolDuplicateRequest,
@@ -281,6 +289,368 @@ export const useCreateFile = <TError = ErrorType<HTTPValidationError>, TContext 
   TContext
 > => {
   return useMutation(getCreateFileMutationOptions(options), queryClient);
+};
+/**
+ * The files in one collection the reader can open: the Files list, with
+ * its parameters, narrowed to the collection. A collection out of reach is
+ * a 404.
+ * @summary List Collection Files
+ */
+export const listCollectionFiles = (
+  communityId: number,
+  collectionId: number,
+  params?: ListCollectionFilesParams,
+  options?: SecondParameter<typeof apiMutator>,
+  signal?: AbortSignal
+) => {
+  return apiMutator<FileListResponse>(
+    {
+      url: `/api/v1/c/${communityId}/collections/${collectionId}/files`,
+      method: "GET",
+      params,
+      signal,
+    },
+    options
+  );
+};
+
+export const getListCollectionFilesQueryKey = (
+  communityId: number,
+  collectionId: number,
+  params?: ListCollectionFilesParams
+) => {
+  return [
+    `/api/v1/c/${communityId}/collections/${collectionId}/files`,
+    ...(params ? [params] : []),
+  ] as const;
+};
+
+export const getListCollectionFilesQueryOptions = <
+  TData = Awaited<ReturnType<typeof listCollectionFiles>>,
+  TError = ErrorType<HTTPValidationError>,
+>(
+  communityId: number,
+  collectionId: number,
+  params?: ListCollectionFilesParams,
+  options?: {
+    query?: Partial<
+      UseQueryOptions<Awaited<ReturnType<typeof listCollectionFiles>>, TError, TData>
+    >;
+    request?: SecondParameter<typeof apiMutator>;
+  }
+) => {
+  const { query: queryOptions, request: requestOptions } = options ?? {};
+
+  const queryKey =
+    queryOptions?.queryKey ?? getListCollectionFilesQueryKey(communityId, collectionId, params);
+
+  const queryFn: QueryFunction<Awaited<ReturnType<typeof listCollectionFiles>>> = ({ signal }) =>
+    listCollectionFiles(communityId, collectionId, params, requestOptions, signal);
+
+  return {
+    queryKey,
+    queryFn,
+    enabled:
+      communityId !== null &&
+      communityId !== undefined &&
+      collectionId !== null &&
+      collectionId !== undefined,
+    ...queryOptions,
+  } as UseQueryOptions<Awaited<ReturnType<typeof listCollectionFiles>>, TError, TData> & {
+    queryKey: DataTag<QueryKey, TData, TError>;
+  };
+};
+
+export type ListCollectionFilesQueryResult = NonNullable<
+  Awaited<ReturnType<typeof listCollectionFiles>>
+>;
+export type ListCollectionFilesQueryError = ErrorType<HTTPValidationError>;
+
+export function useListCollectionFiles<
+  TData = Awaited<ReturnType<typeof listCollectionFiles>>,
+  TError = ErrorType<HTTPValidationError>,
+>(
+  communityId: number,
+  collectionId: number,
+  params: undefined | ListCollectionFilesParams,
+  options: {
+    query: Partial<
+      UseQueryOptions<Awaited<ReturnType<typeof listCollectionFiles>>, TError, TData>
+    > &
+      Pick<
+        DefinedInitialDataOptions<
+          Awaited<ReturnType<typeof listCollectionFiles>>,
+          TError,
+          Awaited<ReturnType<typeof listCollectionFiles>>
+        >,
+        "initialData"
+      >;
+    request?: SecondParameter<typeof apiMutator>;
+  },
+  queryClient?: QueryClient
+): DefinedUseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData, TError> };
+export function useListCollectionFiles<
+  TData = Awaited<ReturnType<typeof listCollectionFiles>>,
+  TError = ErrorType<HTTPValidationError>,
+>(
+  communityId: number,
+  collectionId: number,
+  params?: ListCollectionFilesParams,
+  options?: {
+    query?: Partial<
+      UseQueryOptions<Awaited<ReturnType<typeof listCollectionFiles>>, TError, TData>
+    > &
+      Pick<
+        UndefinedInitialDataOptions<
+          Awaited<ReturnType<typeof listCollectionFiles>>,
+          TError,
+          Awaited<ReturnType<typeof listCollectionFiles>>
+        >,
+        "initialData"
+      >;
+    request?: SecondParameter<typeof apiMutator>;
+  },
+  queryClient?: QueryClient
+): UseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData, TError> };
+export function useListCollectionFiles<
+  TData = Awaited<ReturnType<typeof listCollectionFiles>>,
+  TError = ErrorType<HTTPValidationError>,
+>(
+  communityId: number,
+  collectionId: number,
+  params?: ListCollectionFilesParams,
+  options?: {
+    query?: Partial<
+      UseQueryOptions<Awaited<ReturnType<typeof listCollectionFiles>>, TError, TData>
+    >;
+    request?: SecondParameter<typeof apiMutator>;
+  },
+  queryClient?: QueryClient
+): UseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData, TError> };
+/**
+ * @summary List Collection Files
+ */
+
+export function useListCollectionFiles<
+  TData = Awaited<ReturnType<typeof listCollectionFiles>>,
+  TError = ErrorType<HTTPValidationError>,
+>(
+  communityId: number,
+  collectionId: number,
+  params?: ListCollectionFilesParams,
+  options?: {
+    query?: Partial<
+      UseQueryOptions<Awaited<ReturnType<typeof listCollectionFiles>>, TError, TData>
+    >;
+    request?: SecondParameter<typeof apiMutator>;
+  },
+  queryClient?: QueryClient
+): UseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData, TError> } {
+  const queryOptions = getListCollectionFilesQueryOptions(
+    communityId,
+    collectionId,
+    params,
+    options
+  );
+
+  const query = useQuery(queryOptions, queryClient) as UseQueryResult<TData, TError> & {
+    queryKey: DataTag<QueryKey, TData, TError>;
+  };
+
+  return withQueryKey(query, queryOptions.queryKey);
+}
+
+/**
+ * Put files in a collection: each a file of its initiative the reader can
+ * open. One already in it stays as it is.
+ * @summary Add Collection Files
+ */
+export const addCollectionFiles = (
+  communityId: number,
+  collectionId: number,
+  collectionFiles: BodyType<CollectionFiles>,
+  options?: SecondParameter<typeof apiMutator>,
+  signal?: AbortSignal
+) => {
+  return apiMutator<CollectionRead>(
+    {
+      url: `/api/v1/c/${communityId}/collections/${collectionId}/files`,
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      data: collectionFiles,
+      signal,
+    },
+    options
+  );
+};
+
+export const getAddCollectionFilesMutationKey = () => ["addCollectionFiles"] as const;
+
+export const getAddCollectionFilesMutationOptions = <
+  TError = ErrorType<HTTPValidationError>,
+  TContext = unknown,
+>(options?: {
+  mutation?: UseMutationOptions<
+    Awaited<ReturnType<typeof addCollectionFiles>>,
+    TError,
+    AddCollectionFilesMutationVariables,
+    TContext
+  >;
+  request?: SecondParameter<typeof apiMutator>;
+}): UseMutationOptions<
+  Awaited<ReturnType<typeof addCollectionFiles>>,
+  TError,
+  AddCollectionFilesMutationVariables,
+  TContext
+> => {
+  const mutationKey = getAddCollectionFilesMutationKey();
+  const { mutation: mutationOptions, request: requestOptions } = options
+    ? options.mutation && "mutationKey" in options.mutation && options.mutation.mutationKey
+      ? options
+      : { ...options, mutation: { ...options.mutation, mutationKey } }
+    : { mutation: { mutationKey }, request: undefined };
+
+  const mutationFn: MutationFunction<
+    Awaited<ReturnType<typeof addCollectionFiles>>,
+    AddCollectionFilesMutationVariables
+  > = (props) => {
+    const { communityId, collectionId, data } = props ?? {};
+
+    return addCollectionFiles(communityId, collectionId, data, requestOptions);
+  };
+
+  return { mutationFn, ...mutationOptions };
+};
+
+export type AddCollectionFilesMutationResult = NonNullable<
+  Awaited<ReturnType<typeof addCollectionFiles>>
+>;
+export type AddCollectionFilesMutationBody = BodyType<CollectionFiles>;
+export type AddCollectionFilesMutationError = ErrorType<HTTPValidationError>;
+export type AddCollectionFilesMutationVariables = {
+  communityId: number;
+  collectionId: number;
+  data: BodyType<CollectionFiles>;
+};
+
+/**
+ * @summary Add Collection Files
+ */
+export const useAddCollectionFiles = <TError = ErrorType<HTTPValidationError>, TContext = unknown>(
+  options?: {
+    mutation?: UseMutationOptions<
+      Awaited<ReturnType<typeof addCollectionFiles>>,
+      TError,
+      AddCollectionFilesMutationVariables,
+      TContext
+    >;
+    request?: SecondParameter<typeof apiMutator>;
+  },
+  queryClient?: QueryClient
+): UseMutationResult<
+  Awaited<ReturnType<typeof addCollectionFiles>>,
+  TError,
+  AddCollectionFilesMutationVariables,
+  TContext
+> => {
+  return useMutation(getAddCollectionFilesMutationOptions(options), queryClient);
+};
+/**
+ * Take files out of a collection. The files stay where they are. A
+ * collection left with no file goes to the trash.
+ * @summary Remove Collection Files
+ */
+export const removeCollectionFiles = (
+  communityId: number,
+  collectionId: number,
+  params: RemoveCollectionFilesParams,
+  options?: SecondParameter<typeof apiMutator>,
+  signal?: AbortSignal
+) => {
+  return apiMutator<void>(
+    {
+      url: `/api/v1/c/${communityId}/collections/${collectionId}/files`,
+      method: "DELETE",
+      params,
+      signal,
+    },
+    options
+  );
+};
+
+export const getRemoveCollectionFilesMutationKey = () => ["removeCollectionFiles"] as const;
+
+export const getRemoveCollectionFilesMutationOptions = <
+  TError = ErrorType<HTTPValidationError>,
+  TContext = unknown,
+>(options?: {
+  mutation?: UseMutationOptions<
+    Awaited<ReturnType<typeof removeCollectionFiles>>,
+    TError,
+    RemoveCollectionFilesMutationVariables,
+    TContext
+  >;
+  request?: SecondParameter<typeof apiMutator>;
+}): UseMutationOptions<
+  Awaited<ReturnType<typeof removeCollectionFiles>>,
+  TError,
+  RemoveCollectionFilesMutationVariables,
+  TContext
+> => {
+  const mutationKey = getRemoveCollectionFilesMutationKey();
+  const { mutation: mutationOptions, request: requestOptions } = options
+    ? options.mutation && "mutationKey" in options.mutation && options.mutation.mutationKey
+      ? options
+      : { ...options, mutation: { ...options.mutation, mutationKey } }
+    : { mutation: { mutationKey }, request: undefined };
+
+  const mutationFn: MutationFunction<
+    Awaited<ReturnType<typeof removeCollectionFiles>>,
+    RemoveCollectionFilesMutationVariables
+  > = (props) => {
+    const { communityId, collectionId, params } = props ?? {};
+
+    return removeCollectionFiles(communityId, collectionId, params, requestOptions);
+  };
+
+  return { mutationFn, ...mutationOptions };
+};
+
+export type RemoveCollectionFilesMutationResult = NonNullable<
+  Awaited<ReturnType<typeof removeCollectionFiles>>
+>;
+
+export type RemoveCollectionFilesMutationError = ErrorType<HTTPValidationError>;
+export type RemoveCollectionFilesMutationVariables = {
+  communityId: number;
+  collectionId: number;
+  params: RemoveCollectionFilesParams;
+};
+
+/**
+ * @summary Remove Collection Files
+ */
+export const useRemoveCollectionFiles = <
+  TError = ErrorType<HTTPValidationError>,
+  TContext = unknown,
+>(
+  options?: {
+    mutation?: UseMutationOptions<
+      Awaited<ReturnType<typeof removeCollectionFiles>>,
+      TError,
+      RemoveCollectionFilesMutationVariables,
+      TContext
+    >;
+    request?: SecondParameter<typeof apiMutator>;
+  },
+  queryClient?: QueryClient
+): UseMutationResult<
+  Awaited<ReturnType<typeof removeCollectionFiles>>,
+  TError,
+  RemoveCollectionFilesMutationVariables,
+  TContext
+> => {
+  return useMutation(getRemoveCollectionFilesMutationOptions(options), queryClient);
 };
 /**
  * Upload a file (PDF, DOCX, etc.).
@@ -1383,6 +1753,539 @@ export const useImportSpreadsheetFile = <
   TContext
 > => {
   return useMutation(getImportSpreadsheetFileMutationOptions(options), queryClient);
+};
+/**
+ * The initiative's collections the reader can see — those holding a file
+ * they can open — most recently changed first, each with how many of its
+ * files they can see and a cover they can open.
+ * @summary List Collections
+ */
+export const listCollections = (
+  communityId: number,
+  params: ListCollectionsParams,
+  options?: SecondParameter<typeof apiMutator>,
+  signal?: AbortSignal
+) => {
+  return apiMutator<CollectionListResponse>(
+    { url: `/api/v1/c/${communityId}/collections/`, method: "GET", params, signal },
+    options
+  );
+};
+
+export const getListCollectionsQueryKey = (communityId: number, params?: ListCollectionsParams) => {
+  return [`/api/v1/c/${communityId}/collections/`, ...(params ? [params] : [])] as const;
+};
+
+export const getListCollectionsQueryOptions = <
+  TData = Awaited<ReturnType<typeof listCollections>>,
+  TError = ErrorType<HTTPValidationError>,
+>(
+  communityId: number,
+  params: ListCollectionsParams,
+  options?: {
+    query?: Partial<UseQueryOptions<Awaited<ReturnType<typeof listCollections>>, TError, TData>>;
+    request?: SecondParameter<typeof apiMutator>;
+  }
+) => {
+  const { query: queryOptions, request: requestOptions } = options ?? {};
+
+  const queryKey = queryOptions?.queryKey ?? getListCollectionsQueryKey(communityId, params);
+
+  const queryFn: QueryFunction<Awaited<ReturnType<typeof listCollections>>> = ({ signal }) =>
+    listCollections(communityId, params, requestOptions, signal);
+
+  return {
+    queryKey,
+    queryFn,
+    enabled: communityId !== null && communityId !== undefined,
+    ...queryOptions,
+  } as UseQueryOptions<Awaited<ReturnType<typeof listCollections>>, TError, TData> & {
+    queryKey: DataTag<QueryKey, TData, TError>;
+  };
+};
+
+export type ListCollectionsQueryResult = NonNullable<Awaited<ReturnType<typeof listCollections>>>;
+export type ListCollectionsQueryError = ErrorType<HTTPValidationError>;
+
+export function useListCollections<
+  TData = Awaited<ReturnType<typeof listCollections>>,
+  TError = ErrorType<HTTPValidationError>,
+>(
+  communityId: number,
+  params: ListCollectionsParams,
+  options: {
+    query: Partial<UseQueryOptions<Awaited<ReturnType<typeof listCollections>>, TError, TData>> &
+      Pick<
+        DefinedInitialDataOptions<
+          Awaited<ReturnType<typeof listCollections>>,
+          TError,
+          Awaited<ReturnType<typeof listCollections>>
+        >,
+        "initialData"
+      >;
+    request?: SecondParameter<typeof apiMutator>;
+  },
+  queryClient?: QueryClient
+): DefinedUseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData, TError> };
+export function useListCollections<
+  TData = Awaited<ReturnType<typeof listCollections>>,
+  TError = ErrorType<HTTPValidationError>,
+>(
+  communityId: number,
+  params: ListCollectionsParams,
+  options?: {
+    query?: Partial<UseQueryOptions<Awaited<ReturnType<typeof listCollections>>, TError, TData>> &
+      Pick<
+        UndefinedInitialDataOptions<
+          Awaited<ReturnType<typeof listCollections>>,
+          TError,
+          Awaited<ReturnType<typeof listCollections>>
+        >,
+        "initialData"
+      >;
+    request?: SecondParameter<typeof apiMutator>;
+  },
+  queryClient?: QueryClient
+): UseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData, TError> };
+export function useListCollections<
+  TData = Awaited<ReturnType<typeof listCollections>>,
+  TError = ErrorType<HTTPValidationError>,
+>(
+  communityId: number,
+  params: ListCollectionsParams,
+  options?: {
+    query?: Partial<UseQueryOptions<Awaited<ReturnType<typeof listCollections>>, TError, TData>>;
+    request?: SecondParameter<typeof apiMutator>;
+  },
+  queryClient?: QueryClient
+): UseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData, TError> };
+/**
+ * @summary List Collections
+ */
+
+export function useListCollections<
+  TData = Awaited<ReturnType<typeof listCollections>>,
+  TError = ErrorType<HTTPValidationError>,
+>(
+  communityId: number,
+  params: ListCollectionsParams,
+  options?: {
+    query?: Partial<UseQueryOptions<Awaited<ReturnType<typeof listCollections>>, TError, TData>>;
+    request?: SecondParameter<typeof apiMutator>;
+  },
+  queryClient?: QueryClient
+): UseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData, TError> } {
+  const queryOptions = getListCollectionsQueryOptions(communityId, params, options);
+
+  const query = useQuery(queryOptions, queryClient) as UseQueryResult<TData, TError> & {
+    queryKey: DataTag<QueryKey, TData, TError>;
+  };
+
+  return withQueryKey(query, queryOptions.queryKey);
+}
+
+/**
+ * Make a collection of files. It starts with the files named, each one a
+ * file of the initiative the reader can open. Takes the initiative role's
+ * right to create files.
+ * @summary Create Collection
+ */
+export const createCollection = (
+  communityId: number,
+  collectionCreate: BodyType<CollectionCreate>,
+  options?: SecondParameter<typeof apiMutator>,
+  signal?: AbortSignal
+) => {
+  return apiMutator<CollectionRead>(
+    {
+      url: `/api/v1/c/${communityId}/collections/`,
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      data: collectionCreate,
+      signal,
+    },
+    options
+  );
+};
+
+export const getCreateCollectionMutationKey = () => ["createCollection"] as const;
+
+export const getCreateCollectionMutationOptions = <
+  TError = ErrorType<HTTPValidationError>,
+  TContext = unknown,
+>(options?: {
+  mutation?: UseMutationOptions<
+    Awaited<ReturnType<typeof createCollection>>,
+    TError,
+    CreateCollectionMutationVariables,
+    TContext
+  >;
+  request?: SecondParameter<typeof apiMutator>;
+}): UseMutationOptions<
+  Awaited<ReturnType<typeof createCollection>>,
+  TError,
+  CreateCollectionMutationVariables,
+  TContext
+> => {
+  const mutationKey = getCreateCollectionMutationKey();
+  const { mutation: mutationOptions, request: requestOptions } = options
+    ? options.mutation && "mutationKey" in options.mutation && options.mutation.mutationKey
+      ? options
+      : { ...options, mutation: { ...options.mutation, mutationKey } }
+    : { mutation: { mutationKey }, request: undefined };
+
+  const mutationFn: MutationFunction<
+    Awaited<ReturnType<typeof createCollection>>,
+    CreateCollectionMutationVariables
+  > = (props) => {
+    const { communityId, data } = props ?? {};
+
+    return createCollection(communityId, data, requestOptions);
+  };
+
+  return { mutationFn, ...mutationOptions };
+};
+
+export type CreateCollectionMutationResult = NonNullable<
+  Awaited<ReturnType<typeof createCollection>>
+>;
+export type CreateCollectionMutationBody = BodyType<CollectionCreate>;
+export type CreateCollectionMutationError = ErrorType<HTTPValidationError>;
+export type CreateCollectionMutationVariables = {
+  communityId: number;
+  data: BodyType<CollectionCreate>;
+};
+
+/**
+ * @summary Create Collection
+ */
+export const useCreateCollection = <TError = ErrorType<HTTPValidationError>, TContext = unknown>(
+  options?: {
+    mutation?: UseMutationOptions<
+      Awaited<ReturnType<typeof createCollection>>,
+      TError,
+      CreateCollectionMutationVariables,
+      TContext
+    >;
+    request?: SecondParameter<typeof apiMutator>;
+  },
+  queryClient?: QueryClient
+): UseMutationResult<
+  Awaited<ReturnType<typeof createCollection>>,
+  TError,
+  CreateCollectionMutationVariables,
+  TContext
+> => {
+  return useMutation(getCreateCollectionMutationOptions(options), queryClient);
+};
+/**
+ * @summary Read Collection
+ */
+export const readCollection = (
+  communityId: number,
+  collectionId: number,
+  options?: SecondParameter<typeof apiMutator>,
+  signal?: AbortSignal
+) => {
+  return apiMutator<CollectionRead>(
+    { url: `/api/v1/c/${communityId}/collections/${collectionId}`, method: "GET", signal },
+    options
+  );
+};
+
+export const getReadCollectionQueryKey = (communityId: number, collectionId: number) => {
+  return [`/api/v1/c/${communityId}/collections/${collectionId}`] as const;
+};
+
+export const getReadCollectionQueryOptions = <
+  TData = Awaited<ReturnType<typeof readCollection>>,
+  TError = ErrorType<HTTPValidationError>,
+>(
+  communityId: number,
+  collectionId: number,
+  options?: {
+    query?: Partial<UseQueryOptions<Awaited<ReturnType<typeof readCollection>>, TError, TData>>;
+    request?: SecondParameter<typeof apiMutator>;
+  }
+) => {
+  const { query: queryOptions, request: requestOptions } = options ?? {};
+
+  const queryKey = queryOptions?.queryKey ?? getReadCollectionQueryKey(communityId, collectionId);
+
+  const queryFn: QueryFunction<Awaited<ReturnType<typeof readCollection>>> = ({ signal }) =>
+    readCollection(communityId, collectionId, requestOptions, signal);
+
+  return {
+    queryKey,
+    queryFn,
+    enabled:
+      communityId !== null &&
+      communityId !== undefined &&
+      collectionId !== null &&
+      collectionId !== undefined,
+    ...queryOptions,
+  } as UseQueryOptions<Awaited<ReturnType<typeof readCollection>>, TError, TData> & {
+    queryKey: DataTag<QueryKey, TData, TError>;
+  };
+};
+
+export type ReadCollectionQueryResult = NonNullable<Awaited<ReturnType<typeof readCollection>>>;
+export type ReadCollectionQueryError = ErrorType<HTTPValidationError>;
+
+export function useReadCollection<
+  TData = Awaited<ReturnType<typeof readCollection>>,
+  TError = ErrorType<HTTPValidationError>,
+>(
+  communityId: number,
+  collectionId: number,
+  options: {
+    query: Partial<UseQueryOptions<Awaited<ReturnType<typeof readCollection>>, TError, TData>> &
+      Pick<
+        DefinedInitialDataOptions<
+          Awaited<ReturnType<typeof readCollection>>,
+          TError,
+          Awaited<ReturnType<typeof readCollection>>
+        >,
+        "initialData"
+      >;
+    request?: SecondParameter<typeof apiMutator>;
+  },
+  queryClient?: QueryClient
+): DefinedUseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData, TError> };
+export function useReadCollection<
+  TData = Awaited<ReturnType<typeof readCollection>>,
+  TError = ErrorType<HTTPValidationError>,
+>(
+  communityId: number,
+  collectionId: number,
+  options?: {
+    query?: Partial<UseQueryOptions<Awaited<ReturnType<typeof readCollection>>, TError, TData>> &
+      Pick<
+        UndefinedInitialDataOptions<
+          Awaited<ReturnType<typeof readCollection>>,
+          TError,
+          Awaited<ReturnType<typeof readCollection>>
+        >,
+        "initialData"
+      >;
+    request?: SecondParameter<typeof apiMutator>;
+  },
+  queryClient?: QueryClient
+): UseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData, TError> };
+export function useReadCollection<
+  TData = Awaited<ReturnType<typeof readCollection>>,
+  TError = ErrorType<HTTPValidationError>,
+>(
+  communityId: number,
+  collectionId: number,
+  options?: {
+    query?: Partial<UseQueryOptions<Awaited<ReturnType<typeof readCollection>>, TError, TData>>;
+    request?: SecondParameter<typeof apiMutator>;
+  },
+  queryClient?: QueryClient
+): UseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData, TError> };
+/**
+ * @summary Read Collection
+ */
+
+export function useReadCollection<
+  TData = Awaited<ReturnType<typeof readCollection>>,
+  TError = ErrorType<HTTPValidationError>,
+>(
+  communityId: number,
+  collectionId: number,
+  options?: {
+    query?: Partial<UseQueryOptions<Awaited<ReturnType<typeof readCollection>>, TError, TData>>;
+    request?: SecondParameter<typeof apiMutator>;
+  },
+  queryClient?: QueryClient
+): UseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData, TError> } {
+  const queryOptions = getReadCollectionQueryOptions(communityId, collectionId, options);
+
+  const query = useQuery(queryOptions, queryClient) as UseQueryResult<TData, TError> & {
+    queryKey: DataTag<QueryKey, TData, TError>;
+  };
+
+  return withQueryKey(query, queryOptions.queryKey);
+}
+
+/**
+ * Rename, describe, tag, set the cover of, or switch the comments of a
+ * collection.
+ * @summary Update Collection
+ */
+export const updateCollection = (
+  communityId: number,
+  collectionId: number,
+  collectionUpdate: BodyType<CollectionUpdate>,
+  options?: SecondParameter<typeof apiMutator>,
+  signal?: AbortSignal
+) => {
+  return apiMutator<CollectionRead>(
+    {
+      url: `/api/v1/c/${communityId}/collections/${collectionId}`,
+      method: "PATCH",
+      headers: { "Content-Type": "application/json" },
+      data: collectionUpdate,
+      signal,
+    },
+    options
+  );
+};
+
+export const getUpdateCollectionMutationKey = () => ["updateCollection"] as const;
+
+export const getUpdateCollectionMutationOptions = <
+  TError = ErrorType<HTTPValidationError>,
+  TContext = unknown,
+>(options?: {
+  mutation?: UseMutationOptions<
+    Awaited<ReturnType<typeof updateCollection>>,
+    TError,
+    UpdateCollectionMutationVariables,
+    TContext
+  >;
+  request?: SecondParameter<typeof apiMutator>;
+}): UseMutationOptions<
+  Awaited<ReturnType<typeof updateCollection>>,
+  TError,
+  UpdateCollectionMutationVariables,
+  TContext
+> => {
+  const mutationKey = getUpdateCollectionMutationKey();
+  const { mutation: mutationOptions, request: requestOptions } = options
+    ? options.mutation && "mutationKey" in options.mutation && options.mutation.mutationKey
+      ? options
+      : { ...options, mutation: { ...options.mutation, mutationKey } }
+    : { mutation: { mutationKey }, request: undefined };
+
+  const mutationFn: MutationFunction<
+    Awaited<ReturnType<typeof updateCollection>>,
+    UpdateCollectionMutationVariables
+  > = (props) => {
+    const { communityId, collectionId, data } = props ?? {};
+
+    return updateCollection(communityId, collectionId, data, requestOptions);
+  };
+
+  return { mutationFn, ...mutationOptions };
+};
+
+export type UpdateCollectionMutationResult = NonNullable<
+  Awaited<ReturnType<typeof updateCollection>>
+>;
+export type UpdateCollectionMutationBody = BodyType<CollectionUpdate>;
+export type UpdateCollectionMutationError = ErrorType<HTTPValidationError>;
+export type UpdateCollectionMutationVariables = {
+  communityId: number;
+  collectionId: number;
+  data: BodyType<CollectionUpdate>;
+};
+
+/**
+ * @summary Update Collection
+ */
+export const useUpdateCollection = <TError = ErrorType<HTTPValidationError>, TContext = unknown>(
+  options?: {
+    mutation?: UseMutationOptions<
+      Awaited<ReturnType<typeof updateCollection>>,
+      TError,
+      UpdateCollectionMutationVariables,
+      TContext
+    >;
+    request?: SecondParameter<typeof apiMutator>;
+  },
+  queryClient?: QueryClient
+): UseMutationResult<
+  Awaited<ReturnType<typeof updateCollection>>,
+  TError,
+  UpdateCollectionMutationVariables,
+  TContext
+> => {
+  return useMutation(getUpdateCollectionMutationOptions(options), queryClient);
+};
+/**
+ * Send a collection to the trash. Its files stay where they are.
+ * @summary Delete Collection
+ */
+export const deleteCollection = (
+  communityId: number,
+  collectionId: number,
+  options?: SecondParameter<typeof apiMutator>,
+  signal?: AbortSignal
+) => {
+  return apiMutator<void>(
+    { url: `/api/v1/c/${communityId}/collections/${collectionId}`, method: "DELETE", signal },
+    options
+  );
+};
+
+export const getDeleteCollectionMutationKey = () => ["deleteCollection"] as const;
+
+export const getDeleteCollectionMutationOptions = <
+  TError = ErrorType<HTTPValidationError>,
+  TContext = unknown,
+>(options?: {
+  mutation?: UseMutationOptions<
+    Awaited<ReturnType<typeof deleteCollection>>,
+    TError,
+    DeleteCollectionMutationVariables,
+    TContext
+  >;
+  request?: SecondParameter<typeof apiMutator>;
+}): UseMutationOptions<
+  Awaited<ReturnType<typeof deleteCollection>>,
+  TError,
+  DeleteCollectionMutationVariables,
+  TContext
+> => {
+  const mutationKey = getDeleteCollectionMutationKey();
+  const { mutation: mutationOptions, request: requestOptions } = options
+    ? options.mutation && "mutationKey" in options.mutation && options.mutation.mutationKey
+      ? options
+      : { ...options, mutation: { ...options.mutation, mutationKey } }
+    : { mutation: { mutationKey }, request: undefined };
+
+  const mutationFn: MutationFunction<
+    Awaited<ReturnType<typeof deleteCollection>>,
+    DeleteCollectionMutationVariables
+  > = (props) => {
+    const { communityId, collectionId } = props ?? {};
+
+    return deleteCollection(communityId, collectionId, requestOptions);
+  };
+
+  return { mutationFn, ...mutationOptions };
+};
+
+export type DeleteCollectionMutationResult = NonNullable<
+  Awaited<ReturnType<typeof deleteCollection>>
+>;
+
+export type DeleteCollectionMutationError = ErrorType<HTTPValidationError>;
+export type DeleteCollectionMutationVariables = { communityId: number; collectionId: number };
+
+/**
+ * @summary Delete Collection
+ */
+export const useDeleteCollection = <TError = ErrorType<HTTPValidationError>, TContext = unknown>(
+  options?: {
+    mutation?: UseMutationOptions<
+      Awaited<ReturnType<typeof deleteCollection>>,
+      TError,
+      DeleteCollectionMutationVariables,
+      TContext
+    >;
+    request?: SecondParameter<typeof apiMutator>;
+  },
+  queryClient?: QueryClient
+): UseMutationResult<
+  Awaited<ReturnType<typeof deleteCollection>>,
+  TError,
+  DeleteCollectionMutationVariables,
+  TContext
+> => {
+  return useMutation(getDeleteCollectionMutationOptions(options), queryClient);
 };
 /**
  * Replace the file's entire sharing state in one call — the body is the
