@@ -558,6 +558,24 @@ files list filters by `kind`.
 - GET /api/v1/me/files added the new `xls` enum value to the `items/items/file_type` response property for the response status `200`
 - GET /api/v1/me/files added the new `xlsx` enum value to the `items/items/file_type` response property for the response status `200`
 
+### Share requests
+
+Three notification types are new: `share_requested`, `share_granted` and
+`share_declined`, for asking for access to something and the answer.
+
+- GET /api/v1/notifications/ added the new `share_declined` enum value to the `notifications/items/type` response property for the response status `200`
+- GET /api/v1/notifications/ added the new `share_granted` enum value to the `notifications/items/type` response property for the response status `200`
+- GET /api/v1/notifications/ added the new `share_requested` enum value to the `notifications/items/type` response property for the response status `200`
+- GET /api/v1/notifications/{notification_id}/alert added the new `share_declined` enum value to the `notification/type` response property for the response status `200`
+- GET /api/v1/notifications/{notification_id}/alert added the new `share_granted` enum value to the `notification/type` response property for the response status `200`
+- GET /api/v1/notifications/{notification_id}/alert added the new `share_requested` enum value to the `notification/type` response property for the response status `200`
+- POST /api/v1/notifications/{notification_id}/read added the new `share_declined` enum value to the `type` response property for the response status `200`
+- POST /api/v1/notifications/{notification_id}/read added the new `share_granted` enum value to the `type` response property for the response status `200`
+- POST /api/v1/notifications/{notification_id}/read added the new `share_requested` enum value to the `type` response property for the response status `200`
+- POST /api/v1/notifications/{notification_id}/unread added the new `share_declined` enum value to the `type` response property for the response status `200`
+- POST /api/v1/notifications/{notification_id}/unread added the new `share_granted` enum value to the `type` response property for the response status `200`
+- POST /api/v1/notifications/{notification_id}/unread added the new `share_requested` enum value to the `type` response property for the response status `200`
+
 ## After 0.76.0
 
 ### New values in a response's enums
