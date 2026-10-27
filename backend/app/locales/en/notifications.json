@@ -264,5 +264,36 @@
       "title": "A reply on a case nobody has taken",
       "body": "Open Initiative to read it."
     }
+  },
+  "share": {
+    "requested": {
+      "read": {
+        "title": "Asked to view",
+        "body_one": "{{requester}} asks to view {{title}}",
+        "body_other": "{{requester}} asks to view {{count}} files in {{title}}"
+      },
+      "write": {
+        "title": "Asked to edit",
+        "body_one": "{{requester}} asks to edit {{title}}",
+        "body_other": "{{requester}} asks to edit {{count}} files in {{title}}"
+      }
+    },
+    "granted": {
+      "read": {
+        "title": "You can view it now",
+        "body_one": "{{answerer}} let you view {{title}}",
+        "body_other": "{{answerer}} let you view {{count}} files"
+      },
+      "write": {
+        "title": "You can edit it now",
+        "body_one": "{{answerer}} let you edit {{title}}",
+        "body_other": "{{answerer}} let you edit {{count}} files"
+      }
+    },
+    "declined": {
+      "title": "Request declined",
+      "body_one": "{{answerer}} declined your request",
+      "body_other": "{{answerer}} declined your request for {{count}} files"
+    }
   }
 }

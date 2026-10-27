@@ -310,6 +310,19 @@ class GuildMessages:
     CONFIRMATION_MISMATCH = "COMMUNITY_CONFIRMATION_MISMATCH"
 
 
+class ShareRequestMessages:
+    #: Nothing the reader can open or know is there.
+    NOT_FOUND = "SHARE_REQUEST_NOT_FOUND"
+    #: They already hold what they asked for.
+    ALREADY_SHARED = "SHARE_REQUEST_ALREADY_SHARED"
+    #: They asked for it already, and nobody has answered.
+    ALREADY_PENDING = "SHARE_REQUEST_ALREADY_PENDING"
+    #: A collection or wiki with nothing in it they can't open.
+    NOTHING_TO_ASK = "SHARE_REQUEST_NOTHING_TO_ASK"
+    #: The request is answered, or not one this person may answer.
+    CANNOT_ANSWER = "SHARE_REQUEST_CANNOT_ANSWER"
+
+
 class InitiativeMessages:
     NOT_FOUND = "INITIATIVE_NOT_FOUND"
     MANAGER_REQUIRED = "INITIATIVE_MANAGER_REQUIRED"

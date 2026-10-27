@@ -11,6 +11,7 @@ from app.schemas.base import MentionStr, SanitizedBaseModel, TitleStr
 from app.schemas.query import PageMeta
 from app.schemas.tenant.archive import ContentCan
 from app.schemas.tenant.file import FileSummary
+from app.schemas.tenant.share_request import HiddenFiles
 from app.schemas.tenant.property import (
     PropertiesOnCreate,
     PropertiesOnUpdate,
@@ -128,6 +129,9 @@ class CollectionRead(SanitizedBaseModel):
     cover_file_id: Optional[int] = None
     cover: Optional[CollectionCover] = None
     file_count: int = 0
+    #: Its files the reader knows are there and can't open, which they may
+    #: ask for.
+    hidden_files: HiddenFiles = Field(default_factory=HiddenFiles)
     created_by: PersonId | None = None
     created_at: datetime
     updated_at: datetime
@@ -152,6 +156,7 @@ def serialize_collection(
     *,
     context: "ActorContext",
     file_count: int,
+    hidden_files: HiddenFiles,
     cover: Optional["File"],
     can: CollectionCan,
 ) -> CollectionRead:
@@ -161,6 +166,7 @@ def serialize_collection(
         guild_id=context.guild_id,
         cover=collection_cover(cover),
         file_count=file_count,
+        hidden_files=hidden_files,
         tags=annotated_tags(row),
         properties=annotated_properties(row),
         can=can,

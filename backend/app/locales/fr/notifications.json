@@ -264,5 +264,36 @@
       "title": "Une réponse sur un dossier que personne n'a pris",
       "body": "Ouvrez Initiative pour la lire."
     }
+  },
+  "share": {
+    "requested": {
+      "read": {
+        "title": "Demande de consultation",
+        "body_one": "{{requester}} demande à voir {{title}}",
+        "body_other": "{{requester}} demande à voir {{count}} fichiers dans {{title}}"
+      },
+      "write": {
+        "title": "Demande de modification",
+        "body_one": "{{requester}} demande à modifier {{title}}",
+        "body_other": "{{requester}} demande à modifier {{count}} fichiers dans {{title}}"
+      }
+    },
+    "granted": {
+      "read": {
+        "title": "Vous pouvez le voir",
+        "body_one": "{{answerer}} vous a permis de voir {{title}}",
+        "body_other": "{{answerer}} vous a permis de voir {{count}} fichiers"
+      },
+      "write": {
+        "title": "Vous pouvez le modifier",
+        "body_one": "{{answerer}} vous a permis de modifier {{title}}",
+        "body_other": "{{answerer}} vous a permis de modifier {{count}} fichiers"
+      }
+    },
+    "declined": {
+      "title": "Demande refusée",
+      "body_one": "{{answerer}} a refusé votre demande",
+      "body_other": "{{answerer}} a refusé votre demande pour {{count}} fichiers"
+    }
   }
 }

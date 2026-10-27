@@ -17,12 +17,19 @@ from sqlmodel.ext.asyncio.session import AsyncSession
 
 from app.api import resource_access
 from app.api.actor_route import ActorRoute
-from app.api.deps import ActorContext, ActorSessionDep, ActorUserDep, plugin_scope
+from app.api.deps import (
+    ActorContext,
+    ActorSessionDep,
+    ActorUserDep,
+    GuildContext,
+    plugin_scope,
+)
 from app.core.messages import CollectionMessages
 from app.core.tools import KINDS, Tool
 from app.db.frozen import row_is_frozen
 from app.models.tenant.collection import Collection
 from app.models.tenant.initiative import Initiative
+from app.schemas.tenant.share_request import HiddenFiles
 from app.schemas.tenant.collection import (
     MAX_FILES_PER_CHANGE,
     CollectionCan,
@@ -37,6 +44,7 @@ from app.services.permissions import Action
 from app.services.tenant import archive as archive_service
 from app.services.tenant import collections as collections_service
 from app.services.tenant import properties as properties_service
+from app.services.tenant import share_requests as share_requests_service
 from app.services.tenant import tags as tags_service
 from app.services.tenant.soft_delete import trash
 
@@ -68,6 +76,14 @@ async def _serialize(
     session: AsyncSession, rows: List[Collection], context: ActorContext
 ) -> List[CollectionRead]:
     cards = await collections_service.annotate(session, rows)
+    # A plug-in knows of nothing it can't read, so it is asked nothing.
+    hidden = (
+        await share_requests_service.hidden_file_counts(
+            session, user_id=context.user_id, collection_ids=[row.id for row in rows]
+        )
+        if isinstance(context, GuildContext)
+        else {}
+    )
     # The answer is the initiative's, and whether the row is put away: asked
     # once for each. Taking one out of the archive asks only after what is
     # above it, the initiative.
@@ -88,6 +104,10 @@ async def _serialize(
                 row,
                 context=context,
                 file_count=cards[row.id].file_count,
+                hidden_files=HiddenFiles(
+                    count=hidden.get(row.id, (0, 0))[0],
+                    requested=hidden.get(row.id, (0, 0))[1],
+                ),
                 cover=cards[row.id].cover,
                 can=CollectionCan(
                     edit=editable[key],

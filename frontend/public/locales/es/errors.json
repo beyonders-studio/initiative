@@ -798,5 +798,10 @@
   "INVALID_RECURRENCE_LIMIT": "Un máximo diario requiere una repetición por horas después de completar y una fecha de vencimiento. Introduce un máximo entero de 1 a 24, o déjalo en blanco.",
   "TASK_PARENT_IS_PART": "Una tarea no puede formar parte de sí misma ni de una de sus subtareas.",
   "CHECKLIST_ITEM_UNTITLED": "Ese elemento solo nombra personas o enlaces, así que no deja un título para la tarea.",
-  "CHECKLIST_ITEM_CHANGED": "Ese elemento cambió mientras se convertía en tarea. Revísalo e inténtalo de nuevo."
+  "CHECKLIST_ITEM_CHANGED": "Ese elemento cambió mientras se convertía en tarea. Revísalo e inténtalo de nuevo.",
+  "SHARE_REQUEST_NOT_FOUND": "Aquí no hay nada que solicitar",
+  "SHARE_REQUEST_ALREADY_SHARED": "Ya tienes ese acceso",
+  "SHARE_REQUEST_ALREADY_PENDING": "Ya lo has pedido y nadie ha respondido todavía",
+  "SHARE_REQUEST_NOTHING_TO_ASK": "Ya puedes abrir todo lo que hay aquí",
+  "SHARE_REQUEST_CANNOT_ANSWER": "Esa solicitud ya tiene respuesta o no te corresponde responderla"
 }

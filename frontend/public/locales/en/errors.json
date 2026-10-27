@@ -798,5 +798,10 @@
   "INVALID_RECURRENCE_LIMIT": "A daily maximum requires an hourly repeat after completion and a due date. Enter a whole maximum from 1 to 24, or leave it blank.",
   "TASK_PARENT_IS_PART": "A task can't be part of itself or of one of its own subtasks.",
   "CHECKLIST_ITEM_UNTITLED": "That item names only people or links, so it has nothing to call a task.",
-  "CHECKLIST_ITEM_CHANGED": "That item changed while it was being made a task. Look it over and try again."
+  "CHECKLIST_ITEM_CHANGED": "That item changed while it was being made a task. Look it over and try again.",
+  "SHARE_REQUEST_NOT_FOUND": "There's nothing here to ask for",
+  "SHARE_REQUEST_ALREADY_SHARED": "You already have that access",
+  "SHARE_REQUEST_ALREADY_PENDING": "You've already asked, and nobody has answered yet",
+  "SHARE_REQUEST_NOTHING_TO_ASK": "You can already open everything here",
+  "SHARE_REQUEST_CANNOT_ANSWER": "That request has been answered, or isn't yours to answer"
 }

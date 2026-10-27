@@ -264,5 +264,36 @@
       "title": "Una respuesta en un caso que nadie ha tomado",
       "body": "Abre Initiative para leerla."
     }
+  },
+  "share": {
+    "requested": {
+      "read": {
+        "title": "Solicitud para ver",
+        "body_one": "{{requester}} pide ver {{title}}",
+        "body_other": "{{requester}} pide ver {{count}} archivos de {{title}}"
+      },
+      "write": {
+        "title": "Solicitud para editar",
+        "body_one": "{{requester}} pide editar {{title}}",
+        "body_other": "{{requester}} pide editar {{count}} archivos de {{title}}"
+      }
+    },
+    "granted": {
+      "read": {
+        "title": "Ya puedes verlo",
+        "body_one": "{{answerer}} te dejó ver {{title}}",
+        "body_other": "{{answerer}} te dejó ver {{count}} archivos"
+      },
+      "write": {
+        "title": "Ya puedes editarlo",
+        "body_one": "{{answerer}} te dejó editar {{title}}",
+        "body_other": "{{answerer}} te dejó editar {{count}} archivos"
+      }
+    },
+    "declined": {
+      "title": "Solicitud rechazada",
+      "body_one": "{{answerer}} rechazó tu solicitud",
+      "body_other": "{{answerer}} rechazó tu solicitud de {{count}} archivos"
+    }
   }
 }
