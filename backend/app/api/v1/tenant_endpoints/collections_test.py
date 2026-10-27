@@ -329,6 +329,7 @@ async def test_a_collection_lays_out_its_files_in_a_grid_and_a_table(
     shown = {
         layout["kind"]: (not layout["hidden"], layout["is_default"])
         for layout in layouts.json()["layouts"]
+        if "hidden" in layout
     }
     assert shown == {
         "masonry": (False, False),
@@ -336,6 +337,12 @@ async def test_a_collection_lays_out_its_files_in_a_grid_and_a_table(
         "timeline": (False, False),
         "table": (True, False),
     }
+    # A file opened from it is drawn as shipped until its detail changes.
+    assert [
+        (layout["kind"], layout["updated_at"])
+        for layout in layouts.json()["layouts"]
+        if "hidden" not in layout
+    ] == [("file", None)]
 
     shown_masonry = await client.put(
         maker.g("/layouts/"),
@@ -360,6 +367,43 @@ async def test_a_collection_lays_out_its_files_in_a_grid_and_a_table(
         json={"kind": "table", "definition": {"columns": ["assignees"]}},
     )
     assert assignees.status_code == 400
+
+    # Its file detail places the file's own fields and the collection's; a
+    # task's field or part is not a file's.
+    detail = await client.put(
+        maker.g("/layouts/"),
+        headers=maker.headers,
+        params=params,
+        json={
+            "kind": "file",
+            "definition": {
+                "header": [{"type": "field", "props": {"field": "name"}}],
+                "main": [
+                    {
+                        "type": "section",
+                        "children": [
+                            {"type": "field", "props": {"field": "size"}},
+                            {"type": "field", "props": {"field": "property:12"}},
+                            {"type": "properties"},
+                        ],
+                    }
+                ],
+            },
+        },
+    )
+    assert detail.status_code == 200, detail.text
+    for part in (
+        {"type": "field", "props": {"field": "assignees"}},
+        {"type": "comments"},
+    ):
+        refused = await client.put(
+            maker.g("/layouts/"),
+            headers=maker.headers,
+            params=params,
+            json={"kind": "file", "definition": {"main": [part]}},
+        )
+        assert refused.status_code == 400, refused.text
+        assert refused.json()["detail"] == "TOOL_LAYOUTS_KIND_NOT_ALLOWED"
 
 
 async def test_a_collection_is_an_end_of_a_link_only_for_who_sees_it(

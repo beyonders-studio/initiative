@@ -2365,7 +2365,8 @@ export const TaskFieldId = {
 } as const;
 
 /**
- * A file's own fields, as a collection's lists show them.
+ * A file's own fields, as a collection's lists and its file detail show
+ * them.
  */
 export type FileFieldId = (typeof FileFieldId)[keyof typeof FileFieldId];
 
@@ -5311,6 +5312,7 @@ export interface DetailFieldProps {
     | QueueItemDetailFieldId
     | CounterDetailFieldId
     | PostDetailFieldId
+    | FileFieldId
     | string;
 }
 
@@ -5492,6 +5494,7 @@ export const DetailLayoutReadKind = {
   queue_item: "queue_item",
   counter: "counter",
   post: "post",
+  file: "file",
 } as const;
 
 /**
@@ -5514,6 +5517,7 @@ export const DetailLayoutWriteKind = {
   queue_item: "queue_item",
   counter: "counter",
   post: "post",
+  file: "file",
 } as const;
 
 export interface DetailLayoutWrite {

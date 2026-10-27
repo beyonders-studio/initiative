@@ -106,6 +106,9 @@ DETAIL_PARTS: dict[str, frozenset[str]] = {
         "relations",
         "comments",
     },
+    #: A file opened from a collection: its own fields, which it does not
+    #: edit, and the collection's fields and the initiative's properties.
+    "file": _LAYOUT_PARTS,
 }
 
 #: The built-in fields each kind of detail edits.
@@ -115,6 +118,7 @@ DETAIL_FIELDS: dict[str, frozenset[str]] = {
     "queue_item": frozenset(field.value for field in QueueItemDetailFieldId),
     "counter": frozenset(field.value for field in CounterDetailFieldId),
     "post": frozenset(field.value for field in PostDetailFieldId),
+    "file": frozenset(field.value for field in FileFieldId),
 }
 
 

@@ -192,7 +192,8 @@ class TaskFieldId(str, Enum):
 
 
 class FileFieldId(str, Enum):
-    """A file's own fields, as a collection's lists show them."""
+    """A file's own fields, as a collection's lists and its file detail show
+    them."""
 
     name = "name"
     #: What kind of file it is.
@@ -363,6 +364,7 @@ DetailFieldId = Union[
     QueueItemDetailFieldId,
     CounterDetailFieldId,
     PostDetailFieldId,
+    FileFieldId,
     NamedFieldId,
 ]
 
@@ -522,7 +524,9 @@ ListLayoutKind = Literal[
 ]
 #: Every kind of thing a detail layout shows one of; which a tool holds is
 #: ``app.core.tools.DETAIL_LAYOUTS``.
-DetailLayoutKind = Literal["task", "calendar_event", "queue_item", "counter", "post"]
+DetailLayoutKind = Literal[
+    "task", "calendar_event", "queue_item", "counter", "post", "file"
+]
 
 
 #: What a table can be sorted by, as the task list takes it.
