@@ -5,7 +5,7 @@
     "version": "8.1.0",
     "x-initiative-source": {
       "version": "0.77.1",
-      "commit": "4ea24fd7e4ec975f9e38d307e74695747e573543"
+      "commit": "03db17cbe351dede60026edea62ff2751a04c05f"
     }
   },
   "servers": [
@@ -14613,7 +14613,14 @@
           "video",
           "audio",
           "text",
-          "archive",
+          "compressed",
+          "design",
+          "3d",
+          "font",
+          "raw",
+          "code",
+          "ebook",
+          "cad",
           "link",
           "other"
         ],
@@ -14920,6 +14927,18 @@
             "$ref": "#/components/schemas/FileKind",
             "description": "How the file is shown, which follows from its type.",
             "readOnly": true
+          },
+          "converts_to": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/FileType"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "The editor's own type this uploaded file becomes when somebody\nconverts it to edit it (``POST /files/{id}/convert``), or ``None``.",
+            "readOnly": true
           }
         },
         "type": "object",
@@ -14955,7 +14974,8 @@
           "content",
           "collection_ids",
           "content_version",
-          "kind"
+          "kind",
+          "converts_to"
         ],
         "title": "FileRead"
       },
@@ -15273,6 +15293,63 @@
           "tar",
           "gz",
           "7z",
+          "rar",
+          "ai",
+          "psd",
+          "eps",
+          "indd",
+          "xcf",
+          "kra",
+          "procreate",
+          "clip",
+          "sketch",
+          "fig",
+          "afdesign",
+          "afphoto",
+          "afpub",
+          "cdr",
+          "blend",
+          "fbx",
+          "obj",
+          "stl",
+          "glb",
+          "gltf",
+          "3mf",
+          "usdz",
+          "ttf",
+          "otf",
+          "woff",
+          "woff2",
+          "dng",
+          "cr2",
+          "cr3",
+          "nef",
+          "arw",
+          "raf",
+          "orf",
+          "py",
+          "js",
+          "ts",
+          "css",
+          "sql",
+          "yaml",
+          "xml",
+          "toml",
+          "c",
+          "cpp",
+          "cs",
+          "java",
+          "go",
+          "rs",
+          "rb",
+          "php",
+          "swift",
+          "kt",
+          "epub",
+          "mobi",
+          "dwg",
+          "dxf",
+          "step",
           "other"
         ],
         "title": "FileType"
