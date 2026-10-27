@@ -41,8 +41,9 @@ export type CollectionCard = {
   names: boolean;
 };
 
-/** One line of a card, the space between two, and above the first. */
-const LINE = 20;
+/** One line of a card (as tall as a badge, its tallest part), the space
+ *  between two, and above the first. */
+const LINE = 22;
 const SPACE = 4;
 const ABOVE = 6;
 
