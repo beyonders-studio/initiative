@@ -90,12 +90,6 @@ class PropertyDefinitionCreate(PropertyDefinitionBase):
     #: on the collection's files. The collection is in ``initiative_id``.
     collection_id: Optional[int] = None
 
-    @model_validator(mode="after")
-    def _rating_in_collection(self) -> "PropertyDefinitionCreate":
-        if self.type is PropertyType.rating and self.collection_id is None:
-            raise ValueError(PropertyMessages.RATING_ONLY_IN_COLLECTION)
-        return self
-
 
 class PropertyDefinitionUpdate(SanitizedBaseModel):
     """Mutable fields on a property definition.

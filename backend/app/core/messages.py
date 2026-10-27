@@ -521,7 +521,6 @@ class PropertyMessages:
     #: A money property names the currency its amounts are in.
     CURRENCY_REQUIRED = "PROPERTY_CURRENCY_REQUIRED"
     #: A rating is a collection's own field, never an initiative's property.
-    RATING_ONLY_IN_COLLECTION = "PROPERTY_RATING_ONLY_IN_COLLECTION"
 
 
 class AttachmentMessages:

@@ -150,7 +150,6 @@
   "PROPERTY_OPTIONS_REQUIRED": "Einfach- und Mehrfachauswahl-Eigenschaften erfordern mindestens eine Option",
   "PROPERTY_DUPLICATE_OPTION_VALUE": "Optionswerte müssen innerhalb einer Eigenschaft eindeutig sein",
   "PROPERTY_CURRENCY_REQUIRED": "Eine Geld-Eigenschaft braucht eine Währung",
-  "PROPERTY_RATING_ONLY_IN_COLLECTION": "Nur die eigenen Felder einer Sammlung können Bewertungen sein",
   "ATTACHMENT_IMAGE_ONLY": "Es werden nur Bild-Uploads unterstützt",
   "ATTACHMENT_INVALID_IMAGE": "Bildinhalt konnte nicht validiert werden",
   "FILE_NAME_ALREADY_EXISTS": "Eine Datei mit diesem Titel existiert bereits in dieser Initiative",

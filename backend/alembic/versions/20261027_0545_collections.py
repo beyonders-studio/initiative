@@ -166,11 +166,6 @@ def _apply_upgrade() -> None:
         postgresql_where=sa.text("collection_id IS NOT NULL"),
     )
     op.create_check_constraint(
-        "ck_property_definitions_rating_in_collection",
-        "property_definitions",
-        "type <> 'rating' OR collection_id IS NOT NULL",
-    )
-    op.create_check_constraint(
         "ck_property_definitions_currency",
         "property_definitions",
         "(type = 'currency') = (currency IS NOT NULL)",
@@ -192,11 +187,6 @@ def _apply_downgrade() -> None:
     op.execute("ALTER TABLE property_definitions FORCE ROW LEVEL SECURITY")
     op.drop_constraint(
         "ck_property_definitions_currency", "property_definitions", type_="check"
-    )
-    op.drop_constraint(
-        "ck_property_definitions_rating_in_collection",
-        "property_definitions",
-        type_="check",
     )
     op.drop_index(
         "ix_property_definitions_collection_lower_name",

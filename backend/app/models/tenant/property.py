@@ -75,10 +75,6 @@ class PropertyDefinition(CreatedByMixin, table=True):
             name="fk_property_definitions_collection",
         ),
         CheckConstraint(
-            "type <> 'rating' OR collection_id IS NOT NULL",
-            name="ck_property_definitions_rating_in_collection",
-        ),
-        CheckConstraint(
             "(type = 'currency') = (currency IS NOT NULL)",
             name="ck_property_definitions_currency",
         ),

@@ -279,9 +279,6 @@ _GALLERY_CHECK = (
     r"'(gallery|gallery_image|galleries_enabled|create_galleries)'::|\mgallery_id\M"
 )
 _COLLECTION_CHECK = r"'(collection|masonry|grid|timeline)'::|\mcollection_id\M"
-#: A collection's own fields name it as no gallery could, and 20261027_0545
-#: undoes them.
-_FIELD_CHECK = "ck_property_definitions_rating_in_collection"
 _PERMISSION_CHECK = "ck_initiative_role_permissions_permission_key"
 _METADATA_CHECK = "ck_plugin_metadata_entity_type"
 _BOOKMARK_CHECK = "ck_personal_items_bookmarked_tool"
@@ -423,18 +420,16 @@ def _drop_checks(
     bind: Connection, pattern: str, names: tuple[str, ...] = ()
 ) -> dict[tuple[str, str], str]:
     """Drop the CHECKs in this schema whose definition matches ``pattern`` or
-    whose name is one of ``names``, returning each one's definition. A
-    collection's fields' CHECK is left alone."""
+    whose name is one of ``names``, returning each one's definition."""
     rows = bind.execute(
         text(
             "SELECT conrelid::regclass::text, conname, pg_get_constraintdef(oid) "
             "FROM pg_constraint WHERE contype = 'c' "
             "AND connamespace = current_schema()::regnamespace "
-            "AND CAST(conname AS text) <> :field "
             "AND (pg_get_constraintdef(oid) ~ :pattern "
             "OR CAST(conname AS text) = ANY(CAST(:names AS text[])))"
         ),
-        {"pattern": pattern, "names": list(names), "field": _FIELD_CHECK},
+        {"pattern": pattern, "names": list(names)},
     ).all()
     dropped: dict[tuple[str, str], str] = {}
     for table, name, definition in rows:

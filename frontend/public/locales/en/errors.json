@@ -146,7 +146,6 @@
   "PROPERTY_OPTIONS_REQUIRED": "Select and multi-select properties require at least one option",
   "PROPERTY_DUPLICATE_OPTION_VALUE": "Option values must be unique within a property",
   "PROPERTY_CURRENCY_REQUIRED": "A money property needs a currency",
-  "PROPERTY_RATING_ONLY_IN_COLLECTION": "Only a collection's own fields can be ratings",
   "ATTACHMENT_IMAGE_ONLY": "Only image uploads are supported",
   "ATTACHMENT_INVALID_IMAGE": "Unable to validate image contents",
   "ATTACHMENT_TOO_LARGE": "Image is too large (max 10 MB)",

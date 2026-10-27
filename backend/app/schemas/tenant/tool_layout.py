@@ -603,8 +603,8 @@ class ListLayoutDefinition(_Strict):
     )
     #: Left out of the list's menu; none keeps what its tool ships.
     hidden: Optional[bool] = None
-    #: How each rating it shows is drawn, by the field's ``property:<id>``: a
-    #: collection's lists only. A rating with none is drawn as a number.
+    #: How each rating it shows is drawn, by the field's ``property:<id>``. A
+    #: rating with none is drawn as a number.
     displays: Optional[Dict[PropertyFieldId, RatingDisplay]] = Field(
         default=None, max_length=MAX_NODES
     )

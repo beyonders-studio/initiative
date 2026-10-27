@@ -421,7 +421,7 @@ def _check_list_fields(
         if not field.startswith((PROPERTY_FIELD_PREFIX, PLUGIN_FIELD_PREFIX))
     }
     if target.tool not in LAYOUT_KIND_TARGETS:
-        if "displays" in stored or builtin - _TASK_FIELDS:
+        if builtin - _TASK_FIELDS:
             raise _bad_request(ToolLayoutMessages.KIND_NOT_ALLOWED)
         return
     held = {"hidden", "displays", "columns" if kind == "table" else "card"}

@@ -148,7 +148,6 @@
   "PROPERTY_OPTIONS_REQUIRED": "Las propiedades de selección requieren al menos una opción",
   "PROPERTY_DUPLICATE_OPTION_VALUE": "Los valores de opción deben ser únicos dentro de una propiedad",
   "PROPERTY_CURRENCY_REQUIRED": "Una propiedad de dinero necesita una moneda",
-  "PROPERTY_RATING_ONLY_IN_COLLECTION": "Solo los campos propios de una colección pueden ser valoraciones",
   "ATTACHMENT_IMAGE_ONLY": "Solo se admiten cargas de imágenes",
   "ATTACHMENT_INVALID_IMAGE": "No se pudo validar el contenido de la imagen",
   "FILE_NAME_ALREADY_EXISTS": "Ya existe un archivo con este título en esta iniciativa",

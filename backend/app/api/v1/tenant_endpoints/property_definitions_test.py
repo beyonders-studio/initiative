@@ -573,19 +573,6 @@ async def test_a_collection_field_is_made_by_whoever_may_change_the_collection(
     assert removed.status_code == 204
 
 
-async def test_a_rating_is_only_a_collections_field(client: AsyncClient, acting_user):
-    a = await acting_user(guild_role=CommunityRole.admin, initiative=True)
-
-    response = await client.post(
-        a.g("/property-definitions/"),
-        headers=a.headers,
-        json={"name": "Stars", "type": "rating", "initiative_id": a.initiative.id},
-    )
-
-    assert response.status_code == 422
-    assert "PROPERTY_RATING_ONLY_IN_COLLECTION" in str(response.json()["detail"])
-
-
 async def test_money_names_its_currency_and_keeps_its_amount(
     client: AsyncClient, session: AsyncSession, acting_user
 ):

@@ -148,7 +148,6 @@
   "PROPERTY_OPTIONS_REQUIRED": "Les propriétés de type sélection nécessitent au moins une option",
   "PROPERTY_DUPLICATE_OPTION_VALUE": "Les valeurs d'option doivent être uniques dans une propriété",
   "PROPERTY_CURRENCY_REQUIRED": "Une propriété monétaire a besoin d'une devise",
-  "PROPERTY_RATING_ONLY_IN_COLLECTION": "Seuls les champs propres à une collection peuvent être des notes",
   "ATTACHMENT_IMAGE_ONLY": "Seules les images peuvent être importées",
   "ATTACHMENT_INVALID_IMAGE": "Impossible de valider le contenu de l'image",
   "FILE_NAME_ALREADY_EXISTS": "Un fichier avec ce titre existe déjà dans cette initiative",
