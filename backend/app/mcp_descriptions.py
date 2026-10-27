@@ -298,6 +298,11 @@ TOOL_DESCRIPTIONS: dict[str, str] = {
         "The files in one collection the caller can open. Takes the same "
         "filters as `list_files`."
     ),
+    "get_collection_files_timeline": (
+        "The months files joined one collection, newest first, with how many "
+        "the caller can open in each. Takes the same filters as "
+        "`list_collection_files`."
+    ),
     # --- Wikis --------------------------------------------------------------
     "update_wiki": (
         "Change a wiki: its name and description, its home page, page order "

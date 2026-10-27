@@ -39,6 +39,9 @@ _ROW_EXCEPTIONS = {
     # A copy of a file the guild already stores; its row carries the source's
     # size, type and hash, and no new bytes arrive.
     "app/services/tenant/attachments.py::copy_uploads",
+    # The seam's own record of what it stored, which a finished resumable
+    # upload also takes for the bytes it staged.
+    "app/services/tenant/attachments.py::record_upload",
     # Test data.
     "app/testing/factories.py",
 }
