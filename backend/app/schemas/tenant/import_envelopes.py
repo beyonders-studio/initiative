@@ -207,6 +207,8 @@ class CatalogItemEnvelope(SanitizedBaseModel):
     storage_key: str
     title: Optional[str] = None
     description: Optional[str] = None
+    #: Who the description mentions, by handle (``import_engine.mentions``).
+    mention_handles: list[str] = []
     #: Absent from an archive made before items had a date: the day it is
     #: restored, as for an upload.
     occurred_on: Optional[date] = None

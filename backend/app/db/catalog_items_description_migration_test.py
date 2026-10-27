@@ -47,6 +47,16 @@ _ITEMS_NEW = (
     "WHERE i.description <> 'caption'"
 )
 _ELSEWHERE = "SELECT caption FROM files"
+# A name the statement gives its output is the author's, and so is its
+# ORDER BY naming it; the column the ORDER BY reads qualified moves.
+_SORTED_OLD = (
+    'SELECT length(c.caption) AS "caption" FROM catalog_items c '
+    'ORDER BY "caption", c.caption'
+)
+_SORTED_NEW = (
+    'SELECT length(c.description) AS "caption" FROM catalog_items c '
+    'ORDER BY "caption", c.description'
+)
 
 
 def _load() -> ModuleType:
@@ -131,6 +141,7 @@ async def test_a_caption_is_a_description_and_an_item_gains_its_date(session) ->
             "widgets": [
                 {"id": "w1", "binding": {"source": "query", "sql": _ITEMS_OLD}},
                 {"id": "w2", "binding": {"source": "query", "sql": _ELSEWHERE}},
+                {"id": "w3", "binding": {"source": "query", "sql": _SORTED_OLD}},
             ]
         },
     )
@@ -198,6 +209,10 @@ async def test_a_caption_is_a_description_and_an_item_gains_its_date(session) ->
                     "widgets": [
                         {"id": "w1", "binding": {"source": "query", "sql": _ITEMS_NEW}},
                         {"id": "w2", "binding": {"source": "query", "sql": _ELSEWHERE}},
+                        {
+                            "id": "w3",
+                            "binding": {"source": "query", "sql": _SORTED_NEW},
+                        },
                     ]
                 },
             )

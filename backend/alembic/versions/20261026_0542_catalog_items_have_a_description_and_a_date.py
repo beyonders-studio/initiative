@@ -83,30 +83,45 @@ def _writable(bind: Connection, table: str, fn: Callable[[], None]) -> None:
 
 # --- statements --------------------------------------------------------------
 
-#: What a statement quotes. A string value (single- or dollar-quoted) is left
-#: as written, and so is a double-quoted name right after ``AS`` — a column
-#: name the statement answers with is its author's. Any other quoted name is a
-#: reference, respelled as a bare one is.
-_QUOTED = re.compile(r"'(?:[^']|'')*'|\$(\w*)\$.*?\$\1\$|\"((?:[^\"]|\"\")*)\"", re.S)
-_ALIAS = re.compile(r"\bAS\s*$", re.I)
+#: What a statement is read as: a string value (single- or dollar-quoted),
+#: left as written; a double-quoted name; or a bare word.
+_TOKEN = re.compile(
+    r"'(?:[^']|'')*'|\$(\w*)\$.*?\$\1\$|\"((?:[^\"]|\"\")*)\"|\b(\w+)\b", re.S
+)
+_STRINGS = re.compile(r"'(?:[^']|'')*'|\$(\w*)\$.*?\$\1\$", re.S)
+_AFTER_AS = re.compile(r"\bAS\s*$", re.I)
+_QUALIFIED = re.compile(r"\.\s*$")
+_ORDER_BY = re.compile(r"\bORDER\s+BY\b", re.I)
 _READS_ITEMS = re.compile(r"\bcatalog_items\b", re.I)
 
 
 def _statement(sql: str, old: str, new: str) -> str:
     """``sql`` reading ``new`` for the column ``old``, when it reads
-    ``catalog_items`` at all."""
+    ``catalog_items`` at all.
+
+    A name the statement gives an output column is its author's: it is kept
+    where it is declared (after ``AS``), and where its ``ORDER BY`` names it
+    unqualified, which reads an output column before an input one."""
     if not _READS_ITEMS.search(sql):
         return sql
-    word = re.compile(rf"\b{re.escape(old)}\b")
-    parts: list[str] = []
-    last = 0
-    for quoted in _QUOTED.finditer(sql):
-        kept = quoted.group(0)
-        if quoted.group(2) == old and not _ALIAS.search(sql[: quoted.start()]):
-            kept = f'"{new}"'
-        parts += [word.sub(new, sql[last : quoted.start()]), kept]
-        last = quoted.end()
-    return "".join(parts) + word.sub(new, sql[last:])
+    blank = _STRINGS.sub(lambda m: " " * len(m.group(0)), sql)
+    declared = re.search(rf'\bAS\s+"?{re.escape(old)}"?(?![\w"])', blank, re.I)
+    sorts = [m.start() for m in _ORDER_BY.finditer(blank)]
+    sorted_from = sorts[-1] if declared and sorts else len(sql)
+
+    def respell(token: re.Match[str]) -> str:
+        quoted, bare = token.group(2), token.group(3)
+        named = quoted if quoted is not None else bare
+        if named is None or (named if quoted is not None else named.lower()) != old:
+            return token.group(0)
+        before = sql[: token.start()]
+        if _AFTER_AS.search(before):
+            return token.group(0)
+        if token.start() > sorted_from and not _QUALIFIED.search(before):
+            return token.group(0)
+        return f'"{new}"' if quoted is not None else new
+
+    return _TOKEN.sub(respell, sql)
 
 
 def _sql_respeller(forward: bool) -> Callable[[Any], Any]:
