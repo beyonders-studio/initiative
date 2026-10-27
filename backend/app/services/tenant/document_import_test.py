@@ -340,11 +340,34 @@ def test_repeated_opendocument_rows_and_cells_are_written_out() -> None:
     assert _body(read) == f"<table>{row}{row}<tr><td /></tr></table>"
 
 
-def test_repeats_past_the_cells_a_document_holds_are_refused(monkeypatch) -> None:
-    monkeypatch.setattr(document_import, "MAX_TABLE_CELLS", 10)
+@pytest.mark.parametrize(
+    ("cell", "times"),
+    [
+        ("<table:table-cell/>", 999_999),
+        # 30 cells' overhead fits; 30 copies of their text do not.
+        (f"<table:table-cell><text:p>{'x' * 5000}</text:p></table:table-cell>", 30),
+    ],
+    ids=["many-cells", "long-text"],
+)
+def test_repeats_past_what_a_document_holds_are_refused(
+    monkeypatch, cell, times
+) -> None:
+    monkeypatch.setattr(document_import, "MAX_TABLE_BYTES", 100_000)
+    repeated = cell.replace(
+        "<table:table-cell",
+        f'<table:table-cell table:number-columns-repeated="{times}"',
+        1,
+    )
 
     with pytest.raises(FileContentError) as refused:
-        read_document(FileType.odt, _odt(_repeated_table(4, 4)))
+        read_document(
+            FileType.odt,
+            _odt(
+                f"<table:table><table:table-row>{repeated}<table:table-cell>"
+                "<text:p>end</text:p></table:table-cell></table:table-row>"
+                "</table:table>"
+            ),
+        )
 
     assert refused.value.code == FileMessages.TOO_LARGE_TO_CONVERT
 

@@ -30,6 +30,7 @@ from defusedxml import DefusedXmlException
 from defusedxml.ElementTree import iterparse
 from fastapi import status
 
+from app.core.body_limit import DOCUMENT_MAX_REQUEST_BYTES
 from app.core.file_types import FileType
 from app.core.messages import FileMessages
 from app.services.tenant.attachments import MAX_IMAGE_BYTES
@@ -39,9 +40,12 @@ from app.services.tenant.files import FileContentError
 #: sizes its zip directory declares before anything is opened.
 MAX_DOCUMENT_PACKAGE_BYTES = 100 * 1024 * 1024
 
-#: The most table cells a document is read with once its repeated rows and
-#: cells are counted. A document past it holds more than a document here can.
-MAX_TABLE_CELLS = 100_000
+#: The most a document's tables may come to once their repeated rows and
+#: cells are written out: what a document here holds at all.
+MAX_TABLE_BYTES = DOCUMENT_MAX_REQUEST_BYTES
+
+#: About what a table row or cell adds to a document before its text.
+_CELL_BYTES = 300
 
 #: How deep tables nest before an inner one is kept as its rows' text, as the
 #: walker keeps any table inside a table.
@@ -650,8 +654,9 @@ class _Odt:
         self.styles: dict[str, _OdtStyle] = {}
         #: How many separate lists the body has started.
         self.lists = 0
-        #: How many more table cells may be written.
-        self.cells_left = MAX_TABLE_CELLS
+        #: How much more the tables may add, counted as rows and cells are
+        #: written, so a repeat is refused before its copies are made.
+        self.table_room = MAX_TABLE_BYTES
 
     def read(self) -> Element:
         handle = _part(self.package, "styles.xml")
@@ -802,13 +807,13 @@ class _Odt:
         for (header, row), times in zip(rows, row_times):
             cells = [cell for cell in row if cell.tag == f"{_TABLE}table-cell"]
             cell_times = self.repeats(cells, "number-columns-repeated")
+            costs = [_CELL_BYTES + len("".join(cell.itertext())) for cell in cells]
             for _ in range(times):
+                self.spend(_CELL_BYTES)
                 tr = SubElement(out, "tr")
-                for cell, repeat in zip(cells, cell_times):
+                for cell, repeat, cost in zip(cells, cell_times, costs):
                     for _ in range(repeat):
-                        self.cells_left -= 1
-                        if self.cells_left < 0:
-                            raise _too_large()
+                        self.spend(cost)
                         td = SubElement(tr, "th" if header else "td")
                         for attribute, name in (
                             ("number-columns-spanned", "colspan"),
@@ -825,19 +830,22 @@ class _Odt:
         """How many times each row or cell is written: as many as its
         ``table:<attribute>`` says, except an empty one with nothing filled
         after it, which pads the table to the page's edge and is written
-        once. Refuses a repeat past the cells left to write."""
+        once."""
         filled = [i for i, element in enumerate(elements) if not _empty(element)]
         last = filled[-1] if filled else -1
         out: list[int] = []
         for index, element in enumerate(elements):
             raw = element.get(f"{_TABLE}{attribute}") or ""
             times = int(raw) if raw.isdigit() and int(raw) > 1 else 1
-            if index > last:
-                times = 1
-            if times > self.cells_left:
-                raise _too_large()
-            out.append(times)
+            out.append(1 if index > last else times)
         return out
+
+    def spend(self, cost: int) -> None:
+        """Count ``cost`` against what the tables may add, refusing the
+        document once they would add more than it can hold."""
+        self.table_room -= cost
+        if self.table_room < 0:
+            raise _too_large()
 
     # -- inline ---------------------------------------------------------------
 
