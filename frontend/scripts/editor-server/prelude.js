@@ -1,7 +1,9 @@
 // The browser globals the editor's modules read as they load, for an engine
 // that has none. Nothing here is called while a document is read or written,
 // except `crypto`, which Yjs draws ids from: the server names the client a
-// state is written as, so these never become a document's ids.
+// state is written as, so these never become a document's ids. And `URL`,
+// when the editor refuses a document: Lexical's error names its code and
+// values in a link, and these hold only what building that link reads.
 const nothing = () => {};
 Object.assign(globalThis, {
   self: globalThis,
@@ -30,6 +32,24 @@ Object.assign(globalThis, {
   AbortController: class {
     signal = { aborted: false, addEventListener: nothing, removeEventListener: nothing };
     abort() {}
+  },
+  URL: class {
+    search = "";
+    constructor(href) {
+      this.href = href;
+    }
+    toString() {
+      return this.search ? `${this.href}?${this.search}` : this.href;
+    }
+  },
+  URLSearchParams: class {
+    pairs = [];
+    append(name, value) {
+      this.pairs.push(`${encodeURIComponent(name)}=${encodeURIComponent(value)}`);
+    }
+    toString() {
+      return this.pairs.join("&");
+    }
   },
   crypto: {
     getRandomValues(array) {
