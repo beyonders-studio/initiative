@@ -24,6 +24,8 @@ An upload can be any format but a program. Each one wears its category's icon an
 
 **Filter by type** narrows the list to one category: design files, 3D models, fonts, camera raw, code, e-books, CAD drawings, compressed files, and the usual documents, spreadsheets and pictures.
 
+![A files list: an illustration, a 3D model, a Word file, a layered poster, a spreadsheet, a zip and a font, each under its category's icon and format](../images/files/files-list.png)
+
 Got the file on your desktop already? Drag it anywhere onto the files
 page — any view — and **New file** opens on the **Upload file** tab with it
 ready to go. Or drop it on the box in that tab instead of hunting for it in a
@@ -40,7 +42,7 @@ file picker.
 4. Optionally start from a **template**.
 5. Write. Or upload. Or draw.
 
-![Creating a file](../images/files/create-document.png)
+![The New file dialog, on its New file tab](../images/files/create-file.png){ width="520" }
 
 ## Writing a text document
 
@@ -198,6 +200,8 @@ Anyone who can reply can react. The author gets told — as a periodic summary, 
 
 An upload keeps a **version history**. **Upload new version** and the older ones stay put, numbered and dated, so the copy from before somebody helpfully reorganised it is one click away to look at or download.
 
+![A layered poster's page: its format and size, Version history, and a Download button where a preview would be](../images/files/uploaded-file.png)
+
 The file's owner can delete a version, for good. Delete the newest and the one before it becomes the file again. The last one left always stays.
 
 ### Editing an uploaded document or spreadsheet
@@ -213,6 +217,8 @@ The budget arrived as an Excel file, the minutes as a Word file, and now three p
 | Word (`.docx`), OpenDocument (`.odt`) | Text document | Headings, formatting, lists, tables, links and pictures. Page layout, headers and footers, footnotes, comments and text boxes stay behind. Tracked changes arrive accepted. |
 | Markdown (`.md`) | Text document | Headings, lists, tables, links and formatting. |
 | Plain text (`.txt`) | Text document | The text, as paragraphs. |
+
+![Convert to edit, for a spreadsheet: what comes over, what doesn't, and that the upload is replaced](../images/files/convert.png){ width="520" }
 
 Converting replaces the upload and its version history, and the dialog says so before anything happens. Need the file back out? **Export** it as Excel, CSV, Word, PDF or Markdown whenever you like.
 
@@ -230,6 +236,8 @@ On a collection's page, drop files anywhere to upload them straight in, or **Add
 | **Table** | One row per file, for sorting. |
 | **Masonry** | Every picture at its own shape, packed into columns. For *looking*. |
 | **Timeline** | A row per day, by when each file joined, with a rail for jumping months. |
+
+![A collection of maps and handouts, in the Masonry view](../images/files/collection.png)
 
 **Layouts** in the collection's menu picks which views it offers and the one it opens on, and **Edit what the lists show** picks the table's columns and what each card shows under the picture.
 
