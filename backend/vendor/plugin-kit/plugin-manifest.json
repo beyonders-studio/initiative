@@ -33,7 +33,7 @@
         },
         "scopes": {
           "type": "array",
-          "maxItems": 56,
+          "maxItems": 54,
           "uniqueItems": true,
           "items": {
             "anyOf": [
@@ -53,8 +53,6 @@
                   "dashboards:write",
                   "posts:read",
                   "posts:write",
-                  "libraries:read",
-                  "libraries:write",
                   "wikis:read",
                   "wikis:write",
                   "comments:read",
@@ -144,7 +142,7 @@
     },
     "scopes": {
       "type": "array",
-      "maxItems": 56,
+      "maxItems": 54,
       "uniqueItems": true,
       "items": {
         "anyOf": [
@@ -164,8 +162,6 @@
               "dashboards:write",
               "posts:read",
               "posts:write",
-              "libraries:read",
-              "libraries:write",
               "wikis:read",
               "wikis:write",
               "comments:read",
@@ -1326,7 +1322,7 @@
         "on": {
           "type": "array",
           "minItems": 1,
-          "maxItems": 6,
+          "maxItems": 5,
           "uniqueItems": true,
           "items": {
             "enum": [
@@ -1334,7 +1330,6 @@
               "calendar_event",
               "queue_item",
               "counter",
-              "library_item",
               "post"
             ]
           },
@@ -1684,7 +1679,7 @@
         "on": {
           "type": "array",
           "minItems": 1,
-          "maxItems": 6,
+          "maxItems": 5,
           "uniqueItems": true,
           "items": {
             "enum": [
@@ -1692,7 +1687,6 @@
               "calendar_event",
               "queue_item",
               "counter",
-              "library_item",
               "post"
             ]
           },
@@ -1749,7 +1743,7 @@
         "on": {
           "type": "array",
           "minItems": 1,
-          "maxItems": 6,
+          "maxItems": 5,
           "uniqueItems": true,
           "items": {
             "enum": [
@@ -1757,7 +1751,6 @@
               "calendar_event",
               "queue_item",
               "counter",
-              "library_item",
               "post"
             ]
           },
@@ -1918,7 +1911,6 @@
                 "calendar_event",
                 "queue_item",
                 "counter",
-                "library_item",
                 "post"
               ]
             },
