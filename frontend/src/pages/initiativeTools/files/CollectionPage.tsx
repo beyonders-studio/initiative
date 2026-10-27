@@ -82,6 +82,7 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
+import { Sheet, SheetContent, SheetHeader, SheetTitle } from "@/components/ui/sheet";
 import { useActiveCommunityId } from "@/hooks/useActiveCommunityId";
 import { useCanonicalInitiativeId } from "@/hooks/useCanonicalInitiativeId";
 import {
@@ -356,13 +357,19 @@ export function CollectionPage() {
     (file: FileSummary) => gp(toolDetailRoute(Tool.file, file.initiative_id, file.id)),
     [gp]
   );
+  // Any other file, where the collection has fields, opens beside the wall
+  // with its values there, and from there on its own page.
+  const [besideId, setBesideId] = useState<number | null>(null);
+  const besideFile = rows.find((row) => row.id === besideId);
+  const hasFields = (collection?.fields.length ?? 0) > 0;
   const onActivate = useCallback(
     (file: FileSummary, options: GridToggleOptions) => {
       if (selection.active) selection.toggle(file as FileRow, options);
       else if (file.kind === FileKind.image) setOpenId(file.id);
+      else if (hasFields) setBesideId(file.id);
       else void navigate({ to: fileRoute(file) });
     },
-    [selection.active, selection.toggle, navigate, fileRoute]
+    [selection.active, selection.toggle, navigate, fileRoute, hasFields]
   );
   const lightboxItems = useMemo<LightboxItem[]>(
     () =>
@@ -713,6 +720,30 @@ export function CollectionPage() {
           ) : null
         }
       />
+
+      <Sheet
+        open={besideFile !== undefined}
+        onOpenChange={(next) => {
+          if (!next) setBesideId(null);
+        }}
+      >
+        <SheetContent className="w-full overflow-y-auto sm:max-w-md" aria-describedby={undefined}>
+          <SheetHeader>
+            <SheetTitle className="truncate">{besideFile?.name}</SheetTitle>
+          </SheetHeader>
+          {collection && besideFile ? (
+            <div className="space-y-4 px-4 pb-4">
+              <CollectionFileFields collection={collection} file={besideFile} />
+              <Button asChild variant="outline" size="sm">
+                <Link to={fileRoute(besideFile)}>
+                  <ExternalLink className="size-4" />
+                  {t("collections.openFile")}
+                </Link>
+              </Button>
+            </div>
+          ) : null}
+        </SheetContent>
+      </Sheet>
 
       {collection ? (
         <FileChooserDialog
