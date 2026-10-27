@@ -14,7 +14,6 @@ lines (``app.core.recurrence.imported``).
 
 from __future__ import annotations
 
-from datetime import date
 from typing import Any, Literal, Optional
 
 from pydantic import ConfigDict, Field, model_validator
@@ -191,54 +190,6 @@ class WikiEnvelope(_EnvelopeBase):
     pages: list[WikiPageEnvelope] = []
     #: The files filed in the wiki, when its export carried them.
     files: list[WikiFiledFile] = []
-
-
-class LibraryItemEnvelope(SanitizedBaseModel):
-    """One picture: what the row says about it, and the key naming its bytes.
-
-    ``storage_key`` is the blob's name under ``assets/`` in the backup zip. A
-    picture whose bytes did not travel is skipped on apply and counted — a
-    library row pointing at a file that is not there would render as a broken
-    tile forever.
-    """
-
-    model_config = ConfigDict(extra="ignore")
-
-    storage_key: str
-    title: Optional[str] = None
-    description: Optional[str] = None
-    #: Who the description mentions, by handle (``import_engine.mentions``).
-    mention_handles: list[str] = []
-    #: Absent from an archive made before items had a date: the day it is
-    #: restored, as for an upload.
-    occurred_on: Optional[date] = None
-    content_type: Optional[str] = None
-    size_bytes: Optional[int] = None
-    original_filename: Optional[str] = None
-    width: Optional[int] = None
-    height: Optional[int] = None
-    tags: list[str] = []
-    properties: list[EnvelopePropertyValue] = []
-    #: What this picture was called where it came from — a thing a reference
-    #: elsewhere in the same import can name. Refs live for one job.
-    external_ref: Optional[str] = None
-
-
-class LibraryEnvelope(_EnvelopeBase):
-    """A library and its pictures.
-
-    Only meaningful inside a backup: the bytes ride under ``assets/`` and the
-    items name them by key. Thumbnails are not carried — the app makes those
-    from the picture.
-    """
-
-    type: Literal["initiative-library"]
-    name: str
-    description: Optional[str] = None
-    cover: Optional[str] = None
-    tags: list[str] = []
-    properties: list[EnvelopePropertyValue] = []
-    items: list[LibraryItemEnvelope] = []
 
 
 class QueueEnvelopeItem(SanitizedBaseModel):

@@ -17,6 +17,7 @@ from app.core.references import unresolve_wikilinks_to
 from app.core.messages import FileMessages
 from app.services.tenant import attachments as attachments_service
 from app.services.tenant import body_states
+from app.services.tenant import collections as collections_service
 from app.services.tenant import comments as comments_service
 from app.services.tenant import content_references
 from app.services.tenant import file_versions
@@ -138,7 +139,7 @@ async def get_file_hydrated(
 ) -> File | None:
     """Load a file with everything a serialized ``FileRead`` or an
     export reads: the list loader's eager loads and the body, plus the tags,
-    comment count and owning plug-in a response carries.
+    comment count, owning plug-in and collections a response carries.
     :func:`get_file_for_grants` carries the list loads alone, which is what
     the access decision needs. Uniform ``(session, id)`` shape, the one ``resource_access``
     registers a loader by.
@@ -160,6 +161,8 @@ async def get_file_hydrated(
             session, [file], column="file_id"
         )
         await ownership_service.annotate_owner_plugins(session, [file])
+        held = await collections_service.collection_ids_of(session, [file.id])
+        object.__setattr__(file, "collection_ids", held.get(file.id, []))
     return file
 
 

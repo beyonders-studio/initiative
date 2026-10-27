@@ -15,7 +15,8 @@ from app.schemas.tenant.archive import ArchivableType
 from app.testing import create_file, create_queue
 
 
-#: The wire name of every archivable tool, paired with the list route that has
+#: The wire name of every archivable tool (and the collection, a sub-tool with
+#: a list of its own), paired with the list route that has
 #: to be able to show it once it is archived. Read off ``ArchivableType`` rather
 #: than written out, so a tool that becomes archivable joins this too.
 _TOOL_LISTS = {
@@ -26,8 +27,8 @@ _TOOL_LISTS = {
     "calendar": "calendars",
     "dashboard": "dashboards",
     "post": "posts",
-    "library": "libraries",
     "wiki": "wikis",
+    "collection": "collections",
 }
 
 

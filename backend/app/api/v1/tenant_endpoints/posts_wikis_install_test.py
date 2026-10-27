@@ -1,10 +1,10 @@
-"""Posts, libraries and wikis as an installed plug-in calls them.
+"""Posts, wikis and collections as an installed plug-in calls them.
 
 Each test installs a plug-in the way a community does (``install_plugin``: placed in
 initiative A and not in B, granted scopes by the seat), seals an installation
-token for it, and calls the routes of these three tools that name a scope: the
-list, read, create and update, a post's pin, a wiki's pages and a library's
-pictures.
+token for it, and calls the routes that name a scope: the list, read, create
+and update of posts and wikis, a post's pin, a wiki's pages, and a
+collection's files under the files scopes.
 """
 
 from __future__ import annotations
@@ -23,8 +23,6 @@ from app.models.tenant.resource_grant import ResourceAccessLevel, ResourceGrant
 from app.testing import (
     create_resource_grant,
     guild_url,
-    create_library,
-    create_library_item,
     create_post,
     create_post_poll,
     create_wiki,
@@ -59,9 +57,6 @@ class _Tool:
 
 TOOLS = [
     _Tool("posts", "post", "posts_enabled", create_post, {"name": "Renamed"}),
-    _Tool(
-        "libraries", "library", "libraries_enabled", create_library, {"name": "Renamed"}
-    ),
     _Tool("wikis", "wiki", "wikis_enabled", create_wiki, {"name": "Renamed"}),
 ]
 
@@ -167,7 +162,7 @@ async def test_lists_a_wiki_s_pages_with_the_read_scope(
     )
     seat = installed.seat
     guild_id = installed.guild.id
-    await _switch_on(session, TOOLS[2], installed.placed)
+    await _switch_on(session, TOOLS[1], installed.placed)
     wiki = await create_wiki(session, installed.placed, seat.user)
     await create_wiki_page(session, wiki, seat.user, title="Start here")
     path = guild_url(guild_id, f"/wikis/{wiki.id}/pages")
@@ -179,9 +174,7 @@ async def test_lists_a_wiki_s_pages_with_the_read_scope(
     assert isinstance(page["created_by"], str)
     assert_names_nobody(listed.text, [seat.user.id, guild_id])
 
-    refused = await client.get(
-        path, headers=install_headers(installed, ["libraries:read"])
-    )
+    refused = await client.get(path, headers=install_headers(installed, ["posts:read"]))
     assert refused.status_code == 403, refused.text
     assert refused.json()["detail"] == PluginMessages.SCOPE_REQUIRED
 
@@ -195,7 +188,7 @@ async def test_reads_a_wiki_page_with_the_read_scope(
     )
     seat = installed.seat
     guild_id = installed.guild.id
-    await _switch_on(session, TOOLS[2], installed.placed)
+    await _switch_on(session, TOOLS[1], installed.placed)
     wiki = await create_wiki(session, installed.placed, seat.user)
     content = lexical_body("Over to ", mentioning=seat.user.id, name="The Seat")
     content["root"]["children"].append(
@@ -225,71 +218,12 @@ async def test_reads_a_wiki_page_with_the_read_scope(
     assert "The Seat" not in read.text
     assert_names_nobody(read.text, [seat.user.id, guild_id])
 
-    refused = await client.get(
-        path, headers=install_headers(installed, ["libraries:read"])
-    )
+    refused = await client.get(path, headers=install_headers(installed, ["posts:read"]))
     assert refused.status_code == 403, refused.text
     assert refused.json()["detail"] == PluginMessages.SCOPE_REQUIRED
 
 
-async def test_lists_a_library_s_pictures_with_the_read_scope(
-    client, session, acting_user, role_session
-):
-    await lift_person_and_guild_ids(session)
-    installed = await install_plugin(
-        session, acting_user, role_session, granted=["libraries:read"]
-    )
-    seat = installed.seat
-    guild_id = installed.guild.id
-    await _switch_on(session, TOOLS[1], installed.placed)
-    library = await create_library(session, installed.placed, seat.user)
-    picture = await create_library_item(
-        session,
-        library,
-        seat.user,
-        title="Harbour",
-        write_blob=False,
-        thumbnail_url=f"/uploads/{guild_id}/harbour-thumb.webp",
-    )
-    file_url = picture.current_version.file_url
-    library.cover_item_id = picture.id
-    session.add(library)
-    await session.commit()
-    path = guild_url(guild_id, f"/libraries/{library.id}/items")
-    headers = install_headers(installed, ["libraries:read"])
-
-    listed = await client.get(path, headers=headers)
-    assert listed.status_code == 200, listed.text
-    (image,) = listed.json()["items"]
-    assert image["title"] == "Harbour"
-    assert isinstance(image["created_by"], str)
-    assert isinstance(image["community_id"], str)
-    assert isinstance(image["uploader"]["id"], str)
-    # A picture's stored file is an empty string, and nothing names anybody.
-    assert (image["file_url"], image["thumbnail_url"]) == ("", "")
-    assert "/uploads/" not in listed.text
-    assert_names_nobody(listed.text, [seat.user.id, guild_id])
-    for shown in ("/libraries/", f"/libraries/{library.id}"):
-        read = await client.get(guild_url(guild_id, shown), headers=headers)
-        assert read.status_code == 200, read.text
-        assert '"file_url":""' in read.text
-        assert "/uploads/" not in read.text
-        assert_names_nobody(read.text, [seat.user.id, guild_id])
-
-    # A person reading the same is served the paths.
-    person = await client.get(path, headers=seat.headers)
-    assert person.json()["items"][0]["file_url"] == file_url
-    cover = await client.get(
-        guild_url(guild_id, f"/libraries/{library.id}"), headers=seat.headers
-    )
-    assert cover.json()["cover"]["file_url"] == file_url
-
-    refused = await client.get(path, headers=install_headers(installed, ["wikis:read"]))
-    assert refused.status_code == 403, refused.text
-    assert refused.json()["detail"] == PluginMessages.SCOPE_REQUIRED
-
-
-def test_the_plugin_file_lists_wiki_pages_and_library_pictures():
+def test_the_plugin_file_lists_wiki_pages_collections_and_uploads():
     operations = {
         operation["operationId"]: operation
         for item in plugin_openapi()["paths"].values()
@@ -297,9 +231,12 @@ def test_the_plugin_file_lists_wiki_pages_and_library_pictures():
     }
     assert operations["list_wiki_pages"]["x-plugin-scope"] == "wikis:read"
     assert operations["read_wiki_page"]["x-plugin-scope"] == "wikis:read"
-    assert operations["list_library_items"]["x-plugin-scope"] == "libraries:read"
     assert operations["create_wiki_page"]["x-plugin-scope"] == "wikis:write"
-    assert operations["upload_library_item"]["x-plugin-scope"] == "libraries:write"
+    assert operations["list_collections"]["x-plugin-scope"] == "files:read"
+    assert operations["list_collection_files"]["x-plugin-scope"] == "files:read"
+    assert operations["create_collection"]["x-plugin-scope"] == "files:write"
+    assert operations["upload_file"]["x-plugin-scope"] == "files:write"
+    assert operations["upload_file_version"]["x-plugin-scope"] == "files:write"
 
 
 # ---------------------------------------------------------------------------
@@ -405,7 +342,7 @@ async def test_writes_the_pages_of_a_wiki_it_may_write(
     )
     seat = installed.seat
     guild_id = installed.guild.id
-    await _switch_on(session, TOOLS[2], installed.placed)
+    await _switch_on(session, TOOLS[1], installed.placed)
     headers = install_headers(installed, ["wikis:write"])
     wiki = await client.post(
         guild_url(guild_id, "/wikis/"),
@@ -436,53 +373,62 @@ async def test_writes_the_pages_of_a_wiki_it_may_write(
         assert_names_nobody(response.text, [seat.user.id, guild_id])
 
 
-async def test_adds_pictures_to_a_library_it_may_write(
+async def test_uploads_pictures_into_a_collection_with_the_files_scopes(
     client, session, acting_user, role_session
 ):
     await lift_person_and_guild_ids(session)
-    installed = await install_plugin(
-        session, acting_user, role_session, granted=["libraries:write"]
-    )
+    scopes = ["files:read", "files:write"]
+    installed = await install_plugin(session, acting_user, role_session, granted=scopes)
     seat = installed.seat
     guild_id = installed.guild.id
-    await _switch_on(session, TOOLS[1], installed.placed)
-    headers = install_headers(installed, ["libraries:write"])
-    library = await client.post(
-        guild_url(guild_id, "/libraries/"),
-        headers=headers,
-        json={"name": "Shots", "initiative_id": installed.placed.id},
-    )
-    assert library.status_code == 201, library.text
-    items = guild_url(guild_id, f"/libraries/{library.json()['id']}/items")
+    headers = install_headers(installed, scopes)
 
     def picture() -> dict:
         return {"file": ("shot.png", io.BytesIO(png_bytes()), "image/png")}
 
     uploaded = await client.post(
-        items, headers=headers, files=picture(), data={"title": "Harbour"}
+        guild_url(guild_id, "/files/upload"),
+        headers=headers,
+        files=picture(),
+        data={"name": "Harbour", "initiative_id": str(installed.placed.id)},
     )
     assert uploaded.status_code == 201, uploaded.text
-    body = uploaded.json()
-    assert (body["title"], body["created_by"], body["file_url"]) == (
-        "Harbour",
-        None,
-        "",
-    )
-    item_path = guild_url(guild_id, f"/library-items/{body['id']}")
-
+    file_id = uploaded.json()["id"]
     version = await client.post(
-        f"{item_path}/versions", headers=headers, files=picture()
+        guild_url(guild_id, f"/files/{file_id}/versions"),
+        headers=headers,
+        files=picture(),
     )
     assert version.status_code == 201, version.text
-    assert (version.json()["version_number"], version.json()["file_url"]) == (2, "")
-    updated = await client.patch(
-        item_path, headers=headers, json={"description": "Dawn"}
+    assert version.json()["version_number"] == 2
+
+    made = await client.post(
+        guild_url(guild_id, "/collections/"),
+        headers=headers,
+        json={
+            "name": "Shots",
+            "initiative_id": installed.placed.id,
+            "file_ids": [file_id],
+        },
     )
-    assert updated.status_code == 200, updated.text
-    assert updated.json()["version_count"] == 2
-    for response in (uploaded, version, updated):
+    assert made.status_code == 201, made.text
+    collection_id = made.json()["id"]
+    listed = await client.get(
+        guild_url(guild_id, f"/collections/{collection_id}/files"),
+        headers=install_headers(installed, ["files:read"]),
+    )
+    assert listed.status_code == 200, listed.text
+    assert [row["id"] for row in listed.json()["items"]] == [file_id]
+    for response in (uploaded, version, made, listed):
         assert "/uploads/" not in response.text
         assert_names_nobody(response.text, [seat.user.id, guild_id])
+
+    refused = await client.get(
+        guild_url(guild_id, f"/collections/{collection_id}"),
+        headers=install_headers(installed, ["wikis:read"]),
+    )
+    assert refused.status_code == 403, refused.text
+    assert refused.json()["detail"] == PluginMessages.SCOPE_REQUIRED
 
 
 async def test_pins_the_posts_it_may_write(client, session, acting_user, role_session):

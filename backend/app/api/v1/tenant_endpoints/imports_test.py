@@ -336,7 +336,6 @@ async def _tool_with_a_row(session, a, tool):
         "queue",
         "counter_group",
         "calendar",
-        "library",
         "wiki",
         "dashboard",
         "post",
@@ -1360,15 +1359,16 @@ async def test_an_archive_from_before_files_restores_its_documents(
     assert restored.file_type == FileType.url
 
 
-async def test_an_archive_from_before_libraries_restores_its_galleries(
+async def test_an_archive_with_a_gallery_restores_it_as_files_in_a_collection(
     client, acting_user, session, monkeypatch, role_session
 ):
-    """An archive written while libraries were galleries names them that way:
-    the manifest's tool and switch, the envelope type and the key holding its
-    pictures. A restore reads each as the library it is."""
+    """An archive written while galleries were a tool carries a gallery entry.
+    A restore makes each picture a file of the initiative and gathers the
+    files into a collection named as the gallery was."""
     from sqlmodel import select
 
-    from app.models.tenant.library import Library, LibraryItem
+    from app.models.tenant.collection import Collection, CollectionFile
+    from app.models.tenant.file import File
 
     a = await acting_user(
         guild_role=CommunityRole.superadmin, initiative=True, project=True
@@ -1426,18 +1426,74 @@ async def test_an_archive_from_before_libraries_restores_its_galleries(
         role_session,
     )
     assert job["status"] == ImportJobStatus.done.value, job.get("error")
-    assert job["result"]["per_tool"]["library"]["created"] == 1
+    assert job["result"]["per_tool"]["file"]["created"] == 1
 
     await route_session_to_guild(session, a.guild.id)
     restored = (
-        await session.exec(select(Library).where(Library.name == "Old wall"))
+        await session.exec(select(Collection).where(Collection.name == "Old wall"))
     ).one()
-    items = (
+    files = (
         await session.exec(
-            select(LibraryItem).where(LibraryItem.library_id == restored.id)
+            select(File.name)
+            .join(CollectionFile, CollectionFile.file_id == File.id)
+            .where(CollectionFile.collection_id == restored.id)
         )
     ).all()
-    assert [item.title for item in items] == ["Shot"]
+    assert files == ["Shot"]
+
+
+async def test_a_restored_file_goes_back_into_its_collections(
+    client, acting_user, session, monkeypatch, role_session
+):
+    """A file's entry names the collections it was in; the restore makes each
+    once and puts every file naming it inside."""
+    from sqlmodel import select
+
+    from app.models.tenant.collection import Collection, CollectionFile
+    from app.models.tenant.file import File
+
+    a = await acting_user(
+        guild_role=CommunityRole.superadmin, initiative=True, project=True
+    )
+    payload = b"%PDF-1.4 handout"
+    entries = [
+        {**_file_entry(key, entity_id=n, title=key), "collections": names}
+        for n, (key, names) in enumerate(
+            (("one.pdf", ["Handouts"]), ("two.pdf", ["Handouts", "Maps"])), start=1
+        )
+    ]
+    manifest = _minimal_manifest(
+        entries=entries,
+        assets=[
+            _asset_record(key, size_bytes=len(payload))
+            for key in ("one.pdf", "two.pdf")
+        ],
+    )
+    job = await _apply_backup(
+        client,
+        a,
+        _make_backup_zip(
+            manifest, {"assets/one.pdf": payload, "assets/two.pdf": payload}
+        ),
+        monkeypatch,
+        role_session,
+    )
+    assert job["status"] == ImportJobStatus.done.value, job.get("error")
+
+    await route_session_to_guild(session, a.guild.id)
+    held = (
+        await session.exec(
+            select(Collection.name, File.name)
+            .join(CollectionFile, CollectionFile.collection_id == Collection.id)
+            .join(File, File.id == CollectionFile.file_id)
+            .order_by(Collection.name, File.name)
+        )
+    ).all()
+    assert [tuple(row) for row in held] == [
+        ("Handouts", "one.pdf"),
+        ("Handouts", "two.pdf"),
+        ("Maps", "two.pdf"),
+    ]
 
 
 async def test_backup_corrupt_entry_fails_alone(
@@ -3643,97 +3699,9 @@ async def _import_archive(client, actor, zip_bytes, initiative_id, envelope_type
     return await client.post(
         actor.g("/imports/envelope/archive"),
         headers=actor.headers,
-        files={"file": ("library.zip", zip_bytes, "application/zip")},
+        files={"file": ("export.zip", zip_bytes, "application/zip")},
         data=data,
     )
-
-
-async def test_a_library_zip_imports_with_its_pictures_into_another_community(
-    client, acting_user, session, monkeypatch, tmp_path, role_session
-):
-    """A library exported on its own is a zip of its envelope and its pictures,
-    and importing that zip somewhere the pictures have never been stored brings
-    them along: each lands in the community's storage under its key, and the
-    library shows it. A description's link to another picture points at that
-    picture's copy here, and a mention of somebody who is not here is their
-    handle."""
-    from sqlmodel import select
-
-    from app.api.v1.tenant_endpoints.exports_test import _all_tools_enabled
-    from app.core.config import settings
-    from app.models.tenant.library import Library, LibraryItem
-    from app.testing import route_session_to_guild
-    from app.testing.factories import create_library, create_library_item
-
-    monkeypatch.setattr(settings, "UPLOADS_DIR", str(tmp_path))
-    a = await acting_user(
-        guild_role=CommunityRole.member, initiative=True, project=True
-    )
-    await _all_tools_enabled(session, a.initiative)
-    library = await create_library(session, a.initiative, a.user, name="Barovia maps")
-    picture = await create_library_item(session, library, a.user, title="Village")
-    key = picture.current_version.file_url.rsplit("/", 1)[-1]
-    await create_library_item(
-        session,
-        library,
-        a.user,
-        title="Castle",
-        description=f"Above #library-item[Village]({picture.id}), per @[]({a.user.id})",
-    )
-
-    exported = await client.get(
-        a.g("/exports/library"),
-        headers=a.headers,
-        params={"ids": [library.id], "format": "json"},
-    )
-    assert exported.status_code == 200, exported.text
-
-    b = await acting_user(guild_role=CommunityRole.admin, initiative=True, project=True)
-    await _all_tools_enabled(session, b.initiative)
-    assert get_guild_storage(b.guild.id).exists(key) is False
-    resp = await _import_archive(
-        client, b, exported.content, b.initiative.id, "initiative-library"
-    )
-    # The mention names somebody nobody here can place, so the import waits
-    # for the people step.
-    assert resp.status_code == 202, resp.text
-    job = resp.json()
-    assert job["status"] == "staged"
-    confirm = await client.post(
-        b.g(f"/imports/jobs/{job['id']}/confirm"), headers=b.headers, json={}
-    )
-    assert confirm.status_code == 200, confirm.text
-    await _run_import_worker(monkeypatch, role_session)
-    done = (
-        await client.get(b.g(f"/imports/jobs/{job['id']}"), headers=b.headers)
-    ).json()
-    assert done["status"] == "done", done.get("error")
-    assert done["result"]["created"]["items"] == 2
-
-    assert get_guild_storage(b.guild.id).exists(key)
-    await route_session_to_guild(session, b.guild.id)
-    restored = (
-        await session.exec(
-            select(Library).where(Library.initiative_id == b.initiative.id)
-        )
-    ).one()
-    items = {
-        item.title: item
-        for item in (
-            await session.exec(
-                select(LibraryItem).where(LibraryItem.library_id == restored.id)
-            )
-        ).all()
-    }
-    image = items["Village"]
-    description = items["Castle"].description
-    assert f"#library-item[Village]({image.id})" in description
-    assert f"@[]({a.user.id})" not in description
-    # The picture is its version 1, typed from its bytes.
-    version = image.current_version
-    assert version is not None and version.version_number == 1
-    assert version.file_url == f"/uploads/{b.guild.id}/{key}"
-    assert version.file_content_type == "image/png"
 
 
 async def test_a_wiki_zip_imports_back_from_the_wiki_page(client, acting_user, session):
@@ -3859,38 +3827,6 @@ async def test_a_wiki_zip_brings_its_filed_files_back_where_they_were(
     ).all()
 
 
-async def test_a_library_zip_leaves_out_what_is_not_a_picture(
-    client, acting_user, session
-):
-    """The zip says what its files are; the bytes decide. A file that is not a
-    picture a library can show is not stored, and the import says so."""
-    from app.api.v1.tenant_endpoints.exports_test import _all_tools_enabled
-
-    a = await acting_user(
-        guild_role=CommunityRole.member, initiative=True, project=True
-    )
-    await _all_tools_enabled(session, a.initiative)
-    envelope = {
-        "type": "initiative-library",
-        "schema_version": 1,
-        "name": "Handouts",
-        "items": [
-            {"storage_key": "note.png", "content_type": "image/png", "title": "Note"}
-        ],
-    }
-    buffer = io.BytesIO()
-    with zipfile.ZipFile(buffer, "w") as archive:
-        archive.writestr("handouts.initiative-library.json", json.dumps(envelope))
-        archive.writestr("assets/note.png", b"<svg onload='x'></svg>")
-
-    resp = await _import_archive(client, a, buffer.getvalue(), a.initiative.id)
-    assert resp.status_code == 201, resp.text
-    result = resp.json()["result"]
-    assert "not_a_picture:note.png" in result["warnings"]
-    assert result["created"]["items"] == 0
-    assert get_guild_storage(a.guild.id).exists("note.png") is False
-
-
 async def test_a_zip_is_refused_from_the_wrong_tool_or_without_an_export(
     client, acting_user, session
 ):
@@ -3910,7 +3846,7 @@ async def test_a_zip_is_refused_from_the_wrong_tool_or_without_an_export(
 
     queue = json.dumps({"type": "initiative-queue", "schema_version": 1, "name": "Q"})
     wrong = await _import_archive(
-        client, a, zipped(**{"q.json": queue}), a.initiative.id, "initiative-library"
+        client, a, zipped(**{"q.json": queue}), a.initiative.id, "initiative-wiki"
     )
     assert wrong.status_code == 400
     assert wrong.json()["detail"] == "IMPORT_WRONG_TOOL"

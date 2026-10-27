@@ -91,7 +91,13 @@ async def test_backfill_writes_only_the_missing_rows(session) -> None:
     assert migrations, "no backfill migration found to exercise"
     path = max(migrations)
     migration = _load(path)
-    defaults = getattr(migration, DEFAULTS_NAME)
+    # A key a later tool's removal retired is not one this build stores.
+    known = {key.value for key in PermissionKey}
+    defaults = {
+        key: value
+        for key, value in getattr(migration, DEFAULTS_NAME).items()
+        if key in known
+    }
 
     user = await create_user(session)
     guild = await create_guild(session, creator=user)

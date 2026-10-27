@@ -17,7 +17,7 @@ from fastapi import (
 )
 from fastapi.responses import Response
 from sqlalchemy import text
-from sqlmodel import select
+from sqlmodel import col, select
 from sqlmodel.ext.asyncio.session import AsyncSession
 
 from app.core.search import SearchEntityType
@@ -39,7 +39,6 @@ from app.api.deps import (
     establish_guild_access,
     get_current_active_user,
     GuildAccessError,
-    GuildContext,
     GuildContextDep,
 )
 from app.core.messages import (
@@ -56,6 +55,7 @@ from app.core.file_types import (
     type_of_media,
     types_of_kind,
 )
+from app.models.tenant.collection import CollectionFile
 from app.models.tenant.file import (
     File,
     FileVersion,
@@ -174,6 +174,7 @@ def visible_file_conditions(
     is_template: Optional[bool] = None,
     file_type: Optional[FileType] = None,
     kind: Optional[FileKind] = None,
+    collection_id: Optional[int] = None,
 ):
     """WHERE conditions for visible-file queries — the list and the tag
     counts beside it, so the sidebar's numbers match the rows under them.
@@ -206,6 +207,15 @@ def visible_file_conditions(
         conditions.append(
             tags_service.untagged_clause(
                 tags_service.TOOL_TAG_LINKS[Tool.file], File.id
+            )
+        )
+
+    if collection_id is not None:
+        conditions.append(
+            col(File.id).in_(
+                select(CollectionFile.file_id).where(
+                    CollectionFile.collection_id == collection_id
+                )
             )
         )
 
@@ -307,9 +317,9 @@ async def create_file(
 
 @router.post("/upload", response_model=FileRead, status_code=status.HTTP_201_CREATED)
 async def upload_file(
-    session: RLSSessionDep,
-    current_user: Annotated[User, Depends(get_current_active_user)],
-    guild_context: GuildContextDep,
+    session: ActorSessionDep,
+    current_user: ActorUserDep,
+    guild_context: FilesWrite,
     name: str = Form(...),
     initiative_id: int = Form(...),
     upload: UploadFile = FormFile(..., alias="file"),
@@ -339,7 +349,7 @@ async def upload_file(
         name=name,
         initiative_id=initiative.id,
         content={},  # An uploaded file has no content of its own
-        created_by=current_user.id,
+        created_by=guild_context.user_id,
         file_type=type_of_media(stored["file_content_type"]),
     )
     session.add(file)
@@ -361,7 +371,7 @@ async def upload_file(
     await session.flush()
 
     version = await file_versions.add_version(
-        session, file, created_by=current_user.id, **stored
+        session, file, created_by=guild_context.user_id, **stored
     )
     await file_versions.commit_version(session, guild_context.guild_id, version)
     return await read_after_write(session, file.id, current_user, guild_context)
@@ -369,7 +379,7 @@ async def upload_file(
 
 async def _store_file(
     session: AsyncSession,
-    guild_context: GuildContext,
+    guild_context: ActorContext,
     upload: UploadFile,
     *,
     initiative_id: int,
@@ -436,9 +446,9 @@ async def _store_file(
     status_code=status.HTTP_201_CREATED,
 )
 async def upload_file_version(
-    session: RLSSessionDep,
-    current_user: Annotated[User, Depends(get_current_active_user)],
-    guild_context: GuildContextDep,
+    session: ActorSessionDep,
+    current_user: ActorUserDep,
+    guild_context: FilesWrite,
     file_id: int,
     upload: UploadFile = FormFile(..., alias="file"),
 ) -> FileVersionRead:
@@ -461,7 +471,7 @@ async def upload_file_version(
         keep_kind=spec_of(file.file_type).kind,
     )
     version = await file_versions.add_version(
-        session, file, created_by=current_user.id, **stored
+        session, file, created_by=guild_context.user_id, **stored
     )
     await file_versions.commit_version(
         session,

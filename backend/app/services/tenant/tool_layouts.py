@@ -27,6 +27,8 @@ from app.core.messages import TaskTypeMessages, ToolLayoutMessages
 from app.core.tools import (
     DETAIL_LAYOUTS,
     LAYOUT_DEFAULT,
+    LAYOUT_KIND_TARGETS,
+    LISTS_HIDDEN_AS_SHIPPED,
     LIST_LAYOUTS,
     TYPED_DETAILS,
     Tool,
@@ -53,7 +55,6 @@ from app.schemas.tenant.tool_layout import (
     DetailStackPart,
     CounterDetailFieldId,
     EventDetailFieldId,
-    LibraryItemDetailFieldId,
     PostDetailFieldId,
     QueueItemDetailFieldId,
     ListLayoutDefinition,
@@ -90,8 +91,6 @@ DETAIL_PARTS: dict[str, frozenset[str]] = {
     "calendar_event": _LAYOUT_PARTS
     | {"plugin", "dates", "rsvp", "actions", "relations"},
     "queue_item": _LAYOUT_PARTS | {"plugin", "actions", "relations"},
-    "library_item": _LAYOUT_PARTS
-    | {"plugin", "actions", "relations", "picture", "about", "versions"},
     "counter": _LAYOUT_PARTS | {"plugin", "actions", "relations", "count"},
     "post": _LAYOUT_PARTS
     | {
@@ -111,7 +110,6 @@ DETAIL_FIELDS: dict[str, frozenset[str]] = {
     "task": frozenset(field.value for field in TaskDetailFieldId),
     "calendar_event": frozenset(field.value for field in EventDetailFieldId),
     "queue_item": frozenset(field.value for field in QueueItemDetailFieldId),
-    "library_item": frozenset(field.value for field in LibraryItemDetailFieldId),
     "counter": frozenset(field.value for field in CounterDetailFieldId),
     "post": frozenset(field.value for field in PostDetailFieldId),
 }
@@ -121,10 +119,16 @@ DETAIL_FIELDS: dict[str, frozenset[str]] = {
 class Target:
     """What a set of layouts is for."""
 
-    tool: Tool
+    #: A ``LAYOUT_TARGETS`` value: a tool, or a kind inside one that lays out
+    #: what it holds (a collection).
+    tool: str
     #: The instance, or None for the initiative's shared tool.
     tool_id: Optional[int]
     initiative_id: int
+
+    def __post_init__(self) -> None:
+        # A Tool member is held as the value it is stored as.
+        object.__setattr__(self, "tool", getattr(self.tool, "value", self.tool))
 
 
 def _bad_request(detail: str) -> HTTPException:
@@ -134,7 +138,7 @@ def _bad_request(detail: str) -> HTTPException:
 def _of(target: Target) -> tuple[Any, ...]:
     return (
         ToolLayout.initiative_id == target.initiative_id,
-        ToolLayout.tool == target.tool.value,
+        ToolLayout.tool == target.tool,
         col(ToolLayout.tool_id).is_not_distinct_from(target.tool_id),
     )
 
@@ -192,14 +196,15 @@ async def item_types_by_instance(
     return found
 
 
-def shown_lists(tool: Tool, stored: Mapping[str, dict[str, Any]]) -> tuple[str, ...]:
+def shown_lists(tool: str, stored: Mapping[str, dict[str, Any]]) -> tuple[str, ...]:
     """The lists a target shows, in order, from the definitions it stores by
     kind: each that its own definition does not hide. As shipped, every list
-    shows."""
+    shows but those ``LISTS_HIDDEN_AS_SHIPPED`` names."""
+    hidden = LISTS_HIDDEN_AS_SHIPPED.get(tool, frozenset())
     return tuple(
         kind
         for kind in LIST_LAYOUTS.get(tool, ())
-        if not stored.get(kind, {}).get("hidden", False)
+        if not stored.get(kind, {}).get("hidden", kind in hidden)
     )
 
 
@@ -223,7 +228,7 @@ def _require_one_shown(
 
 
 def read_set(
-    tool: Tool, rows: list[ToolLayout], types: Sequence[TaskType] = ()
+    tool: str, rows: list[ToolLayout], types: Sequence[TaskType] = ()
 ) -> list[ToolLayoutRead]:
     """Every layout the tool draws, its lists then its details, each as stored
     or as shipped. The target opens on its default list, or on the first. A
@@ -366,6 +371,10 @@ def check(target: Target, write: ToolLayoutWrite) -> dict[str, Any]:
     else:
         _require(write.kind, LIST_LAYOUTS.get(target.tool, ()))
         assert isinstance(definition, ListLayoutDefinition)
+        if target.tool in LAYOUT_KIND_TARGETS and set(stored) - {"hidden"}:
+            # What a collection lists is files, drawn as each list draws them:
+            # a list is shown or hidden, and holds nothing else.
+            raise _bad_request(ToolLayoutMessages.KIND_NOT_ALLOWED)
         _check_presets(target.tool, write.kind, stored.get("presets") or [])
         if write.kind not in GROUPED_LISTS and (
             "groupings" in stored or "group_by" in stored
@@ -426,7 +435,7 @@ PRESET_FILTERS: dict[Tool, type[TaskFilterSpec] | type[CalendarFilterSpec]] = {
 }
 
 
-def _check_presets(tool: Tool, kind: str, presets: list[dict[str, Any]]) -> None:
+def _check_presets(tool: str, kind: str, presets: list[dict[str, Any]]) -> None:
     """Refuse presets whose filters are not the tool's shape, or a sort on a
     list other than a table, the one a person sorts by its own."""
     shape = PRESET_FILTERS.get(tool)
@@ -446,7 +455,7 @@ async def _locked_rows(session: AsyncSession, target: Target) -> list[ToolLayout
     await advisory_lock(
         session,
         LockNamespace.TOOL_LAYOUTS,
-        f"{guild_id}:{target.tool.value}:{target.tool_id}:{target.initiative_id}",
+        f"{guild_id}:{target.tool}:{target.tool_id}:{target.initiative_id}",
     )
     return await list_rows(session, target)
 
@@ -487,7 +496,7 @@ async def _keep(
         session.add(
             ToolLayout(
                 initiative_id=target.initiative_id,
-                tool=target.tool.value,
+                tool=target.tool,
                 tool_id=target.tool_id,
                 kind=kind,
                 task_type_id=task_type_id,
@@ -720,7 +729,7 @@ async def copy_layouts(
         session.add(
             ToolLayout(
                 initiative_id=copy.initiative_id,
-                tool=copy.tool.value,
+                tool=copy.tool,
                 tool_id=copy.tool_id,
                 kind=row.kind,
                 task_type_id=(
@@ -798,7 +807,7 @@ async def restore_layouts(
         session.add(
             ToolLayout(
                 initiative_id=target.initiative_id,
-                tool=target.tool.value,
+                tool=target.tool,
                 tool_id=target.tool_id,
                 kind=kind,
                 task_type_id=task_type_id,
@@ -809,14 +818,14 @@ async def restore_layouts(
 
 
 async def drop_for_instances(
-    session: AsyncSession, tool: Tool, tool_ids: Iterable[int]
+    session: AsyncSession, tool: str, tool_ids: Iterable[int]
 ) -> None:
     """Remove these instances' layouts, as they are purged."""
     ids = list(tool_ids)
     if ids:
         await session.exec(
             delete(ToolLayout).where(
-                ToolLayout.tool == tool.value, col(ToolLayout.tool_id).in_(ids)
+                ToolLayout.tool == tool, col(ToolLayout.tool_id).in_(ids)
             )
         )
 
@@ -956,7 +965,7 @@ def _rewrite(
     definition: dict[str, Any],
 ) -> None:
     """Store ``definition`` on ``row``, unless it is not a layout it could hold."""
-    target = Target(Tool(row.tool), row.tool_id, row.initiative_id)
+    target = Target(row.tool, row.tool_id, row.initiative_id)
     try:
         typed = {"task_type_id": row.task_type_id} if row.task_type_id else {}
         check(

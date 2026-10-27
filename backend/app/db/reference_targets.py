@@ -68,29 +68,6 @@ def id_column(entity_type: SearchEntityType):
 
 
 @dataclass(frozen=True)
-class Preview:
-    """Pictures that live on another table — a library's are its own images.
-
-    The chosen one stands alone; with none chosen, the newest few stand in for
-    it. That is what a library shows of itself everywhere else, and a library
-    nobody has picked a cover for is the usual kind.
-    """
-
-    #: The table the pictures are on.
-    table: str
-    #: Column there pointing back at this row.
-    parent_fk: str
-    #: Column here naming the one picture somebody chose, if any.
-    chosen_fk: str
-    #: Columns on a picture, coalesced in preference order.
-    columns: tuple[str, ...]
-    #: Column deciding which are newest.
-    newest_by: str
-    #: How many stand in when none was chosen.
-    limit: int = 4
-
-
-@dataclass(frozen=True)
 class Visual:
     """What a kind shows of itself besides its name.
 
@@ -99,17 +76,14 @@ class Visual:
     which is the honest answer for a thing with no look of its own rather than a
     blank where a picture would go.
 
-    ``image`` names columns coalesced in preference order, because a library
-    thumbnail is absent whenever the source was already small enough not to need
-    one — so the full picture is the fallback, decided here rather than by every
-    surface that draws one.
+    ``image`` names columns coalesced in preference order, so a fallback is
+    decided here rather than by every surface that draws one.
 
     A column named ``pointer.column`` is read from the row the foreign key
     ``pointer`` names: a file's facts live on its current version.
     """
 
     image: tuple[str, ...] = ()
-    preview: Preview | None = None
     icon: str | None = None
     color: str | None = None
     #: Columns saying what SORT of thing this is within its kind, for a kind
@@ -129,9 +103,6 @@ class Visual:
 
 #: Keyed by table, the way :data:`~app.db.search_index.SEARCH_SOURCES` is. A
 #: table with no entry has no look of its own, which is most of them.
-#: A picture's file and its thumbnail, read from the version it shows.
-_PICTURE = ("current_version_id.thumbnail_url", "current_version_id.file_url")
-
 VISUALS: dict[str, Visual] = {
     "files": Visual(
         image=("featured_image_url",),
@@ -139,16 +110,6 @@ VISUALS: dict[str, Visual] = {
         mime="current_version_id.file_content_type",
         filename="current_version_id.original_filename",
         link_in_json=("content", "url"),
-    ),
-    "library_items": Visual(image=_PICTURE),
-    "libraries": Visual(
-        preview=Preview(
-            table="library_items",
-            parent_fk="library_id",
-            chosen_fk="cover_item_id",
-            columns=_PICTURE,
-            newest_by="created_at",
-        )
     ),
     "projects": Visual(icon="icon"),
     "calendars": Visual(color="color"),
@@ -283,44 +244,6 @@ def _column(table: Table, name: str):
     )
 
 
-def _urls_of(picked, column: str):
-    """The URLs a subquery selected, as one array. NULL when it picked none."""
-    rows = picked.subquery()
-    return select(func.array_agg(rows.c[column])).scalar_subquery()
-
-
-def _preview_expr(table: Table, preview: Preview):
-    """The pictures a row shows of itself, as an array of URLs.
-
-    One when somebody chose it, the newest few when nobody did. Ordering and
-    limiting happen in the database rather than over a page of rows here,
-    because this runs once per kind for a whole page of edges.
-    """
-    other = SQLModel.metadata.tables[preview.table]
-    url = _coalesced([_column(other, name) for name in preview.columns]).label("url")
-    live = _live(other)
-
-    chosen = select(url).where(other.c["id"] == table.c[preview.chosen_fk])
-    newest = (
-        select(url)
-        .where(other.c[preview.parent_fk] == table.c["id"])
-        .order_by(other.c[preview.newest_by].desc())
-        .limit(preview.limit)
-    )
-    if live is not None:
-        # A picture in the trash is not one to draw.
-        chosen = chosen.where(live)
-        newest = newest.where(live)
-
-    return case(
-        (
-            table.c[preview.chosen_fk].isnot(None),
-            _urls_of(chosen, "url"),
-        ),
-        else_=_urls_of(newest, "url"),
-    )
-
-
 def _visual_exprs(table_name: str, table: Table):
     """How one kind draws, as select expressions: the picture, the emoji, the
     colour, and the four facts that pick an icon for a kind that has no fixed
@@ -335,8 +258,6 @@ def _visual_exprs(table_name: str, table: Table):
         # A row with no picture reports no pictures, not one that is null.
         one = _coalesced([_column(table, name) for name in visual.image])
         images = case((one.isnot(None), pg_array([one])), else_=null())
-    elif visual.preview is not None:
-        images = _preview_expr(table, visual.preview)
     else:
         images = null()
 
@@ -420,8 +341,7 @@ class Resolved:
     #: a row that is a tool itself.
     tool_title: str | None = None
     #: What the row shows of itself beside its name — see :class:`Visual`. At
-    #: most one of the three is set, and most kinds set none. A picture is a
-    #: list because a library shows several when nobody picked one.
+    #: most one of the three is set, and most kinds set none.
     image_urls: list[str] = field(default_factory=list)
     icon: str | None = None
     color: str | None = None

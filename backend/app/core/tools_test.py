@@ -45,7 +45,8 @@ def test_kinds_keep_their_codes_and_live_where_their_sharing_says():
     Changing one silently re-encodes a kind: rows written before keep the old
     value, rows after get the new one, and nothing errors. This is the test that
     holds that rule, because the database cannot. A kind inside a tool names
-    the tool whose sharing the policies already gate it by.
+    the tool whose sharing the policies already gate it by; one in no one
+    instance of its tool has no sharing to be gated by.
     """
     from app.core.tools import KINDS
     from app.db.initiative_rls import governing_path
@@ -54,7 +55,9 @@ def test_kinds_keep_their_codes_and_live_where_their_sharing_says():
     assert len(codes) == len(set(codes))
     assert all(code > 0 for code in codes)
     for kind in KINDS.values():
-        if kind.parent is not None:
+        if kind.standalone:
+            assert governing_path(kind.table) is None, kind.value
+        elif kind.parent is not None:
             assert governing_path(kind.table) == (
                 kind.parent,
                 ((kind.parent_column, kind.parent.plural),),
@@ -99,7 +102,7 @@ def test_every_tool_is_commentable():
     # its CommentTarget — or an extra that forgets its column — fails here.
     from sqlalchemy import inspect as sa_inspect
 
-    from app.core.tools import COMMENTABLE_EXTRAS, COMMENT_TARGETS
+    from app.core.tools import COMMENTABLE_EXTRAS, COMMENT_TARGETS, KINDS
     from app.db.initiative_rls import _COMMENT_PARENTS
     from app.models.tenant.comment import Comment
     from app.schemas.tenant.comment import COMMENT_TARGET_FIELDS
@@ -124,9 +127,12 @@ def test_every_tool_is_commentable():
 
     # Every extra names a tool to answer for it, and a real column to reach it
     # by — that is what makes a thread on something that is not a tool gated
-    # like one.
+    # like one — or answers for itself, as a kind no sharing governs does.
     for column, extra in EXTRA_COMMENT_TARGETS.items():
         parent = next(p for p in _COMMENT_PARENTS if p.column == column)
+        if parent.governed_by is None:
+            assert KINDS[extra.kind].standalone, column
+            continue
         assert parent.tool_fk is not None, column
         extra_columns = {
             c.name for c in sa_inspect(extra.model).persist_selectable.columns

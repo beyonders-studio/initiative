@@ -73,15 +73,36 @@ _ADMIN_RUNGS = [rung for rung in GUILD_LADDER if rung.reaches(CommunityRole.admi
 @dataclass(frozen=True)
 class Governing:
     """The tool row whose sharing decides who may be named on content inside
-    it: a task's project, an event's calendar, a file itself."""
+    it: a task's project, an event's calendar, a file itself.
+
+    Content no sharing governs, a collection, is opened by whoever can open
+    one of its files: ``resource_id`` is None and ``resource_ids`` selects
+    those files."""
 
     tool: Tool
-    resource_id: int
+    resource_id: Optional[int]
     initiative_id: Optional[int]
+    resource_ids: Any = None
 
     @classmethod
     def of(cls, tool: Tool, row: Any) -> "Governing":
         return cls(tool, row.id, row.initiative_id)
+
+    @classmethod
+    def of_collection(cls, row: Any) -> "Governing":
+        from app.models.tenant.collection import CollectionFile
+
+        files = select(CollectionFile.file_id).where(
+            CollectionFile.collection_id == row.id
+        )
+        return cls(Tool.file, None, row.initiative_id, resource_ids=files)
+
+    def governs(self, column: Any) -> ColumnElement[bool]:
+        """Whether a resource id column names the governing row, or one of
+        them."""
+        if self.resource_ids is not None:
+            return column.in_(self.resource_ids)
+        return column == self.resource_id
 
 
 async def governing_of(
@@ -132,7 +153,7 @@ def _grant_reaches(
         exists()
         .where(
             ResourceGrant.resource_type == governing.tool.value,
-            ResourceGrant.resource_id == governing.resource_id,
+            governing.governs(ResourceGrant.resource_id),
             or_(
                 ResourceGrant.user_id == user_id,
                 ResourceGrant.role_id.in_(held),
@@ -206,7 +227,7 @@ def readers_of(governing: Governing, guild_id: int) -> Select:
             exists()
             .where(
                 ResourceGrant.resource_type == tool.value,
-                ResourceGrant.resource_id == governing.resource_id,
+                governing.governs(ResourceGrant.resource_id),
                 ResourceGrant.user_id == gm.user_id,
             )
             .correlate(gm)

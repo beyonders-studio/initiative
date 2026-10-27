@@ -50,24 +50,12 @@ def test_every_visual_names_columns_that_exist():
         assert not missing, f"{table_name} has no column {missing}"
 
 
-def test_a_preview_points_at_real_columns_on_a_real_table():
-    tables = _tables()
-    for table_name, visual in VISUALS.items():
-        preview = visual.preview
-        if preview is None:
-            continue
-        assert preview.chosen_fk in tables[table_name].columns
-        other = tables[preview.table]
-        for name in (preview.parent_fk, preview.newest_by, *preview.columns):
-            assert _names_a_column(other, name), f"{preview.table} has no {name}"
-
-
 def test_a_kind_declares_at_most_one_look():
     """The card tries picture, emoji, colour in that order and draws the first,
     so a kind declaring two would silently never show the second."""
     for table_name, visual in VISUALS.items():
         looks = [
-            bool(visual.image or visual.preview),
+            bool(visual.image),
             bool(visual.icon),
             bool(visual.color),
         ]

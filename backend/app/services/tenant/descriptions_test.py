@@ -17,8 +17,6 @@ from app.models.tenant.relationship import EntityRelationship
 from app.services.tenant.relationships import Endpoint
 from app.services.tenant.descriptions import newly_mentioned
 from app.testing import (
-    create_library,
-    create_library_item,
     create_file,
     create_resource_grant,
     create_task,
@@ -239,31 +237,3 @@ async def test_a_duplicate_points_where_its_original_does_and_tells_nobody(
         session, writer.guild.id, Endpoint(SearchEntityType.task, copy_id)
     ) == {("file", doc.id)}
     assert await _mentions_for(session, teammate.user.id) == []
-
-
-async def test_a_library_item_s_description_does_what_a_task_s_does(
-    client: AsyncClient, session: AsyncSession, acting_user
-):
-    """Tells whoever it newly names, and its ``#`` becomes the item's
-    reference."""
-    writer, teammate = await _workspace(acting_user, session)
-    writer.initiative.libraries_enabled = True
-    session.add(writer.initiative)
-    library = await create_library(session, writer.initiative, writer.user)
-    item = await create_library_item(session, library, writer.user, write_blob=False)
-    doc = await create_file(session, writer.initiative, writer.user)
-    await session.commit()
-
-    response = await client.patch(
-        writer.g(f"/library-items/{item.id}"),
-        headers=writer.headers,
-        json={"description": f"@[Tea M]({teammate.user.id}) see #doc[Spec]({doc.id})"},
-    )
-    assert response.status_code == 200, response.text
-
-    [notice] = await _mentions_for(session, teammate.user.id)
-    assert (notice["entity_type"], notice["entity_id"]) == ("library_item", item.id)
-    assert notice["target_path"] == f"/go/library-item/{item.id}"
-    assert await _references(
-        session, writer.guild.id, Endpoint(SearchEntityType.library_item, item.id)
-    ) == {("file", doc.id)}

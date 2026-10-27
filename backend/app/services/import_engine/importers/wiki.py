@@ -508,7 +508,6 @@ async def _upload_file(
         return None, (0, 0)
     filename = upload.original_filename or key
     content_type = await file_versions.stored_file_type(
-        File,
         routed_guild_id(session),
         key,
         filename=filename,

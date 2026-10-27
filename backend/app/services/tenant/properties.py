@@ -47,7 +47,7 @@ from sqlmodel.ext.asyncio.session import AsyncSession
 
 from app.core.identity_boundary import current_install_boundary
 from app.core.messages import PluginMessages, PropertyMessages, QueryMessages
-from app.core.tools import PROPERTY_TARGETS, Tool
+from app.core.tools import KINDS, PROPERTY_TARGETS, Tool
 from app.db.advisory_locks import LockNamespace, advisory_lock
 from app.db.base import MODELS_BY_TABLE
 from app.db.initiative_rls import entity_tables, governing_path
@@ -92,6 +92,8 @@ class PropertyLinkSpec:
     Three facts, all read from registries that already hold them: the row's
     model (from its table), the tool whose sharing governs it, and the column
     on the row naming that tool's row — ``None`` where the row IS the tool row.
+    ``shared`` is false for a row no sharing governs (a collection), which
+    answers to its tool in its initiative alone.
     """
 
     target: str
@@ -99,9 +101,16 @@ class PropertyLinkSpec:
     tool: Tool
     via: Optional[str]
     changed: Optional[ValuesChanged] = None
+    shared: bool = True
 
     def governing_id(self, row: Any) -> int:
         return row.id if self.via is None else getattr(row, self.via)
+
+    def governing(self, row: Any, initiative_id: Optional[int]) -> Any:
+        """What decides who may be named on ``row``."""
+        if not self.shared:
+            return named_people.Governing.of_collection(row)
+        return named_people.Governing(self.tool, self.governing_id(row), initiative_id)
 
 
 async def _occurrences_follow(session: AsyncSession, row: Any) -> None:
@@ -117,6 +126,11 @@ _CHANGED: dict[str, ValuesChanged] = {"calendar_event": _occurrences_follow}
 
 def _link(target: str, models: dict[str, type[SQLModel]]) -> PropertyLinkSpec:
     table = entity_tables()[target]
+    kind = KINDS[target]
+    if kind.standalone:
+        return PropertyLinkSpec(
+            target=target, model=models[table], tool=kind.tool, via=None, shared=False
+        )
     governed = governing_path(table)
     if governed is None:  # pragma: no cover - every target has a tool
         raise RuntimeError(f"no single tool governs {table!r}")
@@ -450,7 +464,7 @@ async def write_values(
                 **cols,
             )
         )
-    governing = named_people.Governing(spec.tool, spec.governing_id(row), initiative_id)
+    governing = spec.governing(row, initiative_id)
     await named_people.require_readers(session, governing, named)
     session.add_all(rows)
 

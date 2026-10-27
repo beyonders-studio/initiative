@@ -31,7 +31,13 @@ from sqlalchemy.ext.asyncio import AsyncEngine
 from sqlalchemy.schema import CheckConstraint, CreateTable
 
 from app.core.plugin_scopes import PluginScopeResource, tool_resource
-from app.core.tools import INSTALL_METADATA_KIND, ITEM_KINDS, PROPERTY_TARGETS, Tool
+from app.core.tools import (
+    INSTALL_METADATA_KIND,
+    ITEM_KINDS,
+    KINDS,
+    PROPERTY_TARGETS,
+    Tool,
+)
 from app.db.plugin_rls import (
     PLUGIN_REFUSED_TABLES,
     PLUGIN_TABLE_ACCESS,
@@ -47,7 +53,6 @@ from app.db.initiative_rls import (
     initiative_of,
     INITIATIVE_SCOPED_TABLES,
     dac_asks_at_write,
-    entity_tables,
     governing_path,
     managed_write,
     render_content_item_fn,
@@ -1028,9 +1033,8 @@ def _plugin_search_read() -> str:
 def _entity_tool_scope(table: str, kinds: tuple[str, ...]) -> str:
     """The scope resource of the tool that governs the thing a ``table`` row
     names by ``(entity_type, entity_id)`` — a task's is ``projects``."""
-    tables = entity_tables()
     arms = " ".join(
-        f"WHEN '{kind}' THEN '{tool_resource(governing_path(tables[kind])[0]).value}'"  # ty: ignore[not-subscriptable] — every kind has a tool
+        f"WHEN '{kind}' THEN '{tool_resource(KINDS[kind].tool).value}'"
         for kind in kinds
     )
     return f"(CASE {table}.entity_type {arms} END)"

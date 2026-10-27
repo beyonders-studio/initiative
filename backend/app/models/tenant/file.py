@@ -58,7 +58,11 @@ class File(
     # A tool row is written before anything has been shared, so it is read
     # back by no RETURNING clause: the id comes from the sequence first and
     # the INSERT stands alone. See app/db/initiative_rls.py.
-    __table_args__ = {"implicit_returning": False}
+    __table_args__ = (
+        # What a collection's entries name a file by, with its initiative.
+        UniqueConstraint("id", "initiative_id", name="uq_files_id_initiative"),
+        {"implicit_returning": False},
+    )
     __mapper_args__ = {
         "properties": {
             "content": deferred(_CONTENT, raiseload=True),
@@ -151,7 +155,8 @@ class FileVersion(CreatedByMixin, table=True):
     """A single uploaded version of an uploaded file.
 
     Every uploaded file has at least one row here, and the ``files`` row
-    names the current one (``current_version_id``).
+    names the current one (``current_version_id``). ``created_by`` is null
+    for a version a plug-in acting as its community uploaded.
     """
 
     __tablename__ = "file_versions"
@@ -183,7 +188,6 @@ class FileVersion(CreatedByMixin, table=True):
         default=None,
         sa_column=Column(String(length=255), nullable=True),
     )
-    created_by: int = Field(foreign_key="users.id", nullable=False)
     created_at: datetime = Field(
         default_factory=lambda: datetime.now(timezone.utc),
         sa_column=Column(DateTime(timezone=True), nullable=False),

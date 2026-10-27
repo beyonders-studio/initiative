@@ -57,11 +57,11 @@ from app.api.deps import (
     GuildContextDep,
 )
 from app.core.plugin_scopes import PluginScopeAccess, scope_name, tool_resource
+from app.api import resource_access
 from app.api.v1.tenant_endpoints import calendars as calendars_endpoints
 from app.api.v1.tenant_endpoints import counters as counters_endpoints
 from app.api.v1.tenant_endpoints import dashboards as dashboards_endpoints
 from app.api.v1.tenant_endpoints import files as files_endpoints
-from app.api.v1.tenant_endpoints import libraries as libraries_endpoints
 from app.api.v1.tenant_endpoints import posts as posts_endpoints
 from app.api.v1.tenant_endpoints import projects as projects_endpoints
 from app.api.v1.tenant_endpoints import queues as queues_endpoints
@@ -71,11 +71,11 @@ from app.core.tools import Tool
 from app.db.query import build_paginated_response
 from app.models.platform.user import User
 from app.models.tenant.calendar import Calendar
+from app.models.tenant.collection import Collection
 from app.models.tenant.counter import CounterGroup
 from app.models.tenant.dashboard import Dashboard
 from app.core.file_types import FileKind, FileType
 from app.models.tenant.file import File
-from app.models.tenant.library import Library
 from app.models.tenant.post import Post
 from app.models.tenant.project import Project
 from app.models.tenant.personal_item import PersonalItem
@@ -101,11 +101,6 @@ from app.schemas.tenant.file import (
     FileListResponse,
     FileRead,
 )
-from app.schemas.tenant.library import (
-    LibraryListResponse,
-    LibraryRead,
-    LibrarySummary,
-)
 from app.schemas.tenant.initiative import (
     ToolCountsByInitiativeResponse,
     ToolCountsResponse,
@@ -130,7 +125,6 @@ from app.services.tenant import calendars as calendars_service
 from app.services.tenant import counters as counters_service
 from app.services.tenant import dashboards as dashboards_service
 from app.services.tenant import files as files_service
-from app.services.tenant import libraries as libraries_service
 from app.services.tenant import posts as posts_service
 from app.services.tenant import properties as properties_service
 from app.services.tenant import queues as queues_service
@@ -597,6 +591,7 @@ async def _file_conditions(spec: ToolListSpec, req: ListRequest) -> list:
         is_template=values.get("is_template"),
         file_type=values.get("file_type"),
         kind=values.get("kind"),
+        collection_id=values.get("collection_id"),
     )
     conditions.append(
         archive_service.archive_filter_clause(File, values.get("archived"))
@@ -606,6 +601,13 @@ async def _file_conditions(spec: ToolListSpec, req: ListRequest) -> list:
 
 async def _serialize_files(spec: ToolListSpec, req: ListRequest, rows: list) -> list:
     return await files_endpoints.serialize_file_page(req.session, req.user_id, rows)
+
+
+_COLLECTION_FILTER = ListParam(
+    "collection_id",
+    Optional[int],
+    Query(default=None, description="Filter to the files in one collection"),
+)
 
 
 # ---------------------------------------------------------------------------
@@ -768,6 +770,7 @@ TOOL_LISTS: dict[Tool, ToolListSpec] = {
                 Optional[FileKind],
                 Query(default=None, description="Filter by kind of file"),
             ),
+            _COLLECTION_FILTER,
             page_param(),
             page_size_param(20, ge=0, le=100),
             sort_by_param("Order by one of: name, initiative, updated_at, created_at."),
@@ -991,39 +994,6 @@ TOOL_LISTS: dict[Tool, ToolListSpec] = {
             "could edit it; for everyone else the board starts when it goes up."
         ),
     ),
-    Tool.library: ToolListSpec(
-        tool=Tool.library,
-        read_model=LibraryRead,
-        read_row=libraries_endpoints.read_after_write,
-        model=Library,
-        response_model=LibraryListResponse,
-        loader_options=_loads(libraries_service.list_loader_options),
-        default_order=_order(Library.updated_at.desc(), Library.id.desc()),
-        serialize=_summaries(
-            LibrarySummary,
-            preview=lambda session, _guild_id, rows: libraries_service.list_previews(
-                session, rows
-            ),
-        ),
-        params=(
-            _initiative_id(),
-            search_param(
-                "Full-text match over the library's name and description, "
-                "through the same index the search page reads."
-            ),
-            sort_by_param(
-                "Order by one of: name, initiative, updated_at. Omit for newest first."
-            ),
-            sort_dir_param(),
-            _tag_ids(Tool.library),
-            _property_filters(),
-            _archived(),
-            _include_preview(),
-            page_param(),
-            page_size_param(100, ge=0, le=500),
-        ),
-        list_doc="List libraries visible to the current user (guild admins see all).",
-    ),
     Tool.wiki: ToolListSpec(
         tool=Tool.wiki,
         read_model=WikiRead,
@@ -1109,30 +1079,37 @@ def _signature(
     return inspect.Signature(declared)
 
 
+async def _list(spec: ToolListSpec, request: ListRequest) -> Any:
+    """One page of a tool's list, as its ``GET /`` answers it."""
+    values = request.values
+    conditions = await list_conditions(spec, request)
+    rows, total_count, page = await tool_listing.list_tool_rows(
+        request.session,
+        spec.model,
+        conditions=conditions,
+        loader_options=spec.loader_options(request),
+        sort_by=values.get("sort_by"),
+        sort_dir=values.get("sort_dir"),
+        default_order=spec.default_order(request),
+        page=values["page"],
+        page_size=values["page_size"],
+        extra_sort_fields=spec.extra_sort_fields,
+        refine=spec.refine(request) if spec.refine else None,
+        clamp=spec.clamp_page,
+    )
+    items = await spec.serialize(spec, request, rows)
+    page_size = values["page_size"]
+    return spec.response_model(
+        **build_paginated_response(items, total_count, page, page_size)
+    )
+
+
 def _mount_list(spec: ToolListSpec) -> None:
     """Mount ``GET /`` for one tool."""
 
     async def list_rows(session, current_user, guild_context, **values):
-        request = ListRequest(session, current_user, guild_context, values)
-        conditions = await list_conditions(spec, request)
-        rows, total_count, page = await tool_listing.list_tool_rows(
-            session,
-            spec.model,
-            conditions=conditions,
-            loader_options=spec.loader_options(request),
-            sort_by=values.get("sort_by"),
-            sort_dir=values.get("sort_dir"),
-            default_order=spec.default_order(request),
-            page=values["page"],
-            page_size=values["page_size"],
-            extra_sort_fields=spec.extra_sort_fields,
-            refine=spec.refine(request) if spec.refine else None,
-            clamp=spec.clamp_page,
-        )
-        items = await spec.serialize(spec, request, rows)
-        page_size = values["page_size"]
-        return spec.response_model(
-            **build_paginated_response(items, total_count, page, page_size)
+        return await _list(
+            spec, ListRequest(session, current_user, guild_context, values)
         )
 
     list_rows.__signature__ = _signature(
@@ -1302,3 +1279,30 @@ async def get_tool_counts(
 
 for _spec in TOOL_LISTS.values():
     _mount_list(_spec)
+
+
+async def list_collection_files(
+    session, current_user, guild_context, collection_id, **values
+):
+    """The files in one collection the reader can open: the Files list, with
+    its parameters, narrowed to the collection. A collection out of reach is
+    a 404."""
+    await resource_access.load_child(session, Collection, collection_id)
+    request = ListRequest(
+        session, current_user, guild_context, {**values, "collection_id": collection_id}
+    )
+    return await _list(TOOL_LISTS[Tool.file], request)
+
+
+list_collection_files.__signature__ = _signature(
+    tuple(p for p in TOOL_LISTS[Tool.file].params if p is not _COLLECTION_FILTER),
+    (*_actor_params(Tool.file), ("collection_id", int)),
+)
+router.add_api_route(
+    "/collections/{collection_id}/files",
+    list_collection_files,
+    methods=["GET"],
+    response_model=TOOL_LISTS[Tool.file].response_model,
+    name="list_collection_files",
+    tags=_tags(TOOL_LISTS[Tool.file]),
+)

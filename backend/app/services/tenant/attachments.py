@@ -35,7 +35,7 @@ UPLOADS_URL_PREFIX = "/uploads/"
 #: description, a comment — starts with. The server chooses every stored name,
 #: so this is how an upload says it was pasted, and only an upload that says so
 #: is ever deleted because the text stopped showing it. An image copied in from
-#: a file or a library keeps its own name and is never touched.
+#: a file keeps its own name and is never touched.
 PASTED_IMAGE_PREFIX = "pasted-"
 
 #: An upload's address inside markdown: ``/uploads/{community_id}/{filename}``,
@@ -159,33 +159,6 @@ async def purge_file_uploads(session, files: Iterable[Any]) -> Set[str]:
     return removed | await release_uploads(session, shown, leaving={File: doomed_ids})
 
 
-async def purge_library_item_uploads(session, images: Iterable[Any]) -> Set[str]:
-    """Delete Upload rows + blobs for pictures about to be hard-purged.
-
-    A picture's blobs back exactly one picture by construction — the file and
-    the thumbnail of every version — so there is no orphan check to run: the
-    version rows go with the picture (FK cascade), and this takes their
-    ``Upload`` rows and the bytes behind them.
-
-    Caller must use a session that can DELETE from ``uploads``; caller commits,
-    then deletes the blobs of the stored names returned.
-    """
-    from sqlmodel import select
-
-    from app.models.tenant.library import LibraryItemVersion
-
-    doomed = list(images)
-    if not doomed:
-        return set()
-    versions = await session.exec(
-        select(LibraryItemVersion.file_url, LibraryItemVersion.thumbnail_url).where(
-            LibraryItemVersion.library_item_id.in_({i.id for i in doomed})
-        )
-    )
-    urls = [u for row in versions.all() for u in row]
-    return await _drop_upload_rows(session, upload_names(urls))
-
-
 def upload_urls_in_markdown(text: str | None) -> Set[str]:
     """Every upload a markdown body shows, normalized."""
     urls: Set[str] = set()
@@ -210,10 +183,9 @@ UNCLAIMED_PASTED_IMAGE_GRACE = timedelta(hours=24)
 def _upload_columns() -> tuple[tuple[type, str], ...]:
     """Every column a stored upload can be shown from: every column somebody
     writes in, a file's featured image, and the files of every version of
-    an uploaded file or a picture."""
+    an uploaded file."""
     from app.db.search_index import written_columns
     from app.models.tenant.file import File, FileVersion
-    from app.models.tenant.library import LibraryItemVersion
 
     return (
         *(
@@ -223,8 +195,6 @@ def _upload_columns() -> tuple[tuple[type, str], ...]:
         ),
         (File, "featured_image_url"),
         (FileVersion, "file_url"),
-        (LibraryItemVersion, "file_url"),
-        (LibraryItemVersion, "thumbnail_url"),
     )
 
 
@@ -1040,7 +1010,7 @@ def detect_document_image_type(contents: bytes) -> str | None:
     """Identify a document image from its bytes, or ``None`` if it is not one.
 
     The client's ``Content-Type`` and filename are not consulted — the rule the
-    library, avatar, guild-image and announcement paths already follow, and a
+    avatar, guild-image and announcement paths already follow, and a
     mislabelled PNG is still a PNG. What comes back is what the stored row, the
     stored name and the served response all describe the file as.
     """

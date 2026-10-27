@@ -296,6 +296,8 @@ LEDGER_TABLES: dict[str, tuple[str, str] | None] = {
 # table is in neither bucket, so a new table forces the decision.
 CREATED_BY_EXEMPT_TABLES: frozenset[str] = frozenset(
     {
+        # A file in a collection: ``added_by`` already names who put it there.
+        "collection_files",
         # Roster rows: the membership IS the fact, and ``user_id`` already names
         # whose it is.
         "calendar_event_attendees",

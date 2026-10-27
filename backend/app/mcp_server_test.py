@@ -80,11 +80,6 @@ _SAFE_WRITES = {
     "update_dashboard",
     "create_post",
     "update_post",
-    # A library is authored and renamed here, and filled elsewhere: putting a
-    # picture in one is a multipart upload, which no RouteMap matches, so the
-    # write surface stops at the wall itself.
-    "create_library",
-    "update_library",
     "create_wiki",
     "update_wiki",
     # And what those tools hold: a project's tasks, a queue's items, a counter
@@ -139,6 +134,8 @@ async def test_mcp_tools_are_curated():
         # full one is refused.
         "column_limits",
         "counter",
+        # A collection in Files, read through the files tag.
+        "collection",
         "backlink",
         # The edges between them, which belong to no one tool.
         "relationship",

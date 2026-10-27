@@ -39,7 +39,7 @@ from app.core.notification_categories import (
     category_of,
     sample_type,
 )
-from app.core.tools import COMMENT_TARGETS, Tool
+from app.core.tools import COMMENT_TARGETS, KINDS, Tool
 from app.core.user_display import name_here
 from app.db.guild_standing import ActorContext, InstallContext
 from app.db import cohorts
@@ -221,10 +221,9 @@ async def _channels(
 Ref = tuple[str, int]
 
 #: The kinds the client opens by their own address (``/go/{kind}/{id}``) —
-#: every commentable kind, a calendar event and a library item. Mirrors the
-#: client resolver in ``lib/entityResolver.ts``. Any other kind opens the tool
-#: that governs it.
-_ADDRESSABLE = frozenset((*COMMENT_TARGETS, "calendar_event", "library_item"))
+#: every commentable kind and a calendar event. Mirrors the client resolver in
+#: ``lib/entityResolver.ts``. Any other kind opens the tool that governs it.
+_ADDRESSABLE = frozenset((*COMMENT_TARGETS, "calendar_event"))
 
 #: ``recipients`` for news about a thing nobody asked for — it was shared with
 #: you: everybody its sharing reaches, taken from the thing itself.
@@ -241,8 +240,9 @@ class Subject:
     about: Ref
     tool: Tool
     initiative_id: int | None
-    #: The row of ``tool`` that governs it: the project a task is in.
-    resource_id: int
+    #: The row of ``tool`` that governs it: the project a task is in. None for
+    #: a thing no sharing governs (a collection).
+    resource_id: int | None
     #: Who the thing is shared with, against the roster as it stands.
     shared_with: frozenset[int]
     #: Everybody who can open it now (``named_people.readers_of``): those it
@@ -282,10 +282,27 @@ async def resolve_subject(
     rule is asked.
     """
     kind, entity_id = ref
-    governed = await governing_of(session, ref)
-    if governed is None:
-        return None
-    tool, row = governed
+    if KINDS[kind].standalone:
+        # No sharing of its own: it is opened by whoever can open one of the
+        # files in it.
+        from app.db.base import MODELS_BY_TABLE
+
+        model = MODELS_BY_TABLE[KINDS[kind].table]
+        row = (
+            await session.exec(select(model).where(model.id == entity_id))  # type: ignore[attr-defined]
+        ).scalar_one_or_none()
+        if row is None:
+            return None
+        tool = KINDS[kind].tool
+        resource_id = None
+        governing = Governing.of_collection(row)
+    else:
+        governed = await governing_of(session, ref)
+        if governed is None:
+            return None
+        tool, row = governed
+        resource_id = row.id
+        governing = Governing.of(tool, row)
     target_path = (
         reference_path(kind, entity_id)
         if kind in _ADDRESSABLE
@@ -296,12 +313,11 @@ async def resolve_subject(
             about=ref,
             tool=tool,
             initiative_id=row.initiative_id,
-            resource_id=row.id,
+            resource_id=resource_id,
             shared_with=frozenset(),
             readers=frozenset({only}),
             target_path=target_path,
         )
-    governing = Governing.of(tool, row)
     async with roster_session(session, whole=True) as reader:
         readers = set(
             (
@@ -310,14 +326,16 @@ async def resolve_subject(
                 )
             ).scalars()
         )
-        shared = (await permissions_service.audience(reader, tool, [row])).get(
-            row.id, set()
+        shared = (
+            (await permissions_service.audience(reader, tool, [row])).get(row.id, set())
+            if resource_id is not None
+            else set()
         )
     return Subject(
         about=ref,
         tool=tool,
         initiative_id=row.initiative_id,
-        resource_id=row.id,
+        resource_id=resource_id,
         shared_with=frozenset(shared),
         readers=frozenset(readers),
         target_path=target_path,

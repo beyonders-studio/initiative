@@ -45,6 +45,11 @@ RASTER_CONTENT_TYPES: frozenset[str] = frozenset(
 #: image is refused.
 ASPECT_TOLERANCE = 0.02
 
+#: The most pixels a picture may hold before a decoder refuses it: well above
+#: any canvas or photo, well below what would exhaust a worker's memory
+#: decompressing it.
+MAX_IMAGE_PIXELS = 89_478_485
+
 
 @dataclass(frozen=True)
 class ImageSpec:

@@ -5,9 +5,8 @@ they had where they were exported, and both restore them here, under that key,
 so the references in their envelopes resolve without rewriting.
 
 Every file is what the zip claims only once it has been read. Each is held to
-the rule for what it is meant to be — a picture a library can show, a file a
-file may hold, or either — and stored as the type its bytes turned out to
-be. One that is not is left out, and the import says so. A key already stored
+the rule for what it is meant to be — a file a file may hold, or any upload —
+and stored as the type its bytes turned out to be. One that is not is left out, and the import says so. A key already stored
 here is never written over. The community's storage quota is checked against
 the zip's own sizes before anything is written, and those sizes bound what is
 read, too.
@@ -31,9 +30,9 @@ from app.services.import_engine.zip_bounds import read_member
 if TYPE_CHECKING:
     from app.services.storage import StorageBackend
 
-#: What a file is meant to be: a picture a library can show, a file a
-#: file may hold, or any upload — a picture, or else a file.
-AssetKind = Literal["picture", "file", "upload"]
+#: What a file is meant to be: a file a file may hold, or any upload — a
+#: document image, or else a file.
+AssetKind = Literal["file", "upload"]
 
 #: How many keys one lookup of the ``uploads`` table names.
 _LOOKUP_BATCH = 1000
@@ -66,8 +65,8 @@ class RestoredAssets:
     deduped: int = 0
     #: Keys named but not in the zip, or not readable from it.
     missing: list[str] = field(default_factory=list)
-    #: ``not_a_picture:<key>`` / ``unsupported_file:<key>`` for each file
-    #: left out because of what it turned out to be.
+    #: ``unsupported_file:<key>`` for each file left out because of what it
+    #: turned out to be.
     warnings: list[str] = field(default_factory=list)
 
 
@@ -77,18 +76,7 @@ def _detect(asset: ArchiveAsset, data: bytes) -> tuple[str | None, str | None]:
         detect_document_image_type,
         validate_file,
     )
-    from app.services.tenant.libraries import (
-        EmptyImageError,
-        InvalidImageError,
-        validate_image,
-    )
 
-    if asset.kind == "picture":
-        try:
-            header, _extension = validate_image(data)
-        except (EmptyImageError, InvalidImageError):
-            return None, f"not_a_picture:{asset.key}"
-        return header.content_type, None
     if asset.kind == "upload":
         # An upload is a document image or an uploaded file, whichever its
         # bytes say; an image takes the same rule it was uploaded under.

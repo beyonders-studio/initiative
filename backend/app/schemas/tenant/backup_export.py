@@ -63,6 +63,8 @@ class ManifestEntry(SanitizedBaseModel):
     # What this entry is filed in besides its own list, resolved after every
     # entry has been applied. Absent for everything that is only where it is.
     attach_to: Optional[ManifestAttachTo] = None
+    # The collections a file is in, by name, in its initiative.
+    collections: list[str] = []
 
 
 class ManifestPerson(SanitizedBaseModel):

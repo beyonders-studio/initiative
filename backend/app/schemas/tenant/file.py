@@ -126,6 +126,8 @@ class FileListResponse(PageMeta):
 
 class FileRead(FileSummary):
     content: LexicalState = Field(default_factory=dict)
+    #: The collections it is in that the reader can see.
+    collection_ids: List[int] = Field(default_factory=list)
     #: The version of ``content`` this read returns. Send it back with a
     #: ``PATCH`` of ``content`` so the write merges into the body only if
     #: nobody has changed it since. ``null`` when the body was left out.
@@ -146,7 +148,8 @@ class FileVersionRead(SanitizedBaseModel):
     file_content_type: Optional[str] = None
     file_size: Optional[int] = None
     original_filename: Optional[str] = None
-    created_by: int
+    #: ``null`` for a version a plug-in acting as its community uploaded.
+    created_by: Optional[int] = None
     created_at: datetime
     is_current: bool = False
 

@@ -239,10 +239,10 @@ async def test_every_tag_target_is_bulk_tagged_and_listed_on_its_tag(
     """Bulk editing reaches every taggable kind — each tool, and each
     sub-resource through the tool that governs it — and the tag's own page
     lists every one of them back."""
-    from app.core.tools import TAGGABLE_EXTRAS, Tool
+    from app.core.tools import KINDS, TAGGABLE_EXTRAS, Tool
     from app.testing import (
         create_calendar_event,
-        create_library_item,
+        create_collection,
         create_queue_item,
         create_tool_entity,
         create_wiki_page,
@@ -262,8 +262,8 @@ async def test_every_tag_target_is_bulk_tagged_and_listed_on_its_tag(
         "calendar_event": await create_calendar_event(
             session, tools[Tool.calendar], a.user
         ),
-        "library_item": await create_library_item(
-            session, tools[Tool.library], a.user, write_blob=False
+        "collection": await create_collection(
+            session, a.initiative, a.user, files=[tools[Tool.file]]
         ),
         "wiki_page": await create_wiki_page(session, tools[Tool.wiki], a.user),
     }
@@ -297,7 +297,8 @@ async def test_every_tag_target_is_bulk_tagged_and_listed_on_its_tag(
         assert body["total_count"] == 1, target
         (item,) = body["items"]
         assert (item["entity_type"], item["entity_id"]) == (target, entity.id)
-        assert item["tool_title"], target
+        # A collection lives in no one instance of a tool, so it names none.
+        assert bool(item["tool_title"]) is not KINDS[target].standalone, target
 
 
 async def test_a_tags_entities_page_through_one_kind_by_name(

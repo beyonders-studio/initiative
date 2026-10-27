@@ -79,6 +79,9 @@ _NAMED: dict[str, GuestAccess] = {
     "search_entries": GuestAccess.write,
     # The change log, written by the capture trigger on what they write.
     "event_outbox": GuestAccess.insert,
+    # The collections the files given to them are in, seen through those files.
+    "collections": GuestAccess.read,
+    "collection_files": GuestAccess.read,
     # What they are in, and the vocabulary items are labelled with.
     "initiatives": GuestAccess.read,
     "initiative_members": GuestAccess.read,

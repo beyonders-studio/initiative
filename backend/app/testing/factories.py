@@ -51,7 +51,7 @@ from app.models.platform.marketplace import (
 )
 from app.models.tenant.dashboard import Dashboard
 from app.models.tenant.post import Post
-from app.models.tenant.library import Library, LibraryItem
+from app.models.tenant.collection import Collection, CollectionFile
 from app.models.tenant.wiki import Wiki, WikiPage
 from app.models.tenant.post_poll import PostPoll, PostPollOption
 from app.models.tenant.guild_plugin import GuildPlugin
@@ -1842,106 +1842,45 @@ def png_bytes(
     )
 
 
-async def create_library(
+async def create_collection(
     session: AsyncSession,
     initiative: Initiative,
     creator: User,
     *,
+    files: Sequence[File] = (),
     name: str | None = None,
     commit: bool = True,
     **overrides: Any,
-) -> Library:
-    """Create a test library with sensible defaults.
+) -> Collection:
+    """Create a test collection holding ``files``, each added by ``creator``.
 
-    Mirrors the create endpoint's default sharing: the creator owns it and
-    every initiative member can read it. The initiative is expected to be
-    libraries-enabled.
+    A collection is seen through its files, so one made with none reads as
+    absent to everyone but the community's admins.
     """
     await route_session_to_guild(session, guild_of(initiative))
 
     defaults = {
         "initiative_id": initiative.id,
         "created_by": creator.id,
-        "name": name or f"Library {datetime.now(timezone.utc).timestamp()}",
+        "name": name or f"Collection {datetime.now(timezone.utc).timestamp()}",
     }
-    library = Library(**{**defaults, **overrides})
-    session.add(library)
-
-    if commit:
-        await session.commit()
-        await session.refresh(library)
-
-        await create_resource_grant(
-            session,
-            library,
-            level=ResourceAccessLevel.owner,
-            user=creator,
-            commit=False,
-        )
-        await create_resource_grant(session, library, all_initiative_members=True)
-
-    return library
-
-
-async def create_library_item(
-    session: AsyncSession,
-    library: Library,
-    uploader: User,
-    *,
-    title: str | None = None,
-    width: int = 4,
-    height: int = 4,
-    write_blob: bool = True,
-    commit: bool = True,
-    **overrides: Any,
-) -> LibraryItem:
-    """Create a test picture in a library, with its first version and its
-    ``uploads`` row. File overrides (``thumbnail_url``, …) go on the version.
-
-    ``write_blob`` puts a real PNG in the guild's storage under the version's
-    ``file_url``, so a test that serves or purges the picture finds bytes
-    there; a test about the rows alone can skip it.
-    """
-    from app.services.storage import get_guild_storage
-
-    await route_session_to_guild(session, guild_of(library))
-
-    data = png_bytes(width, height)
-    filename = f"{uuid.uuid4().hex}.png"
-    file_url = f"/uploads/{guild_of(library)}/{filename}"
-    if write_blob:
-        get_guild_storage(guild_of(library)).write(
-            filename, data, content_type="image/png"
-        )
-    session.add(
-        Upload(
-            filename=filename,
-            created_by=uploader.id,
-            size_bytes=len(data),
-            content_type="image/png",
-        )
-    )
-
-    picture = {
-        "file_url": file_url,
-        "file_content_type": "image/png",
-        "file_size": len(data),
-        "original_filename": f"{title or 'picture'}.png",
-        "width": width,
-        "height": height,
-        **_file_overrides(overrides),
-    }
-    defaults = {"library_id": library.id, "created_by": uploader.id, "title": title}
-    image = LibraryItem(**{**defaults, **overrides})
-    session.add(image)
+    collection = Collection(**{**defaults, **overrides})
+    session.add(collection)
     await session.flush()
-    await file_versions.add_version(session, image, created_by=uploader.id, **picture)
-
+    session.add_all(
+        CollectionFile(
+            collection_id=collection.id,
+            file_id=file.id,
+            initiative_id=initiative.id,
+            added_by=creator.id,
+        )
+        for file in files
+    )
+    await session.flush()
     if commit:
         await session.commit()
-        await session.refresh(image)
-
-    return image
+        await session.refresh(collection)
+    return collection
 
 
 async def create_calendar_event(
@@ -2047,7 +1986,6 @@ def _file_overrides(overrides: dict[str, Any]) -> dict[str, Any]:
         key: overrides.pop(key)
         for key in (
             "file_url",
-            "thumbnail_url",
             "file_content_type",
             "file_size",
             "original_filename",
@@ -2070,16 +2008,17 @@ async def create_comment(
     calendar: Calendar | None = None,
     dashboard: Dashboard | None = None,
     post: Post | None = None,
-    library: Library | None = None,
+    collection: Collection | None = None,
     content: str = "A test comment",
     commit: bool = True,
     **overrides: Any,
 ) -> Comment:
     """Create a comment on exactly one parent — any tool entity, or one of the
-    content-level extras (a task, a wiki page)."""
+    content-level extras (a task, a wiki page, a collection)."""
     named = {
         "task": task,
         "wiki_page": wiki_page,
+        "collection": collection,
         Tool.project.value: project,
         Tool.file.value: file,
         Tool.queue.value: queue,
@@ -2087,7 +2026,6 @@ async def create_comment(
         Tool.calendar.value: calendar,
         Tool.dashboard.value: dashboard,
         Tool.post.value: post,
-        Tool.library.value: library,
         Tool.wiki.value: wiki,
     }
     # Keyed by the enum rather than by string literals, and checked against it:
@@ -2616,7 +2554,6 @@ TOOL_FACTORIES: dict[Tool, Any] = {
     Tool.calendar: create_calendar,
     Tool.dashboard: create_dashboard,
     Tool.post: create_post,
-    Tool.library: create_library,
     Tool.wiki: create_wiki,
 }
 
@@ -2641,6 +2578,17 @@ async def create_tool_entity(
     return await TOOL_FACTORIES[tool](session, initiative, creator, **overrides)
 
 
+async def _collection_holding(
+    session: AsyncSession, file: File, creator: User, **overrides: Any
+) -> Collection:
+    await route_session_to_guild(session, guild_of(file))
+    initiative = await session.get(Initiative, file.initiative_id)
+    assert initiative is not None
+    return await create_collection(
+        session, initiative, creator, files=[file], **overrides
+    )
+
+
 # The same for what lives inside a tool, keyed by ``CHILD_KINDS``: each takes
 # its tool's row and a creator, and the ones that name no creator ignore it.
 CHILD_FACTORIES: dict[str, Any] = {
@@ -2652,8 +2600,10 @@ CHILD_FACTORIES: dict[str, Any] = {
     "counter": lambda session, group, creator, **kw: create_counter(
         session, group, **kw
     ),
-    "library_item": create_library_item,
     "wiki_page": create_wiki_page,
+    # A collection is in Files rather than in one file: its tool row is the
+    # file it starts with.
+    "collection": _collection_holding,
 }
 
 if set(CHILD_FACTORIES) != set(CHILD_KINDS):

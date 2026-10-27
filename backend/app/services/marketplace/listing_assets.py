@@ -11,7 +11,7 @@ by the digest of its bytes.
 
 Installing copies each picture the listing names into the installing
 community's storage as a new upload of the member installing, and names the
-copy there. That is how an owner-published library arrives with its pictures.
+copy there. That is how an owner-published listing arrives with its pictures.
 """
 
 from __future__ import annotations
@@ -20,7 +20,6 @@ from typing import Any, Callable
 
 from sqlmodel.ext.asyncio.session import AsyncSession
 
-from app.core.tools import Tool
 from app.services.marketplace import media
 
 __all__ = [
@@ -100,24 +99,9 @@ def media_paths_in(envelope: Any) -> list[str]:
     return found
 
 
-def _rekey_library(envelope: dict[str, Any], keys: dict[str, str]) -> dict[str, Any]:
-    """A library with each picture's key and its cover mapped through ``keys``,
-    and anything unmapped left blank for the importer to count as missing."""
-    rekeyed = dict(envelope)
-    rekeyed["items"] = [
-        {**item, "storage_key": keys.get(item.get("storage_key") or "", "")}
-        if isinstance(item, dict)
-        else item
-        for item in envelope.get("items") or []
-    ]
-    rekeyed["cover"] = keys.get(envelope.get("cover") or "")
-    return rekeyed
-
-
 async def copy_assets_in(
     session: AsyncSession,
     *,
-    tool: Tool,
     envelope: dict[str, Any],
     guild_id: int,
     user_id: int,
@@ -160,7 +144,6 @@ async def copy_assets_in(
     )
 
     to_url: dict[str, str] = {}
-    to_key: dict[str, str] = {}
     for path, (data, content_type) in kept.items():
         key = new_upload_filename(_EXTENSIONS.get(content_type, ""))
         to_url[path] = await store_upload(
@@ -172,10 +155,5 @@ async def copy_assets_in(
             created_by=user_id,
             initiative_id=initiative_id,
         )
-        to_key[path] = key
     await session.flush()
-
-    if tool is Tool.library:
-        # A library names its pictures by key, everything else by URL.
-        return _rekey_library(envelope, to_key)
     return _replace_strings(envelope, to_url)

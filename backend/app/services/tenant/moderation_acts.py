@@ -274,7 +274,11 @@ async def _place(
     subject = await notifications.resolve_subject(system, (target_type, row_id))
     if subject is None:
         return None, None
-    if subject.tool.value != target_type or subject.resource_id != row_id:
+    # A row governed by no tool row of its own (a collection) opens its tool's
+    # list, as a tool's own row does.
+    if subject.resource_id is not None and (
+        subject.tool.value != target_type or subject.resource_id != row_id
+    ):
         return (subject.tool.value, subject.resource_id), None
     if subject.initiative_id is None:
         return None, None

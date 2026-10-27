@@ -23,7 +23,6 @@ with one ``initiatives/`` entry, so ONE import path serves both)::
     initiatives/{id}-{slug}/calendars/{id}-{slug}.initiative-calendar.json
     initiatives/{id}-{slug}/posts/{id}-{slug}.initiative-post.json
     initiatives/{id}-{slug}/wikis/{id}-{slug}.initiative-wiki.json
-    initiatives/{id}-{slug}/libraries/{id}-{slug}.initiative-library.json
     initiatives/{id}-{slug}/dashboards/{id}-{slug}.initiative-dashboard.json
     initiatives/{id}-{slug}/structure.json          (backup mode)
     initiatives/{id}-{slug}/properties.json         (backup mode)
@@ -487,10 +486,9 @@ async def _build_scope(
 def _initiative_tool_states(params: dict, initiative) -> dict[str, str]:
     states: dict[str, str] = {}
     for tool in _TOOLS:
-        # The switch column via the enum, not `tool + "s"`: the naive spelling
-        # is wrong for `library`, and every tool now carries a column, so a
-        # missing-attribute default would hide a real mismatch rather than
-        # cover for the two that used to have none.
+        # The switch column via the enum, not `tool + "s"`: every tool now
+        # carries a column, so a missing-attribute default would hide a real
+        # mismatch rather than cover for the two that used to have none.
         flag = getattr(initiative, Tool(tool).view_permission)
         if not flag:
             states[tool] = "disabled"
@@ -538,8 +536,10 @@ class _ScopeBuilder:
         #: The initiatives beyond those in scope whose files and tasks
         #: the items name.
         self.reach: set[int] = set()
-        # The images each native file embeds, and the stored size and
-        # type of each, loaded once per initiative's files.
+        # The collections each file is in, the images each native file
+        # embeds, and the stored size and type of each, loaded once per
+        # initiative's files.
+        self._collections: dict[int, list[str]] = {}
         self._embedded: dict[int, list[dict]] = {}
         self._upload_info: dict[str, tuple[int, str | None]] = {}
         # The community's member profiles, read once for every initiative's
@@ -674,6 +674,11 @@ class _ScopeBuilder:
             entity_id=entity_id,
             title=title,
             initiative_id=initiative.id,
+            **(
+                {"collections": self._collections.get(entity_id, [])}
+                if section.tool is Tool.file
+                else {}
+            ),
         )
 
     def _skip(
@@ -752,8 +757,19 @@ class _ScopeBuilder:
                     tags=metadata["tags"],
                     properties=metadata["properties"],
                     asset=asset_path,
+                    collections=self._collections.get(file.id, []),
                 )
             )
+
+    async def _preload_files(self, files: list) -> None:
+        """What the files' entries say beside their envelopes: the collections
+        each is in, and the images the native ones embed."""
+        from app.services.tenant.collections import collection_names_of
+
+        self._collections = await collection_names_of(
+            self.session, [file.id for file in files]
+        )
+        await self._preload_embedded_assets(files)
 
     async def _preload_embedded_assets(self, files: list) -> None:
         """The images the native files embed, and each one's stored size
@@ -793,40 +809,6 @@ class _ScopeBuilder:
                 content_type=content_type,
                 size_bytes=size_bytes,
                 referenced_by=entry_path,
-            )
-
-    # -- section hooks: libraries ----------------------------------------------
-
-    def _skip_library_without_uploads(self, loaded, initiative, path_stem: str) -> bool:
-        """A library is mostly blobs, so it obeys the uploads toggle the way a
-        uploaded file does — excluded uploads means the pictures do not
-        travel, and a library of descriptions without them is not worth writing,
-        so the whole library is recorded as skipped instead."""
-        if _include_uploads(self.params):
-            return False
-        library, _images = loaded
-        self._skip(
-            Tool.library, library.id, library.name, initiative, "uploads_excluded"
-        )
-        return True
-
-    async def _register_library_pictures(self, loaded, path: str) -> None:
-        """Each picture's bytes, registered as an asset of the library's
-        entry."""
-        _library, images = loaded
-        for image in images:
-            version = image.current_version
-            key = storage_key_of(version.file_url)
-            if not key:
-                continue
-            # The picture only; a thumbnail is a rendition the app makes
-            # again from it.
-            self._register_asset(
-                key,
-                original_filename=version.original_filename,
-                content_type=version.file_content_type,
-                size_bytes=int(version.file_size or 0),
-                referenced_by=path,
             )
 
     # -- section hooks: dashboards ---------------------------------------------
@@ -1495,7 +1477,7 @@ _SECTIONS: tuple[BackupSection, ...] = (
             FileType.sheet.value: frozenset({"csv", "xlsx"}),
         },
         type_in_filename=False,
-        preload=_ScopeBuilder._preload_embedded_assets,
+        preload=_ScopeBuilder._preload_files,
         format_for=_ScopeBuilder._file_format,
         write_apart=_ScopeBuilder._write_uploaded_file,
         before_envelope=_ScopeBuilder._collect_embedded_assets,
@@ -1507,12 +1489,6 @@ _SECTIONS: tuple[BackupSection, ...] = (
     BackupSection(Tool.calendar, report_formats=frozenset({"ics", "json"})),
     BackupSection(Tool.post, in_reports=False),
     BackupSection(Tool.wiki, in_reports=False, fetch=_fetch_wiki_pages),
-    BackupSection(
-        Tool.library,
-        in_reports=False,
-        write_apart=_ScopeBuilder._skip_library_without_uploads,
-        before_envelope=_ScopeBuilder._register_library_pictures,
-    ),
     # A dashboard is a live canvas, not a document, so a report carries its
     # envelope too.
     BackupSection(Tool.dashboard, finish=_ScopeBuilder._record_foreign_dashboards),

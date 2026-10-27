@@ -38,8 +38,7 @@ from app.testing import (
     create_calendar,
     create_calendar_event,
     create_file,
-    create_library,
-    create_library_item,
+    create_collection,
     create_guild,
     create_guild_membership,
     create_initiative,
@@ -707,18 +706,20 @@ async def test_every_tool_and_its_sub_tools_read_back_what_they_carry(
     assert page_read.status_code == 200, page_read.text
     assert _values(page_read.json()["properties"]) == {defn.id: "wiki_page"}
 
-    # A picture's own update carries them, and its read returns them.
-    library = await create_library(session, a.initiative, a.user)
-    image = await create_library_item(session, library, a.user)
+    # A collection's own update carries them, and its read returns them.
+    file = await create_file(session, a.initiative, a.user)
+    collection = await create_collection(session, a.initiative, a.user, files=[file])
     edited = await client.patch(
-        a.g(f"/library-items/{image.id}"),
+        a.g(f"/collections/{collection.id}"),
         headers=a.headers,
-        json={"properties": [{"property_id": defn.id, "value": "library_item"}]},
+        json={"properties": [{"property_id": defn.id, "value": "collection"}]},
     )
     assert edited.status_code == 200, edited.text
-    assert _values(edited.json()["properties"]) == {defn.id: "library_item"}
-    image_read = await client.get(a.g(f"/library-items/{image.id}"), headers=a.headers)
-    assert _values(image_read.json()["properties"]) == {defn.id: "library_item"}
+    assert _values(edited.json()["properties"]) == {defn.id: "collection"}
+    collection_read = await client.get(
+        a.g(f"/collections/{collection.id}"), headers=a.headers
+    )
+    assert _values(collection_read.json()["properties"]) == {defn.id: "collection"}
 
 
 async def test_a_create_writes_its_values_with_the_row(

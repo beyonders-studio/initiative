@@ -52,7 +52,7 @@ from app.core.tools import (
     ARCHIVE_TARGETS,
     KINDS,
     PROPERTY_TARGETS,
-    LAYOUTS_PER_INSTANCE,
+    LAYOUT_INSTANCE_TABLES,
     Tool,
 )
 from app.db import gucs
@@ -890,9 +890,9 @@ def _tool_layouts_leg(alias: str, trashed_ok: str) -> str:
     """A view freezes with the instance it is for, or with its initiative
     when it is for a shared page."""
     arms = " ".join(
-        f"WHEN '{tool.value}' THEN resource_frozen("
-        f"'{tool.plural}', {alias}.tool_id, {trashed_ok})"
-        for tool in LAYOUTS_PER_INSTANCE
+        f"WHEN '{target}' THEN resource_frozen("
+        f"'{table}', {alias}.tool_id, {trashed_ok})"
+        for target, table in LAYOUT_INSTANCE_TABLES.items()
     )
     return (
         f"COALESCE((CASE WHEN {alias}.tool_id IS NULL THEN resource_frozen("
