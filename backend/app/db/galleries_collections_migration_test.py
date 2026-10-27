@@ -49,7 +49,7 @@ async def _one(session, sql: str, **params: Any) -> Any:
 
 
 def _runner(schema: str):
-    """Revision 0543 one way or the other, on one guild's schema only."""
+    """Revision 0546 one way or the other, on one guild's schema only."""
     migration = _load("20261027_0546_galleries_are_collections.py")
 
     def run(forward: bool):
@@ -142,6 +142,30 @@ async def test_a_gallery_becomes_a_collection_of_files(session) -> None:
     archived = datetime(2026, 1, 3, tzinfo=timezone.utc)
     connection = await session.connection()
     await connection.execute(text("SET LOCAL session_replication_role = replica"))
+    # Galleries on and Files off, and a role that reaches galleries alone.
+    await connection.execute(
+        text(
+            f"UPDATE {s}.initiatives SET galleries_enabled = true, "
+            "files_enabled = false WHERE id = :i"
+        ),
+        {"i": initiative.id},
+    )
+    role = await _one(
+        session,
+        f"SELECT id FROM {s}.initiative_roles WHERE initiative_id = :i "
+        "ORDER BY id DESC LIMIT 1",
+        i=initiative.id,
+    )
+    await connection.execute(
+        text(
+            f"INSERT INTO {s}.initiative_role_permissions "
+            "(initiative_role_id, permission_key, enabled) VALUES "
+            "(:r, 'galleries_enabled', true), (:r, 'create_galleries', true), "
+            "(:r, 'files_enabled', false) ON CONFLICT (initiative_role_id, "
+            "permission_key) DO UPDATE SET enabled = EXCLUDED.enabled"
+        ),
+        {"r": role},
+    )
     gallery = await _one(
         session,
         f"INSERT INTO {s}.galleries (initiative_id, name, description, created_by, "
@@ -432,3 +456,16 @@ async def test_a_gallery_becomes_a_collection_of_files(session) -> None:
         "SELECT public.relationship_kind_code('gallery'), "
         "public.relationship_kind_code('collection')",
     ) == [(None, 17)]
+    assert await _rows(
+        session,
+        f"SELECT files_enabled FROM {s}.initiatives WHERE id = :i",
+        i=initiative.id,
+    ) == [(True,)]
+    assert {("create_files", True), ("files_enabled", True)} <= set(
+        await _rows(
+            session,
+            f"SELECT permission_key, enabled FROM {s}.initiative_role_permissions "
+            "WHERE initiative_role_id = :r",
+            r=role,
+        )
+    )

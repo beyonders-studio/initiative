@@ -103,6 +103,15 @@ class CollectionFileListResponse(PageMeta):
     items: List[CollectionFileSummary]
 
 
+class CollectionCan(ContentCan):
+    """What the caller may do to a collection
+    (``resource_access.may_change``)."""
+
+    #: Take it back out of the archive. False for a collection archived along
+    #: with its initiative, which comes back with the initiative.
+    unarchive: bool = False
+
+
 class CollectionRead(SanitizedBaseModel):
     """A collection as its reader sees it: only the files they can open are
     counted, and the cover is one of those."""
@@ -129,7 +138,7 @@ class CollectionRead(SanitizedBaseModel):
     tags: List[TagSummary] = Field(default_factory=list)
     properties: List[PropertySummary] = Field(default_factory=list)
     #: Whether the reader may rename it, change what is in it, or trash it.
-    can: ContentCan = Field(default_factory=ContentCan)
+    can: CollectionCan = Field(default_factory=CollectionCan)
 
 
 class CollectionListResponse(SanitizedBaseModel):
@@ -144,7 +153,7 @@ def serialize_collection(
     context: "ActorContext",
     file_count: int,
     cover: Optional["File"],
-    can_edit: bool,
+    can: CollectionCan,
 ) -> CollectionRead:
     return from_row(
         CollectionRead,
@@ -154,5 +163,5 @@ def serialize_collection(
         file_count=file_count,
         tags=annotated_tags(row),
         properties=annotated_properties(row),
-        can=ContentCan(edit=can_edit),
+        can=can,
     )

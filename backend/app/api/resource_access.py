@@ -540,11 +540,17 @@ async def require_may_change(
     await require_create(session, kind.tool, row.initiative, user, context)
 
 
-async def may_change(session: Any, row: Any, context: ActorContext) -> bool:
+async def may_change(
+    session: Any,
+    row: Any,
+    context: ActorContext,
+    *,
+    action: Optional[Action] = None,
+) -> bool:
     """Whether :func:`require_may_change` would let the request change ``row``,
     for a read that reports it."""
     try:
-        await require_may_change(session, row, None, context)
+        await require_may_change(session, row, None, context, action=action)
     except (HTTPException, CodedError):
         return False
     return True

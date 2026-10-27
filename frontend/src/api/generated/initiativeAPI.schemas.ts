@@ -2376,6 +2376,15 @@ export interface CollaborationHandover {
   update: string;
 }
 
+/**
+ * What the caller may do to a collection
+ * (``resource_access.may_change``).
+ */
+export interface CollectionCan {
+  edit: boolean;
+  unarchive: boolean;
+}
+
 export type FileType = (typeof FileType)[keyof typeof FileType];
 
 export const FileType = {
@@ -2553,7 +2562,7 @@ export interface CollectionRead {
   comment_count: number;
   tags: TagSummary[];
   properties: PropertySummary[];
-  can: ContentCan;
+  can: CollectionCan;
 }
 
 export interface CollectionListResponse {

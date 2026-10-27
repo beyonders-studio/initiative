@@ -23,7 +23,11 @@ describe("AddToCollectionDialog", () => {
         HttpResponse.json({
           items: [
             buildCollection({ id: 2, name: "Store assets" }),
-            buildCollection({ id: 3, name: "Someone else's", can: { edit: false } }),
+            buildCollection({
+              id: 3,
+              name: "Someone else's",
+              can: { edit: false, unarchive: false },
+            }),
           ],
         })
       ),

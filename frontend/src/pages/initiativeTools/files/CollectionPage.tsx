@@ -399,7 +399,7 @@ export function CollectionPage() {
           chest={
             <ToolChest
               tool={Tool.file}
-              entity={{ ...collection, can: { edit: canEdit, unarchive: canEdit } }}
+              entity={collection}
               kind={{
                 archivable: "collection",
                 properties: propertySaves[PropertyTarget.collection],

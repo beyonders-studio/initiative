@@ -186,9 +186,16 @@ async def test_archiving_a_collection_takes_the_role_that_makes_files(
     archive = f"/archive/collection/{collection.id}"
     unarchive = f"/unarchive/collection/{collection.id}"
 
+    read = f"/collections/{collection.id}"
+
+    async def can(actor) -> dict[str, bool]:
+        return (await client.get(actor.g(read), headers=actor.headers)).json()["can"]
+
+    assert (await can(maker))["unarchive"] is False
     archived = await client.post(maker.g(archive), headers=maker.headers)
     assert archived.status_code == 200, archived.text
     assert archived.json()["archived_at"] is not None
+    assert await can(maker) == {"edit": False, "unarchive": True}
     restored = await client.post(maker.g(unarchive), headers=maker.headers)
     assert restored.status_code == 200, restored.text
 
@@ -202,6 +209,8 @@ async def test_archiving_a_collection_takes_the_role_that_makes_files(
     assert (
         await client.post(owner.g(archive), headers=owner.headers)
     ).status_code == 200
+    assert await can(maker) == {"edit": False, "unarchive": False}
+    assert await can(owner) == {"edit": False, "unarchive": True}
     assert (
         await client.post(maker.g(unarchive), headers=maker.headers)
     ).status_code == 403

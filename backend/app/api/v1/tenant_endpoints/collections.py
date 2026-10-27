@@ -25,6 +25,7 @@ from app.models.tenant.collection import Collection
 from app.models.tenant.initiative import Initiative
 from app.schemas.tenant.collection import (
     MAX_FILES_PER_CHANGE,
+    CollectionCan,
     CollectionCreate,
     CollectionFiles,
     CollectionListResponse,
@@ -32,6 +33,7 @@ from app.schemas.tenant.collection import (
     CollectionUpdate,
     serialize_collection,
 )
+from app.services.permissions import Action
 from app.services.tenant import archive as archive_service
 from app.services.tenant import collections as collections_service
 from app.services.tenant import properties as properties_service
@@ -67,20 +69,30 @@ async def _serialize(
 ) -> List[CollectionRead]:
     cards = await collections_service.annotate(session, rows)
     # The answer is the initiative's, and whether the row is put away: asked
-    # once for each.
+    # once for each. Taking one out of the archive asks only after what is
+    # above it, the initiative.
     editable: dict[tuple[int, bool], bool] = {}
+    restorable: dict[int, bool] = {}
     reads: List[CollectionRead] = []
     for row in rows:
         key = (row.initiative_id, row_is_frozen(row))
         if key not in editable:
             editable[key] = await resource_access.may_change(session, row, context)
+        archived = row.archived_at is not None
+        if archived and row.initiative_id not in restorable:
+            restorable[row.initiative_id] = await resource_access.may_change(
+                session, row, context, action=Action.unarchive
+            )
         reads.append(
             serialize_collection(
                 row,
                 context=context,
                 file_count=cards[row.id].file_count,
                 cover=cards[row.id].cover,
-                can_edit=editable[key],
+                can=CollectionCan(
+                    edit=editable[key],
+                    unarchive=archived and restorable[row.initiative_id],
+                ),
             )
         )
     return reads

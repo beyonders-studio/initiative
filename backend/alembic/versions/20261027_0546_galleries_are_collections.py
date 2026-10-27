@@ -35,6 +35,9 @@ pictures a file. In ``guild_template`` and every ``guild_<id>``:
   and ``comments.gallery_id`` becomes ``comments.collection_id``. A gallery's
   bookmark is dropped (a collection is not a tool); the rest of the personal
   item stays.
+* **Files** — an initiative holding a gallery has Files switched on, and a
+  role there that could view or create galleries can view or create files,
+  so whoever reached a gallery reaches its pictures.
 * **Gone** — the gallery's layouts, its role permissions
   (``galleries_enabled``/``create_galleries``), its change-log rows and queued
   plug-in events, gallery event types and columns in webhook subscriptions (a
@@ -141,6 +144,7 @@ _TOUCHED = (
     "moderation_actions",
     "comments",
     "initiatives",
+    "initiative_roles",
     "tool_layouts",
     "initiative_role_permissions",
     "event_outbox",
@@ -846,6 +850,32 @@ def _settle_plugins_and_hooks(bind: Connection) -> None:
     bind.exec_driver_sql(f"DELETE FROM webhook_subscriptions WHERE {empty}")
 
 
+def _open_files(bind: Connection) -> None:
+    """Let whoever reached a gallery reach its pictures as files: Files is
+    switched on in an initiative that holds a gallery, and a role that could
+    view or create galleries can view or create files."""
+    held = "SELECT initiative_id FROM galleries"
+    bind.exec_driver_sql(
+        f"UPDATE initiatives SET files_enabled = true WHERE galleries_enabled "
+        f"AND NOT files_enabled AND id IN ({held})"
+    )
+    for gallery_key, file_key in (
+        ("galleries_enabled", "files_enabled"),
+        ("create_galleries", "create_files"),
+    ):
+        bind.exec_driver_sql(
+            "INSERT INTO initiative_role_permissions "
+            "(initiative_role_id, permission_key, enabled) "
+            f"SELECT p.initiative_role_id, '{file_key}', true "
+            "FROM initiative_role_permissions p "
+            "JOIN initiative_roles r ON r.id = p.initiative_role_id "
+            f"WHERE p.permission_key = '{gallery_key}' AND p.enabled "
+            f"AND r.initiative_id IN ({held}) "
+            "ON CONFLICT (initiative_role_id, permission_key) "
+            "DO UPDATE SET enabled = true"
+        )
+
+
 def _forget(bind: Connection) -> None:
     """What only the gallery tool had."""
     permissions = ", ".join(f"'{p}'" for p in _PERMISSIONS)
@@ -1138,6 +1168,7 @@ def _upgrade_schema(bind: Connection) -> None:
             _retarget_all(bind)
             _layouts(bind)
             _settle_plugins_and_hooks(bind)
+            _open_files(bind)
             _forget(bind)
             _drop_gallery_structure(bind)
     with _held(bind, _LINK_TABLES):

@@ -119,6 +119,41 @@ describe("a collection's page", () => {
     await waitFor(() => expect(removed).toEqual(["4"]));
   });
 
+  it("offers to take an archived collection out of the archive when the reader may", async () => {
+    server.use(
+      communityHttp.get("/collections/:id", () =>
+        HttpResponse.json(
+          buildCollection({
+            id: 5,
+            name: "Round 4",
+            archived_at: "2026-02-01T00:00:00.000Z",
+            can: { edit: false, unarchive: true },
+          })
+        )
+      ),
+      communityHttp.get("/collections/:id/files", () =>
+        HttpResponse.json({
+          items: [],
+          total_count: 0,
+          page: 1,
+          page_size: 60,
+          has_next: false,
+          has_prev: false,
+        })
+      ),
+      communityHttp.get("/layouts/", () =>
+        HttpResponse.json(buildToolLayoutSet({ tool: "collection" }))
+      ),
+      communityHttp.get("/relationships/", () => HttpResponse.json([]))
+    );
+    renderPage(CollectionPage, {
+      initialRoute: "/c/$communityId/i/$initiativeId/files/collections/$collectionId",
+      routeParams: { communityId: "1", initiativeId: "1", collectionId: "5" },
+    });
+
+    expect(await screen.findByRole("combobox", { name: "Status" })).toHaveTextContent("Archived");
+  });
+
   it("jumps the timeline to a month the rail offers", async () => {
     const files = [{ ...buildFileSummary({ id: 4 }), added_at: "2026-03-20T12:00:00.000Z" }];
     const anchors: (string | null)[] = [];
