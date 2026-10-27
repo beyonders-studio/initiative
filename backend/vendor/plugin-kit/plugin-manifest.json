@@ -53,8 +53,8 @@
                   "dashboards:write",
                   "posts:read",
                   "posts:write",
-                  "catalogs:read",
-                  "catalogs:write",
+                  "libraries:read",
+                  "libraries:write",
                   "wikis:read",
                   "wikis:write",
                   "comments:read",
@@ -164,8 +164,8 @@
               "dashboards:write",
               "posts:read",
               "posts:write",
-              "catalogs:read",
-              "catalogs:write",
+              "libraries:read",
+              "libraries:write",
               "wikis:read",
               "wikis:write",
               "comments:read",
@@ -1334,7 +1334,7 @@
               "calendar_event",
               "queue_item",
               "counter",
-              "catalog_item",
+              "library_item",
               "post"
             ]
           },
@@ -1692,7 +1692,7 @@
               "calendar_event",
               "queue_item",
               "counter",
-              "catalog_item",
+              "library_item",
               "post"
             ]
           },
@@ -1757,7 +1757,7 @@
               "calendar_event",
               "queue_item",
               "counter",
-              "catalog_item",
+              "library_item",
               "post"
             ]
           },
@@ -1918,7 +1918,7 @@
                 "calendar_event",
                 "queue_item",
                 "counter",
-                "catalog_item",
+                "library_item",
                 "post"
               ]
             },

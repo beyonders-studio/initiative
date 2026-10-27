@@ -1,6 +1,6 @@
 """What saving a description sets in motion.
 
-A task's description and a catalog item's are written in the same composer as
+A task's description and a library item's are written in the same composer as
 a comment, so they carry the same mention syntax: ``@[Name](id)`` for a
 person, ``#kind[Title](id)`` for a thing. Saving one does two things with
 those:
@@ -25,7 +25,7 @@ from sqlmodel.ext.asyncio.session import AsyncSession
 from app.core.search import SearchEntityType
 from app.models.platform.notification import NotificationType
 from app.models.platform.user import User
-from app.models.tenant.catalog import CatalogItem
+from app.models.tenant.library import LibraryItem
 from app.models.tenant.task import Task
 from app.services import notifications as notifications_service
 from app.services.tenant import content_references
@@ -33,10 +33,10 @@ from app.services.tenant.mention_parser import extract_mentioned_user_ids
 from app.services.tenant.relationships import Endpoint
 
 #: What carries a description, and the kind it is named by.
-Described = Task | CatalogItem
+Described = Task | LibraryItem
 _KINDS: dict[type, SearchEntityType] = {
     Task: SearchEntityType.task,
-    CatalogItem: SearchEntityType.catalog_item,
+    LibraryItem: SearchEntityType.library_item,
 }
 
 

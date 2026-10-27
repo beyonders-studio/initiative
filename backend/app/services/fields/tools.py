@@ -17,7 +17,7 @@ from app.models.tenant.calendar import Calendar
 from app.models.tenant.counter import Counter, CounterGroup
 from app.models.tenant.dashboard import Dashboard
 from app.models.tenant.file import File, FileVersion
-from app.models.tenant.catalog import Catalog, CatalogItem, CatalogItemVersion
+from app.models.tenant.library import Library, LibraryItem, LibraryItemVersion
 from app.models.tenant.post import Post
 from app.models.tenant.queue import Queue, QueueItem
 from app.models.tenant.wiki import Wiki, WikiPage
@@ -132,8 +132,8 @@ def build_posts() -> Dataset:
     )
 
 
-def build_catalogs() -> Dataset:
-    return Dataset(model=Catalog, tool=Tool.catalog, fields=derive_fields(Catalog))
+def build_libraries() -> Dataset:
+    return Dataset(model=Library, tool=Tool.library, fields=derive_fields(Library))
 
 
 def build_wikis() -> Dataset:
@@ -142,7 +142,7 @@ def build_wikis() -> Dataset:
 
 def build_wiki_pages() -> Dataset:
     """One page of a wiki. Its own dataset for the reason queue items and
-    catalog pictures have one: what somebody asks about a wiki — how many
+    library pictures have one: what somebody asks about a wiki — how many
     pages are still drafts, what has not been touched since spring — is a
     question about the pages, and the wiki is what they are grouped by.
 
@@ -167,26 +167,26 @@ def build_wiki_pages() -> Dataset:
     )
 
 
-def build_catalog_items() -> Dataset:
-    """One picture in a catalog. Its own dataset for the reason queue items
+def build_library_items() -> Dataset:
+    """One picture in a library. Its own dataset for the reason queue items
     have one: the question worth asking — how many arrived this month, which
-    are still untitled — is about the pictures, and the catalog is what they
+    are still untitled — is about the pictures, and the library is what they
     are grouped by."""
     return Dataset(
-        model=CatalogItem,
-        tool=Tool.catalog,
-        name_override="catalog_items",
-        fields=derive_fields(CatalogItem),
+        model=LibraryItem,
+        tool=Tool.library,
+        name_override="library_items",
+        fields=derive_fields(LibraryItem),
         relations=(
             Relation(
-                name="catalog",
-                hops=(Hop(dataset="catalogs", left="catalog_id", right="id"),),
+                name="library",
+                hops=(Hop(dataset="libraries", left="library_id", right="id"),),
             ),
             Relation(
                 name="current_version",
                 hops=(
                     Hop(
-                        dataset="catalog_item_versions",
+                        dataset="library_item_versions",
                         left="current_version_id",
                         right="id",
                     ),
@@ -196,12 +196,12 @@ def build_catalog_items() -> Dataset:
     )
 
 
-def build_catalog_item_versions() -> Dataset:
+def build_library_item_versions() -> Dataset:
     """One uploaded rendition of a picture: its type, size and dimensions. A
     picture reaches the one it shows as ``current_version``."""
     return Dataset(
-        model=CatalogItemVersion,
-        tool=Tool.catalog,
-        name_override="catalog_item_versions",
-        fields=derive_fields(CatalogItemVersion),
+        model=LibraryItemVersion,
+        tool=Tool.library,
+        name_override="library_item_versions",
+        fields=derive_fields(LibraryItemVersion),
     )

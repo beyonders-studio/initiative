@@ -17,7 +17,7 @@ You can ignore this page entirely. Every layout ships ready to use, and plenty o
 | [Projects](projects-and-tasks.md#layouts) | **Table**, **Board**, **Gantt**, **Calendar** (each shown or hidden; all four to start with), and a page for each [task type](projects-and-tasks.md#task-types), per project. |
 | [Queues](queues.md) | **Queue item detail**, per queue. |
 | [Counters](counters.md) | **Counter detail**, per counter group. |
-| [Catalogs](catalogs.md) | **Picture detail**, per catalog. |
+| [Libraries](libraries.md) | **Picture detail**, per library. |
 | [Calendar](calendar.md) | **Event detail** and the calendar's presets, once for the whole initiative. |
 | [Posts](posts.md) | **Notice detail**, once for the whole initiative. |
 
@@ -27,7 +27,7 @@ A project's layouts go wherever the project goes: into a [duplicate](tools.md#du
 
 ## Who can change them
 
-- **A project, queue, counter group or catalog:** whoever owns it, anyone with full access in the initiative, a manager who can edit it, and community admins.
+- **A project, queue, counter group or library:** whoever owns it, anyone with full access in the initiative, a manager who can edit it, and community admins.
 - **The calendar and posts:** the initiative's managers and community admins.
 
 ## The editor

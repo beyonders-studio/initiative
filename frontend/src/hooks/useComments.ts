@@ -194,7 +194,7 @@ const COMMENT_TARGETS = [
   "calendar_id",
   "dashboard_id",
   "post_id",
-  "catalog_id",
+  "library_id",
   "wiki_id",
 ] as const satisfies readonly (keyof CommentThreadParams & keyof CommentRead)[];
 

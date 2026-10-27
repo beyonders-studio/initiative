@@ -91,8 +91,8 @@ const RESOURCE_SPECS: Record<string, (id: number, recount: boolean) => Spec[]> =
   counters: (id) => [q.counter(id)],
   // The wiki it is in is named as its parent, which refreshes the tree.
   wiki_pages: (id) => [q.wikiPage(id)],
-  // The catalog it is in is named as its parent, which refreshes the list.
-  catalog_items: (id) => [q.catalogItem(id)],
+  // The library it is in is named as its parent, which refreshes the list.
+  library_items: (id) => [q.libraryItem(id)],
   // An initiative's roster, its roles, what those roles permit and its
   // property definitions all report against the initiative itself — none of
   // those rows has a route of its own — so "the initiative changed" has to
@@ -114,7 +114,7 @@ const RESOURCE_SPECS: Record<string, (id: number, recount: boolean) => Spec[]> =
 
 /**
  * What a change INSIDE a resource makes stale on it: its own read and the
- * reads under its address — a project's activity, a catalog's pictures.
+ * reads under its address — a project's activity, a library's pictures.
  *
  * The resource a change sits directly in (`direct`) also has its lists read
  * again, because a list row carries what is inside it: a comment count, a
@@ -134,7 +134,7 @@ const CONTAINER_SPECS: Record<string, (id: number, direct: boolean) => Spec[]> =
   tasks: (id, direct) => (direct ? [q.task(id), q.allTasks()] : [q.task(id)]),
   calendar_events: (id) => [q.calendarEvent(id)],
   wiki_pages: (id) => [q.wikiPage(id)],
-  catalog_items: (id) => [q.catalogItem(id)],
+  library_items: (id) => [q.libraryItem(id)],
 };
 
 /**

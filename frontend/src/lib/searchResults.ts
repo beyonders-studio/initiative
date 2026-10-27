@@ -25,7 +25,7 @@ import {
 import type { SearchHit } from "@/api/generated/initiativeAPI.schemas";
 import { SearchEntityType, Tool, ViewSource } from "@/api/generated/initiativeAPI.schemas";
 import {
-  catalogItemRoute,
+  libraryItemRoute,
   counterRoute,
   eventRoute,
   TOOL_ICONS,
@@ -69,7 +69,7 @@ const TOOL_CHILDREN: Partial<Record<SearchEntityType, ToolChild>> = {
     icon: Ticket,
     path: (initiativeId, queueId) => toolDetailRoute(Tool.queue, initiativeId, queueId),
   },
-  [SearchEntityType.catalog_item]: { icon: Image, path: catalogItemRoute },
+  [SearchEntityType.library_item]: { icon: Image, path: libraryItemRoute },
   // A wiki page IS read on a page of its own, inside its wiki — so unlike the
   // rest of these it keeps its own id in the address. Without an entry here it
   // would fall through to the tool rule and be addressed as if the page id

@@ -17,8 +17,8 @@ from app.models.tenant.relationship import EntityRelationship
 from app.services.tenant.relationships import Endpoint
 from app.services.tenant.descriptions import newly_mentioned
 from app.testing import (
-    create_catalog,
-    create_catalog_item,
+    create_library,
+    create_library_item,
     create_file,
     create_resource_grant,
     create_task,
@@ -241,29 +241,29 @@ async def test_a_duplicate_points_where_its_original_does_and_tells_nobody(
     assert await _mentions_for(session, teammate.user.id) == []
 
 
-async def test_a_catalog_item_s_description_does_what_a_task_s_does(
+async def test_a_library_item_s_description_does_what_a_task_s_does(
     client: AsyncClient, session: AsyncSession, acting_user
 ):
     """Tells whoever it newly names, and its ``#`` becomes the item's
     reference."""
     writer, teammate = await _workspace(acting_user, session)
-    writer.initiative.catalogs_enabled = True
+    writer.initiative.libraries_enabled = True
     session.add(writer.initiative)
-    catalog = await create_catalog(session, writer.initiative, writer.user)
-    item = await create_catalog_item(session, catalog, writer.user, write_blob=False)
+    library = await create_library(session, writer.initiative, writer.user)
+    item = await create_library_item(session, library, writer.user, write_blob=False)
     doc = await create_file(session, writer.initiative, writer.user)
     await session.commit()
 
     response = await client.patch(
-        writer.g(f"/catalog-items/{item.id}"),
+        writer.g(f"/library-items/{item.id}"),
         headers=writer.headers,
         json={"description": f"@[Tea M]({teammate.user.id}) see #doc[Spec]({doc.id})"},
     )
     assert response.status_code == 200, response.text
 
     [notice] = await _mentions_for(session, teammate.user.id)
-    assert (notice["entity_type"], notice["entity_id"]) == ("catalog_item", item.id)
-    assert notice["target_path"] == f"/go/catalog-item/{item.id}"
+    assert (notice["entity_type"], notice["entity_id"]) == ("library_item", item.id)
+    assert notice["target_path"] == f"/go/library-item/{item.id}"
     assert await _references(
-        session, writer.guild.id, Endpoint(SearchEntityType.catalog_item, item.id)
+        session, writer.guild.id, Endpoint(SearchEntityType.library_item, item.id)
     ) == {("file", doc.id)}

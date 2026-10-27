@@ -61,9 +61,9 @@ describe("searchHitPath", () => {
     ).toBe("/i/5/counter-groups/6/counter/9");
     expect(
       searchHitPath(
-        target({ entity_type: "catalog_item", entity_id: 12, tool: Tool.catalog, tool_id: 3 })
+        target({ entity_type: "library_item", entity_id: 12, tool: Tool.library, tool_id: 3 })
       )
-    ).toBe("/i/5/catalogs/3/items/12");
+    ).toBe("/i/5/libraries/3/items/12");
   });
 
   it("keeps a wiki page's own id in its address", () => {
@@ -190,10 +190,10 @@ describe("hitIcon", () => {
   it("marks a tool from its kind when nobody filled in the tool", () => {
     // A relation being composed knows what kind it points at and not the tool
     // that governs it — which for a tool's own row is the same thing. Falling
-    // through to the tag mark made every queue and catalog look like a label.
+    // through to the tag mark made every queue and library look like a label.
     expect(hitIcon(target({ entity_type: SearchEntityType.queue }))).toBe(TOOL_ICONS[Tool.queue]);
-    expect(hitIcon(target({ entity_type: SearchEntityType.catalog }))).toBe(
-      TOOL_ICONS[Tool.catalog]
+    expect(hitIcon(target({ entity_type: SearchEntityType.library }))).toBe(
+      TOOL_ICONS[Tool.library]
     );
     expect(hitIcon(target({ entity_type: SearchEntityType.file }))).toBe(TOOL_ICONS[Tool.file]);
   });

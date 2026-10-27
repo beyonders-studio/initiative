@@ -288,19 +288,19 @@ TOOL_DESCRIPTIONS: dict[str, str] = {
         "The months a board has notices in, newest first, with how many in "
         "each. Takes the same filters as `list_posts`."
     ),
-    # --- Catalogs ----------------------------------------------------------
-    "update_catalog": (
-        "Change a catalog's name or description, or choose its cover (`cover_item_id`)."
+    # --- Libraries ----------------------------------------------------------
+    "update_library": (
+        "Change a library's name or description, or choose its cover (`cover_item_id`)."
     ),
-    "list_catalog_items": (
-        "One page of a catalog's pictures, newest first (`oldest_first` to "
+    "list_library_items": (
+        "One page of a library's pictures, newest first (`oldest_first` to "
         "reverse). Narrow with `search` or `tag_ids`."
     ),
-    "get_catalog_item_timeline": (
-        "The months a catalog has pictures in, newest first, with how many in each."
+    "get_library_item_timeline": (
+        "The months a library has pictures in, newest first, with how many in each."
     ),
-    "read_catalog_item": "Read one picture in a catalog by id.",
-    "list_catalog_item_versions": "Every stored rendition of a picture, newest first.",
+    "read_library_item": "Read one picture in a library by id.",
+    "list_library_item_versions": "Every stored rendition of a picture, newest first.",
     # --- Wikis --------------------------------------------------------------
     "update_wiki": (
         "Change a wiki: its name and description, its home page, page order "

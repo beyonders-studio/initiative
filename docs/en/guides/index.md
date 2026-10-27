@@ -70,11 +70,11 @@ Not sure how the pieces fit together yet? [How Initiative is organized](../conce
 
     [:octicons-arrow-right-24: Posts](posts.md)
 
--   :material-image-multiple-outline: __Catalogs__
+-   :material-image-multiple-outline: __Libraries__
 
     A wall of pictures. Mockups, screenshots, the four logos that lost.
 
-    [:octicons-arrow-right-24: Catalogs](catalogs.md)
+    [:octicons-arrow-right-24: Libraries](libraries.md)
 
 -   :material-book-open-page-variant-outline: __Wikis__
 

@@ -156,7 +156,7 @@ describe("useRecordRecentView", () => {
       const { pageId } = useParams({ strict: false }) as { pageId: string };
       const { image } = useSearch({ strict: false }) as { image?: string };
       useRecordOpen("wiki", 4, { each: Number(pageId) });
-      useRecordOpen("catalog_item", image ? Number(image) : undefined, {
+      useRecordOpen("library_item", image ? Number(image) : undefined, {
         source: ViewSource.direct,
       });
       return null;
@@ -167,7 +167,7 @@ describe("useRecordRecentView", () => {
       routeParams: { communityId: "3", pageId: "1" },
       routerSearch: { image: "9" },
     });
-    await waitFor(() => expect(opened.sort()).toEqual(["catalog_item 9 direct", "wiki 4 direct"]));
+    await waitFor(() => expect(opened.sort()).toEqual(["library_item 9 direct", "wiki 4 direct"]));
 
     await router.navigate({ href: "/c/3/wikis/4/pages/2" });
     await waitFor(() => expect(opened).toHaveLength(3));
@@ -181,6 +181,6 @@ describe("useRecordRecentView", () => {
     await new Promise((resolve) => setTimeout(resolve, 50));
     await router.navigate({ href: "/c/3/wikis/4/pages/2?image=9" });
     await waitFor(() => expect(opened).toHaveLength(5));
-    expect(opened[4]).toBe("catalog_item 9 direct");
+    expect(opened[4]).toBe("library_item 9 direct");
   });
 });

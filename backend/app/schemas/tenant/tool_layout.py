@@ -215,7 +215,7 @@ class QueueItemDetailFieldId(str, Enum):
     tags = "tags"
 
 
-class CatalogItemDetailFieldId(str, Enum):
+class LibraryItemDetailFieldId(str, Enum):
     """What a picture's detail edits as a field. The picture itself, where it
     came from, its versions, what is linked to it and what can be done with it
     are parts of their own."""
@@ -349,7 +349,7 @@ DetailFieldId = Union[
     TaskDetailFieldId,
     EventDetailFieldId,
     QueueItemDetailFieldId,
-    CatalogItemDetailFieldId,
+    LibraryItemDetailFieldId,
     CounterDetailFieldId,
     PostDetailFieldId,
     NamedFieldId,
@@ -513,7 +513,7 @@ ListLayoutKind = Literal["table", "board", "gantt", "calendar"]
 #: Every kind of thing a detail layout shows one of; which a tool holds is
 #: ``app.core.tools.DETAIL_LAYOUTS``.
 DetailLayoutKind = Literal[
-    "task", "calendar_event", "queue_item", "catalog_item", "counter", "post"
+    "task", "calendar_event", "queue_item", "library_item", "counter", "post"
 ]
 
 

@@ -33,8 +33,8 @@
     "counter": "Compteur",
     "dashboard": "Tableau de bord",
     "post": "Publication",
-    "catalog": "Catalogue",
-    "catalog_item": "Image",
+    "library": "Bibliothèque",
+    "library_item": "Image",
     "wiki": "Wiki",
     "wiki_page": "Page"
   }

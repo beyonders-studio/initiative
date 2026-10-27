@@ -5,7 +5,7 @@ they had where they were exported, and both restore them here, under that key,
 so the references in their envelopes resolve without rewriting.
 
 Every file is what the zip claims only once it has been read. Each is held to
-the rule for what it is meant to be — a picture a catalog can show, a file a
+the rule for what it is meant to be — a picture a library can show, a file a
 file may hold, or either — and stored as the type its bytes turned out to
 be. One that is not is left out, and the import says so. A key already stored
 here is never written over. The community's storage quota is checked against
@@ -31,7 +31,7 @@ from app.services.import_engine.zip_bounds import read_member
 if TYPE_CHECKING:
     from app.services.storage import StorageBackend
 
-#: What a file is meant to be: a picture a catalog can show, a file a
+#: What a file is meant to be: a picture a library can show, a file a
 #: file may hold, or any upload — a picture, or else a file.
 AssetKind = Literal["picture", "file", "upload"]
 
@@ -77,7 +77,7 @@ def _detect(asset: ArchiveAsset, data: bytes) -> tuple[str | None, str | None]:
         detect_document_image_type,
         validate_file,
     )
-    from app.services.tenant.catalogs import (
+    from app.services.tenant.libraries import (
         EmptyImageError,
         InvalidImageError,
         validate_image,

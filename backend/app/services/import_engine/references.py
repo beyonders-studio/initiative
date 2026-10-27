@@ -163,7 +163,7 @@ def detach_envelope_references(data: Any, *, guild_id: int) -> None:
         return
     for holder, key in _editor_holders(data):
         holder[key] = detach_editor_references(holder.get(key))
-    if data["type"] == tool_envelope_type(Tool.catalog):
+    if data["type"] == tool_envelope_type(Tool.library):
         # An item's description is markdown, as a task's is.
         for item in data.get("items") or []:
             if isinstance(item, dict):

@@ -883,7 +883,7 @@ async def _file(
     from app.models.tenant.calendar_event import CalendarEvent
     from app.models.tenant.comment import Comment
     from app.models.tenant.counter import Counter
-    from app.models.tenant.catalog import CatalogItem
+    from app.models.tenant.library import LibraryItem
     from app.models.tenant.queue import QueueItem
     from app.models.tenant.wiki import Wiki, WikiPage
     from app.testing.factories import (
@@ -891,7 +891,7 @@ async def _file(
         create_calendar_event,
         create_comment,
         create_counter,
-        create_catalog_item,
+        create_library_item,
         create_queue_item,
         create_task,
         create_wiki_page,
@@ -918,8 +918,8 @@ async def _file(
                 **{fk: parent.id, "original_start": parent.start_at},
             )
         return await create_calendar_event(session, parent, user)
-    if model is CatalogItem:
-        return await create_catalog_item(session, parent, user)
+    if model is LibraryItem:
+        return await create_library_item(session, parent, user)
     if model is WikiPage:
         if fk == "wiki_id":
             return await create_wiki_page(session, parent, user)

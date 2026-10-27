@@ -450,13 +450,13 @@ export type SearchEntityType = (typeof SearchEntityType)[keyof typeof SearchEnti
 export const SearchEntityType = {
   calendar: "calendar",
   calendar_event: "calendar_event",
-  catalog: "catalog",
-  catalog_item: "catalog_item",
   comment: "comment",
   counter: "counter",
   counter_group: "counter_group",
   dashboard: "dashboard",
   file: "file",
+  library: "library",
+  library_item: "library_item",
   post: "post",
   project: "project",
   queue: "queue",
@@ -477,7 +477,7 @@ export const Tool = {
   calendar: "calendar",
   dashboard: "dashboard",
   post: "post",
-  catalog: "catalog",
+  library: "library",
   wiki: "wiki",
 } as const;
 
@@ -822,7 +822,7 @@ export const ArchivableType = {
   calendar: "calendar",
   dashboard: "dashboard",
   post: "post",
-  catalog: "catalog",
+  library: "library",
   wiki: "wiki",
   task: "task",
   initiative: "initiative",
@@ -1181,11 +1181,11 @@ export type ListingKind = (typeof ListingKind)[keyof typeof ListingKind];
 export const ListingKind = {
   auto: "auto",
   calendar: "calendar",
-  catalog: "catalog",
   counter_group: "counter_group",
   dashboard: "dashboard",
   file: "file",
   home_layout: "home_layout",
+  library: "library",
   plugin: "plugin",
   post: "post",
   profile_pack: "profile_pack",
@@ -1224,18 +1224,6 @@ export interface BodyUploadBackup {
   file: Blob | File;
 }
 
-export interface BodyUploadCatalogItem {
-  file: Blob | File;
-  title?: string | null;
-  description?: string | null;
-  /** The day the item is about. Defaults to today, in UTC. */
-  occurred_on?: string | null;
-}
-
-export interface BodyUploadCatalogItemVersion {
-  file: Blob | File;
-}
-
 export interface BodyUploadFile {
   name: string;
   initiative_id: number;
@@ -1243,6 +1231,18 @@ export interface BodyUploadFile {
 }
 
 export interface BodyUploadFileVersion {
+  file: Blob | File;
+}
+
+export interface BodyUploadLibraryItem {
+  file: Blob | File;
+  title?: string | null;
+  description?: string | null;
+  /** The day the item is about. Defaults to today, in UTC. */
+  occurred_on?: string | null;
+}
+
+export interface BodyUploadLibraryItemVersion {
   file: Blob | File;
 }
 
@@ -2284,189 +2284,6 @@ export interface CaseMessageRead {
 }
 
 /**
- * What a list draws for a catalog: one picture, at whichever size it has.
- */
-export interface CatalogCover {
-  item_id: number;
-  file_url: string;
-  thumbnail_url: string | null;
-  width: number | null;
-  height: number | null;
-}
-
-export interface CatalogCreate {
-  properties?: PropertyValueInput[];
-  /**
-   * @minLength 1
-   * @maxLength 255
-   */
-  name: string;
-  description?: string | null;
-  initiative_id: number;
-  tag_ids?: number[] | null;
-  grants?: ResourceGrantSchema[];
-}
-
-/**
- * The pictures to send to the trash together — a selection on the wall.
- */
-export interface CatalogItemBulkDelete {
-  /**
-   * @minItems 1
-   * @maxItems 500
-   */
-  item_ids: number[];
-}
-
-export interface CatalogItemBulkDeleteResponse {
-  deleted_count: number;
-}
-
-/**
- * What a picture's detail edits as a field. The picture itself, where it
- * came from, its versions, what is linked to it and what can be done with it
- * are parts of their own.
- */
-export type CatalogItemDetailFieldId =
-  (typeof CatalogItemDetailFieldId)[keyof typeof CatalogItemDetailFieldId];
-
-export const CatalogItemDetailFieldId = {
-  title: "title",
-  description: "description",
-  date: "date",
-  tags: "tags",
-} as const;
-
-export interface CatalogItemRead {
-  id: number;
-  catalog_id: number;
-  community_id: number;
-  title: string | null;
-  description: string | null;
-  occurred_on: string;
-  file_url: string;
-  thumbnail_url: string | null;
-  file_content_type: string | null;
-  file_size: number | null;
-  original_filename: string | null;
-  width: number | null;
-  height: number | null;
-  created_by: number | null;
-  uploader: CommentAuthor | null;
-  created_at: string;
-  updated_at: string;
-  version_count: number;
-  tags: TagSummary[];
-  properties: PropertySummary[];
-  plugin_values: PluginValueSummary[];
-}
-
-export interface CatalogItemListResponse {
-  total_count: number;
-  page: number;
-  page_size: number;
-  has_next: boolean;
-  has_prev: boolean;
-  items: CatalogItemRead[];
-}
-
-export interface CatalogItemUpdate {
-  properties?: PropertyValueInput[] | null;
-  title?: string | null;
-  description?: string | null;
-  occurred_on?: string | null;
-  tag_ids?: number[] | null;
-  description_base?: string | null;
-}
-
-/**
- * One stored rendition of a picture.
- */
-export interface CatalogItemVersionRead {
-  id: number;
-  version_number: number;
-  file_url: string;
-  thumbnail_url: string | null;
-  file_content_type: string | null;
-  file_size: number | null;
-  original_filename: string | null;
-  width: number | null;
-  height: number | null;
-  created_by: number | null;
-  created_at: string;
-  is_current: boolean;
-}
-
-export interface CatalogSummary {
-  archived_at: string | null;
-  can: ToolCan;
-  id: number;
-  initiative_id: number;
-  community_id: number;
-  created_by: number | null;
-  created_at: string;
-  updated_at: string;
-  comments_enabled: boolean;
-  tags: TagSummary[];
-  properties: PropertySummary[];
-  grants: ResourceGrantSchema[];
-  /**
-   * @minLength 1
-   * @maxLength 255
-   */
-  name: string;
-  description: string | null;
-  cover_item_id: number | null;
-  cover: CatalogCover | null;
-  preview: CatalogCover[];
-  comment_count: number;
-}
-
-export interface CatalogListResponse {
-  total_count: number;
-  page: number;
-  page_size: number;
-  has_next: boolean;
-  has_prev: boolean;
-  items: CatalogSummary[];
-}
-
-/**
- * A catalog on its own page. The same shape as its summary: the pictures
- * are paged separately, because a catalog is browsed rather than read.
- */
-export interface CatalogRead {
-  archived_at: string | null;
-  can: ToolCan;
-  id: number;
-  initiative_id: number;
-  community_id: number;
-  created_by: number | null;
-  created_at: string;
-  updated_at: string;
-  comments_enabled: boolean;
-  tags: TagSummary[];
-  properties: PropertySummary[];
-  grants: ResourceGrantSchema[];
-  /**
-   * @minLength 1
-   * @maxLength 255
-   */
-  name: string;
-  description: string | null;
-  cover_item_id: number | null;
-  cover: CatalogCover | null;
-  preview: CatalogCover[];
-  comment_count: number;
-}
-
-export interface CatalogUpdate {
-  name?: string | null;
-  description?: string | null;
-  cover_item_id?: number | null;
-}
-
-/**
  * What a catch-up covers: what changed since ``since`` (the change log's
  * whole window without one), in the community or in one tool.
  */
@@ -2617,7 +2434,7 @@ export interface CommentCreate {
   calendar_id?: number | null;
   dashboard_id?: number | null;
   post_id?: number | null;
-  catalog_id?: number | null;
+  library_id?: number | null;
   wiki_id?: number | null;
   parent_comment_id?: number | null;
   audience?: CommentAudience;
@@ -2677,7 +2494,7 @@ export interface CommentRead {
   calendar_id: number | null;
   dashboard_id: number | null;
   post_id: number | null;
-  catalog_id: number | null;
+  library_id: number | null;
   wiki_id: number | null;
   id: number;
   created_by: number | null;
@@ -4239,13 +4056,13 @@ export const ContentKind = {
   calendar: "calendar",
   dashboard: "dashboard",
   post: "post",
-  catalog: "catalog",
+  library: "library",
   wiki: "wiki",
   task: "task",
   queue_item: "queue_item",
   calendar_event: "calendar_event",
   counter: "counter",
-  catalog_item: "catalog_item",
+  library_item: "library_item",
   wiki_page: "wiki_page",
 } as const;
 
@@ -4764,9 +4581,9 @@ export const DatasetName = {
   calendars: "calendars",
   dashboards: "dashboards",
   posts: "posts",
-  catalogs: "catalogs",
-  catalog_items: "catalog_items",
-  catalog_item_versions: "catalog_item_versions",
+  libraries: "libraries",
+  library_items: "library_items",
+  library_item_versions: "library_item_versions",
   wikis: "wikis",
   wiki_pages: "wiki_pages",
 } as const;
@@ -4949,6 +4766,21 @@ export const QueueItemDetailFieldId = {
 } as const;
 
 /**
+ * What a picture's detail edits as a field. The picture itself, where it
+ * came from, its versions, what is linked to it and what can be done with it
+ * are parts of their own.
+ */
+export type LibraryItemDetailFieldId =
+  (typeof LibraryItemDetailFieldId)[keyof typeof LibraryItemDetailFieldId];
+
+export const LibraryItemDetailFieldId = {
+  title: "title",
+  description: "description",
+  date: "date",
+  tags: "tags",
+} as const;
+
+/**
  * What a notice's detail draws as a field. Its title, tags and properties
  * are its tool's, in its header; what it says, asks and answers, and when it
  * goes up, are parts of their own.
@@ -4964,7 +4796,7 @@ export interface DetailFieldProps {
     | TaskDetailFieldId
     | EventDetailFieldId
     | QueueItemDetailFieldId
-    | CatalogItemDetailFieldId
+    | LibraryItemDetailFieldId
     | CounterDetailFieldId
     | PostDetailFieldId
     | string;
@@ -5149,7 +4981,7 @@ export const DetailLayoutReadKind = {
   task: "task",
   calendar_event: "calendar_event",
   queue_item: "queue_item",
-  catalog_item: "catalog_item",
+  library_item: "library_item",
   counter: "counter",
   post: "post",
 } as const;
@@ -5172,7 +5004,7 @@ export const DetailLayoutWriteKind = {
   task: "task",
   calendar_event: "calendar_event",
   queue_item: "queue_item",
-  catalog_item: "catalog_item",
+  library_item: "library_item",
   counter: "counter",
   post: "post",
 } as const;
@@ -5707,13 +5539,13 @@ export const EntityType = {
   calendar: "calendar",
   dashboard: "dashboard",
   post: "post",
-  catalog: "catalog",
+  library: "library",
   wiki: "wiki",
   task: "task",
   queue_item: "queue_item",
   calendar_event: "calendar_event",
   counter: "counter",
-  catalog_item: "catalog_item",
+  library_item: "library_item",
   wiki_page: "wiki_page",
   comment: "comment",
   initiative: "initiative",
@@ -6478,7 +6310,7 @@ export interface InitiativeCreate {
   calendars_enabled?: boolean;
   dashboards_enabled?: boolean;
   posts_enabled?: boolean;
-  catalogs_enabled?: boolean;
+  libraries_enabled?: boolean;
   wikis_enabled?: boolean;
   name: string;
   description?: string | null;
@@ -6647,7 +6479,7 @@ export interface InitiativeRead {
   calendars_enabled: boolean;
   dashboards_enabled: boolean;
   posts_enabled: boolean;
-  catalogs_enabled: boolean;
+  libraries_enabled: boolean;
   wikis_enabled: boolean;
   name: string;
   description: string | null;
@@ -6682,8 +6514,8 @@ export const PermissionKey = {
   create_dashboards: "create_dashboards",
   posts_enabled: "posts_enabled",
   create_posts: "create_posts",
-  catalogs_enabled: "catalogs_enabled",
-  create_catalogs: "create_catalogs",
+  libraries_enabled: "libraries_enabled",
+  create_libraries: "create_libraries",
   wikis_enabled: "wikis_enabled",
   create_wikis: "create_wikis",
   dashboards_run_as_initiative: "dashboards_run_as_initiative",
@@ -6939,7 +6771,7 @@ export interface InitiativeUpdate {
   calendars_enabled?: boolean | null;
   dashboards_enabled?: boolean | null;
   posts_enabled?: boolean | null;
-  catalogs_enabled?: boolean | null;
+  libraries_enabled?: boolean | null;
   wikis_enabled?: boolean | null;
   name?: string | null;
   description?: string | null;
@@ -7077,7 +6909,7 @@ export const ItemKind = {
   queue_item: "queue_item",
   calendar_event: "calendar_event",
   counter: "counter",
-  catalog_item: "catalog_item",
+  library_item: "library_item",
   post: "post",
 } as const;
 
@@ -7112,6 +6944,174 @@ export interface LegalDocumentRead {
 export interface LegalIndexRead {
   documents: LegalDocumentRead[];
   required: string[];
+}
+
+/**
+ * What a list draws for a library: one picture, at whichever size it has.
+ */
+export interface LibraryCover {
+  item_id: number;
+  file_url: string;
+  thumbnail_url: string | null;
+  width: number | null;
+  height: number | null;
+}
+
+export interface LibraryCreate {
+  properties?: PropertyValueInput[];
+  /**
+   * @minLength 1
+   * @maxLength 255
+   */
+  name: string;
+  description?: string | null;
+  initiative_id: number;
+  tag_ids?: number[] | null;
+  grants?: ResourceGrantSchema[];
+}
+
+/**
+ * The pictures to send to the trash together — a selection on the wall.
+ */
+export interface LibraryItemBulkDelete {
+  /**
+   * @minItems 1
+   * @maxItems 500
+   */
+  item_ids: number[];
+}
+
+export interface LibraryItemBulkDeleteResponse {
+  deleted_count: number;
+}
+
+export interface LibraryItemRead {
+  id: number;
+  library_id: number;
+  community_id: number;
+  title: string | null;
+  description: string | null;
+  occurred_on: string;
+  file_url: string;
+  thumbnail_url: string | null;
+  file_content_type: string | null;
+  file_size: number | null;
+  original_filename: string | null;
+  width: number | null;
+  height: number | null;
+  created_by: number | null;
+  uploader: CommentAuthor | null;
+  created_at: string;
+  updated_at: string;
+  version_count: number;
+  tags: TagSummary[];
+  properties: PropertySummary[];
+  plugin_values: PluginValueSummary[];
+}
+
+export interface LibraryItemListResponse {
+  total_count: number;
+  page: number;
+  page_size: number;
+  has_next: boolean;
+  has_prev: boolean;
+  items: LibraryItemRead[];
+}
+
+export interface LibraryItemUpdate {
+  properties?: PropertyValueInput[] | null;
+  title?: string | null;
+  description?: string | null;
+  occurred_on?: string | null;
+  tag_ids?: number[] | null;
+  description_base?: string | null;
+}
+
+/**
+ * One stored rendition of a picture.
+ */
+export interface LibraryItemVersionRead {
+  id: number;
+  version_number: number;
+  file_url: string;
+  thumbnail_url: string | null;
+  file_content_type: string | null;
+  file_size: number | null;
+  original_filename: string | null;
+  width: number | null;
+  height: number | null;
+  created_by: number | null;
+  created_at: string;
+  is_current: boolean;
+}
+
+export interface LibrarySummary {
+  archived_at: string | null;
+  can: ToolCan;
+  id: number;
+  initiative_id: number;
+  community_id: number;
+  created_by: number | null;
+  created_at: string;
+  updated_at: string;
+  comments_enabled: boolean;
+  tags: TagSummary[];
+  properties: PropertySummary[];
+  grants: ResourceGrantSchema[];
+  /**
+   * @minLength 1
+   * @maxLength 255
+   */
+  name: string;
+  description: string | null;
+  cover_item_id: number | null;
+  cover: LibraryCover | null;
+  preview: LibraryCover[];
+  comment_count: number;
+}
+
+export interface LibraryListResponse {
+  total_count: number;
+  page: number;
+  page_size: number;
+  has_next: boolean;
+  has_prev: boolean;
+  items: LibrarySummary[];
+}
+
+/**
+ * A library on its own page. The same shape as its summary: the pictures
+ * are paged separately, because a library is browsed rather than read.
+ */
+export interface LibraryRead {
+  archived_at: string | null;
+  can: ToolCan;
+  id: number;
+  initiative_id: number;
+  community_id: number;
+  created_by: number | null;
+  created_at: string;
+  updated_at: string;
+  comments_enabled: boolean;
+  tags: TagSummary[];
+  properties: PropertySummary[];
+  grants: ResourceGrantSchema[];
+  /**
+   * @minLength 1
+   * @maxLength 255
+   */
+  name: string;
+  description: string | null;
+  cover_item_id: number | null;
+  cover: LibraryCover | null;
+  preview: LibraryCover[];
+  comment_count: number;
+}
+
+export interface LibraryUpdate {
+  name?: string | null;
+  description?: string | null;
+  cover_item_id?: number | null;
 }
 
 /**
@@ -9438,13 +9438,13 @@ export const PropertyTarget = {
   calendar: "calendar",
   dashboard: "dashboard",
   post: "post",
-  catalog: "catalog",
+  library: "library",
   wiki: "wiki",
   task: "task",
   queue_item: "queue_item",
   calendar_event: "calendar_event",
   counter: "counter",
-  catalog_item: "catalog_item",
+  library_item: "library_item",
   wiki_page: "wiki_page",
 } as const;
 
@@ -10473,12 +10473,12 @@ export const TagTarget = {
   calendar: "calendar",
   dashboard: "dashboard",
   post: "post",
-  catalog: "catalog",
+  library: "library",
   wiki: "wiki",
   task: "task",
   queue_item: "queue_item",
   calendar_event: "calendar_event",
-  catalog_item: "catalog_item",
+  library_item: "library_item",
   wiki_page: "wiki_page",
 } as const;
 
@@ -12663,10 +12663,10 @@ export type ListPostsParams = {
   page_size?: number;
 };
 
-export type ListCatalogsParams = {
+export type ListLibrariesParams = {
   initiative_id?: number | null;
   /**
-   * Full-text match over the catalog's name and description, through the same index the search page reads.
+   * Full-text match over the library's name and description, through the same index the search page reads.
    */
   search?: string | null;
   /**
@@ -12678,7 +12678,7 @@ export type ListCatalogsParams = {
    */
   sort_dir?: string | null;
   /**
-   * Only catalogs carrying any of these tags.
+   * Only libraries carrying any of these tags.
    */
   tag_ids?: number[] | null;
   /**
@@ -12904,7 +12904,7 @@ export type ListCommentsParams = {
   calendar_id?: number | null;
   dashboard_id?: number | null;
   post_id?: number | null;
-  catalog_id?: number | null;
+  library_id?: number | null;
   wiki_id?: number | null;
 };
 
@@ -13181,7 +13181,7 @@ export type ExportToolParams = {
    */
   ids?: number[] | null;
   /**
-   * One of the tool's export formats (project: json, pdf, csv, xlsx; file: json, md, pdf, docx, csv, xlsx, file; queue: json, pdf, csv, xlsx, md; counter_group: json, pdf, csv, xlsx, md; calendar: ics, json; dashboard: json; post: json; catalog: json; wiki: json, pdf, md, docx). ``json`` is the importable envelope. A file's formats depend on its type, so it has no default; a calendar defaults to ``ics``, every other tool to ``json``
+   * One of the tool's export formats (project: json, pdf, csv, xlsx; file: json, md, pdf, docx, csv, xlsx, file; queue: json, pdf, csv, xlsx, md; counter_group: json, pdf, csv, xlsx, md; calendar: ics, json; dashboard: json; post: json; library: json; wiki: json, pdf, md, docx). ``json`` is the importable envelope. A file's formats depend on its type, so it has no default; a calendar defaults to ``ics``, every other tool to ``json``
    */
   format?: ExportToolFormat;
   /**
@@ -13281,14 +13281,14 @@ export type ReadPostParams = {
   include_deleted?: boolean;
 };
 
-export type ReadCatalogParams = {
+export type ReadLibraryParams = {
   /**
    * Also return the resource if it is in the trash. For reading a resource back after a deleted event — the row still exists until retention purges it, and access is checked exactly as for a live one.
    */
   include_deleted?: boolean;
 };
 
-export type ListCatalogItemsParams = {
+export type ListLibraryItemsParams = {
   /**
    * Only pictures carrying ANY of these tags.
    */
@@ -13298,7 +13298,7 @@ export type ListCatalogItemsParams = {
    */
   search?: string | null;
   /**
-   * Read the catalog in the order it was filled rather than newest first.
+   * Read the library in the order it was filled rather than newest first.
    */
   oldest_first?: boolean;
   /**
@@ -13316,7 +13316,7 @@ export type ListCatalogItemsParams = {
   page_size?: number;
 };
 
-export type GetCatalogItemTimelineParams = {
+export type GetLibraryItemTimelineParams = {
   tag_ids?: number[] | null;
   search?: string | null;
 };
@@ -13532,7 +13532,7 @@ export type SearchCommunityParams = {
    */
   search: string;
   /**
-   * Restrict to these entity types. Omit for the default scope (calendar, calendar_event, catalog, catalog_item, counter, counter_group, dashboard, file, post, project, queue, queue_item, tag, task, wiki, wiki_page); naming a type reaches it explicitly.
+   * Restrict to these entity types. Omit for the default scope (calendar, calendar_event, counter, counter_group, dashboard, file, library, library_item, post, project, queue, queue_item, tag, task, wiki, wiki_page); naming a type reaches it explicitly.
    */
   types?: SearchEntityType[] | null;
   /**
@@ -13560,7 +13560,7 @@ export type SearchCommunityParams = {
 
 export type RecentCommunityParams = {
   /**
-   * Restrict to these entity types. Omit for the default scope (calendar, calendar_event, catalog, catalog_item, counter, counter_group, dashboard, file, post, project, queue, queue_item, tag, task, wiki, wiki_page); naming a type reaches it explicitly.
+   * Restrict to these entity types. Omit for the default scope (calendar, calendar_event, counter, counter_group, dashboard, file, library, library_item, post, project, queue, queue_item, tag, task, wiki, wiki_page); naming a type reaches it explicitly.
    */
   types?: SearchEntityType[] | null;
   /**
@@ -13588,7 +13588,7 @@ export type SuggestCommunityParams = {
    */
   search: string;
   /**
-   * Restrict to these entity types. Omit for the default scope (calendar, calendar_event, catalog, catalog_item, counter, counter_group, dashboard, file, post, project, queue, queue_item, tag, task, wiki, wiki_page); naming a type reaches it explicitly.
+   * Restrict to these entity types. Omit for the default scope (calendar, calendar_event, counter, counter_group, dashboard, file, library, library_item, post, project, queue, queue_item, tag, task, wiki, wiki_page); naming a type reaches it explicitly.
    */
   types?: SearchEntityType[] | null;
   /**
@@ -13919,11 +13919,11 @@ export type ListMyPostsParams = {
   page_size?: number;
 };
 
-export type ListMyCatalogsParams = {
+export type ListMyLibrariesParams = {
   community_ids?: number[] | null;
   search?: string | null;
   /**
-   * Narrow to catalogs the caller created.
+   * Narrow to libraries the caller created.
    */
   created_by_me?: boolean;
   /**

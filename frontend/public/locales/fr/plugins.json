@@ -285,9 +285,9 @@
         "read": "Lire les publications",
         "write": "Lire et modifier les publications"
       },
-      "catalogs": {
-        "read": "Lire les catalogues",
-        "write": "Lire et modifier les catalogues"
+      "libraries": {
+        "read": "Lire les bibliothèques",
+        "write": "Lire et modifier les bibliothèques"
       },
       "wikis": {
         "read": "Lire les wikis",

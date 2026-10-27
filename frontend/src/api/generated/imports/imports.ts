@@ -155,7 +155,7 @@ export const useImportEnvelope = <TError = ErrorType<HTTPValidationError>, TCont
   return useMutation(getImportEnvelopeMutationOptions(options), queryClient);
 };
 /**
- * Import an export that travels as a zip — a catalog with its pictures —
+ * Import an export that travels as a zip — a library with its pictures —
  * into the chosen initiative. The zip holds one envelope at its top level and
  * the files it names under ``assets/``; the files are stored first, then the
  * envelope imports exactly as ``POST /imports/envelope`` imports one, with

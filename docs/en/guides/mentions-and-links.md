@@ -34,7 +34,7 @@ Searching for that name or handle finds what mentions them, even mentions writte
 
 Type `#` and Initiative offers you everything in the initiative: every [tool](tools.md), and what's inside them — tasks, events, counters, queue items, pictures, wiki pages. Pick one and its name drops into your text as a link.
 
-Already know what kind of thing you want? Say so and the list narrows: `#task:`, `#file:`, `#project:`, `#queue:`, `#counter-group:`, `#calendar:`, `#dashboard:`, `#post:`, `#catalog:`, `#wiki:`, `#wiki-page:`.
+Already know what kind of thing you want? Say so and the list narrows: `#task:`, `#file:`, `#project:`, `#queue:`, `#counter-group:`, `#calendar:`, `#dashboard:`, `#post:`, `#library:`, `#wiki:`, `#wiki-page:`.
 
 You never *have* to. `#` on its own searches the lot — the prefixes are just a shortcut for when half the community has named something "Planning".
 
@@ -133,7 +133,7 @@ What counts as finished depends on what it is:
 Archived tasks sit it out, so shelving something doesn't keep a project open
 forever.
 
-Anything else — a file, a catalog, a wiki page — still shows up as a link,
+Anything else — a file, a library, a wiki page — still shows up as a link,
 and still sits there under **Blocked by** if that's what you said. It just
 isn't counted, because nothing about a file says when it's done.
 

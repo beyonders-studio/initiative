@@ -1,6 +1,6 @@
 /**
  * THE index page a tool's entities are browsed from — one initiative's shelf of
- * projects, files, wikis, catalogs, queues, counter groups or dashboards.
+ * projects, files, wikis, libraries, queues, counter groups or dashboards.
  *
  * Each of those pages carried its own copy of the same thing: the view toggle,
  * the filter panel, the create button and its dialog, the loading, error,
@@ -45,7 +45,7 @@ import { CreateFileDialog } from "@/components/files/CreateFileDialog";
 import { FileCard } from "@/components/files/FileCard";
 import { useFileColumns } from "@/components/files/fileColumns";
 import { ToolImportAction, useToolImportAction } from "@/components/imports/ToolImportAction";
-import { CatalogCard } from "@/components/initiativeTools/catalogs/CatalogCard";
+import { LibraryCard } from "@/components/initiativeTools/libraries/LibraryCard";
 import { CounterGroupCard } from "@/components/initiativeTools/counters/CounterGroupCard";
 import { DashboardCard } from "@/components/initiativeTools/dashboards/DashboardCard";
 import { QueueCard } from "@/components/initiativeTools/queues/QueueCard";
@@ -402,18 +402,18 @@ const TOOL_INDEX: Record<Tool, ToolIndexEntry | ToolIndexOwnPage> = {
     },
   },
 
-  [Tool.catalog]: {
+  [Tool.library]: {
     useList: makeRows(
-      TOOL_HOOKS[Tool.catalog].useList,
-      (catalog) => <CatalogCard catalog={catalog} />,
+      TOOL_HOOKS[Tool.library].useList,
+      (library) => <LibraryCard library={library} />,
       WITH_PREVIEW
     ),
     text: {
-      create: "createCatalog",
-      createDescription: "createCatalogDescription",
-      noMatches: "filters.noMatchingCatalogs",
-      emptyTitle: "noCatalogs",
-      emptyBody: "noCatalogsDescription",
+      create: "createLibrary",
+      createDescription: "createLibraryDescription",
+      noMatches: "filters.noMatchingLibraries",
+      emptyTitle: "noLibraries",
+      emptyBody: "noLibrariesDescription",
     },
   },
 
