@@ -34,7 +34,7 @@ def test_a_transparent_palette_picture_stays_transparent(tmp_path):
 
     thumbnail = Image.open(io.BytesIO(base64.b64decode(reply["thumbnail"])))
     assert thumbnail.mode == "RGBA"
-    assert thumbnail.getpixel((10, 10))[3] == 0
+    assert thumbnail.getchannel("A").getpixel((10, 10)) == 0
 
 
 def test_a_small_picture_is_its_own_thumbnail(tmp_path):
@@ -62,3 +62,11 @@ def test_bytes_that_are_not_a_picture_are_an_error(tmp_path):
     path.write_bytes(b"\x89PNG\r\n\x1a\n" + b"not a picture" * 10)
 
     assert "error" in answer({"path": str(path), "format": "PNG"}, 640)
+
+
+def test_always_draws_even_a_small_picture(tmp_path):
+    path = _picture(tmp_path, (300, 200))
+
+    reply = answer({"path": path, "format": "PNG", "always": True}, 640)
+
+    assert (reply["width"], reply["height"]) == (300, 200)
