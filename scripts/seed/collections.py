@@ -1,34 +1,35 @@
-"""Libraries: walls of pictures, stored through the storage path itself.
+"""Collections: sets of pictures in Files, stored through the storage path itself.
 
-Every picture is a real PNG written to the guild's storage with an ``uploads``
-row behind it, and its thumbnail is made the way an upload's is — so the wall,
-the lightbox and the quota all read what they would for a picture somebody
-dropped in.
+Every picture is a file in its initiative: a real PNG written to the
+community's storage with an ``uploads`` row behind it, and versions that wait
+on a thumbnail as an uploaded picture's do, so the ``thumbnails`` sweep draws
+them. A collection holds its pictures, each added when it was taken, and lists
+them the way a collection made from a gallery does.
 """
 
 from __future__ import annotations
 
-import uuid
-from datetime import datetime, timedelta, timezone
+from datetime import timedelta
 
-from sqlmodel import select
-
-from app.core.tools import Tool
+from app.core.file_types import type_of_media
+from app.core.tools import LAYOUT_DEFAULT, Tool
+from app.models.platform.user import User
+from app.models.tenant.collection import Collection, CollectionFile
+from app.models.tenant.file import File
 from app.models.tenant.resource_grant import ResourceAccessLevel
-from app.models.tenant.library import Library, LibraryItem, LibraryItemVersion
-from app.models.tenant.upload import Upload
-from app.services.storage import get_guild_storage
+from app.models.tenant.tool_layout import ToolLayout
+from app.services.tenant import attachments as attachments_service
 from app.services.tenant import file_versions
-from app.services.tenant import libraries as libraries_service
 
 from seed.common import Community, days_ago, gradient_png, share, tag
 
-#: Each library, shared with the initiative for reading. ``cover`` names the
-#: picture to use as its cover. A picture is dated ``days_ago``, ``size`` is
-#: ``(width, height)``, and it is drawn as a gradient between its two
-#: ``colours``; ``versions`` is how many renditions to record, each earlier one
-#: a little darker.
-LIBRARIES: dict[str, list[dict]] = {
+#: Each collection, its pictures shared with the initiative for reading.
+#: ``cover`` names the picture to use as its cover. A picture is dated
+#: ``days_ago``, ``size`` is ``(width, height)``, and it is drawn as a gradient
+#: between its two ``colours``; ``versions`` is how many renditions to record,
+#: each earlier one a little darker. One with no ``title`` is named by its
+#: ``filename``.
+COLLECTIONS: dict[str, list[dict]] = {
     "primary": [
         {
             "name": "Barovia maps and handouts",
@@ -38,10 +39,9 @@ LIBRARIES: dict[str, list[dict]] = {
             "created_by": "Dungeon Master",
             "tags": ["lore"],
             "cover": "Castle Ravenloft, ground floor",
-            "images": [
+            "pictures": [
                 {
                     "title": "Castle Ravenloft, ground floor",
-                    "description": "The one the players have. Do not show them the crypts.",
                     "created_by": "Dungeon Master",
                     "days_ago": 160,
                     "size": (1600, 1100),
@@ -60,8 +60,6 @@ LIBRARIES: dict[str, list[dict]] = {
                 },
                 {
                     "title": "Strahd's letter",
-                    "description": "Read aloud at the gates. Sera cried. Everyone pretended "
-                    "not to notice.",
                     "created_by": "Dungeon Master",
                     "days_ago": 150,
                     "size": (900, 1300),
@@ -103,7 +101,6 @@ LIBRARIES: dict[str, list[dict]] = {
                 },
                 {
                     "title": "Tarokka reading",
-                    "description": "The spread as dealt. Photographed before Vex could touch it.",
                     "created_by": "Elara Moonwhisper",
                     "days_ago": 90,
                     "size": (1500, 1000),
@@ -153,7 +150,6 @@ LIBRARIES: dict[str, list[dict]] = {
                 {
                     "title": None,
                     "filename": "IMG_4471.png",
-                    "description": "The table, mid-session. Not sure who took this.",
                     "created_by": "Vex Shadowstep",
                     "days_ago": 1,
                     "size": (1600, 1200),
@@ -166,7 +162,7 @@ LIBRARIES: dict[str, list[dict]] = {
             "initiative": "lmop",
             "description": "Handouts for the table. Print at A4.",
             "created_by": "Dungeon Master",
-            "images": [
+            "pictures": [
                 {
                     "title": "Cragmaw Hideout",
                     "created_by": "Dungeon Master",
@@ -177,7 +173,6 @@ LIBRARIES: dict[str, list[dict]] = {
                 },
                 {
                     "title": "Gundren's map",
-                    "description": "Water-stained on purpose. Took three tea bags.",
                     "created_by": "Dungeon Master",
                     "days_ago": 74,
                     "size": (1200, 900),
@@ -210,7 +205,7 @@ LIBRARIES: dict[str, list[dict]] = {
             "description": "Hull studies, bridge layouts and the one ship nobody liked.",
             "created_by": "Finley Goldtongue",
             "tags": ["engineering"],
-            "images": [
+            "pictures": [
                 {
                     "title": "Exodus, hull study",
                     "created_by": "Finley Goldtongue",
@@ -222,7 +217,6 @@ LIBRARIES: dict[str, list[dict]] = {
                 },
                 {
                     "title": "Exodus, bridge",
-                    "description": "Third pass. The viewscreen finally reads as a window.",
                     "created_by": "Aurelia Brightshield",
                     "days_ago": 96,
                     "size": (1600, 1000),
@@ -264,20 +258,12 @@ LIBRARIES: dict[str, list[dict]] = {
                 {
                     "title": None,
                     "filename": "bridge-wip-final-2.png",
-                    "description": "Whatever this was, it did not survive the review.",
                     "created_by": "Finley Goldtongue",
                     "days_ago": 3,
                     "size": (1000, 1200),
                     "colours": ((120, 40, 40), (40, 12, 12)),
                 },
             ],
-        },
-        {
-            "name": "Crew portraits",
-            "initiative": "starfall",
-            "description": "One per member of the fleet. Nobody has started.",
-            "created_by": "Aurelia Brightshield",
-            "images": [],
         },
     ],
     "tides": [
@@ -288,11 +274,9 @@ LIBRARIES: dict[str, list[dict]] = {
             "created_by": "Finley Goldtongue",
             "tags": ["exploration"],
             "cover": "The Shattered Seas",
-            "images": [
+            "pictures": [
                 {
                     "title": "The Shattered Seas",
-                    "description": "The whole map. Torn along the eastern edge, which is "
-                    "where we are going.",
                     "created_by": "Finley Goldtongue",
                     "days_ago": 200,
                     "size": (2400, 1600),
@@ -318,7 +302,6 @@ LIBRARIES: dict[str, list[dict]] = {
                 },
                 {
                     "title": "Imperial patrol routes",
-                    "description": "Do not leave this one on the table.",
                     "created_by": "Thorn Ironforge",
                     "days_ago": 9,
                     "size": (2000, 1200),
@@ -330,68 +313,86 @@ LIBRARIES: dict[str, list[dict]] = {
     ],
 }
 
+#: How a collection lists its files: masonry and timeline shown, the table
+#: hidden, opening on masonry, as 20261027_0545 lays out a converted gallery.
+_LAYOUTS = (
+    ("masonry", {"hidden": False}),
+    ("timeline", {"hidden": False}),
+    ("table", {"hidden": True}),
+    (LAYOUT_DEFAULT, {"kind": "masonry"}),
+)
 
-def _store(
-    c: Community,
-    library: Library,
-    data: bytes,
-    extension: str,
-    content_type: str,
-    by: int,
-) -> str:
-    """Write one file to the guild's storage, with its ``uploads`` row claimed
-    by the library's initiative, as saving it into the library would."""
-    filename = f"{uuid.uuid4().hex}{extension}"
-    get_guild_storage(c.guild.id).write(filename, data, content_type=content_type)
-    c.session.add(
-        Upload(
-            filename=filename,
-            created_by=by,
-            size_bytes=len(data),
-            content_type=content_type,
-            initiative_id=library.initiative_id,
-            claimed_at=datetime.now(timezone.utc),
-        )
-    )
-    return f"/uploads/{c.guild.id}/{filename}"
+_MEDIA_TYPE = "image/png"
 
 
 async def seed(c: Community) -> None:
-    for d in LIBRARIES[c.key]:
+    for d in COLLECTIONS[c.key]:
         creator = c.users[d["created_by"]]
-        library = Library(
-            initiative_id=c.initiatives[d["initiative"]].id,
+        initiative_id = c.initiatives[d["initiative"]].id
+        pictures: dict[str, File] = {}
+        for p in d["pictures"]:
+            file = await _picture(c, initiative_id, creator, p)
+            pictures[file.name] = file
+        files = list(pictures.values())
+        collection = Collection(
+            initiative_id=initiative_id,
             name=d["name"],
             description=d.get("description"),
+            cover_file_id=pictures[d["cover"]].id if "cover" in d else None,
             created_by=creator.id,
+            created_at=min(f.created_at for f in files),
+            updated_at=max(f.updated_at for f in files),
         )
-        c.session.add(library)
+        c.session.add(collection)
         await c.session.flush()
-        c.ids["libraries"].append(library.id)
-        share(c, Tool.library, library, creator, general=ResourceAccessLevel.read)
-        tag(c, library, d.get("tags", ()))
-        newest_at = library.created_at
-        for im in d["images"]:
-            item = await _picture(c, library, im)
-            if im.get("title") and im["title"] == d.get("cover"):
-                library.cover_item_id = item.id
-            newest_at = max(newest_at, item.updated_at)
-        library.updated_at = newest_at
-        c.session.add(library)
+        c.ids["collections"].append(collection.id)
+        for f in files:
+            c.session.add(
+                CollectionFile(
+                    collection_id=collection.id,
+                    file_id=f.id,
+                    initiative_id=initiative_id,
+                    added_by=f.created_by,
+                    added_at=f.created_at,
+                )
+            )
+            c.ids["collection_files"].append([collection.id, f.id])
+        for kind, definition in _LAYOUTS:
+            c.session.add(
+                ToolLayout(
+                    initiative_id=initiative_id,
+                    tool="collection",
+                    tool_id=collection.id,
+                    kind=kind,
+                    definition=definition,
+                )
+            )
+        tag(c, collection, d.get("tags", ()))
     await c.session.flush()
 
 
-async def _picture(c: Community, library: Library, im: dict) -> LibraryItem:
-    uploader = c.users[im["created_by"]].id
-    created_at = days_ago(im["days_ago"])
-    top, bottom = im["colours"]
-    width, height = im["size"]
-    versions = im.get("versions", 1)
-    filename = (
-        im.get("filename")
-        or f"{(im.get('title') or 'picture').lower().replace(' ', '-')}.png"
+async def _picture(c: Community, initiative_id: int, owner: User, p: dict) -> File:
+    """One picture as an uploaded file, shared as its collection is."""
+    uploader = c.users[p["created_by"]].id
+    created_at = days_ago(p["days_ago"])
+    top, bottom = p["colours"]
+    width, height = p["size"]
+    versions = p.get("versions", 1)
+    filename = p.get("filename") or f"{p['title'].lower().replace(' ', '-')}.png"
+    file = File(
+        initiative_id=initiative_id,
+        name=p.get("title") or filename,
+        content={},
+        file_type=type_of_media(_MEDIA_TYPE),
+        created_by=uploader,
+        created_at=created_at,
     )
-    item: LibraryItem | None = None
+    c.session.add(file)
+    await c.session.flush()
+    c.ids["files"].append(file.id)
+    share(c, Tool.file, file, owner, general=ResourceAccessLevel.read)
+    tag(c, file, p.get("tags", ()))
+    version_at = created_at
     for number in range(1, versions + 1):
         # Earlier renditions lean darker, so the history reads as a picture
         # that was worked on rather than uploaded twice.
@@ -402,40 +403,21 @@ async def _picture(c: Community, library: Library, im: dict) -> LibraryItem:
             tuple(max(0, v - 25 * shade) for v in top),
             tuple(max(0, v - 25 * shade) for v in bottom),
         )
-        file_url = _store(c, library, png, ".png", "image/png", uploader)
-        thumbnail = libraries_service.render_thumbnail(png)
-        thumbnail_url = (
-            _store(
-                c,
-                library,
-                thumbnail.data,
-                thumbnail.extension,
-                thumbnail.content_type,
-                uploader,
-            )
-            if thumbnail is not None
-            else None
+        file_url = await attachments_service.store_upload(
+            c.session,
+            guild_id=c.guild.id,
+            filename=attachments_service.new_upload_filename(".png"),
+            data=png,
+            content_type=_MEDIA_TYPE,
+            created_by=uploader,
+            initiative_id=initiative_id,
         )
         version_at = created_at + timedelta(days=3 * (number - 1))
-        if item is None:
-            item = LibraryItem(
-                library_id=library.id,
-                title=im.get("title"),
-                description=im.get("description"),
-                occurred_on=created_at.date(),
-                created_by=uploader,
-                created_at=created_at,
-                updated_at=version_at,
-            )
-            c.session.add(item)
-            await c.session.flush()
-            c.ids["library_items"].append(item.id)
-        await file_versions.add_version(
+        version = await file_versions.add_version(
             c.session,
-            item,
+            file,
             file_url=file_url,
-            thumbnail_url=thumbnail_url,
-            file_content_type="image/png",
+            file_content_type=_MEDIA_TYPE,
             file_size=len(png),
             original_filename=filename,
             width=width,
@@ -443,19 +425,9 @@ async def _picture(c: Community, library: Library, im: dict) -> LibraryItem:
             created_by=uploader,
             created_at=version_at,
         )
-        item.updated_at = version_at
         # The next rendition is numbered after this one, which it reads back.
         await c.session.flush()
-    assert item is not None
-    await c.session.flush()
-    c.ids["library_item_versions"].extend(
-        (
-            await c.session.exec(
-                select(LibraryItemVersion.id).where(
-                    LibraryItemVersion.library_item_id == item.id
-                )
-            )
-        ).all()
-    )
-    tag(c, item, im.get("tags", ()))
-    return item
+        c.ids["file_versions"].append(version.id)
+    file.updated_at = version_at
+    c.session.add(file)
+    return file

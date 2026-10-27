@@ -101,7 +101,7 @@ INITIATIVES: dict[str, dict[str, dict]] = {
                 "Platform Member",
             ],
             "join_policy": InitiativeJoinPolicy.open,
-            "tools": (*_SMALL_KIT, Tool.dashboard, Tool.library),
+            "tools": (*_SMALL_KIT, Tool.dashboard),
         },
         "fringe": {
             "name": "Side Missions: Fringe Space",
@@ -136,7 +136,7 @@ INITIATIVES: dict[str, dict[str, dict]] = {
             ],
             "join_policy": InitiativeJoinPolicy.open,
             "auto_join": True,
-            "tools": (*_SMALL_KIT, Tool.dashboard, Tool.library),
+            "tools": (*_SMALL_KIT, Tool.dashboard),
         },
         "navy": {
             "name": "Royal Navy Conflicts",
