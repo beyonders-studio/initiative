@@ -103,6 +103,9 @@ class _FakeBody:
     def __init__(self, data: bytes) -> None:
         self._data = data
 
+    def read(self) -> bytes:
+        return self._data
+
     def iter_chunks(self, chunk_size: int = 65536):
         for i in range(0, len(self._data), chunk_size):
             yield self._data[i : i + chunk_size]
@@ -116,6 +119,8 @@ class FakeS3Client:
         self.presigned: list[tuple] = []
         # Keys delete_objects should report as failed (not actually removed).
         self.delete_errors: set[str] = set()
+        self.parts: dict[int, bytes] = {}
+        self.multipart_open = False
 
     @staticmethod
     def _missing(op: str) -> ClientError:
@@ -160,6 +165,28 @@ class FakeS3Client:
             "ContentType": rec["extra"].get("ContentType"),
             "ContentLength": len(body),
         }
+
+    def create_multipart_upload(self, *, Bucket, Key):
+        self.parts, self.multipart_open = {}, True
+        return {"UploadId": "up-1"}
+
+    def upload_part(self, *, Bucket, Key, UploadId, PartNumber, Body):
+        assert UploadId == "up-1" and self.multipart_open
+        self.parts[PartNumber] = Body
+        return {"ETag": f"etag-{PartNumber}"}
+
+    def complete_multipart_upload(self, *, Bucket, Key, UploadId, MultipartUpload):
+        numbers = [part["PartNumber"] for part in MultipartUpload["Parts"]]
+        self.objects[(Bucket, Key)] = {
+            "Body": b"".join(self.parts[n] for n in numbers),
+            "extra": {},
+        }
+        self.multipart_open = False
+        return {}
+
+    def abort_multipart_upload(self, *, Bucket, Key, UploadId):
+        self.multipart_open = False
+        return {}
 
     def generate_presigned_url(self, op, *, Params, ExpiresIn):
         self.presigned.append((op, Params, ExpiresIn))
@@ -233,6 +260,35 @@ def test_s3_open_readable_round_trip():
     assert blob.content_type == "application/pdf"
     assert blob.content_length == len(b"hello world")
     assert b"".join(blob.stream) == b"hello world"
+
+
+def test_s3_stages_a_file_in_parts_with_a_tail_between_requests():
+    client, storage = _s3()
+    state = storage.start_parts("resumable-a", part_bytes=8)
+
+    state = storage.add_part("resumable-a", state, b"first---")
+    # A request's last few bytes wait apart, below S3's least part.
+    state = storage.keep_tail("resumable-a", state, b"sec")
+    assert ("bucket", "guild_7/resumable-a-tail") in client.objects
+    tail, state = storage.take_tail("resumable-a", state)
+    state = storage.add_part("resumable-a", state, tail + b"ond")
+    storage.finish_parts("resumable-a", state)
+
+    blob = storage.open_readable("resumable-a")
+    assert b"".join(blob.stream) == b"first---second"
+    assert ("bucket", "guild_7/resumable-a-tail") not in client.objects
+    assert state["stored"] == 14
+
+
+def test_s3_drops_a_staged_file_whole():
+    client, storage = _s3()
+    state = storage.start_parts("resumable-b", part_bytes=8)
+    state = storage.keep_tail("resumable-b", state, b"abc")
+
+    storage.drop_parts("resumable-b", state)
+
+    assert client.multipart_open is False
+    assert not client.objects
 
 
 def test_s3_open_readable_missing_returns_none():

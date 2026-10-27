@@ -145,7 +145,7 @@ def sweeps() -> tuple[Sweep, ...]:
     from app.models.tenant.task import Task, TaskStatus, TaskStatusCategory
     from app.models.tenant.task_assignment_digest import TaskAssignmentDigestItem
     from app.models.tenant.upload import Upload
-    from app.services import notifications
+    from app.services import notifications, resumable
     from app.services.export import worker as export_worker
     from app.services.import_engine import worker as import_worker
     from app.services.marketplace import community_hooks, plugin_installs
@@ -434,6 +434,15 @@ def sweeps() -> tuple[Sweep, ...]:
                     when=f"NEW.filename LIKE '{PASTED_IMAGE_PREFIX}%'",
                 ),
             ),
+        ),
+        # Resumable uploads nobody finished or took.
+        Sweep(
+            kind="resumable_uploads",
+            scope=Scope.ACTIVE,
+            every=hour,
+            visit=resumable.expire,
+            next_due=resumable.next_due,
+            sources=(on_row("pending_uploads", "{row}.expires_at"),),
         ),
         # Uploaded pictures drawn smaller, as they arrive.
         Sweep(
