@@ -48,6 +48,9 @@ describe("CollectionFileFields", () => {
         body: { values: [{ property_id: 21, value: "Dusk" }], merge: true },
       })
     );
+    // The answer stands before the collection is read again.
+    expect(await screen.findByText("Saved")).toBeInTheDocument();
+    expect(screen.getByPlaceholderText("Empty")).toHaveValue("Dusk");
   });
 
   it("shows a reader only the values a file holds", () => {

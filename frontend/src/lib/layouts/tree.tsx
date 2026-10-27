@@ -36,6 +36,9 @@ export type LayoutContext = {
   editing?: WeakMap<LayoutNode, string>;
   variant: LayoutVariant;
   env: LayoutEnv;
+  /** Each field and row on one line, nothing wrapping: a card whose height is
+   *  reserved from its lines (`cardLines`) rather than measured. */
+  oneLine?: boolean;
 };
 
 /**
@@ -97,6 +100,7 @@ const renderField = (
       field={field}
       variant={view.variant}
       env={view.env}
+      oneLine={view.oneLine}
     />
   );
 };
@@ -201,12 +205,15 @@ const column =
 
 /** Arrangement, for a tree of any kind of item. */
 export const LAYOUT_PARTS = {
-  stack: <I,>(node: LayoutNode, item: I, view: LayoutContext, parts: Parts<I>) => (
-    <div className={stackClassName((node.props ?? {}) as StackProps)}>
-      {renderChildren(node, item, view, parts)}
-      {emptyWhileEdited(node, view)}
-    </div>
-  ),
+  stack: <I,>(node: LayoutNode, item: I, view: LayoutContext, parts: Parts<I>) => {
+    const props = (node.props ?? {}) as StackProps;
+    return (
+      <div className={stackClassName(view.oneLine ? { ...props, wrap: false } : props)}>
+        {renderChildren(node, item, view, parts)}
+        {emptyWhileEdited(node, view)}
+      </div>
+    );
+  },
   /** An item's layout, which holds its header, main and side regions. */
   layout: <I,>(node: LayoutNode, item: I, view: LayoutContext, parts: Parts<I>) => (
     <div className="grid canvas-md:grid-cols-[minmax(0,1fr)_20rem] gap-6">

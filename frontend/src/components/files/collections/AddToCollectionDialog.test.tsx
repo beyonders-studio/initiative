@@ -1,10 +1,11 @@
-import { screen, waitFor } from "@testing-library/react";
+import { act, screen, waitFor } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { HttpResponse } from "msw";
 import { describe, expect, it } from "vitest";
 
 import { buildCollection } from "@/__tests__/factories";
 import { communityHttp } from "@/__tests__/helpers/communityHttp";
+import i18n from "@/__tests__/helpers/i18n-test";
 import { server } from "@/__tests__/helpers/msw-server";
 import { renderPage } from "@/__tests__/helpers/render";
 import { AddToCollectionDialog } from "@/components/files/collections/AddToCollectionDialog";
@@ -46,9 +47,11 @@ describe("AddToCollectionDialog", () => {
 
   it("makes a new collection of the files, never an empty one, as the shape picked", async () => {
     let created: unknown = null;
+    let shapesRead = 0;
     server.use(
-      communityHttp.get("/collections/shapes", () =>
-        HttpResponse.json([
+      communityHttp.get("/collections/shapes", () => {
+        shapesRead += 1;
+        return HttpResponse.json([
           {
             key: "starters",
             name: "Starters",
@@ -65,8 +68,8 @@ describe("AddToCollectionDialog", () => {
               },
             ],
           },
-        ])
-      ),
+        ]);
+      }),
       communityHttp.post("/collections/", async ({ request }) => {
         created = await request.json();
         return HttpResponse.json(buildCollection({ id: 9, name: "Round 4" }), { status: 201 });
@@ -82,9 +85,14 @@ describe("AddToCollectionDialog", () => {
 
     // Named, it asks how the collection starts: blank until a shape is picked.
     expect(screen.getByRole("button", { name: /^Blank/ })).toHaveAttribute("aria-pressed", "true");
-    const catalog = await screen.findByRole("button", { name: /^Catalog/ });
-    expect(catalog).toHaveTextContent("Fields: Price and Rating");
-    await user.click(catalog);
+    expect(await screen.findByRole("button", { name: /^Catalog/ })).toHaveTextContent(
+      "Fields: Price and Rating"
+    );
+    // The shapes are in the reader's language: another is read afresh.
+    await act(() => i18n.changeLanguage("fr"));
+    await waitFor(() => expect(shapesRead).toBe(2));
+    await act(() => i18n.changeLanguage("en"));
+    await user.click(await screen.findByRole("button", { name: /^Catalog/ }));
     await user.click(screen.getByRole("button", { name: "Create collection" }));
     await waitFor(() =>
       expect(created).toEqual({

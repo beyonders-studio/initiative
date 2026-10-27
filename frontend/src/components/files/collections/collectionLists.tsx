@@ -79,6 +79,7 @@ export const useCollectionCard = (
       variant: "card",
       env,
       editing: editing ? indexPaths(card) : undefined,
+      oneLine: true,
     };
     const linesOf = (file: CollectionFileSummary) =>
       cardLines(card, file as unknown as LayoutItem, fields);

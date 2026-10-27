@@ -1,4 +1,5 @@
 import { keepPreviousData, useInfiniteQuery, useQuery } from "@tanstack/react-query";
+import { useTranslation } from "react-i18next";
 
 import {
   addCollectionFiles,
@@ -63,11 +64,12 @@ export const useCollections = (initiativeId: number | null) => {
 };
 
 /** The ready-made shapes a new collection can start as, in the reader's
- *  language. They change only with a release. */
+ *  language, read again when it changes. They change only with a release. */
 export const useCollectionShapes = (enabled: boolean) => {
   const communityId = useActiveCommunityId();
+  const { i18n } = useTranslation();
   return useQuery<CollectionShapeGroup[]>({
-    queryKey: getListCollectionShapesQueryKey(communityId),
+    queryKey: [...getListCollectionShapesQueryKey(communityId), i18n.language],
     queryFn: () => listCollectionShapes(communityId),
     staleTime: Number.POSITIVE_INFINITY,
     enabled,

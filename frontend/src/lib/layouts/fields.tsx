@@ -153,6 +153,8 @@ export type FieldRendererProps = {
   field: FieldDef;
   variant: LayoutVariant;
   env: LayoutEnv;
+  /** Drawn on one line ({@link LayoutContext}'s `oneLine`). */
+  oneLine?: boolean;
 };
 
 /** Whether a value has nothing to show. A count of none is null by then. */
@@ -402,11 +404,12 @@ const TaskTypeField = ({ value, variant }: FieldRendererProps) => {
   return <TaskTypeMark type={type} className="h-lh" iconClassName="h-4 w-4" />;
 };
 
-const PropertyField = ({ value, field, variant }: FieldRendererProps) => (
+const PropertyField = ({ value, field, variant, oneLine }: FieldRendererProps) => (
   <PropertyValueCell
     summary={(value as PropertySummary | null) ?? undefined}
     variant={variant === "cell" || field.plain ? "cell" : "chip"}
     display={field.display}
+    oneLine={oneLine}
   />
 );
 

@@ -46,4 +46,16 @@ describe("cardLines", () => {
     };
     expect(cardLines(card, item, fields)).toBe(3);
   });
+
+  it("counts a row as tall as its tallest part, properties in it sharing its line", () => {
+    const row: LayoutNode = {
+      type: "stack",
+      props: { direction: "row" },
+      children: [
+        { type: "properties" },
+        { type: "stack", children: [field("name"), field("property:21")] },
+      ],
+    };
+    expect(cardLines(row, { ...item, properties: file.fields } as LayoutItem, fields)).toBe(2);
+  });
 });

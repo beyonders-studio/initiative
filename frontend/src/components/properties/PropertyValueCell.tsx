@@ -28,6 +28,9 @@ export interface PropertyValueCellProps {
   nested?: boolean;
   /** How a rating is drawn, as the list showing it says; a number without. */
   display?: RatingDisplay | null;
+  /** On one line, its chips past the end cut off: a card whose height is
+   *  reserved without measuring it. */
+  oneLine?: boolean;
 }
 
 const formatNumber = (raw: unknown, options?: Intl.NumberFormatOptions): string => {
@@ -147,6 +150,7 @@ export const PropertyValueCell = ({
   className,
   nested = false,
   display,
+  oneLine = false,
 }: PropertyValueCellProps) => {
   const { t } = useTranslation("properties");
   const options = useMemo(() => coerceOptionMap(summary?.options), [summary?.options]);
@@ -271,7 +275,12 @@ export const PropertyValueCell = ({
         ? (value as unknown[]).filter((v): v is string => typeof v === "string")
         : [];
       body = (
-        <span className="flex max-w-full flex-wrap items-center gap-1">
+        <span
+          className={cn(
+            "flex max-w-full items-center gap-1",
+            oneLine ? "overflow-hidden *:shrink-0" : "flex-wrap"
+          )}
+        >
           {slugs.map((slug) => (
             <SelectChip
               key={slug}

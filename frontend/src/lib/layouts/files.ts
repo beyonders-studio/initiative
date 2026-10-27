@@ -99,28 +99,31 @@ export const collectionFileFields = (
 };
 
 /**
- * How many lines a card draws under a file's picture: one for each field it
- * shows a value of, one for a row of them, and one for each property where it
- * shows them all. What a wall that places files without measuring them
- * reserves for the card.
+ * How many lines a card draws under a file's picture, which draws each field
+ * and row on one line: one for each field it shows a value of, one for each
+ * property where it shows them all, and a row as many as its tallest part
+ * (properties in a row share its line). What a wall that places files without
+ * measuring them reserves for the card.
  */
 export const cardLines = (
   node: LayoutNode,
   item: LayoutItem,
-  fields: ReadonlyMap<string, FieldDef>
+  fields: ReadonlyMap<string, FieldDef>,
+  inRow = false
 ): number => {
   switch (node.type) {
     case "field": {
       const field = fields.get(String(node.props?.field));
       return field && !isEmptyValue(field.value(item)) ? 1 : 0;
     }
-    case "properties":
-      return nonEmptyPropertySummaries(item.properties).length;
+    case "properties": {
+      const count = nonEmptyPropertySummaries(item.properties).length;
+      return inRow ? Math.min(1, count) : count;
+    }
     default: {
-      const lines = (node.children ?? []).map((child) => cardLines(child, item, fields));
-      return node.type === "stack" && node.props?.direction === "row"
-        ? Math.min(1, Math.max(0, ...lines))
-        : lines.reduce((sum, each) => sum + each, 0);
+      const row = node.type === "stack" && node.props?.direction === "row";
+      const lines = (node.children ?? []).map((child) => cardLines(child, item, fields, row));
+      return row ? Math.max(0, ...lines) : lines.reduce((sum, each) => sum + each, 0);
     }
   }
 };
