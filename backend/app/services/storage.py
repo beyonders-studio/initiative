@@ -123,6 +123,9 @@ def requested_range(header: str | None) -> str | None:
     digits = first + last
     if not dash or not digits or not (digits.isascii() and digits.isdigit()):
         return None
+    # No stored file runs to a petabyte; a longer bound is served whole.
+    if max(len(first), len(last)) > 15:
+        return None
     if first and last and int(first) > int(last):
         return None
     return header
