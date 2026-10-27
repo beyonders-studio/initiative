@@ -1256,17 +1256,18 @@ class _ScopeBuilder:
         """
         if self.mode != "backup" or not _include_uploads(self.params):
             return
-        from sqlmodel import select
+        from sqlmodel import col, select
 
         from app.models.tenant.upload import Upload
-        from app.services.tenant.attachments import guild_wide
+        from app.services.tenant.attachments import THUMBNAIL_PREFIX, guild_wide
 
         async with guild_wide(self.guild_id) as session:
             rows = (
                 await session.exec(
-                    select(
-                        Upload.filename, Upload.size_bytes, Upload.content_type
-                    ).order_by(Upload.id.asc())
+                    select(Upload.filename, Upload.size_bytes, Upload.content_type)
+                    # A thumbnail is made again from its picture.
+                    .where(~col(Upload.filename).startswith(THUMBNAIL_PREFIX))
+                    .order_by(Upload.id.asc())
                 )
             ).all()
         for storage_key, size_bytes, content_type in rows:

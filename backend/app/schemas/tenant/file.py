@@ -90,6 +90,9 @@ class FileSummary(FileBase, ToolSummaryBase):
     file_content_type: Optional[str] = None
     file_size: Optional[int] = None
     original_filename: Optional[str] = None
+    #: A smaller picture of an uploaded picture, for a card; ``None`` until
+    #: the app has drawn it, and for every other type.
+    thumbnail_url: Annotated[Optional[str], UPLOAD_PATH] = None
     # Smart-link URL surfaced on the summary so cards can render the
     # provider-specific icon without fetching the full content JSONB.
     # Only populated when file_type == "url".
@@ -117,7 +120,13 @@ class FileSummary(FileBase, ToolSummaryBase):
 
 
 #: What a file reports of its current version.
-_FILE_FIELDS = ("file_url", "file_content_type", "file_size", "original_filename")
+_FILE_FIELDS = (
+    "file_url",
+    "file_content_type",
+    "file_size",
+    "original_filename",
+    "thumbnail_url",
+)
 
 
 class FileListResponse(PageMeta):

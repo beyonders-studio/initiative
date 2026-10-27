@@ -164,6 +164,7 @@
   "VERSION_CONFLICT": "Jemand anderes hat im selben Moment eine Version hochgeladen. Versuche es erneut.",
   "FILE_INVALID_FILE": "Diese Datei ist leer oder konnte nicht gelesen werden (max. 50 MB).",
   "FILE_TYPE_NOT_ALLOWED": "Programme und Skripte können nicht hochgeladen werden.",
+  "FILE_THUMBNAIL_NOT_WANTED": "Diese Version hat bereits ein Vorschaubild oder ist kein Video.",
   "COMMENT_NOT_FOUND": "Kommentar nicht gefunden",
   "COMMENT_PERMISSION_DENIED": "Nicht berechtigt zu kommentieren",
   "COMMENT_PARENT_NOT_FOUND": "Übergeordneter Kommentar nicht gefunden",

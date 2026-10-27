@@ -21,12 +21,19 @@ vi.mock("@/lib/uploadUrl", () => ({
 
 const uploadMutate = vi.fn();
 const deleteMutate = vi.fn();
+const putThumbnail = vi.fn();
+const frame = new Blob(["frame"], { type: "image/webp" });
+
+vi.mock("@/lib/videoFrame", () => ({
+  drawVideoFrame: () => Promise.resolve(frame),
+}));
 let mockVersions: FileVersionRead[] = [];
 
 vi.mock("@/hooks/useFiles", () => ({
   useFileVersions: () => ({ data: mockVersions }),
   useUploadFileVersion: () => ({ mutate: uploadMutate, isPending: false }),
   useDeleteFileVersion: () => ({ mutate: deleteMutate, isPending: false }),
+  usePutVideoThumbnail: () => ({ mutate: putThumbnail }),
 }));
 
 // Import after mocks are registered.
@@ -101,5 +108,62 @@ describe("UploadedFileViewer version controls", () => {
     await userEvent.click(screen.getByRole("button", { name: /version history/i }));
     await userEvent.click(screen.getByRole("button", { name: /version 1/i }));
     await waitFor(() => expect(screen.getByText(/viewing an older version/i)).toBeInTheDocument());
+  });
+});
+
+describe("UploadedFileViewer media", () => {
+  beforeEach(() => putThumbnail.mockClear());
+
+  const playing = (
+    contentType: string,
+    name: string,
+    props: Partial<Parameters<typeof UploadedFileViewer>[0]> = {}
+  ) => {
+    mockVersions = [
+      buildVersion({
+        id: 2,
+        is_current: true,
+        file_content_type: contentType,
+        original_filename: name,
+      }),
+    ];
+    return renderViewer({
+      contentType,
+      originalFilename: name,
+      fileUrl: `/uploads/${name}`,
+      ...props,
+    });
+  };
+
+  it("plays a video in the browser's player", () => {
+    const { container } = playing("video/mp4", "clip.mp4");
+    const video = container.querySelector("video");
+    expect(video).toHaveAttribute("src", "/dl/5/v/2?inline=1");
+    expect(video).toHaveAttribute("controls");
+  });
+
+  it("plays a recording in the browser's player", () => {
+    const { container } = playing("audio/mpeg", "take.mp3");
+    expect(container.querySelector("audio")).toHaveAttribute("src", "/dl/5/v/2?inline=1");
+    expect(screen.getByRole("heading", { name: "take.mp3" })).toBeInTheDocument();
+  });
+
+  it("gives a video without a thumbnail a frame of itself, for an editor", async () => {
+    playing("video/mp4", "clip.mp4", { canEdit: true });
+
+    await waitFor(() =>
+      expect(putThumbnail).toHaveBeenCalledWith({ fileId: 5, versionId: 2, frame })
+    );
+  });
+
+  it("leaves a video's thumbnail to an editor, and one it already has alone", async () => {
+    playing("video/mp4", "clip.mp4", { canEdit: false });
+    playing("video/mp4", "clip.mp4", {
+      canEdit: true,
+      thumbnailUrl: "/uploads/7/thumbnail-a.webp",
+    });
+
+    await new Promise((settle) => setTimeout(settle, 0));
+    expect(putThumbnail).not.toHaveBeenCalled();
   });
 });

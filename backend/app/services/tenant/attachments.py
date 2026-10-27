@@ -38,6 +38,11 @@ UPLOADS_URL_PREFIX = "/uploads/"
 #: a file keeps its own name and is never touched.
 PASTED_IMAGE_PREFIX = "pasted-"
 
+#: What the stored name of a thumbnail the app made starts with. A thumbnail
+#: is made again whenever it is wanted, so it counts toward no storage limit
+#: and no backup carries it.
+THUMBNAIL_PREFIX = "thumbnail-"
+
 #: An upload's address inside markdown: ``/uploads/{community_id}/{filename}``,
 #: optionally behind an origin.
 _MARKDOWN_UPLOAD_URL = re.compile(rf"(?:https?://[^\s()<>]+?)?{UPLOAD_PATH_SHAPE}")
@@ -129,8 +134,8 @@ def upload_names(urls: Iterable[str | None]) -> Set[str]:
 async def purge_file_uploads(session, files: Iterable[Any]) -> Set[str]:
     """Delete the uploads of files about to be hard-purged.
 
-    An uploaded file's blob, and every version of it, backs that file alone,
-    so they go with it. What a file shows — pictures in its body, its
+    An uploaded file's blob, and every version of it and its thumbnail, backs
+    that file alone, so they go with it. What a file shows — pictures in its body, its
     featured image — goes only when nothing that stays shows it too; a trashed
     file still counts, since it may be restored.
 
@@ -147,9 +152,13 @@ async def purge_file_uploads(session, files: Iterable[Any]) -> Set[str]:
     doomed_ids = {d.id for d in doomed}
 
     versions = await session.exec(
-        select(FileVersion.file_url).where(FileVersion.file_id.in_(doomed_ids))
+        select(FileVersion.file_url, FileVersion.thumbnail_url).where(
+            FileVersion.file_id.in_(doomed_ids)
+        )
     )
-    removed = await _drop_upload_rows(session, upload_names(versions.all()))
+    removed = await _drop_upload_rows(
+        session, upload_names(url for row in versions.all() for url in row)
+    )
 
     shown: Set[str] = set()
     for d in doomed:
@@ -182,8 +191,8 @@ UNCLAIMED_PASTED_IMAGE_GRACE = timedelta(hours=24)
 
 def _upload_columns() -> tuple[tuple[type, str], ...]:
     """Every column a stored upload can be shown from: every column somebody
-    writes in, a file's featured image, and the files of every version of
-    an uploaded file."""
+    writes in, a file's featured image, and the files and thumbnails of every
+    version of an uploaded file."""
     from app.db.search_index import written_columns
     from app.models.tenant.file import File, FileVersion
 
@@ -195,6 +204,7 @@ def _upload_columns() -> tuple[tuple[type, str], ...]:
         ),
         (File, "featured_image_url"),
         (FileVersion, "file_url"),
+        (FileVersion, "thumbnail_url"),
     )
 
 
@@ -893,15 +903,20 @@ async def store_upload(
 
 async def get_guild_storage_usage(guild_id: int) -> int:
     """Total stored blob bytes for the guild — ``SUM(uploads.size_bytes)`` over
-    every upload it stores, read on :func:`guild_wide`."""
+    every upload it stores but the thumbnails the app made
+    (:data:`THUMBNAIL_PREFIX`), read on :func:`guild_wide`."""
     from sqlalchemy import func
-    from sqlmodel import select
+    from sqlmodel import col, select
 
     from app.models.tenant.upload import Upload
 
     async with guild_wide(guild_id) as session:
         return (
-            await session.exec(select(func.coalesce(func.sum(Upload.size_bytes), 0)))
+            await session.exec(
+                select(func.coalesce(func.sum(Upload.size_bytes), 0)).where(
+                    ~col(Upload.filename).startswith(THUMBNAIL_PREFIX)
+                )
+            )
         ).one()
 
 

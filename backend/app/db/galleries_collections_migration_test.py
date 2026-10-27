@@ -1,4 +1,4 @@
-"""Migration 20261026_0543 turns galleries into collections and their pictures
+"""Migration 20261027_0545 turns galleries into collections and their pictures
 into files. Loaded by path and run on a guild the test builds: down to empty
 gallery tables, a gallery written the way 0.68 stored one, then up again, the
 way ``files_formats_migration_test`` runs its revisions."""
@@ -47,7 +47,7 @@ async def _one(session, sql: str, **params: Any) -> Any:
 
 def _runner(schema: str):
     """Revision 0543 one way or the other, on one guild's schema only."""
-    migration = _load("20261026_0543_galleries_are_collections.py")
+    migration = _load("20261027_0545_galleries_are_collections.py")
 
     def run(forward: bool):
         def apply(sync_session) -> None:

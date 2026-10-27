@@ -84,10 +84,19 @@ FROZEN_PARENT_CONSTRAINT = "frozen_parent_guard"
 
 
 #: What a frozen row may still change: the columns that describe the freeze
-#: itself (the two lifecycle mixins' fields), plus the timestamp every write
-#: touches. Everything else is content.
+#: itself (the two lifecycle mixins' fields), the timestamp every write
+#: touches, and a thumbnail the app draws of what is already there.
+#: Everything else is content.
 LIFECYCLE_COLUMNS: tuple[str, ...] = tuple(
-    sorted({*ArchiveMixin.model_fields, *SoftDeleteMixin.model_fields, "updated_at"})
+    sorted(
+        {
+            *ArchiveMixin.model_fields,
+            *SoftDeleteMixin.model_fields,
+            "updated_at",
+            "thumbnail_url",
+            "thumbnail_state",
+        }
+    )
 )
 
 #: Rows that hold a NAME which is unique among their siblings, mapped to the

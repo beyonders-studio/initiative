@@ -40,8 +40,10 @@ export const FileCard = ({ file, className }: FileCardProps) => {
     file_type: file.file_type,
     smart_link_url: file.smart_link_url,
   });
-  // A picture is shown as itself; any other file by its featured image.
-  const picture = file.kind === FileKind.image ? file.file_url : file.featured_image_url;
+  // A picture or a video is shown by its thumbnail, and a picture by itself
+  // until that is drawn; any other file by its featured image.
+  const picture =
+    file.thumbnail_url ?? (file.kind === FileKind.image ? file.file_url : file.featured_image_url);
   const smartLinkMatch =
     file.file_type === FileType.url && file.smart_link_url
       ? matchSmartLinkProvider(file.smart_link_url)

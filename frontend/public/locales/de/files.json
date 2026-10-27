@@ -329,6 +329,8 @@
     "unknownFileType": "Dieser Dateityp kann im Browser nicht in der Vorschau angezeigt werden.",
     "downloadFile": "Datei herunterladen",
     "image": "Bild",
+    "video": "Video",
+    "audio": "Audio",
     "markdownDocument": "Markdown-Dokument",
     "showSource": "Quelltext anzeigen",
     "showRendered": "Gerendert anzeigen"

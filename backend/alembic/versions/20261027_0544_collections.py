@@ -17,8 +17,8 @@ number of them. In ``guild_template`` and every ``guild_<id>``:
 The CHECKs that list kinds and parents, and their policies, are not touched
 here; a start renders the policies from the registries.
 
-Revision ID: 20261026_0542
-Revises: 20261026_0541
+Revision ID: 20261027_0544
+Revises: 20261027_0543
 Create Date: 2026-10-26
 """
 
@@ -27,8 +27,8 @@ from alembic import op
 
 from app.db.guild_migrations import run_for_each_guild_schema
 
-revision = "20261026_0542"
-down_revision = "20261026_0541"
+revision = "20261027_0544"
+down_revision = "20261027_0543"
 branch_labels = None
 depends_on = None
 
@@ -66,13 +66,9 @@ def _apply_upgrade() -> None:
         ),
         sa.ForeignKeyConstraint(["cover_file_id"], ["files.id"], ondelete="SET NULL"),
         sa.PrimaryKeyConstraint("id"),
-        sa.UniqueConstraint(
-            "id", "initiative_id", name="uq_collections_id_initiative"
-        ),
+        sa.UniqueConstraint("id", "initiative_id", name="uq_collections_id_initiative"),
     )
-    op.create_index(
-        "ix_collections_initiative_id", "collections", ["initiative_id"]
-    )
+    op.create_index("ix_collections_initiative_id", "collections", ["initiative_id"])
     op.execute(
         "CREATE TRIGGER tr_collections_set_created_by BEFORE INSERT "
         "ON collections FOR EACH ROW EXECUTE FUNCTION public.fn_set_created_by()"

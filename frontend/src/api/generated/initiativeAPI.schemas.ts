@@ -1159,6 +1159,10 @@ export interface BodyNotifyMentions {
   mentioned_user_ids: number[];
 }
 
+export interface BodyPutVideoThumbnail {
+  file: Blob | File;
+}
+
 export interface BodyReplyToFiledTicket {
   body: string;
   files?: (Blob | File)[];
@@ -5799,6 +5803,7 @@ export interface FileSummary {
   file_content_type: string | null;
   file_size: number | null;
   original_filename: string | null;
+  thumbnail_url: string | null;
   smart_link_url: string | null;
   /** How the file is shown, which follows from its type. */
   readonly kind: FileKind;
@@ -5840,6 +5845,7 @@ export interface FileRead {
   file_content_type: string | null;
   file_size: number | null;
   original_filename: string | null;
+  thumbnail_url: string | null;
   smart_link_url: string | null;
   content: FileReadContent;
   content_version: string | null;

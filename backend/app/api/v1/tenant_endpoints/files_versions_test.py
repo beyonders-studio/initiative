@@ -761,3 +761,103 @@ async def test_upload_file_as_any_author(
         await session.exec(select(FileVersion).where(FileVersion.file_id == body["id"]))
     ).all()
     assert [v.version_number for v in versions] == [1]
+
+
+_MP4 = b"\x00\x00\x00\x18ftypmp42\x00\x00\x00\x00mp42isom" + b"\x00" * 64
+
+
+def _frame(size: tuple[int, int] = (320, 180)) -> bytes:
+    import io
+
+    from PIL import Image
+
+    out = io.BytesIO()
+    Image.new("RGB", size, (20, 20, 20)).save(out, format="PNG")
+    return out.getvalue()
+
+
+async def _video_version(client: AsyncClient, session: AsyncSession, owner):
+    doc = await _upload_initial_file_doc(
+        client,
+        owner,
+        initiative=owner.initiative,
+        content=_MP4,
+        filename="clip.mp4",
+        content_type="video/mp4",
+    )
+    assert doc["kind"] == "video", doc
+    version = (
+        await session.exec(select(FileVersion).where(FileVersion.file_id == doc["id"]))
+    ).one()
+    return doc, version.id
+
+
+async def _put_frame(client, actor, doc, version_id, frame):
+    return await client.put(
+        actor.g(f"/files/{doc['id']}/versions/{version_id}/thumbnail"),
+        headers=actor.headers,
+        files={"file": ("frame.png", frame, "image/png")},
+    )
+
+
+async def test_a_video_takes_one_frame_as_its_thumbnail(
+    client: AsyncClient, session: AsyncSession, acting_user
+) -> None:
+    """Drawn again on the server, so even a small frame is stored as a WebP of
+    its own; a second frame is refused."""
+    owner = await acting_user(guild_role=CommunityRole.admin, initiative=True)
+    doc, version_id = await _video_version(client, session, owner)
+
+    resp = await _put_frame(client, owner, doc, version_id, _frame())
+    assert resp.status_code == 204, resp.text
+
+    listed = await client.get(owner.g(f"/files/{doc['id']}"), headers=owner.headers)
+    thumbnail = listed.json()["thumbnail_url"]
+    name = thumbnail.rsplit("/", 1)[-1]
+    assert name.startswith(attachments_service.THUMBNAIL_PREFIX)
+    assert name.endswith(".webp")
+    again = await _put_frame(client, owner, doc, version_id, _frame())
+    assert again.status_code == 409
+    assert again.json()["detail"] == "FILE_THUMBNAIL_NOT_WANTED"
+
+
+async def test_only_a_video_takes_a_frame(
+    client: AsyncClient, session: AsyncSession, acting_user
+) -> None:
+    owner = await acting_user(guild_role=CommunityRole.admin, initiative=True)
+    doc = await _upload_initial_file_doc(client, owner, initiative=owner.initiative)
+    version = (
+        await session.exec(select(FileVersion).where(FileVersion.file_id == doc["id"]))
+    ).one()
+
+    resp = await _put_frame(client, owner, doc, version.id, _frame())
+    assert resp.status_code == 409
+    assert resp.json()["detail"] == "FILE_THUMBNAIL_NOT_WANTED"
+
+
+async def test_a_frame_that_is_not_a_picture_is_refused(
+    client: AsyncClient, session: AsyncSession, acting_user
+) -> None:
+    owner = await acting_user(guild_role=CommunityRole.admin, initiative=True)
+    doc, version_id = await _video_version(client, session, owner)
+
+    resp = await _put_frame(client, owner, doc, version_id, b"<svg/>" * 10)
+    assert resp.status_code == 400
+    assert resp.json()["detail"] == "FILE_INVALID_FILE"
+
+
+async def test_a_reader_cannot_give_a_video_its_thumbnail(
+    client: AsyncClient, session: AsyncSession, acting_user
+) -> None:
+    owner = await acting_user(guild_role=CommunityRole.admin, initiative=True)
+    reader = await acting_user(
+        guild_role=CommunityRole.member,
+        guild=owner.guild,
+        initiative=owner.initiative,
+        initiative_role="member",
+    )
+    doc, version_id = await _video_version(client, session, owner)
+    await _share(session, doc, reader, ResourceAccessLevel.read)
+
+    resp = await _put_frame(client, reader, doc, version_id, _frame())
+    assert resp.status_code == 403

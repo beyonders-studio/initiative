@@ -89,6 +89,8 @@ class FileTypeSpec:
     #: For the editor's own types: what an export of one may be written as.
     #: Every other type exports as its stored file.
     exports: tuple[str, ...] = ()
+    #: The format Pillow reads it as, for a type the app makes a thumbnail of.
+    picture_format: str | None = None
 
     @property
     def stored(self) -> bool:
@@ -98,9 +100,12 @@ class FileTypeSpec:
 
 
 def _stored(
-    kind: FileKind, media_types: tuple[str, ...], *extensions: str
+    kind: FileKind,
+    media_types: tuple[str, ...],
+    *extensions: str,
+    picture_format: str | None = None,
 ) -> FileTypeSpec:
-    return FileTypeSpec(kind, media_types, extensions)
+    return FileTypeSpec(kind, media_types, extensions, picture_format=picture_format)
 
 
 _OOXML = "application/vnd.openxmlformats-officedocument"
@@ -137,17 +142,25 @@ SPECS: dict[FileType, FileTypeSpec] = {
         FileKind.presentation, (f"{_OOXML}.presentationml.presentation",), ".pptx"
     ),
     FileType.odp: _stored(FileKind.presentation, (f"{_ODF}.presentation",), ".odp"),
-    FileType.png: _stored(FileKind.image, ("image/png",), ".png"),
+    FileType.png: _stored(FileKind.image, ("image/png",), ".png", picture_format="PNG"),
     FileType.jpeg: _stored(
-        FileKind.image, ("image/jpeg", "image/jpg"), ".jpg", ".jpeg"
+        FileKind.image,
+        ("image/jpeg", "image/jpg"),
+        ".jpg",
+        ".jpeg",
+        picture_format="JPEG",
     ),
-    FileType.gif: _stored(FileKind.image, ("image/gif",), ".gif"),
-    FileType.webp: _stored(FileKind.image, ("image/webp",), ".webp"),
+    FileType.gif: _stored(FileKind.image, ("image/gif",), ".gif", picture_format="GIF"),
+    FileType.webp: _stored(
+        FileKind.image, ("image/webp",), ".webp", picture_format="WEBP"
+    ),
     FileType.svg: _stored(FileKind.image, ("image/svg+xml",), ".svg"),
     FileType.heic: _stored(
         FileKind.image, ("image/heic", "image/heif"), ".heic", ".heif"
     ),
-    FileType.tiff: _stored(FileKind.image, ("image/tiff",), ".tiff", ".tif"),
+    FileType.tiff: _stored(
+        FileKind.image, ("image/tiff",), ".tiff", ".tif", picture_format="TIFF"
+    ),
     FileType.mp4: _stored(FileKind.video, ("video/mp4",), ".mp4", ".m4v"),
     FileType.webm: _stored(FileKind.video, ("video/webm",), ".webm"),
     FileType.mov: _stored(FileKind.video, ("video/quicktime",), ".mov"),

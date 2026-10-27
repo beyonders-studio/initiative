@@ -70,10 +70,10 @@ _PLUGIN_BINDING = {"source": "plugin", "params": {"document_id": 5}}
 
 def _guild_runner(schema: str):
     """Revision 0464 one way or the other, on one guild's schema only. The
-    galleries conversion (20261026_0543) comes off first and goes back last:
+    galleries conversion (20261027_0545) comes off first and goes back last:
     the checks 0464 restates name the permissions as they were then."""
     files = _load("20261006_0464_documents_are_files.py")
-    collections = _load("20261026_0543_galleries_are_collections.py")
+    collections = _load("20261027_0545_galleries_are_collections.py")
 
     def run(forward: bool):
         def apply(sync_session) -> None:

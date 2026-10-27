@@ -15,6 +15,9 @@ pictures a file. In ``guild_template`` and every ``guild_<id>``:
   Each ``gallery_image_versions`` row is a ``file_versions`` row pointing at
   the same blob; no bytes move and ``uploads`` is untouched. A version with no
   author takes the picture's, else the gallery's, else its owner's.
+  A picture's version waits on a thumbnail, as 20261027_0543 left every
+  picture uploaded before it, and the gallery's own thumbnails are left for
+  nothing to show.
 * **Membership** — a ``collection_files`` row adds each file to its gallery's
   collection, added by the picture's author when it was uploaded.
 * **Sharing** — every ``resource_grants`` row of a gallery (each grantee and
@@ -70,8 +73,8 @@ The downgrade puts back empty gallery tables, ``comments.gallery_id`` and
 (the comments on one included) and restates the CHECKs the old way. It does not
 turn files back into pictures, and nothing it removed comes back.
 
-Revision ID: 20261026_0543
-Revises: 20261026_0542
+Revision ID: 20261027_0545
+Revises: 20261027_0544
 Create Date: 2026-10-26
 """
 
@@ -89,8 +92,8 @@ from sqlalchemy.engine import Connection
 
 from app.db.guild_migrations import run_for_each_guild_schema
 
-revision = "20261026_0543"
-down_revision = "20261026_0542"
+revision = "20261027_0545"
+down_revision = "20261027_0544"
 branch_labels = None
 depends_on = None
 
@@ -178,6 +181,20 @@ _PICTURE_FORMATS = (
     ("image/gif", "gif"),
     ("image/webp", "webp"),
     ("image/svg+xml", "svg"),
+)
+
+#: The media types 20261027_0543 waits on a thumbnail for: a converted
+#: picture's versions wait the same way, and the thumbnails sweep draws them.
+_THUMBNAILED = ", ".join(
+    f"'{media}'"
+    for media in (
+        "image/png",
+        "image/jpeg",
+        "image/jpg",
+        "image/gif",
+        "image/webp",
+        "image/tiff",
+    )
 )
 
 #: ``public.relationship_kind_code`` as 20261026_0541 left it.
@@ -607,10 +624,13 @@ def _files(bind: Connection) -> None:
     )
     bind.exec_driver_sql(
         "INSERT INTO file_versions (file_id, version_number, file_url, "
-        "file_content_type, file_size, original_filename, created_by, created_at) "
+        "file_content_type, file_size, original_filename, created_by, created_at, "
+        "thumbnail_state) "
         "SELECT m.file_id, v.version_number, v.file_url, v.file_content_type, "
         "v.file_size, v.original_filename, coalesce(v.created_by, m.person), "
-        f"v.created_at FROM gallery_image_versions v JOIN {_MAP} m "
+        "v.created_at, CASE WHEN lower(trim(split_part(v.file_content_type, ';', 1))) "
+        f"IN ({_THUMBNAILED}) THEN 'pending' END "
+        f"FROM gallery_image_versions v JOIN {_MAP} m "
         f"ON m.image_id = v.gallery_image_id WHERE {_IN_SCHEMA}"
     )
     bind.exec_driver_sql(
@@ -908,7 +928,7 @@ _DATA_KINDS = (
 )
 
 
-def _notice_respeller(files: Mapping[int, int]) -> dict[str, Callable[[Any], Any]]:
+def _notice_respeller(files: Mapping[int, int]) -> dict[str, Callable[..., Any]]:
     """How each part of a notice reads with its picture a file and its gallery
     a collection. Raises :class:`_Unmapped` for a picture with no file."""
 

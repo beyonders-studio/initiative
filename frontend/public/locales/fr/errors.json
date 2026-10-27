@@ -162,6 +162,7 @@
   "VERSION_CONFLICT": "Quelqu'un d'autre a téléversé une version au même moment. Réessayez.",
   "FILE_INVALID_FILE": "Ce fichier est vide ou n'a pas pu être lu (max 50 Mo).",
   "FILE_TYPE_NOT_ALLOWED": "Les programmes et les scripts ne peuvent pas être téléversés.",
+  "FILE_THUMBNAIL_NOT_WANTED": "Cette version a déjà une miniature ou n'est pas une vidéo.",
   "COMMENT_NOT_FOUND": "Commentaire introuvable",
   "COMMENT_PERMISSION_DENIED": "Vous n'êtes pas autorisé à commenter",
   "COMMENT_PARENT_NOT_FOUND": "Commentaire parent introuvable",

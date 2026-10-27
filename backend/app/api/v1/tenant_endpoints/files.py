@@ -47,6 +47,7 @@ from app.core.messages import (
 )
 from app.core.rate_limit import limiter
 from app.db.session import require_actor_context
+from app.core.image_headers import read_image_header
 from app.core.file_types import (
     FileKind,
     FileType,
@@ -75,6 +76,7 @@ from app.schemas.tenant.file import (
 from app.schemas.tenant.resource_grant import initiative_readable
 from app.schemas.ai_generation import AIStreamEvent
 from app.services.tenant import attachments as attachments_service
+from app.services.tenant import thumbnails
 from app.services.tenant import file_versions
 from app.services import storage_config
 from app.services.storage import (
@@ -480,6 +482,78 @@ async def upload_file_version(
         conflict=True,
     )
     return file_versions.read(FileVersionRead, version, file)
+
+
+#: The largest frame a browser may send as a video's thumbnail.
+MAX_FRAME_BYTES = 2 * 1024 * 1024
+#: The formats a frame may come in.
+_FRAME_TYPES = frozenset({"image/png", "image/jpeg", "image/webp"})
+
+
+@router.put(
+    "/{file_id}/versions/{version_id}/thumbnail",
+    status_code=status.HTTP_204_NO_CONTENT,
+)
+async def put_video_thumbnail(
+    session: RLSSessionDep,
+    current_user: Annotated[User, Depends(get_current_active_user)],
+    guild_context: GuildContextDep,
+    file_id: int,
+    version_id: int,
+    upload: UploadFile = FormFile(..., alias="file"),
+) -> None:
+    """Give a video version its thumbnail: a frame the browser drew from it.
+    Requires write access. Taken once, for a video version that has none,
+    and drawn again on the server like any picture."""
+    file = await resource_access.load_authorized(
+        session, Tool.file, file_id, current_user, guild_context, access="write"
+    )
+    version = (
+        await session.exec(
+            select(FileVersion)
+            .where(FileVersion.id == version_id, FileVersion.file_id == file.id)
+            .with_for_update()
+        )
+    ).first()
+    if version is None:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail=CommonMessages.VERSION_NOT_FOUND,
+        )
+    if (
+        spec_of(type_of_media(version.file_content_type)).kind is not FileKind.video
+        or version.thumbnail_url is not None
+    ):
+        raise HTTPException(
+            status_code=status.HTTP_409_CONFLICT,
+            detail=FileMessages.THUMBNAIL_NOT_WANTED,
+        )
+    try:
+        frame = await attachments_service.read_upload_bounded(upload, MAX_FRAME_BYTES)
+    except attachments_service.FileTooLargeError:
+        raise HTTPException(
+            status_code=status.HTTP_413_CONTENT_TOO_LARGE,
+            detail=FileMessages.FILE_TOO_LARGE,
+        )
+    header = read_image_header(frame)
+    picture_format = (
+        spec_of(type_of_media(header.content_type)).picture_format
+        if header is not None and header.content_type in _FRAME_TYPES
+        else None
+    )
+    if picture_format is None or not await thumbnails.take_frame(
+        session,
+        guild_context.guild_id,
+        version,
+        file.initiative_id,
+        frame,
+        picture_format,
+    ):
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail=FileMessages.INVALID_FILE,
+        )
+    await session.commit()
 
 
 @router.get("/{file_id}/versions", response_model=List[FileVersionRead])

@@ -8,6 +8,7 @@ from sqlalchemy import (
     Column,
     DateTime,
     ForeignKey,
+    Index,
     Integer,
     LargeBinary,
     String,
@@ -162,6 +163,12 @@ class FileVersion(CreatedByMixin, table=True):
     __tablename__ = "file_versions"
     __table_args__ = (
         UniqueConstraint("file_id", "version_number", name="uq_fv_file_version"),
+        # The thumbnails sweep's queue.
+        Index(
+            "ix_file_versions_thumbnail_pending",
+            "id",
+            postgresql_where=text("thumbnail_state = 'pending'"),
+        ),
     )
 
     id: Optional[int] = Field(default=None, primary_key=True)
@@ -187,6 +194,20 @@ class FileVersion(CreatedByMixin, table=True):
     original_filename: Optional[str] = Field(
         default=None,
         sa_column=Column(String(length=255), nullable=True),
+    )
+    #: A smaller picture of it, for a type the app makes one of
+    #: (``FileTypeSpec.picture_format``); its own ``file_url`` when it is
+    #: already small enough.
+    thumbnail_url: Optional[str] = Field(
+        default=None,
+        sa_column=Column(String(length=512), nullable=True),
+    )
+    #: ``pending`` until the ``thumbnails`` sweep has made it, then ``ready``,
+    #: or ``failed`` for bytes it could not draw; ``NULL`` for a type that has
+    #: no thumbnail.
+    thumbnail_state: Optional[str] = Field(
+        default=None,
+        sa_column=Column(Text, nullable=True),
     )
     created_at: datetime = Field(
         default_factory=lambda: datetime.now(timezone.utc),

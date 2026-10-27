@@ -24,12 +24,18 @@ import { Button } from "@/components/ui/button";
 import { ConfirmDialog } from "@/components/ui/confirm-dialog";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
 import { useAppConfig } from "@/hooks/useAppConfig";
-import { useDeleteFileVersion, useFileVersions, useUploadFileVersion } from "@/hooks/useFiles";
+import {
+  useDeleteFileVersion,
+  useFileVersions,
+  usePutVideoThumbnail,
+  useUploadFileVersion,
+} from "@/hooks/useFiles";
 import { useRelativeTime } from "@/hooks/useRelativeTime";
 import { formatBytes, getFileExtension, getFileTypeLabel } from "@/lib/fileUtils";
 import { toast } from "@/lib/mascotToast";
 import { resolveFileDownloadUrl, resolveFileVersionDownloadUrl } from "@/lib/uploadUrl";
 import { cn } from "@/lib/utils";
+import { drawVideoFrame } from "@/lib/videoFrame";
 
 import "react-pdf/dist/Page/AnnotationLayer.css";
 import "react-pdf/dist/Page/TextLayer.css";
@@ -61,6 +67,9 @@ interface UploadedFileViewerProps {
   canEdit?: boolean;
   /** Whether the current user owns the file (can delete versions). */
   canDeleteVersions?: boolean;
+  /** The current version's thumbnail. A video without one is given a frame
+   *  of itself when somebody who can edit it opens it. */
+  thumbnailUrl?: string | null;
 }
 
 /**
@@ -82,6 +91,7 @@ export const UploadedFileViewer = ({
   fileSize,
   canEdit = false,
   canDeleteVersions = false,
+  thumbnailUrl = null,
 }: UploadedFileViewerProps) => {
   const { t } = useTranslation(["files", "common"]);
   const { maxUploadBytes } = useAppConfig();
@@ -90,6 +100,7 @@ export const UploadedFileViewer = ({
   const { data: versions } = useFileVersions(fileId);
   const uploadVersion = useUploadFileVersion();
   const deleteVersion = useDeleteFileVersion();
+  const { mutate: putVideoThumbnail } = usePutVideoThumbnail();
   const versionInputRef = useRef<HTMLInputElement>(null);
   const [selectedVersionId, setSelectedVersionId] = useState<number | null>(null);
   const [versionsOpen, setVersionsOpen] = useState(false);
@@ -154,6 +165,9 @@ export const UploadedFileViewer = ({
     ["png", "jpg", "jpeg", "gif", "webp", "svg"].includes(extension);
   const isMarkdown =
     extension === "md" || extension === "markdown" || contentType === "text/markdown";
+  // Played by the browser's own player; one it cannot play offers the download.
+  const isVideo = contentType?.startsWith("video/") ?? false;
+  const isAudio = contentType?.startsWith("audio/") ?? false;
 
   // Measure toolbar width once on mount for PDF sizing
   useEffect(() => {
@@ -167,6 +181,22 @@ export const UploadedFileViewer = ({
     const timeoutId = setTimeout(measureWidth, 50);
     return () => clearTimeout(timeoutId);
   }, []);
+
+  // A video with no thumbnail gets a frame of itself from the first editor to
+  // open it. Where the browser keeps the frame from the page, it gets none.
+  const frameVersionId = selectedVersion?.is_current ? selectedVersion.id : null;
+  useEffect(() => {
+    if (!isVideo || !canEdit || thumbnailUrl || frameVersionId == null || !inlineUrl) return;
+    let cancelled = false;
+    drawVideoFrame(inlineUrl)
+      .then((frame) => {
+        if (!cancelled) putVideoThumbnail({ fileId, versionId: frameVersionId, frame });
+      })
+      .catch(() => {});
+    return () => {
+      cancelled = true;
+    };
+  }, [isVideo, canEdit, thumbnailUrl, frameVersionId, inlineUrl, fileId, putVideoThumbnail]);
 
   // Fetch markdown content for rendering
   useEffect(() => {
@@ -565,6 +595,34 @@ export const UploadedFileViewer = ({
               onIndexChange={() => {}}
             />
           </>
+        ) : isVideo ? (
+          <div
+            className="flex w-full items-center justify-center bg-black"
+            style={{ height: "70vh", minHeight: 500 }}
+          >
+            {/* biome-ignore lint/a11y/useMediaCaption: an uploaded video brings no caption track. */}
+            <video
+              src={inlineUrl}
+              controls
+              preload="metadata"
+              className="max-h-full max-w-full"
+              title={originalFilename || t("viewer.video")}
+            />
+          </div>
+        ) : isAudio ? (
+          <div className="flex flex-col items-center justify-center gap-6 bg-muted/50 px-6 py-16">
+            <h3 className="font-semibold text-xl tracking-tight">
+              {originalFilename || t("viewer.audio")}
+            </h3>
+            {/* biome-ignore lint/a11y/useMediaCaption: an uploaded recording brings no caption track. */}
+            <audio
+              src={inlineUrl}
+              controls
+              preload="metadata"
+              className="w-full max-w-xl"
+              title={originalFilename || t("viewer.audio")}
+            />
+          </div>
         ) : isMarkdown ? (
           <div className="flex flex-col">
             <div className="flex items-center justify-between border-b bg-muted/50 px-4 py-2">

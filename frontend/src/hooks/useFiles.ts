@@ -8,6 +8,7 @@ import {
   getListFileVersionsQueryKey,
   getReadFileQueryKey,
   listFileVersions,
+  putVideoThumbnail,
   setFileGrants,
   uploadFile,
   uploadFileVersion,
@@ -266,6 +267,26 @@ export const useUploadFileVersion = (
       onError?.(...args);
     },
     onSettled,
+  });
+};
+
+/** Give a video version the frame the browser drew of it. Quiet: nobody asked
+ *  for it, so a refusal (a frame another editor sent first) says nothing. */
+export const usePutVideoThumbnail = () => {
+  const communityId = useActiveCommunityId();
+  return useMutation({
+    mutationFn: ({
+      fileId,
+      versionId,
+      frame,
+    }: {
+      fileId: number;
+      versionId: number;
+      frame: Blob;
+    }) => putVideoThumbnail(communityId, fileId, versionId, { file: frame }),
+    onSuccess: (_reply, { fileId }) => {
+      void invalidate(q.file(fileId), q.allFiles());
+    },
   });
 };
 

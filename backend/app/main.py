@@ -228,13 +228,15 @@ async def lifespan(app: FastAPI):
         from app.db import post_commit
 
         await post_commit.settle_all()
-        # The expression evaluators of declarative plug-ins and the document
-        # editor, if either started.
+        # The expression evaluators of declarative plug-ins, the document
+        # editor and the image worker, if any started.
         from app.services import editor_engine
         from app.services.marketplace import expressions
+        from app.services.tenant import thumbnails
 
         expressions.shutdown()
         editor_engine.shutdown()
+        thumbnails.shutdown()
 
 
 # docs_url is left None: the default route would inherit the app-wide CSP and
