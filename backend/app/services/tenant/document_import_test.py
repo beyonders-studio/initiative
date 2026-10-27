@@ -7,6 +7,7 @@ import zipfile
 
 import pytest
 from docx import Document
+from docx.enum.style import WD_STYLE_TYPE
 from docx.opc.constants import RELATIONSHIP_TYPE
 from docx.oxml import OxmlElement
 from docx.oxml.ns import qn
@@ -140,6 +141,36 @@ def test_a_word_file_reads_as_headings_formatting_lists_and_links() -> None:
     assert read.pictures == {}
 
 
+def test_a_paragraph_style_formats_its_text_and_a_run_can_undo_it() -> None:
+    document = Document()
+    shout = document.styles.add_style("Shout", WD_STYLE_TYPE.PARAGRAPH)
+    shout.font.bold = True
+    line = document.add_paragraph("Loud ", style="Shout")
+    line.add_run("quiet").bold = False
+
+    read = read_document(FileType.docx, _saved(document))
+
+    assert _body(read) == "<p><strong>Loud </strong>quiet</p>"
+
+
+def _numbered(num_id: str, text: str) -> str:
+    return (
+        f'<w:p><w:pPr><w:numPr><w:ilvl w:val="0"/><w:numId w:val="{num_id}"/>'
+        f"</w:numPr></w:pPr><w:r><w:t>{text}</w:t></w:r></w:p>"
+    )
+
+
+def test_separate_word_lists_stay_separate() -> None:
+    read = read_document(
+        FileType.docx,
+        _docx(_numbered("1", "a") + _numbered("1", "b") + _numbered("2", "c")),
+    )
+
+    assert _body(read) == (
+        "<ul><li><p>a</p></li><li><p>b</p></li></ul><ul><li><p>c</p></li></ul>"
+    )
+
+
 def test_a_word_table_keeps_its_merged_cells_and_header_row() -> None:
     document = Document()
     table = document.add_table(rows=3, cols=3)
@@ -256,6 +287,66 @@ def test_an_opendocument_file_reads_as_its_styles_lists_and_tables_say() -> None
         "<table><tr><th><p>H1</p></th><th><p>H2</p></th></tr>"
         '<tr><td colspan="2"><p>wide</p></td></tr></table>'
     )
+
+
+def test_separate_opendocument_lists_stay_separate_unless_one_continues() -> None:
+    item = "<text:list-item><text:p>{}</text:p></text:list-item>"
+    read = read_document(
+        FileType.odt,
+        _odt(
+            f"<text:list>{item.format('a')}</text:list>"
+            f"<text:list>{item.format('b')}</text:list>"
+            f'<text:list text:continue-numbering="true">{item.format("c")}</text:list>'
+        ),
+    )
+
+    assert _body(read) == (
+        "<ul><li><p>a</p></li></ul><ul><li><p>b</p></li><li><p>c</p></li></ul>"
+    )
+
+
+def test_a_table_in_an_opendocument_list_item_keeps_its_text() -> None:
+    read = read_document(
+        FileType.odt,
+        _odt(
+            "<text:list><text:list-item><text:p>Stalls</text:p>"
+            "<table:table><table:table-row><table:table-cell><text:p>Cakes"
+            "</text:p></table:table-cell></table:table-row></table:table>"
+            "</text:list-item></text:list>"
+        ),
+    )
+
+    assert _body(read) == (
+        "<ul><li><p>Stalls</p><table><tr><td><p>Cakes</p></td></tr></table></li></ul>"
+    )
+
+
+def _repeated_table(rows: int, cells: int) -> str:
+    return (
+        f'<table:table><table:table-row table:number-rows-repeated="{rows}">'
+        f'<table:table-cell table:number-columns-repeated="{cells}"><text:p>x'
+        "</text:p></table:table-cell>"
+        '<table:table-cell table:number-columns-repeated="1000"/>'
+        "</table:table-row>"
+        '<table:table-row table:number-rows-repeated="1000"><table:table-cell/>'
+        "</table:table-row></table:table>"
+    )
+
+
+def test_repeated_opendocument_rows_and_cells_are_written_out() -> None:
+    read = read_document(FileType.odt, _odt(_repeated_table(2, 2)))
+
+    row = "<tr><td><p>x</p></td><td><p>x</p></td><td /></tr>"
+    assert _body(read) == f"<table>{row}{row}<tr><td /></tr></table>"
+
+
+def test_repeats_past_the_cells_a_document_holds_are_refused(monkeypatch) -> None:
+    monkeypatch.setattr(document_import, "MAX_TABLE_CELLS", 10)
+
+    with pytest.raises(FileContentError) as refused:
+        read_document(FileType.odt, _odt(_repeated_table(4, 4)))
+
+    assert refused.value.code == FileMessages.TOO_LARGE_TO_CONVERT
 
 
 def test_an_opendocument_picture_keeps_its_size_and_description() -> None:

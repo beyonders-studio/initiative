@@ -35,7 +35,6 @@ from app.core.file_types import FileType, spec_of
 from app.core.messages import FileMessages
 from app.models.tenant.file import File, FileVersion
 from app.services import editor_engine, storage_config
-from app.services.import_engine.archive_assets import remove_written
 from app.services.import_engine.confluence_storage import storage_to_lexical
 from app.services.import_engine.engine import read_payload
 from app.services.tenant import (
@@ -65,10 +64,12 @@ def _refuse(code: int, detail: str) -> HTTPException:
 
 async def convert(
     session: AsyncSession, guild_id: int, file: File, *, user_id: int
-) -> list[FileVersion]:
+) -> tuple[list[FileVersion], list[str]]:
     """Make ``file`` the type it converts to, from its current version, and
-    delete its versions. The caller commits, then releases the returned
-    versions' files (:func:`file_versions.release_files`)."""
+    delete its versions. Returns the deleted versions and the URLs of the
+    pictures it stored. The caller commits, then releases the versions' files
+    (:func:`file_versions.release_files`); if the commit fails, it takes the
+    pictures back (:func:`file_versions.discard_orphans`)."""
     # One conversion at a time, read fresh once it holds the lock, so two
     # cannot both read the version the first one deletes.
     await session.exec(
@@ -107,9 +108,10 @@ async def convert(
             - (version.file_size or 0),
         )
         await storage_config.ensure_storage_config_fresh(session)
-        written: list[str] = []
-        try:
-            for picture in pictures:
+    stored: list[str] = []
+    try:
+        for picture in pictures:
+            stored.append(
                 await attachments.store_upload(
                     session,
                     guild_id=guild_id,
@@ -119,23 +121,23 @@ async def convert(
                     created_by=user_id,
                     initiative_id=file.initiative_id,
                 )
-                written.append(picture.filename)
-        except BaseException:
-            remove_written(guild_id, written)
-            raise
-
-    versions = await file_versions.versions_newest_first(session, file)
-    # The file stops pointing at a version before its versions go.
-    file.current_version = None
-    await session.flush()
-    for gone in versions:
-        await session.delete(gone)
-    file.file_type = spec.converts_to
-    file.content = content
-    file.yjs_state = None
-    file.updated_at = datetime.now(timezone.utc)
-    session.add(file)
-    return versions
+            )
+        versions = await file_versions.versions_newest_first(session, file)
+        # The file stops pointing at a version before its versions go.
+        file.current_version = None
+        await session.flush()
+        for gone in versions:
+            await session.delete(gone)
+        file.file_type = spec.converts_to
+        file.content = content
+        file.yjs_state = None
+        file.updated_at = datetime.now(timezone.utc)
+        session.add(file)
+    except BaseException:
+        # Nothing has committed, so the pictures stored so far are nobody's.
+        attachments.delete_blobs(guild_id, attachments.upload_names(stored))
+        raise
+    return versions, stored
 
 
 async def _content(

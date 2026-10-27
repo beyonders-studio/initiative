@@ -39,6 +39,10 @@ from app.services.tenant.files import FileContentError
 #: sizes its zip directory declares before anything is opened.
 MAX_DOCUMENT_PACKAGE_BYTES = 100 * 1024 * 1024
 
+#: The most table cells a document is read with once its repeated rows and
+#: cells are counted. A document past it holds more than a document here can.
+MAX_TABLE_CELLS = 100_000
+
 #: How deep tables nest before an inner one is kept as its rows' text, as the
 #: walker keeps any table inside a table.
 _MAX_TABLE_DEPTH = 4
@@ -76,9 +80,7 @@ def read_document(file_type: FileType, data: bytes) -> ReadDocument:
         if sum(info.file_size for info in package.infolist()) > (
             MAX_DOCUMENT_PACKAGE_BYTES
         ):
-            raise FileContentError(
-                FileMessages.TOO_LARGE_TO_CONVERT, status.HTTP_413_CONTENT_TOO_LARGE
-            )
+            raise _too_large()
         reader = _Docx(package) if file_type == FileType.docx else _Odt(package)
         try:
             root = reader.read()
@@ -103,6 +105,12 @@ def read_document(file_type: FileType, data: bytes) -> ReadDocument:
             # what a walk can follow.
             raise FileContentError(FileMessages.INVALID_FILE) from exc
     return ReadDocument(tostring(root, encoding="unicode"), pictures)
+
+
+def _too_large() -> FileContentError:
+    return FileContentError(
+        FileMessages.TOO_LARGE_TO_CONVERT, status.HTTP_413_CONTENT_TOO_LARGE
+    )
 
 
 def _part(package: zipfile.ZipFile, name: str) -> Optional[IO[bytes]]:
@@ -164,31 +172,37 @@ class _Container:
 
     def __init__(self, element: Element) -> None:
         self.element = element
-        #: Open lists, outermost first: ``(level, list, its last item)``.
-        self.lists: list[tuple[int, Element, Optional[Element]]] = []
+        #: Open lists, outermost first: ``(level, which list, list, its last
+        #: item)``.
+        self.lists: list[tuple[int, object, Element, Optional[Element]]] = []
 
     def block(self, tag: str) -> Element:
         self.lists.clear()
         return SubElement(self.element, tag)
 
-    def item(self, level: int, ordered: bool) -> Element:
-        """A new list item at ``level`` (0 outermost), in a list of the kind
-        ``ordered`` says, nested under the last item of a shallower list."""
+    def item(self, level: int, ordered: bool, key: object) -> Element:
+        """A new list item at ``level`` (0 outermost) of the source list
+        ``key`` names, in a list of the kind ``ordered`` says, nested under
+        the last item of a shallower list. A different list at the same level
+        starts a list of its own, so its numbering starts again."""
         tag = "ol" if ordered else "ul"
         while self.lists and (
             self.lists[-1][0] > level
-            or (self.lists[-1][0] == level and self.lists[-1][1].tag != tag)
+            or (
+                self.lists[-1][0] == level
+                and (self.lists[-1][2].tag != tag or self.lists[-1][1] != key)
+            )
         ):
             self.lists.pop()
         if not self.lists or self.lists[-1][0] < level:
-            under = self.lists[-1][2] if self.lists else None
+            under = self.lists[-1][3] if self.lists else None
             if self.lists and under is None:
-                under = SubElement(self.lists[-1][1], "li")
+                under = SubElement(self.lists[-1][2], "li")
             listed = SubElement(under if under is not None else self.element, tag)
-            self.lists.append((level, listed, None))
-        current_level, listed, _ = self.lists[-1]
+            self.lists.append((level, key, listed, None))
+        current_level, _, listed, _ = self.lists[-1]
         entry = SubElement(listed, "li")
-        self.lists[-1] = (current_level, listed, entry)
+        self.lists[-1] = (current_level, key, listed, entry)
         return entry
 
 
@@ -360,16 +374,20 @@ class _Docx:
             _val(properties.find(f"{_W}pStyle")) if properties is not None else ""
         )
         heading = self.heading_level(properties, style_id)
+        # A heading's look is its level; a paragraph's style formats its text.
+        base: list[Element] = []
         if heading is not None:
             target = container.block(_heading_tag(heading))
         else:
+            base = [s.run for s in self.chain(style_id) if s.run is not None]
+            base.reverse()
             numbered = self.list_level(properties, style_id)
             if numbered is None:
                 target = container.block("p")
             else:
-                level, ordered = numbered
-                target = SubElement(container.item(level, ordered), "p")
-        self.inline(target, paragraph)
+                level, ordered, num_id = numbered
+                target = SubElement(container.item(level, ordered, num_id), "p")
+        self.inline(target, paragraph, base)
 
     def heading_level(
         self, properties: Optional[Element], style_id: str
@@ -392,7 +410,9 @@ class _Docx:
 
     def list_level(
         self, properties: Optional[Element], style_id: str
-    ) -> Optional[tuple[int, bool]]:
+    ) -> Optional[tuple[int, bool, str]]:
+        """The level a list paragraph sits at, whether it is numbered, and
+        the list it belongs to."""
         num_id, ilvl = "", 0
         numbered = properties.find(f"{_W}numPr") if properties is not None else None
         if numbered is not None:
@@ -408,7 +428,7 @@ class _Docx:
                     break
         if not num_id or num_id == "0":
             return None
-        return ilvl, self.numbering.get(num_id, {}).get(ilvl, False)
+        return ilvl, self.numbering.get(num_id, {}).get(ilvl, False), num_id
 
     def table(self, container: _Container, table: Element, depth: int) -> None:
         rows = [row for row in _children(table) if row.tag == f"{_W}tr"]
@@ -451,11 +471,10 @@ class _Docx:
                     td.set("colspan", str(span))
                 if state == "restart":
                     down = 1
-                    for below in grid[index + 1 :]:
-                        if not any(
-                            c == column and s == "continue" for c, _, s, _ in below
-                        ):
-                            break
+                    while index + down < len(grid) and any(
+                        c == column and s == "continue"
+                        for c, _, s, _ in grid[index + down]
+                    ):
                         down += 1
                     if down > 1:
                         td.set("rowspan", str(down))
@@ -465,23 +484,27 @@ class _Docx:
 
     # -- inline ---------------------------------------------------------------
 
-    def inline(self, target: Element, element: Element) -> None:
+    def inline(self, target: Element, element: Element, base: list[Element]) -> None:
+        """``element``'s runs, formatted over ``base``, its paragraph style's
+        run properties."""
         for child in _children(element):
             if child.tag == f"{_W}r":
-                self.run(target, child)
+                self.run(target, child, base)
             elif child.tag == f"{_W}hyperlink":
                 url = self.links.get(child.get(f"{_R}id") or "")
-                self.inline(SubElement(target, "a", href=url) if url else target, child)
+                self.inline(
+                    SubElement(target, "a", href=url) if url else target, child, base
+                )
 
-    def run_formats(self, run: Element) -> tuple[str, ...]:
-        """What a run looks like: its character style's formats, then its
-        own, which override them."""
+    def run_formats(self, run: Element, base: list[Element]) -> tuple[str, ...]:
+        """What a run looks like: its paragraph style's formats, then its
+        character style's, then its own, each overriding the last."""
         properties = run.find(f"{_W}rPr")
-        layers: list[Element] = []
+        layers = list(base)
         if properties is not None:
             style_id = _val(properties.find(f"{_W}rStyle"))
-            layers = [s.run for s in self.chain(style_id) if s.run is not None]
-            layers.reverse()
+            character = [s.run for s in self.chain(style_id) if s.run is not None]
+            layers.extend(reversed(character))
             layers.append(properties)
         on: dict[str, bool] = {}
         for layer in layers:
@@ -495,8 +518,8 @@ class _Docx:
                 on[_SUB] = align == "subscript"
         return tuple(tag for tag in _FORMATS if on.get(tag))
 
-    def run(self, target: Element, run: Element) -> None:
-        formats = self.run_formats(run)
+    def run(self, target: Element, run: Element, base: list[Element]) -> None:
+        formats = self.run_formats(run, base)
         for child in run:
             tag = child.tag
             if tag == f"{_W}t":
@@ -514,7 +537,7 @@ class _Docx:
             elif tag == f"{_MC}AlternateContent":
                 choice = child.find(f"{_MC}Choice")
                 if choice is not None:
-                    self.run(target, choice)
+                    self.run(target, choice, base)
 
     def drawing(self, target: Element, drawing: Element) -> None:
         for frame in drawing:
@@ -625,6 +648,10 @@ class _Odt:
         self.package = package
         self.pictures: list[str] = []
         self.styles: dict[str, _OdtStyle] = {}
+        #: How many separate lists the body has started.
+        self.lists = 0
+        #: How many more table cells may be written.
+        self.cells_left = MAX_TABLE_CELLS
 
     def read(self) -> Element:
         handle = _part(self.package, "styles.xml")
@@ -701,7 +728,11 @@ class _Odt:
             else:
                 self.inline(container.block("p"), element, self.formats(style))
         elif tag == f"{_TEXT}list":
-            self.list(container, element, 0, None)
+            if element.get(f"{_TEXT}continue-numbering") != "true" and not (
+                element.get(f"{_TEXT}continue-list")
+            ):
+                self.lists += 1
+            self.read_list(container, element, 0, None, self.lists, depth)
         elif tag == f"{_TABLE}table":
             self.table(container, element, depth + 1)
         elif tag == f"{_DRAW}frame":
@@ -710,30 +741,32 @@ class _Odt:
             for child in element:
                 self.block(container, child, depth)
 
-    def list(
+    def read_list(
         self,
         container: _Container,
         listed: Element,
         level: int,
         inherited: Optional[str],
+        key: int,
+        depth: int,
     ) -> None:
+        """A list and the lists inside it, all part of the body's list
+        ``key``. What an item holds besides lists is read as blocks into the
+        item, which the walker lays on its line."""
         style_name = listed.get(f"{_TEXT}style-name") or inherited
         style = self.styles.get(style_name or "")
         ordered = bool(style and style.levels.get(level + 1))
         for item in listed:
             if item.tag not in (f"{_TEXT}list-item", f"{_TEXT}list-header"):
                 continue
-            entry: Optional[Element] = None
+            entry: Optional[_Container] = None
             for child in item:
                 if child.tag == f"{_TEXT}list":
-                    self.list(container, child, level + 1, style_name)
-                    continue
-                if child.tag not in (f"{_TEXT}p", f"{_TEXT}h"):
+                    self.read_list(container, child, level + 1, style_name, key, depth)
                     continue
                 if entry is None:
-                    entry = container.item(level, ordered)
-                style = child.get(f"{_TEXT}style-name") or ""
-                self.inline(SubElement(entry, "p"), child, self.formats(style))
+                    entry = _Container(container.item(level, ordered, key))
+                self.block(entry, child, depth)
 
     def table(self, container: _Container, table: Element, depth: int) -> None:
         rows: list[tuple[bool, Element]] = []
@@ -765,22 +798,46 @@ class _Odt:
             )
             return
         out = container.block("table")
-        for header, row in rows:
-            tr = SubElement(out, "tr")
-            for cell in row:
-                if cell.tag != f"{_TABLE}table-cell":
-                    continue
-                td = SubElement(tr, "th" if header else "td")
-                for attribute, name in (
-                    ("number-columns-spanned", "colspan"),
-                    ("number-rows-spanned", "rowspan"),
-                ):
-                    span = cell.get(f"{_TABLE}{attribute}") or ""
-                    if span.isdigit() and int(span) > 1:
-                        td.set(name, span)
-                inner = _Container(td)
-                for child in cell:
-                    self.block(inner, child, depth)
+        row_times = self.repeats([row for _, row in rows], "number-rows-repeated")
+        for (header, row), times in zip(rows, row_times):
+            cells = [cell for cell in row if cell.tag == f"{_TABLE}table-cell"]
+            cell_times = self.repeats(cells, "number-columns-repeated")
+            for _ in range(times):
+                tr = SubElement(out, "tr")
+                for cell, repeat in zip(cells, cell_times):
+                    for _ in range(repeat):
+                        self.cells_left -= 1
+                        if self.cells_left < 0:
+                            raise _too_large()
+                        td = SubElement(tr, "th" if header else "td")
+                        for attribute, name in (
+                            ("number-columns-spanned", "colspan"),
+                            ("number-rows-spanned", "rowspan"),
+                        ):
+                            span = cell.get(f"{_TABLE}{attribute}") or ""
+                            if span.isdigit() and int(span) > 1:
+                                td.set(name, span)
+                        inner = _Container(td)
+                        for child in cell:
+                            self.block(inner, child, depth)
+
+    def repeats(self, elements: list[Element], attribute: str) -> list[int]:
+        """How many times each row or cell is written: as many as its
+        ``table:<attribute>`` says, except an empty one with nothing filled
+        after it, which pads the table to the page's edge and is written
+        once. Refuses a repeat past the cells left to write."""
+        filled = [i for i, element in enumerate(elements) if not _empty(element)]
+        last = filled[-1] if filled else -1
+        out: list[int] = []
+        for index, element in enumerate(elements):
+            raw = element.get(f"{_TABLE}{attribute}") or ""
+            times = int(raw) if raw.isdigit() and int(raw) > 1 else 1
+            if index > last:
+                times = 1
+            if times > self.cells_left:
+                raise _too_large()
+            out.append(times)
+        return out
 
     # -- inline ---------------------------------------------------------------
 
@@ -842,6 +899,14 @@ class _Odt:
             _pixels(frame.get(f"{_SVG}width")),
             _pixels(frame.get(f"{_SVG}height")),
         )
+
+
+def _empty(element: Element) -> bool:
+    """Whether a row or cell shows nothing: no text and no picture."""
+    return (
+        not "".join(element.itertext()).strip()
+        and element.find(f".//{_DRAW}frame") is None
+    )
 
 
 def _odt_formats(properties: Element) -> dict[str, bool]:

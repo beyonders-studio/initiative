@@ -10,6 +10,8 @@ from docx import Document
 from docx.shared import Inches
 from httpx import AsyncClient
 from PIL import Image
+from sqlalchemy.exc import IntegrityError
+from sqlmodel.ext.asyncio.session import AsyncSession
 from sqlmodel import select
 
 from app.models.platform.guild import CommunityRole
@@ -87,18 +89,29 @@ async def test_text_becomes_a_document(
     assert "\ufffd" not in str(top)
 
 
+def _png() -> bytes:
+    out = io.BytesIO()
+    Image.new("RGB", (40, 20), "red").save(out, "PNG")
+    return out.getvalue()
+
+
+_PNG = _png()
+
+
+def _word_with_a_picture() -> bytes:
+    word = Document()
+    word.add_heading("Minutes", 1)
+    word.add_picture(io.BytesIO(_PNG), width=Inches(1))
+    saved = io.BytesIO()
+    word.save(saved)
+    return saved.getvalue()
+
+
 async def test_a_word_file_becomes_a_document_and_its_pictures_uploads(
     client: AsyncClient, acting_user, session
 ):
     owner = await acting_user(guild_role=CommunityRole.admin, initiative=True)
-    picture = io.BytesIO()
-    Image.new("RGB", (40, 20), "red").save(picture, "PNG")
-    word = Document()
-    word.add_heading("Minutes", 1)
-    word.add_picture(io.BytesIO(picture.getvalue()), width=Inches(1))
-    saved = io.BytesIO()
-    word.save(saved)
-    uploaded = await _upload(client, owner, "minutes.docx", saved.getvalue())
+    uploaded = await _upload(client, owner, "minutes.docx", _word_with_a_picture())
     assert uploaded["converts_to"] == "lexical"
 
     converted = await _convert(client, owner, uploaded["id"])
@@ -114,9 +127,39 @@ async def test_a_word_file_becomes_a_document_and_its_pictures_uploads(
         owner.initiative.id,
         "image/png",
     )
-    assert await attachments.get_guild_storage_usage(owner.guild.id) == len(
-        picture.getvalue()
+    assert await attachments.get_guild_storage_usage(owner.guild.id) == len(_PNG)
+
+
+async def test_pictures_a_failed_conversion_stored_are_taken_back(
+    client: AsyncClient, acting_user, monkeypatch
+):
+    owner = await acting_user(guild_role=CommunityRole.admin, initiative=True)
+    uploaded = await _upload(client, owner, "minutes.docx", _word_with_a_picture())
+    removed: list[str] = []
+    monkeypatch.setattr(
+        attachments, "delete_blobs", lambda _guild, names: removed.extend(names)
     )
+
+    converted: list[bool] = []
+    convert, commit = file_conversion.convert, AsyncSession.commit
+
+    async def converting(*args, **kwargs):
+        converted.append(True)
+        return await convert(*args, **kwargs)
+
+    async def refuse_once_converted(self):
+        if converted:
+            raise IntegrityError("COMMIT", None, Exception("refused"))
+        await commit(self)
+
+    monkeypatch.setattr(file_conversion, "convert", converting)
+    monkeypatch.setattr(AsyncSession, "commit", refuse_once_converted)
+    with pytest.raises(IntegrityError):
+        await _convert(client, owner, uploaded["id"])
+    monkeypatch.undo()
+
+    (name,) = removed
+    assert name.endswith(".png")
 
 
 async def test_a_word_file_that_does_not_read_stays_as_it_was(
