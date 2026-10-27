@@ -1660,6 +1660,8 @@ NAMED_PEOPLE: tuple[NamedPerson, ...] = (
     NamedPerson("calendar_event_answers", "user_id"),
     NamedPerson("property_values", "value_user_id", clear=True),
     NamedPerson("queue_items", "user_id", clear=True),
+    # What somebody asked for goes with them: nobody is left to answer for.
+    NamedPerson("share_requests", "user_id"),
 )
 
 

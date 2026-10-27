@@ -279,3 +279,27 @@ async def test_a_task_is_asked_for_through_its_project(client, session, two):
         "project",
         project_id,
     )
+
+
+async def test_leaving_the_initiative_takes_what_they_asked_for(client, session, two):
+    owner, reader = two
+    file = await create_file(session, owner.initiative, owner.user)
+    file_id, initiative_id, reader_id = file.id, owner.initiative.id, reader.user.id
+    asked = await client.post(
+        reader.g("/share-requests/"),
+        json={"resource_type": "file", "resource_id": file_id},
+        headers=reader.headers,
+    )
+    batch = asked.json()["batch_id"]
+
+    removed = await client.delete(
+        owner.g(f"/initiatives/{initiative_id}/members/{reader_id}"),
+        headers=owner.headers,
+    )
+
+    assert removed.status_code == 200
+    assert (
+        await client.get(
+            owner.g(f"/share-requests/?batch_id={batch}"), headers=owner.headers
+        )
+    ).json() == []

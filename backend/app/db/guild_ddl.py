@@ -1250,7 +1250,7 @@ _SHARE_REQUESTS_SECTION = """\
 --     resource in its initiative they can read, or know is there without
 --     reading it (app.db.presence);
 --   * whoever may share the resource answers it;
---   * nobody deletes one but the system engine.
+--   * one goes when its requester leaves (a trigger), or by the system engine.
 -- ==========================================================================="""
 
 _REQUEST_SHARES = (
@@ -1274,6 +1274,9 @@ _REQUEST_MADE = (
     " AND ep.initiative_id = share_requests.initiative_id AND NOT ep.trashed)))"
 )
 _REQUEST_ANSWERED = f"({IN_POLICY.system} OR {_REQUEST_SHARES})"
+#: Somebody leaving takes what they asked for with them (the departure
+#: section); nothing else deletes a request but the system engine.
+_REQUEST_REMOVED = f"(pg_trigger_depth() > 0 OR {IN_POLICY.system})"
 
 
 def _share_requests_block() -> str:
@@ -1282,7 +1285,7 @@ def _share_requests_block() -> str:
         ("requests_read", "SELECT", _REQUEST_READ, None),
         ("requests_made", "INSERT", None, _REQUEST_MADE),
         ("requests_answered", "UPDATE", _REQUEST_ANSWERED, _REQUEST_ANSWERED),
-        ("requests_removed", "DELETE", IN_POLICY.system, None),
+        ("requests_removed", "DELETE", _REQUEST_REMOVED, None),
     ):
         lines.append(f"DROP POLICY IF EXISTS {name} ON share_requests;")
         lines.append(
