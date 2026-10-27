@@ -287,13 +287,6 @@ async def test_listings_say_description_and_back(session) -> None:
     await session.commit()
     assert await definitions() == [
         (
-            "describe.library",
-            {
-                **library_definition,
-                "items": [{"storage_key": "a.png", "description": "Dawn"}],
-            },
-        ),
-        (
             "describe.dashboard",
             {
                 **dashboard_definition,
@@ -302,6 +295,13 @@ async def test_listings_say_description_and_back(session) -> None:
                         {"id": "w1", "binding": {"source": "query", "sql": _ITEMS_NEW}}
                     ]
                 },
+            },
+        ),
+        (
+            "describe.library",
+            {
+                **library_definition,
+                "items": [{"storage_key": "a.png", "description": "Dawn"}],
             },
         ),
     ]

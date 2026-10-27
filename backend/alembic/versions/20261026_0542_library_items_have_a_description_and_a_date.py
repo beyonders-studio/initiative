@@ -92,7 +92,7 @@ _STRINGS = re.compile(r"'(?:[^']|'')*'|\$(\w*)\$.*?\$\1\$", re.S)
 _AFTER_AS = re.compile(r"\bAS\s*$", re.I)
 _QUALIFIED = re.compile(r"\.\s*$")
 _ORDER_BY = re.compile(r"\bORDER\s+BY\b", re.I)
-_READS_ITEMS = re.compile(r"\bcatalog_items\b", re.I)
+_READS_ITEMS = re.compile(r"\blibrary_items\b", re.I)
 
 
 def _statement(sql: str, old: str, new: str) -> str:

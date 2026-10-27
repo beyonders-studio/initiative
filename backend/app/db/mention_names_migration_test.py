@@ -38,6 +38,10 @@ from app.testing.factories import (
 _VERSIONS = Path(__file__).resolve().parents[2] / "alembic" / "versions"
 _REVISION = _VERSIONS / "20261002_0444_a_mention_keeps_no_name.py"
 _FILES = _VERSIONS / "20261006_0464_documents_are_files.py"
+_LIBRARIES = _VERSIONS / "20261026_0538_galleries_are_libraries.py"
+_DESCRIPTIONS = (
+    _VERSIONS / "20261026_0542_library_items_have_a_description_and_a_date.py"
+)
 
 
 def _revision(path: Path = _REVISION) -> ModuleType:
@@ -92,7 +96,13 @@ async def test_a_mention_written_before_keeps_no_name(session):
 
     def strip(sync) -> str | None:
         bind = sync.connection()
-        files = _revision(_FILES)
+        # Later revisions, newest last: taken off newest first, put back
+        # oldest first.
+        later = (
+            _revision(_FILES)._apply,
+            _revision(_LIBRARIES)._apply,
+            _revision(_DESCRIPTIONS)._guild,
+        )
 
         def renamed(forward: bool) -> None:
             bind.execute(
@@ -100,7 +110,8 @@ async def test_a_mention_written_before_keeps_no_name(session):
                 {"sp": f"{schema}, public"},
             )
             with Operations.context(MigrationContext.configure(bind)):
-                files._apply(forward)
+                for apply in later if forward else reversed(later):
+                    apply(forward)
 
         renamed(False)
         bind.execute(text(f"COMMENT ON TABLE \"{schema}\".search_entries IS 'current'"))
