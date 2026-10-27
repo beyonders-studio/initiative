@@ -320,6 +320,8 @@ EXEMPT: dict[str, str] = {
     # In-flight workflow rather than owned content: a request to join is a
     # question waiting on somebody in THIS instance.
     "initiative_join_requests": "in_flight",
+    # A file still arriving, which only this instance's storage holds.
+    "pending_uploads": "in_flight",
     # The platform's record of what it holds here. Not the community's to
     # read, so not the community's to carry out.
     "content_holds": "platform",

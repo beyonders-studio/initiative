@@ -175,8 +175,13 @@ class FakeS3Client:
         return {**answer, "Body": _FakeBody(body), "ContentLength": len(body)}
 
     def create_multipart_upload(self, *, Bucket, Key):
-        self.parts, self.multipart_open = {}, True
+        self.parts, self.multipart_open, self.multipart_key = {}, True, Key
         return {"UploadId": "up-1"}
+
+    def list_multipart_uploads(self, *, Bucket, Prefix):
+        open_ = self.multipart_open and self.multipart_key.startswith(Prefix)
+        uploads = [{"Key": self.multipart_key, "UploadId": "up-1"}] if open_ else []
+        return {"Uploads": uploads, "IsTruncated": False}
 
     def upload_part(self, *, Bucket, Key, UploadId, PartNumber, Body):
         assert UploadId == "up-1" and self.multipart_open
@@ -461,12 +466,14 @@ def test_s3_delete_prefix_sweeps_namespace():
     # An object in a *different* guild's namespace must survive.
     other = S3Storage(bucket="bucket", client=client, prefix="guild_8/")
     other.write("c.bin", b"3")
+    storage.start_parts("resumable-a", part_bytes=8)
 
     removed = storage.delete_prefix()
     assert removed == 2
     assert ("bucket", "guild_7/a.bin") not in client.objects
     assert ("bucket", "guild_7/b.bin") not in client.objects
     assert ("bucket", "guild_8/c.bin") in client.objects  # untouched
+    assert client.multipart_open is False
 
 
 def test_s3_delete_prefix_refuses_empty_prefix():

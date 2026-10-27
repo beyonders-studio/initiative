@@ -225,3 +225,19 @@ async def test_an_upload_left_finishing_is_finished_when_asked_where_it_stands(
     session.expunge_all()
     await route_session_to_guild(session, owner.guild.id)
     assert (await session.exec(select(PendingUpload))).one().completed_at is not None
+
+
+async def test_a_held_upload_leaves_no_transaction_open_while_bytes_arrive(
+    client: AsyncClient, acting_user, session
+):
+    owner = await acting_user(guild_role=CommunityRole.admin, initiative=True)
+    created = await _create(client, owner, 8)
+    await route_session_to_guild(session, owner.guild.id)
+    upload_id = _path(created.headers["location"]).rsplit("/", 1)[1]
+    lease = resumable._Lease(session, upload_id, resumable._nothing)
+
+    upload = await lease.take()
+
+    assert upload.offset == 0
+    assert not session.in_transaction()
+    await lease.let_go()

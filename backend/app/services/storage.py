@@ -453,9 +453,9 @@ class S3Storage:
     def delete_prefix(self) -> int:
         """Delete every object under this backend's namespace (``self._prefix``).
 
-        Used to tear down a guild's content on deprovision. Refuses an empty
-        prefix so it can never target the whole bucket. Returns the number of
-        objects deleted.
+        Used to tear down a guild's content on deprovision, files still
+        arriving in parts included. Refuses an empty prefix so it can never
+        target the whole bucket. Returns the number of objects deleted.
         """
         if not self._prefix:
             raise ValueError(
@@ -489,6 +489,23 @@ class S3Storage:
                 token = resp.get("NextContinuationToken")
             else:
                 break
+        # A file still arriving in parts is no object yet, so the listing
+        # above does not see it.
+        markers: dict = {}
+        while True:
+            resp = self._client.list_multipart_uploads(
+                Bucket=self._bucket, Prefix=self._prefix, **markers
+            )
+            for upload in resp.get("Uploads", []):
+                self._client.abort_multipart_upload(
+                    Bucket=self._bucket, Key=upload["Key"], UploadId=upload["UploadId"]
+                )
+            if not resp.get("IsTruncated"):
+                break
+            markers = {
+                "KeyMarker": resp["NextKeyMarker"],
+                "UploadIdMarker": resp["NextUploadIdMarker"],
+            }
         return deleted
 
     def exists(self, key: str) -> bool:

@@ -265,7 +265,8 @@ async def _live(session: AsyncSession, upload_id: str) -> PendingUpload:
 
 class _Lease:
     """One request's hold on an upload: taken and committed before anything
-    else is read, renewed while the request works, and let go at the end.
+    else is read, with no transaction left open after it, renewed while the
+    request works, and let go at the end.
     Every record of progress is made under it, so a request that has lost it
     writes nothing more."""
 
@@ -294,7 +295,10 @@ class _Lease:
         if not found:
             raise _refuse(status.HTTP_423_LOCKED, ResumableMessages.LOCKED)
         self.token = token
-        return await _live(self.session, self.upload_id)
+        upload = await _live(self.session, self.upload_id)
+        # Ended here, so no connection is held while the request waits.
+        await self.session.commit()
+        return upload
 
     async def record(self, values: dict[str, Any], *, done: bool = False) -> None:
         """Save ``values`` under the lease, renewing it, or letting it go when
@@ -543,7 +547,7 @@ async def expire(session: AsyncSession, guild_id: int) -> None:
             )
         except Exception:
             # The row goes; staged bytes left behind cost storage and nothing
-            # else, and the bucket's own lifecycle rule takes an abandoned part.
+            # else, and go with the community's storage when it is deleted.
             logger.exception("resumable_upload_drop_failed upload=%s", upload.id)
         await session.delete(upload)
         await session.commit()
