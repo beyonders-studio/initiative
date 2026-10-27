@@ -182,7 +182,9 @@ async def test_envelope_import_roundtrips_file_types(client, acting_user, sessio
     file shape, spreadsheet re-normalized)."""
     from sqlmodel import select
 
-    from app.models.tenant.file import File, FileType
+    from app.core.file_types import FileType
+
+    from app.models.tenant.file import File
 
     a = await acting_user(
         guild_role=CommunityRole.member, initiative=True, project=True
@@ -201,7 +203,7 @@ async def test_envelope_import_roundtrips_file_types(client, acting_user, sessio
         a.initiative,
         a.user,
         name="Map",
-        file_type=FileType.whiteboard,
+        file_type=FileType.excalidraw,
         content={"elements": [{"type": "rectangle"}], "appState": {}, "files": {}},
     )
     link = await create_file(
@@ -209,14 +211,14 @@ async def test_envelope_import_roundtrips_file_types(client, acting_user, sessio
         a.initiative,
         a.user,
         name="Spec",
-        file_type=FileType.smart_link,
+        file_type=FileType.url,
         content={"url": "https://example.com/spec"},
     )
 
     for doc, doc_type in (
-        (native, "native"),
-        (board, "whiteboard"),
-        (link, "smart_link"),
+        (native, "lexical"),
+        (board, "excalidraw"),
+        (link, "url"),
     ):
         envelope = await _export_json(client, a, "/exports/file", {"ids": [doc.id]})
         resp = await _import_envelope(client, a, envelope, target.id)
@@ -550,7 +552,7 @@ async def test_envelope_import_authorization_gates(client, acting_user, session)
     doc_envelope = {
         "type": "initiative-file",
         "schema_version": 1,
-        "file_type": "smart_link",
+        "file_type": "url",
         "name": "Doc",
         "content": {"url": "https://example.com"},
         "tags": [],
@@ -1009,7 +1011,7 @@ async def test_backup_import_end_to_end_with_assets(
     (deduped here — same guild, key already exists) and quota-checked."""
     from sqlmodel import select
 
-    from app.models.tenant.file import File, FileType
+    from app.models.tenant.file import File
     from app.models.tenant.initiative import Initiative, InitiativeMember
     from app.models.tenant.queue import Queue
 
@@ -1106,7 +1108,7 @@ async def test_backup_import_end_to_end_with_assets(
         await session.exec(
             select(File).where(
                 File.initiative_id == restored.id,
-                File.file_type == FileType.file,
+                File.current_version_id.is_not(None),
             )
         )
     ).one()
@@ -1313,7 +1315,9 @@ async def test_an_archive_from_before_files_restores_its_documents(
     file's type. A restore reads each as the file it is."""
     from sqlmodel import select
 
-    from app.models.tenant.file import File, FileType
+    from app.core.file_types import FileType
+
+    from app.models.tenant.file import File
 
     a = await acting_user(
         guild_role=CommunityRole.superadmin, initiative=True, project=True
@@ -1321,7 +1325,7 @@ async def test_an_archive_from_before_files_restores_its_documents(
     envelope = {
         "type": "initiative-document",
         "schema_version": 1,
-        "document_type": "smart_link",
+        "document_type": "url",
         "name": "Old link",
         "content": {"url": "https://example.com"},
         "tags": [],
@@ -1353,7 +1357,7 @@ async def test_an_archive_from_before_files_restores_its_documents(
 
     await route_session_to_guild(session, a.guild.id)
     restored = (await session.exec(select(File).where(File.name == "Old link"))).one()
-    assert restored.file_type == FileType.smart_link
+    assert restored.file_type == FileType.url
 
 
 async def test_an_archive_from_before_catalogs_restores_its_galleries(
@@ -1761,7 +1765,9 @@ async def test_backup_assets_are_stored_as_what_their_bytes_are(
     reported, and the entry that needed it skipped."""
     from sqlmodel import select
 
-    from app.models.tenant.file import File, FileType
+    from app.core.file_types import FileType
+
+    from app.models.tenant.file import File
     from app.models.tenant.upload import Upload
     from app.testing import route_session_to_guild
 
@@ -1832,7 +1838,7 @@ async def test_backup_assets_are_stored_as_what_their_bytes_are(
         entries["Table"]["detail"]["entity_id"],
         options=[undefer(File.content)],
     )
-    assert sheet.file_type == FileType.spreadsheet
+    assert sheet.file_type == FileType.sheet
     assert sheet.content["sheets"][0]["cells"]
 
 
@@ -2141,7 +2147,7 @@ async def test_backup_attach_to_files_a_file_in_its_wiki(
 
     from app.core.relationships import RelationshipType
     from app.core.search import SearchEntityType
-    from app.models.tenant.file import File, FileType
+    from app.models.tenant.file import File
     from app.models.tenant.initiative import Initiative
     from app.models.tenant.wiki import Wiki
     from app.services.tenant import relationships as relationships_service
@@ -2220,7 +2226,7 @@ async def test_backup_attach_to_files_a_file_in_its_wiki(
         await session.exec(
             select(File).where(
                 File.initiative_id == restored.id,
-                File.file_type == FileType.file,
+                File.current_version_id.is_not(None),
             )
         )
     ).one()
@@ -2760,7 +2766,7 @@ async def test_a_file_naming_somebody_in_a_property_asks_first(
     envelope = {
         "type": "initiative-file",
         "schema_version": 1,
-        "file_type": "smart_link",
+        "file_type": "url",
         "name": "Spec",
         "content": {"url": "https://example.com"},
         "tags": [],
@@ -3296,7 +3302,7 @@ async def test_a_mention_nobody_places_is_restored_as_a_name(
     envelope = {
         "type": "initiative-file",
         "schema_version": 1,
-        "file_type": "native",
+        "file_type": "lexical",
         "name": "Minutes",
         "content": _editor_state(
             {**_mention_node("Bea", None), "mentionHandle": "stranger#4321"}
@@ -3771,7 +3777,8 @@ async def test_a_wiki_zip_brings_its_filed_files_back_where_they_were(
         _all_tools_enabled,
         _wiki_with_filed_files,
     )
-    from app.models.tenant.file import File, FileType
+    from app.core.file_types import FileType
+    from app.models.tenant.file import File
     from app.models.tenant.wiki import Wiki, WikiPage
     from app.services.tenant.wikis import file_parent, linked_files
     from app.testing import route_session_to_guild
@@ -3801,9 +3808,9 @@ async def test_a_wiki_zip_brings_its_filed_files_back_where_they_were(
     ).one()
     filed = {file.name: file for file in await linked_files(session, restored.id)}
     assert set(filed) == {"Session notes", "Loot", "Handout"}
-    assert filed["Loot"].file_type == FileType.spreadsheet
+    assert filed["Loot"].file_type == FileType.sheet
     handout = filed["Handout"]
-    assert handout.file_type == FileType.file
+    assert handout.file_type == FileType.pdf
     # The upload is the file's version 1, typed from its bytes.
     version = handout.current_version
     assert version is not None and version.version_number == 1
@@ -4912,7 +4919,7 @@ async def test_a_jira_import_brings_its_images_as_uploads(
 
     from app.core.relationships import RelationshipType
     from app.core.search import SearchEntityType
-    from app.models.tenant.file import File, FileType
+    from app.models.tenant.file import File
     from app.models.tenant.task import Task
     from app.models.tenant.upload import Upload
     from app.services.import_engine import atlassian as atlassian_service
@@ -4979,7 +4986,7 @@ async def test_a_jira_import_brings_its_images_as_uploads(
     assert blob is not None
 
     file = (
-        await session.exec(select(File).where(File.file_type == FileType.file))
+        await session.exec(select(File).where(File.current_version_id.is_not(None)))
     ).one()
     assert file.current_version.original_filename == "spec.pdf"
     assert await relationships_service.related_ids(
@@ -5679,7 +5686,7 @@ async def test_a_confluence_pages_attachments_arrive_as_uploads_and_files(
 
     from app.core.relationships import RelationshipType
     from app.core.search import SearchEntityType
-    from app.models.tenant.file import File, FileType
+    from app.models.tenant.file import File
     from app.models.tenant.wiki import Wiki, WikiPage
     from app.services.import_engine import atlassian as atlassian_service
     from app.services.tenant import relationships as relationships_service
@@ -5721,7 +5728,7 @@ async def test_a_confluence_pages_attachments_arrive_as_uploads_and_files(
             await session.exec(
                 select(File).where(
                     File.initiative_id == a.initiative.id,
-                    File.file_type == FileType.file,
+                    File.current_version_id.is_not(None),
                 )
             )
         ).all()
@@ -5897,7 +5904,7 @@ async def test_a_confluence_html_export_becomes_a_wiki(
     token."""
     from sqlmodel import select
 
-    from app.models.tenant.file import File, FileType
+    from app.models.tenant.file import File
     from app.models.tenant.wiki import Wiki, WikiPage
     from app.services.import_engine.confluence_export_test import export_bytes
     from app.services.tenant.wikis import file_parent
@@ -5943,7 +5950,7 @@ async def test_a_confluence_html_export_becomes_a_wiki(
     assert pages["Guide"].parent_page_id == pages["Home"].id
     assert pages["Home"].created_by == b.user.id
     file = (
-        await session.exec(select(File).where(File.file_type == FileType.file))
+        await session.exec(select(File).where(File.current_version_id.is_not(None)))
     ).one()
     assert file.current_version.original_filename == "spec.pdf"
     assert file_parent(wiki, file.id) == pages["Home"].id

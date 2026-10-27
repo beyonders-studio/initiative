@@ -10,7 +10,8 @@ from sqlmodel.ext.asyncio.session import AsyncSession
 
 from app.core.errors import CodedError
 from app.core.search import SearchEntityType
-from app.models.tenant.file import File, FileType
+from app.core.file_types import FileType, is_stored
+from app.models.tenant.file import File
 from app.models.tenant.resource_grant import ResourceGrant
 from app.core.references import unresolve_wikilinks_to
 from app.core.messages import FileMessages
@@ -67,18 +68,18 @@ class FileContentError(CodedError, ValueError):
 def normalize_file_content(
     payload: dict[str, Any] | None,
     *,
-    file_type: FileType = FileType.native,
+    file_type: FileType = FileType.lexical,
 ) -> dict[str, Any]:
     """Normalize content JSONB based on file type.
 
-    - native: ensure a Lexical root with at least one paragraph child
-    - whiteboard: ensure the Excalidraw scene shape {elements, appState, files}
-    - file: content is just a passthrough dict (usually empty)
+    - lexical: ensure a Lexical root with at least one paragraph child
+    - excalidraw: ensure the Excalidraw scene shape {elements, appState, files}
+    - a stored type: content is just a passthrough dict (usually empty)
     """
-    if file_type == FileType.file:
+    if is_stored(file_type):
         return payload if isinstance(payload, dict) else {}
 
-    if file_type == FileType.whiteboard:
+    if file_type == FileType.excalidraw:
         if not isinstance(payload, dict):
             return {"elements": [], "appState": {}, "files": {}}
         return {
@@ -87,7 +88,7 @@ def normalize_file_content(
             "files": payload.get("files") or {},
         }
 
-    if file_type == FileType.smart_link:
+    if file_type == FileType.url:
         if not isinstance(payload, dict):
             raise FileContentError(FileMessages.SMART_LINK_URL_REQUIRED)
         url = str(payload.get("url") or "").strip()
@@ -97,7 +98,7 @@ def normalize_file_content(
             raise FileContentError(FileMessages.SMART_LINK_URL_INVALID)
         return {"url": url}
 
-    if file_type == FileType.spreadsheet:
+    if file_type == FileType.sheet:
         # Imported lazily to avoid a circular import: files_spreadsheet
         # imports FileContentError from this module.
         from app.services.tenant.files_spreadsheet import (
@@ -106,7 +107,7 @@ def normalize_file_content(
 
         return normalize_spreadsheet_content(payload)
 
-    # native (default)
+    # lexical (default)
     if not isinstance(payload, dict):
         return deepcopy(EMPTY_LEXICAL_STATE)
     root = payload.get("root")

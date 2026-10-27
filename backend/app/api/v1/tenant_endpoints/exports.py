@@ -415,8 +415,8 @@ async def export_initiative(
         default=None,
         description=(
             "Report mode: JSON object of tool→format; the file entry is a "
-            'nested map, e.g. {"project": "pdf", "file": {"native": "md", '
-            '"spreadsheet": "xlsx"}}. Unlisted tools use their backup format.'
+            'nested map, e.g. {"project": "pdf", "file": {"lexical": "md", '
+            '"sheet": "xlsx"}}. Unlisted tools use their backup format.'
         ),
     ),
     include_uploads: bool = Query(

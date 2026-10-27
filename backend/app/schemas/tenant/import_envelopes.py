@@ -56,7 +56,7 @@ class EnvelopePropertyValue(SanitizedBaseModel):
 
 class FileEnvelope(_EnvelopeBase):
     type: Literal["initiative-file"]
-    file_type: str  # native | spreadsheet | smart_link | whiteboard
+    file_type: str  # one of the editor's types: lexical | excalidraw | sheet | url
     name: str
     content: dict[str, Any] = {}
     tags: list[str] = []

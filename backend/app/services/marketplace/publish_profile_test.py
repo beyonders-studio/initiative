@@ -102,7 +102,7 @@ class TestNobodyIsCarried:
     def test_a_body_mention_and_reference_become_text_and_uploads_go(self):
         file = {
             "type": "initiative-file",
-            "file_type": "native",
+            "file_type": "lexical",
             "name": "Notes",
             "mention_handles": ["alice#1234"],
             "content": _editor(

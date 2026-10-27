@@ -48,7 +48,8 @@ from fastapi import HTTPException
 from app.core.errors import CodedError
 from app.core.tools import Tool, tool_envelope_type
 from app.models.platform.user import User
-from app.models.tenant.file import File, FileType
+from app.core.file_types import FileType, is_stored
+from app.models.tenant.file import File
 from app.models.tenant.wiki import Wiki, WikiPage
 from app.schemas.tenant.tag import annotated_tags
 from app.services.export.adapters._common import (
@@ -270,14 +271,14 @@ def build_wiki_file_item(
 def filed_format(file: File, format: str) -> str:
     """The format a filed file travels in beside a wiki exported as
     ``format``: its own type decides what it can be."""
-    doc_type = getattr(file.file_type, "value", file.file_type)
-    if doc_type == FileType.native.value:
+    file_type = getattr(file.file_type, "value", file.file_type)
+    if file_type == FileType.lexical.value:
         return format
-    if doc_type == FileType.spreadsheet.value:
+    if file_type == FileType.sheet.value:
         return "json" if format == "json" else "xlsx"
-    if doc_type == FileType.file.value:
+    if is_stored(file_type):
         return "file"
-    if doc_type == FileType.smart_link.value:
+    if file_type == FileType.url.value:
         return "json" if format == "json" else "md"
     # A whiteboard is only ever its scene.
     return "json"
@@ -346,8 +347,8 @@ def filed_file_records(
             "position": file_position(wiki, file.id),
             "external_ref": f"file:{file.id}",
         }
-        doc_type = getattr(file.file_type, "value", file.file_type)
-        if doc_type == FileType.file.value:
+        file_type = getattr(file.file_type, "value", file.file_type)
+        if is_stored(file_type):
             version = file.current_version
             asset = asset_item(storage, version)
             if version is None or asset is None:

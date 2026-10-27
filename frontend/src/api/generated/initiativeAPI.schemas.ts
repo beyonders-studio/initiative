@@ -5857,10 +5857,10 @@ export type FileCreateContent = { [key: string]: unknown } | null;
 export type FileCreateFileType = (typeof FileCreateFileType)[keyof typeof FileCreateFileType];
 
 export const FileCreateFileType = {
-  native: "native",
-  whiteboard: "whiteboard",
-  smart_link: "smart_link",
-  spreadsheet: "spreadsheet",
+  lexical: "lexical",
+  excalidraw: "excalidraw",
+  url: "url",
+  sheet: "sheet",
 } as const;
 
 export interface FileCreate {
@@ -5874,17 +5874,46 @@ export interface FileCreate {
   grants?: ResourceGrantSchema[];
 }
 
-/**
- * Discriminator for file type.
- */
+export type FileKind = (typeof FileKind)[keyof typeof FileKind];
+
+export const FileKind = {
+  document: "document",
+  spreadsheet: "spreadsheet",
+  presentation: "presentation",
+  whiteboard: "whiteboard",
+  pdf: "pdf",
+  image: "image",
+  video: "video",
+  audio: "audio",
+  text: "text",
+  archive: "archive",
+  link: "link",
+  other: "other",
+} as const;
+
 export type FileType = (typeof FileType)[keyof typeof FileType];
 
 export const FileType = {
-  native: "native",
-  file: "file",
-  whiteboard: "whiteboard",
-  smart_link: "smart_link",
-  spreadsheet: "spreadsheet",
+  lexical: "lexical",
+  excalidraw: "excalidraw",
+  sheet: "sheet",
+  url: "url",
+  pdf: "pdf",
+  doc: "doc",
+  docx: "docx",
+  xls: "xls",
+  xlsx: "xlsx",
+  ppt: "ppt",
+  pptx: "pptx",
+  txt: "txt",
+  html: "html",
+  md: "md",
+  png: "png",
+  jpeg: "jpeg",
+  gif: "gif",
+  webp: "webp",
+  svg: "svg",
+  other: "other",
 } as const;
 
 export interface FileSummary {
@@ -5913,6 +5942,8 @@ export interface FileSummary {
   file_size: number | null;
   original_filename: string | null;
   smart_link_url: string | null;
+  /** How the file is shown, which follows from its type. */
+  readonly kind: FileKind;
 }
 
 export interface FileListResponse {
@@ -5954,6 +5985,8 @@ export interface FileRead {
   smart_link_url: string | null;
   content: FileReadContent;
   content_version: string | null;
+  /** How the file is shown, which follows from its type. */
+  readonly kind: FileKind;
 }
 
 export type FileUpdateContent = { [key: string]: unknown } | null;
@@ -12303,7 +12336,7 @@ export type GetToolCountsParams = {
    */
   view?: string;
   /**
-   * JSON object of the tool's own list filters, as its list route takes them (``{"search": "notes", "file_type": "native"}``), that the tag counts are for
+   * JSON object of the tool's own list filters, as its list route takes them (``{"search": "notes", "kind": "document"}``), that the tag counts are for
    */
   filters?: string | null;
   /**
@@ -12387,6 +12420,10 @@ export type ListFilesParams = {
    * Filter by file type
    */
   file_type?: FileType | null;
+  /**
+   * Filter by kind of file
+   */
+  kind?: FileKind | null;
   /**
    * @minimum 1
    */
@@ -13078,7 +13115,7 @@ export type ExportInitiativeParams = {
    */
   include?: string | null;
   /**
-   * Report mode: JSON object of tool→format; the file entry is a nested map, e.g. {"project": "pdf", "file": {"native": "md", "spreadsheet": "xlsx"}}. Unlisted tools use their backup format.
+   * Report mode: JSON object of tool→format; the file entry is a nested map, e.g. {"project": "pdf", "file": {"lexical": "md", "sheet": "xlsx"}}. Unlisted tools use their backup format.
    */
   formats?: string | null;
   /**

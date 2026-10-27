@@ -350,12 +350,16 @@
     "noMatchingFiles": "Keine Dateien entsprechen deinen Filtern.",
     "type": "Nach Typ filtern",
     "allTypes": "Alle Typen",
-    "types": {
-      "native": "Textdokument",
-      "file": "Datei",
+    "kinds": {
+      "document": "Dokument",
+      "spreadsheet": "Tabelle",
+      "presentation": "Präsentation",
       "whiteboard": "Whiteboard",
-      "smart_link": "Smart-Link",
-      "spreadsheet": "Tabelle"
+      "pdf": "PDF",
+      "image": "Bild",
+      "text": "Text",
+      "link": "Link",
+      "other": "Sonstiges"
     }
   }
 }

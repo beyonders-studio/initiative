@@ -14,7 +14,6 @@ from alembic.migration import MigrationContext
 from alembic.operations import Operations
 from sqlalchemy import text
 
-from app.models.tenant.file import FileType
 from app.testing import (
     create_file,
     create_catalog,
@@ -56,7 +55,6 @@ async def test_old_files_get_versions_types_and_pointers(
         session,
         initiative,
         user,
-        file_type=FileType.file,
         file_url="/uploads/1/brief.pdf",
         original_filename="brief.pdf",
     )

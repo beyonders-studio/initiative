@@ -96,9 +96,9 @@ describe("what gets written into the comment", () => {
 
 describe("where # is offered", () => {
   it("is a standard document and nothing else", () => {
-    expect(supportsEntityMentions(FileType.native)).toBe(true);
+    expect(supportsEntityMentions(FileType.lexical)).toBe(true);
     for (const type of Object.values(FileType)) {
-      if (type === FileType.native) continue;
+      if (type === FileType.lexical) continue;
       expect(supportsEntityMentions(type)).toBe(false);
     }
   });

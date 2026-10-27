@@ -1,6 +1,7 @@
 import { useLexicalComposerContext } from "@lexical/react/LexicalComposerContext";
 import { UploadIcon } from "lucide-react";
 
+import { FileType } from "@/api/generated/initiativeAPI.schemas";
 import { Button } from "@/components/ui/button";
 import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip";
 
@@ -17,10 +18,10 @@ function extractEditorState(parsed: unknown): unknown | null {
   }
   const record = parsed as Record<string, unknown>;
   const isEnvelope = (name: string): boolean => record.type === name || record.kind === name;
-  const native =
-    (isEnvelope("initiative-file") && record.file_type === "native") ||
+  const lexical =
+    (isEnvelope("initiative-file") && record.file_type === FileType.lexical) ||
     (isEnvelope("initiative-document") && record.document_type === "native");
-  if (native && typeof record.content === "object" && record.content !== null) {
+  if (lexical && typeof record.content === "object" && record.content !== null) {
     return record.content;
   }
   if (typeof record.editorState === "object" && record.editorState !== null) {

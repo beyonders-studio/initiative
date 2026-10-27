@@ -1,4 +1,5 @@
-import type { FileSummary } from "@/api/generated/initiativeAPI.schemas";
+import { type FileSummary, FileType } from "@/api/generated/initiativeAPI.schemas";
+import { FILE_TYPE_KINDS } from "@/lib/fileTypes";
 
 import { ownerCan } from "./can";
 
@@ -10,6 +11,7 @@ export function resetCounter(): void {
 
 export function buildFileSummary(overrides: Partial<FileSummary> = {}): FileSummary {
   counter++;
+  const fileType = overrides.file_type ?? FileType.lexical;
   return {
     id: counter,
     community_id: 1,
@@ -30,7 +32,8 @@ export function buildFileSummary(overrides: Partial<FileSummary> = {}): FileSumm
     can: ownerCan(),
     tags: [],
     properties: [],
-    file_type: "native",
+    file_type: fileType,
+    kind: FILE_TYPE_KINDS[fileType],
     file_url: null,
     file_content_type: null,
     file_size: null,

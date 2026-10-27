@@ -495,7 +495,8 @@ async def _upload_file(
     whose file is not stored here — left out of the zip, or refused on the way
     in — or is not a type an uploaded file holds is not created."""
     from app.db.session import routed_guild_id
-    from app.models.tenant.file import File, FileType
+    from app.core.file_types import type_of_media
+    from app.models.tenant.file import File
     from app.models.tenant.upload import Upload
     from app.services.tenant import file_versions
 
@@ -516,7 +517,7 @@ async def _upload_file(
         return None, (0, 0)
     file = File(
         name=upload.name,
-        file_type=FileType.file,
+        file_type=type_of_media(content_type),
         content={},
         initiative_id=target_initiative.id,
         created_by=importer.id,

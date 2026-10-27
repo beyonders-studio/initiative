@@ -290,6 +290,184 @@ A file's summary arrives as it is written, as JSON lines (`AIStreamEvent`:
 
 - POST /api/v1/c/{community_id}/files/{file_id}/ai/summary removed the media type `application/json` for the response with the status `200`
 
+### A file's type is its format
+
+`file_type` names the file's format rather than how it is kept: `native`,
+`whiteboard`, `spreadsheet` and `smart_link` are `lexical`, `excalidraw`,
+`sheet` and `url`, and an uploaded file (`file`) is its format (`pdf`, `png`
+…, `other` where none is named). A file reports a `kind` beside it, and the
+files list filters by `kind`.
+
+- GET /api/v1/c/{community_id}/files/ removed the enum value `file` from the property `anyOf[subschema #1: FileType]/` of the `query` request parameter `file_type`
+- GET /api/v1/c/{community_id}/files/ removed the enum value `native` from the property `anyOf[subschema #1: FileType]/` of the `query` request parameter `file_type`
+- GET /api/v1/c/{community_id}/files/ removed the enum value `smart_link` from the property `anyOf[subschema #1: FileType]/` of the `query` request parameter `file_type`
+- GET /api/v1/c/{community_id}/files/ removed the enum value `spreadsheet` from the property `anyOf[subschema #1: FileType]/` of the `query` request parameter `file_type`
+- GET /api/v1/c/{community_id}/files/ removed the enum value `whiteboard` from the property `anyOf[subschema #1: FileType]/` of the `query` request parameter `file_type`
+- GET /api/v1/c/{community_id}/files/ added the new `doc` enum value to the `items/items/file_type` response property for the response status `200`
+- GET /api/v1/c/{community_id}/files/ added the new `docx` enum value to the `items/items/file_type` response property for the response status `200`
+- GET /api/v1/c/{community_id}/files/ added the new `excalidraw` enum value to the `items/items/file_type` response property for the response status `200`
+- GET /api/v1/c/{community_id}/files/ added the new `gif` enum value to the `items/items/file_type` response property for the response status `200`
+- GET /api/v1/c/{community_id}/files/ added the new `html` enum value to the `items/items/file_type` response property for the response status `200`
+- GET /api/v1/c/{community_id}/files/ added the new `jpeg` enum value to the `items/items/file_type` response property for the response status `200`
+- GET /api/v1/c/{community_id}/files/ added the new `lexical` enum value to the `items/items/file_type` response property for the response status `200`
+- GET /api/v1/c/{community_id}/files/ added the new `md` enum value to the `items/items/file_type` response property for the response status `200`
+- GET /api/v1/c/{community_id}/files/ added the new `other` enum value to the `items/items/file_type` response property for the response status `200`
+- GET /api/v1/c/{community_id}/files/ added the new `pdf` enum value to the `items/items/file_type` response property for the response status `200`
+- GET /api/v1/c/{community_id}/files/ added the new `png` enum value to the `items/items/file_type` response property for the response status `200`
+- GET /api/v1/c/{community_id}/files/ added the new `ppt` enum value to the `items/items/file_type` response property for the response status `200`
+- GET /api/v1/c/{community_id}/files/ added the new `pptx` enum value to the `items/items/file_type` response property for the response status `200`
+- GET /api/v1/c/{community_id}/files/ added the new `sheet` enum value to the `items/items/file_type` response property for the response status `200`
+- GET /api/v1/c/{community_id}/files/ added the new `svg` enum value to the `items/items/file_type` response property for the response status `200`
+- GET /api/v1/c/{community_id}/files/ added the new `txt` enum value to the `items/items/file_type` response property for the response status `200`
+- GET /api/v1/c/{community_id}/files/ added the new `url` enum value to the `items/items/file_type` response property for the response status `200`
+- GET /api/v1/c/{community_id}/files/ added the new `webp` enum value to the `items/items/file_type` response property for the response status `200`
+- GET /api/v1/c/{community_id}/files/ added the new `xls` enum value to the `items/items/file_type` response property for the response status `200`
+- GET /api/v1/c/{community_id}/files/ added the new `xlsx` enum value to the `items/items/file_type` response property for the response status `200`
+- POST /api/v1/c/{community_id}/files/ removed the enum value `native` of the request property `file_type`
+- POST /api/v1/c/{community_id}/files/ removed the enum value `smart_link` of the request property `file_type`
+- POST /api/v1/c/{community_id}/files/ removed the enum value `spreadsheet` of the request property `file_type`
+- POST /api/v1/c/{community_id}/files/ removed the enum value `whiteboard` of the request property `file_type`
+- POST /api/v1/c/{community_id}/files/ added the new `doc` enum value to the `file_type` response property for the response status `201`
+- POST /api/v1/c/{community_id}/files/ added the new `docx` enum value to the `file_type` response property for the response status `201`
+- POST /api/v1/c/{community_id}/files/ added the new `excalidraw` enum value to the `file_type` response property for the response status `201`
+- POST /api/v1/c/{community_id}/files/ added the new `gif` enum value to the `file_type` response property for the response status `201`
+- POST /api/v1/c/{community_id}/files/ added the new `html` enum value to the `file_type` response property for the response status `201`
+- POST /api/v1/c/{community_id}/files/ added the new `jpeg` enum value to the `file_type` response property for the response status `201`
+- POST /api/v1/c/{community_id}/files/ added the new `lexical` enum value to the `file_type` response property for the response status `201`
+- POST /api/v1/c/{community_id}/files/ added the new `md` enum value to the `file_type` response property for the response status `201`
+- POST /api/v1/c/{community_id}/files/ added the new `other` enum value to the `file_type` response property for the response status `201`
+- POST /api/v1/c/{community_id}/files/ added the new `pdf` enum value to the `file_type` response property for the response status `201`
+- POST /api/v1/c/{community_id}/files/ added the new `png` enum value to the `file_type` response property for the response status `201`
+- POST /api/v1/c/{community_id}/files/ added the new `ppt` enum value to the `file_type` response property for the response status `201`
+- POST /api/v1/c/{community_id}/files/ added the new `pptx` enum value to the `file_type` response property for the response status `201`
+- POST /api/v1/c/{community_id}/files/ added the new `sheet` enum value to the `file_type` response property for the response status `201`
+- POST /api/v1/c/{community_id}/files/ added the new `svg` enum value to the `file_type` response property for the response status `201`
+- POST /api/v1/c/{community_id}/files/ added the new `txt` enum value to the `file_type` response property for the response status `201`
+- POST /api/v1/c/{community_id}/files/ added the new `url` enum value to the `file_type` response property for the response status `201`
+- POST /api/v1/c/{community_id}/files/ added the new `webp` enum value to the `file_type` response property for the response status `201`
+- POST /api/v1/c/{community_id}/files/ added the new `xls` enum value to the `file_type` response property for the response status `201`
+- POST /api/v1/c/{community_id}/files/ added the new `xlsx` enum value to the `file_type` response property for the response status `201`
+- POST /api/v1/c/{community_id}/files/upload added the new `doc` enum value to the `file_type` response property for the response status `201`
+- POST /api/v1/c/{community_id}/files/upload added the new `docx` enum value to the `file_type` response property for the response status `201`
+- POST /api/v1/c/{community_id}/files/upload added the new `excalidraw` enum value to the `file_type` response property for the response status `201`
+- POST /api/v1/c/{community_id}/files/upload added the new `gif` enum value to the `file_type` response property for the response status `201`
+- POST /api/v1/c/{community_id}/files/upload added the new `html` enum value to the `file_type` response property for the response status `201`
+- POST /api/v1/c/{community_id}/files/upload added the new `jpeg` enum value to the `file_type` response property for the response status `201`
+- POST /api/v1/c/{community_id}/files/upload added the new `lexical` enum value to the `file_type` response property for the response status `201`
+- POST /api/v1/c/{community_id}/files/upload added the new `md` enum value to the `file_type` response property for the response status `201`
+- POST /api/v1/c/{community_id}/files/upload added the new `other` enum value to the `file_type` response property for the response status `201`
+- POST /api/v1/c/{community_id}/files/upload added the new `pdf` enum value to the `file_type` response property for the response status `201`
+- POST /api/v1/c/{community_id}/files/upload added the new `png` enum value to the `file_type` response property for the response status `201`
+- POST /api/v1/c/{community_id}/files/upload added the new `ppt` enum value to the `file_type` response property for the response status `201`
+- POST /api/v1/c/{community_id}/files/upload added the new `pptx` enum value to the `file_type` response property for the response status `201`
+- POST /api/v1/c/{community_id}/files/upload added the new `sheet` enum value to the `file_type` response property for the response status `201`
+- POST /api/v1/c/{community_id}/files/upload added the new `svg` enum value to the `file_type` response property for the response status `201`
+- POST /api/v1/c/{community_id}/files/upload added the new `txt` enum value to the `file_type` response property for the response status `201`
+- POST /api/v1/c/{community_id}/files/upload added the new `url` enum value to the `file_type` response property for the response status `201`
+- POST /api/v1/c/{community_id}/files/upload added the new `webp` enum value to the `file_type` response property for the response status `201`
+- POST /api/v1/c/{community_id}/files/upload added the new `xls` enum value to the `file_type` response property for the response status `201`
+- POST /api/v1/c/{community_id}/files/upload added the new `xlsx` enum value to the `file_type` response property for the response status `201`
+- GET /api/v1/c/{community_id}/files/{file_id} added the new `doc` enum value to the `file_type` response property for the response status `200`
+- GET /api/v1/c/{community_id}/files/{file_id} added the new `docx` enum value to the `file_type` response property for the response status `200`
+- GET /api/v1/c/{community_id}/files/{file_id} added the new `excalidraw` enum value to the `file_type` response property for the response status `200`
+- GET /api/v1/c/{community_id}/files/{file_id} added the new `gif` enum value to the `file_type` response property for the response status `200`
+- GET /api/v1/c/{community_id}/files/{file_id} added the new `html` enum value to the `file_type` response property for the response status `200`
+- GET /api/v1/c/{community_id}/files/{file_id} added the new `jpeg` enum value to the `file_type` response property for the response status `200`
+- GET /api/v1/c/{community_id}/files/{file_id} added the new `lexical` enum value to the `file_type` response property for the response status `200`
+- GET /api/v1/c/{community_id}/files/{file_id} added the new `md` enum value to the `file_type` response property for the response status `200`
+- GET /api/v1/c/{community_id}/files/{file_id} added the new `other` enum value to the `file_type` response property for the response status `200`
+- GET /api/v1/c/{community_id}/files/{file_id} added the new `pdf` enum value to the `file_type` response property for the response status `200`
+- GET /api/v1/c/{community_id}/files/{file_id} added the new `png` enum value to the `file_type` response property for the response status `200`
+- GET /api/v1/c/{community_id}/files/{file_id} added the new `ppt` enum value to the `file_type` response property for the response status `200`
+- GET /api/v1/c/{community_id}/files/{file_id} added the new `pptx` enum value to the `file_type` response property for the response status `200`
+- GET /api/v1/c/{community_id}/files/{file_id} added the new `sheet` enum value to the `file_type` response property for the response status `200`
+- GET /api/v1/c/{community_id}/files/{file_id} added the new `svg` enum value to the `file_type` response property for the response status `200`
+- GET /api/v1/c/{community_id}/files/{file_id} added the new `txt` enum value to the `file_type` response property for the response status `200`
+- GET /api/v1/c/{community_id}/files/{file_id} added the new `url` enum value to the `file_type` response property for the response status `200`
+- GET /api/v1/c/{community_id}/files/{file_id} added the new `webp` enum value to the `file_type` response property for the response status `200`
+- GET /api/v1/c/{community_id}/files/{file_id} added the new `xls` enum value to the `file_type` response property for the response status `200`
+- GET /api/v1/c/{community_id}/files/{file_id} added the new `xlsx` enum value to the `file_type` response property for the response status `200`
+- PATCH /api/v1/c/{community_id}/files/{file_id} added the new `doc` enum value to the `file_type` response property for the response status `200`
+- PATCH /api/v1/c/{community_id}/files/{file_id} added the new `docx` enum value to the `file_type` response property for the response status `200`
+- PATCH /api/v1/c/{community_id}/files/{file_id} added the new `excalidraw` enum value to the `file_type` response property for the response status `200`
+- PATCH /api/v1/c/{community_id}/files/{file_id} added the new `gif` enum value to the `file_type` response property for the response status `200`
+- PATCH /api/v1/c/{community_id}/files/{file_id} added the new `html` enum value to the `file_type` response property for the response status `200`
+- PATCH /api/v1/c/{community_id}/files/{file_id} added the new `jpeg` enum value to the `file_type` response property for the response status `200`
+- PATCH /api/v1/c/{community_id}/files/{file_id} added the new `lexical` enum value to the `file_type` response property for the response status `200`
+- PATCH /api/v1/c/{community_id}/files/{file_id} added the new `md` enum value to the `file_type` response property for the response status `200`
+- PATCH /api/v1/c/{community_id}/files/{file_id} added the new `other` enum value to the `file_type` response property for the response status `200`
+- PATCH /api/v1/c/{community_id}/files/{file_id} added the new `pdf` enum value to the `file_type` response property for the response status `200`
+- PATCH /api/v1/c/{community_id}/files/{file_id} added the new `png` enum value to the `file_type` response property for the response status `200`
+- PATCH /api/v1/c/{community_id}/files/{file_id} added the new `ppt` enum value to the `file_type` response property for the response status `200`
+- PATCH /api/v1/c/{community_id}/files/{file_id} added the new `pptx` enum value to the `file_type` response property for the response status `200`
+- PATCH /api/v1/c/{community_id}/files/{file_id} added the new `sheet` enum value to the `file_type` response property for the response status `200`
+- PATCH /api/v1/c/{community_id}/files/{file_id} added the new `svg` enum value to the `file_type` response property for the response status `200`
+- PATCH /api/v1/c/{community_id}/files/{file_id} added the new `txt` enum value to the `file_type` response property for the response status `200`
+- PATCH /api/v1/c/{community_id}/files/{file_id} added the new `url` enum value to the `file_type` response property for the response status `200`
+- PATCH /api/v1/c/{community_id}/files/{file_id} added the new `webp` enum value to the `file_type` response property for the response status `200`
+- PATCH /api/v1/c/{community_id}/files/{file_id} added the new `xls` enum value to the `file_type` response property for the response status `200`
+- PATCH /api/v1/c/{community_id}/files/{file_id} added the new `xlsx` enum value to the `file_type` response property for the response status `200`
+- POST /api/v1/c/{community_id}/files/{file_id}/duplicate added the new `doc` enum value to the `file_type` response property for the response status `201`
+- POST /api/v1/c/{community_id}/files/{file_id}/duplicate added the new `docx` enum value to the `file_type` response property for the response status `201`
+- POST /api/v1/c/{community_id}/files/{file_id}/duplicate added the new `excalidraw` enum value to the `file_type` response property for the response status `201`
+- POST /api/v1/c/{community_id}/files/{file_id}/duplicate added the new `gif` enum value to the `file_type` response property for the response status `201`
+- POST /api/v1/c/{community_id}/files/{file_id}/duplicate added the new `html` enum value to the `file_type` response property for the response status `201`
+- POST /api/v1/c/{community_id}/files/{file_id}/duplicate added the new `jpeg` enum value to the `file_type` response property for the response status `201`
+- POST /api/v1/c/{community_id}/files/{file_id}/duplicate added the new `lexical` enum value to the `file_type` response property for the response status `201`
+- POST /api/v1/c/{community_id}/files/{file_id}/duplicate added the new `md` enum value to the `file_type` response property for the response status `201`
+- POST /api/v1/c/{community_id}/files/{file_id}/duplicate added the new `other` enum value to the `file_type` response property for the response status `201`
+- POST /api/v1/c/{community_id}/files/{file_id}/duplicate added the new `pdf` enum value to the `file_type` response property for the response status `201`
+- POST /api/v1/c/{community_id}/files/{file_id}/duplicate added the new `png` enum value to the `file_type` response property for the response status `201`
+- POST /api/v1/c/{community_id}/files/{file_id}/duplicate added the new `ppt` enum value to the `file_type` response property for the response status `201`
+- POST /api/v1/c/{community_id}/files/{file_id}/duplicate added the new `pptx` enum value to the `file_type` response property for the response status `201`
+- POST /api/v1/c/{community_id}/files/{file_id}/duplicate added the new `sheet` enum value to the `file_type` response property for the response status `201`
+- POST /api/v1/c/{community_id}/files/{file_id}/duplicate added the new `svg` enum value to the `file_type` response property for the response status `201`
+- POST /api/v1/c/{community_id}/files/{file_id}/duplicate added the new `txt` enum value to the `file_type` response property for the response status `201`
+- POST /api/v1/c/{community_id}/files/{file_id}/duplicate added the new `url` enum value to the `file_type` response property for the response status `201`
+- POST /api/v1/c/{community_id}/files/{file_id}/duplicate added the new `webp` enum value to the `file_type` response property for the response status `201`
+- POST /api/v1/c/{community_id}/files/{file_id}/duplicate added the new `xls` enum value to the `file_type` response property for the response status `201`
+- POST /api/v1/c/{community_id}/files/{file_id}/duplicate added the new `xlsx` enum value to the `file_type` response property for the response status `201`
+- PUT /api/v1/c/{community_id}/files/{file_id}/grants added the new `doc` enum value to the `file_type` response property for the response status `200`
+- PUT /api/v1/c/{community_id}/files/{file_id}/grants added the new `docx` enum value to the `file_type` response property for the response status `200`
+- PUT /api/v1/c/{community_id}/files/{file_id}/grants added the new `excalidraw` enum value to the `file_type` response property for the response status `200`
+- PUT /api/v1/c/{community_id}/files/{file_id}/grants added the new `gif` enum value to the `file_type` response property for the response status `200`
+- PUT /api/v1/c/{community_id}/files/{file_id}/grants added the new `html` enum value to the `file_type` response property for the response status `200`
+- PUT /api/v1/c/{community_id}/files/{file_id}/grants added the new `jpeg` enum value to the `file_type` response property for the response status `200`
+- PUT /api/v1/c/{community_id}/files/{file_id}/grants added the new `lexical` enum value to the `file_type` response property for the response status `200`
+- PUT /api/v1/c/{community_id}/files/{file_id}/grants added the new `md` enum value to the `file_type` response property for the response status `200`
+- PUT /api/v1/c/{community_id}/files/{file_id}/grants added the new `other` enum value to the `file_type` response property for the response status `200`
+- PUT /api/v1/c/{community_id}/files/{file_id}/grants added the new `pdf` enum value to the `file_type` response property for the response status `200`
+- PUT /api/v1/c/{community_id}/files/{file_id}/grants added the new `png` enum value to the `file_type` response property for the response status `200`
+- PUT /api/v1/c/{community_id}/files/{file_id}/grants added the new `ppt` enum value to the `file_type` response property for the response status `200`
+- PUT /api/v1/c/{community_id}/files/{file_id}/grants added the new `pptx` enum value to the `file_type` response property for the response status `200`
+- PUT /api/v1/c/{community_id}/files/{file_id}/grants added the new `sheet` enum value to the `file_type` response property for the response status `200`
+- PUT /api/v1/c/{community_id}/files/{file_id}/grants added the new `svg` enum value to the `file_type` response property for the response status `200`
+- PUT /api/v1/c/{community_id}/files/{file_id}/grants added the new `txt` enum value to the `file_type` response property for the response status `200`
+- PUT /api/v1/c/{community_id}/files/{file_id}/grants added the new `url` enum value to the `file_type` response property for the response status `200`
+- PUT /api/v1/c/{community_id}/files/{file_id}/grants added the new `webp` enum value to the `file_type` response property for the response status `200`
+- PUT /api/v1/c/{community_id}/files/{file_id}/grants added the new `xls` enum value to the `file_type` response property for the response status `200`
+- PUT /api/v1/c/{community_id}/files/{file_id}/grants added the new `xlsx` enum value to the `file_type` response property for the response status `200`
+- GET /api/v1/me/files added the new `doc` enum value to the `items/items/file_type` response property for the response status `200`
+- GET /api/v1/me/files added the new `docx` enum value to the `items/items/file_type` response property for the response status `200`
+- GET /api/v1/me/files added the new `excalidraw` enum value to the `items/items/file_type` response property for the response status `200`
+- GET /api/v1/me/files added the new `gif` enum value to the `items/items/file_type` response property for the response status `200`
+- GET /api/v1/me/files added the new `html` enum value to the `items/items/file_type` response property for the response status `200`
+- GET /api/v1/me/files added the new `jpeg` enum value to the `items/items/file_type` response property for the response status `200`
+- GET /api/v1/me/files added the new `lexical` enum value to the `items/items/file_type` response property for the response status `200`
+- GET /api/v1/me/files added the new `md` enum value to the `items/items/file_type` response property for the response status `200`
+- GET /api/v1/me/files added the new `other` enum value to the `items/items/file_type` response property for the response status `200`
+- GET /api/v1/me/files added the new `pdf` enum value to the `items/items/file_type` response property for the response status `200`
+- GET /api/v1/me/files added the new `png` enum value to the `items/items/file_type` response property for the response status `200`
+- GET /api/v1/me/files added the new `ppt` enum value to the `items/items/file_type` response property for the response status `200`
+- GET /api/v1/me/files added the new `pptx` enum value to the `items/items/file_type` response property for the response status `200`
+- GET /api/v1/me/files added the new `sheet` enum value to the `items/items/file_type` response property for the response status `200`
+- GET /api/v1/me/files added the new `svg` enum value to the `items/items/file_type` response property for the response status `200`
+- GET /api/v1/me/files added the new `txt` enum value to the `items/items/file_type` response property for the response status `200`
+- GET /api/v1/me/files added the new `url` enum value to the `items/items/file_type` response property for the response status `200`
+- GET /api/v1/me/files added the new `webp` enum value to the `items/items/file_type` response property for the response status `200`
+- GET /api/v1/me/files added the new `xls` enum value to the `items/items/file_type` response property for the response status `200`
+- GET /api/v1/me/files added the new `xlsx` enum value to the `items/items/file_type` response property for the response status `200`
+
 ## After 0.76.0
 
 ### New values in a response's enums

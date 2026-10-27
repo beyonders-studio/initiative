@@ -39,7 +39,7 @@ from app.testing import (
     create_wiki,
     create_wiki_page,
 )
-from app.models.tenant.file import FileType
+from app.core.file_types import FileType
 
 
 ActingUser = Callable[..., Awaitable[Actor]]
@@ -305,7 +305,7 @@ async def test_an_embedded_text_file_shows_its_body(
         a.initiative,
         a.user,
         name="Ledger",
-        file_type=FileType.spreadsheet,
+        file_type=FileType.sheet,
         content={"cells": {"A1": "1"}},
     )
     task = await create_task(session, a.project, title="Roll call")

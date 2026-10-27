@@ -2,8 +2,9 @@ import { FileSpreadsheet, FileText, Presentation } from "lucide-react";
 import { useMemo } from "react";
 import { useTranslation } from "react-i18next";
 
-import type { FileSummary } from "@/api/generated/initiativeAPI.schemas";
+import { FileKind, type FileSummary } from "@/api/generated/initiativeAPI.schemas";
 import { Badge } from "@/components/ui/badge";
+import { isStoredFileType } from "@/lib/fileTypes";
 import { getFileTypeLabel } from "@/lib/fileUtils";
 import type { AppColumnDef } from "@/lib/table";
 import { getUserDisplayName } from "@/lib/userDisplay";
@@ -36,12 +37,12 @@ export const useFileColumns = (): AppColumnDef<FileSummary>[] => {
         header: t("columns.type"),
         cell: ({ row }) => {
           const doc = row.original;
-          if (doc.file_type === "file") {
+          if (isStoredFileType(doc.file_type)) {
             const fileTypeLabel = getFileTypeLabel(doc.file_content_type, doc.original_filename);
             const Icon =
-              fileTypeLabel === "Excel"
+              doc.kind === FileKind.spreadsheet
                 ? FileSpreadsheet
-                : fileTypeLabel === "PowerPoint"
+                : doc.kind === FileKind.presentation
                   ? Presentation
                   : FileText;
             return (

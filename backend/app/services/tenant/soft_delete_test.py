@@ -16,7 +16,8 @@ from app.db.schema_provisioning import guild_schema_name
 from app.db.soft_delete_filter import SOFT_DELETE_MODELS, select_including_deleted
 from app.db.tenancy import GUILD_SCOPED_TABLES
 from app.models.platform.user import User
-from app.models.tenant.file import File, FileType
+from app.core.file_types import FileType
+from app.models.tenant.file import File
 from app.models.tenant.initiative import Initiative
 from app.models.tenant.project import Project
 from app.models.tenant.queue import Queue
@@ -266,7 +267,7 @@ async def test_soft_delete_file_preserves_uploads(session: AsyncSession):
     doc = File(
         initiative_id=initiative.id,
         name="With image",
-        file_type=FileType.native,
+        file_type=FileType.lexical,
         content={"text": "uses /uploads/abc123.png"},
         featured_image_url="/uploads/abc123.png",
         created_by=user.id,
@@ -319,7 +320,7 @@ async def test_purge_file_uploads_escapes_like_wildcards(session: AsyncSession):
     doomed = File(
         initiative_id=initiative.id,
         name="Doomed",
-        file_type=FileType.native,
+        file_type=FileType.lexical,
         content={},
         featured_image_url="/uploads/file_v2.png",
         created_by=user.id,
@@ -331,7 +332,7 @@ async def test_purge_file_uploads_escapes_like_wildcards(session: AsyncSession):
     decoy = File(
         initiative_id=initiative.id,
         name="Decoy",
-        file_type=FileType.native,
+        file_type=FileType.lexical,
         content={"src": "/uploads/fileXv2.png"},
         created_by=user.id,
     )
@@ -489,7 +490,6 @@ async def test_purging_a_uploaded_file_takes_every_version(session: AsyncSession
         initiative,
         user,
         name="Doomed file",
-        file_type=FileType.file,
         file_url=f"/uploads/{names[0]}",
         original_filename=names[0],
     )

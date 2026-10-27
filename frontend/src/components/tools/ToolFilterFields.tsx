@@ -23,7 +23,7 @@ import type {
   ListQueuesParams,
   ListWikisParams,
 } from "@/api/generated/initiativeAPI.schemas";
-import { FileType, Tool } from "@/api/generated/initiativeAPI.schemas";
+import { FileKind, Tool } from "@/api/generated/initiativeAPI.schemas";
 import { PropertyFilterParam } from "@/components/properties/PropertyFilter";
 import { TagFilterPicker } from "@/components/tags/TagFilterPicker";
 import { Input } from "@/components/ui/input";
@@ -210,7 +210,20 @@ const QueueFilterFields = ({
 };
 
 /** "All" is a sentinel: the underlying filter is absent, not a value. */
-const ALL_FILE_TYPES = "all";
+const ALL_FILE_KINDS = "all";
+
+/** The kinds a files list offers to narrow by. */
+const FILE_FILTER_KINDS = [
+  FileKind.document,
+  FileKind.spreadsheet,
+  FileKind.presentation,
+  FileKind.whiteboard,
+  FileKind.pdf,
+  FileKind.image,
+  FileKind.text,
+  FileKind.link,
+  FileKind.other,
+] as const;
 
 /** A files list is also narrowed to one type of file. */
 const FileFilterFields = ({
@@ -235,11 +248,11 @@ const FileFilterFields = ({
           {t("filters.type")}
         </Label>
         <Select
-          value={value.file_type ?? ALL_FILE_TYPES}
+          value={value.kind ?? ALL_FILE_KINDS}
           onValueChange={(next) =>
             onChange({
               ...value,
-              file_type: next === ALL_FILE_TYPES ? undefined : (next as FileType),
+              kind: next === ALL_FILE_KINDS ? undefined : (next as FileKind),
             })
           }
         >
@@ -247,10 +260,10 @@ const FileFilterFields = ({
             <SelectValue />
           </SelectTrigger>
           <SelectContent>
-            <SelectItem value={ALL_FILE_TYPES}>{t("filters.allTypes")}</SelectItem>
-            {Object.values(FileType).map((type) => (
-              <SelectItem key={type} value={type}>
-                {t(`filters.types.${type}`)}
+            <SelectItem value={ALL_FILE_KINDS}>{t("filters.allTypes")}</SelectItem>
+            {FILE_FILTER_KINDS.map((kind) => (
+              <SelectItem key={kind} value={kind}>
+                {t(`filters.kinds.${kind}`)}
               </SelectItem>
             ))}
           </SelectContent>

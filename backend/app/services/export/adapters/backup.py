@@ -63,13 +63,13 @@ from app.core.user_display import handle_of
 from app.core.config import settings
 from app.core.messages import ExportMessages, InitiativeMessages
 from app.models.platform.user import User
-from app.models.tenant.file import FileType
+from app.core.file_types import FileType, is_stored
 from app.services.export.adapters._common import (
     BuildContext,
     ToolExportAdapter,
     storage_key_of,
 )
-from app.services.export.adapters.file import doc_type_of
+from app.services.export.adapters.file import file_type_of
 from app.services.export.contract import RenderItem, RenderRequest
 from app.core.tools import (
     BULK_EXPORT_TOOLS,
@@ -229,8 +229,8 @@ def _validate_params(params: dict, *, scope_kind: str) -> None:
             if section is not None and section.type_report_formats:
                 allowed = section.type_report_formats
                 if not isinstance(fmt, dict) or not all(
-                    doc_type in allowed and value in allowed[doc_type]
-                    for doc_type, value in fmt.items()
+                    file_type in allowed and value in allowed[file_type]
+                    for file_type, value in fmt.items()
                 ):
                     raise ExportError(ExportMessages.EXPORT_INVALID_FORMAT)
             elif (
@@ -704,16 +704,16 @@ class _ScopeBuilder:
         """Report mode offers per-type choices for native/spreadsheet;
         everything else (whiteboards, smart links) rides as its canonical json
         envelope in both modes."""
-        doc_type = doc_type_of(file)
+        file_type = file_type_of(file)
         doc_formats = self._file_formats()
-        if self.mode == "backup" or doc_type not in doc_formats:
+        if self.mode == "backup" or file_type not in doc_formats:
             return "json"
-        return doc_formats[doc_type]
+        return doc_formats[file_type]
 
     def _write_uploaded_file(self, file, initiative, path_stem: str) -> bool:
         """An uploaded file is its blob, registered as an asset — or, with
         uploads left out, a skipped entry."""
-        if doc_type_of(file) != FileType.file.value:
+        if not is_stored(file_type_of(file)):
             return False
         if not _include_uploads(self.params):
             self._skip(
@@ -766,7 +766,7 @@ class _ScopeBuilder:
 
         keys: list[str] = []
         for file in files:
-            if doc_type_of(file) != FileType.native.value:
+            if file_type_of(file) != FileType.lexical.value:
                 continue
             if self._file_format(file) != "json":
                 continue
@@ -1491,8 +1491,8 @@ _SECTIONS: tuple[BackupSection, ...] = (
     BackupSection(
         Tool.file,
         type_report_formats={
-            FileType.native.value: frozenset({"pdf", "md", "docx"}),
-            FileType.spreadsheet.value: frozenset({"csv", "xlsx"}),
+            FileType.lexical.value: frozenset({"pdf", "md", "docx"}),
+            FileType.sheet.value: frozenset({"csv", "xlsx"}),
         },
         type_in_filename=False,
         preload=_ScopeBuilder._preload_embedded_assets,
@@ -1544,7 +1544,7 @@ async def estimate_backup(
     from sqlalchemy import func
     from sqlmodel import select
 
-    from app.models.tenant.file import File, FileType
+    from app.models.tenant.file import File
     from app.schemas.tenant.backup_export import BackupEstimate, BackupToolEstimate
     from app.services.tenant.attachments import get_guild_storage_usage
 
@@ -1580,7 +1580,7 @@ async def estimate_backup(
                     .select_from(File)
                     .where(
                         File.id.in_(file_ids),
-                        File.file_type == FileType.file,
+                        File.current_version_id.is_not(None),
                     )
                 )
             ).one()

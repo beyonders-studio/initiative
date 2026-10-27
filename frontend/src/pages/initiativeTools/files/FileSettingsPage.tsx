@@ -1,6 +1,6 @@
 import { useParams } from "@tanstack/react-router";
 
-import { Tool } from "@/api/generated/initiativeAPI.schemas";
+import { FileType, Tool } from "@/api/generated/initiativeAPI.schemas";
 import { useFileExportOptions } from "@/components/files/useFileExportOptions";
 import { loadWhiteboardSceneFromContent } from "@/components/files/whiteboardSceneCache";
 import { ToolSettingsLayout } from "@/components/tools/settings/ToolSettingsLayout";
@@ -21,9 +21,11 @@ export const FileSettingsPage = () => {
   // A whiteboard's pictures are drawn from the scene the server holds; the
   // editor has saved it by the time anybody is here.
   const exportOptions = useFileExportOptions(
-    file?.file_type ?? "native",
+    file?.file_type ?? FileType.lexical,
     file?.name ?? "",
-    file?.file_type === "whiteboard" ? loadWhiteboardSceneFromContent(file.content) : undefined
+    file?.file_type === FileType.excalidraw
+      ? loadWhiteboardSceneFromContent(file.content)
+      : undefined
   );
 
   return (

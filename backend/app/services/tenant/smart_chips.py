@@ -39,7 +39,7 @@ from app.models.platform.user import User
 from app.models.platform.user_profile_view import MemberProfile
 from app.models.tenant.calendar_event import CalendarEvent
 from app.models.tenant.counter import Counter
-from app.models.tenant.file import FileType
+from app.core.file_types import FileType
 from app.models.tenant.project import Project
 from app.models.tenant.task import (
     Task,
@@ -533,7 +533,7 @@ async def _descriptions(
 #: shows what it says, not only what it is called. A file is prose only as
 #: a text document; a spreadsheet or a whiteboard embeds as its name.
 _PROSE: dict[SearchEntityType, Callable[[Table], ColumnElement[bool]]] = {
-    SearchEntityType.file: lambda t: t.c["file_type"] == FileType.native,
+    SearchEntityType.file: lambda t: t.c["file_type"] == FileType.lexical,
     SearchEntityType.wiki_page: lambda t: true(),
 }
 

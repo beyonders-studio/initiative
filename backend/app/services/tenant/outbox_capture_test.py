@@ -659,7 +659,8 @@ async def test_an_install_write_names_the_install(session, acting_user, role_ses
     person: the plug-in acts as its community. A person's write names the person
     and no install."""
     from app.db.install_standing_test import _install, _route
-    from app.models.tenant.file import File, FileType
+    from app.core.file_types import FileType
+    from app.models.tenant.file import File
 
     install = await _install(
         session, acting_user, role_session, granted=["files:write"]
@@ -669,7 +670,7 @@ async def test_an_install_write_names_the_install(session, acting_user, role_ses
     made = File(
         initiative_id=install.a.id,
         name="Made by the plug-in",
-        file_type=FileType.native,
+        file_type=FileType.lexical,
     )
     s.add(made)
     await s.commit()
@@ -699,13 +700,14 @@ async def test_an_install_write_names_the_install(session, acting_user, role_ses
 
 async def _create_file_as(session, install) -> int:
     """A file the install's seat creates through the request path."""
-    from app.models.tenant.file import File, FileType
+    from app.core.file_types import FileType
+    from app.models.tenant.file import File
 
     await route_as(session, user_id=install.seat.user.id, guild_id=install.guild.id)
     made = File(
         initiative_id=install.a.id,
         name="Made by a person",
-        file_type=FileType.native,
+        file_type=FileType.lexical,
     )
     session.add(made)
     await session.commit()

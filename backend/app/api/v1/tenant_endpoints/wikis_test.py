@@ -726,7 +726,7 @@ async def test_a_file_row_says_what_kind_of_file_it_is(
     client: AsyncClient, acting_user, session
 ):
     """So the navigation can draw a spreadsheet as a spreadsheet."""
-    from app.models.tenant.file import FileType
+    from app.core.file_types import FileType
 
     a = await acting_user(guild_role=CommunityRole.admin, initiative=True)
     await _wikis_enabled(session, a.initiative)
@@ -737,7 +737,7 @@ async def test_a_file_row_says_what_kind_of_file_it_is(
         a.initiative,
         a.user,
         name="Budget",
-        file_type=FileType.spreadsheet,
+        file_type=FileType.sheet,
     )
 
     await client.put(a.g(f"/wikis/{wiki.id}/files/{file.id}"), headers=a.headers)

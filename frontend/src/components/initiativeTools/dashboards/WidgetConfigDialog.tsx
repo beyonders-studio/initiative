@@ -24,7 +24,11 @@
 import { useEffect, useMemo, useState } from "react";
 import { useTranslation } from "react-i18next";
 
-import type { QueryBuildRequest, WidgetCatalog } from "@/api/generated/initiativeAPI.schemas";
+import {
+  FileType,
+  type QueryBuildRequest,
+  type WidgetCatalog,
+} from "@/api/generated/initiativeAPI.schemas";
 import { type PluginEndpointRead, pluginWidgetEntry, pluginWidgetSource } from "@/api/pluginData";
 import { QueryBuilder } from "@/components/initiativeTools/dashboards/QueryBuilder";
 import { SqlEditor } from "@/components/initiativeTools/dashboards/SqlEditor";
@@ -199,7 +203,7 @@ export function WidgetConfigDialog({
     open && params.some((p) => p.kind === "entity" && p.entity === kind);
 
   const files = useFilesList(
-    { file_type: "spreadsheet", initiative_id: initiativeId },
+    { file_type: FileType.sheet, initiative_id: initiativeId },
     { enabled: needs("file") }
   );
 

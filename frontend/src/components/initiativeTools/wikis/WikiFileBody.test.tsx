@@ -51,24 +51,24 @@ describe("WikiFileBody", () => {
   it.each([
     [
       fileOf({
-        file_type: "file",
+        file_type: "pdf",
         file_url: "/uploads/1/abc.pdf",
         original_filename: "proof.pdf",
       }),
       "file proof.pdf read-only",
     ],
-    [fileOf({ file_type: "whiteboard" }), "canvas read-only"],
-    [fileOf({ file_type: "spreadsheet" }), "grid read-only"],
-    [fileOf({ file_type: "smart_link" }), "link"],
-    [fileOf({ file_type: "native" }), "prose read-only"],
+    [fileOf({ file_type: "excalidraw" }), "canvas read-only"],
+    [fileOf({ file_type: "sheet" }), "grid read-only"],
+    [fileOf({ file_type: "url" }), "link"],
+    [fileOf({ file_type: "lexical" }), "prose read-only"],
   ])("draws a file the way its own kind is drawn", async (file, expected) => {
     renderWithProviders(<WikiFileBody file={file} />);
     expect(await screen.findByText(expected)).toBeInTheDocument();
   });
 
   it("gives everything but prose the wide column", () => {
-    expect(isWideFile(fileOf({ file_type: "native" }))).toBe(false);
-    expect(isWideFile(fileOf({ file_type: "file" }))).toBe(true);
+    expect(isWideFile(fileOf({ file_type: "lexical" }))).toBe(false);
+    expect(isWideFile(fileOf({ file_type: "pdf" }))).toBe(true);
     expect(isWideFile(undefined)).toBe(false);
   });
 });

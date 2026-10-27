@@ -10,9 +10,9 @@ from sqlmodel import select
 from sqlmodel.ext.asyncio.session import AsyncSession
 
 from app.core.tools import Tool
+from app.core.file_types import FileType
 from app.models.tenant.file import (
     File,
-    FileType,
 )
 from app.models.platform.guild import CommunityRole
 from app.models.tenant.initiative import InitiativeRoleModel
@@ -55,7 +55,6 @@ async def _create_uploaded_file(
         initiative,
         owner,
         name="Test File Doc",
-        file_type=FileType.file,
         file_url=f"/uploads/{guild_of(initiative)}/{filename}",
         original_filename=filename,
         file_content_type=content_type,
@@ -567,7 +566,7 @@ async def test_a_versioned_write_goes_into_a_live_session(
 
 
 async def test_create_whiteboard_file(client: AsyncClient, acting_user) -> None:
-    """POST /files/ with file_type='whiteboard' creates a whiteboard doc.
+    """POST /files/ with file_type='excalidraw' creates a whiteboard doc.
 
     The response's content should be the empty Excalidraw scene shape
     ({elements, appState, files}) rather than the Lexical root shape. This
@@ -582,12 +581,12 @@ async def test_create_whiteboard_file(client: AsyncClient, acting_user) -> None:
         json={
             "name": "My Whiteboard",
             "initiative_id": owner.initiative.id,
-            "file_type": "whiteboard",
+            "file_type": "excalidraw",
         },
     )
     assert response.status_code == 201
     body = response.json()
-    assert body["file_type"] == "whiteboard"
+    assert body["file_type"] == "excalidraw"
     assert body["content"] == {"elements": [], "appState": {}, "files": {}}
     # Ensure the Lexical shape was NOT force-injected
     assert "root" not in body["content"]
@@ -598,7 +597,7 @@ async def test_create_whiteboard_file(client: AsyncClient, acting_user) -> None:
         json={
             "name": "Not a file",
             "initiative_id": owner.initiative.id,
-            "file_type": "file",
+            "file_type": "pdf",
         },
     )
     assert file_doc.status_code == 422
@@ -613,7 +612,7 @@ def test_normalize_whiteboard_preserves_shape() -> None:
         "appState": {"viewBackgroundColor": "#ffffff"},
         "files": {},
     }
-    result = normalize_file_content(scene, file_type=FileType.whiteboard)
+    result = normalize_file_content(scene, file_type=FileType.excalidraw)
     assert result["elements"] == scene["elements"]
     assert result["appState"] == scene["appState"]
     assert result["files"] == scene["files"]
@@ -624,13 +623,13 @@ def test_normalize_native_still_injects_root() -> None:
     """Regression: native docs still get a root shape when content is empty."""
     from app.services.tenant.files import normalize_file_content
 
-    result = normalize_file_content({}, file_type=FileType.native)
+    result = normalize_file_content({}, file_type=FileType.lexical)
     assert "root" in result
     assert isinstance(result["root"], dict)
 
 
 async def test_create_smart_link_file(client: AsyncClient, acting_user) -> None:
-    """POST /files/ with file_type='smart_link' stores only the URL,
+    """POST /files/ with file_type='url' stores only the URL,
     and the list reports the URL without the body."""
     owner = await acting_user(guild_role=CommunityRole.member, initiative=True)
     url = "https://www.figma.com/design/abc/Example"
@@ -641,13 +640,13 @@ async def test_create_smart_link_file(client: AsyncClient, acting_user) -> None:
         json={
             "name": "Design file",
             "initiative_id": owner.initiative.id,
-            "file_type": "smart_link",
+            "file_type": "url",
             "content": {"url": url},
         },
     )
     assert response.status_code == 201
     body = response.json()
-    assert body["file_type"] == "smart_link"
+    assert body["file_type"] == "url"
     assert body["content"] == {"url": url}
     assert body["smart_link_url"] == url
 
@@ -669,7 +668,7 @@ async def test_create_smart_link_rejects_missing_url(
         json={
             "name": "Bad link",
             "initiative_id": owner.initiative.id,
-            "file_type": "smart_link",
+            "file_type": "url",
             "content": {},
         },
     )
@@ -688,7 +687,7 @@ async def test_create_smart_link_rejects_non_http_url(
         json={
             "name": "Bad scheme",
             "initiative_id": owner.initiative.id,
-            "file_type": "smart_link",
+            "file_type": "url",
             "content": {"url": "ftp://example.com/file"},
         },
     )
@@ -702,7 +701,7 @@ def test_normalize_smart_link_returns_only_url() -> None:
 
     result = normalize_file_content(
         {"url": "https://youtu.be/dQw4w9WgXcQ", "extra": "ignored"},
-        file_type=FileType.smart_link,
+        file_type=FileType.url,
     )
     assert result == {"url": "https://youtu.be/dQw4w9WgXcQ"}
 
@@ -716,11 +715,11 @@ def test_normalize_smart_link_raises_on_missing_url() -> None:
     )
 
     with pytest.raises(FileContentError) as exc_info:
-        normalize_file_content({}, file_type=FileType.smart_link)
+        normalize_file_content({}, file_type=FileType.url)
     assert exc_info.value.code == "FILE_SMART_LINK_URL_REQUIRED"
 
     with pytest.raises(FileContentError) as exc_info:
-        normalize_file_content(None, file_type=FileType.smart_link)
+        normalize_file_content(None, file_type=FileType.url)
     assert exc_info.value.code == "FILE_SMART_LINK_URL_REQUIRED"
 
 
@@ -733,7 +732,7 @@ def test_normalize_smart_link_raises_on_bad_scheme() -> None:
     with pytest.raises(FileContentError) as exc_info:
         normalize_file_content(
             {"url": "ftp://example.com/file"},
-            file_type=FileType.smart_link,
+            file_type=FileType.url,
         )
     assert exc_info.value.code == "FILE_SMART_LINK_URL_INVALID"
 
@@ -763,7 +762,7 @@ async def test_list_files_filters_by_template_and_type(
         actor.initiative,
         actor.user,
         is_template=True,
-        file_type=FileType.whiteboard,
+        file_type=FileType.excalidraw,
     )
     plain = await create_file(session, actor.initiative, actor.user)
 
@@ -781,12 +780,19 @@ async def test_list_files_filters_by_template_and_type(
     response = await client.get(
         actor.g("/files/"),
         headers=actor.headers,
-        params={"is_template": True, "file_type": "native"},
+        params={"is_template": True, "file_type": "lexical"},
     )
     assert response.status_code == 200
     data = response.json()
     assert [item["id"] for item in data["items"]] == [native_template.id]
     assert data["total_count"] == 1
+
+    response = await client.get(
+        actor.g("/files/"),
+        headers=actor.headers,
+        params={"is_template": True, "kind": "whiteboard"},
+    )
+    assert [item["id"] for item in response.json()["items"]] == [whiteboard_template.id]
 
     response = await client.get(
         actor.g("/files/"),
@@ -813,7 +819,6 @@ async def test_a_list_reads_its_files_in_one_statement(
             actor.initiative,
             actor.user,
             name=name,
-            file_type=FileType.file,
             file_url=f"/uploads/{guild_of(actor.initiative)}/{name}",
             original_filename=name,
         )
@@ -826,7 +831,7 @@ async def test_a_list_reads_its_files_in_one_statement(
     event.listen(Engine, "before_cursor_execute", record)
     try:
         listed = await client.get(
-            url, headers=actor.headers, params={"file_type": "file"}
+            url, headers=actor.headers, params={"file_type": "pdf"}
         )
     finally:
         event.remove(Engine, "before_cursor_execute", record)
@@ -848,7 +853,7 @@ async def test_the_tag_tree_narrows_by_file_type(
         actor.initiative,
         actor.user,
         is_template=True,
-        file_type=FileType.whiteboard,
+        file_type=FileType.excalidraw,
     )
     await create_file(session, actor.initiative, actor.user)
 
@@ -862,8 +867,8 @@ async def test_the_tag_tree_narrows_by_file_type(
         return response.json()["untagged_count"]
 
     assert await untagged(view="templates") == 2
-    assert await untagged(view="templates", filters='{"file_type": "whiteboard"}') == 1
-    assert await untagged(filters='{"file_type": "native"}') == 1
+    assert await untagged(view="templates", filters='{"file_type": "excalidraw"}') == 1
+    assert await untagged(filters='{"file_type": "lexical"}') == 1
 
 
 async def test_file_counts_by_initiative(

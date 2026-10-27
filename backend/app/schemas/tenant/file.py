@@ -11,14 +11,14 @@ from typing import (
     TYPE_CHECKING,
 )
 
-from pydantic import ConfigDict, Field
+from pydantic import ConfigDict, Field, computed_field
 
 from app.core.identity_boundary import UPLOAD_PATH
 from app.schemas.base import LexicalState, SanitizedBaseModel
 from app.schemas.tenant.property import PropertiesOnCreate
 from app.schemas.query import PageMeta
 
-from app.models.tenant.file import FileType
+from app.core.file_types import FileKind, FileType, spec_of
 from app.schemas.tenant.resource_grant import ResourceGrantSchema, initiative_readable
 from app.schemas.platform.user import UserPublic
 from app.schemas.tenant.initiative import InitiativeSummary
@@ -45,11 +45,11 @@ class FileCreate(FileBase, PropertiesOnCreate):
     content: Optional[LexicalState] = Field(default_factory=dict)
     #: An uploaded file is made by uploading the file (``POST /files/upload``).
     file_type: Literal[
-        FileType.native,
-        FileType.whiteboard,
-        FileType.smart_link,
-        FileType.spreadsheet,
-    ] = FileType.native
+        FileType.lexical,
+        FileType.excalidraw,
+        FileType.url,
+        FileType.sheet,
+    ] = FileType.lexical
     # Initial sharing — the same grant list the PUT /grants endpoint takes.
     grants: List[ResourceGrantSchema] = Field(default_factory=initiative_readable)
 
@@ -84,16 +84,22 @@ class FileSummary(FileBase, ToolSummaryBase):
     #: ``FileBase``'s, marked here: a request takes it as it is.
     featured_image_url: Annotated[Optional[str], UPLOAD_PATH] = None
     comment_count: int = 0
+    file_type: FileType = FileType.lexical
     # Uploaded file fields, read from its current version
-    file_type: FileType = FileType.native
     file_url: Annotated[Optional[str], UPLOAD_PATH] = None
     file_content_type: Optional[str] = None
     file_size: Optional[int] = None
     original_filename: Optional[str] = None
     # Smart-link URL surfaced on the summary so cards can render the
     # provider-specific icon without fetching the full content JSONB.
-    # Only populated when file_type == "smart_link".
+    # Only populated when file_type == "url".
     smart_link_url: Optional[str] = None
+
+    @computed_field
+    @property
+    def kind(self) -> FileKind:
+        """How the file is shown, which follows from its type."""
+        return spec_of(self.file_type).kind
 
     @classmethod
     def derived_fields(

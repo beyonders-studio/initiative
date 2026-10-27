@@ -14,7 +14,8 @@ from app.core.messages import ImportEngineMessages
 from app.core.search import SearchEntityType
 from app.core.tools import Tool, tool_envelope_type
 from app.models.platform.user import User
-from app.models.tenant.file import File, FileType
+from app.core.file_types import EDITOR_TYPES, FileType
+from app.models.tenant.file import File
 from app.models.tenant.initiative import Initiative, PermissionKey
 from app.schemas.tenant.import_envelopes import FileEnvelope
 from app.services.import_engine.common import (
@@ -41,12 +42,7 @@ from app.services.tenant.files import (
     normalize_file_content,
 )
 
-_IMPORTABLE_TYPES = {
-    FileType.native.value,
-    FileType.spreadsheet.value,
-    FileType.smart_link.value,
-    FileType.whiteboard.value,
-}
+_IMPORTABLE_TYPES = {file_type.value for file_type in EDITOR_TYPES}
 
 
 class FileImporter(NamesPeopleInPassing):
@@ -65,7 +61,7 @@ class FileImporter(NamesPeopleInPassing):
 
     def count(self, validated: BaseModel) -> int:
         envelope: FileEnvelope = validated  # ty: ignore[invalid-assignment] — validate() returned this model
-        if envelope.file_type == FileType.spreadsheet.value:
+        if envelope.file_type == FileType.sheet.value:
             return len((envelope.content or {}).get("cells") or {}) or 1
         return 1
 
@@ -86,7 +82,7 @@ class FileImporter(NamesPeopleInPassing):
         member_handles = await load_initiative_member_handles(
             session, initiative_id=target_initiative.id
         )
-        if env.file_type == FileType.native.value:
+        if env.file_type == FileType.lexical.value:
             content = place_mentions(
                 content,
                 env.mention_handles,
@@ -156,7 +152,7 @@ def _decode_content(
     env: FileEnvelope, warnings: list[str], guild_id: int
 ) -> dict[str, Any]:
     """Envelope ``content`` → the stored content model per file type."""
-    if env.file_type != FileType.native.value:
+    if env.file_type != FileType.lexical.value:
         return _typed_content(env)
     content = env.content or {}
     # native: the raw editor state, stored as exported. Embedded image

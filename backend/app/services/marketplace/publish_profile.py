@@ -41,6 +41,7 @@ from datetime import date, datetime, timedelta, timezone
 from typing import Any
 
 from app.core import recurrence
+from app.core.file_types import FileType
 from app.core.references import REFERENCE_NODES, reference_as_text, text_node
 from app.core.tools import Tool, tool_export_source
 
@@ -208,7 +209,7 @@ def _strip_project(env: dict[str, Any]) -> None:
 def _strip_file(env: dict[str, Any]) -> None:
     env["mention_handles"] = []
     content = env.get("content")
-    if env.get("file_type") == "native":
+    if env.get("file_type") == FileType.lexical:
         env["content"] = _clean_editor_state(content)
 
 

@@ -38,6 +38,7 @@ from app.core.identity_boundary import (
     MentionForm,
     without_mention_names,
 )
+from app.core.file_types import FileType
 from app.core.user_display import handle_of
 from app.core.tools import Tool, tool_envelope_type
 from app.models.platform.user import UserStatus
@@ -233,7 +234,10 @@ async def detach_envelope_mentions(session: AsyncSession, data: Any) -> None:
     if not isinstance(data, dict):
         return
     kind = data.get("type")
-    if kind == tool_envelope_type(Tool.file) and data.get("file_type") == "native":
+    if (
+        kind == tool_envelope_type(Tool.file)
+        and data.get("file_type") == FileType.lexical
+    ):
         holders = [(data, "content")]
     elif kind == tool_envelope_type(Tool.post):
         holders = [(data, "body")]
@@ -248,7 +252,7 @@ async def detach_envelope_mentions(session: AsyncSession, data: Any) -> None:
             for filed in data.get("files") or []
             if isinstance(filed, dict)
             and isinstance(filed.get("envelope"), dict)
-            and filed["envelope"].get("file_type") == "native"
+            and filed["envelope"].get("file_type") == FileType.lexical
         ]
     else:
         return

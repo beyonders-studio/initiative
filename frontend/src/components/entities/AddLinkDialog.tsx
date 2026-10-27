@@ -213,9 +213,7 @@ export const AddLinkDialog = ({
     defaultValue: t("anchor.generic"),
   });
 
-  const fileMark = file
-    ? fileIcon({ file_type: "file", mime_type: file.type, original_filename: file.name })
-    : null;
+  const fileMark = file ? fileIcon({ mime_type: file.type, original_filename: file.name }) : null;
 
   return (
     <Dialog open onOpenChange={(open) => (open ? null : onClose())}>

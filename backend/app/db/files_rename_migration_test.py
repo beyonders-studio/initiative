@@ -569,9 +569,6 @@ async def test_public_values_say_file_and_back(session) -> None:
             u=user.id,
         )
         assert kept == [("my-tasks",)]
-        assert await _rows(session, "SELECT to_regtype('public.file_type')") != [
-            (None,)
-        ]
     finally:
         await session.run_sync(run(migration.downgrade))
         await session.commit()

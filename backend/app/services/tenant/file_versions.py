@@ -25,6 +25,7 @@ from sqlalchemy.exc import DataError, IntegrityError
 from sqlmodel import select
 from sqlmodel.ext.asyncio.session import AsyncSession
 
+from app.core.file_types import type_of_media
 from app.core.messages import CommonMessages
 from app.schemas.tenant.tool import from_row
 from app.services.tenant import attachments as attachments_service
@@ -102,8 +103,14 @@ async def stored_file_type(
 
 
 def _make_current(parent: Any, version: Any) -> None:
+    """Make ``version`` the one ``parent`` shows. An uploaded file's type is
+    its current version's."""
+    from app.models.tenant.file import File
+
     parent.current_version = version
     parent.updated_at = datetime.now(timezone.utc)
+    if isinstance(parent, File):
+        parent.file_type = type_of_media(version.file_content_type)
 
 
 def _new_version(session: AsyncSession, parent: Any, fields: dict[str, Any]) -> Any:

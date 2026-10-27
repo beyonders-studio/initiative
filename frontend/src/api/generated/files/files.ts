@@ -1093,8 +1093,8 @@ export const useNotifyMentions = <TError = ErrorType<HTTPValidationError>, TCont
 /**
  * A summary of a file, streamed as it is written.
  *
- * Requires read access to the file. Only works for native (editor)
- * files.
+ * Requires read access to the file. Only works for files the editor
+ * writes (``lexical``).
  * @summary Generate Summary
  */
 export const generateSummary = (

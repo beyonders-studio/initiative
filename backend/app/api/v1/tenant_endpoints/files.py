@@ -48,10 +48,17 @@ from app.core.messages import (
 )
 from app.core.rate_limit import limiter
 from app.db.session import require_actor_context
+from app.core.file_types import (
+    FileKind,
+    FileType,
+    is_stored,
+    spec_of,
+    type_of_media,
+    types_of_kind,
+)
 from app.models.tenant.file import (
     File,
     FileVersion,
-    FileType,
 )
 from app.models.platform.notification import NotificationType
 from app.models.platform.user import User
@@ -166,6 +173,7 @@ def visible_file_conditions(
     untagged: Optional[bool] = None,
     is_template: Optional[bool] = None,
     file_type: Optional[FileType] = None,
+    kind: Optional[FileKind] = None,
 ):
     """WHERE conditions for visible-file queries — the list and the tag
     counts beside it, so the sidebar's numbers match the rows under them.
@@ -190,6 +198,9 @@ def visible_file_conditions(
 
     if file_type is not None:
         conditions.append(File.file_type == file_type)
+
+    if kind is not None:
+        conditions.append(File.file_type.in_([t.value for t in types_of_kind(kind)]))
 
     if untagged:
         conditions.append(
@@ -324,16 +335,12 @@ async def upload_file(
         session, guild_context, upload, initiative_id=initiative.id
     )
 
-    # Create file record. A picture is its own featured image, set here so
-    # it is written with the row: the uploader's owner grant is only added
-    # below, so a later UPDATE in this transaction is not theirs to make yet.
     file = File(
         name=name,
         initiative_id=initiative.id,
         content={},  # An uploaded file has no content of its own
         created_by=current_user.id,
-        file_type=FileType.file,
-        featured_image_url=_featured(stored["file_url"], stored["file_content_type"]),
+        file_type=type_of_media(stored["file_content_type"]),
     )
     session.add(file)
     await session.flush()
@@ -360,29 +367,16 @@ async def upload_file(
     return await read_after_write(session, file.id, current_user, guild_context)
 
 
-def _normalize_mime(mime: str | None) -> str:
-    """Normalize a MIME type for version type-match comparison."""
-    normalized = (mime or "").lower().strip()
-    if normalized == "image/jpg":
-        return "image/jpeg"
-    return normalized
-
-
-def _featured(file_url: str, content_type: str | None) -> str | None:
-    """A picture is its own featured image; any other file shows none."""
-    return file_url if (content_type or "").startswith("image/") else None
-
-
 async def _store_file(
     session: AsyncSession,
     guild_context: GuildContext,
     upload: UploadFile,
     *,
     initiative_id: int,
-    keep_type: str | None = None,
+    keep_kind: FileKind | None = None,
 ) -> dict[str, Any]:
     """Read an uploaded file, check it and store it, and return the version
-    columns it was stored as. ``keep_type`` refuses a file of another type."""
+    columns it was stored as. ``keep_kind`` refuses a file of another kind."""
     guild_id = guild_context.guild_id
     # Pick up a backend/credential change saved in another worker before writing.
     await storage_config.ensure_storage_config_fresh(session)
@@ -406,9 +400,7 @@ async def _store_file(
             status_code=status.HTTP_400_BAD_REQUEST,
             detail=FileMessages.INVALID_FILE,
         )
-    if keep_type is not None and _normalize_mime(mime_type) != _normalize_mime(
-        keep_type
-    ):
+    if keep_kind is not None and spec_of(type_of_media(mime_type)).kind != keep_kind:
         raise HTTPException(
             status_code=status.HTTP_400_BAD_REQUEST,
             detail=FileMessages.VERSION_TYPE_MISMATCH,
@@ -449,26 +441,23 @@ async def upload_file_version(
     file = await resource_access.load_authorized(
         session, Tool.file, file_id, current_user, guild_context, access="write"
     )
-    if file.file_type != FileType.file:
+    if not is_stored(file.file_type):
         raise HTTPException(
             status_code=status.HTTP_400_BAD_REQUEST,
             detail=FileMessages.NOT_AN_UPLOADED_FILE,
         )
-    # A new version keeps the type of the one it replaces.
-    current = file.current_version
+    # A new version keeps the kind of the one it replaces: a picture stays a
+    # picture, though a PNG may become a JPEG.
     stored = await _store_file(
         session,
         guild_context,
         upload,
         initiative_id=file.initiative_id,
-        keep_type=current.file_content_type if current is not None else None,
+        keep_kind=spec_of(file.file_type).kind,
     )
     version = await file_versions.add_version(
         session, file, created_by=current_user.id, **stored
     )
-    featured = _featured(version.file_url, version.file_content_type)
-    if featured is not None:
-        file.featured_image_url = featured
     await file_versions.commit_version(
         session,
         guild_context.guild_id,
@@ -489,7 +478,7 @@ async def list_file_versions(
     file = await resource_access.load_authorized(
         session, Tool.file, file_id, current_user, guild_context
     )
-    if file.file_type != FileType.file:
+    if not is_stored(file.file_type):
         raise HTTPException(
             status_code=status.HTTP_400_BAD_REQUEST,
             detail=FileMessages.NOT_AN_UPLOADED_FILE,
@@ -522,16 +511,12 @@ async def delete_file_version(
         guild_context,
         action=Action.delete,
     )
-    if file.file_type != FileType.file:
+    if not is_stored(file.file_type):
         raise HTTPException(
             status_code=status.HTTP_400_BAD_REQUEST,
             detail=FileMessages.NOT_AN_UPLOADED_FILE,
         )
     deleted = await file_versions.delete_version(session, file, version_id)
-    # A featured image that was the deleted file follows the current one.
-    current = file.current_version
-    if current is not None and file.featured_image_url == deleted.file_url:
-        file.featured_image_url = _featured(current.file_url, current.file_content_type)
     await session.commit()
     await file_versions.release_files(guild_context.guild_id, deleted)
 
@@ -761,13 +746,13 @@ async def generate_summary(
 ) -> ai_generation.AIStreamResponse:
     """A summary of a file, streamed as it is written.
 
-    Requires read access to the file. Only works for native (editor)
-    files.
+    Requires read access to the file. Only works for files the editor
+    writes (``lexical``).
     """
     file = await resource_access.load_authorized(
         session, Tool.file, file_id, current_user, guild_context
     )
-    if file.file_type != FileType.native:
+    if file.file_type != FileType.lexical:
         raise HTTPException(
             status_code=status.HTTP_400_BAD_REQUEST,
             detail=FileMessages.AI_NATIVE_ONLY,
@@ -894,7 +879,7 @@ async def download_file(
             int(guild_id),
         )
     version = file.current_version
-    if file.file_type != FileType.file or version is None:
+    if not is_stored(file.file_type) or version is None:
         raise Tool.file.not_found()
 
     resource_access.authorize(
@@ -937,7 +922,7 @@ async def download_file_version(
             int(current_user.id),
             int(guild_id),
         )
-    if file.file_type != FileType.file:
+    if not is_stored(file.file_type):
         raise Tool.file.not_found()
 
     resource_access.authorize(
@@ -998,7 +983,7 @@ async def import_spreadsheet_file(
     file = await resource_access.load_authorized(
         session, Tool.file, file_id, current_user, guild_context, access="write"
     )
-    if file.file_type != FileType.spreadsheet:
+    if file.file_type != FileType.sheet:
         raise HTTPException(
             status_code=status.HTTP_400_BAD_REQUEST,
             detail=FileMessages.SPREADSHEET_INVALID_PAYLOAD,

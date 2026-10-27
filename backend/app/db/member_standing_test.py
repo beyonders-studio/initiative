@@ -24,7 +24,8 @@ from app.db.schema_provisioning import guild_schema_name, GuildRoleKind, guild_r
 from app.models.platform.guild import CommunityRole
 from app.models.platform.user import User, UserStatus
 from app.models.tenant.plugin_member_consent import PluginMemberConsent, ConsentAccess
-from app.models.tenant.file import File, FileType
+from app.core.file_types import FileType
+from app.models.tenant.file import File
 from app.models.tenant.initiative import InitiativeMember
 from app.models.tenant.resource_grant import ResourceAccessLevel, ResourceGrant
 from app.testing import (
@@ -466,7 +467,7 @@ async def test_what_a_member_token_creates_is_owned_by_the_member(
     made = File(
         initiative_id=installed.placed.id,
         name="Made as the member",
-        file_type=FileType.native,
+        file_type=FileType.lexical,
     )
     s.add(made)
     await s.flush()

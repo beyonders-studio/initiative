@@ -13,8 +13,8 @@ import {
 import { useCallback, useEffect, useMemo, useState } from "react";
 import { useTranslation } from "react-i18next";
 
-import type { FileType, ResourceGrantSchema } from "@/api/generated/initiativeAPI.schemas";
-import { SearchEntityType } from "@/api/generated/initiativeAPI.schemas";
+import type { ResourceGrantSchema } from "@/api/generated/initiativeAPI.schemas";
+import { FileType, SearchEntityType } from "@/api/generated/initiativeAPI.schemas";
 import { CreateAccessSection } from "@/components/access/CreateAccessSection";
 import { DEFAULT_GRANTS } from "@/components/access/grants";
 import { AsyncCombobox } from "@/components/ui/async-combobox";
@@ -43,6 +43,7 @@ import { useAppConfig } from "@/hooks/useAppConfig";
 import { useCreateFile, useUploadFile } from "@/hooks/useFiles";
 import { useInitiative } from "@/hooks/useInitiatives";
 import { useCommunityPickerSuggestions } from "@/hooks/useSearch";
+import type { EditorFileType } from "@/lib/fileTypes";
 import {
   FILE_UPLOAD_ACCEPT,
   formatBytes,
@@ -66,7 +67,7 @@ type CreateFileDialogProps = DialogProps & {
 
 /** The file types made from scratch here; files come in by upload, and
  *  smart links from their own tab. */
-type NewFileType = Exclude<FileType, "file" | "smart_link">;
+type NewFileType = Exclude<EditorFileType, typeof FileType.url>;
 
 export const CreateFileDialog = ({
   open,
@@ -87,7 +88,7 @@ export const CreateFileDialog = ({
   const [selectedTemplateLabel, setSelectedTemplateLabel] = useState<string | null>(null);
   const [templateSearch, setTemplateSearch] = useState("");
   const [isTemplateFile, setIsTemplateFile] = useState(false);
-  const [newFileType, setNewFileType] = useState<NewFileType>("native");
+  const [newFileType, setNewFileType] = useState<NewFileType>(FileType.lexical);
   const [selectedFile, setSelectedFile] = useState<File | null>(null);
   const [smartLinkUrl, setSmartLinkUrl] = useState("");
   const [grants, setGrants] = useState<ResourceGrantSchema[]>([...DEFAULT_GRANTS]);
@@ -130,7 +131,7 @@ export const CreateFileDialog = ({
       setNewTitle("");
       clearTemplate();
       setIsTemplateFile(false);
-      setNewFileType("native");
+      setNewFileType(FileType.lexical);
       setSelectedFile(null);
       setSmartLinkUrl("");
       setCreateDialogTab("new");
@@ -146,7 +147,7 @@ export const CreateFileDialog = ({
   }, [isTemplateFile, selectedTemplateId, clearTemplate]);
 
   // Clear template when the file type changes so we don't accidentally
-  // copy a native template into a whiteboard (or vice versa).
+  // copy a text template into a whiteboard (or vice versa).
   useEffect(() => {
     clearTemplate();
   }, [newFileType, clearTemplate]);
@@ -253,9 +254,11 @@ export const CreateFileDialog = ({
                   <SelectValue />
                 </SelectTrigger>
                 <SelectContent>
-                  <SelectItem value="native">{t("create.fileTypeText")}</SelectItem>
-                  <SelectItem value="whiteboard">{t("create.fileTypeWhiteboard")}</SelectItem>
-                  <SelectItem value="spreadsheet">{t("create.fileTypeSpreadsheet")}</SelectItem>
+                  <SelectItem value={FileType.lexical}>{t("create.fileTypeText")}</SelectItem>
+                  <SelectItem value={FileType.excalidraw}>
+                    {t("create.fileTypeWhiteboard")}
+                  </SelectItem>
+                  <SelectItem value={FileType.sheet}>{t("create.fileTypeSpreadsheet")}</SelectItem>
                 </SelectContent>
               </Select>
             </div>
@@ -489,7 +492,7 @@ export const CreateFileDialog = ({
                   name: trimmedTitle,
                   initiative_id: initiativeId,
                   project_id: projectId,
-                  file_type: "smart_link",
+                  file_type: FileType.url,
                   content: { url: trimmedSmartLinkUrl },
                   grants,
                 });
