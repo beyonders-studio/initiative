@@ -236,7 +236,9 @@ def _ods_formulas(
             if tag in _CELLS:
                 repeat = int(element.get(f"{_TABLE}number-columns-repeated", "1"))
                 formula = element.get(f"{_TABLE}formula")
-                if formula and col < cols:
+                # One that can't be written where it is spelled is left to its
+                # value in every repeat too.
+                if formula and col < cols and grid_formula(formula) is not None:
                     spelled.append((col, repeat, formula))
                 col += repeat
                 element.clear()
@@ -245,13 +247,14 @@ def _ods_formulas(
                 for down in range(min(repeat, max(rows - row, 0))):
                     for start, across, formula in spelled:
                         for right in range(min(across, cols - start)):
-                            written = grid_formula(formula, down, right)
-                            if written is None or sheet is None:
-                                continue
-                            sheet[f"{row + down}:{start + right}"] = written
+                            # Counted before it is written, so a repeat that
+                            # writes nothing still costs its share.
                             cells -= 1
                             if cells < 0:
                                 raise _TooLarge
+                            written = grid_formula(formula, down, right)
+                            if written is not None and sheet is not None:
+                                sheet[f"{row + down}:{start + right}"] = written
                 row += repeat
                 element.clear()
     return found

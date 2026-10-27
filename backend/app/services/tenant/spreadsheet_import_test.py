@@ -443,6 +443,23 @@ def test_a_repeated_row_keeps_its_formula_moved_to_each_row() -> None:
     ]
 
 
+def test_repeated_formulas_past_the_cell_budget_are_refused(monkeypatch) -> None:
+    from app.services.tenant import spreadsheet_import
+
+    monkeypatch.setattr(spreadsheet_import, "MAX_IMPORT_CELLS", 2)
+    spreadsheet_import.shutdown()
+    rows = [["1", "of:=[.A1]*2"]]
+
+    try:
+        with pytest.raises(FileContentError) as refused:
+            parse_spreadsheet_file("budget.ods", _ods(rows, repeat_last=5))
+    finally:
+        # The next test's worker starts with the real budget.
+        spreadsheet_import.shutdown()
+
+    assert refused.value.code == FileMessages.SPREADSHEET_FILE_TOO_LARGE
+
+
 def test_a_file_calamine_cannot_read_is_refused() -> None:
     with pytest.raises(FileContentError) as refused:
         parse_spreadsheet_file("broken.xls", b"not a workbook")
