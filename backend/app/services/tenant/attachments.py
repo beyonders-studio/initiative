@@ -144,10 +144,11 @@ def upload_names(urls: Iterable[str | None]) -> Set[str]:
 async def purge_file_uploads(session, files: Iterable[Any]) -> Set[str]:
     """Delete the uploads of files about to be hard-purged.
 
-    An uploaded file's blob, and every version of it and its thumbnail, backs
-    that file alone, so they go with it. What a file shows — pictures in its body, its
-    featured image — goes only when nothing that stays shows it too; a trashed
-    file still counts, since it may be restored.
+    A version's thumbnail backs that version alone, so it goes with it. The
+    version's own file may also be shown by a page a picture was picked into,
+    and it goes, like what a file shows — pictures in its body, its featured
+    image — only when nothing that stays shows it too; a trashed file still
+    counts, since it may be restored.
 
     Caller must use a session that can DELETE from ``uploads``; caller commits,
     then deletes the blobs of the stored names returned.
@@ -161,21 +162,29 @@ async def purge_file_uploads(session, files: Iterable[Any]) -> Set[str]:
         return set()
     doomed_ids = {d.id for d in doomed}
 
-    versions = await session.exec(
-        select(FileVersion.file_url, FileVersion.thumbnail_url).where(
-            FileVersion.file_id.in_(doomed_ids)
+    versions = (
+        await session.exec(
+            select(
+                FileVersion.id, FileVersion.file_url, FileVersion.thumbnail_url
+            ).where(FileVersion.file_id.in_(doomed_ids))
         )
-    )
+    ).all()
+    shown = {row.file_url for row in versions if row.file_url}
+    # A small picture is its own thumbnail, so that name is the version's file.
     removed = await _drop_upload_rows(
-        session, upload_names(url for row in versions.all() for url in row)
+        session,
+        upload_names(row.thumbnail_url for row in versions) - upload_names(shown),
     )
 
-    shown: Set[str] = set()
     for d in doomed:
         shown |= extract_upload_urls(d.content)
         if d.featured_image_url:
             shown.add(d.featured_image_url)
-    return removed | await release_uploads(session, shown, leaving={File: doomed_ids})
+    return removed | await release_uploads(
+        session,
+        shown,
+        leaving={File: doomed_ids, FileVersion: {row.id for row in versions}},
+    )
 
 
 def upload_urls_in_markdown(text: str | None) -> Set[str]:
