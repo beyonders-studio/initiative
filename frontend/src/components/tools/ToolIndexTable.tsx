@@ -54,6 +54,9 @@ type ToolIndexTableProps = {
   /** The columns a layout shows, in its order, in place of the shared ones
    *  and the tool's own; one named `name` has the shared name's cells. */
   laidOut?: AppColumnDef<ToolIndexRow>[];
+  /** Opens a row followed by its name here instead of on its page; a click
+   *  that asks for a new tab or window still goes there. */
+  onOpen?: (row: ToolIndexRow) => void;
   selection: TableSelection;
   sorting: SortingState;
   onSortingChange: (sorting: SortingState) => void;
@@ -73,6 +76,7 @@ export const ToolIndexTable = ({
   rows,
   useColumns = useNoColumns,
   laidOut,
+  onOpen,
   selection,
   sorting,
   onSortingChange,
@@ -113,6 +117,11 @@ export const ToolIndexTable = ({
           <Link
             to={gp(toolDetailRoute(tool, row.original.initiative_id, row.original.id))}
             className="font-medium text-primary hover:underline"
+            onClick={(event) => {
+              if (!onOpen || event.metaKey || event.ctrlKey || event.shiftKey) return;
+              event.preventDefault();
+              onOpen(row.original);
+            }}
           >
             {row.original.name}
           </Link>
@@ -210,6 +219,7 @@ export const ToolIndexTable = ({
     definitions,
     columns,
     laidOut,
+    onOpen,
   ]);
 
   return (

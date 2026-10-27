@@ -203,6 +203,66 @@ describe("a collection's page", () => {
     expect(screen.getByText(euros)).toBeInTheDocument();
   });
 
+  it("opens a file that is not a picture beside its table, with its values there", async () => {
+    const caption = buildPropertyDefinition({ id: 21, name: "Caption", collection_id: 5 });
+    server.use(
+      communityHttp.get("/collections/:id", () =>
+        HttpResponse.json(buildCollection({ id: 5, fields: [caption] }))
+      ),
+      communityHttp.get("/collections/:id/files", () =>
+        HttpResponse.json({
+          items: [
+            buildCollectionFile({
+              id: 4,
+              name: "Price list",
+              fields: [buildPropertySummary({ property_id: 21, name: "Caption", value: "Spring" })],
+            }),
+          ],
+          total_count: 1,
+          page: 1,
+          page_size: 60,
+          has_next: false,
+          has_prev: false,
+        })
+      ),
+      communityHttp.get("/layouts/", () =>
+        HttpResponse.json(
+          buildToolLayoutSet({
+            tool: "collection",
+            hidden: ["masonry", "grid", "timeline"],
+            layouts: [
+              {
+                kind: "table",
+                is_default: true,
+                hidden: false,
+                definition: { columns: ["name", "property:21"] },
+                updated_at: "2026-10-01T12:00:00.000Z",
+              },
+            ],
+          })
+        )
+      ),
+      communityHttp.get("/property-definitions/", () => HttpResponse.json([])),
+      communityHttp.get("/relationships/", () => HttpResponse.json([]))
+    );
+    const user = userEvent.setup();
+    renderPage(CollectionPage, {
+      initialRoute: "/c/$communityId/i/$initiativeId/files/collections/$collectionId",
+      routeParams: { communityId: "1", initiativeId: "1", collectionId: "5" },
+    });
+
+    // The table is drawn again as the initiative's properties arrive, so the
+    // name is clicked once it stays.
+    await waitFor(async () => {
+      await user.click(screen.getByRole("link", { name: "Price list" }));
+      expect(screen.getByRole("dialog", { name: "Price list" })).toBeInTheDocument();
+    });
+
+    const beside = screen.getByRole("dialog", { name: "Price list" });
+    expect(within(beside).getByDisplayValue("Spring")).toBeInTheDocument();
+    expect(within(beside).getByRole("link", { name: "Open file" })).toBeInTheDocument();
+  });
+
   it("makes a field of its own for whoever may change it", async () => {
     let created: PropertyDefinitionCreate | null = null;
     server.use(

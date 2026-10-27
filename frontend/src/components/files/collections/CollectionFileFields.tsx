@@ -14,7 +14,8 @@ export const CollectionFileFields = ({
   file,
 }: {
   collection: CollectionRead;
-  file: CollectionFileSummary;
+  /** The file, with its values of the collection's fields. */
+  file: Pick<CollectionFileSummary, "id" | "fields">;
 }) => {
   const { t } = useTranslation("files");
   if (collection.fields.length === 0) return null;

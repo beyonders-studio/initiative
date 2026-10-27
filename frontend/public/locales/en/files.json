@@ -439,7 +439,8 @@
       "deleteBody": "This removes the field and every file's value of it in this collection.",
       "none": "No fields yet",
       "heading": "In this collection",
-      "saveError": "Couldn't save the value"
+      "saveError": "Couldn't save the value",
+      "of": "{{name}}'s fields"
     },
     "addedOn": "Added {{date}}",
     "createdOn": "Created {{date}}",

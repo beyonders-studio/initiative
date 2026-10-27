@@ -4,7 +4,9 @@ import {
   addCollectionFiles,
   createCollection,
   deleteCollection,
+  getCollectionFileFields,
   getCollectionFilesTimeline,
+  getGetCollectionFileFieldsQueryKey,
   getGetCollectionFilesTimelineQueryKey,
   getListCollectionFilesQueryKey,
   getListCollectionShapesQueryKey,
@@ -78,6 +80,16 @@ export const useCollection = (collectionId: number | null) => {
     queryKey: getReadCollectionQueryKey(communityId, collectionId ?? 0),
     queryFn: () => readCollection(communityId, collectionId ?? 0),
     enabled: collectionId !== null && Number.isFinite(collectionId),
+  });
+};
+
+/** One file's values of a collection's fields, where it is not read from the
+ *  collection's list: on the file's own page. */
+export const useCollectionFileFields = (collectionId: number, fileId: number) => {
+  const communityId = useActiveCommunityId();
+  return useQuery<PropertySummary[]>({
+    queryKey: getGetCollectionFileFieldsQueryKey(communityId, collectionId, fileId),
+    queryFn: () => getCollectionFileFields(communityId, collectionId, fileId),
   });
 };
 

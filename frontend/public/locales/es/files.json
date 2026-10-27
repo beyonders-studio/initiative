@@ -439,7 +439,8 @@
       "deleteBody": "Se eliminarán el campo y el valor que cada archivo tenga en esta colección.",
       "none": "Aún no hay campos",
       "heading": "En esta colección",
-      "saveError": "No se pudo guardar el valor"
+      "saveError": "No se pudo guardar el valor",
+      "of": "Campos de {{name}}"
     },
     "addedOn": "Añadido {{date}}",
     "createdOn": "Creado {{date}}",

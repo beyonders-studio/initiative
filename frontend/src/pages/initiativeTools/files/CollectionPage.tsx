@@ -371,6 +371,9 @@ export function CollectionPage() {
     },
     [selection.active, selection.toggle, navigate, fileRoute, hasFields]
   );
+  // A table row's name opens it as the walls do, once the collection has
+  // fields of its own; until then it goes to the file's page.
+  const openRow = useCallback((row: ToolIndexRow) => onActivate(row as FileRow, {}), [onActivate]);
   const lightboxItems = useMemo<LightboxItem[]>(
     () =>
       pictures.map((file) => ({
@@ -655,6 +658,7 @@ export function CollectionPage() {
                 initiativeId={initiativeId ?? 0}
                 rows={rows}
                 laidOut={columns}
+                onOpen={hasFields ? openRow : undefined}
                 selection={selection}
                 sorting={view.sorting}
                 onSortingChange={setSorting}

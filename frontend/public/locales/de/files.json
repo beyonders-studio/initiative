@@ -439,7 +439,8 @@
       "deleteBody": "Damit werden das Feld und die Werte aller Dateien dafür in dieser Sammlung entfernt.",
       "none": "Noch keine Felder",
       "heading": "In dieser Sammlung",
-      "saveError": "Der Wert konnte nicht gespeichert werden"
+      "saveError": "Der Wert konnte nicht gespeichert werden",
+      "of": "Felder von {{name}}"
     },
     "addedOn": "Hinzugefügt {{date}}",
     "createdOn": "Erstellt {{date}}",

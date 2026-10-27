@@ -439,7 +439,8 @@
       "deleteBody": "Le champ et la valeur de chaque fichier dans cette collection seront supprimés.",
       "none": "Aucun champ pour l'instant",
       "heading": "Dans cette collection",
-      "saveError": "Impossible d'enregistrer la valeur"
+      "saveError": "Impossible d'enregistrer la valeur",
+      "of": "Champs de {{name}}"
     },
     "addedOn": "Ajouté {{date}}",
     "createdOn": "Créé {{date}}",
