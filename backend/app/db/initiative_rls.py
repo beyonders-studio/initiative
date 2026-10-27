@@ -47,6 +47,7 @@ from app.core.tools import (
     LAYOUT_INSTANCE_TABLES,
     Tool,
 )
+from app.db.presence import present, present_to_member
 from app.db.authorization import (
     IN_POLICY,
     POLICY_SETTINGS_ADMIN,
@@ -1230,13 +1231,20 @@ def relationships_path() -> InitiativePath:
             if w
             else "false"
         )
-        return (
-            "("
-            + _entity_call(f"{t}.source_type", f"{t}.source_id", need_write, need_write)
-            + " AND "
-            + _entity_call(f"{t}.target_type", f"{t}.target_id", False, False)
-            + ")"
+        source = _entity_call(
+            f"{t}.source_type", f"{t}.source_id", need_write, need_write
         )
+        target = _entity_call(f"{t}.target_type", f"{t}.target_id", False, False)
+        if w:
+            return f"({source} AND {target})"
+        # What files a thing under a place reads wherever the place does, even
+        # where the thing is only known to be there (``app.db.presence``): a
+        # wiki can say how many of its files a member can't open.
+        filed = (
+            f"({t}.relationship_type = '{RelationshipType.part_of.value}'"
+            f" AND {present(f'{t}.source_type', f'{t}.source_id')})"
+        )
+        return f"({target} AND ({source} OR {filed}))"
 
     def locate(r: str) -> str:
         """The initiative this edge belongs to, either end answering.
@@ -1484,9 +1492,11 @@ def collections_path() -> InitiativePath:
     """A collection is seen through its files and changed by the initiative's
     file makers.
 
-    Reading is one ``EXISTS`` into its entries, whose own read policy is the
-    file's: whoever can open a file in it sees it, and nobody else but the
-    community's administration and the system engine. Writing asks membership
+    Reading is one ``EXISTS`` into its entries joined to their files, whose
+    own read policy answers: whoever can open a file in it sees it, and
+    nobody else but the community's administration and the system engine. The
+    join is what asks it, since an entry alone reads for every member of the
+    initiative (:func:`collection_files_path`). Writing asks membership
     at write level, and, in the slot a tool's sharing takes, the writer rule
     (:func:`_collection_writer`) — on INSERT too, since there is no sharing
     for a new one to lack.
@@ -1497,7 +1507,7 @@ def collections_path() -> InitiativePath:
             return _access(f"{t}.initiative_id", True)
         return (
             f"({_P.system_or_admin} OR EXISTS (SELECT 1 FROM collection_files cf "
-            f"WHERE cf.collection_id = {t}.id))"
+            f"JOIN files f ON f.id = cf.file_id WHERE cf.collection_id = {t}.id))"
         )
 
     return InitiativePath(
@@ -1513,16 +1523,18 @@ def collections_path() -> InitiativePath:
 
 
 def collection_files_path() -> InitiativePath:
-    """A collection's entry reads as its file: one ``EXISTS`` into ``files``,
-    whose own policy answers. Adding or taking one out is changing the
-    collection, in the entry's own initiative — which the keys hold to be the
+    """A collection's entry reads as its file — one ``EXISTS`` into ``files``,
+    whose own policy answers — and to every member of its initiative besides,
+    who may know a file is there without opening it (``app.db.presence``):
+    an entry is two ids. Adding or taking one out is changing the collection,
+    in the entry's own initiative — which the keys hold to be the
     collection's and the file's — with the file in sight.
     """
 
     def predicate(t: str, w: bool) -> str:
         walk = f"EXISTS (SELECT 1 FROM files WHERE files.id = {t}.file_id)"
         if not w:
-            return walk
+            return f"({walk} OR {present_to_member(f'{t}.initiative_id')})"
         return (
             f"({_access(f'{t}.initiative_id', True)} AND {walk}"
             f" AND {_collection_writer(f'{t}.initiative_id')})"
@@ -1574,6 +1586,9 @@ INITIATIVE_PATHS: dict[str, InitiativePath] = {
     # reads this table, so a policy here that called it would not resolve.
     # ``direct()`` derives none, because the table is no tool's own.
     "resource_grants": direct(),
+    # Who asked for a resource, and the answer: the initiative's gate, with
+    # who reads and writes which rows narrowed in ``app.db.guild_ddl``.
+    "share_requests": direct(),
     # The change log itself, read like the content each change describes: a
     # person reads a change only where they can open the tool instance that
     # governs it (``dac_tool``/``dac_id``, stamped by the capture trigger), as
@@ -1681,6 +1696,8 @@ NAMED_PEOPLE: tuple[NamedPerson, ...] = (
     NamedPerson("calendar_event_answers", "user_id"),
     NamedPerson("property_values", "value_user_id", clear=True),
     NamedPerson("queue_items", "user_id", clear=True),
+    # What somebody asked for goes with them: nobody is left to answer for.
+    NamedPerson("share_requests", "user_id"),
 )
 
 
@@ -2127,6 +2144,9 @@ EVENT_SOURCES: dict[str, Emit | Silent] = {
     ),
     "intake_bindings": Silent("routing config; it reports on no content"),
     "guest_invite_grants": Silent("an invite's terms; redeeming it is recorded"),
+    "share_requests": Silent(
+        "a person asking; the sharing an answer writes is what changes"
+    ),
     "moderation_reports": Silent("who reported whom is not an automation signal"),
     "moderation_report_reporters": Silent("the reporters behind one report"),
     "moderation_actions": Silent("the moderation log, read on its own surface"),

@@ -734,6 +734,24 @@ def _grant_statements(schema: str, guild_id: int) -> list[str]:
         stmts.extend(
             guest_role_grant_statements(schema, guest, writes=writes, members=members)
         )
+    # What a member may know exists: read by every role whose policies ask it
+    # (``app.db.presence``), which answers only a person's own request.
+    from app.db.presence import view_statements
+
+    stmts.extend(
+        view_statements(
+            schema,
+            (
+                role,
+                ro_role,
+                support_role,
+                query_role,
+                plugin_role,
+                guest_role,
+                guest_ro_role,
+            ),
+        )
+    )
     return stmts
 
 

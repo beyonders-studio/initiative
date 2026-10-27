@@ -25,6 +25,7 @@ import {
   Tool,
 } from "@/api/generated/initiativeAPI.schemas";
 import { BulkAccessSection } from "@/components/access/BulkAccessSection";
+import { HiddenFilesRequest } from "@/components/access/RequestAccess";
 import { ToolCommentsPanel } from "@/components/comments/ToolCommentsPanel";
 import { ToolRelationsPanel } from "@/components/entities/ToolRelationsPanel";
 import {
@@ -601,6 +602,13 @@ export function CollectionPage() {
         active={uploader.active}
         onDismiss={uploader.dismiss}
       />
+
+      {collection ? (
+        <HiddenFilesRequest
+          hidden={collection.hidden_files}
+          target={{ collection_id: collection.id }}
+        />
+      ) : null}
 
       {anchored ? (
         <div className="flex flex-wrap items-center gap-2 text-muted-foreground text-sm">

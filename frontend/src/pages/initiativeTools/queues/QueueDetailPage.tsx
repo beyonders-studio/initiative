@@ -172,6 +172,7 @@ export function QueueDetailPage() {
         keys="queues:"
         backTo={gp(toolListRoute(Tool.queue, initiativeId))}
         backLabel={t("backToQueues")}
+        entity={{ kind: "queue", id: parsedId }}
       />
     );
   }

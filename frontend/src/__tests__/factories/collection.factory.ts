@@ -21,6 +21,7 @@ export function buildCollection(overrides: Partial<CollectionRead> = {}): Collec
     cover_file_id: null,
     cover: null,
     file_count: 1,
+    hidden_files: { count: 0, requested: 0 },
     created_by: 1,
     created_at: "2026-01-15T00:00:00.000Z",
     updated_at: "2026-01-15T00:00:00.000Z",

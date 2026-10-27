@@ -142,6 +142,10 @@ export const notificationLink = (notification: NotificationRead): string | null 
     case "subscription_activity":
     case "assigned_activity":
       return entityRefFromData(data);
+    // A granted request opens what was shared; one asking opens the requests
+    // through its `target_path`.
+    case "share_granted":
+      return entityRefFromData(data);
     case "post_published":
       if (typeof data.post_id === "number") {
         return entityRefRoute(toolKebabSingular(Tool.post), data.post_id);
@@ -176,6 +180,15 @@ const accessLevelLabel = (
   if (level === "read_write") return t("notifications.accessLevelReadWrite");
   if (level === "read") return t("notifications.accessLevelRead");
   return null;
+};
+
+/** The level a share line is about: edit for `write`, view for anything else. */
+const shareLevel = (level: unknown): "read" | "write" => (level === "write" ? "write" : "read");
+
+/** How many things a share line covers; one where the row does not say. */
+const shareCount = (count: unknown): number => {
+  const parsed = Number(count);
+  return Number.isFinite(parsed) && parsed > 0 ? parsed : 1;
 };
 
 // How many distinct emoji a rolled-up reaction line shows before it stops —
@@ -426,6 +439,26 @@ export const notificationText = (
     case "event_reminder":
       return t("notifications.eventReminder", {
         eventTitle: data.event_title ?? t("notifications.plain.event"),
+      });
+    // A request names what it is for — the thing, or for several files the
+    // collection or wiki they are in — and a yes names what was shared.
+    // Declined names nothing: its reader cannot open it.
+    case "share_requested":
+      return t(`notifications.shareRequested.${shareLevel(data.level)}`, {
+        requester: data.requester_name ?? t("notifications.someone"),
+        title: data.entity_name ?? t("notifications.plain.item"),
+        count: shareCount(data.count),
+      });
+    case "share_granted":
+      return t(`notifications.shareGranted.${shareLevel(data.level)}`, {
+        answerer: data.answerer_name ?? t("notifications.someone"),
+        title: data.entity_name ?? t("notifications.plain.item"),
+        count: shareCount(data.count),
+      });
+    case "share_declined":
+      return t("notifications.shareDeclined", {
+        answerer: data.answerer_name ?? t("notifications.someone"),
+        count: shareCount(data.count),
       });
     case "initiative_join_requested":
       return t("notifications.initiativeJoinRequested", {

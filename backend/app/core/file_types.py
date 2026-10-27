@@ -91,6 +91,9 @@ class FileTypeSpec:
     exports: tuple[str, ...] = ()
     #: The format Pillow reads it as, for a type the app makes a thumbnail of.
     picture_format: str | None = None
+    #: The editor's own type an uploaded file of this type becomes when
+    #: somebody converts it to edit it (``app.services.tenant.file_conversion``).
+    converts_to: FileType | None = None
 
     @property
     def stored(self) -> bool:
@@ -104,8 +107,15 @@ def _stored(
     media_types: tuple[str, ...],
     *extensions: str,
     picture_format: str | None = None,
+    converts_to: FileType | None = None,
 ) -> FileTypeSpec:
-    return FileTypeSpec(kind, media_types, extensions, picture_format=picture_format)
+    return FileTypeSpec(
+        kind,
+        media_types,
+        extensions,
+        picture_format=picture_format,
+        converts_to=converts_to,
+    )
 
 
 _OOXML = "application/vnd.openxmlformats-officedocument"
@@ -121,20 +131,49 @@ SPECS: dict[FileType, FileTypeSpec] = {
     FileType.pdf: _stored(FileKind.pdf, ("application/pdf",), ".pdf"),
     FileType.doc: _stored(FileKind.document, ("application/msword",), ".doc"),
     FileType.docx: _stored(
-        FileKind.document, (f"{_OOXML}.wordprocessingml.document",), ".docx"
+        FileKind.document,
+        (f"{_OOXML}.wordprocessingml.document",),
+        ".docx",
+        converts_to=FileType.lexical,
     ),
-    FileType.odt: _stored(FileKind.document, (f"{_ODF}.text",), ".odt"),
+    FileType.odt: _stored(
+        FileKind.document, (f"{_ODF}.text",), ".odt", converts_to=FileType.lexical
+    ),
     FileType.rtf: _stored(FileKind.document, ("text/rtf", "application/rtf"), ".rtf"),
     FileType.md: _stored(
-        FileKind.document, ("text/markdown", "text/x-markdown"), ".md", ".markdown"
+        FileKind.document,
+        ("text/markdown", "text/x-markdown"),
+        ".md",
+        ".markdown",
+        converts_to=FileType.lexical,
     ),
-    FileType.xls: _stored(FileKind.spreadsheet, ("application/vnd.ms-excel",), ".xls"),
+    FileType.xls: _stored(
+        FileKind.spreadsheet,
+        ("application/vnd.ms-excel",),
+        ".xls",
+        converts_to=FileType.sheet,
+    ),
     FileType.xlsx: _stored(
-        FileKind.spreadsheet, (f"{_OOXML}.spreadsheetml.sheet",), ".xlsx"
+        FileKind.spreadsheet,
+        (f"{_OOXML}.spreadsheetml.sheet",),
+        ".xlsx",
+        converts_to=FileType.sheet,
     ),
-    FileType.ods: _stored(FileKind.spreadsheet, (f"{_ODF}.spreadsheet",), ".ods"),
-    FileType.csv: _stored(FileKind.spreadsheet, ("text/csv",), ".csv"),
-    FileType.tsv: _stored(FileKind.spreadsheet, ("text/tab-separated-values",), ".tsv"),
+    FileType.ods: _stored(
+        FileKind.spreadsheet,
+        (f"{_ODF}.spreadsheet",),
+        ".ods",
+        converts_to=FileType.sheet,
+    ),
+    FileType.csv: _stored(
+        FileKind.spreadsheet, ("text/csv",), ".csv", converts_to=FileType.sheet
+    ),
+    FileType.tsv: _stored(
+        FileKind.spreadsheet,
+        ("text/tab-separated-values",),
+        ".tsv",
+        converts_to=FileType.sheet,
+    ),
     FileType.ppt: _stored(
         FileKind.presentation, ("application/vnd.ms-powerpoint",), ".ppt"
     ),
@@ -169,7 +208,9 @@ SPECS: dict[FileType, FileTypeSpec] = {
     FileType.wav: _stored(FileKind.audio, ("audio/wav", "audio/x-wav"), ".wav"),
     FileType.ogg: _stored(FileKind.audio, ("audio/ogg",), ".ogg", ".oga"),
     FileType.flac: _stored(FileKind.audio, ("audio/flac",), ".flac"),
-    FileType.txt: _stored(FileKind.text, ("text/plain",), ".txt"),
+    FileType.txt: _stored(
+        FileKind.text, ("text/plain",), ".txt", converts_to=FileType.lexical
+    ),
     FileType.json: _stored(FileKind.text, ("application/json",), ".json"),
     FileType.html: _stored(FileKind.text, ("text/html",), ".html", ".htm"),
     FileType.zip: _stored(FileKind.archive, ("application/zip",), ".zip"),

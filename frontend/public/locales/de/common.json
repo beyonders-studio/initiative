@@ -313,6 +313,8 @@
     "taskList": "Aufgabenliste",
     "more": "Weitere Formatierung",
     "image": "Bild",
+    "uploadImage": "Bild hochladen",
+    "imageFromFiles": "Aus Dateien",
     "uploadingImage": "{{name}} wird hochgeladen…",
     "imageUploadFailed": "Das Bild konnte nicht hinzugefügt werden."
   },

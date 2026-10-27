@@ -3,7 +3,7 @@ import userEvent from "@testing-library/user-event";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 
 import { renderWithProviders } from "@/__tests__/helpers/render";
-import type { FileVersionRead } from "@/api/generated/initiativeAPI.schemas";
+import { FileType, type FileVersionRead } from "@/api/generated/initiativeAPI.schemas";
 
 // Avoid pulling in the real react-pdf (pdf.js worker) during tests.
 vi.mock("react-pdf", () => ({
@@ -22,6 +22,7 @@ vi.mock("@/lib/uploadUrl", () => ({
 const uploadMutate = vi.fn();
 const deleteMutate = vi.fn();
 const putThumbnail = vi.fn();
+const convertMutate = vi.fn();
 const frame = new Blob(["frame"], { type: "image/webp" });
 
 const frameSignals: AbortSignal[] = [];
@@ -39,6 +40,7 @@ vi.mock("@/hooks/useFiles", () => ({
   useUploadFileVersion: () => ({ mutate: uploadMutate, isPending: false }),
   useDeleteFileVersion: () => ({ mutate: deleteMutate, isPending: false }),
   usePutVideoThumbnail: () => ({ mutate: putThumbnail }),
+  useConvertFile: () => ({ mutate: convertMutate, isPending: false }),
 }));
 
 // Import after mocks are registered.
@@ -203,5 +205,35 @@ describe("UploadedFileViewer media", () => {
 
     await new Promise((settle) => setTimeout(settle, 0));
     expect(putThumbnail).not.toHaveBeenCalled();
+  });
+});
+
+describe("UploadedFileViewer convert to edit", () => {
+  beforeEach(() => {
+    mockVersions = [];
+    convertMutate.mockReset();
+  });
+
+  const csv = {
+    contentType: "text/csv",
+    originalFilename: "budget.csv",
+    fileType: FileType.csv,
+    convertsTo: FileType.sheet,
+  };
+
+  it("converts a spreadsheet once the editor says so, after saying what comes over", async () => {
+    renderViewer({ ...csv, canEdit: true });
+
+    await userEvent.click(screen.getByRole("button", { name: "Edit" }));
+    expect(await screen.findByText(/its rows and columns as one sheet/i)).toBeInTheDocument();
+    await userEvent.click(screen.getByRole("button", { name: "Convert" }));
+
+    expect(convertMutate).toHaveBeenCalledWith(5);
+  });
+
+  it("offers nothing to somebody who can only read the file", () => {
+    renderViewer({ ...csv, canEdit: false });
+
+    expect(screen.queryByRole("button", { name: "Edit" })).not.toBeInTheDocument();
   });
 });

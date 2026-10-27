@@ -36,6 +36,7 @@ from app.api.deps import (
     RLSSessionDep,
     plugin_scope,
     get_current_active_user,
+    GuildContext,
     GuildContextDep,
 )
 from app.core.messages import CommonMessages, WikiMessages
@@ -59,6 +60,7 @@ from app.schemas.tenant.wiki import (
     serialize_file_as_page,
     serialize_wiki_page_summary,
 )
+from app.schemas.tenant.share_request import HiddenFiles
 from app.schemas.tenant.tool import serialize_tool
 from app.services import ai_generation
 from app.services.tenant import attachments as attachments_service
@@ -72,6 +74,7 @@ from app.services.tenant.collaboration import (
 )
 from app.services.tenant import content_references
 from app.services.tenant import relationships as relationships_service
+from app.services.tenant import share_requests as share_requests_service
 from app.services.tenant import soft_delete as soft_delete_service
 from app.services.tenant import properties as properties_service
 from app.services.tenant import tags as tags_service
@@ -122,9 +125,18 @@ async def read_wiki(
     wiki = await resource_access.load_authorized(
         session, Tool.wiki, wiki_id, current_user, guild_context, hydrated=True
     )
-    return serialize_tool(
+    read = serialize_tool(
         WikiRead, wiki, user_id=guild_context.user_id, context=guild_context
     )
+    # A plug-in knows of nothing it can't read, so it is asked nothing.
+    if isinstance(guild_context, GuildContext):
+        hidden, requested = (
+            await share_requests_service.hidden_file_counts(
+                session, user_id=guild_context.user_id, wiki_ids=[wiki_id]
+            )
+        ).get(wiki_id, (0, 0))
+        read.hidden_files = HiddenFiles(count=hidden, requested=requested)
+    return read
 
 
 @router.post("/", response_model=WikiRead, status_code=status.HTTP_201_CREATED)

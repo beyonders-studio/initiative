@@ -305,6 +305,7 @@ SHARED_ROLES = frozenset(
         "app_guild_base_ro",
         "app_billing_log",
         "app_dm_reader",
+        "app_presence_reader",
         "app_profile_reader",
         "app_superadmin",
         "guest_base",

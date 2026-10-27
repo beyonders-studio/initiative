@@ -4,7 +4,7 @@ import type { SerializedEditorState } from "lexical";
 import { HttpResponse } from "msw";
 import { describe, expect, it } from "vitest";
 
-import { buildTask, buildTaskListResponse } from "@/__tests__/factories";
+import { buildShareStanding, buildTask, buildTaskListResponse } from "@/__tests__/factories";
 import { communityHttp } from "@/__tests__/helpers/communityHttp";
 import { server } from "@/__tests__/helpers/msw-server";
 import { renderPage } from "@/__tests__/helpers/render";
@@ -99,6 +99,27 @@ describe("an embedded page", () => {
     // The inner page's embed of the outer one is a name, not the outer page again.
     await waitFor(() => expect(screen.getByRole("button", { name: "Outer" })).toBeInTheDocument());
     expect(screen.getAllByText("The outer page.")).toHaveLength(1);
+  });
+
+  it("offers to ask for one the reader knows is there and cannot open", async () => {
+    server.use(
+      communityHttp.post("/smart-chips/embeds", () => HttpResponse.json({ items: [] })),
+      communityHttp.get("/share-requests/standing", () =>
+        HttpResponse.json(buildShareStanding({ resource_id: 5 }))
+      )
+    );
+
+    renderPage(() => (
+      <Editor
+        editorSerializedState={page(embed(5, "Budget")) as unknown as SerializedEditorState}
+      />
+    ));
+
+    expect(
+      await screen.findByText("You can't see this", {}, { timeout: 4000 })
+    ).toBeInTheDocument();
+    await userEvent.click(screen.getByRole("button", { name: "Request access" }));
+    expect(await screen.findByRole("dialog")).toBeInTheDocument();
   });
 });
 

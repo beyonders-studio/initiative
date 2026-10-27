@@ -78,7 +78,7 @@ from app.schemas.ai_generation import AIStreamEvent
 from app.services import resumable
 from app.services.tenant import attachments as attachments_service
 from app.services.tenant import thumbnails
-from app.services.tenant import file_versions
+from app.services.tenant import file_conversion, file_versions
 from app.services import storage_config
 from app.services.storage import (
     INLINE_UPLOAD_TYPES,
@@ -513,6 +513,15 @@ async def upload_file_version(
     file = await resource_access.load_authorized(
         session, Tool.file, file_id, current_user, guild_context, access="write"
     )
+    # Held until the version commits and read fresh once held, so a file
+    # converted meanwhile takes no version, and a conversion that starts now
+    # waits and converts this one.
+    await session.exec(
+        select(File)
+        .where(File.id == file.id)
+        .with_for_update()
+        .execution_options(populate_existing=True)
+    )
     if not is_stored(file.file_type):
         raise HTTPException(
             status_code=status.HTTP_400_BAD_REQUEST,
@@ -538,6 +547,34 @@ async def upload_file_version(
         conflict=True,
     )
     return file_versions.read(FileVersionRead, version, file)
+
+
+@router.post("/{file_id}/convert", response_model=FileRead)
+async def convert_file(
+    session: RLSSessionDep,
+    current_user: Annotated[User, Depends(get_current_active_user)],
+    guild_context: GuildContextDep,
+    file_id: int,
+) -> FileRead:
+    """Convert an uploaded file to edit it: it becomes the editor's own type
+    its type converts to (``converts_to``), keeping its id, name, sharing,
+    tags, comments and links, and its uploaded versions go. Requires write
+    access."""
+    file = await resource_access.load_authorized(
+        session, Tool.file, file_id, current_user, guild_context, access="write"
+    )
+    gone, pictures = await file_conversion.convert(
+        session, guild_context.guild_id, file, user_id=current_user.id
+    )
+    try:
+        await session.commit()
+    except Exception as failed:
+        await session.rollback()
+        file_versions.discard_orphans(guild_context.guild_id, pictures, failed)
+        raise
+    for version in gone:
+        await file_versions.release_files(guild_context.guild_id, version)
+    return await read_after_write(session, file.id, current_user, guild_context)
 
 
 #: The largest frame a browser may send as a video's thumbnail.

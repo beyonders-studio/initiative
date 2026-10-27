@@ -106,9 +106,16 @@
   "featuredImage": {
     "label": "Beitragsbild",
     "upload": "Bild hochladen",
+    "fromFiles": "Aus Dateien",
     "replace": "Ersetzen",
     "remove": "Entfernen",
     "uploading": "Wird hochgeladen…"
+  },
+  "imageChooser": {
+    "title": "Bild aus Dateien wählen",
+    "description": "Es wird so eingefügt, wie es jetzt ist: Eine neuere Version der Datei ändert es nicht.",
+    "none": "Hier gibt es keine Bilder.",
+    "more": "Mehr anzeigen"
   },
   "outline": {
     "show": "Inhalt anzeigen",
@@ -313,6 +320,26 @@
     "deleteSuccess": "Version gelöscht",
     "uploadError": "Hochladen der neuen Version fehlgeschlagen",
     "deleteError": "Löschen der Version fehlgeschlagen"
+  },
+  "convert": {
+    "edit": "Bearbeiten",
+    "title": "Zum Bearbeiten umwandeln?",
+    "toSheet": {
+      "xlsx": "Daraus wird eine Tabelle, die du hier bearbeiten kannst. Blätter, Werte, Formeln, Füllungen, Rahmen und Zahlenformate kommen mit; Diagramme, Bilder und Makros nicht.",
+      "ods": "Daraus wird eine Tabelle, die du hier bearbeiten kannst. Blätter, Werte und Formeln kommen mit; die Formatierung bleibt zurück.",
+      "values": "Daraus wird eine Tabelle, die du hier bearbeiten kannst. Blätter und Werte kommen mit. Formeln kommen als die Werte mit, die sie anzeigen, und die Formatierung bleibt zurück.",
+      "table": "Daraus wird eine Tabelle, die du hier bearbeiten kannst, mit den Zeilen und Spalten als ein Blatt."
+    },
+    "toDocument": {
+      "markdown": "Daraus wird ein Dokument, das du hier bearbeiten kannst. Überschriften, Listen, Tabellen, Links und Textformatierung kommen mit.",
+      "text": "Daraus wird ein Dokument, das du hier bearbeiten kannst, mit dem Text als Absätze.",
+      "word": "Daraus wird ein Dokument, das du hier bearbeiten kannst. Überschriften, Textformatierung, Listen, Tabellen, Links und Bilder kommen mit. Seitenlayout, Kopf- und Fußzeilen, Fußnoten, Kommentare und Textfelder bleiben zurück, und nachverfolgte Änderungen kommen angenommen an."
+    },
+    "replaces": "Die hochgeladene Datei und ihre früheren Versionen werden ersetzt. Über den Export bekommst du jederzeit wieder eine Datei.",
+    "confirm": "Umwandeln",
+    "converting": "Wird umgewandelt…",
+    "success": "Umgewandelt. Jetzt kannst du sie bearbeiten.",
+    "error": "Diese Datei konnte nicht umgewandelt werden."
   },
   "viewer": {
     "loadError": "Datei kann nicht geladen werden",

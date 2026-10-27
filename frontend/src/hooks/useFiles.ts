@@ -1,12 +1,21 @@
-import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
+import {
+  keepPreviousData,
+  useInfiniteQuery,
+  useMutation,
+  useQuery,
+  useQueryClient,
+} from "@tanstack/react-query";
 import { useTranslation } from "react-i18next";
 
 import {
+  convertFile,
   createFile,
   deleteFileVersion,
   duplicateFile,
+  getListFilesQueryKey,
   getListFileVersionsQueryKey,
   getReadFileQueryKey,
+  listFiles,
   listFileVersions,
   putVideoThumbnail,
   setFileGrants,
@@ -15,8 +24,10 @@ import {
 } from "@/api/generated/files/files";
 import type {
   FileCreate,
+  FileListResponse,
   FileRead,
   FileVersionRead,
+  ListFilesParams,
   ResourceGrantSchema,
 } from "@/api/generated/initiativeAPI.schemas";
 import { SearchEntityType, Tool } from "@/api/generated/initiativeAPI.schemas";
@@ -46,6 +57,30 @@ export const useUpdateFile = files.useUpdate;
  */
 export const useDeleteFile = files.useDelete;
 export const useSetFileGrants = files.useSetGrants;
+
+const FEED_PAGE_SIZE = 60;
+
+/**
+ * Files page by page, as somebody scrolls a grid of them — the image
+ * chooser's pictures. `keepPreviousData` keeps the grid on screen while a
+ * changed filter loads rather than blanking it.
+ */
+export const useFilesFeed = (
+  params: Omit<ListFilesParams, "page" | "page_size">,
+  options?: { enabled?: boolean }
+) => {
+  const communityId = useActiveCommunityId();
+  return useInfiniteQuery({
+    // Its own key beside the list's: pages of the feed are a different shape.
+    queryKey: [...getListFilesQueryKey(communityId, params), "feed"],
+    queryFn: ({ pageParam }) =>
+      listFiles(communityId, { ...params, page: pageParam, page_size: FEED_PAGE_SIZE }),
+    initialPageParam: 1,
+    getNextPageParam: (last: FileListResponse) => (last.has_next ? last.page + 1 : undefined),
+    placeholderData: keepPreviousData,
+    enabled: options?.enabled ?? true,
+  });
+};
 
 // ── Cache helpers ───────────────────────────────────────────────────────────
 
@@ -276,6 +311,30 @@ export const useUploadFileVersion = (
       // Stopped on purpose: nothing went wrong.
       if (!args[1].signal?.aborted)
         toast.error(getErrorMessage(args[0], "files:versions.uploadError"));
+      onError?.(...args);
+    },
+    onSettled,
+  });
+};
+
+/** Convert an uploaded file to edit it: it becomes a document or a
+ *  spreadsheet the app keeps, and its uploaded versions go. */
+export const useConvertFile = (options?: MutationOpts<FileRead, number>) => {
+  const { t } = useTranslation("files");
+  const communityId = useActiveCommunityId();
+  const { onSuccess, onError, onSettled, ...rest } = options ?? {};
+
+  return useMutation({
+    ...rest,
+    mutationFn: (fileId: number) => convertFile(communityId, fileId),
+    onSuccess: (...args) => {
+      const fileId = args[1];
+      void invalidate(q.file(fileId), q.fileVersions(fileId), q.allFiles());
+      toast.success(t("convert.success"));
+      onSuccess?.(...args);
+    },
+    onError: (...args) => {
+      toast.error(getErrorMessage(args[0], "files:convert.error"));
       onError?.(...args);
     },
     onSettled,

@@ -1697,7 +1697,7 @@ def _give_guest_invite_grants(
         row = await guild_session.get(MODELS_BY_TABLE[tool.plural], grant.resource_id)
         if row is None or grant.level is None:
             return
-        await permissions_service.grant_to_person(
+        await permissions_service.share_with(
             guild_session,
             resource_type=tool,
             resource_id=row.id,

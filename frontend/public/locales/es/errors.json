@@ -172,6 +172,9 @@
   "RESUMABLE_LOCKED": "Esta subida ya se está enviando desde otro lugar.",
   "RESUMABLE_TOO_MANY": "Tienes demasiadas subidas en curso. Espera a que termine una.",
   "FILE_THUMBNAIL_NOT_WANTED": "Esta versión ya tiene una miniatura o no es un vídeo.",
+  "FILE_NOT_CONVERTIBLE": "Este archivo no se puede convertir para editarlo aquí.",
+  "FILE_TOO_LARGE_TO_CONVERT": "Este archivo es demasiado grande para convertirlo. Descárgalo y edítalo en su propia aplicación.",
+  "FILE_UNREADABLE_TEXT": "El texto de este archivo no está en una codificación que la aplicación lea, así que se queda como está.",
   "COMMENT_NOT_FOUND": "Comentario no encontrado",
   "COMMENT_PERMISSION_DENIED": "No autorizado para comentar",
   "COMMENT_PARENT_NOT_FOUND": "Comentario padre no encontrado",
@@ -797,5 +800,10 @@
   "INVALID_RECURRENCE_LIMIT": "Un máximo diario requiere una repetición por horas después de completar y una fecha de vencimiento. Introduce un máximo entero de 1 a 24, o déjalo en blanco.",
   "TASK_PARENT_IS_PART": "Una tarea no puede formar parte de sí misma ni de una de sus subtareas.",
   "CHECKLIST_ITEM_UNTITLED": "Ese elemento solo nombra personas o enlaces, así que no deja un título para la tarea.",
-  "CHECKLIST_ITEM_CHANGED": "Ese elemento cambió mientras se convertía en tarea. Revísalo e inténtalo de nuevo."
+  "CHECKLIST_ITEM_CHANGED": "Ese elemento cambió mientras se convertía en tarea. Revísalo e inténtalo de nuevo.",
+  "SHARE_REQUEST_NOT_FOUND": "Aquí no hay nada que solicitar",
+  "SHARE_REQUEST_ALREADY_SHARED": "Ya tienes ese acceso",
+  "SHARE_REQUEST_ALREADY_PENDING": "Ya lo has pedido y nadie ha respondido todavía",
+  "SHARE_REQUEST_NOTHING_TO_ASK": "Ya puedes abrir todo lo que hay aquí",
+  "SHARE_REQUEST_CANNOT_ANSWER": "Esa solicitud ya tiene respuesta o no te corresponde responderla"
 }

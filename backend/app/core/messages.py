@@ -310,6 +310,19 @@ class GuildMessages:
     CONFIRMATION_MISMATCH = "COMMUNITY_CONFIRMATION_MISMATCH"
 
 
+class ShareRequestMessages:
+    #: Nothing the reader can open or know is there.
+    NOT_FOUND = "SHARE_REQUEST_NOT_FOUND"
+    #: They already hold what they asked for.
+    ALREADY_SHARED = "SHARE_REQUEST_ALREADY_SHARED"
+    #: They asked for it already, and nobody has answered.
+    ALREADY_PENDING = "SHARE_REQUEST_ALREADY_PENDING"
+    #: A collection or wiki with nothing in it they can't open.
+    NOTHING_TO_ASK = "SHARE_REQUEST_NOTHING_TO_ASK"
+    #: The request is answered, or not one this person may answer.
+    CANNOT_ANSWER = "SHARE_REQUEST_CANNOT_ANSWER"
+
+
 class InitiativeMessages:
     NOT_FOUND = "INITIATIVE_NOT_FOUND"
     MANAGER_REQUIRED = "INITIATIVE_MANAGER_REQUIRED"
@@ -555,6 +568,9 @@ class FileMessages:
     VERSION_TYPE_MISMATCH = "FILE_VERSION_TYPE_MISMATCH"
     INVALID_FILE = "FILE_INVALID_FILE"
     THUMBNAIL_NOT_WANTED = "FILE_THUMBNAIL_NOT_WANTED"
+    NOT_CONVERTIBLE = "FILE_NOT_CONVERTIBLE"
+    TOO_LARGE_TO_CONVERT = "FILE_TOO_LARGE_TO_CONVERT"
+    UNREADABLE_TEXT = "FILE_UNREADABLE_TEXT"
     TYPE_NOT_ALLOWED = "FILE_TYPE_NOT_ALLOWED"
     FILE_TOO_LARGE = "FILE_TOO_LARGE"
 

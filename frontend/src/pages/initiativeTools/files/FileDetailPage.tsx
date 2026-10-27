@@ -519,6 +519,7 @@ export const FileDetailPage = () => {
         keys="files:detail."
         backTo={gp(toolListRoute(Tool.file, initiativeId))}
         backLabel={t("detail.backToFiles")}
+        entity={{ kind: "file", id: parsedId }}
       />
     );
   }
@@ -633,6 +634,8 @@ export const FileDetailPage = () => {
               canEdit={canEditFile}
               uploading={isUploadingFeaturedImage}
               onUpload={handleFeaturedImageChange}
+              initiativeId={file.initiative_id}
+              onChoose={setFeaturedImage}
               onRemove={() => setFeaturedImage(null)}
             />
           )}

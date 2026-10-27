@@ -106,9 +106,16 @@
   "featuredImage": {
     "label": "Image à la une",
     "upload": "Téléverser une image",
+    "fromFiles": "Depuis Fichiers",
     "replace": "Remplacer",
     "remove": "Retirer",
     "uploading": "Téléversement en cours…"
+  },
+  "imageChooser": {
+    "title": "Choisir une image dans Fichiers",
+    "description": "Elle est insérée telle qu’elle est maintenant : une version plus récente du fichier ne la change pas.",
+    "none": "Aucune image ici.",
+    "more": "Afficher plus"
   },
   "outline": {
     "show": "Afficher le sommaire",
@@ -313,6 +320,26 @@
     "deleteSuccess": "Version supprimée",
     "uploadError": "Échec du téléversement de la nouvelle version",
     "deleteError": "Échec de la suppression de la version"
+  },
+  "convert": {
+    "edit": "Modifier",
+    "title": "Convertir pour modifier ?",
+    "toSheet": {
+      "xlsx": "Il devient une feuille de calcul que vous pouvez modifier ici. Ses feuilles, valeurs, formules, remplissages, bordures et formats de nombre sont conservés ; les graphiques, images et macros ne le sont pas.",
+      "ods": "Il devient une feuille de calcul que vous pouvez modifier ici. Ses feuilles, valeurs et formules sont conservées ; la mise en forme ne l'est pas.",
+      "values": "Il devient une feuille de calcul que vous pouvez modifier ici. Ses feuilles et ses valeurs sont conservées. Les formules deviennent les valeurs qu'elles affichent, et la mise en forme n'est pas conservée.",
+      "table": "Il devient une feuille de calcul que vous pouvez modifier ici, ses lignes et colonnes formant une seule feuille."
+    },
+    "toDocument": {
+      "markdown": "Il devient un document que vous pouvez modifier ici. Les titres, listes, tableaux, liens et la mise en forme du texte sont conservés.",
+      "text": "Il devient un document que vous pouvez modifier ici, son texte en paragraphes.",
+      "word": "Il devient un document que vous pouvez modifier ici. Les titres, la mise en forme du texte, les listes, les tableaux, les liens et les images sont conservés. La mise en page, les en-têtes et pieds de page, les notes de bas de page, les commentaires et les zones de texte ne le sont pas, et les modifications suivies arrivent acceptées."
+    },
+    "replaces": "Le fichier téléversé et ses versions précédentes sont remplacés. L'export vous redonne un fichier quand vous en avez besoin.",
+    "confirm": "Convertir",
+    "converting": "Conversion…",
+    "success": "Converti. Vous pouvez le modifier.",
+    "error": "Impossible de convertir ce fichier."
   },
   "viewer": {
     "loadError": "Impossible de charger le fichier",

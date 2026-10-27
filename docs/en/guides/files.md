@@ -75,9 +75,11 @@ Pictures keep their captions. Click a picture to see it full size, and zoom in w
 
 Pictures in a text document belong to its initiative, and open for anybody in it. Paste a picture from another initiative's file and this one keeps its own copy.
 
+The logo is already in Files, three versions deep, and the right one is the third. **Insert › Image › Files** shows the pictures in Files, narrowed by initiative, collection or name, so nobody has to download it and upload it again. What goes in is the picture as it is right now. Upload a fourth version tomorrow and this page keeps the third; anyone who can read the page sees it, whoever the file itself is shared with.
+
 ### The featured image
 
-A file can lead with a **featured image**, running across the top. Anyone who can edit the file can **Replace** or **Remove** it, and a file without one has a row at the top to add one with **Upload image**.
+A file can lead with a **featured image**, running across the top. Anyone who can edit the file can **Replace** or **Remove** it, and a file without one has a row at the top to add one with **Upload image**, or **From Files** for a picture that's already there.
 
 Already have the picture in the page? Select it and choose **Make this the featured image**. Uploading a picture with **Insert › Image** offers a box that does the same.
 
@@ -171,7 +173,7 @@ Open a file's **Comments** to talk about it without touching the actual content.
 
 To pull somebody in, type `@`. To point at a *thing* rather than a person, type `#` and pick anything in the initiative. See [Mentions & links](mentions-and-links.md).
 
-A screenshot says it faster than three paragraphs. Paste or drag one into a comment, or tap the picture button — on the app it offers your camera. Take it back out and it's gone from storage too. A picture linked from some other website shows up as a link you click, not an image that loads itself.
+A screenshot says it faster than three paragraphs. Paste or drag one into a comment, or tap the picture button — on the app it offers your camera, and **From Files** picks one somebody already uploaded. Take it back out and it's gone from storage too. A picture linked from some other website shows up as a link you click, not an image that loads itself.
 
 ### Reactions
 
@@ -193,6 +195,22 @@ Anyone who can reply can react. The author gets told — as a periodic summary, 
 An upload keeps a **version history**. **Upload new version** and the older ones stay put, numbered and dated, so the copy from before somebody helpfully reorganised it is one click away to look at or download.
 
 The file's owner can delete a version, for good. Delete the newest and the one before it becomes the file again. The last one left always stays.
+
+### Editing an uploaded document or spreadsheet
+
+The budget arrived as an Excel file, the minutes as a Word file, and now three people need to change both. Open one and choose **Edit**. It's converted into a spreadsheet or document you edit right here: same file, same name, same comments and links, just one you can type into.
+
+| Uploaded as | Becomes | What comes over |
+|---|---|---|
+| Excel (`.xlsx`) | Spreadsheet | Sheets, values, formulas, fills, borders and number formats. Charts, pictures and macros stay behind. |
+| OpenDocument (`.ods`) | Spreadsheet | Sheets, values and formulas. Formatting stays behind. |
+| Older Excel (`.xls`) | Spreadsheet | Sheets and values. A formula arrives as the number it showed. |
+| CSV, TSV | Spreadsheet | The rows and columns, as one sheet. |
+| Word (`.docx`), OpenDocument (`.odt`) | Text document | Headings, formatting, lists, tables, links and pictures. Page layout, headers and footers, footnotes, comments and text boxes stay behind. Tracked changes arrive accepted. |
+| Markdown (`.md`) | Text document | Headings, lists, tables, links and formatting. |
+| Plain text (`.txt`) | Text document | The text, as paragraphs. |
+
+Converting replaces the upload and its version history, and the dialog says so before anything happens. Need the file back out? **Export** it as Excel, CSV, Word, PDF or Markdown whenever you like.
 
 ## Collections
 

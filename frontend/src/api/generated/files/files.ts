@@ -1146,6 +1146,90 @@ export function useListFileVersions<
 }
 
 /**
+ * Convert an uploaded file to edit it: it becomes the editor's own type
+ * its type converts to (``converts_to``), keeping its id, name, sharing,
+ * tags, comments and links, and its uploaded versions go. Requires write
+ * access.
+ * @summary Convert File
+ */
+export const convertFile = (
+  communityId: number,
+  fileId: number,
+  options?: SecondParameter<typeof apiMutator>,
+  signal?: AbortSignal
+) => {
+  return apiMutator<FileRead>(
+    { url: `/api/v1/c/${communityId}/files/${fileId}/convert`, method: "POST", signal },
+    options
+  );
+};
+
+export const getConvertFileMutationKey = () => ["convertFile"] as const;
+
+export const getConvertFileMutationOptions = <
+  TError = ErrorType<HTTPValidationError>,
+  TContext = unknown,
+>(options?: {
+  mutation?: UseMutationOptions<
+    Awaited<ReturnType<typeof convertFile>>,
+    TError,
+    ConvertFileMutationVariables,
+    TContext
+  >;
+  request?: SecondParameter<typeof apiMutator>;
+}): UseMutationOptions<
+  Awaited<ReturnType<typeof convertFile>>,
+  TError,
+  ConvertFileMutationVariables,
+  TContext
+> => {
+  const mutationKey = getConvertFileMutationKey();
+  const { mutation: mutationOptions, request: requestOptions } = options
+    ? options.mutation && "mutationKey" in options.mutation && options.mutation.mutationKey
+      ? options
+      : { ...options, mutation: { ...options.mutation, mutationKey } }
+    : { mutation: { mutationKey }, request: undefined };
+
+  const mutationFn: MutationFunction<
+    Awaited<ReturnType<typeof convertFile>>,
+    ConvertFileMutationVariables
+  > = (props) => {
+    const { communityId, fileId } = props ?? {};
+
+    return convertFile(communityId, fileId, requestOptions);
+  };
+
+  return { mutationFn, ...mutationOptions };
+};
+
+export type ConvertFileMutationResult = NonNullable<Awaited<ReturnType<typeof convertFile>>>;
+
+export type ConvertFileMutationError = ErrorType<HTTPValidationError>;
+export type ConvertFileMutationVariables = { communityId: number; fileId: number };
+
+/**
+ * @summary Convert File
+ */
+export const useConvertFile = <TError = ErrorType<HTTPValidationError>, TContext = unknown>(
+  options?: {
+    mutation?: UseMutationOptions<
+      Awaited<ReturnType<typeof convertFile>>,
+      TError,
+      ConvertFileMutationVariables,
+      TContext
+    >;
+    request?: SecondParameter<typeof apiMutator>;
+  },
+  queryClient?: QueryClient
+): UseMutationResult<
+  Awaited<ReturnType<typeof convertFile>>,
+  TError,
+  ConvertFileMutationVariables,
+  TContext
+> => {
+  return useMutation(getConvertFileMutationOptions(options), queryClient);
+};
+/**
  * Give a video version its thumbnail: a frame the browser drew from it.
  * Requires write access. Taken once, for a video version that has none,
  * and drawn again on the server like any picture.

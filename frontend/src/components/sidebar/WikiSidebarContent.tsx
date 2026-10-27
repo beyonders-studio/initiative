@@ -11,6 +11,7 @@ import { useMemo, useState } from "react";
 import { useTranslation } from "react-i18next";
 
 import { Tool, WikiPageKind, type WikiPageSummary } from "@/api/generated/initiativeAPI.schemas";
+import { HiddenFilesRequest } from "@/components/access/RequestAccess";
 import { FileChooserDialog } from "@/components/files/FileChooserDialog";
 import { WikiPageActions } from "@/components/initiativeTools/wikis/WikiPageActions";
 import {
@@ -265,6 +266,13 @@ export const WikiSidebarContent = ({
                 }
                 accentColor={wikiQuery.data?.accent_color}
               />
+              {wikiQuery.data ? (
+                <HiddenFilesRequest
+                  hidden={wikiQuery.data.hidden_files}
+                  target={{ wiki_id: wikiId }}
+                  className="mx-2 my-2 px-3 py-2"
+                />
+              ) : null}
               {canWrite ? (
                 <SidebarMenu>
                   <SidebarMenuItem>

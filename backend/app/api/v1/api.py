@@ -66,6 +66,7 @@ from app.api.v1.tenant_endpoints import (
     tool_lists,
     tools,
     trash,
+    share_requests,
     wikis,
 )
 from app.api.v1.platform_endpoints import (
@@ -313,6 +314,11 @@ guild_router.include_router(
 )
 guild_router.include_router(
     attachments.router, prefix="/attachments", tags=["attachments"]
+)
+# Asking for something you can't open or edit, and the answer. Every tool's
+# resources, so mounted once at the community's root rather than per tool.
+guild_router.include_router(
+    share_requests.router, prefix="/share-requests", tags=["sharing"]
 )
 guild_router.include_router(exports.router, prefix="/exports", tags=["exports"])
 guild_router.include_router(demo.community_router, prefix="/demo", tags=["demo"])
