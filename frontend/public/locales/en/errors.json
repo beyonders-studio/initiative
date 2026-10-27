@@ -162,6 +162,7 @@
   "VERSION_CONFLICT": "Someone else uploaded a version at the same moment. Try again.",
   "FILE_INVALID_FILE": "This file is empty or couldn't be read (max 50 MB).",
   "FILE_TYPE_NOT_ALLOWED": "Programs and scripts can't be uploaded.",
+  "FILE_THUMBNAIL_NOT_WANTED": "This version already has a thumbnail, or isn't a video.",
   "FILE_TOO_LARGE": "File is too large (max 50 MB)",
   "COMMENT_NOT_FOUND": "Comment not found",
   "COMMENT_PERMISSION_DENIED": "Not authorized to comment",

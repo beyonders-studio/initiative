@@ -4,11 +4,11 @@ The host loads this module by path and calls :func:`start` with ``<edge>
 <pixels> <address space bytes>``; this imports the standard library and
 Pillow and nothing of Initiative.
 
-A request is ``{"path", "format"}``: a stored picture's path on disk and the
-one Pillow format it may be opened as. The answer is ``{"thumbnail",
-"width", "height"}`` (a WebP, base64), ``{"original": true}`` for a picture
-already no larger than the edge, or ``{"error"}`` for bytes Pillow will not
-draw. A picture with more than ``<pixels>`` pixels is refused before it is
+A request is ``{"path", "format", "always"?}``: a picture's path on disk, the
+one Pillow format it may be opened as, and whether it is drawn again however
+small it is. The answer is ``{"thumbnail", "width", "height"}`` (a WebP,
+base64), ``{"original": true}`` for a picture already no larger than the edge
+(unless ``always``), or ``{"error"}`` for bytes Pillow will not draw. A picture with more than ``<pixels>`` pixels is refused before it is
 decoded, and the process's address space is bounded where the platform
 allows it; a decode that runs out of memory is answered with
 ``"replace": true``, and the worker exits.
@@ -31,7 +31,7 @@ def answer(request: dict[str, Any], edge: int) -> dict[str, Any]:
             warnings.simplefilter("error", Image.DecompressionBombWarning)
             with Image.open(request["path"], formats=[request["format"]]) as opened:
                 picture = ImageOps.exif_transpose(opened) or opened
-                if max(picture.size) <= edge:
+                if max(picture.size) <= edge and not request.get("always"):
                     return {"original": True}
                 # WebP takes RGB or RGBA; palette and greyscale pictures are
                 # converted first, keeping a palette's transparency, so they

@@ -1159,6 +1159,10 @@ export interface BodyNotifyMentions {
   mentioned_user_ids: number[];
 }
 
+export interface BodyPutVideoThumbnail {
+  file: Blob | File;
+}
+
 export interface BodyReplyToFiledTicket {
   body: string;
   files?: (Blob | File)[];

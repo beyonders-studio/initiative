@@ -102,6 +102,60 @@ def _draw(guild_id: int, key: str, picture_format: str) -> dict[str, Any]:
         return _the_pool().ask({**request, "path": copy.name})
 
 
+async def _keep(
+    session: AsyncSession,
+    guild_id: int,
+    version: FileVersion,
+    reply: dict[str, Any],
+    initiative_id: int,
+) -> None:
+    """Store the worker's thumbnail as ``version``'s."""
+    version.thumbnail_url = await attachments.store_upload(
+        session,
+        guild_id=guild_id,
+        filename=attachments.new_upload_filename(
+            ".webp", prefix=attachments.THUMBNAIL_PREFIX
+        ),
+        data=base64.b64decode(reply["thumbnail"]),
+        content_type="image/webp",
+        created_by=None,
+        initiative_id=initiative_id,
+    )
+    version.thumbnail_state = "ready"
+
+
+async def take_frame(
+    session: AsyncSession,
+    guild_id: int,
+    version: FileVersion,
+    initiative_id: int,
+    data: bytes,
+    picture_format: str,
+) -> bool:
+    """Make a frame a browser drew of a video ``version``'s thumbnail, drawn
+    again by the worker whatever it is, as an upload would be. ``False`` for
+    bytes the worker will not draw; the caller commits."""
+
+    def draw() -> dict[str, Any]:
+        with tempfile.NamedTemporaryFile() as frame:
+            frame.write(data)
+            frame.flush()
+            return _the_pool().ask(
+                {"path": frame.name, "format": picture_format, "always": True}
+            )
+
+    try:
+        reply = await asyncio.to_thread(draw)
+    except PoolError as exc:
+        reply = {"error": str(exc)}
+    if "thumbnail" not in reply:
+        logger.info("frame_refused version=%s: %s", version.id, reply.get("error"))
+        return False
+    await _keep(session, guild_id, version, reply, initiative_id)
+    session.add(version)
+    return True
+
+
 async def _draw_one(session: AsyncSession, guild_id: int) -> bool:
     """Draw the next pending thumbnail and commit it; ``False`` when none is
     pending."""
@@ -127,18 +181,7 @@ async def _draw_one(session: AsyncSession, guild_id: int) -> bool:
     except Exception as exc:  # noqa: BLE001 - a picture that cannot be drawn fails
         reply = {"error": str(exc) or type(exc).__name__}
     if "thumbnail" in reply:
-        version.thumbnail_url = await attachments.store_upload(
-            session,
-            guild_id=guild_id,
-            filename=attachments.new_upload_filename(
-                ".webp", prefix=attachments.THUMBNAIL_PREFIX
-            ),
-            data=base64.b64decode(reply["thumbnail"]),
-            content_type="image/webp",
-            created_by=None,
-            initiative_id=initiative_id,
-        )
-        version.thumbnail_state = "ready"
+        await _keep(session, guild_id, version, reply, initiative_id)
     elif reply.get("original"):
         version.thumbnail_url = version.file_url
         version.thumbnail_state = "ready"

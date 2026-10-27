@@ -62,3 +62,11 @@ def test_bytes_that_are_not_a_picture_are_an_error(tmp_path):
     path.write_bytes(b"\x89PNG\r\n\x1a\n" + b"not a picture" * 10)
 
     assert "error" in answer({"path": str(path), "format": "PNG"}, 640)
+
+
+def test_always_draws_even_a_small_picture(tmp_path):
+    path = _picture(tmp_path, (300, 200))
+
+    reply = answer({"path": path, "format": "PNG", "always": True}, 640)
+
+    assert (reply["width"], reply["height"]) == (300, 200)

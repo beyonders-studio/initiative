@@ -24,6 +24,7 @@ import type {
   AIStreamEvent,
   BodyImportSpreadsheetFile,
   BodyNotifyMentions,
+  BodyPutVideoThumbnail,
   BodyUploadFile,
   BodyUploadFileVersion,
   FileCreate,
@@ -593,6 +594,105 @@ export function useListFileVersions<
   return withQueryKey(query, queryOptions.queryKey);
 }
 
+/**
+ * Give a video version its thumbnail: a frame the browser drew from it.
+ * Requires write access. Taken once, for a video version that has none,
+ * and drawn again on the server like any picture.
+ * @summary Put Video Thumbnail
+ */
+export const putVideoThumbnail = (
+  communityId: number,
+  fileId: number,
+  versionId: number,
+  bodyPutVideoThumbnail: BodyType<BodyPutVideoThumbnail>,
+  options?: SecondParameter<typeof apiMutator>,
+  signal?: AbortSignal
+) => {
+  const formData = toFormData(bodyPutVideoThumbnail);
+  return apiMutator<void>(
+    {
+      url: `/api/v1/c/${communityId}/files/${fileId}/versions/${versionId}/thumbnail`,
+      method: "PUT",
+      headers: { "Content-Type": "multipart/form-data" },
+      data: formData,
+      signal,
+    },
+    options
+  );
+};
+
+export const getPutVideoThumbnailMutationKey = () => ["putVideoThumbnail"] as const;
+
+export const getPutVideoThumbnailMutationOptions = <
+  TError = ErrorType<HTTPValidationError>,
+  TContext = unknown,
+>(options?: {
+  mutation?: UseMutationOptions<
+    Awaited<ReturnType<typeof putVideoThumbnail>>,
+    TError,
+    PutVideoThumbnailMutationVariables,
+    TContext
+  >;
+  request?: SecondParameter<typeof apiMutator>;
+}): UseMutationOptions<
+  Awaited<ReturnType<typeof putVideoThumbnail>>,
+  TError,
+  PutVideoThumbnailMutationVariables,
+  TContext
+> => {
+  const mutationKey = getPutVideoThumbnailMutationKey();
+  const { mutation: mutationOptions, request: requestOptions } = options
+    ? options.mutation && "mutationKey" in options.mutation && options.mutation.mutationKey
+      ? options
+      : { ...options, mutation: { ...options.mutation, mutationKey } }
+    : { mutation: { mutationKey }, request: undefined };
+
+  const mutationFn: MutationFunction<
+    Awaited<ReturnType<typeof putVideoThumbnail>>,
+    PutVideoThumbnailMutationVariables
+  > = (props) => {
+    const { communityId, fileId, versionId, data } = props ?? {};
+
+    return putVideoThumbnail(communityId, fileId, versionId, data, requestOptions);
+  };
+
+  return { mutationFn, ...mutationOptions };
+};
+
+export type PutVideoThumbnailMutationResult = NonNullable<
+  Awaited<ReturnType<typeof putVideoThumbnail>>
+>;
+export type PutVideoThumbnailMutationBody = BodyType<BodyPutVideoThumbnail>;
+export type PutVideoThumbnailMutationError = ErrorType<HTTPValidationError>;
+export type PutVideoThumbnailMutationVariables = {
+  communityId: number;
+  fileId: number;
+  versionId: number;
+  data: BodyType<BodyPutVideoThumbnail>;
+};
+
+/**
+ * @summary Put Video Thumbnail
+ */
+export const usePutVideoThumbnail = <TError = ErrorType<HTTPValidationError>, TContext = unknown>(
+  options?: {
+    mutation?: UseMutationOptions<
+      Awaited<ReturnType<typeof putVideoThumbnail>>,
+      TError,
+      PutVideoThumbnailMutationVariables,
+      TContext
+    >;
+    request?: SecondParameter<typeof apiMutator>;
+  },
+  queryClient?: QueryClient
+): UseMutationResult<
+  Awaited<ReturnType<typeof putVideoThumbnail>>,
+  TError,
+  PutVideoThumbnailMutationVariables,
+  TContext
+> => {
+  return useMutation(getPutVideoThumbnailMutationOptions(options), queryClient);
+};
 /**
  * Delete a version of an uploaded file. Owner only. Deleting the current
  * version promotes the previous one; deleting the last version is blocked.
