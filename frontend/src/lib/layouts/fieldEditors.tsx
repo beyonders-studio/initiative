@@ -441,14 +441,20 @@ export const ColorField = <
  */
 export const PlacedPropertyField = <I extends { properties: PropertySummary[] }, P>({
   propertyId,
+  definitions: given,
   ...props
-}: PropertiesProps<I, P> & { propertyId: number }) => {
+}: PropertiesProps<I, P> & {
+  propertyId: number;
+  /** Where its definition is, where not among the initiative's properties:
+   *  a collection's own fields. */
+  definitions?: PropertyDefinitionRead[];
+}) => {
   const { t } = useTranslation(["properties", "common"]);
   const definitions = useProperties({
     initiativeId: props.initiativeId ?? undefined,
-    enabled: props.initiativeId !== null,
+    enabled: props.initiativeId !== null && given === undefined,
   });
-  const definition = definitions.data?.find((each) => each.id === propertyId);
+  const definition = (given ?? definitions.data)?.find((each) => each.id === propertyId);
   const held = props.properties.find((each) => each.property_id === propertyId);
   const property = held ?? (definition ? propertyStubFromDefinition(definition) : undefined);
   // Not loaded is not deleted: an editor is told, and can ask again.

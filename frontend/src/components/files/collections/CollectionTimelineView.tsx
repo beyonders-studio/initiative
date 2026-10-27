@@ -3,6 +3,7 @@ import { useTranslation } from "react-i18next";
 
 import type { CollectionFileSummary, TimelineBucket } from "@/api/generated/initiativeAPI.schemas";
 import { CollectionFileTile } from "@/components/files/collections/CollectionFileTile";
+import type { CollectionCard } from "@/components/files/collections/collectionLists";
 import { type VirtualRow, VirtualRows } from "@/components/files/collections/VirtualRows";
 import { TimelineRail } from "@/components/timeline/TimelineRail";
 import type { GridToggleOptions } from "@/hooks/useGridSelection";
@@ -11,6 +12,8 @@ import { formatPeriod, formatPeriodYear } from "@/lib/formatDate";
 
 interface CollectionTimelineViewProps {
   files: CollectionFileSummary[];
+  /** What each file shows under its picture, as the layout says. */
+  card?: CollectionCard;
   /** The months files were added in — what the rail is drawn from. */
   buckets: TimelineBucket[];
   onActivate: (file: CollectionFileSummary, options: GridToggleOptions) => void;
@@ -36,6 +39,7 @@ const DAY_HEADING = 28;
  */
 export const CollectionTimelineView = ({
   files,
+  card,
   buckets,
   onActivate,
   selecting = false,
@@ -60,26 +64,28 @@ export const CollectionTimelineView = ({
               </span>
             </h3>
             <div className="flex flex-wrap gap-2">
-              {group.items.map((file) => (
-                <CollectionFileTile
-                  key={file.id}
-                  file={file}
-                  fit="shape"
-                  onActivate={(options) => onActivate(file, options)}
-                  selecting={selecting}
-                  selected={isSelected?.(file) ?? false}
-                  className="max-w-full"
-                  style={{
-                    height: ROW_HEIGHT,
-                    width: Math.round(ROW_HEIGHT * fileRatio(file)),
-                  }}
-                />
-              ))}
+              {group.items.map((file) => {
+                const width = Math.round(ROW_HEIGHT * fileRatio(file));
+                return (
+                  <div key={file.id} className="max-w-full" style={{ width }}>
+                    <CollectionFileTile
+                      file={file}
+                      fit="shape"
+                      onActivate={(options) => onActivate(file, options)}
+                      selecting={selecting}
+                      selected={isSelected?.(file) ?? false}
+                      className="max-w-full"
+                      style={{ height: ROW_HEIGHT, width }}
+                    />
+                    {card?.render(file)}
+                  </div>
+                );
+              })}
             </div>
           </section>
         ),
       })),
-    [days, onActivate, selecting, isSelected, t]
+    [days, card, onActivate, selecting, isSelected, t]
   );
 
   // The month at the top of the view, so the rail marks where the reader is.

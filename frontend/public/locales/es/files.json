@@ -14,7 +14,8 @@
     "added": "Añadido",
     "community": "Comunidad",
     "initiative": "Iniciativa",
-    "ownerFallback": "Usuario {{id}}"
+    "ownerFallback": "Usuario {{id}}",
+    "size": "Tamaño"
   },
   "create": {
     "title": "Nuevo archivo",
@@ -439,6 +440,15 @@
       "none": "Aún no hay campos",
       "heading": "En esta colección",
       "saveError": "No se pudo guardar el valor"
+    },
+    "addedOn": "Añadido {{date}}",
+    "createdOn": "Creado {{date}}",
+    "editLayouts": "Editar lo que muestran las listas",
+    "listHelp": {
+      "masonry": "Cada archivo con su propia forma, agrupado en columnas: lo que su tarjeta muestra bajo la imagen.",
+      "grid": "Cada archivo como un mosaico cuadrado: lo que su tarjeta muestra bajo la imagen.",
+      "timeline": "Los archivos según el día en que se añadieron: lo que cada tarjeta muestra bajo la imagen.",
+      "table": "Los archivos de la colección como tabla: qué columnas, en qué orden."
     }
   }
 }

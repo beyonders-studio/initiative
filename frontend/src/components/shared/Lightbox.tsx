@@ -27,6 +27,9 @@ interface LightboxProps {
   /** Called as the reader nears the end of `items`, so a caller feeding it
    *  from a paged list can fetch the next page before they arrive. */
   onNearEnd?: () => void;
+  /** Drawn beside the picture, or under it on a narrow screen: what the
+   *  caller shows and edits of this one. Keys typed into it stay there. */
+  panel?: ReactNode;
 }
 
 /** How far a finger has to travel, as a share of the width, before a drag is
@@ -85,6 +88,7 @@ export const Lightbox = ({
   onIndexChange,
   actions,
   onNearEnd,
+  panel,
 }: LightboxProps) => {
   const { t } = useTranslation("common");
   const count = items.length;
@@ -176,6 +180,13 @@ export const Lightbox = ({
   useEffect(() => {
     if (!open) return;
     const onKey = (event: KeyboardEvent) => {
+      const target = event.target;
+      if (
+        target instanceof Element &&
+        target.closest("input, textarea, select, [contenteditable='true']")
+      ) {
+        return;
+      }
       if (event.key === "ArrowLeft" && !zoomed) goTo(index - 1);
       else if (event.key === "ArrowRight" && !zoomed) goTo(index + 1);
       else if (event.key === "+" || event.key === "=") applyScale(transform.scale + 0.5);
@@ -385,86 +396,95 @@ export const Lightbox = ({
           </div>
         </div>
 
-        {/* The stage. Unzoomed, `touch-action: pan-y` leaves vertical scrolling
-            to the browser and takes horizontal for the swipe; zoomed, the
-            picture takes both so a drag pans it. */}
-        {/* biome-ignore lint/a11y/noStaticElementInteractions: the dialog owns
-            the keyboard route out (Escape) and the close button; this is the
-            pointer shortcut beside them.
-            biome-ignore lint/a11y/useKeyWithClickEvents: the double click
-            zooms, and the keyboard reaches that through the toolbar buttons
-            and the +/-/0 keys the dialog listens for. */}
-        <div
-          ref={stageRef}
-          className={cn(
-            "relative flex min-h-0 flex-1 select-none items-center justify-center overflow-hidden",
-            zoomed ? "touch-none" : "touch-pan-y"
-          )}
-          // Clicking the dark around the picture closes it, the way clicking
-          // outside any other dialog does — the content fills the overlay
-          // here, so there is no backdrop of its own left to click. Only the
-          // stage itself: a click that landed on the picture or a chevron was
-          // aimed at that. A zoomed picture may cover the stage entirely, so
-          // this is the unzoomed shortcut only.
-          onClick={(event) => {
-            if (zoomed || pressedPicture.current) return;
-            if (event.target === event.currentTarget) onOpenChange(false);
-          }}
-          onDoubleClick={(event) => {
-            if (zoomed) resetZoom();
-            else applyScale(DOUBLE_TAP_SCALE, event.clientX, event.clientY);
-          }}
-          onPointerDown={onPointerDown}
-          onPointerMove={onPointerMove}
-          onPointerUp={endPointer}
-          onPointerCancel={onPointerCancel}
-          onWheel={onWheel}
-        >
-          <img
-            key={current.id}
-            ref={imageRef}
-            src={current.src}
-            alt={current.alt}
-            draggable={false}
-            referrerPolicy="no-referrer"
-            style={{
-              transform: `translate3d(${translateX}px, ${zoomed ? transform.y : 0}px, 0) scale(${transform.scale})`,
-            }}
-            className={cn(
-              "max-h-full max-w-full object-contain",
-              dragging ? "transition-none" : "transition-transform duration-200 ease-out",
-              zoomed ? "cursor-grab" : undefined
-            )}
-          />
-          {hasPrev && !zoomed && (
-            <Button
-              variant="ghost"
-              size="icon"
-              aria-label={t("previous")}
-              onClick={() => goTo(index - 1)}
-              className="absolute left-2 hidden size-10 rounded-full bg-black/40 text-white hover:bg-black/60 hover:text-white sm:inline-flex"
+        <div className="flex min-h-0 flex-1 flex-col md:flex-row">
+          <div className="flex min-h-0 min-w-0 flex-1 flex-col">
+            {/* The stage. Unzoomed, `touch-action: pan-y` leaves vertical scrolling
+                to the browser and takes horizontal for the swipe; zoomed, the
+                picture takes both so a drag pans it. */}
+            {/* biome-ignore lint/a11y/noStaticElementInteractions: the dialog owns
+                the keyboard route out (Escape) and the close button; this is the
+                pointer shortcut beside them.
+                biome-ignore lint/a11y/useKeyWithClickEvents: the double click
+                zooms, and the keyboard reaches that through the toolbar buttons
+                and the +/-/0 keys the dialog listens for. */}
+            <div
+              ref={stageRef}
+              className={cn(
+                "relative flex min-h-0 flex-1 select-none items-center justify-center overflow-hidden",
+                zoomed ? "touch-none" : "touch-pan-y"
+              )}
+              // Clicking the dark around the picture closes it, the way clicking
+              // outside any other dialog does — the content fills the overlay
+              // here, so there is no backdrop of its own left to click. Only the
+              // stage itself: a click that landed on the picture or a chevron was
+              // aimed at that. A zoomed picture may cover the stage entirely, so
+              // this is the unzoomed shortcut only.
+              onClick={(event) => {
+                if (zoomed || pressedPicture.current) return;
+                if (event.target === event.currentTarget) onOpenChange(false);
+              }}
+              onDoubleClick={(event) => {
+                if (zoomed) resetZoom();
+                else applyScale(DOUBLE_TAP_SCALE, event.clientX, event.clientY);
+              }}
+              onPointerDown={onPointerDown}
+              onPointerMove={onPointerMove}
+              onPointerUp={endPointer}
+              onPointerCancel={onPointerCancel}
+              onWheel={onWheel}
             >
-              <ChevronLeft className="size-6" />
-            </Button>
-          )}
-          {hasNext && !zoomed && (
-            <Button
-              variant="ghost"
-              size="icon"
-              aria-label={t("next")}
-              onClick={() => goTo(index + 1)}
-              className="absolute right-2 hidden size-10 rounded-full bg-black/40 text-white hover:bg-black/60 hover:text-white sm:inline-flex"
-            >
-              <ChevronRight className="size-6" />
-            </Button>
-          )}
-        </div>
+              <img
+                key={current.id}
+                ref={imageRef}
+                src={current.src}
+                alt={current.alt}
+                draggable={false}
+                referrerPolicy="no-referrer"
+                style={{
+                  transform: `translate3d(${translateX}px, ${zoomed ? transform.y : 0}px, 0) scale(${transform.scale})`,
+                }}
+                className={cn(
+                  "max-h-full max-w-full object-contain",
+                  dragging ? "transition-none" : "transition-transform duration-200 ease-out",
+                  zoomed ? "cursor-grab" : undefined
+                )}
+              />
+              {hasPrev && !zoomed && (
+                <Button
+                  variant="ghost"
+                  size="icon"
+                  aria-label={t("previous")}
+                  onClick={() => goTo(index - 1)}
+                  className="absolute left-2 hidden size-10 rounded-full bg-black/40 text-white hover:bg-black/60 hover:text-white sm:inline-flex"
+                >
+                  <ChevronLeft className="size-6" />
+                </Button>
+              )}
+              {hasNext && !zoomed && (
+                <Button
+                  variant="ghost"
+                  size="icon"
+                  aria-label={t("next")}
+                  onClick={() => goTo(index + 1)}
+                  className="absolute right-2 hidden size-10 rounded-full bg-black/40 text-white hover:bg-black/60 hover:text-white sm:inline-flex"
+                >
+                  <ChevronRight className="size-6" />
+                </Button>
+              )}
+            </div>
 
-        {current.caption ? (
-          <div className="shrink-0 px-4 py-3 text-center text-sm text-white/80">
-            {current.caption}
+            {current.caption ? (
+              <div className="shrink-0 px-4 py-3 text-center text-sm text-white/80">
+                {current.caption}
+              </div>
+            ) : null}
           </div>
-        ) : null}
+          {panel ? (
+            <aside className="max-h-[40dvh] shrink-0 overflow-y-auto bg-background p-4 text-foreground md:max-h-none md:w-80">
+              {panel}
+            </aside>
+          ) : null}
+        </div>
       </DialogContent>
     </Dialog>
   );

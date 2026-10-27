@@ -1,8 +1,9 @@
 import { useEffect, useMemo, useRef, useState } from "react";
 import { useTranslation } from "react-i18next";
 
-import type { FileSummary } from "@/api/generated/initiativeAPI.schemas";
+import type { CollectionFileSummary, FileSummary } from "@/api/generated/initiativeAPI.schemas";
 import { CollectionFileTile } from "@/components/files/collections/CollectionFileTile";
+import type { CollectionCard } from "@/components/files/collections/collectionLists";
 import { type VirtualRow, VirtualRows } from "@/components/files/collections/VirtualRows";
 import { TagBadge } from "@/components/tags/TagBadge";
 import type { GridToggleOptions } from "@/hooks/useGridSelection";
@@ -10,7 +11,9 @@ import { useWidthClass } from "@/hooks/useWidthClass";
 import { groupByTag } from "@/lib/collections";
 
 interface CollectionGridViewProps {
-  files: FileSummary[];
+  files: CollectionFileSummary[];
+  /** What each file shows under its picture, as the layout says. */
+  card?: CollectionCard;
   groupByTags: boolean;
   onActivate: (file: FileSummary, options: GridToggleOptions) => void;
   selecting?: boolean;
@@ -50,6 +53,7 @@ const useWidth = () => {
  */
 export const CollectionGridView = ({
   files,
+  card,
   groupByTags,
   onActivate,
   selecting = false,
@@ -62,7 +66,7 @@ export const CollectionGridView = ({
   const tile = width > 0 ? (width - GAP * (columns - 1)) / columns : minTile;
 
   const rows = useMemo<VirtualRow[]>(() => {
-    const tileRows = (items: FileSummary[], prefix: string): VirtualRow[] => {
+    const tileRows = (items: CollectionFileSummary[], prefix: string): VirtualRow[] => {
       const out: VirtualRow[] = [];
       for (let start = 0; start < items.length; start += columns) {
         const slice = items.slice(start, start + columns);
@@ -75,14 +79,16 @@ export const CollectionGridView = ({
               style={{ gridTemplateColumns: `repeat(${columns}, minmax(0, 1fr))`, gap: GAP }}
             >
               {slice.map((file) => (
-                <CollectionFileTile
-                  key={file.id}
-                  file={file}
-                  fit="square"
-                  onActivate={(options) => onActivate(file, options)}
-                  selecting={selecting}
-                  selected={isSelected?.(file) ?? false}
-                />
+                <div key={file.id} className="min-w-0">
+                  <CollectionFileTile
+                    file={file}
+                    fit="square"
+                    onActivate={(options) => onActivate(file, options)}
+                    selecting={selecting}
+                    selected={isSelected?.(file) ?? false}
+                  />
+                  {card?.render(file)}
+                </div>
               ))}
             </div>
           ),
@@ -114,7 +120,7 @@ export const CollectionGridView = ({
         ...tileRows(group.items, key),
       ];
     });
-  }, [files, groupByTags, columns, tile, onActivate, selecting, isSelected, t]);
+  }, [files, card, groupByTags, columns, tile, onActivate, selecting, isSelected, t]);
 
   return <div ref={ref}>{width > 0 && <VirtualRows rows={rows} />}</div>;
 };

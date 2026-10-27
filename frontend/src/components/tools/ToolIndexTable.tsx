@@ -50,7 +50,10 @@ type ToolIndexTableProps = {
   initiativeId: number;
   rows: ToolIndexRow[];
   /** The tool's own columns, after the shared ones (its entry's `table`). */
-  useColumns: () => AppColumnDef<ToolIndexRow>[];
+  useColumns?: () => AppColumnDef<ToolIndexRow>[];
+  /** The columns a layout shows, in its order, in place of the shared ones
+   *  and the tool's own; one named `name` has the shared name's cells. */
+  laidOut?: AppColumnDef<ToolIndexRow>[];
   selection: TableSelection;
   sorting: SortingState;
   onSortingChange: (sorting: SortingState) => void;
@@ -61,11 +64,15 @@ type ToolIndexTableProps = {
   ) => void;
 };
 
+const NO_COLUMNS: AppColumnDef<ToolIndexRow>[] = [];
+const useNoColumns = () => NO_COLUMNS;
+
 export const ToolIndexTable = ({
   tool,
   initiativeId,
   rows,
-  useColumns,
+  useColumns = useNoColumns,
+  laidOut,
   selection,
   sorting,
   onSortingChange,
@@ -78,7 +85,7 @@ export const ToolIndexTable = ({
   const communityId = useActiveCommunityId();
   const unread = useUnreadTree();
 
-  const { data: definitions = [] } = useProperties({ initiativeId });
+  const { data: definitions = [] } = useProperties({ initiativeId, enabled: !laidOut });
   // Property columns start hidden; the column menu turns them on.
   const hiddenByDefault = useMemo(() => propertyColumnIds(definitions), [definitions]);
   // A property column nobody chose about starts hidden.
@@ -96,8 +103,34 @@ export const ToolIndexTable = ({
   const allSelected = rows.length > 0 && rows.every((row) => selectedIds.has(row.id));
   const someSelected = rows.some((row) => selectedIds.has(row.id));
 
-  const tableColumns = useMemo<AppColumnDef<ToolIndexRow>[]>(
-    () => [
+  const tableColumns = useMemo<AppColumnDef<ToolIndexRow>[]>(() => {
+    const name: AppColumnDef<ToolIndexRow> = {
+      id: "name",
+      accessorKey: "name",
+      header: ({ column }) => <SortHeader column={column} label={t("name")} />,
+      cell: ({ row }) => (
+        <div className="flex min-w-[220px] items-center gap-2 sm:min-w-0">
+          <Link
+            to={gp(toolDetailRoute(tool, row.original.initiative_id, row.original.id))}
+            className="font-medium text-primary hover:underline"
+          >
+            {row.original.name}
+          </Link>
+          {unread.hasResource(communityId, tool, row.original.id) ? <UnreadDot /> : null}
+          <BookmarkButton
+            tool={tool}
+            entityId={row.original.id}
+            name={row.original.name}
+            initiativeId={row.original.initiative_id}
+            iconSize="sm"
+            className="-my-1.5"
+          />
+        </div>
+      ),
+      enableSorting: true,
+      enableHiding: false,
+    };
+    return [
       ...(active
         ? [
             {
@@ -125,75 +158,59 @@ export const ToolIndexTable = ({
             } satisfies AppColumnDef<ToolIndexRow>,
           ]
         : []),
-      {
-        id: "name",
-        accessorKey: "name",
-        header: ({ column }) => <SortHeader column={column} label={t("name")} />,
-        cell: ({ row }) => (
-          <div className="flex min-w-[220px] items-center gap-2 sm:min-w-0">
-            <Link
-              to={gp(toolDetailRoute(tool, row.original.initiative_id, row.original.id))}
-              className="font-medium text-primary hover:underline"
-            >
-              {row.original.name}
-            </Link>
-            {unread.hasResource(communityId, tool, row.original.id) ? <UnreadDot /> : null}
-            <BookmarkButton
-              tool={tool}
-              entityId={row.original.id}
-              name={row.original.name}
-              initiativeId={row.original.initiative_id}
-              iconSize="sm"
-              className="-my-1.5"
-            />
-          </div>
-        ),
-        enableSorting: true,
-        enableHiding: false,
-      },
-      {
-        id: "updated_at",
-        accessorKey: "updated_at",
-        header: ({ column }) => <SortHeader column={column} label={t("toolIndex.lastUpdated")} />,
-        cell: ({ row }) => (
-          <div className="min-w-[100px] sm:min-w-0">
-            <RelativeTime date={row.original.updated_at} className="text-muted-foreground" />
-          </div>
-        ),
-        enableSorting: true,
-      },
-      {
-        id: "tags",
-        header: t("toolIndex.tags"),
-        cell: ({ row }) =>
-          row.original.tags?.length ? (
-            <TagBadgeList tags={row.original.tags} tagHref={(tag) => gp(`/tags/${tag.id}`)} />
-          ) : (
-            <span className="text-muted-foreground text-sm">—</span>
-          ),
-        size: 150,
-        enableSorting: false,
-      },
-      ...buildPropertyColumns<ToolIndexRow>(definitions, (row) => row.properties),
-      ...columns,
-    ],
-    [
-      active,
-      selectedIds,
-      toggle,
-      setMany,
-      allSelected,
-      someSelected,
-      rows,
-      t,
-      gp,
-      tool,
-      unread,
-      communityId,
-      definitions,
-      columns,
-    ]
-  );
+      ...(laidOut
+        ? laidOut.map((column) =>
+            // The name cell is the shared one; the layout's header names it.
+            column.id === "name" ? { ...name, header: column.header ?? name.header } : column
+          )
+        : ([
+            name,
+            {
+              id: "updated_at",
+              accessorKey: "updated_at",
+              header: ({ column }) => (
+                <SortHeader column={column} label={t("toolIndex.lastUpdated")} />
+              ),
+              cell: ({ row }) => (
+                <div className="min-w-[100px] sm:min-w-0">
+                  <RelativeTime date={row.original.updated_at} className="text-muted-foreground" />
+                </div>
+              ),
+              enableSorting: true,
+            },
+            {
+              id: "tags",
+              header: t("toolIndex.tags"),
+              cell: ({ row }) =>
+                row.original.tags?.length ? (
+                  <TagBadgeList tags={row.original.tags} tagHref={(tag) => gp(`/tags/${tag.id}`)} />
+                ) : (
+                  <span className="text-muted-foreground text-sm">—</span>
+                ),
+              size: 150,
+              enableSorting: false,
+            },
+            ...buildPropertyColumns<ToolIndexRow>(definitions, (row) => row.properties),
+            ...columns,
+          ] satisfies AppColumnDef<ToolIndexRow>[])),
+    ];
+  }, [
+    active,
+    selectedIds,
+    toggle,
+    setMany,
+    allSelected,
+    someSelected,
+    rows,
+    t,
+    gp,
+    tool,
+    unread,
+    communityId,
+    definitions,
+    columns,
+    laidOut,
+  ]);
 
   return (
     <DataTable

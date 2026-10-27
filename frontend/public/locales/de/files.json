@@ -14,7 +14,8 @@
     "added": "Hinzugefügt",
     "community": "Community",
     "initiative": "Initiative",
-    "ownerFallback": "Benutzer {{id}}"
+    "ownerFallback": "Benutzer {{id}}",
+    "size": "Größe"
   },
   "create": {
     "title": "Neue Datei",
@@ -439,6 +440,15 @@
       "none": "Noch keine Felder",
       "heading": "In dieser Sammlung",
       "saveError": "Der Wert konnte nicht gespeichert werden"
+    },
+    "addedOn": "Hinzugefügt {{date}}",
+    "createdOn": "Erstellt {{date}}",
+    "editLayouts": "Bearbeiten, was die Listen zeigen",
+    "listHelp": {
+      "masonry": "Jede Datei in ihrer eigenen Form, in Spalten gepackt: was ihre Karte unter dem Bild zeigt.",
+      "grid": "Jede Datei als quadratische Kachel: was ihre Karte unter dem Bild zeigt.",
+      "timeline": "Dateien nach dem Tag, an dem sie hinzugefügt wurden: was jede Karte unter dem Bild zeigt.",
+      "table": "Die Dateien der Sammlung als Tabelle: welche Spalten, in welcher Reihenfolge."
     }
   }
 }

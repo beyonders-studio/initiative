@@ -14,7 +14,8 @@
     "added": "Ajouté",
     "community": "Communauté",
     "initiative": "Initiative",
-    "ownerFallback": "Utilisateur {{id}}"
+    "ownerFallback": "Utilisateur {{id}}",
+    "size": "Taille"
   },
   "create": {
     "title": "Nouveau fichier",
@@ -439,6 +440,15 @@
       "none": "Aucun champ pour l'instant",
       "heading": "Dans cette collection",
       "saveError": "Impossible d'enregistrer la valeur"
+    },
+    "addedOn": "Ajouté {{date}}",
+    "createdOn": "Créé {{date}}",
+    "editLayouts": "Modifier ce que montrent les listes",
+    "listHelp": {
+      "masonry": "Chaque fichier dans sa propre forme, rangé en colonnes : ce que sa carte montre sous l'image.",
+      "grid": "Chaque fichier en vignette carrée : ce que sa carte montre sous l'image.",
+      "timeline": "Les fichiers selon le jour où ils ont été ajoutés : ce que chaque carte montre sous l'image.",
+      "table": "Les fichiers de la collection en tableau : quelles colonnes, dans quel ordre."
     }
   }
 }

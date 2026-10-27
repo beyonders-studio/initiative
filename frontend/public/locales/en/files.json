@@ -14,7 +14,8 @@
     "added": "Added",
     "community": "Community",
     "initiative": "Initiative",
-    "ownerFallback": "User {{id}}"
+    "ownerFallback": "User {{id}}",
+    "size": "Size"
   },
   "create": {
     "title": "New file",
@@ -439,6 +440,15 @@
       "none": "No fields yet",
       "heading": "In this collection",
       "saveError": "Couldn't save the value"
+    },
+    "addedOn": "Added {{date}}",
+    "createdOn": "Created {{date}}",
+    "editLayouts": "Edit what the lists show",
+    "listHelp": {
+      "masonry": "Each file at its own shape, packed into columns: what its card shows under the picture.",
+      "grid": "Each file as a square tile: what its card shows under the picture.",
+      "timeline": "Files by the day they were added: what each card shows under the picture.",
+      "table": "The collection's files as a table: which columns, in what order."
     }
   }
 }

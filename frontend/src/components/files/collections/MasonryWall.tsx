@@ -5,6 +5,8 @@ export interface MasonryEntry {
   key: string | number;
   /** Width over height. What the wall lays out from — no measuring. */
   aspectRatio: number;
+  /** Pixels it takes below its picture, for its card. */
+  below?: number;
   render: () => ReactNode;
 }
 
@@ -75,7 +77,7 @@ export const MasonryWall = ({
       for (let index = 1; index < columns; index += 1) {
         if (heights[index] < heights[column]) column = index;
       }
-      const entryHeight = columnWidth / entry.aspectRatio;
+      const entryHeight = columnWidth / entry.aspectRatio + (entry.below ?? 0);
       const placement = {
         entry,
         left: column * (columnWidth + gap),

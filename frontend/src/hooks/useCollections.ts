@@ -13,6 +13,7 @@ import {
   listCollections,
   readCollection,
   removeCollectionFiles,
+  setCollectionFileFields,
   updateCollection,
   uploadFile,
 } from "@/api/generated/files/files";
@@ -25,11 +26,14 @@ import type {
   FileRead,
   GetCollectionFilesTimelineParams,
   ListCollectionFilesParams,
+  PropertySummary,
   TimelineResponse,
 } from "@/api/generated/initiativeAPI.schemas";
+import { PropertyTarget } from "@/api/generated/initiativeAPI.schemas";
 import { invalidate, q } from "@/api/query-keys";
 import { useActiveCommunityId } from "@/hooks/useActiveCommunityId";
 import { useCommunityMutation } from "@/hooks/useApiMutation";
+import { type FieldSaveKind, heldKey } from "@/hooks/useFieldSave";
 import { nameWithoutExtension } from "@/lib/fileUtils";
 import type { MutationOpts } from "@/types/mutation";
 import type { QueryOpts } from "@/types/query";
@@ -112,6 +116,32 @@ export const useCollectionFilesTimeline = (
     enabled: collectionId !== null && Number.isFinite(collectionId) && enabled,
     ...rest,
   });
+};
+
+const fieldSaves = new Map<number, FieldSaveKind<{ properties: PropertySummary[] }, never>>();
+
+/**
+ * How a file's values of a collection's fields are saved, one at a time:
+ * they are the collection's, so whoever may change it sets them, and its
+ * lists show them.
+ */
+export const collectionFieldSaves = (collectionId: number) => {
+  let kind = fieldSaves.get(collectionId);
+  if (!kind) {
+    const name = `collection-fields-${collectionId}`;
+    kind = {
+      name,
+      readKey: (communityId, id) => heldKey(name, communityId, id),
+      patch: () => Promise.reject(new Error("a file's collection fields take no patch")),
+      properties: PropertyTarget.file,
+      setProperties: (communityId, fileId, body) =>
+        setCollectionFileFields(communityId, collectionId, fileId, body),
+      lists: () => q.allCollections(),
+      itself: () => ({}),
+    };
+    fieldSaves.set(collectionId, kind);
+  }
+  return kind;
 };
 
 /** Make a collection of the files named: a collection never starts empty. */
