@@ -1,4 +1,4 @@
-"""Migration 20261026_0540 gives catalog items a description and a date.
+"""Migration 20261026_0542 gives catalog items a description and a date.
 
 Loaded by path and run on a guild the test builds: down to the caption an
 older release wrote, rows written that way, then up, down and up again, the
@@ -33,7 +33,7 @@ _PATH = (
     Path(__file__).resolve().parents[2]
     / "alembic"
     / "versions"
-    / "20261026_0540_catalog_items_have_a_description_and_a_date.py"
+    / "20261026_0542_catalog_items_have_a_description_and_a_date.py"
 )
 
 # Only a statement that reads catalog items moves; a string value and a

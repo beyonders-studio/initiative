@@ -21,8 +21,8 @@ that read ``catalog_items``, say ``description`` where they said ``caption``.
 
 The downgrade reverses each rewrite and drops the dates.
 
-Revision ID: 20261026_0540
-Revises: 20261026_0539
+Revision ID: 20261026_0542
+Revises: 20261026_0541
 Create Date: 2026-10-26
 """
 
@@ -39,8 +39,8 @@ from sqlalchemy.engine import Connection
 
 from app.db.guild_migrations import run_for_each_guild_schema
 
-revision = "20261026_0540"
-down_revision = "20261026_0539"
+revision = "20261026_0542"
+down_revision = "20261026_0541"
 branch_labels = None
 depends_on = None
 
