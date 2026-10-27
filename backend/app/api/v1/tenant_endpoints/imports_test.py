@@ -4943,7 +4943,7 @@ async def test_a_jira_import_brings_its_images_as_uploads(
     from app.services.tenant import relationships as relationships_service
     from app.services.tenant.relationships import Endpoint
 
-    png = b"\x89PNG\r\n\x1a\nfake-image"
+    png = _PNG
     pdf = b"%PDF-spec"
     issue = _jira_issue("ACME-1", "Fit the frame")
     issue["fields"]["attachment"] = [
@@ -5020,7 +5020,7 @@ async def test_a_jira_file_stays_behind_when_the_initiative_has_no_files(
     whole import down with it."""
     from app.services.import_engine import atlassian as atlassian_service
 
-    png = b"\x89PNG\r\n\x1a\nfake-image"
+    png = _PNG
     issue = _jira_issue("ACME-1", "Fit the frame")
     issue["fields"]["attachment"] = [
         {
@@ -5647,7 +5647,13 @@ async def test_a_confluence_space_becomes_a_wiki_with_its_tree_and_its_people(
     assert by_type["mention"]["mentionUserId"] == b.user.id
 
 
-_PNG, _PDF = b"\x89PNG\r\n\x1a\nchart", b"%PDF-spec"
+_PNG = (
+    b"\x89PNG\r\n\x1a\n\x00\x00\x00\rIHDR\x00\x00\x00\x01"
+    b"\x00\x00\x00\x01\x08\x02\x00\x00\x00\x90wS\xde\x00\x00\x00\x0cIDA"
+    b"Tx\xdac\xf8\xcf\xc0\x00\x00\x03\x01\x01\x00\xf7\x03AC\x00\x00\x00"
+    b"\x00IEND\xaeB`\x82"
+)
+_PDF = b"%PDF-spec"
 
 
 def _attachment_site():
