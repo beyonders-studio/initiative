@@ -1,7 +1,8 @@
 /**
  * A target's layouts in settings: its views and its pages apart, and each view
- * shown in its layout menu or hidden from here, one always staying shown, and
- * each task type deleted with its page, one always staying.
+ * shown in its layout menu or hidden from here, one always staying shown, a
+ * shown one made the one it opens on, and each task type deleted with its
+ * page, one always staying.
  */
 import { screen, waitFor, within } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
@@ -88,6 +89,35 @@ describe("LayoutList", () => {
     mount();
 
     expect(await screen.findByRole("button", { name: "Delete the Task task type" })).toBeDisabled();
+  });
+
+  it("makes a shown view the one a collection opens on", async () => {
+    let opensOn: unknown = null;
+    server.use(
+      communityHttp.put("/layouts/default", async ({ request }) => {
+        opensOn = {
+          tool: new URL(request.url).searchParams.get("tool"),
+          ...((await request.json()) as object),
+        };
+        return HttpResponse.json(buildToolLayoutSet({ tool: "collection" }));
+      })
+    );
+    const user = userEvent.setup();
+    renderPage(
+      () => (
+        <LayoutList
+          layouts={buildToolLayoutSet({ tool: "collection", hidden: ["timeline"] }).layouts}
+          target={instanceTarget("collection", 5)}
+        />
+      ),
+      { initialRoute: "/c/1" }
+    );
+
+    // It opens on the masonry, and a hidden list cannot be what it opens on.
+    expect(await screen.findByRole("img", { name: "Opens first" })).toBeInTheDocument();
+    expect(screen.queryByRole("button", { name: /Timeline first/ })).not.toBeInTheDocument();
+    await user.click(screen.getByRole("button", { name: "Open on Grid first" }));
+    await waitFor(() => expect(opensOn).toEqual({ tool: "collection", kind: "grid" }));
   });
 
   it("only reads, saying which views are hidden, without a target", async () => {

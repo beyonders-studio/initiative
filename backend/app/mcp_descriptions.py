@@ -288,19 +288,21 @@ TOOL_DESCRIPTIONS: dict[str, str] = {
         "The months a board has notices in, newest first, with how many in "
         "each. Takes the same filters as `list_posts`."
     ),
-    # --- Libraries ----------------------------------------------------------
-    "update_library": (
-        "Change a library's name or description, or choose its cover (`cover_item_id`)."
+    # --- Collections --------------------------------------------------------
+    "list_collections": (
+        "The collections in an initiative's Files that the caller can see, "
+        "each with how many of its files they can open."
     ),
-    "list_library_items": (
-        "One page of a library's pictures, newest first (`oldest_first` to "
-        "reverse). Narrow with `search` or `tag_ids`."
+    "read_collection": "Read one collection of files by id.",
+    "list_collection_files": (
+        "The files in one collection the caller can open. Takes the same "
+        "filters as `list_files`."
     ),
-    "get_library_item_timeline": (
-        "The months a library has pictures in, newest first, with how many in each."
+    "get_collection_files_timeline": (
+        "The months files joined one collection, newest first, with how many "
+        "the caller can open in each. Takes the same filters as "
+        "`list_collection_files`."
     ),
-    "read_library_item": "Read one picture in a library by id.",
-    "list_library_item_versions": "Every stored rendition of a picture, newest first.",
     # --- Wikis --------------------------------------------------------------
     "update_wiki": (
         "Change a wiki: its name and description, its home page, page order "

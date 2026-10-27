@@ -24,7 +24,6 @@ from app.services.tenant import task_types as task_types_service
 from app.services.tenant import tool_layouts as tool_layouts_service
 from app.testing import (
     create_counter_group,
-    create_library,
     create_project,
     create_queue,
     create_resource_grant,
@@ -458,7 +457,6 @@ async def test_tools_lay_out_their_items(
     """Each its own item detail, listed among the initiative's layouts."""
     a = await acting_user(guild_role=CommunityRole.admin, initiative=True)
     queue = await create_queue(session, a.initiative, a.user, name="Turns")
-    library = await create_library(session, a.initiative, a.user, name="Wall")
     group = await create_counter_group(session, a.initiative, a.user, name="Tally")
     detail = _detail(
         "queue_item",
@@ -480,13 +478,6 @@ async def test_tools_lay_out_their_items(
         headers=a.headers,
     )
 
-    pictures = await client.put(
-        a.g("/layouts/"),
-        params={"tool": "library", "tool_id": library.id},
-        json=_detail("library_item", {"type": "picture"}, _field("description")),
-        headers=a.headers,
-    )
-
     assert saved.status_code == 200, saved.text
     assert [layout["kind"] for layout in saved.json()["layouts"]] == ["queue_item"]
     counters = await client.put(
@@ -497,11 +488,8 @@ async def test_tools_lay_out_their_items(
     )
     assert counters.status_code == 200, counters.text
     assert [layout["kind"] for layout in counters.json()["layouts"]] == ["counter"]
-    assert pictures.status_code == 200, pictures.text
-    assert [layout["kind"] for layout in pictures.json()["layouts"]] == ["library_item"]
     assert sorted((each["tool"], each["name"]) for each in listed.json()) == [
         ("counter_group", "Tally"),
-        ("library", "Wall"),
         ("queue", "Turns"),
     ]
 
@@ -641,7 +629,7 @@ def _task(*side: dict[str, Any]) -> dict[str, Any]:
         ),
         (_task({"type": "field", "props": {"field": "startDate"}}), 422, None),
         (_task({"type": "card"}), 422, None),
-        ({"kind": "library", "definition": {}}, 422, None),
+        ({"kind": "wiki", "definition": {}}, 422, None),
         (_table(columns=["plugin:x:ci"]), 422, None),
         (_card({"type": "plugin", "props": {"plugin": 3}}), 422, None),
         (

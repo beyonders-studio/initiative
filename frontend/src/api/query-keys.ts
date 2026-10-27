@@ -471,18 +471,15 @@ const calendarEvent = (eventId: number): Spec => ({
   communityExact: [`/api/v1/calendar-events/${eventId}`],
 });
 
-/** A library's items — its list and each item's own read — without the
- *  library row itself. An item is read by its own id (`/library-items/{id}`),
- *  which names no library, so every item read goes too. */
-const libraryItems = (libraryId: number): Spec => ({
-  communityPrefix: [`/api/v1/libraries/${libraryId}/items`, "/api/v1/library-items"],
-});
+/** Files' collections: every list of them and each one's own read and files.
+ *  What is in one shows on its card (a count, a cover) and in its list. */
+const allCollections = (): Spec => ({ communityPrefix: ["/api/v1/collections"] });
 
-/** One item's own read and every read under its address — its history. The
- *  trailing slash keeps item 1 from reaching item 10. */
-const libraryItem = (itemId: number): Spec => ({
-  communityExact: [`/api/v1/library-items/${itemId}`],
-  communityPrefix: [`/api/v1/library-items/${itemId}/`],
+/** One collection's own read and its files. The trailing slash keeps
+ *  collection 1 from reaching collection 10. */
+const collection = (id: number): Spec => ({
+  communityExact: [`/api/v1/collections/${id}`],
+  communityPrefix: [`/api/v1/collections/${id}/`],
 });
 
 const counter = (counterId: number): Spec => ({
@@ -575,12 +572,11 @@ const toolLists = (which: Tool): Spec => {
     communityPrefix: [`/api/v1/tools/${which}/counts`],
   });
   if (which === Tool.calendar) return compose(lists, allCalendarEvents());
-  // An initiative's list of layouts names its projects, queues, libraries and
-  // counter groups,
-  // by name. The entries carry projects by their dates and posts by their
+  // An initiative's list of layouts names its projects, queues and counter
+  // groups, by name. The entries carry projects by their dates and posts by their
   // polls' closing.
   if (which === Tool.project) return compose(lists, initiativeLayouts(), allCalendarEntries());
-  if (which === Tool.queue || which === Tool.library || which === Tool.counter_group) {
+  if (which === Tool.queue || which === Tool.counter_group) {
     return compose(lists, initiativeLayouts());
   }
   if (which === Tool.post) return compose(lists, allCalendarEntries());
@@ -597,8 +593,8 @@ const toolEntity = (which: Tool, id: number): Spec => ({
 });
 
 /**
- * One tool entity's own read and every read under its address — a library's
- * pictures, a wiki's pages, a project's activity and statuses. What a change
+ * One tool entity's own read and every read under its address — a wiki's
+ * pages, a project's activity and statuses. What a change
  * inside it makes stale. The trailing slash keeps project 1 from reaching
  * project 10.
  */
@@ -613,8 +609,10 @@ const tool = (which: Tool, id: number): Spec => compose(toolEntity(which, id), t
 // The same two, by name, for the call sites that already know their tool.
 const allProjects = (): Spec => toolList(Tool.project);
 const project = (id: number): Spec => toolEntity(Tool.project, id);
-const allFiles = (): Spec => toolList(Tool.file);
-const file = (id: number): Spec => toolEntity(Tool.file, id);
+// A file shows in the collections it is in (their rows, covers and counts),
+// so a change to one refreshes them too.
+const allFiles = (): Spec => compose(toolList(Tool.file), allCollections());
+const file = (id: number): Spec => compose(toolEntity(Tool.file, id), allCollections());
 const allQueues = (): Spec => toolList(Tool.queue);
 const allCounterGroups = (): Spec => toolList(Tool.counter_group);
 const counterGroup = (id: number): Spec => toolEntity(Tool.counter_group, id);
@@ -624,8 +622,6 @@ const allDashboards = (): Spec => toolList(Tool.dashboard);
 const dashboard = (id: number): Spec => toolEntity(Tool.dashboard, id);
 const allPosts = (): Spec => toolList(Tool.post);
 const post = (id: number): Spec => toolEntity(Tool.post, id);
-const allLibraries = (): Spec => toolList(Tool.library);
-const library = (id: number): Spec => toolEntity(Tool.library, id);
 const allWikis = (): Spec => toolList(Tool.wiki);
 const wiki = (id: number): Spec => toolEntity(Tool.wiki, id);
 
@@ -654,7 +650,14 @@ const allPropertyHolders = (): Spec =>
 // name its rows one by one says so instead, and this is the answer.
 
 const communityContent = (): Spec =>
-  compose(allInitiatives(), ...TOOLS.map(toolList), allTasks(), allComments(), allReferences());
+  compose(
+    allInitiatives(),
+    ...TOOLS.map(toolList),
+    allCollections(),
+    allTasks(),
+    allComments(),
+    allReferences()
+  );
 
 /** Every description, by name. The only export a call site needs beside `invalidate`. */
 export const q = {
@@ -666,7 +669,7 @@ export const q = {
   allCounterGroups,
   allDashboards,
   allFiles,
-  allLibraries,
+  allCollections,
   allCommunities,
   allInitiatives,
   allPosts,
@@ -692,8 +695,6 @@ export const q = {
   calendarEvent,
   queueItem,
   counter,
-  libraryItem,
-  libraryItems,
   communitySettings,
   notificationSettings,
   platformAuthSettings,
@@ -730,7 +731,7 @@ export const q = {
   platformAIConnections,
   platformAIMode,
   platformCommunities,
-  library,
+  collection,
   post,
   postTimeline,
   project,

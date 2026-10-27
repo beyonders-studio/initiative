@@ -40,17 +40,6 @@ import {
   updateCalendar,
 } from "@/api/generated/calendars/calendars";
 import {
-  createLibrary,
-  deleteLibrary,
-  duplicateLibrary,
-  getListLibrariesQueryKey,
-  getReadLibraryQueryKey,
-  listLibraries,
-  readLibrary,
-  setLibraryGrants,
-  updateLibrary,
-} from "@/api/generated/libraries/libraries";
-import {
   createCounterGroup,
   deleteCounterGroup,
   duplicateCounterGroup,
@@ -91,7 +80,6 @@ import type {
 import { Tool } from "@/api/generated/initiativeAPI.schemas";
 import {
   getListMyCalendarsQueryKey,
-  getListMyLibrariesQueryKey,
   getListMyCounterGroupsQueryKey,
   getListMyDashboardsQueryKey,
   getListMyFilesQueryKey,
@@ -100,7 +88,6 @@ import {
   getListMyQueuesQueryKey,
   getListMyWikisQueryKey,
   listMyCalendars,
-  listMyLibraries,
   listMyCounterGroups,
   listMyDashboards,
   listMyFiles,
@@ -542,21 +529,6 @@ const fileHooks = {
   useSetGrants: grantsHook(fileEndpoints, "files:settings.updateAccessError"),
 };
 
-const libraryEndpoints = {
-  listKey: getListLibrariesQueryKey,
-  list: listLibraries,
-  myListKey: getListMyLibrariesQueryKey,
-  myList: listMyLibraries,
-  detailKey: getReadLibraryQueryKey,
-  detail: readLibrary,
-  create: createLibrary,
-  update: updateLibrary,
-  remove: deleteLibrary,
-  setGrants: setLibraryGrants,
-  duplicate: duplicateLibrary,
-  tool: Tool.library,
-};
-
 const postEndpoints = {
   listKey: getListPostsQueryKey,
   list: listPosts,
@@ -670,7 +642,6 @@ export const TOOL_HOOKS = {
     seedsDetailOnUpdate: true,
     refreshesRelationships: true,
   }),
-  [Tool.library]: makeToolHooks(libraryEndpoints, { seedsDetailOnUpdate: true }),
   [Tool.wiki]: makeToolHooks(wikiEndpoints),
 } satisfies Record<Tool, ToolQueries>;
 

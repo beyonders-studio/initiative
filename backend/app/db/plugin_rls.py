@@ -98,6 +98,9 @@ _SIDE_EFFECTS: frozenset[str] = frozenset(
 #: The tables no tool governs that a plug-in reaches, by name.
 _NAMED: dict[str, PluginTableAccess] = {
     "comments": _scoped("comments"),
+    # Part of Files, with no sharing of their own.
+    "collections": _scoped("files"),
+    "collection_files": _scoped("files"),
     "relationships": _scoped("relationships"),
     "tags": _scoped("tags"),
     "initiatives": _scoped("initiatives"),

@@ -274,6 +274,13 @@ _TOOL_READ_EXCLUSIONS = [
 ]
 
 _ROUTE_MAPS = [
+    # A collection's own writes are not on the write surface, and adding files
+    # to one would otherwise read as creating a file.
+    RouteMap(
+        methods=["POST", "PATCH", "DELETE"],
+        pattern=r".*/collections/.*",
+        mcp_type=MCPType.EXCLUDE,
+    ),
     *_WRITE_ROUTE_MAPS,
     *_COMMENT_READ_ROUTE_MAPS,
     *_SEARCH_READ_ROUTE_MAPS,

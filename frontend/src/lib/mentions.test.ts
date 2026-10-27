@@ -27,12 +27,6 @@ describe("what can be mentioned", () => {
     }
   });
 
-  it("still reads the shorthand already sitting in stored comments", () => {
-    expect(typeForTrigger("doc")).toBe(SearchEntityType.file);
-    // `#document[..](N)`: the kind's spelling before files were called files.
-    expect(typeForTrigger("document")).toBe(SearchEntityType.file);
-  });
-
   // A name is what a mention points at, so it does not also spell one. The
   // backend holds names to the same two characters; this is this side of it.
   it("keeps the two triggers out of a typed name", () => {

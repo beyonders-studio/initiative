@@ -124,12 +124,6 @@ class Comment(HoldMixin, CreatedByMixin, SoftDeleteMixin, table=True):
             Integer, ForeignKey("posts.id", ondelete="CASCADE"), nullable=True
         ),
     )
-    library_id: Optional[int] = Field(
-        default=None,
-        sa_column=Column(
-            Integer, ForeignKey("libraries.id", ondelete="CASCADE"), nullable=True
-        ),
-    )
     wiki_id: Optional[int] = Field(
         default=None,
         sa_column=Column(
@@ -143,6 +137,12 @@ class Comment(HoldMixin, CreatedByMixin, SoftDeleteMixin, table=True):
         default=None,
         sa_column=Column(
             Integer, ForeignKey("wiki_pages.id", ondelete="CASCADE"), nullable=True
+        ),
+    )
+    collection_id: Optional[int] = Field(
+        default=None,
+        sa_column=Column(
+            Integer, ForeignKey("collections.id", ondelete="CASCADE"), nullable=True
         ),
     )
     #: Who said this where it came from, when an import could not match them

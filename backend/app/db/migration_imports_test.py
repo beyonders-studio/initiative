@@ -40,7 +40,11 @@ _VERSIONS = Path(__file__).resolve().parents[2] / "alembic" / "versions"
 #: the current app reads it, as with encryption. ``app.core.recurrence`` is the
 #: converter for RFC 5545 repeats: a migration that writes one must write what
 #: the current app reads, and the standard it implements does not move. The
-#: revision states the shape it converts from itself.
+#: revision states the shape it converts from itself. ``app.core.legacy_references``
+#: is the same case for links in a body: it states the spellings older builds
+#: wrote and writes them as the current app reads them. ``app.services.editor_engine``
+#: is the editor itself: a body's Yjs state is only read and written through it,
+#: and a migration that changes one must leave what the current editor reads.
 _ALLOWED = frozenset(
     {
         "app.db.guild_migrations",
@@ -49,6 +53,8 @@ _ALLOWED = frozenset(
         "app.db.authorization",
         "app.services.storage",
         "app.core.recurrence",
+        "app.core.legacy_references",
+        "app.services.editor_engine",
     }
 )
 

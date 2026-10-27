@@ -21,7 +21,8 @@ def test_a_large_picture_is_drawn_to_the_edge(tmp_path):
 
     thumbnail = Image.open(io.BytesIO(base64.b64decode(reply["thumbnail"])))
     assert thumbnail.format == "WEBP"
-    assert thumbnail.size == (640, 320) == (reply["width"], reply["height"])
+    assert thumbnail.size == (640, 320)
+    assert (reply["width"], reply["height"]) == (1600, 800)
 
 
 def test_a_transparent_palette_picture_stays_transparent(tmp_path):
@@ -40,7 +41,7 @@ def test_a_transparent_palette_picture_stays_transparent(tmp_path):
 def test_a_small_picture_is_its_own_thumbnail(tmp_path):
     reply = answer({"path": _picture(tmp_path, (300, 200)), "format": "PNG"}, 640)
 
-    assert reply == {"original": True}
+    assert reply == {"original": True, "width": 300, "height": 200}
 
 
 def test_a_picture_opens_only_as_its_own_format(tmp_path):

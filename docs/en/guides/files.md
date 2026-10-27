@@ -194,6 +194,28 @@ An upload keeps a **version history**. **Upload new version** and the older ones
 
 The file's owner can delete a version, for good. Delete the newest and the one before it becomes the file again. The last one left always stays.
 
+## Collections
+
+A **collection** is a handful of files that belong together. The fete photos. The logo, and the four other logos that lost. Everything the new treasurer needs, which is somehow eleven files and one of them is a spreadsheet called `REAL one`.
+
+Select files in the list, then **Add to collection** in **More actions**, and name a new one or pick one you already have. A file can sit in as many collections as it suits. It stays in Files the whole time, so nothing goes missing because somebody filed it somewhere clever.
+
+On a collection's page, drop files anywhere to upload them straight in, or **Add files** to bring in ones that are already here.
+
+| View | What it's for |
+|---|---|
+| **Grid** | Tiles, as many across as fit. Where a new collection opens. |
+| **Table** | One row per file, for sorting. |
+| **Masonry** | Every picture at its own shape, packed into columns. For *looking*. |
+| **Timeline** | A row per day, by when each file joined, with a rail for jumping months. |
+
+**Layouts** in the collection's menu picks which views it offers and the one it opens on.
+
+!!! tip "A collection doesn't change who sees a file"
+    Each file keeps its own sharing. Somebody opening a collection sees the files in it they could already open, and nothing else. If they can't open any of them, the collection doesn't show up for them at all.
+
+Anyone whose role can create files can rename a collection, tag it, and add or take out files. A collection has comments, tags and links like everything else. Take its last file out and it goes to the trash by itself; bring one of those files back and the collection comes with it.
+
 ## Attaching files to a project
 
 A file can be **attached** to a project so the relevant reference sits right next to the work. Add it from the project's **Connections** section, where it sits under **Attached** — or drop something from your computer there and it becomes a new file, already attached. See [Mentions & links](mentions-and-links.md#connections).

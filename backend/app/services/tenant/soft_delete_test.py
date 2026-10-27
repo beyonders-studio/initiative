@@ -522,11 +522,11 @@ async def test_purging_a_uploaded_file_takes_every_version(session: AsyncSession
 
 
 # ---------------------------------------------------------------------------
-# Wikilink unresolution at hard purge
+# Unlinking references at hard purge
 # ---------------------------------------------------------------------------
 
 
-def _wikilink_content(target_file_id: int) -> dict:
+def _linking_content(target_file_id: int) -> dict:
     return {
         "root": {
             "type": "root",
@@ -535,9 +535,10 @@ def _wikilink_content(target_file_id: int) -> dict:
                     "type": "paragraph",
                     "children": [
                         {
-                            "type": "wikilink",
-                            "documentId": target_file_id,
-                            "children": [],
+                            "type": "entity-mention",
+                            "entityType": "file",
+                            "entityId": target_file_id,
+                            "text": "Target",
                         }
                     ],
                 }
@@ -546,13 +547,18 @@ def _wikilink_content(target_file_id: int) -> dict:
     }
 
 
-async def test_hard_purge_unresolves_wikilinks_in_linking_files(
+def _unlinked(content: dict) -> bool:
+    node = content["root"]["children"][0]["children"][0]
+    return node["type"] == "text" and node["text"] == "Target"
+
+
+async def test_hard_purge_unlinks_references_in_linking_files(
     session: AsyncSession,
 ):
-    """Purging a file rewrites links pointing at it in surviving files
-    (documentId -> null) and takes the edges with it, so nothing dangles after
-    the row is gone. A Yjs state the editor cannot read is cleared, and the
-    next session makes it from the repaired content."""
+    """Purging a file makes references to it in surviving files their words
+    and takes the edges with it, so nothing dangles after the row is gone. A
+    Yjs state the editor cannot read is cleared, and the next session makes it
+    from the repaired content."""
     from sqlmodel import select
 
     from app.core.relationships import RelationshipType, node_id
@@ -572,7 +578,7 @@ async def test_hard_purge_unresolves_wikilinks_in_linking_files(
         initiative,
         user,
         name="Linking",
-        content=_wikilink_content(target.id),
+        content=_linking_content(target.id),
         yjs_state=b"stale-collab-state",
     )
     await content_references.sync_for_entity(
@@ -598,9 +604,7 @@ async def test_hard_purge_unresolves_wikilinks_in_linking_files(
             .options(undefer(File.content), undefer(File.yjs_state))
         )
     ).one()
-    wikilink_node = refreshed.content["root"]["children"][0]["children"][0]
-    assert wikilink_node["type"] == "wikilink"
-    assert wikilink_node["documentId"] is None
+    assert _unlinked(refreshed.content)
     assert refreshed.yjs_state is None
 
     edges = (
@@ -616,10 +620,10 @@ async def test_hard_purge_unresolves_wikilinks_in_linking_files(
     assert edges == []
 
 
-async def test_hard_purge_unresolves_wikilinks_in_trashed_linking_files(
+async def test_hard_purge_unlinks_references_in_trashed_linking_files(
     session: AsyncSession,
 ):
-    """A linking file sitting in the trash gets its links unresolved too —
+    """A linking file sitting in the trash gets its references unlinked too —
     restoring it after the purge must not bring back a dangling link."""
     from app.core.search import SearchEntityType
     from app.services.tenant import content_references
@@ -636,7 +640,7 @@ async def test_hard_purge_unresolves_wikilinks_in_trashed_linking_files(
         initiative,
         user,
         name="Trashed Linking",
-        content=_wikilink_content(target.id),
+        content=_linking_content(target.id),
     )
     await content_references.sync_for_entity(
         session,
@@ -665,8 +669,7 @@ async def test_hard_purge_unresolves_wikilinks_in_trashed_linking_files(
             .options(undefer(File.content))
         )
     ).one()
-    wikilink_node = refreshed.content["root"]["children"][0]["children"][0]
-    assert wikilink_node["documentId"] is None
+    assert _unlinked(refreshed.content)
 
 
 # ---------------------------------------------------------------------------
@@ -883,7 +886,7 @@ async def _file(
     from app.models.tenant.calendar_event import CalendarEvent
     from app.models.tenant.comment import Comment
     from app.models.tenant.counter import Counter
-    from app.models.tenant.library import LibraryItem
+    from app.models.tenant.collection import Collection
     from app.models.tenant.queue import QueueItem
     from app.models.tenant.wiki import Wiki, WikiPage
     from app.testing.factories import (
@@ -891,7 +894,7 @@ async def _file(
         create_calendar_event,
         create_comment,
         create_counter,
-        create_library_item,
+        create_collection,
         create_queue_item,
         create_task,
         create_wiki_page,
@@ -918,8 +921,8 @@ async def _file(
                 **{fk: parent.id, "original_start": parent.start_at},
             )
         return await create_calendar_event(session, parent, user)
-    if model is LibraryItem:
-        return await create_library_item(session, parent, user)
+    if model is Collection:
+        return await create_collection(session, parent, user)
     if model is WikiPage:
         if fk == "wiki_id":
             return await create_wiki_page(session, parent, user)

@@ -21,6 +21,7 @@ from app.testing.factories import (
     create_task,
     create_tool_entity,
     create_user,
+    create_collection,
     create_wiki_page,
     enable_all_tools,
     get_auth_headers,
@@ -368,6 +369,9 @@ async def test_the_bell_reads_the_title_back_from_the_community(
     subjects["task"] = task
     subjects["wiki_page"] = await create_wiki_page(
         session, subjects[Tool.wiki.value], actor.user
+    )
+    subjects["collection"] = await create_collection(
+        session, actor.initiative, actor.user, files=[subjects[Tool.file.value]]
     )
     assert set(subjects) == set(COMMENT_TARGETS)
     for kind, entity in subjects.items():

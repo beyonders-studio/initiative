@@ -39,7 +39,6 @@ from app.models.tenant._mixins import (
 from app.models.tenant.calendar import Calendar
 from app.models.tenant.calendar_event import CalendarEvent, CalendarEventAttendee
 from app.models.tenant.counter import Counter
-from app.models.tenant.library import Library, LibraryItem
 from app.models.tenant.post import Post
 from app.models.tenant.post_poll import PostPoll, PostPollOption
 from app.models.tenant.project import Project
@@ -52,7 +51,6 @@ from app.services import notifications as notifications_service
 from app.services.tenant import attachments as attachments_service
 from app.services.tenant import calendar_occurrences as occurrences_service
 from app.services.tenant import files as files_service
-from app.services.tenant import file_versions
 from app.services.tenant import named_people, project_grants
 from app.services.tenant import properties as properties_service
 from app.services.tenant import content_references, relationships
@@ -377,37 +375,6 @@ def _rows_inside(model: type, *carried: str) -> Contents:
     return contents
 
 
-async def _library_contents(
-    session: AsyncSession, source: Library, copy: Library, actor: ActorContext
-) -> list[Any]:
-    images = (
-        await session.exec(
-            select(LibraryItem).where(LibraryItem.library_id == source.id)
-        )
-    ).all()
-    # Each picture starts again at version 1, authored by whoever copied it; a
-    # plug-in is never an author, so its copy keeps the picture's uploader.
-    pairs = await _copy_children(
-        session,
-        images,
-        beside=_beside(source, copy),
-        values=lambda image: {
-            "library_id": copy.id,
-            "created_by": actor.user_id or image.created_by,
-        },
-    )
-    versions = [
-        file_versions.copy_version(
-            session, image.current_version, clone, created_by=clone.created_by
-        )
-        for image, clone in pairs
-        if image.current_version is not None
-    ]
-    copy.cover_item_id = {s.id: c.id for s, c in pairs}.get(source.cover_item_id)
-    # The versions name the files, so they are what is claimed for the copy.
-    return [*(clone for _, clone in pairs), *versions]
-
-
 async def _post_contents(
     session: AsyncSession, source: Post, copy: Post, actor: ActorContext
 ) -> list[Any]:
@@ -653,9 +620,6 @@ TOOL_COPIERS: dict[Tool, ToolCopier] = {
         contents=_rows_inside(QueueItem, "user_id"),
         # A copy starts its rotation from the top.
         reset={"is_active": False, "current_round": 1},
-    ),
-    Tool.library: ToolCopier(
-        copies=frozenset({LibraryItem}), contents=_library_contents
     ),
     Tool.dashboard: ToolCopier(),
     Tool.calendar: ToolCopier(

@@ -17,7 +17,7 @@ from app.models.tenant.calendar import Calendar
 from app.models.tenant.counter import Counter, CounterGroup
 from app.models.tenant.dashboard import Dashboard
 from app.models.tenant.file import File, FileVersion
-from app.models.tenant.library import Library, LibraryItem, LibraryItemVersion
+from app.models.tenant.collection import Collection
 from app.models.tenant.post import Post
 from app.models.tenant.queue import Queue, QueueItem
 from app.models.tenant.wiki import Wiki, WikiPage
@@ -132,8 +132,15 @@ def build_posts() -> Dataset:
     )
 
 
-def build_libraries() -> Dataset:
-    return Dataset(model=Library, tool=Tool.library, fields=derive_fields(Library))
+def build_collections() -> Dataset:
+    """A collection in Files, read as its reader sees it: one holding a file
+    they can open."""
+    return Dataset(
+        model=Collection,
+        tool=Tool.file,
+        name_override="collections",
+        fields=derive_fields(Collection),
+    )
 
 
 def build_wikis() -> Dataset:
@@ -141,10 +148,10 @@ def build_wikis() -> Dataset:
 
 
 def build_wiki_pages() -> Dataset:
-    """One page of a wiki. Its own dataset for the reason queue items and
-    library pictures have one: what somebody asks about a wiki — how many
-    pages are still drafts, what has not been touched since spring — is a
-    question about the pages, and the wiki is what they are grouped by.
+    """One page of a wiki. Its own dataset for the reason queue items have
+    one: what somebody asks about a wiki — how many pages are still drafts,
+    what has not been touched since spring — is a question about the pages,
+    and the wiki is what they are grouped by.
 
     A page's body and the Yjs state beside it are dropped: one is a structured
     blob and the other is a room's working copy of it, and neither is a value a
@@ -164,44 +171,4 @@ def build_wiki_pages() -> Dataset:
                 hops=(Hop(dataset="wikis", left="wiki_id", right="id"),),
             ),
         ),
-    )
-
-
-def build_library_items() -> Dataset:
-    """One picture in a library. Its own dataset for the reason queue items
-    have one: the question worth asking — how many arrived this month, which
-    are still untitled — is about the pictures, and the library is what they
-    are grouped by."""
-    return Dataset(
-        model=LibraryItem,
-        tool=Tool.library,
-        name_override="library_items",
-        fields=derive_fields(LibraryItem),
-        relations=(
-            Relation(
-                name="library",
-                hops=(Hop(dataset="libraries", left="library_id", right="id"),),
-            ),
-            Relation(
-                name="current_version",
-                hops=(
-                    Hop(
-                        dataset="library_item_versions",
-                        left="current_version_id",
-                        right="id",
-                    ),
-                ),
-            ),
-        ),
-    )
-
-
-def build_library_item_versions() -> Dataset:
-    """One uploaded rendition of a picture: its type, size and dimensions. A
-    picture reaches the one it shows as ``current_version``."""
-    return Dataset(
-        model=LibraryItemVersion,
-        tool=Tool.library,
-        name_override="library_item_versions",
-        fields=derive_fields(LibraryItemVersion),
     )

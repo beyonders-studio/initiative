@@ -8,7 +8,9 @@ pending versions one at a time and asks an image worker
 process, never in the server's. The thumbnail is stored as an upload of its
 own, under :data:`attachments.THUMBNAIL_PREFIX`, which no storage limit counts
 and no backup carries. A picture already small enough is its own thumbnail,
-and bytes the worker cannot draw leave the version ``failed``.
+and bytes the worker cannot draw leave the version ``failed``. A version
+drawn either way keeps the picture's size, turned upright, which a wall lays
+it out by.
 
 A thumbnail goes with its version, as its file does: it is one of the columns
 an upload is shown from.
@@ -174,6 +176,7 @@ async def _draw_one(session: AsyncSession, guild_id: int) -> bool:
     version, initiative_id = row
     picture_format = spec_of(type_of_media(version.file_content_type)).picture_format
     key = next(iter(attachments.upload_names([version.file_url])), None)
+    reply: dict[str, Any]
     try:
         if picture_format is None or key is None:
             raise PoolError("not a picture the app draws")
@@ -188,6 +191,8 @@ async def _draw_one(session: AsyncSession, guild_id: int) -> bool:
     else:
         logger.info("thumbnail_failed version=%s: %s", version.id, reply.get("error"))
         version.thumbnail_state = "failed"
+    if version.thumbnail_state == "ready":
+        version.width, version.height = reply["width"], reply["height"]
     session.add(version)
     await session.commit()
     return True

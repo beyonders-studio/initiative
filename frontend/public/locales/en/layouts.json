@@ -228,28 +228,6 @@
   },
   "tab": "Layouts",
   "settingsDescription": "How it lays out what it holds: each layout, when it was last changed, and the way into the editor. Everyone who can open it sees them; what each person filters and sorts by is their own.",
-  "libraryItemDetail": {
-    "name": "Picture detail",
-    "help": "How every picture in this library is shown when it's opened. What it leaves out is hidden.",
-    "shipped": "This is the layout as shipped. Changing it makes it the library's own.",
-    "titleHelp": "Every picture shows its title.",
-    "hiddenHelp": "Every picture can show this. Taken off, it is hidden, and Add puts it back.",
-    "parts": {
-      "actions": "Menu",
-      "relations": "Relations",
-      "picture": "Picture",
-      "about": "Where it came from",
-      "versions": "Versions"
-    },
-    "partHelp": {
-      "actions": "What else can be done with the picture: report, download, use as cover and remove.",
-      "relations": "What the picture is linked to.",
-      "picture": "The picture itself.",
-      "about": "Who added it and when, and its file.",
-      "versions": "Every version uploaded, and uploading a new one."
-    },
-    "noItems": "Add a picture to the library to see its layout here."
-  },
   "counterDetail": {
     "name": "Counter detail",
     "help": "How every counter in this group is shown when it's opened to edit. What it leaves out is hidden.",
@@ -294,5 +272,6 @@
     },
     "noItems": "Write a notice in this initiative to see its layout here."
   },
-  "calendarNote": "A calendar has no card or columns to lay out. Whether it shows, and whether the project opens on it, is set on the right."
+  "calendarNote": "A calendar has no card or columns to lay out. Whether it shows, and whether the project opens on it, is set on the right.",
+  "makeOpensFirst": "Open on {{name}} first"
 }

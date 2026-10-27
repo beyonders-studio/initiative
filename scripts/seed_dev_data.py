@@ -54,12 +54,12 @@ from seed import (  # noqa: E402
     access_grants,
     accounts,
     calendars,
+    collections,
     comments,
     counters,
     dashboards,
     directory,
     files,
-    libraries,
     guilds,
     initiatives,
     operations,
@@ -93,7 +93,7 @@ AREAS = (
     calendars,
     properties,
     posts,
-    libraries,
+    collections,
     wikis,
 )
 
@@ -180,9 +180,9 @@ async def seed() -> None:
         f"{len(ids['calendar_event_attendees'])} attendees"
     )
     print(
-        f"  {len(ids['libraries'])} libraries, "
-        f"{len(ids['library_items'])} pictures "
-        f"({len(ids['library_item_versions'])} versions)"
+        f"  {len(ids['collections'])} collections holding "
+        f"{len(ids['collection_files'])} pictures "
+        f"({len(ids['file_versions'])} versions)"
     )
     print(
         f"  {len(ids['posts'])} posts "

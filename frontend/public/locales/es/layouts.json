@@ -228,28 +228,6 @@
   },
   "tab": "Diseños",
   "settingsDescription": "Cómo dispone lo que contiene: cada diseño, cuándo cambió por última vez y el acceso al editor. Todos los que pueden abrirlo los ven; lo que cada persona filtra y ordena es suyo.",
-  "libraryItemDetail": {
-    "name": "Detalle de la imagen",
-    "help": "Cómo se muestra cada imagen de esta biblioteca al abrirla. Lo que deja fuera queda oculto.",
-    "shipped": "Este es el diseño tal como viene. Cambiarlo lo convierte en el de la biblioteca.",
-    "titleHelp": "Cada imagen muestra su título.",
-    "hiddenHelp": "Cada imagen puede mostrar esto. Si se quita, queda oculto, y Añadir lo vuelve a poner.",
-    "parts": {
-      "actions": "Menú",
-      "relations": "Relaciones",
-      "picture": "Imagen",
-      "about": "De dónde viene",
-      "versions": "Versiones"
-    },
-    "partHelp": {
-      "actions": "Qué más se puede hacer con la imagen: denunciar, descargar, usar como portada y quitar.",
-      "relations": "Con qué está vinculada la imagen.",
-      "picture": "La imagen en sí.",
-      "about": "Quién la añadió y cuándo, y su archivo.",
-      "versions": "Cada versión subida, y subir una nueva."
-    },
-    "noItems": "Añade una imagen a la biblioteca para ver aquí su diseño."
-  },
   "counterDetail": {
     "name": "Detalle del contador",
     "help": "Cómo se muestra cada contador de este grupo al abrirlo para editarlo. Lo que deja fuera queda oculto.",
@@ -294,5 +272,6 @@
     },
     "noItems": "Escribe un aviso en esta iniciativa para ver aquí su diseño."
   },
-  "calendarNote": "Un calendario no tiene tarjeta ni columnas que organizar. Si se muestra, y si el proyecto se abre en él, se ajusta a la derecha."
+  "calendarNote": "Un calendario no tiene tarjeta ni columnas que organizar. Si se muestra, y si el proyecto se abre en él, se ajusta a la derecha.",
+  "makeOpensFirst": "Abrir primero con {{name}}"
 }

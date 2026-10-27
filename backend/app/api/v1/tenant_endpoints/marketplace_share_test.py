@@ -305,33 +305,6 @@ class TestPictures:
 
         return (await session.exec(select(func.count(MarketplaceMedia.id)))).one()
 
-    async def test_nothing_is_read_from_the_communitys_storage(
-        self, client, acting_user, session
-    ):
-        from app.testing import create_library, create_library_item
-
-        member = await acting_user(guild_role=CommunityRole.member, initiative=True)
-        owner = await acting_user("owner")
-        member.initiative.libraries_enabled = True
-        session.add(member.initiative)
-        await session.commit()
-        library = await create_library(session, member.initiative, member.user)
-        await create_library_item(session, library, member.user)
-        before = await self._media_count(session)
-
-        shared = await _share(
-            client, member, kind="library", entity_id=library.id, name="Moodboard"
-        )
-
-        assert shared.status_code == 201, shared.text
-        assert await self._media_count(session) == before
-        pending = await client.get(PENDING_URL, headers=owner.headers)
-        [waiting] = [
-            item for item in pending.json() if item["uid"] == shared.json()["uid"]
-        ]
-        assert waiting["definition"]["items"] == []
-        assert waiting["definition"]["cover"] is None
-
     async def test_a_files_picture_stays_behind(self, client, acting_user, session):
         from app.services.storage import get_guild_storage
         from app.testing import create_file, png_bytes
@@ -408,65 +381,6 @@ class TestPictures:
 
         assert shared.status_code == 422
         assert shared.json()["detail"] == MarketplaceMessages.SHARE_IMAGE_INVALID
-
-    async def test_an_owner_published_library_installs_with_its_pictures(
-        self, client, acting_user, session
-    ):
-        from sqlmodel import select
-
-        from app.models.tenant.upload import Upload
-        from app.testing import png_bytes, route_session_to_guild
-
-        owner = await acting_user("owner")
-        uploaded = await client.post(
-            "/api/v1/marketplace/local/media",
-            files={"file": ("tile.png", png_bytes(4, 4), "image/png")},
-            headers=owner.headers,
-        )
-        assert uploaded.status_code == 201, uploaded.text
-        path = uploaded.json()["path"]
-        published = await client.post(
-            "/api/v1/marketplace/local/upload",
-            json={
-                "manifest": {
-                    "uid": "GA11ERY0000001",
-                    "public_id": "ours.tiles",
-                    "kind": "library",
-                    "name": "Tiles",
-                    "publisher": "Our deployment",
-                    "description": "Some tiles.",
-                    "version": "1.0.0",
-                    "images": [path],
-                    "definition": {
-                        "type": "initiative-library",
-                        "name": "Tiles",
-                        "items": [{"storage_key": path, "title": "A tile"}],
-                    },
-                }
-            },
-            headers=owner.headers,
-        )
-        assert published.status_code == 201, published.text
-
-        member = await acting_user(guild_role=CommunityRole.member, initiative=True)
-        member.initiative.libraries_enabled = True
-        session.add(member.initiative)
-        await session.commit()
-        installed = await client.post(
-            member.g("/marketplace/listings/by-uid/GA11ERY0000001/install"),
-            json={"initiative_id": member.initiative.id},
-            headers=member.headers,
-        )
-
-        assert installed.status_code == 201, installed.text
-        assert installed.json()["result"]["created"]["items"] == 1
-        await route_session_to_guild(session, member.guild.id)
-        uploads = (
-            await session.exec(
-                select(Upload).where(Upload.created_by == member.user.id)
-            )
-        ).all()
-        assert len(uploads) == 1
 
     async def test_uploading_a_picture_for_a_listing_file_is_the_owners(
         self, client, acting_user

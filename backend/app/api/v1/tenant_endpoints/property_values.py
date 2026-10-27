@@ -70,7 +70,12 @@ async def set_properties(
     """
     spec = properties_service.PROPERTY_LINKS[target.value]
     row: Any
-    if spec.via is None:
+    if not spec.shared:
+        row = await resource_access.load_child(
+            session, spec.model, entity_id, access="write"
+        )
+        initiative_id = row.initiative_id
+    elif spec.via is None:
         row = await resource_access.load_authorized(
             session, spec.tool, entity_id, current_user, guild_context, access="write"
         )

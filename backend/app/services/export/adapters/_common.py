@@ -29,7 +29,6 @@ from app.db import session as db_session
 from app.models.platform.user import User
 from app.models.tenant._mixins import tool_models
 from app.models.tenant.file import File, FileVersion
-from app.models.tenant.library import LibraryItemVersion
 from app.models.tenant.project import Project
 from app.models.tenant.task import Task
 from app.schemas.query import DateBucket
@@ -244,7 +243,7 @@ def storage_key_of(url: str | None) -> str:
 
 def asset_item(
     storage: "StorageBackend",
-    version: FileVersion | LibraryItemVersion | None,
+    version: FileVersion | None,
 ) -> RenderItem | None:
     """A stored file's bytes, zipped under ``assets/`` by its storage key
     beside the envelope naming it — or ``None`` when the file is gone."""
@@ -380,7 +379,7 @@ class ToolExportAdapter:
 
     def items(self, entity: Any, ctx: BuildContext, /) -> tuple[RenderItem, ...]:
         """Every file one entity becomes. One, unless its contents travel
-        beside it — a library's pictures ride next to its envelope."""
+        beside it — an uploaded file's bytes ride next to its envelope."""
         return (self.item(entity, ctx),)
 
     async def reach(

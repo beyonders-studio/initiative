@@ -212,13 +212,6 @@ def _current_filename(row: str, versions: str) -> str:
     )
 
 
-def _library_item_text(row: str) -> str:
-    """A picture's searchable text: its description, and the filename split into
-    words so ``round-4-detail.png`` is found by ``detail``."""
-    filename = _current_filename(row, "library_item_versions")
-    return f"coalesce({row}.description, '') || ' ' || {_with_words(filename)}"
-
-
 def _file_text(row: str) -> str:
     """A file's searchable text, by what kind of file it is.
 
@@ -226,7 +219,7 @@ def _file_text(row: str) -> str:
     expression. ``lexical`` and ``excalidraw`` share one: a Lexical text node
     and an Excalidraw text or label element both keep their text in a field
     named ``text``, and the recursive path reaches nested cases — a mention, a
-    wikilink, an image caption's own editor state.
+    reference, an image caption's own editor state.
 
     An uploaded file contributes nothing here: its bytes live in ``uploads``,
     so its name, description and uploaded filename are all there is to index.
@@ -294,7 +287,7 @@ def _comment_archive_parents() -> tuple[ArchiveParent, ...]:
     for column, parent in COMMENT_PARENTS.items():
         if "archived_at" in tables[parent.table].columns:
             parents.append(ArchiveParent(parent.table, column))
-        elif parent.tool_fk is not None:
+        elif parent.tool_fk is not None and parent.governed_by is not None:
             parents.append(
                 ArchiveParent(
                     parent.governed_by.plural,
@@ -316,6 +309,9 @@ def _comment_dac(row: str) -> tuple[str, str]:
     tools: list[str] = []
     ids: list[str] = []
     for column, parent in COMMENT_PARENTS.items():
+        if parent.governed_by is None:
+            # No sharing to stamp: the entry is reached as the comment is.
+            continue
         ident = (
             f"{row}.{column}"
             if parent.tool_fk is None
@@ -505,17 +501,11 @@ SEARCH_SOURCES: dict[str, SearchSource] = {
         title="title",
         body=("description", "location"),
     ),
-    # A picture is found by what somebody called it, or failing that by the
-    # name of the file they uploaded — which is often the only name it has.
-    "library_items": _inside(
-        SearchEntityType.library_item,
-        title="title",
-        title_sql=lambda row: (
-            f"coalesce(nullif({row}.title, ''),"
-            f" {_current_filename(row, 'library_item_versions')})"
-        ),
-        body=("description", "current_version_id"),
-        body_sql=_library_item_text,
+    # A collection is found by its name and what it is described as. It has no
+    # sharing to stamp: its entry is reached as the collection itself is
+    # (``initiative_rls.named_tool_path``).
+    "collections": SearchSource(
+        SearchEntityType.collection, title="name", body=("description",)
     ),
     # A page is found by its title and by what is written on it. Its body is a
     # Lexical state, the same shape a lexical file's is, so it is read by the
@@ -587,7 +577,7 @@ NOT_SEARCHABLE: dict[str, str] = {
     "task_statuses": "column names, reached from the project",
     "task_types": "type names, reached from the project",
     "file_versions": "history of a file already indexed",
-    "library_item_versions": "history of a picture already indexed",
+    "collection_files": "which files a collection holds; each file is indexed",
     "post_polls": "the question a notice asks, reached from the notice",
     "post_poll_options": "a poll's choices, reached from the notice",
     "calendar_event_answers": "one invitee's answer, reached from the event",

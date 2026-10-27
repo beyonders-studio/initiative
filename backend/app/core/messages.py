@@ -1212,10 +1212,12 @@ class PostMessages:
     POLL_NOT_PUBLISHED = "POST_POLL_NOT_PUBLISHED"
 
 
-class LibraryMessages:
-    IMAGE_TOO_LARGE = "LIBRARY_ITEM_TOO_LARGE"
-    #: A cover has to be one of the library's own pictures.
-    COVER_NOT_IN_LIBRARY = "LIBRARY_COVER_NOT_IN_LIBRARY"
+class CollectionMessages:
+    #: A file named for a collection is not one of its initiative's files the
+    #: reader can open.
+    FILE_NOT_AVAILABLE = "COLLECTION_FILE_NOT_AVAILABLE"
+    #: A cover has to be one of the collection's own files.
+    COVER_NOT_IN_COLLECTION = "COLLECTION_COVER_NOT_IN_COLLECTION"
 
 
 class WikiMessages:

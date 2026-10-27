@@ -1,7 +1,7 @@
 import { Link } from "@tanstack/react-router";
 import { useTranslation } from "react-i18next";
 
-import { FileKind, type FileSummary, FileType, Tool } from "@/api/generated/initiativeAPI.schemas";
+import { type FileSummary, FileType, Tool } from "@/api/generated/initiativeAPI.schemas";
 import { PropertyValueCell } from "@/components/properties/PropertyValueCell";
 import { nonEmptyPropertySummaries } from "@/components/properties/propertyHelpers";
 import { LazyImage } from "@/components/shared/LazyImage";
@@ -12,7 +12,7 @@ import { useRelativeTime } from "@/hooks/useRelativeTime";
 import { useCommunityPath } from "@/lib/communityUrl";
 import { fileIcon } from "@/lib/fileIcon";
 import { isStoredFileType } from "@/lib/fileTypes";
-import { getFileTypeLabel } from "@/lib/fileUtils";
+import { filePicture, getFileTypeLabel } from "@/lib/fileUtils";
 import { matchSmartLinkProvider } from "@/lib/smartLinkProviders";
 import { toolDetailRoute } from "@/lib/tools";
 import { resolveUploadUrl } from "@/lib/uploadUrl";
@@ -40,10 +40,7 @@ export const FileCard = ({ file, className }: FileCardProps) => {
     file_type: file.file_type,
     smart_link_url: file.smart_link_url,
   });
-  // A picture or a video is shown by its thumbnail, and a picture by itself
-  // until that is drawn; any other file by its featured image.
-  const picture =
-    file.thumbnail_url ?? (file.kind === FileKind.image ? file.file_url : file.featured_image_url);
+  const picture = filePicture(file);
   const smartLinkMatch =
     file.file_type === FileType.url && file.smart_link_url
       ? matchSmartLinkProvider(file.smart_link_url)

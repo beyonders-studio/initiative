@@ -67,11 +67,6 @@ _DATE_PROPERTY_TYPES = frozenset({"date", "datetime"})
 #: Editor nodes that name a person.
 _MENTION_NODES = frozenset({"mention", "custom-mention"})
 
-#: Editor nodes that name something else in the community by id. A wikilink is
-#: not among them: it names a page by title, and a link between two pages of
-#: the same wiki is part of the wiki.
-_REFERENCE_NODES = REFERENCE_NODES.keys() - {"wikilink"}
-
 #: Editor nodes that carry a picture.
 _IMAGE_NODES = frozenset({"image"})
 
@@ -103,7 +98,7 @@ def _clean_editor_state(content: Any) -> Any:
         kind = node.get("type")
         if kind in _MENTION_NODES:
             return text_node(_mention_text(node), node.get("format") or 0)
-        if kind in _REFERENCE_NODES:
+        if kind in REFERENCE_NODES:
             return reference_as_text(node)
         children = node.get("children")
         if isinstance(children, list):
@@ -245,16 +240,6 @@ def _strip_queue(env: dict[str, Any]) -> None:
             item["member"] = None
 
 
-def _strip_library(env: dict[str, Any]) -> None:
-    env["items"] = [
-        item
-        for item in env.get("items") or []
-        if isinstance(item, dict) and _in_marketplace(item.get("storage_key"))
-    ]
-    if not _in_marketplace(env.get("cover")):
-        env["cover"] = None
-
-
 def _strip_nothing(env: dict[str, Any]) -> None:
     """A counter group and a dashboard name nobody and point at nothing a
     listing could carry. (A dashboard's configuration, which does, is dropped
@@ -269,7 +254,6 @@ _STRIPPERS: dict[Tool, Callable[[dict[str, Any]], None]] = {
     Tool.calendar: _strip_calendar,
     Tool.dashboard: _strip_nothing,
     Tool.post: _strip_post,
-    Tool.library: _strip_library,
     Tool.wiki: _strip_wiki,
 }
 

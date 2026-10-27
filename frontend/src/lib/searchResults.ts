@@ -14,7 +14,6 @@ import {
   CalendarClock,
   FileText,
   Hash,
-  Image,
   type LucideIcon,
   MessageSquare,
   SquareCheckBig,
@@ -24,8 +23,9 @@ import {
 
 import type { SearchHit } from "@/api/generated/initiativeAPI.schemas";
 import { SearchEntityType, Tool, ViewSource } from "@/api/generated/initiativeAPI.schemas";
+import { COLLECTION_ICON } from "@/lib/collections";
 import {
-  libraryItemRoute,
+  collectionRoute,
   counterRoute,
   eventRoute,
   TOOL_ICONS,
@@ -50,6 +50,9 @@ interface ToolChild {
   /** Address, from the initiative, the parent's id, the child's own, and the
    *  tool the hit named — which is fixed for most, and per-row for a comment. */
   path: (initiativeId: number | null, parentId: number, entityId: number, tool: Tool) => string;
+  /** In its tool but in no one instance of it (a collection, in Files), so
+   *  addressed without a parent. */
+  standalone?: true;
 }
 
 /**
@@ -69,7 +72,11 @@ const TOOL_CHILDREN: Partial<Record<SearchEntityType, ToolChild>> = {
     icon: Ticket,
     path: (initiativeId, queueId) => toolDetailRoute(Tool.queue, initiativeId, queueId),
   },
-  [SearchEntityType.library_item]: { icon: Image, path: libraryItemRoute },
+  [SearchEntityType.collection]: {
+    icon: COLLECTION_ICON,
+    path: (initiativeId, _parentId, collectionId) => collectionRoute(initiativeId, collectionId),
+    standalone: true,
+  },
   // A wiki page IS read on a page of its own, inside its wiki — so unlike the
   // rest of these it keeps its own id in the address. Without an entry here it
   // would fall through to the tool rule and be addressed as if the page id
@@ -169,6 +176,9 @@ export const FROM_FEED = { viewSource: ViewSource.feed };
 export const searchHitPath = (target: SearchTarget): string | null => {
   if (target.entity_type === TAG_ENTITY_TYPE) return `/tags/${target.entity_id}`;
   const child = TOOL_CHILDREN[target.entity_type];
+  if (child?.standalone) {
+    return child.path(target.initiative_id ?? null, 0, target.entity_id, Tool.file);
+  }
   if (child) {
     if (target.tool_id == null || !target.tool) return null;
     return child.path(target.initiative_id ?? null, target.tool_id, target.entity_id, target.tool);

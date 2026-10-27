@@ -7,8 +7,9 @@ Pillow and nothing of Initiative.
 A request is ``{"path", "format", "always"?}``: a picture's path on disk, the
 one Pillow format it may be opened as, and whether it is drawn again however
 small it is. The answer is ``{"thumbnail", "width", "height"}`` (a WebP,
-base64), ``{"original": true}`` for a picture already no larger than the edge
-(unless ``always``), or ``{"error"}`` for bytes Pillow will not draw. A picture with more than ``<pixels>`` pixels is refused before it is
+base64), ``{"original": true, "width", "height"}`` for a picture already no
+larger than the edge (unless ``always``), or ``{"error"}`` for bytes Pillow
+will not draw. ``width`` and ``height`` are the picture's own, turned upright. A picture with more than ``<pixels>`` pixels is refused before it is
 decoded, and the process's address space is bounded where the platform
 allows it; a decode that runs out of memory is answered with
 ``"replace": true``, and the worker exits.
@@ -31,8 +32,9 @@ def answer(request: dict[str, Any], edge: int) -> dict[str, Any]:
             warnings.simplefilter("error", Image.DecompressionBombWarning)
             with Image.open(request["path"], formats=[request["format"]]) as opened:
                 picture = ImageOps.exif_transpose(opened) or opened
+                width, height = picture.size
                 if max(picture.size) <= edge and not request.get("always"):
-                    return {"original": True}
+                    return {"original": True, "width": width, "height": height}
                 # WebP takes RGB or RGBA; palette and greyscale pictures are
                 # converted first, keeping a palette's transparency, so they
                 # are resampled smoothly. An animation keeps its first frame.
@@ -42,7 +44,6 @@ def answer(request: dict[str, Any], edge: int) -> dict[str, Any]:
                 picture.thumbnail((edge, edge), Image.Resampling.LANCZOS)
                 out = io.BytesIO()
                 picture.save(out, format="WEBP", quality=80, method=4)
-                width, height = picture.size
     except MemoryError:
         return {"error": "the picture ran out of memory", "replace": True}
     except Exception as error:  # noqa: BLE001 - every decode failure is one answer

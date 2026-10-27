@@ -2,7 +2,7 @@
  * Remark plugins for rendering comment bodies.
  *
  * Comments are markdown, but they also carry the mention syntax the composer
- * writes — `@[](12)`, `#task[Title](3)`, `#doc[…](3)`, `#project[…](3)`.
+ * writes — `@[](12)`, `#task[Title](3)`, `#file[…](3)`, `#project[…](3)`.
  * That syntax is shaped like a markdown link, so remark parses it before any
  * text-level pass can see it: the result is a text node ending in the trigger
  * followed by a link whose url is the entity id. `remarkMentions` recognises
@@ -19,8 +19,8 @@ import { type MdastNode, visitParents } from "@/lib/remarkProse";
 
 export type MentionType = "user" | SearchEntityType;
 
-/** Trigger text preceding the link, longest first so `#doc` can't shadow a
- *  longer trigger that happens to share its prefix.
+/** Trigger text preceding the link, longest first so `#counter` can't shadow
+ *  a longer trigger that happens to share its prefix.
  *
  * Derived from the same table the composer writes with, so a kind that can be
  * mentioned can be read back. */

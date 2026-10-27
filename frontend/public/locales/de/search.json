@@ -36,8 +36,7 @@
     "tag": "Tag",
     "comment": "Kommentar",
     "post": "Beitrag",
-    "library": "Bibliothek",
-    "library_item": "Bild"
+    "collection": "Sammlung"
   },
   "switchHint": "Tab zum Wechseln",
   "closeMatches": "Nichts passt genau zu „{{query}}“. Das hier kommt am nächsten.",

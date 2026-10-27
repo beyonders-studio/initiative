@@ -31,7 +31,7 @@ from typing import Annotated, Any, List, Literal, Optional, Union, get_args
 
 from pydantic import AfterValidator, ConfigDict, Field, field_validator, model_validator
 
-from app.core.tools import Tool
+from app.core.tools import LAYOUT_KIND_TARGETS, Tool
 from app.models.tenant.task import TaskPriority, TaskStatusCategory
 from app.schemas.base import SanitizedBaseModel
 from app.schemas.query import DateBucket, FilterOp, SortDir
@@ -215,17 +215,6 @@ class QueueItemDetailFieldId(str, Enum):
     tags = "tags"
 
 
-class LibraryItemDetailFieldId(str, Enum):
-    """What a picture's detail edits as a field. The picture itself, where it
-    came from, its versions, what is linked to it and what can be done with it
-    are parts of their own."""
-
-    title = "title"
-    description = "description"
-    date = "date"
-    tags = "tags"
-
-
 class CounterDetailFieldId(str, Enum):
     """What a counter's detail edits as a field. Its count, what is linked to
     it and what can be done with it are parts of their own."""
@@ -349,7 +338,6 @@ DetailFieldId = Union[
     TaskDetailFieldId,
     EventDetailFieldId,
     QueueItemDetailFieldId,
-    LibraryItemDetailFieldId,
     CounterDetailFieldId,
     PostDetailFieldId,
     NamedFieldId,
@@ -472,9 +460,6 @@ OwnPartType = Literal[
     "case",
     "comments",
     "rsvp",
-    "picture",
-    "about",
-    "versions",
     "count",
     "body",
     "schedule",
@@ -509,12 +494,12 @@ DetailStackPart.model_rebuild()
 
 #: Every way a layout can list a tool's items; which of them a tool draws is
 #: ``app.core.tools.LIST_LAYOUTS``.
-ListLayoutKind = Literal["table", "board", "gantt", "calendar"]
+ListLayoutKind = Literal[
+    "table", "board", "gantt", "calendar", "masonry", "grid", "timeline"
+]
 #: Every kind of thing a detail layout shows one of; which a tool holds is
 #: ``app.core.tools.DETAIL_LAYOUTS``.
-DetailLayoutKind = Literal[
-    "task", "calendar_event", "queue_item", "library_item", "counter", "post"
-]
+DetailLayoutKind = Literal["task", "calendar_event", "queue_item", "counter", "post"]
 
 
 #: What a table can be sorted by, as the task list takes it.
@@ -700,6 +685,17 @@ class DetailLayoutRead(SanitizedBaseModel):
 ToolLayoutRead = Annotated[
     Union[ListLayoutRead, DetailLayoutRead], Field(discriminator="kind")
 ]
+
+
+#: What a request names a set of layouts by: any tool, or a kind inside one
+#: that lays out what it holds. Which of them have layouts is
+#: ``app.core.tools.LAYOUT_TARGETS``; the others are refused by name.
+LayoutTarget = Enum(
+    "LayoutTarget",
+    {value: value for value in (*(t.value for t in Tool), *LAYOUT_KIND_TARGETS)},
+    type=str,
+)
+LayoutTarget.__doc__ = "What a set of layouts is for."
 
 
 class ToolLayoutSetRead(SanitizedBaseModel):

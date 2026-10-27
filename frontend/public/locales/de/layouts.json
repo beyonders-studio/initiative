@@ -228,28 +228,6 @@
   },
   "tab": "Layouts",
   "settingsDescription": "Wie es anordnet, was es enthält: jedes Layout, wann es zuletzt geändert wurde, und der Weg in den Editor. Alle, die es öffnen können, sehen sie; was jede Person filtert und sortiert, gehört ihr.",
-  "libraryItemDetail": {
-    "name": "Bild-Detailansicht",
-    "help": "Wie jedes Bild dieser Bibliothek beim Öffnen angezeigt wird. Was es weglässt, ist ausgeblendet.",
-    "shipped": "Das ist das Layout wie ausgeliefert. Eine Änderung macht es zum Layout der Bibliothek.",
-    "titleHelp": "Jedes Bild zeigt seinen Titel.",
-    "hiddenHelp": "Jedes Bild kann dies zeigen. Entfernt ist es ausgeblendet, und Hinzufügen bringt es zurück.",
-    "parts": {
-      "actions": "Menü",
-      "relations": "Beziehungen",
-      "picture": "Bild",
-      "about": "Herkunft",
-      "versions": "Versionen"
-    },
-    "partHelp": {
-      "actions": "Was sonst mit dem Bild möglich ist: melden, herunterladen, als Titelbild verwenden und entfernen.",
-      "relations": "Womit das Bild verknüpft ist.",
-      "picture": "Das Bild selbst.",
-      "about": "Wer es wann hinzugefügt hat, und seine Datei.",
-      "versions": "Jede hochgeladene Version, und eine neue hochladen."
-    },
-    "noItems": "Füge der Bibliothek ein Bild hinzu, um hier sein Layout zu sehen."
-  },
   "counterDetail": {
     "name": "Zähler-Detailansicht",
     "help": "Wie jeder Zähler dieser Gruppe beim Öffnen zum Bearbeiten angezeigt wird. Was es weglässt, ist ausgeblendet.",
@@ -294,5 +272,6 @@
     },
     "noItems": "Schreibe eine Mitteilung in dieser Initiative, um hier ihr Layout zu sehen."
   },
-  "calendarNote": "Ein Kalender hat keine Karte und keine Spalten zum Anordnen. Ob er angezeigt wird und ob das Projekt damit öffnet, stellst du rechts ein."
+  "calendarNote": "Ein Kalender hat keine Karte und keine Spalten zum Anordnen. Ob er angezeigt wird und ob das Projekt damit öffnet, stellst du rechts ein.",
+  "makeOpensFirst": "Zuerst mit {{name}} öffnen"
 }

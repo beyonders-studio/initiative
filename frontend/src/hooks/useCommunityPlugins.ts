@@ -156,8 +156,6 @@ const ITEM_READS: Record<DetailLayoutReadKind, (id: number) => Spec[]> = {
   task: (id) => [q.allTasks(), q.task(id)],
   calendar_event: (id) => [q.allCalendarEvents(), q.calendarEvent(id)],
   queue_item: (id) => [q.allQueues(), q.queueItem(id)],
-  // A picture is read under its library, which an action names no more of.
-  library_item: () => [q.allLibraries()],
   counter: (id) => [q.allCounterGroups(), q.counter(id)],
   post: (id) => [q.allPosts(), q.post(id)],
 };

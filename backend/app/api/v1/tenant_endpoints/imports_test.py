@@ -336,7 +336,6 @@ async def _tool_with_a_row(session, a, tool):
         "queue",
         "counter_group",
         "calendar",
-        "library",
         "wiki",
         "dashboard",
         "post",
@@ -1360,15 +1359,16 @@ async def test_an_archive_from_before_files_restores_its_documents(
     assert restored.file_type == FileType.url
 
 
-async def test_an_archive_from_before_libraries_restores_its_galleries(
+async def test_an_archive_with_a_gallery_restores_it_as_files_in_a_collection(
     client, acting_user, session, monkeypatch, role_session
 ):
-    """An archive written while libraries were galleries names them that way:
-    the manifest's tool and switch, the envelope type and the key holding its
-    pictures. A restore reads each as the library it is."""
+    """An archive written while galleries were a tool carries a gallery entry.
+    A restore makes each picture a file of the initiative and gathers the
+    files into a collection named as the gallery was."""
     from sqlmodel import select
 
-    from app.models.tenant.library import Library, LibraryItem
+    from app.models.tenant.collection import Collection, CollectionFile
+    from app.models.tenant.file import File
 
     a = await acting_user(
         guild_role=CommunityRole.superadmin, initiative=True, project=True
@@ -1426,18 +1426,197 @@ async def test_an_archive_from_before_libraries_restores_its_galleries(
         role_session,
     )
     assert job["status"] == ImportJobStatus.done.value, job.get("error")
-    assert job["result"]["per_tool"]["library"]["created"] == 1
+    assert job["result"]["per_tool"]["file"]["created"] == 1
 
     await route_session_to_guild(session, a.guild.id)
     restored = (
-        await session.exec(select(Library).where(Library.name == "Old wall"))
+        await session.exec(select(Collection).where(Collection.name == "Old wall"))
     ).one()
-    items = (
+    files = (
         await session.exec(
-            select(LibraryItem).where(LibraryItem.library_id == restored.id)
+            select(File.name)
+            .join(CollectionFile, CollectionFile.file_id == File.id)
+            .where(CollectionFile.collection_id == restored.id)
         )
     ).all()
-    assert [item.title for item in items] == ["Shot"]
+    assert files == ["Shot"]
+
+
+async def test_restored_collections_keep_their_own_files_and_cover(
+    client, acting_user, session, monkeypatch, role_session
+):
+    """A backup carries each collection by the id it had, so two of one name
+    come back as two, each with its own files, description and cover."""
+    from sqlmodel import select
+
+    from app.models.tenant.collection import Collection, CollectionFile
+    from app.models.tenant.file import File
+    from app.testing import create_collection
+
+    a = await acting_user(
+        guild_role=CommunityRole.superadmin, initiative=True, project=True
+    )
+    sunset = await create_file(session, a.initiative, a.user, name="Sunset")
+    dunes = await create_file(session, a.initiative, a.user, name="Dunes")
+    await create_collection(
+        session,
+        a.initiative,
+        a.user,
+        files=[sunset, dunes],
+        name="Photos",
+        description="Studio shots",
+        cover_file_id=sunset.id,
+    )
+    await create_collection(session, a.initiative, a.user, files=[dunes], name="Photos")
+
+    restored_id = await _restore_referencing_backup(
+        client, a, monkeypatch, role_session, elsewhere=False
+    )
+
+    await route_session_to_guild(session, a.guild.id)
+    names = {
+        file.id: file.name
+        for file in (
+            await session.exec(select(File).where(File.initiative_id == restored_id))
+        ).all()
+    }
+    collections = (
+        await session.exec(
+            select(Collection)
+            .where(Collection.initiative_id == restored_id)
+            .order_by(Collection.id)
+        )
+    ).all()
+    held = (
+        await session.exec(
+            select(CollectionFile.collection_id, CollectionFile.file_id).where(
+                CollectionFile.initiative_id == restored_id
+            )
+        )
+    ).all()
+    assert [
+        (
+            c.name,
+            c.description,
+            names.get(c.cover_file_id or 0),
+            sorted(names[f] for cid, f in held if cid == c.id),
+        )
+        for c in collections
+    ] == [
+        ("Photos", "Studio shots", "Sunset", ["Dunes", "Sunset"]),
+        ("Photos", None, None, ["Dunes"]),
+    ]
+
+
+async def test_a_restored_collection_names_only_who_can_open_a_file_in_it(
+    client, acting_user, session, monkeypatch, role_session
+):
+    """A collection has no sharing: a person its values name who cannot open a
+    file in it is taken off it, and nothing is shared with them — least of all
+    a file that happens to have the collection's id."""
+    from sqlmodel import select
+
+    from app.models.tenant.collection import Collection
+    from app.models.tenant.property import PropertyValue
+    from app.models.tenant.resource_grant import ResourceGrant
+
+    a = await acting_user(
+        guild_role=CommunityRole.superadmin, initiative=True, project=True
+    )
+    b = await acting_user(guild_role=CommunityRole.member, guild=a.guild)
+    secret = await create_file(session, a.initiative, a.user, name="Secret")
+    folder = "initiatives/1-restored"
+    file_entry = {
+        "path": f"{folder}/files/5-notes.initiative-file.json",
+        "tool": "file",
+        "type": "initiative-file",
+        "schema_version": 1,
+        "entity_id": 5,
+        "title": "Notes",
+        "initiative_id": 1,
+        "asset": None,
+    }
+    collections_entry = {
+        "path": f"{folder}/collections.json",
+        "tool": "initiative",
+        "type": "initiative-collections",
+        "schema_version": 1,
+        "entity_id": 1,
+        "title": "Restored",
+        "initiative_id": 1,
+        "asset": None,
+    }
+    collections = {
+        "type": "initiative-collections",
+        "schema_version": 1,
+        "collections": [
+            {
+                "id": 3,
+                "name": "Shelf",
+                "file_ids": [5],
+                "properties": [
+                    {
+                        "property_name": "Owner",
+                        "property_type": "user_reference",
+                        "value_handle": "stranger#4321",
+                        "value_name": "Bea",
+                    }
+                ],
+            }
+        ],
+    }
+    file_envelope = {
+        "type": "initiative-file",
+        "schema_version": 1,
+        "file_type": "lexical",
+        "name": "Notes",
+        "content": _editor_state(),
+    }
+    manifest = _minimal_manifest(entries=[file_entry, collections_entry])
+    manifest["people"] = [
+        {"handle": "stranger#4321", "name": "Bea", "comment_count": 0}
+    ]
+    resp = await _upload_backup(
+        client,
+        a,
+        _make_backup_zip(
+            manifest,
+            {
+                file_entry["path"]: json.dumps(file_envelope).encode(),
+                collections_entry["path"]: json.dumps(collections).encode(),
+            },
+        ),
+    )
+    assert resp.status_code == 201, resp.text
+    job_id = resp.json()["id"]
+    confirmed = await client.post(
+        a.g(f"/imports/jobs/{job_id}/confirm"),
+        headers=a.headers,
+        json={"people_map": {"stranger#4321": b.user.id}},
+    )
+    assert confirmed.status_code == 200, confirmed.text
+    await _run_import_worker(monkeypatch, role_session)
+    job = (await client.get(a.g(f"/imports/jobs/{job_id}"), headers=a.headers)).json()
+    assert job["status"] == ImportJobStatus.done.value, job.get("error")
+
+    await route_session_to_guild(session, a.guild.id)
+    shelf = (
+        await session.exec(select(Collection).where(Collection.name == "Shelf"))
+    ).one()
+    assert shelf.id == secret.id
+    assert (
+        await session.exec(
+            select(PropertyValue.value_user_id).where(
+                PropertyValue.entity_type == "collection",
+                PropertyValue.entity_id == shelf.id,
+            )
+        )
+    ).all() == [None]
+    assert (
+        await session.exec(
+            select(ResourceGrant).where(ResourceGrant.user_id == b.user.id)
+        )
+    ).all() == []
 
 
 async def test_backup_corrupt_entry_fails_alone(
@@ -3423,6 +3602,76 @@ async def test_a_mention_nobody_places_is_restored_as_a_name(
     assert "mentionHandle" not in mention
 
 
+async def test_an_older_envelopes_wikilink_is_imported_as_a_reference(
+    client, acting_user, session
+):
+    """A ``[[ ]]`` link in an envelope an older build wrote comes in as the
+    reference to its file it always was, as a restore reads one. A
+    spreadsheet's cells are what was typed, and come in as written."""
+    from sqlmodel import select
+
+    from app.models.tenant.file import File
+
+    a = await acting_user(
+        guild_role=CommunityRole.member, initiative=True, project=True
+    )
+    target = await _second_initiative(session, a, files_enabled=True)
+    spec = await create_file(session, target, a.user, name="Spec")
+    envelope = {
+        "type": "initiative-file",
+        "schema_version": 1,
+        "file_type": "lexical",
+        "name": "Minutes",
+        "content": _editor_state(
+            {"type": "wikilink", "documentId": spec.id, "documentTitle": "Spec"}
+        ),
+    }
+
+    resp = await _import_envelope(client, a, envelope, target.id)
+    assert resp.status_code == 201, resp.text
+
+    file = (
+        await session.exec(
+            select(File)
+            .where(File.initiative_id == target.id, File.name == "Minutes")
+            .options(undefer(File.content))
+        )
+    ).one()
+    [node] = file.content["root"]["children"][0]["children"]
+    assert (node["type"], node["entityType"], node["entityId"]) == (
+        "entity-mention",
+        "file",
+        spec.id,
+    )
+
+    cells = {"0:0": "#doc[Spec](7)", "0:1": "#gallery-image[Sample](12)"}
+    resp = await _import_envelope(
+        client,
+        a,
+        {
+            "type": "initiative-file",
+            "schema_version": 1,
+            "file_type": "sheet",
+            "name": "Budget",
+            "content": {
+                "schema_version": 3,
+                "kind": "spreadsheet",
+                "sheets": [{"id": "s1", "name": "Sheet 1", "cells": cells}],
+            },
+        },
+        target.id,
+    )
+    assert resp.status_code == 201, resp.text
+    sheet = (
+        await session.exec(
+            select(File)
+            .where(File.initiative_id == target.id, File.name == "Budget")
+            .options(undefer(File.content))
+        )
+    ).one()
+    assert sheet.content["sheets"][0]["cells"] == cells
+
+
 def _reference_node(entity_type: str, entity_id: int, text: str) -> dict:
     return {
         "type": "entity-mention",
@@ -3440,16 +3689,6 @@ def _chip_node(chip_kind: str, entity_id: int, text: str) -> dict:
         "chipKind": chip_kind,
         "entityId": entity_id,
         "text": text,
-    }
-
-
-def _wikilink_node(file_id: int, title: str) -> dict:
-    return {
-        "type": "wikilink",
-        "version": 1,
-        "documentId": file_id,
-        "documentTitle": title,
-        "text": title,
     }
 
 
@@ -3499,7 +3738,7 @@ async def _referencing_initiative(session, a) -> dict:
             _reference_node("task", fix.id, "Fix the bug"),
             _chip_node("task:status", fix.id, "To do"),
             _chip_node("counter:value", counter.id, "3"),
-            _wikilink_node(spec.id, "Spec"),
+            _reference_node("file", spec.id, "Spec"),
         ),
     )
     ship = await create_task(
@@ -3507,7 +3746,7 @@ async def _referencing_initiative(session, a) -> dict:
         a.project,
         title="Ship it",
         description=(
-            f"After #task[Fix the bug]({fix.id}), per #doc[Spec]({spec.id}) "
+            f"After #task[Fix the bug]({fix.id}), per #file[Spec]({spec.id}) "
             f"and #file[Elsewhere]({outside.id})"
         ),
     )
@@ -3655,15 +3894,15 @@ async def test_a_restored_reference_points_at_the_restored_copy(
     spec, plan = r["files"]["Spec"], r["files"]["Plan"]
 
     assert ship.description == (
-        f"After #task[Fix the bug]({fix.id}), per #doc[Spec]({spec.id}) "
+        f"After #task[Fix the bug]({fix.id}), per #file[Spec]({spec.id}) "
         f"and #file[Elsewhere]({outside.id})"
     )
     assert r["comment"].content == f"Written up in #wiki-page[Start]({r['page'].id})"
-    mention, status, value, wikilink = _nodes(plan.content)
+    mention, status, value, link = _nodes(plan.content)
     assert mention["entityId"] == fix.id
     assert status["entityId"] == fix.id
     assert value["entityId"] == r["counter"].id
-    assert wikilink["documentId"] == spec.id
+    assert link["entityId"] == spec.id
     [project_mention] = _nodes(r["post"].body)
     assert project_mention["entityId"] == r["project"].id
     [post_mention] = _nodes(r["page"].content)
@@ -3720,7 +3959,7 @@ async def test_a_reference_restored_elsewhere_to_something_left_behind_is_its_ti
 
     assert ship.description == (
         f"After #task[Fix the bug]({fix.id}), "
-        f"per #doc[Spec]({r['files']['Spec'].id}) and Elsewhere"
+        f"per #file[Spec]({r['files']['Spec'].id}) and Elsewhere"
     )
 
 
@@ -3731,97 +3970,9 @@ async def _import_archive(client, actor, zip_bytes, initiative_id, envelope_type
     return await client.post(
         actor.g("/imports/envelope/archive"),
         headers=actor.headers,
-        files={"file": ("library.zip", zip_bytes, "application/zip")},
+        files={"file": ("export.zip", zip_bytes, "application/zip")},
         data=data,
     )
-
-
-async def test_a_library_zip_imports_with_its_pictures_into_another_community(
-    client, acting_user, session, monkeypatch, tmp_path, role_session
-):
-    """A library exported on its own is a zip of its envelope and its pictures,
-    and importing that zip somewhere the pictures have never been stored brings
-    them along: each lands in the community's storage under its key, and the
-    library shows it. A description's link to another picture points at that
-    picture's copy here, and a mention of somebody who is not here is their
-    handle."""
-    from sqlmodel import select
-
-    from app.api.v1.tenant_endpoints.exports_test import _all_tools_enabled
-    from app.core.config import settings
-    from app.models.tenant.library import Library, LibraryItem
-    from app.testing import route_session_to_guild
-    from app.testing.factories import create_library, create_library_item
-
-    monkeypatch.setattr(settings, "UPLOADS_DIR", str(tmp_path))
-    a = await acting_user(
-        guild_role=CommunityRole.member, initiative=True, project=True
-    )
-    await _all_tools_enabled(session, a.initiative)
-    library = await create_library(session, a.initiative, a.user, name="Barovia maps")
-    picture = await create_library_item(session, library, a.user, title="Village")
-    key = picture.current_version.file_url.rsplit("/", 1)[-1]
-    await create_library_item(
-        session,
-        library,
-        a.user,
-        title="Castle",
-        description=f"Above #library-item[Village]({picture.id}), per @[]({a.user.id})",
-    )
-
-    exported = await client.get(
-        a.g("/exports/library"),
-        headers=a.headers,
-        params={"ids": [library.id], "format": "json"},
-    )
-    assert exported.status_code == 200, exported.text
-
-    b = await acting_user(guild_role=CommunityRole.admin, initiative=True, project=True)
-    await _all_tools_enabled(session, b.initiative)
-    assert get_guild_storage(b.guild.id).exists(key) is False
-    resp = await _import_archive(
-        client, b, exported.content, b.initiative.id, "initiative-library"
-    )
-    # The mention names somebody nobody here can place, so the import waits
-    # for the people step.
-    assert resp.status_code == 202, resp.text
-    job = resp.json()
-    assert job["status"] == "staged"
-    confirm = await client.post(
-        b.g(f"/imports/jobs/{job['id']}/confirm"), headers=b.headers, json={}
-    )
-    assert confirm.status_code == 200, confirm.text
-    await _run_import_worker(monkeypatch, role_session)
-    done = (
-        await client.get(b.g(f"/imports/jobs/{job['id']}"), headers=b.headers)
-    ).json()
-    assert done["status"] == "done", done.get("error")
-    assert done["result"]["created"]["items"] == 2
-
-    assert get_guild_storage(b.guild.id).exists(key)
-    await route_session_to_guild(session, b.guild.id)
-    restored = (
-        await session.exec(
-            select(Library).where(Library.initiative_id == b.initiative.id)
-        )
-    ).one()
-    items = {
-        item.title: item
-        for item in (
-            await session.exec(
-                select(LibraryItem).where(LibraryItem.library_id == restored.id)
-            )
-        ).all()
-    }
-    image = items["Village"]
-    description = items["Castle"].description
-    assert f"#library-item[Village]({image.id})" in description
-    assert f"@[]({a.user.id})" not in description
-    # The picture is its version 1, typed from its bytes.
-    version = image.current_version
-    assert version is not None and version.version_number == 1
-    assert version.file_url == f"/uploads/{b.guild.id}/{key}"
-    assert version.file_content_type == "image/png"
 
 
 async def test_a_wiki_zip_imports_back_from_the_wiki_page(client, acting_user, session):
@@ -3947,38 +4098,6 @@ async def test_a_wiki_zip_brings_its_filed_files_back_where_they_were(
     ).all()
 
 
-async def test_a_library_zip_leaves_out_what_is_not_a_picture(
-    client, acting_user, session
-):
-    """The zip says what its files are; the bytes decide. A file that is not a
-    picture a library can show is not stored, and the import says so."""
-    from app.api.v1.tenant_endpoints.exports_test import _all_tools_enabled
-
-    a = await acting_user(
-        guild_role=CommunityRole.member, initiative=True, project=True
-    )
-    await _all_tools_enabled(session, a.initiative)
-    envelope = {
-        "type": "initiative-library",
-        "schema_version": 1,
-        "name": "Handouts",
-        "items": [
-            {"storage_key": "note.png", "content_type": "image/png", "title": "Note"}
-        ],
-    }
-    buffer = io.BytesIO()
-    with zipfile.ZipFile(buffer, "w") as archive:
-        archive.writestr("handouts.initiative-library.json", json.dumps(envelope))
-        archive.writestr("assets/note.png", b"<svg onload='x'></svg>")
-
-    resp = await _import_archive(client, a, buffer.getvalue(), a.initiative.id)
-    assert resp.status_code == 201, resp.text
-    result = resp.json()["result"]
-    assert "not_a_picture:note.png" in result["warnings"]
-    assert result["created"]["items"] == 0
-    assert get_guild_storage(a.guild.id).exists("note.png") is False
-
-
 async def test_a_zip_is_refused_from_the_wrong_tool_or_without_an_export(
     client, acting_user, session
 ):
@@ -3998,7 +4117,7 @@ async def test_a_zip_is_refused_from_the_wrong_tool_or_without_an_export(
 
     queue = json.dumps({"type": "initiative-queue", "schema_version": 1, "name": "Q"})
     wrong = await _import_archive(
-        client, a, zipped(**{"q.json": queue}), a.initiative.id, "initiative-library"
+        client, a, zipped(**{"q.json": queue}), a.initiative.id, "initiative-wiki"
     )
     assert wrong.status_code == 400
     assert wrong.json()["detail"] == "IMPORT_WRONG_TOOL"
@@ -4030,7 +4149,7 @@ async def test_a_lone_envelope_resolves_what_it_carries(client, acting_user, ses
         session,
         a.project,
         title="Ship it",
-        description=f"After #task[Fix the bug]({fix.id}), per #doc[Spec]({spec.id})",
+        description=f"After #task[Fix the bug]({fix.id}), per #file[Spec]({spec.id})",
         # What an edit of just this task kept back is placed the same way.
         recurrence_carry={"description": f"Once #task[Fix the bug]({fix.id})"},
     )
@@ -4058,7 +4177,7 @@ async def test_a_lone_envelope_resolves_what_it_carries(client, acting_user, ses
         }
 
     (here_fix, here), (there_fix, there) = descriptions
-    assert here == f"After #task[Fix the bug]({here_fix}), per #doc[Spec]({spec.id})"
+    assert here == f"After #task[Fix the bug]({here_fix}), per #file[Spec]({spec.id})"
     assert there == f"After #task[Fix the bug]({there_fix}), per Spec"
 
 

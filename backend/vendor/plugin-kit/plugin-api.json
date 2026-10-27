@@ -5,7 +5,7 @@
     "version": "8.1.0",
     "x-initiative-source": {
       "version": "0.77.1",
-      "commit": "0d9393c29639ec3057442c18c04f5ac9afb2ab0f"
+      "commit": "e77ecffa2d7173da6f2fdc9fdbbef1af6f1028f1"
     }
   },
   "servers": [
@@ -68,7 +68,6 @@
             "dashboards:read",
             "files:read",
             "initiatives:read",
-            "libraries:read",
             "posts:read",
             "projects:read",
             "queues:read",
@@ -133,7 +132,6 @@
             "dashboards:read",
             "files:read",
             "initiatives:read",
-            "libraries:read",
             "posts:read",
             "projects:read",
             "queues:read",
@@ -661,6 +659,24 @@
               "title": "Kind"
             },
             "description": "Filter by kind of file"
+          },
+          {
+            "name": "collection_id",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "integer"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "description": "Filter to the files in one collection",
+              "title": "Collection Id"
+            },
+            "description": "Filter to the files in one collection"
           },
           {
             "name": "page",
@@ -1991,288 +2007,6 @@
         ]
       }
     },
-    "/libraries/": {
-      "get": {
-        "tags": [
-          "libraries"
-        ],
-        "summary": "List Libraries",
-        "description": "List libraries visible to the current user (guild admins see all).",
-        "operationId": "list_libraries",
-        "security": [
-          {
-            "PluginToken": []
-          }
-        ],
-        "responses": {
-          "200": {
-            "description": "Successful Response",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/LibraryListResponse"
-                }
-              }
-            }
-          },
-          "422": {
-            "description": "Validation Error",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/HTTPValidationError"
-                }
-              }
-            }
-          }
-        },
-        "x-plugin-scope": "libraries:read",
-        "parameters": [
-          {
-            "name": "initiative_id",
-            "in": "query",
-            "required": false,
-            "schema": {
-              "anyOf": [
-                {
-                  "type": "integer"
-                },
-                {
-                  "type": "null"
-                }
-              ],
-              "title": "Initiative Id"
-            }
-          },
-          {
-            "name": "search",
-            "in": "query",
-            "required": false,
-            "schema": {
-              "anyOf": [
-                {
-                  "type": "string"
-                },
-                {
-                  "type": "null"
-                }
-              ],
-              "description": "Full-text match over the library's name and description, through the same index the search page reads.",
-              "title": "Search"
-            },
-            "description": "Full-text match over the library's name and description, through the same index the search page reads."
-          },
-          {
-            "name": "sort_by",
-            "in": "query",
-            "required": false,
-            "schema": {
-              "anyOf": [
-                {
-                  "type": "string"
-                },
-                {
-                  "type": "null"
-                }
-              ],
-              "description": "Order by one of: name, initiative, updated_at. Omit for newest first.",
-              "title": "Sort By"
-            },
-            "description": "Order by one of: name, initiative, updated_at. Omit for newest first."
-          },
-          {
-            "name": "sort_dir",
-            "in": "query",
-            "required": false,
-            "schema": {
-              "anyOf": [
-                {
-                  "type": "string"
-                },
-                {
-                  "type": "null"
-                }
-              ],
-              "description": "asc (default) or desc.",
-              "title": "Sort Dir"
-            },
-            "description": "asc (default) or desc."
-          },
-          {
-            "name": "tag_ids",
-            "in": "query",
-            "required": false,
-            "schema": {
-              "anyOf": [
-                {
-                  "type": "array",
-                  "items": {
-                    "type": "integer"
-                  }
-                },
-                {
-                  "type": "null"
-                }
-              ],
-              "description": "Only libraries carrying any of these tags.",
-              "title": "Tag Ids"
-            },
-            "description": "Only libraries carrying any of these tags."
-          },
-          {
-            "name": "property_filters",
-            "in": "query",
-            "required": false,
-            "schema": {
-              "anyOf": [
-                {
-                  "type": "string"
-                },
-                {
-                  "type": "null"
-                }
-              ],
-              "description": "JSON-encoded list of property-value filters, e.g. `[{\"property_id\": 12, \"op\": \"eq\", \"value\": \"live\"}]`. Maximum 5 conditions per request.",
-              "title": "Property Filters"
-            },
-            "description": "JSON-encoded list of property-value filters, e.g. `[{\"property_id\": 12, \"op\": \"eq\", \"value\": \"live\"}]`. Maximum 5 conditions per request."
-          },
-          {
-            "name": "archived",
-            "in": "query",
-            "required": false,
-            "schema": {
-              "anyOf": [
-                {
-                  "type": "boolean"
-                },
-                {
-                  "type": "null"
-                }
-              ],
-              "description": "true lists what has been archived instead of what is live. Omit for the live list, which is what every other view shows.",
-              "title": "Archived"
-            },
-            "description": "true lists what has been archived instead of what is live. Omit for the live list, which is what every other view shows."
-          },
-          {
-            "name": "include_preview",
-            "in": "query",
-            "required": false,
-            "schema": {
-              "type": "boolean",
-              "description": "Also send what each row's card shows of what is inside it, read for the whole page at once.",
-              "default": false,
-              "title": "Include Preview"
-            },
-            "description": "Also send what each row's card shows of what is inside it, read for the whole page at once."
-          },
-          {
-            "name": "page",
-            "in": "query",
-            "required": false,
-            "schema": {
-              "type": "integer",
-              "minimum": 1,
-              "default": 1,
-              "title": "Page"
-            }
-          },
-          {
-            "name": "page_size",
-            "in": "query",
-            "required": false,
-            "schema": {
-              "type": "integer",
-              "maximum": 500,
-              "minimum": 0,
-              "default": 100,
-              "title": "Page Size"
-            }
-          },
-          {
-            "name": "session_token",
-            "in": "cookie",
-            "required": false,
-            "schema": {
-              "anyOf": [
-                {
-                  "type": "string"
-                },
-                {
-                  "type": "null"
-                }
-              ],
-              "title": "Session Token"
-            }
-          }
-        ]
-      },
-      "post": {
-        "tags": [
-          "libraries"
-        ],
-        "summary": "Create Library",
-        "description": "Create a library. Requires create_libraries permission on the\ninitiative (or guild admin); the creator gets the owner grant.",
-        "operationId": "create_library",
-        "security": [
-          {
-            "PluginToken": []
-          }
-        ],
-        "requestBody": {
-          "required": true,
-          "content": {
-            "application/json": {
-              "schema": {
-                "$ref": "#/components/schemas/LibraryCreate"
-              }
-            }
-          }
-        },
-        "responses": {
-          "201": {
-            "description": "Successful Response",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/LibraryRead"
-                }
-              }
-            }
-          },
-          "422": {
-            "description": "Validation Error",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/HTTPValidationError"
-                }
-              }
-            }
-          }
-        },
-        "x-plugin-scope": "libraries:write",
-        "parameters": [
-          {
-            "name": "session_token",
-            "in": "cookie",
-            "required": false,
-            "schema": {
-              "anyOf": [
-                {
-                  "type": "string"
-                },
-                {
-                  "type": "null"
-                }
-              ],
-              "title": "Session Token"
-            }
-          }
-        ]
-      }
-    },
     "/wikis/": {
       "get": {
         "tags": [
@@ -2524,6 +2258,434 @@
         },
         "x-plugin-scope": "wikis:write",
         "parameters": [
+          {
+            "name": "session_token",
+            "in": "cookie",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Session Token"
+            }
+          }
+        ]
+      }
+    },
+    "/collections/{collection_id}/files": {
+      "get": {
+        "tags": [
+          "files"
+        ],
+        "summary": "List Collection Files",
+        "description": "The files in one collection the reader can open: the Files list, with\nits parameters, narrowed to the collection. A collection out of reach is\na 404.",
+        "operationId": "list_collection_files",
+        "security": [
+          {
+            "PluginToken": []
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/FileListResponse"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        },
+        "x-plugin-scope": "files:read",
+        "parameters": [
+          {
+            "name": "collection_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "integer",
+              "title": "Collection Id"
+            }
+          },
+          {
+            "name": "initiative_id",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "integer"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Initiative Id"
+            }
+          },
+          {
+            "name": "search",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Search"
+            }
+          },
+          {
+            "name": "tag_ids",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "array",
+                  "items": {
+                    "type": "integer"
+                  }
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "description": "Filter by tag IDs",
+              "title": "Tag Ids"
+            },
+            "description": "Filter by tag IDs"
+          },
+          {
+            "name": "property_filters",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "description": "JSON-encoded list of property-value filters, e.g. `[{\"property_id\": 12, \"op\": \"eq\", \"value\": \"live\"}]`. Maximum 5 conditions per request.",
+              "title": "Property Filters"
+            },
+            "description": "JSON-encoded list of property-value filters, e.g. `[{\"property_id\": 12, \"op\": \"eq\", \"value\": \"live\"}]`. Maximum 5 conditions per request."
+          },
+          {
+            "name": "untagged",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "boolean"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "description": "Filter to files with no tags",
+              "title": "Untagged"
+            },
+            "description": "Filter to files with no tags"
+          },
+          {
+            "name": "is_template",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "boolean"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "description": "Only templates (true) or only files that are not templates (false). Omit for both.",
+              "title": "Is Template"
+            },
+            "description": "Only templates (true) or only files that are not templates (false). Omit for both."
+          },
+          {
+            "name": "file_type",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "$ref": "#/components/schemas/FileType"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "description": "Filter by file type",
+              "title": "File Type"
+            },
+            "description": "Filter by file type"
+          },
+          {
+            "name": "kind",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "$ref": "#/components/schemas/FileKind"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "description": "Filter by kind of file",
+              "title": "Kind"
+            },
+            "description": "Filter by kind of file"
+          },
+          {
+            "name": "page",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "integer",
+              "minimum": 1,
+              "default": 1,
+              "title": "Page"
+            }
+          },
+          {
+            "name": "page_size",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "integer",
+              "maximum": 100,
+              "minimum": 0,
+              "default": 20,
+              "title": "Page Size"
+            }
+          },
+          {
+            "name": "sort_by",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "description": "Order by one of: name, initiative, updated_at, created_at.",
+              "title": "Sort By"
+            },
+            "description": "Order by one of: name, initiative, updated_at, created_at."
+          },
+          {
+            "name": "sort_dir",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "description": "asc (default) or desc.",
+              "title": "Sort Dir"
+            },
+            "description": "asc (default) or desc."
+          },
+          {
+            "name": "archived",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "boolean"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "description": "true lists what has been archived instead of what is live. Omit for the live list, which is what every other view shows.",
+              "title": "Archived"
+            },
+            "description": "true lists what has been archived instead of what is live. Omit for the live list, which is what every other view shows."
+          },
+          {
+            "name": "session_token",
+            "in": "cookie",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Session Token"
+            }
+          }
+        ]
+      },
+      "post": {
+        "tags": [
+          "files"
+        ],
+        "summary": "Add Collection Files",
+        "description": "Put files in a collection: each a file of its initiative the reader can\nopen. One already in it stays as it is.",
+        "operationId": "add_collection_files",
+        "security": [
+          {
+            "PluginToken": []
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/CollectionFiles"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/CollectionRead"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        },
+        "x-plugin-scope": "files:write",
+        "parameters": [
+          {
+            "name": "collection_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "integer",
+              "title": "Collection Id"
+            }
+          },
+          {
+            "name": "session_token",
+            "in": "cookie",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Session Token"
+            }
+          }
+        ]
+      },
+      "delete": {
+        "tags": [
+          "files"
+        ],
+        "summary": "Remove Collection Files",
+        "description": "Take files out of a collection. The files stay where they are. A\ncollection left with no file goes to the trash.",
+        "operationId": "remove_collection_files",
+        "security": [
+          {
+            "PluginToken": []
+          }
+        ],
+        "responses": {
+          "204": {
+            "description": "Successful Response"
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        },
+        "x-plugin-scope": "files:write",
+        "parameters": [
+          {
+            "name": "collection_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "integer",
+              "title": "Collection Id"
+            }
+          },
+          {
+            "name": "file_ids",
+            "in": "query",
+            "required": true,
+            "schema": {
+              "type": "array",
+              "items": {
+                "type": "integer"
+              },
+              "minItems": 1,
+              "maxItems": 500,
+              "title": "File Ids"
+            }
+          },
           {
             "name": "session_token",
             "in": "cookie",
@@ -4064,6 +4226,23 @@
             }
           },
           {
+            "name": "collection_id",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "integer",
+                  "exclusiveMinimum": 0
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Collection Id"
+            }
+          },
+          {
             "name": "project_id",
             "in": "query",
             "required": false,
@@ -4180,23 +4359,6 @@
                 }
               ],
               "title": "Post Id"
-            }
-          },
-          {
-            "name": "library_id",
-            "in": "query",
-            "required": false,
-            "schema": {
-              "anyOf": [
-                {
-                  "type": "integer",
-                  "exclusiveMinimum": 0
-                },
-                {
-                  "type": "null"
-                }
-              ],
-              "title": "Library Id"
             }
           },
           {
@@ -4457,6 +4619,147 @@
         ]
       }
     },
+    "/files/upload": {
+      "post": {
+        "tags": [
+          "files"
+        ],
+        "summary": "Upload File",
+        "description": "Upload a file (PDF, DOCX, etc.).",
+        "operationId": "upload_file",
+        "security": [
+          {
+            "PluginToken": []
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "multipart/form-data": {
+              "schema": {
+                "$ref": "#/components/schemas/Body_upload_file"
+              }
+            }
+          }
+        },
+        "responses": {
+          "201": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/FileRead"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        },
+        "x-plugin-scope": "files:write",
+        "parameters": [
+          {
+            "name": "session_token",
+            "in": "cookie",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Session Token"
+            }
+          }
+        ]
+      }
+    },
+    "/files/{file_id}/versions": {
+      "post": {
+        "tags": [
+          "files"
+        ],
+        "summary": "Upload File Version",
+        "description": "Upload a new version of an uploaded file. Requires write access.",
+        "operationId": "upload_file_version",
+        "security": [
+          {
+            "PluginToken": []
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "multipart/form-data": {
+              "schema": {
+                "$ref": "#/components/schemas/Body_upload_file_version"
+              }
+            }
+          }
+        },
+        "responses": {
+          "201": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/FileVersionRead"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        },
+        "x-plugin-scope": "files:write",
+        "parameters": [
+          {
+            "name": "file_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "integer",
+              "title": "File Id"
+            }
+          },
+          {
+            "name": "session_token",
+            "in": "cookie",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Session Token"
+            }
+          }
+        ]
+      }
+    },
     "/files/{file_id}": {
       "get": {
         "tags": [
@@ -4596,6 +4899,346 @@
             "schema": {
               "type": "integer",
               "title": "File Id"
+            }
+          },
+          {
+            "name": "session_token",
+            "in": "cookie",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Session Token"
+            }
+          }
+        ]
+      }
+    },
+    "/collections/": {
+      "get": {
+        "tags": [
+          "files"
+        ],
+        "summary": "List Collections",
+        "description": "The initiative's collections the reader can see — those holding a file\nthey can open — most recently changed first, each with how many of its\nfiles they can see and a cover they can open.",
+        "operationId": "list_collections",
+        "security": [
+          {
+            "PluginToken": []
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/CollectionListResponse"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        },
+        "x-plugin-scope": "files:read",
+        "parameters": [
+          {
+            "name": "initiative_id",
+            "in": "query",
+            "required": true,
+            "schema": {
+              "type": "integer",
+              "title": "Initiative Id"
+            }
+          },
+          {
+            "name": "archived",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "boolean"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "description": "true lists what has been archived instead of what is live. Omit for the live list, which is what every other view shows.",
+              "title": "Archived"
+            },
+            "description": "true lists what has been archived instead of what is live. Omit for the live list, which is what every other view shows."
+          },
+          {
+            "name": "session_token",
+            "in": "cookie",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Session Token"
+            }
+          }
+        ]
+      },
+      "post": {
+        "tags": [
+          "files"
+        ],
+        "summary": "Create Collection",
+        "description": "Make a collection of files. It starts with the files named, each one a\nfile of the initiative the reader can open. Takes the initiative role's\nright to create files.",
+        "operationId": "create_collection",
+        "security": [
+          {
+            "PluginToken": []
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/CollectionCreate"
+              }
+            }
+          }
+        },
+        "responses": {
+          "201": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/CollectionRead"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        },
+        "x-plugin-scope": "files:write",
+        "parameters": [
+          {
+            "name": "session_token",
+            "in": "cookie",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Session Token"
+            }
+          }
+        ]
+      }
+    },
+    "/collections/{collection_id}": {
+      "get": {
+        "tags": [
+          "files"
+        ],
+        "summary": "Read Collection",
+        "operationId": "read_collection",
+        "security": [
+          {
+            "PluginToken": []
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/CollectionRead"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        },
+        "x-plugin-scope": "files:read",
+        "parameters": [
+          {
+            "name": "collection_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "integer",
+              "title": "Collection Id"
+            }
+          },
+          {
+            "name": "session_token",
+            "in": "cookie",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Session Token"
+            }
+          }
+        ]
+      },
+      "patch": {
+        "tags": [
+          "files"
+        ],
+        "summary": "Update Collection",
+        "description": "Rename, describe, tag, set the cover of, or switch the comments of a\ncollection.",
+        "operationId": "update_collection",
+        "security": [
+          {
+            "PluginToken": []
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/CollectionUpdate"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/CollectionRead"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        },
+        "x-plugin-scope": "files:write",
+        "parameters": [
+          {
+            "name": "collection_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "integer",
+              "title": "Collection Id"
+            }
+          },
+          {
+            "name": "session_token",
+            "in": "cookie",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Session Token"
+            }
+          }
+        ]
+      },
+      "delete": {
+        "tags": [
+          "files"
+        ],
+        "summary": "Delete Collection",
+        "description": "Send a collection to the trash. Its files stay where they are.",
+        "operationId": "delete_collection",
+        "security": [
+          {
+            "PluginToken": []
+          }
+        ],
+        "responses": {
+          "204": {
+            "description": "Successful Response"
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        },
+        "x-plugin-scope": "files:write",
+        "parameters": [
+          {
+            "name": "collection_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "integer",
+              "title": "Collection Id"
             }
           },
           {
@@ -6769,832 +7412,6 @@
         ]
       }
     },
-    "/libraries/{library_id}": {
-      "get": {
-        "tags": [
-          "libraries"
-        ],
-        "summary": "Read Library",
-        "operationId": "read_library",
-        "security": [
-          {
-            "PluginToken": []
-          }
-        ],
-        "responses": {
-          "200": {
-            "description": "Successful Response",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/LibraryRead"
-                }
-              }
-            }
-          },
-          "422": {
-            "description": "Validation Error",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/HTTPValidationError"
-                }
-              }
-            }
-          }
-        },
-        "x-plugin-scope": "libraries:read",
-        "parameters": [
-          {
-            "name": "library_id",
-            "in": "path",
-            "required": true,
-            "schema": {
-              "type": "integer",
-              "title": "Library Id"
-            }
-          },
-          {
-            "name": "include_deleted",
-            "in": "query",
-            "required": false,
-            "schema": {
-              "type": "boolean",
-              "description": "Also return the resource if it is in the trash. For reading a resource back after a deleted event — the row still exists until retention purges it, and access is checked exactly as for a live one.",
-              "default": false,
-              "title": "Include Deleted"
-            },
-            "description": "Also return the resource if it is in the trash. For reading a resource back after a deleted event — the row still exists until retention purges it, and access is checked exactly as for a live one."
-          },
-          {
-            "name": "session_token",
-            "in": "cookie",
-            "required": false,
-            "schema": {
-              "anyOf": [
-                {
-                  "type": "string"
-                },
-                {
-                  "type": "null"
-                }
-              ],
-              "title": "Session Token"
-            }
-          }
-        ]
-      },
-      "patch": {
-        "tags": [
-          "libraries"
-        ],
-        "summary": "Update Library",
-        "description": "Rename, describe, or choose the cover. Requires write access.",
-        "operationId": "update_library",
-        "security": [
-          {
-            "PluginToken": []
-          }
-        ],
-        "requestBody": {
-          "required": true,
-          "content": {
-            "application/json": {
-              "schema": {
-                "$ref": "#/components/schemas/LibraryUpdate"
-              }
-            }
-          }
-        },
-        "responses": {
-          "200": {
-            "description": "Successful Response",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/LibraryRead"
-                }
-              }
-            }
-          },
-          "422": {
-            "description": "Validation Error",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/HTTPValidationError"
-                }
-              }
-            }
-          }
-        },
-        "x-plugin-scope": "libraries:write",
-        "parameters": [
-          {
-            "name": "library_id",
-            "in": "path",
-            "required": true,
-            "schema": {
-              "type": "integer",
-              "title": "Library Id"
-            }
-          },
-          {
-            "name": "session_token",
-            "in": "cookie",
-            "required": false,
-            "schema": {
-              "anyOf": [
-                {
-                  "type": "string"
-                },
-                {
-                  "type": "null"
-                }
-              ],
-              "title": "Session Token"
-            }
-          }
-        ]
-      }
-    },
-    "/libraries/{library_id}/items": {
-      "get": {
-        "tags": [
-          "libraries"
-        ],
-        "summary": "List Library Items",
-        "description": "One page of a library's pictures, newest first.\n\nReaching the library is the whole gate: its pictures are its content, so\nthere is no per-picture sharing to consult.",
-        "operationId": "list_library_items",
-        "security": [
-          {
-            "PluginToken": []
-          }
-        ],
-        "responses": {
-          "200": {
-            "description": "Successful Response",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/LibraryItemListResponse"
-                }
-              }
-            }
-          },
-          "422": {
-            "description": "Validation Error",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/HTTPValidationError"
-                }
-              }
-            }
-          }
-        },
-        "x-plugin-scope": "libraries:read",
-        "parameters": [
-          {
-            "name": "library_id",
-            "in": "path",
-            "required": true,
-            "schema": {
-              "type": "integer",
-              "title": "Library Id"
-            }
-          },
-          {
-            "name": "tag_ids",
-            "in": "query",
-            "required": false,
-            "schema": {
-              "anyOf": [
-                {
-                  "type": "array",
-                  "items": {
-                    "type": "integer"
-                  }
-                },
-                {
-                  "type": "null"
-                }
-              ],
-              "description": "Only pictures carrying ANY of these tags.",
-              "title": "Tag Ids"
-            },
-            "description": "Only pictures carrying ANY of these tags."
-          },
-          {
-            "name": "search",
-            "in": "query",
-            "required": false,
-            "schema": {
-              "anyOf": [
-                {
-                  "type": "string"
-                },
-                {
-                  "type": "null"
-                }
-              ],
-              "description": "Match on title, description or filename.",
-              "title": "Search"
-            },
-            "description": "Match on title, description or filename."
-          },
-          {
-            "name": "oldest_first",
-            "in": "query",
-            "required": false,
-            "schema": {
-              "type": "boolean",
-              "description": "Read the library in the order it was filled rather than newest first.",
-              "default": false,
-              "title": "Oldest First"
-            },
-            "description": "Read the library in the order it was filled rather than newest first."
-          },
-          {
-            "name": "until",
-            "in": "query",
-            "required": false,
-            "schema": {
-              "anyOf": [
-                {
-                  "type": "string",
-                  "format": "date-time"
-                },
-                {
-                  "type": "null"
-                }
-              ],
-              "description": "Start the list at this day, inclusive, measured by each item's date — which is what the list is ordered by. This is how a timeline jumps to a month without paging through everything since. It follows the list's own direction: newest first it is a ceiling and the page walks back from it, oldest first a floor and the page walks forward, so pair it with the matching end of the timeline bucket.",
-              "title": "Until"
-            },
-            "description": "Start the list at this day, inclusive, measured by each item's date — which is what the list is ordered by. This is how a timeline jumps to a month without paging through everything since. It follows the list's own direction: newest first it is a ceiling and the page walks back from it, oldest first a floor and the page walks forward, so pair it with the matching end of the timeline bucket."
-          },
-          {
-            "name": "page",
-            "in": "query",
-            "required": false,
-            "schema": {
-              "type": "integer",
-              "minimum": 1,
-              "default": 1,
-              "title": "Page"
-            }
-          },
-          {
-            "name": "page_size",
-            "in": "query",
-            "required": false,
-            "schema": {
-              "type": "integer",
-              "maximum": 200,
-              "minimum": 1,
-              "default": 40,
-              "title": "Page Size"
-            }
-          },
-          {
-            "name": "session_token",
-            "in": "cookie",
-            "required": false,
-            "schema": {
-              "anyOf": [
-                {
-                  "type": "string"
-                },
-                {
-                  "type": "null"
-                }
-              ],
-              "title": "Session Token"
-            }
-          }
-        ]
-      },
-      "post": {
-        "tags": [
-          "libraries"
-        ],
-        "summary": "Upload Library Item",
-        "description": "Add one picture to a library. Requires write access.\n\nOne picture per request, so a drop of forty files is forty requests the\nclient can run a few at a time and report on one by one — and one that\nfails does not take the other thirty-nine with it.",
-        "operationId": "upload_library_item",
-        "security": [
-          {
-            "PluginToken": []
-          }
-        ],
-        "requestBody": {
-          "required": true,
-          "content": {
-            "multipart/form-data": {
-              "schema": {
-                "$ref": "#/components/schemas/Body_upload_library_item"
-              }
-            }
-          }
-        },
-        "responses": {
-          "201": {
-            "description": "Successful Response",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/LibraryItemRead"
-                }
-              }
-            }
-          },
-          "422": {
-            "description": "Validation Error",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/HTTPValidationError"
-                }
-              }
-            }
-          }
-        },
-        "x-plugin-scope": "libraries:write",
-        "parameters": [
-          {
-            "name": "library_id",
-            "in": "path",
-            "required": true,
-            "schema": {
-              "type": "integer",
-              "title": "Library Id"
-            }
-          },
-          {
-            "name": "session_token",
-            "in": "cookie",
-            "required": false,
-            "schema": {
-              "anyOf": [
-                {
-                  "type": "string"
-                },
-                {
-                  "type": "null"
-                }
-              ],
-              "title": "Session Token"
-            }
-          }
-        ]
-      }
-    },
-    "/libraries/{library_id}/items/timeline": {
-      "get": {
-        "tags": [
-          "libraries"
-        ],
-        "summary": "Get Library Item Timeline",
-        "description": "The months this library has items in, by each item's date, newest\nfirst — what the timeline rail is drawn from. Takes the same filters the\nlist does, so the rail is a picture of the list as it currently stands. A\ndate is a day, so its month is the same wherever it is read.",
-        "operationId": "get_library_item_timeline",
-        "security": [
-          {
-            "PluginToken": []
-          }
-        ],
-        "responses": {
-          "200": {
-            "description": "Successful Response",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/TimelineResponse"
-                }
-              }
-            }
-          },
-          "422": {
-            "description": "Validation Error",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/HTTPValidationError"
-                }
-              }
-            }
-          }
-        },
-        "x-plugin-scope": "libraries:read",
-        "parameters": [
-          {
-            "name": "library_id",
-            "in": "path",
-            "required": true,
-            "schema": {
-              "type": "integer",
-              "title": "Library Id"
-            }
-          },
-          {
-            "name": "tag_ids",
-            "in": "query",
-            "required": false,
-            "schema": {
-              "anyOf": [
-                {
-                  "type": "array",
-                  "items": {
-                    "type": "integer"
-                  }
-                },
-                {
-                  "type": "null"
-                }
-              ],
-              "title": "Tag Ids"
-            }
-          },
-          {
-            "name": "search",
-            "in": "query",
-            "required": false,
-            "schema": {
-              "anyOf": [
-                {
-                  "type": "string"
-                },
-                {
-                  "type": "null"
-                }
-              ],
-              "title": "Search"
-            }
-          },
-          {
-            "name": "session_token",
-            "in": "cookie",
-            "required": false,
-            "schema": {
-              "anyOf": [
-                {
-                  "type": "string"
-                },
-                {
-                  "type": "null"
-                }
-              ],
-              "title": "Session Token"
-            }
-          }
-        ]
-      }
-    },
-    "/library-items/{item_id}": {
-      "get": {
-        "tags": [
-          "libraries"
-        ],
-        "summary": "Read Library Item",
-        "operationId": "read_library_item",
-        "security": [
-          {
-            "PluginToken": []
-          }
-        ],
-        "responses": {
-          "200": {
-            "description": "Successful Response",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/LibraryItemRead"
-                }
-              }
-            }
-          },
-          "422": {
-            "description": "Validation Error",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/HTTPValidationError"
-                }
-              }
-            }
-          }
-        },
-        "x-plugin-scope": "libraries:read",
-        "parameters": [
-          {
-            "name": "item_id",
-            "in": "path",
-            "required": true,
-            "schema": {
-              "type": "integer",
-              "title": "Item Id"
-            }
-          },
-          {
-            "name": "session_token",
-            "in": "cookie",
-            "required": false,
-            "schema": {
-              "anyOf": [
-                {
-                  "type": "string"
-                },
-                {
-                  "type": "null"
-                }
-              ],
-              "title": "Session Token"
-            }
-          }
-        ]
-      },
-      "patch": {
-        "tags": [
-          "libraries"
-        ],
-        "summary": "Update Library Item",
-        "description": "Retitle, describe, date, retag or set the properties of a picture.\nRequires write access on the library.",
-        "operationId": "update_library_item",
-        "security": [
-          {
-            "PluginToken": []
-          }
-        ],
-        "requestBody": {
-          "required": true,
-          "content": {
-            "application/json": {
-              "schema": {
-                "$ref": "#/components/schemas/LibraryItemUpdate"
-              }
-            }
-          }
-        },
-        "responses": {
-          "200": {
-            "description": "Successful Response",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/LibraryItemRead"
-                }
-              }
-            }
-          },
-          "422": {
-            "description": "Validation Error",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/HTTPValidationError"
-                }
-              }
-            }
-          }
-        },
-        "x-plugin-scope": "libraries:write",
-        "parameters": [
-          {
-            "name": "item_id",
-            "in": "path",
-            "required": true,
-            "schema": {
-              "type": "integer",
-              "title": "Item Id"
-            }
-          },
-          {
-            "name": "session_token",
-            "in": "cookie",
-            "required": false,
-            "schema": {
-              "anyOf": [
-                {
-                  "type": "string"
-                },
-                {
-                  "type": "null"
-                }
-              ],
-              "title": "Session Token"
-            }
-          }
-        ]
-      }
-    },
-    "/library-items/{item_id}/versions": {
-      "post": {
-        "tags": [
-          "libraries"
-        ],
-        "summary": "Upload Library Item Version",
-        "description": "Replace a picture with a new rendition, keeping the old one as history.\nRequires write access on the library.",
-        "operationId": "upload_library_item_version",
-        "security": [
-          {
-            "PluginToken": []
-          }
-        ],
-        "requestBody": {
-          "required": true,
-          "content": {
-            "multipart/form-data": {
-              "schema": {
-                "$ref": "#/components/schemas/Body_upload_library_item_version"
-              }
-            }
-          }
-        },
-        "responses": {
-          "201": {
-            "description": "Successful Response",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/LibraryItemVersionRead"
-                }
-              }
-            }
-          },
-          "422": {
-            "description": "Validation Error",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/HTTPValidationError"
-                }
-              }
-            }
-          }
-        },
-        "x-plugin-scope": "libraries:write",
-        "parameters": [
-          {
-            "name": "item_id",
-            "in": "path",
-            "required": true,
-            "schema": {
-              "type": "integer",
-              "title": "Item Id"
-            }
-          },
-          {
-            "name": "session_token",
-            "in": "cookie",
-            "required": false,
-            "schema": {
-              "anyOf": [
-                {
-                  "type": "string"
-                },
-                {
-                  "type": "null"
-                }
-              ],
-              "title": "Session Token"
-            }
-          }
-        ]
-      },
-      "get": {
-        "tags": [
-          "libraries"
-        ],
-        "summary": "List Library Item Versions",
-        "description": "Every stored rendition of a picture, newest first.",
-        "operationId": "list_library_item_versions",
-        "security": [
-          {
-            "PluginToken": []
-          }
-        ],
-        "responses": {
-          "200": {
-            "description": "Successful Response",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "type": "array",
-                  "items": {
-                    "$ref": "#/components/schemas/LibraryItemVersionRead"
-                  },
-                  "title": "Response List Library Item Versions"
-                }
-              }
-            }
-          },
-          "422": {
-            "description": "Validation Error",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/HTTPValidationError"
-                }
-              }
-            }
-          }
-        },
-        "x-plugin-scope": "libraries:read",
-        "parameters": [
-          {
-            "name": "item_id",
-            "in": "path",
-            "required": true,
-            "schema": {
-              "type": "integer",
-              "title": "Item Id"
-            }
-          },
-          {
-            "name": "session_token",
-            "in": "cookie",
-            "required": false,
-            "schema": {
-              "anyOf": [
-                {
-                  "type": "string"
-                },
-                {
-                  "type": "null"
-                }
-              ],
-              "title": "Session Token"
-            }
-          }
-        ]
-      }
-    },
-    "/library-items/{item_id}/versions/{version_id}": {
-      "delete": {
-        "tags": [
-          "libraries"
-        ],
-        "summary": "Delete Library Item Version",
-        "description": "Delete one rendition of a picture. Owner only. Deleting the current\none promotes the previous; deleting the last is refused — remove the\npicture instead.",
-        "operationId": "delete_library_item_version",
-        "security": [
-          {
-            "PluginToken": []
-          }
-        ],
-        "responses": {
-          "204": {
-            "description": "Successful Response"
-          },
-          "422": {
-            "description": "Validation Error",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/HTTPValidationError"
-                }
-              }
-            }
-          }
-        },
-        "x-plugin-scope": "libraries:write",
-        "parameters": [
-          {
-            "name": "item_id",
-            "in": "path",
-            "required": true,
-            "schema": {
-              "type": "integer",
-              "title": "Item Id"
-            }
-          },
-          {
-            "name": "version_id",
-            "in": "path",
-            "required": true,
-            "schema": {
-              "type": "integer",
-              "title": "Version Id"
-            }
-          },
-          {
-            "name": "session_token",
-            "in": "cookie",
-            "required": false,
-            "schema": {
-              "anyOf": [
-                {
-                  "type": "string"
-                },
-                {
-                  "type": "null"
-                }
-              ],
-              "title": "Session Token"
-            }
-          }
-        ]
-      }
-    },
     "/wikis/{wiki_id}": {
       "get": {
         "tags": [
@@ -9482,85 +9299,6 @@
         ]
       }
     },
-    "/libraries/{library_id}/grants": {
-      "put": {
-        "tags": [
-          "libraries"
-        ],
-        "summary": "Set Library Grants",
-        "description": "Replace the library's entire sharing state in one call — the body is the\nfull list of grants (all-initiative-members / per-user / per-role). Every\nnon-owner grant is rebuilt from it; the owner is always preserved.\n\nAnyone the new sharing no longer lets open the library is taken off\nwhatever in it names them.",
-        "operationId": "set_library_grants",
-        "security": [
-          {
-            "PluginToken": []
-          }
-        ],
-        "requestBody": {
-          "required": true,
-          "content": {
-            "application/json": {
-              "schema": {
-                "type": "array",
-                "items": {
-                  "$ref": "#/components/schemas/ResourceGrantSchema"
-                },
-                "title": "Grants"
-              }
-            }
-          }
-        },
-        "responses": {
-          "200": {
-            "description": "Successful Response",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/LibraryRead"
-                }
-              }
-            }
-          },
-          "422": {
-            "description": "Validation Error",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/HTTPValidationError"
-                }
-              }
-            }
-          }
-        },
-        "x-plugin-scope": "sharing:write",
-        "parameters": [
-          {
-            "name": "library_id",
-            "in": "path",
-            "required": true,
-            "schema": {
-              "type": "integer",
-              "title": "Library Id"
-            }
-          },
-          {
-            "name": "session_token",
-            "in": "cookie",
-            "required": false,
-            "schema": {
-              "anyOf": [
-                {
-                  "type": "string"
-                },
-                {
-                  "type": "null"
-                }
-              ],
-              "title": "Session Token"
-            }
-          }
-        ]
-      }
-    },
     "/wikis/{wiki_id}/grants": {
       "put": {
         "tags": [
@@ -10132,88 +9870,6 @@
         ]
       }
     },
-    "/libraries/{library_id}/duplicate": {
-      "post": {
-        "tags": [
-          "libraries"
-        ],
-        "summary": "Duplicate Library",
-        "description": "Copy it, with everything inside it, into an initiative: its own unless the body names another. Read is enough to copy a template; anything else needs write. The copy is shared as its source is while it stays in the same initiative, and carries the tags its maker may set: an installed plug-in's copy carries them only when it holds the scope to tag.",
-        "operationId": "duplicate_library",
-        "security": [
-          {
-            "PluginToken": []
-          }
-        ],
-        "requestBody": {
-          "content": {
-            "application/json": {
-              "schema": {
-                "anyOf": [
-                  {
-                    "$ref": "#/components/schemas/ToolDuplicateRequest"
-                  },
-                  {
-                    "type": "null"
-                  }
-                ],
-                "title": "Body"
-              }
-            }
-          }
-        },
-        "responses": {
-          "201": {
-            "description": "Successful Response",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/LibraryRead"
-                }
-              }
-            }
-          },
-          "422": {
-            "description": "Validation Error",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/HTTPValidationError"
-                }
-              }
-            }
-          }
-        },
-        "x-plugin-scope": "libraries:write",
-        "parameters": [
-          {
-            "name": "library_id",
-            "in": "path",
-            "required": true,
-            "schema": {
-              "type": "integer",
-              "title": "Library Id"
-            }
-          },
-          {
-            "name": "session_token",
-            "in": "cookie",
-            "required": false,
-            "schema": {
-              "anyOf": [
-                {
-                  "type": "string"
-                },
-                {
-                  "type": "null"
-                }
-              ],
-              "title": "Session Token"
-            }
-          }
-        ]
-      }
-    },
     "/wikis/{wiki_id}/duplicate": {
       "post": {
         "tags": [
@@ -10343,7 +9999,6 @@
             "counter_groups:read",
             "dashboards:read",
             "files:read",
-            "libraries:read",
             "posts:read",
             "projects:read",
             "queues:read",
@@ -10380,10 +10035,10 @@
                   "type": "null"
                 }
               ],
-              "description": "Restrict to these entity types. Omit for the default scope (calendar, calendar_event, counter, counter_group, dashboard, file, library, library_item, post, project, queue, queue_item, tag, task, wiki, wiki_page); naming a type reaches it explicitly.",
+              "description": "Restrict to these entity types. Omit for the default scope (calendar, calendar_event, collection, counter, counter_group, dashboard, file, post, project, queue, queue_item, tag, task, wiki, wiki_page); naming a type reaches it explicitly.",
               "title": "Types"
             },
-            "description": "Restrict to these entity types. Omit for the default scope (calendar, calendar_event, counter, counter_group, dashboard, file, library, library_item, post, project, queue, queue_item, tag, task, wiki, wiki_page); naming a type reaches it explicitly."
+            "description": "Restrict to these entity types. Omit for the default scope (calendar, calendar_event, collection, counter, counter_group, dashboard, file, post, project, queue, queue_item, tag, task, wiki, wiki_page); naming a type reaches it explicitly."
           },
           {
             "name": "initiative_id",
@@ -10515,7 +10170,6 @@
             "counter_groups:read",
             "dashboards:read",
             "files:read",
-            "libraries:read",
             "posts:read",
             "projects:read",
             "properties:read",
@@ -10808,12 +10462,11 @@
           "scopes": {
             "calendar": "calendars:write",
             "calendar_event": "calendars:write",
+            "collection": "files:write",
             "counter": "counter_groups:write",
             "counter_group": "counter_groups:write",
             "dashboard": "dashboards:write",
             "file": "files:write",
-            "library": "libraries:write",
-            "library_item": "libraries:write",
             "post": "posts:write",
             "project": "projects:write",
             "queue": "queues:write",
@@ -10899,10 +10552,10 @@
           "by": "entity_type",
           "scopes": {
             "calendar": "calendars:write",
+            "collection": "files:write",
             "counter_group": "counter_groups:write",
             "dashboard": "dashboards:write",
             "file": "files:write",
-            "library": "libraries:write",
             "post": "posts:write",
             "project": "projects:write",
             "queue": "queues:write",
@@ -11215,10 +10868,10 @@
           "calendar",
           "dashboard",
           "post",
-          "library",
           "wiki",
           "task",
-          "initiative"
+          "initiative",
+          "collection"
         ],
         "title": "ArchivableType",
         "description": "Things that can be archived."
@@ -11253,58 +10906,31 @@
         "title": "ArchiveResponse",
         "description": "What archiving or unarchiving answers with.\n\nThe stamp, not the entity: one endpoint serves ten kinds, and a caller that\nwants the whole row reads it back from the route that already serves it."
       },
-      "Body_upload_library_item": {
+      "Body_upload_file": {
         "properties": {
+          "name": {
+            "type": "string",
+            "title": "Name"
+          },
+          "initiative_id": {
+            "type": "integer",
+            "title": "Initiative Id"
+          },
           "file": {
             "type": "string",
             "contentMediaType": "application/octet-stream",
             "title": "File"
-          },
-          "title": {
-            "anyOf": [
-              {
-                "type": "string"
-              },
-              {
-                "type": "null"
-              }
-            ],
-            "title": "Title"
-          },
-          "description": {
-            "anyOf": [
-              {
-                "type": "string",
-                "x-mentions": "markdown",
-                "description": "A person is mentioned as `@[](<reference>)`, by your reference for them, with no name: read who they are from the members search (`members:read`). Write a mention the same way. A stored file comes without its path: `![alt]()`, `[name]()`."
-              },
-              {
-                "type": "null"
-              }
-            ],
-            "title": "Description"
-          },
-          "occurred_on": {
-            "anyOf": [
-              {
-                "type": "string",
-                "format": "date"
-              },
-              {
-                "type": "null"
-              }
-            ],
-            "title": "Occurred On",
-            "description": "The day the item is about. Defaults to today, in UTC."
           }
         },
         "type": "object",
         "required": [
+          "name",
+          "initiative_id",
           "file"
         ],
-        "title": "Body_upload_library_item"
+        "title": "Body_upload_file"
       },
-      "Body_upload_library_item_version": {
+      "Body_upload_file_version": {
         "properties": {
           "file": {
             "type": "string",
@@ -11316,7 +10942,7 @@
         "required": [
           "file"
         ],
-        "title": "Body_upload_library_item_version"
+        "title": "Body_upload_file_version"
       },
       "CalendarCreate": {
         "properties": {
@@ -12424,6 +12050,395 @@
         ],
         "title": "ChecklistProgress"
       },
+      "CollectionCover": {
+        "properties": {
+          "file_id": {
+            "type": "integer",
+            "title": "File Id"
+          },
+          "name": {
+            "type": "string",
+            "title": "Name"
+          },
+          "file_type": {
+            "$ref": "#/components/schemas/FileType"
+          },
+          "file_url": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "File Url",
+            "x-upload": true,
+            "description": "A stored file comes as an empty string, without its path. A URL from elsewhere comes as it is."
+          },
+          "file_content_type": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "File Content Type"
+          }
+        },
+        "type": "object",
+        "required": [
+          "file_id",
+          "name",
+          "file_type",
+          "file_url",
+          "file_content_type"
+        ],
+        "title": "CollectionCover",
+        "description": "The file a card shows for a collection."
+      },
+      "CollectionCreate": {
+        "properties": {
+          "properties": {
+            "items": {
+              "$ref": "#/components/schemas/PropertyValueInput"
+            },
+            "type": "array",
+            "title": "Properties"
+          },
+          "file_ids": {
+            "items": {
+              "type": "integer"
+            },
+            "type": "array",
+            "maxItems": 500,
+            "minItems": 1,
+            "title": "File Ids"
+          },
+          "initiative_id": {
+            "type": "integer",
+            "title": "Initiative Id"
+          },
+          "name": {
+            "type": "string",
+            "maxLength": 255,
+            "minLength": 1,
+            "title": "Name"
+          },
+          "description": {
+            "anyOf": [
+              {
+                "type": "string",
+                "maxLength": 2000,
+                "x-mentions": "markdown",
+                "description": "A person is mentioned as `@[](<reference>)`, by your reference for them, with no name: read who they are from the members search (`members:read`). Write a mention the same way. A stored file comes without its path: `![alt]()`, `[name]()`."
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Description"
+          },
+          "tag_ids": {
+            "anyOf": [
+              {
+                "items": {
+                  "type": "integer"
+                },
+                "type": "array"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Tag Ids"
+          }
+        },
+        "type": "object",
+        "required": [
+          "file_ids",
+          "initiative_id",
+          "name"
+        ],
+        "title": "CollectionCreate",
+        "description": "A new collection, made with the files it starts with: a collection is\nnever empty."
+      },
+      "CollectionFiles": {
+        "properties": {
+          "file_ids": {
+            "items": {
+              "type": "integer"
+            },
+            "type": "array",
+            "maxItems": 500,
+            "minItems": 1,
+            "title": "File Ids"
+          }
+        },
+        "type": "object",
+        "required": [
+          "file_ids"
+        ],
+        "title": "CollectionFiles",
+        "description": "Files to put in a collection or take out of it."
+      },
+      "CollectionListResponse": {
+        "properties": {
+          "items": {
+            "items": {
+              "$ref": "#/components/schemas/CollectionRead"
+            },
+            "type": "array",
+            "title": "Items"
+          }
+        },
+        "type": "object",
+        "required": [
+          "items"
+        ],
+        "title": "CollectionListResponse"
+      },
+      "CollectionRead": {
+        "properties": {
+          "id": {
+            "type": "integer",
+            "title": "Id"
+          },
+          "initiative_id": {
+            "type": "integer",
+            "title": "Initiative Id"
+          },
+          "community_id": {
+            "title": "Community Id",
+            "type": "string",
+            "x-identity": "community"
+          },
+          "name": {
+            "type": "string",
+            "title": "Name"
+          },
+          "description": {
+            "anyOf": [
+              {
+                "type": "string",
+                "x-mentions": "markdown",
+                "description": "A person is mentioned as `@[](<reference>)`, by your reference for them, with no name: read who they are from the members search (`members:read`). Write a mention the same way. A stored file comes without its path: `![alt]()`, `[name]()`."
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Description"
+          },
+          "cover_file_id": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Cover File Id"
+          },
+          "cover": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/CollectionCover"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "file_count": {
+            "type": "integer",
+            "title": "File Count",
+            "default": 0
+          },
+          "created_by": {
+            "anyOf": [
+              {
+                "type": "string",
+                "x-identity": "person"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Created By"
+          },
+          "created_at": {
+            "type": "string",
+            "format": "date-time",
+            "title": "Created At"
+          },
+          "updated_at": {
+            "type": "string",
+            "format": "date-time",
+            "title": "Updated At"
+          },
+          "archived_at": {
+            "anyOf": [
+              {
+                "type": "string",
+                "format": "date-time"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Archived At"
+          },
+          "comments_enabled": {
+            "type": "boolean",
+            "title": "Comments Enabled",
+            "default": true
+          },
+          "comments_locked_at": {
+            "anyOf": [
+              {
+                "type": "string",
+                "format": "date-time"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Comments Locked At"
+          },
+          "comment_count": {
+            "type": "integer",
+            "title": "Comment Count",
+            "default": 0
+          },
+          "tags": {
+            "items": {
+              "$ref": "#/components/schemas/TagSummary"
+            },
+            "type": "array",
+            "title": "Tags"
+          },
+          "properties": {
+            "items": {
+              "$ref": "#/components/schemas/PropertySummary"
+            },
+            "type": "array",
+            "title": "Properties"
+          },
+          "can": {
+            "$ref": "#/components/schemas/ContentCan"
+          }
+        },
+        "type": "object",
+        "required": [
+          "id",
+          "initiative_id",
+          "community_id",
+          "name",
+          "description",
+          "cover_file_id",
+          "cover",
+          "file_count",
+          "created_by",
+          "created_at",
+          "updated_at",
+          "archived_at",
+          "comments_enabled",
+          "comments_locked_at",
+          "comment_count",
+          "tags",
+          "properties",
+          "can"
+        ],
+        "title": "CollectionRead",
+        "description": "A collection as its reader sees it: only the files they can open are\ncounted, and the cover is one of those."
+      },
+      "CollectionUpdate": {
+        "properties": {
+          "properties": {
+            "anyOf": [
+              {
+                "items": {
+                  "$ref": "#/components/schemas/PropertyValueInput"
+                },
+                "type": "array"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Properties"
+          },
+          "name": {
+            "anyOf": [
+              {
+                "type": "string",
+                "maxLength": 255,
+                "minLength": 1
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Name"
+          },
+          "description": {
+            "anyOf": [
+              {
+                "type": "string",
+                "maxLength": 2000,
+                "x-mentions": "markdown",
+                "description": "A person is mentioned as `@[](<reference>)`, by your reference for them, with no name: read who they are from the members search (`members:read`). Write a mention the same way. A stored file comes without its path: `![alt]()`, `[name]()`."
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Description"
+          },
+          "cover_file_id": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Cover File Id"
+          },
+          "tag_ids": {
+            "anyOf": [
+              {
+                "items": {
+                  "type": "integer"
+                },
+                "type": "array"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Tag Ids"
+          },
+          "comments_enabled": {
+            "anyOf": [
+              {
+                "type": "boolean"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Comments Enabled"
+          }
+        },
+        "type": "object",
+        "title": "CollectionUpdate"
+      },
       "ColumnFillRead": {
         "properties": {
           "project_id": {
@@ -12493,6 +12508,18 @@
               }
             ],
             "title": "Wiki Page Id"
+          },
+          "collection_id": {
+            "anyOf": [
+              {
+                "type": "integer",
+                "exclusiveMinimum": 0
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Collection Id"
           },
           "project_id": {
             "anyOf": [
@@ -12577,18 +12604,6 @@
               }
             ],
             "title": "Post Id"
-          },
-          "library_id": {
-            "anyOf": [
-              {
-                "type": "integer",
-                "exclusiveMinimum": 0
-              },
-              {
-                "type": "null"
-              }
-            ],
-            "title": "Library Id"
           },
           "wiki_id": {
             "anyOf": [
@@ -12696,6 +12711,17 @@
             ],
             "title": "Wiki Page Id"
           },
+          "collection_id": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Collection Id"
+          },
           "project_id": {
             "anyOf": [
               {
@@ -12772,17 +12798,6 @@
               }
             ],
             "title": "Post Id"
-          },
-          "library_id": {
-            "anyOf": [
-              {
-                "type": "integer"
-              },
-              {
-                "type": "null"
-              }
-            ],
-            "title": "Library Id"
           },
           "wiki_id": {
             "anyOf": [
@@ -12903,6 +12918,7 @@
           "content",
           "task_id",
           "wiki_page_id",
+          "collection_id",
           "project_id",
           "file_id",
           "queue_id",
@@ -12910,7 +12926,6 @@
           "calendar_id",
           "dashboard_id",
           "post_id",
-          "library_id",
           "wiki_id",
           "id",
           "created_by",
@@ -14174,6 +14189,19 @@
             ],
             "title": "Original Filename"
           },
+          "thumbnail_url": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Thumbnail Url",
+            "x-upload": true,
+            "description": "A stored file comes as an empty string, without its path. A URL from elsewhere comes as it is."
+          },
           "smart_link_url": {
             "anyOf": [
               {
@@ -14191,6 +14219,13 @@
             "title": "Content",
             "x-mentions": "lexical",
             "description": "A Lexical editor state. A person is mentioned by a node whose `mentionUserId` is your reference for them, with `mentionName` and `text` empty: read who they are from the members search (`members:read`). Write a mention the same way. A stored file comes without its path: an image's `src` and a link's `url` are empty."
+          },
+          "collection_ids": {
+            "items": {
+              "type": "integer"
+            },
+            "type": "array",
+            "title": "Collection Ids"
           },
           "content_version": {
             "anyOf": [
@@ -14235,8 +14270,10 @@
           "file_content_type",
           "file_size",
           "original_filename",
+          "thumbnail_url",
           "smart_link_url",
           "content",
+          "collection_ids",
           "content_version",
           "kind"
         ],
@@ -14427,6 +14464,19 @@
             ],
             "title": "Original Filename"
           },
+          "thumbnail_url": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Thumbnail Url",
+            "x-upload": true,
+            "description": "A stored file comes as an empty string, without its path. A URL from elsewhere comes as it is."
+          },
           "smart_link_url": {
             "anyOf": [
               {
@@ -14470,6 +14520,7 @@
           "file_content_type",
           "file_size",
           "original_filename",
+          "thumbnail_url",
           "smart_link_url",
           "kind"
         ],
@@ -14485,18 +14536,39 @@
           "pdf",
           "doc",
           "docx",
+          "odt",
+          "rtf",
+          "md",
           "xls",
           "xlsx",
+          "ods",
+          "csv",
+          "tsv",
           "ppt",
           "pptx",
-          "txt",
-          "html",
-          "md",
+          "odp",
           "png",
           "jpeg",
           "gif",
           "webp",
           "svg",
+          "heic",
+          "tiff",
+          "mp4",
+          "webm",
+          "mov",
+          "mp3",
+          "m4a",
+          "wav",
+          "ogg",
+          "flac",
+          "txt",
+          "json",
+          "html",
+          "zip",
+          "tar",
+          "gz",
+          "7z",
           "other"
         ],
         "title": "FileType"
@@ -14564,6 +14636,85 @@
         },
         "type": "object",
         "title": "FileUpdate"
+      },
+      "FileVersionRead": {
+        "properties": {
+          "id": {
+            "type": "integer",
+            "title": "Id"
+          },
+          "version_number": {
+            "type": "integer",
+            "title": "Version Number"
+          },
+          "file_content_type": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "File Content Type"
+          },
+          "file_size": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "File Size"
+          },
+          "original_filename": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Original Filename"
+          },
+          "created_by": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Created By"
+          },
+          "created_at": {
+            "type": "string",
+            "format": "date-time",
+            "title": "Created At"
+          },
+          "is_current": {
+            "type": "boolean",
+            "title": "Is Current",
+            "default": false
+          }
+        },
+        "type": "object",
+        "required": [
+          "id",
+          "version_number",
+          "file_content_type",
+          "file_size",
+          "original_filename",
+          "created_by",
+          "created_at",
+          "is_current"
+        ],
+        "title": "FileVersionRead",
+        "description": "A single stored version of an uploaded file. The binary is fetched\nvia the version download endpoint by id — ``file_url`` is intentionally\nnot exposed."
       },
       "FilterCondition": {
         "description": "A single field comparison.\n\nSet ``negate=True`` to invert the result::\n\n    # name != 'bob'\n    FilterCondition(field=\"name\", value=\"bob\", negate=True)\n\n    # priority NOT IN ('low', 'medium')\n    FilterCondition(field=\"priority\", op=FilterOp.in_, value=[\"low\", \"medium\"], negate=True)",
@@ -14810,11 +14961,6 @@
             "title": "Posts Enabled",
             "default": false
           },
-          "libraries_enabled": {
-            "type": "boolean",
-            "title": "Libraries Enabled",
-            "default": false
-          },
           "wikis_enabled": {
             "type": "boolean",
             "title": "Wikis Enabled",
@@ -14930,7 +15076,6 @@
           "calendars_enabled",
           "dashboards_enabled",
           "posts_enabled",
-          "libraries_enabled",
           "wikis_enabled",
           "name",
           "description",
@@ -15018,976 +15163,6 @@
         ],
         "title": "InitiativeTaskStatusRead",
         "description": "A status column as it appears across one initiative's projects.\n\nEntries are aggregated by ``(name, category)``, so the same column\nconfigured in several projects collapses to a single row; ``color`` and\n``icon`` come from the first project that defines it. ``project_count`` is\nhow many of the projects the caller can read carry the column, out of\n``projects_total``."
-      },
-      "LibraryCover": {
-        "properties": {
-          "item_id": {
-            "type": "integer",
-            "title": "Item Id"
-          },
-          "file_url": {
-            "type": "string",
-            "title": "File Url",
-            "x-upload": true,
-            "description": "A stored file comes as an empty string, without its path. A URL from elsewhere comes as it is."
-          },
-          "thumbnail_url": {
-            "anyOf": [
-              {
-                "type": "string"
-              },
-              {
-                "type": "null"
-              }
-            ],
-            "title": "Thumbnail Url",
-            "x-upload": true,
-            "description": "A stored file comes as an empty string, without its path. A URL from elsewhere comes as it is."
-          },
-          "width": {
-            "anyOf": [
-              {
-                "type": "integer"
-              },
-              {
-                "type": "null"
-              }
-            ],
-            "title": "Width"
-          },
-          "height": {
-            "anyOf": [
-              {
-                "type": "integer"
-              },
-              {
-                "type": "null"
-              }
-            ],
-            "title": "Height"
-          }
-        },
-        "type": "object",
-        "required": [
-          "item_id",
-          "file_url",
-          "thumbnail_url",
-          "width",
-          "height"
-        ],
-        "title": "LibraryCover",
-        "description": "What a list draws for a library: one picture, at whichever size it has."
-      },
-      "LibraryCreate": {
-        "properties": {
-          "properties": {
-            "items": {
-              "$ref": "#/components/schemas/PropertyValueInput"
-            },
-            "type": "array",
-            "title": "Properties"
-          },
-          "name": {
-            "type": "string",
-            "maxLength": 255,
-            "minLength": 1,
-            "title": "Name"
-          },
-          "description": {
-            "anyOf": [
-              {
-                "type": "string",
-                "maxLength": 2000,
-                "x-mentions": "markdown",
-                "description": "A person is mentioned as `@[](<reference>)`, by your reference for them, with no name: read who they are from the members search (`members:read`). Write a mention the same way. A stored file comes without its path: `![alt]()`, `[name]()`."
-              },
-              {
-                "type": "null"
-              }
-            ],
-            "title": "Description"
-          },
-          "initiative_id": {
-            "type": "integer",
-            "title": "Initiative Id"
-          },
-          "tag_ids": {
-            "anyOf": [
-              {
-                "items": {
-                  "type": "integer"
-                },
-                "type": "array"
-              },
-              {
-                "type": "null"
-              }
-            ],
-            "title": "Tag Ids"
-          },
-          "grants": {
-            "items": {
-              "$ref": "#/components/schemas/ResourceGrantSchema"
-            },
-            "type": "array",
-            "title": "Grants"
-          }
-        },
-        "type": "object",
-        "required": [
-          "name",
-          "initiative_id"
-        ],
-        "title": "LibraryCreate"
-      },
-      "LibraryItemListResponse": {
-        "properties": {
-          "total_count": {
-            "type": "integer",
-            "title": "Total Count"
-          },
-          "page": {
-            "type": "integer",
-            "title": "Page"
-          },
-          "page_size": {
-            "type": "integer",
-            "title": "Page Size"
-          },
-          "has_next": {
-            "type": "boolean",
-            "title": "Has Next"
-          },
-          "has_prev": {
-            "type": "boolean",
-            "title": "Has Prev"
-          },
-          "items": {
-            "items": {
-              "$ref": "#/components/schemas/LibraryItemRead"
-            },
-            "type": "array",
-            "title": "Items"
-          }
-        },
-        "type": "object",
-        "required": [
-          "total_count",
-          "page",
-          "page_size",
-          "has_next",
-          "has_prev",
-          "items"
-        ],
-        "title": "LibraryItemListResponse"
-      },
-      "LibraryItemRead": {
-        "properties": {
-          "id": {
-            "type": "integer",
-            "title": "Id"
-          },
-          "library_id": {
-            "type": "integer",
-            "title": "Library Id"
-          },
-          "community_id": {
-            "title": "Community Id",
-            "type": "string",
-            "x-identity": "community"
-          },
-          "title": {
-            "anyOf": [
-              {
-                "type": "string"
-              },
-              {
-                "type": "null"
-              }
-            ],
-            "title": "Title"
-          },
-          "description": {
-            "anyOf": [
-              {
-                "type": "string",
-                "x-mentions": "markdown",
-                "description": "A person is mentioned as `@[](<reference>)`, by your reference for them, with no name: read who they are from the members search (`members:read`). Write a mention the same way. A stored file comes without its path: `![alt]()`, `[name]()`."
-              },
-              {
-                "type": "null"
-              }
-            ],
-            "title": "Description"
-          },
-          "occurred_on": {
-            "type": "string",
-            "format": "date",
-            "title": "Occurred On"
-          },
-          "file_url": {
-            "type": "string",
-            "title": "File Url",
-            "x-upload": true,
-            "description": "A stored file comes as an empty string, without its path. A URL from elsewhere comes as it is."
-          },
-          "thumbnail_url": {
-            "anyOf": [
-              {
-                "type": "string"
-              },
-              {
-                "type": "null"
-              }
-            ],
-            "title": "Thumbnail Url",
-            "x-upload": true,
-            "description": "A stored file comes as an empty string, without its path. A URL from elsewhere comes as it is."
-          },
-          "file_content_type": {
-            "anyOf": [
-              {
-                "type": "string"
-              },
-              {
-                "type": "null"
-              }
-            ],
-            "title": "File Content Type"
-          },
-          "file_size": {
-            "anyOf": [
-              {
-                "type": "integer"
-              },
-              {
-                "type": "null"
-              }
-            ],
-            "title": "File Size"
-          },
-          "original_filename": {
-            "anyOf": [
-              {
-                "type": "string"
-              },
-              {
-                "type": "null"
-              }
-            ],
-            "title": "Original Filename"
-          },
-          "width": {
-            "anyOf": [
-              {
-                "type": "integer"
-              },
-              {
-                "type": "null"
-              }
-            ],
-            "title": "Width"
-          },
-          "height": {
-            "anyOf": [
-              {
-                "type": "integer"
-              },
-              {
-                "type": "null"
-              }
-            ],
-            "title": "Height"
-          },
-          "created_by": {
-            "anyOf": [
-              {
-                "type": "string",
-                "x-identity": "person"
-              },
-              {
-                "type": "null"
-              }
-            ],
-            "title": "Created By"
-          },
-          "uploader": {
-            "anyOf": [
-              {
-                "$ref": "#/components/schemas/PluginPerson"
-              },
-              {
-                "type": "null"
-              }
-            ]
-          },
-          "created_at": {
-            "type": "string",
-            "format": "date-time",
-            "title": "Created At"
-          },
-          "updated_at": {
-            "type": "string",
-            "format": "date-time",
-            "title": "Updated At"
-          },
-          "version_count": {
-            "type": "integer",
-            "title": "Version Count",
-            "default": 1
-          },
-          "tags": {
-            "items": {
-              "$ref": "#/components/schemas/TagSummary"
-            },
-            "type": "array",
-            "title": "Tags"
-          },
-          "properties": {
-            "items": {
-              "$ref": "#/components/schemas/PropertySummary"
-            },
-            "type": "array",
-            "title": "Properties"
-          },
-          "plugin_values": {
-            "items": {
-              "$ref": "#/components/schemas/PluginValueSummary"
-            },
-            "type": "array",
-            "title": "Plugin Values"
-          }
-        },
-        "type": "object",
-        "required": [
-          "id",
-          "library_id",
-          "community_id",
-          "title",
-          "description",
-          "occurred_on",
-          "file_url",
-          "thumbnail_url",
-          "file_content_type",
-          "file_size",
-          "original_filename",
-          "width",
-          "height",
-          "created_by",
-          "uploader",
-          "created_at",
-          "updated_at",
-          "version_count",
-          "tags",
-          "properties",
-          "plugin_values"
-        ],
-        "title": "LibraryItemRead"
-      },
-      "LibraryItemUpdate": {
-        "properties": {
-          "properties": {
-            "anyOf": [
-              {
-                "items": {
-                  "$ref": "#/components/schemas/PropertyValueInput"
-                },
-                "type": "array"
-              },
-              {
-                "type": "null"
-              }
-            ],
-            "title": "Properties"
-          },
-          "title": {
-            "anyOf": [
-              {
-                "type": "string",
-                "maxLength": 255
-              },
-              {
-                "type": "null"
-              }
-            ],
-            "title": "Title"
-          },
-          "description": {
-            "anyOf": [
-              {
-                "type": "string",
-                "x-mentions": "markdown",
-                "description": "A person is mentioned as `@[](<reference>)`, by your reference for them, with no name: read who they are from the members search (`members:read`). Write a mention the same way. A stored file comes without its path: `![alt]()`, `[name]()`."
-              },
-              {
-                "type": "null"
-              }
-            ],
-            "title": "Description"
-          },
-          "occurred_on": {
-            "anyOf": [
-              {
-                "type": "string",
-                "format": "date"
-              },
-              {
-                "type": "null"
-              }
-            ],
-            "title": "Occurred On"
-          },
-          "tag_ids": {
-            "anyOf": [
-              {
-                "items": {
-                  "type": "integer"
-                },
-                "type": "array"
-              },
-              {
-                "type": "null"
-              }
-            ],
-            "title": "Tag Ids"
-          },
-          "description_base": {
-            "anyOf": [
-              {
-                "type": "string",
-                "x-mentions": "markdown",
-                "description": "A person is mentioned as `@[](<reference>)`, by your reference for them, with no name: read who they are from the members search (`members:read`). Write a mention the same way. A stored file comes without its path: `![alt]()`, `[name]()`."
-              },
-              {
-                "type": "null"
-              }
-            ],
-            "title": "Description Base"
-          }
-        },
-        "type": "object",
-        "title": "LibraryItemUpdate"
-      },
-      "LibraryItemVersionRead": {
-        "properties": {
-          "id": {
-            "type": "integer",
-            "title": "Id"
-          },
-          "version_number": {
-            "type": "integer",
-            "title": "Version Number"
-          },
-          "file_url": {
-            "type": "string",
-            "title": "File Url",
-            "x-upload": true,
-            "description": "A stored file comes as an empty string, without its path. A URL from elsewhere comes as it is."
-          },
-          "thumbnail_url": {
-            "anyOf": [
-              {
-                "type": "string"
-              },
-              {
-                "type": "null"
-              }
-            ],
-            "title": "Thumbnail Url",
-            "x-upload": true,
-            "description": "A stored file comes as an empty string, without its path. A URL from elsewhere comes as it is."
-          },
-          "file_content_type": {
-            "anyOf": [
-              {
-                "type": "string"
-              },
-              {
-                "type": "null"
-              }
-            ],
-            "title": "File Content Type"
-          },
-          "file_size": {
-            "anyOf": [
-              {
-                "type": "integer"
-              },
-              {
-                "type": "null"
-              }
-            ],
-            "title": "File Size"
-          },
-          "original_filename": {
-            "anyOf": [
-              {
-                "type": "string"
-              },
-              {
-                "type": "null"
-              }
-            ],
-            "title": "Original Filename"
-          },
-          "width": {
-            "anyOf": [
-              {
-                "type": "integer"
-              },
-              {
-                "type": "null"
-              }
-            ],
-            "title": "Width"
-          },
-          "height": {
-            "anyOf": [
-              {
-                "type": "integer"
-              },
-              {
-                "type": "null"
-              }
-            ],
-            "title": "Height"
-          },
-          "created_by": {
-            "anyOf": [
-              {
-                "type": "string",
-                "x-identity": "person"
-              },
-              {
-                "type": "null"
-              }
-            ],
-            "title": "Created By"
-          },
-          "created_at": {
-            "type": "string",
-            "format": "date-time",
-            "title": "Created At"
-          },
-          "is_current": {
-            "type": "boolean",
-            "title": "Is Current",
-            "default": false
-          }
-        },
-        "type": "object",
-        "required": [
-          "id",
-          "version_number",
-          "file_url",
-          "thumbnail_url",
-          "file_content_type",
-          "file_size",
-          "original_filename",
-          "width",
-          "height",
-          "created_by",
-          "created_at",
-          "is_current"
-        ],
-        "title": "LibraryItemVersionRead",
-        "description": "One stored rendition of a picture."
-      },
-      "LibraryListResponse": {
-        "properties": {
-          "total_count": {
-            "type": "integer",
-            "title": "Total Count"
-          },
-          "page": {
-            "type": "integer",
-            "title": "Page"
-          },
-          "page_size": {
-            "type": "integer",
-            "title": "Page Size"
-          },
-          "has_next": {
-            "type": "boolean",
-            "title": "Has Next"
-          },
-          "has_prev": {
-            "type": "boolean",
-            "title": "Has Prev"
-          },
-          "items": {
-            "items": {
-              "$ref": "#/components/schemas/LibrarySummary"
-            },
-            "type": "array",
-            "title": "Items"
-          }
-        },
-        "type": "object",
-        "required": [
-          "total_count",
-          "page",
-          "page_size",
-          "has_next",
-          "has_prev",
-          "items"
-        ],
-        "title": "LibraryListResponse"
-      },
-      "LibraryRead": {
-        "properties": {
-          "archived_at": {
-            "anyOf": [
-              {
-                "type": "string",
-                "format": "date-time"
-              },
-              {
-                "type": "null"
-              }
-            ],
-            "title": "Archived At"
-          },
-          "can": {
-            "$ref": "#/components/schemas/ToolCan"
-          },
-          "id": {
-            "type": "integer",
-            "title": "Id"
-          },
-          "initiative_id": {
-            "type": "integer",
-            "title": "Initiative Id"
-          },
-          "community_id": {
-            "title": "Community Id",
-            "type": "string",
-            "x-identity": "community"
-          },
-          "created_by": {
-            "anyOf": [
-              {
-                "type": "string",
-                "x-identity": "person"
-              },
-              {
-                "type": "null"
-              }
-            ],
-            "title": "Created By"
-          },
-          "created_at": {
-            "type": "string",
-            "format": "date-time",
-            "title": "Created At"
-          },
-          "updated_at": {
-            "type": "string",
-            "format": "date-time",
-            "title": "Updated At"
-          },
-          "comments_enabled": {
-            "type": "boolean",
-            "title": "Comments Enabled",
-            "default": true
-          },
-          "tags": {
-            "items": {
-              "$ref": "#/components/schemas/TagSummary"
-            },
-            "type": "array",
-            "title": "Tags"
-          },
-          "properties": {
-            "items": {
-              "$ref": "#/components/schemas/PropertySummary"
-            },
-            "type": "array",
-            "title": "Properties"
-          },
-          "grants": {
-            "items": {
-              "$ref": "#/components/schemas/ResourceGrantSchema"
-            },
-            "type": "array",
-            "title": "Grants"
-          },
-          "name": {
-            "type": "string",
-            "maxLength": 255,
-            "minLength": 1,
-            "title": "Name"
-          },
-          "description": {
-            "anyOf": [
-              {
-                "type": "string",
-                "maxLength": 2000,
-                "x-mentions": "markdown",
-                "description": "A person is mentioned as `@[](<reference>)`, by your reference for them, with no name: read who they are from the members search (`members:read`). Write a mention the same way. A stored file comes without its path: `![alt]()`, `[name]()`."
-              },
-              {
-                "type": "null"
-              }
-            ],
-            "title": "Description"
-          },
-          "cover_item_id": {
-            "anyOf": [
-              {
-                "type": "integer"
-              },
-              {
-                "type": "null"
-              }
-            ],
-            "title": "Cover Item Id"
-          },
-          "cover": {
-            "anyOf": [
-              {
-                "$ref": "#/components/schemas/LibraryCover"
-              },
-              {
-                "type": "null"
-              }
-            ]
-          },
-          "preview": {
-            "items": {
-              "$ref": "#/components/schemas/LibraryCover"
-            },
-            "type": "array",
-            "title": "Preview"
-          },
-          "comment_count": {
-            "type": "integer",
-            "title": "Comment Count",
-            "default": 0
-          }
-        },
-        "type": "object",
-        "required": [
-          "archived_at",
-          "can",
-          "id",
-          "initiative_id",
-          "community_id",
-          "created_by",
-          "created_at",
-          "updated_at",
-          "comments_enabled",
-          "tags",
-          "properties",
-          "grants",
-          "name",
-          "description",
-          "cover_item_id",
-          "cover",
-          "preview",
-          "comment_count"
-        ],
-        "title": "LibraryRead",
-        "description": "A library on its own page. The same shape as its summary: the pictures\nare paged separately, because a library is browsed rather than read."
-      },
-      "LibrarySummary": {
-        "properties": {
-          "archived_at": {
-            "anyOf": [
-              {
-                "type": "string",
-                "format": "date-time"
-              },
-              {
-                "type": "null"
-              }
-            ],
-            "title": "Archived At"
-          },
-          "can": {
-            "$ref": "#/components/schemas/ToolCan"
-          },
-          "id": {
-            "type": "integer",
-            "title": "Id"
-          },
-          "initiative_id": {
-            "type": "integer",
-            "title": "Initiative Id"
-          },
-          "community_id": {
-            "title": "Community Id",
-            "type": "string",
-            "x-identity": "community"
-          },
-          "created_by": {
-            "anyOf": [
-              {
-                "type": "string",
-                "x-identity": "person"
-              },
-              {
-                "type": "null"
-              }
-            ],
-            "title": "Created By"
-          },
-          "created_at": {
-            "type": "string",
-            "format": "date-time",
-            "title": "Created At"
-          },
-          "updated_at": {
-            "type": "string",
-            "format": "date-time",
-            "title": "Updated At"
-          },
-          "comments_enabled": {
-            "type": "boolean",
-            "title": "Comments Enabled",
-            "default": true
-          },
-          "tags": {
-            "items": {
-              "$ref": "#/components/schemas/TagSummary"
-            },
-            "type": "array",
-            "title": "Tags"
-          },
-          "properties": {
-            "items": {
-              "$ref": "#/components/schemas/PropertySummary"
-            },
-            "type": "array",
-            "title": "Properties"
-          },
-          "grants": {
-            "items": {
-              "$ref": "#/components/schemas/ResourceGrantSchema"
-            },
-            "type": "array",
-            "title": "Grants"
-          },
-          "name": {
-            "type": "string",
-            "maxLength": 255,
-            "minLength": 1,
-            "title": "Name"
-          },
-          "description": {
-            "anyOf": [
-              {
-                "type": "string",
-                "maxLength": 2000,
-                "x-mentions": "markdown",
-                "description": "A person is mentioned as `@[](<reference>)`, by your reference for them, with no name: read who they are from the members search (`members:read`). Write a mention the same way. A stored file comes without its path: `![alt]()`, `[name]()`."
-              },
-              {
-                "type": "null"
-              }
-            ],
-            "title": "Description"
-          },
-          "cover_item_id": {
-            "anyOf": [
-              {
-                "type": "integer"
-              },
-              {
-                "type": "null"
-              }
-            ],
-            "title": "Cover Item Id"
-          },
-          "cover": {
-            "anyOf": [
-              {
-                "$ref": "#/components/schemas/LibraryCover"
-              },
-              {
-                "type": "null"
-              }
-            ]
-          },
-          "preview": {
-            "items": {
-              "$ref": "#/components/schemas/LibraryCover"
-            },
-            "type": "array",
-            "title": "Preview"
-          },
-          "comment_count": {
-            "type": "integer",
-            "title": "Comment Count",
-            "default": 0
-          }
-        },
-        "type": "object",
-        "required": [
-          "archived_at",
-          "can",
-          "id",
-          "initiative_id",
-          "community_id",
-          "created_by",
-          "created_at",
-          "updated_at",
-          "comments_enabled",
-          "tags",
-          "properties",
-          "grants",
-          "name",
-          "description",
-          "cover_item_id",
-          "cover",
-          "preview",
-          "comment_count"
-        ],
-        "title": "LibrarySummary"
-      },
-      "LibraryUpdate": {
-        "properties": {
-          "name": {
-            "anyOf": [
-              {
-                "type": "string",
-                "maxLength": 255,
-                "minLength": 1
-              },
-              {
-                "type": "null"
-              }
-            ],
-            "title": "Name"
-          },
-          "description": {
-            "anyOf": [
-              {
-                "type": "string",
-                "maxLength": 2000,
-                "x-mentions": "markdown",
-                "description": "A person is mentioned as `@[](<reference>)`, by your reference for them, with no name: read who they are from the members search (`members:read`). Write a mention the same way. A stored file comes without its path: `![alt]()`, `[name]()`."
-              },
-              {
-                "type": "null"
-              }
-            ],
-            "title": "Description"
-          },
-          "cover_item_id": {
-            "anyOf": [
-              {
-                "type": "integer"
-              },
-              {
-                "type": "null"
-              }
-            ],
-            "title": "Cover Item Id"
-          }
-        },
-        "type": "object",
-        "title": "LibraryUpdate"
       },
       "OccurrenceRequest": {
         "properties": {
@@ -17659,14 +16834,13 @@
           "calendar",
           "dashboard",
           "post",
-          "library",
           "wiki",
           "task",
           "queue_item",
           "calendar_event",
           "counter",
-          "library_item",
-          "wiki_page"
+          "wiki_page",
+          "collection"
         ],
         "title": "PropertyTarget",
         "description": "What can carry custom property values: every tool and sub-tool."
@@ -18720,13 +17894,12 @@
         "enum": [
           "calendar",
           "calendar_event",
+          "collection",
           "comment",
           "counter",
           "counter_group",
           "dashboard",
           "file",
-          "library",
-          "library_item",
           "post",
           "project",
           "queue",
@@ -18978,13 +18151,12 @@
           "calendar",
           "dashboard",
           "post",
-          "library",
           "wiki",
           "task",
           "queue_item",
           "calendar_event",
-          "library_item",
-          "wiki_page"
+          "wiki_page",
+          "collection"
         ],
         "title": "TagTarget",
         "description": "Entity types a bulk tag edit can address."
@@ -20620,53 +19792,6 @@
         "type": "object",
         "title": "TaskUpdate"
       },
-      "TimelineBucket": {
-        "properties": {
-          "period": {
-            "type": "string",
-            "title": "Period"
-          },
-          "count": {
-            "type": "integer",
-            "title": "Count"
-          },
-          "anchor": {
-            "type": "string",
-            "format": "date-time",
-            "title": "Anchor"
-          },
-          "anchor_oldest": {
-            "type": "string",
-            "format": "date-time",
-            "title": "Anchor Oldest"
-          }
-        },
-        "type": "object",
-        "required": [
-          "period",
-          "count",
-          "anchor",
-          "anchor_oldest"
-        ],
-        "title": "TimelineBucket",
-        "description": "One period on the rail."
-      },
-      "TimelineResponse": {
-        "properties": {
-          "buckets": {
-            "items": {
-              "$ref": "#/components/schemas/TimelineBucket"
-            },
-            "type": "array",
-            "title": "Buckets"
-          }
-        },
-        "type": "object",
-        "required": [
-          "buckets"
-        ],
-        "title": "TimelineResponse"
-      },
       "Tool": {
         "type": "string",
         "enum": [
@@ -20677,7 +19802,6 @@
           "calendar",
           "dashboard",
           "post",
-          "library",
           "wiki"
         ],
         "title": "Tool"

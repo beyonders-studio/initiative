@@ -34,13 +34,15 @@ from sqlmodel import select
 from sqlmodel.ext.asyncio.session import AsyncSession
 
 from app.core.tools import Tool
+from app.db import post_commit
 from app.models.platform.guild import CommunityRole
 from app.models.tenant.initiative import InitiativeRoleModel
-from app.models.tenant.property import PropertyType
+from app.models.tenant.property import PropertyType, PropertyValue
 from app.models.tenant.resource_grant import ResourceAccessLevel
 from app.services.tenant import named_people
 from app.testing import (
     create_calendar_event,
+    create_collection,
     create_property_definition,
     create_property_value,
     create_queue_item,
@@ -273,3 +275,46 @@ async def test_a_grant_change_lets_go_only_of_who_can_no_longer_open_it(
     r = await client.put(url, headers=a.headers, json=[])
     assert r.status_code == 200, r.text
     assert b.user.id not in await named()
+
+
+async def test_a_collection_names_whoever_can_open_a_file_in_it(
+    client: AsyncClient, session: AsyncSession, acting_user
+):
+    """A collection has no sharing of its own: a file's sharing changing lets
+    nobody go from a collection that only has the same id, and lets go of who
+    can no longer open any file in a collection that holds it."""
+    a = await acting_user(guild_role=CommunityRole.member, initiative=True)
+    file = await _entity(session, a, Tool.file)
+    held = await create_tool_entity(session, Tool.file, a.initiative, a.user)
+    collection = await create_collection(session, a.initiative, a.user, files=[held])
+    assert collection.id == file.id
+    b = await acting_user(
+        guild_role=CommunityRole.member,
+        guild=a.guild,
+        initiative=a.initiative,
+        initiative_role="member",
+    )
+    await grant_role_permission(session, a.initiative, Tool.file.view_permission)
+    await create_resource_grant(session, held, user=b.user)
+    await _person_field(session, a, collection, b.user)
+
+    async def named() -> list[int | None]:
+        await post_commit.settle_all()
+        await route_session_to_guild(session, a.guild.id)
+        return list(
+            (
+                await session.exec(
+                    select(PropertyValue.value_user_id).where(
+                        PropertyValue.entity_type == "collection",
+                        PropertyValue.entity_id == collection.id,
+                    )
+                )
+            ).all()
+        )
+
+    for shared, still in ((file, [b.user.id]), (held, [None])):
+        r = await client.put(
+            a.g(f"/files/{shared.id}/grants"), headers=a.headers, json=[]
+        )
+        assert r.status_code == 200, r.text
+        assert await named() == still

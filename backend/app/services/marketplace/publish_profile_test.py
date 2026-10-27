@@ -298,17 +298,3 @@ class TestPictures:
         }
         paragraph = strip_for_listing(Tool.post, post)["body"]["root"]["children"][0]
         assert paragraph["children"] == [{"type": "image", "src": kept}]
-
-    def test_a_library_keeps_only_what_travelled(self):
-        from app.services.marketplace.media import media_path
-
-        kept = media_path(self.DIGEST)
-        library = {
-            "type": "initiative-library",
-            "name": "Moodboard",
-            "cover": "abc.png",
-            "items": [{"storage_key": kept}, {"storage_key": "abc.png"}],
-        }
-        stripped = strip_for_listing(Tool.library, library)
-        assert stripped["items"] == [{"storage_key": kept}]
-        assert stripped["cover"] is None

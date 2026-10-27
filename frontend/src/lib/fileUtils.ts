@@ -1,3 +1,5 @@
+import { FileKind, type FileSummary } from "@/api/generated/initiativeAPI.schemas";
+
 /** What a file made from an upload is called until somebody names it. */
 export function nameWithoutExtension(filename: string): string {
   return filename.replace(/\.[^/.]+$/, "") || filename;
@@ -107,3 +109,14 @@ export function getFileTypeLabel(
 
   return "File";
 }
+
+/**
+ * The picture a file is shown by on a card or a tile: its thumbnail for a
+ * picture or a video, a picture itself until its thumbnail is drawn, and any
+ * other file's featured image. `null` where it has none, and its icon stands
+ * in.
+ */
+export const filePicture = (
+  file: Pick<FileSummary, "thumbnail_url" | "kind" | "file_url" | "featured_image_url">
+): string | null =>
+  file.thumbnail_url ?? (file.kind === FileKind.image ? file.file_url : file.featured_image_url);

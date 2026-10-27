@@ -90,8 +90,6 @@
   "requestsWaiting_other": "{{count}} ausstehend",
   "posts": "Beiträge",
   "createPost": "Neuer Beitrag",
-  "libraries": "Bibliotheken",
-  "createLibrary": "Neue Bibliothek",
   "moderation": "Moderation",
   "wikis": "Wikis",
   "createWiki": "Neues Wiki",

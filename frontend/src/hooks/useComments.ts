@@ -187,6 +187,7 @@ export const useCommentsCache = (params: CommentThreadParams) => {
 const COMMENT_TARGETS = [
   "task_id",
   "wiki_page_id",
+  "collection_id",
   "file_id",
   "project_id",
   "queue_id",
@@ -194,7 +195,6 @@ const COMMENT_TARGETS = [
   "calendar_id",
   "dashboard_id",
   "post_id",
-  "library_id",
   "wiki_id",
 ] as const satisfies readonly (keyof CommentThreadParams & keyof CommentRead)[];
 

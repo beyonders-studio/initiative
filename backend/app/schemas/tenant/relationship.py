@@ -79,11 +79,8 @@ class RelatedEnd(SanitizedBaseModel):
     tool_title: Optional[str] = None
     #: What it shows of itself besides its name: a picture, an emoji, or a
     #: colour. At most one is set, and most kinds set none — those draw as their
-    #: kind's own icon. A picture URL has already fallen back from a thumbnail to
-    #: the full image, so a caller renders what it is given.
-    #: Pictures to draw, newest first. A file has its featured image at
-    #: most; a library has the cover somebody chose, or the newest few when
-    #: nobody did — which is what a library shows of itself everywhere else.
+    #: kind's own icon. A caller renders what it is given.
+    #: Pictures to draw. A file has its featured image at most.
     image_urls: List[str] = Field(default_factory=list)
     icon: Optional[str] = None
     color: Optional[str] = None

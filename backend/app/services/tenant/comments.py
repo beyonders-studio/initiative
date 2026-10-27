@@ -34,7 +34,7 @@ from app.core.messages import (
     CommentMessages,
     KindMessages,
 )
-from app.core.tools import Tool
+from app.core.tools import KINDS, Tool
 from app.db.initiative_rls import (
     COMMENT_PARENTS,
     COMMENT_PARENT_COLUMNS as RLS_COMMENT_PARENT_COLUMNS,
@@ -49,7 +49,7 @@ from app.models.platform.notification import NotificationType
 from app.models.tenant.counter import CounterGroup
 from app.models.tenant.dashboard import Dashboard
 from app.models.tenant.post import Post
-from app.models.tenant.library import Library
+from app.models.tenant.collection import Collection
 from app.models.tenant.file import File
 from app.models.tenant.initiative import Initiative
 from app.models.tenant.project import Project
@@ -114,7 +114,6 @@ _REGISTERED = (
     CounterGroup,
     Dashboard,
     File,
-    Library,
     Post,
     Project,
     Queue,
@@ -176,6 +175,9 @@ EXTRA_COMMENT_TARGETS: dict[str, ExtraCommentTarget] = {
             anchor_switch=False,
         ),
         ExtraCommentTarget("wiki_page", WikiPage, "title"),
+        # A collection answers for its own thread: its own switch, and the
+        # Files switch of its initiative.
+        ExtraCommentTarget("collection", Collection, "name"),
     )
 }
 
@@ -314,14 +316,23 @@ async def _get_extra_context(
     by — the master switch, the comment switch, and the sharing — and only the
     identity of the thread differs.
     """
-    row = (
-        await session.exec(
-            select(target.model).where(target.model.id == entity_id)  # type: ignore[attr-defined]
-        )
-    ).one_or_none()
+    parent = COMMENT_PARENTS[target.column]
+    statement = select(target.model).where(target.model.id == entity_id)  # type: ignore[attr-defined]
+    if parent.governed_by is None:
+        statement = statement.options(selectinload(target.model.initiative))  # type: ignore[attr-defined]
+    row = (await session.exec(statement)).one_or_none()
     if row is None:
         return None
-    parent = COMMENT_PARENTS[target.column]
+    if parent.governed_by is None:
+        return _ParentContext(
+            column=target.column,
+            entity_id=cast(int, row.id),
+            initiative_id=row.initiative_id,
+            title=getattr(row, target.title_field),
+            resource=row,
+            extra=target,
+            extra_row=row,
+        )
     anchor = await _get_tool_context(
         session,
         TOOL_COMMENT_TARGETS[parent.governed_by],
@@ -435,8 +446,20 @@ async def _ensure_parent_access(
         # asked none of its switches. The task is the one, and its context
         # carries the project that answers for it.
         anchor_model, anchor_row = Project, ctx.project
+    elif ctx.tool is None:
+        # An extra that answers for itself, in its tool's switch and its own.
+        extra = cast(ExtraCommentTarget, ctx.extra)
+        tool = KINDS[extra.kind].tool
+        initiative = getattr(ctx.extra_row, "initiative", None)
+        if initiative is not None and not getattr(initiative, tool.view_permission):
+            raise CommentPermissionError(
+                KindMessages.TOOL_NOT_ENABLED, params={"kind": tool.value}
+            )
+        if not getattr(ctx.extra_row, "comments_enabled", True):
+            raise CommentPermissionError(CommentMessages.COMMENTS_DISABLED)
+        anchor_model, anchor_row = extra.model, ctx.extra_row
     else:
-        target = TOOL_COMMENT_TARGETS[cast(Tool, ctx.tool)]
+        target = TOOL_COMMENT_TARGETS[ctx.tool]
         initiative = getattr(ctx.resource, "initiative", None)
         if initiative is not None and not getattr(
             initiative, target.tool.view_permission
@@ -903,7 +926,7 @@ async def _process_comment_notifications(
     # The thread's own fields: a task by its column, any other parent as an
     # entity.
     where = {"comment_id": comment.id, "task_id": comment.task_id}
-    if ctx.tool is not None:
+    if ctx.task is None:
         where |= {"entity_type": ctx.ref_type, "entity_id": ctx.entity_id}
 
     if parent_comment is not None:
@@ -1329,7 +1352,17 @@ async def recent_activity(
         parent = COMMENT_PARENTS[column]
         fk = getattr(Comment, column)
         rows = select(extra.model.id)
-        if extra.anchor_switch:
+        if parent.governed_by is None:
+            tool = KINDS[extra.kind].tool
+            rows = rows.where(
+                extra.model.comments_enabled.is_(True),
+                extra.model.initiative_id.in_(
+                    select(Initiative.id).where(
+                        getattr(Initiative, tool.view_permission).is_(True)
+                    )
+                ),
+            )
+        elif extra.anchor_switch:
             rows = rows.where(
                 getattr(extra.model, parent.tool_fk).in_(
                     reachable_by_tool[parent.governed_by]
@@ -1383,6 +1416,10 @@ async def recent_activity(
                 await session.exec(select(extra.model).where(extra.model.id.in_(ids)))
             ).all()
             rows = {row.id: row for row in loaded}
+            if parent.governed_by is None:
+                # It is its own anchor.
+                extra_rows[column] = extra_anchors[column] = rows
+                continue
             anchor_model = TOOL_COMMENT_TARGETS[parent.governed_by].model
             anchor_ids = {getattr(row, parent.tool_fk) for row in loaded}
             if anchor_ids:
@@ -1452,8 +1489,9 @@ async def recent_activity(
             column, value = hit
             extra = EXTRA_COMMENT_TARGETS[column]
             row = extra_rows[column].get(value)
+            tool_fk = COMMENT_PARENTS[column].tool_fk
             anchor = (
-                extra_anchors[column].get(getattr(row, COMMENT_PARENTS[column].tool_fk))
+                extra_anchors[column].get(getattr(row, tool_fk) if tool_fk else value)
                 if row is not None
                 else None
             )

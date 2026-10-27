@@ -3,10 +3,11 @@ each read as shipped until it is changed, and changed on its own.
 
 A target is one instance of a tool (``tool`` and ``tool_id``: a project), or,
 for a tool the initiative shares, the initiative (``tool`` and
-``initiative_id``: its calendar). Reading follows reading the instance, or
-being in the initiative. Changing a layout follows the ``configure`` action on
-the instance — its owner, the initiative's managers, the community's admins —
-with write access to it, or, for a shared tool, managing the initiative.
+``initiative_id``: its calendar), or a collection (``tool`` is ``collection``).
+Reading follows reading the instance, or being in the initiative. Changing a
+layout follows the ``configure`` action on the instance — its owner, the
+initiative's managers, the community's admins — with write access to it, for
+a shared tool managing the initiative, and for a collection changing it.
 """
 
 from dataclasses import dataclass
@@ -24,19 +25,24 @@ from app.api.deps import (
     RLSSessionDep,
     get_current_active_user,
 )
-from app.core.messages import InitiativeMessages, ToolLayoutMessages
+from app.core.messages import InitiativeMessages, KindMessages, ToolLayoutMessages
 from app.core.tools import (
     INSTANCE_LAYOUT_TOOLS,
+    LAYOUT_KIND_TARGETS,
     LAYOUTS_PER_INSTANCE,
     LAYOUTS_SHARED,
+    KINDS,
     Tool,
+    kind_refusal,
 )
+from app.db.base import MODELS_BY_TABLE
 from app.models.tenant._mixins import tool_models
 
 from app.models.platform.user import User
 from app.models.tenant.initiative import Initiative
 from app.schemas.tenant.tool_layout import (
     InitiativeToolLayoutsRead,
+    LayoutTarget,
     ToolLayoutDefaultWrite,
     ToolLayoutSetRead,
     ToolLayoutWrite,
@@ -51,7 +57,7 @@ router = APIRouter(prefix="/layouts")
 CurrentUser = Annotated[User, Depends(get_current_active_user)]
 
 #: The target a request names.
-ToolQuery = Annotated[Tool, Query()]
+ToolQuery = Annotated[LayoutTarget, Query()]
 InstanceQuery = Annotated[Optional[int], Query()]
 
 
@@ -69,7 +75,7 @@ async def _resolve(
     session: AsyncSession,
     context: GuildContext,
     user: User,
-    tool: Tool,
+    target: LayoutTarget,
     tool_id: Optional[int],
     initiative_id: Optional[int],
 ) -> _Resolved:
@@ -77,6 +83,17 @@ async def _resolve(
         status_code=status.HTTP_400_BAD_REQUEST,
         detail=ToolLayoutMessages.TARGET_INVALID,
     )
+    if target.value in LAYOUT_KIND_TARGETS:
+        if tool_id is None or initiative_id is not None:
+            raise invalid
+        model: Any = MODELS_BY_TABLE[KINDS[target.value].table]
+        row = await resource_access.load_child(session, model, tool_id)
+        return _Resolved(
+            Target(target.value, tool_id, row.initiative_id),
+            await resource_access.may_change(session, row, context),
+            row,
+        )
+    tool = Tool(target.value)
     if tool in LAYOUTS_PER_INSTANCE:
         if tool_id is None or initiative_id is not None:
             raise invalid
@@ -125,6 +142,12 @@ async def _require_initiative(
 
 
 def _require_configure(resolved: _Resolved, context: GuildContext) -> None:
+    if resolved.target.tool in LAYOUT_KIND_TARGETS:
+        if not resolved.can_configure:
+            raise kind_refusal(
+                resolved.target.tool, KindMessages.WRITE_ACCESS_REQUIRED, 403
+            )
+        return
     if resolved.row is None:
         if not resolved.can_configure:
             raise HTTPException(
@@ -132,7 +155,7 @@ def _require_configure(resolved: _Resolved, context: GuildContext) -> None:
                 detail=InitiativeMessages.MANAGER_REQUIRED,
             )
         return
-    resource = permissions_service.DAC_RESOURCES[resolved.target.tool]
+    resource = permissions_service.DAC_RESOURCES[Tool(resolved.target.tool)]
     for action in (Action.configure, Action.contribute):
         permissions_service.require_access(
             resource, resolved.row, context=context, action=action
@@ -152,7 +175,7 @@ async def _configured(
     session: AsyncSession,
     context: GuildContext,
     user: User,
-    tool: Tool,
+    tool: LayoutTarget,
     tool_id: Optional[int],
     initiative_id: Optional[int],
 ) -> _Resolved:

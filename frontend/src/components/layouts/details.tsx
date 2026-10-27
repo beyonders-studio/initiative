@@ -26,14 +26,12 @@ import { useActiveCommunityId } from "@/hooks/useActiveCommunityId";
 import { useAuth } from "@/hooks/useAuth";
 import { useCalendarEntries } from "@/hooks/useCalendarEntries";
 import { useCalendarEvent } from "@/hooks/useCalendarEvents";
-import { useLibraryItemsFeed } from "@/hooks/useLibraries";
 import { useCounterGroup } from "@/hooks/useCounters";
 import { usePost, usePostsFeed } from "@/hooks/usePosts";
 import { useQueue } from "@/hooks/useQueues";
 import { useTask, useTasks } from "@/hooks/useTasks";
 import { type CalendarFilters, EMPTY_CALENDAR_FILTERS } from "@/lib/filters/calendarFilters";
 import { buildTaskListParams, EMPTY_TASK_FILTERS } from "@/lib/filters/taskFilters";
-import { LIBRARY_ITEM_DETAIL } from "@/lib/layouts/libraryItemLayout";
 import { COUNTER_DETAIL } from "@/lib/layouts/counterLayout";
 import { type DetailKind, DetailLayoutView } from "@/lib/layouts/DetailLayoutView";
 import type { DetailLayoutSpec, StoredRegions } from "@/lib/layouts/detailLayout";
@@ -273,37 +271,6 @@ const QueueItemPreview = ({
   );
 };
 
-/** The library's picture detail drawn with its first picture. */
-const LibraryItemPreview = ({
-  libraryId,
-  initiativeId,
-  tree,
-}: {
-  libraryId: number;
-  initiativeId: number;
-  tree: LayoutNode;
-}) => {
-  const pictures = useLibraryItemsFeed(libraryId);
-  return (
-    <ItemPreview
-      detail={LIBRARY_ITEM_DETAIL}
-      tree={tree}
-      item={pictures.data?.pages[0]?.items[0]}
-      none={pictures.isSuccess}
-      empty="libraryItemDetail.noItems"
-      context={() => ({
-        readOnly: false,
-        libraryId,
-        initiativeId,
-        canDeleteVersions: false,
-        leaving: LEFT,
-        actions: <ActionsPreview />,
-        preview: true,
-      })}
-    />
-  );
-};
-
 /** The group's counter detail drawn with its first counter. */
 const CounterPreview = ({
   groupId,
@@ -391,16 +358,6 @@ export const queueItemDetail = (queueId: number, initiativeId: number): Editable
   preview: (tree) => <QueueItemPreview queueId={queueId} initiativeId={initiativeId} tree={tree} />,
 });
 
-/** A library's picture detail. */
-export const libraryItemDetail = (libraryId: number, initiativeId: number): EditableDetail => ({
-  spec: LIBRARY_ITEM_DETAIL.spec,
-  words: wordsOf("libraryItemDetail"),
-  fields: LIBRARY_ITEM_DETAIL.fields,
-  preview: (tree) => (
-    <LibraryItemPreview libraryId={libraryId} initiativeId={initiativeId} tree={tree} />
-  ),
-});
-
 /** A counter group's counter detail. */
 export const counterDetail = (groupId: number, initiativeId: number): EditableDetail => ({
   spec: COUNTER_DETAIL.spec,
@@ -423,7 +380,6 @@ export const ITEM_DETAILS: Partial<
   Record<Tool, (id: number, initiativeId: number) => EditableDetail>
 > = {
   [Tool.queue]: queueItemDetail,
-  [Tool.library]: libraryItemDetail,
   [Tool.counter_group]: counterDetail,
 };
 

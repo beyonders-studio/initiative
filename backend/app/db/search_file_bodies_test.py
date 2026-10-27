@@ -78,7 +78,7 @@ async def test_a_native_file_indexes_its_prose(
 async def test_nested_editor_content_is_reached(
     session: AsyncSession, acting_user: ActingUser
 ) -> None:
-    """A mention, a wikilink and an image caption all keep text below the top
+    """A mention, a reference and an image caption all keep text below the top
     level; the recursive path is what picks them up."""
     a = await acting_user(guild_role=CommunityRole.admin, initiative=True)
     doc = await create_file(
@@ -109,7 +109,12 @@ async def test_nested_editor_content_is_reached(
                             }
                         },
                     },
-                    {"type": "wikilink", "text": "Q3 Plan", "documentId": 4},
+                    {
+                        "type": "entity-mention",
+                        "text": "Q3 Plan",
+                        "entityType": "file",
+                        "entityId": 4,
+                    },
                 ]
             }
         },

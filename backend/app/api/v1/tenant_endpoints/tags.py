@@ -25,6 +25,7 @@ from app.core.plugin_scopes import tool_resource
 from app.core.messages import PluginMessages, TagMessages
 from app.api.v1.tenant_endpoints.tool_lists import TOOL_LISTS, view_conditions
 from app.core.tools import KINDS, Tool
+from app.models.tenant.initiative import Initiative
 from app.db.guild_standing import GuildContext, InstallContext
 from app.db.initiative_rls import governing_path
 from app.db.query import build_paginated_response, paginated_query
@@ -79,7 +80,7 @@ def _require_install_tagging_scopes(actor: ActorContext, target: str) -> None:
     which is stored as a relationship. A person passes."""
     if not isinstance(actor, InstallContext):
         return
-    tool, _chain = _governing(tags_service.TAG_LINKS[target])
+    tool = KINDS[target].tool
     needed = ["relationships:write", f"{tool_resource(tool).value}:write"]
     if not all(actor.holds(scope) for scope in needed):
         raise HTTPException(
@@ -157,44 +158,62 @@ async def bulk_edit_tags(
     remove_ids = list(dict.fromkeys(payload.remove_tag_ids))
     target_ids = list(dict.fromkeys(payload.target_ids))
 
-    tool, chain = _governing(spec)
-    parent_ids = target_ids
-    if chain:
-        ((parent_fk, _parent_table),) = chain
-        rows = (
-            await session.exec(
-                select(spec.entity.id, getattr(spec.entity, parent_fk)).where(
-                    spec.entity.id.in_(target_ids)
+    if KINDS[target].standalone:
+        # Answers for itself: each is changed by its own rule.
+        for entity_id in target_ids:
+            await resource_access.load_child(
+                session, spec.entity, entity_id, access="write"
+            )
+    else:
+        tool, chain = _governing(spec)
+        parent_ids = target_ids
+        if chain:
+            ((parent_fk, _parent_table),) = chain
+            rows = (
+                await session.exec(
+                    select(spec.entity.id, getattr(spec.entity, parent_fk)).where(
+                        spec.entity.id.in_(target_ids)
+                    )
                 )
-            )
-        ).all()
-        if len(rows) != len(target_ids):
-            raise KINDS[target].not_found()
-        parent_ids = list(dict.fromkeys(parent_id for _, parent_id in rows))
-    # One load for every governing row, with what the decision reads: the
-    # actions the database answered and the initiative's switches.
-    parent = tags_service.TOOL_TAG_LINKS[tool].entity
-    loaded = {
-        row.id: row
-        for row in (
+            ).all()
+            if len(rows) != len(target_ids):
+                raise KINDS[target].not_found()
+            parent_ids = list(dict.fromkeys(parent_id for _, parent_id in rows))
+        # One load for every governing row, with what the decision reads: the
+        # actions the database answered and the initiative's switches.
+        parent = tags_service.TOOL_TAG_LINKS[tool].entity
+        loaded = {
+            row.id: row
+            for row in (
+                await session.exec(
+                    select(parent)
+                    .where(parent.id.in_(parent_ids))
+                    .options(selectinload(parent.initiative), undefer(parent.actions))
+                )
+            ).all()
+        }
+        for parent_id in parent_ids:
+            row = loaded.get(parent_id)
+            if row is None:
+                # Out of sight: the single loader names the refusal — 404, or 403
+                # to a reader in the initiative whom sharing refused.
+                await resource_access.load_authorized(
+                    session,
+                    tool,
+                    parent_id,
+                    current_user,
+                    guild_context,
+                    access="write",
+                )
+            else:
+                resource_access.authorize(
+                    tool, row, current_user, context=guild_context, access="write"
+                )
+        if chain:
             await session.exec(
-                select(parent)
+                sa_update(parent)
                 .where(parent.id.in_(parent_ids))
-                .options(selectinload(parent.initiative), undefer(parent.actions))
-            )
-        ).all()
-    }
-    for parent_id in parent_ids:
-        row = loaded.get(parent_id)
-        if row is None:
-            # Out of sight: the single loader names the refusal — 404, or 403
-            # to a reader in the initiative whom sharing refused.
-            await resource_access.load_authorized(
-                session, tool, parent_id, current_user, guild_context, access="write"
-            )
-        else:
-            resource_access.authorize(
-                tool, row, current_user, context=guild_context, access="write"
+                .values(updated_at=datetime.now(timezone.utc))
             )
 
     await tags_service.bulk_edit_tags(
@@ -204,12 +223,6 @@ async def bulk_edit_tags(
         add_tag_ids=add_ids,
         remove_tag_ids=remove_ids,
     )
-    if chain:
-        await session.exec(
-            sa_update(parent)
-            .where(parent.id.in_(parent_ids))
-            .values(updated_at=datetime.now(timezone.utc))
-        )
     await session.commit()
 
     return TagBulkEditResponse(updated_count=len(target_ids))
@@ -296,6 +309,20 @@ async def _tagged_conditions(
     one.
     """
     spec = tags_service.TAG_LINKS[kind]
+    model = spec.entity
+    if KINDS[kind].standalone:
+        # No tool row to pass a list: the reader's policies on the row decide
+        # whether it is listed, beside its tool's switch.
+        tool = KINDS[kind].tool
+        return [
+            model.id.in_(tags_service.tagged_entity_ids(spec, [tag_id])),
+            archive_filter_clause(model, None),
+            model.initiative_id.in_(
+                select(Initiative.id).where(
+                    getattr(Initiative, tool.view_permission).is_(True)
+                )
+            ),
+        ]
     tool, chain = _governing(spec)
     tool_list = TOOL_LISTS[tool]
     if not chain:
@@ -307,7 +334,6 @@ async def _tagged_conditions(
             **tool_list.views["active"],
             tag_ids=[tag_id],
         )
-    model = spec.entity
     parents = select(tool_list.model.id).where(
         *await view_conditions(
             tool_list,
@@ -379,11 +405,17 @@ async def get_tag_entities(
     tag = await _get_tag_or_404(session, tag_id, guild_context.guild_id)
     spec = tags_service.TAG_LINKS[kind.value]
     model = spec.entity
-    tool, chain = _governing(spec)
-    parent = tags_service.TOOL_TAG_LINKS[tool].entity
-    tool_id = getattr(model, chain[0][0]) if chain else model.id
     label = getattr(model, model.display_field())
-    parent_label = getattr(parent, parent.display_field())
+    standalone = KINDS[kind.value].standalone
+    if standalone:
+        # In no one instance of a tool: it names none.
+        tool, chain, parent = None, (), model
+        tool_id, parent_label = literal(None), literal("")
+    else:
+        tool, chain = _governing(spec)
+        parent = tags_service.TOOL_TAG_LINKS[tool].entity
+        tool_id = getattr(model, chain[0][0]) if chain else model.id
+        parent_label = getattr(parent, parent.display_field())
     updated_at = getattr(model, "updated_at", None)
     conditions = await _tagged_conditions(
         kind.value, tag.id, session, current_user, guild_context

@@ -21,7 +21,7 @@ interface LazyImageProps extends Omit<ImgHTMLAttributes<HTMLImageElement>, "src"
  *
  * Two things a plain `<img>` does not do on a wall of forty. It waits: the
  * bytes are not requested until the box is near the viewport, so opening a
- * library costs a screen of pictures, not the whole library. And it fades:
+ * collection costs a screen of pictures, not the whole collection. And it fades:
  * the box is drawn at the picture's shape from the start, in the placeholder
  * colour, and the picture fades in over it once decoded — so the wall keeps
  * its layout while it fills and nothing flashes from blank to loaded.

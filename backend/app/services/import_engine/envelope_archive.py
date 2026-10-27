@@ -1,18 +1,17 @@
 """An export that travels as a zip: its envelope, and the files it names.
 
-A library is its pictures, so a library exported on its own downloads as a zip
-holding its envelope at the top level and each picture under ``assets/``, named
-by the storage key the envelope gives it — the layout a backup uses. Importing
-that zip puts the pictures in the community's storage under those keys and then
-imports the envelope exactly as a lone JSON file is imported, so every rule the
-envelope path has (authorization, the people step, inline or queued) holds.
+A wiki exported on its own downloads as a zip holding its envelope at the top
+level and each upload filed in it under ``assets/``, named by the storage key
+the envelope gives it — the layout a backup uses. Importing that zip puts the
+files in the community's storage under those keys and then imports the
+envelope exactly as a lone JSON file is imported, so every rule the envelope
+path has (authorization, the people step, inline or queued) holds. A zip
+holding any other tool's envelope imports too: it simply carries nothing
+beside it.
 
-A wiki's zip carries the uploads filed in it the same way. A zip holding any
-other tool's envelope imports too: it simply carries nothing beside it.
-
-Every file is what the zip claims only once it has been read: a picture must
-be one a library can show, and an upload a file an uploaded file may hold. One that
-is not is left out and the import says so. A key already stored here is never
+Every file is what the zip claims only once it has been read: an upload must
+be a file an uploaded file may hold. One that is not is left out and the
+import says so. A key already stored here is never
 written over — a re-import of the same zip reuses the file it already brought
 — and the community's storage quota is checked against the zip's own sizes
 before anything is written.
@@ -32,7 +31,6 @@ from app.models.platform.user import User
 from app.services.import_engine import engine as import_engine
 from app.services.import_engine.archive_assets import (
     ArchiveAsset,
-    AssetKind,
     remove_written,
     restore_assets,
 )
@@ -97,8 +95,8 @@ async def restore_archive_assets(
     """Put each named file the zip carries into the community's storage, kept
     for the initiative the envelope is imported into.
 
-    ``assets`` are the envelope's own records of its files, each with what it
-    should be — ``"picture"`` or ``"file"``; each record's ``content_type`` is
+    ``assets`` are the envelope's own records of its files; each record's
+    ``content_type`` is
     set to what the file turned out to be, since that is what the importer
     stores. Returns the keys written — for the caller to remove if the import
     then fails — and the warnings to report. A file the envelope lists but the
@@ -106,15 +104,11 @@ async def restore_archive_assets(
     unless it is already stored here.
     """
     by_key: dict[str, list[dict[str, Any]]] = {}
-    kinds: dict[str, AssetKind] = {}
-    for record, kind in assets:
+    for record, _kind in assets:
         key = _flat_key(record.get("storage_key"))
         if key is None:
             continue
         by_key.setdefault(key, []).append(record)
-        # A key named as a picture anywhere is held to the picture rule.
-        if kinds.get(key) != "picture":
-            kinds[key] = "picture" if kind == "picture" else "file"
 
     restored = await restore_assets(
         session,
@@ -123,7 +117,7 @@ async def restore_archive_assets(
             ArchiveAsset(
                 key=key,
                 member=f"{ASSET_DIR}{key}",
-                kind=kinds[key],
+                kind="file",
                 original_filename=records[0].get("original_filename"),
                 content_type=records[0].get("content_type"),
             )

@@ -343,7 +343,6 @@ async def install_tool_listing(
     try:
         body = await copy_assets_in(
             session,
-            tool=tool,
             envelope=body,
             guild_id=guild_id,
             user_id=user.id,
