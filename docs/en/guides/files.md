@@ -239,11 +239,11 @@ On a collection's page, drop files anywhere to upload them straight in, or **Add
 
 ![A collection of maps and handouts, in the Masonry view](../images/files/collection.png)
 
-**Layouts** in the collection's menu picks which views it offers and the one it opens on, and **Edit what the lists show** picks the table's columns and what each card shows under the picture.
+**Layouts** in the collection's menu opens its layout editor, the same one a project's layouts use. Pick which views the collection offers and the one it opens on, the table's columns, what each card shows under the picture, and the **File detail**: what sits beside a file when you open it from the collection.
 
 ### A collection's fields
 
-A collection can have **fields** of its own, from **Fields** in its menu: a price, a rating, the day a photo was taken. The values belong to the collection, not the file, so the same photo can be "£40, four stars" in the shop catalogue and just a picture in the fete gallery. Open a file from the collection to fill them in.
+A collection can have **fields** of its own: a price, a rating, the day a photo was taken. Make one in the layout editor, with **Add** wherever a field can go, and it lands right there. The values belong to the collection, not the file, so the same photo can be "£40, four stars" in the shop catalogue and just a picture in the fete gallery. Open a file from the collection to fill them in; until the file detail is changed, it shows every field the collection has.
 
 Lists can also show the initiative's own [properties](initiatives.md#custom-properties), which a file carries wherever it goes. Fields are for what only makes sense in this collection.
 
