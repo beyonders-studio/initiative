@@ -20,6 +20,7 @@ from app.services.storage import (
     S3Storage,
     StorageBackend,
     build_upload_response,
+    requested_range,
     get_guild_storage,
     get_storage,
 )
@@ -155,16 +156,23 @@ class FakeS3Client:
         }
         return {}
 
-    def get_object(self, *, Bucket, Key):
+    def get_object(self, *, Bucket, Key, Range=None):
         if (Bucket, Key) not in self.objects:
             raise self._missing("GetObject")
         rec = self.objects[(Bucket, Key)]
         body = rec["Body"]
-        return {
-            "Body": _FakeBody(body),
-            "ContentType": rec["extra"].get("ContentType"),
-            "ContentLength": len(body),
-        }
+        answer = {"ContentType": rec["extra"].get("ContentType")}
+        if Range is not None:
+            first, _, last = Range.removeprefix("bytes=").partition("-")
+            start = int(first) if first else len(body) - int(last)
+            end = min(int(last), len(body) - 1) if first and last else len(body) - 1
+            if start >= len(body):
+                raise ClientError(
+                    {"Error": {"Code": "InvalidRange", "Message": "bad"}}, "GetObject"
+                )
+            answer["ContentRange"] = f"bytes {start}-{end}/{len(body)}"
+            body = body[start : end + 1]
+        return {**answer, "Body": _FakeBody(body), "ContentLength": len(body)}
 
     def create_multipart_upload(self, *, Bucket, Key):
         self.parts, self.multipart_open = {}, True
@@ -318,6 +326,51 @@ def test_s3_drops_a_staged_file_whole():
 
     assert client.multipart_open is False
     assert not client.objects
+
+
+def test_s3_open_readable_reads_the_range_asked_for():
+    _, storage = _s3()
+    storage.write("clip.mp4", b"hello world", content_type="video/mp4")
+
+    part = storage.open_readable("clip.mp4", byte_range="bytes=6-")
+    assert b"".join(part.stream) == b"world"
+    assert (part.content_length, part.content_range) == (5, "bytes 6-10/11")
+    # A range past the end is answered with the whole object.
+    whole = storage.open_readable("clip.mp4", byte_range="bytes=50-")
+    assert b"".join(whole.stream) == b"hello world"
+    assert whole.content_range is None
+
+
+@pytest.mark.parametrize(
+    ("header", "kept"),
+    [
+        ("bytes=0-499", True),
+        ("bytes=500-", True),
+        ("bytes=-500", True),
+        ("bytes=0-1,5-9", False),
+        ("bytes=9-1", False),
+        ("bytes=-", False),
+        ("items=0-1", False),
+        ("bytes=٠-1", False),
+        ("bytes=" + "9" * 4301 + "-9", False),
+        (None, False),
+    ],
+)
+def test_one_range_of_bytes_is_honoured(header, kept):
+    assert requested_range(header) == (header if kept else None)
+
+
+def test_build_upload_response_stream_answers_a_range_partially():
+    blob = ReadableBlob(
+        stream=iter([b"world"]),
+        content_type="video/mp4",
+        content_length=5,
+        content_range="bytes 6-10/11",
+    )
+    resp = build_upload_response(blob)
+    assert resp.status_code == 206
+    assert resp.headers["Content-Range"] == "bytes 6-10/11"
+    assert resp.headers["Accept-Ranges"] == "bytes"
 
 
 def test_s3_open_readable_missing_returns_none():

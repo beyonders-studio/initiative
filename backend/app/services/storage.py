@@ -110,6 +110,26 @@ class ReadableBlob:
     stream: Iterator[bytes] | None = None
     content_type: str | None = None
     content_length: int | None = None
+    #: For a stream of part of the object, the ``Content-Range`` it answers.
+    content_range: str | None = None
+
+
+def requested_range(header: str | None) -> str | None:
+    """A request's ``Range`` header when it asks for one range of bytes
+    (``bytes=0-499``, ``bytes=500-``, ``bytes=-500``); ``None`` for anything
+    else, which is served whole."""
+    if not header or not header.startswith("bytes="):
+        return None
+    first, dash, last = header.removeprefix("bytes=").partition("-")
+    digits = first + last
+    if not dash or not digits or not (digits.isascii() and digits.isdigit()):
+        return None
+    # No stored file runs to a petabyte; a longer bound is served whole.
+    if max(len(first), len(last)) > 15:
+        return None
+    if first and last and int(first) > int(last):
+        return None
+    return header
 
 
 @runtime_checkable
@@ -141,7 +161,9 @@ class StorageBackend(Protocol):
 
     def exists(self, key: str) -> bool: ...
 
-    def open_readable(self, key: str) -> ReadableBlob | None: ...
+    def open_readable(
+        self, key: str, *, byte_range: str | None = None
+    ) -> ReadableBlob | None: ...
 
     # --- A file staged in parts (``app.services.resumable``) -----------------
     # ``state`` is the backend's own record of the parts, kept by the caller
@@ -295,7 +317,10 @@ class LocalFilesystemStorage:
             return None
         return target
 
-    def open_readable(self, key: str) -> ReadableBlob | None:
+    def open_readable(
+        self, key: str, *, byte_range: str | None = None
+    ) -> ReadableBlob | None:
+        # ``byte_range`` is answered by the ``FileResponse`` the path becomes.
         target = self.resolve_readable(key)
         if target is None:
             return None
@@ -469,13 +494,23 @@ class S3Storage:
     def exists(self, key: str) -> bool:
         return self._head(self._object_key(key))
 
-    def open_readable(self, key: str) -> ReadableBlob | None:
+    def open_readable(
+        self, key: str, *, byte_range: str | None = None
+    ) -> ReadableBlob | None:
         from botocore.exceptions import ClientError
 
+        params = {"Bucket": self._bucket, "Key": self._object_key(key)}
         try:
-            obj = self._client.get_object(
-                Bucket=self._bucket, Key=self._object_key(key)
-            )
+            try:
+                obj = self._client.get_object(
+                    **params, **({"Range": byte_range} if byte_range else {})
+                )
+            except ClientError as exc:
+                # A range past the end is answered with the whole object, as
+                # a server may answer any range.
+                if exc.response.get("Error", {}).get("Code") != "InvalidRange":
+                    raise
+                obj = self._client.get_object(**params)
         except ClientError as exc:
             if exc.response.get("Error", {}).get("Code") in _S3_MISSING_CODES:
                 return None
@@ -484,6 +519,7 @@ class S3Storage:
             stream=obj["Body"].iter_chunks(chunk_size=_STREAM_CHUNK),
             content_type=obj.get("ContentType"),
             content_length=obj.get("ContentLength"),
+            content_range=obj.get("ContentRange"),
         )
 
     def _tail_key(self, key: str) -> str:
@@ -648,7 +684,9 @@ class DualReadStorage:
     def exists(self, key: str) -> bool:
         return self._primary.exists(key) or self._fallback.exists(key)
 
-    def open_readable(self, key: str) -> ReadableBlob | None:
+    def open_readable(
+        self, key: str, *, byte_range: str | None = None
+    ) -> ReadableBlob | None:
         # The whole point of the fallback window is "keep serving during the
         # cutover." A clean miss (None) falls through to local; so does an S3
         # *error* (auth/signature/transient) — we log it loudly so a real
@@ -656,7 +694,7 @@ class DualReadStorage:
         # serving from local instead of 500ing. Once the backfill is verified and
         # S3 reads are healthy, turn S3_LOCAL_FALLBACK off.
         try:
-            blob = self._primary.open_readable(key)
+            blob = self._primary.open_readable(key, byte_range=byte_range)
         except Exception:
             logger.warning(
                 "S3 read failed for %r; serving from local fallback "
@@ -666,7 +704,7 @@ class DualReadStorage:
                 exc_info=True,
             )
             blob = None
-        return blob or self._fallback.open_readable(key)
+        return blob or self._fallback.open_readable(key, byte_range=byte_range)
 
     def start_parts(self, key: str, *, part_bytes: int) -> dict:
         return self._primary.start_parts(key, part_bytes=part_bytes)
@@ -707,7 +745,8 @@ def build_upload_response(
 
     Local blobs become a ``FileResponse`` (sendfile + range, media type inferred
     from the path as before). S3 blobs stream via ``StreamingResponse`` using the
-    content-type recorded on the object. ``filename`` forces an attachment
+    content-type recorded on the object, as ``206`` when the blob is the range a
+    request asked for. ``filename`` forces an attachment
     download; otherwise the response is inline. The serve endpoints keep owning
     their security headers (CSP / nosniff / Content-Disposition) and pass them in.
     """
@@ -727,7 +766,15 @@ def build_upload_response(
         headers["Content-Length"] = str(blob.content_length)
     if filename is not None and "Content-Disposition" not in headers:
         headers["Content-Disposition"] = content_disposition_attachment(filename)
-    return StreamingResponse(blob.stream or iter(()), media_type=media, headers=headers)
+    headers.setdefault("Accept-Ranges", "bytes")
+    if blob.content_range is not None:
+        headers["Content-Range"] = blob.content_range
+    return StreamingResponse(
+        blob.stream or iter(()),
+        status_code=206 if blob.content_range is not None else 200,
+        media_type=media,
+        headers=headers,
+    )
 
 
 _local_backends: dict[str, LocalFilesystemStorage] = {}

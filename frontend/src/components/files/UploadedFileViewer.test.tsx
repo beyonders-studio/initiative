@@ -24,8 +24,13 @@ const deleteMutate = vi.fn();
 const putThumbnail = vi.fn();
 const frame = new Blob(["frame"], { type: "image/webp" });
 
+const frameSignals: AbortSignal[] = [];
+
 vi.mock("@/lib/videoFrame", () => ({
-  drawVideoFrame: () => Promise.resolve(frame),
+  drawVideoFrame: (_url: string, signal: AbortSignal) => {
+    frameSignals.push(signal);
+    return Promise.resolve(frame);
+  },
 }));
 let mockVersions: FileVersionRead[] = [];
 
@@ -153,6 +158,39 @@ describe("UploadedFileViewer media", () => {
 
     await waitFor(() =>
       expect(putThumbnail).toHaveBeenCalledWith({ fileId: 5, versionId: 2, frame })
+    );
+  });
+
+  it("stops drawing a frame when the viewer goes", () => {
+    const { unmount } = playing("video/mp4", "clip.mp4", { canEdit: true });
+
+    unmount();
+
+    expect(frameSignals.at(-1)?.aborted).toBe(true);
+  });
+
+  it("names an older recording by its own name", async () => {
+    mockVersions = [
+      buildVersion({
+        id: 2,
+        version_number: 2,
+        is_current: true,
+        file_content_type: "audio/mpeg",
+        original_filename: "take-2.mp3",
+      }),
+      buildVersion({ id: 1, file_content_type: "audio/mpeg", original_filename: "take-1.mp3" }),
+    ];
+    renderViewer({
+      contentType: "audio/mpeg",
+      originalFilename: "take-2.mp3",
+      fileUrl: "/uploads/take-2.mp3",
+    });
+
+    await userEvent.click(screen.getByRole("button", { name: /version history/i }));
+    await userEvent.click(screen.getByRole("button", { name: /version 1/i }));
+
+    await waitFor(() =>
+      expect(screen.getByRole("heading", { name: "take-1.mp3" })).toBeInTheDocument()
     );
   });
 

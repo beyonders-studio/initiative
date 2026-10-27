@@ -33,6 +33,7 @@ from app.api.deps import (
 from app.api.plugin_openapi import build_plugin_openapi, mark_plugin_scopes
 from app.api.embed_csp import content_security_policy, plugin_frame_policy
 from app.core.body_limit import BodySizeLimitMiddleware
+from app.core.compression import TextCompressionMiddleware
 from app.core.csrf import CsrfOriginMiddleware
 from app.api.v1.api import api_router
 from app.api.well_known import router as well_known_router
@@ -504,6 +505,10 @@ class SecurityHeadersMiddleware(BaseHTTPMiddleware):
 
 app.add_middleware(SecurityHeadersMiddleware)
 
+# Text-like responses gzipped, outside the headers above; see
+# app/core/compression.py.
+app.add_middleware(TextCompressionMiddleware, minimum_size=1024, compresslevel=6)
+
 # Body-size bounds for every request — a route's own where it has one, a
 # default otherwise — enforced at the ASGI seam so an oversized (or chunked,
 # length-less) request is refused before its body is buffered, not after
@@ -569,6 +574,7 @@ async def serve_upload_file(
         USER_CONTENT_CSP,
         build_upload_response,
         get_guild_storage,
+        requested_range,
     )
 
     # Media is referenced by pages inside a guild, and ``<img>``/iframe can't
@@ -595,7 +601,9 @@ async def serve_upload_file(
 
     # Storage is touched only after authorization passes. open_readable returns
     # None for a missing/traversal key -> 404 (same fail-closed shape as before).
-    blob = get_guild_storage(guild_id).open_readable(filename)
+    blob = get_guild_storage(guild_id).open_readable(
+        filename, byte_range=requested_range(request.headers.get("range"))
+    )
     if blob is None:
         raise HTTPException(status_code=404)
 
