@@ -47,7 +47,6 @@ import {
   useRelationsNeighbourhood,
   useUnrelate,
 } from "@/hooks/useRelationships";
-import { FILE_UPLOAD_ACCEPT } from "@/lib/fileUtils";
 import { docsUrl } from "@/lib/links";
 import { toast } from "@/lib/mascotToast";
 import {
@@ -219,7 +218,7 @@ export const RelationsSection = ({
       const [first] = files;
       if (first) openDialog(first);
     },
-    { accept: FILE_UPLOAD_ACCEPT, maxBytes: maxUploadBytes }
+    { maxBytes: maxUploadBytes }
   );
 
   const unrelate = useUnrelate(anchorTool, {

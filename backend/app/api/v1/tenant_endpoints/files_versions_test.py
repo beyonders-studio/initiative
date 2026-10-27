@@ -301,10 +301,8 @@ async def test_upload_version_non_uploaded_file_rejected(
     assert list_resp.json()["detail"] == "FILE_NOT_AN_UPLOADED_FILE"
 
 
-async def test_upload_version_unsupported_file_rejected(
-    client: AsyncClient, acting_user
-) -> None:
-    """An unsupported/invalid file is rejected with a coded error."""
+async def test_upload_version_program_refused(client: AsyncClient, acting_user) -> None:
+    """A program is refused with a coded error."""
     owner = await acting_user(guild_role=CommunityRole.admin, initiative=True)
     doc = await _upload_initial_file_doc(client, owner, initiative=owner.initiative)
 
@@ -320,7 +318,7 @@ async def test_upload_version_unsupported_file_rejected(
         },
     )
     assert resp.status_code == 400
-    assert resp.json()["detail"] == "FILE_INVALID_FILE"
+    assert resp.json()["detail"] == "FILE_TYPE_NOT_ALLOWED"
 
 
 async def test_list_versions_read_user_allowed_and_ordered(

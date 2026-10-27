@@ -104,7 +104,6 @@ import { useTagTreeSelection } from "@/hooks/useTagTreeSelection";
 import { useToolCounts } from "@/hooks/useToolCounts";
 import { useUnreadTree } from "@/hooks/useUnreadTree";
 import { useCommunityPath } from "@/lib/communityUrl";
-import { FILE_UPLOAD_ACCEPT } from "@/lib/fileUtils";
 import type { AppColumnDef } from "@/lib/table";
 import {
   isToolView,
@@ -206,7 +205,7 @@ export type ToolIndexEntry = {
   CreateDialog?: ComponentType<ToolIndexCreateDialogProps>;
   /** Files dropped anywhere on the list open the create dialog holding the
    *  first; `label` is the overlay's key in the tool's namespace. */
-  fileDrop?: { accept: string; label: string };
+  fileDrop?: { label: string };
   /** The list layout as a sortable table, with these columns after the shared
    *  ones. Without it the list layout is one line a row. */
   table?: { useColumns: () => AppColumnDef<ToolIndexRow>[] };
@@ -351,7 +350,7 @@ const TOOL_INDEX: Record<Tool, ToolIndexEntry | ToolIndexOwnPage> = {
     tiles: true,
     // Made from a type, an upload, a link or a template, not just a name.
     CreateDialog: CreateFileDialog,
-    fileDrop: { accept: FILE_UPLOAD_ACCEPT, label: "dropToUpload" },
+    fileDrop: { label: "dropToUpload" },
     // The rows are files, which is what these columns read.
     table: { useColumns: useFileColumns as unknown as () => AppColumnDef<ToolIndexRow>[] },
     untagged: true,
@@ -701,7 +700,7 @@ const ToolIndexBody = ({ tool, entry, fixedInitiativeId, canCreate }: ToolIndexB
       setDroppedFile(first);
       setCreateOpen(true);
     },
-    { accept: entry.fileDrop?.accept, maxBytes: maxUploadBytes }
+    { maxBytes: maxUploadBytes }
   );
   const onCreateOpenChange = (open: boolean) => {
     if (!open) setDroppedFile(null);

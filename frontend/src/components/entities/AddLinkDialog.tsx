@@ -33,12 +33,7 @@ import { useAppConfig } from "@/hooks/useAppConfig";
 import { useUploadFile } from "@/hooks/useFiles";
 import { type ToolRef, useRelate } from "@/hooks/useRelationships";
 import { fileIcon } from "@/lib/fileIcon";
-import {
-  FILE_UPLOAD_ACCEPT,
-  formatBytes,
-  getFileTypeLabel,
-  nameWithoutExtension,
-} from "@/lib/fileUtils";
+import { formatBytes, getFileTypeLabel, nameWithoutExtension } from "@/lib/fileUtils";
 import { toast } from "@/lib/mascotToast";
 import {
   canAssert,
@@ -280,11 +275,7 @@ export const AddLinkDialog = ({
           ) : canUpload ? (
             /* The other way to name the far end: something that is not in the
                app yet. */
-            <FileDropArea
-              accept={FILE_UPLOAD_ACCEPT}
-              onFile={chooseFile}
-              prompt={t("dialog.upload.prompt")}
-            />
+            <FileDropArea onFile={chooseFile} prompt={t("dialog.upload.prompt")} />
           ) : null}
 
           {farType && farTitle ? (

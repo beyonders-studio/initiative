@@ -169,8 +169,8 @@ class FileVersion(CreatedByMixin, table=True):
     )
     version_number: int = Field(nullable=False)
     file_url: str = Field(sa_column=Column(String(length=512), nullable=False))
-    #: One of ``attachments.ALLOWED_FILE_MIME_TYPES``: it decides how the
-    #: file is shown.
+    #: What its bytes were read as (``attachments.validate_file``): it
+    #: decides the file's type.
     file_content_type: str = Field(
         sa_column=Column(String(length=128), nullable=False),
     )

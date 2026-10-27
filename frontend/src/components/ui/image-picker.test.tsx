@@ -36,6 +36,7 @@ describe("acceptsNonImages", () => {
   it("is true once anything else is allowed", () => {
     expect(acceptsNonImages(".png,.pdf")).toBe(true);
     expect(acceptsNonImages("image/*,application/pdf")).toBe(true);
+    expect(acceptsNonImages("")).toBe(true);
   });
 });
 
