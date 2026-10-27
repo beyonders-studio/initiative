@@ -566,6 +566,7 @@ NOT_SEARCHABLE: dict[str, str] = {
     "webhook_subscriptions": "integration config",
     "intake_bindings": "routing config, reached from the settings page",
     "guest_invite_grants": "an invite's terms, reached from the invite",
+    "share_requests": "who asked for what, read where it is answered",
     "moderation_reports": "moderation work, reached from its own surface",
     "moderation_report_reporters": "who reported a thing; never a search result",
     "moderation_actions": "the moderation log, reached from its own surface",

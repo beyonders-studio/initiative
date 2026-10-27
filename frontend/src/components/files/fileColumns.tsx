@@ -1,15 +1,34 @@
 import { useMemo } from "react";
 import { useTranslation } from "react-i18next";
 
-import type { CollectionFileSummary, FileSummary } from "@/api/generated/initiativeAPI.schemas";
-import { SortHeader } from "@/components/SortIcon";
+import type { FileSummary } from "@/api/generated/initiativeAPI.schemas";
 import { Badge } from "@/components/ui/badge";
-import { RelativeTime } from "@/components/ui/relative-time";
 import { fileIcon } from "@/lib/fileIcon";
 import { isStoredFileType } from "@/lib/fileTypes";
 import { getFileTypeLabel } from "@/lib/fileUtils";
 import type { AppColumnDef } from "@/lib/table";
 import { getUserDisplayName } from "@/lib/userDisplay";
+
+/** What kind of file it is: its stored format, or a template or a file of the
+ *  app's own. */
+export const FileTypeBadge = ({ file }: { file: FileSummary }) => {
+  const { t } = useTranslation("files");
+  if (isStoredFileType(file.file_type)) {
+    const fileTypeLabel = getFileTypeLabel(file.file_content_type, file.original_filename);
+    const { Icon } = fileIcon(file);
+    return (
+      <Badge variant="secondary" className="flex w-fit items-center gap-1">
+        <Icon className="h-3 w-3" />
+        {fileTypeLabel}
+      </Badge>
+    );
+  }
+  return file.is_template ? (
+    <Badge variant="outline">{t("type.template")}</Badge>
+  ) : (
+    <span className="text-muted-foreground">{t("type.file")}</span>
+  );
+};
 
 /** What the files table shows beside the columns every tool's table has:
  *  its owner and its type. */
@@ -37,24 +56,7 @@ export const useFileColumns = (): AppColumnDef<FileSummary>[] => {
       {
         id: "type",
         header: t("columns.type"),
-        cell: ({ row }) => {
-          const doc = row.original;
-          if (isStoredFileType(doc.file_type)) {
-            const fileTypeLabel = getFileTypeLabel(doc.file_content_type, doc.original_filename);
-            const { Icon } = fileIcon(doc);
-            return (
-              <Badge variant="secondary" className="flex w-fit items-center gap-1">
-                <Icon className="h-3 w-3" />
-                {fileTypeLabel}
-              </Badge>
-            );
-          }
-          return doc.is_template ? (
-            <Badge variant="outline">{t("type.template")}</Badge>
-          ) : (
-            <span className="text-muted-foreground">{t("type.file")}</span>
-          );
-        },
+        cell: ({ row }) => <FileTypeBadge file={row.original} />,
       },
     ],
     [t]
@@ -64,33 +66,3 @@ export const useFileColumns = (): AppColumnDef<FileSummary>[] => {
 /** The fields a collection's table also sorts by: when each file was made,
  *  and when it was added to the collection. */
 export const COLLECTION_SORT_FIELDS: ReadonlySet<string> = new Set(["created_at", "added_at"]);
-
-/** A collection's table: the files table's columns, and when each file was
- *  made and added to the collection. */
-export const useCollectionFileColumns = (): AppColumnDef<CollectionFileSummary>[] => {
-  const { t } = useTranslation("files");
-  const fileColumns = useFileColumns() as AppColumnDef<CollectionFileSummary>[];
-
-  return useMemo<AppColumnDef<CollectionFileSummary>[]>(
-    () => [
-      ...fileColumns,
-      ...(["created_at", "added_at"] as const).map(
-        (field): AppColumnDef<CollectionFileSummary> => ({
-          id: field,
-          accessorKey: field,
-          header: ({ column }) => (
-            <SortHeader
-              column={column}
-              label={t(field === "added_at" ? "columns.added" : "columns.created")}
-            />
-          ),
-          cell: ({ row }) => (
-            <RelativeTime date={row.original[field]} className="text-muted-foreground" />
-          ),
-          enableSorting: true,
-        })
-      ),
-    ],
-    [fileColumns, t]
-  );
-};

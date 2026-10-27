@@ -15,7 +15,9 @@
     "url": "URL",
     "select": "Selección",
     "multi_select": "Selección múltiple",
-    "user_reference": "Persona"
+    "user_reference": "Persona",
+    "currency": "Importe",
+    "rating": "Valoración"
   },
   "picker": {
     "placeholder": "Buscar propiedades…",
@@ -41,11 +43,13 @@
     "searchOptions": "Buscar o crear opción…",
     "createOption": "Crear \"{{label}}\"",
     "optionAdded": "Opción agregada",
-    "optionAddFailed": "No se pudo agregar la opción"
+    "optionAddFailed": "No se pudo agregar la opción",
+    "ratingPlaceholder": "1–100"
   },
   "cell": {
     "emptyValue": "—",
-    "none": "Ninguno"
+    "none": "Ninguno",
+    "rating": "Valorado con {{value}} de 100"
   },
   "manager": {
     "title": "Propiedades personalizadas",
@@ -66,7 +70,9 @@
     "createError": "No se pudo crear la propiedad",
     "updateError": "No se pudo actualizar la propiedad",
     "deleteError": "No se pudo eliminar la propiedad",
-    "setValuesError": "No se pudo guardar el valor de la propiedad"
+    "setValuesError": "No se pudo guardar el valor de la propiedad",
+    "moveUp": "Subir {{name}}",
+    "moveDown": "Bajar {{name}}"
   },
   "filter": {
     "addFilter": "Agregar filtro de propiedad",
@@ -83,5 +89,10 @@
       "ilike": "contiene",
       "is_null": "está vacío"
     }
+  },
+  "currency": {
+    "label": "Moneda",
+    "none": "Ninguna moneda coincide",
+    "default": "EUR"
   }
 }

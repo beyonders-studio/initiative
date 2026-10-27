@@ -1,6 +1,6 @@
 import { useBlocker } from "@tanstack/react-router";
 import { Laptop, Redo2, Smartphone, Tablet, Undo2, X } from "lucide-react";
-import { useEffect, useMemo, useReducer, useRef, useState } from "react";
+import { type ReactNode, useEffect, useMemo, useReducer, useRef, useState } from "react";
 import { useTranslation } from "react-i18next";
 
 import type {
@@ -14,6 +14,7 @@ import type {
   ToolLayoutSetRead,
 } from "@/api/generated/initiativeAPI.schemas";
 import { listLayoutLooks } from "@/components/projects/projectTasksConfig";
+import type { RatingDisplay } from "@/components/properties/propertyHelpers";
 import { Button } from "@/components/ui/button";
 import { ConfirmDialog } from "@/components/ui/confirm-dialog";
 import {
@@ -45,6 +46,7 @@ import {
   insertAt,
   LAYOUT_SELECTED,
   type ListLayout,
+  type ListShape,
   moveNode,
   type NodePath,
   nodeAt,
@@ -56,6 +58,7 @@ import {
   startHistory,
   withCard,
 } from "@/lib/layouts/draft";
+import { type FieldDef, withDisplays } from "@/lib/layouts/fields";
 import { pluginFields, shippedPluginParts, usePluginsOnItems } from "@/lib/layouts/plugins";
 import { taskFields } from "@/lib/layouts/tasks";
 import type { LayoutNode } from "@/lib/layouts/tree";
@@ -110,6 +113,8 @@ export type LayoutEdits = {
   removeColumn: (field: string) => void;
   /** At `index`, or last. */
   addColumn: (field: string, index?: number) => void;
+  /** The open list draws the rating `field` as `display`. */
+  changeDisplay: (field: string, display: RatingDisplay) => void;
   /** The open list offers `presets`, in order. */
   changePresets: (presets: LayoutPreset[]) => void;
   /** The open list offers `groupings`, in order, and starts grouped by
@@ -119,6 +124,20 @@ export type LayoutEdits = {
   changeLimits: (limits: ColumnLimit[]) => void;
   /** The open layout goes back to the shipped one. */
   resetLayout: () => void;
+};
+
+/** What a target lists where that is not a project's tasks (a collection's
+ *  files): the fields its lists can show, what they draw as shipped, and the
+ *  open list drawn with the target's own items, its parts marked. */
+export type EditableLists = {
+  fields: ReadonlyMap<string, FieldDef>;
+  shape: ListShape;
+  /** `fields` as the open list draws them: its ratings as it says. */
+  preview: (layout: ListLayout, fields: ReadonlyMap<string, FieldDef>) => ReactNode;
+  /** Where a field made in the editor is made: this collection's own. */
+  collectionId?: number;
+  /** What a list is, as a key: what its settings say of it. */
+  help: (kind: ListLayoutReadKind) => string;
 };
 
 /** What the editor knows a detail by: its kind, and for a page laid out per
@@ -224,6 +243,7 @@ export const LayoutEditor = ({
   target,
   initiativeId,
   project,
+  lists,
   details,
   presets,
   set,
@@ -233,8 +253,9 @@ export const LayoutEditor = ({
   target: GetLayoutsParams;
   initiativeId: number;
   /** The project whose lists these are, drawn with its tasks. A target with
-   *  no project offers its lists' presets alone. */
+   *  no project offers its lists' presets alone, or draws its `lists`. */
   project?: LayoutProject;
+  lists?: EditableLists;
   details: EditableDetail[];
   /** The presets its lists offer; a target with no lists has none. */
   presets?: EditablePresets;
@@ -255,7 +276,7 @@ export const LayoutEditor = ({
   const [active, setActive] = useState<string>(
     initialKind && offered.includes(initialKind as ListLayoutReadKind)
       ? initialKind
-      : project
+      : project || lists
         ? draft.opensOn
         : details[0]
           ? detailKey(details[0])
@@ -269,10 +290,11 @@ export const LayoutEditor = ({
     : {
         kind: active as ListLayoutReadKind,
         definition: draft.lists[active as ListLayoutReadKind] ?? {},
+        shape: lists?.shape,
       };
   const stored = openDetail ? (draft.details[detailKey(openDetail)] ?? null) : null;
   // The plug-ins that draw on what is open: a list's tasks, or a detail's item.
-  const plugins = usePluginsOnItems(initiativeId, true, openDetail?.spec.kind ?? "task");
+  const plugins = usePluginsOnItems(initiativeId, !lists, openDetail?.spec.kind ?? "task");
   const detail = useMemo(
     () =>
       openDetail
@@ -303,12 +325,14 @@ export const LayoutEditor = ({
 
   const { data: definitions = [] } = useProperties({ initiativeId });
   const fields = useMemo(
-    () => (openDetail?.fields ?? taskFields)(definitions, pluginFields(plugins, i18n.language)),
-    [openDetail, definitions, plugins, i18n.language]
+    () =>
+      lists?.fields ??
+      (openDetail?.fields ?? taskFields)(definitions, pluginFields(plugins, i18n.language)),
+    [lists, openDetail, definitions, plugins, i18n.language]
   );
   // The tree the part edits change.
-  const tree = current ? cardOf(current.definition, fields) : (detail ?? EMPTY_TREE);
-  const columns = current ? columnsOf(current.definition, fields) : [];
+  const tree = current ? cardOf(current.definition, fields, current.shape) : (detail ?? EMPTY_TREE);
+  const columns = current ? columnsOf(current.definition, fields, current.shape) : [];
   const selection = stillThere(selected, tree, columns) ? selected : LAYOUT_SELECTED;
 
   // Which lists the target's menu offers, as the draft has them: each its own
@@ -409,6 +433,13 @@ export const LayoutEditor = ({
       next.splice(index ?? next.length, 0, field);
       changeList({ ...current.definition, columns: next }, { kind: "column", field });
     },
+    changeDisplay: (field, display) => {
+      if (!current) return;
+      changeList({
+        ...current.definition,
+        displays: { ...current.definition.displays, [field]: display },
+      });
+    },
     changePresets: (presets) => {
       if (current) changeList({ ...current.definition, presets });
     },
@@ -437,7 +468,7 @@ export const LayoutEditor = ({
   const choices =
     current?.kind === "calendar" || current?.kind === "gantt" || (!current && !detail)
       ? listed
-      : { ...listed, newField: initiativeId };
+      : { ...listed, newField: { initiativeId, collectionId: lists?.collectionId } };
   const addersAt = (place?: Place): Adders =>
     current?.kind === "table"
       ? { onField: (id) => edits.addColumn(id, place?.index), onPart: noop, onNode: noop }
@@ -666,7 +697,7 @@ export const LayoutEditor = ({
       {/* A screen too narrow to edit on keeps the draft, and says so. */}
       {!wide ? (
         <p className="p-6 text-muted-foreground text-sm">{t("layouts:compact")}</p>
-      ) : current && project && presets ? (
+      ) : current && ((project && presets) || lists) ? (
         <div className="grid min-h-0 flex-1 grid-cols-[16rem_minmax(0,1fr)_18rem]">
           <aside className="min-h-0 border-r">
             <ListLayoutOutline
@@ -681,26 +712,32 @@ export const LayoutEditor = ({
             />
           </aside>
           <main className="min-h-0">
-            <LayoutCanvas
-              projectId={project.id}
-              initiativeId={project.initiativeId}
-              statuses={project.statuses}
-              layout={current}
-              fields={fields}
-              width={width}
-              selection={selection}
-              onSelect={setSelected}
-              tools={tools}
-              onGroupingsChange={(groupings) =>
-                edits.changeGroupings(groupings, current.definition.group_by ?? null)
-              }
-            />
+            {project ? (
+              <LayoutCanvas
+                projectId={project.id}
+                initiativeId={project.initiativeId}
+                statuses={project.statuses}
+                layout={current}
+                fields={fields}
+                width={width}
+                selection={selection}
+                onSelect={setSelected}
+                tools={tools}
+                onGroupingsChange={(groupings) =>
+                  edits.changeGroupings(groupings, current.definition.group_by ?? null)
+                }
+              />
+            ) : lists ? (
+              <CanvasFrame width={width} selection={selection} onSelect={setSelected} tools={tools}>
+                {lists.preview(current, withDisplays(fields, current.definition.displays))}
+              </CanvasFrame>
+            ) : null}
           </main>
           <aside className="min-h-0 overflow-y-auto border-l">
             <ListLayoutSettings
               layout={current}
               presets={presets}
-              help={`layouts:listHelp.${current.kind}`}
+              help={lists ? lists.help(current.kind) : `layouts:listHelp.${current.kind}`}
               opensFirst={draft.opensOn === current.kind}
               shown={{
                 value: !hiddenOf(current.kind),

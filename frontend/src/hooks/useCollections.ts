@@ -1,18 +1,24 @@
 import { keepPreviousData, useInfiniteQuery, useQuery } from "@tanstack/react-query";
+import { useTranslation } from "react-i18next";
 
 import {
   addCollectionFiles,
   createCollection,
   deleteCollection,
+  getCollectionFileFields,
   getCollectionFilesTimeline,
+  getGetCollectionFileFieldsQueryKey,
   getGetCollectionFilesTimelineQueryKey,
   getListCollectionFilesQueryKey,
+  getListCollectionShapesQueryKey,
   getListCollectionsQueryKey,
   getReadCollectionQueryKey,
   listCollectionFiles,
+  listCollectionShapes,
   listCollections,
   readCollection,
   removeCollectionFiles,
+  setCollectionFileFields,
   updateCollection,
   uploadFile,
 } from "@/api/generated/files/files";
@@ -21,15 +27,19 @@ import type {
   CollectionFileListResponse,
   CollectionListResponse,
   CollectionRead,
+  CollectionShapeGroup,
   CollectionUpdate,
   FileRead,
   GetCollectionFilesTimelineParams,
   ListCollectionFilesParams,
+  PropertySummary,
   TimelineResponse,
 } from "@/api/generated/initiativeAPI.schemas";
+import { PropertyTarget } from "@/api/generated/initiativeAPI.schemas";
 import { invalidate, q } from "@/api/query-keys";
 import { useActiveCommunityId } from "@/hooks/useActiveCommunityId";
 import { useCommunityMutation } from "@/hooks/useApiMutation";
+import { type FieldSaveKind, heldKey } from "@/hooks/useFieldSave";
 import { nameWithoutExtension } from "@/lib/fileUtils";
 import type { MutationOpts } from "@/types/mutation";
 import type { QueryOpts } from "@/types/query";
@@ -53,12 +63,35 @@ export const useCollections = (initiativeId: number | null) => {
   });
 };
 
+/** The ready-made shapes a new collection can start as, in the reader's
+ *  language, read again when it changes. They change only with a release. */
+export const useCollectionShapes = (enabled: boolean) => {
+  const communityId = useActiveCommunityId();
+  const { i18n } = useTranslation();
+  return useQuery<CollectionShapeGroup[]>({
+    queryKey: [...getListCollectionShapesQueryKey(communityId), i18n.language],
+    queryFn: () => listCollectionShapes(communityId),
+    staleTime: Number.POSITIVE_INFINITY,
+    enabled,
+  });
+};
+
 export const useCollection = (collectionId: number | null) => {
   const communityId = useActiveCommunityId();
   return useQuery<CollectionRead>({
     queryKey: getReadCollectionQueryKey(communityId, collectionId ?? 0),
     queryFn: () => readCollection(communityId, collectionId ?? 0),
     enabled: collectionId !== null && Number.isFinite(collectionId),
+  });
+};
+
+/** One file's values of a collection's fields, where it is not read from the
+ *  collection's list: on the file's own page. */
+export const useCollectionFileFields = (collectionId: number, fileId: number) => {
+  const communityId = useActiveCommunityId();
+  return useQuery<PropertySummary[]>({
+    queryKey: getGetCollectionFileFieldsQueryKey(communityId, collectionId, fileId),
+    queryFn: () => getCollectionFileFields(communityId, collectionId, fileId),
   });
 };
 
@@ -112,6 +145,32 @@ export const useCollectionFilesTimeline = (
     enabled: collectionId !== null && Number.isFinite(collectionId) && enabled,
     ...rest,
   });
+};
+
+const fieldSaves = new Map<number, FieldSaveKind<{ properties: PropertySummary[] }, never>>();
+
+/**
+ * How a file's values of a collection's fields are saved, one at a time:
+ * they are the collection's, so whoever may change it sets them, and its
+ * lists show them.
+ */
+export const collectionFieldSaves = (collectionId: number) => {
+  let kind = fieldSaves.get(collectionId);
+  if (!kind) {
+    const name = `collection-fields-${collectionId}`;
+    kind = {
+      name,
+      readKey: (communityId, id) => heldKey(name, communityId, id),
+      patch: () => Promise.reject(new Error("a file's collection fields take no patch")),
+      properties: PropertyTarget.file,
+      setProperties: (communityId, fileId, body) =>
+        setCollectionFileFields(communityId, collectionId, fileId, body),
+      lists: () => q.allCollections(),
+      itself: () => ({}),
+    };
+    fieldSaves.set(collectionId, kind);
+  }
+  return kind;
 };
 
 /** Make a collection of the files named: a collection never starts empty. */

@@ -14,7 +14,8 @@
     "added": "Ajouté",
     "community": "Communauté",
     "initiative": "Initiative",
-    "ownerFallback": "Utilisateur {{id}}"
+    "ownerFallback": "Utilisateur {{id}}",
+    "size": "Taille"
   },
   "create": {
     "title": "Nouveau fichier",
@@ -464,6 +465,39 @@
     "notFoundDescription": "La collection que vous cherchez n’existe pas, ou aucun de ses fichiers ne vous est accessible.",
     "noAccess": "Accès refusé",
     "noAccessDescription": "Vous n’avez pas la permission de voir cette collection.",
-    "error": "Impossible de modifier la collection"
+    "error": "Impossible de modifier la collection",
+    "fields": {
+      "title": "Champs",
+      "description": "Ce que chaque fichier de cette collection peut porter ici : ses valeurs appartiennent à la collection, pas au fichier.",
+      "create": "Nouveau champ",
+      "edit": "Modifier le champ",
+      "delete": "Supprimer le champ",
+      "deleteTitle": "Supprimer ce champ ?",
+      "deleteBody": "Le champ et la valeur de chaque fichier dans cette collection seront supprimés.",
+      "none": "Aucun champ pour l'instant",
+      "heading": "Dans cette collection",
+      "saveError": "Impossible d'enregistrer la valeur",
+      "of": "Champs de {{name}}"
+    },
+    "addedOn": "Ajouté {{date}}",
+    "createdOn": "Créé {{date}}",
+    "editLayouts": "Modifier ce que montrent les listes",
+    "listHelp": {
+      "masonry": "Chaque fichier dans sa propre forme, rangé en colonnes : ce que sa carte montre sous l'image.",
+      "grid": "Chaque fichier en vignette carrée : ce que sa carte montre sous l'image.",
+      "timeline": "Les fichiers selon le jour où ils ont été ajoutés : ce que chaque carte montre sous l'image.",
+      "table": "Les fichiers de la collection en tableau : quelles colonnes, dans quel ordre."
+    },
+    "shapes": {
+      "name": "Nom",
+      "blank": "Vierge",
+      "blankHint": "Une grille et un tableau, sans champs propres pour l'instant.",
+      "lists": "Affiche {{lists}}",
+      "fields": "Champs : {{fields}}",
+      "copyLabel": "Ou copier la forme de",
+      "copyPlaceholder": "Une autre collection",
+      "copyHint": "Ses champs et ce que montrent ses listes, sans ses fichiers ni leurs valeurs.",
+      "create": "Créer la collection"
+    }
   }
 }

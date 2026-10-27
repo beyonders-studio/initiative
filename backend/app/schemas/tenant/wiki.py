@@ -18,6 +18,7 @@ from app.schemas.tenant.property import (
     PropertySummary,
     annotated_properties,
 )
+from app.schemas.tenant.share_request import HiddenFiles
 from app.schemas.tenant.tag import TagSummary, annotated_tags
 from app.schemas.tenant.tool import ToolSummaryBase, from_row
 
@@ -86,9 +87,11 @@ class WikiSummary(WikiBase, ToolSummaryBase):
 
 
 class WikiRead(WikiSummary):
-    """A wiki on its own page. The same shape as its summary: the pages are
-    fetched as a tree of their own, because a wiki is navigated rather than
-    read end to end."""
+    """A wiki on its own page: its summary, and the files filed in it the
+    reader knows are there and can't open. The pages are fetched as a tree of
+    their own, because a wiki is navigated rather than read end to end."""
+
+    hidden_files: HiddenFiles = Field(default_factory=HiddenFiles)
 
 
 class WikiListResponse(PageMeta):

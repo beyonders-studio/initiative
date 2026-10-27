@@ -523,5 +523,41 @@
       "title": "Eine neue Möglichkeit, dich anzumelden",
       "body": "Du kannst dich jetzt über <strong>{{provider}}</strong> bei deinem Konto anmelden, weil dort eine deiner Adressen bestätigt wurde."
     }
+  },
+  "share": {
+    "requested": {
+      "read": {
+        "subject": "Bitte um Ansicht",
+        "title": "Bitte um Ansicht",
+        "body_one": "<strong>{{requester}}</strong> möchte <strong>{{title}}</strong> ansehen",
+        "body_other": "<strong>{{requester}}</strong> möchte {{count}} Dateien ansehen"
+      },
+      "write": {
+        "subject": "Bitte um Bearbeitung",
+        "title": "Bitte um Bearbeitung",
+        "body_one": "<strong>{{requester}}</strong> möchte <strong>{{title}}</strong> bearbeiten",
+        "body_other": "<strong>{{requester}}</strong> möchte {{count}} Dateien bearbeiten"
+      }
+    },
+    "granted": {
+      "read": {
+        "subject": "Du kannst es jetzt ansehen",
+        "title": "Du kannst es jetzt ansehen",
+        "body_one": "<strong>{{answerer}}</strong> hat dir <strong>{{title}}</strong> zum Ansehen freigegeben",
+        "body_other": "<strong>{{answerer}}</strong> hat dir {{count}} Dateien zum Ansehen freigegeben"
+      },
+      "write": {
+        "subject": "Du kannst es jetzt bearbeiten",
+        "title": "Du kannst es jetzt bearbeiten",
+        "body_one": "<strong>{{answerer}}</strong> hat dir <strong>{{title}}</strong> zum Bearbeiten freigegeben",
+        "body_other": "<strong>{{answerer}}</strong> hat dir {{count}} Dateien zum Bearbeiten freigegeben"
+      }
+    },
+    "declined": {
+      "subject": "Anfrage abgelehnt",
+      "title": "Anfrage abgelehnt",
+      "body_one": "<strong>{{answerer}}</strong> hat deine Anfrage abgelehnt",
+      "body_other": "<strong>{{answerer}}</strong> hat deine Anfrage für {{count}} Dateien abgelehnt"
+    }
   }
 }

@@ -433,7 +433,18 @@ export const ColorField = <
   );
 };
 
-/** An item's custom properties, each saved on its own, and adding one. */
+/** One holder per read of a row's properties, so a copy passed again is the
+ *  same copy ({@link useHeldItem}). */
+const holders = new WeakMap<PropertySummary[], { properties: PropertySummary[] }>();
+const holderOf = (properties: PropertySummary[]) => {
+  let holder = holders.get(properties);
+  if (!holder) {
+    holder = { properties };
+    holders.set(properties, holder);
+  }
+  return holder;
+};
+
 /**
  * One property placed on the layout on its own: drawn whether or not the item
  * has a value for it yet, and saved on its own. A reader sees it only where it
@@ -441,15 +452,26 @@ export const ColorField = <
  */
 export const PlacedPropertyField = <I extends { properties: PropertySummary[] }, P>({
   propertyId,
+  definitions: given,
   ...props
-}: PropertiesProps<I, P> & { propertyId: number }) => {
+}: PropertiesProps<I, P> & {
+  propertyId: number;
+  /** Where its definition is, where not among the initiative's properties:
+   *  a collection's own fields. */
+  definitions?: PropertyDefinitionRead[];
+}) => {
   const { t } = useTranslation(["properties", "common"]);
   const definitions = useProperties({
     initiativeId: props.initiativeId ?? undefined,
-    enabled: props.initiativeId !== null,
+    enabled: props.initiativeId !== null && given === undefined,
   });
-  const definition = definitions.data?.find((each) => each.id === propertyId);
-  const held = props.properties.find((each) => each.property_id === propertyId);
+  const { properties } = useHeldItem(
+    props.kind as unknown as FieldSaveKind<{ properties: PropertySummary[] }, P>,
+    props.id,
+    holderOf(props.properties)
+  );
+  const definition = (given ?? definitions.data)?.find((each) => each.id === propertyId);
+  const held = properties.find((each) => each.property_id === propertyId);
   const property = held ?? (definition ? propertyStubFromDefinition(definition) : undefined);
   // Not loaded is not deleted: an editor is told, and can ask again.
   if (!property && definitions.isError && !props.readOnly) {
@@ -471,21 +493,10 @@ export const PlacedPropertyField = <I extends { properties: PropertySummary[] },
       </ReadField>
     );
   }
-  return <PropertyField {...props} property={property} placed />;
+  return <PropertyField {...props} properties={properties} property={property} placed />;
 };
 
-/** One holder per read of a row's properties, so a copy passed again is the
- *  same copy ({@link useHeldItem}). */
-const holders = new WeakMap<PropertySummary[], { properties: PropertySummary[] }>();
-const holderOf = (properties: PropertySummary[]) => {
-  let holder = holders.get(properties);
-  if (!holder) {
-    holder = { properties };
-    holders.set(properties, holder);
-  }
-  return holder;
-};
-
+/** An item's custom properties, each saved on its own, and adding one. */
 export const PropertiesField = <I extends { properties: PropertySummary[] }, P>({
   except,
   hideLabel = false,

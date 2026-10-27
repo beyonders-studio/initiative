@@ -3,6 +3,7 @@ import { useMemo, useState } from "react";
 import { useTranslation } from "react-i18next";
 
 import {
+  type CurrencyCode,
   type PropertyDefinitionCreate,
   type PropertyDefinitionRead,
   type PropertyOption,
@@ -15,6 +16,7 @@ import { Label } from "@/components/ui/label";
 import { Select, SelectContent, SelectItem, SelectTrigger } from "@/components/ui/select";
 import { useCreateProperty } from "@/hooks/useProperties";
 
+import { CurrencySelect, useDefaultCurrency } from "./CurrencySelect";
 import { normalizeOptionList, typeRequiresOptions } from "./propertyHelpers";
 import { iconForPropertyType } from "./propertyTypeIcons";
 
@@ -29,15 +31,19 @@ export const PROPERTY_TYPES: PropertyTypeValue[] = [
   PropertyType.select,
   PropertyType.multi_select,
   PropertyType.user_reference,
+  PropertyType.currency,
+  PropertyType.rating,
 ];
 
 /**
- * A new property for an initiative: its name, its kind and, for a select, its
- * options. Where an item's properties are added to, and where a layout adds a
- * field, it is the one way a property is made there.
+ * A new property for an initiative, or a field of one of its collections: its
+ * name, its kind and, for a select, its options, for money its currency. Where
+ * an item's properties are added to, and where a layout adds a field, it is
+ * the one way a property is made there.
  */
 export const NewPropertyForm = ({
   initiativeId,
+  collectionId,
   name: startName = "",
   type: startType = PropertyType.text,
   onCreated,
@@ -45,6 +51,8 @@ export const NewPropertyForm = ({
   onPendingChange,
 }: {
   initiativeId: number;
+  /** The collection it is a field of; left out, it is the initiative's. */
+  collectionId?: number;
   /** What the name starts as: what was searched for, say. */
   name?: string;
   /** The kind it starts as. */
@@ -60,6 +68,8 @@ export const NewPropertyForm = ({
   const [newOptions, setNewOptions] = useState<PropertyOption[]>(() =>
     typeRequiresOptions(startType) ? [{ value: "", label: "" }] : []
   );
+  const defaultCurrency = useDefaultCurrency();
+  const [newCurrency, setNewCurrency] = useState<CurrencyCode>(defaultCurrency);
   const createPropertyMutation = useCreateProperty();
 
   const handleAddOption = () => setNewOptions((prev) => [...prev, { value: "", label: "" }]);
@@ -82,7 +92,9 @@ export const NewPropertyForm = ({
       name,
       type: newType,
       initiative_id: initiativeId,
+      ...(collectionId !== undefined ? { collection_id: collectionId } : {}),
       options,
+      ...(newType === PropertyType.currency ? { currency: newCurrency } : {}),
     };
     onPendingChange?.(true);
     try {
@@ -158,6 +170,13 @@ export const NewPropertyForm = ({
           </SelectContent>
         </Select>
       </div>
+
+      {newType === PropertyType.currency ? (
+        <div className="space-y-2">
+          <Label className="font-normal text-xs">{t("properties:currency.label")}</Label>
+          <CurrencySelect value={newCurrency} onChange={setNewCurrency} />
+        </div>
+      ) : null}
 
       {typeRequiresOptions(newType) ? (
         <div className="space-y-2">

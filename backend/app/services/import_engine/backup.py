@@ -52,6 +52,7 @@ from app.models.tenant.initiative import Initiative
 from app.models.tenant.resource_grant import ResourceAccessLevel, ResourceGrant
 from app.schemas.base import SanitizedBaseModel
 from app.schemas.tenant.import_envelopes import EnvelopePropertyValue
+from app.schemas.tenant.project_export import ProjectExportPropertyDefinition
 from app.schemas.tenant.backup_export import (
     BACKUP_SCHEMA_VERSION,
     MIN_SUPPORTED_IMPORT_VERSION,
@@ -73,8 +74,10 @@ from app.services.import_engine.archive_assets import (
     restore_assets,
 )
 from app.services.import_engine.common import (
+    decode_property_value,
     handle_key,
     load_guild_member_handles,
+    load_initiative_member_handles,
     unique_name,
     unique_name_in_initiative,
 )
@@ -903,7 +906,6 @@ async def _apply_property_definitions(
     binds the definitions an envelope declares."""
     from pydantic import ValidationError
 
-    from app.schemas.tenant.project_export import ProjectExportPropertyDefinition
     from app.services.import_engine.importers._base import PropertyRestore
 
     declared = []
@@ -920,7 +922,8 @@ async def _apply_property_definitions(
 
 class _CollectionRecord(SanitizedBaseModel):
     """One collection as a backup carries it: its files and cover by the ids
-    they had where it was exported."""
+    they had where it was exported, its own fields, and each file's values of
+    them by the file's id there."""
 
     model_config = ConfigDict(extra="ignore")
 
@@ -931,6 +934,8 @@ class _CollectionRecord(SanitizedBaseModel):
     file_ids: list[int] = []
     tags: list[str] = []
     properties: list[EnvelopePropertyValue] = []
+    fields: list[ProjectExportPropertyDefinition] = []
+    values: dict[int, list[EnvelopePropertyValue]] = {}
 
 
 async def _apply_collections(
@@ -942,9 +947,12 @@ async def _apply_collections(
     context: ImportContext | None,
 ) -> dict:
     """Make each collection that holds a file this job made, with the files
-    made of its own. One whose files none came over is not made: a collection
-    is never empty."""
+    made of its own, its fields and their values on those files. One whose
+    files none came over is not made: a collection is never empty. A person a
+    value names is placed as any property's is, and a value placing nobody is
+    left out."""
     from app.models.tenant.collection import Collection
+    from app.models.tenant.property import PropertyDefinition, PropertyValue
     from app.services.import_engine.importers._base import (
         PropertyRestore,
         TagRestore,
@@ -953,6 +961,7 @@ async def _apply_collections(
 
     if context is None:
         return {}
+    members = await load_initiative_member_handles(session, initiative_id=initiative.id)
     made = 0
     for raw in payload.get("collections") or []:
         record = _CollectionRecord.model_validate(raw)
@@ -975,6 +984,40 @@ async def _apply_collections(
         await collections_service.add_files(
             session, collection, list(files.values()), added_by=user.id
         )
+        fields = {
+            field.name: PropertyDefinition(
+                initiative_id=initiative.id,
+                collection_id=collection.id,
+                name=field.name,
+                type=field.type,
+                position=field.position,
+                color=field.color,
+                options=field.options,
+                currency=field.currency,
+            )
+            for field in record.fields
+        }
+        session.add_all(fields.values())
+        await session.flush()
+        for source_id, values in record.values.items():
+            for value in values:
+                field = fields.get(value.property_name)
+                columns = (
+                    decode_property_value(value, members, people=context.people)
+                    if source_id in files
+                    and field is not None
+                    and field.type == value.property_type
+                    else None
+                )
+                if columns is not None:
+                    session.add(
+                        PropertyValue(
+                            entity_type=Tool.file.value,
+                            entity_id=files[source_id],
+                            property_id=field.id,
+                            **columns,
+                        )
+                    )
         await TagRestore(session).attach(collection, record.tags)
         props = PropertyRestore(session, initiative_id=initiative.id, context=context)
         await props.attach(collection, record.properties)
@@ -1128,6 +1171,7 @@ class _GalleryPicture(SanitizedBaseModel):
 
     storage_key: str
     title: Optional[str] = None
+    caption: Optional[str] = None
     original_filename: Optional[str] = None
     tags: list[str] = []
     properties: list[EnvelopePropertyValue] = []
@@ -1159,10 +1203,13 @@ async def _apply_gallery_entry(
 ) -> EntryResult:
     """An older build's gallery: each picture whose bytes were restored is a
     file of the initiative, owned by the importer, and the files one collection
-    named as the gallery was. The gallery's tags and properties go on the
-    collection, each picture's on its file; a caption is not kept."""
+    named as the gallery was, made as the Gallery shape in the importer's
+    language. The gallery's tags and properties go on the collection, each
+    picture's on its file, and its caption is its file's Caption."""
+    from app.core.collection_shapes import SHAPES_BY_KEY
     from app.models.tenant.collection import Collection
     from app.models.tenant.file import File
+    from app.models.tenant.property import PropertyValue
     from app.services.import_engine.importers._base import (
         PropertyRestore,
         TagRestore,
@@ -1184,6 +1231,7 @@ async def _apply_gallery_entry(
         )
     missing = 0
     files: list[Any] = []
+    captions: dict[int, str] = {}
     cover: int | None = None
     try:
         async with session.begin_nested():
@@ -1223,6 +1271,8 @@ async def _apply_gallery_entry(
                 await tags.attach(file, picture.tags)
                 await props.attach(file, picture.properties)
                 files.append(file)
+                if picture.caption and picture.caption.strip():
+                    captions[file.id] = picture.caption.strip()
                 if gallery.cover and key == gallery.cover:
                     cover = file.id
             collection = None
@@ -1238,6 +1288,21 @@ async def _apply_gallery_entry(
                 await session.flush()
                 await collections_service.add_files(
                     session, collection, [f.id for f in files], added_by=user.id
+                )
+                shaped = await collections_service.apply_shape(
+                    session,
+                    collection,
+                    SHAPES_BY_KEY["gallery"],
+                    locale=user.locale or "en",
+                )
+                session.add_all(
+                    PropertyValue(
+                        entity_type=Tool.file.value,
+                        entity_id=file_id,
+                        property_id=shaped["caption"].id,
+                        value_text=caption,
+                    )
+                    for file_id, caption in captions.items()
                 )
                 await tags.attach(collection, gallery.tags)
                 await props.attach(collection, gallery.properties)

@@ -6,8 +6,8 @@ file; the one place it is kept is a saved files view's ``kind`` filter, in
 ``public.user_view_preferences``, which takes the new name. The downgrade
 gives it the old one back.
 
-Revision ID: 20261027_0548
-Revises: 20261027_0547
+Revision ID: 20261027_0549
+Revises: 20261027_0548
 Create Date: 2026-10-27
 """
 
@@ -20,8 +20,8 @@ from alembic import op
 from sqlalchemy import text
 from sqlalchemy.engine import Connection
 
-revision = "20261027_0548"
-down_revision = "20261027_0547"
+revision = "20261027_0549"
+down_revision = "20261027_0548"
 branch_labels = None
 depends_on = None
 

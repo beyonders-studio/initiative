@@ -982,6 +982,7 @@ export function CalendarFocusPage() {
         keys="calendars:"
         backTo={gp(toolListRoute(Tool.calendar, initiativeId))}
         backLabel={t("backToEvents")}
+        entity={{ kind: "calendar", id: calendarId }}
       />
     );
   }

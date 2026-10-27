@@ -41,6 +41,7 @@ import { LAYOUT_REGIONS } from "@/lib/layouts/detailLayout";
 import {
   addableFields,
   addablePluginParts,
+  CARD_LISTS,
   cardOf,
   columnsOf,
   dropInto,
@@ -120,8 +121,9 @@ export type AddChoices = {
   fields: FieldDef[];
   plugins: PickerPlugin[];
   parts: PickerPart[];
-  /** The initiative a new field is made in, where one can be placed. */
-  newField?: number;
+  /** Where a new field is made, where one can be placed: the initiative's
+   *  properties, or a collection's own fields. */
+  newField?: { initiativeId: number; collectionId?: number };
 };
 
 /** What a pick in the Add picker does. */
@@ -143,8 +145,8 @@ export const listChoices = (
   if (layout.kind === "calendar" || layout.kind === "gantt") {
     return { fields: [], plugins: [], parts: [] };
   }
-  const card = cardOf(layout.definition, fields);
-  const board = layout.kind === "board";
+  const card = cardOf(layout.definition, fields, layout.shape);
+  const board = CARD_LISTS.has(layout.kind);
   return {
     fields: addableFields(layout, fields),
     // A table draws fields only; a card takes parts as well.
@@ -327,8 +329,8 @@ export const ListLayoutOutline = ({
   const sensors = useOutlineSensors();
   const { labelOf, partLabel } = usePartLabel(fields, plugins);
   const { definition, kind: layout } = open;
-  const card = cardOf(definition, fields);
-  const columns = columnsOf(definition, fields);
+  const card = cardOf(definition, fields, open.shape);
+  const columns = columnsOf(definition, fields, open.shape);
   const isSelected = (other: Selection) => sameSelection(selection, other);
 
   const onColumnDragEnd = ({ active, over }: DragEndEvent) => {
@@ -348,7 +350,7 @@ export const ListLayoutOutline = ({
           onSelect={() => edits.select({ kind: "layout" })}
           fixed
         />
-        {layout === "board" ? (
+        {CARD_LISTS.has(layout) ? (
           <>
             <OutlineRow
               id="card"
@@ -718,7 +720,13 @@ export const AddPicker = ({
   const sourceOf = (field: FieldDef) =>
     field.source === "plugin"
       ? (pluginName.get(field.plugin?.install ?? 0) ?? "")
-      : t(field.source === "property" ? "layouts:fromProperty" : "layouts:builtIn");
+      : t(
+          field.property?.collection_id
+            ? "layouts:fromCollection"
+            : field.source === "property"
+              ? "layouts:fromProperty"
+              : "layouts:builtIn"
+        );
   const blocks = parts.filter(
     (part) => part.group === "layout" && matches(query, part.label, part.description)
   );
@@ -778,7 +786,8 @@ export const AddPicker = ({
       >
         {making !== null && newField !== undefined ? (
           <NewPropertyForm
-            initiativeId={newField}
+            initiativeId={newField.initiativeId}
+            collectionId={newField.collectionId}
             type={making}
             name={search.trim()}
             onCreated={(created) => pick(() => onField(propertyFieldId(created.id)))}

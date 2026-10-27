@@ -471,6 +471,10 @@ const calendarEvent = (eventId: number): Spec => ({
   communityExact: [`/api/v1/calendar-events/${eventId}`],
 });
 
+/** Access requests: where the reader stands on each thing, and the requests
+ *  waiting on their answer. Asking or answering moves both. */
+const shareRequests = (): Spec => ({ communityPrefix: ["/api/v1/share-requests"] });
+
 /** Files' collections: every list of them and each one's own read and files.
  *  What is in one shows on its card (a count, a cover) and in its list. */
 const allCollections = (): Spec => ({ communityPrefix: ["/api/v1/collections"] });
@@ -742,6 +746,7 @@ export const q = {
   recentComments,
   relationships,
   resolvedAISettings,
+  shareRequests,
   storageSettings,
   tag,
   tagEntities,

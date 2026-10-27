@@ -137,8 +137,8 @@ async def test_a_gallery_becomes_a_collection_of_files(session) -> None:
     await session.commit()
 
     # A gallery as 0.68 stored one, archived: two pictures, the first replaced
-    # once, a restricted grant, a comment, tags on it and on a picture, and
-    # links.
+    # once and captioned, a restricted grant, a comment, tags on it and on a
+    # picture, and links.
     archived = datetime(2026, 1, 3, tzinfo=timezone.utc)
     connection = await session.connection()
     await connection.execute(text("SET LOCAL session_replication_role = replica"))
@@ -176,18 +176,19 @@ async def test_a_gallery_becomes_a_collection_of_files(session) -> None:
         archived=archived,
     )
     pictures = []
-    for title, at in (
-        ("Sunset", datetime(2026, 2, 1, tzinfo=timezone.utc)),
-        (None, datetime(2026, 3, 1, tzinfo=timezone.utc)),
+    for title, caption, at in (
+        ("Sunset", " Golden hour ", datetime(2026, 2, 1, tzinfo=timezone.utc)),
+        (None, " ", datetime(2026, 3, 1, tzinfo=timezone.utc)),
     ):
         pictures.append(
             await _one(
                 session,
                 f"INSERT INTO {s}.gallery_images (gallery_id, title, caption, "
-                "created_by, created_at, updated_at) VALUES (:g, :t, 'a caption', "
+                "created_by, created_at, updated_at) VALUES (:g, :t, :c, "
                 ":u, :at, :at) RETURNING id",
                 g=gallery,
                 t=title,
+                c=caption,
                 u=owner.id,
                 at=at,
             )
@@ -412,6 +413,29 @@ async def test_a_gallery_becomes_a_collection_of_files(session) -> None:
             ("project", project.id, "attached", "collection", gallery, 10, 17),
         ]
     )
+    # Made as the Gallery shape: a Caption field of its own, holding each
+    # caption that says something, which its lists show as the gallery did.
+    ((caption, name, kind),) = await _rows(
+        session,
+        f"SELECT id, name, CAST(type AS text) FROM {s}.property_definitions "
+        "WHERE collection_id = :g",
+        g=gallery,
+    )
+    assert (name, kind) == ("Caption", "text")
+    assert await _rows(
+        session,
+        f"SELECT entity_type, entity_id, value_text FROM {s}.property_values "
+        "WHERE property_id = :p",
+        p=caption,
+    ) == [("file", sunset_file, "Golden hour")]
+    field = f"property:{caption}"
+    card = {
+        "type": "card",
+        "children": [
+            {"type": "field", "props": {"field": "name"}},
+            {"type": "field", "props": {"field": field}},
+        ],
+    }
     assert await _rows(
         session,
         f"SELECT kind, definition FROM {s}.tool_layouts "
@@ -419,9 +443,10 @@ async def test_a_gallery_becomes_a_collection_of_files(session) -> None:
         g=gallery,
     ) == [
         ("default", {"kind": "masonry"}),
-        ("masonry", {"hidden": False}),
-        ("table", {"hidden": True}),
-        ("timeline", {"hidden": False}),
+        ("grid", {"hidden": False, "card": card}),
+        ("masonry", {"hidden": False, "card": card}),
+        ("table", {"hidden": True, "columns": ["name", field, "added"]}),
+        ("timeline", {"hidden": False, "card": card}),
     ]
     assert await _rows(
         session,

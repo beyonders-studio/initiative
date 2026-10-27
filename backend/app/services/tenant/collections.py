@@ -6,6 +6,11 @@ shows, is what the reader's own file policies let through
 person. A collection is never empty for long: once its last live file leaves,
 :func:`settle` takes it to the trash, and restoring one of its files brings it
 back.
+
+A collection owns its fields (``property_definitions.collection_id``): it can
+start with a ready-made shape's (:func:`apply_shape`) or another collection's
+(:func:`copy_shape`), and a file taken out of it leaves its values for them
+behind.
 """
 
 from __future__ import annotations
@@ -20,17 +25,33 @@ from sqlalchemy.orm import selectinload
 from sqlmodel import col, select
 from sqlmodel.ext.asyncio.session import AsyncSession
 
-from app.core.tools import KINDS
+from app.core.collection_shapes import (
+    SHAPE_GROUPS,
+    SHAPES,
+    CollectionShape,
+    ShownField,
+)
+from app.core.email_i18n import translate
+from app.core.tools import KINDS, LIST_LAYOUTS
 from app.db import post_commit
 from app.db.query import ids_in
 from app.db.session import guild_context, install_context, routed_guild_id
 from app.db.soft_delete_filter import select_including_deleted
 from app.models.tenant.collection import Collection, CollectionFile
 from app.models.tenant.file import File
+from app.models.tenant.property import PropertyDefinition, PropertyType
+from app.schemas.tenant.collection import (
+    CollectionShapeEntry,
+    CollectionShapeField,
+    CollectionShapeGroup,
+)
+from app.schemas.tenant.property import PropertyDefinitionRead
+from app.schemas.tenant.tool_layout import PROPERTY_FIELD_PREFIX
 from app.services.tenant import comments as comments_service
 from app.services.tenant import named_people
 from app.services.tenant import properties as properties_service
 from app.services.tenant import tags as tags_service
+from app.services.tenant import tool_layouts
 
 
 async def get_collection(
@@ -141,12 +162,14 @@ async def remove_files(
     removal commits (:func:`settle`)."""
     wanted = sorted(set(file_ids))
     # The collection first: taking out the last file its reader can open puts
-    # it out of their sight, and so out of reach of an update after.
+    # it out of their sight, and so out of reach of an update after. Its
+    # fields' values on the files go while the files are still in it.
     if collection.cover_file_id in wanted:
         collection.cover_file_id = None
     collection.updated_at = datetime.now(timezone.utc)
     session.add(collection)
     await session.flush()
+    await properties_service.drop_collection_values(session, collection.id, wanted)
     await session.exec(
         delete(CollectionFile).where(
             col(CollectionFile.collection_id) == collection.id,
@@ -258,17 +281,189 @@ async def cards(session: AsyncSession, rows: Sequence[Collection]) -> dict[int, 
     }
 
 
+async def fields_of(
+    session: AsyncSession, collection_ids: Sequence[int]
+) -> dict[int, list[PropertyDefinition]]:
+    """Each collection's own fields, in order."""
+    if not collection_ids:
+        return {}
+    rows = await session.exec(
+        select(PropertyDefinition)
+        .where(ids_in(PropertyDefinition.collection_id, collection_ids))
+        .order_by(col(PropertyDefinition.position), col(PropertyDefinition.id))
+    )
+    found: dict[int, list[PropertyDefinition]] = {}
+    for row in rows.all():
+        found.setdefault(row.collection_id or 0, []).append(row)
+    return found
+
+
 async def annotate(
     session: AsyncSession, rows: Sequence[Collection]
 ) -> dict[int, Card]:
     """Everything a serialized collection reads beside its row: its tags,
-    properties, comment count, and :func:`cards`."""
+    properties, own fields, comment count, and :func:`cards`."""
+    fields = await fields_of(session, [row.id for row in rows if row.id is not None])
+    for row in rows:
+        object.__setattr__(
+            row,
+            "fields",
+            [
+                PropertyDefinitionRead.model_validate(f)
+                for f in fields.get(row.id or 0, [])
+            ],
+        )
     await tags_service.annotate_tags(session, rows)
     await properties_service.annotate_properties(session, rows)
     await comments_service.annotate_comment_counts(
         session, rows, column="collection_id"
     )
     return await cards(session, rows)
+
+
+# ---------------------------------------------------------------------------
+# Shapes
+# ---------------------------------------------------------------------------
+
+
+def shape_word(key: str, locale: str) -> str:
+    """One of the ready-made shapes' words (``collections.shapes.<key>``), in
+    ``locale``."""
+    return translate(f"collections.shapes.{key}", locale, namespace="files")
+
+
+def shapes(locale: str) -> list[CollectionShapeGroup]:
+    """The ready-made shapes, grouped, in ``locale``."""
+    currency = shape_word("currency", locale)
+    return [
+        CollectionShapeGroup(
+            key=group,
+            name=shape_word(f"groups.{group}", locale),
+            entries=[
+                CollectionShapeEntry(
+                    key=shape.key,
+                    name=shape_word(f"shapes.{shape.key}.name", locale),
+                    hint=shape_word(f"shapes.{shape.key}.hint", locale),
+                    lists=list(shape.lists),
+                    fields=[
+                        CollectionShapeField(
+                            name=shape_word(f"fields.{field.key}", locale),
+                            type=PropertyType(field.type),
+                            display=field.display,
+                            currency=(
+                                currency
+                                if field.type == PropertyType.currency.value
+                                else None
+                            ),
+                        )
+                        for field in shape.fields
+                    ],
+                )
+                for shape in SHAPES
+                if shape.group == group
+            ],
+        )
+        for group in SHAPE_GROUPS
+    ]
+
+
+def _target(collection: Collection) -> tool_layouts.Target:
+    return tool_layouts.Target("collection", collection.id, collection.initiative_id)
+
+
+async def apply_shape(
+    session: AsyncSession,
+    collection: Collection,
+    shape: CollectionShape,
+    *,
+    locale: str,
+) -> dict[str, PropertyDefinition]:
+    """Give a collection made in this transaction a ready-made shape: its
+    fields, named in ``locale``, and its lists, each showing what the shape
+    has a card or the table show. Its files are in it already, so whoever
+    makes it sees it. Answers the fields made, by the shape's key for each."""
+    made = [
+        PropertyDefinition(
+            initiative_id=collection.initiative_id,
+            collection_id=collection.id,
+            name=shape_word(f"fields.{field.key}", locale),
+            type=PropertyType(field.type),
+            position=float(position),
+            currency=(
+                shape_word("currency", locale)
+                if field.type == PropertyType.currency.value
+                else None
+            ),
+        )
+        for position, field in enumerate(shape.fields, start=1)
+    ]
+    session.add_all(made)
+    await session.flush()
+    ids = {field.key: definition.id for field, definition in zip(shape.fields, made)}
+
+    def shown(entry: ShownField) -> str:
+        return (
+            entry
+            if isinstance(entry, str)
+            else f"{PROPERTY_FIELD_PREFIX}{ids[entry.key]}"
+        )
+
+    displays = {
+        f"{PROPERTY_FIELD_PREFIX}{ids[field.key]}": field.display
+        for field in shape.fields
+        if field.display is not None
+    }
+    card = {
+        "type": "card",
+        "children": [
+            {"type": "field", "props": {"field": shown(entry)}} for entry in shape.card
+        ],
+    }
+    lists: dict[str, dict[str, Any]] = {}
+    for kind in LIST_LAYOUTS["collection"]:
+        definition: dict[str, Any] = {"hidden": kind not in shape.lists}
+        if kind == "table":
+            definition["columns"] = [shown(entry) for entry in shape.columns]
+        else:
+            definition["card"] = card
+        if displays:
+            definition["displays"] = displays
+        lists[kind] = definition
+    await tool_layouts.start(session, _target(collection), lists, shape.lists[0])
+    return {field.key: definition for field, definition in zip(shape.fields, made)}
+
+
+async def copy_shape(
+    session: AsyncSession, source: Collection, collection: Collection
+) -> None:
+    """Give a collection made in this transaction the fields and lists of
+    ``source``, none of its values."""
+    fields = (await fields_of(session, [source.id or 0])).get(source.id or 0, [])
+    made = [
+        PropertyDefinition(
+            initiative_id=collection.initiative_id,
+            collection_id=collection.id,
+            name=field.name,
+            type=field.type,
+            position=field.position,
+            color=field.color,
+            options=field.options,
+            currency=field.currency,
+        )
+        for field in fields
+    ]
+    session.add_all(made)
+    await session.flush()
+    await tool_layouts.copy_layouts(
+        session,
+        _target(source),
+        _target(collection),
+        status_mapping={},
+        type_mapping={},
+        fields={
+            field.id or 0: definition.id or 0 for field, definition in zip(fields, made)
+        },
+    )
 
 
 # ---------------------------------------------------------------------------

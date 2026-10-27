@@ -1368,6 +1368,8 @@ export const PropertyType = {
   select: "select",
   multi_select: "multi_select",
   user_reference: "user_reference",
+  currency: "currency",
+  rating: "rating",
 } as const;
 
 /**
@@ -1389,6 +1391,169 @@ export interface PropertyOption {
 }
 
 /**
+ * The ISO 4217 code a money property's amounts are in.
+ */
+export type CurrencyCode = (typeof CurrencyCode)[keyof typeof CurrencyCode];
+
+export const CurrencyCode = {
+  AED: "AED",
+  AFN: "AFN",
+  ALL: "ALL",
+  AMD: "AMD",
+  AOA: "AOA",
+  ARS: "ARS",
+  AUD: "AUD",
+  AWG: "AWG",
+  AZN: "AZN",
+  BAM: "BAM",
+  BBD: "BBD",
+  BDT: "BDT",
+  BHD: "BHD",
+  BIF: "BIF",
+  BMD: "BMD",
+  BND: "BND",
+  BOB: "BOB",
+  BRL: "BRL",
+  BSD: "BSD",
+  BTN: "BTN",
+  BWP: "BWP",
+  BYN: "BYN",
+  BZD: "BZD",
+  CAD: "CAD",
+  CDF: "CDF",
+  CHF: "CHF",
+  CLP: "CLP",
+  CNY: "CNY",
+  COP: "COP",
+  CRC: "CRC",
+  CUP: "CUP",
+  CVE: "CVE",
+  CZK: "CZK",
+  DJF: "DJF",
+  DKK: "DKK",
+  DOP: "DOP",
+  DZD: "DZD",
+  EGP: "EGP",
+  ERN: "ERN",
+  ETB: "ETB",
+  EUR: "EUR",
+  FJD: "FJD",
+  FKP: "FKP",
+  GBP: "GBP",
+  GEL: "GEL",
+  GHS: "GHS",
+  GIP: "GIP",
+  GMD: "GMD",
+  GNF: "GNF",
+  GTQ: "GTQ",
+  GYD: "GYD",
+  HKD: "HKD",
+  HNL: "HNL",
+  HTG: "HTG",
+  HUF: "HUF",
+  IDR: "IDR",
+  ILS: "ILS",
+  INR: "INR",
+  IQD: "IQD",
+  IRR: "IRR",
+  ISK: "ISK",
+  JMD: "JMD",
+  JOD: "JOD",
+  JPY: "JPY",
+  KES: "KES",
+  KGS: "KGS",
+  KHR: "KHR",
+  KMF: "KMF",
+  KPW: "KPW",
+  KRW: "KRW",
+  KWD: "KWD",
+  KYD: "KYD",
+  KZT: "KZT",
+  LAK: "LAK",
+  LBP: "LBP",
+  LKR: "LKR",
+  LRD: "LRD",
+  LSL: "LSL",
+  LYD: "LYD",
+  MAD: "MAD",
+  MDL: "MDL",
+  MGA: "MGA",
+  MKD: "MKD",
+  MMK: "MMK",
+  MNT: "MNT",
+  MOP: "MOP",
+  MRU: "MRU",
+  MUR: "MUR",
+  MVR: "MVR",
+  MWK: "MWK",
+  MXN: "MXN",
+  MYR: "MYR",
+  MZN: "MZN",
+  NAD: "NAD",
+  NGN: "NGN",
+  NIO: "NIO",
+  NOK: "NOK",
+  NPR: "NPR",
+  NZD: "NZD",
+  OMR: "OMR",
+  PAB: "PAB",
+  PEN: "PEN",
+  PGK: "PGK",
+  PHP: "PHP",
+  PKR: "PKR",
+  PLN: "PLN",
+  PYG: "PYG",
+  QAR: "QAR",
+  RON: "RON",
+  RSD: "RSD",
+  RUB: "RUB",
+  RWF: "RWF",
+  SAR: "SAR",
+  SBD: "SBD",
+  SCR: "SCR",
+  SDG: "SDG",
+  SEK: "SEK",
+  SGD: "SGD",
+  SHP: "SHP",
+  SLE: "SLE",
+  SOS: "SOS",
+  SRD: "SRD",
+  SSP: "SSP",
+  STN: "STN",
+  SVC: "SVC",
+  SYP: "SYP",
+  SZL: "SZL",
+  THB: "THB",
+  TJS: "TJS",
+  TMT: "TMT",
+  TND: "TND",
+  TOP: "TOP",
+  TRY: "TRY",
+  TTD: "TTD",
+  TWD: "TWD",
+  TZS: "TZS",
+  UAH: "UAH",
+  UGX: "UGX",
+  USD: "USD",
+  UYU: "UYU",
+  UZS: "UZS",
+  VED: "VED",
+  VES: "VES",
+  VND: "VND",
+  VUV: "VUV",
+  WST: "WST",
+  XAF: "XAF",
+  XCD: "XCD",
+  XCG: "XCG",
+  XOF: "XOF",
+  XPF: "XPF",
+  YER: "YER",
+  ZAR: "ZAR",
+  ZMW: "ZMW",
+  ZWG: "ZWG",
+} as const;
+
+/**
  * Lightweight property value for embedding in entity reads.
  *
  * ``value`` is rehydrated from the correct typed column by the service
@@ -1400,6 +1565,7 @@ export interface PropertySummary {
   name: string;
   type: PropertyType;
   options: PropertyOption[] | null;
+  currency: CurrencyCode | null;
   /** Shaped by the property's type. For user_reference, a person: id, username, discriminator, display_name and avatar_url, or an PluginPerson when the reader is an installed plug-in. */
   value: unknown;
 }
@@ -2198,8 +2364,21 @@ export const TaskFieldId = {
   tags: "tags",
 } as const;
 
+/**
+ * A file's own fields, as a collection's lists show them.
+ */
+export type FileFieldId = (typeof FileFieldId)[keyof typeof FileFieldId];
+
+export const FileFieldId = {
+  name: "name",
+  type: "type",
+  size: "size",
+  added: "added",
+  created: "created",
+} as const;
+
 export interface FieldProps {
-  field: TaskFieldId | string;
+  field: TaskFieldId | FileFieldId | string;
 }
 
 export interface FieldPart {
@@ -2503,8 +2682,21 @@ export interface CollectionCover {
 }
 
 /**
+ * A ready-made shape a collection can start as.
+ */
+export type CollectionShapeKey = (typeof CollectionShapeKey)[keyof typeof CollectionShapeKey];
+
+export const CollectionShapeKey = {
+  gallery: "gallery",
+  catalog: "catalog",
+  log: "log",
+} as const;
+
+/**
  * A new collection, made with the files it starts with: a collection is
- * never empty.
+ * never empty. It starts blank (its grid and table, and no fields of its
+ * own), as a ready-made ``shape``, or with the fields and lists of another
+ * collection in the initiative (``shape_from``), none of its values.
  */
 export interface CollectionCreate {
   properties?: PropertyValueInput[];
@@ -2521,6 +2713,8 @@ export interface CollectionCreate {
   name: string;
   description?: string | null;
   tag_ids?: number[] | null;
+  shape?: CollectionShapeKey | null;
+  shape_from?: number | null;
 }
 
 export type FileKind = (typeof FileKind)[keyof typeof FileKind];
@@ -2548,7 +2742,8 @@ export const FileKind = {
 } as const;
 
 /**
- * A file as its collection lists it: with when it was added there.
+ * A file as its collection lists it: with when it was added there, and
+ * its values of the collection's own fields.
  */
 export interface CollectionFileSummary {
   archived_at: string | null;
@@ -2580,6 +2775,7 @@ export interface CollectionFileSummary {
   height: number | null;
   smart_link_url: string | null;
   added_at: string;
+  fields: PropertySummary[];
   /** How the file is shown, which follows from its type. */
   readonly kind: FileKind;
 }
@@ -2605,6 +2801,33 @@ export interface CollectionFiles {
 }
 
 /**
+ * The files of a collection or a wiki the reader knows are there and
+ * can't open, and how many of those they have asked for.
+ */
+export interface HiddenFiles {
+  count?: number;
+  requested?: number;
+}
+
+export interface PropertyDefinitionRead {
+  /**
+   * @minLength 1
+   * @maxLength 100
+   */
+  name: string;
+  type: PropertyType;
+  position: number;
+  color: string | null;
+  options: PropertyOption[] | null;
+  currency: CurrencyCode | null;
+  id: number;
+  initiative_id: number;
+  collection_id: number | null;
+  created_at: string;
+  updated_at: string;
+}
+
+/**
  * A collection as its reader sees it: only the files they can open are
  * counted, and the cover is one of those.
  */
@@ -2617,6 +2840,7 @@ export interface CollectionRead {
   cover_file_id: number | null;
   cover: CollectionCover | null;
   file_count: number;
+  hidden_files: HiddenFiles;
   created_by: number | null;
   created_at: string;
   updated_at: string;
@@ -2626,11 +2850,59 @@ export interface CollectionRead {
   comment_count: number;
   tags: TagSummary[];
   properties: PropertySummary[];
+  fields: PropertyDefinitionRead[];
   can: CollectionCan;
 }
 
 export interface CollectionListResponse {
   items: CollectionRead[];
+}
+
+export type CollectionShapeEntryListsItem =
+  (typeof CollectionShapeEntryListsItem)[keyof typeof CollectionShapeEntryListsItem];
+
+export const CollectionShapeEntryListsItem = {
+  table: "table",
+  board: "board",
+  gantt: "gantt",
+  calendar: "calendar",
+  masonry: "masonry",
+  grid: "grid",
+  timeline: "timeline",
+} as const;
+
+export type CollectionShapeFieldDisplay =
+  | (typeof CollectionShapeFieldDisplay)[keyof typeof CollectionShapeFieldDisplay]
+  | null;
+
+export const CollectionShapeFieldDisplay = {
+  number: "number",
+  stars: "stars",
+  bar: "bar",
+} as const;
+
+/**
+ * A field a ready-made shape brings, in the reader's language.
+ */
+export interface CollectionShapeField {
+  name: string;
+  type: PropertyType;
+  display: CollectionShapeFieldDisplay;
+  currency: CurrencyCode | null;
+}
+
+export interface CollectionShapeEntry {
+  key: CollectionShapeKey;
+  name: string;
+  hint: string;
+  lists: CollectionShapeEntryListsItem[];
+  fields: CollectionShapeField[];
+}
+
+export interface CollectionShapeGroup {
+  key: string;
+  name: string;
+  entries: CollectionShapeEntry[];
 }
 
 export interface CollectionUpdate {
@@ -6927,6 +7199,10 @@ export interface LayoutGrouping {
   hidden?: string[];
 }
 
+export type ListLayoutDefinitionOutputDisplays = {
+  [key: string]: "number" | "stars" | "bar";
+} | null;
+
 /**
  * How a list draws its items, and the presets and groupings it offers.
  * What it leaves out is drawn as shipped: a board with no ``card`` draws the
@@ -6936,12 +7212,13 @@ export interface LayoutGrouping {
  */
 export interface ListLayoutDefinitionOutput {
   card?: CardPartOutput | null;
-  columns?: (TaskColumnFieldId | string)[] | null;
+  columns?: (TaskColumnFieldId | FileFieldId | string)[] | null;
   presets?: LayoutPreset[] | null;
   groupings?: LayoutGrouping[] | null;
   group_by?: string | null;
   limits?: ColumnLimit[] | null;
   hidden?: boolean | null;
+  displays?: ListLayoutDefinitionOutputDisplays;
 }
 
 /**
@@ -7179,6 +7456,10 @@ export interface LinkedTaskRead {
   done: boolean;
 }
 
+export type ListLayoutDefinitionInputDisplays = {
+  [key: string]: "number" | "stars" | "bar";
+} | null;
+
 /**
  * How a list draws its items, and the presets and groupings it offers.
  * What it leaves out is drawn as shipped: a board with no ``card`` draws the
@@ -7188,12 +7469,13 @@ export interface LinkedTaskRead {
  */
 export interface ListLayoutDefinitionInput {
   card?: CardPartInput | null;
-  columns?: (TaskColumnFieldId | string)[] | null;
+  columns?: (TaskColumnFieldId | FileFieldId | string)[] | null;
   presets?: LayoutPreset[] | null;
   groupings?: LayoutGrouping[] | null;
   group_by?: string | null;
   limits?: ColumnLimit[] | null;
   hidden?: boolean | null;
+  displays?: ListLayoutDefinitionInputDisplays;
 }
 
 export type ListLayoutWriteKind = (typeof ListLayoutWriteKind)[keyof typeof ListLayoutWriteKind];
@@ -7772,6 +8054,9 @@ export const NotificationType = {
   initiative_join_requested: "initiative_join_requested",
   initiative_join_approved: "initiative_join_approved",
   initiative_join_denied: "initiative_join_denied",
+  share_requested: "share_requested",
+  share_granted: "share_granted",
+  share_declined: "share_declined",
   project_added: "project_added",
   mention: "mention",
   comment_on_task: "comment_on_task",
@@ -9420,23 +9705,9 @@ export interface PropertyDefinitionCreate {
   position?: number;
   color?: string | null;
   options?: PropertyOption[] | null;
+  currency?: CurrencyCode | null;
   initiative_id: number;
-}
-
-export interface PropertyDefinitionRead {
-  /**
-   * @minLength 1
-   * @maxLength 100
-   */
-  name: string;
-  type: PropertyType;
-  position: number;
-  color: string | null;
-  options: PropertyOption[] | null;
-  id: number;
-  initiative_id: number;
-  created_at: string;
-  updated_at: string;
+  collection_id?: number | null;
 }
 
 /**
@@ -9451,6 +9722,7 @@ export interface PropertyDefinitionUpdate {
   position?: number | null;
   color?: string | null;
   options?: PropertyOption[] | null;
+  currency?: CurrencyCode | null;
 }
 
 /**
@@ -10309,6 +10581,82 @@ export interface SecondFactorStatus {
 export interface SecondFactorStepUpAnswer {
   code?: string | null;
   recovery_code?: string | null;
+}
+
+/**
+ * Who an approval reached: the requester, or every member of the
+ * initiative.
+ */
+export type ShareRequestScope = (typeof ShareRequestScope)[keyof typeof ShareRequestScope];
+
+export const ShareRequestScope = {
+  user: "user",
+  initiative: "initiative",
+} as const;
+
+/**
+ * A yes or a no to some of the requests the reader may answer.
+ */
+export interface ShareRequestAnswer {
+  /**
+   * @minItems 1
+   * @maxItems 500
+   */
+  ids: number[];
+  approve: boolean;
+  level?: ResourceAccessLevel | null;
+  scope?: ShareRequestScope;
+  tell?: boolean;
+}
+
+/**
+ * The requests one ask made.
+ */
+export interface ShareRequestBatch {
+  batch_id: string;
+  count: number;
+}
+
+/**
+ * Ask for one thing, or for the files of a collection or a wiki the
+ * reader can't open.
+ */
+export interface ShareRequestCreate {
+  resource_type: Tool;
+  resource_id?: number | null;
+  collection_id?: number | null;
+  wiki_id?: number | null;
+  level?: ResourceAccessLevel;
+  message?: string | null;
+}
+
+/**
+ * One request waiting on the reader's answer.
+ */
+export interface ShareRequestRead {
+  id: number;
+  batch_id: string;
+  resource_type: Tool;
+  resource_id: number;
+  resource_name: string;
+  initiative_id: number;
+  user: UserSummary;
+  guest_until?: string | null;
+  level: ResourceAccessLevel;
+  message?: string | null;
+  created_at: string;
+}
+
+/**
+ * Where the reader stands on one thing they can open, or know is there:
+ * on the tool whose sharing decides it, which is what to ask for.
+ */
+export interface ShareStanding {
+  resource_type: Tool;
+  resource_id: number;
+  initiative_id: number;
+  level?: ResourceAccessLevel | null;
+  pending?: ResourceAccessLevel | null;
 }
 
 /**
@@ -11750,9 +12098,9 @@ export interface WikiPageUpdate {
 }
 
 /**
- * A wiki on its own page. The same shape as its summary: the pages are
- * fetched as a tree of their own, because a wiki is navigated rather than
- * read end to end.
+ * A wiki on its own page: its summary, and the files filed in it the
+ * reader knows are there and can't open. The pages are fetched as a tree of
+ * their own, because a wiki is navigated rather than read end to end.
  */
 export interface WikiRead {
   archived_at: string | null;
@@ -11782,6 +12130,7 @@ export interface WikiRead {
   accent_color: string | null;
   template_page_id: number | null;
   comment_count: number;
+  hidden_files: HiddenFiles;
 }
 
 export interface WikiUpdate {
@@ -13132,6 +13481,17 @@ export type ListCollectionsParams = {
   archived?: boolean | null;
 };
 
+export type ReadShareStandingParams = {
+  kind: SearchEntityType;
+  entity_id: number;
+};
+
+export type ListShareRequestsParams = {
+  batch_id?: string | null;
+  resource_type?: Tool | null;
+  resource_id?: number | null;
+};
+
 export type ExportTasksParams = {
   format?: ExportTasksFormat;
   /**
@@ -13694,6 +14054,10 @@ export type SuggestCommunityParams = {
 
 export type ListPropertyDefinitionsParams = {
   initiative_id?: number | null;
+  /**
+   * List this collection's own fields instead of properties.
+   */
+  collection_id?: number | null;
 };
 
 export type ListCommunityTrashParams = {

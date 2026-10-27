@@ -145,6 +145,7 @@
   "PROPERTY_NOT_INITIATIVE_MEMBER": "You need to be a member of this initiative to manage its properties",
   "PROPERTY_OPTIONS_REQUIRED": "Select and multi-select properties require at least one option",
   "PROPERTY_DUPLICATE_OPTION_VALUE": "Option values must be unique within a property",
+  "PROPERTY_CURRENCY_REQUIRED": "A money property needs a currency",
   "ATTACHMENT_IMAGE_ONLY": "Only image uploads are supported",
   "ATTACHMENT_INVALID_IMAGE": "Unable to validate image contents",
   "ATTACHMENT_TOO_LARGE": "Image is too large (max 10 MB)",
@@ -580,6 +581,7 @@
   "REACTION_DISABLED": "This notice is not taking reactions.",
   "COLLECTION_FILE_NOT_AVAILABLE": "That file isn't one of this initiative's files that you can open",
   "COLLECTION_COVER_NOT_IN_COLLECTION": "The cover has to be one of this collection's own files",
+  "COLLECTION_FILE_NOT_IN_COLLECTION": "That file isn't in this collection",
   "LIVE_SESSION_OWNS_CONTENT": "This is being edited live. Reconnect to the editing session to save your changes.",
   "CONTENT_CHANGED": "This has changed since you opened it. Reload to see the latest version, then make your change again.",
   "FILE_COLLABORATION_UPDATE_INVALID": "These edits could not be read, so they were not saved.",
@@ -798,5 +800,10 @@
   "INVALID_RECURRENCE_LIMIT": "A daily maximum requires an hourly repeat after completion and a due date. Enter a whole maximum from 1 to 24, or leave it blank.",
   "TASK_PARENT_IS_PART": "A task can't be part of itself or of one of its own subtasks.",
   "CHECKLIST_ITEM_UNTITLED": "That item names only people or links, so it has nothing to call a task.",
-  "CHECKLIST_ITEM_CHANGED": "That item changed while it was being made a task. Look it over and try again."
+  "CHECKLIST_ITEM_CHANGED": "That item changed while it was being made a task. Look it over and try again.",
+  "SHARE_REQUEST_NOT_FOUND": "There's nothing here to ask for",
+  "SHARE_REQUEST_ALREADY_SHARED": "You already have that access",
+  "SHARE_REQUEST_ALREADY_PENDING": "You've already asked, and nobody has answered yet",
+  "SHARE_REQUEST_NOTHING_TO_ASK": "You can already open everything here",
+  "SHARE_REQUEST_CANNOT_ANSWER": "That request has been answered, or isn't yours to answer"
 }

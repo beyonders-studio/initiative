@@ -3,7 +3,11 @@ import userEvent from "@testing-library/user-event";
 import { HttpResponse } from "msw";
 import { describe, expect, it, vi } from "vitest";
 
-import { buildPropertyDefinition, buildPropertyOption } from "@/__tests__/factories/properties";
+import {
+  buildPropertyDefinition,
+  buildPropertyOption,
+  buildPropertySummary,
+} from "@/__tests__/factories/properties";
 import { communityHttp } from "@/__tests__/helpers/communityHttp";
 import { server } from "@/__tests__/helpers/msw-server";
 import { renderWithProviders } from "@/__tests__/helpers/render";
@@ -48,6 +52,40 @@ describe("PropertyInput", () => {
       // for type=number; fire change directly to mirror user entering 42.
       fireEvent.change(input, { target: { value: "42" } });
       expect(onChange).toHaveBeenCalledWith(42);
+    });
+  });
+
+  describe("money type", () => {
+    it("takes an amount and names the property's currency beside it", () => {
+      const onChange = vi.fn();
+      renderWithProviders(
+        <PropertyInput
+          definition={def({ type: PropertyType.currency, name: "Price", currency: "EUR" })}
+          value={null}
+          onChange={onChange}
+        />
+      );
+      expect(screen.getByText("EUR")).toBeInTheDocument();
+      fireEvent.change(screen.getByPlaceholderText("0"), { target: { value: "12.5" } });
+      expect(onChange).toHaveBeenCalledWith(12.5);
+    });
+  });
+
+  describe("rating type", () => {
+    it("keeps a rating within 1 to 100", () => {
+      const onChange = vi.fn();
+      renderWithProviders(
+        <PropertyInput
+          definition={def({ type: PropertyType.rating, name: "Rating" })}
+          value={null}
+          onChange={onChange}
+        />
+      );
+      const input = screen.getByPlaceholderText("1–100");
+      fireEvent.change(input, { target: { value: "140" } });
+      expect(onChange).toHaveBeenLastCalledWith(100);
+      fireEvent.change(input, { target: { value: "0" } });
+      expect(onChange).toHaveBeenLastCalledWith(1);
     });
   });
 
@@ -264,13 +302,7 @@ describe("PropertyInput", () => {
     it("accepts a PropertySummary (no id/initiative_id) as definition", () => {
       renderWithProviders(
         <PropertyInput
-          definition={{
-            property_id: 9,
-            name: "Lite",
-            type: PropertyType.text,
-            options: null,
-            value: null,
-          }}
+          definition={buildPropertySummary({ name: "Lite", value: null })}
           value="hello"
           onChange={vi.fn()}
         />

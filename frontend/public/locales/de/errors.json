@@ -149,6 +149,7 @@
   "PROPERTY_NOT_INITIATIVE_MEMBER": "Du musst Mitglied dieser Initiative sein, um ihre Eigenschaften zu verwalten",
   "PROPERTY_OPTIONS_REQUIRED": "Einfach- und Mehrfachauswahl-Eigenschaften erfordern mindestens eine Option",
   "PROPERTY_DUPLICATE_OPTION_VALUE": "Optionswerte müssen innerhalb einer Eigenschaft eindeutig sein",
+  "PROPERTY_CURRENCY_REQUIRED": "Eine Geld-Eigenschaft braucht eine Währung",
   "ATTACHMENT_IMAGE_ONLY": "Es werden nur Bild-Uploads unterstützt",
   "ATTACHMENT_INVALID_IMAGE": "Bildinhalt konnte nicht validiert werden",
   "FILE_NAME_ALREADY_EXISTS": "Eine Datei mit diesem Titel existiert bereits in dieser Initiative",
@@ -580,6 +581,7 @@
   "REACTION_DISABLED": "Diese Mitteilung nimmt keine Reaktionen an.",
   "COLLECTION_FILE_NOT_AVAILABLE": "Diese Datei gehört nicht zu den Dateien dieser Initiative, die du öffnen kannst",
   "COLLECTION_COVER_NOT_IN_COLLECTION": "Das Titelbild muss eine der Dateien dieser Sammlung sein",
+  "COLLECTION_FILE_NOT_IN_COLLECTION": "Diese Datei ist nicht in dieser Sammlung",
   "LIVE_SESSION_OWNS_CONTENT": "Das wird gerade gemeinsam bearbeitet. Stelle die Verbindung zur Bearbeitungssitzung wieder her, um deine Änderungen zu speichern.",
   "CONTENT_CHANGED": "Das wurde geändert, seit du es geöffnet hast. Lade neu, um die aktuelle Fassung zu sehen, und nimm deine Änderung dann erneut vor.",
   "FILE_COLLABORATION_UPDATE_INVALID": "Diese Änderungen konnten nicht gelesen werden und wurden daher nicht gespeichert.",
@@ -798,5 +800,10 @@
   "INVALID_RECURRENCE_LIMIT": "Ein Tagesmaximum erfordert eine stündliche Wiederholung nach Abschluss und ein Fälligkeitsdatum. Gib ein ganzzahliges Maximum von 1 bis 24 ein oder lasse das Feld leer.",
   "TASK_PARENT_IS_PART": "Eine Aufgabe kann nicht Teil von sich selbst oder einer ihrer Unteraufgaben sein.",
   "CHECKLIST_ITEM_UNTITLED": "Dieser Punkt nennt nur Personen oder Links und ergibt daher keinen Aufgabentitel.",
-  "CHECKLIST_ITEM_CHANGED": "Der Punkt wurde geändert, während er zur Aufgabe gemacht wurde. Sieh ihn dir an und versuche es erneut."
+  "CHECKLIST_ITEM_CHANGED": "Der Punkt wurde geändert, während er zur Aufgabe gemacht wurde. Sieh ihn dir an und versuche es erneut.",
+  "SHARE_REQUEST_NOT_FOUND": "Hier gibt es nichts anzufragen",
+  "SHARE_REQUEST_ALREADY_SHARED": "Du hast diesen Zugriff bereits",
+  "SHARE_REQUEST_ALREADY_PENDING": "Du hast schon gefragt, und noch hat niemand geantwortet",
+  "SHARE_REQUEST_NOTHING_TO_ASK": "Du kannst hier bereits alles öffnen",
+  "SHARE_REQUEST_CANNOT_ANSWER": "Diese Anfrage ist bereits beantwortet oder nicht deine zu beantworten"
 }

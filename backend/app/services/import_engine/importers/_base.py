@@ -299,6 +299,9 @@ class PropertyRestore:
             self._existing = await load_initiative_properties(
                 self._session, initiative_id=self._initiative_id
             )
+        currency = (declared.currency if declared is not None else None) or (
+            value.currency if value is not None else None
+        )
         for candidate in (name, f"{name}_{prop_type.value}"):
             found = self._existing.get(candidate)
             if (
@@ -309,6 +312,8 @@ class PropertyRestore:
                     declared is None
                     or options_compatible(prop_type, found.options, declared.options)
                 )
+                # Amounts in one currency are not amounts in another.
+                and found.currency == currency
             ):
                 self.matched += 1
                 self._resolved[key] = found
@@ -330,6 +335,7 @@ class PropertyRestore:
                 declared.position if declared is not None else len(self._existing)
             ),
             color=declared.color if declared is not None else None,
+            currency=currency,
             options=(
                 declared.options
                 if declared is not None

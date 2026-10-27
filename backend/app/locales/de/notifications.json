@@ -264,5 +264,36 @@
       "title": "Eine Antwort auf einen Fall, den niemand übernommen hat",
       "body": "Öffne Initiative, um sie zu lesen."
     }
+  },
+  "share": {
+    "requested": {
+      "read": {
+        "title": "Bitte um Ansicht",
+        "body_one": "{{requester}} möchte {{title}} ansehen",
+        "body_other": "{{requester}} möchte {{count}} Dateien ansehen"
+      },
+      "write": {
+        "title": "Bitte um Bearbeitung",
+        "body_one": "{{requester}} möchte {{title}} bearbeiten",
+        "body_other": "{{requester}} möchte {{count}} Dateien bearbeiten"
+      }
+    },
+    "granted": {
+      "read": {
+        "title": "Du kannst es jetzt ansehen",
+        "body_one": "{{answerer}} hat dir {{title}} zum Ansehen freigegeben",
+        "body_other": "{{answerer}} hat dir {{count}} Dateien zum Ansehen freigegeben"
+      },
+      "write": {
+        "title": "Du kannst es jetzt bearbeiten",
+        "body_one": "{{answerer}} hat dir {{title}} zum Bearbeiten freigegeben",
+        "body_other": "{{answerer}} hat dir {{count}} Dateien zum Bearbeiten freigegeben"
+      }
+    },
+    "declined": {
+      "title": "Anfrage abgelehnt",
+      "body_one": "{{answerer}} hat deine Anfrage abgelehnt",
+      "body_other": "{{answerer}} hat deine Anfrage für {{count}} Dateien abgelehnt"
+    }
   }
 }

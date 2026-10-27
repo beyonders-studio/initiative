@@ -1,4 +1,4 @@
-"""Migrations 20261027_0547 and 20261027_0548: files take their categories'
+"""Migrations 20261027_0548 and 20261027_0549: files take their categories'
 formats, and a saved files view's kind filter says ``compressed``. Loaded by
 path and run on rows written the way the release before them wrote them, the
 way ``files_formats_migration_test`` runs 20261026_0540."""
@@ -70,7 +70,7 @@ async def test_files_of_a_category_s_formats_take_them(session) -> None:
     bundle = await uploaded("bundle.zip", "application/zip")
     notes = await uploaded("notes.txt", "text/plain")
     await session.commit()
-    files = _load("20261027_0547_files_take_their_categories.py")
+    files = _load("20261027_0548_files_take_their_categories.py")
 
     async def types() -> dict[int, tuple[str, str]]:
         result = await (await session.connection()).execute(
@@ -124,7 +124,7 @@ async def test_a_saved_files_view_filters_by_compressed(session) -> None:
     }
     session.add_all(rows.values())
     await session.commit()
-    kind = _load("20261027_0548_compressed_files_kind.py")
+    kind = _load("20261027_0549_compressed_files_kind.py")
 
     async def values() -> dict[str, dict]:
         result = await (await session.connection()).execute(

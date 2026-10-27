@@ -6,7 +6,7 @@ export {
   resetCounter as resetCalendarEventCounter,
 } from "./calendarEvent.factory";
 export { ownerCan, readerCan, writerCan } from "./can";
-export { buildCollection } from "./collection.factory";
+export { buildCollection, buildCollectionFile } from "./collection.factory";
 export {
   buildComment,
   buildReactionGroup,
@@ -83,6 +83,11 @@ export {
   buildTaggedEntity,
   resetCounter as resetSearchCounter,
 } from "./search.factory";
+export {
+  buildShareRequest,
+  buildShareStanding,
+  resetCounter as resetShareRequestCounter,
+} from "./shareRequest.factory";
 export { buildTag, buildTagSummary, resetCounter as resetTagCounter } from "./tag.factory";
 export {
   buildTask,
@@ -124,6 +129,7 @@ import { resetCounter as resetPropertyCounter } from "./properties";
 import { resetCounter as resetQueueCounter } from "./queue.factory";
 import { resetRecentCounter } from "./recent.factory";
 import { resetCounter as resetSearchCounter } from "./search.factory";
+import { resetCounter as resetShareRequestCounter } from "./shareRequest.factory";
 import { resetCounter as resetTagCounter } from "./tag.factory";
 import { resetCounter as resetTaskCounter } from "./task.factory";
 import { resetCounter as resetTaskTypeCounter } from "./taskType.factory";
@@ -155,4 +161,5 @@ export function resetFactories(): void {
   resetCollectionCounter();
   resetWikiCounter();
   resetCalendarEventCounter();
+  resetShareRequestCounter();
 }

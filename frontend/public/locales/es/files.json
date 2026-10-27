@@ -14,7 +14,8 @@
     "added": "Añadido",
     "community": "Comunidad",
     "initiative": "Iniciativa",
-    "ownerFallback": "Usuario {{id}}"
+    "ownerFallback": "Usuario {{id}}",
+    "size": "Tamaño"
   },
   "create": {
     "title": "Nuevo archivo",
@@ -464,6 +465,39 @@
     "notFoundDescription": "La colección que buscas no existe, o ninguno de sus archivos es uno que puedas abrir.",
     "noAccess": "Acceso denegado",
     "noAccessDescription": "No tienes permiso para ver esta colección.",
-    "error": "No se pudo cambiar la colección"
+    "error": "No se pudo cambiar la colección",
+    "fields": {
+      "title": "Campos",
+      "description": "Lo que cada archivo de esta colección puede tener aquí: sus valores pertenecen a la colección, no al archivo.",
+      "create": "Nuevo campo",
+      "edit": "Editar campo",
+      "delete": "Eliminar campo",
+      "deleteTitle": "¿Eliminar este campo?",
+      "deleteBody": "Se eliminarán el campo y el valor que cada archivo tenga en esta colección.",
+      "none": "Aún no hay campos",
+      "heading": "En esta colección",
+      "saveError": "No se pudo guardar el valor",
+      "of": "Campos de {{name}}"
+    },
+    "addedOn": "Añadido {{date}}",
+    "createdOn": "Creado {{date}}",
+    "editLayouts": "Editar lo que muestran las listas",
+    "listHelp": {
+      "masonry": "Cada archivo con su propia forma, agrupado en columnas: lo que su tarjeta muestra bajo la imagen.",
+      "grid": "Cada archivo como un mosaico cuadrado: lo que su tarjeta muestra bajo la imagen.",
+      "timeline": "Los archivos según el día en que se añadieron: lo que cada tarjeta muestra bajo la imagen.",
+      "table": "Los archivos de la colección como tabla: qué columnas, en qué orden."
+    },
+    "shapes": {
+      "name": "Nombre",
+      "blank": "En blanco",
+      "blankHint": "Una cuadrícula y una tabla, todavía sin campos propios.",
+      "lists": "Muestra {{lists}}",
+      "fields": "Campos: {{fields}}",
+      "copyLabel": "O copiar la forma de",
+      "copyPlaceholder": "Otra colección",
+      "copyHint": "Sus campos y lo que muestran sus listas, sin sus archivos ni sus valores.",
+      "create": "Crear colección"
+    }
   }
 }

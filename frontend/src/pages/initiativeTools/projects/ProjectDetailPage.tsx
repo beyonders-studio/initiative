@@ -98,6 +98,7 @@ export const ProjectDetailPage = () => {
         keys="projects:detail."
         backTo={gp(toolListRoute(Tool.project, initiativeId))}
         backLabel={t("detail.backToProjects")}
+        entity={{ kind: "project", id: parsedProjectId }}
       />
     );
   }

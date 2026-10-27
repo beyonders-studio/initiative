@@ -182,7 +182,8 @@ CATEGORY_SPECS: Mapping[NotificationCategory, CategorySpec] = {
         mutable_channels=_ALL_MUTABLE,
     ),
     # What arrived in a community for you to see: a post went up, you were
-    # added to an initiative or a project, your request to join was answered.
+    # added to an initiative or a project, your request to join or to see
+    # something was answered.
     NotificationCategory.news: CategorySpec(
         types=frozenset(
             {
@@ -191,6 +192,8 @@ CATEGORY_SPECS: Mapping[NotificationCategory, CategorySpec] = {
                 NotificationType.initiative_added,
                 NotificationType.initiative_join_approved,
                 NotificationType.initiative_join_denied,
+                NotificationType.share_granted,
+                NotificationType.share_declined,
             }
         ),
         group=CategoryGroup.your_communities,
@@ -204,6 +207,7 @@ CATEGORY_SPECS: Mapping[NotificationCategory, CategorySpec] = {
         types=frozenset(
             {
                 NotificationType.initiative_join_requested,
+                NotificationType.share_requested,
                 NotificationType.access_grant_requested,
                 NotificationType.plugin_consent_requested,
                 NotificationType.plugin_update_pending,

@@ -2,8 +2,13 @@ import { EyeClosed } from "lucide-react";
 import { type ReactNode, useEffect, useRef, useState } from "react";
 import { useTranslation } from "react-i18next";
 
-import type { TaskStatusRead, TaskTypeRead } from "@/api/generated/initiativeAPI.schemas";
+import {
+  PropertyType,
+  type TaskStatusRead,
+  type TaskTypeRead,
+} from "@/api/generated/initiativeAPI.schemas";
 import { listLayoutLooks } from "@/components/projects/projectTasksConfig";
+import type { RatingDisplay } from "@/components/properties/propertyHelpers";
 import { TaskStatusOption } from "@/components/tasks/TaskStatusOption";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -56,7 +61,9 @@ export const ListLayoutSettings = ({
   locked,
 }: {
   layout: ListLayout;
-  presets: EditablePresets;
+  /** The presets it offers, and the groupings with them; a list of files
+   *  offers neither. */
+  presets?: EditablePresets;
   /** The project's statuses, whose board columns can be limited. */
   statuses?: TaskStatusRead[];
   /** What the list is, as a key in `projects`. */
@@ -76,6 +83,20 @@ export const ListLayoutSettings = ({
 }) => {
   const { t } = useTranslation(LAYOUT_NAMESPACES);
   const translate = t as TranslateFn;
+  // The field selected, as a column or a part of the card.
+  const selectedField =
+    selection.kind === "column"
+      ? selection.field
+      : selection.kind === "part"
+        ? (() => {
+            const node = nodeAt(cardOf(layout.definition, fields, layout.shape), selection.path);
+            return node?.type === "field" ? String(node.props?.field) : null;
+          })()
+        : null;
+  const rating =
+    selectedField !== null && fields.get(selectedField)?.property?.type === PropertyType.rating
+      ? selectedField
+      : null;
   return (
     // Disabled as one, so a save under way leaves every control as it was.
     <fieldset disabled={locked} className="min-w-0">
@@ -109,9 +130,13 @@ export const ListLayoutSettings = ({
               />
             </div>
           ) : null}
-          <LayoutPresets layout={layout} of={presets} fields={fields} edits={edits} />
-          {layout.kind !== "calendar" ? (
-            <LayoutGroupings layout={layout} fields={fields} edits={edits} />
+          {presets ? (
+            <>
+              <LayoutPresets layout={layout} of={presets} fields={fields} edits={edits} />
+              {layout.kind !== "calendar" ? (
+                <LayoutGroupings layout={layout} fields={fields} edits={edits} />
+              ) : null}
+            </>
           ) : null}
           {layout.kind === "board" && statuses ? (
             <ColumnLimits layout={layout} statuses={statuses} edits={edits} />
@@ -122,13 +147,49 @@ export const ListLayoutSettings = ({
         <ColumnSettings field={selection.field} fields={fields} edits={edits} />
       ) : (
         <PartSettings
-          tree={cardOf(layout.definition, fields)}
+          tree={cardOf(layout.definition, fields, layout.shape)}
           path={selection.path}
           fields={fields}
           edits={edits}
         />
       )}
+      {rating !== null ? (
+        <RatingDisplaySetting
+          value={layout.definition.displays?.[rating] ?? "number"}
+          onChange={(display) => edits.changeDisplay(rating, display)}
+        />
+      ) : null}
     </fieldset>
+  );
+};
+
+const RATING_DISPLAYS: RatingDisplay[] = ["number", "stars", "bar"];
+
+/** How the list draws the rating selected: a number, five stars, or a bar. */
+const RatingDisplaySetting = ({
+  value,
+  onChange,
+}: {
+  value: RatingDisplay;
+  onChange: (display: RatingDisplay) => void;
+}) => {
+  const { t } = useTranslation(["layouts"]);
+  return (
+    <div className="space-y-2 px-4 pb-4">
+      <Label htmlFor="rating-display">{t("layouts:ratingDisplay.label")}</Label>
+      <Select value={value} onValueChange={(next) => onChange(next as RatingDisplay)}>
+        <SelectTrigger id="rating-display">
+          <SelectValue />
+        </SelectTrigger>
+        <SelectContent>
+          {RATING_DISPLAYS.map((display) => (
+            <SelectItem key={display} value={display}>
+              {t(`layouts:ratingDisplay.${display}`)}
+            </SelectItem>
+          ))}
+        </SelectContent>
+      </Select>
+    </div>
   );
 };
 

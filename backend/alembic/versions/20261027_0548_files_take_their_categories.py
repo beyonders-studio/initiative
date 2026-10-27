@@ -21,8 +21,8 @@ The downgrade makes every one of these files ``other``, the type the release
 before this gives a media type it does not name; the versions keep their media
 types.
 
-Revision ID: 20261027_0547
-Revises: 20261027_0546
+Revision ID: 20261027_0548
+Revises: 20261027_0547
 Create Date: 2026-10-27
 """
 
@@ -34,8 +34,8 @@ from sqlalchemy.engine import Connection
 
 from app.db.guild_migrations import run_for_each_guild_schema
 
-revision = "20261027_0547"
-down_revision = "20261027_0546"
+revision = "20261027_0548"
+down_revision = "20261027_0547"
 branch_labels = None
 depends_on = None
 

@@ -6,13 +6,19 @@ pictures a file. In ``guild_template`` and every ``guild_<id>``:
 * **Collections** — each ``galleries`` row is a ``collections`` row with the
   same id, initiative, name, description, author, dates, trash, archive, hold
   and comment state. Its cover picture's file is its ``cover_file_id``. Each
-  converted collection lists its files the way the gallery did: masonry, grid
-  and timeline shown, table hidden, opening on masonry (``tool_layouts``).
+  converted collection is made as the Gallery shape
+  (``app.core.collection_shapes``): a text field of its own named "Caption"
+  (``property_definitions.collection_id``), written in English because a
+  migration has no maker whose language to write it in, and its lists the way
+  the gallery showed its pictures: masonry, grid and timeline shown, each card
+  showing the file's name and its Caption, table hidden with the name, the
+  Caption and when the file was added, opening on masonry (``tool_layouts``).
 * **Files** — each ``gallery_images`` row that has a version is a ``files`` row
   in its gallery's initiative, named by its title, else its current version's
-  filename, and typed by its current version's media type. The caption is
-  dropped. A picture in a trashed, held or archived gallery is trashed, held
-  or archived with it.
+  filename, and typed by its current version's media type. Its caption is its
+  file's value of the collection's Caption; an empty caption is no value. A
+  picture in a trashed, held or archived gallery is trashed, held or archived
+  with it.
   Each ``gallery_image_versions`` row is a ``file_versions`` row pointing at
   the same blob, with the size the gallery measured; no bytes move and
   ``uploads`` is untouched. A version with no author takes the picture's,
@@ -127,6 +133,7 @@ _TOUCHED = (
     *_GALLERY_TABLES,
     "collections",
     "collection_files",
+    "property_definitions",
     "files",
     "file_versions",
     "resource_grants",
@@ -186,13 +193,28 @@ _GALLERY_FIELDS = (
 )
 #: Keys in an install's definition whose value names a kind.
 _KIND_KEYS = ("entity", "kind", "tool", "itemKind")
-#: How a converted collection lists its files: (kind, definition). Grid is
-#: shown as shipped.
+#: The converted collection's own field a caption becomes.
+_CAPTION = "Caption"
+#: What each list of a converted collection shows: (kind, definition), as SQL
+#: over its Caption field ``pd``, the Gallery shape's.
+_CAPTION_FIELD = "'property:' || pd.id"
+_CARD = (
+    "jsonb_build_object('type', 'card', 'children', jsonb_build_array("
+    "jsonb_build_object('type', 'field', 'props', jsonb_build_object('field', 'name')), "
+    "jsonb_build_object('type', 'field', 'props', "
+    f"jsonb_build_object('field', {_CAPTION_FIELD}))))"
+)
 _COLLECTION_LAYOUTS = (
-    ("masonry", {"hidden": False}),
-    ("timeline", {"hidden": False}),
-    ("table", {"hidden": True}),
-    ("default", {"kind": "masonry"}),
+    *(
+        (kind, f"jsonb_build_object('hidden', false, 'card', {_CARD})")
+        for kind in ("masonry", "grid", "timeline")
+    ),
+    (
+        "table",
+        "jsonb_build_object('hidden', true, 'columns', "
+        f"jsonb_build_array('name', {_CAPTION_FIELD}, 'added'))",
+    ),
+    ("default", "jsonb_build_object('kind', 'masonry')"),
 )
 _LIST_KINDS = ("masonry", "grid", "timeline")
 
@@ -685,6 +707,25 @@ def _membership_and_cover(bind: Connection) -> None:
     )
 
 
+def _captions(bind: Connection) -> None:
+    """Each converted collection's Caption, and each picture's caption as its
+    file's value of it."""
+    bind.exec_driver_sql(
+        "INSERT INTO property_definitions (initiative_id, collection_id, name, "
+        "type, position, created_by, created_at, updated_at) "
+        f"SELECT initiative_id, id, '{_CAPTION}', 'text', 1, created_by, now(), now() "
+        "FROM galleries"
+    )
+    bind.exec_driver_sql(
+        "INSERT INTO property_values (entity_type, entity_id, property_id, "
+        "value_text, created_at, updated_at) "
+        "SELECT 'file', m.file_id, pd.id, btrim(i.caption), i.created_at, i.updated_at "
+        f"FROM {_MAP} m JOIN gallery_images i ON i.id = m.image_id "
+        "JOIN property_definitions pd ON pd.collection_id = m.gallery_id "
+        f"WHERE {_IN_SCHEMA} AND btrim(coalesce(i.caption, '')) <> ''"
+    )
+
+
 def _copy_grants(bind: Connection, table: str) -> None:
     """Each of a gallery's rows in ``table``, once per picture's file."""
     if not _table_exists(bind, table):
@@ -771,15 +812,14 @@ def _layouts(bind: Connection) -> None:
     bind.exec_driver_sql(
         f"DELETE FROM tool_layouts WHERE tool = '{_GALLERY}' OR kind = '{_PICTURE}'"
     )
-    rows = ", ".join(
-        f"('{kind}', '{json.dumps(body)}')" for kind, body in _COLLECTION_LAYOUTS
-    )
+    rows = ", ".join(f"('{kind}', {body})" for kind, body in _COLLECTION_LAYOUTS)
     bind.exec_driver_sql(
         "INSERT INTO tool_layouts (initiative_id, tool, tool_id, kind, definition, "
         "created_at, updated_at) "
-        f"SELECT g.initiative_id, '{_COLLECTION}', g.id, l.kind, "
-        "CAST(l.definition AS jsonb), now(), now() "
-        f"FROM galleries g CROSS JOIN (VALUES {rows}) AS l(kind, definition)"
+        f"SELECT g.initiative_id, '{_COLLECTION}', g.id, l.kind, l.definition, "
+        "now(), now() FROM galleries g "
+        "JOIN property_definitions pd ON pd.collection_id = g.id "
+        f"CROSS JOIN LATERAL (VALUES {rows}) AS l(kind, definition)"
     )
 
 
@@ -1163,6 +1203,7 @@ def _upgrade_schema(bind: Connection) -> None:
             _collections(bind)
             _files(bind)
             _membership_and_cover(bind)
+            _captions(bind)
             _copy_grants(bind, "resource_grants")
             _copy_grants(bind, "guest_invite_grants")
             _retarget_all(bind)

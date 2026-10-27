@@ -15,9 +15,37 @@ import { MAX_PLUGIN_PARTS } from "./plugins";
 import { TASK_CARD, TASK_COLUMNS } from "./tasks";
 import type { LayoutNode } from "./tree";
 
-/** A list layout as the editor changes it: which list it is, and how it draws
- *  what it lists. */
-export type ListLayout = { kind: ListLayoutReadKind; definition: ListLayoutDefinitionInput };
+/** What a target's lists draw until they are changed: a card's parts and a
+ *  table's columns, and the built-in fields a table can draw as a column. */
+export type ListShape = {
+  card: LayoutNode;
+  columns: readonly string[];
+  columnFields: ReadonlySet<string>;
+};
+
+/** A project's lists, of its tasks. */
+export const TASK_LIST_SHAPE: ListShape = {
+  card: TASK_CARD,
+  columns: TASK_COLUMNS,
+  columnFields: new Set(TASK_COLUMNS),
+};
+
+/** The lists that draw each item as a card: a project's board, and a
+ *  collection's walls of files. */
+export const CARD_LISTS: ReadonlySet<ListLayoutReadKind> = new Set([
+  "board",
+  "masonry",
+  "grid",
+  "timeline",
+]);
+
+/** A list layout as the editor changes it: which list it is, how it draws what
+ *  it lists, and what it draws as shipped where that is not a project's. */
+export type ListLayout = {
+  kind: ListLayoutReadKind;
+  definition: ListLayoutDefinitionInput;
+  shape?: ListShape;
+};
 
 /** The fields of the plug-ins placed on the tasks, which a list as shipped
  *  shows after its own: a plug-in shows as it arrives. */
@@ -27,17 +55,18 @@ const pluginFieldIds = (fields: ReadonlyMap<string, FieldDef>): string[] =>
 /** A board's card: its own, or the shipped one with the plug-ins' fields. */
 export const cardOf = (
   definition: ListLayoutDefinitionInput,
-  fields: ReadonlyMap<string, FieldDef>
+  fields: ReadonlyMap<string, FieldDef>,
+  { card: shipped }: ListShape = TASK_LIST_SHAPE
 ): LayoutNode => {
   const own = definition.card as LayoutNode | null | undefined;
   if (own) return own;
   const plugins = pluginFieldIds(fields);
   return plugins.length === 0
-    ? TASK_CARD
+    ? shipped
     : {
-        ...TASK_CARD,
+        ...shipped,
         children: [
-          ...(TASK_CARD.children ?? []),
+          ...(shipped.children ?? []),
           ...plugins.map((field): LayoutNode => ({ type: "field", props: { field } })),
         ],
       };
@@ -52,8 +81,9 @@ export const withCard = (
  *  with the plug-ins' fields. */
 export const columnsOf = (
   definition: ListLayoutDefinitionInput,
-  fields: ReadonlyMap<string, FieldDef>
-): string[] => definition.columns ?? [...TASK_COLUMNS, ...pluginFieldIds(fields)];
+  fields: ReadonlyMap<string, FieldDef>,
+  { columns: shipped }: ListShape = TASK_LIST_SHAPE
+): string[] => definition.columns ?? [...shipped, ...pluginFieldIds(fields)];
 
 /** Where a node is in a tree: the child it is at each level below the root. */
 export type NodePath = readonly number[];
@@ -127,19 +157,16 @@ export const removable = (node: LayoutNode, fields: ReadonlyMap<string, FieldDef
     (each) => each.type === "field" && fields.get(String(each.props?.field))?.hideable === false
   );
 
-/** The built-in fields a table draws as a column. */
-const TABLE_BUILTINS = new Set(TASK_COLUMNS);
-
 /** The fields a list layout can still add: a card's not on it (and no
  *  property alone where it shows them all), a table's not among its columns
  *  and drawn as one. */
 export const addableFields = (
-  { kind, definition }: ListLayout,
+  { kind, definition, shape = TASK_LIST_SHAPE }: ListLayout,
   fields: ReadonlyMap<string, FieldDef>
 ): FieldDef[] => {
   const all = [...fields.values()];
-  if (kind === "board") {
-    const card = cardOf(definition, fields);
+  if (CARD_LISTS.has(kind)) {
+    const card = cardOf(definition, fields, shape);
     const named = namedFields(card);
     const showsProperties = holdsPart(card, "properties");
     return all.filter(
@@ -147,10 +174,10 @@ export const addableFields = (
     );
   }
   if (kind === "table") {
-    const columns = new Set(columnsOf(definition, fields));
+    const columns = new Set(columnsOf(definition, fields, shape));
     return all.filter(
       (field) =>
-        !columns.has(field.id) && (field.source !== "builtin" || TABLE_BUILTINS.has(field.id))
+        !columns.has(field.id) && (field.source !== "builtin" || shape.columnFields.has(field.id))
     );
   }
   return [];

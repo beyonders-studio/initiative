@@ -1,0 +1,30 @@
+{
+  "collections": {
+    "shapes": {
+      "currency": "EUR",
+      "groups": {
+        "starters": "Commencer par"
+      },
+      "shapes": {
+        "gallery": {
+          "name": "Galerie",
+          "hint": "Des images au mur, chacune avec sa légende"
+        },
+        "catalog": {
+          "name": "Catalogue",
+          "hint": "Des choses à parcourir, chacune avec un prix et une note"
+        },
+        "log": {
+          "name": "Journal",
+          "hint": "Des fichiers par date, les plus récents d'abord"
+        }
+      },
+      "fields": {
+        "caption": "Légende",
+        "price": "Prix",
+        "rating": "Note",
+        "date": "Date"
+      }
+    }
+  }
+}

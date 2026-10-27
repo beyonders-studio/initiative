@@ -294,6 +294,7 @@ async def build_project_export(
             position=definitions[property_id].position,
             color=definitions[property_id].color,
             options=definitions[property_id].options,
+            currency=definitions[property_id].currency,
         )
         for property_id in property_places
     ]

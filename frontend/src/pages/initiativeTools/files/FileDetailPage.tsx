@@ -519,6 +519,7 @@ export const FileDetailPage = () => {
         keys="files:detail."
         backTo={gp(toolListRoute(Tool.file, initiativeId))}
         backLabel={t("detail.backToFiles")}
+        entity={{ kind: "file", id: parsedId }}
       />
     );
   }

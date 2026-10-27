@@ -18,6 +18,7 @@ import { Trans, useTranslation } from "react-i18next";
 
 import type {
   LayoutGrouping,
+  ListLayoutDefinitionInputDisplays,
   ListTasksParams,
   TaskListRead,
   TaskStatusRead,
@@ -39,7 +40,7 @@ import { useTaskGroupings } from "@/hooks/useTaskGroupings";
 import { useMoveTaskToGroup } from "@/hooks/useTasks";
 import { fieldColumnId } from "@/lib/layouts/columns";
 import { columnsOf } from "@/lib/layouts/draft";
-import { useProjectLayoutEnv } from "@/lib/layouts/fields";
+import { useProjectLayoutEnv, withDisplays } from "@/lib/layouts/fields";
 import { groupRowId, groupRows, NO_GROUP, uniqueTasksFromRows } from "@/lib/layouts/grouping";
 import { pluginFields, usePluginsOnItems } from "@/lib/layouts/plugins";
 import { taskFields } from "@/lib/layouts/tasks";
@@ -76,6 +77,8 @@ type ProjectTasksListViewProps = {
   tableState: ReturnType<typeof useProjectTaskTableState>;
   /** The fields the view shows as columns, in order, where it names them. */
   viewColumns?: string[] | null;
+  /** How its columns draw each rating, as the layout says. */
+  displays?: ListLayoutDefinitionInputDisplays;
   /** The groupings the view offers, in order, where it names them. */
   viewGroupings?: LayoutGrouping[] | null;
   /** How full the board's limited columns are. */
@@ -345,6 +348,7 @@ const ProjectTasksTableViewComponent = ({
   onExitSelection,
   tableState: [tableState, { setGrouping, setSorting }],
   viewColumns,
+  displays,
   viewGroupings,
   columnLimits = NO_COLUMN_LIMITS,
   editing = false,
@@ -360,8 +364,12 @@ const ProjectTasksTableViewComponent = ({
   // A project with one type shows none: it tells no task apart.
   const typed = (useProjectTaskTypes(projectId).data?.length ?? 0) > 1;
   const fields = useMemo(
-    () => taskFields(propertyDefinitions, pluginFields(plugins, i18n.language), { typed }),
-    [propertyDefinitions, plugins, i18n.language, typed]
+    () =>
+      withDisplays(
+        taskFields(propertyDefinitions, pluginFields(plugins, i18n.language), { typed }),
+        displays
+      ),
+    [propertyDefinitions, plugins, i18n.language, typed, displays]
   );
   const { grouping, sorting } = tableState;
   // What the view offers to group by, the groups each leaves out, and the
@@ -782,6 +790,7 @@ export const ProjectTasksTableView = memo(
       prevProps.initiativeId === nextProps.initiativeId &&
       prevProps.tableState[0] === nextProps.tableState[0] &&
       prevProps.viewColumns === nextProps.viewColumns &&
+      prevProps.displays === nextProps.displays &&
       prevProps.viewGroupings === nextProps.viewGroupings &&
       prevProps.columnLimits === nextProps.columnLimits &&
       prevProps.editing === nextProps.editing

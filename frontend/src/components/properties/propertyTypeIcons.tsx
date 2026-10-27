@@ -1,5 +1,6 @@
 import {
   AlignLeft,
+  Banknote,
   CalendarClock,
   CalendarDays,
   CircleCheck,
@@ -8,6 +9,7 @@ import {
   List,
   ListChecks,
   type LucideIcon,
+  Star,
   User,
 } from "lucide-react";
 
@@ -23,6 +25,8 @@ export const PROPERTY_TYPE_ICONS: Record<PropertyType, LucideIcon> = {
   [PropertyType.select]: List,
   [PropertyType.multi_select]: ListChecks,
   [PropertyType.user_reference]: User,
+  [PropertyType.currency]: Banknote,
+  [PropertyType.rating]: Star,
 };
 
 export const iconForPropertyType = (type: PropertyType): LucideIcon =>

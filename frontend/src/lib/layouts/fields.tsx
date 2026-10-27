@@ -5,6 +5,7 @@ import { useTranslation } from "react-i18next";
 
 import type {
   ChecklistProgress,
+  FileSummary,
   PropertyDefinitionRead,
   PropertySummary,
   TagSummary,
@@ -14,6 +15,7 @@ import type {
   TaskPriority,
   TaskTypeRead,
 } from "@/api/generated/initiativeAPI.schemas";
+import { FileTypeBadge } from "@/components/files/fileColumns";
 import { UnreadDot } from "@/components/notifications/UnreadDot";
 import { priorityVariant } from "@/components/projects/projectTasksConfig";
 import { TaskAssigneeList, TaskAssigneeStack } from "@/components/projects/TaskAssigneeList";
@@ -21,6 +23,7 @@ import { TaskBlockersHoverCard } from "@/components/projects/TaskBlockersHoverCa
 import { TaskDescriptionHoverCard } from "@/components/projects/TaskDescriptionHoverCard";
 import { TaskSubtasksHoverCard } from "@/components/projects/TaskSubtasksHoverCard";
 import { PropertyValueCell } from "@/components/properties/PropertyValueCell";
+import type { RatingDisplay } from "@/components/properties/propertyHelpers";
 import { TagBadge } from "@/components/tags";
 import { TagBadgeList } from "@/components/tags/TagBadge";
 import { TaskChecklistProgress } from "@/components/tasks/TaskChecklistProgress";
@@ -30,6 +33,7 @@ import { Badge } from "@/components/ui/badge";
 import { MentionText } from "@/components/user/MentionText";
 import { useUnreadTree } from "@/hooks/useUnreadTree";
 import { useCommunityPath } from "@/lib/communityUrl";
+import { formatBytes } from "@/lib/fileUtils";
 import { formatDateTime } from "@/lib/formatDate";
 import { summarizeStored } from "@/lib/recurrence";
 import { truncateText } from "@/lib/text";
@@ -39,7 +43,8 @@ import type { TranslateFn } from "@/types/i18n";
 
 import { PluginField, type PluginFieldDecl, type PluginOnItems } from "./plugins";
 
-/** What a view draws. Tasks for now; other kinds join as their tools move. */
+/** What a view draws: tasks, and a collection's files, which its own fields
+ *  (`lib/layouts/files.ts`) read. */
 export type LayoutItem = TaskListRead;
 
 /** Where a field is drawn. On a detail it is its editor, which the
@@ -60,7 +65,10 @@ export type FieldKind =
   | "tags"
   | "taskType"
   | "property"
-  | "plugin";
+  | "plugin"
+  | "fileName"
+  | "fileType"
+  | "fileSize";
 
 /** A property's field, by its definition id: what a view stores, so renaming
  *  the property keeps every view that shows it. */
@@ -88,6 +96,12 @@ export type FieldDef = {
   plugin?: { install: number; field: PluginFieldDecl; on: PluginOnItems };
   /** A property field's definition. */
   property?: PropertyDefinitionRead;
+  /** How a rating is drawn where the list showing it says. */
+  display?: RatingDisplay;
+  /** A property drawn on a card as its value alone, not named: a
+   *  collection's card under a picture, which reads as a caption or a price
+   *  rather than a row of labelled chips. */
+  plain?: boolean;
   /** The sentence the value sits in, as an i18n key ("Due: {{date}}"). */
   phrase?: string;
   icon?: LucideIcon;
@@ -139,6 +153,8 @@ export type FieldRendererProps = {
   field: FieldDef;
   variant: LayoutVariant;
   env: LayoutEnv;
+  /** Drawn on one line ({@link LayoutContext}'s `oneLine`). */
+  oneLine?: boolean;
 };
 
 /** Whether a value has nothing to show. A count of none is null by then. */
@@ -388,12 +404,54 @@ const TaskTypeField = ({ value, variant }: FieldRendererProps) => {
   return <TaskTypeMark type={type} className="h-lh" iconClassName="h-4 w-4" />;
 };
 
-const PropertyField = ({ value, variant }: FieldRendererProps) => (
+const PropertyField = ({ value, field, variant, oneLine }: FieldRendererProps) => (
   <PropertyValueCell
     summary={(value as PropertySummary | null) ?? undefined}
-    variant={variant === "cell" ? "cell" : "chip"}
+    variant={variant === "cell" || field.plain ? "cell" : "chip"}
+    display={field.display}
+    oneLine={oneLine}
   />
 );
+
+/** `fields`, each rating drawn as a list's `displays` say. */
+export const withDisplays = <F extends Pick<FieldDef, "display">>(
+  fields: ReadonlyMap<string, F>,
+  displays: Readonly<Record<string, RatingDisplay>> | null | undefined
+): ReadonlyMap<string, F> =>
+  displays && Object.keys(displays).length > 0
+    ? new Map(
+        [...fields].map(([id, field]) => [
+          id,
+          id in displays ? { ...field, display: displays[id] } : field,
+        ])
+      )
+    : fields;
+
+// A file's own fields hold the file, or its size, as their value.
+const FileNameField = ({ value, variant }: FieldRendererProps) => (
+  <p className={cn("min-w-0 truncate", variant === "card" ? "font-medium text-sm" : "text-sm")}>
+    {(value as FileSummary).name}
+  </p>
+);
+
+const FileTypeField = ({ value }: FieldRendererProps) => (
+  <FileTypeBadge file={value as FileSummary} />
+);
+
+// A file of the app's own has no size; a cell says so.
+const FileSizeField = ({ value, variant }: FieldRendererProps) =>
+  typeof value === "number" ? (
+    <span
+      className={cn(
+        "tabular-nums",
+        variant === "card" ? "text-muted-foreground text-xs" : "text-sm"
+      )}
+    >
+      {formatBytes(value)}
+    </span>
+  ) : variant === "cell" ? (
+    <span className="text-muted-foreground text-sm">&mdash;</span>
+  ) : null;
 
 /** One renderer per kind of field, each skipping a redraw its props don't call
  *  for. */
@@ -412,4 +470,7 @@ export const FIELD_RENDERERS: Record<FieldKind, ComponentType<FieldRendererProps
   taskType: memo(TaskTypeField),
   property: memo(PropertyField),
   plugin: memo(PluginField),
+  fileName: memo(FileNameField),
+  fileType: memo(FileTypeField),
+  fileSize: memo(FileSizeField),
 };

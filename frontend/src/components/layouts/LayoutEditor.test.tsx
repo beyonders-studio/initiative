@@ -10,6 +10,8 @@ import { beforeEach, describe, expect, it, vi } from "vitest";
 
 import {
   buildCalendarEvent,
+  buildCollection,
+  buildCollectionFile,
   buildDefaultTaskStatuses,
   buildPropertyDefinition,
   buildPropertyOption,
@@ -29,6 +31,7 @@ import {
   Tool,
   type ToolLayoutSetRead,
 } from "@/api/generated/initiativeAPI.schemas";
+import { CollectionLayoutEditor } from "@/components/files/collections/CollectionLayoutEditor";
 import { instanceTarget, sharedTarget, useToolLayouts } from "@/hooks/useToolLayouts";
 import { MAX_PRESETS } from "@/lib/layouts/presets";
 import { TASK_COLUMNS } from "@/lib/layouts/tasks";
@@ -212,6 +215,27 @@ describe("LayoutEditor", () => {
       "comments",
       "property:12",
     ]);
+  });
+
+  it("draws a rating column as the layout picks", async () => {
+    server.use(
+      communityHttp.get("/property-definitions/", () =>
+        HttpResponse.json([
+          buildPropertyDefinition({ id: 13, name: "Score", type: PropertyType.rating }),
+        ])
+      )
+    );
+    const { user } = editor("table");
+
+    await user.click(await within(await outline()).findByRole("button", { name: /^add$/i }));
+    await user.click(await screen.findByRole("button", { name: /^score/i }));
+    // What was added is selected, and its settings say how it is drawn.
+    await user.click(screen.getByRole("combobox", { name: /show the rating as/i }));
+    await user.click(await screen.findByRole("option", { name: "Stars" }));
+    await user.click(screen.getByRole("button", { name: /^save$/i }));
+
+    await waitFor(() => expect(sent).toHaveLength(1));
+    expect(saved("table")?.displays).toEqual({ "property:13": "stars" });
   });
 
   it("changes nothing while a save is under way, and still asks before leaving", async () => {
@@ -787,6 +811,42 @@ describe("LayoutEditor", () => {
 
       await waitFor(() => expect(sent).toHaveLength(1));
       expect(JSON.stringify(saved("calendar_event"))).not.toContain('"location"');
+    });
+  });
+
+  describe("a collection's lists", () => {
+    it("puts the collection's own field on a wall's card, its rating drawn as stars", async () => {
+      const rating = buildPropertyDefinition({
+        id: 31,
+        name: "Stars given",
+        type: PropertyType.rating,
+        collection_id: 5,
+      });
+      const collection = buildCollection({ id: 5, fields: [rating] });
+      const set = buildToolLayoutSet({ tool: "collection", hidden: ["masonry", "timeline"] });
+      renderPage(() => (
+        <CollectionLayoutEditor
+          collection={collection}
+          set={set}
+          files={[buildCollectionFile({ id: 4 })]}
+          onClose={vi.fn()}
+        />
+      ));
+      const user = userEvent.setup();
+
+      await user.click(await within(await outline()).findByRole("button", { name: /^add$/i }));
+      const field = await screen.findByRole("button", { name: /^stars given/i });
+      expect(field).toHaveTextContent("This collection");
+      await user.click(field);
+      await user.click(screen.getByRole("combobox", { name: /show the rating as/i }));
+      await user.click(await screen.findByRole("option", { name: "Stars" }));
+      await user.click(screen.getByRole("button", { name: /^save$/i }));
+
+      await waitFor(() => expect(saved("grid")).toBeDefined());
+      expect(saved("grid")).toMatchObject({
+        card: { type: "card", children: [{ type: "field", props: { field: "property:31" } }] },
+        displays: { "property:31": "stars" },
+      });
     });
   });
 });

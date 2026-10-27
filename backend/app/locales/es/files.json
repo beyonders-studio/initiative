@@ -1,0 +1,30 @@
+{
+  "collections": {
+    "shapes": {
+      "currency": "EUR",
+      "groups": {
+        "starters": "Empezar con"
+      },
+      "shapes": {
+        "gallery": {
+          "name": "Galería",
+          "hint": "Imágenes en una pared, con un pie de foto bajo cada una"
+        },
+        "catalog": {
+          "name": "Catálogo",
+          "hint": "Cosas para explorar, cada una con un precio y una valoración"
+        },
+        "log": {
+          "name": "Registro",
+          "hint": "Archivos por fecha, los más recientes primero"
+        }
+      },
+      "fields": {
+        "caption": "Pie de foto",
+        "price": "Precio",
+        "rating": "Valoración",
+        "date": "Fecha"
+      }
+    }
+  }
+}

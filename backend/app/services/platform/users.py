@@ -48,6 +48,7 @@ from app.services.platform import identity_refs
 from app.services.platform.retention import ACCOUNT_DELETION
 from app.services.platform import user_avatars as user_avatars_service
 from app.models.tenant.resource_grant import ResourceGrant
+from app.models.tenant.share_request import ShareRequest
 from app.models.tenant.task import TaskAssignee
 from app.models.platform.notification import Notification
 from app.models.tenant.personal_item import PersonalItem
@@ -266,6 +267,15 @@ async def _erase_in_guild(
     # every resource type for this user in the schema.
     await guild_session.exec(
         delete(ResourceGrant).where(ResourceGrant.user_id == user_id)
+    )
+    # What they asked for, and their name on what they answered.
+    await guild_session.exec(
+        delete(ShareRequest).where(col(ShareRequest.user_id) == user_id)
+    )
+    await guild_session.exec(
+        update(ShareRequest)
+        .where(col(ShareRequest.resolved_by) == user_id)
+        .values(resolved_by=None)
     )
     await guild_session.exec(
         delete(TaskAssignee).where(TaskAssignee.user_id == user_id)

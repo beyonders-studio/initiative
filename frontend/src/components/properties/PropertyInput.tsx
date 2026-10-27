@@ -105,6 +105,8 @@ const toDefinitionForPatch = (defn: PropertyDefinitionLike): PropertyDefinitionR
     position: 0,
     color: null,
     options: summary.options ?? null,
+    currency: summary.currency ?? null,
+    collection_id: null,
     created_at: "",
     updated_at: "",
   } as PropertyDefinitionRead;
@@ -162,6 +164,55 @@ export const PropertyInput = ({
             onChange(Number.isFinite(parsed) ? parsed : null);
           }}
           placeholder={t("properties:input.numberPlaceholder")}
+          disabled={disabled}
+          className={cn("bg-transparent", className)}
+        />
+      );
+    }
+
+    case PropertyType.currency: {
+      // An amount, in the currency the property names, beside it.
+      return (
+        <div className={cn("flex items-center gap-2", className)}>
+          <Input
+            type="number"
+            inputMode="decimal"
+            step="any"
+            value={coerceNumber(value)}
+            onChange={(e) => {
+              const raw = e.target.value;
+              const parsed = Number(raw);
+              onChange(raw === "" || !Number.isFinite(parsed) ? null : parsed);
+            }}
+            placeholder={t("properties:input.numberPlaceholder")}
+            disabled={disabled}
+            className="bg-transparent"
+          />
+          {definition.currency ? (
+            <span className="shrink-0 text-muted-foreground text-sm">{definition.currency}</span>
+          ) : null}
+        </div>
+      );
+    }
+
+    case PropertyType.rating: {
+      // A whole number from 1 to 100; anything outside is brought within.
+      return (
+        <Input
+          type="number"
+          inputMode="numeric"
+          min={1}
+          max={100}
+          step={1}
+          value={coerceNumber(value)}
+          onChange={(e) => {
+            const raw = e.target.value;
+            const parsed = Math.round(Number(raw));
+            onChange(
+              raw === "" || !Number.isFinite(parsed) ? null : Math.min(100, Math.max(1, parsed))
+            );
+          }}
+          placeholder={t("properties:input.ratingPlaceholder")}
           disabled={disabled}
           className={cn("bg-transparent", className)}
         />

@@ -1364,11 +1364,13 @@ async def test_an_archive_with_a_gallery_restores_it_as_files_in_a_collection(
 ):
     """An archive written while galleries were a tool carries a gallery entry.
     A restore makes each picture a file of the initiative and gathers the
-    files into a collection named as the gallery was."""
+    files into a collection named as the gallery was, made as the Gallery
+    shape with each caption its file's Caption."""
     from sqlmodel import select
 
     from app.models.tenant.collection import Collection, CollectionFile
     from app.models.tenant.file import File
+    from app.models.tenant.property import PropertyDefinition, PropertyValue
 
     a = await acting_user(
         guild_role=CommunityRole.superadmin, initiative=True, project=True
@@ -1385,6 +1387,7 @@ async def test_an_archive_with_a_gallery_restores_it_as_files_in_a_collection(
             {
                 "storage_key": "shot.png",
                 "title": "Shot",
+                "caption": "From the pier",
                 "content_type": "image/png",
                 "size_bytes": len(payload),
                 "original_filename": "shot.png",
@@ -1434,31 +1437,44 @@ async def test_an_archive_with_a_gallery_restores_it_as_files_in_a_collection(
     ).one()
     files = (
         await session.exec(
-            select(File.name)
+            select(File.name, PropertyValue.value_text)
             .join(CollectionFile, CollectionFile.file_id == File.id)
-            .where(CollectionFile.collection_id == restored.id)
+            .join(PropertyValue, PropertyValue.entity_id == File.id)
+            .join(
+                PropertyDefinition, PropertyDefinition.id == PropertyValue.property_id
+            )
+            .where(
+                CollectionFile.collection_id == restored.id,
+                PropertyDefinition.collection_id == restored.id,
+                PropertyDefinition.name == "Caption",
+            )
         )
     ).all()
-    assert files == ["Shot"]
+    assert files == [("Shot", "From the pier")]
 
 
 async def test_restored_collections_keep_their_own_files_and_cover(
     client, acting_user, session, monkeypatch, role_session
 ):
     """A backup carries each collection by the id it had, so two of one name
-    come back as two, each with its own files, description and cover."""
+    come back as two, each with its own files, description, cover, fields and
+    their values."""
+    from decimal import Decimal
+
     from sqlmodel import select
 
     from app.models.tenant.collection import Collection, CollectionFile
     from app.models.tenant.file import File
-    from app.testing import create_collection
+    from app.models.tenant.property import PropertyDefinition, PropertyValue
+    from app.services.tenant import collections as collections_service
+    from app.testing import create_collection, create_property_value
 
     a = await acting_user(
         guild_role=CommunityRole.superadmin, initiative=True, project=True
     )
     sunset = await create_file(session, a.initiative, a.user, name="Sunset")
     dunes = await create_file(session, a.initiative, a.user, name="Dunes")
-    await create_collection(
+    shop = await create_collection(
         session,
         a.initiative,
         a.user,
@@ -1466,7 +1482,10 @@ async def test_restored_collections_keep_their_own_files_and_cover(
         name="Photos",
         description="Studio shots",
         cover_file_id=sunset.id,
+        shape="catalog",
     )
+    price, _rating = (await collections_service.fields_of(session, [shop.id]))[shop.id]
+    await create_property_value(session, sunset, price, value_number=Decimal("12.50"))
     await create_collection(session, a.initiative, a.user, files=[dunes], name="Photos")
 
     restored_id = await _restore_referencing_backup(
@@ -1505,6 +1524,21 @@ async def test_restored_collections_keep_their_own_files_and_cover(
     ] == [
         ("Photos", "Studio shots", "Sunset", ["Dunes", "Sunset"]),
         ("Photos", None, None, ["Dunes"]),
+    ]
+    values = (
+        await session.exec(
+            select(
+                PropertyDefinition.name,
+                PropertyDefinition.currency,
+                PropertyValue.entity_id,
+                PropertyValue.value_number,
+            )
+            .join(PropertyValue, PropertyValue.property_id == PropertyDefinition.id)
+            .where(PropertyDefinition.collection_id == collections[0].id)
+        )
+    ).all()
+    assert [(n, c, names[f], v) for n, c, f, v in values] == [
+        ("Price", "USD", "Sunset", Decimal("12.50"))
     ]
 
 

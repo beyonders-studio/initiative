@@ -15,7 +15,9 @@
     "url": "URL",
     "select": "Select",
     "multi_select": "Multi-select",
-    "user_reference": "Person"
+    "user_reference": "Person",
+    "currency": "Money",
+    "rating": "Rating"
   },
   "picker": {
     "placeholder": "Search properties…",
@@ -41,11 +43,13 @@
     "searchOptions": "Search or create option…",
     "createOption": "Create \"{{label}}\"",
     "optionAdded": "Option added",
-    "optionAddFailed": "Could not add option"
+    "optionAddFailed": "Could not add option",
+    "ratingPlaceholder": "1–100"
   },
   "cell": {
     "emptyValue": "—",
-    "none": "None"
+    "none": "None",
+    "rating": "Rated {{value}} out of 100"
   },
   "manager": {
     "title": "Custom properties",
@@ -66,7 +70,9 @@
     "createError": "Failed to create property",
     "updateError": "Failed to update property",
     "deleteError": "Failed to delete property",
-    "setValuesError": "Failed to save property value"
+    "setValuesError": "Failed to save property value",
+    "moveUp": "Move {{name}} up",
+    "moveDown": "Move {{name}} down"
   },
   "filter": {
     "addFilter": "Add property filter",
@@ -83,5 +89,10 @@
       "ilike": "contains",
       "is_null": "is empty"
     }
+  },
+  "currency": {
+    "label": "Currency",
+    "none": "No currency matches",
+    "default": "USD"
   }
 }

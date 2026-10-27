@@ -10,6 +10,8 @@ Covers /api/v1/property-definitions CRUD including:
 - Cascade delete to attached values
 """
 
+from decimal import Decimal
+
 from httpx import AsyncClient
 from sqlmodel import select
 from sqlmodel.ext.asyncio.session import AsyncSession
@@ -21,13 +23,16 @@ from app.models.tenant.property import (
     PropertyValue,
 )
 from app.testing import (
+    create_collection,
     create_file,
     create_initiative,
     create_project,
     create_property_definition,
     create_property_value,
+    create_resource_grant,
     create_task,
 )
+from app.testing.factories import grant_role_permission
 
 
 # ---------------------------------------------------------------------------
@@ -504,3 +509,102 @@ async def test_delete_definition_cascades_to_values(
         select(PropertyDefinition).where(PropertyDefinition.id == defn.id)
     )
     assert defn_row.one_or_none() is None
+
+
+# ---------------------------------------------------------------------------
+# A collection's own fields, ratings and money
+# ---------------------------------------------------------------------------
+
+
+async def test_a_collection_field_is_made_by_whoever_may_change_the_collection(
+    client: AsyncClient, session: AsyncSession, acting_user
+):
+    owner = await acting_user(guild_role=CommunityRole.member, initiative=True)
+    member = await acting_user(
+        guild_role=CommunityRole.member,
+        guild=owner.guild,
+        initiative=owner.initiative,
+        initiative_role="member",
+    )
+    shared = await create_file(session, owner.initiative, owner.user)
+    await create_resource_grant(session, shared, all_initiative_members=True)
+    collection = await create_collection(
+        session, owner.initiative, owner.user, files=[shared]
+    )
+    payload = {
+        "name": "Rating",
+        "type": "rating",
+        "initiative_id": owner.initiative.id,
+        "collection_id": collection.id,
+    }
+
+    refused = await client.post(
+        member.g("/property-definitions/"), headers=member.headers, json=payload
+    )
+    assert refused.status_code == 403
+
+    await grant_role_permission(session, owner.initiative, "create_files")
+    created = await client.post(
+        member.g("/property-definitions/"), headers=member.headers, json=payload
+    )
+    assert created.status_code == 201, created.text
+    field_id = created.json()["id"]
+    assert created.json()["collection_id"] == collection.id
+
+    async def listed(**params) -> list[int]:
+        found = await client.get(
+            member.g("/property-definitions/"), headers=member.headers, params=params
+        )
+        return [item["id"] for item in found.json()]
+
+    assert field_id not in await listed(initiative_id=owner.initiative.id)
+    assert await listed(collection_id=collection.id) == [field_id]
+
+    # Not an initiative manager, and changing the collection is enough.
+    renamed = await client.patch(
+        member.g(f"/property-definitions/{field_id}"),
+        headers=member.headers,
+        json={"name": "Stars"},
+    )
+    assert renamed.status_code == 200, renamed.text
+    removed = await client.delete(
+        member.g(f"/property-definitions/{field_id}"), headers=member.headers
+    )
+    assert removed.status_code == 204
+
+
+async def test_money_names_its_currency_and_keeps_its_amount(
+    client: AsyncClient, session: AsyncSession, acting_user
+):
+    a = await acting_user(guild_role=CommunityRole.admin, initiative=True)
+    payload = {"name": "Deal", "type": "currency", "initiative_id": a.initiative.id}
+
+    unnamed = await client.post(
+        a.g("/property-definitions/"), headers=a.headers, json=payload
+    )
+    assert unnamed.status_code == 422
+    assert "PROPERTY_CURRENCY_REQUIRED" in str(unnamed.json()["detail"])
+
+    created = await client.post(
+        a.g("/property-definitions/"),
+        headers=a.headers,
+        json={**payload, "currency": "EUR"},
+    )
+    assert created.status_code == 201, created.text
+    definition_id = created.json()["id"]
+    project = await create_project(session, a.initiative, a.user)
+    task = await create_task(session, project)
+
+    written = await client.put(
+        a.g(f"/properties/task/{task.id}"),
+        headers=a.headers,
+        json={"values": [{"property_id": definition_id, "value": "1234.56"}]},
+    )
+    assert written.status_code == 200, written.text
+    assert [(v["value"], v["currency"]) for v in written.json()] == [(1234.56, "EUR")]
+    stored = await session.exec(
+        select(PropertyValue.value_number).where(
+            PropertyValue.property_id == definition_id
+        )
+    )
+    assert stored.one() == Decimal("1234.56")

@@ -523,5 +523,41 @@
       "title": "Une nouvelle façon de vous connecter à votre compte",
       "body": "Il est désormais possible de se connecter à votre compte via <strong>{{provider}}</strong>, car l'une de vos adresses y a été vérifiée."
     }
+  },
+  "share": {
+    "requested": {
+      "read": {
+        "subject": "Demande de consultation",
+        "title": "Demande de consultation",
+        "body_one": "<strong>{{requester}}</strong> demande à voir <strong>{{title}}</strong>",
+        "body_other": "<strong>{{requester}}</strong> demande à voir {{count}} fichiers"
+      },
+      "write": {
+        "subject": "Demande de modification",
+        "title": "Demande de modification",
+        "body_one": "<strong>{{requester}}</strong> demande à modifier <strong>{{title}}</strong>",
+        "body_other": "<strong>{{requester}}</strong> demande à modifier {{count}} fichiers"
+      }
+    },
+    "granted": {
+      "read": {
+        "subject": "Vous pouvez le voir",
+        "title": "Vous pouvez le voir",
+        "body_one": "<strong>{{answerer}}</strong> vous a permis de voir <strong>{{title}}</strong>",
+        "body_other": "<strong>{{answerer}}</strong> vous a permis de voir {{count}} fichiers"
+      },
+      "write": {
+        "subject": "Vous pouvez le modifier",
+        "title": "Vous pouvez le modifier",
+        "body_one": "<strong>{{answerer}}</strong> vous a permis de modifier <strong>{{title}}</strong>",
+        "body_other": "<strong>{{answerer}}</strong> vous a permis de modifier {{count}} fichiers"
+      }
+    },
+    "declined": {
+      "subject": "Demande refusée",
+      "title": "Demande refusée",
+      "body_one": "<strong>{{answerer}}</strong> a refusé votre demande",
+      "body_other": "<strong>{{answerer}}</strong> a refusé votre demande pour {{count}} fichiers"
+    }
   }
 }

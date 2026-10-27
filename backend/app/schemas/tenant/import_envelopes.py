@@ -52,6 +52,8 @@ class EnvelopePropertyValue(SanitizedBaseModel):
     value_json: Any = None
     value_handle: Optional[str] = None
     value_name: Optional[str] = None
+    #: A money value's currency, which is its property's.
+    currency: Optional[str] = None
 
 
 class FileEnvelope(_EnvelopeBase):

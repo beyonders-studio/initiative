@@ -370,7 +370,7 @@ async def _ensure_field_definitions(
         definition.name: definition
         for definition in await session.exec(
             select(PropertyDefinition).where(
-                PropertyDefinition.initiative_id == initiative_id,
+                PropertyDefinition.of_initiative(initiative_id),
                 PropertyDefinition.name.in_([field.value for field in wanted]),
             )
         )

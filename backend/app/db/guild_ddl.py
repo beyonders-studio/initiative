@@ -47,6 +47,7 @@ from app.db.plugin_rls import (
 from app.db.initiative_rls import (
     ANSWERED,
     COMMENT_PARENTS,
+    ENTITY_INITIATIVE_FN,
     INITIATIVE_PATHS,
     NAMED_PEOPLE,
     NamedPerson,
@@ -61,6 +62,7 @@ from app.db.initiative_rls import (
     InitiativePath,
 )
 from app.db import gucs
+from app.db.presence import VIEW as PRESENCE_VIEW
 from app.db.authorization import (
     IN_POLICY,
     POLICY_SEAT,
@@ -1143,6 +1145,13 @@ def _plugin_predicates(table: str) -> dict[str, str]:
     write = (
         plugin_scope(access.resource, True, IN_POLICY) if access.writable else refused
     )
+    if table == "property_definitions":
+        # A collection's own field is part of Files, written with its scope.
+        files = plugin_scope(tool_resource(Tool.file), True, IN_POLICY)
+        write = (
+            f"(CASE WHEN property_definitions.collection_id IS NULL"
+            f" THEN {write} ELSE {files} END)"
+        )
     return {"SELECT": read, "INSERT": write, "UPDATE": write, "DELETE": write}
 
 
@@ -1235,6 +1244,67 @@ _RECLAIMS_ROW = (
     " AND resource_reclaimable(resource_grants.resource_type,"
     " resource_grants.resource_id, user_id))"
 )
+
+
+_SHARE_REQUESTS_SECTION = """\
+-- ===========================================================================
+-- Share requests: a person asks for a resource, whoever may share it answers.
+--
+-- RESTRICTIVE, in addition to the table's initiative check:
+--   * a request is read by the person who made it and whoever may share its
+--     resource (resource_shares);
+--   * one is made by the person it names, pending and unanswered, for a
+--     resource in its initiative they can read, or know is there without
+--     reading it (app.db.presence);
+--   * whoever may share the resource answers it;
+--   * one goes when its requester leaves (a trigger), or by the system engine.
+-- ==========================================================================="""
+
+_REQUEST_SHARES = (
+    "resource_shares(share_requests.resource_type, share_requests.resource_id,"
+    f" {_PLUGIN_MEMBER}, share_requests.initiative_id, {STANDING})"
+)
+_REQUEST_READ = (
+    f"({IN_POLICY.system} OR share_requests.user_id = {_PLUGIN_MEMBER}"
+    f" OR {_REQUEST_SHARES})"
+)
+_REQUEST_MADE = (
+    f"(share_requests.user_id = {_PLUGIN_MEMBER}"
+    " AND share_requests.status = 'pending'"
+    " AND share_requests.granted_level IS NULL AND share_requests.scope IS NULL"
+    " AND share_requests.resolved_at IS NULL AND share_requests.resolved_by IS NULL"
+    f" AND ({ENTITY_INITIATIVE_FN}(share_requests.resource_type,"
+    " share_requests.resource_id) = share_requests.initiative_id"
+    f" OR EXISTS (SELECT 1 FROM {PRESENCE_VIEW} ep"
+    " WHERE ep.kind = share_requests.resource_type"
+    " AND ep.id = share_requests.resource_id"
+    " AND ep.initiative_id = share_requests.initiative_id AND NOT ep.trashed)))"
+)
+_REQUEST_ANSWERED = f"({IN_POLICY.system} OR {_REQUEST_SHARES})"
+#: Somebody leaving takes what they asked for with them (the departure
+#: section); nothing else deletes a request but the system engine.
+_REQUEST_REMOVED = f"(pg_trigger_depth() > 0 OR {IN_POLICY.system})"
+
+
+def _share_requests_block() -> str:
+    lines: list[str] = []
+    for name, command, using, check in (
+        ("requests_read", "SELECT", _REQUEST_READ, None),
+        ("requests_made", "INSERT", None, _REQUEST_MADE),
+        ("requests_answered", "UPDATE", _REQUEST_ANSWERED, _REQUEST_ANSWERED),
+        ("requests_removed", "DELETE", _REQUEST_REMOVED, None),
+    ):
+        lines.append(f"DROP POLICY IF EXISTS {name} ON share_requests;")
+        lines.append(
+            f"CREATE POLICY {name} ON share_requests AS RESTRICTIVE FOR {command}"
+        )
+        clauses = []
+        if using is not None:
+            clauses.append(f"USING ({using})")
+        if check is not None:
+            clauses.append(f"WITH CHECK ({check})")
+        lines.append("  " + " ".join(clauses) + ";")
+    return "\n".join(lines)
 
 
 def _sharing_block() -> str:
@@ -1440,6 +1510,7 @@ def render_guild_rls_ddl() -> str:
     from app.db.guest_access import render_guest_rls_ddl
     from app.db.holds import render_holds_ddl
     from app.db.moderation_log import render_moderation_log_ddl
+    from app.db.presence import render_presence_policies  # noqa: PLC0415
 
     blocks = [_table_block(t, INITIATIVE_PATHS[t]) for t in sorted(INITIATIVE_PATHS)]
     # Shared, and written before the policies that call it. Re-rendered on every
@@ -1511,7 +1582,9 @@ def render_guild_rls_ddl() -> str:
     plugin_blocks = [_plugin_block(t) for t in sorted(PLUGIN_POLICY_TABLES)]
     out += "\n\n" + _PLUGIN_SECTION + "\n\n" + "\n\n".join(plugin_blocks)
     out += "\n\n" + render_guest_rls_ddl()
+    out += "\n\n" + render_presence_policies()
     out += "\n\n" + _SHARING_SECTION + "\n\n" + _sharing_block()
+    out += "\n\n" + _SHARE_REQUESTS_SECTION + "\n\n" + _share_requests_block()
     out += "\n\n" + _DRAFT_SECTION + "\n\n" + _draft_block()
     out += "\n\n" + render_holds_ddl()
     out += "\n\n" + render_moderation_log_ddl()

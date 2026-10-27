@@ -1,10 +1,10 @@
 """Collections: seen through the files in them, changed by the initiative's
 file makers, gone to the trash once their last file leaves."""
 
-from datetime import datetime, timezone
+from datetime import date, datetime, timezone
 
 from httpx import AsyncClient
-from sqlmodel import update
+from sqlmodel import select, update
 
 from app.core.messages import CollectionMessages
 from app.db import post_commit
@@ -12,9 +12,12 @@ from app.db.soft_delete_filter import select_including_deleted
 from app.models.platform.guild import CommunityRole
 from app.models.tenant.collection import Collection, CollectionFile
 from app.models.tenant.file import FileVersion
+from app.models.tenant.property import PropertyValue
+from app.services.tenant import collections as collections_service
 from app.testing import (
     create_collection,
     create_file,
+    create_property_value,
     create_resource_grant,
     create_tag,
     route_session_to_guild,
@@ -341,13 +344,22 @@ async def test_a_collection_lays_out_its_files_in_a_grid_and_a_table(
         json={"kind": "masonry", "definition": {"hidden": False}},
     )
     assert shown_masonry.status_code == 200, shown_masonry.text
+    # A table shows a file's own fields and the collection's; a task's are
+    # not a file's.
     columns = await client.put(
         maker.g("/layouts/"),
         headers=maker.headers,
         params=params,
-        json={"kind": "table", "definition": {"columns": []}},
+        json={"kind": "table", "definition": {"columns": ["name", "size"]}},
     )
-    assert columns.status_code == 400
+    assert columns.status_code == 200, columns.text
+    assignees = await client.put(
+        maker.g("/layouts/"),
+        headers=maker.headers,
+        params=params,
+        json={"kind": "table", "definition": {"columns": ["assignees"]}},
+    )
+    assert assignees.status_code == 400
 
 
 async def test_a_collection_is_an_end_of_a_link_only_for_who_sees_it(
@@ -503,3 +515,205 @@ async def test_a_collection_shows_its_pictures_at_their_size(
         1600,
         900,
     )
+
+
+async def test_a_collection_made_as_a_shape_brings_its_fields_and_lists(
+    client: AsyncClient, session, acting_user
+):
+    _owner, maker, shared, _private = await _scene(session, acting_user)
+    created = await client.post(
+        maker.g("/collections/"),
+        headers=maker.headers,
+        json={
+            "initiative_id": maker.initiative.id,
+            "name": "Shop",
+            "file_ids": [shared.id],
+            "shape": "catalog",
+        },
+    )
+    assert created.status_code == 201, created.text
+    fields = {field["name"]: field for field in created.json()["fields"]}
+    assert {name: (f["type"], f["currency"]) for name, f in fields.items()} == {
+        "Price": ("currency", "USD"),
+        "Rating": ("rating", None),
+    }
+    price, rating = (f"property:{fields[name]['id']}" for name in ("Price", "Rating"))
+
+    layouts = await client.get(
+        maker.g("/layouts/"),
+        headers=maker.headers,
+        params={"tool": "collection", "tool_id": created.json()["id"]},
+    )
+    assert layouts.status_code == 200, layouts.text
+    lists = {layout["kind"]: layout for layout in layouts.json()["layouts"]}
+    assert {kind for kind, layout in lists.items() if not layout["hidden"]} == {
+        "grid",
+        "table",
+    }
+    assert lists["grid"]["is_default"]
+    assert [
+        child["props"]["field"]
+        for child in lists["grid"]["definition"]["card"]["children"]
+    ] == ["name", price, rating]
+    assert lists["table"]["definition"]["columns"] == ["name", price, rating, "added"]
+    assert lists["grid"]["definition"]["displays"] == {rating: "stars"}
+
+
+async def test_the_shapes_are_offered_in_the_readers_language(
+    client: AsyncClient, session, acting_user
+):
+    reader = await acting_user(guild_role=CommunityRole.member, initiative=True)
+    reader.user.locale = "de"
+    session.add(reader.user)
+    await session.commit()
+
+    listed = await client.get(reader.g("/collections/shapes"), headers=reader.headers)
+    assert listed.status_code == 200, listed.text
+    entries = {e["key"]: e for group in listed.json() for e in group["entries"]}
+    assert list(entries) == ["gallery", "catalog", "log"]
+    assert entries["catalog"]["name"] == "Katalog"
+    assert entries["catalog"]["fields"][0] == {
+        "name": "Preis",
+        "type": "currency",
+        "display": None,
+        "currency": "EUR",
+    }
+
+
+async def test_a_collection_can_start_with_another_collections_shape(
+    client: AsyncClient, session, acting_user
+):
+    owner, maker, shared, _private = await _scene(session, acting_user)
+    source = await create_collection(
+        session, owner.initiative, owner.user, files=[shared], shape="gallery"
+    )
+    (caption,) = (await collections_service.fields_of(session, [source.id]))[source.id]
+    await create_property_value(session, shared, caption, value_text="Dusk")
+
+    created = await client.post(
+        maker.g("/collections/"),
+        headers=maker.headers,
+        json={
+            "initiative_id": maker.initiative.id,
+            "name": "Second wall",
+            "file_ids": [shared.id],
+            "shape_from": source.id,
+        },
+    )
+    assert created.status_code == 201, created.text
+    (copied,) = created.json()["fields"]
+    assert (copied["name"], copied["type"]) == ("Caption", "text")
+    assert copied["id"] != caption.id
+
+    layouts = await client.get(
+        maker.g("/layouts/"),
+        headers=maker.headers,
+        params={"tool": "collection", "tool_id": created.json()["id"]},
+    )
+    masonry = next(
+        layout for layout in layouts.json()["layouts"] if layout["kind"] == "masonry"
+    )
+    assert masonry["is_default"]
+    assert masonry["definition"]["card"]["children"][1]["props"]["field"] == (
+        f"property:{copied['id']}"
+    )
+    # The shape, not the values.
+    listed = await client.get(
+        maker.g(f"/collections/{created.json()['id']}/files"), headers=maker.headers
+    )
+    assert listed.json()["items"][0]["fields"] == []
+
+
+async def test_a_file_maker_fills_a_collections_fields_without_editing_the_file(
+    client: AsyncClient, session, acting_user
+):
+    owner, maker, shared, private = await _scene(session, acting_user)
+    collection = await create_collection(
+        session, owner.initiative, owner.user, files=[shared, private], shape="catalog"
+    )
+    price, rating = (await collections_service.fields_of(session, [collection.id]))[
+        collection.id
+    ]
+    path = f"/collections/{collection.id}/files/{shared.id}/fields"
+
+    written = await client.put(
+        maker.g(path),
+        headers=maker.headers,
+        json={
+            "values": [
+                {"property_id": price.id, "value": "19.99"},
+                {"property_id": rating.id, "value": 80},
+            ]
+        },
+    )
+    assert written.status_code == 200, written.text
+    assert {(v["name"], v["value"], v["currency"]) for v in written.json()} == {
+        ("Price", 19.99, "USD"),
+        ("Rating", 80, None),
+    }
+    out_of_range = await client.put(
+        maker.g(path),
+        headers=maker.headers,
+        json={"values": [{"property_id": rating.id, "value": 101}]},
+    )
+    assert out_of_range.status_code == 400
+
+    # Seen with the collection's files, and not among the file's properties.
+    listed = await client.get(
+        maker.g(f"/collections/{collection.id}/files"), headers=maker.headers
+    )
+    assert {v["name"] for v in listed.json()["items"][0]["fields"]} == {
+        "Price",
+        "Rating",
+    }
+    one = await client.get(maker.g(path), headers=maker.headers)
+    assert {v["name"] for v in one.json()} == {"Price", "Rating"}
+    opened = await client.get(maker.g(f"/files/{shared.id}"), headers=maker.headers)
+    assert opened.json()["properties"] == []
+    # Nor written as one.
+    as_property = await client.put(
+        owner.g(f"/properties/file/{shared.id}"),
+        headers=owner.headers,
+        json={"values": [{"property_id": rating.id, "value": 10}]},
+    )
+    assert as_property.status_code == 404
+
+    # A file of the collection the maker cannot open is not one they fill.
+    hidden = await client.put(
+        maker.g(f"/collections/{collection.id}/files/{private.id}/fields"),
+        headers=maker.headers,
+        json={"values": [{"property_id": rating.id, "value": 50}]},
+    )
+    assert hidden.status_code == 422
+    assert hidden.json()["detail"] == CollectionMessages.FILE_NOT_IN_COLLECTION
+    unseen = await client.get(
+        maker.g(f"/collections/{collection.id}/files/{private.id}/fields"),
+        headers=maker.headers,
+    )
+    assert unseen.status_code == 404
+
+
+async def test_a_file_taken_out_of_a_collection_leaves_its_values_behind(
+    client: AsyncClient, session, acting_user
+):
+    owner, _maker, shared, private = await _scene(session, acting_user)
+    collection = await create_collection(
+        session, owner.initiative, owner.user, files=[shared, private], shape="log"
+    )
+    (day,) = (await collections_service.fields_of(session, [collection.id]))[
+        collection.id
+    ]
+    await create_property_value(session, shared, day, value_date=date(2026, 1, 2))
+
+    removed = await client.delete(
+        owner.g(f"/collections/{collection.id}/files"),
+        headers=owner.headers,
+        params={"file_ids": [shared.id]},
+    )
+    assert removed.status_code == 204, removed.text
+
+    await route_session_to_guild(session, owner.guild.id)
+    left = await session.exec(
+        select(PropertyValue).where(PropertyValue.property_id == day.id)
+    )
+    assert left.all() == []
