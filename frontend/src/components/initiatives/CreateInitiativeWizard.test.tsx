@@ -110,7 +110,7 @@ describe("CreateInitiativeWizard", () => {
       files_enabled: true,
       calendars_enabled: true,
       queues_enabled: false,
-      catalogs_enabled: false,
+      libraries_enabled: false,
     });
   });
 

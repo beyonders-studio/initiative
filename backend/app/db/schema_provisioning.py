@@ -150,7 +150,7 @@ SYSTEM_GUILD_MAINTENANCE_GRANTS: dict[str, tuple[str, ...]] = {
     "counter_groups": ("SELECT",),
     "calendars": ("SELECT",),
     "dashboards": ("SELECT",),
-    "catalogs": ("SELECT",),
+    "libraries": ("SELECT",),
     # A comment can hang off a wiki, and off one of its pages — which is where
     # a wiki's conversation actually happens — so the guard reads both while
     # the scrub rewrites that comment.

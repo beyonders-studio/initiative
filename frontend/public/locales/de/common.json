@@ -422,10 +422,10 @@
       "this": "diesen Beitrag",
       "plural": "Beiträge"
     },
-    "catalog": {
-      "name": "Katalog",
-      "this": "dieser Katalog",
-      "plural": "Kataloge"
+    "library": {
+      "name": "Bibliothek",
+      "this": "diese Bibliothek",
+      "plural": "Bibliotheken"
     },
     "wiki": {
       "name": "Wiki",
@@ -452,7 +452,7 @@
       "this": "diesen Zähler",
       "plural": "Zähler"
     },
-    "catalog_item": {
+    "library_item": {
       "name": "Bild",
       "this": "dieses Bild",
       "plural": "Bilder"

@@ -270,7 +270,7 @@ async def detach_envelope_mentions(session: AsyncSession, data: Any) -> None:
     replaced).
 
     Files, posts and wiki pages carry their bodies as editor states, and a
-    catalog's items their descriptions as markdown. A project envelope's
+    library's items their descriptions as markdown. A project envelope's
     mentions are markdown too, and are written by ``build_project_export``
     itself, which is where the text is read.
     """
@@ -299,7 +299,7 @@ async def detach_envelope_mentions(session: AsyncSession, data: Any) -> None:
             and isinstance(filed.get("envelope"), dict)
             and filed["envelope"].get("file_type") == FileType.lexical
         ]
-    elif kind == tool_envelope_type(Tool.catalog):
+    elif kind == tool_envelope_type(Tool.library):
         markdown = [
             (item, "description")
             for item in data.get("items") or []

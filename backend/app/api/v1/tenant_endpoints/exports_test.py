@@ -1938,33 +1938,33 @@ async def test_a_wikis_importable_file_carries_its_filed_files(
     assert by_name["Session notes"]["envelope"]["type"] == "initiative-file"
 
 
-async def test_a_catalog_exports_as_a_zip_of_its_envelope_and_pictures(
+async def test_a_library_exports_as_a_zip_of_its_envelope_and_pictures(
     client: AsyncClient, acting_user, session
 ):
-    """A catalog's envelope names its pictures by storage key, so the download
+    """A library's envelope names its pictures by storage key, so the download
     carries the pictures beside it under ``assets/``. One whose file is gone is
     still listed and left out of the zip, which is what an import expects."""
-    from app.testing.factories import create_catalog, create_catalog_item
+    from app.testing.factories import create_library, create_library_item
     from app.services.storage import get_guild_storage
 
     a = await acting_user(
         guild_role=CommunityRole.member, initiative=True, project=True
     )
     await enable_all_tools(session, a.initiative)
-    catalog = await create_catalog(session, a.initiative, a.user, name="Barovia maps")
-    kept = await create_catalog_item(session, catalog, a.user, title="Village")
-    gone = await create_catalog_item(
-        session, catalog, a.user, title="Castle", write_blob=False
+    library = await create_library(session, a.initiative, a.user, name="Barovia maps")
+    kept = await create_library_item(session, library, a.user, title="Village")
+    gone = await create_library_item(
+        session, library, a.user, title="Castle", write_blob=False
     )
     kept_key = kept.current_version.file_url.rsplit("/", 1)[-1]
     gone_key = gone.current_version.file_url.rsplit("/", 1)[-1]
 
-    resp = await _export(client, a, "catalog", ids=[catalog.id], format="json")
+    resp = await _export(client, a, "library", ids=[library.id], format="json")
     assert resp.status_code == 200, resp.text
     assert resp.headers["content-type"] == "application/zip"
     archive = _zip(resp)
     [envelope_name] = [n for n in archive.namelist() if n.endswith(".json")]
-    assert envelope_name.endswith(".initiative-catalog.json")
+    assert envelope_name.endswith(".initiative-library.json")
     envelope = json.loads(archive.read(envelope_name))
     assert {image["storage_key"] for image in envelope["items"]} == {
         kept_key,
@@ -2736,7 +2736,7 @@ async def test_initiative_backup_zip_layout_and_manifest(
         # On, and holding nothing: a tool the initiative has is in the backup
         # whether or not anybody has written in it yet.
         "wiki": "included",
-        "catalog": "included",
+        "library": "included",
         "dashboard": "included",
     }
 
@@ -3240,7 +3240,7 @@ async def test_estimate_reports_counts_uploads_and_ceilings(
         "calendar": 1,
         "post": 1,
         "wiki": 0,  # the tool is on; nobody has made one
-        "catalog": 0,  # likewise
+        "library": 0,  # likewise
         "dashboard": 0,  # likewise
     }
     assert not any(t["disabled"] for t in body["tools"].values())

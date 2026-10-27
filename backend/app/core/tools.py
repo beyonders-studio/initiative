@@ -22,8 +22,8 @@ def kind_refusal(kind: str, code: str, status_code: int) -> CodedError:
 
 
 def plural_of(stem: str) -> str:
-    """The plural spelling of a tool stem — ``post`` → ``posts``, ``catalog`` →
-    ``catalogs``. The frontend's ``toolPlural`` applies the same rule."""
+    """The plural spelling of a tool stem — ``post`` → ``posts``, ``library`` →
+    ``libraries``. The frontend's ``toolPlural`` applies the same rule."""
     if len(stem) > 1 and stem.endswith("y") and stem[-2] not in "aeiou":
         return stem[:-1] + "ies"
     return stem + "s"
@@ -37,13 +37,13 @@ class Tool(str, Enum):
     calendar = "calendar"
     dashboard = "dashboard"
     post = "post"
-    catalog = "catalog"
+    library = "library"
     wiki = "wiki"
 
     @property
     def plural(self) -> str:
         """Pluralized stem — the table-ish spelling every derived name uses
-        (``counter_group`` → ``counter_groups``, ``catalog`` → ``catalogs``).
+        (``counter_group`` → ``counter_groups``, ``library`` → ``libraries``).
 
         One rule, mirrored by the frontend's ``toolPlural``: a trailing ``y``
         after a consonant becomes ``ies``, and everything else takes an ``s``.
@@ -153,13 +153,13 @@ KINDS: dict[str, Kind] = {
         Kind(Tool.calendar.value, 1),
         Kind(Tool.dashboard.value, 5),
         Kind(Tool.post.value, 9),
-        Kind(Tool.catalog.value, 7),
+        Kind(Tool.library.value, 7),
         Kind(Tool.wiki.value, 15),
         Kind("task", 14, parent=Tool.project),
         Kind("queue_item", 12, parent=Tool.queue),
         Kind("calendar_event", 2, parent=Tool.calendar),
         Kind("counter", 3, parent=Tool.counter_group),
-        Kind("catalog_item", 8, parent=Tool.catalog),
+        Kind("library_item", 8, parent=Tool.library),
         Kind("wiki_page", 16, parent=Tool.wiki),
         Kind("tag", 13),
     )
@@ -180,7 +180,7 @@ CONTENT_KINDS: tuple[str, ...] = tuple(t.value for t in Tool) + CHILD_KINDS
 # the initiative. Projects and files used to be exempt — always on, with no
 # column at all — because they were the only places content could live and the
 # other tools hung off them. Relationships ended that: anything links to
-# anything, so an initiative that is only a calendar, or only a catalog, is a
+# anything, so an initiative that is only a calendar, or only a library, is a
 # coherent thing to want rather than a half-built one.
 #
 # They keep the *default*, which is the part that was ever load-bearing. An
@@ -286,7 +286,7 @@ LAYOUTS_PER_INSTANCE: tuple[Tool, ...] = (
     Tool.project,
     Tool.queue,
     Tool.counter_group,
-    Tool.catalog,
+    Tool.library,
 )
 LAYOUTS_SHARED: tuple[Tool, ...] = (Tool.calendar, Tool.post)
 LAYOUT_TOOLS: tuple[Tool, ...] = LAYOUTS_PER_INSTANCE + LAYOUTS_SHARED
@@ -302,7 +302,7 @@ DETAIL_LAYOUTS: dict[Tool, tuple[str, ...]] = {
     Tool.project: ("task",),
     Tool.calendar: ("calendar_event",),
     Tool.queue: ("queue_item",),
-    Tool.catalog: ("catalog_item",),
+    Tool.library: ("library_item",),
     Tool.counter_group: ("counter",),
     Tool.post: ("post",),
 }

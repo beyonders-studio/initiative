@@ -21,11 +21,11 @@ import {
 } from "@/api/generated/calendar-events/calendar-events";
 import { getReadCalendarQueryKey, readCalendar } from "@/api/generated/calendars/calendars";
 import {
-  getReadCatalogItemQueryKey,
-  getReadCatalogQueryKey,
-  readCatalog,
-  readCatalogItem,
-} from "@/api/generated/catalogs/catalogs";
+  getReadLibraryItemQueryKey,
+  getReadLibraryQueryKey,
+  readLibrary,
+  readLibraryItem,
+} from "@/api/generated/libraries/libraries";
 import { getReadCommentQueryKey, readComment } from "@/api/generated/comments/comments";
 import { getReadCounterGroupQueryKey, readCounterGroup } from "@/api/generated/counters/counters";
 import { getReadDashboardQueryKey, readDashboard } from "@/api/generated/dashboards/dashboards";
@@ -47,7 +47,7 @@ import {
   readWikiPage,
 } from "@/api/generated/wikis/wikis";
 import {
-  catalogItemRoute,
+  libraryItemRoute,
   eventRoute,
   initiativeRoute,
   type PARENT_TOOL,
@@ -101,9 +101,9 @@ const TOOL_READS: Record<
     key: getReadPostQueryKey,
     read: readPost,
   },
-  [Tool.catalog]: {
-    key: getReadCatalogQueryKey,
-    read: readCatalog,
+  [Tool.library]: {
+    key: getReadLibraryQueryKey,
+    read: readLibrary,
   },
   [Tool.wiki]: {
     key: getReadWikiQueryKey,
@@ -157,12 +157,12 @@ const CHILD_RESOLVERS: Partial<Record<keyof typeof PARENT_TOOL, Resolve>> = {
       item.queue_id
     );
   },
-  catalog_item: async (read, communityId, id) => {
-    const item = await read(getReadCatalogItemQueryKey(communityId, id), () =>
-      readCatalogItem(communityId, id)
+  library_item: async (read, communityId, id) => {
+    const item = await read(getReadLibraryItemQueryKey(communityId, id), () =>
+      readLibraryItem(communityId, id)
     );
-    const initiativeId = await toolInitiative(read, communityId, Tool.catalog, item.catalog_id);
-    return catalogItemRoute(initiativeId, item.catalog_id, id);
+    const initiativeId = await toolInitiative(read, communityId, Tool.library, item.library_id);
+    return libraryItemRoute(initiativeId, item.library_id, id);
   },
   wiki_page: async (read, communityId, id) => {
     const page = await read(getReadWikiPageQueryKey(communityId, id), () =>

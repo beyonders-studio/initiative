@@ -48,7 +48,7 @@ from app.db.soft_delete_filter import select_including_deleted
 from app.models.tenant._mixins import SoftDeleteMixin
 from app.models.tenant.comment import Comment
 from app.models.tenant.file import File
-from app.models.tenant.catalog import CatalogItem
+from app.models.tenant.library import LibraryItem
 from app.models.tenant.initiative import Initiative
 from app.models.tenant.task import Task
 from app.services.tenant.held import refuse_if_held
@@ -303,7 +303,7 @@ async def _purge_references(session: AsyncSession, doomed: Level) -> None:
 #: deferred columns those hooks read.
 _PURGE_LOADS: dict[type, tuple] = {
     Comment: (),
-    CatalogItem: (),
+    LibraryItem: (),
     Task: (),
     File: (undefer(File.content),),
 }
@@ -418,7 +418,7 @@ async def hard_purge_entities(
     from app.services.tenant.files import unresolve_wikilinks_to_file
     from app.services.tenant.attachments import (
         purge_file_uploads,
-        purge_catalog_item_uploads,
+        purge_library_item_uploads,
         purge_initiative_uploads,
         purge_pasted_images,
     )
@@ -467,8 +467,8 @@ async def hard_purge_entities(
 
     # A picture's blobs — every version and its thumbnail — go with it, the
     # way an uploaded file's do.
-    if loaded.get(CatalogItem):
-        released |= await purge_catalog_item_uploads(session, loaded[CatalogItem])
+    if loaded.get(LibraryItem):
+        released |= await purge_library_item_uploads(session, loaded[LibraryItem])
 
     # Pictures pasted into a task's description or a comment go with it,
     # unless something that stays still shows them.

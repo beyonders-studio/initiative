@@ -15,7 +15,7 @@ graph TD
   I2["Initiative"]
   P1["Project<br/>(a task board)"]
   D1["File"]
-  T1["Calendar · Queue · Counter<br/>Dashboard · Posts · Catalog · Wiki"]
+  T1["Calendar · Queue · Counter<br/>Dashboard · Posts · Library · Wiki"]
   TASK["Tasks"]
 
   G --> I1
@@ -87,7 +87,7 @@ A **task** carries a description, a status, a priority, dates, the people doing 
 - **Counters** — numbers that move.
 - **Dashboards** — one screen that answers "how are we doing?"
 - **Posts** — a noticeboard, for the things that need saying rather than doing.
-- **Catalogs** — a wall of pictures, for the things that need looking at rather than reading.
+- **Libraries** — a wall of pictures, for the things that need looking at rather than reading.
 - **Wikis** — linked pages, for the things your group knows rather than the things it is doing.
 
 Use none of these and nothing is missing. They aren't sitting there judging you. See [Tools](../guides/tools.md).

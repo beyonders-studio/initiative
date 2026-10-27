@@ -577,27 +577,27 @@ def via_post_poll(fk: str = "poll_id") -> InitiativePath:
     )
 
 
-def via_catalog_item(fk: str = "catalog_item_id") -> InitiativePath:
-    """Two hops: ``table.<fk> -> catalog_items -> catalogs.initiative_id``."""
+def via_library_item(fk: str = "library_item_id") -> InitiativePath:
+    """Two hops: ``table.<fk> -> library_items -> libraries.initiative_id``."""
     return InitiativePath(
         predicate=lambda t, w: (
-            f"EXISTS (SELECT 1 FROM catalog_items ci "
-            f"JOIN catalogs cat ON cat.id = ci.catalog_id "
-            f"WHERE ci.id = {t}.{fk} "
-            f"AND {_access('cat.initiative_id', w)})"
+            f"EXISTS (SELECT 1 FROM library_items li "
+            f"JOIN libraries lib ON lib.id = li.library_id "
+            f"WHERE li.id = {t}.{fk} "
+            f"AND {_access('lib.initiative_id', w)})"
         ),
         initiative_expr=lambda r: (
-            f"(SELECT cat.initiative_id FROM catalog_items ci "  # noqa: S608
-            f"JOIN catalogs cat ON cat.id = ci.catalog_id WHERE ci.id = {r}.{fk})"
+            f"(SELECT lib.initiative_id FROM library_items li "  # noqa: S608
+            f"JOIN libraries lib ON lib.id = li.library_id WHERE li.id = {r}.{fk})"
         ),
         parents=lambda r: _parent_chain(
-            "catalog_items ci",
-            "ci.id",
+            "library_items li",
+            "li.id",
             f"{r}.{fk}",
-            ("catalog_items", "ci.id"),
-            ("catalogs", "ci.catalog_id"),
+            ("library_items", "li.id"),
+            ("libraries", "li.library_id"),
         ),
-        dac=_dac_two_hop("catalog_items", "catalog_id", "catalogs", fk),
+        dac=_dac_two_hop("library_items", "library_id", "libraries", fk),
     )
 
 
@@ -1504,10 +1504,10 @@ INITIATIVE_PATHS: dict[str, InitiativePath] = {
     # One hop -> dashboards
     # One hop -> posts
     "post_reads": via("posts", "post_id"),
-    # One hop -> catalogs
-    "catalog_items": via("catalogs", "catalog_id"),
-    # Two hops -> catalog_items -> catalogs
-    "catalog_item_versions": via_catalog_item("catalog_item_id"),
+    # One hop -> libraries
+    "library_items": via("libraries", "library_id"),
+    # Two hops -> library_items -> libraries
+    "library_item_versions": via_library_item("library_item_id"),
     "post_polls": via("posts", "post_id"),
     # Two hops -> tasks -> projects
     "task_assignees": via_task_project("task_id"),
@@ -2076,8 +2076,8 @@ EVENT_SOURCES: dict[str, Emit | Silent] = {
     # A draft page is read only by the wiki's writers, so like an unpublished
     # notice it is not news until it is finished.
     "wiki_pages": Emit(quiet_when=lambda r: f"{r}.is_draft"),
-    "catalog_item_versions": Emit(
-        reports_as=reports_as("catalog_items", "catalog_item_id", "versions")
+    "library_item_versions": Emit(
+        reports_as=reports_as("library_items", "library_item_id", "versions")
     ),
     "resource_grants": Emit(reports_as=grants_report_on_their_resource()),
     "post_polls": Emit(reports_as=reports_as("posts", "post_id", "poll")),

@@ -5,7 +5,7 @@
  * through both — so a tool that can be exported can be imported, and the
  * place a file gets dropped is the list page for the thing inside it. The
  * failure this guards is quiet: the endpoint works, the importer works, and
- * there is simply nowhere in the app to hand it a file. Wikis, catalogs and
+ * there is simply nowhere in the app to hand it a file. Wikis, libraries and
  * posts all shipped importers that way, and posts stayed unreachable longest
  * because it is the one board that does not go through {@link ToolIndexPage}.
  *
@@ -14,7 +14,7 @@
  * actually regresses is a page being written without the wiring.
  *
  * {@link ToolIndexPage} covers every tool with no list page of its own
- * (projects, files, wikis, catalogs, queues, …), so it is on the list too:
+ * (projects, files, wikis, libraries, queues, …), so it is on the list too:
  * the entry disappearing from it would take all of them at once.
  */
 import fs from "node:fs";

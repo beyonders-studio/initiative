@@ -78,13 +78,13 @@ describe("resolveEntityPath", () => {
     );
   });
 
-  it("opens a catalog item beside its catalog", async () => {
+  it("opens a library item beside its library", async () => {
     server.use(
-      communityHttp.get("/catalog-items/:id", () => HttpResponse.json({ id: 12, catalog_id: 5 })),
-      communityHttp.get("/catalogs/:id", () => HttpResponse.json({ id: 5, initiative_id: 1 }))
+      communityHttp.get("/library-items/:id", () => HttpResponse.json({ id: 12, library_id: 5 })),
+      communityHttp.get("/libraries/:id", () => HttpResponse.json({ id: 5, initiative_id: 1 }))
     );
-    await expect(resolveEntityPath(queryClient, COMMUNITY, "catalog-item", 12)).resolves.toBe(
-      "/i/1/catalogs/5/items/12"
+    await expect(resolveEntityPath(queryClient, COMMUNITY, "library-item", 12)).resolves.toBe(
+      "/i/1/libraries/5/items/12"
     );
   });
 
@@ -154,7 +154,7 @@ describe("resolveEntityPath", () => {
     expect(isEntityRefType("calendar-event")).toBe(true);
     expect(isEntityRefType("counter_group")).toBe(false);
     expect(isEntityRefType("user")).toBe(false);
-    expect(isEntityRefType("catalog-item")).toBe(true);
+    expect(isEntityRefType("library-item")).toBe(true);
   });
 });
 

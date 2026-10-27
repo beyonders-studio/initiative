@@ -39,7 +39,7 @@ from app.models.tenant._mixins import (
 from app.models.tenant.calendar import Calendar
 from app.models.tenant.calendar_event import CalendarEvent, CalendarEventAttendee
 from app.models.tenant.counter import Counter
-from app.models.tenant.catalog import Catalog, CatalogItem
+from app.models.tenant.library import Library, LibraryItem
 from app.models.tenant.post import Post
 from app.models.tenant.post_poll import PostPoll, PostPollOption
 from app.models.tenant.project import Project
@@ -377,12 +377,12 @@ def _rows_inside(model: type, *carried: str) -> Contents:
     return contents
 
 
-async def _catalog_contents(
-    session: AsyncSession, source: Catalog, copy: Catalog, actor: ActorContext
+async def _library_contents(
+    session: AsyncSession, source: Library, copy: Library, actor: ActorContext
 ) -> list[Any]:
     images = (
         await session.exec(
-            select(CatalogItem).where(CatalogItem.catalog_id == source.id)
+            select(LibraryItem).where(LibraryItem.library_id == source.id)
         )
     ).all()
     # Each picture starts again at version 1, authored by whoever copied it; a
@@ -392,7 +392,7 @@ async def _catalog_contents(
         images,
         beside=_beside(source, copy),
         values=lambda image: {
-            "catalog_id": copy.id,
+            "library_id": copy.id,
             "created_by": actor.user_id or image.created_by,
         },
     )
@@ -654,8 +654,8 @@ TOOL_COPIERS: dict[Tool, ToolCopier] = {
         # A copy starts its rotation from the top.
         reset={"is_active": False, "current_round": 1},
     ),
-    Tool.catalog: ToolCopier(
-        copies=frozenset({CatalogItem}), contents=_catalog_contents
+    Tool.library: ToolCopier(
+        copies=frozenset({LibraryItem}), contents=_library_contents
     ),
     Tool.dashboard: ToolCopier(),
     Tool.calendar: ToolCopier(

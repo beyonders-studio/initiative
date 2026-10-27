@@ -167,16 +167,16 @@ export const TOOL_PALETTE: Record<Tool, ToolPaletteSource> = {
       }));
     },
   },
-  [Tool.catalog]: {
-    useHeading: () => useGroupHeading(Tool.catalog),
+  [Tool.library]: {
+    useHeading: () => useGroupHeading(Tool.library),
     useItems: (ctx) => {
-      const query = useToolPaletteList(TOOL_HOOKS[Tool.catalog].listQuery, BROWSE_PAGE, ctx);
-      return (query.data?.items ?? []).map((catalog) => ({
-        id: catalog.id,
-        label: catalog.name,
-        keywords: [catalog.description ?? ""],
+      const query = useToolPaletteList(TOOL_HOOKS[Tool.library].listQuery, BROWSE_PAGE, ctx);
+      return (query.data?.items ?? []).map((library) => ({
+        id: library.id,
+        label: library.name,
+        keywords: [library.description ?? ""],
         icon: null,
-        path: toolDetailRoute(Tool.catalog, catalog.initiative_id, catalog.id),
+        path: toolDetailRoute(Tool.library, library.initiative_id, library.id),
       }));
     },
   },

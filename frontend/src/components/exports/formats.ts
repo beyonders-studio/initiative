@@ -89,7 +89,7 @@ export const TOOL_EXPORT_FORMATS: Partial<Record<Tool, ExportFormatOption[]>> = 
     // over other tools' data, so there is nothing to render it as.
     { format: "json", labelKey: "export.formatJson" },
   ],
-  [Tool.catalog]: [
+  [Tool.library]: [
     // The importable envelope and the pictures it names, zipped together:
     // the envelope names each picture by its stored file.
     { format: "json", labelKey: "export.formatJsonWithPictures" },

@@ -182,7 +182,7 @@ describe("notificationText — mentions", () => {
   it("names what a description that mentioned you describes", () => {
     const line = notificationText(
       notice("mention", {
-        entity_type: "catalog_item",
+        entity_type: "library_item",
         entity_id: 7,
         entity_name: "Ship it",
         mentioned_by_name: "ada",

@@ -211,10 +211,10 @@ def _current_filename(row: str, versions: str) -> str:
     )
 
 
-def _catalog_item_text(row: str) -> str:
+def _library_item_text(row: str) -> str:
     """A picture's searchable text: its description, and the filename split into
     words so ``round-4-detail.png`` is found by ``detail``."""
-    filename = _current_filename(row, "catalog_item_versions")
+    filename = _current_filename(row, "library_item_versions")
     return f"coalesce({row}.description, '') || ' ' || {_with_words(filename)}"
 
 
@@ -497,15 +497,15 @@ SEARCH_SOURCES: dict[str, SearchSource] = {
     ),
     # A picture is found by what somebody called it, or failing that by the
     # name of the file they uploaded — which is often the only name it has.
-    "catalog_items": _inside(
-        SearchEntityType.catalog_item,
+    "library_items": _inside(
+        SearchEntityType.library_item,
         title="title",
         title_sql=lambda row: (
             f"coalesce(nullif({row}.title, ''),"
-            f" {_current_filename(row, 'catalog_item_versions')})"
+            f" {_current_filename(row, 'library_item_versions')})"
         ),
         body=("description", "current_version_id"),
-        body_sql=_catalog_item_text,
+        body_sql=_library_item_text,
     ),
     # A page is found by its title and by what is written on it. Its body is a
     # Lexical state, the same shape a lexical file's is, so it is read by the
@@ -577,7 +577,7 @@ NOT_SEARCHABLE: dict[str, str] = {
     "task_statuses": "column names, reached from the project",
     "task_types": "type names, reached from the project",
     "file_versions": "history of a file already indexed",
-    "catalog_item_versions": "history of a picture already indexed",
+    "library_item_versions": "history of a picture already indexed",
     "post_polls": "the question a notice asks, reached from the notice",
     "post_poll_options": "a poll's choices, reached from the notice",
     "calendar_event_answers": "one invitee's answer, reached from the event",

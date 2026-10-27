@@ -26,14 +26,14 @@ import { useActiveCommunityId } from "@/hooks/useActiveCommunityId";
 import { useAuth } from "@/hooks/useAuth";
 import { useCalendarEntries } from "@/hooks/useCalendarEntries";
 import { useCalendarEvent } from "@/hooks/useCalendarEvents";
-import { useCatalogItemsFeed } from "@/hooks/useCatalogs";
+import { useLibraryItemsFeed } from "@/hooks/useLibraries";
 import { useCounterGroup } from "@/hooks/useCounters";
 import { usePost, usePostsFeed } from "@/hooks/usePosts";
 import { useQueue } from "@/hooks/useQueues";
 import { useTask, useTasks } from "@/hooks/useTasks";
 import { type CalendarFilters, EMPTY_CALENDAR_FILTERS } from "@/lib/filters/calendarFilters";
 import { buildTaskListParams, EMPTY_TASK_FILTERS } from "@/lib/filters/taskFilters";
-import { CATALOG_ITEM_DETAIL } from "@/lib/layouts/catalogItemLayout";
+import { LIBRARY_ITEM_DETAIL } from "@/lib/layouts/libraryItemLayout";
 import { COUNTER_DETAIL } from "@/lib/layouts/counterLayout";
 import { type DetailKind, DetailLayoutView } from "@/lib/layouts/DetailLayoutView";
 import type { DetailLayoutSpec, StoredRegions } from "@/lib/layouts/detailLayout";
@@ -273,27 +273,27 @@ const QueueItemPreview = ({
   );
 };
 
-/** The catalog's picture detail drawn with its first picture. */
-const CatalogItemPreview = ({
-  catalogId,
+/** The library's picture detail drawn with its first picture. */
+const LibraryItemPreview = ({
+  libraryId,
   initiativeId,
   tree,
 }: {
-  catalogId: number;
+  libraryId: number;
   initiativeId: number;
   tree: LayoutNode;
 }) => {
-  const pictures = useCatalogItemsFeed(catalogId);
+  const pictures = useLibraryItemsFeed(libraryId);
   return (
     <ItemPreview
-      detail={CATALOG_ITEM_DETAIL}
+      detail={LIBRARY_ITEM_DETAIL}
       tree={tree}
       item={pictures.data?.pages[0]?.items[0]}
       none={pictures.isSuccess}
-      empty="catalogItemDetail.noItems"
+      empty="libraryItemDetail.noItems"
       context={() => ({
         readOnly: false,
-        catalogId,
+        libraryId,
         initiativeId,
         canDeleteVersions: false,
         leaving: LEFT,
@@ -391,13 +391,13 @@ export const queueItemDetail = (queueId: number, initiativeId: number): Editable
   preview: (tree) => <QueueItemPreview queueId={queueId} initiativeId={initiativeId} tree={tree} />,
 });
 
-/** A catalog's picture detail. */
-export const catalogItemDetail = (catalogId: number, initiativeId: number): EditableDetail => ({
-  spec: CATALOG_ITEM_DETAIL.spec,
-  words: wordsOf("catalogItemDetail"),
-  fields: CATALOG_ITEM_DETAIL.fields,
+/** A library's picture detail. */
+export const libraryItemDetail = (libraryId: number, initiativeId: number): EditableDetail => ({
+  spec: LIBRARY_ITEM_DETAIL.spec,
+  words: wordsOf("libraryItemDetail"),
+  fields: LIBRARY_ITEM_DETAIL.fields,
   preview: (tree) => (
-    <CatalogItemPreview catalogId={catalogId} initiativeId={initiativeId} tree={tree} />
+    <LibraryItemPreview libraryId={libraryId} initiativeId={initiativeId} tree={tree} />
   ),
 });
 
@@ -423,7 +423,7 @@ export const ITEM_DETAILS: Partial<
   Record<Tool, (id: number, initiativeId: number) => EditableDetail>
 > = {
   [Tool.queue]: queueItemDetail,
-  [Tool.catalog]: catalogItemDetail,
+  [Tool.library]: libraryItemDetail,
   [Tool.counter_group]: counterDetail,
 };
 

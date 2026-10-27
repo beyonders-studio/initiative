@@ -19,17 +19,17 @@ import type {
 
 import type {
   CalendarListResponse,
-  CatalogListResponse,
   CounterGroupListResponse,
   DashboardListResponse,
   FileListResponse,
   GetMyToolCountsParams,
   HTTPValidationError,
+  LibraryListResponse,
   ListMyCalendarsParams,
-  ListMyCatalogsParams,
   ListMyCounterGroupsParams,
   ListMyDashboardsParams,
   ListMyFilesParams,
+  ListMyLibrariesParams,
   ListMyPostsParams,
   ListMyProjectsParams,
   ListMyQueuesParams,
@@ -1047,63 +1047,63 @@ export function useListMyPosts<
 }
 
 /**
- * Catalogs that reach the caller across every guild they belong to.
- * @summary List My Catalogs
+ * Libraries that reach the caller across every guild they belong to.
+ * @summary List My Libraries
  */
-export const listMyCatalogs = (
-  params?: ListMyCatalogsParams,
+export const listMyLibraries = (
+  params?: ListMyLibrariesParams,
   options?: SecondParameter<typeof apiMutator>,
   signal?: AbortSignal
 ) => {
-  return apiMutator<CatalogListResponse>(
-    { url: `/api/v1/me/catalogs`, method: "GET", params, signal },
+  return apiMutator<LibraryListResponse>(
+    { url: `/api/v1/me/libraries`, method: "GET", params, signal },
     options
   );
 };
 
-export const getListMyCatalogsQueryKey = (params?: ListMyCatalogsParams) => {
-  return [`/api/v1/me/catalogs`, ...(params ? [params] : [])] as const;
+export const getListMyLibrariesQueryKey = (params?: ListMyLibrariesParams) => {
+  return [`/api/v1/me/libraries`, ...(params ? [params] : [])] as const;
 };
 
-export const getListMyCatalogsQueryOptions = <
-  TData = Awaited<ReturnType<typeof listMyCatalogs>>,
+export const getListMyLibrariesQueryOptions = <
+  TData = Awaited<ReturnType<typeof listMyLibraries>>,
   TError = ErrorType<HTTPValidationError>,
 >(
-  params?: ListMyCatalogsParams,
+  params?: ListMyLibrariesParams,
   options?: {
-    query?: Partial<UseQueryOptions<Awaited<ReturnType<typeof listMyCatalogs>>, TError, TData>>;
+    query?: Partial<UseQueryOptions<Awaited<ReturnType<typeof listMyLibraries>>, TError, TData>>;
     request?: SecondParameter<typeof apiMutator>;
   }
 ) => {
   const { query: queryOptions, request: requestOptions } = options ?? {};
 
-  const queryKey = queryOptions?.queryKey ?? getListMyCatalogsQueryKey(params);
+  const queryKey = queryOptions?.queryKey ?? getListMyLibrariesQueryKey(params);
 
-  const queryFn: QueryFunction<Awaited<ReturnType<typeof listMyCatalogs>>> = ({ signal }) =>
-    listMyCatalogs(params, requestOptions, signal);
+  const queryFn: QueryFunction<Awaited<ReturnType<typeof listMyLibraries>>> = ({ signal }) =>
+    listMyLibraries(params, requestOptions, signal);
 
   return { queryKey, queryFn, ...queryOptions } as UseQueryOptions<
-    Awaited<ReturnType<typeof listMyCatalogs>>,
+    Awaited<ReturnType<typeof listMyLibraries>>,
     TError,
     TData
   > & { queryKey: DataTag<QueryKey, TData, TError> };
 };
 
-export type ListMyCatalogsQueryResult = NonNullable<Awaited<ReturnType<typeof listMyCatalogs>>>;
-export type ListMyCatalogsQueryError = ErrorType<HTTPValidationError>;
+export type ListMyLibrariesQueryResult = NonNullable<Awaited<ReturnType<typeof listMyLibraries>>>;
+export type ListMyLibrariesQueryError = ErrorType<HTTPValidationError>;
 
-export function useListMyCatalogs<
-  TData = Awaited<ReturnType<typeof listMyCatalogs>>,
+export function useListMyLibraries<
+  TData = Awaited<ReturnType<typeof listMyLibraries>>,
   TError = ErrorType<HTTPValidationError>,
 >(
-  params: undefined | ListMyCatalogsParams,
+  params: undefined | ListMyLibrariesParams,
   options: {
-    query: Partial<UseQueryOptions<Awaited<ReturnType<typeof listMyCatalogs>>, TError, TData>> &
+    query: Partial<UseQueryOptions<Awaited<ReturnType<typeof listMyLibraries>>, TError, TData>> &
       Pick<
         DefinedInitialDataOptions<
-          Awaited<ReturnType<typeof listMyCatalogs>>,
+          Awaited<ReturnType<typeof listMyLibraries>>,
           TError,
-          Awaited<ReturnType<typeof listMyCatalogs>>
+          Awaited<ReturnType<typeof listMyLibraries>>
         >,
         "initialData"
       >;
@@ -1111,18 +1111,18 @@ export function useListMyCatalogs<
   },
   queryClient?: QueryClient
 ): DefinedUseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData, TError> };
-export function useListMyCatalogs<
-  TData = Awaited<ReturnType<typeof listMyCatalogs>>,
+export function useListMyLibraries<
+  TData = Awaited<ReturnType<typeof listMyLibraries>>,
   TError = ErrorType<HTTPValidationError>,
 >(
-  params?: ListMyCatalogsParams,
+  params?: ListMyLibrariesParams,
   options?: {
-    query?: Partial<UseQueryOptions<Awaited<ReturnType<typeof listMyCatalogs>>, TError, TData>> &
+    query?: Partial<UseQueryOptions<Awaited<ReturnType<typeof listMyLibraries>>, TError, TData>> &
       Pick<
         UndefinedInitialDataOptions<
-          Awaited<ReturnType<typeof listMyCatalogs>>,
+          Awaited<ReturnType<typeof listMyLibraries>>,
           TError,
-          Awaited<ReturnType<typeof listMyCatalogs>>
+          Awaited<ReturnType<typeof listMyLibraries>>
         >,
         "initialData"
       >;
@@ -1130,33 +1130,33 @@ export function useListMyCatalogs<
   },
   queryClient?: QueryClient
 ): UseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData, TError> };
-export function useListMyCatalogs<
-  TData = Awaited<ReturnType<typeof listMyCatalogs>>,
+export function useListMyLibraries<
+  TData = Awaited<ReturnType<typeof listMyLibraries>>,
   TError = ErrorType<HTTPValidationError>,
 >(
-  params?: ListMyCatalogsParams,
+  params?: ListMyLibrariesParams,
   options?: {
-    query?: Partial<UseQueryOptions<Awaited<ReturnType<typeof listMyCatalogs>>, TError, TData>>;
+    query?: Partial<UseQueryOptions<Awaited<ReturnType<typeof listMyLibraries>>, TError, TData>>;
     request?: SecondParameter<typeof apiMutator>;
   },
   queryClient?: QueryClient
 ): UseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData, TError> };
 /**
- * @summary List My Catalogs
+ * @summary List My Libraries
  */
 
-export function useListMyCatalogs<
-  TData = Awaited<ReturnType<typeof listMyCatalogs>>,
+export function useListMyLibraries<
+  TData = Awaited<ReturnType<typeof listMyLibraries>>,
   TError = ErrorType<HTTPValidationError>,
 >(
-  params?: ListMyCatalogsParams,
+  params?: ListMyLibrariesParams,
   options?: {
-    query?: Partial<UseQueryOptions<Awaited<ReturnType<typeof listMyCatalogs>>, TError, TData>>;
+    query?: Partial<UseQueryOptions<Awaited<ReturnType<typeof listMyLibraries>>, TError, TData>>;
     request?: SecondParameter<typeof apiMutator>;
   },
   queryClient?: QueryClient
 ): UseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData, TError> } {
-  const queryOptions = getListMyCatalogsQueryOptions(params, options);
+  const queryOptions = getListMyLibrariesQueryOptions(params, options);
 
   const query = useQuery(queryOptions, queryClient) as UseQueryResult<TData, TError> & {
     queryKey: DataTag<QueryKey, TData, TError>;

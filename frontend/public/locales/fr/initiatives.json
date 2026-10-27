@@ -98,7 +98,7 @@
     "dashboards": "Tableaux de bord",
     "counterGroups": "Compteurs",
     "posts": "Publications",
-    "catalogs": "Catalogues",
+    "libraries": "Bibliothèques",
     "wikis": "Wikis"
   },
   "settings": {
@@ -227,7 +227,7 @@
       "dashboards": "Tableaux de bord",
       "counterGroups": "Compteurs",
       "posts": "Publications",
-      "catalogs": "Catalogues",
+      "libraries": "Bibliothèques",
       "wikis": "Wikis"
     },
     "permissions": {
@@ -245,8 +245,8 @@
       "createCounterGroups": "Créer des compteurs",
       "viewPosts": "Voir les publications",
       "createPosts": "Créer des publications",
-      "viewCatalogs": "Voir les catalogues",
-      "createCatalogs": "Créer des catalogues",
+      "viewLibraries": "Voir les bibliothèques",
+      "createLibraries": "Créer des bibliothèques",
       "viewShort": "Voir",
       "createShort": "Créer",
       "viewWikis": "Voir les wikis",
@@ -294,8 +294,8 @@
   "counterGroupsFeatureDescription": "Des nombres qui bougent. Décomptes, totaux, scores, places restantes, points de vie — un seul nombre sur lequel toute la salle est d'accord.",
   "postsFeature": "Publications",
   "postsFeatureDescription": "Un panneau d'affichage. Annonces, sondages, qui les a lues — l'importante épinglée en haut, pour que quatre personnes ne la ratent pas.",
-  "catalogsFeature": "Catalogues",
-  "catalogsFeatureDescription": "Un mur d'images. Maquettes, captures, les quatre logos qui ont perdu.",
+  "librariesFeature": "Bibliothèques",
+  "librariesFeatureDescription": "Un mur d'images. Maquettes, captures, les quatre logos qui ont perdu.",
   "projectsFeature": "Projets",
   "projectsFeatureDescription": "Des tableaux de choses à faire : qui s'en occupe, où ça en est, ce qui reste. En tableau, en Kanban ou en calendrier — les mêmes tâches, à vous de choisir.",
   "filesFeature": "Fichiers",
