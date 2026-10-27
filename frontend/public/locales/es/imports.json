@@ -228,7 +228,7 @@
   },
   "envelope": {
     "title": "Importar desde archivo",
-    "description": "Importa un archivo exportado desde Initiative: un archivo JSON, o un zip cuando la exportación trae sus archivos, como las imágenes de un catálogo. Su contenido se crea en la iniciativa que elijas.",
+    "description": "Importa un archivo exportado desde Initiative: un archivo JSON, o un zip cuando la exportación trae sus archivos, como las imágenes de una biblioteca. Su contenido se crea en la iniciativa que elijas.",
     "selectFile": "Archivo de exportación",
     "parseError": "Este archivo no es una exportación reconocida de Initiative.",
     "wrongTool": "Este archivo es una exportación de {{type}}: impórtalo desde la página de esa herramienta.",
@@ -274,7 +274,7 @@
       "initiative-calendar": "Calendario",
       "initiative-post": "Publicación",
       "initiative-wiki": "Wiki",
-      "initiative-catalog": "Catálogo",
+      "initiative-library": "Biblioteca",
       "initiative-counter-group": "Grupo de contadores",
       "initiative-dashboard": "Panel"
     },

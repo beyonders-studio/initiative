@@ -16,8 +16,8 @@ from app.models.platform.notification import Notification, NotificationType
 from app.services.platform import user_notifications
 from app.services import notifications
 from app.testing import (
-    create_catalog,
-    create_catalog_item,
+    create_library,
+    create_library_item,
     create_resource_grant,
     create_task,
     create_user,
@@ -155,16 +155,16 @@ async def test_a_community_admin_is_among_the_readers(
     )
 
 
-async def test_a_notice_about_a_catalog_item_opens_the_item(session, acting_user):
+async def test_a_notice_about_a_library_item_opens_the_item(session, acting_user):
     owner = await acting_user(guild_role=CommunityRole.member, initiative=True)
-    catalog = await create_catalog(session, owner.initiative, owner.user)
-    item = await create_catalog_item(session, catalog, owner.user, write_blob=False)
+    library = await create_library(session, owner.initiative, owner.user)
+    item = await create_library_item(session, library, owner.user, write_blob=False)
     await set_rls_context(session, SystemGuild(owner.guild.id))
 
-    subject = await notifications.resolve_subject(session, ("catalog_item", item.id))
+    subject = await notifications.resolve_subject(session, ("library_item", item.id))
 
     assert subject is not None
-    assert subject.target_path == f"/go/catalog-item/{item.id}"
+    assert subject.target_path == f"/go/library-item/{item.id}"
 
 
 async def test_repeated_file_mentions_fold_into_one_line(client, session, acting_user):

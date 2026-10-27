@@ -14,7 +14,7 @@ import { useTranslation } from "react-i18next";
 
 import type {
   ListCalendarsParams,
-  ListCatalogsParams,
+  ListLibrariesParams,
   ListCounterGroupsParams,
   ListDashboardsParams,
   ListFilesParams,
@@ -47,7 +47,7 @@ type ToolListParams = {
   [Tool.calendar]: ListCalendarsParams;
   [Tool.dashboard]: ListDashboardsParams;
   [Tool.post]: ListPostsParams;
-  [Tool.catalog]: ListCatalogsParams;
+  [Tool.library]: ListLibrariesParams;
   [Tool.wiki]: ListWikisParams;
 };
 
@@ -288,7 +288,7 @@ const TOOL_FILTER_FIELDS: { [T in Tool]: ComponentType<ToolFilterFieldsProps<T>>
   [Tool.calendar]: searchAndTags(Tool.calendar, "filters.searchCalendars"),
   [Tool.dashboard]: searchAndTags(Tool.dashboard, "filters.searchDashboards"),
   [Tool.post]: searchAndTags(Tool.post, "filters.searchPosts"),
-  [Tool.catalog]: searchAndTags(Tool.catalog, "filters.searchCatalogs"),
+  [Tool.library]: searchAndTags(Tool.library, "filters.searchLibraries"),
   [Tool.wiki]: searchAndTags(Tool.wiki, "filters.searchWikis"),
 };
 

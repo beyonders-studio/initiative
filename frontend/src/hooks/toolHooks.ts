@@ -40,16 +40,16 @@ import {
   updateCalendar,
 } from "@/api/generated/calendars/calendars";
 import {
-  createCatalog,
-  deleteCatalog,
-  duplicateCatalog,
-  getListCatalogsQueryKey,
-  getReadCatalogQueryKey,
-  listCatalogs,
-  readCatalog,
-  setCatalogGrants,
-  updateCatalog,
-} from "@/api/generated/catalogs/catalogs";
+  createLibrary,
+  deleteLibrary,
+  duplicateLibrary,
+  getListLibrariesQueryKey,
+  getReadLibraryQueryKey,
+  listLibraries,
+  readLibrary,
+  setLibraryGrants,
+  updateLibrary,
+} from "@/api/generated/libraries/libraries";
 import {
   createCounterGroup,
   deleteCounterGroup,
@@ -91,7 +91,7 @@ import type {
 import { Tool } from "@/api/generated/initiativeAPI.schemas";
 import {
   getListMyCalendarsQueryKey,
-  getListMyCatalogsQueryKey,
+  getListMyLibrariesQueryKey,
   getListMyCounterGroupsQueryKey,
   getListMyDashboardsQueryKey,
   getListMyFilesQueryKey,
@@ -100,7 +100,7 @@ import {
   getListMyQueuesQueryKey,
   getListMyWikisQueryKey,
   listMyCalendars,
-  listMyCatalogs,
+  listMyLibraries,
   listMyCounterGroups,
   listMyDashboards,
   listMyFiles,
@@ -542,19 +542,19 @@ const fileHooks = {
   useSetGrants: grantsHook(fileEndpoints, "files:settings.updateAccessError"),
 };
 
-const catalogEndpoints = {
-  listKey: getListCatalogsQueryKey,
-  list: listCatalogs,
-  myListKey: getListMyCatalogsQueryKey,
-  myList: listMyCatalogs,
-  detailKey: getReadCatalogQueryKey,
-  detail: readCatalog,
-  create: createCatalog,
-  update: updateCatalog,
-  remove: deleteCatalog,
-  setGrants: setCatalogGrants,
-  duplicate: duplicateCatalog,
-  tool: Tool.catalog,
+const libraryEndpoints = {
+  listKey: getListLibrariesQueryKey,
+  list: listLibraries,
+  myListKey: getListMyLibrariesQueryKey,
+  myList: listMyLibraries,
+  detailKey: getReadLibraryQueryKey,
+  detail: readLibrary,
+  create: createLibrary,
+  update: updateLibrary,
+  remove: deleteLibrary,
+  setGrants: setLibraryGrants,
+  duplicate: duplicateLibrary,
+  tool: Tool.library,
 };
 
 const postEndpoints = {
@@ -670,7 +670,7 @@ export const TOOL_HOOKS = {
     seedsDetailOnUpdate: true,
     refreshesRelationships: true,
   }),
-  [Tool.catalog]: makeToolHooks(catalogEndpoints, { seedsDetailOnUpdate: true }),
+  [Tool.library]: makeToolHooks(libraryEndpoints, { seedsDetailOnUpdate: true }),
   [Tool.wiki]: makeToolHooks(wikiEndpoints),
 } satisfies Record<Tool, ToolQueries>;
 

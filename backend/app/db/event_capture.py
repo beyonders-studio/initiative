@@ -175,7 +175,7 @@ class CaptureSpec:
 
 def _singular(table: str) -> str:
     """Junction owners are all regular plurals in this schema — ``posts``,
-    ``counter_groups``, ``catalogs`` — so one spelling rule reads them back:
+    ``counter_groups``, ``libraries`` — so one spelling rule reads them back:
     ``ies`` was a ``y``, and otherwise the ``s`` comes off."""
     if table.endswith("ies"):
         return table[:-3] + "y"

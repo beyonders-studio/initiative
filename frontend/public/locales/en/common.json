@@ -422,10 +422,10 @@
       "this": "this post",
       "plural": "posts"
     },
-    "catalog": {
-      "name": "Catalog",
-      "this": "this catalog",
-      "plural": "catalogs"
+    "library": {
+      "name": "Library",
+      "this": "this library",
+      "plural": "libraries"
     },
     "wiki": {
       "name": "Wiki",
@@ -452,7 +452,7 @@
       "this": "this counter",
       "plural": "counters"
     },
-    "catalog_item": {
+    "library_item": {
       "name": "Picture",
       "this": "this picture",
       "plural": "pictures"

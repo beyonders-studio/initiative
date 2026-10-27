@@ -70,7 +70,7 @@ const CHART_BARS = [
   { id: "q3", height: 55 },
   { id: "q4", height: 90 },
 ] as const;
-const CATALOG_TILES = [
+const LIBRARY_TILES = [
   { id: "p1", tall: true, tone: ink },
   { id: "p2", tall: false, tone: faint },
   { id: "p3", tall: false, tone: accent },
@@ -370,10 +370,10 @@ const PostSketch = ({ active }: SketchProps) => (
 );
 
 /** The wall: pictures at their own heights, packed three across. */
-const CatalogSketch = ({ active }: SketchProps) => (
+const LibrarySketch = ({ active }: SketchProps) => (
   <Frame>
     <div className="grid h-full grid-cols-3 grid-rows-3 gap-1">
-      {CATALOG_TILES.map((tile) => (
+      {LIBRARY_TILES.map((tile) => (
         <div
           key={tile.id}
           className={cn("rounded-sm", tile.tone(active), tile.tall && "row-span-2")}
@@ -420,7 +420,7 @@ export const TOOL_SKETCHES: Record<Tool, (props: SketchProps) => ReactNode> = {
   [Tool.counter_group]: CounterGroupSketch,
   [Tool.dashboard]: DashboardSketch,
   [Tool.post]: PostSketch,
-  [Tool.catalog]: CatalogSketch,
+  [Tool.library]: LibrarySketch,
   [Tool.wiki]: WikiSketch,
 };
 

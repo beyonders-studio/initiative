@@ -82,8 +82,8 @@ class RelatedEnd(SanitizedBaseModel):
     #: kind's own icon. A picture URL has already fallen back from a thumbnail to
     #: the full image, so a caller renders what it is given.
     #: Pictures to draw, newest first. A file has its featured image at
-    #: most; a catalog has the cover somebody chose, or the newest few when
-    #: nobody did — which is what a catalog shows of itself everywhere else.
+    #: most; a library has the cover somebody chose, or the newest few when
+    #: nobody did — which is what a library shows of itself everywhere else.
     image_urls: List[str] = Field(default_factory=list)
     icon: Optional[str] = None
     color: Optional[str] = None

@@ -11,7 +11,7 @@ type AccessKeys =
   | "counterGroups:"
   | "dashboards:"
   | "files:detail."
-  | "catalogs:"
+  | "libraries:"
   | "posts:"
   | "projects:detail."
   | "queues:"

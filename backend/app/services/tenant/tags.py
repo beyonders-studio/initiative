@@ -2,7 +2,7 @@
 
 ``TOOL_TAG_LINKS`` is the registry: **every** ``Tool`` is taggable, and the
 content-level extras (``TAGGABLE_EXTRAS``: tasks, queue items, calendar events,
-catalog images, wiki pages) are in ``EXTRA_TAG_LINKS``. Both derive from those
+library images, wiki pages) are in ``EXTRA_TAG_LINKS``. Both derive from those
 names, finding each model by its table. Everything an assignment surface needs
 — validation, replace-all, copy, bulk add/remove, serialization — lives here,
 so per-entity endpoints are wiring only.

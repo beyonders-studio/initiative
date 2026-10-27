@@ -75,8 +75,8 @@ const RESTORED: Record<EntityType, () => Spec> = {
   counter_group: q.allCounterGroups,
   counter: q.allCounterGroups,
   post: q.allPosts,
-  catalog: q.allCatalogs,
-  catalog_item: q.allCatalogs,
+  library: q.allLibraries,
+  library_item: q.allLibraries,
   dashboard: q.allDashboards,
 };
 

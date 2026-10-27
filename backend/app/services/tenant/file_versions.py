@@ -1,4 +1,4 @@
-"""A file kept as numbered versions: an uploaded file's, a catalog picture's.
+"""A file kept as numbered versions: an uploaded file's, a library picture's.
 
 The parent row names the version it shows (``current_version_id``) and the
 version rows are its history. Both tools take the same steps through here:
@@ -58,12 +58,12 @@ def _stored(version: Any) -> list[str | None]:
 
 def _may_hold(model: type, content_type: str | None) -> bool:
     """Whether a ``model`` row's file may be of ``content_type``: what an
-    upload of one accepts. A catalog item holds a picture; a file holds
+    upload of one accepts. A library item holds a picture; a file holds
     anything but a program."""
-    from app.models.tenant.catalog import CatalogItem
-    from app.services.tenant.catalogs import PICTURE_EXTENSIONS
+    from app.models.tenant.library import LibraryItem
+    from app.services.tenant.libraries import PICTURE_EXTENSIONS
 
-    if model is CatalogItem:
+    if model is LibraryItem:
         return content_type in PICTURE_EXTENSIONS
     return content_type is not None and not is_refused(content_type, None)
 
@@ -72,12 +72,12 @@ def file_type(model: type, data: bytes, *, filename: str | None) -> str | None:
     """The type ``data`` takes as a ``model`` row's file, read from its bytes
     by the rule an upload of one follows (``filename`` narrows it), or
     ``None`` where it is not a file the row may hold."""
-    from app.models.tenant.catalog import CatalogItem
-    from app.services.tenant import catalogs
+    from app.models.tenant.library import LibraryItem
+    from app.services.tenant import libraries
 
     try:
-        if model is CatalogItem:
-            return catalogs.validate_image(data)[0].content_type
+        if model is LibraryItem:
+            return libraries.validate_image(data)[0].content_type
         return attachments_service.validate_file(data, filename)[0]
     except ValueError:
         return None

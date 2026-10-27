@@ -124,10 +124,10 @@ class Comment(HoldMixin, CreatedByMixin, SoftDeleteMixin, table=True):
             Integer, ForeignKey("posts.id", ondelete="CASCADE"), nullable=True
         ),
     )
-    catalog_id: Optional[int] = Field(
+    library_id: Optional[int] = Field(
         default=None,
         sa_column=Column(
-            Integer, ForeignKey("catalogs.id", ondelete="CASCADE"), nullable=True
+            Integer, ForeignKey("libraries.id", ondelete="CASCADE"), nullable=True
         ),
     )
     wiki_id: Optional[int] = Field(

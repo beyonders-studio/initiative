@@ -16,8 +16,8 @@ from app.testing import (
     create_calendar_event,
     create_file,
     create_guild_calendar,
-    create_catalog,
-    create_catalog_item,
+    create_library,
+    create_library_item,
     create_initiative,
     create_project,
     create_tag,
@@ -29,9 +29,9 @@ def _url(a) -> str:
     return a.g("/relationships/")
 
 
-async def _catalogs_enabled(session, initiative) -> None:
-    """A catalog only exists in an initiative that has catalogs turned on."""
-    initiative.catalogs_enabled = True
+async def _libraries_enabled(session, initiative) -> None:
+    """A library only exists in an initiative that has libraries turned on."""
+    initiative.libraries_enabled = True
     session.add(initiative)
     await session.commit()
     await session.refresh(initiative)
@@ -636,40 +636,40 @@ async def test_a_picture_brings_its_thumbnail_and_falls_back_to_itself(
     a = await acting_user(
         guild_role=CommunityRole.member, initiative=True, project=True
     )
-    await _catalogs_enabled(session, a.initiative)
-    catalog = await create_catalog(session, a.initiative, a.user)
-    small = await create_catalog_item(session, catalog, a.user)
-    large = await create_catalog_item(
-        session, catalog, a.user, thumbnail_url="/uploads/3/thumb.webp"
+    await _libraries_enabled(session, a.initiative)
+    library = await create_library(session, a.initiative, a.user)
+    small = await create_library_item(session, library, a.user)
+    large = await create_library_item(
+        session, library, a.user, thumbnail_url="/uploads/3/thumb.webp"
     )
 
-    assert (await _attach(client, a, "catalog_item", small.id))["image_urls"] == [
+    assert (await _attach(client, a, "library_item", small.id))["image_urls"] == [
         small.current_version.file_url
     ]
-    assert (await _attach(client, a, "catalog_item", large.id))["image_urls"] == [
+    assert (await _attach(client, a, "library_item", large.id))["image_urls"] == [
         "/uploads/3/thumb.webp"
     ]
 
 
-async def test_a_catalog_brings_the_cover_somebody_chose(
+async def test_a_library_brings_the_cover_somebody_chose(
     client: AsyncClient, acting_user, session
 ):
-    """A catalog's picture lives on another row, so it is one hop away."""
+    """A library's picture lives on another row, so it is one hop away."""
     a = await acting_user(
         guild_role=CommunityRole.member, initiative=True, project=True
     )
-    await _catalogs_enabled(session, a.initiative)
-    catalog = await create_catalog(session, a.initiative, a.user)
-    cover = await create_catalog_item(
-        session, catalog, a.user, thumbnail_url="/uploads/3/cover-thumb.webp"
+    await _libraries_enabled(session, a.initiative)
+    library = await create_library(session, a.initiative, a.user)
+    cover = await create_library_item(
+        session, library, a.user, thumbnail_url="/uploads/3/cover-thumb.webp"
     )
-    catalog.cover_item_id = cover.id
-    session.add(catalog)
+    library.cover_item_id = cover.id
+    session.add(library)
     await session.commit()
 
-    end = await _attach(client, a, "catalog", catalog.id)
+    end = await _attach(client, a, "library", library.id)
 
-    # The chosen one stands alone, even though the catalog holds others.
+    # The chosen one stands alone, even though the library holds others.
     assert end["image_urls"] == ["/uploads/3/cover-thumb.webp"]
 
 
@@ -748,39 +748,39 @@ async def test_a_kind_with_one_fixed_icon_says_nothing_about_its_sort(
     assert end["smart_link_url"] is None
 
 
-async def test_a_catalog_nobody_chose_a_cover_for_shows_its_newest(
+async def test_a_library_nobody_chose_a_cover_for_shows_its_newest(
     client: AsyncClient, acting_user, session
 ):
-    """A catalog with no chosen cover is the usual kind, and it is not blank —
+    """A library with no chosen cover is the usual kind, and it is not blank —
     it stands for itself with the newest few pictures, which is what it shows
     everywhere else."""
     a = await acting_user(
         guild_role=CommunityRole.member, initiative=True, project=True
     )
-    await _catalogs_enabled(session, a.initiative)
-    catalog = await create_catalog(session, a.initiative, a.user)
+    await _libraries_enabled(session, a.initiative)
+    library = await create_library(session, a.initiative, a.user)
     for n in range(5):
-        await create_catalog_item(
-            session, catalog, a.user, thumbnail_url=f"/uploads/3/pic-{n}.webp"
+        await create_library_item(
+            session, library, a.user, thumbnail_url=f"/uploads/3/pic-{n}.webp"
         )
 
-    end = await _attach(client, a, "catalog", catalog.id)
+    end = await _attach(client, a, "library", library.id)
 
     assert len(end["image_urls"]) == 4, end["image_urls"]
     # Newest first, so the four it shows are the four most recently added.
     assert end["image_urls"][0] == "/uploads/3/pic-4.webp"
 
 
-async def test_an_empty_catalog_shows_no_pictures_rather_than_a_blank_one(
+async def test_an_empty_library_shows_no_pictures_rather_than_a_blank_one(
     client: AsyncClient, acting_user, session
 ):
     a = await acting_user(
         guild_role=CommunityRole.member, initiative=True, project=True
     )
-    await _catalogs_enabled(session, a.initiative)
-    catalog = await create_catalog(session, a.initiative, a.user)
+    await _libraries_enabled(session, a.initiative)
+    library = await create_library(session, a.initiative, a.user)
 
-    end = await _attach(client, a, "catalog", catalog.id)
+    end = await _attach(client, a, "library", library.id)
 
     assert end["image_urls"] == []
 

@@ -16,12 +16,12 @@ export const LazyInitiativeDetailPage = lazyRouteComponent(() =>
 );
 
 /**
- * The catalog page, shared by the catalog's own route and an item's
- * (`/catalogs/{id}/items/{itemId}`), so opening and closing an item keeps the
+ * The library page, shared by the library's own route and an item's
+ * (`/libraries/{id}/items/{itemId}`), so opening and closing an item keeps the
  * wall where it was rather than drawing it again.
  */
-export const LazyCatalogDetailPage = lazyRouteComponent(() =>
-  import("@/pages/initiativeTools/catalogs/CatalogDetailPage").then((m) => ({
-    default: m.CatalogDetailPage,
+export const LazyLibraryDetailPage = lazyRouteComponent(() =>
+  import("@/pages/initiativeTools/libraries/LibraryDetailPage").then((m) => ({
+    default: m.LibraryDetailPage,
   }))
 );

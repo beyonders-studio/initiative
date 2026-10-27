@@ -1,7 +1,7 @@
 """Migrations 20261026_0540 and 20261026_0541 store a file's format as its
 type. Loaded by path and run on a guild the test builds: down to the types an
 older release wrote, rows written that way, then up again, the way
-``catalogs_rename_migration_test`` runs the catalogs rename."""
+``libraries_rename_migration_test`` runs the libraries rename."""
 
 from __future__ import annotations
 

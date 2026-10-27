@@ -245,7 +245,7 @@ def _strip_queue(env: dict[str, Any]) -> None:
             item["member"] = None
 
 
-def _strip_catalog(env: dict[str, Any]) -> None:
+def _strip_library(env: dict[str, Any]) -> None:
     env["items"] = [
         item
         for item in env.get("items") or []
@@ -269,7 +269,7 @@ _STRIPPERS: dict[Tool, Callable[[dict[str, Any]], None]] = {
     Tool.calendar: _strip_calendar,
     Tool.dashboard: _strip_nothing,
     Tool.post: _strip_post,
-    Tool.catalog: _strip_catalog,
+    Tool.library: _strip_library,
     Tool.wiki: _strip_wiki,
 }
 

@@ -40,6 +40,7 @@ from app.core.relationships import Provenance, RelationshipType
 from app.core.search import SearchEntityType
 from app.db import reference_targets
 from app.db.initiative_rls import COMMENT_PARENT_COLUMNS
+from app.models.tenant.library import LibraryItem
 from app.models.tenant.comment import Comment
 from app.models.tenant.file import File
 from app.models.tenant.post import Post
@@ -55,6 +56,7 @@ from app.services.tenant.relationships import Endpoint
 #: :func:`references_in` reads either. A kind absent from this map contributes
 #: nothing but its comments.
 BODY_COLUMNS: dict[SearchEntityType, tuple[type, str]] = {
+    SearchEntityType.library_item: (LibraryItem, "description"),
     SearchEntityType.file: (File, "content"),
     SearchEntityType.post: (Post, "body"),
     SearchEntityType.task: (Task, "description"),

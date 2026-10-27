@@ -54,7 +54,7 @@ export const detailLayoutLooks: Record<DetailLayoutRead["kind"], Look> = {
   task: { icon: FileText, labelKey: "layouts:taskLayout" },
   calendar_event: { icon: CalendarDays, labelKey: "layouts:eventDetail.name" },
   queue_item: { icon: ListOrdered, labelKey: "layouts:queueItemDetail.name" },
-  catalog_item: { icon: Image, labelKey: "layouts:catalogItemDetail.name" },
+  library_item: { icon: Image, labelKey: "layouts:libraryItemDetail.name" },
   counter: { icon: Hash, labelKey: "layouts:counterDetail.name" },
   post: { icon: Megaphone, labelKey: "layouts:postDetail.name" },
 };

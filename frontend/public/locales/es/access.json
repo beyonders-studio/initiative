@@ -112,8 +112,8 @@
     "resource_dashboard_other": "paneles",
     "resource_post_one": "publicación",
     "resource_post_other": "publicaciones",
-    "resource_catalog_one": "catálogo",
-    "resource_catalog_other": "catálogos",
+    "resource_library_one": "biblioteca",
+    "resource_library_other": "bibliotecas",
     "resource_wiki_one": "wiki",
     "resource_wiki_other": "wikis"
   }

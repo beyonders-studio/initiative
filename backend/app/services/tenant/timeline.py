@@ -16,7 +16,7 @@ tools.
 from collections.abc import Sequence
 from typing import Any
 
-from sqlalchemy import func, select
+from sqlalchemy import Date, DateTime, cast, func, select
 from sqlmodel.ext.asyncio.session import AsyncSession
 
 from app.core.user_input_validators import resolve_zone
@@ -47,20 +47,29 @@ async def month_buckets(
     taking them from the data means the client never has to work out when a
     month begins or ends somewhere else — nor which of the two a list reads
     from, which is a question about that list's own direction.
+
+    A row dated by a day (a ``date`` column) is in that day's month wherever
+    it is read, so ``tz`` does not apply; its anchors are the day's start in
+    UTC.
     """
-    zone = resolve_zone(tz).key
-    # ``timezone(zone, ts)`` renders the instant as local wall time, which is
-    # what a month boundary is drawn against.
-    local = func.timezone(zone, date_expr)
-    month = func.date_trunc("month", local)
+    if isinstance(date_expr.type, Date):
+        month = func.date_trunc("month", date_expr)
+        newest = func.timezone("UTC", cast(func.max(date_expr), DateTime))
+        oldest = func.timezone("UTC", cast(func.min(date_expr), DateTime))
+    else:
+        zone = resolve_zone(tz).key
+        # ``timezone(zone, ts)`` renders the instant as local wall time, which
+        # is what a month boundary is drawn against.
+        month = func.date_trunc("month", func.timezone(zone, date_expr))
+        newest, oldest = func.max(date_expr), func.min(date_expr)
 
     rows = (
         await session.exec(
             select(
                 func.to_char(month, "YYYY-MM").label("period"),
                 func.count().label("count"),
-                func.max(date_expr).label("anchor"),
-                func.min(date_expr).label("anchor_oldest"),
+                newest.label("anchor"),
+                oldest.label("anchor_oldest"),
             )
             .where(*conditions)
             .group_by(month)

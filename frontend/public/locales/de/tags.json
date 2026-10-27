@@ -17,7 +17,7 @@
     "children": {
       "task": "Aufgaben",
       "calendar_event": "Termine",
-      "catalog_item": "Bilder",
+      "library_item": "Bilder",
       "queue_item": "Warteschlangeneinträge",
       "wiki_page": "Seiten"
     },

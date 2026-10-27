@@ -17,7 +17,7 @@
     "children": {
       "task": "Tareas",
       "calendar_event": "Eventos",
-      "catalog_item": "Imágenes",
+      "library_item": "Imágenes",
       "queue_item": "Elementos de la cola",
       "wiki_page": "Páginas"
     },

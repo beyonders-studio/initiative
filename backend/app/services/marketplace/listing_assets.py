@@ -11,7 +11,7 @@ by the digest of its bytes.
 
 Installing copies each picture the listing names into the installing
 community's storage as a new upload of the member installing, and names the
-copy there. That is how an owner-published catalog arrives with its pictures.
+copy there. That is how an owner-published library arrives with its pictures.
 """
 
 from __future__ import annotations
@@ -100,8 +100,8 @@ def media_paths_in(envelope: Any) -> list[str]:
     return found
 
 
-def _rekey_catalog(envelope: dict[str, Any], keys: dict[str, str]) -> dict[str, Any]:
-    """A catalog with each picture's key and its cover mapped through ``keys``,
+def _rekey_library(envelope: dict[str, Any], keys: dict[str, str]) -> dict[str, Any]:
+    """A library with each picture's key and its cover mapped through ``keys``,
     and anything unmapped left blank for the importer to count as missing."""
     rekeyed = dict(envelope)
     rekeyed["items"] = [
@@ -175,7 +175,7 @@ async def copy_assets_in(
         to_key[path] = key
     await session.flush()
 
-    if tool is Tool.catalog:
-        # A catalog names its pictures by key, everything else by URL.
-        return _rekey_catalog(envelope, to_key)
+    if tool is Tool.library:
+        # A library names its pictures by key, everything else by URL.
+        return _rekey_library(envelope, to_key)
     return _replace_strings(envelope, to_url)

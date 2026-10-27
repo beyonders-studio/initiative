@@ -73,11 +73,11 @@ _ID_DIGITS = frozenset("0123456789")
 #: Kinds stored content still names by an older spelling. A body keeps what
 #: was written into it, Yjs state included, so these are read for as long as
 #: such content exists: a file was called a document before it was a file,
-#: and a catalog a gallery before it was a catalog.
+#: and a library a gallery before it was a library.
 _LEGACY_KINDS: dict[str, SearchEntityType] = {
     "document": SearchEntityType.file,
-    "gallery": SearchEntityType.catalog,
-    "gallery_image": SearchEntityType.catalog_item,
+    "gallery": SearchEntityType.library,
+    "gallery_image": SearchEntityType.library_item,
 }
 
 

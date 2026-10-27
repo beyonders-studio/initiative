@@ -36,8 +36,8 @@
     "tag": "Etiqueta",
     "comment": "Comentario",
     "post": "Publicación",
-    "catalog": "Catálogo",
-    "catalog_item": "Imagen"
+    "library": "Biblioteca",
+    "library_item": "Imagen"
   },
   "switchHint": "Tab para cambiar",
   "closeMatches": "Nada coincide exactamente con «{{query}}». Esto es lo más parecido.",

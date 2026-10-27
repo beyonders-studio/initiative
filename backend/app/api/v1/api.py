@@ -43,7 +43,7 @@ from app.api.v1.tenant_endpoints import (
     initiatives,
     marketplace as guild_marketplace,
     me_tools,
-    catalogs,
+    libraries,
     me_trash,
     posts,
     projects,
@@ -323,9 +323,9 @@ guild_router.include_router(counters.counters_router, tags=["counters"])
 guild_router.include_router(calendars.router, **_tool_mount(Tool.calendar))
 guild_router.include_router(dashboards.router, **_tool_mount(Tool.dashboard))
 guild_router.include_router(posts.router, **_tool_mount(Tool.post))
-guild_router.include_router(catalogs.router, **_tool_mount(Tool.catalog))
+guild_router.include_router(libraries.router, **_tool_mount(Tool.library))
 guild_router.include_router(
-    catalogs.items_router, tags=_tool_mount(Tool.catalog)["tags"]
+    libraries.items_router, tags=_tool_mount(Tool.library)["tags"]
 )
 guild_router.include_router(wikis.router, **_tool_mount(Tool.wiki))
 guild_router.include_router(wikis.pages_router, tags=_tool_mount(Tool.wiki)["tags"])

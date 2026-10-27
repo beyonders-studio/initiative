@@ -422,10 +422,10 @@
       "this": "cette publication",
       "plural": "publications"
     },
-    "catalog": {
-      "name": "Catalogue",
-      "this": "ce catalogue",
-      "plural": "catalogues"
+    "library": {
+      "name": "Bibliothèque",
+      "this": "cette bibliothèque",
+      "plural": "bibliothèques"
     },
     "wiki": {
       "name": "Wiki",
@@ -452,7 +452,7 @@
       "this": "ce compteur",
       "plural": "compteurs"
     },
-    "catalog_item": {
+    "library_item": {
       "name": "Image",
       "this": "cette image",
       "plural": "images"

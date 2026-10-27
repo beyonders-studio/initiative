@@ -16,6 +16,7 @@ path that gives a long file several.
 
 from __future__ import annotations
 
+import enum
 import hashlib
 from collections.abc import Callable
 from typing import Any
@@ -211,11 +212,11 @@ def _current_filename(row: str, versions: str) -> str:
     )
 
 
-def _catalog_item_text(row: str) -> str:
-    """A picture's searchable text: its caption, and the filename split into
+def _library_item_text(row: str) -> str:
+    """A picture's searchable text: its description, and the filename split into
     words so ``round-4-detail.png`` is found by ``detail``."""
-    filename = _current_filename(row, "catalog_item_versions")
-    return f"coalesce({row}.caption, '') || ' ' || {_with_words(filename)}"
+    filename = _current_filename(row, "library_item_versions")
+    return f"coalesce({row}.description, '') || ' ' || {_with_words(filename)}"
 
 
 def _file_text(row: str) -> str:
@@ -385,12 +386,21 @@ def _archived_expr(table: str, source: "SearchSource", row: str) -> str | None:
 
 def _written(table: str, source: "SearchSource") -> tuple[str, ...]:
     """The body columns somebody writes in: all of them, less a column that only
-    names a kind (an enum) or another row (a foreign key)."""
+    names a kind (an enum, in the database or on the model) or another row (a
+    foreign key)."""
+    from app.db.base import MODELS_BY_TABLE
+
     columns = SQLModel.metadata.tables[table].columns
+    fields = MODELS_BY_TABLE[table].model_fields
+
+    def names_a_kind(column: str) -> bool:
+        annotation = fields[column].annotation if column in fields else None
+        return isinstance(columns[column].type, Enum) or (
+            isinstance(annotation, type) and issubclass(annotation, enum.Enum)
+        )
+
     return tuple(
-        c
-        for c in source.body
-        if not isinstance(columns[c].type, Enum) and not columns[c].foreign_keys
+        c for c in source.body if not names_a_kind(c) and not columns[c].foreign_keys
     )
 
 
@@ -497,15 +507,15 @@ SEARCH_SOURCES: dict[str, SearchSource] = {
     ),
     # A picture is found by what somebody called it, or failing that by the
     # name of the file they uploaded — which is often the only name it has.
-    "catalog_items": _inside(
-        SearchEntityType.catalog_item,
+    "library_items": _inside(
+        SearchEntityType.library_item,
         title="title",
         title_sql=lambda row: (
             f"coalesce(nullif({row}.title, ''),"
-            f" {_current_filename(row, 'catalog_item_versions')})"
+            f" {_current_filename(row, 'library_item_versions')})"
         ),
-        body=("caption", "current_version_id"),
-        body_sql=_catalog_item_text,
+        body=("description", "current_version_id"),
+        body_sql=_library_item_text,
     ),
     # A page is found by its title and by what is written on it. Its body is a
     # Lexical state, the same shape a lexical file's is, so it is read by the
@@ -577,7 +587,7 @@ NOT_SEARCHABLE: dict[str, str] = {
     "task_statuses": "column names, reached from the project",
     "task_types": "type names, reached from the project",
     "file_versions": "history of a file already indexed",
-    "catalog_item_versions": "history of a picture already indexed",
+    "library_item_versions": "history of a picture already indexed",
     "post_polls": "the question a notice asks, reached from the notice",
     "post_poll_options": "a poll's choices, reached from the notice",
     "calendar_event_answers": "one invitee's answer, reached from the event",
