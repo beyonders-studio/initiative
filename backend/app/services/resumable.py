@@ -46,6 +46,7 @@ from starlette.requests import ClientDisconnect
 
 from app.core.file_types import is_refused
 from app.core.messages import FileMessages, ResumableMessages
+from app.db.advisory_locks import LockNamespace, advisory_lock
 from app.models.platform.user import User
 from app.models.tenant.pending_upload import PendingUpload
 from app.services.storage import get_guild_storage
@@ -69,6 +70,10 @@ MAX_METADATA_BYTES = 4096
 _MAX_PARTS = 9_000
 #: How often a long request re-establishes the reader's standing.
 _STANDING_SECONDS = 30
+#: How long a request waits for the client's next bytes before renewing.
+_RENEW_SECONDS = 20
+#: The largest size Postgres keeps (``bigint``).
+_MAX_BYTES = 2**63 - 1
 _STAGING_PREFIX = "resumable-"
 
 
@@ -141,7 +146,13 @@ def _require_version(request: Request) -> None:
 
 
 def _number(value: str | None) -> int:
-    if value is None or not (value.isascii() and value.isdigit()):
+    """A header's count of bytes, as large as Postgres keeps one."""
+    if (
+        value is None
+        or not (value.isascii() and value.isdigit())
+        or len(value) > 19
+        or int(value) > _MAX_BYTES
+    ):
         raise _refuse(status.HTTP_400_BAD_REQUEST, ResumableMessages.INVALID_REQUEST)
     return int(value)
 
@@ -196,6 +207,9 @@ async def create(
     if cap is not None and length > cap:
         raise _refuse(status.HTTP_413_CONTENT_TOO_LARGE, FileMessages.FILE_TOO_LARGE)
     initiative_id = await purpose.admit(session, guild_context, user, metadata)
+    guild_id = guild_context.guild_id
+    # Counted and added in turn, so two at once count each other.
+    await advisory_lock(session, LockNamespace.PENDING_UPLOADS, f"{guild_id}:{user.id}")
     live = await session.scalar(
         select(func.count())
         .select_from(PendingUpload)
@@ -203,7 +217,6 @@ async def create(
     )
     if (live or 0) >= MAX_LIVE_PER_PERSON:
         raise _refuse(status.HTTP_429_TOO_MANY_REQUESTS, ResumableMessages.TOO_MANY)
-    guild_id = guild_context.guild_id
     await attachments.enforce_storage_quota(
         session, guild_id=guild_id, incoming_bytes=length
     )
@@ -250,28 +263,121 @@ async def _live(session: AsyncSession, upload_id: str) -> PendingUpload:
     return upload
 
 
-async def head(session: AsyncSession, upload_id: str) -> Response:
-    """Where an upload stands."""
-    return Response(headers=_headers(await _live(session, upload_id)))
+class _Lease:
+    """One request's hold on an upload: taken and committed before anything
+    else is read, renewed while the request works, and let go at the end.
+    Every record of progress is made under it, so a request that has lost it
+    writes nothing more."""
 
+    def __init__(self, session: AsyncSession, upload_id: str, renew: Any) -> None:
+        self.session, self.upload_id, self._renew = session, upload_id, renew
+        self.token: str | None = None
 
-async def _lease(session: AsyncSession, upload_id: str) -> str | None:
-    token = secrets.token_urlsafe(16)
-    taken = await session.exec(
-        update(PendingUpload)
-        .where(
-            col(PendingUpload.id) == upload_id,
-            or_(
-                col(PendingUpload.lease_until).is_(None),
-                col(PendingUpload.lease_until) < func.now(),
-            ),
+    async def take(self) -> PendingUpload:
+        """The upload as it stands, now that this request holds it."""
+        await _live(self.session, self.upload_id)
+        token = secrets.token_urlsafe(16)
+        taken = await self.session.exec(
+            update(PendingUpload)
+            .where(
+                col(PendingUpload.id) == self.upload_id,
+                or_(
+                    col(PendingUpload.lease_until).is_(None),
+                    col(PendingUpload.lease_until) < func.now(),
+                ),
+            )
+            .values(lease_token=token, lease_until=func.now() + LEASE)
+            .returning(PendingUpload.id)
         )
-        .values(lease_token=token, lease_until=func.now() + LEASE)
-        .returning(PendingUpload.id)
-    )
-    found = taken.first() is not None
-    await session.commit()
-    return token if found else None
+        found = taken.first() is not None
+        await self.session.commit()
+        if not found:
+            raise _refuse(status.HTTP_423_LOCKED, ResumableMessages.LOCKED)
+        self.token = token
+        return await _live(self.session, self.upload_id)
+
+    async def record(self, values: dict[str, Any], *, done: bool = False) -> None:
+        """Save ``values`` under the lease, renewing it, or letting it go when
+        ``done``; refused once another request holds it."""
+        await self._renew()
+        lease = (
+            {"lease_token": None, "lease_until": None}
+            if done
+            else {"lease_until": func.now() + LEASE}
+        )
+        saved = await self.session.exec(
+            update(PendingUpload)
+            .where(
+                col(PendingUpload.id) == self.upload_id,
+                col(PendingUpload.lease_token) == self.token,
+            )
+            .values(**values, **lease)
+            .returning(PendingUpload.id)
+        )
+        held = saved.first() is not None
+        await self.session.commit()
+        if done:
+            self.token = None
+        if not held:
+            self.token = None
+            raise _refuse(status.HTTP_423_LOCKED, ResumableMessages.LOCKED)
+
+    async def let_go(self) -> None:
+        """Let the lease go if the request still holds it; a failure to is
+        left to the lease's own expiry."""
+        if self.token is None:
+            return
+        try:
+            await self.session.rollback()
+            await self.session.exec(
+                update(PendingUpload)
+                .where(
+                    col(PendingUpload.id) == self.upload_id,
+                    col(PendingUpload.lease_token) == self.token,
+                )
+                .values(lease_token=None, lease_until=None)
+            )
+            await self.session.commit()
+        except Exception:
+            logger.warning("lease_release_failed upload=%s", self.upload_id)
+        self.token = None
+
+
+async def _finish(lease: _Lease, storage: Any, upload: PendingUpload) -> None:
+    """Make a fully arrived upload's parts its staged object, and record it
+    complete. Recorded as finishing first, so a request whose own record of
+    completion does not land leaves an upload the next can finish."""
+    state = {**upload.blob_state, "finishing": True}
+    await lease.record({"offset": upload.length, "blob_state": state})
+    await asyncio.to_thread(storage.finish_parts, upload.staging_key, state)
+    await lease.record({"completed_at": func.now()}, done=True)
+
+
+def _finishing(upload: PendingUpload) -> bool:
+    return upload.completed_at is None and bool(upload.blob_state.get("finishing"))
+
+
+async def head(session: AsyncSession, guild_id: int, upload_id: str) -> Response:
+    """Where an upload stands. One a request left finishing is finished."""
+    upload = await _live(session, upload_id)
+    if _finishing(upload):
+        lease = _Lease(session, upload_id, _nothing)
+        try:
+            upload = await lease.take()
+            if _finishing(upload):
+                await _finish(lease, get_guild_storage(guild_id), upload)
+        except HTTPException as exc:
+            # Another request is finishing it; say where it stands.
+            if exc.status_code != status.HTTP_423_LOCKED:
+                raise
+        finally:
+            await lease.let_go()
+        upload = await _live(session, upload_id)
+    return Response(headers=_headers(upload))
+
+
+async def _nothing() -> None:
+    return None
 
 
 async def patch(
@@ -283,12 +389,13 @@ async def patch(
 ) -> Response:
     """Append the request's body to an upload at the offset it names.
 
-    The lease is taken and committed before the body is read, so no database
-    connection is held while it streams. After each part the progress is
-    recorded and the lease renewed, re-establishing the reader's standing as
-    it ages; a person who lost access is refused at the next part. A client
-    that drops keeps what arrived: the request's last bytes wait for the next
-    one, and ``HEAD`` answers from there.
+    The lease is taken and committed before anything else is read, so no
+    database connection is held while the body streams. It is renewed before
+    each part is written and while the request waits for bytes, and progress
+    is recorded after each part, re-establishing the reader's standing as it
+    ages; a person who lost access is refused at the next part. A client that
+    drops keeps what arrived: the request's last bytes wait for the next one,
+    and ``HEAD`` answers from there.
     """
     from app.api.deps import (
         GuildAccessError,
@@ -302,25 +409,11 @@ async def patch(
             status.HTTP_415_UNSUPPORTED_MEDIA_TYPE, ResumableMessages.INVALID_REQUEST
         )
     offset = _number(request.headers.get("upload-offset"))
-    upload = await _live(session, upload_id)
-    if offset != upload.offset or upload.completed_at is not None:
-        raise _refuse(status.HTTP_409_CONFLICT, ResumableMessages.OFFSET_MISMATCH)
     declared = request.headers.get("content-length")
-    if declared is not None and offset + _number(declared) > upload.length:
-        raise _refuse(status.HTTP_400_BAD_REQUEST, ResumableMessages.PAST_LENGTH)
-    token = await _lease(session, upload_id)
-    if token is None:
-        raise _refuse(status.HTTP_423_LOCKED, ResumableMessages.LOCKED)
-
     guild_id = guild_context.guild_id
-    storage = get_guild_storage(guild_id)
-    key, length = upload.staging_key, upload.length
-    tail, state = await asyncio.to_thread(storage.take_tail, key, upload.blob_state)
-    buffer = bytearray(tail)
-    part = state["part_bytes"]
     established = time.monotonic()
 
-    async def record(values: dict[str, Any]) -> None:
+    async def keep_standing() -> None:
         nonlocal established
         if time.monotonic() - established > _STANDING_SECONDS:
             try:
@@ -328,72 +421,98 @@ async def patch(
             except GuildAccessError as exc:
                 raise_for_guild_access(exc)
             established = time.monotonic()
-        saved = await session.exec(
-            update(PendingUpload)
-            .where(
-                col(PendingUpload.id) == upload_id,
-                col(PendingUpload.lease_token) == token,
-            )
-            .values(**values)
-            .returning(PendingUpload.id)
-        )
-        lost = saved.first() is None
-        await session.commit()
-        if lost:
-            raise _refuse(status.HTTP_423_LOCKED, ResumableMessages.LOCKED)
 
+    lease = _Lease(session, upload_id, keep_standing)
+    pending: asyncio.Future | None = None
     try:
-        async for chunk in request.stream():
-            room = length - state["stored"] - len(buffer)
-            buffer += chunk[:room]
+        upload = await lease.take()
+        if offset != upload.offset or upload.completed_at is not None:
+            raise _refuse(status.HTTP_409_CONFLICT, ResumableMessages.OFFSET_MISMATCH)
+        if declared is not None and offset + _number(declared) > upload.length:
+            raise _refuse(status.HTTP_400_BAD_REQUEST, ResumableMessages.PAST_LENGTH)
+        storage = get_guild_storage(guild_id)
+        if _finishing(upload):
+            await _finish(lease, storage, upload)
+            return Response(
+                status_code=status.HTTP_204_NO_CONTENT,
+                headers=_headers(await _live(session, upload_id)),
+            )
+
+        key, length = upload.staging_key, upload.length
+        tail, state = await asyncio.to_thread(storage.take_tail, key, upload.blob_state)
+        buffer = bytearray(tail)
+        part = state["part_bytes"]
+        stream = request.stream().__aiter__()
+        while True:
+            if pending is None:
+                pending = asyncio.ensure_future(anext(stream))
+            if not (await asyncio.wait({pending}, timeout=_RENEW_SECONDS))[0]:
+                # Still waiting for the client: keep the upload held.
+                await lease.record({})
+                continue
+            arrived, pending = pending, None
+            try:
+                chunk = arrived.result()
+            except (StopAsyncIteration, ClientDisconnect):
+                break
+            if len(chunk) > length - state["stored"] - len(buffer):
+                raise _refuse(
+                    status.HTTP_400_BAD_REQUEST, ResumableMessages.PAST_LENGTH
+                )
+            buffer += chunk
             while len(buffer) >= part and state["stored"] + part < length:
+                # Held before it is written, so no request writes after
+                # another has taken the upload over.
+                await lease.record({})
                 state = await asyncio.to_thread(
                     storage.add_part, key, state, bytes(buffer[:part])
                 )
                 del buffer[:part]
-                await record(
-                    {
-                        "offset": state["stored"],
-                        "blob_state": state,
-                        "lease_until": func.now() + LEASE,
-                    }
-                )
-            if len(chunk) > room:
-                break
-    except ClientDisconnect:
-        pass
+                await lease.record({"offset": state["stored"], "blob_state": state})
 
-    done = state["stored"] + len(buffer) == length
-    if done:
-        if buffer:
-            state = await asyncio.to_thread(storage.add_part, key, state, bytes(buffer))
-        await asyncio.to_thread(storage.finish_parts, key, state)
-    else:
-        state = await asyncio.to_thread(storage.keep_tail, key, state, bytes(buffer))
-    reached = state["stored"] + state["tail"]
-    await record(
-        {
-            "offset": reached,
-            "blob_state": state,
-            "lease_token": None,
-            "lease_until": None,
-            **({"completed_at": func.now()} if done else {}),
-        }
+        await lease.record({})
+        if state["stored"] + len(buffer) == length:
+            if buffer:
+                state = await asyncio.to_thread(
+                    storage.add_part, key, state, bytes(buffer)
+                )
+            upload.blob_state = state
+            await _finish(lease, storage, upload)
+        else:
+            state = await asyncio.to_thread(
+                storage.keep_tail, key, state, bytes(buffer)
+            )
+            await lease.record(
+                {"offset": state["stored"] + state["tail"], "blob_state": state},
+                done=True,
+            )
+    finally:
+        if pending is not None:
+            pending.cancel()
+        await lease.let_go()
+    return Response(
+        status_code=status.HTTP_204_NO_CONTENT,
+        headers=_headers(await _live(session, upload_id)),
     )
-    upload.offset = reached
-    return Response(status_code=status.HTTP_204_NO_CONTENT, headers=_headers(upload))
 
 
 async def terminate(session: AsyncSession, guild_id: int, upload_id: str) -> Response:
     """Throw an upload away, staged bytes and all."""
-    upload = await _live(session, upload_id)
-    if await _lease(session, upload_id) is None:
-        raise _refuse(status.HTTP_423_LOCKED, ResumableMessages.LOCKED)
-    await asyncio.to_thread(
-        get_guild_storage(guild_id).drop_parts, upload.staging_key, upload.blob_state
-    )
-    await session.exec(delete(PendingUpload).where(col(PendingUpload.id) == upload_id))
-    await session.commit()
+    lease = _Lease(session, upload_id, _nothing)
+    try:
+        upload = await lease.take()
+        await asyncio.to_thread(
+            get_guild_storage(guild_id).drop_parts,
+            upload.staging_key,
+            upload.blob_state,
+        )
+        await session.exec(
+            delete(PendingUpload).where(col(PendingUpload.id) == upload_id)
+        )
+        await session.commit()
+        lease.token = None
+    finally:
+        await lease.let_go()
     return Response(
         status_code=status.HTTP_204_NO_CONTENT, headers={"Tus-Resumable": TUS_VERSION}
     )

@@ -39,7 +39,7 @@ async def create_upload(
 async def upload_offset(
     upload_id: str, session: RLSSessionDep, guild_context: GuildContextDep
 ) -> Response:
-    return await resumable.head(session, upload_id)
+    return await resumable.head(session, guild_context.guild_id, upload_id)
 
 
 @router.patch("/{upload_id}")

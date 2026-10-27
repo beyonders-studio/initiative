@@ -157,3 +157,71 @@ async def test_an_expired_upload_is_thrown_away(
 
     assert (await session.exec(select(PendingUpload))).first() is None
     assert get_guild_storage(owner.guild.id).open_readable(key) is None
+
+
+async def test_bytes_past_the_length_are_refused_though_no_length_was_declared(
+    client: AsyncClient, acting_user
+):
+    owner = await acting_user(guild_role=CommunityRole.admin, initiative=True)
+    created = await _create(client, owner, 4)
+
+    async def body():
+        yield b"abcdefgh"
+
+    refused = await _append(
+        client, owner, _path(created.headers["location"]), 0, body()
+    )
+
+    assert refused.status_code == 400
+    assert refused.json()["detail"] == "RESUMABLE_PAST_LENGTH"
+
+
+async def test_a_size_past_what_can_be_kept_is_refused(
+    client: AsyncClient, acting_user
+):
+    owner = await acting_user(guild_role=CommunityRole.admin, initiative=True)
+
+    refused = await _create(client, owner, 2**63)
+
+    assert refused.status_code == 400
+    assert refused.json()["detail"] == "RESUMABLE_INVALID_REQUEST"
+
+
+async def test_an_upload_held_by_one_request_refuses_another(
+    client: AsyncClient, acting_user, session
+):
+    owner = await acting_user(guild_role=CommunityRole.admin, initiative=True)
+    created = await _create(client, owner, 8)
+    await route_session_to_guild(session, owner.guild.id)
+    upload = (await session.exec(select(PendingUpload))).one()
+    upload.lease_token = "another"
+    upload.lease_until = datetime.now(timezone.utc) + timedelta(minutes=1)
+    session.add(upload)
+    await session.commit()
+
+    refused = await _append(client, owner, _path(created.headers["location"]), 0, b"ab")
+
+    assert refused.status_code == 423
+
+
+async def test_an_upload_left_finishing_is_finished_when_asked_where_it_stands(
+    client: AsyncClient, acting_user, session
+):
+    """A request whose record of completion did not land leaves it finishing."""
+    owner = await acting_user(guild_role=CommunityRole.admin, initiative=True)
+    created = await _create(client, owner, 4)
+    location = _path(created.headers["location"])
+    await _append(client, owner, location, 0, b"abcd")
+    await route_session_to_guild(session, owner.guild.id)
+    upload = (await session.exec(select(PendingUpload))).one()
+    upload.completed_at = None
+    upload.blob_state = {**upload.blob_state, "finishing": True}
+    session.add(upload)
+    await session.commit()
+
+    where = await client.head(location, headers={**owner.headers, **TUS})
+
+    assert where.headers["upload-offset"] == "4"
+    session.expunge_all()
+    await route_session_to_guild(session, owner.guild.id)
+    assert (await session.exec(select(PendingUpload))).one().completed_at is not None

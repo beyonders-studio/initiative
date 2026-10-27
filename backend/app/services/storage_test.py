@@ -176,6 +176,11 @@ class FakeS3Client:
         return {"ETag": f"etag-{PartNumber}"}
 
     def complete_multipart_upload(self, *, Bucket, Key, UploadId, MultipartUpload):
+        if not self.multipart_open:
+            raise ClientError(
+                {"Error": {"Code": "NoSuchUpload", "Message": "gone"}},
+                "CompleteMultipartUpload",
+            )
         numbers = [part["PartNumber"] for part in MultipartUpload["Parts"]]
         self.objects[(Bucket, Key)] = {
             "Body": b"".join(self.parts[n] for n in numbers),
@@ -278,6 +283,30 @@ def test_s3_stages_a_file_in_parts_with_a_tail_between_requests():
     assert b"".join(blob.stream) == b"first---second"
     assert ("bucket", "guild_7/resumable-a-tail") not in client.objects
     assert state["stored"] == 14
+
+
+def test_s3_reads_back_only_the_tail_that_was_recorded():
+    """A tail written by a request whose record did not land starts with the
+    one recorded before it."""
+    _, storage = _s3()
+    state = storage.start_parts("resumable-c", part_bytes=8)
+    recorded = storage.keep_tail("resumable-c", state, b"abc")
+    storage.keep_tail("resumable-c", recorded, b"abcdef")
+
+    tail, _ = storage.take_tail("resumable-c", recorded)
+
+    assert tail == b"abc"
+
+
+def test_s3_finishing_twice_finds_the_object_there():
+    _, storage = _s3()
+    state = storage.start_parts("resumable-d", part_bytes=8)
+    state = storage.add_part("resumable-d", state, b"whole")
+    storage.finish_parts("resumable-d", state)
+
+    storage.finish_parts("resumable-d", state)
+
+    assert b"".join(storage.open_readable("resumable-d").stream) == b"whole"
 
 
 def test_s3_drops_a_staged_file_whole():

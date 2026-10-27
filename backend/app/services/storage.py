@@ -45,8 +45,6 @@ if TYPE_CHECKING:  # botocore imported lazily at call time; type-only here
 
 logger = logging.getLogger(__name__)
 
-#: The least a part of an S3 multipart upload may hold, but the last.
-_S3_MIN_PART_BYTES = 5 * 1024 * 1024
 
 # Streaming proxy chunk size for S3 GetObject bodies.
 _STREAM_CHUNK = 64 * 1024
@@ -520,12 +518,13 @@ class S3Storage:
         }
 
     def keep_tail(self, key: str, state: dict, data: bytes) -> dict:
+        # Every part but the last is a whole ``part_bytes``, so the parts stay
+        # within S3's limit; what a request leaves short of one waits as an
+        # object of its own. It starts with the tail it replaces, so reading
+        # only what the caller recorded gets that tail back should the record
+        # of this one not land.
         if not data:
             return state
-        # A part but the last must be at least S3's minimum; below it, the
-        # bytes wait as an object of their own.
-        if len(data) >= _S3_MIN_PART_BYTES:
-            return self.add_part(key, state, data)
         self._client.put_object(Bucket=self._bucket, Key=self._tail_key(key), Body=data)
         return {**state, "tail": len(data)}
 
@@ -533,28 +532,42 @@ class S3Storage:
         if not state["tail"]:
             return b"", state
         tail = self._client.get_object(Bucket=self._bucket, Key=self._tail_key(key))
-        return tail["Body"].read(), {**state, "tail": 0}
+        return tail["Body"].read()[: state["tail"]], {**state, "tail": 0}
 
     def finish_parts(self, key: str, state: dict) -> None:
+        from botocore.exceptions import ClientError
+
         if state["parts"]:
-            self._client.complete_multipart_upload(
-                Bucket=self._bucket,
-                Key=self._object_key(key),
-                UploadId=state["upload_id"],
-                MultipartUpload={
-                    "Parts": [
-                        {"PartNumber": part["n"], "ETag": part["etag"]}
-                        for part in state["parts"]
-                    ]
-                },
-            )
+            try:
+                self._client.complete_multipart_upload(
+                    Bucket=self._bucket,
+                    Key=self._object_key(key),
+                    UploadId=state["upload_id"],
+                    MultipartUpload={
+                        "Parts": [
+                            {"PartNumber": part["n"], "ETag": part["etag"]}
+                            for part in state["parts"]
+                        ]
+                    },
+                )
+            except ClientError as exc:
+                # Finished once already, by a request whose record did not
+                # land: the object is there.
+                code = exc.response.get("Error", {}).get("Code")
+                if code != "NoSuchUpload" or not self._head(self._object_key(key)):
+                    raise
         else:
             # An empty file has no part to complete.
             self._abort(key, state)
             self._client.put_object(
                 Bucket=self._bucket, Key=self._object_key(key), Body=b""
             )
-        self._client.delete_object(Bucket=self._bucket, Key=self._tail_key(key))
+        try:
+            self._client.delete_object(Bucket=self._bucket, Key=self._tail_key(key))
+        except ClientError:
+            # A tail left over costs storage and nothing else; dropping the
+            # parts takes it.
+            logger.warning("tail_delete_failed key=%s", key, exc_info=True)
 
     def _abort(self, key: str, state: dict) -> None:
         from botocore.exceptions import ClientError

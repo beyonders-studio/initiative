@@ -438,7 +438,7 @@ def sweeps() -> tuple[Sweep, ...]:
         # Resumable uploads nobody finished or took.
         Sweep(
             kind="resumable_uploads",
-            scope=Scope.ACTIVE,
+            scope=Scope.PROVISIONED,
             every=hour,
             visit=resumable.expire,
             next_due=resumable.next_due,
