@@ -204,6 +204,7 @@ describe("a collection's page", () => {
   });
 
   it("opens a file that is not a picture beside its table, with its values there", async () => {
+    let propertiesServed = false;
     const caption = buildPropertyDefinition({ id: 21, name: "Caption", collection_id: 5 });
     server.use(
       communityHttp.get("/collections/:id", () =>
@@ -242,7 +243,10 @@ describe("a collection's page", () => {
           })
         )
       ),
-      communityHttp.get("/property-definitions/", () => HttpResponse.json([])),
+      communityHttp.get("/property-definitions/", () => {
+        propertiesServed = true;
+        return HttpResponse.json([]);
+      }),
       communityHttp.get("/relationships/", () => HttpResponse.json([]))
     );
     const user = userEvent.setup();
@@ -251,14 +255,13 @@ describe("a collection's page", () => {
       routeParams: { communityId: "1", initiativeId: "1", collectionId: "5" },
     });
 
-    // The table is drawn again as the initiative's properties arrive, so the
-    // name is clicked once it stays.
-    await waitFor(async () => {
-      await user.click(screen.getByRole("link", { name: "Price list" }));
-      expect(screen.getByRole("dialog", { name: "Price list" })).toBeInTheDocument();
-    });
+    // The table is drawn again as the initiative's properties arrive; the name
+    // is clicked once they have.
+    await waitFor(() => expect(propertiesServed).toBe(true));
+    await screen.findByRole("columnheader", { name: "Caption" });
+    await user.click(screen.getByRole("link", { name: "Price list" }));
 
-    const beside = screen.getByRole("dialog", { name: "Price list" });
+    const beside = await screen.findByRole("dialog", { name: "Price list" });
     expect(within(beside).getByDisplayValue("Spring")).toBeInTheDocument();
     expect(within(beside).getByRole("link", { name: "Open file" })).toBeInTheDocument();
   });
