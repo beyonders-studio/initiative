@@ -3,37 +3,47 @@
 Every picture is a file in its initiative: a real PNG written to the
 community's storage with an ``uploads`` row behind it, and versions that wait
 on a thumbnail as an uploaded picture's do, so the ``thumbnails`` sweep draws
-them. A collection holds its pictures, each added when it was taken, and lists
-them the way a collection made from a gallery does.
+them. A collection holds its pictures, each added when it was taken, and
+starts as one of the ready-made shapes, its fields filled in for each file. A
+collection can also hold pictures another one holds, so the same picture is
+shown one way in one collection and another way in the next.
 """
 
 from __future__ import annotations
 
-from datetime import timedelta
+from datetime import datetime, timedelta
 
+from app.core.collection_shapes import SHAPES_BY_KEY
 from app.core.file_types import type_of_media
-from app.core.tools import LAYOUT_DEFAULT, Tool
+from app.core.image_headers import read_image_header
+from app.core.tools import Tool
 from app.models.platform.user import User
 from app.models.tenant.collection import Collection, CollectionFile
 from app.models.tenant.file import File
 from app.models.tenant.resource_grant import ResourceAccessLevel
-from app.models.tenant.tool_layout import ToolLayout
+from app.schemas.tenant.property import PropertyValueInput
 from app.services.tenant import attachments as attachments_service
+from app.services.tenant import collections as collections_service
 from app.services.tenant import file_versions
+from app.services.tenant import properties as properties_service
 
-from seed.common import Community, days_ago, gradient_png, share, tag
+from seed.common import Community, days_ago, photo, share, tag
 
 #: Each collection, its pictures shared with the initiative for reading.
-#: ``cover`` names the picture to use as its cover. A picture is dated
-#: ``days_ago``, ``size`` is ``(width, height)``, and it is drawn as a gradient
-#: between its two ``colours``; ``versions`` is how many renditions to record,
-#: each earlier one a little darker. One with no ``title`` is named by its
-#: ``filename``.
+#: ``shape`` is the ready-made shape it starts as, and ``cover`` names the
+#: picture to use as its cover. A picture is dated ``days_ago`` and cut from
+#: the front page's ``photo`` to the proportions of ``size``, ``(width,
+#: height)``; ``versions`` is how many renditions to record, each earlier one
+#: a little darker. One with no ``title`` is named by its ``filename``.
+#: ``fields`` are a file's values for the collection's fields, by the shape's
+#: key. ``files`` are pictures an earlier collection in the initiative holds,
+#: added ``days_after`` they were taken.
 COLLECTIONS: dict[str, list[dict]] = {
     "primary": [
         {
             "name": "Barovia maps and handouts",
             "initiative": "strahd",
+            "shape": "gallery",
             "description": "Every map, letter and prop the table has seen. Tagged by "
             "what it was for.",
             "created_by": "Dungeon Master",
@@ -45,16 +55,17 @@ COLLECTIONS: dict[str, list[dict]] = {
                     "created_by": "Dungeon Master",
                     "days_ago": 160,
                     "size": (1600, 1100),
-                    "colours": ((72, 52, 104), (26, 18, 40)),
+                    "photo": "fantasy-map",
                     "tags": ["exploration"],
                     "versions": 3,
+                    "fields": {"caption": "The one they keep asking for."},
                 },
                 {
                     "title": "Castle Ravenloft, crypts",
                     "created_by": "Dungeon Master",
                     "days_ago": 158,
                     "size": (1400, 1400),
-                    "colours": ((40, 40, 60), (12, 12, 20)),
+                    "photo": "fantasy-map",
                     "tags": ["exploration", "boss fight"],
                     "versions": 2,
                 },
@@ -63,15 +74,18 @@ COLLECTIONS: dict[str, list[dict]] = {
                     "created_by": "Dungeon Master",
                     "days_ago": 150,
                     "size": (900, 1300),
-                    "colours": ((214, 190, 140), (150, 120, 70)),
+                    "photo": "book-pages",
                     "tags": ["roleplay", "lore"],
+                    "fields": {
+                        "caption": "Read aloud in session 1. Nobody trusted it."
+                    },
                 },
                 {
                     "title": "Village of Barovia",
                     "created_by": "Thorn Ironforge",
                     "days_ago": 120,
                     "size": (1800, 1000),
-                    "colours": ((60, 90, 70), (20, 40, 30)),
+                    "photo": "street",
                     "tags": ["exploration"],
                 },
                 {
@@ -79,7 +93,7 @@ COLLECTIONS: dict[str, list[dict]] = {
                     "created_by": "Dungeon Master",
                     "days_ago": 118,
                     "size": (1200, 1600),
-                    "colours": ((100, 60, 60), (40, 20, 20)),
+                    "photo": "family",
                     "tags": ["exploration", "combat"],
                 },
                 {
@@ -87,7 +101,7 @@ COLLECTIONS: dict[str, list[dict]] = {
                     "created_by": "Dungeon Master",
                     "days_ago": 118,
                     "size": (1200, 1600),
-                    "colours": ((110, 70, 60), (44, 22, 20)),
+                    "photo": "family",
                     "tags": ["exploration", "combat"],
                 },
                 {
@@ -95,24 +109,26 @@ COLLECTIONS: dict[str, list[dict]] = {
                     "created_by": "Dungeon Master",
                     "days_ago": 118,
                     "size": (1200, 1400),
-                    "colours": ((60, 40, 50), (18, 10, 14)),
+                    "photo": "theater",
                     "tags": ["exploration", "combat", "boss fight"],
                     "versions": 2,
+                    "fields": {"caption": "Not before they find the stairs."},
                 },
                 {
                     "title": "Tarokka reading",
                     "created_by": "Elara Moonwhisper",
                     "days_ago": 90,
                     "size": (1500, 1000),
-                    "colours": ((160, 90, 40), (60, 30, 10)),
+                    "photo": "book-pages",
                     "tags": ["lore"],
+                    "fields": {"caption": "Madam Eva's spread, as drawn at the table."},
                 },
                 {
                     "title": "Vallaki",
                     "created_by": "Dungeon Master",
                     "days_ago": 61,
                     "size": (2000, 1200),
-                    "colours": ((80, 110, 130), (30, 45, 60)),
+                    "photo": "street",
                     "tags": ["exploration"],
                 },
                 {
@@ -120,7 +136,7 @@ COLLECTIONS: dict[str, list[dict]] = {
                     "created_by": "Dungeon Master",
                     "days_ago": 61,
                     "size": (1000, 1000),
-                    "colours": ((60, 100, 140), (20, 40, 70)),
+                    "photo": "breakfast-club",
                     "tags": ["roleplay"],
                 },
                 {
@@ -128,7 +144,7 @@ COLLECTIONS: dict[str, list[dict]] = {
                     "created_by": "Thorn Ironforge",
                     "days_ago": 30,
                     "size": (1600, 900),
-                    "colours": ((120, 40, 80), (50, 10, 30)),
+                    "photo": "bakery",
                     "tags": ["quest", "combat"],
                 },
                 {
@@ -136,7 +152,7 @@ COLLECTIONS: dict[str, list[dict]] = {
                     "created_by": "Dungeon Master",
                     "days_ago": 4,
                     "size": (1400, 1800),
-                    "colours": ((200, 150, 40), (90, 60, 10)),
+                    "photo": "campus",
                     "tags": ["quest", "puzzle"],
                 },
                 {
@@ -144,23 +160,56 @@ COLLECTIONS: dict[str, list[dict]] = {
                     "created_by": "Dungeon Master",
                     "days_ago": 4,
                     "size": (1400, 1800),
-                    "colours": ((180, 130, 30), (70, 45, 5)),
+                    "photo": "campus",
                     "tags": ["quest", "puzzle", "items/loot"],
+                    "fields": {"caption": "Unfinished. The north wing is a guess."},
                 },
                 {
                     "title": None,
-                    "filename": "IMG_4471.png",
+                    "filename": "IMG_4471.webp",
                     "created_by": "Vex Shadowstep",
                     "days_ago": 1,
                     "size": (1600, 1200),
-                    "colours": ((90, 90, 90), (30, 30, 30)),
+                    "photo": "meetup",
+                },
+            ],
+        },
+        {
+            "name": "Prints for the table",
+            "initiative": "strahd",
+            "shape": "catalog",
+            "description": "The maps people asked to take home. A3, from the print "
+            "shop on the corner.",
+            "created_by": "Elara Moonwhisper",
+            "files": [
+                {
+                    "title": "Castle Ravenloft, ground floor",
+                    "days_after": 30,
+                    "fields": {"price": 6.5, "rating": 100},
+                },
+                {
+                    "title": "Village of Barovia",
+                    "days_after": 30,
+                    "fields": {"price": 6.5, "rating": 80},
+                },
+                {
+                    "title": "Tarokka reading",
+                    "days_after": 12,
+                    "fields": {"price": 4, "rating": 60},
+                },
+                {
+                    "title": "Vallaki",
+                    "days_after": 2,
+                    "fields": {"price": 8, "rating": 40},
                 },
             ],
         },
         {
             "name": "Phandelver props",
             "initiative": "lmop",
-            "description": "Handouts for the table. Print at A4.",
+            "shape": "log",
+            "description": "Handouts for the table, by the session they came out in. "
+            "Print at A4.",
             "created_by": "Dungeon Master",
             "pictures": [
                 {
@@ -168,32 +217,36 @@ COLLECTIONS: dict[str, list[dict]] = {
                     "created_by": "Dungeon Master",
                     "days_ago": 75,
                     "size": (1600, 1100),
-                    "colours": ((70, 80, 60), (25, 30, 20)),
+                    "photo": "fantasy-map",
                     "tags": ["exploration"],
+                    "fields": {"date": days_ago(73).date()},
                 },
                 {
                     "title": "Gundren's map",
                     "created_by": "Dungeon Master",
                     "days_ago": 74,
                     "size": (1200, 900),
-                    "colours": ((200, 170, 120), (140, 110, 60)),
+                    "photo": "book-pages",
                     "tags": ["quest", "lore"],
+                    "fields": {"date": days_ago(73).date()},
                 },
                 {
                     "title": "Wave Echo Cave",
                     "created_by": "Dungeon Master",
                     "days_ago": 20,
                     "size": (2000, 1400),
-                    "colours": ((50, 70, 90), (15, 25, 35)),
+                    "photo": "fantasy-map",
                     "tags": ["exploration", "boss fight"],
                     "versions": 2,
+                    "fields": {"date": days_ago(17).date()},
                 },
                 {
                     "title": "Phandalin",
                     "created_by": "Thorn Ironforge",
                     "days_ago": 20,
                     "size": (1500, 1500),
-                    "colours": ((100, 120, 80), (40, 50, 30)),
+                    "photo": "street",
+                    "fields": {"date": days_ago(17).date()},
                 },
             ],
         },
@@ -202,6 +255,7 @@ COLLECTIONS: dict[str, list[dict]] = {
         {
             "name": "Fleet concept art",
             "initiative": "starfall",
+            "shape": "gallery",
             "description": "Hull studies, bridge layouts and the one ship nobody liked.",
             "created_by": "Finley Goldtongue",
             "tags": ["engineering"],
@@ -211,16 +265,17 @@ COLLECTIONS: dict[str, list[dict]] = {
                     "created_by": "Finley Goldtongue",
                     "days_ago": 140,
                     "size": (2200, 900),
-                    "colours": ((30, 60, 110), (8, 16, 34)),
+                    "photo": "robot",
                     "tags": ["engineering"],
                     "versions": 4,
+                    "fields": {"caption": "Version four. The fins stay."},
                 },
                 {
                     "title": "Exodus, bridge",
                     "created_by": "Aurelia Brightshield",
                     "days_ago": 96,
                     "size": (1600, 1000),
-                    "colours": ((40, 90, 130), (10, 24, 44)),
+                    "photo": "robot",
                     "tags": ["engineering"],
                     "versions": 2,
                 },
@@ -229,22 +284,24 @@ COLLECTIONS: dict[str, list[dict]] = {
                     "created_by": "Finley Goldtongue",
                     "days_ago": 95,
                     "size": (1400, 1400),
-                    "colours": ((70, 80, 95), (20, 24, 30)),
+                    "photo": "instruments",
+                    "fields": {"caption": "The one nobody liked."},
                 },
                 {
                     "title": "Frontier station",
                     "created_by": "Kael Windrunner",
                     "days_ago": 52,
                     "size": (2400, 800),
-                    "colours": ((90, 60, 130), (24, 14, 40)),
+                    "photo": "classroom",
                     "tags": ["exploration"],
+                    "fields": {"caption": "Seen from the approach lane."},
                 },
                 {
                     "title": "Reactor deck",
                     "created_by": "Aurelia Brightshield",
                     "days_ago": 51,
                     "size": (1200, 1600),
-                    "colours": ((150, 90, 30), (50, 26, 6)),
+                    "photo": "robot",
                     "tags": ["engineering", "survival"],
                 },
                 {
@@ -252,16 +309,16 @@ COLLECTIONS: dict[str, list[dict]] = {
                     "created_by": "Vex Shadowstep",
                     "days_ago": 12,
                     "size": (1800, 1100),
-                    "colours": ((60, 70, 60), (18, 22, 18)),
+                    "photo": "food-bank",
                     "tags": ["loot"],
                 },
                 {
                     "title": None,
-                    "filename": "bridge-wip-final-2.png",
+                    "filename": "bridge-wip-final-2.webp",
                     "created_by": "Finley Goldtongue",
                     "days_ago": 3,
                     "size": (1000, 1200),
-                    "colours": ((120, 40, 40), (40, 12, 12)),
+                    "photo": "classroom",
                 },
             ],
         },
@@ -270,6 +327,7 @@ COLLECTIONS: dict[str, list[dict]] = {
         {
             "name": "Charts of the Shattered Seas",
             "initiative": "crimson",
+            "shape": "gallery",
             "description": "Every chart the crew has bought, stolen or drawn themselves.",
             "created_by": "Finley Goldtongue",
             "tags": ["exploration"],
@@ -280,16 +338,19 @@ COLLECTIONS: dict[str, list[dict]] = {
                     "created_by": "Finley Goldtongue",
                     "days_ago": 200,
                     "size": (2400, 1600),
-                    "colours": ((30, 90, 120), (8, 30, 48)),
+                    "photo": "fantasy-map",
                     "tags": ["exploration"],
                     "versions": 2,
+                    "fields": {
+                        "caption": "Bought in Port Blackwater, corrected twice."
+                    },
                 },
                 {
                     "title": "Port Blackwater",
                     "created_by": "Dungeon Master",
                     "days_ago": 150,
                     "size": (1400, 1000),
-                    "colours": ((100, 80, 50), (36, 28, 16)),
+                    "photo": "street",
                     "tags": ["NPC"],
                 },
                 {
@@ -297,15 +358,16 @@ COLLECTIONS: dict[str, list[dict]] = {
                     "created_by": "Dungeon Master",
                     "days_ago": 44,
                     "size": (1600, 1600),
-                    "colours": ((20, 60, 70), (6, 18, 22)),
+                    "photo": "book-pages",
                     "tags": ["boss fight"],
+                    "fields": {"caption": "Drawn from the survivor's account."},
                 },
                 {
                     "title": "Imperial patrol routes",
                     "created_by": "Thorn Ironforge",
                     "days_ago": 9,
                     "size": (2000, 1200),
-                    "colours": ((40, 50, 110), (12, 16, 40)),
+                    "photo": "fantasy-map",
                     "tags": ["naval combat", "stealth"],
                 },
             ],
@@ -313,60 +375,72 @@ COLLECTIONS: dict[str, list[dict]] = {
     ],
 }
 
-#: How a collection lists its files: masonry and timeline shown, the table
-#: hidden, opening on masonry, as 20261027_0545 lays out a converted gallery.
-_LAYOUTS = (
-    ("masonry", {"hidden": False}),
-    ("timeline", {"hidden": False}),
-    ("table", {"hidden": True}),
-    (LAYOUT_DEFAULT, {"kind": "masonry"}),
-)
-
-_MEDIA_TYPE = "image/png"
+_MEDIA_TYPE = "image/webp"
 
 
 async def seed(c: Community) -> None:
+    # Every picture made so far, by initiative and title, for a later
+    # collection to hold too.
+    made: dict[tuple[str, str], File] = {}
     for d in COLLECTIONS[c.key]:
         creator = c.users[d["created_by"]]
         initiative_id = c.initiatives[d["initiative"]].id
-        pictures: dict[str, File] = {}
-        for p in d["pictures"]:
+        # Each file, when and by whom it was added, and its values here.
+        held: list[tuple[File, datetime, int, dict]] = []
+        for p in d.get("pictures", ()):
             file = await _picture(c, initiative_id, creator, p)
-            pictures[file.name] = file
-        files = list(pictures.values())
+            made[(d["initiative"], file.name)] = file
+            held.append((file, file.created_at, file.created_by, p.get("fields", {})))
+        for f in d.get("files", ()):
+            file = made[(d["initiative"], f["title"])]
+            added = file.created_at + timedelta(days=f["days_after"])
+            held.append((file, added, creator.id, f["fields"]))
         collection = Collection(
             initiative_id=initiative_id,
             name=d["name"],
             description=d.get("description"),
-            cover_file_id=pictures[d["cover"]].id if "cover" in d else None,
+            cover_file_id=made[(d["initiative"], d["cover"])].id
+            if "cover" in d
+            else None,
             created_by=creator.id,
-            created_at=min(f.created_at for f in files),
-            updated_at=max(f.updated_at for f in files),
+            created_at=min(added for _, added, _, _ in held),
+            updated_at=max(max(f.updated_at, added) for f, added, _, _ in held),
         )
         c.session.add(collection)
         await c.session.flush()
         c.ids["collections"].append(collection.id)
-        for f in files:
+        for f, added, added_by, _ in held:
             c.session.add(
                 CollectionFile(
                     collection_id=collection.id,
                     file_id=f.id,
                     initiative_id=initiative_id,
-                    added_by=f.created_by,
-                    added_at=f.created_at,
+                    added_by=added_by,
+                    added_at=added,
                 )
             )
             c.ids["collection_files"].append([collection.id, f.id])
-        for kind, definition in _LAYOUTS:
-            c.session.add(
-                ToolLayout(
-                    initiative_id=initiative_id,
-                    tool="collection",
-                    tool_id=collection.id,
-                    kind=kind,
-                    definition=definition,
-                )
+        await c.session.flush()
+        fields = await collections_service.apply_shape(
+            c.session, collection, SHAPES_BY_KEY[d["shape"]], locale="en"
+        )
+        c.ids["property_definitions"].extend(f.id for f in fields.values())
+        # Through the service the field editor uses, so a seeded value is
+        # held to the same rules a typed one is.
+        for f, _, _, values in held:
+            if not values:
+                continue
+            await properties_service.write_values(
+                c.session,
+                f,
+                [
+                    PropertyValueInput(property_id=fields[key].id, value=value)
+                    for key, value in values.items()
+                ],
+                initiative_id=initiative_id,
+                collection_id=collection.id,
             )
+            c.ids["property_values"].extend(values)
         tag(c, collection, d.get("tags", ()))
     await c.session.flush()
 
@@ -375,10 +449,8 @@ async def _picture(c: Community, initiative_id: int, owner: User, p: dict) -> Fi
     """One picture as an uploaded file, shared as its collection is."""
     uploader = c.users[p["created_by"]].id
     created_at = days_ago(p["days_ago"])
-    top, bottom = p["colours"]
-    width, height = p["size"]
     versions = p.get("versions", 1)
-    filename = p.get("filename") or f"{p['title'].lower().replace(' ', '-')}.png"
+    filename = p.get("filename") or f"{p['title'].lower().replace(' ', '-')}.webp"
     file = File(
         initiative_id=initiative_id,
         name=p.get("title") or filename,
@@ -397,17 +469,14 @@ async def _picture(c: Community, initiative_id: int, owner: User, p: dict) -> Fi
         # Earlier renditions lean darker, so the history reads as a picture
         # that was worked on rather than uploaded twice.
         shade = versions - number
-        png = gradient_png(
-            width,
-            height,
-            tuple(max(0, v - 25 * shade) for v in top),
-            tuple(max(0, v - 25 * shade) for v in bottom),
-        )
+        data = photo(p["photo"], *p["size"], shade=shade)
+        header = read_image_header(data)
+        assert header is not None
         file_url = await attachments_service.store_upload(
             c.session,
             guild_id=c.guild.id,
-            filename=attachments_service.new_upload_filename(".png"),
-            data=png,
+            filename=attachments_service.new_upload_filename(".webp"),
+            data=data,
             content_type=_MEDIA_TYPE,
             created_by=uploader,
             initiative_id=initiative_id,
@@ -418,10 +487,10 @@ async def _picture(c: Community, initiative_id: int, owner: User, p: dict) -> Fi
             file,
             file_url=file_url,
             file_content_type=_MEDIA_TYPE,
-            file_size=len(png),
+            file_size=len(data),
             original_filename=filename,
-            width=width,
-            height=height,
+            width=header.width,
+            height=header.height,
             created_by=uploader,
             created_at=version_at,
         )

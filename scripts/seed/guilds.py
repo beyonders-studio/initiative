@@ -17,7 +17,7 @@ from app.models.platform.guild import (
     GuildMembership,
     CommunityRole,
 )
-from app.models.platform.guild_image import IMAGE_SPECS, GuildImageVariant
+from app.models.platform.guild_image import IMAGE_SPECS
 from app.models.platform.user import User
 from app.services.platform import guild_images
 from app.services.platform import guilds as guilds_service
@@ -26,7 +26,7 @@ from app.services.platform.app_settings import (
     get_or_create_guild_settings,
 )
 
-from seed.common import Community, gradient_png
+from seed.common import Community, photo
 
 #: The three communities with real content, in the order they are seeded.
 #: ``primary`` is the community init_db already made; the others are created
@@ -34,8 +34,7 @@ from seed.common import Community, gradient_png
 COMMUNITIES: dict[str, dict] = {
     "primary": {
         "title": "Community 1: Primary Community (TTRPG Campaign)",
-        "icon": ((190, 18, 60), (136, 19, 55)),
-        "banner": ((69, 10, 30), (190, 18, 60)),
+        "photo": "fantasy-map",
         # kael joins the community but no initiative in it: his view of it
         # must be empty (initiative RLS hides everything; content 404s).
         "members": [
@@ -57,8 +56,7 @@ COMMUNITIES: dict[str, dict] = {
         "name": "Starforge Collective",
         "description": "A science fiction tabletop campaign set in the far reaches of the galaxy",
         "creator": "Admin User",
-        "icon": ((37, 99, 235), (30, 58, 138)),
-        "banner": ((15, 23, 42), (37, 99, 235)),
+        "photo": "robot",
         "members": [
             "Overseer Nova",
             "Finley Goldtongue",
@@ -78,8 +76,7 @@ COMMUNITIES: dict[str, dict] = {
         # admin3 creates (and therefore holds) this community; the platform
         # owner superuser is deliberately a plain member here.
         "creator": "Harbormaster Marisol",
-        "icon": ((13, 148, 136), (15, 118, 110)),
-        "banner": ((4, 47, 46), (20, 184, 166)),
+        "photo": "instruments",
         "members": [
             "Archivist Okoro",
             "Admin User",
@@ -117,7 +114,7 @@ async def open_community(
         )
     else:
         guild = await guilds_service.get_primary_guild(session)
-    await set_images(session, guild, icon=spec["icon"], banner=spec["banner"])
+    await set_images(session, guild, spec["photo"])
     await session.commit()
     expunge_guild_scoped(session)
     if "name" in spec:
@@ -194,14 +191,9 @@ def expunge_guild_scoped(session: AsyncSession) -> None:
             sync.expunge(obj)
 
 
-async def set_images(
-    session: AsyncSession,
-    guild: Guild,
-    *,
-    icon: tuple[tuple[int, int, int], tuple[int, int, int]],
-    banner: tuple[tuple[int, int, int], tuple[int, int, int]],
-) -> None:
-    """Give a community an icon and a banner, through the upload path itself.
+async def set_images(session: AsyncSession, guild: Guild, name: str) -> None:
+    """Give a community an icon and a banner cut from photo ``name``, through
+    the upload path itself.
 
     Each rendition is held to its ``IMAGE_SPECS`` entry, as an uploaded one
     is; the banner is stored as both of its renditions. Writes
@@ -209,9 +201,8 @@ async def set_images(
     schema.
     """
     pictures = {
-        GuildImageVariant.icon: gradient_png(256, 256, *icon),
-        GuildImageVariant.full: gradient_png(2400, 600, *banner),
-        GuildImageVariant.card: gradient_png(1040, 260, *banner),
+        variant: photo(name, spec.width, spec.height, max_bytes=spec.max_bytes)
+        for variant, spec in IMAGE_SPECS.items()
     }
     renditions = {
         variant: validate_image(IMAGE_SPECS[variant], data)
