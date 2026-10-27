@@ -12,7 +12,8 @@ from app.services.tenant import properties as properties_service
 from seed.common import NOW, Community
 
 #: Each initiative's definitions, in position order. ``options`` — ``(value,
-#: label[, colour])`` — are required for select / multi_select.
+#: label[, colour])`` — are required for select / multi_select, and
+#: ``currency`` for money.
 DEFINITIONS: dict[str, dict[str, list[dict]]] = {
     "primary": {
         "strahd": [
@@ -42,6 +43,15 @@ DEFINITIONS: dict[str, dict[str, list[dict]]] = {
             {"name": "Deadline", "type": PropertyType.date},
             {"name": "Owner", "type": PropertyType.user_reference, "color": "#8B5CF6"},
             {"name": "Public Knowledge", "type": PropertyType.checkbox},
+            {"name": "Session Rating", "type": PropertyType.rating, "color": "#F59E0B"},
+        ],
+        "default": [
+            {
+                "name": "Cost",
+                "type": PropertyType.currency,
+                "currency": "USD",
+                "color": "#10B981",
+            },
         ],
         "lmop": [
             {"name": "Hook", "type": PropertyType.text},
@@ -172,9 +182,13 @@ VALUES: dict[str, dict[str, list[tuple]]] = {
             (
                 "calendar_event",
                 "Session 11: Vallaki Festival",
-                {"Difficulty": "moderate"},
+                {"Difficulty": "moderate", "Session Rating": 90},
             ),
             ("calendar_event", "Weekly Strahd Session", {"Owner": "Dungeon Master"}),
+        ],
+        "default": [
+            ("task", "Order new dice set for the table", {"Cost": 48.5}),
+            ("task", "Prepare battle maps for next session", {"Cost": 12}),
         ],
         "lmop": [
             (
@@ -290,6 +304,7 @@ async def seed(c: Community) -> None:
                 type=d["type"],
                 position=float(position),
                 color=d.get("color"),
+                currency=d.get("currency"),
                 options=[
                     dict(zip(("value", "label", "color"), option))
                     for option in d["options"]
