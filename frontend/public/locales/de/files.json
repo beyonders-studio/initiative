@@ -427,6 +427,18 @@
     "notFoundDescription": "Die gesuchte Sammlung existiert nicht, oder du kannst keine ihrer Dateien öffnen.",
     "noAccess": "Zugriff verweigert",
     "noAccessDescription": "Du hast keine Berechtigung, diese Sammlung anzusehen.",
-    "error": "Die Sammlung konnte nicht geändert werden"
+    "error": "Die Sammlung konnte nicht geändert werden",
+    "fields": {
+      "title": "Felder",
+      "description": "Was jede Datei in dieser Sammlung hier tragen kann: Die Werte gehören zur Sammlung, nicht zur Datei.",
+      "create": "Neues Feld",
+      "edit": "Feld bearbeiten",
+      "delete": "Feld löschen",
+      "deleteTitle": "Dieses Feld löschen?",
+      "deleteBody": "Damit werden das Feld und die Werte aller Dateien dafür in dieser Sammlung entfernt.",
+      "none": "Noch keine Felder",
+      "heading": "In dieser Sammlung",
+      "saveError": "Der Wert konnte nicht gespeichert werden"
+    }
   }
 }

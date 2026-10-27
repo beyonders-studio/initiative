@@ -427,6 +427,18 @@
     "notFoundDescription": "La colección que buscas no existe, o ninguno de sus archivos es uno que puedas abrir.",
     "noAccess": "Acceso denegado",
     "noAccessDescription": "No tienes permiso para ver esta colección.",
-    "error": "No se pudo cambiar la colección"
+    "error": "No se pudo cambiar la colección",
+    "fields": {
+      "title": "Campos",
+      "description": "Lo que cada archivo de esta colección puede tener aquí: sus valores pertenecen a la colección, no al archivo.",
+      "create": "Nuevo campo",
+      "edit": "Editar campo",
+      "delete": "Eliminar campo",
+      "deleteTitle": "¿Eliminar este campo?",
+      "deleteBody": "Se eliminarán el campo y el valor que cada archivo tenga en esta colección.",
+      "none": "Aún no hay campos",
+      "heading": "En esta colección",
+      "saveError": "No se pudo guardar el valor"
+    }
   }
 }

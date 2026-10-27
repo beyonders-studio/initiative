@@ -427,6 +427,18 @@
     "notFoundDescription": "La collection que vous cherchez n’existe pas, ou aucun de ses fichiers ne vous est accessible.",
     "noAccess": "Accès refusé",
     "noAccessDescription": "Vous n’avez pas la permission de voir cette collection.",
-    "error": "Impossible de modifier la collection"
+    "error": "Impossible de modifier la collection",
+    "fields": {
+      "title": "Champs",
+      "description": "Ce que chaque fichier de cette collection peut porter ici : ses valeurs appartiennent à la collection, pas au fichier.",
+      "create": "Nouveau champ",
+      "edit": "Modifier le champ",
+      "delete": "Supprimer le champ",
+      "deleteTitle": "Supprimer ce champ ?",
+      "deleteBody": "Le champ et la valeur de chaque fichier dans cette collection seront supprimés.",
+      "none": "Aucun champ pour l'instant",
+      "heading": "Dans cette collection",
+      "saveError": "Impossible d'enregistrer la valeur"
+    }
   }
 }

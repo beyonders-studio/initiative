@@ -427,6 +427,18 @@
     "notFoundDescription": "The collection you're looking for doesn't exist, or none of its files are ones you can open.",
     "noAccess": "Access denied",
     "noAccessDescription": "You don't have permission to view this collection.",
-    "error": "Couldn't change the collection"
+    "error": "Couldn't change the collection",
+    "fields": {
+      "title": "Fields",
+      "description": "What each file in this collection can hold here: its values belong to this collection, not to the file.",
+      "create": "New field",
+      "edit": "Edit field",
+      "delete": "Delete field",
+      "deleteTitle": "Delete this field?",
+      "deleteBody": "This removes the field and every file's value of it in this collection.",
+      "none": "No fields yet",
+      "heading": "In this collection",
+      "saveError": "Couldn't save the value"
+    }
   }
 }

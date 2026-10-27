@@ -308,6 +308,7 @@ export const offeredGroupings = ({
         name: definition.name,
         type: definition.type,
         options: definition.options,
+        currency: definition.currency,
         value,
       };
     };

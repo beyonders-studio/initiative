@@ -76,6 +76,8 @@ export const opsForType = (type: PropertyType): BackendOp[] => {
     case PropertyType.url:
       return ["ilike", "eq", "is_null"];
     case PropertyType.number:
+    case PropertyType.currency:
+    case PropertyType.rating:
     case PropertyType.date:
     case PropertyType.datetime:
       return ["eq", "lt", "lte", "gt", "gte", "is_null"];
@@ -170,7 +172,14 @@ export const PropertyFilter = ({
         key: field.id,
         name: field.name,
         type: field.type,
-        input: { property_id: 0, name: field.name, type: field.type, options: null, value: null },
+        input: {
+          property_id: 0,
+          name: field.name,
+          type: field.type,
+          options: null,
+          currency: null,
+          value: null,
+        },
         plugin: true,
       })),
     ],

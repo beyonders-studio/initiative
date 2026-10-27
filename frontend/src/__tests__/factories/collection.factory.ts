@@ -28,6 +28,7 @@ export function buildCollection(overrides: Partial<CollectionRead> = {}): Collec
     comment_count: 0,
     tags: [],
     properties: [],
+    fields: [],
     can: { edit: true, unarchive: false },
     ...overrides,
   };

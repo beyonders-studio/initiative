@@ -1,8 +1,9 @@
-import { Loader2, Pencil, Plus, Trash2, X } from "lucide-react";
-import { useEffect, useMemo, useState } from "react";
+import { ArrowDown, ArrowUp, Loader2, Pencil, Plus, Trash2, X } from "lucide-react";
+import { type ReactNode, useEffect, useMemo, useState } from "react";
 import { useTranslation } from "react-i18next";
 
 import {
+  type CurrencyCode,
   type PropertyDefinitionCreate,
   type PropertyDefinitionRead,
   type PropertyDefinitionUpdate,
@@ -10,6 +11,8 @@ import {
   PropertyType,
   type PropertyType as PropertyTypeValue,
 } from "@/api/generated/initiativeAPI.schemas";
+import { CurrencySelect, useDefaultCurrency } from "@/components/properties/CurrencySelect";
+import { PROPERTY_TYPES } from "@/components/properties/NewPropertyForm";
 import { normalizeOptionList, typeRequiresOptions } from "@/components/properties/propertyHelpers";
 import { iconForPropertyType } from "@/components/properties/propertyTypeIcons";
 import { Button } from "@/components/ui/button";
@@ -41,19 +44,8 @@ import {
   useProperties,
   useUpdateProperty,
 } from "@/hooks/useProperties";
+import { collator } from "@/lib/intl";
 import { toast } from "@/lib/mascotToast";
-
-const PROPERTY_TYPE_OPTIONS: PropertyTypeValue[] = [
-  PropertyType.text,
-  PropertyType.number,
-  PropertyType.checkbox,
-  PropertyType.date,
-  PropertyType.datetime,
-  PropertyType.url,
-  PropertyType.select,
-  PropertyType.multi_select,
-  PropertyType.user_reference,
-];
 
 const DEFAULT_COLOR = "#64748B";
 
@@ -67,19 +59,26 @@ interface FormState {
   type: PropertyTypeValue;
   color: string | null;
   options: PropertyOption[];
+  /** A money property's currency. */
+  currency: CurrencyCode;
 }
 
-const emptyFormState: FormState = {
+const emptyFormState = (currency: CurrencyCode): FormState => ({
   name: "",
   type: PropertyType.text,
   color: null,
   options: [],
-};
+  currency,
+});
 
-const definitionToFormState = (definition: PropertyDefinitionRead): FormState => ({
+const definitionToFormState = (
+  definition: PropertyDefinitionRead,
+  currency: CurrencyCode
+): FormState => ({
   name: definition.name,
   type: definition.type,
   color: definition.color,
+  currency: definition.currency ?? currency,
   options: (definition.options ?? []).map((option) => ({
     value: option.value,
     label: option.label,
@@ -162,47 +161,102 @@ const OptionListEditor = ({ options, onChange, disabled }: OptionListEditorProps
   );
 };
 
+/** What the manager calls what it lists: an initiative's properties, or a
+ *  collection's fields. */
+const WORDS = {
+  initiative: {
+    description: "properties:manager.description",
+    create: "properties:manager.newDefinition",
+    edit: "properties:manager.editDefinition",
+    delete: "properties:manager.delete",
+    deleteTitle: "properties:manager.deleteConfirmTitle",
+    deleteBody: "properties:manager.deleteConfirmBody",
+    none: "properties:noProperties",
+  },
+  collection: {
+    description: "files:collections.fields.description",
+    create: "files:collections.fields.create",
+    edit: "files:collections.fields.edit",
+    delete: "files:collections.fields.delete",
+    deleteTitle: "files:collections.fields.deleteTitle",
+    deleteBody: "files:collections.fields.deleteBody",
+    none: "files:collections.fields.none",
+  },
+} as const;
+
 /**
  * Initiative-manager surface for listing and managing custom property
  * definitions. The panel behind the Properties tab of an initiative's
  * settings, which is its own route (``/settings/properties``). Pairs with
  * ``PropertyFilter``/``PropertyList``/``PropertyInput`` which render
  * individual values on files and tasks.
+ *
+ * Given a ``collectionId``, it manages that collection's own fields instead,
+ * which whoever may change the collection adds, renames, orders and removes.
  */
-export const InitiativeSettingsPropertiesTab = ({ initiativeId }: { initiativeId: number }) => {
-  const { t } = useTranslation(["properties", "common"]);
+export const InitiativeSettingsPropertiesTab = ({
+  initiativeId,
+  collectionId,
+}: {
+  initiativeId: number;
+  collectionId?: number;
+}) => {
+  const { t, i18n } = useTranslation(["properties", "common", "files"]);
+  const words = WORDS[collectionId === undefined ? "initiative" : "collection"];
+  const defaultCurrency = useDefaultCurrency();
 
-  const propertiesQuery = useProperties({ initiativeId });
+  const propertiesQuery = useProperties(
+    collectionId === undefined ? { initiativeId } : { collectionId }
+  );
   const createMutation = useCreateProperty();
   const updateMutation = useUpdateProperty();
   const deleteMutation = useDeleteProperty();
 
   const [dialogState, setDialogState] = useState<DialogState | null>(null);
-  const [formState, setFormState] = useState<FormState>(emptyFormState);
+  const [formState, setFormState] = useState<FormState>(() => emptyFormState(defaultCurrency));
   const [deleteTarget, setDeleteTarget] = useState<PropertyDefinitionRead | null>(null);
+  const [moving, setMoving] = useState(false);
 
   const sortedDefinitions = useMemo(() => {
     const list = propertiesQuery.data ?? [];
+    const byName = collator(i18n.language);
     return [...list].sort((a, b) => {
       if (a.position !== b.position) return a.position - b.position;
-      return a.name.localeCompare(b.name);
+      return byName.compare(a.name, b.name);
     });
-  }, [propertiesQuery.data]);
+  }, [propertiesQuery.data, i18n.language]);
+
+  /** Move one a place up or down, numbering each in the order shown. */
+  const move = async (index: number, by: -1 | 1) => {
+    const order = [...sortedDefinitions];
+    const [moved] = order.splice(index, 1);
+    order.splice(index + by, 0, moved);
+    setMoving(true);
+    try {
+      await Promise.all(
+        order.flatMap((definition, position) =>
+          definition.position === position
+            ? []
+            : [updateMutation.mutateAsync({ propertyId: definition.id, data: { position } })]
+        )
+      );
+    } catch {
+      // Error toast handled by the mutation hook.
+    } finally {
+      setMoving(false);
+    }
+  };
 
   // Sync the form state when the dialog target changes. Using an effect
   // here (rather than initializing via state) avoids stale form data when
   // the user closes one edit dialog and opens another without remounting.
   useEffect(() => {
-    if (!dialogState) {
-      setFormState(emptyFormState);
-      return;
-    }
-    if (dialogState.mode === "edit" && dialogState.definition) {
-      setFormState(definitionToFormState(dialogState.definition));
+    if (dialogState?.mode === "edit" && dialogState.definition) {
+      setFormState(definitionToFormState(dialogState.definition, defaultCurrency));
     } else {
-      setFormState(emptyFormState);
+      setFormState(emptyFormState(defaultCurrency));
     }
-  }, [dialogState]);
+  }, [dialogState, defaultCurrency]);
 
   const isEditing = dialogState?.mode === "edit";
   const submitting = createMutation.isPending || updateMutation.isPending;
@@ -248,12 +302,16 @@ export const InitiativeSettingsPropertiesTab = ({ initiativeId }: { initiativeId
         name: trimmedName,
         type: formState.type,
         initiative_id: initiativeId,
+        ...(collectionId !== undefined ? { collection_id: collectionId } : {}),
         color: formState.color ?? null,
         options,
+        ...(formState.type === PropertyType.currency ? { currency: formState.currency } : {}),
+        // A new one goes last.
+        position: sortedDefinitions.length,
       };
       try {
         await createMutation.mutateAsync(payload);
-        toast.success(t("properties:manager.newDefinition"));
+        toast.success(t(words.create));
         handleCloseDialog();
       } catch {
         // Error toast handled by the mutation hook.
@@ -268,6 +326,8 @@ export const InitiativeSettingsPropertiesTab = ({ initiativeId }: { initiativeId
       // Type is immutable on edit, so use the existing definition's type to
       // decide whether to include options in the PATCH payload.
       options: typeRequiresOptions(dialogState.definition.type) ? options : undefined,
+      currency:
+        dialogState.definition.type === PropertyType.currency ? formState.currency : undefined,
     };
     try {
       const response = await updateMutation.mutateAsync({
@@ -281,7 +341,7 @@ export const InitiativeSettingsPropertiesTab = ({ initiativeId }: { initiativeId
           })
         );
       } else {
-        toast.success(t("properties:manager.editDefinition"));
+        toast.success(t(words.edit));
       }
       handleCloseDialog();
     } catch {
@@ -293,110 +353,144 @@ export const InitiativeSettingsPropertiesTab = ({ initiativeId }: { initiativeId
     if (!deleteTarget) return;
     try {
       await deleteMutation.mutateAsync(deleteTarget.id);
-      toast.success(t("properties:manager.delete"));
+      toast.success(t(words.delete));
       setDeleteTarget(null);
     } catch {
       // Error toast handled by the mutation hook.
     }
   };
 
+  const newButton = (
+    <Button onClick={handleOpenCreate}>
+      <Plus className="h-4 w-4" />
+      {t(words.create)}
+    </Button>
+  );
+  const list: ReactNode = propertiesQuery.isLoading ? (
+    <div className="flex items-center gap-2 text-muted-foreground text-sm">
+      <Loader2 className="h-4 w-4 animate-spin" />
+      {t("common:loading")}
+    </div>
+  ) : sortedDefinitions.length === 0 ? (
+    <p className="text-muted-foreground text-sm">{t(words.none)}</p>
+  ) : (
+    <div className="overflow-x-auto">
+      <Table>
+        <TableHeader>
+          <TableRow>
+            <TableHead>{t("properties:manager.nameLabel")}</TableHead>
+            <TableHead>{t("properties:manager.typeLabel")}</TableHead>
+            <TableHead>{t("properties:manager.optionsLabel")}</TableHead>
+            <TableHead>{t("properties:manager.colorLabel")}</TableHead>
+            <TableHead className="w-40 text-right" />
+          </TableRow>
+        </TableHeader>
+        <TableBody>
+          {sortedDefinitions.map((definition, index) => {
+            const optionCount = definition.options?.length ?? 0;
+            const Icon = iconForPropertyType(definition.type);
+            return (
+              <TableRow key={definition.id}>
+                <TableCell className="font-medium">{definition.name}</TableCell>
+                <TableCell>
+                  <span className="inline-flex items-center gap-2">
+                    <Icon className="h-4 w-4 text-muted-foreground" aria-hidden />
+                    <span>{t(`properties:types.${definition.type}`)}</span>
+                    {definition.currency ? (
+                      <span className="text-muted-foreground text-xs">{definition.currency}</span>
+                    ) : null}
+                  </span>
+                </TableCell>
+                <TableCell>{optionCount > 0 ? optionCount : "—"}</TableCell>
+                <TableCell>
+                  {definition.color ? (
+                    <span className="inline-flex items-center gap-2">
+                      <span
+                        aria-hidden
+                        className="inline-block h-4 w-4 rounded-full border"
+                        style={{ backgroundColor: definition.color }}
+                      />
+                      <span className="font-mono text-muted-foreground text-xs uppercase">
+                        {definition.color}
+                      </span>
+                    </span>
+                  ) : (
+                    "—"
+                  )}
+                </TableCell>
+                <TableCell className="text-right">
+                  <div className="inline-flex items-center gap-1">
+                    <Button
+                      type="button"
+                      variant="ghost"
+                      size="icon-sm"
+                      onClick={() => void move(index, -1)}
+                      disabled={moving || index === 0}
+                      aria-label={t("properties:manager.moveUp", { name: definition.name })}
+                    >
+                      <ArrowUp className="h-4 w-4" />
+                    </Button>
+                    <Button
+                      type="button"
+                      variant="ghost"
+                      size="icon-sm"
+                      onClick={() => void move(index, 1)}
+                      disabled={moving || index === sortedDefinitions.length - 1}
+                      aria-label={t("properties:manager.moveDown", { name: definition.name })}
+                    >
+                      <ArrowDown className="h-4 w-4" />
+                    </Button>
+                    <Button
+                      type="button"
+                      variant="ghost"
+                      size="icon-sm"
+                      onClick={() => handleOpenEdit(definition)}
+                      aria-label={t(words.edit)}
+                    >
+                      <Pencil className="h-4 w-4" />
+                    </Button>
+                    <Button
+                      type="button"
+                      variant="ghost"
+                      size="icon-sm"
+                      onClick={() => setDeleteTarget(definition)}
+                      aria-label={t(words.delete)}
+                    >
+                      <Trash2 className="h-4 w-4" />
+                    </Button>
+                  </div>
+                </TableCell>
+              </TableRow>
+            );
+          })}
+        </TableBody>
+      </Table>
+    </div>
+  );
+
   return (
     <div className="space-y-6">
-      <Card>
-        <CardHeader className="flex flex-row items-start justify-between gap-4">
-          <div>
-            <CardDescription>{t("properties:manager.description")}</CardDescription>
+      {/* A collection's fields are managed in a dialog of their own, which
+          is the frame a card would be. */}
+      {collectionId === undefined ? (
+        <Card>
+          <CardHeader className="flex flex-row items-start justify-between gap-4">
+            <div>
+              <CardDescription>{t(words.description)}</CardDescription>
+            </div>
+            {newButton}
+          </CardHeader>
+          <CardContent>{list}</CardContent>
+        </Card>
+      ) : (
+        <div className="space-y-4">
+          <div className="flex flex-wrap items-start justify-between gap-4">
+            <p className="text-muted-foreground text-sm">{t(words.description)}</p>
+            {newButton}
           </div>
-          <Button onClick={handleOpenCreate}>
-            <Plus className="h-4 w-4" />
-            {t("properties:manager.newDefinition")}
-          </Button>
-        </CardHeader>
-        <CardContent>
-          {propertiesQuery.isLoading ? (
-            <div className="flex items-center gap-2 text-muted-foreground text-sm">
-              <Loader2 className="h-4 w-4 animate-spin" />
-              {t("common:loading")}
-            </div>
-          ) : sortedDefinitions.length === 0 ? (
-            <p className="text-muted-foreground text-sm">{t("properties:noProperties")}</p>
-          ) : (
-            <div className="overflow-x-auto">
-              <Table>
-                <TableHeader>
-                  <TableRow>
-                    <TableHead>{t("properties:manager.nameLabel")}</TableHead>
-                    <TableHead>{t("properties:manager.typeLabel")}</TableHead>
-                    <TableHead>{t("properties:manager.optionsLabel")}</TableHead>
-                    <TableHead>{t("properties:manager.colorLabel")}</TableHead>
-                    <TableHead className="w-32 text-right" />
-                  </TableRow>
-                </TableHeader>
-                <TableBody>
-                  {sortedDefinitions.map((definition) => {
-                    const optionCount = definition.options?.length ?? 0;
-                    return (
-                      <TableRow key={definition.id}>
-                        <TableCell className="font-medium">{definition.name}</TableCell>
-                        <TableCell>
-                          {(() => {
-                            const Icon = iconForPropertyType(definition.type);
-                            return (
-                              <span className="inline-flex items-center gap-2">
-                                <Icon className="h-4 w-4 text-muted-foreground" aria-hidden />
-                                <span>{t(`properties:types.${definition.type}`)}</span>
-                              </span>
-                            );
-                          })()}
-                        </TableCell>
-                        <TableCell>{optionCount > 0 ? optionCount : "—"}</TableCell>
-                        <TableCell>
-                          {definition.color ? (
-                            <span className="inline-flex items-center gap-2">
-                              <span
-                                aria-hidden
-                                className="inline-block h-4 w-4 rounded-full border"
-                                style={{ backgroundColor: definition.color }}
-                              />
-                              <span className="font-mono text-muted-foreground text-xs uppercase">
-                                {definition.color}
-                              </span>
-                            </span>
-                          ) : (
-                            "—"
-                          )}
-                        </TableCell>
-                        <TableCell className="text-right">
-                          <div className="inline-flex items-center gap-1">
-                            <Button
-                              type="button"
-                              variant="ghost"
-                              size="icon-sm"
-                              onClick={() => handleOpenEdit(definition)}
-                              aria-label={t("properties:manager.editDefinition")}
-                            >
-                              <Pencil className="h-4 w-4" />
-                            </Button>
-                            <Button
-                              type="button"
-                              variant="ghost"
-                              size="icon-sm"
-                              onClick={() => setDeleteTarget(definition)}
-                              aria-label={t("properties:manager.delete")}
-                            >
-                              <Trash2 className="h-4 w-4" />
-                            </Button>
-                          </div>
-                        </TableCell>
-                      </TableRow>
-                    );
-                  })}
-                </TableBody>
-              </Table>
-            </div>
-          )}
-        </CardContent>
-      </Card>
+          {list}
+        </div>
+      )}
 
       <Dialog
         open={dialogState !== null}
@@ -406,12 +500,8 @@ export const InitiativeSettingsPropertiesTab = ({ initiativeId }: { initiativeId
       >
         <DialogContent className="sm:max-w-xl">
           <DialogHeader>
-            <DialogTitle>
-              {isEditing
-                ? t("properties:manager.editDefinition")
-                : t("properties:manager.newDefinition")}
-            </DialogTitle>
-            <DialogDescription>{t("properties:manager.description")}</DialogDescription>
+            <DialogTitle>{isEditing ? t(words.edit) : t(words.create)}</DialogTitle>
+            <DialogDescription>{t(words.description)}</DialogDescription>
           </DialogHeader>
 
           <div className="space-y-4">
@@ -442,7 +532,7 @@ export const InitiativeSettingsPropertiesTab = ({ initiativeId }: { initiativeId
                   </div>
                 </SelectTrigger>
                 <SelectContent>
-                  {PROPERTY_TYPE_OPTIONS.map((type) => {
+                  {PROPERTY_TYPES.map((type) => {
                     const Icon = iconForPropertyType(type);
                     const label = t(`properties:types.${type}`);
                     return (
@@ -457,6 +547,16 @@ export const InitiativeSettingsPropertiesTab = ({ initiativeId }: { initiativeId
                 </SelectContent>
               </Select>
             </div>
+
+            {formState.type === PropertyType.currency ? (
+              <div className="space-y-2">
+                <Label>{t("properties:currency.label")}</Label>
+                <CurrencySelect
+                  value={formState.currency}
+                  onChange={(currency) => setFormState((prev) => ({ ...prev, currency }))}
+                />
+              </div>
+            ) : null}
 
             <div className="space-y-2">
               <Label>{t("properties:manager.colorLabel")}</Label>
@@ -497,9 +597,9 @@ export const InitiativeSettingsPropertiesTab = ({ initiativeId }: { initiativeId
         onOpenChange={(next) => {
           if (!next) setDeleteTarget(null);
         }}
-        title={t("properties:manager.deleteConfirmTitle")}
-        description={t("properties:manager.deleteConfirmBody")}
-        confirmLabel={t("properties:manager.delete")}
+        title={t(words.deleteTitle)}
+        description={t(words.deleteBody)}
+        confirmLabel={t(words.delete)}
         cancelLabel={t("common:cancel")}
         onConfirm={() => void handleConfirmDelete()}
         isLoading={deleteMutation.isPending}

@@ -1,4 +1,4 @@
-import { Check, ExternalLink, Minus } from "lucide-react";
+import { Check, ExternalLink, Minus, Star } from "lucide-react";
 import { useMemo } from "react";
 import { useTranslation } from "react-i18next";
 
@@ -13,7 +13,7 @@ import { numberFormat } from "@/lib/intl";
 import { getAvatarSrc, getInitialsForUser, getUserDisplayName } from "@/lib/userDisplay";
 import { cn } from "@/lib/utils";
 
-import { isEmptyPropertyValue } from "./propertyHelpers";
+import { isEmptyPropertyValue, numericValue, type RatingDisplay } from "./propertyHelpers";
 import { iconForPropertyType } from "./propertyTypeIcons";
 
 type CellVariant = "cell" | "chip";
@@ -26,17 +26,55 @@ export interface PropertyValueCellProps {
    * value opens via a programmatic handler instead of nesting an `<a>` in an
    * `<a>`, and stops the click from also triggering the outer link. */
   nested?: boolean;
+  /** How a rating is drawn, as the list showing it says; a number without. */
+  display?: RatingDisplay | null;
 }
 
-const formatNumber = (raw: unknown): string => {
-  if (typeof raw === "number" && Number.isFinite(raw)) {
-    return numberFormat().format(raw);
+const formatNumber = (raw: unknown, options?: Intl.NumberFormatOptions): string => {
+  const value = numericValue(raw);
+  return value === null ? "" : numberFormat(undefined, options).format(value);
+};
+
+/** How many of five stars a rating of 1–100 fills: one for each fifth begun. */
+const ratingStars = (rating: number): number => Math.min(5, Math.max(0, Math.ceil(rating / 20)));
+
+/** A rating of 1–100 as a list draws it. */
+const Rating = ({ value, display }: { value: number; display: RatingDisplay }) => {
+  const { t } = useTranslation("properties");
+  const label = t("cell.rating", { value: formatNumber(value) });
+  if (display === "stars") {
+    const filled = ratingStars(value);
+    return (
+      <span role="img" aria-label={label} title={label} className="inline-flex items-center">
+        {[1, 2, 3, 4, 5].map((star) => (
+          <Star
+            key={star}
+            aria-hidden
+            className={cn(
+              "h-3.5 w-3.5",
+              star <= filled ? "fill-current text-warning" : "text-muted-foreground/40"
+            )}
+          />
+        ))}
+      </span>
+    );
   }
-  if (typeof raw === "string" && raw.trim() !== "") {
-    const parsed = Number(raw);
-    if (Number.isFinite(parsed)) return numberFormat().format(parsed);
+  if (display === "bar") {
+    return (
+      <span
+        role="img"
+        aria-label={label}
+        title={label}
+        className="inline-block h-1.5 w-16 overflow-hidden rounded-full bg-muted-foreground/20"
+      >
+        <span
+          className="block h-full rounded-full bg-primary"
+          style={{ width: `${Math.min(100, Math.max(0, value))}%` }}
+        />
+      </span>
+    );
   }
-  return "";
+  return <span className="tabular-nums">{formatNumber(value)}</span>;
 };
 
 const coerceOptionMap = (options: PropertyOption[] | null | undefined) => {
@@ -108,6 +146,7 @@ export const PropertyValueCell = ({
   variant = "cell",
   className,
   nested = false,
+  display,
 }: PropertyValueCellProps) => {
   const { t } = useTranslation("properties");
   const options = useMemo(() => coerceOptionMap(summary?.options), [summary?.options]);
@@ -180,6 +219,21 @@ export const PropertyValueCell = ({
     }
     case PropertyType.number: {
       body = <span className="tabular-nums">{formatNumber(value)}</span>;
+      break;
+    }
+    case PropertyType.currency: {
+      body = (
+        <span className="tabular-nums">
+          {summary.currency
+            ? formatNumber(value, { style: "currency", currency: summary.currency })
+            : formatNumber(value)}
+        </span>
+      );
+      break;
+    }
+    case PropertyType.rating: {
+      const rating = numericValue(value);
+      body = rating === null ? null : <Rating value={rating} display={display ?? "number"} />;
       break;
     }
     case PropertyType.checkbox: {
