@@ -20,6 +20,7 @@ from sqlalchemy.orm import selectinload
 from sqlmodel import col, select
 from sqlmodel.ext.asyncio.session import AsyncSession
 
+from app.core.tools import KINDS
 from app.db import post_commit
 from app.db.query import ids_in
 from app.db.session import guild_context, install_context, routed_guild_id
@@ -82,7 +83,22 @@ async def add_files(
     added_by: Optional[int],
 ) -> list[int]:
     """Put these files in the collection, leaving out any already there, and
-    return the ones added. The caller has checked the reader can open them."""
+    return the ones added. The caller has checked the reader can open them.
+
+    The collection's row is locked first, as :func:`settle` locks it before
+    asking whether the collection is empty, so the two take turns. A
+    collection found in the trash by then is not there to add to."""
+    locked = (
+        await session.exec(
+            select_including_deleted(Collection.id, Collection.deleted_at)
+            .where(Collection.id == collection.id)
+            .with_for_update()
+        )
+    ).first()
+    # A collection made in this transaction, with no entries yet, is out of
+    # its maker's sight: nobody else can reach it before it commits.
+    if locked is not None and locked.deleted_at is not None:
+        raise KINDS["collection"].not_found()
     wanted = sorted(set(file_ids))
     present = set(
         (
@@ -123,17 +139,19 @@ async def remove_files(
     nothing to take out. An emptied collection goes to the trash once the
     removal commits (:func:`settle`)."""
     wanted = sorted(set(file_ids))
+    # The collection first: taking out the last file its reader can open puts
+    # it out of their sight, and so out of reach of an update after.
+    if collection.cover_file_id in wanted:
+        collection.cover_file_id = None
+    collection.updated_at = datetime.now(timezone.utc)
+    session.add(collection)
+    await session.flush()
     await session.exec(
         delete(CollectionFile).where(
             col(CollectionFile.collection_id) == collection.id,
             ids_in(CollectionFile.file_id, wanted),
         )
     )
-    if collection.cover_file_id in wanted:
-        collection.cover_file_id = None
-    collection.updated_at = datetime.now(timezone.utc)
-    session.add(collection)
-    await session.flush()
     settle_after_commit(session, collections=[collection.id])
 
 
@@ -181,49 +199,6 @@ def added_from(collection_id: int, until: datetime, *, oldest_first: bool) -> An
             added >= until if oldest_first else added <= until,
         )
     )
-
-
-async def collection_names_of(
-    session: AsyncSession, file_ids: Sequence[int]
-) -> dict[int, list[str]]:
-    """The names of the live collections the reader can see that each file
-    is in, as an export carries them."""
-    if not file_ids:
-        return {}
-    rows = await session.exec(
-        select(CollectionFile.file_id, Collection.name)
-        .join(Collection, col(Collection.id) == CollectionFile.collection_id)
-        .where(ids_in(CollectionFile.file_id, file_ids))
-        .order_by(col(Collection.name))
-    )
-    found: dict[int, list[str]] = {}
-    for file_id, name in rows.all():
-        found.setdefault(file_id, []).append(name)
-    return found
-
-
-async def gather(
-    session: AsyncSession,
-    made: dict[tuple[int, str], Collection],
-    *,
-    file_id: int,
-    names: Iterable[str],
-    initiative_id: int,
-    user_id: Optional[int],
-) -> None:
-    """Put a file an import made in the collections it was in, by name: one
-    collection per name per initiative per import, made the first time a
-    name is met (``made`` is the import's own record of them)."""
-    for name in dict.fromkeys(names):
-        collection = made.get((initiative_id, name))
-        if collection is None:
-            collection = Collection(
-                initiative_id=initiative_id, name=name, created_by=user_id
-            )
-            session.add(collection)
-            await session.flush()
-            made[(initiative_id, name)] = collection
-        await add_files(session, collection, [file_id], added_by=user_id)
 
 
 @dataclass(frozen=True)
@@ -396,16 +371,29 @@ async def settle(
             ).all()
         )
     if candidates:
-        live = set((await session.exec(_live_entry())).all()) & candidates
-        emptied = (
+        # Each row locked before its entries are counted, in id order, as
+        # adding to a collection locks its row before writing an entry: an
+        # addition either committed before the count, or waits for the trash.
+        locked = (
             await session.exec(
-                select(Collection).where(
-                    ids_in(Collection.id, sorted(candidates - live))
-                )
+                select(Collection)
+                .where(ids_in(Collection.id, sorted(candidates)))
+                .order_by(col(Collection.id))
+                .with_for_update()
             )
         ).all()
-        for collection in emptied:
-            await trash(session, collection, deleted_by_user_id=actor_id)
+        live = set(
+            (
+                await session.exec(
+                    _live_entry().where(
+                        ids_in(CollectionFile.collection_id, sorted(candidates))
+                    )
+                )
+            ).all()
+        )
+        for collection in locked:
+            if collection.id not in live:
+                await trash(session, collection, deleted_by_user_id=actor_id)
 
     if restored_files:
         holding = select_including_deleted(CollectionFile.collection_id).where(

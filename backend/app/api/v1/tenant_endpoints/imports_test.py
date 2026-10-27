@@ -1442,57 +1442,69 @@ async def test_an_archive_with_a_gallery_restores_it_as_files_in_a_collection(
     assert files == ["Shot"]
 
 
-async def test_a_restored_file_goes_back_into_its_collections(
+async def test_restored_collections_keep_their_own_files_and_cover(
     client, acting_user, session, monkeypatch, role_session
 ):
-    """A file's entry names the collections it was in; the restore makes each
-    once and puts every file naming it inside."""
+    """A backup carries each collection by the id it had, so two of one name
+    come back as two, each with its own files, description and cover."""
     from sqlmodel import select
 
     from app.models.tenant.collection import Collection, CollectionFile
     from app.models.tenant.file import File
+    from app.testing import create_collection
 
     a = await acting_user(
         guild_role=CommunityRole.superadmin, initiative=True, project=True
     )
-    payload = b"%PDF-1.4 handout"
-    entries = [
-        {**_file_entry(key, entity_id=n, title=key), "collections": names}
-        for n, (key, names) in enumerate(
-            (("one.pdf", ["Handouts"]), ("two.pdf", ["Handouts", "Maps"])), start=1
-        )
-    ]
-    manifest = _minimal_manifest(
-        entries=entries,
-        assets=[
-            _asset_record(key, size_bytes=len(payload))
-            for key in ("one.pdf", "two.pdf")
-        ],
+    sunset = await create_file(session, a.initiative, a.user, name="Sunset")
+    dunes = await create_file(session, a.initiative, a.user, name="Dunes")
+    await create_collection(
+        session,
+        a.initiative,
+        a.user,
+        files=[sunset, dunes],
+        name="Photos",
+        description="Studio shots",
+        cover_file_id=sunset.id,
     )
-    job = await _apply_backup(
-        client,
-        a,
-        _make_backup_zip(
-            manifest, {"assets/one.pdf": payload, "assets/two.pdf": payload}
-        ),
-        monkeypatch,
-        role_session,
+    await create_collection(session, a.initiative, a.user, files=[dunes], name="Photos")
+
+    restored_id = await _restore_referencing_backup(
+        client, a, monkeypatch, role_session, elsewhere=False
     )
-    assert job["status"] == ImportJobStatus.done.value, job.get("error")
 
     await route_session_to_guild(session, a.guild.id)
-    held = (
+    names = {
+        file.id: file.name
+        for file in (
+            await session.exec(select(File).where(File.initiative_id == restored_id))
+        ).all()
+    }
+    collections = (
         await session.exec(
-            select(Collection.name, File.name)
-            .join(CollectionFile, CollectionFile.collection_id == Collection.id)
-            .join(File, File.id == CollectionFile.file_id)
-            .order_by(Collection.name, File.name)
+            select(Collection)
+            .where(Collection.initiative_id == restored_id)
+            .order_by(Collection.id)
         )
     ).all()
-    assert [tuple(row) for row in held] == [
-        ("Handouts", "one.pdf"),
-        ("Handouts", "two.pdf"),
-        ("Maps", "two.pdf"),
+    held = (
+        await session.exec(
+            select(CollectionFile.collection_id, CollectionFile.file_id).where(
+                CollectionFile.initiative_id == restored_id
+            )
+        )
+    ).all()
+    assert [
+        (
+            c.name,
+            c.description,
+            names.get(c.cover_file_id or 0),
+            sorted(names[f] for cid, f in held if cid == c.id),
+        )
+        for c in collections
+    ] == [
+        ("Photos", "Studio shots", "Sunset", ["Dunes", "Sunset"]),
+        ("Photos", None, None, ["Dunes"]),
     ]
 
 
@@ -3389,6 +3401,48 @@ async def test_a_mention_nobody_places_is_restored_as_a_name(
     assert mention["mentionUserId"] is None
     assert mention["mentionName"] == "Bea"
     assert "mentionHandle" not in mention
+
+
+async def test_an_older_envelopes_wikilink_is_imported_as_a_reference(
+    client, acting_user, session
+):
+    """A ``[[ ]]`` link in an envelope an older build wrote comes in as the
+    reference to its file it always was, as a restore reads one."""
+    from sqlmodel import select
+
+    from app.models.tenant.file import File
+
+    a = await acting_user(
+        guild_role=CommunityRole.member, initiative=True, project=True
+    )
+    target = await _second_initiative(session, a, files_enabled=True)
+    spec = await create_file(session, target, a.user, name="Spec")
+    envelope = {
+        "type": "initiative-file",
+        "schema_version": 1,
+        "file_type": "lexical",
+        "name": "Minutes",
+        "content": _editor_state(
+            {"type": "wikilink", "documentId": spec.id, "documentTitle": "Spec"}
+        ),
+    }
+
+    resp = await _import_envelope(client, a, envelope, target.id)
+    assert resp.status_code == 201, resp.text
+
+    file = (
+        await session.exec(
+            select(File)
+            .where(File.initiative_id == target.id, File.name == "Minutes")
+            .options(undefer(File.content))
+        )
+    ).one()
+    [node] = file.content["root"]["children"][0]["children"]
+    assert (node["type"], node["entityType"], node["entityId"]) == (
+        "entity-mention",
+        "file",
+        spec.id,
+    )
 
 
 def _reference_node(entity_type: str, entity_id: int, text: str) -> dict:

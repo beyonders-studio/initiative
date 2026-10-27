@@ -11,7 +11,8 @@ pictures a file. In ``guild_template`` and every ``guild_<id>``:
 * **Files** — each ``gallery_images`` row that has a version is a ``files`` row
   in its gallery's initiative, named by its title, else its current version's
   filename, and typed by its current version's media type. The caption is
-  dropped. A picture in a trashed or held gallery is trashed or held with it.
+  dropped. A picture in a trashed, held or archived gallery is trashed, held
+  or archived with it.
   Each ``gallery_image_versions`` row is a ``file_versions`` row pointing at
   the same blob, with the size the gallery measured; no bytes move and
   ``uploads`` is untouched. A version with no author takes the picture's,
@@ -623,7 +624,7 @@ def _files(bind: Connection) -> None:
     bind.exec_driver_sql(
         "INSERT INTO files (id, initiative_id, is_template, name, file_type, "
         "created_by, created_at, updated_at, deleted_at, deleted_by, purge_at, "
-        "held_at, hold_id) "
+        "held_at, hold_id, archived_at) "
         "SELECT m.file_id, m.initiative_id, false, "
         "left(coalesce(nullif(btrim(i.title), ''), "
         "nullif(btrim(v.original_filename), ''), "
@@ -633,7 +634,8 @@ def _files(bind: Connection) -> None:
         "coalesce(i.deleted_at, g.deleted_at), "
         "CASE WHEN i.deleted_at IS NOT NULL THEN i.deleted_by ELSE g.deleted_by END, "
         "coalesce(i.purge_at, g.purge_at), coalesce(i.held_at, g.held_at), "
-        "CASE WHEN i.held_at IS NOT NULL THEN i.hold_id ELSE g.hold_id END "
+        "CASE WHEN i.held_at IS NOT NULL THEN i.hold_id ELSE g.hold_id END, "
+        "g.archived_at "
         f"FROM {_MAP} m JOIN gallery_images i ON i.id = m.image_id "
         "JOIN galleries g ON g.id = i.gallery_id "
         "CROSS JOIN LATERAL (SELECT * FROM gallery_image_versions v "

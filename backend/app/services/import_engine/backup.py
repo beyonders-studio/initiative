@@ -41,7 +41,6 @@ from sqlmodel.ext.asyncio.session import AsyncSession
 
 from app.db import gucs
 from app.db.session import raise_flag, routed_guild_id
-from app.core.legacy_references import rewrite_body, rewrite_ref, rewrite_text
 from app.core.references import format_ref
 from app.core.relationships import RelationshipType
 from app.core.search import SearchEntityType
@@ -79,7 +78,6 @@ from app.services.import_engine.common import (
     unique_name,
     unique_name_in_initiative,
 )
-from app.services.tenant import collections as collections_service
 from app.services.tenant.attachments import claim_shown
 from app.services.import_engine.contract import (
     EnvelopeImportResult,
@@ -110,9 +108,13 @@ _TOOL_ORDER = tuple(t.value for t in BULK_EXPORT_TOOLS)
 # inside it. They carry no Tool and no registry importer — like ``file``
 # entries, they are applied here — and they go FIRST, because the content
 # behind them refers to what they establish: a value binds to a property
-# definition, and a member holds a role.
+# definition, and a member holds a role. Its collections go LAST: each is put
+# together from files the entries before it made.
 _STRUCTURAL_TOOL = "initiative"
-_STRUCTURAL_TYPES = frozenset({"initiative-structure", "initiative-properties"})
+_COLLECTIONS_TYPE = "initiative-collections"
+_STRUCTURAL_TYPES = frozenset(
+    {"initiative-structure", "initiative-properties", _COLLECTIONS_TYPE}
+)
 
 # Refresh the routed session's authorization context this often (see the
 # export backup adapter's identical constant).
@@ -133,61 +135,8 @@ _ATTACH_RELATIONSHIPS: dict[str, RelationshipType] = {
     "wiki": RelationshipType.part_of,
 }
 
-#: How an archive written by an older build names files (once documents): the
-#: manifest's tool, its tool switches and envelope type, the keys holding a
-#: file's type and the files filed in a wiki or attached to an item, the refs
-#: naming one, and the role permissions for the tool. Read on restore and
-#: rewritten to this build's names before anything else looks at the archive;
-#: nothing writes them. A gallery's entry is filed with the files, since its
-#: pictures are restored as files and a collection (``_apply_gallery_entry``).
-_LEGACY_ENVELOPE_TYPES = {"initiative-document": tool_envelope_type(Tool.file)}
-_LEGACY_TOOLS = {"document": Tool.file.value}
-_LEGACY_ENTRY_TOOLS = {**_LEGACY_TOOLS, "gallery": Tool.file.value}
-_LEGACY_KEYS = {"documents": "files", "document_type": "file_type"}
-_LEGACY_PERMISSIONS = {
-    "documents_enabled": Tool.file.view_permission,
-    "create_documents": Tool.file.create_permission,
-}
 #: An older build's gallery entry: its pictures become files in a collection.
 _GALLERY_TYPE = "initiative-gallery"
-
-
-def _current_shape(value: Any) -> Any:
-    """``value``, read from an archive, with the names an older build gave
-    files spelled as this one spells them, and every reference in a body as
-    well. A gallery's pictures are restored with no id to name them by, so a
-    reference to one is its words."""
-    if isinstance(value, str):
-        return rewrite_text(value, {})
-    if isinstance(value, list):
-        return [_current_shape(item) for item in value]
-    if not isinstance(value, dict):
-        return value
-    value = rewrite_body(value, {})
-    shaped = {
-        _LEGACY_KEYS.get(key, key): _current_shape(item) for key, item in value.items()
-    }
-    tools = shaped.get("tools")
-    if isinstance(tools, dict):
-        shaped["tools"] = {
-            _LEGACY_TOOLS.get(key, key): item for key, item in tools.items()
-        }
-    kind = shaped.get("type")
-    if isinstance(kind, str) and kind in _LEGACY_ENVELOPE_TYPES:
-        shaped["type"] = _LEGACY_ENVELOPE_TYPES[kind]
-    tool = shaped.get("tool")
-    if isinstance(tool, str) and tool in _LEGACY_ENTRY_TOOLS:
-        shaped["tool"] = _LEGACY_ENTRY_TOOLS[tool]
-    ref = shaped.get("external_ref")
-    if isinstance(ref, str):
-        shaped["external_ref"] = rewrite_ref(ref, {}) or ref
-    permissions = shaped.get("permissions")
-    if isinstance(permissions, list):
-        shaped["permissions"] = [
-            _LEGACY_PERMISSIONS.get(key, key) if isinstance(key, str) else key
-            for key in permissions
-        ]
-    return shaped
 
 
 def _entry_ref(path: str) -> str:
@@ -230,7 +179,7 @@ def read_manifest(archive: zipfile.ZipFile, *, fetched: bool = False) -> BackupM
     except Exception as exc:
         raise ImportEngineError(ImportEngineMessages.IMPORT_ZIP_INVALID) from exc
     try:
-        manifest = BackupManifest.model_validate(_current_shape(raw))
+        manifest = BackupManifest.model_validate(import_engine.current_shape(raw))
     except Exception as exc:
         raise ImportEngineError(ImportEngineMessages.IMPORT_ZIP_INVALID) from exc
     if not (
@@ -499,8 +448,6 @@ async def apply_backup(
             entries_by_initiative.setdefault(entry.initiative_id, []).append(entry)
 
         since_refresh = 0
-        # The collections the job made, by initiative and name.
-        gathered: dict[tuple[int, str], Any] = {}
 
         # One context for the whole bundle. Its collector matters because an edge
         # routinely crosses two entries applied by two different importers, so
@@ -554,7 +501,9 @@ async def apply_backup(
             entries = sorted(
                 entries_here,
                 key=lambda e: (
-                    -1
+                    len(_TOOL_ORDER) + 1
+                    if e.type == _COLLECTIONS_TYPE
+                    else -1
                     if e.tool == _STRUCTURAL_TOOL
                     else _TOOL_ORDER.index(e.tool)
                     if e.tool in _TOOL_ORDER
@@ -589,15 +538,6 @@ async def apply_backup(
                     max_json_bytes=max_json_bytes,
                     shift_days=shift_days,
                 )
-                if entry.collections and outcome.detail is not None:
-                    await collections_service.gather(
-                        session,
-                        gathered,
-                        file_id=outcome.detail.entity_id,
-                        names=entry.collections,
-                        initiative_id=initiative.id,
-                        user_id=user.id,
-                    )
                 result.entries.append(outcome)
                 bucket = result.per_tool.setdefault(
                     entry.tool, {"created": 0, "failed": 0, "skipped": 0}
@@ -814,7 +754,7 @@ async def _apply_entry(
         raw = await asyncio.to_thread(
             read_json_member, archive, entry.path, max_bytes=max_json_bytes
         )
-        envelope = _current_shape(raw)
+        envelope = import_engine.current_shape(raw)
         if shift_days and isinstance(envelope, dict) and entry.tool in _TOOL_ORDER:
             envelope = shift_dates(Tool(entry.tool), envelope, shift_days)
         validated = importer.validate(envelope)
@@ -900,8 +840,8 @@ async def _apply_structural_entry(
     *,
     context: ImportContext | None = None,
 ) -> EntryResult:
-    """An initiative's own shape: its property definitions, or its roles and
-    members.
+    """An initiative's own shape: its property definitions, its roles and
+    members, or its collections.
 
     Both are **additive**. They create what the target does not have and leave
     what it does alone: a role of the same name, or a definition of the same
@@ -922,12 +862,16 @@ async def _apply_structural_entry(
         return invalid
     if not isinstance(payload, dict):
         return invalid
-    payload = _current_shape(payload)
+    payload = import_engine.current_shape(payload)
     try:
         async with session.begin_nested():
             if entry.type == "initiative-properties":
                 created = await _apply_property_definitions(
                     session, initiative, payload, context=context
+                )
+            elif entry.type == _COLLECTIONS_TYPE:
+                created = await _apply_collections(
+                    session, initiative, user, payload, context=context
                 )
             else:
                 created = await _apply_initiative_structure(
@@ -969,6 +913,77 @@ async def _apply_property_definitions(
     await props.declare(declared)
     await session.flush()
     return {"property_definitions": props.created}
+
+
+class _CollectionRecord(SanitizedBaseModel):
+    """One collection as a backup carries it: its files and cover by the ids
+    they had where it was exported."""
+
+    model_config = ConfigDict(extra="ignore")
+
+    id: int
+    name: str
+    description: Optional[str] = None
+    cover_file_id: Optional[int] = None
+    file_ids: list[int] = []
+    tags: list[str] = []
+    properties: list[EnvelopePropertyValue] = []
+
+
+async def _apply_collections(
+    session: AsyncSession,
+    initiative,
+    user: User,
+    payload: dict,
+    *,
+    context: ImportContext | None,
+) -> dict:
+    """Make each collection that holds a file this job made, with the files
+    made of its own. One whose files none came over is not made: a collection
+    is never empty."""
+    from app.models.tenant.collection import Collection
+    from app.services.import_engine.importers._base import (
+        PropertyRestore,
+        TagRestore,
+    )
+    from app.services.tenant import collections as collections_service
+
+    if context is None:
+        return {}
+    made = 0
+    for raw in payload.get("collections") or []:
+        record = _CollectionRecord.model_validate(raw)
+        files: dict[int, int] = {}
+        for source_id in record.file_ids:
+            found = context.links.lookup(format_ref(SearchEntityType.file, source_id))
+            if found is not None and found.kind == SearchEntityType.file:
+                files[source_id] = found.id
+        if not files:
+            continue
+        collection = Collection(
+            initiative_id=initiative.id,
+            name=record.name,
+            description=record.description,
+            cover_file_id=files.get(record.cover_file_id or 0),
+            created_by=user.id,
+        )
+        session.add(collection)
+        await session.flush()
+        await collections_service.add_files(
+            session, collection, list(files.values()), added_by=user.id
+        )
+        await TagRestore(session).attach(collection, record.tags)
+        props = PropertyRestore(session, initiative_id=initiative.id, context=context)
+        await props.attach(collection, record.properties)
+        await props.settle(collection)
+        context.links.register(
+            format_ref(SearchEntityType.collection, record.id),
+            SearchEntityType.collection,
+            collection.id,
+        )
+        made += 1
+    await session.flush()
+    return {"collections": made}
 
 
 async def _apply_initiative_structure(session, initiative, user: User, payload) -> dict:

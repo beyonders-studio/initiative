@@ -136,17 +136,20 @@ async def test_a_gallery_becomes_a_collection_of_files(session) -> None:
     await session.run_sync(run(False))
     await session.commit()
 
-    # A gallery as 0.68 stored one: two pictures, the first replaced once, a
-    # restricted grant, a comment, tags on it and on a picture, and links.
+    # A gallery as 0.68 stored one, archived: two pictures, the first replaced
+    # once, a restricted grant, a comment, tags on it and on a picture, and
+    # links.
+    archived = datetime(2026, 1, 3, tzinfo=timezone.utc)
     connection = await session.connection()
     await connection.execute(text("SET LOCAL session_replication_role = replica"))
     gallery = await _one(
         session,
         f"INSERT INTO {s}.galleries (initiative_id, name, description, created_by, "
-        "created_at, updated_at) VALUES (:i, 'Wall', 'Studio shots', :u, "
-        "'2026-01-01', '2026-01-02') RETURNING id",
+        "created_at, updated_at, archived_at) VALUES (:i, 'Wall', 'Studio shots', "
+        ":u, '2026-01-01', '2026-01-02', :archived) RETURNING id",
         i=initiative.id,
         u=owner.id,
+        archived=archived,
     )
     pictures = []
     for title, at in (
@@ -280,18 +283,20 @@ async def test_a_gallery_becomes_a_collection_of_files(session) -> None:
     await session.commit()
 
     files = {
-        name: (file_id, file_type, number)
-        for file_id, name, file_type, number in await _rows(
+        name: (file_id, file_type, number, archived_at)
+        for file_id, name, file_type, number, archived_at in await _rows(
             session,
-            f"SELECT f.id, f.name, f.file_type, v.version_number FROM {s}.files f "
+            f"SELECT f.id, f.name, f.file_type, v.version_number, f.archived_at "
+            f"FROM {s}.files f "
             f"JOIN {s}.file_versions v ON v.id = f.current_version_id "
             "WHERE f.initiative_id = :i",
             i=initiative.id,
         )
     }
+    # An archived gallery's pictures are archived with it.
     assert {name: rest[1:] for name, rest in files.items()} == {
-        "Sunset": ("jpeg", 2),
-        "dunes.webp": ("webp", 1),
+        "Sunset": ("jpeg", 2, archived),
+        "dunes.webp": ("webp", 1, archived),
     }
     sunset_file, dunes_file = files["Sunset"][0], files["dunes.webp"][0]
     assert await _rows(

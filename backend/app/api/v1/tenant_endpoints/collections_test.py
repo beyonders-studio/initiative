@@ -227,6 +227,33 @@ async def test_an_emptied_collection_goes_to_the_trash_and_comes_back(
     assert await deleted_at() is None
 
 
+async def test_a_member_takes_out_the_last_file_they_can_open(
+    client: AsyncClient, session, acting_user
+):
+    owner, maker, shared, _private = await _scene(session, acting_user)
+    collection = await create_collection(
+        session, owner.initiative, owner.user, files=[shared]
+    )
+
+    removed = await client.delete(
+        maker.g(f"/collections/{collection.id}/files"),
+        headers=maker.headers,
+        params={"file_ids": [shared.id]},
+    )
+    assert removed.status_code == 204, removed.text
+    await post_commit.settle_all()
+
+    await route_session_to_guild(session, owner.guild.id)
+    row = (
+        await session.exec(
+            select_including_deleted(Collection)
+            .where(Collection.id == collection.id)
+            .execution_options(populate_existing=True)
+        )
+    ).one()
+    assert row.deleted_at is not None
+
+
 async def test_a_collection_lays_out_its_files_in_a_grid_and_a_table(
     client: AsyncClient, session, acting_user
 ):

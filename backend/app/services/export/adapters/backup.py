@@ -26,6 +26,7 @@ with one ``initiatives/`` entry, so ONE import path serves both)::
     initiatives/{id}-{slug}/dashboards/{id}-{slug}.initiative-dashboard.json
     initiatives/{id}-{slug}/structure.json          (backup mode)
     initiatives/{id}-{slug}/properties.json         (backup mode)
+    initiatives/{id}-{slug}/collections.json        (backup mode)
     assets/{storage_key}                            (include_uploads only)
 
 Authorization: the initiative source requires the creator to manage the
@@ -536,10 +537,8 @@ class _ScopeBuilder:
         #: The initiatives beyond those in scope whose files and tasks
         #: the items name.
         self.reach: set[int] = set()
-        # The collections each file is in, the images each native file
-        # embeds, and the stored size and type of each, loaded once per
-        # initiative's files.
-        self._collections: dict[int, list[str]] = {}
+        # The images each native file embeds, and the stored size and
+        # type of each, loaded once per initiative's files.
         self._embedded: dict[int, list[dict]] = {}
         self._upload_info: dict[str, tuple[int, str | None]] = {}
         # The community's member profiles, read once for every initiative's
@@ -571,6 +570,7 @@ class _ScopeBuilder:
             await self._add_section(section, initiative, folder)
         await self._add_initiative_structure(initiative, folder)
         await self._add_initiative_properties(initiative, folder)
+        await self._add_initiative_collections(initiative, folder)
         await self._link_wiki_files(initiative)
 
     # -- per-tool sections ---------------------------------------------------
@@ -674,11 +674,6 @@ class _ScopeBuilder:
             entity_id=entity_id,
             title=title,
             initiative_id=initiative.id,
-            **(
-                {"collections": self._collections.get(entity_id, [])}
-                if section.tool is Tool.file
-                else {}
-            ),
         )
 
     def _skip(
@@ -757,19 +752,8 @@ class _ScopeBuilder:
                     tags=metadata["tags"],
                     properties=metadata["properties"],
                     asset=asset_path,
-                    collections=self._collections.get(file.id, []),
                 )
             )
-
-    async def _preload_files(self, files: list) -> None:
-        """What the files' entries say beside their envelopes: the collections
-        each is in, and the images the native ones embed."""
-        from app.services.tenant.collections import collection_names_of
-
-        self._collections = await collection_names_of(
-            self.session, [file.id for file in files]
-        )
-        await self._preload_embedded_assets(files)
 
     async def _preload_embedded_assets(self, files: list) -> None:
         """The images the native files embed, and each one's stored size
@@ -1204,6 +1188,69 @@ class _ScopeBuilder:
             initiative_id=initiative.id,
         )
 
+    async def _add_initiative_collections(self, initiative, folder: str) -> None:
+        """The initiative's collections the creator can see, each under the id
+        it has here, holding its files by theirs: an import puts each one
+        together from the files it made of them."""
+        if self.mode != "backup" or not _included(self.params, Tool.file.value):
+            return
+        from sqlmodel import col, select
+
+        from app.db.query import ids_in
+        from app.models.tenant.collection import Collection, CollectionFile
+        from app.models.tenant.file import File
+        from app.services.tenant import properties as properties_service
+        from app.services.tenant import tags as tags_service
+
+        rows = list(
+            await self.session.exec(
+                select(Collection)
+                .where(Collection.initiative_id == initiative.id)
+                .order_by(col(Collection.id))
+            )
+        )
+        if not rows:
+            return
+        held: dict[int, list[int]] = {}
+        for collection_id, file_id in await self.session.exec(
+            select(CollectionFile.collection_id, CollectionFile.file_id)
+            .join(File, col(File.id) == CollectionFile.file_id)
+            .where(ids_in(CollectionFile.collection_id, [row.id for row in rows]))
+            .order_by(col(CollectionFile.added_at), col(CollectionFile.file_id))
+        ):
+            held.setdefault(collection_id, []).append(file_id)
+        await tags_service.annotate_tags(self.session, rows)
+        await properties_service.annotate_properties(self.session, rows)
+        payload = {
+            "type": "initiative-collections",
+            "schema_version": 1,
+            "initiative_id": initiative.id,
+            "collections": [
+                {
+                    "id": row.id,
+                    "name": row.name,
+                    "description": row.description,
+                    "cover_file_id": row.cover_file_id
+                    if row.cover_file_id in held.get(row.id, [])
+                    else None,
+                    "file_ids": held.get(row.id, []),
+                    **_file_metadata(row),
+                }
+                for row in rows
+            ],
+        }
+        path = f"{folder}/collections.json"
+        await self._append_backup(
+            RenderItem(key=path, data=payload, filename=path, format="json"),
+            path=path,
+            tool=_STRUCTURAL_TOOL,
+            type="initiative-collections",
+            schema_version=1,
+            entity_id=initiative.id,
+            title=initiative.name,
+            initiative_id=initiative.id,
+        )
+
     async def add_guild_sections(self, scope_kind: str) -> None:
         """What the community owns outside any initiative.
 
@@ -1478,7 +1525,7 @@ _SECTIONS: tuple[BackupSection, ...] = (
             FileType.sheet.value: frozenset({"csv", "xlsx"}),
         },
         type_in_filename=False,
-        preload=_ScopeBuilder._preload_files,
+        preload=_ScopeBuilder._preload_embedded_assets,
         format_for=_ScopeBuilder._file_format,
         write_apart=_ScopeBuilder._write_uploaded_file,
         before_envelope=_ScopeBuilder._collect_embedded_assets,
