@@ -68,7 +68,7 @@ from app.services.tenant import task_hierarchy
 from app.services.tenant import task_creation as task_creation_service
 from app.core.tools import KINDS, Tool
 from app.services.tenant import named_people
-from app.services.tenant import task_description as task_description_service
+from app.services.tenant import descriptions as descriptions_service
 from app.services.tenant import task_queries
 from app.services.tenant import task_series
 from app.services.tenant import task_statuses as task_statuses_service
@@ -408,7 +408,7 @@ async def _insert_task(
         raise
 
     if task.description:
-        await task_description_service.description_saved(
+        await descriptions_service.description_saved(
             session,
             task,
             previous=None,
@@ -843,7 +843,7 @@ async def update_task(
 
     let_go: set[str] = set()
     if task.description != previous_description:
-        await task_description_service.description_saved(
+        await descriptions_service.description_saved(
             session,
             task,
             previous=previous_description,

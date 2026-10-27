@@ -1227,7 +1227,9 @@ export interface BodyUploadBackup {
 export interface BodyUploadCatalogItem {
   file: Blob | File;
   title?: string | null;
-  caption?: string | null;
+  description?: string | null;
+  /** The day the item is about. Defaults to today, in UTC. */
+  occurred_on?: string | null;
 }
 
 export interface BodyUploadCatalogItemVersion {
@@ -2330,7 +2332,8 @@ export type CatalogItemDetailFieldId =
 
 export const CatalogItemDetailFieldId = {
   title: "title",
-  caption: "caption",
+  description: "description",
+  date: "date",
   tags: "tags",
 } as const;
 
@@ -2339,7 +2342,8 @@ export interface CatalogItemRead {
   catalog_id: number;
   community_id: number;
   title: string | null;
-  caption: string | null;
+  description: string | null;
+  occurred_on: string;
   file_url: string;
   thumbnail_url: string | null;
   file_content_type: string | null;
@@ -2369,9 +2373,10 @@ export interface CatalogItemListResponse {
 export interface CatalogItemUpdate {
   properties?: PropertyValueInput[] | null;
   title?: string | null;
-  caption?: string | null;
+  description?: string | null;
+  occurred_on?: string | null;
   tag_ids?: number[] | null;
-  caption_base?: string | null;
+  description_base?: string | null;
 }
 
 /**
@@ -13289,7 +13294,7 @@ export type ListCatalogItemsParams = {
    */
   tag_ids?: number[] | null;
   /**
-   * Match on title, caption or filename.
+   * Match on title, description or filename.
    */
   search?: string | null;
   /**
@@ -13297,7 +13302,7 @@ export type ListCatalogItemsParams = {
    */
   oldest_first?: boolean;
   /**
-   * Start the list at this instant, inclusive, measured by upload time — which is what the list is ordered by. This is how a timeline jumps to a month without paging through everything since. It follows the list's own direction: newest first it is a ceiling and the page walks back from it, oldest first a floor and the page walks forward, so pair it with the matching end of the timeline bucket.
+   * Start the list at this day, inclusive, measured by each item's date — which is what the list is ordered by. This is how a timeline jumps to a month without paging through everything since. It follows the list's own direction: newest first it is a ceiling and the page walks back from it, oldest first a floor and the page walks forward, so pair it with the matching end of the timeline bucket.
    */
   until?: string | null;
   /**
@@ -13314,10 +13319,6 @@ export type ListCatalogItemsParams = {
 export type GetCatalogItemTimelineParams = {
   tag_ids?: number[] | null;
   search?: string | null;
-  /**
-   * IANA zone the month boundaries are cut in, e.g. Pacific/Auckland. Defaults to UTC.
-   */
-  tz?: string | null;
 };
 
 export type ReadPluginDataParams = {

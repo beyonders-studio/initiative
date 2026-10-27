@@ -53,41 +53,31 @@ export const thumbSrc = (image: Pick<CatalogItemRead, "file_url" | "thumbnail_ur
 export const aspectRatio = (image: Pick<CatalogItemRead, "width" | "height">): number | null =>
   image.width && image.height ? image.width / image.height : null;
 
-const two = (n: number) => String(n).padStart(2, "0");
-
-/** The `YYYY-MM` a picture falls in, in the reader's own zone — the same
- *  boundary the timeline endpoint cuts its months on. */
-export const imagePeriod = (image: Pick<CatalogItemRead, "created_at">): string => {
-  const at = new Date(image.created_at);
-  return `${at.getFullYear()}-${two(at.getMonth() + 1)}`;
-};
-
-/** The local calendar day a picture arrived on, as `YYYY-MM-DD`. */
-export const imageDay = (image: Pick<CatalogItemRead, "created_at">): string => {
-  const at = new Date(image.created_at);
-  return `${at.getFullYear()}-${two(at.getMonth() + 1)}-${two(at.getDate())}`;
-};
+/** The `YYYY-MM` an item's date falls in — the month the timeline endpoint
+ *  files it under. A date is a day, so it is the same wherever it is read. */
+export const imagePeriod = (image: Pick<CatalogItemRead, "occurred_on">): string =>
+  image.occurred_on.slice(0, 7);
 
 export interface DayGroup<T> {
-  /** `YYYY-MM-DD`, local. */
+  /** `YYYY-MM-DD`. */
   day: string;
   items: T[];
 }
 
 /**
- * Pictures grouped by the day they arrived, in the order given.
+ * Items grouped by their date, in the order given.
  *
- * The timeline view: pictures uploaded on the same day sit side by side, and
- * a new day starts a new row. Stable — a picture is in exactly one group, and
- * groups keep the list's own order — so a list that arrived newest first
- * groups newest day first.
+ * The timeline view: items dated the same day sit side by side, and a new
+ * day starts a new row. Stable — an item is in exactly one group, and groups
+ * keep the list's own order — so a list that arrived newest first groups
+ * newest day first.
  */
-export const groupByDay = <T extends Pick<CatalogItemRead, "created_at">>(
+export const groupByDay = <T extends Pick<CatalogItemRead, "occurred_on">>(
   images: T[]
 ): DayGroup<T>[] => {
   const groups: DayGroup<T>[] = [];
   for (const image of images) {
-    const day = imageDay(image);
+    const day = image.occurred_on;
     const last = groups[groups.length - 1];
     if (last && last.day === day) last.items.push(image);
     else groups.push({ day, items: [image] });

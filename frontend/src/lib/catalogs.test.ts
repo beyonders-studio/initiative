@@ -5,7 +5,6 @@ import {
   aspectRatio,
   groupByDay,
   groupByTag,
-  imageDay,
   imageLabel,
   imagePeriod,
   refuseFile,
@@ -52,21 +51,18 @@ describe("naming and drawing a picture", () => {
 });
 
 describe("grouping a wall", () => {
-  it("cuts days and months in the reader's own zone", () => {
-    const image = buildCatalogItem({ created_at: "2026-03-05T12:00:00.000Z" });
-    const local = new Date(image.created_at);
-    expect(imageDay(image)).toBe(
-      `${local.getFullYear()}-${String(local.getMonth() + 1).padStart(2, "0")}-${String(local.getDate()).padStart(2, "0")}`
-    );
-    expect(imagePeriod(image)).toBe(
-      `${local.getFullYear()}-${String(local.getMonth() + 1).padStart(2, "0")}`
-    );
+  it("files an item under the month of its date, not of when it was added", () => {
+    const image = buildCatalogItem({
+      occurred_on: "2026-03-05",
+      created_at: "2026-05-01T12:00:00.000Z",
+    });
+    expect(imagePeriod(image)).toBe("2026-03");
   });
 
-  it("puts pictures from the same day side by side and keeps the list's order", () => {
-    const a = buildCatalogItem({ created_at: "2026-03-05T18:00:00.000Z" });
-    const b = buildCatalogItem({ created_at: "2026-03-05T17:00:00.000Z" });
-    const c = buildCatalogItem({ created_at: "2026-03-01T17:00:00.000Z" });
+  it("puts items dated the same day side by side and keeps the list's order", () => {
+    const a = buildCatalogItem({ occurred_on: "2026-03-05" });
+    const b = buildCatalogItem({ occurred_on: "2026-03-05" });
+    const c = buildCatalogItem({ occurred_on: "2026-03-01" });
     const groups = groupByDay([a, b, c]);
     expect(groups.map((g) => g.items.map((i) => i.id))).toEqual([[a.id, b.id], [c.id]]);
   });

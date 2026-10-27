@@ -41,7 +41,7 @@ CATALOGS: dict[str, list[dict]] = {
             "images": [
                 {
                     "title": "Castle Ravenloft, ground floor",
-                    "caption": "The one the players have. Do not show them the crypts.",
+                    "description": "The one the players have. Do not show them the crypts.",
                     "created_by": "Dungeon Master",
                     "days_ago": 160,
                     "size": (1600, 1100),
@@ -60,7 +60,7 @@ CATALOGS: dict[str, list[dict]] = {
                 },
                 {
                     "title": "Strahd's letter",
-                    "caption": "Read aloud at the gates. Sera cried. Everyone pretended "
+                    "description": "Read aloud at the gates. Sera cried. Everyone pretended "
                     "not to notice.",
                     "created_by": "Dungeon Master",
                     "days_ago": 150,
@@ -103,7 +103,7 @@ CATALOGS: dict[str, list[dict]] = {
                 },
                 {
                     "title": "Tarokka reading",
-                    "caption": "The spread as dealt. Photographed before Vex could touch it.",
+                    "description": "The spread as dealt. Photographed before Vex could touch it.",
                     "created_by": "Elara Moonwhisper",
                     "days_ago": 90,
                     "size": (1500, 1000),
@@ -153,7 +153,7 @@ CATALOGS: dict[str, list[dict]] = {
                 {
                     "title": None,
                     "filename": "IMG_4471.png",
-                    "caption": "The table, mid-session. Not sure who took this.",
+                    "description": "The table, mid-session. Not sure who took this.",
                     "created_by": "Vex Shadowstep",
                     "days_ago": 1,
                     "size": (1600, 1200),
@@ -177,7 +177,7 @@ CATALOGS: dict[str, list[dict]] = {
                 },
                 {
                     "title": "Gundren's map",
-                    "caption": "Water-stained on purpose. Took three tea bags.",
+                    "description": "Water-stained on purpose. Took three tea bags.",
                     "created_by": "Dungeon Master",
                     "days_ago": 74,
                     "size": (1200, 900),
@@ -222,7 +222,7 @@ CATALOGS: dict[str, list[dict]] = {
                 },
                 {
                     "title": "Exodus, bridge",
-                    "caption": "Third pass. The viewscreen finally reads as a window.",
+                    "description": "Third pass. The viewscreen finally reads as a window.",
                     "created_by": "Aurelia Brightshield",
                     "days_ago": 96,
                     "size": (1600, 1000),
@@ -264,7 +264,7 @@ CATALOGS: dict[str, list[dict]] = {
                 {
                     "title": None,
                     "filename": "bridge-wip-final-2.png",
-                    "caption": "Whatever this was, it did not survive the review.",
+                    "description": "Whatever this was, it did not survive the review.",
                     "created_by": "Finley Goldtongue",
                     "days_ago": 3,
                     "size": (1000, 1200),
@@ -291,7 +291,7 @@ CATALOGS: dict[str, list[dict]] = {
             "images": [
                 {
                     "title": "The Shattered Seas",
-                    "caption": "The whole map. Torn along the eastern edge, which is "
+                    "description": "The whole map. Torn along the eastern edge, which is "
                     "where we are going.",
                     "created_by": "Finley Goldtongue",
                     "days_ago": 200,
@@ -318,7 +318,7 @@ CATALOGS: dict[str, list[dict]] = {
                 },
                 {
                     "title": "Imperial patrol routes",
-                    "caption": "Do not leave this one on the table.",
+                    "description": "Do not leave this one on the table.",
                     "created_by": "Thorn Ironforge",
                     "days_ago": 9,
                     "size": (2000, 1200),
@@ -421,7 +421,8 @@ async def _picture(c: Community, catalog: Catalog, im: dict) -> CatalogItem:
             item = CatalogItem(
                 catalog_id=catalog.id,
                 title=im.get("title"),
-                caption=im.get("caption"),
+                description=im.get("description"),
+                occurred_on=created_at.date(),
                 created_by=uploader,
                 created_at=created_at,
                 updated_at=version_at,

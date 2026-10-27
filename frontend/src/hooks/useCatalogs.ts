@@ -32,6 +32,7 @@ import { TOOL_HOOKS } from "@/hooks/toolHooks";
 import { useActiveCommunityId } from "@/hooks/useActiveCommunityId";
 import { useCommunityMutation } from "@/hooks/useApiMutation";
 import type { FieldSaveKind } from "@/hooks/useFieldSave";
+import { localDayKey } from "@/lib/formatDate";
 import type { MutationOpts } from "@/types/mutation";
 import type { QueryOpts } from "@/types/query";
 
@@ -121,7 +122,6 @@ export const invalidateImages = (catalogId: number) =>
 export interface UploadCatalogItemVariables {
   file: File;
   title?: string | null;
-  caption?: string | null;
 }
 
 /**
@@ -140,11 +140,12 @@ export const useUploadCatalogItem = (
 ) =>
   useCommunityMutation<CatalogItemRead, UploadCatalogItemVariables>(
     {
-      mutationFn: (communityId, { file, title, caption }) =>
+      mutationFn: (communityId, { file, title }) =>
         uploadCatalogItem(communityId, catalogId, {
           file,
           title: title ?? null,
-          caption: caption ?? null,
+          // Dated the day it is added where the person adding it is.
+          occurred_on: localDayKey(new Date().toISOString()),
         }),
     },
     options

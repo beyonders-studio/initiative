@@ -284,22 +284,17 @@ export const notificationText = (
         initiativeName: data.initiative_name ?? t("notifications.plain.initiativeIn"),
       });
     case "mention":
-      // A comment, a task's description, or a file.
       if (data.comment_id) {
         return t("notifications.mentionComment", {
           mentionedBy: data.mentioned_by_name ?? t("notifications.someone"),
           contextTitle: data.context_title ?? t("notifications.plain.item"),
         });
       }
-      if (data.task_id) {
-        return t("notifications.mentionTaskDescription", {
-          mentionedBy: data.mentioned_by_name ?? t("notifications.someone"),
-          taskTitle: data.task_title ?? t("notifications.plain.item"),
-        });
-      }
-      return t("notifications.mentionFile", {
+      // A description or a file, named by kind and id. A task's description
+      // named its task by `task_id` before that.
+      return t("notifications.mentionIn", {
         mentionedBy: data.mentioned_by_name ?? t("notifications.someone"),
-        fileTitle: data.entity_name ?? t("notifications.plain.file"),
+        title: data.entity_name ?? data.task_title ?? t("notifications.plain.item"),
       });
     case "comment_on_task": {
       const { name, others, count } = commentSummary(data);

@@ -27,7 +27,7 @@ interface CatalogItemTileProps {
  *
  * A button, not a link: a picture has no page of its own, it opens in the
  * lightbox over the wall it is on. The title is on hover and never in the
- * layout — the wall is for looking, and a caption under every tile would
+ * layout — the wall is for looking, and a description under every tile would
  * make it a list.
  *
  * The same button takes the picture into a selection while the wall is

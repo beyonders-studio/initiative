@@ -1,11 +1,13 @@
-from datetime import datetime, timezone
+from datetime import date, datetime, timezone
 from typing import ClassVar, List, Optional, TYPE_CHECKING
 
 from sqlalchemy import (
     BigInteger,
     Column,
+    Date,
     DateTime,
     ForeignKey,
+    Index,
     Integer,
     String,
     Text,
@@ -146,9 +148,22 @@ class CatalogItem(HoldMixin, CreatedByMixin, SoftDeleteMixin, table=True):
     ``title`` is optional — most pictures are named by what they show — and
     surfaces fall back to the original filename, which is at least what the
     person who uploaded it called it.
+
+    ``occurred_on`` is the day the item is about — a visit, a photo, a bottle
+    opened — and the day it was added until somebody says otherwise. Every
+    list of a catalog is in that order.
     """
 
     __tablename__ = "catalog_items"
+    __table_args__ = (
+        Index(
+            "ix_catalog_items_catalog_order",
+            "catalog_id",
+            "occurred_on",
+            "created_at",
+            "id",
+        ),
+    )
     # What labels a picture in a bare list of mixed things (the trash can).
     # Often empty, and the trash then shows the row with no name — which is
     # still the row, and still restorable.
@@ -166,7 +181,13 @@ class CatalogItem(HoldMixin, CreatedByMixin, SoftDeleteMixin, table=True):
     title: Optional[str] = Field(
         default=None, sa_column=Column(String(length=255), nullable=True)
     )
-    caption: Optional[str] = Field(default=None, sa_column=Column(Text, nullable=True))
+    description: Optional[str] = Field(
+        default=None, sa_column=Column(Text, nullable=True)
+    )
+    occurred_on: date = Field(
+        default_factory=lambda: datetime.now(timezone.utc).date(),
+        sa_column=Column(Date, nullable=False),
+    )
     current_version_id: Optional[int] = Field(
         default=None,
         sa_column=Column(

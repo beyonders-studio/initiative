@@ -22,7 +22,7 @@ after that does anything decode a pixel — to make the thumbnail, boxed so a
 picture that cannot be thumbnailed is still stored.
 """
 
-from datetime import datetime, timezone
+from datetime import date, datetime, timezone
 from typing import Annotated, Any, List, Optional, cast
 
 from fastapi import (
@@ -59,7 +59,7 @@ from app.core.tools import KINDS, Tool
 from app.db.query import apply_pagination, build_paginated_response
 from app.models.platform.user import User
 from app.models.tenant.catalog import Catalog, CatalogItem, CatalogItemVersion
-from app.schemas.base import MentionStr
+from app.schemas.base import RichMentionStr
 from app.schemas.tenant.catalog import (
     CatalogCreate,
     CatalogItemBulkDelete,
@@ -80,6 +80,7 @@ from app.services.tenant import attachments as attachments_service
 from app.services.tenant import overwrites
 from app.services.tenant import file_versions
 from app.services.tenant import catalogs as catalogs_service
+from app.services.tenant import descriptions as descriptions_service
 from app.services.tenant import plugin_metadata
 from app.services.tenant import properties as properties_service
 from app.services.tenant import tags as tags_service
@@ -255,7 +256,7 @@ def _item_scope(
         needle = f"%{search.strip()}%"
         conditions.append(
             func.coalesce(CatalogItem.title, "").ilike(needle)
-            | func.coalesce(CatalogItem.caption, "").ilike(needle)
+            | func.coalesce(CatalogItem.description, "").ilike(needle)
             | CatalogItem.current_version.has(
                 CatalogItemVersion.original_filename.ilike(needle)
             )
@@ -413,7 +414,7 @@ async def list_catalog_items(
         default=None, description="Only pictures carrying ANY of these tags."
     ),
     search: Optional[str] = Query(
-        default=None, description="Match on title, caption or filename."
+        default=None, description="Match on title, description or filename."
     ),
     oldest_first: bool = Query(
         default=False,
@@ -422,8 +423,8 @@ async def list_catalog_items(
     until: Optional[datetime] = Query(
         default=None,
         description=(
-            "Start the list at this instant, inclusive, measured by upload "
-            "time — which is what the list is ordered by. This is how a "
+            "Start the list at this day, inclusive, measured by each item's "
+            "date — which is what the list is ordered by. This is how a "
             "timeline jumps to a month without paging through everything "
             "since. It follows the list's own direction: newest first it is a "
             "ceiling and the page walks back from it, oldest first a floor "
@@ -479,24 +480,18 @@ async def get_catalog_item_timeline(
     guild_context: CatalogsRead,
     tag_ids: Optional[List[int]] = Query(default=None),
     search: Optional[str] = Query(default=None),
-    tz: Optional[str] = Query(
-        default=None,
-        description=(
-            "IANA zone the month boundaries are cut in, e.g. Pacific/Auckland. "
-            "Defaults to UTC."
-        ),
-    ),
 ) -> TimelineResponse:
-    """The months this catalog has pictures in, newest first — what the
-    timeline rail is drawn from. Takes the same filters the list does, so the
-    rail is a picture of the list as it currently stands."""
+    """The months this catalog has items in, by each item's date, newest
+    first — what the timeline rail is drawn from. Takes the same filters the
+    list does, so the rail is a picture of the list as it currently stands. A
+    date is a day, so its month is the same wherever it is read."""
     catalog = await resource_access.load_authorized(
         session, Tool.catalog, catalog_id, current_user, guild_context
     )
     conditions = _item_scope(catalog, tag_ids=tag_ids, search=search)
     return TimelineResponse(
         buckets=await timeline_service.month_buckets(
-            session, date_expr=CatalogItem.created_at, conditions=conditions, tz=tz
+            session, date_expr=CatalogItem.occurred_on, conditions=conditions
         )
     )
 
@@ -513,7 +508,11 @@ async def upload_catalog_item(
     guild_context: CatalogsWrite,
     file: UploadFile = File(...),
     title: Optional[str] = Form(default=None),
-    caption: Annotated[Optional[MentionStr], Form()] = None,
+    description: Annotated[Optional[RichMentionStr], Form()] = None,
+    occurred_on: Annotated[
+        Optional[date],
+        Form(description="The day the item is about. Defaults to today, in UTC."),
+    ] = None,
 ) -> CatalogItemRead:
     """Add one picture to a catalog. Requires write access.
 
@@ -530,13 +529,18 @@ async def upload_catalog_item(
     item = CatalogItem(
         catalog_id=catalog.id,
         title=(title or "").strip()[:255] or None,
-        caption=(caption or "").strip() or None,
+        description=(description or "").strip() or None,
+        occurred_on=occurred_on or now.date(),
         created_by=guild_context.user_id,
         created_at=now,
         updated_at=now,
     )
     session.add(item)
     await session.flush()
+    if item.description:
+        await descriptions_service.description_saved(
+            session, item, previous=None, author=current_user
+        )
     version = await file_versions.add_version(
         session, item, created_by=guild_context.user_id, **stored
     )
@@ -582,20 +586,23 @@ async def update_catalog_item(
     current_user: ActorUserDep,
     guild_context: CatalogsWrite,
 ) -> CatalogItemRead:
-    """Retitle, caption, retag or set the properties of a picture. Requires
-    write access on the catalog."""
+    """Retitle, describe, date, retag or set the properties of a picture.
+    Requires write access on the catalog."""
     item = await resource_access.load_child(
         session, CatalogItem, item_id, access="write"
     )
-    if "caption_base" in item_in.model_fields_set:
+    if "description_base" in item_in.model_fields_set:
         await overwrites.refuse_written_over(
-            session, item, "caption", item_in.caption_base
+            session, item, "description", item_in.description_base
         )
-    update_data = item_in.model_dump(exclude_unset=True, exclude={"caption_base"})
+    update_data = item_in.model_dump(exclude_unset=True, exclude={"description_base"})
+    previous_description = item.description
     if "title" in update_data:
         item.title = (update_data["title"] or "").strip() or None
-    if "caption" in update_data:
-        item.caption = (update_data["caption"] or "").strip() or None
+    if "description" in update_data:
+        item.description = (update_data["description"] or "").strip() or None
+    if update_data.get("occurred_on") is not None:
+        item.occurred_on = update_data["occurred_on"]
     if "tag_ids" in update_data and update_data["tag_ids"] is not None:
         await tags_service.set_entity_tags(
             session,
@@ -607,6 +614,10 @@ async def update_catalog_item(
     await properties_service.write_on_update(session, item, item_in.properties)
     item.updated_at = datetime.now(timezone.utc)
     session.add(item)
+    if item.description != previous_description:
+        await descriptions_service.description_saved(
+            session, item, previous=previous_description, author=current_user
+        )
     await attachments_service.claim_uploads(session, item)
     await session.commit()
     hydrated = await _refetch_item(session, item.id)

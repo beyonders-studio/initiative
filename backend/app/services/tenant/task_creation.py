@@ -48,7 +48,7 @@ from app.services.tenant import properties as properties_service
 from app.services.tenant import tags as tags_service
 from app.services.tenant import task_checklist as checklist_service
 from app.services.tenant import task_completion
-from app.services.tenant import task_description as task_description_service
+from app.services.tenant import descriptions as descriptions_service
 from app.services.tenant import task_statuses as task_statuses_service
 from app.services.tenant import task_types as task_types_service
 from app.services.tenant.names import copy_name
@@ -495,7 +495,7 @@ async def copy_tasks(
             if assignees is None or assignee.id in assignees
         )
         if copy.description:
-            await task_description_service.record_references(
+            await descriptions_service.record_references(
                 session, copy, author_id=author_id
             )
     copied_ids = {s.id: c.id for s, c in zip(sources, copies)}

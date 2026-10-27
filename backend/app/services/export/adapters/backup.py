@@ -800,7 +800,7 @@ class _ScopeBuilder:
     def _skip_catalog_without_uploads(self, loaded, initiative, path_stem: str) -> bool:
         """A catalog is mostly blobs, so it obeys the uploads toggle the way a
         uploaded file does — excluded uploads means the pictures do not
-        travel, and a catalog of captions without them is not worth writing,
+        travel, and a catalog of descriptions without them is not worth writing,
         so the whole catalog is recorded as skipped instead."""
         if _include_uploads(self.params):
             return False

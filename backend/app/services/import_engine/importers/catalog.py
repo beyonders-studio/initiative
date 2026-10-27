@@ -120,7 +120,12 @@ class CatalogImporter(NamesPeopleInPassing):
             row = CatalogItem(
                 catalog_id=catalog.id,
                 title=image_env.title,
-                caption=image_env.caption,
+                description=image_env.description,
+                **(
+                    {"occurred_on": image_env.occurred_on}
+                    if image_env.occurred_on is not None
+                    else {}
+                ),
                 created_by=importer.id,
             )
             session.add(row)

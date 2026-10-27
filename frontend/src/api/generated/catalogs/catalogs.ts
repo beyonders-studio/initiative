@@ -845,9 +845,10 @@ export const useUploadCatalogItem = <TError = ErrorType<HTTPValidationError>, TC
   return useMutation(getUploadCatalogItemMutationOptions(options), queryClient);
 };
 /**
- * The months this catalog has pictures in, newest first — what the
- * timeline rail is drawn from. Takes the same filters the list does, so the
- * rail is a picture of the list as it currently stands.
+ * The months this catalog has items in, by each item's date, newest
+ * first — what the timeline rail is drawn from. Takes the same filters the
+ * list does, so the rail is a picture of the list as it currently stands. A
+ * date is a day, so its month is the same wherever it is read.
  * @summary Get Catalog Item Timeline
  */
 export const getCatalogItemTimeline = (
@@ -1243,8 +1244,8 @@ export function useReadCatalogItem<
 }
 
 /**
- * Retitle, caption, retag or set the properties of a picture. Requires
- * write access on the catalog.
+ * Retitle, describe, date, retag or set the properties of a picture.
+ * Requires write access on the catalog.
  * @summary Update Catalog Item
  */
 export const updateCatalogItem = (

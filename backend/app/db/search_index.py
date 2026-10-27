@@ -212,10 +212,10 @@ def _current_filename(row: str, versions: str) -> str:
 
 
 def _catalog_item_text(row: str) -> str:
-    """A picture's searchable text: its caption, and the filename split into
+    """A picture's searchable text: its description, and the filename split into
     words so ``round-4-detail.png`` is found by ``detail``."""
     filename = _current_filename(row, "catalog_item_versions")
-    return f"coalesce({row}.caption, '') || ' ' || {_with_words(filename)}"
+    return f"coalesce({row}.description, '') || ' ' || {_with_words(filename)}"
 
 
 def _file_text(row: str) -> str:
@@ -504,7 +504,7 @@ SEARCH_SOURCES: dict[str, SearchSource] = {
             f"coalesce(nullif({row}.title, ''),"
             f" {_current_filename(row, 'catalog_item_versions')})"
         ),
-        body=("caption", "current_version_id"),
+        body=("description", "current_version_id"),
         body_sql=_catalog_item_text,
     ),
     # A page is found by its title and by what is written on it. Its body is a

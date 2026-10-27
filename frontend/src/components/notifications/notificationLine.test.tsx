@@ -179,13 +179,28 @@ describe("notificationLink — a target_path without a community", () => {
 });
 
 describe("notificationText — mentions", () => {
-  it("names the task whose description mentioned you", () => {
+  it("names what a description that mentioned you describes", () => {
+    const line = notificationText(
+      notice("mention", {
+        entity_type: "catalog_item",
+        entity_id: 7,
+        entity_name: "Ship it",
+        mentioned_by_name: "ada",
+      }),
+      t
+    );
+
+    expect(line).toContain("notifications.mentionIn");
+    expect(line).toContain("Ship it");
+  });
+
+  it("still names the task of a description mention sent by its task", () => {
     const line = notificationText(
       notice("mention", { task_id: 7, task_title: "Ship it", mentioned_by_name: "ada" }),
       t
     );
 
-    expect(line).toContain("notifications.mentionTaskDescription");
+    expect(line).toContain("notifications.mentionIn");
     expect(line).toContain("Ship it");
   });
 

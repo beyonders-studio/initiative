@@ -14,6 +14,7 @@ lines (``app.core.recurrence.imported``).
 
 from __future__ import annotations
 
+from datetime import date
 from typing import Any, Literal, Optional
 
 from pydantic import ConfigDict, Field, model_validator
@@ -205,7 +206,10 @@ class CatalogItemEnvelope(SanitizedBaseModel):
 
     storage_key: str
     title: Optional[str] = None
-    caption: Optional[str] = None
+    description: Optional[str] = None
+    #: Absent from an archive made before items had a date: the day it is
+    #: restored, as for an upload.
+    occurred_on: Optional[date] = None
     content_type: Optional[str] = None
     size_bytes: Optional[int] = None
     original_filename: Optional[str] = None
