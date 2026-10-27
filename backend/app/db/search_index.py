@@ -16,6 +16,7 @@ path that gives a long file several.
 
 from __future__ import annotations
 
+import enum
 import hashlib
 from collections.abc import Callable
 from typing import Any
@@ -385,12 +386,21 @@ def _archived_expr(table: str, source: "SearchSource", row: str) -> str | None:
 
 def _written(table: str, source: "SearchSource") -> tuple[str, ...]:
     """The body columns somebody writes in: all of them, less a column that only
-    names a kind (an enum) or another row (a foreign key)."""
+    names a kind (an enum, in the database or on the model) or another row (a
+    foreign key)."""
+    from app.db.base import MODELS_BY_TABLE
+
     columns = SQLModel.metadata.tables[table].columns
+    fields = MODELS_BY_TABLE[table].model_fields
+
+    def names_a_kind(column: str) -> bool:
+        annotation = fields[column].annotation if column in fields else None
+        return isinstance(columns[column].type, Enum) or (
+            isinstance(annotation, type) and issubclass(annotation, enum.Enum)
+        )
+
     return tuple(
-        c
-        for c in source.body
-        if not isinstance(columns[c].type, Enum) and not columns[c].foreign_keys
+        c for c in source.body if not names_a_kind(c) and not columns[c].foreign_keys
     )
 
 

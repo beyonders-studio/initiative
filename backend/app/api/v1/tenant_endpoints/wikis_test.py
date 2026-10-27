@@ -743,7 +743,7 @@ async def test_a_file_row_says_what_kind_of_file_it_is(
     await client.put(a.g(f"/wikis/{wiki.id}/files/{file.id}"), headers=a.headers)
     listed = await client.get(a.g(f"/wikis/{wiki.id}/pages"), headers=a.headers)
     rows = {row["title"]: row for row in listed.json()["items"]}
-    assert rows["Budget"]["file_type"] == "spreadsheet"
+    assert rows["Budget"]["file_type"] == "sheet"
     assert rows["Written here"]["file_type"] is None
 
 
