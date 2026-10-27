@@ -187,15 +187,11 @@ export const UploadedFileViewer = ({
   const frameVersionId = selectedVersion?.is_current ? selectedVersion.id : null;
   useEffect(() => {
     if (!isVideo || !canEdit || thumbnailUrl || frameVersionId == null || !inlineUrl) return;
-    let cancelled = false;
-    drawVideoFrame(inlineUrl)
-      .then((frame) => {
-        if (!cancelled) putVideoThumbnail({ fileId, versionId: frameVersionId, frame });
-      })
+    const leaving = new AbortController();
+    drawVideoFrame(inlineUrl, leaving.signal)
+      .then((frame) => putVideoThumbnail({ fileId, versionId: frameVersionId, frame }))
       .catch(() => {});
-    return () => {
-      cancelled = true;
-    };
+    return () => leaving.abort();
   }, [isVideo, canEdit, thumbnailUrl, frameVersionId, inlineUrl, fileId, putVideoThumbnail]);
 
   // Fetch markdown content for rendering
@@ -606,13 +602,13 @@ export const UploadedFileViewer = ({
               controls
               preload="metadata"
               className="max-h-full max-w-full"
-              title={originalFilename || t("viewer.video")}
+              title={displayFilename || t("viewer.video")}
             />
           </div>
         ) : isAudio ? (
           <div className="flex flex-col items-center justify-center gap-6 bg-muted/50 px-6 py-16">
-            <h3 className="font-semibold text-xl tracking-tight">
-              {originalFilename || t("viewer.audio")}
+            <h3 className="w-full min-w-0 break-words text-center font-semibold text-xl tracking-tight">
+              {displayFilename || t("viewer.audio")}
             </h3>
             {/* biome-ignore lint/a11y/useMediaCaption: an uploaded recording brings no caption track. */}
             <audio
@@ -620,7 +616,7 @@ export const UploadedFileViewer = ({
               controls
               preload="metadata"
               className="w-full max-w-xl"
-              title={originalFilename || t("viewer.audio")}
+              title={displayFilename || t("viewer.audio")}
             />
           </div>
         ) : isMarkdown ? (
