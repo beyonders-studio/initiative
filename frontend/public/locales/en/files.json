@@ -105,9 +105,16 @@
   "featuredImage": {
     "label": "Featured image",
     "upload": "Upload image",
+    "fromFiles": "From Files",
     "replace": "Replace",
     "remove": "Remove",
     "uploading": "Uploading…"
+  },
+  "imageChooser": {
+    "title": "Choose a picture from Files",
+    "description": "It goes in as it is now: a newer version of the file won't change it.",
+    "none": "No pictures here.",
+    "more": "Show more"
   },
   "outline": {
     "show": "Show contents",

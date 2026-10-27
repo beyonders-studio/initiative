@@ -105,9 +105,16 @@
   "featuredImage": {
     "label": "Image à la une",
     "upload": "Téléverser une image",
+    "fromFiles": "Depuis Fichiers",
     "replace": "Remplacer",
     "remove": "Retirer",
     "uploading": "Téléversement en cours…"
+  },
+  "imageChooser": {
+    "title": "Choisir une image dans Fichiers",
+    "description": "Elle est insérée telle qu’elle est maintenant : une version plus récente du fichier ne la change pas.",
+    "none": "Aucune image ici.",
+    "more": "Afficher plus"
   },
   "outline": {
     "show": "Afficher le sommaire",

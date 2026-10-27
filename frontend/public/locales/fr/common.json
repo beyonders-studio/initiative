@@ -313,6 +313,8 @@
     "taskList": "Liste de tâches",
     "more": "Plus de mise en forme",
     "image": "Image",
+    "uploadImage": "Téléverser une image",
+    "imageFromFiles": "Depuis Fichiers",
     "uploadingImage": "Envoi de {{name}}…",
     "imageUploadFailed": "Impossible d'ajouter cette image."
   },

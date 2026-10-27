@@ -313,6 +313,8 @@
     "taskList": "Task list",
     "more": "More formatting",
     "image": "Image",
+    "uploadImage": "Upload a picture",
+    "imageFromFiles": "From Files",
     "uploadingImage": "Uploading {{name}}…",
     "imageUploadFailed": "Couldn't add that picture."
   },

@@ -120,6 +120,7 @@
   "imageDialog": {
     "urlTab": "URL",
     "fileTab": "File",
+    "filesTab": "Files",
     "imageUrl": "Image URL",
     "imageUrlPlaceholder": "https://example.com/picture.png",
     "altText": "Alt text",

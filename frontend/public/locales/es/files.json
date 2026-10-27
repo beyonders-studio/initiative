@@ -105,9 +105,16 @@
   "featuredImage": {
     "label": "Imagen destacada",
     "upload": "Subir imagen",
+    "fromFiles": "Desde Archivos",
     "replace": "Reemplazar",
     "remove": "Quitar",
     "uploading": "Subiendo…"
+  },
+  "imageChooser": {
+    "title": "Elegir una imagen de Archivos",
+    "description": "Se inserta tal como está ahora: una versión más reciente del archivo no la cambia.",
+    "none": "No hay imágenes aquí.",
+    "more": "Mostrar más"
   },
   "outline": {
     "show": "Mostrar contenido",

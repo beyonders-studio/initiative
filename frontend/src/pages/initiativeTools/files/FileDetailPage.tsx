@@ -633,6 +633,8 @@ export const FileDetailPage = () => {
               canEdit={canEditFile}
               uploading={isUploadingFeaturedImage}
               onUpload={handleFeaturedImageChange}
+              initiativeId={file.initiative_id}
+              onChoose={setFeaturedImage}
               onRemove={() => setFeaturedImage(null)}
             />
           )}
