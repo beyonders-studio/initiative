@@ -94,6 +94,7 @@ import { Route as ServerRequiredAuthenticatedCCommunityIdSettingsSecurityRouteIm
 import { Route as ServerRequiredAuthenticatedCCommunityIdSettingsTrashRouteImport } from './routes/_serverRequired/_authenticated/c/$communityId/settings/trash'
 import { Route as ServerRequiredAuthenticatedCCommunityIdSettingsUsageRouteImport } from './routes/_serverRequired/_authenticated/c/$communityId/settings/usage'
 import { Route as ServerRequiredAuthenticatedCCommunityIdSettingsUsersRouteImport } from './routes/_serverRequired/_authenticated/c/$communityId/settings/users'
+import { Route as ServerRequiredAuthenticatedCCommunityIdShareRequestsBatchIdRouteImport } from './routes/_serverRequired/_authenticated/c/$communityId/share-requests_.$batchId'
 import { Route as ServerRequiredAuthenticatedCCommunityIdTagsTagIdRouteImport } from './routes/_serverRequired/_authenticated/c/$communityId/tags_.$tagId'
 import { Route as ServerRequiredAuthenticatedCCommunityIdCalendarsCalendarIdIndexRouteImport } from './routes/_serverRequired/_authenticated/c/$communityId/calendars/$calendarId/index'
 import { Route as ServerRequiredAuthenticatedCCommunityIdCalendarsCalendarIdSettingsRouteImport } from './routes/_serverRequired/_authenticated/c/$communityId/calendars/$calendarId/settings'
@@ -682,6 +683,14 @@ const ServerRequiredAuthenticatedCCommunityIdSettingsUsersRoute =
     path: '/users',
     getParentRoute: () => ServerRequiredAuthenticatedCCommunityIdSettingsRoute,
   } as any)
+const ServerRequiredAuthenticatedCCommunityIdShareRequestsBatchIdRoute =
+  ServerRequiredAuthenticatedCCommunityIdShareRequestsBatchIdRouteImport.update(
+    {
+      id: '/share-requests_/$batchId',
+      path: '/share-requests/$batchId',
+      getParentRoute: () => ServerRequiredAuthenticatedCCommunityIdRoute,
+    } as any,
+  )
 const ServerRequiredAuthenticatedCCommunityIdTagsTagIdRoute =
   ServerRequiredAuthenticatedCCommunityIdTagsTagIdRouteImport.update({
     id: '/tags_/$tagId',
@@ -1527,6 +1536,7 @@ export interface FileRoutesByFullPath {
   '/c/$communityId/settings/trash': typeof ServerRequiredAuthenticatedCCommunityIdSettingsTrashRoute
   '/c/$communityId/settings/usage': typeof ServerRequiredAuthenticatedCCommunityIdSettingsUsageRoute
   '/c/$communityId/settings/users': typeof ServerRequiredAuthenticatedCCommunityIdSettingsUsersRoute
+  '/c/$communityId/share-requests/$batchId': typeof ServerRequiredAuthenticatedCCommunityIdShareRequestsBatchIdRoute
   '/c/$communityId/tags/$tagId': typeof ServerRequiredAuthenticatedCCommunityIdTagsTagIdRoute
   '/c/$communityId/calendars/': typeof ServerRequiredAuthenticatedCCommunityIdCalendarsIndexRoute
   '/c/$communityId/settings/': typeof ServerRequiredAuthenticatedCCommunityIdSettingsIndexRoute
@@ -1692,6 +1702,7 @@ export interface FileRoutesByTo {
   '/c/$communityId/settings/trash': typeof ServerRequiredAuthenticatedCCommunityIdSettingsTrashRoute
   '/c/$communityId/settings/usage': typeof ServerRequiredAuthenticatedCCommunityIdSettingsUsageRoute
   '/c/$communityId/settings/users': typeof ServerRequiredAuthenticatedCCommunityIdSettingsUsersRoute
+  '/c/$communityId/share-requests/$batchId': typeof ServerRequiredAuthenticatedCCommunityIdShareRequestsBatchIdRoute
   '/c/$communityId/tags/$tagId': typeof ServerRequiredAuthenticatedCCommunityIdTagsTagIdRoute
   '/c/$communityId/calendars': typeof ServerRequiredAuthenticatedCCommunityIdCalendarsIndexRoute
   '/c/$communityId/settings': typeof ServerRequiredAuthenticatedCCommunityIdSettingsIndexRoute
@@ -1856,6 +1867,7 @@ export interface FileRoutesById {
   '/_serverRequired/_authenticated/c/$communityId/settings/trash': typeof ServerRequiredAuthenticatedCCommunityIdSettingsTrashRoute
   '/_serverRequired/_authenticated/c/$communityId/settings/usage': typeof ServerRequiredAuthenticatedCCommunityIdSettingsUsageRoute
   '/_serverRequired/_authenticated/c/$communityId/settings/users': typeof ServerRequiredAuthenticatedCCommunityIdSettingsUsersRoute
+  '/_serverRequired/_authenticated/c/$communityId/share-requests_/$batchId': typeof ServerRequiredAuthenticatedCCommunityIdShareRequestsBatchIdRoute
   '/_serverRequired/_authenticated/c/$communityId/tags_/$tagId': typeof ServerRequiredAuthenticatedCCommunityIdTagsTagIdRoute
   '/_serverRequired/_authenticated/c/$communityId/calendars/': typeof ServerRequiredAuthenticatedCCommunityIdCalendarsIndexRoute
   '/_serverRequired/_authenticated/c/$communityId/settings/': typeof ServerRequiredAuthenticatedCCommunityIdSettingsIndexRoute
@@ -2029,6 +2041,7 @@ export interface FileRouteTypes {
     | '/c/$communityId/settings/trash'
     | '/c/$communityId/settings/usage'
     | '/c/$communityId/settings/users'
+    | '/c/$communityId/share-requests/$batchId'
     | '/c/$communityId/tags/$tagId'
     | '/c/$communityId/calendars/'
     | '/c/$communityId/settings/'
@@ -2194,6 +2207,7 @@ export interface FileRouteTypes {
     | '/c/$communityId/settings/trash'
     | '/c/$communityId/settings/usage'
     | '/c/$communityId/settings/users'
+    | '/c/$communityId/share-requests/$batchId'
     | '/c/$communityId/tags/$tagId'
     | '/c/$communityId/calendars'
     | '/c/$communityId/settings'
@@ -2357,6 +2371,7 @@ export interface FileRouteTypes {
     | '/_serverRequired/_authenticated/c/$communityId/settings/trash'
     | '/_serverRequired/_authenticated/c/$communityId/settings/usage'
     | '/_serverRequired/_authenticated/c/$communityId/settings/users'
+    | '/_serverRequired/_authenticated/c/$communityId/share-requests_/$batchId'
     | '/_serverRequired/_authenticated/c/$communityId/tags_/$tagId'
     | '/_serverRequired/_authenticated/c/$communityId/calendars/'
     | '/_serverRequired/_authenticated/c/$communityId/settings/'
@@ -3048,6 +3063,13 @@ declare module '@tanstack/react-router' {
       fullPath: '/c/$communityId/settings/users'
       preLoaderRoute: typeof ServerRequiredAuthenticatedCCommunityIdSettingsUsersRouteImport
       parentRoute: typeof ServerRequiredAuthenticatedCCommunityIdSettingsRoute
+    }
+    '/_serverRequired/_authenticated/c/$communityId/share-requests_/$batchId': {
+      id: '/_serverRequired/_authenticated/c/$communityId/share-requests_/$batchId'
+      path: '/share-requests/$batchId'
+      fullPath: '/c/$communityId/share-requests/$batchId'
+      preLoaderRoute: typeof ServerRequiredAuthenticatedCCommunityIdShareRequestsBatchIdRouteImport
+      parentRoute: typeof ServerRequiredAuthenticatedCCommunityIdRoute
     }
     '/_serverRequired/_authenticated/c/$communityId/tags_/$tagId': {
       id: '/_serverRequired/_authenticated/c/$communityId/tags_/$tagId'
@@ -4116,6 +4138,7 @@ interface ServerRequiredAuthenticatedCCommunityIdRouteChildren {
   ServerRequiredAuthenticatedCCommunityIdIInitiativeIdRoute: typeof ServerRequiredAuthenticatedCCommunityIdIInitiativeIdRouteWithChildren
   ServerRequiredAuthenticatedCCommunityIdMarketplacePublicIdRoute: typeof ServerRequiredAuthenticatedCCommunityIdMarketplacePublicIdRoute
   ServerRequiredAuthenticatedCCommunityIdPluginsPluginIdRoute: typeof ServerRequiredAuthenticatedCCommunityIdPluginsPluginIdRoute
+  ServerRequiredAuthenticatedCCommunityIdShareRequestsBatchIdRoute: typeof ServerRequiredAuthenticatedCCommunityIdShareRequestsBatchIdRoute
   ServerRequiredAuthenticatedCCommunityIdTagsTagIdRoute: typeof ServerRequiredAuthenticatedCCommunityIdTagsTagIdRoute
   ServerRequiredAuthenticatedCCommunityIdCalendarsIndexRoute: typeof ServerRequiredAuthenticatedCCommunityIdCalendarsIndexRoute
   ServerRequiredAuthenticatedCCommunityIdCalendarsCalendarIdSettingsRoute: typeof ServerRequiredAuthenticatedCCommunityIdCalendarsCalendarIdSettingsRouteWithChildren
@@ -4142,6 +4165,8 @@ const ServerRequiredAuthenticatedCCommunityIdRouteChildren: ServerRequiredAuthen
       ServerRequiredAuthenticatedCCommunityIdMarketplacePublicIdRoute,
     ServerRequiredAuthenticatedCCommunityIdPluginsPluginIdRoute:
       ServerRequiredAuthenticatedCCommunityIdPluginsPluginIdRoute,
+    ServerRequiredAuthenticatedCCommunityIdShareRequestsBatchIdRoute:
+      ServerRequiredAuthenticatedCCommunityIdShareRequestsBatchIdRoute,
     ServerRequiredAuthenticatedCCommunityIdTagsTagIdRoute:
       ServerRequiredAuthenticatedCCommunityIdTagsTagIdRoute,
     ServerRequiredAuthenticatedCCommunityIdCalendarsIndexRoute:

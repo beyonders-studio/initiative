@@ -2541,6 +2541,15 @@ export interface CollectionFiles {
 }
 
 /**
+ * The files of a collection or a wiki the reader knows are there and
+ * can't open, and how many of those they have asked for.
+ */
+export interface HiddenFiles {
+  count?: number;
+  requested?: number;
+}
+
+/**
  * A collection as its reader sees it: only the files they can open are
  * counted, and the cover is one of those.
  */
@@ -2553,6 +2562,7 @@ export interface CollectionRead {
   cover_file_id: number | null;
   cover: CollectionCover | null;
   file_count: number;
+  hidden_files: HiddenFiles;
   created_by: number | null;
   created_at: string;
   updated_at: string;
@@ -7708,6 +7718,9 @@ export const NotificationType = {
   initiative_join_requested: "initiative_join_requested",
   initiative_join_approved: "initiative_join_approved",
   initiative_join_denied: "initiative_join_denied",
+  share_requested: "share_requested",
+  share_granted: "share_granted",
+  share_declined: "share_declined",
   project_added: "project_added",
   mention: "mention",
   comment_on_task: "comment_on_task",
@@ -10248,6 +10261,82 @@ export interface SecondFactorStepUpAnswer {
 }
 
 /**
+ * Who an approval reached: the requester, or every member of the
+ * initiative.
+ */
+export type ShareRequestScope = (typeof ShareRequestScope)[keyof typeof ShareRequestScope];
+
+export const ShareRequestScope = {
+  user: "user",
+  initiative: "initiative",
+} as const;
+
+/**
+ * A yes or a no to some of the requests the reader may answer.
+ */
+export interface ShareRequestAnswer {
+  /**
+   * @minItems 1
+   * @maxItems 500
+   */
+  ids: number[];
+  approve: boolean;
+  level?: ResourceAccessLevel | null;
+  scope?: ShareRequestScope;
+  tell?: boolean;
+}
+
+/**
+ * The requests one ask made.
+ */
+export interface ShareRequestBatch {
+  batch_id: string;
+  count: number;
+}
+
+/**
+ * Ask for one thing, or for the files of a collection or a wiki the
+ * reader can't open.
+ */
+export interface ShareRequestCreate {
+  resource_type: Tool;
+  resource_id?: number | null;
+  collection_id?: number | null;
+  wiki_id?: number | null;
+  level?: ResourceAccessLevel;
+  message?: string | null;
+}
+
+/**
+ * One request waiting on the reader's answer.
+ */
+export interface ShareRequestRead {
+  id: number;
+  batch_id: string;
+  resource_type: Tool;
+  resource_id: number;
+  resource_name: string;
+  initiative_id: number;
+  user: UserSummary;
+  guest_until?: string | null;
+  level: ResourceAccessLevel;
+  message?: string | null;
+  created_at: string;
+}
+
+/**
+ * Where the reader stands on one thing they can open, or know is there:
+ * on the tool whose sharing decides it, which is what to ask for.
+ */
+export interface ShareStanding {
+  resource_type: Tool;
+  resource_id: number;
+  initiative_id: number;
+  level?: ResourceAccessLevel | null;
+  pending?: ResourceAccessLevel | null;
+}
+
+/**
  * One place the account is signed in — a browser, the phone app or the
  * desktop app — or one of its message devices that is not signed in, as its
  * own "where you're signed in" list shows it. ``started_at`` is the sign-in,
@@ -11686,9 +11775,9 @@ export interface WikiPageUpdate {
 }
 
 /**
- * A wiki on its own page. The same shape as its summary: the pages are
- * fetched as a tree of their own, because a wiki is navigated rather than
- * read end to end.
+ * A wiki on its own page: its summary, and the files filed in it the
+ * reader knows are there and can't open. The pages are fetched as a tree of
+ * their own, because a wiki is navigated rather than read end to end.
  */
 export interface WikiRead {
   archived_at: string | null;
@@ -11718,6 +11807,7 @@ export interface WikiRead {
   accent_color: string | null;
   template_page_id: number | null;
   comment_count: number;
+  hidden_files: HiddenFiles;
 }
 
 export interface WikiUpdate {
@@ -13066,6 +13156,17 @@ export type ListCollectionsParams = {
    * true lists what has been archived instead of what is live. Omit for the live list, which is what every other view shows.
    */
   archived?: boolean | null;
+};
+
+export type ReadShareStandingParams = {
+  kind: SearchEntityType;
+  entity_id: number;
+};
+
+export type ListShareRequestsParams = {
+  batch_id?: string | null;
+  resource_type?: Tool | null;
+  resource_id?: number | null;
 };
 
 export type ExportTasksParams = {

@@ -269,6 +269,20 @@
     "initiativeJoinRequested": "{{requester}} ha solicitado unirse a {{initiativeName}}.",
     "initiativeJoinApproved": "Tu solicitud para unirte a {{initiativeName}} fue aprobada.",
     "initiativeJoinDenied": "Tu solicitud para unirte a {{initiativeName}} fue rechazada.",
+    "shareRequested": {
+      "read_one": "{{requester}} pide ver {{title}}.",
+      "read_other": "{{requester}} pide ver {{count}} archivos en {{title}}.",
+      "write_one": "{{requester}} pide editar {{title}}.",
+      "write_other": "{{requester}} pide editar {{count}} archivos en {{title}}."
+    },
+    "shareGranted": {
+      "read_one": "{{answerer}} te dio acceso para ver {{title}}.",
+      "read_other": "{{answerer}} te dio acceso para ver {{count}} archivos.",
+      "write_one": "{{answerer}} te dio acceso para editar {{title}}.",
+      "write_other": "{{answerer}} te dio acceso para editar {{count}} archivos."
+    },
+    "shareDeclined_one": "{{answerer}} rechazó tu solicitud.",
+    "shareDeclined_other": "{{answerer}} rechazó tu solicitud de {{count}} archivos.",
     "projectAdded": "{{projectName}} fue agregado a {{initiativeName}} de la que formas parte.",
     "mentionComment": "{{mentionedBy}} te mencionó en un comentario en {{contextTitle}}.",
     "mentionIn": "{{mentionedBy}} te mencionó en {{title}}.",
