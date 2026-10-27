@@ -52,8 +52,8 @@ def _history(parent: Any) -> tuple[type, Column]:
 
 
 def _stored(version: Any) -> list[str | None]:
-    """The stored files a version names."""
-    return [version.file_url]
+    """The stored files a version names: its file, and its thumbnail."""
+    return [version.file_url, version.thumbnail_url]
 
 
 def _may_hold(content_type: str | None) -> bool:

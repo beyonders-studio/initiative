@@ -874,14 +874,16 @@ def _entity_dac(table: str) -> DacPath | None:
     real table, so the tool is named.
 
     A kind that reaches its resource through a parent keeps the leg its own
-    entry declares: that walk names each table, so it survives the alias.
+    entry declares: that walk names each table, so it survives the alias. So
+    does a kind no tool governs whose entry states its own leg (a collection's
+    writer rule), which reads only the row it is handed.
     """
     path = INITIATIVE_PATHS.get(table)
     dac = path.dac if path is not None else None
     if dac is None or dac.via:
         return dac
     tool = dac.tool or _TOOL_BY_TABLE.get(table)
-    return _dac_self(tool) if tool is not None else None
+    return _dac_self(tool) if tool is not None else dac
 
 
 def _entity_arm(table: str) -> str:

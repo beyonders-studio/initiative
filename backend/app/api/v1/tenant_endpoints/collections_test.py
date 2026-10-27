@@ -16,6 +16,7 @@ from app.testing import (
     create_collection,
     create_file,
     create_resource_grant,
+    create_tag,
     route_session_to_guild,
 )
 from app.testing.factories import grant_role_permission
@@ -129,6 +130,19 @@ async def test_changing_a_collection_takes_the_role_that_makes_files(
         session, owner.initiative, owner.user, files=[shared]
     )
 
+    async def tag_it() -> int:
+        tag = await create_tag(session, owner.guild)
+        response = await client.post(
+            maker.g("/relationships/"),
+            headers=maker.headers,
+            json={
+                "source": {"type": "collection", "id": collection.id},
+                "relationship_type": "tagged_with",
+                "target": {"type": "tag", "id": tag.id},
+            },
+        )
+        return response.status_code
+
     renamed = await client.patch(
         maker.g(f"/collections/{collection.id}"),
         headers=maker.headers,
@@ -136,6 +150,7 @@ async def test_changing_a_collection_takes_the_role_that_makes_files(
     )
     assert renamed.status_code == 200
     assert renamed.json()["name"] == "Renamed by a file maker"
+    assert await tag_it() == 201
 
     await grant_role_permission(
         session, owner.initiative, "create_files", enabled=False
@@ -151,6 +166,7 @@ async def test_changing_a_collection_takes_the_role_that_makes_files(
         json={"name": "Not allowed"},
     )
     assert refused.status_code == 403
+    assert await tag_it() == 403
     # Seeing it is enough to talk about it.
     comment = await client.post(
         maker.g("/comments/"),
@@ -158,6 +174,37 @@ async def test_changing_a_collection_takes_the_role_that_makes_files(
         json={"content": "Nice set", "collection_id": collection.id},
     )
     assert comment.status_code == 201, comment.text
+
+
+async def test_archiving_a_collection_takes_the_role_that_makes_files(
+    client: AsyncClient, session, acting_user
+):
+    owner, maker, shared, _private = await _scene(session, acting_user)
+    collection = await create_collection(
+        session, owner.initiative, owner.user, files=[shared]
+    )
+    archive = f"/archive/collection/{collection.id}"
+    unarchive = f"/unarchive/collection/{collection.id}"
+
+    archived = await client.post(maker.g(archive), headers=maker.headers)
+    assert archived.status_code == 200, archived.text
+    assert archived.json()["archived_at"] is not None
+    restored = await client.post(maker.g(unarchive), headers=maker.headers)
+    assert restored.status_code == 200, restored.text
+
+    await grant_role_permission(
+        session, owner.initiative, "create_files", enabled=False
+    )
+    await session.commit()
+    assert (
+        await client.post(maker.g(archive), headers=maker.headers)
+    ).status_code == 403
+    assert (
+        await client.post(owner.g(archive), headers=owner.headers)
+    ).status_code == 200
+    assert (
+        await client.post(maker.g(unarchive), headers=maker.headers)
+    ).status_code == 403
 
 
 async def test_adding_a_file_takes_being_able_to_open_it(

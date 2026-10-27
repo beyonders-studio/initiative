@@ -34,7 +34,7 @@ from app.core.messages import (
 )
 from app.core.errors import CodedError
 from app.core.tools import KIND_BY_TABLE, KINDS, Tool, kind_refusal
-from app.db.frozen import row_is_frozen
+from app.db.frozen import ancestor_is_frozen, row_is_frozen
 from app.db.guild_standing import InstallContext
 from app.db.initiative_rls import governing_path
 from app.db.session import require_actor_context
@@ -512,16 +512,26 @@ def parent_column(model: type) -> str:
 
 
 async def require_may_change(
-    session: Any, row: Any, user: Optional[User], context: ActorContext
+    session: Any,
+    row: Any,
+    user: Optional[User],
+    context: ActorContext,
+    *,
+    action: Optional[Action] = None,
 ) -> None:
     """Raise unless the request may change ``row``, a kind in no one instance
     of its tool: its tool switched on in the row's initiative, a role there
-    that creates the tool, and the row neither archived nor in the trash. A
-    collection, which a file maker changes whoever's files are in it."""
+    that creates the tool, and the row neither archived nor in the trash —
+    or, to take it back out of the archive (``Action.unarchive``), nothing
+    above it. A collection, which a file maker changes whoever's files are in
+    it."""
     kind = KIND_BY_TABLE[type(row).__tablename__]
     if context.content_read_only:
         raise kind_refusal(kind.value, KindMessages.WRITE_ACCESS_REQUIRED, 403)
-    if row_is_frozen(row):
+    frozen = (
+        ancestor_is_frozen(row) if action is Action.unarchive else row_is_frozen(row)
+    )
+    if frozen:
         raise HTTPException(
             status_code=status.HTTP_409_CONFLICT,
             detail=CommonMessages.CONTENT_IS_FROZEN,
@@ -562,7 +572,7 @@ async def load_child(
         if row is None:
             raise _missing(model)
         if access != "read" or action is not None:
-            await require_may_change(session, row, None, context)
+            await require_may_change(session, row, None, context, action=action)
         return row
     kind = governing_tool(model.__tablename__)
     column = parent_column(model)

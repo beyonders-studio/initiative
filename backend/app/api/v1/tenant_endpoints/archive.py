@@ -93,6 +93,9 @@ async def _load(session: AsyncSession, entity_type: str, entity_id: int) -> Any:
     visible at all, so a miss here is a 404 in the ordinary way.
     """
     model = ARCHIVE_REGISTRY[entity_type]
+    if entity_type != "initiative" and KINDS[entity_type].standalone:
+        # In no one instance of its tool: it answers for itself.
+        return await resource_access.load_child(session, model, entity_id)
     stmt = select(model).where(model.id == entity_id)
     inside = KINDS[entity_type].parent if entity_type != "initiative" else None
     if inside is not None:
@@ -120,7 +123,8 @@ async def _load(session: AsyncSession, entity_type: str, entity_id: int) -> Any:
     return row
 
 
-def _authorize(
+async def _authorize(
+    session: AsyncSession,
     entity_type: str,
     row: Any,
     user: User | None,
@@ -129,7 +133,9 @@ def _authorize(
     """Who may put this away, and who may take it back out.
 
     A tool answers to its own sharing, like any other write to it. A row inside
-    a tool, like a task, answers to the tool it is in. An initiative answers to the guild admins:
+    a tool, like a task, answers to the tool it is in, and one in no instance
+    of its tool (a collection) to its own rule for changing it. An initiative
+    answers to the guild admins:
     archiving one hides it from every member's sidebar and freezes everything
     inside it, which is a guild-wide act rather than one initiative's.
 
@@ -146,14 +152,21 @@ def _authorize(
                 detail=GuildMessages.COMMUNITY_ADMIN_REQUIRED,
             )
         return
+    standalone = KINDS[entity_type].standalone
     governing = _governing(entity_type)
-    subject = row if governing.value == entity_type else getattr(row, governing.value)
+    subject = (
+        row
+        if standalone or governing.value == entity_type
+        else getattr(row, governing.value)
+    )
+    action = Action.unarchive if subject.archived_at is not None else Action.edit
+    if standalone:
+        await resource_access.require_may_change(
+            session, row, user, guild_context, action=action
+        )
+        return
     resource_access.authorize(
-        governing,
-        subject,
-        user,
-        action=Action.unarchive if subject.archived_at is not None else Action.edit,
-        context=guild_context,
+        governing, subject, user, action=action, context=guild_context
     )
 
 
@@ -169,7 +182,7 @@ async def archive_entity(
     already-archived row keeps the stamp it has, so the date means when it was
     archived, not when it was last asked about."""
     row = await _load(session, entity_type.value, entity_id)
-    _authorize(entity_type.value, row, current_user, guild_context)
+    await _authorize(session, entity_type.value, row, current_user, guild_context)
     # Read the stamp back from the service, not off the row: committing expires
     # the instance, and reaching for the column afterwards would be a lazy load
     # with no async context to run in.
@@ -192,7 +205,7 @@ async def unarchive_entity(
     inside that was archived on its own occasion stays archived. Idempotent on a
     live row."""
     row = await _load(session, entity_type.value, entity_id)
-    _authorize(entity_type.value, row, current_user, guild_context)
+    await _authorize(session, entity_type.value, row, current_user, guild_context)
     was_archived = getattr(row, "archived_at", None) is not None
     await archive_service.unarchive_entity(session, row)
     # A task back out of the archive goes back into its column.

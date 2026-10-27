@@ -131,8 +131,10 @@ def visible_ids(
 
     Joins the row to the resource that governs it — its own, or its parent's —
     and asks ``resource_access``, the same function the tables' own RLS
-    policies call. A kind with no sharing of its own (the guild's tags) is
-    reachable by anyone who reached the schema, which is the whole gate for it.
+    policies call. A kind with no sharing of its own (the guild's tags, a
+    collection) is read as its own policies read it, and changed as the edge
+    policies ask: through ``entity_access``, which holds a collection to its
+    file makers.
 
     ``need_write`` asks the same question at edit level. It is the caller's to
     say, because reaching a thing and changing it are different questions and
@@ -148,7 +150,13 @@ def visible_ids(
         statement = statement.where(live)
 
     if source.dac_tool is None:
-        return statement
+        if not need_write:
+            return statement
+        return statement.where(
+            func.entity_access(
+                entity_type.value, table.c["id"], True, True, standing_arg()
+            )
+        )
 
     resource = SQLModel.metadata.tables[source.dac_tool.plural]
     if resource is table:
