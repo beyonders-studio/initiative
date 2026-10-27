@@ -28,14 +28,18 @@ def test_backfill_copies_with_content_type_from_meta(tmp_path):
     gd.mkdir()
     (gd / "a.png").write_bytes(b"img")
     (gd / "b.dat").write_bytes(b"x")
+    (gd / "resumable-taken").write_bytes(b"whole")
+    (gd / "resumable-arriving").write_bytes(b"half")
     dest = _FakeDest()
-    meta = {"a.png": ("image/png", None)}  # b.dat has no row
+    # b.dat has no row; a file still arriving has none until it is taken.
+    meta = {"a.png": ("image/png", None), "resumable-taken": ("video/mp4", None)}
     summary = BackfillSummary()
 
     backfill_guild_dir(gd, meta, dest, summary, guild_id=5, dry_run=False)
 
-    assert summary.copied == 2
+    assert summary.copied == 3
     assert summary.failed == 0
+    assert "resumable-arriving" not in dest.written
     assert dest.written["a.png"] == (b"img", "image/png")
     # No row -> content_type guessed from the extension (".dat" is unknown -> None).
     assert dest.written["b.dat"][1] is None

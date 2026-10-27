@@ -51,23 +51,20 @@ const wait = (ms: number, signal?: AbortSignal) =>
 
 /**
  * Throw an upload away, trying again while the request it stopped still holds
- * it. It is forgotten once it is gone; until then, picking the same file again
- * finds it.
+ * it. Forgotten first, so picking the same file again starts afresh rather
+ * than carrying on with the upload being thrown away.
  */
 const discard = async (address: string, remembered: string) => {
+  await removeItem(remembered);
   for (const delay of [0, ...RETRY_DELAYS_MS]) {
     await wait(delay);
     try {
       await apiClient.delete(address, { headers: TUS });
+      return;
     } catch (error) {
       const gone = isAxiosError(error) && [404, 410].includes(error.response?.status ?? 0);
-      if (!gone) {
-        if (retryable(error)) continue;
-        return;
-      }
+      if (gone || !retryable(error)) return;
     }
-    await removeItem(remembered);
-    return;
   }
 };
 

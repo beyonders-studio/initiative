@@ -61,34 +61,41 @@ describe("uploadInPieces", () => {
     vi.useRealTimers();
   });
 
-  it("throws the upload away when it is stopped, once the piece lets go of it", async () => {
+  it("throws a stopped upload away, and starts afresh when the file is picked again", async () => {
     vi.useFakeTimers({ shouldAdvanceTime: true });
-    const thrownAway = vi.fn();
+    const thrownAway: string[] = [];
     const stop = new AbortController();
+    let stopped: string | null = null;
     server.use(
-      communityHttp.patch("/resumable-uploads/:id", () => {
-        stop.abort();
-        return new HttpResponse(null, { status: 204, headers: { "Upload-Offset": "2" } });
+      communityHttp.patch("/resumable-uploads/:id", ({ params }) => {
+        const id = String(params.id);
+        stopped ??= id;
+        if (id === stopped) stop.abort();
+        const offset = id === stopped ? "2" : "8";
+        return new HttpResponse(null, { status: 204, headers: { "Upload-Offset": offset } });
       }),
       // The stopped piece still holds it the first time.
-      communityHttp.delete("/resumable-uploads/:id", () => {
-        thrownAway();
-        return new HttpResponse(null, { status: thrownAway.mock.calls.length === 1 ? 423 : 204 });
+      communityHttp.delete("/resumable-uploads/:id", ({ params }) => {
+        thrownAway.push(String(params.id));
+        return new HttpResponse(null, { status: thrownAway.length === 1 ? 423 : 204 });
       })
     );
-
-    await expect(
+    const send = (signal?: AbortSignal) =>
       uploadInPieces(
         3,
-        new File(["a report"], "draft.pdf"),
+        new File(["a report"], "draft.pdf", { lastModified: 1 }),
         "draft.pdf",
         { fileId: 9 },
         async (uploadId) => uploadId,
-        { signal: stop.signal }
-      )
-    ).rejects.toBeDefined();
+        { signal }
+      );
+
+    await expect(send(stop.signal)).rejects.toBeDefined();
+    const again = await send();
     await vi.advanceTimersByTimeAsync(2_000);
-    await vi.waitFor(() => expect(thrownAway).toHaveBeenCalledTimes(2));
+
+    await vi.waitFor(() => expect(thrownAway).toEqual([stopped, stopped]));
+    expect(again).not.toBe(stopped);
     vi.useRealTimers();
   });
 });

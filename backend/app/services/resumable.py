@@ -49,7 +49,7 @@ from app.core.messages import FileMessages, ResumableMessages
 from app.db.advisory_locks import LockNamespace, advisory_lock
 from app.models.platform.user import User
 from app.models.tenant.pending_upload import PendingUpload
-from app.services.storage import get_guild_storage
+from app.services.storage import STAGING_PREFIX, get_guild_storage
 from app.services.tenant import attachments
 
 logger = logging.getLogger(__name__)
@@ -74,7 +74,6 @@ _STANDING_SECONDS = 30
 _RENEW_SECONDS = 20
 #: The largest size Postgres keeps (``bigint``).
 _MAX_BYTES = 2**63 - 1
-_STAGING_PREFIX = "resumable-"
 
 
 @dataclass(frozen=True)
@@ -222,7 +221,7 @@ async def create(
     )
 
     upload_id = secrets.token_urlsafe(16)
-    key = f"{_STAGING_PREFIX}{upload_id}"
+    key = f"{STAGING_PREFIX}{upload_id}"
     storage = get_guild_storage(guild_id)
     part_bytes = max(PART_BYTES, math.ceil(length / _MAX_PARTS))
     state = await asyncio.to_thread(storage.start_parts, key, part_bytes=part_bytes)
