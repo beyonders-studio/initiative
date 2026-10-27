@@ -103,3 +103,30 @@ describe("UploadedFileViewer version controls", () => {
     await waitFor(() => expect(screen.getByText(/viewing an older version/i)).toBeInTheDocument());
   });
 });
+
+describe("UploadedFileViewer media", () => {
+  const playing = (contentType: string, name: string) => {
+    mockVersions = [
+      buildVersion({
+        id: 2,
+        is_current: true,
+        file_content_type: contentType,
+        original_filename: name,
+      }),
+    ];
+    return renderViewer({ contentType, originalFilename: name, fileUrl: `/uploads/${name}` });
+  };
+
+  it("plays a video in the browser's player", () => {
+    const { container } = playing("video/mp4", "clip.mp4");
+    const video = container.querySelector("video");
+    expect(video).toHaveAttribute("src", "/dl/5/v/2?inline=1");
+    expect(video).toHaveAttribute("controls");
+  });
+
+  it("plays a recording in the browser's player", () => {
+    const { container } = playing("audio/mpeg", "take.mp3");
+    expect(container.querySelector("audio")).toHaveAttribute("src", "/dl/5/v/2?inline=1");
+    expect(screen.getByRole("heading", { name: "take.mp3" })).toBeInTheDocument();
+  });
+});

@@ -329,6 +329,8 @@
     "unknownFileType": "Este tipo de archivo no se puede previsualizar en el navegador.",
     "downloadFile": "Descargar archivo",
     "image": "Imagen",
+    "video": "Vídeo",
+    "audio": "Audio",
     "markdownDocument": "Documento Markdown",
     "showSource": "Ver código fuente",
     "showRendered": "Ver renderizado"

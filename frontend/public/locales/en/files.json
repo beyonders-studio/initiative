@@ -329,6 +329,8 @@
     "unknownFileType": "This file type cannot be previewed in the browser.",
     "downloadFile": "Download file",
     "image": "Image",
+    "video": "Video",
+    "audio": "Audio",
     "markdownDocument": "Markdown document",
     "showSource": "View source",
     "showRendered": "View rendered"
