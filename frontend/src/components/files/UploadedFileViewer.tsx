@@ -154,6 +154,9 @@ export const UploadedFileViewer = ({
     ["png", "jpg", "jpeg", "gif", "webp", "svg"].includes(extension);
   const isMarkdown =
     extension === "md" || extension === "markdown" || contentType === "text/markdown";
+  // Played by the browser's own player; one it cannot play offers the download.
+  const isVideo = contentType?.startsWith("video/") ?? false;
+  const isAudio = contentType?.startsWith("audio/") ?? false;
 
   // Measure toolbar width once on mount for PDF sizing
   useEffect(() => {
@@ -565,6 +568,34 @@ export const UploadedFileViewer = ({
               onIndexChange={() => {}}
             />
           </>
+        ) : isVideo ? (
+          <div
+            className="flex w-full items-center justify-center bg-black"
+            style={{ height: "70vh", minHeight: 500 }}
+          >
+            {/* biome-ignore lint/a11y/useMediaCaption: an uploaded video brings no caption track. */}
+            <video
+              src={inlineUrl}
+              controls
+              preload="metadata"
+              className="max-h-full max-w-full"
+              title={originalFilename || t("viewer.video")}
+            />
+          </div>
+        ) : isAudio ? (
+          <div className="flex flex-col items-center justify-center gap-6 bg-muted/50 px-6 py-16">
+            <h3 className="font-semibold text-xl tracking-tight">
+              {originalFilename || t("viewer.audio")}
+            </h3>
+            {/* biome-ignore lint/a11y/useMediaCaption: an uploaded recording brings no caption track. */}
+            <audio
+              src={inlineUrl}
+              controls
+              preload="metadata"
+              className="w-full max-w-xl"
+              title={originalFilename || t("viewer.audio")}
+            />
+          </div>
         ) : isMarkdown ? (
           <div className="flex flex-col">
             <div className="flex items-center justify-between border-b bg-muted/50 px-4 py-2">
