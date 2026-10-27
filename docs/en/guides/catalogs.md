@@ -32,17 +32,18 @@ PNG, JPEG, WebP or GIF, up to 25 MB each. Anything else is left out, by name, so
 |---|---|
 | **Masonry** | Every picture at its own shape, packed into columns. The default, and the one for *looking*. |
 | **Grid** | Square tiles, as many across as fit. The one for finding a thing among a hundred. |
-| **Timeline** | A row per day, newest first, with a rail down the side for jumping months. The one for design rounds, where the order *is* the story. |
+| **Timeline** | A row per day, by each picture's date, newest first, with a rail down the side for jumping months. The one for design rounds and site diaries, where the order *is* the story. |
 
 Masonry and grid can be **grouped by tag**, which turns the wall into one section per tag. A picture carrying two tags stands in both — "everything still waiting on a decision" wants every such picture, wherever else it also lives.
 
-The filter button narrows the wall by title, caption or filename, by tag, and by oldest-first if you'd rather read the round in the order it happened.
+The filter button narrows the wall by title, description or filename, by tag, and by oldest-first if you'd rather read the round in the order it happened.
 
 ## One picture
 
 Tap a picture and it opens full size. Arrow keys page through the wall; on a phone, swipe. **Details** opens the panel beside it, where you can:
 
-- **Title and caption it.** Untitled pictures go by their filename, which is at least what somebody called it.
+- **Title and describe it.** Untitled pictures go by their filename, which is at least what somebody called it. A description works like a task's: @mention somebody and they're told, `#` something and the two are linked.
+- **Date it.** The day the picture is about: when the photo was taken, when the bottle was opened. It starts as the day it was added. Every view orders by it, so forty photos uploaded on a Sunday night can sit on the days they were actually taken.
 - **Tag it.** The same tags as everything else in the community.
 - **Set it as the cover.** Otherwise the newest picture stands for the catalog in the list.
 - **Upload a new version.** The earlier ones are kept, so a canvas that went through four rounds is one picture with a history rather than four pictures and a naming convention.

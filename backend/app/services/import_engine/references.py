@@ -149,7 +149,7 @@ def _editor_holders(data: dict[str, Any]) -> list[tuple[dict[str, Any], str]]:
 
 
 def detach_envelope_references(data: Any, *, guild_id: int) -> None:
-    """Rewrite the editor-state references in one tool envelope, in place on
+    """Rewrite the references in one tool envelope, in place on
     ``data`` (a freshly built envelope dict — the content inside it is never
     edited, only replaced), and say where it was taken.
 
@@ -163,6 +163,13 @@ def detach_envelope_references(data: Any, *, guild_id: int) -> None:
         return
     for holder, key in _editor_holders(data):
         holder[key] = detach_editor_references(holder.get(key))
+    if data["type"] == tool_envelope_type(Tool.catalog):
+        # An item's description is markdown, as a task's is.
+        for item in data.get("items") or []:
+            if isinstance(item, dict):
+                item["description"] = detach_markdown_references(
+                    item.get("description")
+                )
     if data.get("source_instance_url") is None:
         data["source_instance_url"] = settings.APP_URL
     if data.get("source_guild_id") is None:

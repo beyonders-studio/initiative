@@ -8,7 +8,7 @@ is reached only through its catalog, and how the list pages and anchors.
 """
 
 import io
-from datetime import datetime, timedelta, timezone
+from datetime import date, datetime, timedelta, timezone
 
 from httpx import AsyncClient
 from sqlmodel import select
@@ -159,28 +159,30 @@ async def test_list_carries_newest_picture_as_cover(
     assert chosen.json()["cover_item_id"] == older.id
 
 
-async def test_a_caption_written_over_another_is_refused(
+async def test_a_description_written_over_another_is_refused(
     client: AsyncClient, acting_user, session
 ):
-    """As a description is: a caption saved over one that has since changed."""
+    """A description saved over one that has since changed."""
     a = await acting_user(guild_role=CommunityRole.admin, initiative=True)
     await _catalogs_enabled(session, a.initiative)
     catalog = await create_catalog(session, a.initiative, a.user)
     item = await create_catalog_item(session, catalog, a.user, write_blob=False)
     path = a.g(f"/catalog-items/{item.id}")
 
-    first = await client.patch(path, headers=a.headers, json={"caption": "Dawn"})
+    first = await client.patch(path, headers=a.headers, json={"description": "Dawn"})
     stale = await client.patch(
-        path, headers=a.headers, json={"caption": "Dusk", "caption_base": None}
+        path, headers=a.headers, json={"description": "Dusk", "description_base": None}
     )
     current = await client.patch(
-        path, headers=a.headers, json={"caption": "Dusk", "caption_base": "Dawn"}
+        path,
+        headers=a.headers,
+        json={"description": "Dusk", "description_base": "Dawn"},
     )
 
     assert first.status_code == 200, first.text
     assert stale.status_code == 409
     assert stale.json()["detail"] == "DESCRIPTION_CHANGED"
-    assert current.json()["caption"] == "Dusk"
+    assert current.json()["description"] == "Dusk"
     assert current.json()["plugin_values"] == []
 
 
@@ -466,7 +468,7 @@ async def test_a_jump_lands_on_the_month_whichever_way_the_list_reads(
                 catalog,
                 a.user,
                 title=f"{month:02d}-{day:02d}",
-                created_at=datetime(2026, month, day, tzinfo=timezone.utc),
+                occurred_on=date(2026, month, day),
                 write_blob=False,
             )
 
@@ -540,7 +542,7 @@ async def test_pictures_page_newest_first_and_anchor(
                 catalog,
                 a.user,
                 title=f"day {day}",
-                created_at=base + timedelta(days=day),
+                occurred_on=(base + timedelta(days=day)).date(),
                 write_blob=False,
             )
         )
@@ -580,19 +582,22 @@ async def test_pictures_page_newest_first_and_anchor(
     assert [i["title"] for i in oldest.json()["items"]] == ["day 0", "day 1"]
 
 
-async def test_the_timeline_groups_pictures_by_month(
+async def test_the_timeline_groups_items_by_the_month_of_their_date(
     client: AsyncClient, acting_user, session
 ):
+    """By the day each item is about, not the day it was added: all three
+    were added on one day."""
     a = await acting_user(guild_role=CommunityRole.admin, initiative=True)
     await _catalogs_enabled(session, a.initiative)
     catalog = await create_catalog(session, a.initiative, a.user)
-    for when in (
-        datetime(2026, 1, 15, tzinfo=timezone.utc),
-        datetime(2026, 3, 2, tzinfo=timezone.utc),
-        datetime(2026, 3, 9, tzinfo=timezone.utc),
-    ):
+    for day in (date(2026, 1, 15), date(2026, 3, 2), date(2026, 3, 9)):
         await create_catalog_item(
-            session, catalog, a.user, created_at=when, write_blob=False
+            session,
+            catalog,
+            a.user,
+            occurred_on=day,
+            created_at=datetime(2026, 5, 1, tzinfo=timezone.utc),
+            write_blob=False,
         )
 
     response = await client.get(
@@ -608,7 +613,7 @@ async def test_the_timeline_groups_pictures_by_month(
 async def test_pictures_filter_by_tag_and_search(
     client: AsyncClient, acting_user, session
 ):
-    """Tags on a picture are ANY-of, and the search box reads title, caption
+    """Tags on a picture are ANY-of, and the search box reads title, description
     and filename."""
     a = await acting_user(guild_role=CommunityRole.admin, initiative=True)
     await _catalogs_enabled(session, a.initiative)
@@ -628,11 +633,11 @@ async def test_pictures_filter_by_tag_and_search(
     tagged = await client.patch(
         a.g(f"/catalog-items/{one.id}"),
         headers=a.headers,
-        json={"tag_ids": [picked.id], "caption": "The one we chose"},
+        json={"tag_ids": [picked.id], "description": "The one we chose"},
     )
     assert tagged.status_code == 200, tagged.text
     assert [t["name"] for t in tagged.json()["tags"]] == ["picked"]
-    assert tagged.json()["caption"] == "The one we chose"
+    assert tagged.json()["description"] == "The one we chose"
     await client.patch(
         a.g(f"/catalog-items/{two.id}"),
         headers=a.headers,

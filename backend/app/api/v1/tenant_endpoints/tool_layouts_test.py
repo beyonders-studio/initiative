@@ -483,7 +483,7 @@ async def test_tools_lay_out_their_items(
     pictures = await client.put(
         a.g("/layouts/"),
         params={"tool": "catalog", "tool_id": catalog.id},
-        json=_detail("catalog_item", {"type": "picture"}, _field("caption")),
+        json=_detail("catalog_item", {"type": "picture"}, _field("description")),
         headers=a.headers,
     )
 

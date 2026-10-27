@@ -64,7 +64,6 @@ import { imageLabel, imageSrc } from "@/lib/catalogs";
 import { useCommunityPath } from "@/lib/communityUrl";
 import { formatPeriod } from "@/lib/formatDate";
 import { toast } from "@/lib/mascotToast";
-import { browserTimezone } from "@/lib/timezones";
 import { catalogItemRoute, toolDetailRoute, toolListRoute, toolSettingsRoute } from "@/lib/tools";
 
 type ViewMode = "masonry" | "grid" | "timeline";
@@ -213,7 +212,6 @@ export function CatalogDetailPage() {
     {
       ...(filters.search ? { search: filters.search } : {}),
       ...(filters.tag_ids ? { tag_ids: filters.tag_ids } : {}),
-      tz: browserTimezone(),
     },
     { enabled: viewMode === "timeline" }
   );

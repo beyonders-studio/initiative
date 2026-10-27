@@ -69,10 +69,10 @@
       "title": "Deine Aufgabe wurde erwähnt",
       "body": "<strong>{{actor}}</strong> hat <strong>{{task}}</strong> in <strong>{{context}}</strong> erwähnt"
     },
-    "taskDescription": {
-      "subject": "Du wurdest in {{task}} erwähnt",
+    "description": {
+      "subject": "Du wurdest in {{title}} erwähnt",
       "title": "Du wurdest erwähnt",
-      "body": "<strong>{{actor}}</strong> hat dich in der Beschreibung von <strong>{{task}}</strong> erwähnt"
+      "body": "<strong>{{actor}}</strong> hat dich in der Beschreibung von <strong>{{title}}</strong> erwähnt"
     },
     "greeting": "Hallo <strong>{{name}}</strong>,",
     "buttonLabel": "Ansehen"

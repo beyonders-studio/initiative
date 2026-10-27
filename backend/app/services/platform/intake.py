@@ -61,7 +61,7 @@ from app.schemas.tenant.property import PropertyValueInput
 from app.services.platform import case_activity, case_notices
 from app.services.tenant import properties as properties_service
 from app.services.tenant import task_creation as task_creation_service
-from app.services.tenant import task_description as task_description_service
+from app.services.tenant import descriptions as descriptions_service
 from app.services.tenant import task_types as task_types_service
 from app.db.request_context import SystemGuild
 
@@ -642,9 +642,7 @@ async def open_case(
         if task.description:
             # What its description points at lists the case among its
             # references; nobody wrote it, so it names nobody anew.
-            await task_description_service.record_references(
-                session, task, author_id=None
-            )
+            await descriptions_service.record_references(session, task, author_id=None)
         if refs is not None:
             await _record_refs(
                 session,

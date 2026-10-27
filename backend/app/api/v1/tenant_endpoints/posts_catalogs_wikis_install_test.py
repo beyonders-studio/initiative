@@ -475,7 +475,9 @@ async def test_adds_pictures_to_a_catalog_it_may_write(
     )
     assert version.status_code == 201, version.text
     assert (version.json()["version_number"], version.json()["file_url"]) == (2, "")
-    updated = await client.patch(item_path, headers=headers, json={"caption": "Dawn"})
+    updated = await client.patch(
+        item_path, headers=headers, json={"description": "Dawn"}
+    )
     assert updated.status_code == 200, updated.text
     assert updated.json()["version_count"] == 2
     for response in (uploaded, version, updated):

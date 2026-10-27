@@ -26,7 +26,7 @@ const serve = (image: CatalogItemRead) => {
   return sent;
 };
 
-// Drawn on a page: its caption, like a description, holds the page while unsaved.
+// Drawn on a page: its description holds the page while unsaved.
 const open = (image: CatalogItemRead, canEdit = true) =>
   renderPage(() => (
     <CatalogItemSheet
@@ -71,7 +71,7 @@ describe("a picture, opened", () => {
   });
 
   it("shows a reader what it holds, with nothing to change it with", async () => {
-    const image = buildCatalogItem({ id: 6, title: "Sketch", caption: "Round one" });
+    const image = buildCatalogItem({ id: 6, title: "Sketch", description: "Round one" });
     serve(image);
     open(image, false);
 

@@ -3654,7 +3654,9 @@ async def test_a_catalog_zip_imports_with_its_pictures_into_another_community(
     """A catalog exported on its own is a zip of its envelope and its pictures,
     and importing that zip somewhere the pictures have never been stored brings
     them along: each lands in the community's storage under its key, and the
-    catalog shows it."""
+    catalog shows it. A description's link to another picture points at that
+    picture's copy here, and a mention of somebody who is not here is their
+    handle."""
     from sqlmodel import select
 
     from app.api.v1.tenant_endpoints.exports_test import _all_tools_enabled
@@ -3671,6 +3673,13 @@ async def test_a_catalog_zip_imports_with_its_pictures_into_another_community(
     catalog = await create_catalog(session, a.initiative, a.user, name="Barovia maps")
     picture = await create_catalog_item(session, catalog, a.user, title="Village")
     key = picture.current_version.file_url.rsplit("/", 1)[-1]
+    await create_catalog_item(
+        session,
+        catalog,
+        a.user,
+        title="Castle",
+        description=f"Above #catalog-item[Village]({picture.id}), per @[]({a.user.id})",
+    )
 
     exported = await client.get(
         a.g("/exports/catalog"),
@@ -3686,7 +3695,7 @@ async def test_a_catalog_zip_imports_with_its_pictures_into_another_community(
         client, b, exported.content, b.initiative.id, "initiative-catalog"
     )
     assert resp.status_code == 201, resp.text
-    assert resp.json()["result"]["created"]["items"] == 1
+    assert resp.json()["result"]["created"]["items"] == 2
 
     assert get_guild_storage(b.guild.id).exists(key)
     await route_session_to_guild(session, b.guild.id)
@@ -3695,11 +3704,18 @@ async def test_a_catalog_zip_imports_with_its_pictures_into_another_community(
             select(Catalog).where(Catalog.initiative_id == b.initiative.id)
         )
     ).one()
-    [image] = (
-        await session.exec(
-            select(CatalogItem).where(CatalogItem.catalog_id == restored.id)
-        )
-    ).all()
+    items = {
+        item.title: item
+        for item in (
+            await session.exec(
+                select(CatalogItem).where(CatalogItem.catalog_id == restored.id)
+            )
+        ).all()
+    }
+    image = items["Village"]
+    description = items["Castle"].description
+    assert f"#catalog-item[Village]({image.id})" in description
+    assert f"@[]({a.user.id})" not in description
     # The picture is its version 1, typed from its bytes.
     version = image.current_version
     assert version is not None and version.version_number == 1

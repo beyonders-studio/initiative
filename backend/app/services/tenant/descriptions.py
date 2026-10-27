@@ -1,18 +1,19 @@
-"""What saving a task's description sets in motion.
+"""What saving a description sets in motion.
 
-A description is written in the same composer as a comment, so it carries the
-same mention syntax: ``@[Name](id)`` for a person, ``#kind[Title](id)`` for a
-thing. Saving one does two things with those:
+A task's description and a catalog item's are written in the same composer as
+a comment, so they carry the same mention syntax: ``@[Name](id)`` for a
+person, ``#kind[Title](id)`` for a thing. Saving one does two things with
+those:
 
-* the ``#`` references become the task's ``references`` edges, recomputed from
-  the description and the task's comments together
+* the ``#`` references become the thing's ``references`` edges, recomputed
+  from the description and its comments together
   (:mod:`app.services.tenant.content_references`);
 * each person the description names *for the first time* hears about it. A
   mention that was already there when the description was last saved is not
   news, so editing a sentence around it does not notify again.
 
-Only people who can open the task are told — a notice names the task to
-whoever gets it.
+Only people who can open the thing are told — a notice names it to whoever
+gets it.
 """
 
 from __future__ import annotations
@@ -24,11 +25,19 @@ from sqlmodel.ext.asyncio.session import AsyncSession
 from app.core.search import SearchEntityType
 from app.models.platform.notification import NotificationType
 from app.models.platform.user import User
+from app.models.tenant.catalog import CatalogItem
 from app.models.tenant.task import Task
 from app.services import notifications as notifications_service
 from app.services.tenant import content_references
 from app.services.tenant.mention_parser import extract_mentioned_user_ids
 from app.services.tenant.relationships import Endpoint
+
+#: What carries a description, and the kind it is named by.
+Described = Task | CatalogItem
+_KINDS: dict[type, SearchEntityType] = {
+    Task: SearchEntityType.task,
+    CatalogItem: SearchEntityType.catalog_item,
+}
 
 
 def newly_mentioned(description: str | None, previous: str | None) -> set[int]:
@@ -38,25 +47,26 @@ def newly_mentioned(description: str | None, previous: str | None) -> set[int]:
     )
 
 
+def _endpoint(row: Described) -> Endpoint:
+    return Endpoint(_KINDS[type(row)], cast(int, row.id))
+
+
 async def record_references(
-    session: AsyncSession, task: Task, *, author_id: int | None
+    session: AsyncSession, row: Described, *, author_id: int | None
 ) -> None:
-    """Make the task's ``references`` edges match its description and comments.
+    """Make the thing's ``references`` edges match its description and comments.
 
     On its own for a copy of text somebody already wrote — a duplicated task
     points at what its original did, and names nobody anew.
     """
     await content_references.sync_for_entity(
-        session,
-        Endpoint(SearchEntityType.task, cast(int, task.id)),
-        body=task.description,
-        author_id=author_id,
+        session, _endpoint(row), body=row.description, author_id=author_id
     )
 
 
 async def description_saved(
     session: AsyncSession,
-    task: Task,
+    row: Described,
     *,
     previous: str | None,
     author: User | None,
@@ -65,27 +75,31 @@ async def description_saved(
     names.
 
     ``previous`` is the description as it stood before this save — ``None`` for
-    a task that is new. ``author`` is ``None`` for an installed plug-in, whose
+    a thing that is new. ``author`` is ``None`` for an installed plug-in, whose
     save records references and tells nobody: a mention names a person by
     their row id, which a plug-in does not hold. Rides the caller's transaction;
     the caller commits.
     """
     await record_references(
-        session, task, author_id=author.id if author is not None else None
+        session, row, author_id=author.id if author is not None else None
     )
     if author is None:
         return
 
+    endpoint = _endpoint(row)
     name = await notifications_service.actor_name(session, author)
     await notifications_service.notify(
         session,
         NotificationType.mention,
-        sorted(newly_mentioned(task.description, previous)),
-        about=("task", cast(int, task.id)),
-        key="mention.taskDescription",
-        values={"actor": name, "task": task.title},
+        sorted(newly_mentioned(row.description, previous)),
+        about=(endpoint.kind.value, endpoint.id),
+        key="mention.description",
+        values={"actor": name, "title": getattr(row, row.display_field()) or ""},
+        # The title is community content: the bell reads it back by kind and
+        # id.
         data={
-            "task_id": task.id,
+            "entity_type": endpoint.kind.value,
+            "entity_id": endpoint.id,
             "mentioned_by_name": name,
             "mentioned_by_id": author.id,
         },

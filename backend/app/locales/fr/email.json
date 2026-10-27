@@ -69,10 +69,10 @@
       "title": "Votre tâche a été mentionnée",
       "body": "<strong>{{actor}}</strong> a mentionné <strong>{{task}}</strong> dans <strong>{{context}}</strong>"
     },
-    "taskDescription": {
-      "subject": "Vous avez été mentionné(e) dans {{task}}",
+    "description": {
+      "subject": "Vous avez été mentionné(e) dans {{title}}",
       "title": "Vous avez été mentionné(e)",
-      "body": "<strong>{{actor}}</strong> vous a mentionné(e) dans la description de <strong>{{task}}</strong>"
+      "body": "<strong>{{actor}}</strong> vous a mentionné(e) dans la description de <strong>{{title}}</strong>"
     },
     "greeting": "Bonjour <strong>{{name}}</strong>,",
     "buttonLabel": "Voir"

@@ -13,7 +13,7 @@ type CatalogsViewProps = {
  *
  * The list is the shelf; each catalog is its own wall. Search here reads the
  * index (name and description) — the filter box that finds a picture by its
- * caption is on the catalog's own page, where the pictures are.
+ * description is on the catalog's own page, where the pictures are.
  */
 export const CatalogsView = (props: CatalogsViewProps) => (
   <ToolIndexPage tool={Tool.catalog} {...props} />

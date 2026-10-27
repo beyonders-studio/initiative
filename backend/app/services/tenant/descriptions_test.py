@@ -1,4 +1,4 @@
-"""Saving a task's description: the edges it makes and the people it tells.
+"""Saving a description: the edges it makes and the people it tells.
 
 Driven through the task endpoints, because that is where a description is
 saved — create, edit, duplicate — and each has its own answer to "who hears
@@ -15,8 +15,10 @@ from app.models.platform.guild import CommunityRole
 from app.models.platform.notification import Notification, NotificationType
 from app.models.tenant.relationship import EntityRelationship
 from app.services.tenant.relationships import Endpoint
-from app.services.tenant.task_description import newly_mentioned
+from app.services.tenant.descriptions import newly_mentioned
 from app.testing import (
+    create_catalog,
+    create_catalog_item,
     create_file,
     create_resource_grant,
     create_task,
@@ -46,12 +48,11 @@ async def _mentions_for(session: AsyncSession, user_id: int) -> list[dict]:
     return [row.data for row in rows]
 
 
-async def _references(session: AsyncSession, guild_id: int, task_id: int) -> set:
+async def _references(session: AsyncSession, guild_id: int, source: Endpoint) -> set:
     await route_session_to_guild(session, guild_id)
     rows = await session.exec(
         select(EntityRelationship.target_type, EntityRelationship.target_id).where(
-            EntityRelationship.source_node
-            == Endpoint(SearchEntityType.task, task_id).node,
+            EntityRelationship.source_node == source.node,
             EntityRelationship.relationship_type == RelationshipType.references.value,
             EntityRelationship.removed_at.is_(None),  # type: ignore[union-attr]
         )
@@ -93,9 +94,9 @@ async def test_creating_a_task_tells_whoever_its_description_names(
     task_id = response.json()["id"]
 
     [notice] = await _mentions_for(session, teammate.user.id)
-    assert notice["task_id"] == task_id
-    # The title is guild content: the bell reads it back from ``task_id``.
-    assert "task_title" not in notice
+    assert (notice["entity_type"], notice["entity_id"]) == ("task", task_id)
+    # The title is guild content: the bell reads it back by kind and id.
+    assert "entity_name" not in notice
     assert notice["target_path"] == f"/go/task/{task_id}"
 
 
@@ -196,7 +197,9 @@ async def test_a_description_s_hash_becomes_the_task_s_reference(
         json={"description": f"Spec: #doc[Spec]({doc.id})"},
     )
     assert response.status_code == 200, response.text
-    assert await _references(session, writer.guild.id, task.id) == {("file", doc.id)}
+    assert await _references(
+        session, writer.guild.id, Endpoint(SearchEntityType.task, task.id)
+    ) == {("file", doc.id)}
 
     # Writing the sentence out takes the edge with it.
     session.expunge_all()
@@ -206,7 +209,12 @@ async def test_a_description_s_hash_becomes_the_task_s_reference(
         json={"description": "No spec after all"},
     )
     assert response.status_code == 200, response.text
-    assert await _references(session, writer.guild.id, task.id) == set()
+    assert (
+        await _references(
+            session, writer.guild.id, Endpoint(SearchEntityType.task, task.id)
+        )
+        == set()
+    )
 
 
 async def test_a_duplicate_points_where_its_original_does_and_tells_nobody(
@@ -227,5 +235,35 @@ async def test_a_duplicate_points_where_its_original_does_and_tells_nobody(
     assert response.status_code in (200, 201), response.text
     copy_id = response.json()["id"]
 
-    assert await _references(session, writer.guild.id, copy_id) == {("file", doc.id)}
+    assert await _references(
+        session, writer.guild.id, Endpoint(SearchEntityType.task, copy_id)
+    ) == {("file", doc.id)}
     assert await _mentions_for(session, teammate.user.id) == []
+
+
+async def test_a_catalog_item_s_description_does_what_a_task_s_does(
+    client: AsyncClient, session: AsyncSession, acting_user
+):
+    """Tells whoever it newly names, and its ``#`` becomes the item's
+    reference."""
+    writer, teammate = await _workspace(acting_user, session)
+    writer.initiative.catalogs_enabled = True
+    session.add(writer.initiative)
+    catalog = await create_catalog(session, writer.initiative, writer.user)
+    item = await create_catalog_item(session, catalog, writer.user, write_blob=False)
+    doc = await create_file(session, writer.initiative, writer.user)
+    await session.commit()
+
+    response = await client.patch(
+        writer.g(f"/catalog-items/{item.id}"),
+        headers=writer.headers,
+        json={"description": f"@[Tea M]({teammate.user.id}) see #doc[Spec]({doc.id})"},
+    )
+    assert response.status_code == 200, response.text
+
+    [notice] = await _mentions_for(session, teammate.user.id)
+    assert (notice["entity_type"], notice["entity_id"]) == ("catalog_item", item.id)
+    assert notice["target_path"] == f"/go/catalog-item/{item.id}"
+    assert await _references(
+        session, writer.guild.id, Endpoint(SearchEntityType.catalog_item, item.id)
+    ) == {("file", doc.id)}

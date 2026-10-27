@@ -1,6 +1,6 @@
 """Text written over whole, refused when it was written over another version.
 
-A task's or event's description, a queue item's notes and a picture's caption
+A task's, event's or catalog item's description and a queue item's notes
 are each sent whole, with the version they were written over (its base). One
 written over a version that has since moved on would undo that move, so it is
 refused instead.

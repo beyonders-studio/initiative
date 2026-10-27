@@ -21,6 +21,7 @@ enough not to need one is stored without it and the grid shows the picture
 itself; a picture that cannot be decoded at all is not stored.
 """
 
+from datetime import timezone
 import io
 import logging
 import warnings
@@ -177,28 +178,36 @@ def item_loader_options() -> list:
     ]
 
 
+#: What orders a catalog: each item's date, then when it was added, then its
+#: id, so two added in the same instant still order stably. Matches
+#: ``ix_catalog_items_catalog_order``.
+_ITEM_ORDER = (CatalogItem.occurred_on, CatalogItem.created_at, CatalogItem.id)
+
+
 def item_order(*, oldest_first: bool = False) -> list:
-    """The order pictures are shown in: newest first, id as the tiebreak so
-    two uploaded in the same instant still order stably. ``oldest_first``
-    is the same order read the other way — a design round, in sequence."""
+    """The order items are shown in: newest first by their date.
+    ``oldest_first`` is the same order read the other way — a site diary, in
+    sequence."""
     if oldest_first:
-        return [CatalogItem.created_at.asc(), CatalogItem.id.asc()]
-    return [CatalogItem.created_at.desc(), CatalogItem.id.desc()]
+        return [column.asc() for column in _ITEM_ORDER]
+    return [column.desc() for column in _ITEM_ORDER]
 
 
 def anchored_clause(until, *, oldest_first: bool = False):
     """The WHERE leg for "start the list here", inclusive.
 
-    Measured by the same instant the list is ordered by, so the picture the
-    rail's anchor names is the first one the page returns — and pointed the
-    same way the list is read. Newest first, an anchor is a ceiling and the
+    Measured by the same day the list is ordered by, so the item the rail's
+    anchor names is the first one the page returns — and pointed the same way
+    the list is read. The anchor is that day's start in UTC, which is the
+    shape a timeline bucket carries. Newest first, an anchor is a ceiling and the
     page walks back from it; oldest first, it is a floor and the page walks
     forward. One clause with a direction rather than two, because there is
     one question: where does this page start.
     """
+    day = (until.astimezone(timezone.utc) if until.tzinfo else until).date()
     if oldest_first:
-        return CatalogItem.created_at >= until
-    return CatalogItem.created_at <= until
+        return CatalogItem.occurred_on >= day
+    return CatalogItem.occurred_on <= day
 
 
 async def get_catalog(

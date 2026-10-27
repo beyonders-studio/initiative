@@ -1,12 +1,12 @@
 from __future__ import annotations
 
-from datetime import datetime
+from datetime import date, datetime
 from typing import Annotated, Any, List, Optional, Sequence, TYPE_CHECKING
 
 from pydantic import AliasChoices, ConfigDict, Field
 
 from app.core.identity_boundary import UPLOAD_PATH, GuildId, PersonId
-from app.schemas.base import MentionStr, SanitizedBaseModel, TitleStr
+from app.schemas.base import MentionStr, RichMentionStr, SanitizedBaseModel, TitleStr
 from app.schemas.query import PageMeta
 from app.schemas.tenant.comment import CommentAuthor
 from app.schemas.tenant.resource_grant import ResourceGrantSchema, initiative_readable
@@ -89,11 +89,12 @@ class CatalogListResponse(PageMeta):
 
 class CatalogItemUpdate(PropertiesOnUpdate):
     title: Optional[TitleStr] = Field(default=None, max_length=255)
-    caption: Optional[MentionStr] = Field(default=None, max_length=2000)
+    description: Optional[RichMentionStr] = None
+    occurred_on: Optional[date] = None
     tag_ids: Optional[List[int]] = None
-    #: The caption this was written over, as its writer saw it. Given, a
-    #: write over a caption that has since changed is refused.
-    caption_base: Optional[MentionStr] = None
+    #: The description this was written over, as its writer saw it. Given, a
+    #: write over a description that has since changed is refused.
+    description_base: Optional[RichMentionStr] = None
 
 
 class CatalogItemBulkDelete(SanitizedBaseModel):
@@ -121,7 +122,10 @@ class CatalogItemRead(SanitizedBaseModel):
     #: What somebody called it, if they did. Surfaces fall back to
     #: ``original_filename``, which is at least what the uploader called it.
     title: Optional[str] = None
-    caption: Optional[MentionStr] = None
+    description: Optional[RichMentionStr] = None
+    #: The day the item is about; the day it was added unless somebody said
+    #: otherwise. Every list of the catalog is in this order.
+    occurred_on: date
     #: The current version's file, served at ``/uploads/{guild}/{name}``.
     file_url: Annotated[str, UPLOAD_PATH]
     #: A smaller rendition for grids, or ``null`` where none was made — the
@@ -210,7 +214,8 @@ def serialize_catalog_item(
         catalog_id=item.catalog_id,
         community_id=context.guild_id,
         title=item.title,
-        caption=item.caption,
+        description=item.description,
+        occurred_on=item.occurred_on,
         **{name: getattr(item.current_version, name, None) for name in _FILE_FIELDS},
         created_by=item.created_by,
         uploader=(

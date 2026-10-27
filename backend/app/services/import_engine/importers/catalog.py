@@ -26,7 +26,10 @@ from app.models.platform.user import User
 from app.models.tenant.catalog import Catalog, CatalogItem
 from app.models.tenant.initiative import Initiative, PermissionKey
 from app.schemas.tenant.import_envelopes import CatalogEnvelope
-from app.services.import_engine.common import unique_name_in_initiative
+from app.services.import_engine.common import (
+    load_initiative_member_handles,
+    unique_name_in_initiative,
+)
 from app.services.import_engine.contract import EnvelopeImportResult
 from app.services.import_engine.context import ImportContext
 from app.services.import_engine.importers._base import (
@@ -36,6 +39,8 @@ from app.services.import_engine.importers._base import (
     grant_ownership,
     parse_envelope,
 )
+from app.services.import_engine.mentions import place_markdown_mentions
+from app.services.import_engine.references import note_or_settle
 from app.services.tenant import file_versions
 
 
@@ -100,6 +105,13 @@ class CatalogImporter(NamesPeopleInPassing):
         )
         await props.attach(catalog, env.properties)
 
+        member_handles = (
+            await load_initiative_member_handles(
+                session, initiative_id=target_initiative.id
+            )
+            if any(item.mention_handles for item in env.items)
+            else {}
+        )
         created = 0
         missing = 0
         cover_id: int | None = None
@@ -120,11 +132,26 @@ class CatalogImporter(NamesPeopleInPassing):
             row = CatalogItem(
                 catalog_id=catalog.id,
                 title=image_env.title,
-                caption=image_env.caption,
+                description=place_markdown_mentions(
+                    image_env.description,
+                    image_env.mention_handles,
+                    context=context,
+                    initiative_member_handles=member_handles,
+                ),
+                **(
+                    {"occurred_on": image_env.occurred_on}
+                    if image_env.occurred_on is not None
+                    else {}
+                ),
                 created_by=importer.id,
             )
             session.add(row)
             await session.flush()
+            # An exported description names other things by the refs they
+            # had; they are placed once every entry of the job is written.
+            row.description = note_or_settle(
+                context, SearchEntityType.catalog_item, row.id, row.description
+            )
             await file_versions.add_version(
                 session,
                 row,

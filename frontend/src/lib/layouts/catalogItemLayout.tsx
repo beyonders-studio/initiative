@@ -13,6 +13,7 @@ import { LazyImage } from "@/components/shared/LazyImage";
 import { UserName } from "@/components/UserHandle";
 import { Button } from "@/components/ui/button";
 import { ConfirmDialog } from "@/components/ui/confirm-dialog";
+import { DateTimePicker } from "@/components/ui/date-time-picker";
 import { ImagePicker } from "@/components/ui/image-picker";
 import { RelativeTime } from "@/components/ui/relative-time";
 import { ProfileAvatar } from "@/components/user/ProfileAvatar";
@@ -25,12 +26,14 @@ import {
 import { type ItemFieldSave, useItemFieldSave } from "@/hooks/useFieldSave";
 import { ACCEPT_ATTRIBUTE, imageLabel, imageSrc, refuseFile } from "@/lib/catalogs";
 import { formatBytes } from "@/lib/fileUtils";
+import { formatDate } from "@/lib/formatDate";
 import { toast } from "@/lib/mascotToast";
 import { referenceRef } from "@/lib/smartChips";
 import { resolveUploadUrl } from "@/lib/uploadUrl";
 
 import { type CATALOG_ITEM_FIELDS, CATALOG_ITEM_LAYOUT, catalogItemFields } from "./catalogItems";
 import { type DetailKind, useItemContext } from "./DetailLayoutView";
+import { FieldFrame, ReadField } from "./editing";
 import { DescriptionField, TagsField, TitleField } from "./fieldEditors";
 
 /** What a picture's detail shares with its parts, beside the picture itself. */
@@ -76,30 +79,49 @@ const TitleEditor = ({ item: image, label }: EditorProps) => {
   );
 };
 
-/** The longest caption, as the server allows. */
-const CAPTION_LENGTH = 2000;
-
-/** What is said about it, written and saved as a task's description is. */
-const CaptionEditor = ({ item: image, label }: EditorProps) => {
+/** The description, as a task's is ({@link DescriptionField}). */
+const DescriptionEditor = ({ item: image, label }: EditorProps) => {
   const { t } = useTranslation("catalogs");
   const context = useCatalogItemLayout();
   return (
     <DescriptionField
-      field="caption"
       kind={catalogItemSaves(context.catalogId)}
       id={image.id}
       options={{}}
       label={label}
-      htmlId="catalog-item-caption"
-      value={image.caption ?? null}
+      htmlId="catalog-item-description"
+      value={image.description ?? null}
       readOnly={context.readOnly}
       initiativeId={context.initiativeId}
       subject={referenceRef(SearchEntityType.catalog_item, image.id)}
       leaving={context.leaving}
       preview={context.preview}
-      placeholder={t("sheet.captionPlaceholder")}
-      maxLength={CAPTION_LENGTH}
+      placeholder={t("sheet.descriptionPlaceholder")}
     />
+  );
+};
+
+/** The day it is about, saved as it is picked. Every item has one, so there
+ *  is nothing to clear. */
+const DateEditor = ({ item: image, label }: EditorProps) => {
+  const { readOnly } = useCatalogItemLayout();
+  const save = useSave(image, label);
+  if (readOnly) {
+    return <ReadField label={label}>{formatDate(image.occurred_on)}</ReadField>;
+  }
+  return (
+    <FieldFrame label={label} save={save}>
+      <DateTimePicker
+        id="catalog-item-date"
+        value={image.occurred_on}
+        includeTime={false}
+        onChange={(next) => {
+          if (next && next !== image.occurred_on) {
+            void save.save({ patch: { occurred_on: next }, shows: { occurred_on: next } });
+          }
+        }}
+      />
+    </FieldFrame>
   );
 };
 
@@ -283,7 +305,8 @@ export const CATALOG_ITEM_DETAIL: DetailKind<
   namespaces: ["catalogs", "common"],
   editors: {
     title: TitleEditor,
-    caption: CaptionEditor,
+    description: DescriptionEditor,
+    date: DateEditor,
     tags: TagsEditor,
   } satisfies Record<keyof typeof CATALOG_ITEM_FIELDS, ComponentType<EditorProps>>,
   parts: {

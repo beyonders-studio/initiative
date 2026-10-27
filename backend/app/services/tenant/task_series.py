@@ -49,7 +49,7 @@ from app.schemas.recurrence import OccurrenceScope
 from app.services.tenant import properties as properties_service
 from app.services.tenant import tags as tags_service
 from app.services.tenant import task_checklist as checklist_service
-from app.services.tenant import task_description as task_description_service
+from app.services.tenant import descriptions as descriptions_service
 from app.services.tenant import task_statuses as task_statuses_service
 from app.services.tenant.task_completion import sync_completed_at
 from app.services.tenant.task_creation import next_position, set_task_assignees
@@ -595,7 +595,7 @@ async def _next_task(
     elif not in_place:
         await tags_service.copy_entity_tags(session, _TAGS, {task.id: following.id})
     if "description" in values or (not in_place and following.description):
-        await task_description_service.record_references(
+        await descriptions_service.record_references(
             session, following, author_id=task.created_by
         )
     return following
@@ -667,7 +667,7 @@ async def apply_to_others(
                 session, _TAGS, member.id, after["tag_ids"]
             )
         if "description" in fields:
-            await task_description_service.record_references(
+            await descriptions_service.record_references(
                 session, member, author_id=author_id
             )
         _release(member, fields)

@@ -48,9 +48,9 @@
       "title": "Votre tâche a été mentionnée",
       "body": "{{actor}} a mentionné {{task}} dans {{context}}"
     },
-    "taskDescription": {
+    "description": {
       "title": "Vous avez été mentionné(e)",
-      "body": "{{actor}} vous a mentionné(e) dans la description de {{task}}"
+      "body": "{{actor}} vous a mentionné(e) dans la description de {{title}}"
     }
   },
   "comment": {

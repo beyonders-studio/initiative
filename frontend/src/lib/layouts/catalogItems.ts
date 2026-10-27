@@ -9,7 +9,8 @@ import type { LayoutNode } from "./tree";
  *  It is drawn in its detail alone, so no kind draws it anywhere else. */
 export const CATALOG_ITEM_FIELDS = {
   title: { label: "catalogs:sheet.titleLabel", kind: "title" },
-  caption: { label: "catalogs:sheet.caption", kind: "excerpt" },
+  description: { label: "catalogs:sheet.descriptionLabel", kind: "excerpt" },
+  date: { label: "catalogs:sheet.dateLabel", kind: "date" },
   tags: { label: "catalogs:sheet.tags", kind: "tags" },
 } as const satisfies Record<string, { label: string; kind: FieldKind }>;
 
@@ -54,11 +55,14 @@ const CATALOG_ITEM_DETAIL_REGIONS: Record<Region, LayoutNode[]> = {
   ],
   main: [
     at(1, { type: "picture" }),
-    at(2, { type: "section", children: [field("caption")] }),
+    at(2, { type: "section", children: [field("description")] }),
     at(6, { type: "relations" }),
   ],
   side: [
-    at(3, { type: "section", children: [field("tags"), { type: "properties" }] }),
+    at(3, {
+      type: "section",
+      children: [field("date"), field("tags"), { type: "properties" }],
+    }),
     at(4, { type: "about" }),
     at(5, { type: "versions" }),
   ],

@@ -221,7 +221,8 @@ class CatalogItemDetailFieldId(str, Enum):
     are parts of their own."""
 
     title = "title"
-    caption = "caption"
+    description = "description"
+    date = "date"
     tags = "tags"
 
 

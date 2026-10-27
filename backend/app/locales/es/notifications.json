@@ -48,9 +48,9 @@
       "title": "Tu tarea fue mencionada",
       "body": "{{actor}} mencionó {{task}} en {{context}}"
     },
-    "taskDescription": {
+    "description": {
       "title": "Te mencionaron",
-      "body": "{{actor}} te mencionó en la descripción de {{task}}"
+      "body": "{{actor}} te mencionó en la descripción de {{title}}"
     }
   },
   "comment": {

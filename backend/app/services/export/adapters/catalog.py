@@ -1,11 +1,11 @@
 """Catalog source adapter: the importable envelope, with its pictures.
 
 A catalog is its pictures, so the envelope carries what the rows say about
-them — title, caption, dimensions, the order they arrived in — and names each
+them — title, description, date, dimensions, the order they arrived in — and names each
 blob by its **storage key**. The bytes ride beside it under ``assets/``, named
 by that key: in a backup the backup adapter registers them, and a catalog
 exported on its own is always a zip of the envelope and its pictures, because
-an envelope alone would be a list of captions for pictures that are not there.
+an envelope alone would be a list of descriptions for pictures that are not there.
 A picture whose file is gone is left out of the zip and still listed, which is
 what the importer already expects of a missing file.
 
@@ -158,7 +158,8 @@ def _item_envelope(item: CatalogItem) -> dict[str, Any]:
     version = item.current_version
     return {
         "title": item.title,
-        "caption": item.caption,
+        "description": item.description,
+        "occurred_on": item.occurred_on.isoformat(),
         "storage_key": storage_key_of(version.file_url),
         "content_type": version.file_content_type,
         "size_bytes": version.file_size,
