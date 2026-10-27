@@ -21,6 +21,7 @@ import { TaskBlockersHoverCard } from "@/components/projects/TaskBlockersHoverCa
 import { TaskDescriptionHoverCard } from "@/components/projects/TaskDescriptionHoverCard";
 import { TaskSubtasksHoverCard } from "@/components/projects/TaskSubtasksHoverCard";
 import { PropertyValueCell } from "@/components/properties/PropertyValueCell";
+import type { RatingDisplay } from "@/components/properties/propertyHelpers";
 import { TagBadge } from "@/components/tags";
 import { TagBadgeList } from "@/components/tags/TagBadge";
 import { TaskChecklistProgress } from "@/components/tasks/TaskChecklistProgress";
@@ -88,6 +89,8 @@ export type FieldDef = {
   plugin?: { install: number; field: PluginFieldDecl; on: PluginOnItems };
   /** A property field's definition. */
   property?: PropertyDefinitionRead;
+  /** How a rating is drawn where the list showing it says. */
+  display?: RatingDisplay;
   /** The sentence the value sits in, as an i18n key ("Due: {{date}}"). */
   phrase?: string;
   icon?: LucideIcon;
@@ -388,12 +391,27 @@ const TaskTypeField = ({ value, variant }: FieldRendererProps) => {
   return <TaskTypeMark type={type} className="h-lh" iconClassName="h-4 w-4" />;
 };
 
-const PropertyField = ({ value, variant }: FieldRendererProps) => (
+const PropertyField = ({ value, field, variant }: FieldRendererProps) => (
   <PropertyValueCell
     summary={(value as PropertySummary | null) ?? undefined}
     variant={variant === "cell" ? "cell" : "chip"}
+    display={field.display}
   />
 );
+
+/** `fields`, each rating drawn as a list's `displays` say. */
+export const withDisplays = <F extends Pick<FieldDef, "display">>(
+  fields: ReadonlyMap<string, F>,
+  displays: Readonly<Record<string, RatingDisplay>> | null | undefined
+): ReadonlyMap<string, F> =>
+  displays && Object.keys(displays).length > 0
+    ? new Map(
+        [...fields].map(([id, field]) => [
+          id,
+          id in displays ? { ...field, display: displays[id] } : field,
+        ])
+      )
+    : fields;
 
 /** One renderer per kind of field, each skipping a redraw its props don't call
  *  for. */

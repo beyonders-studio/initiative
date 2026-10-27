@@ -214,6 +214,27 @@ describe("LayoutEditor", () => {
     ]);
   });
 
+  it("draws a rating column as the layout picks", async () => {
+    server.use(
+      communityHttp.get("/property-definitions/", () =>
+        HttpResponse.json([
+          buildPropertyDefinition({ id: 13, name: "Score", type: PropertyType.rating }),
+        ])
+      )
+    );
+    const { user } = editor("table");
+
+    await user.click(await within(await outline()).findByRole("button", { name: /^add$/i }));
+    await user.click(await screen.findByRole("button", { name: /^score/i }));
+    // What was added is selected, and its settings say how it is drawn.
+    await user.click(screen.getByRole("combobox", { name: /show the rating as/i }));
+    await user.click(await screen.findByRole("option", { name: "Stars" }));
+    await user.click(screen.getByRole("button", { name: /^save$/i }));
+
+    await waitFor(() => expect(sent).toHaveLength(1));
+    expect(saved("table")?.displays).toEqual({ "property:13": "stars" });
+  });
+
   it("changes nothing while a save is under way, and still asks before leaving", async () => {
     let answer = () => {};
     server.use(

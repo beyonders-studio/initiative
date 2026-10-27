@@ -18,6 +18,7 @@ import { useTranslation } from "react-i18next";
 import type {
   CardPartInput,
   LayoutGrouping,
+  ListLayoutDefinitionInputDisplays,
   ListTasksParams,
   PropertyDefinitionRead,
   TaskListRead,
@@ -38,7 +39,7 @@ import { useTaskGroupings } from "@/hooks/useTaskGroupings";
 import { useMoveTaskToGroup } from "@/hooks/useTasks";
 import { formatDateTime } from "@/lib/formatDate";
 import { cardOf } from "@/lib/layouts/draft";
-import { useProjectLayoutEnv } from "@/lib/layouts/fields";
+import { useProjectLayoutEnv, withDisplays } from "@/lib/layouts/fields";
 import { boardBands } from "@/lib/layouts/grouping";
 import { pluginFields, usePluginsOnItems } from "@/lib/layouts/plugins";
 import { taskFields } from "@/lib/layouts/tasks";
@@ -79,6 +80,8 @@ type ProjectTasksKanbanViewProps = {
   /** The view's card, where it has its own. */
   /** The project's own card; none draws the shipped one. */
   card?: LayoutNode | null;
+  /** How the card draws each rating, as the layout says. */
+  displays?: ListLayoutDefinitionInputDisplays;
   /** What the board is grouped by, as its reader's view keeps it. */
   grouping?: GroupingState;
   /** Where the reader picks what it is grouped by; left out, nowhere. */
@@ -118,6 +121,7 @@ export const ProjectTasksKanbanView = ({
   isArchivingDoneTasks,
   propertyDefinitions: givenDefinitions,
   card: ownCard,
+  displays,
   grouping = NOT_GROUPED,
   onGroupingChange,
   viewGroupings,
@@ -170,8 +174,12 @@ export const ProjectTasksKanbanView = ({
   // A project with one type shows none: it tells no task apart.
   const typed = (useProjectTaskTypes(projectId).data?.length ?? 0) > 1;
   const fields = useMemo(
-    () => taskFields(propertyDefinitions, pluginFields(plugins, i18n.language), { typed }),
-    [propertyDefinitions, plugins, i18n.language, typed]
+    () =>
+      withDisplays(
+        taskFields(propertyDefinitions, pluginFields(plugins, i18n.language), { typed }),
+        displays
+      ),
+    [propertyDefinitions, plugins, i18n.language, typed, displays]
   );
   const card = useMemo(
     () => cardOf({ card: ownCard as CardPartInput | null | undefined }, fields),

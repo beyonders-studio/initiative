@@ -273,5 +273,12 @@
     "noItems": "Escribe un aviso en esta iniciativa para ver aquí su diseño."
   },
   "calendarNote": "Un calendario no tiene tarjeta ni columnas que organizar. Si se muestra, y si el proyecto se abre en él, se ajusta a la derecha.",
-  "makeOpensFirst": "Abrir primero con {{name}}"
+  "makeOpensFirst": "Abrir primero con {{name}}",
+  "fromCollection": "Esta colección",
+  "ratingDisplay": {
+    "label": "Mostrar la valoración como",
+    "number": "Un número",
+    "stars": "Estrellas",
+    "bar": "Una barra"
+  }
 }

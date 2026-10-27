@@ -273,5 +273,12 @@
     "noItems": "Schreibe eine Mitteilung in dieser Initiative, um hier ihr Layout zu sehen."
   },
   "calendarNote": "Ein Kalender hat keine Karte und keine Spalten zum Anordnen. Ob er angezeigt wird und ob das Projekt damit öffnet, stellst du rechts ein.",
-  "makeOpensFirst": "Zuerst mit {{name}} öffnen"
+  "makeOpensFirst": "Zuerst mit {{name}} öffnen",
+  "fromCollection": "Diese Sammlung",
+  "ratingDisplay": {
+    "label": "Bewertung anzeigen als",
+    "number": "Zahl",
+    "stars": "Sterne",
+    "bar": "Balken"
+  }
 }

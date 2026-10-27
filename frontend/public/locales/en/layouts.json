@@ -273,5 +273,12 @@
     "noItems": "Write a notice in this initiative to see its layout here."
   },
   "calendarNote": "A calendar has no card or columns to lay out. Whether it shows, and whether the project opens on it, is set on the right.",
-  "makeOpensFirst": "Open on {{name}} first"
+  "makeOpensFirst": "Open on {{name}} first",
+  "fromCollection": "This collection",
+  "ratingDisplay": {
+    "label": "Show the rating as",
+    "number": "A number",
+    "stars": "Stars",
+    "bar": "A bar"
+  }
 }

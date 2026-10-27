@@ -273,5 +273,12 @@
     "noItems": "Écrivez une annonce dans cette initiative pour voir sa mise en page ici."
   },
   "calendarNote": "Un calendrier n’a ni carte ni colonnes à disposer. Son affichage, et le fait que le projet s’ouvre dessus, se règlent à droite.",
-  "makeOpensFirst": "Ouvrir d’abord sur {{name}}"
+  "makeOpensFirst": "Ouvrir d’abord sur {{name}}",
+  "fromCollection": "Cette collection",
+  "ratingDisplay": {
+    "label": "Afficher la note comme",
+    "number": "Un nombre",
+    "stars": "Des étoiles",
+    "bar": "Une barre"
+  }
 }
