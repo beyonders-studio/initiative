@@ -40,8 +40,10 @@ const IMAGE_EXTENSIONS = new Set([
   ".bmp",
 ]);
 
-/** Whether this accept list would also take something that is not an image. */
+/** Whether this accept list would also take something that is not an image.
+ *  An empty one takes anything. */
 export const acceptsNonImages = (accept: string): boolean =>
+  !accept.trim() ||
   accept
     .split(",")
     .map((token) => token.trim().toLowerCase())

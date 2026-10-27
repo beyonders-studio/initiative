@@ -1,7 +1,3 @@
-/** What an uploaded file may be, as a file picker's `accept` list. */
-export const FILE_UPLOAD_ACCEPT =
-  ".pdf,.doc,.docx,.xls,.xlsx,.ppt,.pptx,.txt,.html,.htm,.png,.jpg,.jpeg,.gif,.webp,.svg,.md,.markdown";
-
 /** What a file made from an upload is called until somebody names it. */
 export function nameWithoutExtension(filename: string): string {
   return filename.replace(/\.[^/.]+$/, "") || filename;

@@ -26,12 +26,7 @@ import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover
 import { useAppConfig } from "@/hooks/useAppConfig";
 import { useDeleteFileVersion, useFileVersions, useUploadFileVersion } from "@/hooks/useFiles";
 import { useRelativeTime } from "@/hooks/useRelativeTime";
-import {
-  FILE_UPLOAD_ACCEPT,
-  formatBytes,
-  getFileExtension,
-  getFileTypeLabel,
-} from "@/lib/fileUtils";
+import { formatBytes, getFileExtension, getFileTypeLabel } from "@/lib/fileUtils";
 import { toast } from "@/lib/mascotToast";
 import { resolveFileDownloadUrl, resolveFileVersionDownloadUrl } from "@/lib/uploadUrl";
 import { cn } from "@/lib/utils";
@@ -422,7 +417,6 @@ export const UploadedFileViewer = ({
       <input
         ref={versionInputRef}
         type="file"
-        accept={FILE_UPLOAD_ACCEPT}
         className="hidden"
         onChange={handleVersionFileSelected}
       />

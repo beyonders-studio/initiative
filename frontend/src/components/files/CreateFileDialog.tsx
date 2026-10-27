@@ -44,12 +44,7 @@ import { useCreateFile, useUploadFile } from "@/hooks/useFiles";
 import { useInitiative } from "@/hooks/useInitiatives";
 import { useCommunityPickerSuggestions } from "@/hooks/useSearch";
 import type { EditorFileType } from "@/lib/fileTypes";
-import {
-  FILE_UPLOAD_ACCEPT,
-  formatBytes,
-  getFileTypeLabel,
-  nameWithoutExtension,
-} from "@/lib/fileUtils";
+import { formatBytes, getFileTypeLabel, nameWithoutExtension } from "@/lib/fileUtils";
 import { toast } from "@/lib/mascotToast";
 import { matchSmartLinkProvider, SUPPORTED_PROVIDER_BADGES } from "@/lib/smartLinkProviders";
 import type { DialogProps } from "@/types/dialog";
@@ -352,11 +347,7 @@ export const CreateFileDialog = ({
                   </Button>
                 </div>
               ) : (
-                <FileDropArea
-                  accept={FILE_UPLOAD_ACCEPT}
-                  onFile={handleFileSelect}
-                  prompt={t("create.dropPrompt")}
-                />
+                <FileDropArea onFile={handleFileSelect} prompt={t("create.dropPrompt")} />
               )}
               <p className="whitespace-pre-line text-muted-foreground text-xs">
                 {t("create.fileHelp")}

@@ -395,6 +395,11 @@ async def _store_file(
         mime_type, extension = attachments_service.validate_file(
             content=contents, filename=upload.filename
         )
+    except attachments_service.RefusedFileTypeError:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail=FileMessages.TYPE_NOT_ALLOWED,
+        )
     except ValueError:
         raise HTTPException(
             status_code=status.HTTP_400_BAD_REQUEST,

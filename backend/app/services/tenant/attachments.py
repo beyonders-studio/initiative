@@ -18,6 +18,7 @@ from uuid import uuid4
 from fastapi import UploadFile
 
 from app.core.errors import CodedError
+from app.core.file_types import is_refused, spec_of, type_of_media, type_of_name
 from app.core.identity_boundary import UPLOAD_PATH_SHAPE
 from app.core.messages import AttachmentMessages
 from app.core.image_headers import read_image_header
@@ -88,50 +89,6 @@ def compute_content_hash(data: bytes) -> str:
     """SHA-256 hex of blob bytes — recorded on the ``uploads`` row for integrity
     verification (object-store migration) and future content dedup."""
     return hashlib.sha256(data).hexdigest()
-
-
-# Supported MIME types for uploaded files (based on react-doc-viewer support)
-ALLOWED_FILE_MIME_TYPES: Dict[str, str] = {
-    "application/pdf": ".pdf",
-    "application/msword": ".doc",
-    "application/vnd.openxmlformats-officedocument.wordprocessingml.document": ".docx",
-    "application/vnd.ms-excel": ".xls",
-    "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet": ".xlsx",
-    "application/vnd.ms-powerpoint": ".ppt",
-    "application/vnd.openxmlformats-officedocument.presentationml.presentation": ".pptx",
-    "text/plain": ".txt",
-    "text/html": ".html",
-    # Images
-    "image/png": ".png",
-    "image/jpeg": ".jpg",
-    "image/gif": ".gif",
-    "image/webp": ".webp",
-    "image/svg+xml": ".svg",
-    # Markdown
-    "text/markdown": ".md",
-}
-
-# Extension to MIME type mapping for validation
-EXTENSION_TO_MIME: Dict[str, str] = {
-    ".pdf": "application/pdf",
-    ".doc": "application/msword",
-    ".docx": "application/vnd.openxmlformats-officedocument.wordprocessingml.document",
-    ".xls": "application/vnd.ms-excel",
-    ".xlsx": "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
-    ".ppt": "application/vnd.ms-powerpoint",
-    ".pptx": "application/vnd.openxmlformats-officedocument.presentationml.presentation",
-    ".txt": "text/plain",
-    ".html": "text/html",
-    ".htm": "text/html",
-    ".png": "image/png",
-    ".jpg": "image/jpeg",
-    ".jpeg": "image/jpeg",
-    ".gif": "image/gif",
-    ".webp": "image/webp",
-    ".svg": "image/svg+xml",
-    ".md": "text/markdown",
-    ".markdown": "text/markdown",
-}
 
 
 def normalize_upload_url(url: str | None) -> str | None:
@@ -816,6 +773,10 @@ _OFFICE_CONTAINERS = frozenset(
 _CONTAINER_TYPES = frozenset({"application/CDFV2", "application/x-ole-storage"})
 
 
+class RefusedFileTypeError(ValueError):
+    """A program, which no upload may be (``file_types.is_refused``)."""
+
+
 def detect_mime_type(content: bytes) -> str | None:
     """The type ``content``'s bytes say it is, or ``None`` where they can't be
     read."""
@@ -828,30 +789,41 @@ def detect_mime_type(content: bytes) -> str | None:
         return None
 
 
-def _is_office_package(content: bytes) -> bool:
+def _zip_names(content: bytes) -> list[str]:
     try:
         with zipfile.ZipFile(io.BytesIO(content)) as package:
-            return "[Content_Types].xml" in package.namelist()
+            return package.namelist()
     except zipfile.BadZipFile:
-        return False
+        return []
+
+
+def _is_app_package(content: bytes) -> bool:
+    """Whether a zip is a Java, Android or iOS app."""
+    return any(
+        name in ("META-INF/MANIFEST.MF", "AndroidManifest.xml")
+        or (name.startswith("Payload/") and ".app/" in name)
+        for name in _zip_names(content)
+    )
 
 
 def _name_settles(detected: str, named: str, content: bytes) -> bool:
     """Whether a file's name may make it ``named`` where its bytes said
     ``detected``: only where the bytes say no more than the family."""
     if detected in _PLAIN_TEXT:
-        return named.startswith("text/")
+        return named.startswith("text/") or named == "application/json"
     if named in _OFFICE_PACKAGES:
-        return _is_office_package(content)
+        return "[Content_Types].xml" in _zip_names(content)
     return named in _OFFICE_CONTAINERS and detected in _CONTAINER_TYPES
 
 
 def validate_file(content: bytes, filename: str | None) -> Tuple[str, str]:
     """The type and stored extension of an uploaded file, read from its bytes.
 
-    The name only narrows what the bytes allow (:func:`_name_settles`); the
-    type the client sent is never asked. Raises ``ValueError`` for a file that
-    is empty, too large, unreadable, or of a type a file can't be.
+    Any format is taken but a program. The name only narrows what the bytes
+    allow (:func:`_name_settles`); the type the client sent is never asked.
+    Bytes nothing can read are ``application/octet-stream``. Raises
+    :class:`RefusedFileTypeError` for a program, and ``ValueError`` for a file
+    that is empty or too large.
     """
     if len(content) > MAX_FILE_SIZE:
         raise ValueError(
@@ -860,22 +832,22 @@ def validate_file(content: bytes, filename: str | None) -> Tuple[str, str]:
     if not content:
         raise ValueError("Uploaded file is empty")
 
-    detected = detect_mime_type(content)
-    if detected is None:
-        raise ValueError("Unable to determine file type")
-    suffix = Path(filename).suffix.lower() if filename else ""
-    named = EXTENSION_TO_MIME.get(suffix)
-    mime = detected
-    if (
-        named is not None
-        and named in ALLOWED_FILE_MIME_TYPES
-        and named != detected
-        and _name_settles(detected, named, content)
+    # Read as the name the file is kept and downloaded under.
+    filename = display_filename(filename)
+    detected = detect_mime_type(content) or "application/octet-stream"
+    if is_refused(detected, filename) or (
+        detected == "application/zip" and _is_app_package(content)
     ):
-        mime = named
-    if mime not in ALLOWED_FILE_MIME_TYPES:
-        raise ValueError(f"Unsupported file type: {detected}")
-    return mime, suffix if named == mime else ALLOWED_FILE_MIME_TYPES[mime]
+        raise RefusedFileTypeError(f"Refused file type: {detected}")
+    named_type = type_of_name(filename)
+    mime = detected
+    if named_type is not None and named_type is not type_of_media(detected):
+        named = spec_of(named_type).media_types[0]
+        if _name_settles(detected, named, content):
+            mime = named
+    extensions = spec_of(type_of_media(mime)).extensions
+    suffix = Path(filename).suffix.lower() if filename else ""
+    return mime, suffix if suffix in extensions else next(iter(extensions), "")
 
 
 #: The longest name a file keeps; most filesystems stop at 255.

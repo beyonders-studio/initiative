@@ -13,7 +13,6 @@ work for any model that keeps one.
 
 import asyncio
 import logging
-from collections.abc import Collection
 from datetime import datetime, timezone
 from typing import Any, TypeVar
 
@@ -25,7 +24,7 @@ from sqlalchemy.exc import DataError, IntegrityError
 from sqlmodel import select
 from sqlmodel.ext.asyncio.session import AsyncSession
 
-from app.core.file_types import type_of_media
+from app.core.file_types import is_refused, type_of_media
 from app.core.messages import CommonMessages
 from app.schemas.tenant.tool import from_row
 from app.services.tenant import attachments as attachments_service
@@ -57,17 +56,16 @@ def _stored(version: Any) -> list[str | None]:
     return [version.file_url, getattr(version, "thumbnail_url", None)]
 
 
-def _allowed(model: type) -> Collection[str]:
-    """The types a ``model`` row's file may be: what an upload of one accepts,
-    which is what decides how the file is shown."""
-    from app.models.tenant.file import File
+def _may_hold(model: type, content_type: str | None) -> bool:
+    """Whether a ``model`` row's file may be of ``content_type``: what an
+    upload of one accepts. A library item holds a picture; a file holds
+    anything but a program."""
     from app.models.tenant.library import LibraryItem
     from app.services.tenant.libraries import PICTURE_EXTENSIONS
 
-    return {
-        File: attachments_service.ALLOWED_FILE_MIME_TYPES,
-        LibraryItem: PICTURE_EXTENSIONS,
-    }[model]
+    if model is LibraryItem:
+        return content_type in PICTURE_EXTENSIONS
+    return content_type is not None and not is_refused(content_type, None)
 
 
 def file_type(model: type, data: bytes, *, filename: str | None) -> str | None:
@@ -117,7 +115,7 @@ def _new_version(session: AsyncSession, parent: Any, fields: dict[str, Any]) -> 
     """Add a version of ``parent``'s file and make it current. Its type is one
     ``parent`` may show; anything else raises ``ValueError``."""
     content_type = fields.get("file_content_type")
-    if content_type not in _allowed(type(parent)):
+    if not _may_hold(type(parent), content_type):
         raise ValueError(f"Unsupported file type: {content_type}")
     model, _ = _history(parent)
     if "original_filename" in fields:

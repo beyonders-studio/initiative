@@ -9,9 +9,12 @@
  */
 
 import {
+  FileArchive,
+  FileAudio,
   FileCode,
   FileSpreadsheet,
   FileText,
+  FileVideo,
   ImageIcon,
   PenTool,
   Presentation,
@@ -54,6 +57,9 @@ const KIND_MARKS: Partial<Record<FileKind, Mark>> = {
   [FileKind.whiteboard]: { Icon: PenTool, colorClass: "text-purple-500" },
   [FileKind.pdf]: { Icon: FileText, colorClass: "text-red-500" },
   [FileKind.image]: { Icon: ImageIcon, colorClass: "text-emerald-500" },
+  [FileKind.video]: { Icon: FileVideo, colorClass: "text-rose-500" },
+  [FileKind.audio]: { Icon: FileAudio, colorClass: "text-sky-500" },
+  [FileKind.archive]: { Icon: FileArchive, colorClass: "text-amber-600" },
   [FileKind.text]: { Icon: FileText, colorClass: "text-gray-500" },
   [FileKind.link]: PLAIN,
 };
