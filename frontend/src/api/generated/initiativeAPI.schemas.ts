@@ -1208,9 +1208,10 @@ export interface BodyShareToMarketplace {
 }
 
 export interface BodyStartConfluenceExportImport {
-  file: Blob | File;
   initiative_id: number;
   include_attachments?: boolean;
+  file?: Blob | File | null;
+  upload_id?: string | null;
 }
 
 export interface BodyUploadAnnouncementImage {
@@ -1222,7 +1223,8 @@ export interface BodyUploadAttachment {
 }
 
 export interface BodyUploadBackup {
-  file: Blob | File;
+  file?: Blob | File | null;
+  upload_id?: string | null;
 }
 
 export interface BodyUploadFile {

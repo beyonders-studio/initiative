@@ -675,7 +675,8 @@ export const useStartAtlassianImport = <
   return useMutation(getStartAtlassianImportMutationOptions(options), queryClient);
 };
 /**
- * Start reading a Confluence space's HTML export into an initiative.
+ * Start reading a Confluence space's HTML export into an initiative,
+ * sent as ``file`` or as a resumable upload named by ``upload_id``.
  *
  * The zip Confluence's "Export space → HTML" writes, for a site this server
  * cannot reach or somebody would rather not hand a token to. It is staged
@@ -1119,7 +1120,8 @@ export const useCancelImportJob = <TError = ErrorType<HTTPValidationError>, TCon
   return useMutation(getCancelImportJobMutationOptions(options), queryClient);
 };
 /**
- * Upload a backup zip and get its pre-flight plan. The zip is staged in
+ * Upload a backup zip, as ``file`` or as a resumable upload named by
+ * ``upload_id``, and get its pre-flight plan. The zip is staged in
  * guild storage and the job parked as ``staged`` (nothing is imported yet);
  * ``POST /imports/jobs/{id}/confirm`` starts the apply. Unconfirmed staged
  * backups expire after IMPORT_STAGED_TTL_HOURS. The community's seat only.
@@ -1127,7 +1129,7 @@ export const useCancelImportJob = <TError = ErrorType<HTTPValidationError>, TCon
  */
 export const uploadBackup = (
   communityId: number,
-  bodyUploadBackup: BodyType<BodyUploadBackup>,
+  bodyUploadBackup?: BodyType<BodyUploadBackup>,
   options?: SecondParameter<typeof apiMutator>,
   signal?: AbortSignal
 ) => {
@@ -1183,11 +1185,11 @@ export const getUploadBackupMutationOptions = <
 };
 
 export type UploadBackupMutationResult = NonNullable<Awaited<ReturnType<typeof uploadBackup>>>;
-export type UploadBackupMutationBody = BodyType<BodyUploadBackup>;
+export type UploadBackupMutationBody = BodyType<BodyUploadBackup> | undefined;
 export type UploadBackupMutationError = ErrorType<HTTPValidationError>;
 export type UploadBackupMutationVariables = {
   communityId: number;
-  data: BodyType<BodyUploadBackup>;
+  data?: BodyType<BodyUploadBackup>;
 };
 
 /**

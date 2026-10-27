@@ -152,6 +152,15 @@ def current_shape(value: Any) -> Any:
     return shaped
 
 
+def require_writable(guild_context: Any) -> None:
+    """Imports are writes, always — no inline carve-out for read-only actors
+    (the inverse of the export engine's read-friendly inline path). A guild in
+    read_only lifecycle can't author rows, and neither can a grantee: a grant
+    reaches existing content, whatever level it carries."""
+    if guild_context.content_read_only or guild_context.is_pam:
+        raise ImportEngineError(ImportEngineMessages.IMPORT_WRITE_REQUIRED, 403)
+
+
 def get_importer(envelope_type: str) -> EnvelopeImporter:
     from app.services.import_engine.importers import IMPORTERS
 

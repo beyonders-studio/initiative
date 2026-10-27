@@ -200,7 +200,7 @@ describe("AtlassianChooseStep", () => {
 });
 
 describe("AtlassianExportStep", () => {
-  it("uploads the export with where it goes, then hands over the job", async () => {
+  it("sends the export in pieces, then hands it over with where it goes", async () => {
     let sent = "";
     server.use(
       communityHttp.post("/imports/atlassian/export", async ({ request }) => {
@@ -224,10 +224,10 @@ describe("AtlassianExportStep", () => {
     await userEvent.click(start);
 
     await waitFor(() => expect(onStarted).toHaveBeenCalled());
-    // A multipart body: the file and where it goes.
+    // The upload it arrived as, and where it goes.
     expect(sent).toMatch(/name="initiative_id"\s+5/);
     expect(sent).toMatch(/name="include_attachments"\s+true/);
-    expect(sent).toMatch(/name="file"; filename="[^"]*"/);
+    expect(sent).toMatch(/name="upload_id"\s+up-\d+/);
   });
 
   it("says so when the zip is not a space export", async () => {

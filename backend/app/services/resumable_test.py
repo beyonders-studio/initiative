@@ -2,7 +2,6 @@
 
 from __future__ import annotations
 
-import base64
 from datetime import datetime, timedelta, timezone
 
 import pytest
@@ -16,21 +15,13 @@ from app.services import resumable
 from app.services.storage import get_guild_storage
 from app.services.tenant import attachments
 from app.testing import route_session_to_guild
-
-TUS = {"Tus-Resumable": "1.0.0"}
+from app.testing.resumable import TUS, send_in_pieces, upload_metadata
 
 
 @pytest.fixture(autouse=True)
 def small_parts(monkeypatch):
     """Parts of four bytes, so a short file takes several."""
     monkeypatch.setattr(resumable, "PART_BYTES", 4)
-
-
-def _metadata(**values: str) -> str:
-    return ",".join(
-        f"{key} {base64.b64encode(value.encode()).decode()}"
-        for key, value in values.items()
-    )
 
 
 async def _create(client: AsyncClient, actor, length: int, **metadata: str):
@@ -43,7 +34,7 @@ async def _create(client: AsyncClient, actor, length: int, **metadata: str):
             **actor.headers,
             **TUS,
             "Upload-Length": str(length),
-            "Upload-Metadata": _metadata(**values),
+            "Upload-Metadata": upload_metadata(**values),
         },
     )
 
@@ -244,21 +235,19 @@ async def test_a_held_upload_leaves_no_transaction_open_while_bytes_arrive(
     await lease.let_go()
 
 
-async def _send(client: AsyncClient, actor, body: bytes, **metadata: str) -> str:
-    """A whole file sent in pieces; its upload id."""
-    created = await _create(client, actor, len(body), **metadata)
-    location = _path(created.headers["location"])
-    sent = await _append(client, actor, location, 0, body)
-    assert sent.status_code == 204, sent.text
-    return location.rsplit("/", 1)[1]
-
-
 async def test_a_file_sent_in_pieces_is_kept_where_it_arrived(
     client: AsyncClient, acting_user, session
 ):
     owner = await acting_user(guild_role=CommunityRole.admin, initiative=True)
     body = b"%PDF-1.4 a report sent in pieces"
-    upload_id = await _send(client, owner, body, filename="report.pdf")
+    upload_id = await send_in_pieces(
+        client,
+        owner,
+        body,
+        purpose="file",
+        filename="report.pdf",
+        initiative_id=str(owner.initiative.id),
+    )
     before = await attachments.get_guild_storage_usage(owner.guild.id)
     form = {"name": "Report", "initiative_id": str(owner.initiative.id)}
 
@@ -297,8 +286,13 @@ async def test_a_new_version_can_arrive_in_pieces(client: AsyncClient, acting_us
         files={"file": ("report.pdf", b"%PDF-1.4 first", "application/pdf")},
     )
     file_id = first.json()["id"]
-    upload_id = await _send(
-        client, owner, b"%PDF-1.4 second", filename="v2.pdf", file_id=str(file_id)
+    upload_id = await send_in_pieces(
+        client,
+        owner,
+        b"%PDF-1.4 second",
+        purpose="file",
+        filename="v2.pdf",
+        file_id=str(file_id),
     )
 
     version = await client.post(
@@ -315,8 +309,13 @@ async def test_a_program_sent_in_pieces_is_refused_and_left_to_cancel(
     client: AsyncClient, acting_user, session
 ):
     owner = await acting_user(guild_role=CommunityRole.admin, initiative=True)
-    upload_id = await _send(
-        client, owner, b"MZ\x90\x00" + b"\x00" * 60 + b"PE\x00\x00", filename="a.pdf"
+    upload_id = await send_in_pieces(
+        client,
+        owner,
+        b"MZ\x90\x00" + b"\x00" * 60 + b"PE\x00\x00",
+        purpose="file",
+        filename="a.pdf",
+        initiative_id=str(owner.initiative.id),
     )
 
     refused = await client.post(

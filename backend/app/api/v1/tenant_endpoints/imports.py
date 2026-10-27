@@ -10,7 +10,10 @@ literal route MUST stay declared before the parametric ones.
 
 import asyncio
 import logging
+from collections.abc import AsyncIterator
+from contextlib import asynccontextmanager
 from datetime import datetime, timedelta, timezone
+from pathlib import Path
 from typing import Annotated, Optional
 
 from fastapi import (
@@ -26,16 +29,17 @@ from fastapi import (
 )
 from fastapi.responses import JSONResponse
 from sqlmodel import select
+from sqlmodel.ext.asyncio.session import AsyncSession
 
 from app.api.deps import (
-    GuildContext,
     RLSSessionDep,
     get_current_active_user,
     require_seat,
+    GuildContext,
     GuildContextDep,
 )
 from app.core.body_limit import MULTIPART_SLACK_BYTES, max_body
-from app.core.messages import ImportEngineMessages
+from app.core.messages import ImportEngineMessages, ResumableMessages
 from app.core.version import get_version
 from app.models.platform.user import User
 from app.models.tenant.import_job import ImportJob, ImportJobStatus
@@ -53,6 +57,7 @@ from app.schemas.tenant.import_job import (
     ImportJobRead,
     serialize_import_job,
 )
+from app.services import resumable
 from app.services.import_engine import atlassian as atlassian_service
 from app.services.import_engine import atlassian_job
 from app.services.import_engine import backup as backup_service
@@ -94,18 +99,6 @@ def _upload_bytes() -> int:
     return import_limits.IMPORT_MAX_BACKUP_UPLOAD_BYTES + MULTIPART_SLACK_BYTES
 
 
-def _require_writable(guild_context: GuildContext) -> None:
-    """Imports are writes, always — no inline carve-out for read-only actors
-    (the inverse of the export engine's read-friendly inline path). A guild in
-    read_only lifecycle can't author rows, and neither can a grantee: a grant
-    reaches existing content, whatever level it carries."""
-    if guild_context.content_read_only or guild_context.is_pam:
-        raise HTTPException(
-            status_code=status.HTTP_403_FORBIDDEN,
-            detail=ImportEngineMessages.IMPORT_WRITE_REQUIRED,
-        )
-
-
 @router.post("/envelope", response_model=None, status_code=status.HTTP_201_CREATED)
 @max_body(_envelope_bytes, ImportEngineMessages.IMPORT_TOO_LARGE)
 async def import_envelope(
@@ -127,7 +120,7 @@ async def import_envelope(
     # enforced by BodySizeLimitMiddleware at the ASGI seam — a handler-level
     # check would run only after FastAPI had already buffered and parsed the
     # body.
-    _require_writable(guild_context)
+    import_engine.require_writable(guild_context)
     outcome = await import_engine.start_envelope_import(
         session,
         user=current_user,
@@ -172,7 +165,7 @@ async def import_envelope_archive(
     the files it names under ``assets/``; the files are stored first, then the
     envelope imports exactly as ``POST /imports/envelope`` imports one, with
     the same responses."""
-    _require_writable(guild_context)
+    import_engine.require_writable(guild_context)
     async with spooled_upload(
         file.file, max_bytes=import_limits.IMPORT_MAX_BACKUP_UPLOAD_BYTES
     ) as payload:
@@ -224,7 +217,7 @@ async def preview_foreign_import(
     somebody's file on the community's behalf, and a community nobody can
     write to has nothing to read it for.
     """
-    _require_writable(guild_context)
+    import_engine.require_writable(guild_context)
     foreign_source = foreign_service.get_source(source)
     options = foreign_service.read_preview(foreign_source, content)
     return ForeignPreview(
@@ -260,7 +253,7 @@ async def import_foreign(
     Answers exactly as ``/imports/envelope`` does — 201 with the counts when
     it applied in the request, 202 with the job when it did not.
     """
-    _require_writable(guild_context)
+    import_engine.require_writable(guild_context)
     foreign_source = foreign_service.get_source(source)
     mapped = foreign_service.build(
         foreign_source,
@@ -319,7 +312,7 @@ async def connect_atlassian(
     here — the target and the create permission for it are resolved on the
     start, and again by the worker at apply time.
     """
-    _require_writable(guild_context)
+    import_engine.require_writable(guild_context)
     if guild_context.grant is not None:
         # A break-glass or support grant reaches existing content; it does not
         # get to make this server talk to somebody else's on its behalf.
@@ -368,7 +361,7 @@ async def start_atlassian_import(
     The initiative needs projects switched on for projects, wikis for spaces,
     and the caller needs to be able to create them there. That is checked
     now, again before the site is read, and again when the bundle is applied."""
-    _require_writable(guild_context)
+    import_engine.require_writable(guild_context)
     if guild_context.grant is not None:
         # A grant reaches existing content, not this server's outbound
         # connections.
@@ -404,11 +397,13 @@ async def start_confluence_export_import(
     session: RLSSessionDep,
     current_user: Annotated[User, Depends(get_current_active_user)],
     guild_context: GuildContextDep,
-    file: UploadFile = File(...),
     initiative_id: int = Form(...),
     include_attachments: bool = Form(True),
+    file: UploadFile | None = File(None),
+    upload_id: str | None = Form(None),
 ) -> ImportJobRead:
-    """Start reading a Confluence space's HTML export into an initiative.
+    """Start reading a Confluence space's HTML export into an initiative,
+    sent as ``file`` or as a resumable upload named by ``upload_id``.
 
     The zip Confluence's "Export space → HTML" writes, for a site this server
     cannot reach or somebody would rather not hand a token to. It is staged
@@ -416,15 +411,15 @@ async def start_confluence_export_import(
     a site, and parks it at ``staged`` with the same plan for
     ``POST /imports/jobs/{id}/confirm``. The initiative needs wikis switched on
     and the caller able to create one there."""
-    _require_writable(guild_context)
+    import_engine.require_writable(guild_context)
     if guild_context.grant is not None:
         raise HTTPException(
             status_code=status.HTTP_403_FORBIDDEN,
             detail=ImportEngineMessages.IMPORT_WRITE_REQUIRED,
         )
-    async with spooled_upload(
-        file.file, max_bytes=import_limits.IMPORT_MAX_BACKUP_UPLOAD_BYTES
-    ) as payload:
+    async with _payload(
+        session, guild_context, file, upload_id, "atlassian_export", initiative_id
+    ) as (payload, payload_ref):
         job = await atlassian_job.start_export(
             session,
             user=current_user,
@@ -432,6 +427,7 @@ async def start_confluence_export_import(
             initiative_id=initiative_id,
             payload=payload,
             include_attachments=include_attachments,
+            payload_ref=payload_ref,
         )
     return serialize_import_job(job, guild_id=guild_context.guild_id)
 
@@ -509,6 +505,52 @@ async def cancel_import_job(
     return serialize_import_job(job, guild_id=guild_context.guild_id)
 
 
+@asynccontextmanager
+async def _payload(
+    session: AsyncSession,
+    guild_context: GuildContext,
+    file: UploadFile | None,
+    upload_id: str | None,
+    purpose: str,
+    initiative_id: int | None,
+) -> AsyncIterator[tuple[Path, str | None]]:
+    """An import's zip as a local file for the block, with its key in the
+    community's storage when it is already there: sent with the request as
+    ``file``, or taken from the resumable upload ``upload_id``."""
+    if (file is None) == (upload_id is None):
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail=ImportEngineMessages.IMPORT_INVALID_PARAMS,
+        )
+    if file is not None:
+        # Byte cap: BodySizeLimitMiddleware already rejected an oversized or
+        # chunked-over-cap request at the ASGI seam; the bounded copy to a
+        # temporary file is the in-process backstop.
+        async with spooled_upload(
+            file.file, max_bytes=import_limits.IMPORT_MAX_BACKUP_UPLOAD_BYTES
+        ) as payload:
+            yield payload, None
+        return
+    assert upload_id is not None
+    staged = await resumable.take(
+        session,
+        guild_context.guild_id,
+        upload_id,
+        purpose=purpose,
+        user_id=guild_context.user_id,
+        initiative_id=initiative_id,
+    )
+    async with import_engine.open_payload(
+        guild_context.guild_id, staged.staging_key
+    ) as payload:
+        if payload is None:
+            raise HTTPException(
+                status_code=status.HTTP_404_NOT_FOUND,
+                detail=ResumableMessages.NOT_FOUND,
+            )
+        yield payload, staged.staging_key
+
+
 # ---------------------------------------------------------------------------
 # Backup-zip imports (guild admin only)
 # ---------------------------------------------------------------------------
@@ -522,28 +564,29 @@ async def upload_backup(
     session: RLSSessionDep,
     current_user: Annotated[User, Depends(get_current_active_user)],
     guild_context: GuildContextDep,
-    file: UploadFile = File(...),
+    file: UploadFile | None = File(None),
+    upload_id: str | None = Form(None),
 ) -> ImportJobRead:
-    """Upload a backup zip and get its pre-flight plan. The zip is staged in
+    """Upload a backup zip, as ``file`` or as a resumable upload named by
+    ``upload_id``, and get its pre-flight plan. The zip is staged in
     guild storage and the job parked as ``staged`` (nothing is imported yet);
     ``POST /imports/jobs/{id}/confirm`` starts the apply. Unconfirmed staged
     backups expire after IMPORT_STAGED_TTL_HOURS. The community's seat only."""
     require_seat(guild_context, detail=ImportEngineMessages.IMPORT_SUPERADMIN_REQUIRED)
-    _require_writable(guild_context)
+    import_engine.require_writable(guild_context)
     guild_id = guild_context.guild_id
 
-    # Byte cap: BodySizeLimitMiddleware already rejected an oversized or
-    # chunked-over-cap request at the ASGI seam; the bounded copy to a
-    # temporary file is the in-process backstop.
-    async with spooled_upload(
-        file.file, max_bytes=import_limits.IMPORT_MAX_BACKUP_UPLOAD_BYTES
-    ) as payload:
+    async with _payload(session, guild_context, file, upload_id, "backup", None) as (
+        payload,
+        payload_ref,
+    ):
         job = await backup_service.stage_backup_job(
             session,
             guild_id=guild_id,
             user=current_user,
             payload=payload,
             status=ImportJobStatus.staged,
+            payload_ref=payload_ref,
         )
     await session.commit()
     await session.refresh(job)
@@ -576,7 +619,7 @@ async def confirm_import(
     for when they dropped it; it is staged only to ask who the handles in it
     are, so that creator is the one who answers, and nobody else confirms on
     their behalf."""
-    _require_writable(guild_context)
+    import_engine.require_writable(guild_context)
     job = await session.get(ImportJob, job_id)
     if job is None:
         raise HTTPException(
