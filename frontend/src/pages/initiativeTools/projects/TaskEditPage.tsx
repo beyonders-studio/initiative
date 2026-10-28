@@ -63,7 +63,7 @@ import { getErrorMessage, getHttpStatus, requiredKeysIn } from "@/lib/errorMessa
 import { DetailLayoutView } from "@/lib/layouts/DetailLayoutView";
 import type { StoredRegions } from "@/lib/layouts/detailLayout";
 import { usePluginMenuActions } from "@/lib/layouts/plugins";
-import { TASK_DETAIL, taskChanges, taskFillContext } from "@/lib/layouts/taskLayout";
+import { TASK_DETAIL, taskChanges, taskFillContext, withoutValues } from "@/lib/layouts/taskLayout";
 import { toast } from "@/lib/mascotToast";
 import { queryClient } from "@/lib/queryClient";
 import { taskRoute, toolDetailRoute, toolListRoute } from "@/lib/tools";
@@ -197,7 +197,7 @@ export const TaskEditPage = () => {
       }
       setIsMoveDialogOpen(false);
       fillForMove.ask({
-        item: { ...task, project_id: target.id },
+        item: withoutValues({ ...task, project_id: target.id }, keys),
         context: taskFillContext(target.initiative_id),
         keys,
         title: t("layouts:required.moveTitle", { project: target.name }),
