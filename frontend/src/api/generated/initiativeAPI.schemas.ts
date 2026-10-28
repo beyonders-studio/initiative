@@ -7792,6 +7792,18 @@ export interface MessageRequestCreate {
 }
 
 /**
+ * Who owns a definition people define: the initiative (its metadata), or
+ * a project or a collection (its properties).
+ */
+export type MetadataOwnerKind = (typeof MetadataOwnerKind)[keyof typeof MetadataOwnerKind];
+
+export const MetadataOwnerKind = {
+  initiative: "initiative",
+  project: "project",
+  collection: "collection",
+} as const;
+
+/**
  * What a moderator did, as the moderation log records it.
  */
 export type ModerationAct = (typeof ModerationAct)[keyof typeof ModerationAct];
@@ -9696,6 +9708,18 @@ export interface ProjectUpdate {
   end_date?: string | null;
 }
 
+/**
+ * Definitions of one initiative to delete together, or none of them.
+ */
+export interface PropertyDefinitionBulkDelete {
+  initiative_id: number;
+  /**
+   * @minItems 1
+   * @maxItems 100
+   */
+  ids: number[];
+}
+
 export interface PropertyDefinitionCreate {
   /**
    * @minLength 1
@@ -9710,6 +9734,43 @@ export interface PropertyDefinitionCreate {
   initiative_id: number;
   project_id?: number | null;
   collection_id?: number | null;
+}
+
+/**
+ * One owner's definitions, as the initiative's settings list them.
+ */
+export interface PropertyDefinitionGroup {
+  owner: MetadataOwnerKind;
+  owner_id?: number | null;
+  name?: string | null;
+  can_edit: boolean;
+  definitions: PropertyDefinitionRead[];
+}
+
+/**
+ * An initiative's metadata, then the properties of each project and each
+ * collection in it the reader may edit, each under its owner.
+ */
+export interface PropertyDefinitionGroups {
+  groups: PropertyDefinitionGroup[];
+}
+
+/**
+ * Properties of one type, from the initiative's projects and
+ * collections, merged into one of its metadata, named ``name``.
+ */
+export interface PropertyDefinitionPromote {
+  initiative_id: number;
+  /**
+   * @minItems 1
+   * @maxItems 100
+   */
+  ids: number[];
+  /**
+   * @minLength 1
+   * @maxLength 100
+   */
+  name: string;
 }
 
 /**
@@ -14062,6 +14123,10 @@ export type ListPropertyDefinitionsParams = {
    * List this collection's metadata instead of properties.
    */
   collection_id?: number | null;
+};
+
+export type ListPropertyDefinitionsByOwnerParams = {
+  initiative_id: number;
 };
 
 export type ListCommunityTrashParams = {

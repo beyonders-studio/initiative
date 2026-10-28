@@ -22,8 +22,12 @@ import type {
 
 import type {
   HTTPValidationError,
+  ListPropertyDefinitionsByOwnerParams,
   ListPropertyDefinitionsParams,
+  PropertyDefinitionBulkDelete,
   PropertyDefinitionCreate,
+  PropertyDefinitionGroups,
+  PropertyDefinitionPromote,
   PropertyDefinitionRead,
   PropertyDefinitionUpdate,
   PropertyDefinitionUpdateResponse,
@@ -304,6 +308,370 @@ export const useCreatePropertyDefinition = <
   TContext
 > => {
   return useMutation(getCreatePropertyDefinitionMutationOptions(options), queryClient);
+};
+/**
+ * The initiative's metadata, then the properties of each of its projects
+ * and each of its collections, under the owner's name.
+ *
+ * A project's or a collection's are listed only to whoever may edit them,
+ * as making, changing and removing one asks; a role that reaches every
+ * project and collection (the community's admin, a live grant) is listed
+ * them all. ``can_edit`` says whether the reader may rename, reorder and
+ * delete a group's: a project's and a collection's always, as listed, and
+ * the initiative's for its managers and the community's admin.
+ * @summary List Property Definitions By Owner
+ */
+export const listPropertyDefinitionsByOwner = (
+  communityId: number,
+  params: ListPropertyDefinitionsByOwnerParams,
+  options?: SecondParameter<typeof apiMutator>,
+  signal?: AbortSignal
+) => {
+  return apiMutator<PropertyDefinitionGroups>(
+    {
+      url: `/api/v1/c/${communityId}/property-definitions/by-owner`,
+      method: "GET",
+      params,
+      signal,
+    },
+    options
+  );
+};
+
+export const getListPropertyDefinitionsByOwnerQueryKey = (
+  communityId: number,
+  params?: ListPropertyDefinitionsByOwnerParams
+) => {
+  return [
+    `/api/v1/c/${communityId}/property-definitions/by-owner`,
+    ...(params ? [params] : []),
+  ] as const;
+};
+
+export const getListPropertyDefinitionsByOwnerQueryOptions = <
+  TData = Awaited<ReturnType<typeof listPropertyDefinitionsByOwner>>,
+  TError = ErrorType<HTTPValidationError>,
+>(
+  communityId: number,
+  params: ListPropertyDefinitionsByOwnerParams,
+  options?: {
+    query?: Partial<
+      UseQueryOptions<Awaited<ReturnType<typeof listPropertyDefinitionsByOwner>>, TError, TData>
+    >;
+    request?: SecondParameter<typeof apiMutator>;
+  }
+) => {
+  const { query: queryOptions, request: requestOptions } = options ?? {};
+
+  const queryKey =
+    queryOptions?.queryKey ?? getListPropertyDefinitionsByOwnerQueryKey(communityId, params);
+
+  const queryFn: QueryFunction<Awaited<ReturnType<typeof listPropertyDefinitionsByOwner>>> = ({
+    signal,
+  }) => listPropertyDefinitionsByOwner(communityId, params, requestOptions, signal);
+
+  return {
+    queryKey,
+    queryFn,
+    enabled: communityId !== null && communityId !== undefined,
+    ...queryOptions,
+  } as UseQueryOptions<
+    Awaited<ReturnType<typeof listPropertyDefinitionsByOwner>>,
+    TError,
+    TData
+  > & { queryKey: DataTag<QueryKey, TData, TError> };
+};
+
+export type ListPropertyDefinitionsByOwnerQueryResult = NonNullable<
+  Awaited<ReturnType<typeof listPropertyDefinitionsByOwner>>
+>;
+export type ListPropertyDefinitionsByOwnerQueryError = ErrorType<HTTPValidationError>;
+
+export function useListPropertyDefinitionsByOwner<
+  TData = Awaited<ReturnType<typeof listPropertyDefinitionsByOwner>>,
+  TError = ErrorType<HTTPValidationError>,
+>(
+  communityId: number,
+  params: ListPropertyDefinitionsByOwnerParams,
+  options: {
+    query: Partial<
+      UseQueryOptions<Awaited<ReturnType<typeof listPropertyDefinitionsByOwner>>, TError, TData>
+    > &
+      Pick<
+        DefinedInitialDataOptions<
+          Awaited<ReturnType<typeof listPropertyDefinitionsByOwner>>,
+          TError,
+          Awaited<ReturnType<typeof listPropertyDefinitionsByOwner>>
+        >,
+        "initialData"
+      >;
+    request?: SecondParameter<typeof apiMutator>;
+  },
+  queryClient?: QueryClient
+): DefinedUseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData, TError> };
+export function useListPropertyDefinitionsByOwner<
+  TData = Awaited<ReturnType<typeof listPropertyDefinitionsByOwner>>,
+  TError = ErrorType<HTTPValidationError>,
+>(
+  communityId: number,
+  params: ListPropertyDefinitionsByOwnerParams,
+  options?: {
+    query?: Partial<
+      UseQueryOptions<Awaited<ReturnType<typeof listPropertyDefinitionsByOwner>>, TError, TData>
+    > &
+      Pick<
+        UndefinedInitialDataOptions<
+          Awaited<ReturnType<typeof listPropertyDefinitionsByOwner>>,
+          TError,
+          Awaited<ReturnType<typeof listPropertyDefinitionsByOwner>>
+        >,
+        "initialData"
+      >;
+    request?: SecondParameter<typeof apiMutator>;
+  },
+  queryClient?: QueryClient
+): UseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData, TError> };
+export function useListPropertyDefinitionsByOwner<
+  TData = Awaited<ReturnType<typeof listPropertyDefinitionsByOwner>>,
+  TError = ErrorType<HTTPValidationError>,
+>(
+  communityId: number,
+  params: ListPropertyDefinitionsByOwnerParams,
+  options?: {
+    query?: Partial<
+      UseQueryOptions<Awaited<ReturnType<typeof listPropertyDefinitionsByOwner>>, TError, TData>
+    >;
+    request?: SecondParameter<typeof apiMutator>;
+  },
+  queryClient?: QueryClient
+): UseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData, TError> };
+/**
+ * @summary List Property Definitions By Owner
+ */
+
+export function useListPropertyDefinitionsByOwner<
+  TData = Awaited<ReturnType<typeof listPropertyDefinitionsByOwner>>,
+  TError = ErrorType<HTTPValidationError>,
+>(
+  communityId: number,
+  params: ListPropertyDefinitionsByOwnerParams,
+  options?: {
+    query?: Partial<
+      UseQueryOptions<Awaited<ReturnType<typeof listPropertyDefinitionsByOwner>>, TError, TData>
+    >;
+    request?: SecondParameter<typeof apiMutator>;
+  },
+  queryClient?: QueryClient
+): UseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData, TError> } {
+  const queryOptions = getListPropertyDefinitionsByOwnerQueryOptions(communityId, params, options);
+
+  const query = useQuery(queryOptions, queryClient) as UseQueryResult<TData, TError> & {
+    queryKey: DataTag<QueryKey, TData, TError>;
+  };
+
+  return withQueryKey(query, queryOptions.queryKey);
+}
+
+/**
+ * Delete several of the initiative's definitions at once, with every
+ * value of each: all of them, or, when any may not be removed as deleting it
+ * alone asks, none.
+ * @summary Delete Property Definitions
+ */
+export const deletePropertyDefinitions = (
+  communityId: number,
+  propertyDefinitionBulkDelete: BodyType<PropertyDefinitionBulkDelete>,
+  options?: SecondParameter<typeof apiMutator>,
+  signal?: AbortSignal
+) => {
+  return apiMutator<void>(
+    {
+      url: `/api/v1/c/${communityId}/property-definitions/bulk-delete`,
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      data: propertyDefinitionBulkDelete,
+      signal,
+    },
+    options
+  );
+};
+
+export const getDeletePropertyDefinitionsMutationKey = () => ["deletePropertyDefinitions"] as const;
+
+export const getDeletePropertyDefinitionsMutationOptions = <
+  TError = ErrorType<HTTPValidationError>,
+  TContext = unknown,
+>(options?: {
+  mutation?: UseMutationOptions<
+    Awaited<ReturnType<typeof deletePropertyDefinitions>>,
+    TError,
+    DeletePropertyDefinitionsMutationVariables,
+    TContext
+  >;
+  request?: SecondParameter<typeof apiMutator>;
+}): UseMutationOptions<
+  Awaited<ReturnType<typeof deletePropertyDefinitions>>,
+  TError,
+  DeletePropertyDefinitionsMutationVariables,
+  TContext
+> => {
+  const mutationKey = getDeletePropertyDefinitionsMutationKey();
+  const { mutation: mutationOptions, request: requestOptions } = options
+    ? options.mutation && "mutationKey" in options.mutation && options.mutation.mutationKey
+      ? options
+      : { ...options, mutation: { ...options.mutation, mutationKey } }
+    : { mutation: { mutationKey }, request: undefined };
+
+  const mutationFn: MutationFunction<
+    Awaited<ReturnType<typeof deletePropertyDefinitions>>,
+    DeletePropertyDefinitionsMutationVariables
+  > = (props) => {
+    const { communityId, data } = props ?? {};
+
+    return deletePropertyDefinitions(communityId, data, requestOptions);
+  };
+
+  return { mutationFn, ...mutationOptions };
+};
+
+export type DeletePropertyDefinitionsMutationResult = NonNullable<
+  Awaited<ReturnType<typeof deletePropertyDefinitions>>
+>;
+export type DeletePropertyDefinitionsMutationBody = BodyType<PropertyDefinitionBulkDelete>;
+export type DeletePropertyDefinitionsMutationError = ErrorType<HTTPValidationError>;
+export type DeletePropertyDefinitionsMutationVariables = {
+  communityId: number;
+  data: BodyType<PropertyDefinitionBulkDelete>;
+};
+
+/**
+ * @summary Delete Property Definitions
+ */
+export const useDeletePropertyDefinitions = <
+  TError = ErrorType<HTTPValidationError>,
+  TContext = unknown,
+>(
+  options?: {
+    mutation?: UseMutationOptions<
+      Awaited<ReturnType<typeof deletePropertyDefinitions>>,
+      TError,
+      DeletePropertyDefinitionsMutationVariables,
+      TContext
+    >;
+    request?: SecondParameter<typeof apiMutator>;
+  },
+  queryClient?: QueryClient
+): UseMutationResult<
+  Awaited<ReturnType<typeof deletePropertyDefinitions>>,
+  TError,
+  DeletePropertyDefinitionsMutationVariables,
+  TContext
+> => {
+  return useMutation(getDeletePropertyDefinitionsMutationOptions(options), queryClient);
+};
+/**
+ * Merge properties of one type, from the initiative's projects and
+ * collections, into one of its metadata named ``name``, answering it.
+ *
+ * It is the initiative's metadata of that name and type if there is one, or
+ * a new one. Its options gain theirs, their values move to it, every layout
+ * showing one of them shows it instead, and they are deleted, in one
+ * transaction (``metadata_service.promote``). It asks to remove each of them
+ * as deleting it alone does, and to define the initiative's metadata, as
+ * making one does; an installed plug-in also needs ``properties:write``.
+ * @summary Promote Property Definitions
+ */
+export const promotePropertyDefinitions = (
+  communityId: number,
+  propertyDefinitionPromote: BodyType<PropertyDefinitionPromote>,
+  options?: SecondParameter<typeof apiMutator>,
+  signal?: AbortSignal
+) => {
+  return apiMutator<PropertyDefinitionRead>(
+    {
+      url: `/api/v1/c/${communityId}/property-definitions/promote`,
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      data: propertyDefinitionPromote,
+      signal,
+    },
+    options
+  );
+};
+
+export const getPromotePropertyDefinitionsMutationKey = () =>
+  ["promotePropertyDefinitions"] as const;
+
+export const getPromotePropertyDefinitionsMutationOptions = <
+  TError = ErrorType<HTTPValidationError>,
+  TContext = unknown,
+>(options?: {
+  mutation?: UseMutationOptions<
+    Awaited<ReturnType<typeof promotePropertyDefinitions>>,
+    TError,
+    PromotePropertyDefinitionsMutationVariables,
+    TContext
+  >;
+  request?: SecondParameter<typeof apiMutator>;
+}): UseMutationOptions<
+  Awaited<ReturnType<typeof promotePropertyDefinitions>>,
+  TError,
+  PromotePropertyDefinitionsMutationVariables,
+  TContext
+> => {
+  const mutationKey = getPromotePropertyDefinitionsMutationKey();
+  const { mutation: mutationOptions, request: requestOptions } = options
+    ? options.mutation && "mutationKey" in options.mutation && options.mutation.mutationKey
+      ? options
+      : { ...options, mutation: { ...options.mutation, mutationKey } }
+    : { mutation: { mutationKey }, request: undefined };
+
+  const mutationFn: MutationFunction<
+    Awaited<ReturnType<typeof promotePropertyDefinitions>>,
+    PromotePropertyDefinitionsMutationVariables
+  > = (props) => {
+    const { communityId, data } = props ?? {};
+
+    return promotePropertyDefinitions(communityId, data, requestOptions);
+  };
+
+  return { mutationFn, ...mutationOptions };
+};
+
+export type PromotePropertyDefinitionsMutationResult = NonNullable<
+  Awaited<ReturnType<typeof promotePropertyDefinitions>>
+>;
+export type PromotePropertyDefinitionsMutationBody = BodyType<PropertyDefinitionPromote>;
+export type PromotePropertyDefinitionsMutationError = ErrorType<HTTPValidationError>;
+export type PromotePropertyDefinitionsMutationVariables = {
+  communityId: number;
+  data: BodyType<PropertyDefinitionPromote>;
+};
+
+/**
+ * @summary Promote Property Definitions
+ */
+export const usePromotePropertyDefinitions = <
+  TError = ErrorType<HTTPValidationError>,
+  TContext = unknown,
+>(
+  options?: {
+    mutation?: UseMutationOptions<
+      Awaited<ReturnType<typeof promotePropertyDefinitions>>,
+      TError,
+      PromotePropertyDefinitionsMutationVariables,
+      TContext
+    >;
+    request?: SecondParameter<typeof apiMutator>;
+  },
+  queryClient?: QueryClient
+): UseMutationResult<
+  Awaited<ReturnType<typeof promotePropertyDefinitions>>,
+  TError,
+  PromotePropertyDefinitionsMutationVariables,
+  TContext
+> => {
+  return useMutation(getPromotePropertyDefinitionsMutationOptions(options), queryClient);
 };
 /**
  * Update a property definition.
