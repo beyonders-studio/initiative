@@ -317,14 +317,15 @@ Change any of it from **Project settings → Layouts → Edit layouts**. That's 
 - **Layouts** — how its lists and tasks are laid out, and which list it opens on. See [Layouts](#layouts).
 - **Task statuses** — your workflow.
 - **Task types** — the kinds of task the project holds, and a shortcut to each one's page. See [Task types](#task-types).
-- **Properties** — fields of the project's own. See below.
 - **Advanced** — save as a template, [duplicate](tools.md#duplicating) it here or into another initiative, export, archive, delete.
 
 ### Project properties
 
 Some things only matter in one project. The sprint a bug landed in. Which van the delivery goes on. Nobody planning the summer fete needs a "Van" box on their tasks, so it doesn't belong to the whole initiative.
 
-That's a **property**: a field that belongs to the project and turns up on its tasks alone. Make one in **Project settings → Properties**, or from **Add** in the layout editor, which asks whether a new field is the project's property or the initiative's [metadata](initiatives.md#metadata). Properties take the same types metadata does. Whoever can change the project's tasks can change its properties; everyone else sees the list.
+That's a **property**: a field that belongs to the project and turns up on its tasks alone. Make one from **Add** in the [layout editor](layouts.md), which asks whether a new field is the project's property or the initiative's [metadata](initiatives.md#metadata). Properties take the same types metadata does.
+
+To rename one, change its options or delete it, select the field that shows it in the editor; its settings have **Edit property** and **Delete property**. Whoever can edit the project can change its properties. [Initiative settings → Metadata](initiatives.md#everything-in-one-place) lists them too, beside every other project's.
 
 ### Moving a task to another project
 

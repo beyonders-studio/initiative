@@ -174,7 +174,7 @@ Hidden content is **held for the platform**:
 - **Details** — name, colour, description, and the **Tools** card, where you choose which tools it offers.
 - **Members** — **Joining**, any waiting requests, and who's in with their roles.
 - **Roles** — make roles and set what they can do.
-- **Metadata** — fields of your own that anything in this initiative can carry. See below.
+- **Metadata** — fields of your own that anything in this initiative can carry, and every project's and collection's properties beside them. See below.
 - **Layouts** — every layout in the initiative, when each last changed, and the way into each one's editor (managers and above). See [Layouts](layouts.md).
 - **Export** — download the initiative's data (managers and above). **Keep content in this initiative** stops anyone, managers and community admins included, from exporting things from it one at a time, or copying or moving them to another initiative. Copies and moves inside it, this whole-initiative download and the community's own export carry on as normal.
 - **Danger zone** — archive, unarchive, delete.
@@ -183,7 +183,7 @@ Hidden content is **held for the platform**:
 
 Metadata is the fields your initiative needs and Initiative didn't think of: "Budget code", "Squad", "Signed off by". It belongs to the initiative. Make it here, or from **Add metadata** on anything that has some. Once it exists, every project, task, file, event and the rest in this initiative can carry it.
 
-Something only one project or one collection cares about is a **property** of that project or collection instead, and lives there: [a project's](projects-and-tasks.md#project-properties) in its settings, [a collection's](files.md#a-collections-properties) on its layouts page. This list holds the initiative's own.
+Something only one project or one collection cares about is a **property** of that project or collection instead: [a project's](projects-and-tasks.md#project-properties) or [a collection's](files.md#a-collections-properties), made in its layout editor.
 
 | Type | Holds |
 |---|---|
@@ -200,6 +200,16 @@ Something only one project or one collection cares about is a **property** of th
 | **Scale** | 0 to 100. A layout draws it as a percentage, stars or a bar. |
 
 Typing a new option into a select adds it to the list. Deleting metadata deletes every value set for it in the initiative, so it asks first.
+
+#### Everything in one place
+
+Under the initiative's metadata, the page lists the properties of each project and collection, under its name. You see the ones you're allowed to edit: those of the projects and collections you can change. A community admin sees them all.
+
+- **Edit** one with the pencil: its name, its options and their colours, its colour, its currency.
+- **Tick** several to delete them in one go. Each takes all its values with it, so it asks first.
+- **Promote to metadata** is for the day four projects each grow a "Budget" box and somebody notices. Tick properties of one type, from as many projects and collections as you like, and name the result. They become one piece of the initiative's metadata, or join the one already called that, if it's the same type.
+
+Promoting keeps the work. Options are pooled, values move across, every layout that showed one of them shows the metadata in its place, and the properties are deleted. If a file held a value for two of them, the most recently changed one wins. You need to be able to edit everything holding those values; if you can't, nothing changes and it says so.
 
 ### Archiving vs. deleting
 

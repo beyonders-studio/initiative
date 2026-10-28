@@ -245,7 +245,7 @@ On a collection's page, drop files anywhere to upload them straight in, or **Add
 
 A collection can have **properties** of its own: a price, a rating, the day a photo was taken. Make one in the layout editor, with **Add** wherever a field can go, and it lands right there. The values belong to the collection, not the file, so the same photo can be "£40, four stars" in the shop catalogue and just a picture in the fete gallery. Open a file from the collection to fill them in; until the file detail is changed, it shows every property the collection has.
 
-**Properties**, at the top of the layout editor, is where they get renamed, put in order or deleted. Deleting one takes every file's value of it in this collection, so it asks first.
+To rename one, change its options or delete it, select a field that shows it; its settings have **Edit property** and **Delete property**. Deleting one takes every file's value of it in this collection, so it asks first. [Initiative settings → Metadata](initiatives.md#everything-in-one-place) lists every collection's properties too, for tidying several at once.
 
 Lists can also show the initiative's own [metadata](initiatives.md#metadata), which a file carries wherever it goes. Properties are for what only makes sense in this collection.
 
