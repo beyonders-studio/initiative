@@ -34,7 +34,7 @@ Drag projects on the first page of the list to put them in your own order.
 
 ## Adding tasks
 
-Click **Add task**. Only the **title** is required. Everything else is in the same dialog, laid out exactly as the task will be once it exists, so there's one layout to learn instead of two. Fill in what you know. The rest can wait, possibly forever, and nothing will nag you about it.
+Click **Add task**. Only the **title** is required, unless the task type says otherwise: a type's page can [require fields](layouts.md#required-fields), and those sit up top in the dialog until they're filled. Everything else is in the same dialog, laid out exactly as the task will be once it exists, so there's one layout to learn instead of two. Fill in what you know. The rest can wait, possibly forever, and nothing will nag you about it.
 
 Nothing is saved until **Create task**. Close the dialog and it's gone.
 
