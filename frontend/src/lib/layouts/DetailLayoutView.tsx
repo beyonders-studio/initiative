@@ -120,8 +120,9 @@ export interface DetailKind<I extends Item, C, P> {
    *  drawn as its page is. */
   addingUpFront?: readonly string[];
   /** Whether an item fills in what its layout can require, by its key
-   *  (`requiredKey`): a kind whose layout requires nothing has none. */
-  filled?: (item: I, key: string) => boolean;
+   *  (`requiredKey`), with what is being sent for it (an item being added)
+   *  applied: a kind whose layout requires nothing has none. */
+  filled?: (item: I, key: string, sent?: Partial<P>) => boolean;
 }
 
 interface Drawn {
@@ -223,9 +224,10 @@ const RequiredMark = ({
 }) => {
   const { t } = useTranslation("layouts");
   const { detail, home } = useDrawn();
-  const adding = useContext(ItemDraftContext) !== null;
+  const draft = useContext(ItemDraftContext);
+  const adding = draft !== null;
   const key = requiredKey(node);
-  if (home.readOnly || (detail.filled?.(item, key) ?? true)) return children;
+  if (home.readOnly || (detail.filled?.(item, key, draft?.sent()) ?? true)) return children;
   return (
     <div className="flex min-w-0 flex-col gap-1" data-required-missing={key}>
       {children}

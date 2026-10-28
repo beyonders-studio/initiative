@@ -64,15 +64,28 @@ export const propertyFilled = (properties: readonly PropertySummary[], key: stri
       !isEmptyPropertyValue(each.value)
   );
 
-/** How an item of one kind reads as filled for a required key: by its own
- *  reader for the key, or else by the value its `properties` hold. */
+/** A field's value once `sent` (changes not yet saved, as an item being added
+ *  holds them) is applied: what it sends for `key`, or else what `held` says. */
+export const sentOr = <P, K extends keyof P>(sent: Partial<P>, key: K, held: unknown): unknown =>
+  Object.hasOwn(sent, key) ? sent[key] : held;
+
+/** Whether a value holds text. */
+export const hasText = (value: unknown): boolean =>
+  typeof value === "string" && value.trim() !== "";
+
+/** Whether a value is a list holding something. */
+export const hasAny = (value: unknown): boolean => Array.isArray(value) && value.length > 0;
+
+/** How an item of one kind reads as filled for a required key, with what is
+ *  being sent for it applied: by its own reader for the key, or else by the
+ *  value its `properties` hold. */
 export const filledBy =
-  <I>(
-    readers: Readonly<Record<string, (item: I) => boolean>>,
+  <I, P>(
+    readers: Readonly<Record<string, (item: I, sent: Partial<P>) => boolean>>,
     properties: (item: I) => readonly PropertySummary[]
   ) =>
-  (item: I, key: string): boolean =>
-    Object.hasOwn(readers, key) ? readers[key](item) : propertyFilled(properties(item), key);
+  (item: I, key: string, sent: Partial<P> = {}): boolean =>
+    Object.hasOwn(readers, key) ? readers[key](item, sent) : propertyFilled(properties(item), key);
 
 /**
  * What of `keys` an item leaves empty, by `filled`. A property only while

@@ -126,11 +126,8 @@ const Adding = <I extends Item, C, P, R extends { id: number }>({
     values: new Map<number, unknown>(),
     holding: new Set<string>(),
   });
-  const layout = detailLayoutOf(
-    useToolLayouts(layouts(item)).data,
-    detail.spec.kind,
-    detail.typed?.typeOf(item)
-  );
+  const laidOut = useToolLayouts(layouts(item));
+  const layout = detailLayoutOf(laidOut.data, detail.spec.kind, detail.typed?.typeOf(item));
   const home = detail.home(item, context);
   const definitions = useOwnedDefinitions({
     initiativeId: home.initiativeId ?? undefined,
@@ -141,7 +138,7 @@ const Adding = <I extends Item, C, P, R extends { id: number }>({
   const missingOf = (it: I) =>
     missingRequired(
       requiredKeys(layout as StoredRegions | null),
-      (key) => detail.filled?.(it, key) ?? true,
+      (key) => detail.filled?.(it, key, latest.current.fields) ?? true,
       home.initiativeId === null ? [] : definitions
     );
   const missing = missingOf(item);
@@ -169,7 +166,8 @@ const Adding = <I extends Item, C, P, R extends { id: number }>({
 
   const add = async () => {
     const { item: now, fields, values, holding: held } = latest.current;
-    if (adding || held.size > 0 || !ready(now) || missingOf(now).length > 0) return;
+    if (adding || held.size > 0 || !ready(now) || laidOut.isLoading || missingOf(now).length > 0)
+      return;
     setAdding(true);
     try {
       if (made.current === null) {
@@ -223,6 +221,7 @@ const Adding = <I extends Item, C, P, R extends { id: number }>({
         else held.delete(id);
         setHolding(new Set(held));
       },
+      sent: () => latest.current.fields as Record<string, unknown>,
     }),
     [changed]
   );
@@ -261,7 +260,14 @@ const Adding = <I extends Item, C, P, R extends { id: number }>({
         <Button
           type="button"
           onClick={() => void add()}
-          disabled={adding || holding.size > 0 || !ready(item) || missing.length > 0}
+          disabled={
+            adding ||
+            holding.size > 0 ||
+            !ready(item) ||
+            // Until its layout is read, what it requires is not known.
+            laidOut.isLoading ||
+            missing.length > 0
+          }
         >
           {adding ? <Loader2 className="h-4 w-4 animate-spin" /> : null}
           {adding ? t("adding") : title}

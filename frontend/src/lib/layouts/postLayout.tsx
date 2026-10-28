@@ -344,5 +344,8 @@ export const POST_DETAIL: DetailKind<PostRead, PostLayoutContext, PostUpdate> = 
     links: { entity: post, title: post.name },
   }),
   Shell: PostShell,
-  filled: filledBy<PostRead>({ tags: (post) => post.tags.length > 0 }, (post) => post.properties),
+  filled: filledBy<PostRead, PostUpdate>(
+    { tags: (post) => post.tags.length > 0 },
+    (post) => post.properties
+  ),
 };

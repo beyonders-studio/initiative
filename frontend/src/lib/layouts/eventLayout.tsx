@@ -70,7 +70,7 @@ import { getUserDisplayName } from "@/lib/userDisplay";
 import type { TranslateFn } from "@/types/i18n";
 
 import { type DetailKind, useItemContext } from "./DetailLayoutView";
-import { filledBy } from "./detailLayout";
+import { filledBy, hasAny, hasText, sentOr } from "./detailLayout";
 import { FieldFrame, sameIds, sameJson, useFieldDraft } from "./editing";
 import { type EVENT_FIELDS, EVENT_LAYOUT, eventFields } from "./events";
 import { DescriptionField, TagsField, TitleField } from "./fieldEditors";
@@ -633,13 +633,13 @@ export const EVENT_DETAIL: DetailKind<CalendarEventRead, EventLayoutContext, Eve
     rsvp: (_node, event) => <MyAnswer event={event} />,
   },
   addingParts: ["dates"],
-  filled: filledBy<CalendarEventRead>(
+  filled: filledBy<CalendarEventRead, EventPatch>(
     {
-      description: (event) => Boolean(event.description?.trim()),
-      location: (event) => Boolean(event.location?.trim()),
-      recurrence: (event) => event.recurrence !== null,
-      attendees: (event) => event.attendees.length > 0,
-      tags: (event) => event.tags.length > 0,
+      description: (event, sent) => hasText(sentOr(sent, "description", event.description)),
+      location: (event, sent) => hasText(sentOr(sent, "location", event.location)),
+      recurrence: (event, sent) => sentOr(sent, "recurrence", event.recurrence) != null,
+      attendees: (event, sent) => hasAny(sentOr(sent, "attendee_ids", event.attendees)),
+      tags: (event, sent) => hasAny(sentOr(sent, "tag_ids", event.tags)),
     },
     (event) => event.properties
   ),

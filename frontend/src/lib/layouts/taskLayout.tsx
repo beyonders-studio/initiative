@@ -76,7 +76,7 @@ import {
 } from "@/lib/userDisplay";
 
 import { type DetailKind, useItemContext } from "./DetailLayoutView";
-import { filledBy } from "./detailLayout";
+import { filledBy, hasAny, hasText, sentOr } from "./detailLayout";
 import { FieldFrame, sameIds, sameJson, useFieldDraft } from "./editing";
 import { DescriptionField, TagsField, TitleField } from "./fieldEditors";
 import { TASK_LAYOUT, taskFields, taskLayoutFor } from "./tasks";
@@ -591,11 +591,23 @@ const TaskRecurrenceEditor = ({ item: task, label }: EditorProps) => {
   );
 };
 
-const Checklist = ({ item: task }: EditorProps) => {
-  const { readOnly } = useTaskLayout();
-  // Its items are each saved on a task that exists.
-  if (useContext(ItemDraftContext) !== null) return null;
-  return <TaskChecklist taskId={task.id} items={task.checklist ?? []} canEdit={!readOnly} />;
+const Checklist = ({ item: task, label }: EditorProps) => {
+  const { readOnly, askScope } = useTaskLayout();
+  const save = useTaskFieldSave(task, label, askScope);
+  // A task being added keeps its list in the draft, sent with it.
+  const adding = useContext(ItemDraftContext) !== null;
+  return (
+    <TaskChecklist
+      taskId={task.id}
+      items={task.checklist ?? []}
+      canEdit={!readOnly}
+      onDraftChange={
+        adding
+          ? (checklist) => void save.save({ patch: { checklist }, shows: { checklist } })
+          : undefined
+      }
+    />
+  );
 };
 
 /** Who made the task and when. */
@@ -733,15 +745,17 @@ export const TASK_DETAIL: DetailKind<TaskRead, TaskLayoutContext, TaskUpdate> = 
   addingParts: ["status", "dates"],
   // The type picks the page the rest is laid out as.
   addingUpFront: ["type"],
-  filled: filledBy<TaskRead>(
+  filled: filledBy<TaskRead, TaskUpdate>(
     {
-      description: (task) => Boolean(task.description?.trim()),
-      assignees: (task) => task.assignees.length > 0,
-      checklist: (task) => task.checklist.length > 0,
-      recurrence: (task) => task.recurrence !== null,
-      tags: (task) => task.tags.length > 0,
+      description: (task, sent) => hasText(sentOr(sent, "description", task.description)),
+      assignees: (task, sent) => hasAny(sentOr(sent, "assignee_ids", task.assignees)),
+      checklist: (task, sent) => hasAny(sentOr(sent, "checklist", task.checklist)),
+      recurrence: (task, sent) => sentOr(sent, "recurrence", task.recurrence) != null,
+      tags: (task, sent) => hasAny(sentOr(sent, "tag_ids", task.tags)),
       // Either date fills them.
-      dates: (task) => task.start_date !== null || task.due_date !== null,
+      dates: (task, sent) =>
+        sentOr(sent, "start_date", task.start_date) != null ||
+        sentOr(sent, "due_date", task.due_date) != null,
     },
     (task) => task.properties
   ),

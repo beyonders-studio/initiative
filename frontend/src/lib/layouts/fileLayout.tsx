@@ -132,5 +132,5 @@ export const FILE_DETAIL: DetailKind<CollectionFileSummary, FileLayoutContext, n
     links: { entity: file },
   }),
   // A collection requires its own metadata, which the file holds there.
-  filled: filledBy<CollectionFileSummary>({}, (file) => file.metadata),
+  filled: filledBy<CollectionFileSummary, never>({}, (file) => file.metadata),
 };

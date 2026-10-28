@@ -264,6 +264,53 @@ describe("adding a task", () => {
     );
   });
 
+  it("takes a checklist a type requires, written before the task exists", async () => {
+    const type = buildTaskType({ id: 1, name: "Packing" });
+    server.use(
+      communityHttp.get("/layouts/", () =>
+        HttpResponse.json(
+          buildToolLayoutSet({
+            layouts: [
+              {
+                kind: "task",
+                task_type_id: type.id,
+                task_type_name: type.name,
+                definition: {
+                  main: [{ type: "field", props: { field: "checklist", required: true } }],
+                },
+                updated_at: "2026-10-01T12:00:00.000Z",
+              },
+            ],
+          })
+        )
+      )
+    );
+    const create = vi.fn(async () => ({ id: 5 }));
+    renderPage(() => <AddingTask types={[type]} create={create} laidOut />);
+    const user = userEvent.setup();
+
+    // Its page, once read, holds the checklist alone, marked.
+    await waitFor(() =>
+      expect(document.querySelector('[data-required-missing="checklist"]')).not.toBeNull()
+    );
+    const line = screen.getByPlaceholderText("Add checklist item");
+    const add = screen.getByRole("button", { name: "Create task" });
+    expect(add).toBeDisabled();
+    await user.type(line, "Tent{Enter}");
+    await waitFor(() => expect(add).toBeEnabled());
+    await user.click(add);
+
+    await waitFor(() =>
+      expect(create).toHaveBeenCalledWith(
+        expect.objectContaining({
+          fields: expect.objectContaining({
+            checklist: [expect.objectContaining({ text: "Tent", done: false })],
+          }),
+        })
+      )
+    );
+  });
+
   it("keeps More options open when the type changes the page", async () => {
     renderPage(() => (
       <AddingTask
@@ -480,6 +527,59 @@ describe("naming somebody in a task's title", () => {
     expect(sent(create).fields).toMatchObject({
       title: "Review the draft",
       assignee_ids: [42],
+    });
+  });
+
+  it("counts the people and the repeat it is sent with as filled in", async () => {
+    stubPeople();
+    const type = buildTaskType({ id: 1 });
+    server.use(
+      communityHttp.get("/layouts/", () =>
+        HttpResponse.json(
+          buildToolLayoutSet({
+            layouts: [
+              {
+                kind: "task",
+                task_type_id: type.id,
+                task_type_name: type.name,
+                definition: {
+                  side: [
+                    { type: "field", props: { field: "assignees", required: true } },
+                    { type: "field", props: { field: "recurrence", required: true } },
+                  ],
+                },
+                updated_at: "2026-10-01T12:00:00.000Z",
+              },
+            ],
+          })
+        )
+      )
+    );
+    const create = vi.fn(async () => ({ id: 5 }));
+    renderPage(() => <AddingTask types={[type]} create={create} laidOut />, reader);
+    const user = userEvent.setup();
+
+    const title = await screen.findByPlaceholderText(/task title/i);
+    const add = screen.getByRole("button", { name: "Create task" });
+    await waitFor(() =>
+      expect(document.querySelectorAll("[data-required-missing]")).toHaveLength(2)
+    );
+    await user.type(title, "Review @sa");
+    await user.click(await screen.findByRole("button", { name: /Sam Vimes/ }));
+    await waitFor(() =>
+      expect(document.querySelector('[data-required-missing="assignees"]')).toBeNull()
+    );
+    expect(add).toBeDisabled();
+
+    await user.click(screen.getByRole("combobox", { name: "Repeat" }));
+    await user.click(await screen.findByRole("option", { name: "Daily" }));
+    await waitFor(() => expect(add).toBeEnabled());
+    await user.click(add);
+
+    await waitFor(() => expect(create).toHaveBeenCalled());
+    expect(sent(create).fields).toMatchObject({
+      assignee_ids: [42],
+      recurrence: expect.stringContaining("FREQ=DAILY"),
     });
   });
 
