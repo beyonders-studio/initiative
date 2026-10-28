@@ -64,7 +64,6 @@
   "/c/$communityId/i/$initiativeId/projects/$projectId/settings/access",
   "/c/$communityId/i/$initiativeId/projects/$projectId/settings/advanced",
   "/c/$communityId/i/$initiativeId/projects/$projectId/settings/layouts",
-  "/c/$communityId/i/$initiativeId/projects/$projectId/settings/properties",
   "/c/$communityId/i/$initiativeId/projects/$projectId/settings/task-statuses",
   "/c/$communityId/i/$initiativeId/projects/$projectId/settings/task-types",
   "/c/$communityId/i/$initiativeId/projects/$projectId/tasks/$taskId",
