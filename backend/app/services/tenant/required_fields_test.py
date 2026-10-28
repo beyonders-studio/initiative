@@ -471,6 +471,7 @@ async def test_a_moved_task_meets_its_page_in_the_destination(
         headers=a.headers,
     )
     _refused(refused, "Size")
+    assert refused.json()["params"]["keys"] == f"property:{there_size.id}"
 
     given = await client.post(
         a.g(f"/tasks/{lacking}/move"),

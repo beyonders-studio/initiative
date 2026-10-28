@@ -393,7 +393,8 @@ class ToolLayoutMessages:
     ONE_LIST_SHOWN = "TOOL_LAYOUTS_ONE_LIST_SHOWN"
     # A person adding an item without a field its page requires, or emptying
     # one. ``params.fields`` names them, one a line: a built-in field by its
-    # id, a property by its name.
+    # id, a property by its name; ``params.keys`` holds each as its layout
+    # names it (``property:<id>``), for a client to ask for them.
     REQUIRED_FIELDS_MISSING = "REQUIRED_FIELDS_MISSING"
 
 
