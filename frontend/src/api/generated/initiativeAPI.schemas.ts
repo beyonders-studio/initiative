@@ -4304,8 +4304,6 @@ export interface CommunityRead {
   content_read_only: boolean;
   contact_email: string | null;
   auth_options: CommunityAuthOption[] | null;
-  enforce_compliance_session: boolean | null;
-  require_second_factor: boolean | null;
   is_community: boolean;
   categories: CommunityCategory[];
   has_adult_content: boolean | null;

@@ -25,6 +25,7 @@ from app.testing import (
     set_notification_prefs,
 )
 from app.testing.sockets import settle
+from app.services.platform import rules
 
 NIGHT = {"quiet_hours": {"start": "22:00", "end": "07:00"}}
 MENTION = NotificationType.mention
@@ -428,8 +429,7 @@ async def test_a_community_with_push_off_is_left_out_of_the_summary(
 ):
     user = await create_user(session, timezone="UTC")
     guild = await create_guild(session, creator=user)
-    guild.allow_push_notifications = False
-    session.add(guild)
+    await rules.put(session, "allow_push_notifications", False, guild_id=guild.id)
     await set_notification_prefs(session, user, dict(NIGHT))
     notification = await user_notifications.create_notification(
         session,

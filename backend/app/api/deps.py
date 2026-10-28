@@ -46,7 +46,7 @@ from app.core.login_methods import SecondFactorRequirement
 from app.models.platform.app_setting import AppSetting
 from app.core.guild_auth_options import CommunityAuthOption
 from app.services.platform import auth_posture
-from app.services.platform import guild_entitlements
+from app.services.platform import guild_entitlements, rules
 from app.services.platform.app_settings import GLOBAL_SETTINGS_ID
 from app.core import audit_context
 from app.core.messages import (
@@ -1330,7 +1330,9 @@ async def _refuse_sign_in(
         guild_id,
         satisfied,
         auth_context.current().session_amr,
-        require_second_factor=guild_context.guild.require_second_factor,
+        require_second_factor=await rules.community_value(
+            session, guild_id, "require_second_factor", applied=False
+        ),
     )
     raise GuildAccessError()
 

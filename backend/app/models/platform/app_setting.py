@@ -120,51 +120,12 @@ class AppSetting(SQLModel, table=True):
         sa_column=Column(JSONB, nullable=False, server_default=text("'{}'::jsonb")),
     )
 
-    # Which ways in this deployment permits. A Postgres enum array: adding a
-    # method later is a value on the type, not a column per method, and the
-    # database validates the elements rather than a hand-kept CHECK list. The
-    # non-empty constraint is the "at least one" rule — see
-    # ``app.core.login_methods``.
-    # How long somebody may stay signed in before signing in again, in hours.
-    # This is the *absolute* limit; ``AUTH_REFRESH_TTL_DAYS`` is the separate
-    # question of how long they may leave the app alone.
-    #
-    # NULL, the default, asks for no limit — a self-hosted deployment is not
-    # answering to anybody, and the idle window already ends a session nobody
-    # uses. It also has to be longer than that window to mean anything: set
-    # equal to it, the absolute limit always binds first and the idle window
-    # stops sliding, so a daily user is signed out on a timer regardless.
-    session_max_hours: Optional[int] = Field(
-        default=None,
-        sa_column=Column(Integer, nullable=True),
-    )
-
-    # And the other half: the longest a session may be left alone. NULL keeps
-    # ``AUTH_REFRESH_TTL_DAYS``, which is where this question was answered
-    # before and still is for a deployment that says nothing. A figure here
-    # narrows it; a community held to the compliance standard narrows it
-    # further. Whichever is strictest binds, which is what a limit means.
-    session_idle_minutes: Optional[int] = Field(
-        default=None,
-        sa_column=Column(Integer, nullable=True),
-    )
-
-    # How long a deleted community is kept before it is destroyed, in days.
-    #
-    # NULL is not the default here, unlike the limit above: it means **never**
-    # destroy one. A deployment that has undertaken to keep what its members
-    # put in it — or that is holding everything pending something unresolved —
-    # says so by clearing this, and deleted communities then sit in the
-    # operator's list until somebody restores or purges one deliberately.
-    #
-    # 90 days on a fresh install and on every upgrade, because that is the
-    # figure the retention window shipped as.
     # How long a deleted account is kept before it is erased, in days.
     #
-    # NULL means never, as it does above: the deployment keeps the account and
-    # nothing erases it on a timer. That is the answer for one required to keep
-    # accounts rather than to remove them, and the reason this is a setting at
-    # all rather than the constant it started as.
+    # NULL means never: the deployment keeps the account and nothing erases it
+    # on a timer. That is the answer for one required to keep accounts rather
+    # than to remove them, and the reason this is a setting at all rather than
+    # the constant it started as.
     deleted_account_retention_days: Optional[int] = Field(
         default=DEFAULT_ACCOUNT_RETENTION_DAYS,
         sa_column=Column(
@@ -172,6 +133,16 @@ class AppSetting(SQLModel, table=True):
         ),
     )
 
+    # How long a deleted community is kept before it is destroyed, in days.
+    #
+    # NULL is not the default: it means **never** destroy one. A deployment
+    # that has undertaken to keep what its members put in it — or that is
+    # holding everything pending something unresolved — says so by clearing
+    # this, and deleted communities then sit in the operator's list until
+    # somebody restores or purges one deliberately.
+    #
+    # 90 days on a fresh install and on every upgrade, because that is the
+    # figure the retention window shipped as.
     deleted_community_retention_days: Optional[int] = Field(
         default=DEFAULT_GUILD_RETENTION_DAYS,
         sa_column=Column(
@@ -187,6 +158,12 @@ class AppSetting(SQLModel, table=True):
             Integer, nullable=True, server_default=str(DEFAULT_HOLD_DELETION_DAYS)
         ),
     )
+
+    # Which ways in this deployment permits. A Postgres enum array: adding a
+    # method later is a value on the type, not a column per method, and the
+    # database validates the elements rather than a hand-kept CHECK list. The
+    # non-empty constraint is the "at least one" rule — see
+    # ``app.core.login_methods``.
     login_methods: list[str] = Field(
         default_factory=lambda: [m.value for m in DEFAULT_LOGIN_METHODS],
         sa_column=Column(
@@ -311,14 +288,6 @@ class AppSetting(SQLModel, table=True):
         sa_column=Column(Boolean, nullable=False, server_default="true"),
     )
 
-    # Whether search may order a community's content by how many members
-    # engaged with it lately. Each community is asked too, and off wins, so a
-    # community can turn off what this allows and never the reverse.
-    engagement_ranking_enabled: bool = Field(
-        default=True,
-        sa_column=Column(Boolean, nullable=False, server_default="true"),
-    )
-
     # Whether a member's share to this deployment's marketplace goes on the
     # shelf straight away. Off by default: each one waits for the owner to
     # approve it. A deployment whose members all know each other turns it on.
@@ -347,37 +316,6 @@ class AppSetting(SQLModel, table=True):
             nullable=False,
             server_default=DmPolicy.private.value,
         ),
-    )
-
-    # Whether a notification may reach a phone at all. On by default, which is
-    # what every deployment has had. Off means this deployment sends none: no
-    # push leaves it, the registration endpoint declines, and the push tokens
-    # it was holding are dropped, so switching it off is the whole answer rather
-    # than the delivery half of one. Devices register again when it comes back.
-    push_notifications_enabled: bool = Field(
-        default=True,
-        sa_column=Column(Boolean, nullable=False, server_default="true"),
-    )
-
-    # And the other place a notification lands: a mailbox. Off means no
-    # notification email is written, on any cadence. It is the *notification*
-    # half of email and nothing else — a sign-in code, an address to confirm, a
-    # password reset and the notices an account gets about itself are not
-    # notifications and keep going, because switching this off must not lock
-    # anybody out of their account.
-    email_notifications_enabled: bool = Field(
-        default=True,
-        sa_column=Column(Boolean, nullable=False, server_default="true"),
-    )
-
-    # Whether a notification that leaves the app may say what it is about. Off
-    # by default: a push that reads "Ana mentioned you in Q3 budget" is the one
-    # worth sending. On, a notification that leaves reduces to the kind of thing
-    # that happened — "You were mentioned in a comment" — and the app is where
-    # the rest of it is. The bell inside the app is unaffected either way.
-    redact_notification_content: bool = Field(
-        default=False,
-        sa_column=Column(Boolean, nullable=False, server_default="false"),
     )
 
     # AI config ownership mode: "platform" (the operator's connections apply to

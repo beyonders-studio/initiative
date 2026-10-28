@@ -46,6 +46,7 @@ from app.testing.factories import (
 from app.testing import route_as
 from app.db.request_context import SystemGuild
 from app.services.platform import app_settings as app_settings_service
+from app.services.platform import rules
 
 
 def _bearer(token: str) -> dict[str, str]:
@@ -1374,8 +1375,9 @@ async def test_a_community_asks_for_a_factor_without_asking_about_arrival(
 
     assert response.status_code == 200, response.text
     assert response.json()["require_second_factor"] is True
-    await session.refresh(seat.guild)
-    assert seat.guild.require_second_factor is True
+    assert await rules.community_value(
+        session, seat.guild.id, "require_second_factor", applied=False
+    )
 
     async def asked() -> bool:
         reached = await client.get(seat.g("/initiatives/"), headers=seat.headers)
@@ -1395,8 +1397,7 @@ async def test_a_community_asks_for_a_factor_without_asking_about_arrival(
     await guild_administration(
         session, seat.guild, auth_options=["providers", "restrictions"]
     )
-    seat.guild.require_second_factor = False
-    session.add(seat.guild)
+    await rules.put(session, "require_second_factor", False, guild_id=seat.guild.id)
     session.add(
         GuildAuthPolicy(
             guild_id=seat.guild.id, policy="required", require_methods=["totp"]

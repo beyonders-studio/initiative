@@ -542,7 +542,6 @@ COMMUNITY_FIELDS: tuple[str, ...] = (
     "community_age_gate_enabled",
     "default_dm_policy",
     "direct_messages_enabled",
-    "engagement_ranking_enabled",
     "guests_enabled",
     "max_guest_days",
     "deleted_community_retention_days",
@@ -795,7 +794,6 @@ async def update_community_settings(
     community_age_gate_enabled: bool | None = None,
     default_dm_policy: "DmPolicy | None" = None,
     direct_messages_enabled: bool | None = None,
-    engagement_ranking_enabled: bool | None = None,
     guests_enabled: bool | None = None,
     max_guest_days: int | None = None,
     deleted_community_retention_days: int | None = None,
@@ -827,9 +825,6 @@ async def update_community_settings(
     it is left alone. Switching it off keeps every channel, policy and queued
     message as it is, so switching it back on restores them.
 
-    ``engagement_ranking_enabled`` is left alone when omitted. Off, no
-    community ranks by engagement, whatever its own answer.
-
     ``guests_enabled`` and ``max_guest_days`` are left alone when omitted.
     Off, no guest reaches anything; the ceiling bounds guests made or
     extended after it changes.
@@ -857,8 +852,6 @@ async def update_community_settings(
             settings_row.default_dm_policy = default_dm_policy
         if direct_messages_enabled is not None:
             settings_row.direct_messages_enabled = bool(direct_messages_enabled)
-        if engagement_ranking_enabled is not None:
-            settings_row.engagement_ranking_enabled = engagement_ranking_enabled
         if guests_enabled is not None:
             settings_row.guests_enabled = guests_enabled
         if max_guest_days is not None:

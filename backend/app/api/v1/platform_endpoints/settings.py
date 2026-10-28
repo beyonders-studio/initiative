@@ -119,7 +119,7 @@ from app.core.login_methods import (
     LoginMethod,
     SecondFactorRequirement,
 )
-from app.services.platform import auth_posture
+from app.services.platform import auth_posture, rules
 from app.services.platform import app_settings as app_settings_service
 from app.services.platform import push_config, push_relay
 from app.services import captcha as captcha_service
@@ -211,6 +211,7 @@ async def _platform_auth_payload(session) -> PlatformAuthSettingsResponse:
     an operator acknowledges is one the page actually showed them.
     """
     row = await app_settings_service.get_app_settings(session)
+    stored = await rules.platform_values(session)
     permitted = auth_posture.methods_from_row(row)
     stranding, without_factor = await auth_posture.account_figures(
         session, permitted=permitted
@@ -230,8 +231,8 @@ async def _platform_auth_payload(session) -> PlatformAuthSettingsResponse:
             session
         ),
         factor_methods_permitted=bool(permitted.intersection(FACTOR_METHODS)),
-        session_max_hours=row.session_max_hours,
-        session_idle_minutes=row.session_idle_minutes,
+        session_max_hours=stored["session_max_hours"],
+        session_idle_minutes=stored["session_idle_minutes"],
         second_factor_requirement=auth_posture.requirement_from_row(row),
         accounts_without_factor=AccountsWithoutFactor(
             platform_roles=without_factor[SecondFactorRequirement.platform_roles],
@@ -289,11 +290,11 @@ async def update_platform_auth_settings(
 
 
 async def _notification_payload(session) -> NotificationSettingsResponse:
-    row = await app_settings_service.get_app_settings(session)
+    stored = await rules.platform_values(session)
     return NotificationSettingsResponse(
-        push_notifications_enabled=row.push_notifications_enabled,
-        email_notifications_enabled=row.email_notifications_enabled,
-        redact_notification_content=row.redact_notification_content,
+        push_notifications_enabled=stored["push_notifications_enabled"],
+        email_notifications_enabled=stored["email_notifications_enabled"],
+        redact_notification_content=stored["redact_notification_content"],
     )
 
 
@@ -381,7 +382,9 @@ async def read_community_settings(
         deleted_community_retention_days=settings_obj.deleted_community_retention_days,
         deleted_account_retention_days=settings_obj.deleted_account_retention_days,
         on_hold_community_deletion_days=settings_obj.on_hold_community_deletion_days,
-        engagement_ranking_enabled=settings_obj.engagement_ranking_enabled,
+        engagement_ranking_enabled=(await rules.platform_values(session))[
+            "engagement_ranking_enabled"
+        ],
         guests_enabled=settings_obj.guests_enabled,
         max_guest_days=settings_obj.max_guest_days,
     )
@@ -444,7 +447,6 @@ async def update_community_settings(
         community_age_gate_enabled=payload.age_gate_enabled,
         default_dm_policy=payload.default_dm_policy,
         direct_messages_enabled=payload.direct_messages_enabled,
-        engagement_ranking_enabled=payload.engagement_ranking_enabled,
         guests_enabled=payload.guests_enabled,
         max_guest_days=payload.max_guest_days,
         deleted_community_retention_days=payload.deleted_community_retention_days,
@@ -458,6 +460,11 @@ async def update_community_settings(
         in payload.model_fields_set,
         actor_user_id=owner.id,
     )
+    if payload.engagement_ranking_enabled is not None:
+        await auth_posture.change(
+            auth_posture.RuleContext.platform(session, owner),
+            {"engagement_ranking_enabled": payload.engagement_ranking_enabled},
+        )
     return CommunitySettingsResponse(
         community_directory_enabled=settings_obj.community_directory_enabled,
         age_gate_enabled=settings_obj.community_age_gate_enabled,
@@ -466,7 +473,9 @@ async def update_community_settings(
         deleted_community_retention_days=settings_obj.deleted_community_retention_days,
         deleted_account_retention_days=settings_obj.deleted_account_retention_days,
         on_hold_community_deletion_days=settings_obj.on_hold_community_deletion_days,
-        engagement_ranking_enabled=settings_obj.engagement_ranking_enabled,
+        engagement_ranking_enabled=(await rules.platform_values(session))[
+            "engagement_ranking_enabled"
+        ],
         guests_enabled=settings_obj.guests_enabled,
         max_guest_days=settings_obj.max_guest_days,
     )

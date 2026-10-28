@@ -28,6 +28,7 @@ from app.testing import (
     set_notification_prefs,
 )
 from app.testing.sockets import settle
+from app.services.platform import rules
 
 
 @pytest.fixture
@@ -136,8 +137,7 @@ async def test_a_redacting_community_writes_down_no_more_than_it_will_say(
     actor = await create_user(session)
     recipient = await create_user(session)
     guild = await create_guild(session, creator=actor)
-    guild.redact_notification_content = True
-    session.add(guild)
+    await rules.put(session, "redact_notification_content", True, guild_id=guild.id)
     await session.commit()
 
     with push_switched_on():
@@ -180,8 +180,7 @@ async def test_a_push_of_its_own_writes_no_line(session: AsyncSession, fcm):
             )
         ],
     )
-    guild.allow_push_notifications = False
-    session.add(guild)
+    await rules.put(session, "allow_push_notifications", False, guild_id=guild.id)
     await session.commit()
 
     await _deliver(session, datetime.now(timezone.utc))
@@ -252,8 +251,7 @@ async def test_a_retry_follows_the_communitys_switches_as_they_stand_then(
     await _deliver(session, start)
     assert len(pushed) == 2
 
-    guild.redact_notification_content = True
-    session.add(guild)
+    await rules.put(session, "redact_notification_content", True, guild_id=guild.id)
     await session.commit()
     answer["now"] = (True, False)
     await _deliver(session, start + timedelta(seconds=31))
@@ -267,8 +265,7 @@ async def test_a_retry_follows_the_communitys_switches_as_they_stand_then(
     await session.commit()
     at = datetime.now(timezone.utc)
     await _deliver(session, at)
-    guild.allow_push_notifications = False
-    session.add(guild)
+    await rules.put(session, "allow_push_notifications", False, guild_id=guild.id)
     await session.commit()
     await _deliver(session, at + timedelta(seconds=31))
     assert len(pushed) == 5
@@ -400,8 +397,7 @@ async def test_no_desktop_alert_where_it_is_refused(
             session, recipient, {"categories": {"mentions": {"desktop": False}}}
         )
     else:
-        guild.allow_push_notifications = False
-        session.add(guild)
+        await rules.put(session, "allow_push_notifications", False, guild_id=guild.id)
     await session.commit()
     app = account_socket(recipient.id)
 

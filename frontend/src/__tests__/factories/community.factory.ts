@@ -71,8 +71,6 @@ export function buildCommunity(overrides: Partial<CommunityRead> = {}): Communit
     content_read_only: false,
     contact_email: null,
     auth_options: null,
-    enforce_compliance_session: null,
-    require_second_factor: null,
     is_community: false,
     categories: [],
     has_adult_content: null,

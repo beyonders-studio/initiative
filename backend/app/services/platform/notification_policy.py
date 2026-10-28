@@ -34,15 +34,11 @@ from __future__ import annotations
 from dataclasses import dataclass, replace
 from typing import TYPE_CHECKING, Iterable, Mapping, TypeVar, cast
 
-from sqlmodel import select
 from sqlmodel.ext.asyncio.session import AsyncSession
 
 from app.core.email_i18n import translate
 from app.core.notification_categories import NotificationCategory
-from app.models.platform.app_setting import AppSetting
-from app.models.platform.guild import Guild
-from app.core.guild_auth_options import CommunityAuthOption
-from app.services.platform import guild_entitlements
+from app.services.platform import rules
 
 if TYPE_CHECKING:
     from app.services.email import EmailPieces
@@ -65,31 +61,24 @@ class NotificationPolicy:
 
 
 #: What every deployment and community says until one of them says otherwise:
-#: notifications reach both channels and name what they are about. Also what a
-#: caller is served where the configuration cannot be read — the shape the app
-#: had before any of this existed.
+#: notifications reach both channels and name what they are about.
 UNRESTRICTED = NotificationPolicy(push=True, email=True, redact=False)
 
 
-def _platform_policy(row: AppSetting | None) -> NotificationPolicy:
-    if row is None:
-        return UNRESTRICTED
+def _platform_policy(values: Mapping[str, object]) -> NotificationPolicy:
     return NotificationPolicy(
-        push=row.push_notifications_enabled,
-        email=row.email_notifications_enabled,
-        redact=row.redact_notification_content,
+        push=bool(values["push_notifications_enabled"]),
+        email=bool(values["email_notifications_enabled"]),
+        redact=bool(values["redact_notification_content"]),
     )
 
 
-def _guild_policy(row: Guild | None, *, lapsed: bool = False) -> NotificationPolicy:
-    """A community's own answers, while it holds the ``restrictions`` option
-    they need; ``lapsed`` when its row shows that option withdrawn."""
-    if row is None or lapsed:
-        return UNRESTRICTED
+def _guild_policy(values: Mapping[str, object]) -> NotificationPolicy:
+    """A community's own answers, each while it holds the option it needs."""
     return NotificationPolicy(
-        push=row.allow_push_notifications,
-        email=row.allow_email_notifications,
-        redact=row.redact_notification_content,
+        push=bool(values["allow_push_notifications"]),
+        email=bool(values["allow_email_notifications"]),
+        redact=bool(values["redact_notification_content"]),
     )
 
 
@@ -107,29 +96,17 @@ async def resolve_many(
     each item it carries is answered by its own.
     """
     wanted = set(guild_ids)
-    platform = _platform_policy(
-        (await session.exec(select(AppSetting).where(AppSetting.id == 1))).one_or_none()
-    )
-    named = {gid for gid in wanted if gid is not None}
-    rows = (
-        (
-            await session.exec(
-                select(
-                    Guild,
-                    guild_entitlements.holds_option(
-                        Guild.id, CommunityAuthOption.restrictions
-                    ),
-                ).where(Guild.id.in_(named))
+    platform = _platform_policy(await rules.platform_values(session))
+    by_id = {
+        gid: _guild_policy(values)
+        for gid, values in (
+            await rules.community_values(
+                session, {gid for gid in wanted if gid is not None}
             )
-        ).all()
-        if named
-        else []
-    )
-    by_id = {row.id: _guild_policy(row, lapsed=not held) for row, held in rows}
+        ).items()
+    }
     return {
-        gid: platform
-        if gid is None
-        else platform.stricter_than(by_id.get(gid, UNRESTRICTED))
+        gid: platform if gid is None else platform.stricter_than(by_id[gid])
         for gid in wanted
     }
 

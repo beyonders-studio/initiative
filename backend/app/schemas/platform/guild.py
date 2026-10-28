@@ -243,14 +243,6 @@ class CommunityRead(CommunityBase):
     # entitlement), so their settings UI knows which surfaces to offer;
     # ``None`` for non-admin members (they never configure auth).
     auth_options: Optional[List[CommunityAuthOption]] = None
-    # ADMIN-ONLY. Whether this guild holds its members to the twelve-hour
-    # session standard. ``None`` for non-admin members: the settings surface
-    # that sets it is what reads it, and nothing a member does depends on the
-    # answer.
-    enforce_compliance_session: Optional[bool] = None
-    # ADMIN-ONLY. Whether reaching this guild asks for a second factor.
-    # ``None`` for non-admin members, like the one above.
-    require_second_factor: Optional[bool] = None
     # Community directory opt-in and its subject tags. Guild identity, not
     # administration: every member sees them (they are published to strangers
     # anyway), and the settings page shows the controls to admins.

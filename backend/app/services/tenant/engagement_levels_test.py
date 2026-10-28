@@ -14,12 +14,12 @@ from app.models.tenant.engagement_level import EngagementLevel
 from app.models.tenant.event_outbox import EventOutbox
 from app.models.tenant.personal_item import PersonalItem, ViewSource
 from app.services.guild_sweeps import Scope, each_guild
-from app.services.platform import app_settings as app_settings_service
 from app.services.tenant import engagement_levels
 from app.services.tenant.engagement_levels import HALF_LIFE
 from app.services.tenant.personal_items import WINDOW
 from app.testing import create_task, guild_administration
 from app.testing.routing import route_as
+from app.services.platform import rules
 
 
 async def _pass(guild_id: int) -> None:
@@ -231,8 +231,7 @@ async def test_turning_ranking_off_clears_the_levels(
     # Three opens a moment old come to just under 3: log2(1 + 3), floored.
     assert await _levels(session) == {("task", task.id): 1}
 
-    guild.allow_engagement_ranking = False
-    session.add(guild)
+    await rules.put(session, "allow_engagement_ranking", False, guild_id=guild.id)
     await session.commit()
     await guild_administration(session, guild, auth_options=[])
     await _pass(guild.id)
@@ -242,8 +241,7 @@ async def test_turning_ranking_off_clears_the_levels(
     await _pass(guild.id)
     assert await _levels(session) == {}
 
-    guild.allow_engagement_ranking = True
-    session.add(guild)
+    await rules.put(session, "allow_engagement_ranking", True, guild_id=guild.id)
     await session.commit()
     await _pass(guild.id)
     assert await _levels(session) == {("task", task.id): 1}
@@ -251,9 +249,7 @@ async def test_turning_ranking_off_clears_the_levels(
     # A read-only community is still cleared when the deployment turns it off.
     guild.status = CommunityStatus.read_only
     session.add(guild)
-    settings_row = await app_settings_service.ensure_settings_row(session)
-    settings_row.engagement_ranking_enabled = False
-    session.add(settings_row)
+    await rules.put(session, "engagement_ranking_enabled", False)
     await session.commit()
     await _pass(guild.id)
     assert await _levels(session) == {}

@@ -35,12 +35,11 @@ from app.core.audit_events import AuditEventType
 from app.core.encryption import SALT_AI_API_KEY, decrypt_field, encrypt_field
 from app.core.messages import AIMessages, GuildMessages
 from app.db import session as db_session
-from app.core.guild_auth_options import CommunityAuthOption
 from app.models.platform.ai_connection import PlatformAIConnection
 from app.models.platform.guild import CommunityStatus, Guild
 from app.models.tenant.ai_connection import GuildAIConnection, GuildAIConnectionKey
 from app.services.platform.app_settings import get_app_settings, locked_settings
-from app.services.platform import guild_entitlements
+from app.services.platform import rules
 from app.schemas.ai_settings import (
     AIConfigMode,
     AIConnectionCommunity,
@@ -350,17 +349,7 @@ async def resolve_ai_settings(
         return ResolvedAISettings(enabled=False, source="disabled")
 
     # The community's own answer, while it holds the option that sets it.
-    switch = (
-        await session.exec(
-            select(
-                Guild.allow_ai,
-                guild_entitlements.holds_option(
-                    Guild.id, CommunityAuthOption.restrictions
-                ),
-            ).where(Guild.id == guild_id)
-        )
-    ).first()
-    if switch is not None and not switch[0] and switch[1]:
+    if not await rules.community_value(session, guild_id, "allow_ai"):
         return ResolvedAISettings(enabled=False, source=cfg.mode)
 
     # Connections available in the active mode.

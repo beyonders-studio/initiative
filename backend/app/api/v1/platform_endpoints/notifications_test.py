@@ -27,6 +27,7 @@ from app.testing.factories import (
     get_auth_headers,
     set_notification_prefs,
 )
+from app.services.platform import rules
 
 
 async def _seed_notification(session: AsyncSession, user_id: int) -> int:
@@ -310,8 +311,7 @@ async def test_the_desktop_alert_is_the_line_unless_its_community_redacts(
     assert body["notification"]["id"] == line.id
     assert body["redacted"] is None
 
-    guild.redact_notification_content = True
-    session.add(guild)
+    await rules.put(session, "redact_notification_content", True, guild_id=guild.id)
     await session.commit()
     body = (await client.get(url, headers=get_auth_headers(user))).json()
     title, text = notification_policy.redacted_line(

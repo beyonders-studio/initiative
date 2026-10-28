@@ -16,11 +16,11 @@ from sqlmodel.ext.asyncio.session import AsyncSession
 from app.core.audit_events import AuditEventType
 from app.core.login_methods import LoginMethod, SecondFactorRequirement
 from app.core.security import AUTH_POLICY_UNMET_HEADER
-from app.models.platform.guild import Guild
 from app.models.platform.guild_auth_policy import GuildAuthPolicy
 from app.models.platform.user import UserRole
 from app.services.platform import app_settings as app_settings_service
-from app.services.platform import auth_posture
+from app.core import rules as rule_catalog
+from app.services.platform import auth_posture, rules
 from app.services.platform.auth_posture import (
     COMMUNITY_RULES,
     PLATFORM_RULES,
@@ -45,7 +45,14 @@ async def _settings(session: AsyncSession, **values: Any) -> None:
 
 async def _put(session: AsyncSession, guild_id: int | None, key: str, value: Any):
     """Put ``value`` in place directly, as a rule's own write would leave it."""
-    if guild_id is None:
+    if key in (
+        rule_catalog.PLATFORM_RULES
+        if guild_id is None
+        else rule_catalog.COMMUNITY_RULES
+    ):
+        await rules.put(session, key, value, guild_id=guild_id)
+        await session.commit()
+    elif guild_id is None:
         if key == "login_methods":
             value = sorted(m.value for m in value)
         await _settings(session, **{key: value})
@@ -67,11 +74,6 @@ async def _put(session: AsyncSession, guild_id: int | None, key: str, value: Any
                 guest_require_methods=sorted(m.value for m in value.methods),
             )
         )
-        await session.commit()
-    else:
-        guild = await session.get(Guild, guild_id)
-        setattr(guild, key, value)
-        session.add(guild)
         await session.commit()
 
 
@@ -112,6 +114,7 @@ CASES: dict[tuple[str, str], Case] = {
     ("platform", "push_notifications_enabled"): Case(True, False, PLATFORM_SETTINGS),
     ("platform", "email_notifications_enabled"): Case(True, False, PLATFORM_SETTINGS),
     ("platform", "redact_notification_content"): Case(False, True, PLATFORM_SETTINGS),
+    ("platform", "engagement_ranking_enabled"): Case(True, False, PLATFORM_SETTINGS),
     ("community", "auth_policy"): Case(
         SignInRequirement(),
         FACTOR_REQUIREMENT,

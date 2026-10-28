@@ -42,6 +42,7 @@ from sqlalchemy import select as sa_select
 from sqlmodel import func, select
 from sqlmodel.ext.asyncio.session import AsyncSession
 
+from app.core import rules as rule_catalog
 from app.core.audit_events import AuditEventType
 from app.core.login_methods import (
     FACTOR_METHODS,
@@ -69,6 +70,7 @@ from app.services.platform import app_settings as app_settings_service
 from app.services.platform import guild_entitlements
 from app.services.platform import guilds as guilds_service
 from app.services.platform import push_tokens
+from app.services.platform import rules as rules_service
 from app.services.platform.app_settings import GLOBAL_SETTINGS_ID
 
 logger = logging.getLogger(__name__)
@@ -389,6 +391,8 @@ class RuleContext:
     settings: AppSetting = field(init=False)
     guild: Guild = field(init=False)
     policy: GuildAuthPolicy | None = field(default=None, init=False)
+    #: The layer's stored rules as written, whether or not each applies.
+    rules: dict[str, Any] = field(default_factory=dict, init=False)
     stranded: int = field(default=0, init=False)
 
     @classmethod
@@ -411,11 +415,6 @@ class RuleContext:
     ) -> RuleContext:
         return cls(session, system, actor, guild_id=guild_id)
 
-    @property
-    def target(self) -> AppSetting | Guild:
-        """The row a column rule reads and writes."""
-        return self.settings if self.guild_id is None else self.guild
-
 
 FollowUp = Callable[[RuleContext, Any, Any], Awaitable[None]]
 
@@ -424,10 +423,10 @@ FollowUp = Callable[[RuleContext, Any, Any], Awaitable[None]]
 class Rule:
     """One rule, as :func:`change` writes it.
 
-    The base is a column of the settings row (a deployment's rule) or of the
-    community's row: ``loose`` is its most permissive value, ``None`` for a
-    limit where no limit is the loosest. Rules that are more than a column
-    override the hooks.
+    The base is a stored rule (``app.core.rules``) of the deployment or of
+    the community: ``loose`` is its most permissive value, which is also its
+    default, ``None`` for a limit where no limit is the loosest. Rules stored
+    anywhere else override the hooks.
     """
 
     key: str
@@ -437,7 +436,7 @@ class Rule:
     follow_up: FollowUp | None = None
 
     async def read(self, ctx: RuleContext) -> Any:
-        return getattr(ctx.target, self.key)
+        return ctx.rules[self.key]
 
     def tightens(self, before: Any, after: Any) -> bool:
         if self.loose is None:
@@ -454,8 +453,8 @@ class Rule:
         """Refusals of this rule's own, asked of every change to it."""
 
     async def write(self, ctx: RuleContext, after: Any) -> None:
-        setattr(ctx.target, self.key, after)
-        ctx.session.add(ctx.target)
+        await rules_service.put(ctx.session, self.key, after, guild_id=ctx.guild_id)
+        ctx.rules[self.key] = after
 
     async def audit(self, ctx: RuleContext, moved: dict[str, tuple[Any, Any]]) -> None:
         """Record this rule's area: every column rule in it that moved, once."""
@@ -817,7 +816,17 @@ class _CommunityFactor(Rule):
             raise self_unsatisfied(LoginMethod.totp.value)
 
 
-_RESTRICTIONS = CommunityAuthOption.restrictions
+def _platform(key: str, area: str, follow_up: FollowUp | None = None) -> Rule:
+    """A stored rule of the deployment, its loosest value its default."""
+    stored = rule_catalog.PLATFORM_RULES[key]
+    return Rule(key, area=area, loose=stored.default, follow_up=follow_up)
+
+
+def _community(key: str, area: str, cls: type[Rule] = Rule) -> Rule:
+    """A stored rule of a community, with the option it needs."""
+    stored = rule_catalog.COMMUNITY_RULES[key]
+    return cls(key, area=area, loose=stored.default, entitlement=stored.entitlement)
+
 
 #: The deployment's rules, by the field that names each.
 PLATFORM_RULES: dict[str, Rule] = {
@@ -825,16 +834,16 @@ PLATFORM_RULES: dict[str, Rule] = {
     for rule in (
         _LoginMethods("login_methods", area="login_methods"),
         _FactorRequirement("second_factor_requirement", area="second_factor"),
-        Rule("session_max_hours", area="session_lifetime"),
-        Rule("session_idle_minutes", area="session_lifetime"),
-        Rule(
+        _platform("session_max_hours", "session_lifetime"),
+        _platform("session_idle_minutes", "session_lifetime"),
+        _platform(
             "push_notifications_enabled",
-            area="notifications",
-            loose=True,
+            "notifications",
             follow_up=_drop_push_tokens,
         ),
-        Rule("email_notifications_enabled", area="notifications", loose=True),
-        Rule("redact_notification_content", area="notifications", loose=False),
+        _platform("email_notifications_enabled", "notifications"),
+        _platform("redact_notification_content", "notifications"),
+        _platform("engagement_ranking_enabled", "engagement_ranking"),
     )
 }
 
@@ -851,46 +860,16 @@ COMMUNITY_RULES: dict[str, Rule] = {
             entitlement=CommunityAuthOption.providers,
             guest=True,
         ),
-        _CommunityFactor(
-            "require_second_factor",
-            area="second_factor",
-            loose=False,
-            entitlement=_RESTRICTIONS,
-        ),
-        Rule(
-            "enforce_compliance_session",
-            area="session_limit",
-            loose=False,
-            entitlement=_RESTRICTIONS,
-        ),
-        Rule(
-            "allow_push_notifications",
-            area="notifications",
-            loose=True,
-            entitlement=_RESTRICTIONS,
-        ),
-        Rule(
-            "allow_email_notifications",
-            area="notifications",
-            loose=True,
-            entitlement=_RESTRICTIONS,
-        ),
-        Rule(
-            "redact_notification_content",
-            area="notifications",
-            loose=False,
-            entitlement=_RESTRICTIONS,
-        ),
-        Rule(
-            "allow_engagement_ranking",
-            area="engagement_ranking",
-            loose=True,
-            entitlement=_RESTRICTIONS,
-        ),
-        Rule("allow_ai", area="ai", loose=True, entitlement=_RESTRICTIONS),
+        _community("require_second_factor", "second_factor", _CommunityFactor),
+        _community("enforce_compliance_session", "session_limit"),
+        _community("allow_push_notifications", "notifications"),
+        _community("allow_email_notifications", "notifications"),
+        _community("redact_notification_content", "notifications"),
+        _community("allow_engagement_ranking", "engagement_ranking"),
+        _community("allow_ai", "ai"),
         # The longest a guest may stay. It bounds the guests made or extended
         # after it changes, and no others.
-        Rule("guest_max_days", area="guests", entitlement=_RESTRICTIONS),
+        _community("guest_max_days", "guests"),
     )
 }
 
@@ -900,10 +879,12 @@ def _rules(ctx: RuleContext) -> dict[str, Rule]:
 
 
 async def _load(ctx: RuleContext) -> None:
-    """Take the rows the rules read: the settings row, held, for the
-    deployment's; the community's row and its requirement for a community's."""
+    """Take the rows the rules read: the settings row, held, and the stored
+    rules for the deployment's; the community's row, its requirement and its
+    stored rules for a community's."""
     if ctx.guild_id is None:
         ctx.settings = await app_settings_service.locked_settings(ctx.session)
+        ctx.rules = await rules_service.platform_values(ctx.session)
         return
     guild = await ctx.session.get(Guild, ctx.guild_id)
     if guild is None:
@@ -913,6 +894,9 @@ async def _load(ctx: RuleContext) -> None:
         )
     ctx.guild = guild
     ctx.policy = await ctx.session.get(GuildAuthPolicy, ctx.guild_id)
+    ctx.rules = (
+        await rules_service.community_values(ctx.session, [ctx.guild_id], applied=False)
+    )[ctx.guild_id]
 
 
 async def change(ctx: RuleContext, changes: dict[str, Any]) -> None:

@@ -19,6 +19,7 @@ from app.core.config import INSTALL_HEADER
 from app.core.security import decode_session_token
 from app.models.platform.auth_session import AuthSession
 from app.testing import create_user
+from app.services.platform import rules
 
 
 PASSWORD = "testpassword123"
@@ -146,11 +147,8 @@ async def test_a_narrowed_session_narrows_the_token_the_app_is_handed(
 ):
     """A session that ends sooner than the deployment's access-token lifetime
     ends its tokens with it, on the app's way in as on the browser's."""
-    from app.services.platform import app_settings as app_settings_service
 
-    row = await app_settings_service.get_app_settings(session)
-    row.session_idle_minutes = 5
-    session.add(row)
+    await rules.put(session, "session_idle_minutes", 5)
     await create_user(session, email="native-narrowed@example.com")
     await session.commit()
     ceiling = timedelta(minutes=5).total_seconds()

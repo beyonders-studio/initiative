@@ -32,10 +32,8 @@ from datetime import datetime, timedelta
 from sqlmodel import select
 from sqlmodel.ext.asyncio.session import AsyncSession
 
-from app.core.guild_auth_options import CommunityAuthOption
-from app.models.platform.guild import Guild, GuildMembership
-from app.services.platform import app_settings as app_settings_service
-from app.services.platform import guild_entitlements
+from app.models.platform.guild import GuildMembership
+from app.services.platform import rules
 
 
 #: What a community held to the compliance standard asks of its members.
@@ -56,10 +54,10 @@ COMPLIANCE_IDLE_MINUTES = 15
 
 
 #: A community holds its members to the standard while it asks for it and
-#: holds the ``restrictions`` option that asking needs.
-_holds_the_standard = Guild.enforce_compliance_session.is_(
-    True
-) & guild_entitlements.holds_option(Guild.id, CommunityAuthOption.restrictions)
+#: holds the option that asking needs.
+_holds_the_standard = rules.community_rule_sql(
+    GuildMembership.guild_id, "enforce_compliance_session"
+).is_(True)
 
 
 async def _belongs_to_a_compliance_guild(
@@ -68,7 +66,6 @@ async def _belongs_to_a_compliance_guild(
     found = (
         await session.exec(
             select(GuildMembership.guild_id)
-            .join(Guild, Guild.id == GuildMembership.guild_id)
             .where(
                 GuildMembership.user_id == user_id,
                 _holds_the_standard,
@@ -90,8 +87,7 @@ async def resolve_max_hours(session: AsyncSession, *, user_id: int) -> int | Non
     free-form and may already be shorter than twelve hours, and a community
     asking for a stricter session is not a place to lengthen one.
     """
-    row = await app_settings_service.get_app_settings(session)
-    platform_hours = row.session_max_hours
+    platform_hours = (await rules.platform_values(session))["session_max_hours"]
     if not await _belongs_to_a_compliance_guild(session, user_id=user_id):
         return platform_hours
     if platform_hours is None:
@@ -111,8 +107,8 @@ async def resolve_idle_minutes(session: AsyncSession, *, user_id: int) -> int | 
     belonging to two of them is not a comparison. The deployment's half is a
     figure, because a deployment is only ever one.
     """
-    row = await app_settings_service.get_app_settings(session)
-    windows = [row.session_idle_minutes] if row.session_idle_minutes else []
+    platform_idle = (await rules.platform_values(session))["session_idle_minutes"]
+    windows = [platform_idle] if platform_idle else []
     if await _belongs_to_a_compliance_guild(session, user_id=user_id):
         windows.append(COMPLIANCE_IDLE_MINUTES)
     return min(windows) if windows else None
