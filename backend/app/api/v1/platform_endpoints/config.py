@@ -32,6 +32,7 @@ from app.services.platform.billing import billing_managed
 from app.core.version import get_min_desktop_version, get_min_native_version
 from app.services import captcha as captcha_service
 from app.services.platform import app_settings as app_settings_service
+from app.services.platform import rules
 from app.services.platform import auth_posture
 from app.services.tenant.attachments import MAX_FILE_SIZE
 
@@ -197,7 +198,9 @@ async def get_app_config(session: SessionDep) -> AppConfig:
         community_age_gate_enabled=app_settings.community_age_gate_enabled,
         direct_messages_enabled=app_settings.direct_messages_enabled,
         guests_enabled=app_settings.guests_enabled,
-        engagement_ranking_enabled=app_settings.engagement_ranking_enabled,
+        engagement_ranking_enabled=(await rules.platform_values(session))[
+            "engagement_ranking_enabled"
+        ],
         cookie_consent_enabled=app_settings.cookie_consent_enabled,
         light_accent_color=app_settings.light_accent_color,
         dark_accent_color=app_settings.dark_accent_color,

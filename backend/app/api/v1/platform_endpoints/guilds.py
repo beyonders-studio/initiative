@@ -111,7 +111,7 @@ from app.models.platform.guild_auth_policy import GuildAuthPolicy, SignInHalf
 from app.core.guild_auth_options import CommunityAuthOption, effective_options
 from app.services.platform import app_settings as app_settings_service
 from app.services.platform import auth_posture
-from app.services.platform import notification_policy
+from app.services.platform import rules
 from app.services.platform import billing_ping
 from app.services.platform import guild_images as images_service
 from app.services.tenant.attachments import FileTooLargeError, read_upload_bounded
@@ -248,13 +248,6 @@ def _serialize_guild(
         auth_options=sorted(effective_options(admin_row.auth_options))
         if admin_row
         else None,
-        # Admins only: the state of the API-access control on that tab.
-        # Admins only: and of the session-limit control beside it.
-        enforce_compliance_session=(
-            guild.enforce_compliance_session if is_admin else None
-        ),
-        # Admins only: and of the second-factor control beside that.
-        require_second_factor=(guild.require_second_factor if is_admin else None),
         # Guild identity, not administration: the directory publishes both to
         # strangers, so withholding them from the guild's own members would
         # only mean the settings page could not render its own state.
@@ -1172,7 +1165,10 @@ async def _auth_settings_response(
     administration = await guilds_service.get_administration(
         seat_session, guild_id=guild_id
     )
-    platform = await notification_policy.resolve(seat_session, None)
+    platform = await rules.platform_values(seat_session)
+    community = (await rules.community_values(seat_session, [guild_id], applied=False))[
+        guild_id
+    ]
     settings_row = await app_settings_service.get_app_settings(seat_session)
     return CommunityAuthSettingsRead(
         auth_options=sorted(effective_options(administration.auth_options))
@@ -1182,19 +1178,12 @@ async def _auth_settings_response(
         guest_auth_policy=await _auth_policy_response(
             system_session, guild_id, guest=True
         ),
-        enforce_compliance_session=guild.enforce_compliance_session,
-        require_second_factor=guild.require_second_factor,
-        allow_push_notifications=guild.allow_push_notifications,
-        allow_email_notifications=guild.allow_email_notifications,
-        redact_notification_content=guild.redact_notification_content,
-        push_allowed_by_platform=platform.push,
-        email_allowed_by_platform=platform.email,
-        redacted_by_platform=platform.redact,
-        allow_engagement_ranking=guild.allow_engagement_ranking,
-        engagement_ranking_allowed_by_platform=settings_row.engagement_ranking_enabled,
-        allow_ai=guild.allow_ai,
+        **community,
+        push_allowed_by_platform=platform["push_notifications_enabled"],
+        email_allowed_by_platform=platform["email_notifications_enabled"],
+        redacted_by_platform=platform["redact_notification_content"],
+        engagement_ranking_allowed_by_platform=platform["engagement_ranking_enabled"],
         ai_offered_by_platform=settings_row.ai_config_mode != "disabled",
-        guest_max_days=guild.guest_max_days,
         guest_max_days_by_platform=settings_row.max_guest_days,
     )
 

@@ -163,11 +163,6 @@ const grantEntry = (grant: AccessGrantRead, settingsGrant?: AccessGrantRead): Co
   contact_email: null,
   // Admin-only entitlements; a grantee acts as a member here, so they're absent.
   auth_options: null,
-  // Likewise: these settings are not inferred into a synthetic entry. An
-  // authorized settings grantee reads their real values from the dedicated
-  // settings endpoint when opening Authentication.
-  enforce_compliance_session: null,
-  require_second_factor: null,
   // A grant reaches one named community directly; the directory is not how the
   // grantee got here, and this synthetic entry is never listed in it.
   is_community: false,

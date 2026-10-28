@@ -11,7 +11,7 @@ from app.schemas.platform.push import (
     PushTokenResponse,
 )
 from app.core.messages import NotificationMessages
-from app.services.platform import app_settings, push_tokens
+from app.services.platform import push_tokens, rules
 
 router = APIRouter()
 
@@ -48,7 +48,7 @@ async def register_push_token(
     piling up tokens the push relay will answer as dead: enough dead answers
     and the relay suspends this whole server.
     """
-    if not (await app_settings.get_app_settings(session)).push_notifications_enabled:
+    if not (await rules.platform_values(session))["push_notifications_enabled"]:
         raise HTTPException(
             status_code=status.HTTP_403_FORBIDDEN,
             detail=NotificationMessages.PUSH_DISABLED,

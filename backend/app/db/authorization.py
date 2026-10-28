@@ -364,17 +364,18 @@ AS $function$
         )
         AND NOT EXISTS (
             -- Asked of everybody reaching this community, whatever it says
-            -- about how they arrive. Its own row rather than the policy's,
-            -- because a community that asks nothing about arrival holds no
-            -- policy row and still asks this, while it holds
+            -- about how they arrive. One of its stored rules rather than the
+            -- policy's, because a community that asks nothing about arrival
+            -- holds no policy row and still asks this, while it holds
             -- ``restrictions``. Unsatisfied is what this finds, like the leg
             -- above it.
             SELECT 1
-            FROM public.guilds g
-            WHERE g.id = {gucs.ROUTED_GUILD_ID}
-              AND g.require_second_factor
+            FROM public.community_rules r
+            WHERE r.guild_id = {gucs.ROUTED_GUILD_ID}
+              AND r.key = 'require_second_factor'
+              AND r.enabled
               AND NOT ('mfa' = ANY(public.session_amr()))
-              AND public.guild_holds_option(g.id, 'restrictions')
+              AND public.guild_holds_option(r.guild_id, 'restrictions')
         ))
 $function$
 

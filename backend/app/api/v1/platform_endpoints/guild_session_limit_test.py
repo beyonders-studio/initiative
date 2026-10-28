@@ -16,7 +16,7 @@ from app.testing.factories import (
 )
 
 
-async def test_the_seat_switches_the_standard_and_the_guild_list_reads_it(
+async def test_the_seat_switches_the_standard_and_reads_it_back(
     client: AsyncClient, session: AsyncSession
 ):
     admin = await create_user(session)
@@ -25,29 +25,21 @@ async def test_the_seat_switches_the_standard_and_the_guild_list_reads_it(
         session, user=admin, guild=guild, role=CommunityRole.superadmin
     )
     headers = get_auth_headers(admin)
+    settings = f"/api/v1/communities/{guild.id}/auth-settings"
 
-    listed = await client.get("/api/v1/communities/", headers=headers)
-    assert [
-        g["enforce_compliance_session"] for g in listed.json() if g["id"] == guild.id
-    ] == [False]
+    read = await client.get(settings, headers=headers)
+    assert read.json()["enforce_compliance_session"] is False
 
     on = await client.patch(
-        f"/api/v1/communities/{guild.id}/auth-settings",
-        headers=headers,
-        json={"enforce_compliance_session": True},
+        settings, headers=headers, json={"enforce_compliance_session": True}
     )
     assert on.status_code == 200, on.text
     assert on.json()["enforce_compliance_session"] is True
-
-    listed = await client.get("/api/v1/communities/", headers=headers)
-    assert [
-        g["enforce_compliance_session"] for g in listed.json() if g["id"] == guild.id
-    ] == [True]
+    read = await client.get(settings, headers=headers)
+    assert read.json()["enforce_compliance_session"] is True
 
     off = await client.patch(
-        f"/api/v1/communities/{guild.id}/auth-settings",
-        headers=headers,
-        json={"enforce_compliance_session": False},
+        settings, headers=headers, json={"enforce_compliance_session": False}
     )
     assert off.json()["enforce_compliance_session"] is False
 
@@ -55,8 +47,8 @@ async def test_the_seat_switches_the_standard_and_the_guild_list_reads_it(
 async def test_a_member_is_not_told_the_standard(
     client: AsyncClient, session: AsyncSession
 ):
-    """It is read by the surface that sets it; the guild list tells a member
-    nothing about it."""
+    """It is read by the surface that sets it; the guild list tells nobody
+    about it, and a member cannot read that surface."""
     admin = await create_user(session)
     guild = await create_guild(session, creator=admin)
     await create_guild_membership(
@@ -72,7 +64,10 @@ async def test_a_member_is_not_told_the_standard(
     await create_guild_membership(
         session, user=member, guild=guild, role=CommunityRole.member
     )
-    listed = await client.get("/api/v1/communities/", headers=get_auth_headers(member))
-    assert [
-        g["enforce_compliance_session"] for g in listed.json() if g["id"] == guild.id
-    ] == [None]
+    member_headers = get_auth_headers(member)
+    listed = await client.get("/api/v1/communities/", headers=member_headers)
+    assert all("enforce_compliance_session" not in g for g in listed.json())
+    read = await client.get(
+        f"/api/v1/communities/{guild.id}/auth-settings", headers=member_headers
+    )
+    assert read.status_code == 403

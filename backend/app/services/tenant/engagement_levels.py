@@ -45,13 +45,12 @@ from app.db import cohorts
 from app.db.advisory_locks import LockNamespace, advisory_lock
 from app.db.request_context import Unattributed
 from app.db.session import routed_guild_id, set_rls_context
-from app.core.guild_auth_options import CommunityAuthOption
 from app.models.platform.guild import LIVE_STATUS_VALUES, Guild
 from app.models.platform.user import User
 from app.models.tenant.engagement_level import LEVEL_MAX, EngagementLevel
 from app.models.tenant.personal_item import ViewSource
 from app.services.guild_sweeps import Visit
-from app.services.platform import app_settings, guild_entitlements
+from app.services.platform import rules
 from app.services.tenant.personal_items import WINDOW
 
 #: How fast an engagement fades: one this old counts half as much.
@@ -165,23 +164,18 @@ _LEVELS = text(
 
 async def _community(session: AsyncSession, guild_id: int) -> tuple[bool, bool]:
     """Whether the community leaves ranking on (its own answer, which applies
-    while it holds the ``restrictions`` option), and whether its members can
-    read it."""
-    row = (
+    while it holds the option it needs), and whether its members can read it."""
+    live = (
         await session.exec(
-            select(
-                Guild.allow_engagement_ranking,
-                guild_entitlements.holds_option(
-                    Guild.id, CommunityAuthOption.restrictions
-                ),
-                Guild.status.in_(LIVE_STATUS_VALUES),  # type: ignore[attr-defined]
-            ).where(Guild.id == guild_id)
+            select(Guild.status.in_(LIVE_STATUS_VALUES)).where(  # type: ignore[attr-defined]
+                Guild.id == guild_id
+            )
         )
     ).one_or_none()
-    if row is None:
+    if live is None:
         return False, False
-    allowed, held, live = row
-    return bool(allowed) or not held, bool(live)
+    allowed = await rules.community_value(session, guild_id, "allow_engagement_ranking")
+    return bool(allowed), bool(live)
 
 
 async def prepare() -> Visit:
@@ -191,9 +185,7 @@ async def prepare() -> Visit:
     wherever ranking is off, and worked out where members can read."""
     async with cohorts.system_session(None) as session:
         await set_rls_context(session, Unattributed())
-        enabled = (
-            await app_settings.get_app_settings(session)
-        ).engagement_ranking_enabled
+        enabled = (await rules.platform_values(session))["engagement_ranking_enabled"]
         uncounted = list(
             (
                 await session.exec(

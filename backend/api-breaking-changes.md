@@ -9,6 +9,33 @@ matter and can be deleted.
 
 ## After 0.77.1
 
+### The community list stops carrying two admin-only rules
+
+`enforce_compliance_session` and `require_second_factor` left `CommunityRead`.
+Nothing read them there: the seat's Security page reads both from
+`GET /communities/{community_id}/auth-settings`, which still carries them.
+
+- DELETE /api/v1/communities/{community_id}/banner removed the required property `enforce_compliance_session` from the response with the `200` status
+- DELETE /api/v1/communities/{community_id}/banner removed the required property `require_second_factor` from the response with the `200` status
+- DELETE /api/v1/communities/{community_id}/icon removed the required property `enforce_compliance_session` from the response with the `200` status
+- DELETE /api/v1/communities/{community_id}/icon removed the required property `require_second_factor` from the response with the `200` status
+- GET /api/v1/communities/ removed the required property `items/enforce_compliance_session` from the response with the `200` status
+- GET /api/v1/communities/ removed the required property `items/require_second_factor` from the response with the `200` status
+- GET /api/v1/communities/{community_id} removed the required property `enforce_compliance_session` from the response with the `200` status
+- GET /api/v1/communities/{community_id} removed the required property `require_second_factor` from the response with the `200` status
+- PATCH /api/v1/communities/{community_id} removed the required property `enforce_compliance_session` from the response with the `200` status
+- PATCH /api/v1/communities/{community_id} removed the required property `require_second_factor` from the response with the `200` status
+- POST /api/v1/communities/ removed the required property `enforce_compliance_session` from the response with the `201` status
+- POST /api/v1/communities/ removed the required property `require_second_factor` from the response with the `201` status
+- POST /api/v1/communities/directory/{community_id}/join removed the required property `enforce_compliance_session` from the response with the `200` status
+- POST /api/v1/communities/directory/{community_id}/join removed the required property `require_second_factor` from the response with the `200` status
+- POST /api/v1/communities/invite/accept removed the required property `enforce_compliance_session` from the response with the `200` status
+- POST /api/v1/communities/invite/accept removed the required property `require_second_factor` from the response with the `200` status
+- PUT /api/v1/communities/{community_id}/banner removed the required property `enforce_compliance_session` from the response with the `200` status
+- PUT /api/v1/communities/{community_id}/banner removed the required property `require_second_factor` from the response with the `200` status
+- PUT /api/v1/communities/{community_id}/icon removed the required property `enforce_compliance_session` from the response with the `200` status
+- PUT /api/v1/communities/{community_id}/icon removed the required property `require_second_factor` from the response with the `200` status
+
 ### Metadata is one store
 
 Every custom value is one list on an item's read, `properties`: the

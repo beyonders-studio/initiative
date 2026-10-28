@@ -7,27 +7,24 @@ from types import SimpleNamespace
 
 from app.models.platform.guild import CommunityRole
 from app.services.auth import session_lifetime, sessions as session_service
-from app.services.platform import app_settings as app_settings_service
 from app.testing import (
     create_guild,
     create_guild_membership,
     create_user,
     guild_administration,
 )
+from app.services.platform import rules
 
 _AT = datetime(2026, 8, 1, 12, 0, tzinfo=timezone.utc)
 
 
 async def _set_platform_hours(session, hours):
-    row = await app_settings_service.get_app_settings(session)
-    row.session_max_hours = hours
-    session.add(row)
+    await rules.put(session, "session_max_hours", hours)
     await session.flush()
 
 
 async def _hold_to_the_standard(session, guild):
-    guild.enforce_compliance_session = True
-    session.add(guild)
+    await rules.put(session, "enforce_compliance_session", True, guild_id=guild.id)
     await session.flush()
 
 
@@ -280,9 +277,7 @@ def test_an_access_token_does_not_outlive_the_session_it_names():
 async def test_the_deployment_can_set_its_own_idle_window(session):
     """A figure here narrows the window every session is opened with."""
     user = await create_user(session, email="sl-idle-platform@example.com")
-    row = await app_settings_service.get_app_settings(session)
-    row.session_idle_minutes = 45
-    session.add(row)
+    await rules.put(session, "session_idle_minutes", 45)
     await session.flush()
 
     issued = await session_service.create_session(
@@ -295,7 +290,6 @@ async def test_the_deployment_can_set_its_own_idle_window(session):
 async def test_the_stricter_idle_window_wins(session):
     """The deployment's figure and a community's standard both narrow it, and
     the answer is whichever is shorter — in either direction."""
-    row = await app_settings_service.get_app_settings(session)
     guild = await create_guild(session)
     await _hold_to_the_standard(session, guild)
 
@@ -304,8 +298,7 @@ async def test_the_stricter_idle_window_wins(session):
         session, user=lenient, guild=guild, role=CommunityRole.member
     )
     # Deployment is looser than the standard, so the standard binds.
-    row.session_idle_minutes = 60
-    session.add(row)
+    await rules.put(session, "session_idle_minutes", 60)
     await session.flush()
     issued = await session_service.create_session(
         session, user_id=lenient.id, amr=["pwd"], satisfied_providers=[], now=_AT
@@ -319,8 +312,7 @@ async def test_the_stricter_idle_window_wins(session):
     await create_guild_membership(
         session, user=strict, guild=guild, role=CommunityRole.member
     )
-    row.session_idle_minutes = 5
-    session.add(row)
+    await rules.put(session, "session_idle_minutes", 5)
     await session.flush()
     issued = await session_service.create_session(
         session, user_id=strict.id, amr=["pwd"], satisfied_providers=[], now=_AT

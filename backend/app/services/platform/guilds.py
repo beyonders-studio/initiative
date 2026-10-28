@@ -57,7 +57,7 @@ from app.services.platform import billing as billing_service
 
 from app.services.platform import account_stream, user_stream
 from app.services.platform import api_keys as api_keys_service
-from app.services.platform import guild_entitlements
+from app.services.platform import guild_entitlements, rules
 from app.services.platform import contact_grants as contact_grants_service
 from app.services.platform.retention import COMMUNITY_DELETION, COMMUNITY_HOLD
 from app.db.request_context import Platform, SystemGuild, Unattributed
@@ -578,8 +578,8 @@ async def _guest_days(session: AsyncSession, *, guild_id: int, days: int) -> int
     settings_row = await app_settings_service.get_app_settings(session)
     if not settings_row.guests_enabled:
         raise GuestsDisabledError(GuildMessages.COMMUNITY_GUESTS_DISABLED)
-    guild = await get_guild(session, guild_id=guild_id)
-    limits = (days, settings_row.max_guest_days, guild.guest_max_days)
+    guild_limit = await rules.community_value(session, guild_id, "guest_max_days")
+    limits = (days, settings_row.max_guest_days, guild_limit)
     return min(limit for limit in limits if limit is not None)
 
 

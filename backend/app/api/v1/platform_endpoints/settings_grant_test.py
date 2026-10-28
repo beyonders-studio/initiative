@@ -19,6 +19,7 @@ from app.testing.factories import (
     create_user,
     get_auth_headers,
 )
+from app.services.platform import rules
 
 
 async def _request_and_approve(client, *, requester, approver, guild, rung):
@@ -183,11 +184,9 @@ async def test_the_superadmin_grantee_reads_the_auth_controls(
     """The temporary seat gets the current values before changing them."""
     owner = await create_user(session, role=UserRole.owner)
     support = await create_user(session, role=UserRole.support)
-    guild = await create_guild(
-        session,
-        creator=owner,
-        enforce_compliance_session=True,
-    )
+    guild = await create_guild(session, creator=owner)
+    await rules.put(session, "enforce_compliance_session", True, guild_id=guild.id)
+    await session.commit()
     await _request_and_approve(
         client, requester=support, approver=owner, guild=guild, rung="superadmin"
     )

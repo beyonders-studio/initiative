@@ -233,59 +233,36 @@ async def test_the_seat_floor_alone_writes_the_sign_in_rule(engine):
             assert held, f"app_superadmin must hold {verb} on guild_auth_policies"
 
 
-async def test_the_seat_writes_only_its_own_switches(engine):
+async def test_the_seat_writes_its_rules_and_nothing_of_the_guild_row(engine):
     """The seat changes what its community asks of the people reaching it, and
-    nothing else about the community.
-
-    Eight columns: whether a second factor is required, whether the session
-    standard is held to, the three that say what a notification may leave
-    carrying, whether search ranks by engagement, how long a guest may stay,
-    and whether AI features may be used. A name, an icon, an owner
-    or a lifecycle status is not the seat's, and a new column on ``guilds`` is
-    not either until a migration says so.
+    nothing else about the community: it writes ``community_rules`` and no
+    column of ``guilds``. A name, an icon, an owner or a lifecycle status is
+    not the seat's, and a new column on ``guilds`` is not either until a
+    migration says so.
     """
-    writable = {
-        "require_second_factor",
-        "enforce_compliance_session",
-        "allow_push_notifications",
-        "allow_email_notifications",
-        "redact_notification_content",
-        "allow_engagement_ranking",
-        "guest_max_days",
-        "allow_ai",
-    }
     async with engine.connect() as conn:
-        held = await conn.scalar(
-            text("SELECT has_table_privilege('app_superadmin', 'public.guilds', :v)"),
-            {"v": "UPDATE"},
-        )
-        assert not held, "the seat floor must hold no table-wide UPDATE on guilds"
-
-        rows = (
+        writable = (
             await conn.execute(
                 text(
-                    "SELECT column_name, has_column_privilege("
-                    "'app_superadmin', 'public.guilds', column_name, 'UPDATE'"
-                    ") AS can_write FROM information_schema.columns "
-                    "WHERE table_schema = 'public' AND table_name = 'guilds'"
+                    "SELECT column_name FROM information_schema.columns"
+                    " WHERE table_schema = 'public' AND table_name = 'guilds'"
+                    " AND has_column_privilege("
+                    "'app_superadmin', 'public.guilds', column_name, 'UPDATE')"
                 )
             )
         ).all()
-        assert rows, "guilds must exist"
-        granted = {name for name, can_write in rows if can_write}
-        assert granted == writable, (
-            "the seat floor's UPDATE on guilds must be exactly the switches its "
-            f"own routes set; got {sorted(granted)}"
-        )
-
-        for verb in ("INSERT", "DELETE"):
+        assert writable == [], f"the seat floor writes guilds columns: {writable}"
+        for verb in ("INSERT", "UPDATE", "DELETE"):
             held = await conn.scalar(
-                text(
-                    "SELECT has_table_privilege('app_superadmin', 'public.guilds', :v)"
-                ),
-                {"v": verb},
+                text("SELECT has_table_privilege('app_superadmin', :t, :v)"),
+                {"t": "public.guilds", "v": verb},
             )
             assert not held, f"the seat floor must not hold {verb} on guilds"
+            held = await conn.scalar(
+                text("SELECT has_table_privilege('app_superadmin', :t, :v)"),
+                {"t": "public.community_rules", "v": verb},
+            )
+            assert held, f"the seat floor must hold {verb} on community_rules"
 
 
 async def test_guild_image_bytes_are_unreadable_by_request_roles(engine):
