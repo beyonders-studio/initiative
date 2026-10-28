@@ -23,7 +23,7 @@ from sqlmodel.ext.asyncio.session import AsyncSession
 from app.core.messages import TaskMessages
 from app.core.tools import Tool
 from app.db.advisory_locks import LockNamespace, advisory_lock
-from app.db.guild_standing import ActorContext, InstallContext
+from app.db.guild_standing import ActorContext, by_a_person
 from app.db.session import routed_guild_id
 from app.models.tenant.project import Project
 from app.models.tenant.task import Task
@@ -109,10 +109,6 @@ async def fills(
     ]
 
 
-def _by_a_person(context: ActorContext) -> bool:
-    return not isinstance(context, InstallContext) or context.member_user_id is not None
-
-
 async def refuse_full_columns(
     session: AsyncSession,
     context: ActorContext,
@@ -126,7 +122,7 @@ async def refuse_full_columns(
     people dropping into its last place at once cannot both get in. What a
     column holds is its other open tasks, so a task already in it, or one
     taken out of it, is never counted against a move."""
-    if not entering or not _by_a_person(context):
+    if not entering or not by_a_person(context):
         return
     limits = await limits_of(session, project_id)
     into = Counter(

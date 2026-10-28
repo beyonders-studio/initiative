@@ -391,6 +391,10 @@ class ToolLayoutMessages:
     TOO_MANY_PLUGIN_PARTS = "TOOL_LAYOUTS_TOO_MANY_PLUGIN_PARTS"
     # A change that would hide every one of a target's lists.
     ONE_LIST_SHOWN = "TOOL_LAYOUTS_ONE_LIST_SHOWN"
+    # A person adding an item without a field its page requires, or emptying
+    # one. ``params.fields`` names them, one a line: a built-in field by its
+    # id, a property by its name.
+    REQUIRED_FIELDS_MISSING = "REQUIRED_FIELDS_MISSING"
 
 
 class ProjectMessages:

@@ -82,6 +82,7 @@ from app.core.search import SearchEntityType
 from app.services.tenant import archive as archive_service
 from app.services.tenant import attachments as attachments_service
 from app.services.tenant import comments as comments_service
+from app.services.tenant import required_fields
 from app.services.tenant import content_references
 from app.services.tenant import post_polls as post_polls_service
 from app.services.tenant import post_publication
@@ -423,6 +424,7 @@ async def create_post(
 
     if post_in.poll is not None:
         session.add(post_polls_service.write_poll(post, _validated_poll(post_in.poll)))
+    await required_fields.refuse_missing(session, guild_context, post)
 
     if post.published_at is not None:
         author = await notifications_service.author_of(
