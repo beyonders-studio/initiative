@@ -50,6 +50,7 @@ from app.models.tenant.metadata import MetadataDefinition, MetadataType, Metadat
 from app.models.tenant.plugin_placement import PluginPlacement
 from app.models.tenant.project import Project
 from app.models.tenant.task import Task
+from app.services.marketplace import plugin_refs
 from app.services.marketplace.registration_lookup import invalidate_registrations
 from app.services.tenant import plugin_channels as channels_service
 from app.services.tenant import metadata as metadata_service
@@ -1517,6 +1518,12 @@ class TestShownValues:
             "on": ["task"],
             "currency": "EUR",
         }
+        owner = {
+            "key": "owner",
+            "name": {"en": "Owner"},
+            "kind": "user_reference",
+            "on": ["task"],
+        }
         installed = await install_plugin(
             session,
             acting_user,
@@ -1530,6 +1537,7 @@ class TestShownValues:
                     ),
                     stage,
                     price,
+                    owner,
                 ]
             },
         )
@@ -1574,8 +1582,15 @@ class TestShownValues:
             "done": (None, None, 75, None),
             "count": (None, None, 5, {"status": "open"}),
         }
-        chosen = await put({"stage": "won", "price": 12.5})
+        # The seat, as this install knows them.
+        seat_ref = await plugin_refs.ensure_plugin_ref(
+            guild_id=installed.guild.id,
+            public_id=CLIENT,
+            user_id=installed.seat.user.id,
+        )
+        chosen = await put({"stage": "won", "price": 12.5, "owner": seat_ref})
         assert chosen.status_code == 200, chosen.text
+        assert chosen.json()["values"]["owner"] == seat_ref
 
         async def shown_to(locale: str) -> dict:
             await session.exec(
@@ -1595,6 +1610,9 @@ class TestShownValues:
             [{"value": "won", "label": "Won", "color": "#22aa55"}],
         )
         assert (shown["price"]["value"], shown["price"]["currency"]) == (12.5, "EUR")
+        # A person reads the person a plug-in names as a property's is read.
+        assert shown["owner"]["value"]["id"] == installed.seat.user.id
+        assert shown["owner"]["value"]["username"] == installed.seat.user.username
         # The same value, read by somebody reading German.
         assert (await shown_to("de"))["stage"]["options"] == [
             {"value": "won", "label": "Gewonnen", "color": "#22aa55"}

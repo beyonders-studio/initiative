@@ -1004,18 +1004,23 @@ def _rehydrate_value(
     if ptype is MetadataType.multi_select:
         return list(row.value_json) if row.value_json is not None else []
     if ptype is MetadataType.user_reference:
-        if user is None:
-            return {"id": row.value_user_id} if row.value_user_id else None
-        # The same person shape the rest of the API ships. ``value_user`` is
-        # the guild projection, so its name is the one set in this guild.
-        return {
-            "id": user.id,
-            "username": user.username,
-            "discriminator": user.discriminator,
-            "display_name": user.display_name,
-            "avatar_url": user.avatar_url,
-        }
+        return _person(row.value_user_id, user)
     return None  # pragma: no cover
+
+
+def _person(user_id: Optional[int], user: Optional[MemberProfile]) -> Any:
+    """The person a value names, as a reader is shown them: the same person
+    shape the rest of the API ships, from the guild projection, so the name
+    is the one set in this guild; their id alone where it is not read."""
+    if user is None:
+        return {"id": user_id} if user_id else None
+    return {
+        "id": user.id,
+        "username": user.username,
+        "discriminator": user.discriminator,
+        "display_name": user.display_name,
+        "avatar_url": user.avatar_url,
+    }
 
 
 def summaries_from_rows(rows: Iterable[MetadataValue]) -> List[PropertySummary]:
@@ -1666,35 +1671,68 @@ class _People:
     gives: Callable[[int], Any]
 
 
-def _install_people() -> _People:
-    """People as the install being answered names them."""
-    boundary = current_install_boundary()
+async def _install_people(
+    session: AsyncSession,
+    context: InstallContext,
+    rows: Iterable[Any],
+    *,
+    commit: bool = True,
+) -> _People:
+    """People as the install names them: by the references its request named,
+    which its standing resolved (``named_refs``), coming in; and going out, by
+    its own reference for each person these value rows name, minted where it
+    has none (``plugin_refs.install_refs``). A reference minted is committed
+    here, or with ``commit`` False by the caller's own commit, which holds
+    its locks until then."""
+    from app.services.marketplace import plugin_refs
+
+    named = {
+        ref: entity_id
+        for ref, entity_type, entity_id in context.named_refs
+        if entity_type == IdentityEntity.user.value
+    }
+    refs = {entity_id: ref for ref, entity_id in named.items()}
+    wanted = {row.value_user_id for row in rows if row.value_user_id} - set(refs)
+    if wanted:
+        found, minted = await plugin_refs.install_refs(
+            session,
+            guild_id=context.guild_id,
+            install_id=context.install_id,
+            wanted=[(IdentityEntity.user, user_id) for user_id in wanted],
+        )
+        refs.update({user_id: ref for (_, user_id), ref in found.items()})
+        if minted and commit:
+            await session.commit()
 
     def takes(value: Any) -> int:
-        if boundary is None or not isinstance(value, str):
+        if not isinstance(value, str) or value not in named:
             raise _invalid()
-        # A person this request already answered with, kept in an element
-        # an upsert merges into.
-        marked, _, user_id = value.rpartition(":")
-        if (
-            marked == f"{boundary.nonce}:{IdentityEntity.user.code}"
-            and user_id.isdigit()
-        ):
-            return int(user_id)
-        try:
-            return boundary.resolve(value, IdentityEntity.user)
-        except PydanticCustomError:
-            raise _invalid() from None
+        return named[value]
 
-    def gives(user_id: int) -> Any:
-        return (
-            user_id if boundary is None else boundary.mark(IdentityEntity.user, user_id)
-        )
-
-    return _People(takes, gives)
+    return _People(takes, lambda user_id: refs.get(user_id, user_id))
 
 
 _ROW_IDS = _People(takes=lambda value: value, gives=lambda user_id: user_id)
+
+
+async def _shown_people(session: AsyncSession, rows: Iterable[Any]) -> _People:
+    """People as a person reading these value rows is shown them
+    (:func:`_person`), each read once for the rows."""
+    named = sorted({row.value_user_id for row in rows if row.value_user_id})
+    profiles = (
+        {
+            profile.id: profile
+            for profile in await session.exec(
+                select(MemberProfile).where(col(MemberProfile.id).in_(named))
+            )
+        }
+        if named
+        else {}
+    )
+    return _People(
+        takes=_ROW_IDS.takes,
+        gives=lambda user_id: _person(user_id, profiles.get(user_id)),
+    )
 
 
 def _is_state(value: Any) -> bool:
@@ -2037,7 +2075,9 @@ async def read(
     if not entity_ids:
         return []
     rows = await _kept(session, context.install_id, [_of(kind, set(entity_ids))])
-    grouped = _grouped(rows, _install_people())
+    grouped = _grouped(
+        rows, await _install_people(session, context, (row for _, row in rows))
+    )
     return [
         (entity_type, entity_id, values)
         for (entity_type, entity_id), values in sorted(grouped.items())
@@ -2203,11 +2243,14 @@ async def write(
         LockNamespace.PLUGIN_METADATA,
         f"{context.guild_id}:{context.install_id}:{kind}:{entity_id}",
     )
-    people = _install_people()
     where = [_of(kind, [entity_id])]
+    kept_rows = await _kept(session, context.install_id, where)
+    people = await _install_people(
+        session, context, (row for _, row in kept_rows), commit=False
+    )
     stored = {
         (str(defn.key), row.ref): (_told(defn, row, people), row.updated_at)
-        for defn, row in await _kept(session, context.install_id, where)
+        for defn, row in kept_rows
     }
     if made is not None:
         changes = await made(
@@ -2419,7 +2462,9 @@ async def find(
         context.install_id,
         [or_(*(_of(entity_type, ids) for entity_type, ids in by_kind.items()))],
     )
-    grouped = _grouped(rows, _install_people())
+    grouped = _grouped(
+        rows, await _install_people(session, context, (row for _, row in rows))
+    )
     return [
         (entity_type, entity_id, grouped.get((entity_type, entity_id), {}))
         for entity_type, entity_id in matches
@@ -2430,7 +2475,8 @@ async def shown_values(
     session: AsyncSession, install_id: int, kind: str, entity_id: int
 ) -> dict[str, Any]:
     """The values an install shows on one item, by key, as the plug-in wrote
-    them, read on the reader's session."""
+    them but a person as the reader is shown one, read on the reader's
+    session."""
     rows = await _kept(
         session,
         install_id,
@@ -2439,7 +2485,8 @@ async def shown_values(
             MetadataValue.entity_type == any_(MetadataDefinition.shown_on),
         ],
     )
-    return _grouped(rows, _ROW_IDS).get((kind, entity_id), {})
+    people = await _shown_people(session, (row for _, row in rows))
+    return _grouped(rows, people).get((kind, entity_id), {})
 
 
 def _is_target(target: Any) -> bool:
@@ -2815,10 +2862,13 @@ async def _plugin_summaries(
                 )
                 or language
             )
+    people = await _shown_people(
+        session, (row for kept in held.values() for row in kept)
+    )
     found: dict[int, List[PropertySummary]] = defaultdict(list)
     for (item_id, defn_id), kept in held.items():
         defn = definitions[defn_id]
-        told = [_told(defn, row, _ROW_IDS) for row in kept]
+        told = [_told(defn, row, people) for row in kept]
         found[item_id].append(
             PropertySummary(
                 property_id=defn.id,

@@ -47,6 +47,7 @@ from app.api.deps import (
     SessionDep,
     VerifiedInstall,
     establish_install_access,
+    named_refs,
     oauth2_scheme,
     SystemSessionDep,
 )
@@ -147,6 +148,9 @@ async def _admit(
                 scopes=token.scopes,
                 initiative_id=token.initiative_id,
             ),
+            # A routed route may name people, by the install's references
+            # for them, which its standing resolves.
+            await named_refs(request) if routed else (),
         )
     except InstallAccessError as exc:
         raise _refuse() from exc
