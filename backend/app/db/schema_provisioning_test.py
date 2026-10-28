@@ -81,7 +81,7 @@ async def test_provision_creates_every_guild_scoped_table(engine):
             res = await conn.execute(
                 text(
                     "SELECT table_name FROM information_schema.tables "
-                    "WHERE table_schema = :s"
+                    "WHERE table_schema = :s AND table_type = 'BASE TABLE'"
                 ),
                 {"s": schema},
             )
@@ -155,7 +155,7 @@ async def test_provision_is_idempotent(engine):
             count = await conn.scalar(
                 text(
                     "SELECT count(*) FROM information_schema.tables "
-                    "WHERE table_schema = :s"
+                    "WHERE table_schema = :s AND table_type = 'BASE TABLE'"
                 ),
                 {"s": schema},
             )
@@ -792,6 +792,7 @@ async def test_the_template_strip_removes_only_what_a_render_put_there(engine):
     """``guild_template`` carries structure. Boots before it became
     structure-only rendered the registries into it; the boot back-fill now
     strips those, and must leave the migrations' own triggers where they are."""
+    from app.db import presence
     from app.db.authorization import GUILD_FUNCTION_SIGNATURES
 
     async def counts(conn):
@@ -825,8 +826,12 @@ async def test_the_template_strip_removes_only_what_a_render_put_there(engine):
             int(functions),
         )
 
-    # What an earlier boot did: render the registry into the template.
+    # What an earlier boot did: render the registry into the template. Its
+    # policies name the presence view, which provisioning makes beside them.
+    view = f'"{_TEMPLATE_SCHEMA}".{presence.VIEW}'
+    body = "\nUNION ALL\n".join(arm.select(_TEMPLATE_SCHEMA) for arm in presence.arms())
     async with engine.begin() as conn:
+        await conn.execute(text(f"CREATE VIEW {view} AS\n{body}"))
         await apply_guild_rls(conn, _TEMPLATE_SCHEMA)
     async with engine.connect() as conn:
         policies, rendered, own, functions = await counts(conn)
@@ -842,6 +847,7 @@ async def test_the_template_strip_removes_only_what_a_render_put_there(engine):
     # And once clean, there is nothing to do.
     async with engine.begin() as conn:
         assert await strip_template_registry_objects(conn) == 0
+        await conn.execute(text(f"DROP VIEW {view}"))
 
 
 async def test_public_schema_has_no_tenant_tables(engine):
@@ -904,7 +910,7 @@ async def test_backfill_provisions_a_guild_missing_its_schema(engine):
             tables = await conn.scalar(
                 text(
                     "SELECT count(*) FROM information_schema.tables "
-                    "WHERE table_schema = :s"
+                    "WHERE table_schema = :s AND table_type = 'BASE TABLE'"
                 ),
                 {"s": missing_schema},
             )
@@ -1003,7 +1009,7 @@ async def test_backfill_continues_past_a_failing_guild(engine, monkeypatch):
                 tables = await conn.scalar(
                     text(
                         "SELECT count(*) FROM information_schema.tables "
-                        "WHERE table_schema = :s"
+                        "WHERE table_schema = :s AND table_type = 'BASE TABLE'"
                     ),
                     {"s": guild_schema_name(gid)},
                 )

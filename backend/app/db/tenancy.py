@@ -308,9 +308,11 @@ CREATED_BY_EXEMPT_TABLES: frozenset[str] = frozenset(
         "initiative_members",
         "initiative_role_permissions",
         "task_assignees",
-        # A knock at a door: ``user_id`` is both the author and the subject, and
-        # ``resolved_by`` already names the manager who answered it.
+        # A knock at a door: ``user_id`` is both the author and the subject (a
+        # person asks only for themselves), and ``resolved_by`` already names
+        # whoever answered it.
         "initiative_join_requests",
+        "share_requests",
         # Per-user state, keyed by the user it belongs to. ``user_id`` is both
         # the author and the subject, so a second copy of it says nothing.
         "guild_plugin_user_connections",
