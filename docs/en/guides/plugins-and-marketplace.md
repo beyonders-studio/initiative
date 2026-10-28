@@ -79,7 +79,7 @@ Adding a plug-in asks up to three things, and every answer can be changed later 
 
 | | What it means |
 |---|---|
-| **What it can reach** | The kinds of thing it may read, or read and change: projects, files, comments, tags, custom properties, and so on. Everything it asks for starts ticked; untick what you'd rather it didn't have. A line marked *This server doesn't allow it* is off-limits whatever you tick. Two lines start unticked: acting as a moderator, and acting as an admin (see below). |
+| **What it can reach** | The kinds of thing it may read, or read and change: projects, files, comments, tags, metadata, and so on. Everything it asks for starts ticked; untick what you'd rather it didn't have. A line marked *This server doesn't allow it* is off-limits whatever you tick. Two lines start unticked: acting as a moderator, and acting as an admin (see below). |
 | **Where it works** | Every current initiative, or only the ones you pick. A plug-in reads and changes things only in the initiatives it works in, so the committee's private budget initiative stays out of reach unless you put it there. |
 | **Who can open it there** | Only for a plug-in with a page inside initiatives: which roles see that page. Community admins always can. |
 | **Plug-ins that can use it** | Only when plug-ins already here have asked to use this one. Each starts ticked. |
@@ -88,7 +88,7 @@ A plug-in asking for nothing gets asked nothing. It just gets a name.
 
 Some plug-ins work through another one: automations that open GitHub issues, say. You're asked about that when the other one arrives, not before, so a community without GitHub is never asked whether automations may use it. Remove GitHub and that permission goes with it. Add it back and you're asked again.
 
-A plug-in allowed to change something, such as a task, can fill in that thing's [custom properties](initiatives.md#custom-properties) as well. **Properties** on its own is for making new ones: it lets the plug-in read an initiative's property definitions, and with write, add to them.
+A plug-in allowed to change something, such as a task, can fill in that thing's [metadata](initiatives.md#metadata) as well. **Metadata** on its own is for making new ones: it lets the plug-in read the initiative's metadata, and with write, add to it.
 
 !!! info "Some plug-ins have a minimum age"
     A listing that has one says so: **Ages 16+**, for the country your browser is set to. It can differ by country. The community can still add it; somebody under the age where they are just can't open or use it.

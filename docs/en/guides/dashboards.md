@@ -56,7 +56,7 @@ Usually faster than starting from a blank canvas, and often better, because some
 
 Two steps, and most people never leave the first.
 
-**Build** is clicking. Pick what to read — tasks, files, queue items, notices, events, your community's own people, or **Property values**, the initiative's own fields wherever they're set — then which columns, what to group them by, and what to narrow it to. The dashboard writes the query for you.
+**Build** is clicking. Pick what to read — tasks, files, queue items, notices, events, your community's own people, or **Metadata and property values**, the initiative's and its projects' and collections' own fields wherever they're set — then which columns, what to group them by, and what to narrow it to. The dashboard writes the query for you.
 
 **SQL** is the tab beside it, for the question clicking can't describe. It's real SQL, with the tables and columns offered as you type and the statement checked as you pause. One thing to know before you start: once you've edited the text, **Build** can't read it back. It offers to build a new query instead, which replaces what you wrote, so it never quietly mangles it.
 
@@ -87,9 +87,9 @@ Group a date by **day**, **week**, **month**, **quarter** or **year** and a char
 - **A target.** Give a chart, stat or progress bar a **Target** and a **Target date**. The chart draws it as a line, the progress bar marks it, and each says whether you've reached it, are on track, behind, or missed it, judged from the trend so far.
 - **A burn-up.** Show a count or total as **Running count** or **Running total**, and each point adds up everything before it.
 - **A split.** Group by a second column (status, say, beside the sprint) and a chart draws one series per value; **Stacked** piles them up. Past twelve series, the smallest fold into Other.
-- **Points per sprint.** Read **Property values**, filter by **Property**, show **Property › Name** and the total of **Number**, and group by the name.
+- **Points per sprint.** Read **Metadata and property values**, filter by **Metadata or property**, show **Metadata or property › Name** and the total of **Number**, and group by the name.
 
-In SQL, the same tables are `property_values` and `property_definitions`, and window functions work: `sum(…) OVER (…)`, `row_number()`, `lag()` and friends.
+In SQL, the same tables are `metadata_values` and `metadata_definitions`, and window functions work: `sum(…) OVER (…)`, `row_number()`, `lag()` and friends.
 
 ### Subtasks under their parent
 

@@ -21,7 +21,7 @@ If you only ever learn one part of Initiative, make it this one. It's where basi
 
 ![Creating a project](../images/projects/create-project.png)
 
-The top of the project shows how far along it is and its dates, beside its status, tags and properties — the same [header every tool has](tools.md#the-top-of-every-tool-page).
+The top of the project shows how far along it is and its dates, beside its status, tags and metadata — the same [header every tool has](tools.md#the-top-of-every-tool-page).
 
 ### Bookmarks, pinning and your own order
 
@@ -54,8 +54,8 @@ A task can hold:
 | **Checklist** | The smaller steps, ticked off, with a progress count. |
 | **Tags** | Labels for finding things later — see [Tags](tags.md). |
 | **Recurring** | Make it come back on a schedule. |
-| **Properties** | Your initiative's own fields — see [Custom properties](initiatives.md#custom-properties). |
-| **Metadata** | Fields only this project's tasks have — see [Project metadata](#project-metadata). |
+| **Metadata** | Your initiative's own fields — see [Metadata](initiatives.md#metadata). |
+| **Properties** | Fields only this project's tasks have — see [Project properties](#project-properties). |
 
 ![Editing a task's details](../images/projects/task-details.png)
 
@@ -206,7 +206,7 @@ A spreadsheet-style list. One row per task, with columns for status, priority, d
 **Best for:** scanning a lot of tasks, sorting, and editing several at once.
 
 - Click a column heading to **sort** by it. Hold ++shift++ and click another to sort by both.
-- **Group** rows by any field whose values repeat: date window (Overdue, Today, This Week, This Month, Later), status, priority, assignees, tags, who created it, or a select, person or checkbox property. Dates group by day, week, month, quarter or year. Each group says how many tasks it holds.
+- **Group** rows by any field whose values repeat: date window (Overdue, Today, This Week, This Month, Later), status, priority, assignees, tags, who created it, or any select, person or checkbox metadata or property. Dates group by day, week, month, quarter or year. Each group says how many tasks it holds.
 - **Filter** down to exactly what you want.
 - **Select** several rows and edit them together.
 - **Assign to me** in the **Assignees** column takes a task without opening it. Missing the column? Add it in **Edit layouts**.
@@ -297,7 +297,7 @@ Each of the project's four lists has a layout, and so does a task:
 | Layout | What it decides |
 |---|---|
 | **Table** | Which columns, in what order. |
-| **Board** | What a card holds: priority, dates, tags, the checklist and subtask bars, the task it's part of, comment and blocker counts, any property. And each column's limit. |
+| **Board** | What a card holds: priority, dates, tags, the checklist and subtask bars, the task it's part of, comment and blocker counts, any metadata or property. And each column's limit. |
 | **Gantt** | Only its presets and groupings. Bars are bars. |
 | **Calendar** | Only its presets. A calendar is a calendar. |
 | **Task pages** | Where everything sits when a task is open, and in **Create task**. One per [task type](#task-types), each starting from a shape that suits it. |
@@ -317,18 +317,18 @@ Change any of it from **Project settings → Layouts → Edit layouts**. That's 
 - **Layouts** — how its lists and tasks are laid out, and which list it opens on. See [Layouts](#layouts).
 - **Task statuses** — your workflow.
 - **Task types** — the kinds of task the project holds, and a shortcut to each one's page. See [Task types](#task-types).
-- **Metadata** — fields of the project's own. See below.
+- **Properties** — fields of the project's own. See below.
 - **Advanced** — save as a template, [duplicate](tools.md#duplicating) it here or into another initiative, export, archive, delete.
 
-### Project metadata
+### Project properties
 
 Some things only matter in one project. The sprint a bug landed in. Which van the delivery goes on. Nobody planning the summer fete needs a "Van" box on their tasks, so it doesn't belong to the whole initiative.
 
-That's **metadata**: fields that belong to the project and turn up on its tasks alone. Make it in **Project settings → Metadata**, or from **Add** in the layout editor, which asks whether a new field is the project's metadata or one of the initiative's [properties](initiatives.md#custom-properties). It takes the same types properties do. Whoever can change the project's tasks can change its metadata; everyone else sees the list.
+That's a **property**: a field that belongs to the project and turns up on its tasks alone. Make one in **Project settings → Properties**, or from **Add** in the layout editor, which asks whether a new field is the project's property or the initiative's [metadata](initiatives.md#metadata). Properties take the same types metadata does. Whoever can change the project's tasks can change its properties; everyone else sees the list.
 
 ### Moving a task to another project
 
-You can move a task from its menu. One thing that catches people out: because every project can have its own statuses, a moved task restarts at the new project's default status. Its type comes along if the new project has one with the same name, and becomes that project's default type if not. Its metadata keeps a value wherever the new project has metadata with the same name and type, and drops the rest.
+You can move a task from its menu. One thing that catches people out: because every project can have its own statuses, a moved task restarts at the new project's default status. Its type comes along if the new project has one with the same name, and becomes that project's default type if not. Each of its properties keeps its value wherever the new project has a property with the same name and type, and the rest are dropped.
 
 Nothing's broken and you haven't lost anything. Set the new status and carry on.
 

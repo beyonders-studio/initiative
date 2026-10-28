@@ -241,13 +241,13 @@ On a collection's page, drop files anywhere to upload them straight in, or **Add
 
 **Layouts** in the collection's menu opens its layout editor, the same one a project's layouts use. Pick which views the collection offers and the one it opens on, the table's columns, what each card shows under the picture, and the **File detail**: what sits beside a file when you open it from the collection.
 
-### A collection's metadata
+### A collection's properties
 
-A collection can have **metadata** of its own: a price, a rating, the day a photo was taken. Make it in the layout editor, with **Add** wherever a field can go, and it lands right there. The values belong to the collection, not the file, so the same photo can be "£40, four stars" in the shop catalogue and just a picture in the fete gallery. Open a file from the collection to fill them in; until the file detail is changed, it shows all of the collection's metadata.
+A collection can have **properties** of its own: a price, a rating, the day a photo was taken. Make one in the layout editor, with **Add** wherever a field can go, and it lands right there. The values belong to the collection, not the file, so the same photo can be "£40, four stars" in the shop catalogue and just a picture in the fete gallery. Open a file from the collection to fill them in; until the file detail is changed, it shows every property the collection has.
 
-**Metadata**, at the top of the layout editor, is where it gets renamed, put in order or deleted. Deleting takes every file's value in this collection with it, so it asks first.
+**Properties**, at the top of the layout editor, is where they get renamed, put in order or deleted. Deleting one takes every file's value of it in this collection, so it asks first.
 
-Lists can also show the initiative's own [properties](initiatives.md#custom-properties), which a file carries wherever it goes. Metadata is for what only makes sense in this collection.
+Lists can also show the initiative's own [metadata](initiatives.md#metadata), which a file carries wherever it goes. Properties are for what only makes sense in this collection.
 
 !!! tip "A collection doesn't change who sees a file"
     Each file keeps its own sharing. Somebody opening a collection sees the files in it they could already open, and nothing else. If they can't open any of them, the collection doesn't show up for them at all.
@@ -260,7 +260,7 @@ A file can be **attached** to a project so the relevant reference sits right nex
 
 ## File settings
 
-- **Details** — tags, properties, the comment switch, and whether it's a template.
+- **Details** — tags, metadata, the comment switch, and whether it's a template.
 - **Access** — who can view, edit or own it. Levels are **Viewer**, **Editor**, **Owner**. See [Sharing](../sharing/sharing-projects-and-files.md).
 - **Advanced** — [duplicate](tools.md#duplicating) it here or into another initiative, export, archive, delete.
 

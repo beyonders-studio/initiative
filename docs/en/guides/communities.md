@@ -200,7 +200,7 @@ Jira and Confluence have no file to drop in. Pick **Jira & Confluence** in the s
 1. **Connect** with your site's address, your Atlassian email and an [API token](https://id.atlassian.com/manage-profile/security/api-tokens). The token reads only what you pick, and it's deleted as soon as it's been read.
 2. **Tick the projects and spaces**, choose the initiative they all land in, and decide whether comments and attachments come along.
 3. **Wait while it reads.** A big project takes a few minutes. You can close the window and make a cup of tea — opening the import again picks up exactly where it was.
-4. **Check what it found.** Nothing is written yet. You get the count of everything coming across, the Jira fields that become properties (untick any you don't want), and — just as plainly — anything that won't make it.
+4. **Check what it found.** Nothing is written yet. You get the count of everything coming across, the Jira fields that become metadata (untick any you don't want), and — just as plainly — anything that won't make it.
 5. **Say who its people are**, then start it. Somebody who's in both products is asked about once.
 
 No token to hand, or a Confluence this server can't reach — one on the office network, say? Export the space instead: in Confluence, **Space settings → Export space → HTML**. Pick **Jira & Confluence** here, choose **Upload it** under the connect form, and drop in the zip. It's read the same way and you get the same review; only the comments stay behind.
