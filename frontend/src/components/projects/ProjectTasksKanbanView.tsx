@@ -100,9 +100,12 @@ type ProjectTasksKanbanViewProps = {
 const NOT_GROUPED: GroupingState = [];
 
 /** A drop as it was released, kept to be placed after something is asked:
- *  where the card was let go, which the drag stops holding once it ends. */
-const heldDrop = (event: DragEndEvent): DragEndEvent => ({
+ *  where the card was let go, which the drag stops holding once it ends, and
+ *  what it was last over where it ended over nothing, which the board stops
+ *  holding once the drag is cancelled. */
+const heldDrop = (event: DragEndEvent, lastOver: DragOverEvent["over"] | null): DragEndEvent => ({
   ...event,
+  over: event.over ?? lastOver,
   active: {
     ...event.active,
     rect: { current: { ...event.active.rect.current } },
@@ -244,7 +247,8 @@ export const ProjectTasksKanbanView = ({
     onDragOver(event);
   };
   const handleDragEnd = (event: DragEndEvent) => {
-    const target = resolveKanbanDropTarget(event, lastOver.current);
+    const wasOver = lastOver.current;
+    const target = resolveKanbanDropTarget(event, wasOver);
     lastOver.current = null;
     const dragged = event.active.data.current;
     const from = dragged?.group;
@@ -280,7 +284,7 @@ export const ProjectTasksKanbanView = ({
       onDragCancel();
       const taskId = dragged.taskId;
       const statusId = target?.data?.statusId;
-      const later = heldDrop(event);
+      const later = heldDrop(event, wasOver);
       void typeChange.change(taskId, typeId, async (changes) => {
         await moveTaskNow({
           taskId,
