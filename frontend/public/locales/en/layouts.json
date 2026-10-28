@@ -306,6 +306,10 @@
     "always": "A title is always required.",
     "part": "{{name}} (required)",
     "missing": "Required, and not filled in yet.",
-    "toAdd": "Fill in what is required to add it."
+    "toAdd": "Fill in what is required to add it.",
+    "ask": "Its new page requires these, and it doesn't have them yet. Fill them in and the change goes through with them.",
+    "confirm": "Continue",
+    "retypeTitle": "What the {{type}} page asks for",
+    "moveTitle": "What {{project}} asks for"
   }
 }

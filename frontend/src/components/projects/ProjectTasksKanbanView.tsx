@@ -37,6 +37,7 @@ import { useProjectTaskTypes } from "@/hooks/useProjects";
 import { NO_DEFINITIONS, useOwnedDefinitions } from "@/hooks/useProperties";
 import { useTaskGroupings } from "@/hooks/useTaskGroupings";
 import { useMoveTaskToGroup } from "@/hooks/useTasks";
+import { useTaskTypeChange } from "@/hooks/useTaskTypeChange";
 import { formatDateTime } from "@/lib/formatDate";
 import { cardOf } from "@/lib/layouts/draft";
 import { useProjectLayoutEnv, withDisplays } from "@/lib/layouts/fields";
@@ -224,7 +225,9 @@ export const ProjectTasksKanbanView = ({
   // A card dropped into another band changes the field the board is grouped
   // by, beside what the drop does to its column and its place in it. One
   // dropped on an empty part of a cell in its own column changes only that.
-  const { mutate: moveTask } = useMoveTaskToGroup();
+  const { mutate: moveTask, mutateAsync: moveTaskNow } = useMoveTaskToGroup();
+  // A drop into another type asks first for what that type's page requires.
+  const typeChange = useTaskTypeChange(projectId, initiativeId);
   const lastOver = useRef<DragOverEvent["over"] | null>(null);
   const handleDragOver = (event: DragOverEvent) => {
     if (event.over) lastOver.current = event.over;
@@ -254,7 +257,15 @@ export const ProjectTasksKanbanView = ({
     }
     if (!intoBand || typeof dragged?.taskId !== "number") return;
     const move = active.grouping.move?.(from, to);
-    if (move && !("status" in move)) moveTask({ taskId: dragged.taskId, move });
+    if (!move || "status" in move) return;
+    const taskId = dragged.taskId;
+    if ("patch" in move && typeof move.patch.task_type_id === "number") {
+      void typeChange.change(taskId, move.patch.task_type_id, (changes) =>
+        moveTaskNow({ taskId, move: { patch: { ...move.patch, ...changes } } })
+      );
+    } else {
+      moveTask({ taskId, move });
+    }
   };
 
   const taskStatusesLength = taskStatuses.length;
@@ -266,6 +277,7 @@ export const ProjectTasksKanbanView = ({
 
   return (
     <BoardActionsContext.Provider value={boardActions}>
+      {typeChange.dialog}
       {onGroupingChange && offered.length > 0 && !editing ? (
         <div className="mb-3 flex justify-end">
           <GroupBySelect

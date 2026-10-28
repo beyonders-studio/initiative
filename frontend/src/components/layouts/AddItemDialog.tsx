@@ -37,6 +37,85 @@ export interface Written<I, P> {
   properties: PropertyValueInput[];
 }
 
+/** What a draft holds as its last change left it: read by a handler that can
+ *  run in the same event as the change it follows (leaving a field, or Enter
+ *  in it), before the render that shows it. */
+interface Held<I, P> {
+  item: I;
+  fields: Partial<P>;
+  values: Map<number, unknown>;
+  holding: Set<string>;
+}
+
+/**
+ * An item changed field by field with nothing saved: an item being added, or
+ * the fields a change of one asks for. Its fields' saves write into `draft`
+ * (as `ItemDraftContext`); `written()` is what it holds, as it is sent.
+ */
+export const useItemDraft = <I extends Item, P>(
+  blank: I,
+  { onEdit, onSubmit }: { onEdit?: () => void; onSubmit: () => void }
+) => {
+  const [item, setItem] = useState(blank);
+  // The fields showing a value they cannot take, which sending waits for.
+  const [holding, setHolding] = useState<ReadonlySet<string>>(new Set());
+  const latest = useRef<Held<I, P>>({
+    item,
+    fields: {},
+    values: new Map(),
+    holding: new Set(),
+  });
+  const handlers = useRef({ onEdit, onSubmit });
+  handlers.current = { onEdit, onSubmit };
+  const draft = useMemo<ItemDraft>(
+    () => ({
+      edit: (edit: ItemEdit<unknown, unknown>) => {
+        handlers.current.onEdit?.();
+        const held = latest.current;
+        held.item = { ...held.item, ...(edit.shows as Partial<I>) };
+        if ("patch" in edit) {
+          held.fields = { ...held.fields, ...(edit.patch as Partial<P>) };
+        } else {
+          for (const { property_id, value } of edit.properties.values) {
+            held.values.set(property_id, value);
+          }
+          // A property taken off shows as gone: nothing reads it back.
+          const removed = edit.properties.removed ?? [];
+          for (const id of removed) held.values.delete(id);
+          held.item = {
+            ...held.item,
+            properties: held.item.properties.filter((each) => !removed.includes(each.property_id)),
+          };
+        }
+        setItem(held.item);
+      },
+      submit: () => handlers.current.onSubmit(),
+      hold: (id: string, holds: boolean) => {
+        const held = latest.current.holding;
+        if (held.has(id) === holds) return;
+        if (holds) held.add(id);
+        else held.delete(id);
+        setHolding(new Set(held));
+      },
+      sent: () => latest.current.fields as Record<string, unknown>,
+    }),
+    []
+  );
+  /** What it holds now, as it is sent: a description written over is named
+   *  with its base, which a new one has none of. */
+  const written = (): Written<I, P> => {
+    const { item: now, fields, values } = latest.current;
+    return {
+      item: now,
+      fields: Object.fromEntries(
+        Object.entries(fields).filter(([key]) => !key.endsWith("_base"))
+      ) as Partial<P>,
+      properties: [...values].map(([property_id, value]) => ({ property_id, value })),
+    };
+  };
+  return { item, holding, latest, draft, written };
+};
+
 type AddItemProps<I extends Item, C, P, R extends { id: number }> = {
   detail: DetailKind<I, C, P>;
   /** The item as it starts, before anything is changed. */
@@ -113,18 +192,13 @@ const Adding = <I extends Item, C, P, R extends { id: number }>({
   changed,
 }: AddItemProps<I, C, P, R> & { changed: RefObject<boolean> }) => {
   const { t } = useTranslation(["common", "layouts"]);
-  const [item, setItem] = useState(blank);
   const [links, setLinks] = useState<LinkedRef[]>([]);
   const [adding, setAdding] = useState(false);
-  // The fields showing a value they cannot take, which Add waits for.
-  const [holding, setHolding] = useState<ReadonlySet<string>>(new Set());
-  // Read by Add, which can run in the same event as the change it follows
-  // (leaving a field, or Enter in it), before the render that shows it.
-  const latest = useRef({
-    item,
-    fields: {} as Partial<P>,
-    values: new Map<number, unknown>(),
-    holding: new Set<string>(),
+  const { item, holding, latest, draft, written } = useItemDraft<I, P>(blank, {
+    onEdit: () => {
+      changed.current = true;
+    },
+    onSubmit: () => void submit.current(),
   });
   const laidOut = useToolLayouts(layouts(item));
   const layout = detailLayoutOf(laidOut.data, detail.spec.kind, detail.typed?.typeOf(item));
@@ -165,19 +239,12 @@ const Adding = <I extends Item, C, P, R extends { id: number }>({
   };
 
   const add = async () => {
-    const { item: now, fields, values, holding: held } = latest.current;
+    const { item: now, holding: held } = latest.current;
     if (adding || held.size > 0 || !ready(now) || laidOut.isLoading || missingOf(now).length > 0)
       return;
     setAdding(true);
     try {
-      if (made.current === null) {
-        // A description written over is named with its base; a new one has none.
-        const sent = Object.fromEntries(
-          Object.entries(fields).filter(([key]) => !key.endsWith("_base"))
-        ) as Partial<P>;
-        const properties = [...values].map(([property_id, value]) => ({ property_id, value }));
-        made.current = await create({ item: now, fields: sent, properties });
-      }
+      if (made.current === null) made.current = await create(written());
       await finish(made.current);
     } catch {
       // What failed has said so; everything changed is still here to try again.
@@ -191,40 +258,6 @@ const Adding = <I extends Item, C, P, R extends { id: number }>({
   useEffect(() => {
     changed.current = false;
   }, [changed]);
-  const draft = useMemo<ItemDraft>(
-    () => ({
-      edit: (edit: ItemEdit<unknown, unknown>) => {
-        changed.current = true;
-        const held = latest.current;
-        held.item = { ...held.item, ...(edit.shows as Partial<I>) };
-        if ("patch" in edit) {
-          held.fields = { ...held.fields, ...(edit.patch as Partial<P>) };
-        } else {
-          for (const { property_id, value } of edit.properties.values) {
-            held.values.set(property_id, value);
-          }
-          // A property taken off shows as gone: nothing reads it back.
-          const removed = edit.properties.removed ?? [];
-          for (const id of removed) held.values.delete(id);
-          held.item = {
-            ...held.item,
-            properties: held.item.properties.filter((each) => !removed.includes(each.property_id)),
-          };
-        }
-        setItem(held.item);
-      },
-      submit: () => void submit.current(),
-      hold: (id: string, holds: boolean) => {
-        const held = latest.current.holding;
-        if (held.has(id) === holds) return;
-        if (holds) held.add(id);
-        else held.delete(id);
-        setHolding(new Set(held));
-      },
-      sent: () => latest.current.fields as Record<string, unknown>,
-    }),
-    [changed]
-  );
   const picking = useMemo(
     () => ({
       value: links,

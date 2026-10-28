@@ -20,6 +20,8 @@ import {
   Tool,
 } from "@/api/generated/initiativeAPI.schemas";
 import { CommentSection } from "@/components/comments/CommentSection";
+import type { Written } from "@/components/layouts/AddItemDialog";
+import { useFillRequired } from "@/components/layouts/FillRequiredDialog";
 import { MemberMultiSelect } from "@/components/members/MemberSearchSelect";
 import type { useScopePrompt } from "@/components/recurrence/OccurrenceScopeDialog";
 import { RecurrenceEditor } from "@/components/recurrence/RecurrenceEditor";
@@ -45,6 +47,7 @@ import { useAIEnabled } from "@/hooks/useAIEnabled";
 import { useComments, useCommentsCache, useCommentThreadState } from "@/hooks/useComments";
 import { useDateLocale } from "@/hooks/useDateLocale";
 import { ItemDraftContext, type ItemEdit } from "@/hooks/useFieldSave";
+import { useOwnedDefinitions } from "@/hooks/useProperties";
 import { useRelativeTime } from "@/hooks/useRelativeTime";
 import { useSmartTitle, useSmartTitlesOn } from "@/hooks/useSmartTitle";
 import {
@@ -54,6 +57,7 @@ import {
   useTaskFieldSave,
   useTaskSaveOptions,
 } from "@/hooks/useTasks";
+import { detailLayoutOf, instanceTarget, useToolLayouts } from "@/hooks/useToolLayouts";
 import { dateRangeBounds } from "@/lib/dateRange";
 import { toast } from "@/lib/mascotToast";
 import {
@@ -76,7 +80,15 @@ import {
 } from "@/lib/userDisplay";
 
 import { type DetailKind, useItemContext } from "./DetailLayoutView";
-import { filledBy, hasAny, hasText, sentOr } from "./detailLayout";
+import {
+  filledBy,
+  hasAny,
+  hasText,
+  missingRequired,
+  requiredKeys,
+  type StoredRegions,
+  sentOr,
+} from "./detailLayout";
 import { FieldFrame, sameIds, sameJson, useFieldDraft } from "./editing";
 import { DescriptionField, TagsField, TitleField } from "./fieldEditors";
 import { TASK_LAYOUT, taskFields, taskLayoutFor } from "./tasks";
@@ -309,14 +321,60 @@ const startedFrom = (task: TaskRead, was: TaskTypeRead, type: TaskTypeRead) => {
   };
 };
 
+/** What the fields a change of a task asks for are drawn in: writable, and
+ *  with nothing of its page around them. */
+export const taskFillContext = (initiativeId: number | null): TaskLayoutContext => ({
+  readOnly: false,
+  readOnlyMessage: null,
+  statuses: [],
+  types: [],
+  initiativeId,
+  askScope: async () => null,
+  actions: null,
+  leaving: { current: false },
+});
+
+/** What was filled in for a change of a task, as the change sends it: its
+ *  fields, and the properties it was given beside those it holds. */
+export const taskChanges = ({ fields, properties }: Written<TaskRead, TaskUpdate>): TaskUpdate => ({
+  ...fields,
+  ...(properties.length > 0 ? { properties, merge_properties: true } : {}),
+});
+
+/** What a task of `projectId` would leave empty that its page as another of
+ *  the project's types requires, with `patch` applied: nothing until the
+ *  project's layouts and fields are read, when the server still holds it to
+ *  them. */
+export const useMissingAsType = (projectId: number, initiativeId: number | null) => {
+  const layouts = useToolLayouts(instanceTarget(Tool.project, projectId)).data;
+  const definitions = useOwnedDefinitions({
+    initiativeId: initiativeId ?? undefined,
+    owner: { kind: "project", id: projectId },
+    enabled: initiativeId !== null,
+  }).data;
+  return (task: TaskRead, typeId: number, patch: Partial<TaskUpdate> = {}): string[] =>
+    layouts && definitions
+      ? missingRequired(
+          requiredKeys(detailLayoutOf(layouts, "task", typeId) as StoredRegions | null),
+          (key) => TASK_DETAIL.filled?.(task, key, patch) ?? true,
+          definitions
+        )
+      : [];
+};
+
 /** Which of the project's types the task is. Changing it redraws the page as
  *  the new type lays it out; nothing the task holds is lost, only what the new
- *  page leaves out is not shown. While the task is being added, what it starts
- *  with follows the type, until the person changes it. */
+ *  page leaves out is not shown. A type whose page requires what the task
+ *  leaves empty asks for it first, and the change is sent with it. While the
+ *  task is being added, what it starts with follows the type, until the
+ *  person changes it. */
 const TypeEditor = ({ item: task, label }: EditorProps) => {
-  const { readOnly, types, askScope } = useTaskLayout();
+  const { t } = useTranslation("layouts");
+  const { readOnly, types, askScope, initiativeId } = useTaskLayout();
   const save = useTaskFieldSave(task, label, askScope);
   const adding = useContext(ItemDraftContext) !== null;
+  const missingAs = useMissingAsType(task.project_id, initiativeId);
+  const fill = useFillRequired(TASK_DETAIL);
   if (types.length < 2) return null;
   const options = types.some((type) => type.id === task.task_type_id)
     ? types
@@ -334,9 +392,29 @@ const TypeEditor = ({ item: task, label }: EditorProps) => {
         value={String(task.task_type_id)}
         onValueChange={(selected) => {
           const next = options.find((type) => String(type.id) === selected);
-          if (next && next.id !== task.task_type_id) {
+          if (!next || next.id === task.task_type_id) return;
+          // One being added draws its whole page, required fields up front.
+          const keys = adding ? [] : missingAs(task, next.id);
+          if (keys.length === 0) {
             void save.save(edit(next), edit(task.task_type));
+            return;
           }
+          fill.ask({
+            item: { ...task, task_type_id: next.id, task_type: next },
+            context: taskFillContext(initiativeId),
+            keys,
+            title: t("required.retypeTitle", { type: next.name }),
+            send: async (written) => {
+              const saved = await save.save(
+                {
+                  patch: { task_type_id: next.id, ...taskChanges(written) },
+                  shows: { ...written.item, task_type_id: next.id, task_type: next },
+                },
+                edit(task.task_type)
+              );
+              if (!saved) throw new Error("not saved");
+            },
+          });
         }}
         disabled={readOnly}
       >
@@ -351,6 +429,7 @@ const TypeEditor = ({ item: task, label }: EditorProps) => {
           ))}
         </SelectContent>
       </Select>
+      {fill.dialog}
     </FieldFrame>
   );
 };
