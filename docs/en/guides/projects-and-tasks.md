@@ -324,7 +324,9 @@ Change any of it from **Project settings → Layouts → Edit layouts**. That's 
 
 Some things only matter in one project. The sprint a bug landed in. Which van the delivery goes on. Nobody planning the summer fete needs a "Van" box on their tasks, so it doesn't belong to the whole initiative.
 
-That's a **property**: a field that belongs to the project and turns up on its tasks alone. Make one in **Project settings → Properties**, or from **Add** in the layout editor, which asks whether a new field is the project's property or the initiative's [metadata](initiatives.md#metadata). Properties take the same types metadata does. Whoever can change the project's tasks can change its properties; everyone else sees the list.
+That's a **property**: a field that belongs to the project and turns up on its tasks alone. Make one in **Project settings → Properties**, or from **Add** in the [layout editor](layouts.md), which asks whether a new field is the project's property or the initiative's [metadata](initiatives.md#metadata). Properties take the same types metadata does.
+
+Rename, reorder or delete them in the same settings tab, or in the editor: click the layout's name at the top of its outline and the project's properties are listed on the right, each saying which layouts show it. Whoever can edit the project can change its properties. [Initiative settings → Metadata](initiatives.md#everything-in-one-place) lists them too, beside every other project's.
 
 ### Moving a task to another project
 

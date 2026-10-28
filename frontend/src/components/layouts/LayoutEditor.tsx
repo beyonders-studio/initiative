@@ -262,6 +262,7 @@ export const LayoutEditor = ({
   presets,
   set,
   initialKind,
+  ownPropertiesEditable = false,
   onClose,
 }: {
   target: GetLayoutsParams;
@@ -277,6 +278,10 @@ export const LayoutEditor = ({
   set: ToolLayoutSetRead;
   /** The layout to open on: a list's kind, or the task's detail. */
   initialKind?: string;
+  /** Whether the request may make, edit and delete the target's own
+   *  properties, the project's or the collection's: the server's answer on
+   *  it. Without it the panel lists them and changes nothing. */
+  ownPropertiesEditable?: boolean;
   onClose: () => void;
 }) => {
   const { t, i18n } = useTranslation(["projects", "layouts", "common"]);
@@ -398,7 +403,12 @@ export const LayoutEditor = ({
   // The target's own properties, managed beside the layout they are placed on.
   const properties =
     owner && selection.kind === "layout" ? (
-      <LayoutProperties initiativeId={initiativeId} owner={owner} shownOn={shownOn} />
+      <LayoutProperties
+        initiativeId={initiativeId}
+        owner={owner}
+        canManage={ownPropertiesEditable}
+        shownOn={shownOn}
+      />
     ) : null;
 
   const changeDraft = (next: Draft, then?: Selection) => {

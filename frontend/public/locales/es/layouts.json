@@ -294,5 +294,10 @@
     "number": "Un número",
     "stars": "Estrellas",
     "bar": "Una barra"
+  },
+  "fieldProperty": {
+    "metadata": "Metadatos",
+    "metadataHelp": "Son metadatos de la iniciativa, que se editan en su configuración.",
+    "openSettings": "Abrir la configuración de la iniciativa"
   }
 }

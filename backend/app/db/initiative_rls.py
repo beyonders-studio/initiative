@@ -1472,13 +1472,23 @@ def metadata_definitions_path() -> InitiativePath:
     * A collection's: also read only by whoever sees the collection — one
       ``EXISTS`` into it, whose own policy answers — and written only by
       whoever may change it (:func:`_collection_writer`).
-    * A project's: what the project's task types ask, through the project.
+    * A project's: read by whoever reads the project, and written, as the
+      project's tasks are, by whoever may write the project: its sharing at
+      write, the same leg every write of a project's content takes.
     * A plug-in's: declared by its manifest and kept by its install, which
       alone writes it besides the system engine. It belongs to no
       initiative, and anybody in the community reads it, as they read which
       plug-ins are installed.
     """
     project = via("projects", "project_id")
+    sharing = _dac_via("projects", "project_id")
+
+    def project_sharing(t: str, c: str, w: bool) -> str | None:
+        # Reading is the project's own SELECT policy, reached by the walk
+        # above; only a write asks the project's sharing.
+        if c == "SELECT":
+            return None
+        return f"({t}.project_id IS NULL OR {sharing.predicate(t, c, w)})"
 
     def predicate(t: str, w: bool) -> str:
         seen = f"EXISTS (SELECT 1 FROM collections c WHERE c.id = {t}.collection_id)"  # noqa: S608
@@ -1501,6 +1511,7 @@ def metadata_definitions_path() -> InitiativePath:
         predicate=predicate,
         initiative_expr=lambda r: f"{r}.initiative_id",
         parents=_no_parents,
+        dac=DacPath(predicate=project_sharing),
     )
 
 

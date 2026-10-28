@@ -86,7 +86,31 @@
     "deleteError": "Konnte nicht gelöscht werden",
     "setValuesError": "Der Wert konnte nicht gespeichert werden",
     "moveUp": "{{name}} nach oben verschieben",
-    "moveDown": "{{name}} nach unten verschieben"
+    "moveDown": "{{name}} nach unten verschieben",
+    "toolsTitle": "Eigenschaften von Projekten und Sammlungen",
+    "toolsDescription": "Die eigenen Eigenschaften jedes Projekts und jeder Sammlung, die du bearbeiten darfst. Sie werden auch im Layout-Editor des Projekts oder der Sammlung erstellt, bearbeitet und gelöscht.",
+    "noTools": "Keine Eigenschaften, die du bearbeiten kannst",
+    "owner": {
+      "project": "Projekt",
+      "collection": "Sammlung"
+    },
+    "select": "{{name}} auswählen",
+    "selected_one": "{{count}} ausgewählt",
+    "selected_other": "{{count}} ausgewählt",
+    "promote": "Zu Metadaten machen",
+    "promoteBody_one": "Sie wird zu Metadaten dieser Initiative, für alles darin. Ihre Werte werden übernommen, jedes Layout, das sie zeigt, zeigt stattdessen die Metadaten, und sie wird gelöscht.",
+    "promoteBody_other": "Sie werden zu einem Metadatenfeld dieser Initiative, für alles darin. Ihre Werte werden übernommen, jedes Layout, das eine davon zeigt, zeigt stattdessen die Metadaten, und sie werden gelöscht. Hat etwas Werte von mehreren, bleibt der zuletzt geänderte.",
+    "promoteInto": "Wird mit den Metadaten „{{name}}“ zusammengeführt, die denselben Typ haben.",
+    "promoteTaken": "Diese Initiative hat bereits Metadaten mit diesem Namen, aber mit einem anderen Typ.",
+    "promoteHint": "Wähle Eigenschaften eines Typs aus, um sie zu Metadaten zu machen.",
+    "promoted": "Zu „{{name}}“ gemacht",
+    "promoteError": "Konnte sie nicht zu Metadaten machen",
+    "bulkDeleteTitle_one": "{{count}} Feld löschen?",
+    "bulkDeleteTitle_other": "{{count}} Felder löschen?",
+    "bulkDeleteBody": "Mit jedem Feld werden alle seine Werte gelöscht.",
+    "bulkDeleted_one": "{{count}} Feld gelöscht",
+    "bulkDeleted_other": "{{count}} Felder gelöscht",
+    "bulkDeleteError": "Konnte sie nicht löschen"
   },
   "filter": {
     "addFilter": "Filter hinzufügen",

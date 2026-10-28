@@ -247,7 +247,7 @@ A collection can have **properties** of its own: a price, a rating, the day a ph
 
 Where a new one shows up is the bit that surprises people. The file page shows every property the collection has, so a new one appears there straight away. Cards and the table show only what you put on them, so a new one sits quietly off them until you add it.
 
-Click the layout's name at the top of the editor's outline and the collection's properties are listed on the right, each saying which layouts show it. That's where they get renamed, put in order or deleted. Deleting one takes every file's value of it in this collection, so it asks first.
+Click the layout's name at the top of the editor's outline and the collection's properties are listed on the right, each saying which layouts show it. That's where they get renamed, put in order or deleted. Deleting one takes every file's value of it in this collection, so it asks first. [Initiative settings → Metadata](initiatives.md#everything-in-one-place) lists every collection's properties too, for tidying several at once.
 
 Lists can also show the initiative's own [metadata](initiatives.md#metadata), which a file carries wherever it goes. Properties are for what only makes sense in this collection.
 

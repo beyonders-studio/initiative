@@ -115,6 +115,7 @@ export const CollectionLayoutEditorPage = () => {
       lists={lists}
       details={details}
       set={set}
+      ownPropertiesEditable={collection.can.edit}
       initialKind={layout}
       onClose={() =>
         void navigate({ to: gp(collectionRoute(collection.initiative_id, collection.id)) })

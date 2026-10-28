@@ -10,10 +10,14 @@ Covers /api/v1/property-definitions CRUD including:
 - Cascade delete to attached values
 """
 
+from datetime import datetime, timedelta, timezone
 from decimal import Decimal
 
+import pytest
 from httpx import AsyncClient
-from sqlmodel import select
+from sqlalchemy import delete, update
+from sqlalchemy.exc import DBAPIError
+from sqlmodel import col, select
 from sqlmodel.ext.asyncio.session import AsyncSession
 
 from app.models.platform.guild import CommunityRole
@@ -22,6 +26,8 @@ from app.models.tenant.metadata import (
     MetadataType,
     MetadataValue,
 )
+from app.models.tenant.resource_grant import ResourceAccessLevel
+from app.models.tenant.tool_layout import ToolLayout
 from app.testing import (
     create_collection,
     create_file,
@@ -681,3 +687,414 @@ async def test_a_projects_metadata_is_defined_by_whoever_may_write_its_tasks(
         select(MetadataDefinition).where(MetadataDefinition.id == metadata_id)
     )
     assert gone.one_or_none() is None
+
+
+# ---------------------------------------------------------------------------
+# The initiative's settings: every owner's, bulk delete and promote
+# ---------------------------------------------------------------------------
+
+
+async def test_the_settings_list_only_the_properties_the_reader_may_edit(
+    client: AsyncClient, session: AsyncSession, acting_user
+):
+    """A member who may edit one project and only read another sees the
+    first's properties and not the second's, and can neither delete nor
+    promote the second's; the community's admin sees both."""
+    owner = await acting_user(guild_role=CommunityRole.member, initiative=True)
+    member = await acting_user(
+        guild_role=CommunityRole.member,
+        guild=owner.guild,
+        initiative=owner.initiative,
+        initiative_role="member",
+    )
+    admin = await acting_user(guild_role=CommunityRole.admin, guild=owner.guild)
+    initiative = owner.initiative
+    editable = await create_project(session, initiative, owner.user, name="Alpha")
+    readable = await create_project(session, initiative, owner.user, name="Beta")
+    await create_resource_grant(
+        session, editable, user=member.user, level=ResourceAccessLevel.write
+    )
+    await create_resource_grant(session, readable, all_initiative_members=True)
+    metadata = await create_property_definition(session, initiative, name="Stage")
+    alpha = await create_property_definition(
+        session, initiative, name="Points", type=MetadataType.number, project=editable
+    )
+    beta = await create_property_definition(
+        session, initiative, name="Effort", type=MetadataType.number, project=readable
+    )
+
+    async def groups(actor) -> list[tuple]:
+        listed = await client.get(
+            actor.g("/property-definitions/by-owner"),
+            headers=actor.headers,
+            params={"initiative_id": initiative.id},
+        )
+        assert listed.status_code == 200, listed.text
+        return [
+            (
+                group["owner"],
+                group["name"],
+                group["can_edit"],
+                [definition["id"] for definition in group["definitions"]],
+            )
+            for group in listed.json()["groups"]
+        ]
+
+    assert await groups(member) == [
+        ("initiative", None, False, [metadata.id]),
+        ("project", "Alpha", True, [alpha.id]),
+    ]
+    assert await groups(admin) == [
+        ("initiative", None, True, [metadata.id]),
+        ("project", "Alpha", True, [alpha.id]),
+        ("project", "Beta", True, [beta.id]),
+    ]
+
+    url = member.g("/property-definitions/")
+    for ids in ([beta.id], [alpha.id, beta.id]):
+        refused = await client.post(
+            f"{url}bulk-delete",
+            headers=member.headers,
+            json={"initiative_id": initiative.id, "ids": ids},
+        )
+        assert refused.status_code == 403, refused.text
+    promoted = await client.post(
+        f"{url}promote",
+        headers=member.headers,
+        json={
+            "initiative_id": initiative.id,
+            "ids": [alpha.id, beta.id],
+            "name": "Size",
+        },
+    )
+    assert promoted.status_code == 403, promoted.text
+    kept = await session.exec(
+        select(MetadataDefinition.id).where(
+            col(MetadataDefinition.id).in_([alpha.id, beta.id])
+        )
+    )
+    assert sorted(kept.all()) == sorted([alpha.id, beta.id])
+
+    # What they may edit, they promote and delete.
+    task = await create_task(session, editable)
+    await create_property_value(session, task, alpha, value_number=Decimal(3))
+    promoted = await client.post(
+        f"{url}promote",
+        headers=member.headers,
+        json={"initiative_id": initiative.id, "ids": [alpha.id], "name": "Points"},
+    )
+    assert promoted.status_code == 200, promoted.text
+    moved = await session.exec(
+        select(MetadataValue.value_number).where(
+            MetadataValue.property_id == promoted.json()["id"]
+        )
+    )
+    assert moved.all() == [Decimal(3)]
+    other = await create_property_definition(session, initiative, project=editable)
+    deleted = await client.post(
+        f"{url}bulk-delete",
+        headers=member.headers,
+        json={"initiative_id": initiative.id, "ids": [other.id]},
+    )
+    assert deleted.status_code == 204, deleted.text
+    # The initiative's metadata is reshaped by its managers.
+    refused = await client.post(
+        f"{url}bulk-delete",
+        headers=member.headers,
+        json={"initiative_id": initiative.id, "ids": [metadata.id]},
+    )
+    assert refused.status_code == 403, refused.text
+
+
+async def test_promote_merges_properties_into_one_metadata_field(
+    client: AsyncClient, session: AsyncSession, acting_user
+):
+    """Options join by value, values move with the newest kept where an item
+    holds several, layouts show the merged field once in their place, and the
+    sources go."""
+    a = await acting_user(guild_role=CommunityRole.admin, initiative=True)
+    initiative = a.initiative
+    first = await create_project(session, initiative, a.user, name="One")
+    second = await create_project(session, initiative, a.user, name="Two")
+    shared = await create_file(session, initiative, a.user)
+    walls = [
+        await create_collection(session, initiative, a.user, files=[shared])
+        for _ in range(2)
+    ]
+
+    def options(*values: str) -> list[dict]:
+        return [{"value": value, "label": value.title()} for value in values]
+
+    sizes = [
+        await create_property_definition(
+            session,
+            initiative,
+            name="Size",
+            type=MetadataType.select,
+            options=options(*values),
+            **owner,
+        )
+        for values, owner in (
+            (("small", "medium"), {"project": first}),
+            (("medium", "large"), {"project": second}),
+            (("tiny",), {"collection": walls[0]}),
+            (("huge",), {"collection": walls[1]}),
+        )
+    ]
+    one, two = await create_task(session, first), await create_task(session, second)
+    await create_property_value(session, one, sizes[0], value_text="small")
+    await create_property_value(session, two, sizes[1], value_text="large")
+    now = datetime.now(timezone.utc)
+    await create_property_value(
+        session, shared, sizes[2], value_text="tiny", updated_at=now
+    )
+    await create_property_value(
+        session,
+        shared,
+        sizes[3],
+        value_text="huge",
+        updated_at=now - timedelta(days=1),
+    )
+    existing = await create_property_definition(
+        session,
+        initiative,
+        name="size",
+        type=MetadataType.select,
+        options=options("medium"),
+    )
+    laid_out = await client.put(
+        a.g("/layouts/"),
+        params={"tool": "project", "tool_id": first.id},
+        headers=a.headers,
+        json={
+            "kind": "table",
+            "definition": {
+                "columns": [
+                    "title",
+                    f"property:{sizes[0].id}",
+                    f"property:{existing.id}",
+                ]
+            },
+        },
+    )
+    assert laid_out.status_code == 200, laid_out.text
+    url = a.g("/property-definitions/")
+    every = [size.id for size in sizes]
+
+    number = await create_property_definition(
+        session, initiative, type=MetadataType.number, project=second
+    )
+    await create_property_definition(
+        session, initiative, name="Count", type=MetadataType.number
+    )
+    for ids, name, status_code, detail in (
+        ([sizes[0].id, number.id], "Size", 400, "PROPERTY_PROMOTE_TYPES_DIFFER"),
+        # The initiative's own metadata is not a property to promote.
+        ([existing.id], "Size", 404, "PROPERTY_DEFINITION_NOT_FOUND"),
+        # Of that name, but not of that type.
+        (every, "count", 409, "PROPERTY_NAME_ALREADY_EXISTS"),
+    ):
+        refused = await client.post(
+            f"{url}promote",
+            headers=a.headers,
+            json={"initiative_id": initiative.id, "ids": ids, "name": name},
+        )
+        assert refused.status_code == status_code, refused.text
+        assert refused.json()["detail"] == detail
+
+    promoted = await client.post(
+        f"{url}promote",
+        headers=a.headers,
+        json={"initiative_id": initiative.id, "ids": every, "name": "Size"},
+    )
+    assert promoted.status_code == 200, promoted.text
+    merged = promoted.json()
+    assert merged["id"] == existing.id
+    assert (merged["project_id"], merged["collection_id"]) == (None, None)
+    assert [option["value"] for option in merged["options"]] == [
+        "medium",
+        "small",
+        "large",
+        "tiny",
+        "huge",
+    ]
+
+    values = await session.exec(
+        select(MetadataValue.entity_type, MetadataValue.value_text).where(
+            MetadataValue.property_id == existing.id
+        )
+    )
+    assert sorted(values.all()) == [
+        ("file", "tiny"),
+        ("task", "large"),
+        ("task", "small"),
+    ]
+    gone = await session.exec(
+        select(MetadataDefinition.id).where(col(MetadataDefinition.id).in_(every))
+    )
+    assert gone.all() == []
+    layout = await session.exec(
+        select(ToolLayout.definition).where(
+            ToolLayout.tool == "project", ToolLayout.tool_id == first.id
+        )
+    )
+    assert layout.one()["columns"] == ["title", f"property:{existing.id}"]
+
+
+async def test_promote_moves_no_value_onto_what_the_reader_may_not_edit(
+    client: AsyncClient, session: AsyncSession, acting_user
+):
+    """A collection's values are written by whoever may change it, and the
+    initiative's metadata only by whoever may edit the file: a value on a
+    file the reader only reads refuses the merge, and nothing changes."""
+    owner = await acting_user(guild_role=CommunityRole.member, initiative=True)
+    member = await acting_user(
+        guild_role=CommunityRole.member,
+        guild=owner.guild,
+        initiative=owner.initiative,
+        initiative_role="member",
+    )
+    await grant_role_permission(session, owner.initiative, "create_files")
+    shared = await create_file(session, owner.initiative, owner.user)
+    await create_resource_grant(session, shared, all_initiative_members=True)
+    wall = await create_collection(
+        session, owner.initiative, owner.user, files=[shared]
+    )
+    rating = await create_property_definition(
+        session, owner.initiative, type=MetadataType.scale, collection=wall
+    )
+    await create_property_value(session, shared, rating, value_number=Decimal(80))
+
+    refused = await client.post(
+        member.g("/property-definitions/promote"),
+        headers=member.headers,
+        json={
+            "initiative_id": owner.initiative.id,
+            "ids": [rating.id],
+            "name": "Rating",
+        },
+    )
+    assert refused.status_code == 403, refused.text
+    assert refused.json()["detail"] == "PROPERTY_PROMOTE_VALUE_NOT_EDITABLE"
+    kept = await session.exec(
+        select(MetadataDefinition.id).where(
+            MetadataDefinition.initiative_id == owner.initiative.id
+        )
+    )
+    assert kept.all() == [rating.id]
+
+
+async def test_the_database_refuses_a_projects_property_to_whoever_only_reads_it(
+    session: AsyncSession, acting_user, reading_as
+):
+    """Written on the request's own login and routing, with no route in front:
+    a member who reads project B and may not edit it reads B's property and
+    can't make, change or delete one; on project A, which they may edit, the
+    same statements land."""
+    owner = await acting_user(guild_role=CommunityRole.member, initiative=True)
+    member = await acting_user(
+        guild_role=CommunityRole.member,
+        guild=owner.guild,
+        initiative=owner.initiative,
+        initiative_role="member",
+    )
+    initiative = owner.initiative
+    editable = await create_project(session, initiative, owner.user, name="Alpha")
+    readable = await create_project(session, initiative, owner.user, name="Beta")
+    await create_resource_grant(
+        session, editable, user=member.user, level=ResourceAccessLevel.write
+    )
+    await create_resource_grant(session, readable, all_initiative_members=True)
+    alpha = await create_property_definition(session, initiative, project=editable)
+    beta = await create_property_definition(session, initiative, project=readable)
+
+    writer = await reading_as(member.user.id, owner.guild.id)
+    seen = await writer.exec(
+        select(MetadataDefinition.id).where(
+            col(MetadataDefinition.id).in_([alpha.id, beta.id])
+        )
+    )
+    assert sorted(seen.all()) == sorted([alpha.id, beta.id])
+
+    def renamed(definition: MetadataDefinition):
+        return (
+            update(MetadataDefinition)
+            .where(col(MetadataDefinition.id) == definition.id)
+            .values(name="Renamed")
+        )
+
+    assert (await writer.exec(renamed(beta))).rowcount == 0
+    removed = delete(MetadataDefinition).where(col(MetadataDefinition.id) == beta.id)
+    assert (await writer.exec(removed)).rowcount == 0
+    assert (await writer.exec(renamed(alpha))).rowcount == 1
+    await writer.commit()
+
+    for project, refused in ((editable, False), (readable, True)):
+        writer.add(
+            MetadataDefinition(
+                initiative_id=initiative.id,
+                project_id=project.id,
+                name=f"Made in {project.name}",
+                type=MetadataType.text,
+            )
+        )
+        if refused:
+            with pytest.raises(DBAPIError):
+                await writer.commit()
+            await writer.rollback()
+        else:
+            await writer.commit()
+
+
+async def test_promote_moves_no_value_while_one_is_out_of_sight(
+    client: AsyncClient, session: AsyncSession, acting_user
+):
+    """A file the reader can't see still holds a value of the collection's
+    property: the merge is refused, and that value and the property stay."""
+    owner = await acting_user(guild_role=CommunityRole.member, initiative=True)
+    member = await acting_user(
+        guild_role=CommunityRole.member,
+        guild=owner.guild,
+        initiative=owner.initiative,
+        initiative_role="member",
+    )
+    await grant_role_permission(session, owner.initiative, "create_files")
+    shared = await create_file(session, owner.initiative, owner.user)
+    await create_resource_grant(
+        session, shared, all_initiative_members=True, level=ResourceAccessLevel.write
+    )
+    hidden = await create_file(session, owner.initiative, owner.user)
+    wall = await create_collection(
+        session, owner.initiative, owner.user, files=[shared, hidden]
+    )
+    rating = await create_property_definition(
+        session, owner.initiative, type=MetadataType.scale, collection=wall
+    )
+    await create_property_value(session, shared, rating, value_number=Decimal(80))
+    await create_property_value(session, hidden, rating, value_number=Decimal(20))
+
+    refused = await client.post(
+        member.g("/property-definitions/promote"),
+        headers=member.headers,
+        json={
+            "initiative_id": owner.initiative.id,
+            "ids": [rating.id],
+            "name": "Rating",
+        },
+    )
+    assert refused.status_code == 403, refused.text
+    assert refused.json()["detail"] == "PROPERTY_PROMOTE_VALUE_NOT_EDITABLE"
+    kept = await session.exec(
+        select(MetadataValue.entity_id, MetadataValue.value_number).where(
+            MetadataValue.property_id == rating.id
+        )
+    )
+    assert sorted(kept.all()) == sorted(
+        [(shared.id, Decimal(80)), (hidden.id, Decimal(20))]
+    )
+    definitions = await session.exec(
+        select(MetadataDefinition.id).where(
+            MetadataDefinition.initiative_id == owner.initiative.id
+        )
+    )
+    assert definitions.all() == [rating.id]

@@ -9,6 +9,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Added
 
+- **Every field in one place.** **Initiative settings › Metadata** lists the initiative's metadata, then the properties of each project and collection you can edit. Edit one, delete several at once, or **Promote to metadata**: properties of one type become one metadata field, values and layouts included. A project's properties, like a collection's, can also be made, reordered, edited and deleted in the properties panel of its layout editor.
 - **Ask for access to what you can't open.** In your initiatives, a link to something not shared with you says **You need access** and asks for **View** or **Edit**, with a note; something you can only read has **Ask to edit**. Whoever can share it answers from the notice or the **Access** tab. Anything outside your initiatives still reads as not found.
 - **Edit an uploaded document or spreadsheet.** Open a Word, OpenDocument, Excel, CSV, Markdown or text file and choose **Edit** to turn it into a document or spreadsheet you edit in the app, keeping its name, sharing, comments and links. The upload and its versions are replaced; export gets a file back out.
 - **Upload large files, and resume dropped ones.** Files go up in pieces with a progress bar, as large as the community's storage allows rather than 50 MB, and picking the same file again carries on where it stopped. Backups and Confluence exports go up the same way, up to 256 MB. **Server operators:** a reverse proxy must pass 50 MB per request.

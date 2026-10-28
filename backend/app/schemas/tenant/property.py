@@ -160,6 +160,60 @@ class PropertyDefinitionRead(PropertyDefinitionBase):
     updated_at: datetime
 
 
+class MetadataOwnerKind(str, Enum):
+    """Who owns a definition people define: the initiative (its metadata), or
+    a project or a collection (its properties)."""
+
+    initiative = "initiative"
+    project = "project"
+    collection = "collection"
+
+
+class PropertyDefinitionGroup(SanitizedBaseModel):
+    """One owner's definitions, as the initiative's settings list them."""
+
+    model_config = ConfigDict(json_schema_serialization_defaults_required=True)
+
+    owner: MetadataOwnerKind
+    #: The project's or the collection's id; none for the initiative.
+    owner_id: Optional[int] = None
+    #: The project's or the collection's name; none for the initiative.
+    name: Optional[str] = None
+    #: Whether the reader may rename, reorder and delete these.
+    can_edit: bool
+    definitions: List[PropertyDefinitionRead]
+
+
+class PropertyDefinitionGroups(SanitizedBaseModel):
+    """An initiative's metadata, then the properties of each project and each
+    collection in it the reader may edit, each under its owner."""
+
+    groups: List[PropertyDefinitionGroup]
+
+
+class PropertyDefinitionBulkDelete(SanitizedBaseModel):
+    """Definitions of one initiative to delete together, or none of them."""
+
+    initiative_id: int
+    ids: List[int] = Field(..., min_length=1, max_length=100)
+
+
+class PropertyDefinitionPromote(SanitizedBaseModel):
+    """Properties of one type, from the initiative's projects and
+    collections, merged into one of its metadata, named ``name``."""
+
+    initiative_id: int
+    ids: List[int] = Field(..., min_length=1, max_length=100)
+    name: str = Field(..., min_length=1, max_length=100)
+
+    @field_validator("name")
+    def _strip_name(cls, v: str) -> str:
+        v = v.strip()
+        if not v:
+            raise ValueError("Property name cannot be empty")
+        return v
+
+
 class PropertyDefinitionUpdateResponse(SanitizedBaseModel):
     """Envelope for PATCH /property-definitions/{id}.
 

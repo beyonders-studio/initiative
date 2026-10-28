@@ -1,6 +1,6 @@
 import { HttpResponse } from "msw";
 
-import { buildPropertyDefinition } from "@/__tests__/factories/properties";
+import { buildPropertyDefinition, buildPropertyGroup } from "@/__tests__/factories/properties";
 import type { PropertyDefinitionRead } from "@/api/generated/initiativeAPI.schemas";
 
 import { communityHttp } from "../communityHttp";
@@ -31,6 +31,24 @@ export const definitionsHandler = (
 export const propertyHandlers = [
   // ── Property definitions ──────────────────────────────────────────────────
   definitionsHandler([]),
+
+  communityHttp.get("/property-definitions/by-owner", () =>
+    HttpResponse.json({ groups: [buildPropertyGroup()] })
+  ),
+
+  communityHttp.post("/property-definitions/bulk-delete", () => {
+    return new HttpResponse(null, { status: 204 });
+  }),
+
+  communityHttp.post("/property-definitions/promote", async ({ request }) => {
+    const body = (await request.json()) as Record<string, unknown>;
+    return HttpResponse.json(
+      buildPropertyDefinition({
+        name: String(body.name),
+        initiative_id: typeof body.initiative_id === "number" ? body.initiative_id : 1,
+      })
+    );
+  }),
 
   communityHttp.post("/property-definitions/", async ({ request }) => {
     const body = (await request.json()) as Record<string, unknown>;

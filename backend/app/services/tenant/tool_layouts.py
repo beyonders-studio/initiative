@@ -19,6 +19,7 @@ from typing import Any, Callable, Iterable, Mapping, Optional, Sequence
 
 from fastapi import HTTPException, status
 from pydantic import ValidationError
+from sqlalchemy import and_, or_
 from sqlmodel import col, delete, select
 from sqlmodel.ext.asyncio.session import AsyncSession
 
@@ -1047,6 +1048,95 @@ async def add_to_saved_lists(
                     {**row.definition, "columns": [*columns, *added_columns]},
                 )
     await session.flush()
+
+
+async def repoint_properties(
+    session: AsyncSession,
+    initiative_id: int,
+    instances: Iterable[tuple[str, int]],
+    moved: Mapping[int, int],
+) -> None:
+    """In every stored layout of these instances (``(tool, tool_id)``), show
+    each property ``moved`` names, by id, as the one it maps to: what merging
+    properties leaves behind. A layout that showed two of them, or one and the
+    one it maps to, shows it once, where it first did."""
+    held: dict[str, set[int]] = {}
+    for tool, tool_id in instances:
+        held.setdefault(tool, set()).add(tool_id)
+    if not held or not moved:
+        return
+    rows = await session.exec(
+        select(ToolLayout)
+        .where(
+            ToolLayout.initiative_id == initiative_id,
+            or_(
+                *(
+                    and_(ToolLayout.tool == tool, col(ToolLayout.tool_id).in_(ids))
+                    for tool, ids in held.items()
+                )
+            ),
+        )
+        .with_for_update()
+    )
+    remap = Remap(
+        statuses=lambda status_id: status_id,
+        properties=lambda property_id: moved.get(property_id, property_id),
+    )
+    merged = frozenset(f"{PROPERTY_FIELD_PREFIX}{to}" for to in moved.values())
+    for row in rows.all():
+        definition = _shown_once(remapped_definition(row.definition, remap), merged)
+        if definition == row.definition:
+            continue
+        write = (
+            DetailLayoutWrite
+            if row.kind in DETAIL_LAYOUTS.get(row.tool, ())
+            else ListLayoutWrite
+        )
+        _rewrite(session, row, write, definition)
+    await session.flush()
+
+
+def _shown_once(definition: dict[str, Any], fields: frozenset[str]) -> dict[str, Any]:
+    """``definition`` showing each of ``fields`` once, where it first did: as
+    a part, a column and a grouping."""
+    seen: set[str] = set()
+
+    def first(field: Any) -> bool:
+        if field not in fields:
+            return True
+        if field in seen:
+            return False
+        seen.add(field)
+        return True
+
+    def nodes(parts: list[Any]) -> list[Any]:
+        kept: list[Any] = []
+        for node in parts:
+            if isinstance(node, dict):
+                if node.get("type") == "field" and not first(
+                    (node.get("props") or {}).get("field")
+                ):
+                    continue
+                if isinstance(node.get("children"), list):
+                    node = {**node, "children": nodes(node["children"])}
+            kept.append(node)
+        return kept
+
+    copy = dict(definition)
+    for region in ("header", "main", "side"):
+        if isinstance(copy.get(region), list):
+            copy[region] = nodes(copy[region])
+    if isinstance(copy.get("card"), dict):
+        [copy["card"]] = nodes([copy["card"]])
+    if isinstance(copy.get("columns"), list):
+        seen.clear()
+        copy["columns"] = [column for column in copy["columns"] if first(column)]
+    if isinstance(copy.get("groupings"), list):
+        seen.clear()
+        copy["groupings"] = [
+            grouping for grouping in copy["groupings"] if first(grouping.get("field"))
+        ]
+    return copy
 
 
 def _rewrite(

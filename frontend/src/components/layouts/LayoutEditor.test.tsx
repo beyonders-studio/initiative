@@ -89,6 +89,7 @@ const editor = (kind: string, onClose = vi.fn(), set = buildToolLayoutSet(), cal
         presets={calendar ? CALENDAR_PRESETS : PROJECT_PRESETS}
         set={read}
         initialKind={kind}
+        ownPropertiesEditable={!calendar}
         onClose={onClose}
       />
     ) : null;
@@ -237,6 +238,63 @@ describe("LayoutEditor", () => {
 
     await waitFor(() => expect(sent).toHaveLength(1));
     expect(saved("table")?.columns).toContain("property:14");
+  });
+
+  it("manages the project's properties only where the server says it may", async () => {
+    server.use(
+      definitionsHandler([buildPropertyDefinition({ id: 12, name: "Effort" })], {
+        project: [buildPropertyDefinition({ id: 14, name: "Sprint", project_id: 1 })],
+      })
+    );
+    const { user } = editor("table");
+
+    // With the layout selected, the panel lists them, to change.
+    const panel = (await screen.findByRole("heading", { name: "Properties" })).closest(
+      "section"
+    ) as HTMLElement;
+    expect(await within(panel).findByText("Sprint")).toBeInTheDocument();
+    expect(within(panel).getByRole("button", { name: "Edit property" })).toBeInTheDocument();
+    expect(within(panel).getByRole("button", { name: "New property" })).toBeInTheDocument();
+
+    // The initiative's metadata is placed here and edited in its settings.
+    await user.click(await within(await outline()).findByRole("button", { name: /^add$/i }));
+    await user.click(await screen.findByRole("button", { name: "Effort" }));
+    expect(
+      await screen.findByRole("link", { name: "Open initiative settings" })
+    ).toBeInTheDocument();
+  });
+
+  it("lists the project's properties and changes nothing without the right to", async () => {
+    server.use(
+      definitionsHandler([], {
+        project: [buildPropertyDefinition({ id: 14, name: "Sprint", project_id: 1 })],
+      })
+    );
+    server.use(communityHttp.get("/layouts/", () => HttpResponse.json(buildToolLayoutSet())));
+    const target = instanceTarget(Tool.project, 1);
+    const Page = () => {
+      const read = useToolLayouts(target).data;
+      return read ? (
+        <LayoutEditor
+          target={target}
+          initiativeId={1}
+          project={PROJECT}
+          details={PROJECT_DETAILS}
+          presets={PROJECT_PRESETS}
+          set={read}
+          initialKind="table"
+          onClose={vi.fn()}
+        />
+      ) : null;
+    };
+    renderPage(Page);
+
+    const panel = (await screen.findByRole("heading", { name: "Properties" })).closest(
+      "section"
+    ) as HTMLElement;
+    expect(await within(panel).findByText("Sprint")).toBeInTheDocument();
+    expect(within(panel).queryByRole("button", { name: "Edit property" })).not.toBeInTheDocument();
+    expect(within(panel).queryByRole("button", { name: "New property" })).not.toBeInTheDocument();
   });
 
   it("makes a new field the project's property, or the initiative's metadata if asked", async () => {

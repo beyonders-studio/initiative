@@ -1,3 +1,4 @@
+import { Link } from "@tanstack/react-router";
 import { EyeClosed } from "lucide-react";
 import { type ReactNode, useEffect, useRef, useState } from "react";
 import { useTranslation } from "react-i18next";
@@ -24,6 +25,7 @@ import {
 import { Switch } from "@/components/ui/switch";
 import { MAX_COLUMN_LIMIT } from "@/hooks/useColumnLimits";
 import type { MetadataOwner } from "@/hooks/useProperties";
+import { useCommunityPath } from "@/lib/communityUrl";
 import { listFormat } from "@/lib/intl";
 import { LAYOUT_REGIONS } from "@/lib/layouts/detailLayout";
 import {
@@ -37,6 +39,7 @@ import {
 } from "@/lib/layouts/draft";
 import { type FieldDef, LAYOUT_NAMESPACES } from "@/lib/layouts/fields";
 import type { LayoutNode } from "@/lib/layouts/tree";
+import { initiativeRoute } from "@/lib/tools";
 import type { TranslateFn } from "@/types/i18n";
 
 import type { EditableDetail } from "./details";
@@ -162,7 +165,36 @@ export const ListLayoutSettings = ({
           onChange={(display) => edits.changeDisplay(scale, display)}
         />
       ) : null}
+      {selectedField !== null ? <MetadataFieldNote field={selectedField} fields={fields} /> : null}
     </fieldset>
+  );
+};
+
+/** Where the initiative's metadata a selected field shows is edited: the
+ *  initiative's settings, which this links to. The target's own properties
+ *  are managed in its properties panel. */
+const MetadataFieldNote = ({
+  field,
+  fields,
+}: {
+  field: string;
+  fields: ReadonlyMap<string, FieldDef>;
+}) => {
+  const { t } = useTranslation(["layouts"]);
+  const gp = useCommunityPath();
+  const definition = fields.get(field)?.property;
+  if (!definition || definition.project_id !== null || definition.collection_id !== null) {
+    return null;
+  }
+  return (
+    <Panel heading={t("layouts:fieldProperty.metadata")}>
+      <p className="text-muted-foreground text-sm">{t("layouts:fieldProperty.metadataHelp")}</p>
+      <Button type="button" variant="outline" size="sm" asChild>
+        <Link to={gp(`${initiativeRoute(definition.initiative_id)}/settings/properties`)}>
+          {t("layouts:fieldProperty.openSettings")}
+        </Link>
+      </Button>
+    </Panel>
   );
 };
 
@@ -313,10 +345,16 @@ export const DetailLayoutSettings = ({
 }) => {
   const { t } = useTranslation(LAYOUT_NAMESPACES);
   const translate = t as TranslateFn;
+  const node = selection.kind === "part" ? nodeAt(detail, selection.path) : undefined;
   return (
     <fieldset disabled={locked} className="min-w-0">
       {selection.kind === "part" ? (
-        <PartSettings tree={detail} path={selection.path} fields={fields} edits={edits} on={of} />
+        <>
+          <PartSettings tree={detail} path={selection.path} fields={fields} edits={edits} on={of} />
+          {node?.type === "field" ? (
+            <MetadataFieldNote field={String(node.props?.field)} fields={fields} />
+          ) : null}
+        </>
       ) : (
         <Panel heading={translate(of.words.name)}>
           <p className="text-muted-foreground text-sm">{translate(of.words.help)}</p>
@@ -332,10 +370,14 @@ export const DetailLayoutSettings = ({
 export const LayoutProperties = ({
   initiativeId,
   owner,
+  canManage,
   shownOn,
 }: {
   initiativeId: number;
   owner: MetadataOwner;
+  /** Whether the request may make, edit and delete them: the server's
+   *  answer on the owner. */
+  canManage: boolean;
   shownOn: (propertyId: number) => string[];
 }) => {
   const { t, i18n } = useTranslation(["layouts"]);
@@ -344,6 +386,7 @@ export const LayoutProperties = ({
       <InitiativeSettingsPropertiesTab
         initiativeId={initiativeId}
         owner={owner}
+        canManage={canManage}
         placement={(definition) => {
           const names = shownOn(definition.id);
           return names.length > 0

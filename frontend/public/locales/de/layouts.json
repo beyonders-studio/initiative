@@ -294,5 +294,10 @@
     "number": "Zahl",
     "stars": "Sterne",
     "bar": "Balken"
+  },
+  "fieldProperty": {
+    "metadata": "Metadaten",
+    "metadataHelp": "Das sind Metadaten der Initiative. Sie werden in ihren Einstellungen bearbeitet.",
+    "openSettings": "Initiative-Einstellungen öffnen"
   }
 }

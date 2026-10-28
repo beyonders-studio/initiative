@@ -86,7 +86,31 @@
     "deleteError": "No se pudo eliminar",
     "setValuesError": "No se pudo guardar el valor",
     "moveUp": "Subir {{name}}",
-    "moveDown": "Bajar {{name}}"
+    "moveDown": "Bajar {{name}}",
+    "toolsTitle": "Propiedades de proyectos y colecciones",
+    "toolsDescription": "Las propiedades propias de cada proyecto y colección que puedes editar. También se crean, editan y eliminan en su editor de diseño.",
+    "noTools": "No hay propiedades que puedas editar",
+    "owner": {
+      "project": "Proyecto",
+      "collection": "Colección"
+    },
+    "select": "Seleccionar {{name}}",
+    "selected_one": "{{count}} seleccionado",
+    "selected_other": "{{count}} seleccionados",
+    "promote": "Convertir en metadatos",
+    "promoteBody_one": "Pasa a ser metadatos de esta iniciativa, en todo lo que contiene. Sus valores se trasladan, cada diseño que la muestra muestra los metadatos en su lugar, y se elimina.",
+    "promoteBody_other": "Pasan a ser un solo campo de metadatos de esta iniciativa, en todo lo que contiene. Sus valores se trasladan, cada diseño que muestra una de ellas muestra los metadatos en su lugar, y se eliminan. Si algo tiene valores de varias, se conserva el modificado más recientemente.",
+    "promoteInto": "Se combina con los metadatos «{{name}}», que son del mismo tipo.",
+    "promoteTaken": "Esta iniciativa ya tiene metadatos con este nombre, de otro tipo.",
+    "promoteHint": "Selecciona propiedades de un mismo tipo para convertirlas en metadatos.",
+    "promoted": "Convertido en «{{name}}»",
+    "promoteError": "No se pudieron convertir",
+    "bulkDeleteTitle_one": "¿Eliminar {{count}} campo?",
+    "bulkDeleteTitle_other": "¿Eliminar {{count}} campos?",
+    "bulkDeleteBody": "Cada uno se elimina con todos sus valores.",
+    "bulkDeleted_one": "{{count}} campo eliminado",
+    "bulkDeleted_other": "{{count}} campos eliminados",
+    "bulkDeleteError": "No se pudieron eliminar"
   },
   "filter": {
     "addFilter": "Añadir filtro",
