@@ -912,7 +912,12 @@ describe("LayoutEditor", () => {
         type: MetadataType.scale,
         collection_id: 5,
       });
+      server.use(definitionsHandler([], { collection: [rating] }));
       const user = collectionEditor(buildCollection({ id: 5, metadata: [rating] }));
+
+      // Beside the layout, the collection's properties, each saying where it
+      // shows: the file's page shows every one.
+      expect(await screen.findByText("Shown on File page")).toBeInTheDocument();
 
       await user.click(await within(await outline()).findByRole("button", { name: /^add$/i }));
       const picker = await screen.findByRole("dialog", { name: "Add" });
@@ -922,6 +927,8 @@ describe("LayoutEditor", () => {
       await user.click(field);
       await user.click(screen.getByRole("combobox", { name: /show the scale as/i }));
       await user.click(await screen.findByRole("option", { name: "Stars" }));
+      await user.click(within(await outline()).getByRole("button", { name: "Grid" }));
+      expect(await screen.findByText("Shown on Grid and File page")).toBeInTheDocument();
       await user.click(screen.getByRole("button", { name: /^save$/i }));
 
       await waitFor(() => expect(saved("grid")).toBeDefined());
@@ -931,7 +938,7 @@ describe("LayoutEditor", () => {
       });
     });
 
-    it("makes a property of the collection's on a file's detail and places it", async () => {
+    it("makes a property of the collection's on a file's page and places it", async () => {
       const made: Record<string, unknown>[] = [];
       server.use(
         communityHttp.post("/property-definitions/", async ({ request }) => {
@@ -946,7 +953,7 @@ describe("LayoutEditor", () => {
       const user = collectionEditor(buildCollection({ id: 5, initiative_id: 1 }));
 
       await user.click(await screen.findByRole("combobox", { name: "Layout being edited" }));
-      await user.click(await screen.findByRole("option", { name: "File detail" }));
+      await user.click(await screen.findByRole("option", { name: "File page" }));
       // Drawn with the collection's first file.
       expect(
         await within(await canvas()).findByRole("heading", { name: "Harbour" })

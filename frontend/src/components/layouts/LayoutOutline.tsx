@@ -121,8 +121,9 @@ const row = (): LayoutNode => ({
 /** The title an accordion is added with, selected so typing names it. */
 export const accordionTitle = (translate: TranslateFn) => translate("layouts:blocks.accordion");
 
-/** What the part showing every property is called, as an i18n key: on a
- *  project's tasks it shows the project's metadata as well. */
+/** What the part showing every property is called, as an i18n key: where a
+ *  project or a collection has properties of its own, it shows those and the
+ *  initiative's metadata. */
 export const PropertiesPartName = createContext("layouts:allMetadata");
 
 /** What Add offers where something is added: the fields, each plug-in's
@@ -132,7 +133,7 @@ export type AddChoices = {
   plugins: PickerPlugin[];
   parts: PickerPart[];
   /** Where a new field is made, where one can be placed: among the
-   *  initiative's properties, or the project's or collection's metadata. */
+   *  initiative's metadata, or the project's or collection's properties. */
   newField?: { initiativeId: number; owner?: MetadataOwner };
 };
 
@@ -861,7 +862,9 @@ export const AddPicker = ({
               </PickerGroup>
             ) : null}
             {newTypes.length > 0 ? (
-              <PickerGroup heading={t("layouts:newField")}>
+              <PickerGroup
+                heading={t(newField?.owner ? "layouts:newProperty" : "layouts:newMetadata")}
+              >
                 {newTypes.map((type) => {
                   const Icon = iconForPropertyType(type);
                   return (

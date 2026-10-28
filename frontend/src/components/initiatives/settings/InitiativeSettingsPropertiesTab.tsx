@@ -201,18 +201,22 @@ const WORDS = {
  * ``PropertyFilter``/``PropertyList``/``PropertyInput`` which render
  * individual values on files and tasks.
  *
- * Given an ``owner``, it manages that project's or collection's metadata
- * instead: a project's in its settings, a collection's on its layouts page.
- * Without ``canManage`` it lists them and changes nothing.
+ * Given an ``owner``, it manages that project's or collection's properties
+ * instead. Given a ``placement`` as well, it is the layout editor's: a narrow
+ * list, each property with where it shows. Without ``canManage`` it lists
+ * them and changes nothing.
  */
 export const InitiativeSettingsPropertiesTab = ({
   initiativeId,
   owner,
   canManage = true,
+  placement,
 }: {
   initiativeId: number;
   owner?: MetadataOwner;
   canManage?: boolean;
+  /** Where the property shows, said under its name. */
+  placement?: (definition: PropertyDefinitionRead) => string;
 }) => {
   const { t, i18n } = useTranslation(["properties", "common", "files", "projects"]);
   const words = WORDS[owner?.kind ?? "initiative"];
@@ -375,6 +379,50 @@ export const InitiativeSettingsPropertiesTab = ({
     }
   };
 
+  /** Moving it up or down, editing it and deleting it. */
+  const rowActions = (definition: PropertyDefinitionRead, index: number) => (
+    <div className="inline-flex shrink-0 items-center gap-1">
+      <Button
+        type="button"
+        variant="ghost"
+        size="icon-sm"
+        onClick={() => void move(index, -1)}
+        disabled={moving || index === 0}
+        aria-label={t("properties:manager.moveUp", { name: definition.name })}
+      >
+        <ArrowUp className="h-4 w-4" />
+      </Button>
+      <Button
+        type="button"
+        variant="ghost"
+        size="icon-sm"
+        onClick={() => void move(index, 1)}
+        disabled={moving || index === sortedDefinitions.length - 1}
+        aria-label={t("properties:manager.moveDown", { name: definition.name })}
+      >
+        <ArrowDown className="h-4 w-4" />
+      </Button>
+      <Button
+        type="button"
+        variant="ghost"
+        size="icon-sm"
+        onClick={() => handleOpenEdit(definition)}
+        aria-label={t(words.edit)}
+      >
+        <Pencil className="h-4 w-4" />
+      </Button>
+      <Button
+        type="button"
+        variant="ghost"
+        size="icon-sm"
+        onClick={() => setDeleteTarget(definition)}
+        aria-label={t(words.delete)}
+      >
+        <Trash2 className="h-4 w-4" />
+      </Button>
+    </div>
+  );
+
   const newButton = canManage ? (
     <Button onClick={handleOpenCreate}>
       <Plus className="h-4 w-4" />
@@ -388,6 +436,26 @@ export const InitiativeSettingsPropertiesTab = ({
     </div>
   ) : sortedDefinitions.length === 0 ? (
     <p className="text-muted-foreground text-sm">{t(words.none)}</p>
+  ) : placement ? (
+    <ul className="divide-y rounded-md border text-sm">
+      {sortedDefinitions.map((definition, index) => {
+        const Icon = iconForPropertyType(definition.type);
+        return (
+          <li key={definition.id} className="space-y-1 px-3 py-2">
+            <div className="flex items-center gap-2">
+              <Icon
+                className="h-4 w-4 shrink-0 text-muted-foreground"
+                aria-label={t(`properties:types.${definition.type}`)}
+                role="img"
+              />
+              <span className="min-w-0 flex-1 truncate font-medium">{definition.name}</span>
+              {canManage ? rowActions(definition, index) : null}
+            </div>
+            <p className="text-muted-foreground text-xs">{placement(definition)}</p>
+          </li>
+        );
+      })}
+    </ul>
   ) : (
     <div className="overflow-x-auto">
       <Table>
@@ -434,48 +502,7 @@ export const InitiativeSettingsPropertiesTab = ({
                   )}
                 </TableCell>
                 {canManage ? (
-                  <TableCell className="text-right">
-                    <div className="inline-flex items-center gap-1">
-                      <Button
-                        type="button"
-                        variant="ghost"
-                        size="icon-sm"
-                        onClick={() => void move(index, -1)}
-                        disabled={moving || index === 0}
-                        aria-label={t("properties:manager.moveUp", { name: definition.name })}
-                      >
-                        <ArrowUp className="h-4 w-4" />
-                      </Button>
-                      <Button
-                        type="button"
-                        variant="ghost"
-                        size="icon-sm"
-                        onClick={() => void move(index, 1)}
-                        disabled={moving || index === sortedDefinitions.length - 1}
-                        aria-label={t("properties:manager.moveDown", { name: definition.name })}
-                      >
-                        <ArrowDown className="h-4 w-4" />
-                      </Button>
-                      <Button
-                        type="button"
-                        variant="ghost"
-                        size="icon-sm"
-                        onClick={() => handleOpenEdit(definition)}
-                        aria-label={t(words.edit)}
-                      >
-                        <Pencil className="h-4 w-4" />
-                      </Button>
-                      <Button
-                        type="button"
-                        variant="ghost"
-                        size="icon-sm"
-                        onClick={() => setDeleteTarget(definition)}
-                        aria-label={t(words.delete)}
-                      >
-                        <Trash2 className="h-4 w-4" />
-                      </Button>
-                    </div>
-                  </TableCell>
+                  <TableCell className="text-right">{rowActions(definition, index)}</TableCell>
                 ) : null}
               </TableRow>
             );
@@ -487,9 +514,9 @@ export const InitiativeSettingsPropertiesTab = ({
 
   return (
     <div className="space-y-6">
-      {/* A collection's metadata is managed in a dialog of its own, which is
-          the frame a card would be. */}
-      {owner?.kind !== "collection" ? (
+      {/* In the layout editor it is a panel of its own, which is the frame a
+          card would be. */}
+      {placement === undefined ? (
         <Card>
           <CardHeader className="flex flex-row items-start justify-between gap-4">
             <div>
@@ -501,11 +528,14 @@ export const InitiativeSettingsPropertiesTab = ({
         </Card>
       ) : (
         <div className="space-y-4">
-          <div className="flex flex-wrap items-start justify-between gap-4">
-            <p className="text-muted-foreground text-sm">{t(words.description)}</p>
-            {newButton}
-          </div>
+          <p className="text-muted-foreground text-sm">{t(words.description)}</p>
           {list}
+          {canManage ? (
+            <Button type="button" variant="outline" size="sm" onClick={handleOpenCreate}>
+              <Plus className="h-4 w-4" />
+              {t(words.create)}
+            </Button>
+          ) : null}
         </div>
       )}
 

@@ -1,4 +1,5 @@
-import { Star, Trash2 } from "lucide-react";
+import { Link } from "@tanstack/react-router";
+import { Pencil, Star, Trash2 } from "lucide-react";
 import { useState } from "react";
 import { useTranslation } from "react-i18next";
 
@@ -13,6 +14,7 @@ import { TaskTypeDeleteDialog } from "@/components/projects/TaskTypeDeleteDialog
 import { Button } from "@/components/ui/button";
 import { Switch } from "@/components/ui/switch";
 import { useSaveLayouts } from "@/hooks/useToolLayouts";
+import { atLeast, useWidthClass } from "@/hooks/useWidthClass";
 import { formatDateTime } from "@/lib/formatDate";
 
 type Layout = ListLayoutRead | DetailLayoutRead;
@@ -33,15 +35,19 @@ const setOf = (definition: ListLayoutRead["definition"]) =>
  * Given its `target` by someone who may change it, each view is shown in its
  * layout menu or hidden from here, one at least staying shown, and a shown one
  * made the one it opens on; and each task type deleted with its page, one at
- * least staying.
+ * least staying. Given its `editor` as well, each layout's name opens the
+ * editor on it.
  */
 export const LayoutList = ({
   layouts,
   target,
+  editor,
 }: {
   layouts: Layout[];
   /** Where to save a view shown or hidden; left out, the list only reads. */
   target?: GetLayoutsParams;
+  /** The layout editor's address. */
+  editor?: string;
 }) => {
   const { t } = useTranslation(["projects", "layouts", "common"]);
   const [deleting, setDeleting] = useState<number | null>(null);
@@ -60,16 +66,25 @@ export const LayoutList = ({
         ? t("layouts:typedTaskLayout", { name: layout.task_type_name })
         : t(labelKey as never);
     const view = isList(layout) ? layout : null;
+    // What the editor's `?layout=` names it by.
+    const key = typeId ? `${layout.kind}:${typeId}` : layout.kind;
+    const nameClass = view?.hidden ? "truncate text-muted-foreground" : "truncate";
     return (
-      <li
-        key={typeId ? `${layout.kind}:${typeId}` : layout.kind}
-        className="flex items-center justify-between gap-3 px-3 py-2"
-      >
+      <li key={key} className="flex items-center justify-between gap-3 px-3 py-2">
         <span className="flex min-w-0 items-center gap-2">
           <Icon className="h-4 w-4 shrink-0 text-muted-foreground" aria-hidden="true" />
-          <span className={view?.hidden ? "truncate text-muted-foreground" : "truncate"}>
-            {name}
-          </span>
+          {editor ? (
+            <Link
+              to={editor}
+              search={{ layout: key }}
+              className={`${nameClass} hover:underline`}
+              aria-label={t("layouts:editLayout", { name })}
+            >
+              {name}
+            </Link>
+          ) : (
+            <span className={nameClass}>{name}</span>
+          )}
           {view?.is_default ? (
             <Star
               className="h-3 w-3 shrink-0 fill-current text-muted-foreground"
@@ -150,6 +165,40 @@ export const LayoutList = ({
         />
       ) : null}
     </>
+  );
+};
+
+/**
+ * A target's layouts and the way into its editor, for someone who may change
+ * them. The editor needs a tablet-sized screen, and says so itself too; on a
+ * narrower one this says so in place of the way in.
+ */
+export const LayoutsOverview = ({
+  layouts,
+  target,
+  editor,
+}: {
+  layouts: Layout[];
+  target: GetLayoutsParams;
+  /** The layout editor's address. */
+  editor: string;
+}) => {
+  const { t } = useTranslation("layouts");
+  const wide = atLeast(useWidthClass(), "md");
+  return (
+    <div className="space-y-4">
+      <LayoutList layouts={layouts} target={target} editor={wide ? editor : undefined} />
+      {wide ? (
+        <Button asChild variant="outline" size="sm">
+          <Link to={editor}>
+            <Pencil className="h-4 w-4" />
+            {t("open")}
+          </Link>
+        </Button>
+      ) : (
+        <p className="text-muted-foreground text-sm">{t("compact")}</p>
+      )}
+    </div>
   );
 };
 

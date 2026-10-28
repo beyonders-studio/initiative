@@ -466,7 +466,6 @@
     "noAccessDescription": "You don't have permission to view this collection.",
     "error": "Couldn't change the collection",
     "properties": {
-      "title": "Properties",
       "description": "What each file in this collection can hold here: its values belong to this collection, not to the file.",
       "create": "New property",
       "edit": "Edit property",

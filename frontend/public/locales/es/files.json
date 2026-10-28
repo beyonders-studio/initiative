@@ -466,7 +466,6 @@
     "noAccessDescription": "No tienes permiso para ver esta colección.",
     "error": "No se pudo cambiar la colección",
     "properties": {
-      "title": "Propiedades",
       "description": "Lo que cada archivo de esta colección puede tener aquí: sus valores pertenecen a la colección, no al archivo.",
       "create": "Nueva propiedad",
       "edit": "Editar propiedad",

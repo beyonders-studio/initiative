@@ -34,8 +34,9 @@ import {
   useSaveLayouts,
 } from "@/hooks/useToolLayouts";
 import { atLeast, useWidthClass } from "@/hooks/useWidthClass";
-import { type StoredRegions, storedLayout } from "@/lib/layouts/detailLayout";
+import { placedProperties, type StoredRegions, storedLayout } from "@/lib/layouts/detailLayout";
 import {
+  CARD_LISTS,
   cardOf,
   changeAt,
   columnsOf,
@@ -43,12 +44,14 @@ import {
   dropInto,
   HOLDERS,
   historyReducer,
+  holdsPart,
   insertAt,
   LAYOUT_SELECTED,
   type ListLayout,
   type ListShape,
   moveNode,
   type NodePath,
+  namedFields,
   nodeAt,
   type Place,
   pathAfterMove,
@@ -58,7 +61,7 @@ import {
   startHistory,
   withCard,
 } from "@/lib/layouts/draft";
-import { type FieldDef, withDisplays } from "@/lib/layouts/fields";
+import { type FieldDef, propertyFieldId, withDisplays } from "@/lib/layouts/fields";
 import {
   pluginFields,
   pluginKindOf,
@@ -86,10 +89,15 @@ import type { EditablePresets } from "./LayoutPresets";
 import {
   DetailLayoutSettings,
   type LayoutProject,
+  LayoutProperties,
   ListLayoutSettings,
 } from "./LayoutSettingsPanel";
 
 const noop = () => {};
+
+/** No fields: where a list shows a property is its own card or columns, or
+ *  its shape's, whatever plug-ins add. */
+const NO_FIELDS: ReadonlyMap<string, FieldDef> = new Map();
 
 /** What the part edits change while nothing is open. */
 const EMPTY_TREE: LayoutNode = { type: "layout", children: [] };
@@ -254,7 +262,6 @@ export const LayoutEditor = ({
   presets,
   set,
   initialKind,
-  actions,
   onClose,
 }: {
   target: GetLayoutsParams;
@@ -270,9 +277,6 @@ export const LayoutEditor = ({
   set: ToolLayoutSetRead;
   /** The layout to open on: a list's kind, or the task's detail. */
   initialKind?: string;
-  /** What else the target offers from the top bar: a collection's
-   *  metadata. */
-  actions?: ReactNode;
   onClose: () => void;
 }) => {
   const { t, i18n } = useTranslation(["projects", "layouts", "common"]);
@@ -369,6 +373,33 @@ export const LayoutEditor = ({
     const opensOn = shown.includes(draft.opensOn) ? draft.opensOn : (shown[0] ?? draft.opensOn);
     return { ...draft, lists, opensOn };
   };
+
+  /** The names of the layouts that show the property, as the draft has
+   *  them: each shown list that places it, and each page that places it or
+   *  shows every property. */
+  const shownOn = (propertyId: number): string[] => {
+    const field = propertyFieldId(propertyId);
+    const onLists = shownKinds.filter((kind) => {
+      const definition = draft.lists[kind] ?? {};
+      return kind === "table"
+        ? columnsOf(definition, NO_FIELDS, lists?.shape).includes(field)
+        : CARD_LISTS.has(kind) &&
+            namedFields(cardOf(definition, NO_FIELDS, lists?.shape)).has(field);
+    });
+    const onPages = details.filter((each) => {
+      const page = each.spec.root(draft.details[detailKey(each)] as StoredRegions | null);
+      return placedProperties(page).has(propertyId) || holdsPart(page, "properties");
+    });
+    return [
+      ...onLists.map((kind) => translate(listLayoutLooks[kind].labelKey)),
+      ...onPages.map((each) => translate(each.words.name, { name: each.typeName })),
+    ];
+  };
+  // The target's own properties, managed beside the layout they are placed on.
+  const properties =
+    owner && selection.kind === "layout" ? (
+      <LayoutProperties initiativeId={initiativeId} owner={owner} shownOn={shownOn} />
+    ) : null;
 
   const changeDraft = (next: Draft, then?: Selection) => {
     if (saving) return;
@@ -475,9 +506,9 @@ export const LayoutEditor = ({
 
   // What Add offers, in the outline and at a point on the canvas, and what a
   // pick does there.
-  // On a project's tasks, the part showing every property shows its metadata
-  // as well.
-  const propertiesPart = project ? "layouts:allPropertiesAndMetadata" : "layouts:allMetadata";
+  // Where the target has properties of its own, the part showing every
+  // property shows the initiative's metadata as well.
+  const propertiesPart = owner ? "layouts:allPropertiesAndMetadata" : "layouts:allMetadata";
   const { labelOf, partLabel, pickerPlugins } = usePartLabel(
     fields,
     plugins,
@@ -667,7 +698,6 @@ export const LayoutEditor = ({
             </SelectContent>
           </Select>
           <div className="flex-1" />
-          {actions}
           <ToggleGroup
             type="single"
             value={width}
@@ -783,6 +813,7 @@ export const LayoutEditor = ({
                 edits={edits}
                 locked={saving}
               />
+              {properties}
             </aside>
           </div>
         ) : current && presets ? (
@@ -832,6 +863,7 @@ export const LayoutEditor = ({
                 edits={edits}
                 locked={saving}
               />
+              {properties}
             </aside>
           </div>
         ) : null}

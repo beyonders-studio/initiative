@@ -466,7 +466,6 @@
     "noAccessDescription": "Du hast keine Berechtigung, diese Sammlung anzusehen.",
     "error": "Die Sammlung konnte nicht geändert werden",
     "properties": {
-      "title": "Eigenschaften",
       "description": "Was jede Datei in dieser Sammlung hier tragen kann: Die Werte gehören zur Sammlung, nicht zur Datei.",
       "create": "Neue Eigenschaft",
       "edit": "Eigenschaft bearbeiten",
