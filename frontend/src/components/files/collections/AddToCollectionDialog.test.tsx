@@ -1,7 +1,7 @@
 import { act, screen, waitFor, within } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { HttpResponse } from "msw";
-import { describe, expect, it } from "vitest";
+import { describe, expect, it, vi } from "vitest";
 
 import {
   buildCollection,
@@ -13,6 +13,9 @@ import i18n from "@/__tests__/helpers/i18n-test";
 import { server } from "@/__tests__/helpers/msw-server";
 import { renderPage } from "@/__tests__/helpers/render";
 import { AddToCollectionDialog } from "@/components/files/collections/AddToCollectionDialog";
+
+const toasts = vi.hoisted(() => ({ success: vi.fn(), error: vi.fn() }));
+vi.mock("@/lib/mascotToast", () => ({ toast: toasts }));
 
 const mount = () =>
   renderPage(
@@ -102,6 +105,30 @@ describe("AddToCollectionDialog", () => {
         metadata: [{ property_id: 21, value: "Ada" }],
       })
     );
+  });
+
+  it("says so when what the collection requires cannot be read", async () => {
+    let added = false;
+    server.use(
+      communityHttp.get("/collections/", () =>
+        HttpResponse.json({ items: [buildCollection({ id: 2, name: "Store assets" })] })
+      ),
+      communityHttp.get("/layouts/", () => new HttpResponse(null, { status: 500 })),
+      communityHttp.post("/collections/:id/files", () => {
+        added = true;
+        return HttpResponse.json(buildCollection({ id: 2 }));
+      })
+    );
+    const user = userEvent.setup();
+    mount();
+
+    await user.click(await screen.findByRole("button", { name: "Store assets" }));
+
+    await waitFor(() =>
+      expect(toasts.error).toHaveBeenCalledWith("Couldn't change the collection")
+    );
+    expect(added).toBe(false);
+    expect(screen.getByRole("button", { name: "Store assets" })).toBeEnabled();
   });
 
   it("makes a new collection of the files, never an empty one, as the shape picked", async () => {

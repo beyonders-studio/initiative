@@ -42,6 +42,7 @@ import {
 import { detailLayoutOf, instanceTarget, useReadToolLayouts } from "@/hooks/useToolLayouts";
 import { COLLECTION_ICON } from "@/lib/collections";
 import { useCommunityPath } from "@/lib/communityUrl";
+import { getErrorMessage } from "@/lib/errorMessage";
 import { listFormat } from "@/lib/intl";
 import { requiredKeys, type StoredRegions } from "@/lib/layouts/detailLayout";
 import { toast } from "@/lib/mascotToast";
@@ -301,6 +302,8 @@ const AddToOne = ({
       const keys = requiredKeys(detailLayoutOf(layouts, "file") as StoredRegions | null);
       if (asksForMetadata(collection, keys)) setAsking(keys);
       else add.mutate({ fileIds });
+    } catch (error) {
+      toast.error(getErrorMessage(error, "files:collections.error"));
     } finally {
       setReading(false);
     }
