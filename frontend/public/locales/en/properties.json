@@ -1,8 +1,10 @@
 {
   "title": "Properties",
+  "titleWithMetadata": "Properties and metadata",
   "addProperty": "Add property",
   "addPropertyOrMetadata": "Add property or metadata",
   "noProperties": "No properties",
+  "noPropertiesOrMetadata": "No properties or metadata",
   "saving": "Saving…",
   "saved": "Saved",
   "remove": "Remove property",

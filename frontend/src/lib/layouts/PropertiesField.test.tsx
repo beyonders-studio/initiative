@@ -179,4 +179,20 @@ describe("a row's properties, saved one at a time", () => {
     expect(screen.queryByText("Dusk")).not.toBeInTheDocument();
     expect(screen.queryByText("green")).not.toBeInTheDocument();
   });
+
+  it("names a task's panel for its project's metadata as well", () => {
+    renderWithProviders(
+      <PropertiesField
+        kind={propertySaves[PropertyTarget.task]}
+        id={10}
+        properties={[]}
+        readOnly
+        initiativeId={1}
+        owner={{ kind: "project", id: 3 }}
+      />
+    );
+
+    expect(screen.getByText("Properties and metadata")).toBeInTheDocument();
+    expect(screen.getByText("No properties or metadata")).toBeInTheDocument();
+  });
 });

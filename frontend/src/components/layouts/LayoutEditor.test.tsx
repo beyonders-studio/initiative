@@ -277,6 +277,15 @@ describe("LayoutEditor", () => {
     expect(made[1]).not.toHaveProperty("project_id");
   });
 
+  it("names the part showing every property for the project's metadata too", async () => {
+    editor("board");
+
+    // The shipped card holds it.
+    expect(
+      await within(await outline()).findByRole("button", { name: "All properties and metadata" })
+    ).toBeInTheDocument();
+  });
+
   it("draws a scale column as the layout picks", async () => {
     server.use(
       definitionsHandler([

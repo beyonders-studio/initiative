@@ -1,8 +1,10 @@
 {
   "title": "Propiedades",
+  "titleWithMetadata": "Propiedades y metadatos",
   "addProperty": "Agregar propiedad",
   "addPropertyOrMetadata": "Añadir propiedad o metadatos",
   "noProperties": "Sin propiedades",
+  "noPropertiesOrMetadata": "Sin propiedades ni metadatos",
   "saving": "Guardando…",
   "saved": "Guardado",
   "remove": "Eliminar propiedad",

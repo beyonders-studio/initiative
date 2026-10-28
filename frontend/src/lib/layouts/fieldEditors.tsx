@@ -522,7 +522,9 @@ export const PropertiesField = <I extends { properties: PropertySummary[] }, P>(
   // Its own values: a collection's metadata is the collection's, and a
   // plug-in's values are drawn as its fields.
   const listed = ownProperties(properties).filter((each) => !except?.has(each.property_id));
-  const label = t("title");
+  // Where the item also holds its project's metadata, the panel says so.
+  const label = t(props.owner ? "titleWithMetadata" : "title");
+  const none = t(props.owner ? "noPropertiesOrMetadata" : "noProperties");
   const save = useItemFieldSave(kind, id, label);
   const add = (definition: PropertyDefinitionRead) => {
     if (properties.some((p) => p.property_id === definition.id)) return;
@@ -540,7 +542,7 @@ export const PropertiesField = <I extends { properties: PropertySummary[] }, P>(
       <div className="space-y-2">
         {hideLabel ? null : <p className="font-medium text-sm">{label}</p>}
         {sorted.length === 0 ? (
-          <p className="text-muted-foreground text-sm">{t("noProperties")}</p>
+          <p className="text-muted-foreground text-sm">{none}</p>
         ) : (
           <ul className="space-y-2">
             {sorted.map((property) => {
@@ -566,7 +568,7 @@ export const PropertiesField = <I extends { properties: PropertySummary[] }, P>(
   return (
     <FieldFrame label={label} save={save} hideLabel={hideLabel}>
       {sorted.length === 0 ? (
-        <p className="text-muted-foreground text-sm">{t("noProperties")}</p>
+        <p className="text-muted-foreground text-sm">{none}</p>
       ) : (
         sorted.map((property) => (
           // Keyed by the row too: a host that moves to another row starts
