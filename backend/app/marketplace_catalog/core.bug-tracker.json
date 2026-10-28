@@ -9,7 +9,7 @@
   "avatar_url": "/marketplace/core-bug-tracker.svg",
   "images": [],
   "version": "1.2.0",
-  "release_notes": "Bugs, feature requests and chores are each their own type, with a page of their own. A new bug starts with steps to reproduce, and a card shows its type beside its title.",
+  "release_notes": "Bugs, feature requests and chores are each their own type, with a page of their own. A new bug starts with steps to reproduce, and a card shows its type beside its title. The project's fields are its own properties rather than the initiative's metadata.",
   "definition": {
     "type": "initiative-project",
     "schema_version": 1,
@@ -134,28 +134,32 @@
             "label": "Cosmetic",
             "color": "#94A3B8"
           }
-        ]
+        ],
+        "project": true
       },
       {
         "name": "Component",
         "type": "text",
         "position": 1.0,
         "color": null,
-        "options": null
+        "options": null,
+        "project": true
       },
       {
         "name": "Version found",
         "type": "text",
         "position": 2.0,
         "color": null,
-        "options": null
+        "options": null,
+        "project": true
       },
       {
         "name": "Reproducible",
         "type": "checkbox",
         "position": 3.0,
         "color": null,
-        "options": null
+        "options": null,
+        "project": true
       }
     ],
     "tasks": [],
@@ -697,28 +701,32 @@
             "label": "Cosmetic",
             "color": "#94A3B8"
           }
-        ]
+        ],
+        "project": true
       },
       {
         "name": "Component",
         "type": "text",
         "position": 1.0,
         "color": null,
-        "options": null
+        "options": null,
+        "project": true
       },
       {
         "name": "Version found",
         "type": "text",
         "position": 2.0,
         "color": null,
-        "options": null
+        "options": null,
+        "project": true
       },
       {
         "name": "Reproducible",
         "type": "checkbox",
         "position": 3.0,
         "color": null,
-        "options": null
+        "options": null,
+        "project": true
       }
     ],
     "tasks": [
@@ -738,22 +746,26 @@
           {
             "property_name": "Severity",
             "property_type": "select",
-            "value_text": "critical"
+            "value_text": "critical",
+            "project": true
           },
           {
             "property_name": "Component",
             "property_type": "text",
-            "value_text": "Checkout"
+            "value_text": "Checkout",
+            "project": true
           },
           {
             "property_name": "Version found",
             "property_type": "text",
-            "value_text": "2.4.0"
+            "value_text": "2.4.0",
+            "project": true
           },
           {
             "property_name": "Reproducible",
             "property_type": "checkbox",
-            "value_boolean": false
+            "value_boolean": false,
+            "project": true
           }
         ],
         "type_name": "Bug"
@@ -774,22 +786,26 @@
           {
             "property_name": "Severity",
             "property_type": "select",
-            "value_text": "major"
+            "value_text": "major",
+            "project": true
           },
           {
             "property_name": "Component",
             "property_type": "text",
-            "value_text": "Orders"
+            "value_text": "Orders",
+            "project": true
           },
           {
             "property_name": "Version found",
             "property_type": "text",
-            "value_text": "2.4.0"
+            "value_text": "2.4.0",
+            "project": true
           },
           {
             "property_name": "Reproducible",
             "property_type": "checkbox",
-            "value_boolean": true
+            "value_boolean": true,
+            "project": true
           }
         ],
         "type_name": "Bug"
@@ -810,22 +826,26 @@
           {
             "property_name": "Severity",
             "property_type": "select",
-            "value_text": "minor"
+            "value_text": "minor",
+            "project": true
           },
           {
             "property_name": "Component",
             "property_type": "text",
-            "value_text": "Search"
+            "value_text": "Search",
+            "project": true
           },
           {
             "property_name": "Version found",
             "property_type": "text",
-            "value_text": "2.3.1"
+            "value_text": "2.3.1",
+            "project": true
           },
           {
             "property_name": "Reproducible",
             "property_type": "checkbox",
-            "value_boolean": true
+            "value_boolean": true,
+            "project": true
           }
         ],
         "type_name": "Bug"
@@ -859,22 +879,26 @@
           {
             "property_name": "Severity",
             "property_type": "select",
-            "value_text": "major"
+            "value_text": "major",
+            "project": true
           },
           {
             "property_name": "Component",
             "property_type": "text",
-            "value_text": "Accounts"
+            "value_text": "Accounts",
+            "project": true
           },
           {
             "property_name": "Version found",
             "property_type": "text",
-            "value_text": "2.3.0"
+            "value_text": "2.3.0",
+            "project": true
           },
           {
             "property_name": "Reproducible",
             "property_type": "checkbox",
-            "value_boolean": true
+            "value_boolean": true,
+            "project": true
           }
         ],
         "type_name": "Bug"
@@ -908,22 +932,26 @@
           {
             "property_name": "Severity",
             "property_type": "select",
-            "value_text": "major"
+            "value_text": "major",
+            "project": true
           },
           {
             "property_name": "Component",
             "property_type": "text",
-            "value_text": "Reports"
+            "value_text": "Reports",
+            "project": true
           },
           {
             "property_name": "Version found",
             "property_type": "text",
-            "value_text": "2.2.0"
+            "value_text": "2.2.0",
+            "project": true
           },
           {
             "property_name": "Reproducible",
             "property_type": "checkbox",
-            "value_boolean": true
+            "value_boolean": true,
+            "project": true
           }
         ],
         "type_name": "Bug"
@@ -944,22 +972,26 @@
           {
             "property_name": "Severity",
             "property_type": "select",
-            "value_text": "cosmetic"
+            "value_text": "cosmetic",
+            "project": true
           },
           {
             "property_name": "Component",
             "property_type": "text",
-            "value_text": "Branding"
+            "value_text": "Branding",
+            "project": true
           },
           {
             "property_name": "Version found",
             "property_type": "text",
-            "value_text": "2.1.0"
+            "value_text": "2.1.0",
+            "project": true
           },
           {
             "property_name": "Reproducible",
             "property_type": "checkbox",
-            "value_boolean": true
+            "value_boolean": true,
+            "project": true
           }
         ],
         "type_name": "Bug"
@@ -980,22 +1012,26 @@
           {
             "property_name": "Severity",
             "property_type": "select",
-            "value_text": "major"
+            "value_text": "major",
+            "project": true
           },
           {
             "property_name": "Component",
             "property_type": "text",
-            "value_text": "Design system"
+            "value_text": "Design system",
+            "project": true
           },
           {
             "property_name": "Version found",
             "property_type": "text",
-            "value_text": "2.3.0"
+            "value_text": "2.3.0",
+            "project": true
           },
           {
             "property_name": "Reproducible",
             "property_type": "checkbox",
-            "value_boolean": true
+            "value_boolean": true,
+            "project": true
           }
         ],
         "type_name": "Bug"
@@ -1016,22 +1052,26 @@
           {
             "property_name": "Severity",
             "property_type": "select",
-            "value_text": "minor"
+            "value_text": "minor",
+            "project": true
           },
           {
             "property_name": "Component",
             "property_type": "text",
-            "value_text": "Browser support"
+            "value_text": "Browser support",
+            "project": true
           },
           {
             "property_name": "Version found",
             "property_type": "text",
-            "value_text": "2.4.0"
+            "value_text": "2.4.0",
+            "project": true
           },
           {
             "property_name": "Reproducible",
             "property_type": "checkbox",
-            "value_boolean": true
+            "value_boolean": true,
+            "project": true
           }
         ],
         "type_name": "Bug"
@@ -1052,7 +1092,8 @@
           {
             "property_name": "Component",
             "property_type": "text",
-            "value_text": "Checkout"
+            "value_text": "Checkout",
+            "project": true
           }
         ],
         "type_name": "Feature request",
@@ -1074,7 +1115,8 @@
           {
             "property_name": "Component",
             "property_type": "text",
-            "value_text": "Checkout"
+            "value_text": "Checkout",
+            "project": true
           }
         ],
         "type_name": "Chore",

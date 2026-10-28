@@ -24,7 +24,11 @@ from sqlmodel import col, select
 
 from app.models.platform.guild import CommunityRole
 from app.models.platform.marketplace import MarketplaceListing
-from app.models.tenant.metadata import MetadataValue
+from app.models.tenant.metadata import (
+    MetadataDefinition,
+    MetadataType,
+    MetadataValue,
+)
 from app.models.tenant.task import Task, TaskType
 from app.models.tenant.tool_layout import ToolLayout
 from app.services.marketplace import catalog as catalog_service
@@ -137,6 +141,16 @@ async def _installed_layouts(session, project_id: int):
         (kind, None if task_type_id is None else types[task_type_id])
         for kind, task_type_id in rows.all()
     )
+
+
+async def _initiative_metadata(session, initiative_id: int) -> list[str]:
+    """The names of the initiative's own metadata."""
+    rows = await session.exec(
+        select(MetadataDefinition.name).where(
+            MetadataDefinition.of_initiative(initiative_id)
+        )
+    )
+    return list(rows.all())
 
 
 class TestShippedManifests:
@@ -333,6 +347,71 @@ class TestShippedManifests:
                     assert await _installed_layouts(
                         session, project_id
                     ) == _listed_layouts(shipped), (manifest["public_id"], start_from)
+        # A ready-made project's fields are its own properties: installing
+        # every one adds nothing to the initiative's metadata.
+        assert await _initiative_metadata(session, actor.initiative.id) == []
+
+    async def test_a_shipped_project_brings_its_own_properties(
+        self, client, acting_user, session
+    ):
+        """Installing a ready-made project makes its fields on the project,
+        none among the initiative's metadata, with the example's values on its
+        tasks, money in its currency, and its layouts naming them."""
+        manifest = next(
+            m
+            for m in load_builtin_manifests()
+            if m["public_id"] == "core.sales-pipeline"
+        )
+        await catalog_service.upsert_listing(session, manifest, source="builtin")
+        await session.commit()
+        actor = await acting_user(guild_role=CommunityRole.member, initiative=True)
+
+        response = await client.post(
+            actor.g(f"/marketplace/listings/by-uid/{manifest['uid']}/install"),
+            json={"initiative_id": actor.initiative.id, "start_from": "example"},
+            headers=actor.headers,
+        )
+        assert response.status_code == 201, response.text
+        project_id = response.json()["result"]["entity_id"]
+
+        await route_session_to_guild(session, actor.guild.id)
+        made = {
+            defn.name: defn
+            for defn in await session.exec(
+                select(MetadataDefinition).where(
+                    MetadataDefinition.project_id == project_id
+                )
+            )
+        }
+        assert set(made) == {"Company", "Contact", "Value", "Next step", "Source"}
+        assert await _initiative_metadata(session, actor.initiative.id) == []
+        value = made["Value"]
+        assert (value.type, value.currency) == (MetadataType.currency, "USD")
+        deal = (
+            await session.exec(
+                select(Task.id).where(
+                    Task.project_id == project_id, Task.title == "Copper Kettle Café"
+                )
+            )
+        ).one()
+        amounts = await session.exec(
+            select(MetadataValue.value_number).where(
+                MetadataValue.entity_type == "task",
+                MetadataValue.entity_id == deal,
+                MetadataValue.property_id == value.id,
+            )
+        )
+        assert amounts.all() == [1200]
+        table = (
+            await session.exec(
+                select(ToolLayout.definition).where(
+                    ToolLayout.tool == "project",
+                    ToolLayout.tool_id == project_id,
+                    ToolLayout.kind == "table",
+                )
+            )
+        ).one()
+        assert f"property:{value.id}" in table["columns"]
 
 
 class TestWithdrawingWhatIsNoLongerShipped:

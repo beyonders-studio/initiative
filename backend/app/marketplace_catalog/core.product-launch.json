@@ -9,7 +9,7 @@
   "avatar_url": "/marketplace/core-product-launch.svg",
   "images": [],
   "version": "1.2.0",
-  "release_notes": "Tasks, milestones and meetings are each their own type, with a page of their own that shows the workstream. A new meeting starts with room for what was decided.",
+  "release_notes": "Tasks, milestones and meetings are each their own type, with a page of their own that shows the workstream. A new meeting starts with room for what was decided. The project's fields are its own properties rather than the initiative's metadata.",
   "definition": {
     "type": "initiative-project",
     "schema_version": 1,
@@ -115,7 +115,8 @@
             "label": "Support",
             "color": "#10B981"
           }
-        ]
+        ],
+        "project": true
       }
     ],
     "tasks": [
@@ -152,7 +153,8 @@
           {
             "property_name": "Workstream",
             "property_type": "select",
-            "value_text": "product"
+            "value_text": "product",
+            "project": true
           }
         ],
         "type_name": "Task"
@@ -173,7 +175,8 @@
           {
             "property_name": "Workstream",
             "property_type": "select",
-            "value_text": "product"
+            "value_text": "product",
+            "project": true
           }
         ],
         "type_name": "Task"
@@ -194,7 +197,8 @@
           {
             "property_name": "Workstream",
             "property_type": "select",
-            "value_text": "marketing"
+            "value_text": "marketing",
+            "project": true
           }
         ],
         "type_name": "Task"
@@ -215,7 +219,8 @@
           {
             "property_name": "Workstream",
             "property_type": "select",
-            "value_text": "engineering"
+            "value_text": "engineering",
+            "project": true
           }
         ],
         "type_name": "Task"
@@ -236,7 +241,8 @@
           {
             "property_name": "Workstream",
             "property_type": "select",
-            "value_text": "engineering"
+            "value_text": "engineering",
+            "project": true
           }
         ],
         "type_name": "Task"
@@ -257,7 +263,8 @@
           {
             "property_name": "Workstream",
             "property_type": "select",
-            "value_text": "support"
+            "value_text": "support",
+            "project": true
           }
         ],
         "type_name": "Task"
@@ -295,7 +302,8 @@
           {
             "property_name": "Workstream",
             "property_type": "select",
-            "value_text": "marketing"
+            "value_text": "marketing",
+            "project": true
           }
         ],
         "type_name": "Task"
@@ -329,7 +337,8 @@
           {
             "property_name": "Workstream",
             "property_type": "select",
-            "value_text": "support"
+            "value_text": "support",
+            "project": true
           }
         ],
         "type_name": "Task"
@@ -350,7 +359,8 @@
           {
             "property_name": "Workstream",
             "property_type": "select",
-            "value_text": "product"
+            "value_text": "product",
+            "project": true
           }
         ],
         "type_name": "Meeting"
@@ -392,7 +402,8 @@
           {
             "property_name": "Workstream",
             "property_type": "select",
-            "value_text": "product"
+            "value_text": "product",
+            "project": true
           }
         ],
         "type_name": "Milestone"
@@ -413,7 +424,8 @@
           {
             "property_name": "Workstream",
             "property_type": "select",
-            "value_text": "support"
+            "value_text": "support",
+            "project": true
           }
         ],
         "type_name": "Task"
@@ -434,7 +446,8 @@
           {
             "property_name": "Workstream",
             "property_type": "select",
-            "value_text": "product"
+            "value_text": "product",
+            "project": true
           }
         ],
         "type_name": "Meeting"
