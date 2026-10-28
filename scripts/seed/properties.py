@@ -43,7 +43,7 @@ DEFINITIONS: dict[str, dict[str, list[dict]]] = {
             {"name": "Deadline", "type": MetadataType.date},
             {"name": "Owner", "type": MetadataType.user_reference, "color": "#8B5CF6"},
             {"name": "Public Knowledge", "type": MetadataType.checkbox},
-            {"name": "Session Rating", "type": MetadataType.rating, "color": "#F59E0B"},
+            {"name": "Session Rating", "type": MetadataType.scale, "color": "#F59E0B"},
         ],
         "default": [
             {
