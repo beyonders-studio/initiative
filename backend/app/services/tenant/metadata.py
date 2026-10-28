@@ -863,8 +863,8 @@ async def promote(
     caller commits, so all of it happens or none does.
 
     Every statement runs under the request's own policies: a value moves only
-    onto an item the request may edit, and one on an item it may not refuses
-    the whole merge first."""
+    onto an item the request may edit. Any value the request may not move,
+    on an item it may not edit or not see, refuses the whole merge first."""
     first = sources[0]
     shape = (first.type, first.currency)
     if any((source.type, source.currency) != shape for source in sources):
@@ -873,13 +873,14 @@ async def promote(
             detail=PropertyMessages.PROMOTE_TYPES_DIFFER,
         )
     ids = [int(source.id or 0) for source in sources]
-    held = (
+    of_sources = col(MetadataValue.property_id).in_(ids)
+    movable = (
         await session.exec(
             select(func.count())
             .select_from(MetadataValue)
             .where(
-                col(MetadataValue.property_id).in_(ids),
-                ~func.entity_access(
+                of_sources,
+                func.entity_access(
                     MetadataValue.entity_type,
                     MetadataValue.entity_id,
                     True,
@@ -889,7 +890,18 @@ async def promote(
             )
         )
     ).one()
-    if held:
+    # How many values the sources hold in all, counted by the community's
+    # system session: a number and nothing else, so a merge moves every value
+    # or none, and none is lost with the sources it leaves behind.
+    guild_id = routed_guild_id(session)
+    async with cohorts.system_session(guild_id) as system:
+        await set_rls_context(system, SystemGuild(int(guild_id or 0), read_only=True))
+        held = (
+            await system.exec(
+                select(func.count()).select_from(MetadataValue).where(of_sources)
+            )
+        ).one()
+    if held != movable:
         raise HTTPException(
             status_code=status.HTTP_403_FORBIDDEN,
             detail=PropertyMessages.PROMOTE_VALUE_NOT_EDITABLE,

@@ -1044,3 +1044,57 @@ async def test_the_database_refuses_a_projects_property_to_whoever_only_reads_it
             await writer.rollback()
         else:
             await writer.commit()
+
+
+async def test_promote_moves_no_value_while_one_is_out_of_sight(
+    client: AsyncClient, session: AsyncSession, acting_user
+):
+    """A file the reader can't see still holds a value of the collection's
+    property: the merge is refused, and that value and the property stay."""
+    owner = await acting_user(guild_role=CommunityRole.member, initiative=True)
+    member = await acting_user(
+        guild_role=CommunityRole.member,
+        guild=owner.guild,
+        initiative=owner.initiative,
+        initiative_role="member",
+    )
+    await grant_role_permission(session, owner.initiative, "create_files")
+    shared = await create_file(session, owner.initiative, owner.user)
+    await create_resource_grant(
+        session, shared, all_initiative_members=True, level=ResourceAccessLevel.write
+    )
+    hidden = await create_file(session, owner.initiative, owner.user)
+    wall = await create_collection(
+        session, owner.initiative, owner.user, files=[shared, hidden]
+    )
+    rating = await create_property_definition(
+        session, owner.initiative, type=MetadataType.scale, collection=wall
+    )
+    await create_property_value(session, shared, rating, value_number=Decimal(80))
+    await create_property_value(session, hidden, rating, value_number=Decimal(20))
+
+    refused = await client.post(
+        member.g("/property-definitions/promote"),
+        headers=member.headers,
+        json={
+            "initiative_id": owner.initiative.id,
+            "ids": [rating.id],
+            "name": "Rating",
+        },
+    )
+    assert refused.status_code == 403, refused.text
+    assert refused.json()["detail"] == "PROPERTY_PROMOTE_VALUE_NOT_EDITABLE"
+    kept = await session.exec(
+        select(MetadataValue.entity_id, MetadataValue.value_number).where(
+            MetadataValue.property_id == rating.id
+        )
+    )
+    assert sorted(kept.all()) == sorted(
+        [(shared.id, Decimal(80)), (hidden.id, Decimal(20))]
+    )
+    definitions = await session.exec(
+        select(MetadataDefinition.id).where(
+            MetadataDefinition.initiative_id == owner.initiative.id
+        )
+    )
+    assert definitions.all() == [rating.id]
