@@ -375,16 +375,16 @@ export const LayoutEditor = ({
   };
 
   /** The names of the layouts that show the property, as the draft has
-   *  them: each shown list that places it, and each page that places it or
-   *  shows every property. */
+   *  them: each shown list, and each page, that places it or shows every
+   *  property. */
   const shownOn = (propertyId: number): string[] => {
     const field = propertyFieldId(propertyId);
     const onLists = shownKinds.filter((kind) => {
       const definition = draft.lists[kind] ?? {};
-      return kind === "table"
-        ? columnsOf(definition, NO_FIELDS, lists?.shape).includes(field)
-        : CARD_LISTS.has(kind) &&
-            namedFields(cardOf(definition, NO_FIELDS, lists?.shape)).has(field);
+      if (kind === "table") return columnsOf(definition, NO_FIELDS, lists?.shape).includes(field);
+      if (!CARD_LISTS.has(kind)) return false;
+      const card = cardOf(definition, NO_FIELDS, lists?.shape);
+      return namedFields(card).has(field) || holdsPart(card, "properties");
     });
     const onPages = details.filter((each) => {
       const page = each.spec.root(draft.details[detailKey(each)] as StoredRegions | null);
