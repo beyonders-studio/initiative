@@ -1944,13 +1944,35 @@ def _declared(field: Optional[Mapping[str, Any]], key: str) -> Dict[str, Any]:
         "type": kind,
         "list": field.get("list") is True,
         "shown_on": sorted(field.get("on") or ()),
-        "options": field.get("options") if kind in _SELECT_TYPES else None,
+        "options": (
+            [_option(option) for option in field.get("options") or ()]
+            if kind in _SELECT_TYPES
+            else None
+        ),
         "currency": field.get("currency") if kind is MetadataType.currency else None,
     }
 
 
 #: The types whose definitions hold options.
 _SELECT_TYPES = frozenset({MetadataType.select, MetadataType.multi_select})
+#: The longest label an option keeps (``PropertyOption``).
+_OPTION_LABEL_LENGTH = 100
+
+
+def _option(declared: Mapping[str, Any]) -> Dict[str, Any]:
+    """A manifest field's option as a definition keeps one
+    (``PropertyOption``): its value, its label in English or else the first
+    language it names, and its colour."""
+    label = declared.get("label")
+    if isinstance(label, dict):
+        label = label.get("en") or next(iter(label.values()), None)
+    option = {
+        "value": declared.get("value"),
+        "label": str(label or declared.get("value"))[:_OPTION_LABEL_LENGTH],
+    }
+    if declared.get("color"):
+        option["color"] = declared["color"]
+    return option
 
 
 async def _defined(
@@ -2773,6 +2795,7 @@ async def _plugin_summaries(
                 type=defn.type,
                 install_id=defn.install_id,
                 key=defn.key,
+                options=_parsed_options(defn) or None,
                 currency=defn.currency,
                 value=told if defn.list else told[0],
             )

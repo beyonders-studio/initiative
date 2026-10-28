@@ -491,6 +491,101 @@ async def test_a_project_brings_its_layouts(session: AsyncSession):
     assert imported["default"] == {"kind": "board"}
 
 
+async def test_a_project_brings_its_metadata_and_its_values(session: AsyncSession):
+    """The project's metadata goes with it, held or not, marked as its own; a
+    task's value of it says so; and an import makes it again on the new
+    project, with the values and the layouts that place it, beside the
+    initiative's properties rather than among them."""
+    owner, _assignee, guild, initiative, project = await _seed_populated_project(
+        session
+    )
+    points = await create_property_definition(
+        session, initiative, project=project, name="Points", type=MetadataType.number
+    )
+    await create_property_definition(
+        session, initiative, project=project, name="Phase", type=MetadataType.text
+    )
+    task = (
+        await session.exec(select(Task).where(Task.project_id == project.id))
+    ).first()
+    assert task is not None
+    await create_property_value(session, task, points, value_number=5)
+    session.add(
+        ToolLayout(
+            initiative_id=project.initiative_id,
+            tool="project",
+            tool_id=project.id,
+            kind="board",
+            definition={
+                "card": {
+                    "type": "card",
+                    "children": [
+                        {"type": "field", "props": {"field": f"property:{points.id}"}}
+                    ],
+                }
+            },
+        )
+    )
+    await session.commit()
+
+    envelope = await export_service.build_project_export(
+        session, await get_project_hydrated(session, project.id)
+    )
+
+    assert {(p.name, p.project) for p in envelope.property_definitions} == {
+        ("Severity", False),
+        ("Points", True),
+        ("Phase", True),
+    }
+    assert {(v.property_name, v.project) for v in envelope.tasks[0].properties} == {
+        ("Severity", False),
+        ("Points", True),
+    }
+
+    target = await create_initiative(session, guild, owner, name="Target")
+    await route_as(session, user_id=owner.id, guild_id=guild.id)
+    result = await import_service.import_project(
+        session, envelope=envelope, target_initiative=target, importer=owner
+    )
+    await session.commit()
+
+    await route_session_to_guild(session, guild.id)
+    made = {
+        defn.name: defn
+        for defn in await session.exec(
+            select(MetadataDefinition).where(
+                MetadataDefinition.project_id == result.entity_id
+            )
+        )
+    }
+    assert {name: d.type for name, d in made.items()} == {
+        "Points": MetadataType.number,
+        "Phase": MetadataType.text,
+    }
+    assert all(d.initiative_id == target.id for d in made.values())
+    new_task = (
+        await session.exec(select(Task).where(Task.project_id == result.entity_id))
+    ).one()
+    values = await session.exec(
+        select(MetadataValue.property_id, MetadataValue.value_number).where(
+            MetadataValue.entity_type == "task",
+            MetadataValue.entity_id == new_task.id,
+            MetadataValue.property_id == made["Points"].id,
+        )
+    )
+    assert values.all() == [(made["Points"].id, 5)]
+    board = (
+        await session.exec(
+            select(ToolLayout.definition).where(
+                ToolLayout.tool_id == result.entity_id, ToolLayout.kind == "board"
+            )
+        )
+    ).one()
+    assert board["card"]["children"] == [
+        {"type": "field", "props": {"field": f"property:{made['Points'].id}"}}
+    ]
+
+
 async def test_an_envelope_holds_one_layout_of_each_kind_as_read(
     session: AsyncSession,
 ):
@@ -517,7 +612,7 @@ async def test_an_envelope_holds_one_layout_of_each_kind_as_read(
 
 
 async def test_an_envelope_holds_a_task_page_for_each_type(session: AsyncSession):
-    owner, _assignee, guild, _initiative, project = await _seed_populated_project(
+    owner, _assignee, guild, initiative, project = await _seed_populated_project(
         session
     )
     body = (
@@ -857,7 +952,7 @@ async def test_task_types_survive_the_round_trip(session: AsyncSession):
     """A project's types come back as they were, and each task as its type."""
     from app.models.tenant.task import TaskType
 
-    owner, _assignee, guild, _initiative, project = await _seed_populated_project(
+    owner, _assignee, guild, initiative, project = await _seed_populated_project(
         session
     )
     types = await task_types_service.list_types(session, project.id)

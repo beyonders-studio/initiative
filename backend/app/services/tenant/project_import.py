@@ -208,7 +208,7 @@ async def import_project(
         context=context,
         member_handles=initiative_member_handles,
     )
-    await props.declare(envelope.property_definitions)
+    await props.declare(envelope.property_definitions, project_id=project.id)
     await props.attach(project, envelope.project.properties)
 
     # 5. Its tasks
@@ -245,7 +245,9 @@ async def import_project(
     # plug-ins placed here shown on them as they are on every saved layout.
     if envelope.layouts:
         property_by_place = {
-            place: props.bound_id(declared.name, declared.type)
+            place: props.bound_id(
+                declared.name, declared.type, project=declared.project
+            )
             for place, declared in enumerate(envelope.property_definitions, start=1)
         }
         remap = tool_layouts_service.Remap(

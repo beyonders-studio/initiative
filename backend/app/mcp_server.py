@@ -417,7 +417,7 @@ def _conditions_description(dataset_name: str | None) -> str:
     text = f"{_CONDITIONS_SHAPE} Fields: {'; '.join(lines)}."
     if "property_values" in spec.by_name:
         text += (
-            " A custom property: "
+            " A property or metadata: "
             '{"field": "property_values", "op": "eq", "value": '
             '{"property_id": <id>, "value": <value>}}.'
         )

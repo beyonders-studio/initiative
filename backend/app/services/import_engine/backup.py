@@ -922,8 +922,8 @@ async def _apply_property_definitions(
 
 class _CollectionRecord(SanitizedBaseModel):
     """One collection as a backup carries it: its files and cover by the ids
-    they had where it was exported, its own fields, and each file's values of
-    them by the file's id there."""
+    they had where it was exported, its metadata, each file's values of it by
+    the file's id there, and its layouts, naming its metadata by place."""
 
     model_config = ConfigDict(extra="ignore")
 
@@ -936,6 +936,7 @@ class _CollectionRecord(SanitizedBaseModel):
     properties: list[EnvelopePropertyValue] = []
     fields: list[ProjectExportPropertyDefinition] = []
     values: dict[int, list[EnvelopePropertyValue]] = {}
+    layouts: list[dict] = []
 
 
 async def _apply_collections(
@@ -958,6 +959,8 @@ async def _apply_collections(
         TagRestore,
     )
     from app.services.tenant import collections as collections_service
+    from app.services.tenant import metadata as metadata_service
+    from app.services.tenant import tool_layouts as tool_layouts_service
 
     if context is None:
         return {}
@@ -984,29 +987,25 @@ async def _apply_collections(
         await collections_service.add_files(
             session, collection, list(files.values()), added_by=user.id
         )
+        made_ids = await metadata_service.copy_definitions(
+            session,
+            [
+                MetadataDefinition(id=place, **field.model_dump(exclude={"project"}))
+                for place, field in enumerate(record.fields, start=1)
+            ],
+            initiative_id=initiative.id,
+            collection_id=collection.id,
+        )
         fields = {
-            field.name: MetadataDefinition(
-                initiative_id=initiative.id,
-                collection_id=collection.id,
-                name=field.name,
-                type=field.type,
-                position=field.position,
-                color=field.color,
-                options=field.options,
-                currency=field.currency,
-            )
-            for field in record.fields
+            (field.name, field.type): made_ids[place]
+            for place, field in enumerate(record.fields, start=1)
         }
-        session.add_all(fields.values())
-        await session.flush()
         for source_id, values in record.values.items():
             for value in values:
-                field = fields.get(value.property_name)
+                field_id = fields.get((value.property_name, value.property_type))
                 columns = (
                     decode_property_value(value, members, people=context.people)
-                    if source_id in files
-                    and field is not None
-                    and field.type == value.property_type
+                    if source_id in files and field_id is not None
                     else None
                 )
                 if columns is not None:
@@ -1014,10 +1013,27 @@ async def _apply_collections(
                         MetadataValue(
                             entity_type=Tool.file.value,
                             entity_id=files[source_id],
-                            property_id=field.id,
+                            property_id=field_id,
                             **columns,
                         )
                     )
+        await tool_layouts_service.restore_layouts(
+            session,
+            tool_layouts_service.Target("collection", collection.id, initiative.id),
+            (
+                tool_layouts_service.Restored(
+                    str(layout.get("kind")),
+                    tool_layouts_service.remapped_definition(
+                        layout.get("definition") or {},
+                        tool_layouts_service.Remap(
+                            statuses=lambda _: None, properties=made_ids.get
+                        ),
+                    ),
+                )
+                for layout in record.layouts
+                if isinstance(layout, dict)
+            ),
+        )
         await TagRestore(session).attach(collection, record.tags)
         props = PropertyRestore(session, initiative_id=initiative.id, context=context)
         await props.attach(collection, record.properties)

@@ -54,6 +54,9 @@ class EnvelopePropertyValue(SanitizedBaseModel):
     value_name: Optional[str] = None
     #: A money value's currency, which is its property's.
     currency: Optional[str] = None
+    #: A value of its project's metadata, not of one of the initiative's
+    #: properties.
+    project: bool = False
 
 
 class FileEnvelope(_EnvelopeBase):

@@ -1493,8 +1493,29 @@ class TestShownValues:
     ):
         """Each declared kind in its column, a scale out of its ``max`` as a
         figure out of 100, a value beside its state with the state kept apart,
-        and a value that is not one of its kind's refused."""
+        and a value that is not one of its kind's refused. A select's options
+        and money's currency come with the values a reader is shown."""
         kinds = {"when": "date", "health": "badge", "done": "scale", "count": "number"}
+        stage = {
+            "key": "stage",
+            "name": {"en": "Stage"},
+            "kind": "select",
+            "on": ["task"],
+            "options": [
+                {
+                    "value": "won",
+                    "label": {"de": "Gewonnen", "en": "Won"},
+                    "color": "#22aa55",
+                }
+            ],
+        }
+        price = {
+            "key": "price",
+            "name": {"en": "Price"},
+            "kind": "currency",
+            "on": ["task"],
+            "currency": "EUR",
+        }
         installed = await install_plugin(
             session,
             acting_user,
@@ -1502,8 +1523,12 @@ class TestShownValues:
             granted=["projects:read"],
             declares={
                 "fields": [
-                    {"key": key, "name": {"en": key}, "kind": kind, "on": ["task"]}
-                    for key, kind in kinds.items()
+                    *(
+                        {"key": key, "name": {"en": key}, "kind": kind, "on": ["task"]}
+                        for key, kind in kinds.items()
+                    ),
+                    stage,
+                    price,
                 ]
             },
         )
@@ -1548,7 +1573,23 @@ class TestShownValues:
             "done": (None, None, 75, None),
             "count": (None, None, 5, {"status": "open"}),
         }
-        for refused in ({"done": 101}, {"when": 3}, {"health": "passing"}):
+        chosen = await put({"stage": "won", "price": 12.5})
+        assert chosen.status_code == 200, chosen.text
+        read = await client.get(
+            installed.seat.g(f"/tasks/{task.id}"), headers=installed.seat.headers
+        )
+        shown = {v["key"]: v for v in read.json()["properties"] if v["install_id"]}
+        assert (shown["stage"]["value"], shown["stage"]["options"]) == (
+            "won",
+            [{"value": "won", "label": "Won", "color": "#22aa55"}],
+        )
+        assert (shown["price"]["value"], shown["price"]["currency"]) == (12.5, "EUR")
+        for refused in (
+            {"done": 101},
+            {"when": 3},
+            {"health": "passing"},
+            {"stage": "lost"},
+        ):
             response = await put(refused)
             assert response.status_code == 400, response.text
             assert (

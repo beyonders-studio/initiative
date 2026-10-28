@@ -1191,9 +1191,9 @@ class _ScopeBuilder:
 
     async def _add_initiative_collections(self, initiative, folder: str) -> None:
         """The initiative's collections the creator can see, each under the id
-        it has here, holding its files by theirs, with its own fields and each
-        file's values of them: an import puts each one together from the files
-        it made of them."""
+        it has here, holding its files by theirs, with its metadata, each
+        file's values of it and its layouts, which name its metadata by place:
+        an import puts each one together from the files it made of them."""
         if self.mode != "backup" or not _included(self.params, Tool.file.value):
             return
         from sqlmodel import col, select
@@ -1201,10 +1201,12 @@ class _ScopeBuilder:
         from app.db.query import ids_in
         from app.models.tenant.collection import Collection, CollectionFile
         from app.models.tenant.file import File
+        from app.models.tenant.metadata import MetadataType
         from app.services.export.property_values import property_export_dict
         from app.services.tenant import collections as collections_service
         from app.services.tenant import metadata as metadata_service
         from app.services.tenant import tags as tags_service
+        from app.services.tenant import tool_layouts as tool_layouts_service
 
         rows = list(
             await self.session.exec(
@@ -1237,6 +1239,35 @@ class _ScopeBuilder:
             )
             for row in rows
         }
+
+        async def layouts(row) -> list[dict]:
+            places = {
+                field.id: place
+                for place, field in enumerate(fields.get(row.id, []), start=1)
+            }
+            remap = tool_layouts_service.Remap(
+                statuses=lambda _: None,
+                properties=places.get,
+                community=False,
+                people=frozenset(
+                    field.id
+                    for field in fields.get(row.id, [])
+                    if field.type == MetadataType.user_reference
+                ),
+            )
+            return [
+                {
+                    "kind": layout.kind,
+                    "definition": tool_layouts_service.remapped_definition(
+                        layout.definition, remap
+                    ),
+                }
+                for layout in await tool_layouts_service.list_rows(
+                    self.session,
+                    tool_layouts_service.Target("collection", row.id, initiative.id),
+                )
+            ]
+
         payload = {
             "type": "initiative-collections",
             "schema_version": 1,
@@ -1266,6 +1297,7 @@ class _ScopeBuilder:
                         str(file_id): [property_export_dict(v) for v in summaries]
                         for file_id, summaries in values[row.id].items()
                     },
+                    "layouts": await layouts(row),
                 }
                 for row in rows
             ],

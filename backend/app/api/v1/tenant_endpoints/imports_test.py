@@ -1457,8 +1457,8 @@ async def test_restored_collections_keep_their_own_files_and_cover(
     client, acting_user, session, monkeypatch, role_session
 ):
     """A backup carries each collection by the id it had, so two of one name
-    come back as two, each with its own files, description, cover, fields and
-    their values."""
+    come back as two, each with its own files, description, cover, metadata,
+    its values and the layouts that place it."""
     from decimal import Decimal
 
     from sqlmodel import select
@@ -1466,6 +1466,7 @@ async def test_restored_collections_keep_their_own_files_and_cover(
     from app.models.tenant.collection import Collection, CollectionFile
     from app.models.tenant.file import File
     from app.models.tenant.metadata import MetadataDefinition, MetadataValue
+    from app.models.tenant.tool_layout import ToolLayout
     from app.services.tenant import collections as collections_service
     from app.testing import create_collection, create_property_value
 
@@ -1541,6 +1542,30 @@ async def test_restored_collections_keep_their_own_files_and_cover(
     ).all()
     assert [(n, c, names[f], v) for n, c, f, v in values] == [
         ("Price", "USD", "Sunset", Decimal("12.50"))
+    ]
+    # Its layouts come back naming its own metadata there.
+    restored = {
+        defn.name: defn.id
+        for defn in (
+            await collections_service.metadata_of(session, [collections[0].id])
+        )[collections[0].id]
+    }
+    tables = (
+        await session.exec(
+            select(ToolLayout.definition).where(
+                ToolLayout.tool == "collection",
+                ToolLayout.tool_id == collections[0].id,
+                ToolLayout.kind == "table",
+            )
+        )
+    ).all()
+    assert [table["columns"] for table in tables] == [
+        [
+            "name",
+            f"property:{restored['Price']}",
+            f"property:{restored['Rating']}",
+            "added",
+        ]
     ]
 
 

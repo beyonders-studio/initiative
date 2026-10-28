@@ -38,6 +38,7 @@ from app.services.import_engine.contract import ImportEngineError
 from app.services.import_engine.people import bring_in_named
 from app.services.tenant import tags as tags_service
 from app.services.tenant import named_people
+from app.services.tenant import metadata as metadata_service
 from app.services.tenant.metadata import link_for
 
 if TYPE_CHECKING:  # pragma: no cover - typing only
@@ -231,6 +232,10 @@ class PropertyRestore:
     property unticked on the review is left out with its values. A person
     value is placed through the people step's answer; one that lands on
     nobody is dropped and its handle collected.
+
+    A project's own metadata is made again on the project an import makes
+    (``declare`` with ``project_id``), as a copy makes it, and a value of it
+    goes onto the one of the same name and type there.
     """
 
     def __init__(
@@ -263,22 +268,49 @@ class PropertyRestore:
         #: What each envelope property became in the target, so every row
         #: naming it shares one definition — a renamed one included.
         self._resolved: dict[tuple[str, MetadataType], MetadataDefinition] = {}
+        #: The project's metadata made, by name and type.
+        self._project: dict[tuple[str, MetadataType], int] = {}
         #: The target definitions already standing for one envelope property.
         #: One definition holds one value a row, so no second property may
         #: bind to it — a ``Priority`` renamed onto ``Priority_select`` beside
         #: a ``Priority_select`` of the envelope's own.
         self._bound: set[int] = set()
 
-    async def declare(self, definitions: list[ProjectExportPropertyDefinition]) -> None:
+    async def declare(
+        self,
+        definitions: list[ProjectExportPropertyDefinition],
+        *,
+        project_id: int | None = None,
+    ) -> None:
         """Bind the definitions an envelope declares, before any value names
-        them, so each is matched with its options or created whole."""
+        them, so each is matched with its options or created whole; and with
+        ``project_id``, make the project's own metadata on it."""
+        own = [declared for declared in definitions if declared.project]
+        if own and project_id is not None:
+            made = await metadata_service.copy_definitions(
+                self._session,
+                [
+                    MetadataDefinition(
+                        id=place, **declared.model_dump(exclude={"project"})
+                    )
+                    for place, declared in enumerate(own, start=1)
+                ],
+                initiative_id=self._initiative_id,
+                project_id=project_id,
+            )
+            for place, declared in enumerate(own, start=1):
+                self._project[(declared.name, declared.type)] = made[place]
         for declared in definitions:
-            if declared.name not in self._excluded:
+            if not declared.project and declared.name not in self._excluded:
                 await self._definition(declared.name, declared.type, declared=declared)
 
-    def bound_id(self, name: str, prop_type: MetadataType) -> int | None:
+    def bound_id(
+        self, name: str, prop_type: MetadataType, *, project: bool = False
+    ) -> int | None:
         """The target definition an envelope property became, or None for one
-        left out."""
+        left out; with ``project``, the project's metadata."""
+        if project:
+            return self._project.get((name, prop_type))
         found = self._resolved.get((name, prop_type))
         return found.id if found is not None else None
 
@@ -364,9 +396,14 @@ class PropertyRestore:
         # One value per definition: the last one named wins.
         column_kwargs_by_id: dict[int, dict[str, Any]] = {}
         for pv in values:
-            definition = await self._definition(
-                pv.property_name, pv.property_type, value=pv
-            )
+            if pv.project:
+                property_id = self._project.get((pv.property_name, pv.property_type))
+                if property_id is None:
+                    continue
+            else:
+                property_id = (
+                    await self._definition(pv.property_name, pv.property_type, value=pv)
+                ).id
             column_kwargs = decode_property_value(
                 pv, self._member_handles, people=self._people
             )
@@ -376,7 +413,7 @@ class PropertyRestore:
                 continue
             if column_kwargs.get("value_user_id") is not None and pv.value_handle:
                 self.named.setdefault(column_kwargs["value_user_id"], pv.value_handle)
-            column_kwargs_by_id[definition.id] = column_kwargs  # ty: ignore[invalid-assignment] — persisted row, id is set
+            column_kwargs_by_id[property_id] = column_kwargs  # ty: ignore[invalid-assignment] — persisted row, id is set
         target = link_for(row).target
         self._session.add_all(
             MetadataValue(

@@ -13,9 +13,13 @@ with one rule set:
 - multi_select     → ``value_json``
 - user_reference   → ``value_handle``, and ``value_name`` beside it
 
+A task's value of its project's metadata says ``project``, so an import puts
+it on the project's metadata rather than among the initiative's properties.
+
 Reads the ``PropertySummary`` list every row carries once
 ``metadata_service.annotate_properties`` has run — the same values its read
-shows.
+shows, but a collection's metadata, which its collection's own record carries,
+and a plug-in's, which only the plug-in writes.
 """
 
 from __future__ import annotations
@@ -61,9 +65,22 @@ def property_export_dict(summary: PropertySummary) -> dict:
         )
     if summary.currency is not None:
         record["currency"] = summary.currency.value
+    if summary.project_id is not None:
+        record["project"] = True
     return record
 
 
+def portable_summaries(row: Any) -> list[PropertySummary]:
+    """The values ``row`` carries that an envelope carries with it: the
+    initiative's properties and its project's metadata."""
+    return [
+        summary
+        for summary in annotated_properties(row)
+        if summary.install_id is None and summary.collection_id is None
+    ]
+
+
 def exported_properties(row: Any) -> list[dict]:
-    """Every value ``row`` carries, in the flat by-name encoding."""
-    return [property_export_dict(summary) for summary in annotated_properties(row)]
+    """The values ``row`` carries with it (:func:`portable_summaries`), in the
+    flat by-name encoding."""
+    return [property_export_dict(summary) for summary in portable_summaries(row)]

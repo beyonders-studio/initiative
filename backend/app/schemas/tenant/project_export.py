@@ -99,6 +99,8 @@ class ProjectExportPropertyDefinition(SanitizedBaseModel):
     options: Optional[List[dict]] = None
     #: A money property's currency.
     currency: Optional[str] = None
+    #: The project's own metadata, not one of the initiative's properties.
+    project: bool = False
 
 
 class ProjectExportChecklistItem(SanitizedBaseModel):
