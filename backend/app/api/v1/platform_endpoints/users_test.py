@@ -155,6 +155,7 @@ async def test_every_mutable_channel_can_be_switched_off(client, acting_user):
         for channel in row["mutable_channels"]
     ]
     assert changes
+    defaults = {row["category"]: row["defaults"] for row in registry}
 
     response = await client.put(
         "/api/v1/me/notification-preferences",
@@ -167,7 +168,12 @@ async def test_every_mutable_channel_can_be_switched_off(client, acting_user):
     missing = [
         (change["category"], change["channel"])
         for change in changes
-        if settings.get(change["category"], {}).get(change["channel"]) is not False
+        # What the account now has: what it stored, or the default where it
+        # stored nothing, as a channel that starts off does.
+        if settings.get(change["category"], {}).get(
+            change["channel"], defaults[change["category"]][change["channel"]]
+        )
+        is not False
     ]
     assert missing == []
 

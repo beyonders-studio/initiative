@@ -217,6 +217,14 @@
     "account": {
       "title": "Ein Hinweis zu deinem Konto",
       "body": "Öffne Initiative, um ihn zu lesen."
+    },
+    "overdue": {
+      "title": "Du hast überfällige Aufgaben",
+      "body": "Öffne Initiative, um sie zu sehen."
+    },
+    "coming_up": {
+      "title": "Bei dir steht etwas an",
+      "body": "Öffne Initiative, um es zu sehen."
     }
   },
   "quietHours": {

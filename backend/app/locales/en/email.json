@@ -397,7 +397,9 @@
       "cases": "Cases",
       "direct_messages": "Messages and connections",
       "jobs": "Exports and imports",
-      "account": "Your account"
+      "account": "Your account",
+      "overdue": "Overdue",
+      "coming_up": "Coming up"
     }
   },
   "signInCode": {

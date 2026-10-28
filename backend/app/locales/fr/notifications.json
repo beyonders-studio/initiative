@@ -217,6 +217,14 @@
     "account": {
       "title": "Un avis concernant votre compte",
       "body": "Ouvrez Initiative pour le lire."
+    },
+    "overdue": {
+      "title": "Vous avez des tâches en retard",
+      "body": "Ouvrez Initiative pour les voir."
+    },
+    "coming_up": {
+      "title": "Vous avez des échéances à venir",
+      "body": "Ouvrez Initiative pour les voir."
     }
   },
   "quietHours": {
