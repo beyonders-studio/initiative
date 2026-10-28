@@ -2809,14 +2809,16 @@ export interface CollectionFileListResponse {
 }
 
 /**
- * Files to put in a collection or take out of it.
+ * Files to put in a collection, and the values of the collection's
+ * metadata each one it takes starts with: what its file page requires.
  */
-export interface CollectionFiles {
+export interface CollectionFilesAdd {
   /**
    * @minItems 1
    * @maxItems 500
    */
   file_ids: number[];
+  metadata?: PropertyValueInput[];
 }
 
 /**
@@ -5344,6 +5346,7 @@ export interface DetailFieldProps {
     | PostDetailFieldId
     | FileFieldId
     | string;
+  required?: boolean | null;
 }
 
 export interface DetailFieldPart {
@@ -5375,11 +5378,16 @@ export const OwnPartType = {
   poll: "poll",
 } as const;
 
+export interface OwnPartProps {
+  required?: boolean | null;
+}
+
 /**
  * One of a detail's own parts.
  */
 export interface OwnPart {
   type: OwnPartType;
+  props?: OwnPartProps | null;
 }
 
 /**
