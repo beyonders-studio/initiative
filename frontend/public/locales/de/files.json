@@ -467,10 +467,12 @@
     "error": "Die Sammlung konnte nicht geändert werden",
     "properties": {
       "description": "Was jede Datei in dieser Sammlung hier tragen kann: Die Werte gehören zur Sammlung, nicht zur Datei.",
+      "create": "Neue Eigenschaft",
       "edit": "Eigenschaft bearbeiten",
       "delete": "Eigenschaft löschen",
       "deleteTitle": "Diese Eigenschaft löschen?",
       "deleteBody": "Damit werden die Eigenschaft und die Werte aller Dateien dafür in dieser Sammlung entfernt.",
+      "none": "Noch keine Eigenschaften",
       "heading": "In dieser Sammlung",
       "saveError": "Der Wert konnte nicht gespeichert werden",
       "of": "Eigenschaften von {{name}}"

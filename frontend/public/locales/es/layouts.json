@@ -1,5 +1,6 @@
 {
   "open": "Editar diseños",
+  "editLayout": "Editar {{name}}",
   "title": "Editar diseños",
   "close": "Cerrar el editor",
   "previewWidth": "Ancho de la vista previa",
@@ -39,10 +40,13 @@
   "emptyGroup": "Vacío. Suelta aquí una parte o añade una.",
   "builtIn": "Integrados",
   "properties": "Propiedades",
+  "propertiesShownOn": "Se muestra en {{layouts}}",
+  "propertiesNowhere": "Aún no se muestra en ningún diseño. Colócala con Añadir.",
+  "propertiesPlacementHelp": "Una página que muestra todas las propiedades muestra una nueva al instante. Las tarjetas y las tablas solo muestran lo que les añades.",
   "layoutParts": "Diseño",
   "hidePart": "Ocultar",
   "settings": "Ajustes",
-  "cardHelp": "Lo que muestra cada tarea en el tablero. Selecciona una parte para cambiarla o añade una bajo el esquema.",
+  "cardHelp": "Lo que muestra cada elemento en su tarjeta. Selecciona una parte para cambiarla o añade una bajo el esquema.",
   "propertiesHelp": "Muestra cada propiedad y cada metadato para los que una tarea tiene un valor.",
   "pluginPartHelp": "La dibuja el plug-in con sus propios valores y acciones.",
   "fieldHelp": "Muestra este campo cuando una tarea tiene un valor para él.",
@@ -96,7 +100,7 @@
   "typedTaskLayout": "Página de {{name}}",
   "detailHelp": "Cómo se organiza el detalle de cada tarea de este proyecto. Lo que deja fuera queda oculto.",
   "useShipped": "Usar el diseño original",
-  "shipped": "Este es el diseño original. Cambiarlo lo convierte en el del proyecto.",
+  "shipped": "Este es el diseño original. Un cambio se aplica a todos los que lo ven.",
   "detailTitleHelp": "El detalle de cada tarea muestra su título.",
   "opensFirst": "Se abre primero",
   "shownInMenu": "Mostrar en el menú de diseños",
@@ -204,7 +208,8 @@
     "rowHelp": "Pone lado a lado lo que contiene."
   },
   "boxWith": "Caja con {{name}}",
-  "newField": "Campo nuevo",
+  "newProperty": "Propiedad nueva",
+  "newMetadata": "Metadatos nuevos",
   "projectProperties": "Propiedades de este proyecto",
   "collectionProperties": "Propiedades de esta colección",
   "initiativeMetadata": "Metadatos de la iniciativa",
@@ -249,8 +254,8 @@
     "noItems": "Añade un contador al grupo para ver aquí su diseño."
   },
   "fileDetail": {
-    "name": "Detalle del archivo",
-    "help": "Cómo se muestra junto a la colección un archivo abierto desde ella. Lo que deja fuera queda oculto.",
+    "name": "Página del archivo",
+    "help": "Cómo se muestra un archivo abierto desde esta colección, junto a su imagen o junto a la colección, una vez que la colección tiene propiedades propias. Lo que deja fuera queda oculto.",
     "shipped": "Este es el diseño tal como viene. Cambiarlo lo convierte en el de la colección.",
     "titleHelp": "Cada archivo muestra su nombre.",
     "hiddenHelp": "Cada archivo puede mostrar esto. Si se quita, queda oculto, y Añadir lo vuelve a poner.",
@@ -291,7 +296,6 @@
     "bar": "Una barra"
   },
   "fieldProperty": {
-    "property": "Propiedad",
     "metadata": "Metadatos",
     "metadataHelp": "Son metadatos de la iniciativa, que se editan en su configuración.",
     "openSettings": "Abrir la configuración de la iniciativa"

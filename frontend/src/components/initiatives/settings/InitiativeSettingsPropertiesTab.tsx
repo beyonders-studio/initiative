@@ -1,5 +1,5 @@
 import { ArrowDown, ArrowUp, ArrowUpToLine, Loader2, Pencil, Plus, Trash2, X } from "lucide-react";
-import { useEffect, useMemo, useState } from "react";
+import { type ReactNode, useEffect, useMemo, useState } from "react";
 import { useTranslation } from "react-i18next";
 
 import {
@@ -41,13 +41,17 @@ import {
   TableRow,
 } from "@/components/ui/table";
 import {
+  type MetadataOwner,
+  ownerColumns,
   useCreateProperty,
   useDeleteProperties,
   useDeleteProperty,
   usePromoteProperties,
+  useProperties,
   usePropertyGroups,
   useUpdateProperty,
 } from "@/hooks/useProperties";
+import { collator } from "@/lib/intl";
 import { toast } from "@/lib/mascotToast";
 
 const DEFAULT_COLOR = "#64748B";
@@ -164,29 +168,35 @@ const OptionListEditor = ({ options, onChange, disabled }: OptionListEditorProps
 const WORDS = {
   initiative: {
     description: "properties:manager.description",
+    create: "properties:manager.newDefinition",
     edit: "properties:manager.editDefinition",
     delete: "properties:manager.delete",
     deleteTitle: "properties:manager.deleteConfirmTitle",
     deleteBody: "properties:manager.deleteConfirmBody",
+    none: "properties:noMetadata",
   },
   project: {
     description: "projects:properties.description",
+    create: "projects:properties.create",
     edit: "projects:properties.edit",
     delete: "projects:properties.delete",
     deleteTitle: "projects:properties.deleteTitle",
     deleteBody: "projects:properties.deleteBody",
+    none: "projects:properties.none",
   },
   collection: {
     description: "files:collections.properties.description",
+    create: "files:collections.properties.create",
     edit: "files:collections.properties.edit",
     delete: "files:collections.properties.delete",
     deleteTitle: "files:collections.properties.deleteTitle",
     deleteBody: "files:collections.properties.deleteBody",
+    none: "files:collections.properties.none",
   },
 } as const;
 
 /** The words for `definition`, by whose it is; none is new metadata. */
-export const propertyWords = (definition?: PropertyDefinitionRead | null) =>
+const propertyWords = (definition?: PropertyDefinitionRead | null) =>
   WORDS[
     definition?.project_id != null
       ? "project"
@@ -199,27 +209,30 @@ const PROPERTY_NAMESPACES = ["properties", "common", "files", "projects"] as con
 
 /**
  * A definition's name, options and their colors, color and currency, saved
- * as one change; or, given no `definition`, new metadata of the initiative's,
- * whose type is chosen then and kept. Where one is edited: the initiative's
- * settings, and the layout editor, from the field that shows it.
+ * as one change; or, given no `definition`, a new one, the `owner`'s property
+ * or the initiative's metadata, whose type is chosen then and kept. Where one
+ * is edited: the initiative's settings, and the layout editor's properties.
  */
-export const PropertyDialog = ({
+const PropertyDialog = ({
   open,
   definition,
   initiativeId,
+  owner,
   position = 0,
   onClose,
 }: {
   open: boolean;
-  /** The one to edit; left out, new metadata of the initiative's. */
+  /** The one to edit; left out, a new one. */
   definition?: PropertyDefinitionRead;
   initiativeId: number;
-  /** Where new metadata goes among the initiative's. */
+  /** Whose a new one is; left out, the initiative's metadata. */
+  owner?: MetadataOwner;
+  /** Where a new one goes among its owner's. */
   position?: number;
   onClose: () => void;
 }) => {
   const { t } = useTranslation(PROPERTY_NAMESPACES);
-  const words = propertyWords(definition);
+  const words = definition ? propertyWords(definition) : WORDS[owner?.kind ?? "initiative"];
   const defaultCurrency = useDefaultCurrency();
   const createMutation = useCreateProperty();
   const updateMutation = useUpdateProperty();
@@ -237,7 +250,7 @@ export const PropertyDialog = ({
   }, [open, definition, defaultCurrency]);
 
   const isEditing = definition !== undefined;
-  const title = isEditing ? words.edit : "properties:manager.newDefinition";
+  const title = isEditing ? words.edit : words.create;
   const submitting = createMutation.isPending || updateMutation.isPending;
 
   const handleTypeChange = (nextType: MetadataType) => {
@@ -276,6 +289,7 @@ export const PropertyDialog = ({
         name: trimmedName,
         type: formState.type,
         initiative_id: initiativeId,
+        ...ownerColumns(owner),
         color: formState.color ?? null,
         options,
         ...(formState.type === MetadataType.currency ? { currency: formState.currency } : {}),
@@ -424,7 +438,7 @@ export const PropertyDialog = ({
 
 /** Deleting `definition`, with every value of it, once asked; closed while
  *  none is given. */
-export const PropertyDeleteDialog = ({
+const PropertyDeleteDialog = ({
   definition,
   onClose,
 }: {
@@ -558,58 +572,11 @@ const PromoteDialog = ({
   );
 };
 
-/** Whether `definition` is a project's or a collection's property. */
-const isToolProperty = (definition: PropertyDefinitionRead) =>
-  definition.project_id !== null || definition.collection_id !== null;
-
-/**
- * Initiative settings › Metadata: the initiative's metadata, then each of its
- * projects' and collections' properties under the owner's name. It lists what
- * the server lists, which is only the properties of the tools the reader may
- * edit, and offers what each group's `can_edit` allows: editing one,
- * reordering, deleting several at once, and promoting properties of one type
- * into one of the initiative's metadata. A project's or a collection's
- * properties are made in its layout editor; the initiative's metadata here.
- */
-export const InitiativeSettingsPropertiesTab = ({ initiativeId }: { initiativeId: number }) => {
-  const { t } = useTranslation(PROPERTY_NAMESPACES);
-  const groupsQuery = usePropertyGroups(initiativeId);
+/** Moving one of a list a place up or down, numbering each in the order
+ *  shown. */
+const useMoveDefinition = () => {
   const updateMutation = useUpdateProperty();
-  const deleteMany = useDeleteProperties();
-
-  const [editing, setEditing] = useState<{ definition?: PropertyDefinitionRead } | null>(null);
-  const [deleteTarget, setDeleteTarget] = useState<PropertyDefinitionRead | null>(null);
-  const [selected, setSelected] = useState<ReadonlySet<number>>(() => new Set());
-  const [askingDelete, setAskingDelete] = useState(false);
-  const [promoting, setPromoting] = useState(false);
   const [moving, setMoving] = useState(false);
-
-  const groups = groupsQuery.data?.groups ?? [];
-  const metadataGroup = groups.find((group) => group.owner === "initiative");
-  const toolGroups = groups.filter((group) => group.owner !== "initiative");
-  // What is selected, of what is still listed.
-  const chosen = groups.flatMap((group) =>
-    group.definitions.filter((definition) => selected.has(definition.id))
-  );
-  const promotable =
-    chosen.length > 0 &&
-    chosen.every(
-      (definition) =>
-        isToolProperty(definition) &&
-        definition.type === chosen[0].type &&
-        definition.currency === chosen[0].currency
-    );
-
-  const toggle = (id: number, on: boolean) =>
-    setSelected((prev) => {
-      const next = new Set(prev);
-      if (on) next.add(id);
-      else next.delete(id);
-      return next;
-    });
-
-  /** Move one of a group's a place up or down, numbering each in the order
-   *  shown. */
   const move = async (definitions: PropertyDefinitionRead[], index: number, by: -1 | 1) => {
     const order = [...definitions];
     const [moved] = order.splice(index, 1);
@@ -629,27 +596,98 @@ export const InitiativeSettingsPropertiesTab = ({ initiativeId }: { initiativeId
       setMoving(false);
     }
   };
+  return { move, moving };
+};
 
-  const handleDeleteSelected = async () => {
-    try {
-      await deleteMany.mutateAsync({
-        initiative_id: initiativeId,
-        ids: chosen.map((definition) => definition.id),
-      });
-      toast.success(t("properties:manager.bulkDeleted", { count: chosen.length }));
-      setSelected(new Set());
-      setAskingDelete(false);
-    } catch {
-      // Error toast handled by the mutation hook.
-    }
-  };
+/** Moving one of `definitions` up or down, editing it and deleting it. */
+const RowActions = ({
+  definitions,
+  index,
+  moving,
+  onMove,
+  onEdit,
+  onDelete,
+}: {
+  definitions: PropertyDefinitionRead[];
+  index: number;
+  moving: boolean;
+  onMove: (by: -1 | 1) => void;
+  onEdit: () => void;
+  onDelete: () => void;
+}) => {
+  const { t } = useTranslation(PROPERTY_NAMESPACES);
+  const definition = definitions[index];
+  const words = propertyWords(definition);
+  return (
+    <div className="inline-flex shrink-0 items-center gap-1">
+      <Button
+        type="button"
+        variant="ghost"
+        size="icon-sm"
+        onClick={() => onMove(-1)}
+        disabled={moving || index === 0}
+        aria-label={t("properties:manager.moveUp", { name: definition.name })}
+      >
+        <ArrowUp className="h-4 w-4" />
+      </Button>
+      <Button
+        type="button"
+        variant="ghost"
+        size="icon-sm"
+        onClick={() => onMove(1)}
+        disabled={moving || index === definitions.length - 1}
+        aria-label={t("properties:manager.moveDown", { name: definition.name })}
+      >
+        <ArrowDown className="h-4 w-4" />
+      </Button>
+      <Button
+        type="button"
+        variant="ghost"
+        size="icon-sm"
+        onClick={onEdit}
+        aria-label={t(words.edit)}
+      >
+        <Pencil className="h-4 w-4" />
+      </Button>
+      <Button
+        type="button"
+        variant="ghost"
+        size="icon-sm"
+        onClick={onDelete}
+        aria-label={t(words.delete)}
+      >
+        <Trash2 className="h-4 w-4" />
+      </Button>
+    </div>
+  );
+};
 
-  const table = ({ definitions, can_edit: canEdit }: PropertyDefinitionGroup) => (
+/** Definitions as a table: name, type, options and color, and with
+ *  `canEdit` the row actions; with `selection`, a box to tick each. */
+const DefinitionTable = ({
+  definitions,
+  canEdit,
+  selection,
+  moving,
+  onMove,
+  onEdit,
+  onDelete,
+}: {
+  definitions: PropertyDefinitionRead[];
+  canEdit: boolean;
+  selection?: { selected: ReadonlySet<number>; toggle: (id: number, on: boolean) => void };
+  moving: boolean;
+  onMove: (index: number, by: -1 | 1) => void;
+  onEdit: (definition: PropertyDefinitionRead) => void;
+  onDelete: (definition: PropertyDefinitionRead) => void;
+}) => {
+  const { t } = useTranslation(PROPERTY_NAMESPACES);
+  return (
     <div className="overflow-x-auto">
       <Table>
         <TableHeader>
           <TableRow>
-            {canEdit ? <TableHead className="w-10" /> : null}
+            {canEdit && selection ? <TableHead className="w-10" /> : null}
             <TableHead>{t("properties:manager.nameLabel")}</TableHead>
             <TableHead>{t("properties:manager.typeLabel")}</TableHead>
             <TableHead>{t("properties:manager.optionsLabel")}</TableHead>
@@ -661,14 +699,15 @@ export const InitiativeSettingsPropertiesTab = ({ initiativeId }: { initiativeId
           {definitions.map((definition, index) => {
             const optionCount = definition.options?.length ?? 0;
             const Icon = iconForPropertyType(definition.type);
-            const words = propertyWords(definition);
             return (
               <TableRow key={definition.id}>
-                {canEdit ? (
+                {canEdit && selection ? (
                   <TableCell>
                     <Checkbox
-                      checked={selected.has(definition.id)}
-                      onCheckedChange={(checked) => toggle(definition.id, checked === true)}
+                      checked={selection.selected.has(definition.id)}
+                      onCheckedChange={(checked) =>
+                        selection.toggle(definition.id, checked === true)
+                      }
                       aria-label={t("properties:manager.select", { name: definition.name })}
                     />
                   </TableCell>
@@ -702,46 +741,14 @@ export const InitiativeSettingsPropertiesTab = ({ initiativeId }: { initiativeId
                 </TableCell>
                 {canEdit ? (
                   <TableCell className="text-right">
-                    <div className="inline-flex items-center gap-1">
-                      <Button
-                        type="button"
-                        variant="ghost"
-                        size="icon-sm"
-                        onClick={() => void move(definitions, index, -1)}
-                        disabled={moving || index === 0}
-                        aria-label={t("properties:manager.moveUp", { name: definition.name })}
-                      >
-                        <ArrowUp className="h-4 w-4" />
-                      </Button>
-                      <Button
-                        type="button"
-                        variant="ghost"
-                        size="icon-sm"
-                        onClick={() => void move(definitions, index, 1)}
-                        disabled={moving || index === definitions.length - 1}
-                        aria-label={t("properties:manager.moveDown", { name: definition.name })}
-                      >
-                        <ArrowDown className="h-4 w-4" />
-                      </Button>
-                      <Button
-                        type="button"
-                        variant="ghost"
-                        size="icon-sm"
-                        onClick={() => setEditing({ definition })}
-                        aria-label={t(words.edit)}
-                      >
-                        <Pencil className="h-4 w-4" />
-                      </Button>
-                      <Button
-                        type="button"
-                        variant="ghost"
-                        size="icon-sm"
-                        onClick={() => setDeleteTarget(definition)}
-                        aria-label={t(words.delete)}
-                      >
-                        <Trash2 className="h-4 w-4" />
-                      </Button>
-                    </div>
+                    <RowActions
+                      definitions={definitions}
+                      index={index}
+                      moving={moving}
+                      onMove={(by) => onMove(index, by)}
+                      onEdit={() => onEdit(definition)}
+                      onDelete={() => onDelete(definition)}
+                    />
                   </TableCell>
                 ) : null}
               </TableRow>
@@ -750,6 +757,212 @@ export const InitiativeSettingsPropertiesTab = ({ initiativeId }: { initiativeId
         </TableBody>
       </Table>
     </div>
+  );
+};
+
+/**
+ * A project's or a collection's properties, to reorder, edit and delete, and
+ * New property: as a table in a project's Settings › Properties, or, given a
+ * `placement`, as its layout editor's narrow list, each with where it shows.
+ * Without `canManage` it lists them and changes nothing.
+ */
+const OwnerProperties = ({
+  initiativeId,
+  owner,
+  canManage,
+  placement,
+}: {
+  initiativeId: number;
+  owner: MetadataOwner;
+  canManage: boolean;
+  placement?: (definition: PropertyDefinitionRead) => string;
+}) => {
+  const { t, i18n } = useTranslation(PROPERTY_NAMESPACES);
+  const words = WORDS[owner.kind];
+  const propertiesQuery = useProperties({ owner });
+  const { move, moving } = useMoveDefinition();
+  const [editing, setEditing] = useState<{ definition?: PropertyDefinitionRead } | null>(null);
+  const [deleteTarget, setDeleteTarget] = useState<PropertyDefinitionRead | null>(null);
+
+  const definitions = useMemo(() => {
+    const byName = collator(i18n.language);
+    return [...(propertiesQuery.data ?? [])].sort((a, b) =>
+      a.position !== b.position ? a.position - b.position : byName.compare(a.name, b.name)
+    );
+  }, [propertiesQuery.data, i18n.language]);
+
+  let list: ReactNode;
+  if (propertiesQuery.isLoading) {
+    list = (
+      <div className="flex items-center gap-2 text-muted-foreground text-sm">
+        <Loader2 className="h-4 w-4 animate-spin" />
+        {t("common:loading")}
+      </div>
+    );
+  } else if (definitions.length === 0) {
+    list = <p className="text-muted-foreground text-sm">{t(words.none)}</p>;
+  } else if (!placement) {
+    list = (
+      <DefinitionTable
+        definitions={definitions}
+        canEdit={canManage}
+        moving={moving}
+        onMove={(index, by) => void move(definitions, index, by)}
+        onEdit={(definition) => setEditing({ definition })}
+        onDelete={setDeleteTarget}
+      />
+    );
+  } else {
+    list = (
+      <ul className="divide-y rounded-md border text-sm">
+        {definitions.map((definition, index) => {
+          const Icon = iconForPropertyType(definition.type);
+          return (
+            <li key={definition.id} className="space-y-1 px-3 py-2">
+              <div className="flex items-center gap-2">
+                <Icon
+                  className="h-4 w-4 shrink-0 text-muted-foreground"
+                  aria-label={t(`properties:types.${definition.type}`)}
+                  role="img"
+                />
+                <span className="min-w-0 flex-1 truncate font-medium">{definition.name}</span>
+                {canManage ? (
+                  <RowActions
+                    definitions={definitions}
+                    index={index}
+                    moving={moving}
+                    onMove={(by) => void move(definitions, index, by)}
+                    onEdit={() => setEditing({ definition })}
+                    onDelete={() => setDeleteTarget(definition)}
+                  />
+                ) : null}
+              </div>
+              <p className="text-muted-foreground text-xs">{placement(definition)}</p>
+            </li>
+          );
+        })}
+      </ul>
+    );
+  }
+
+  const dialogs = (
+    <>
+      <PropertyDialog
+        open={editing !== null}
+        definition={editing?.definition}
+        initiativeId={initiativeId}
+        owner={owner}
+        position={definitions.length}
+        onClose={() => setEditing(null)}
+      />
+      <PropertyDeleteDialog definition={deleteTarget} onClose={() => setDeleteTarget(null)} />
+    </>
+  );
+  if (!placement) {
+    return (
+      <Card>
+        <CardHeader className="flex flex-row flex-wrap items-start justify-between gap-4">
+          <CardDescription>{t(words.description)}</CardDescription>
+          {canManage ? (
+            <Button onClick={() => setEditing({})}>
+              <Plus className="h-4 w-4" />
+              {t(words.create)}
+            </Button>
+          ) : null}
+        </CardHeader>
+        <CardContent>{list}</CardContent>
+        {dialogs}
+      </Card>
+    );
+  }
+  return (
+    <div className="space-y-4">
+      <p className="text-muted-foreground text-sm">{t(words.description)}</p>
+      {list}
+      {canManage ? (
+        <Button type="button" variant="outline" size="sm" onClick={() => setEditing({})}>
+          <Plus className="h-4 w-4" />
+          {t(words.create)}
+        </Button>
+      ) : null}
+      {dialogs}
+    </div>
+  );
+};
+
+/** Whether `definition` is a project's or a collection's property. */
+const isToolProperty = (definition: PropertyDefinitionRead) =>
+  definition.project_id !== null || definition.collection_id !== null;
+
+/**
+ * Initiative settings › Metadata: the initiative's metadata, then each of its
+ * projects' and collections' properties under the owner's name. It lists what
+ * the server lists, which is only the properties of the tools the reader may
+ * edit, and offers what each group's `can_edit` allows: editing one,
+ * reordering, deleting several at once, and promoting properties of one type
+ * into one of the initiative's metadata. A project's or a collection's
+ * properties are made in its layout editor; the initiative's metadata here.
+ */
+const InitiativeMetadata = ({ initiativeId }: { initiativeId: number }) => {
+  const { t } = useTranslation(PROPERTY_NAMESPACES);
+  const groupsQuery = usePropertyGroups(initiativeId);
+  const { move, moving } = useMoveDefinition();
+  const deleteMany = useDeleteProperties();
+
+  const [editing, setEditing] = useState<{ definition?: PropertyDefinitionRead } | null>(null);
+  const [deleteTarget, setDeleteTarget] = useState<PropertyDefinitionRead | null>(null);
+  const [selected, setSelected] = useState<ReadonlySet<number>>(() => new Set());
+  const [askingDelete, setAskingDelete] = useState(false);
+  const [promoting, setPromoting] = useState(false);
+
+  const groups = groupsQuery.data?.groups ?? [];
+  const metadataGroup = groups.find((group) => group.owner === "initiative");
+  const toolGroups = groups.filter((group) => group.owner !== "initiative");
+  // What is selected, of what is still listed.
+  const chosen = groups.flatMap((group) =>
+    group.definitions.filter((definition) => selected.has(definition.id))
+  );
+  const promotable =
+    chosen.length > 0 &&
+    chosen.every(
+      (definition) =>
+        isToolProperty(definition) &&
+        definition.type === chosen[0].type &&
+        definition.currency === chosen[0].currency
+    );
+
+  const toggle = (id: number, on: boolean) =>
+    setSelected((prev) => {
+      const next = new Set(prev);
+      if (on) next.add(id);
+      else next.delete(id);
+      return next;
+    });
+
+  const handleDeleteSelected = async () => {
+    try {
+      await deleteMany.mutateAsync({
+        initiative_id: initiativeId,
+        ids: chosen.map((definition) => definition.id),
+      });
+      toast.success(t("properties:manager.bulkDeleted", { count: chosen.length }));
+      setSelected(new Set());
+      setAskingDelete(false);
+    } catch {
+      // Error toast handled by the mutation hook.
+    }
+  };
+
+  const table = ({ definitions, can_edit: canEdit }: PropertyDefinitionGroup) => (
+    <DefinitionTable
+      definitions={definitions}
+      canEdit={canEdit}
+      selection={{ selected, toggle }}
+      moving={moving}
+      onMove={(index, by) => void move(definitions, index, by)}
+      onEdit={(definition) => setEditing({ definition })}
+      onDelete={setDeleteTarget}
+    />
   );
 
   if (groupsQuery.isLoading) {
@@ -884,3 +1097,35 @@ export const InitiativeSettingsPropertiesTab = ({ initiativeId }: { initiativeId
     </div>
   );
 };
+
+/**
+ * The property manager. Given no `owner`, Initiative settings › Metadata
+ * (``/settings/properties``): the initiative's metadata and every project's
+ * and collection's properties the reader may edit. Given an `owner`, that
+ * project's or collection's properties: a project's Settings › Properties,
+ * or with a `placement`, the layout editor's panel, each with where it
+ * shows.
+ */
+export const InitiativeSettingsPropertiesTab = ({
+  initiativeId,
+  owner,
+  canManage = true,
+  placement,
+}: {
+  initiativeId: number;
+  owner?: MetadataOwner;
+  /** With an `owner`: whether the request may change its properties. */
+  canManage?: boolean;
+  /** With an `owner`: where a property shows, said under its name. */
+  placement?: (definition: PropertyDefinitionRead) => string;
+}) =>
+  owner ? (
+    <OwnerProperties
+      initiativeId={initiativeId}
+      owner={owner}
+      canManage={canManage}
+      placement={placement}
+    />
+  ) : (
+    <InitiativeMetadata initiativeId={initiativeId} />
+  );

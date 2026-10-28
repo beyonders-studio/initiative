@@ -467,10 +467,12 @@
     "error": "Couldn't change the collection",
     "properties": {
       "description": "What each file in this collection can hold here: its values belong to this collection, not to the file.",
+      "create": "New property",
       "edit": "Edit property",
       "delete": "Delete property",
       "deleteTitle": "Delete this property?",
       "deleteBody": "This removes the property and every file's value of it in this collection.",
+      "none": "No properties yet",
       "heading": "In this collection",
       "saveError": "Couldn't save the value",
       "of": "{{name}}'s properties"

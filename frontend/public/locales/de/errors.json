@@ -789,6 +789,7 @@
   "ACCESS_GRANT_CASE_NOT_LINKABLE": "Für einen Fall dieser Art kann kein Zugriff angefragt werden.",
   "ACCESS_GRANT_CASE_CLOSED": "Dieser Fall ist geschlossen.",
   "ACCESS_GRANT_CASE_OTHER_COMMUNITY": "Dieser Fall betrifft eine andere Community.",
+  "ACCESS_GRANT_COMMUNITY_NOTICE_NOT_OFFERED": "Die Community zu benachrichtigen kann nur für einen Sicherheits- oder Moderationsfall gewählt werden.",
   "HOLD_CASE_OTHER_COMMUNITY": "Dieser Fall betrifft eine andere Community als diesen Inhalt.",
   "DEMO_LINK_NOT_FOUND": "Dieser Demo-Link funktioniert nicht mehr. Bitte die Person, die ihn geschickt hat, um einen neuen.",
   "DEMO_BUSY": "Alle Demo-Bereiche sind belegt. Versuche es in einer Minute noch einmal.",

@@ -235,7 +235,8 @@
   },
   "settings": {
     "tabTaskStatuses": "Statuts de tâche",
-    "tabTaskTypes": "Types de tâche"
+    "tabTaskTypes": "Types de tâche",
+    "tabProperties": "Propriétés"
   },
   "files": {
     "newFile": "Nouveau fichier"
@@ -423,9 +424,11 @@
   },
   "properties": {
     "description": "Ce que les tâches de ce projet peuvent porter en plus des métadonnées de l'initiative. Une tâche déplacée vers un autre projet ne garde une valeur que si ce projet a une propriété du même nom et du même type.",
+    "create": "Nouvelle propriété",
     "edit": "Modifier la propriété",
     "delete": "Supprimer la propriété",
     "deleteTitle": "Supprimer cette propriété ?",
-    "deleteBody": "La propriété et la valeur de chaque tâche dans ce projet seront supprimées."
+    "deleteBody": "La propriété et la valeur de chaque tâche dans ce projet seront supprimées.",
+    "none": "Aucune propriété pour l'instant"
   }
 }

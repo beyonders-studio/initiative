@@ -9,7 +9,7 @@
   "avatar_url": "/marketplace/core-facility-maintenance.svg",
   "images": [],
   "version": "1.2.0",
-  "release_notes": "Routines, service visits and repairs are each their own type, with a page of their own. A new task is a repair, and asks what is wrong and who has been called.",
+  "release_notes": "Routines, service visits and repairs are each their own type, with a page of their own. A new task is a repair, and asks what is wrong and who has been called. The project's fields are its own properties rather than the initiative's metadata. Cost is money, in US dollars.",
   "definition": {
     "type": "initiative-project",
     "schema_version": 1,
@@ -135,21 +135,25 @@
             "label": "Grounds",
             "color": "#10B981"
           }
-        ]
+        ],
+        "project": true
       },
       {
         "name": "Vendor",
         "type": "text",
         "position": 1.0,
         "color": null,
-        "options": null
+        "options": null,
+        "project": true
       },
       {
         "name": "Cost",
-        "type": "number",
+        "type": "currency",
         "position": 2.0,
         "color": null,
-        "options": null
+        "options": null,
+        "currency": "USD",
+        "project": true
       }
     ],
     "tasks": [
@@ -169,7 +173,8 @@
           {
             "property_name": "Area",
             "property_type": "select",
-            "value_text": "safety"
+            "value_text": "safety",
+            "project": true
           }
         ],
         "type_name": "Routine"
@@ -190,7 +195,8 @@
           {
             "property_name": "Area",
             "property_type": "select",
-            "value_text": "safety"
+            "value_text": "safety",
+            "project": true
           }
         ],
         "type_name": "Routine"
@@ -211,7 +217,8 @@
           {
             "property_name": "Area",
             "property_type": "select",
-            "value_text": "safety"
+            "value_text": "safety",
+            "project": true
           }
         ],
         "type_name": "Routine"
@@ -232,7 +239,8 @@
           {
             "property_name": "Area",
             "property_type": "select",
-            "value_text": "safety"
+            "value_text": "safety",
+            "project": true
           }
         ],
         "type_name": "Routine"
@@ -253,7 +261,8 @@
           {
             "property_name": "Area",
             "property_type": "select",
-            "value_text": "hvac"
+            "value_text": "hvac",
+            "project": true
           }
         ],
         "type_name": "Routine"
@@ -274,7 +283,8 @@
           {
             "property_name": "Area",
             "property_type": "select",
-            "value_text": "building"
+            "value_text": "building",
+            "project": true
           }
         ],
         "type_name": "Service visit"
@@ -308,7 +318,8 @@
           {
             "property_name": "Area",
             "property_type": "select",
-            "value_text": "hvac"
+            "value_text": "hvac",
+            "project": true
           }
         ],
         "type_name": "Service visit"
@@ -329,7 +340,8 @@
           {
             "property_name": "Area",
             "property_type": "select",
-            "value_text": "grounds"
+            "value_text": "grounds",
+            "project": true
           }
         ],
         "type_name": "Routine"
@@ -350,7 +362,8 @@
           {
             "property_name": "Area",
             "property_type": "select",
-            "value_text": "plumbing"
+            "value_text": "plumbing",
+            "project": true
           }
         ],
         "type_name": "Routine"
@@ -384,7 +397,8 @@
           {
             "property_name": "Area",
             "property_type": "select",
-            "value_text": "safety"
+            "value_text": "safety",
+            "project": true
           }
         ],
         "type_name": "Service visit"
@@ -405,7 +419,8 @@
           {
             "property_name": "Area",
             "property_type": "select",
-            "value_text": "building"
+            "value_text": "building",
+            "project": true
           }
         ],
         "type_name": "Routine"
@@ -426,7 +441,8 @@
           {
             "property_name": "Area",
             "property_type": "select",
-            "value_text": "electrical"
+            "value_text": "electrical",
+            "project": true
           }
         ],
         "type_name": "Routine"

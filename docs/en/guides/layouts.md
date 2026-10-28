@@ -46,13 +46,17 @@ Nothing changes for anyone until you save, and leaving with unsaved changes asks
 
 ### What goes in
 
-- **Fields.** The built-ins, a project's or a collection's properties, and the initiative's [metadata](initiatives.md#metadata), each under its own heading, or **All metadata** (**All properties and metadata** on a project's tasks) for every value a thing has. Pick a type under **New field** to make one without leaving the editor; in a project or a collection, it asks whose it is.
-
-Select a field that shows the project's or the collection's own property and its settings have **Edit property** (name, options and their colours, colour, currency) and **Delete property**, which takes every value with it and asks first. The initiative's metadata is edited in [its settings](initiatives.md#metadata); its field links there.
+- **Fields.** The built-ins, a project's or a collection's properties, and the initiative's [metadata](initiatives.md#metadata), each under its own heading, or **All metadata** (**All properties and metadata** on a project's tasks) for every value a thing has. Pick a type under **New property** (**New metadata** where there's no project or collection) to make one without leaving the editor; in a project or a collection, it asks whose it is.
 - **Plug-in parts**, from plug-ins installed in your community, on a card or a detail.
 - **Row**, which puts what it holds side by side. A detail also takes an **Accordion** (a titled section that opens and closes, and can **Start closed**) and a **Box** (a border round what it holds).
 
 A table takes fields and nothing else, since a column is a column.
+
+### Properties
+
+Click the layout's name at the top of the outline and, in a project or a collection, its properties are listed on the right, each saying which layouts show it. Reorder, edit or delete them there, or make a **New property**; a project's are also in **Settings → Properties**. Deleting one takes every value of it with it, so it asks first. A page that shows all properties picks up a new one straight away; cards and tables show only what you add.
+
+The initiative's metadata is edited in [its settings](initiatives.md#metadata). Select a field that shows some and its settings link there.
 
 A table or board layout also says what people may **group by**, what it **starts grouped by**, and which groups to leave out, such as finished sprints. A date groups by day, week, month, quarter or year; pick which beside it. A board's **Column limits** cap how many open tasks a status column holds; once one is full, nobody adds or moves a task into it until one leaves.
 

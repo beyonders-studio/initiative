@@ -34,8 +34,9 @@ import {
   useSaveLayouts,
 } from "@/hooks/useToolLayouts";
 import { atLeast, useWidthClass } from "@/hooks/useWidthClass";
-import { type StoredRegions, storedLayout } from "@/lib/layouts/detailLayout";
+import { placedProperties, type StoredRegions, storedLayout } from "@/lib/layouts/detailLayout";
 import {
+  CARD_LISTS,
   cardOf,
   changeAt,
   columnsOf,
@@ -43,12 +44,14 @@ import {
   dropInto,
   HOLDERS,
   historyReducer,
+  holdsPart,
   insertAt,
   LAYOUT_SELECTED,
   type ListLayout,
   type ListShape,
   moveNode,
   type NodePath,
+  namedFields,
   nodeAt,
   type Place,
   pathAfterMove,
@@ -58,7 +61,7 @@ import {
   startHistory,
   withCard,
 } from "@/lib/layouts/draft";
-import { type FieldDef, withDisplays } from "@/lib/layouts/fields";
+import { type FieldDef, propertyFieldId, withDisplays } from "@/lib/layouts/fields";
 import {
   pluginFields,
   pluginKindOf,
@@ -86,10 +89,15 @@ import type { EditablePresets } from "./LayoutPresets";
 import {
   DetailLayoutSettings,
   type LayoutProject,
+  LayoutProperties,
   ListLayoutSettings,
 } from "./LayoutSettingsPanel";
 
 const noop = () => {};
+
+/** No fields: where a list shows a property is its own card or columns, or
+ *  its shape's, whatever plug-ins add. */
+const NO_FIELDS: ReadonlyMap<string, FieldDef> = new Map();
 
 /** What the part edits change while nothing is open. */
 const EMPTY_TREE: LayoutNode = { type: "layout", children: [] };
@@ -270,8 +278,9 @@ export const LayoutEditor = ({
   set: ToolLayoutSetRead;
   /** The layout to open on: a list's kind, or the task's detail. */
   initialKind?: string;
-  /** Whether the request may edit the target's own properties, the
-   *  project's or the collection's: the server's answer on it. */
+  /** Whether the request may make, edit and delete the target's own
+   *  properties, the project's or the collection's: the server's answer on
+   *  it. Without it the panel lists them and changes nothing. */
   ownPropertiesEditable?: boolean;
   onClose: () => void;
 }) => {
@@ -341,8 +350,6 @@ export const LayoutEditor = ({
   // collection's files'.
   const owner: MetadataOwner | undefined =
     lists?.owner ?? (project ? { kind: "project", id: project.id } : undefined);
-  // The owner whose properties a selected field edits and deletes here.
-  const ownProperties = ownPropertiesEditable ? owner : undefined;
   const { data: definitions = NO_DEFINITIONS } = useOwnedDefinitions({
     initiativeId,
     owner: project ? owner : undefined,
@@ -371,6 +378,38 @@ export const LayoutEditor = ({
     const opensOn = shown.includes(draft.opensOn) ? draft.opensOn : (shown[0] ?? draft.opensOn);
     return { ...draft, lists, opensOn };
   };
+
+  /** The names of the layouts that show the property, as the draft has
+   *  them: each shown list, and each page, that places it or shows every
+   *  property. */
+  const shownOn = (propertyId: number): string[] => {
+    const field = propertyFieldId(propertyId);
+    const onLists = shownKinds.filter((kind) => {
+      const definition = draft.lists[kind] ?? {};
+      if (kind === "table") return columnsOf(definition, NO_FIELDS, lists?.shape).includes(field);
+      if (!CARD_LISTS.has(kind)) return false;
+      const card = cardOf(definition, NO_FIELDS, lists?.shape);
+      return namedFields(card).has(field) || holdsPart(card, "properties");
+    });
+    const onPages = details.filter((each) => {
+      const page = each.spec.root(draft.details[detailKey(each)] as StoredRegions | null);
+      return placedProperties(page).has(propertyId) || holdsPart(page, "properties");
+    });
+    return [
+      ...onLists.map((kind) => translate(listLayoutLooks[kind].labelKey)),
+      ...onPages.map((each) => translate(each.words.name, { name: each.typeName })),
+    ];
+  };
+  // The target's own properties, managed beside the layout they are placed on.
+  const properties =
+    owner && selection.kind === "layout" ? (
+      <LayoutProperties
+        initiativeId={initiativeId}
+        owner={owner}
+        canManage={ownPropertiesEditable}
+        shownOn={shownOn}
+      />
+    ) : null;
 
   const changeDraft = (next: Draft, then?: Selection) => {
     if (saving) return;
@@ -477,9 +516,9 @@ export const LayoutEditor = ({
 
   // What Add offers, in the outline and at a point on the canvas, and what a
   // pick does there.
-  // On a project's tasks, the part showing every property shows its metadata
-  // as well.
-  const propertiesPart = project ? "layouts:allPropertiesAndMetadata" : "layouts:allMetadata";
+  // Where the target has properties of its own, the part showing every
+  // property shows the initiative's metadata as well.
+  const propertiesPart = owner ? "layouts:allPropertiesAndMetadata" : "layouts:allMetadata";
   const { labelOf, partLabel, pickerPlugins } = usePartLabel(
     fields,
     plugins,
@@ -783,8 +822,8 @@ export const LayoutEditor = ({
                 selection={selection}
                 edits={edits}
                 locked={saving}
-                ownProperties={ownProperties}
               />
+              {properties}
             </aside>
           </div>
         ) : current && presets ? (
@@ -833,8 +872,8 @@ export const LayoutEditor = ({
                 selection={selection}
                 edits={edits}
                 locked={saving}
-                ownProperties={ownProperties}
               />
+              {properties}
             </aside>
           </div>
         ) : null}

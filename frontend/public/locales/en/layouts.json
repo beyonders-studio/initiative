@@ -1,5 +1,6 @@
 {
   "open": "Edit layouts",
+  "editLayout": "Edit {{name}}",
   "title": "Edit layouts",
   "close": "Close the editor",
   "previewWidth": "Preview width",
@@ -39,10 +40,13 @@
   "emptyGroup": "Empty. Drop a part here, or add one.",
   "builtIn": "Built-in",
   "properties": "Properties",
+  "propertiesShownOn": "Shown on {{layouts}}",
+  "propertiesNowhere": "Not shown on any layout yet. Place it with Add.",
+  "propertiesPlacementHelp": "A page that shows all properties shows a new one straight away. Cards and tables show only what you add to them.",
   "layoutParts": "Layout",
   "hidePart": "Hide",
   "settings": "Settings",
-  "cardHelp": "What each task shows on the board. Select a part to change it, or add one below the outline.",
+  "cardHelp": "What each item shows on its card. Select a part to change it, or add one below the outline.",
   "propertiesHelp": "Shows every property and metadata value a task holds.",
   "pluginPartHelp": "Drawn by the plug-in from its own values and actions.",
   "fieldHelp": "Shows this field when a task has a value for it.",
@@ -96,7 +100,7 @@
   "typedTaskLayout": "{{name}} page",
   "detailHelp": "How every task's detail in this project is laid out. What it leaves out is hidden.",
   "useShipped": "Use the shipped layout",
-  "shipped": "This is the layout as shipped. Changing it makes it the project's own.",
+  "shipped": "This is the layout as shipped. A change is kept for everyone who sees it.",
   "detailTitleHelp": "Every task's detail shows its title.",
   "opensFirst": "Opens first",
   "shownInMenu": "Shown in the layout menu",
@@ -204,7 +208,8 @@
     "rowHelp": "Puts what it holds side by side."
   },
   "boxWith": "Box with {{name}}",
-  "newField": "New field",
+  "newProperty": "New property",
+  "newMetadata": "New metadata",
   "projectProperties": "This project's properties",
   "collectionProperties": "This collection's properties",
   "initiativeMetadata": "Initiative metadata",
@@ -249,8 +254,8 @@
     "noItems": "Add a counter to the group to see its layout here."
   },
   "fileDetail": {
-    "name": "File detail",
-    "help": "How a file opened from this collection is shown beside it. What it leaves out is hidden.",
+    "name": "File page",
+    "help": "How a file opened from this collection is shown, beside its picture or beside the collection, once the collection has properties of its own. What it leaves out is hidden.",
     "shipped": "This is the layout as shipped. Changing it makes it the collection's own.",
     "titleHelp": "Every file shows its name.",
     "hiddenHelp": "Every file can show this. Taken off, it is hidden, and Add puts it back.",
@@ -291,7 +296,6 @@
     "bar": "A bar"
   },
   "fieldProperty": {
-    "property": "Property",
     "metadata": "Metadata",
     "metadataHelp": "This is the initiative's metadata, which is edited in its settings.",
     "openSettings": "Open initiative settings"

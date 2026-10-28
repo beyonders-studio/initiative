@@ -211,6 +211,7 @@ describe("CasePanel", () => {
       expires_at: new Date(Date.now() + 45 * 60_000).toISOString(),
       revoked_at: null,
       case_task_id: 3,
+      community_notice: "none",
       community_status: "active",
       approved_by: null,
       is_live: true,

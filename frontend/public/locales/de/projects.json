@@ -235,7 +235,8 @@
   },
   "settings": {
     "tabTaskStatuses": "Aufgabenstatus",
-    "tabTaskTypes": "Aufgabentypen"
+    "tabTaskTypes": "Aufgabentypen",
+    "tabProperties": "Eigenschaften"
   },
   "files": {
     "newFile": "Neue Datei"
@@ -423,9 +424,11 @@
   },
   "properties": {
     "description": "Was die Aufgaben dieses Projekts neben den Metadaten der Initiative tragen können. Eine Aufgabe, die in ein anderes Projekt verschoben wird, behält einen Wert nur, wenn dieses Projekt eine Eigenschaft mit demselben Namen und Typ hat.",
+    "create": "Neue Eigenschaft",
     "edit": "Eigenschaft bearbeiten",
     "delete": "Eigenschaft löschen",
     "deleteTitle": "Diese Eigenschaft löschen?",
-    "deleteBody": "Damit werden die Eigenschaft und die Werte aller Aufgaben dafür in diesem Projekt entfernt."
+    "deleteBody": "Damit werden die Eigenschaft und die Werte aller Aufgaben dafür in diesem Projekt entfernt.",
+    "none": "Noch keine Eigenschaften"
   }
 }

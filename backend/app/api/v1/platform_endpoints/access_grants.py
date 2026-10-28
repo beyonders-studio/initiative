@@ -25,6 +25,7 @@ from app.api.deps import (
 )
 from app.api.v1.platform_endpoints.session_opening import prove_second_factor
 from app.core.capabilities import Capability
+from app.core.clock import utcnow
 from app.core.audit_events import AuditEventType
 from app.core.messages import AccessGrantMessages, AuthMessages
 from app.db.query import build_paginated_response
@@ -34,6 +35,7 @@ from app.models.platform.access_grant import (
     AccessGrantPurpose,
     AccessGrantStatus,
     AccessLevel,
+    CommunityNotice,
     SettingsLevel,
 )
 from app.schemas.platform.access_grant import (
@@ -78,23 +80,30 @@ async def _one(grant, *, system_session: AsyncSession | None = None) -> AccessGr
 
 
 async def _check_case(
-    actor: User, case_task_id: Optional[int], guild_id: int, *, required: bool
-) -> None:
+    actor: User,
+    case_task_id: Optional[int],
+    guild_id: int,
+    *,
+    required: bool,
+    notice: Optional[CommunityNotice],
+) -> CommunityNotice:
     """Hold the case a grant is asked for to what it may be: one the asker
     reads, open, of a kind a grant serves, and about this community or none
     yet. Settling a case that names none waits for :func:`_claim_case`, once
-    the grant itself has passed its own checks."""
-    if case_task_id is None:
-        if required and await grant_cases.cases_required():
-            raise HTTPException(
-                status_code=status.HTTP_400_BAD_REQUEST,
-                detail=AccessGrantMessages.CASE_REQUIRED,
-            )
-        return
+    the grant itself has passed its own checks. Returns the notice the
+    community is owed, from the case and what the asker chose."""
     try:
-        await grant_cases.check_case(
+        if case_task_id is None:
+            if required and await grant_cases.cases_required():
+                raise HTTPException(
+                    status_code=status.HTTP_400_BAD_REQUEST,
+                    detail=AccessGrantMessages.CASE_REQUIRED,
+                )
+            return grant_cases.community_notice(None, notice)
+        stream = await grant_cases.check_case(
             actor, case_task_id=case_task_id, guild_id=guild_id
         )
+        return grant_cases.community_notice(stream, notice)
     except grant_cases.GrantCaseError as exc:
         raise HTTPException(status_code=exc.status_code, detail=exc.code) from exc
 
@@ -191,14 +200,19 @@ async def create_access_request(
     names the case it is for (``case_task_id``): one the requester can read,
     still open, and about this community or none yet. The case is told.
     """
-    await _check_case(
-        current_user, payload.case_task_id, payload.community_id, required=True
+    notice = await _check_case(
+        current_user,
+        payload.case_task_id,
+        payload.community_id,
+        required=True,
+        notice=payload.community_notice,
     )
     asked = await service.request_grants(
         session,
         requester=current_user,
         payload=payload,
         asks=payload.wanted,
+        community_notice=notice,
     )
     grant = asked[0]
     for requested in asked:
@@ -392,17 +406,25 @@ async def break_glass_access(
     await check_second_factor(
         session, actor=current_user, answer=payload, during="break_glass"
     )
-    await _check_case(
-        current_user, payload.case_task_id, payload.community_id, required=False
+    notice = await _check_case(
+        current_user,
+        payload.case_task_id,
+        payload.community_id,
+        required=False,
+        notice=payload.community_notice,
     )
     replaced = await service.reconcile_break_glass_pair(
         session, actor=current_user, payload=payload
     )
+    # One act: both grants carry the same moment.
+    issued_at = utcnow()
     grant = await service.break_glass(
         session,
         actor=current_user,
         payload=payload,
         level=AccessLevel.read_write.value,
+        community_notice=notice,
+        issued_at=issued_at,
     )
     settings_grant = await service.break_glass(
         session,
@@ -410,6 +432,8 @@ async def break_glass_access(
         payload=payload,
         purpose=AccessGrantPurpose.settings,
         level=SettingsLevel.superadmin.value,
+        community_notice=notice,
+        issued_at=issued_at,
     )
     for prior in replaced:
         await audit_service.record(
@@ -443,6 +467,13 @@ async def break_glass_access(
             },
         )
     read = await _one(grant, system_session=session)
+    if notice is CommunityNotice.when_granted:
+        await grant_cases.tell_community(
+            session,
+            [grant, settings_grant],
+            ended=False,
+            guild_name=read.community_name,
+        )
     await _commit_with_case(session, payload.case_task_id, payload.community_id)
     await _tell_requested(
         session,
@@ -547,6 +578,7 @@ async def list_grant_cases(
                 stream=case.stream,
                 subject_community_id=case.subject_guild_id,
                 mine=case.mine,
+                community_notice=grant_cases.notice_rule(case.stream),
             )
             for case in await grant_cases.readable_open_cases(
                 current_user, search=search
@@ -588,6 +620,10 @@ async def approve_access_grant(
         },
     )
     read = await _one(grant, system_session=session)
+    if grant.community_notice == CommunityNotice.when_granted.value:
+        await grant_cases.tell_community(
+            session, [grant], ended=False, guild_name=read.community_name
+        )
     await session.commit()
     await _tell_decided(
         session, grant, decided_by=current_user, guild_name=read.community_name

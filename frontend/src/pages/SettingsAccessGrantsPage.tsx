@@ -5,6 +5,7 @@ import { useTranslation } from "react-i18next";
 import type {
   AccessGrantRead,
   BreakGlassCreate,
+  CommunityNotice,
   GrantCaseRead,
 } from "@/api/generated/initiativeAPI.schemas";
 import { AccessGrantStatusBadge } from "@/components/platform/AccessGrantStatusBadge";
@@ -112,6 +113,17 @@ const useCaseChoice = (form: AccessGrantsForm) => {
     setChosenId(taskId);
     setFound(picked);
   };
+  const listed =
+    caseTaskId == null
+      ? undefined
+      : (items.find((item) => item.task_id === caseTaskId) ??
+        (found?.task_id === caseTaskId ? found : undefined));
+  // A case the page was opened for that is past the first page is looked up
+  // by its number, so the form knows what it allows.
+  const lookedUp = useGrantCases({
+    enabled: caseTaskId != null && cases.isSuccess && listed === undefined,
+    search: `#${caseTaskId}`,
+  });
   return {
     items,
     loading: cases.isLoading,
@@ -119,11 +131,7 @@ const useCaseChoice = (form: AccessGrantsForm) => {
     required: cases.data?.required ?? false,
     caseTaskId,
     setCaseTaskId,
-    chosen:
-      caseTaskId == null
-        ? undefined
-        : (items.find((item) => item.task_id === caseTaskId) ??
-          (found?.task_id === caseTaskId ? found : undefined)),
+    chosen: listed ?? lookedUp.data?.items.find((item) => item.task_id === caseTaskId),
   };
 };
 
@@ -185,7 +193,57 @@ const CaseField = ({
   );
 };
 
-/** The case a grant was asked for, by its number. */
+/**
+ * Whether the community is told of the access, as the chosen case allows: a
+ * support case always tells it when access starts, and a security or
+ * moderation case leaves it to the asker. The server settles it; this only
+ * offers what it will take.
+ */
+const CommunityNoticeField = ({
+  id,
+  chosen,
+  value,
+  onChange,
+}: {
+  id: string;
+  chosen: GrantCaseRead | undefined;
+  value: CommunityNotice;
+  onChange: (value: CommunityNotice) => void;
+}) => {
+  const { t } = useTranslation("settings");
+  if (chosen?.community_notice === "always") {
+    return (
+      <p className="col-span-full text-muted-foreground text-xs">
+        {t("accessGrants.notice.always")}
+      </p>
+    );
+  }
+  if (chosen?.community_notice !== "optional") return null;
+  return (
+    <div className="space-y-1">
+      <Label htmlFor={id}>{t("accessGrants.notice.label")}</Label>
+      <Select value={value} onValueChange={(next) => onChange(next as CommunityNotice)}>
+        <SelectTrigger id={id}>
+          <SelectValue />
+        </SelectTrigger>
+        <SelectContent>
+          <SelectItem value="none">{t("accessGrants.notice.none")}</SelectItem>
+          <SelectItem value="when_granted">{t("accessGrants.notice.when_granted")}</SelectItem>
+          <SelectItem value="when_ended">{t("accessGrants.notice.when_ended")}</SelectItem>
+        </SelectContent>
+      </Select>
+      <p className="text-muted-foreground text-xs">{t("accessGrants.notice.help")}</p>
+    </div>
+  );
+};
+
+/** What a form sends for the community's notice: a choice only where the
+ *  chosen case offers one. */
+const noticeChoice = (chosen: GrantCaseRead | undefined, notice: CommunityNotice) =>
+  chosen?.community_notice === "optional" && notice !== "none" ? { community_notice: notice } : {};
+
+/** The case a grant was asked for, by its number, and when its community is
+ *  told of it. */
 const GrantCaseMark = ({ grant }: { grant: AccessGrantRead }) => {
   const { t } = useTranslation("settings");
   if (grant.case_task_id == null) return null;
@@ -194,6 +252,9 @@ const GrantCaseMark = ({ grant }: { grant: AccessGrantRead }) => {
   return (
     <span className="shrink-0 text-muted-foreground text-xs">
       {t("accessGrants.caseMark", { id: grant.case_task_id })}
+      {grant.community_notice !== "none"
+        ? ` · ${t(`accessGrants.notice.mark.${grant.community_notice}`)}`
+        : null}
     </span>
   );
 };
@@ -271,6 +332,7 @@ const BreakGlassSection = () => {
   // Null until chosen: the offered windows arrive with the requirements below.
   const [chosenDuration, setDuration] = useState<string | null>(null);
   const [reason, setReason] = useState("");
+  const [notice, setNotice] = useState<CommunityNotice>("none");
   const [code, setCode] = useState("");
 
   // What this request will be asked for. Breaking glass carries the account's
@@ -303,6 +365,7 @@ const BreakGlassSection = () => {
       setCommunity(null);
       caseChoice.setCaseTaskId(null);
       setReason("");
+      setNotice("none");
       setCode("");
       setFactorRefused(false);
       setPresenting(false);
@@ -332,6 +395,7 @@ const BreakGlassSection = () => {
       reason: reason.trim(),
       requested_duration_minutes: Number.parseInt(duration, 10),
       ...(caseChoice.caseTaskId == null ? {} : { case_task_id: caseChoice.caseTaskId }),
+      ...noticeChoice(caseChoice.chosen, notice),
       ...answer,
     });
   };
@@ -375,6 +439,12 @@ const BreakGlassSection = () => {
             />
           </div>
           <CaseField choice={caseChoice} community={community} optional />
+          <CommunityNoticeField
+            id="bg-notice"
+            chosen={caseChoice.chosen}
+            value={notice}
+            onChange={setNotice}
+          />
           <div className="space-y-1">
             <Label htmlFor="bg-duration">{t("accessGrants.durationLabel")}</Label>
             <Select value={duration} onValueChange={setDuration}>
@@ -495,6 +565,7 @@ const RequestSection = () => {
   const [chosenDuration, setDuration] = useState<string | null>(null);
   const duration = chosenDuration ?? defaultDuration;
   const [reason, setReason] = useState("");
+  const [notice, setNotice] = useState<CommunityNotice>("none");
 
   const createRequest = useCreateAccessRequest({
     onSuccess: () => {
@@ -502,6 +573,7 @@ const RequestSection = () => {
       setCommunity(null);
       caseChoice.setCaseTaskId(null);
       setReason("");
+      setNotice("none");
       setDuration(null);
     },
     onError: (err) => toast.error(getErrorMessage(err, "settings:accessGrants.requestError")),
@@ -527,6 +599,7 @@ const RequestSection = () => {
       reason: reason.trim(),
       requested_duration_minutes: Number.parseInt(duration, 10),
       ...(caseChoice.caseTaskId == null ? {} : { case_task_id: caseChoice.caseTaskId }),
+      ...noticeChoice(caseChoice.chosen, notice),
     });
   };
 
@@ -547,6 +620,12 @@ const RequestSection = () => {
             />
           </div>
           <CaseField choice={caseChoice} community={community} optional={false} />
+          <CommunityNoticeField
+            id="ag-notice"
+            chosen={caseChoice.chosen}
+            value={notice}
+            onChange={setNotice}
+          />
           <div className="space-y-1">
             <Label htmlFor="ag-level">{t("accessGrants.purposeContent")}</Label>
             <Select value={level} onValueChange={setLevel}>

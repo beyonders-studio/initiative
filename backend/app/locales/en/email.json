@@ -437,6 +437,26 @@
     "contactNobody": "Contact whoever runs this server to sort it out.",
     "buttonLabel": "Restore the plan"
   },
+  "communityAccess": {
+    "granted": {
+      "subject": "Platform staff have access to {{community}}",
+      "title": "Platform staff have access to {{community}}",
+      "body": "Staff of this server were given <strong>{{level}}</strong> access to <strong>{{community}}</strong> on {{start}}, until {{end}}."
+    },
+    "ended": {
+      "subject": "Platform staff had access to {{community}}",
+      "title": "Platform staff had access to {{community}}",
+      "body": "Staff of this server had <strong>{{level}}</strong> access to <strong>{{community}}</strong> from {{start}} until {{end}}. That access has ended."
+    },
+    "case": {
+      "security": "It was for a security case.",
+      "moderation": "It was for a moderation case.",
+      "support": "It was for a support case."
+    },
+    "recorded": "Every request made with it is recorded.",
+    "contact": "Questions about it can go to <strong>{{contact}}</strong>.",
+    "moment": "{{date}}, {{time}} UTC"
+  },
   "communityTrialEnding": {
     "subject": "{{community}}'s trial ends on {{date}}",
     "title": "{{community}}'s trial ends on {{date}}",

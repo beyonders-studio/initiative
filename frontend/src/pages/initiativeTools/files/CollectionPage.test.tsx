@@ -268,7 +268,7 @@ describe("a collection's page", () => {
     expect(within(beside).getByRole("link", { name: "Open file" })).toBeInTheDocument();
   });
 
-  it("leads whoever may lay it out to its layouts, where its fields are made", async () => {
+  it("lists its layouts for whoever may lay it out, and leads into the editor", async () => {
     server.use(
       communityHttp.get("/collections/:id", () =>
         HttpResponse.json(buildCollection({ id: 5, initiative_id: 1 }))
@@ -300,6 +300,10 @@ describe("a collection's page", () => {
     expect(screen.queryByRole("menuitem", { name: "Fields" })).not.toBeInTheDocument();
     await user.click(screen.getByRole("menuitem", { name: "Layouts" }));
 
+    // Its views, and the page a file opens on, each a way into the editor.
+    const layouts = await screen.findByRole("dialog", { name: "Layouts" });
+    expect(within(layouts).getByRole("link", { name: "Edit File page" })).toBeInTheDocument();
+    await user.click(within(layouts).getByRole("link", { name: "Edit layouts" }));
     await waitFor(() =>
       expect(router.state.location.pathname).toBe("/c/1/i/1/files/collections/5/layouts")
     );

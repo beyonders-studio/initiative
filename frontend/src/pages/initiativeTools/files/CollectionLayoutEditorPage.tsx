@@ -1,16 +1,17 @@
 /**
  * `/files/collections/$collectionId/layouts` — a collection's layouts (its
- * walls and table, and a file opened from it), edited in place: each wall's
- * card and the table's columns, and the file's detail, chosen from a file's
- * own fields, the collection's metadata and the initiative's properties,
- * drawn with the collection's own files. The collection's properties are
- * made here, and edited and deleted from the field that shows one.
+ * walls and table, and the page a file opens on from it), edited in place:
+ * each wall's card and the table's columns, and the file's page, chosen from
+ * a file's own fields, the collection's properties and the initiative's
+ * metadata, drawn with the collection's own files. The collection's
+ * properties are managed here too, beside the layouts they show on.
+ * `?layout=file` opens on the file's page.
  *
  * Who may is the server's answer on the set. The editor itself says when the
  * screen is too narrow to edit on, and keeps its draft while it is.
  */
 
-import { useNavigate, useParams } from "@tanstack/react-router";
+import { useNavigate, useParams, useSearch } from "@tanstack/react-router";
 import { useMemo } from "react";
 
 import { Tool } from "@/api/generated/initiativeAPI.schemas";
@@ -44,6 +45,7 @@ const NEWEST_ADDED = { sort_by: "added_at", sort_dir: "desc" };
 
 export const CollectionLayoutEditorPage = () => {
   const { collectionId } = useParams({ strict: false }) as { collectionId?: string };
+  const { layout } = useSearch({ strict: false }) as { layout?: string };
   const parsedId = collectionId ? Number(collectionId) : Number.NaN;
   const id = Number.isFinite(parsedId) ? parsedId : null;
   const navigate = useNavigate();
@@ -114,6 +116,7 @@ export const CollectionLayoutEditorPage = () => {
       details={details}
       set={set}
       ownPropertiesEditable={collection.can.edit}
+      initialKind={layout}
       onClose={() =>
         void navigate({ to: gp(collectionRoute(collection.initiative_id, collection.id)) })
       }

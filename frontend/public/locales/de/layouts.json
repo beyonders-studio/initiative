@@ -1,5 +1,6 @@
 {
   "open": "Layouts bearbeiten",
+  "editLayout": "{{name}} bearbeiten",
   "title": "Layouts bearbeiten",
   "close": "Editor schließen",
   "previewWidth": "Vorschaubreite",
@@ -39,10 +40,13 @@
   "emptyGroup": "Leer. Lege hier einen Teil ab oder füge einen hinzu.",
   "builtIn": "Eingebaut",
   "properties": "Eigenschaften",
+  "propertiesShownOn": "Angezeigt auf {{layouts}}",
+  "propertiesNowhere": "Noch auf keinem Layout angezeigt. Platziere sie mit Hinzufügen.",
+  "propertiesPlacementHelp": "Eine Seite, die alle Eigenschaften zeigt, zeigt eine neue sofort. Karten und Tabellen zeigen nur, was du ihnen hinzufügst.",
   "layoutParts": "Layout",
   "hidePart": "Ausblenden",
   "settings": "Einstellungen",
-  "cardHelp": "Was jede Aufgabe auf dem Board zeigt. Wähle einen Teil aus, um ihn zu ändern, oder füge unter der Gliederung einen hinzu.",
+  "cardHelp": "Was jedes Element auf seiner Karte zeigt. Wähle einen Teil aus, um ihn zu ändern, oder füge unter der Gliederung einen hinzu.",
   "propertiesHelp": "Zeigt jede Eigenschaft und alle Metadaten, für die eine Aufgabe einen Wert hat.",
   "pluginPartHelp": "Vom Plug-in aus seinen eigenen Werten und Aktionen gezeichnet.",
   "fieldHelp": "Zeigt dieses Feld, wenn eine Aufgabe einen Wert dafür hat.",
@@ -96,7 +100,7 @@
   "typedTaskLayout": "Seite „{{name}}“",
   "detailHelp": "Wie das Detail jeder Aufgabe in diesem Projekt aufgebaut ist. Was es weglässt, ist ausgeblendet.",
   "useShipped": "Ausgeliefertes Layout verwenden",
-  "shipped": "Das ist das Layout, wie es ausgeliefert wird. Eine Änderung macht es zum eigenen Layout des Projekts.",
+  "shipped": "Das ist das Layout, wie es ausgeliefert wird. Eine Änderung gilt für alle, die es sehen.",
   "detailTitleHelp": "Das Detail jeder Aufgabe zeigt ihren Titel.",
   "opensFirst": "Wird zuerst geöffnet",
   "shownInMenu": "Im Layout-Menü anzeigen",
@@ -204,7 +208,8 @@
     "rowHelp": "Stellt nebeneinander, was sie enthält."
   },
   "boxWith": "Box mit {{name}}",
-  "newField": "Neues Feld",
+  "newProperty": "Neue Eigenschaft",
+  "newMetadata": "Neue Metadaten",
   "projectProperties": "Eigenschaften dieses Projekts",
   "collectionProperties": "Eigenschaften dieser Sammlung",
   "initiativeMetadata": "Metadaten der Initiative",
@@ -249,8 +254,8 @@
     "noItems": "Füge der Gruppe einen Zähler hinzu, um hier sein Layout zu sehen."
   },
   "fileDetail": {
-    "name": "Datei-Detailansicht",
-    "help": "Wie eine aus dieser Sammlung geöffnete Datei daneben angezeigt wird. Was es weglässt, ist ausgeblendet.",
+    "name": "Dateiseite",
+    "help": "Wie eine aus dieser Sammlung geöffnete Datei angezeigt wird, neben ihrem Bild oder neben der Sammlung, sobald die Sammlung eigene Eigenschaften hat. Was es weglässt, ist ausgeblendet.",
     "shipped": "Das ist das Layout wie ausgeliefert. Eine Änderung macht es zum Layout der Sammlung.",
     "titleHelp": "Jede Datei zeigt ihren Namen.",
     "hiddenHelp": "Jede Datei kann dies zeigen. Entfernt ist es ausgeblendet, und Hinzufügen bringt es zurück.",
@@ -291,7 +296,6 @@
     "bar": "Balken"
   },
   "fieldProperty": {
-    "property": "Eigenschaft",
     "metadata": "Metadaten",
     "metadataHelp": "Das sind Metadaten der Initiative. Sie werden in ihren Einstellungen bearbeitet.",
     "openSettings": "Initiative-Einstellungen öffnen"

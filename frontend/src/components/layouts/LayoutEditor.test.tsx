@@ -240,52 +240,61 @@ describe("LayoutEditor", () => {
     expect(saved("table")?.columns).toContain("property:14");
   });
 
-  it("edits and deletes the project's property from its field, and leaves metadata to settings", async () => {
-    const changed: Array<{ id: string; body: unknown }> = [];
-    const deleted: string[] = [];
+  it("manages the project's properties only where the server says it may", async () => {
     server.use(
       definitionsHandler([buildPropertyDefinition({ id: 12, name: "Effort" })], {
         project: [buildPropertyDefinition({ id: 14, name: "Sprint", project_id: 1 })],
-      }),
-      communityHttp.patch("/property-definitions/:id", async ({ params, request }) => {
-        changed.push({ id: String(params.id), body: await request.json() });
-        return HttpResponse.json({
-          definition: buildPropertyDefinition({ id: 14, name: "Iteration", project_id: 1 }),
-          orphaned_value_count: 0,
-        });
-      }),
-      communityHttp.delete("/property-definitions/:id", ({ params }) => {
-        deleted.push(String(params.id));
-        return new HttpResponse(null, { status: 204 });
       })
     );
     const { user } = editor("table");
 
-    await user.click(await within(await outline()).findByRole("button", { name: /^add$/i }));
-    await user.click(await screen.findByRole("button", { name: "Sprint" }));
-    // What was added is selected, and its settings edit the property itself.
-    await user.click(await screen.findByRole("button", { name: "Edit property" }));
-    const dialog = await screen.findByRole("dialog", { name: "Edit property" });
-    const name = within(dialog).getByRole("textbox", { name: "Name" });
-    await user.clear(name);
-    await user.type(name, "Iteration");
-    await user.click(within(dialog).getByRole("button", { name: /^save$/i }));
-    await waitFor(() => expect(changed).toHaveLength(1));
-    expect(changed[0]).toMatchObject({ id: "14", body: { name: "Iteration" } });
-
-    await user.click(screen.getByRole("button", { name: "Delete property" }));
-    const confirm = await screen.findByRole("alertdialog");
-    expect(within(confirm).getByText("Delete this property?")).toBeInTheDocument();
-    await user.click(within(confirm).getByRole("button", { name: "Delete property" }));
-    await waitFor(() => expect(deleted).toEqual(["14"]));
+    // With the layout selected, the panel lists them, to change.
+    const panel = (await screen.findByRole("heading", { name: "Properties" })).closest(
+      "section"
+    ) as HTMLElement;
+    expect(await within(panel).findByText("Sprint")).toBeInTheDocument();
+    expect(within(panel).getByRole("button", { name: "Edit property" })).toBeInTheDocument();
+    expect(within(panel).getByRole("button", { name: "New property" })).toBeInTheDocument();
 
     // The initiative's metadata is placed here and edited in its settings.
-    await user.click(within(await outline()).getByRole("button", { name: /^add$/i }));
+    await user.click(await within(await outline()).findByRole("button", { name: /^add$/i }));
     await user.click(await screen.findByRole("button", { name: "Effort" }));
     expect(
       await screen.findByRole("link", { name: "Open initiative settings" })
     ).toBeInTheDocument();
-    expect(screen.queryByRole("button", { name: "Edit property" })).not.toBeInTheDocument();
+  });
+
+  it("lists the project's properties and changes nothing without the right to", async () => {
+    server.use(
+      definitionsHandler([], {
+        project: [buildPropertyDefinition({ id: 14, name: "Sprint", project_id: 1 })],
+      })
+    );
+    server.use(communityHttp.get("/layouts/", () => HttpResponse.json(buildToolLayoutSet())));
+    const target = instanceTarget(Tool.project, 1);
+    const Page = () => {
+      const read = useToolLayouts(target).data;
+      return read ? (
+        <LayoutEditor
+          target={target}
+          initiativeId={1}
+          project={PROJECT}
+          details={PROJECT_DETAILS}
+          presets={PROJECT_PRESETS}
+          set={read}
+          initialKind="table"
+          onClose={vi.fn()}
+        />
+      ) : null;
+    };
+    renderPage(Page);
+
+    const panel = (await screen.findByRole("heading", { name: "Properties" })).closest(
+      "section"
+    ) as HTMLElement;
+    expect(await within(panel).findByText("Sprint")).toBeInTheDocument();
+    expect(within(panel).queryByRole("button", { name: "Edit property" })).not.toBeInTheDocument();
+    expect(within(panel).queryByRole("button", { name: "New property" })).not.toBeInTheDocument();
   });
 
   it("makes a new field the project's property, or the initiative's metadata if asked", async () => {
@@ -961,7 +970,12 @@ describe("LayoutEditor", () => {
         type: MetadataType.scale,
         collection_id: 5,
       });
+      server.use(definitionsHandler([], { collection: [rating] }));
       const user = collectionEditor(buildCollection({ id: 5, metadata: [rating] }));
+
+      // Beside the layout, the collection's properties, each saying where it
+      // shows: the file's page shows every one.
+      expect(await screen.findByText("Shown on File page")).toBeInTheDocument();
 
       await user.click(await within(await outline()).findByRole("button", { name: /^add$/i }));
       const picker = await screen.findByRole("dialog", { name: "Add" });
@@ -971,6 +985,8 @@ describe("LayoutEditor", () => {
       await user.click(field);
       await user.click(screen.getByRole("combobox", { name: /show the scale as/i }));
       await user.click(await screen.findByRole("option", { name: "Stars" }));
+      await user.click(within(await outline()).getByRole("button", { name: "Grid" }));
+      expect(await screen.findByText("Shown on Grid and File page")).toBeInTheDocument();
       await user.click(screen.getByRole("button", { name: /^save$/i }));
 
       await waitFor(() => expect(saved("grid")).toBeDefined());
@@ -980,7 +996,7 @@ describe("LayoutEditor", () => {
       });
     });
 
-    it("makes a property of the collection's on a file's detail and places it", async () => {
+    it("makes a property of the collection's on a file's page and places it", async () => {
       const made: Record<string, unknown>[] = [];
       server.use(
         communityHttp.post("/property-definitions/", async ({ request }) => {
@@ -995,7 +1011,7 @@ describe("LayoutEditor", () => {
       const user = collectionEditor(buildCollection({ id: 5, initiative_id: 1 }));
 
       await user.click(await screen.findByRole("combobox", { name: "Layout being edited" }));
-      await user.click(await screen.findByRole("option", { name: "File detail" }));
+      await user.click(await screen.findByRole("option", { name: "File page" }));
       // Drawn with the collection's first file.
       expect(
         await within(await canvas()).findByRole("heading", { name: "Harbour" })

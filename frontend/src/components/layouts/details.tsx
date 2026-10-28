@@ -14,6 +14,7 @@ import { useReadCounter } from "@/api/generated/counters/counters";
 import {
   type CollectionFileSummary,
   type CollectionRead,
+  FileKind,
   type PropertyDefinitionRead,
   type PropertySummary,
   type TaskTypeRead,
@@ -47,6 +48,7 @@ import { QUEUE_ITEM_DETAIL } from "@/lib/layouts/queueItemLayout";
 import { TASK_DETAIL } from "@/lib/layouts/taskLayout";
 import { taskLayoutFor } from "@/lib/layouts/tasks";
 import type { LayoutNode } from "@/lib/layouts/tree";
+import { resolveUploadUrl } from "@/lib/uploadUrl";
 import type { TranslateFn } from "@/types/i18n";
 
 import { editablePresets } from "./LayoutPresets";
@@ -370,6 +372,44 @@ export const counterDetail = (groupId: number, initiativeId: number): EditableDe
   preview: (tree) => <CounterPreview groupId={groupId} initiativeId={initiativeId} tree={tree} />,
 });
 
+/** A file's page in a collection drawn where the collection opens it: a
+ *  picture's in the panel beside it, as the lightbox has it, and any other
+ *  file's in the sheet beside the wall. */
+const FilePreview = ({
+  collection,
+  file,
+  loaded,
+  tree,
+}: {
+  collection: CollectionRead;
+  file: CollectionFileSummary | undefined;
+  loaded: boolean;
+  tree: LayoutNode;
+}) => {
+  const page = (
+    <div className="@container">
+      <ItemPreview
+        detail={FILE_DETAIL}
+        tree={tree}
+        item={file}
+        none={loaded}
+        empty="fileDetail.noItems"
+        context={() => ({ collection })}
+      />
+    </div>
+  );
+  const picture = file?.kind === FileKind.image ? resolveUploadUrl(file.file_url) : null;
+  if (!picture) return <div className="max-w-md">{page}</div>;
+  return (
+    <div className="flex canvas-md:flex-row flex-col overflow-hidden rounded-md">
+      <div className="flex min-h-64 flex-1 items-center justify-center bg-black p-4">
+        <img src={picture} alt={file?.name} className="max-h-96 max-w-full object-contain" />
+      </div>
+      <div className="canvas-md:w-80 shrink-0 border bg-background p-4">{page}</div>
+    </div>
+  );
+};
+
 /** A file opened from a collection, drawn with `first`, the first of its
  *  files, once they are `loaded`. Its fields are the collection's lists'. */
 export const fileDetail = (
@@ -381,14 +421,7 @@ export const fileDetail = (
   words: wordsOf("fileDetail"),
   fields: (definitions) => collectionFileFields(collection.metadata, definitions),
   preview: (tree) => (
-    <ItemPreview
-      detail={FILE_DETAIL}
-      tree={tree}
-      item={first}
-      none={loaded}
-      empty="fileDetail.noItems"
-      context={() => ({ collection })}
-    />
+    <FilePreview collection={collection} file={first} loaded={loaded} tree={tree} />
   ),
 });
 

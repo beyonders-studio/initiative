@@ -198,6 +198,24 @@ export const SettingsLevel = {
 } as const;
 
 /**
+ * Whether, and when, a community's superadmins are emailed that platform
+ * staff hold a grant to it.
+ *
+ * The case a grant serves decides what may be chosen
+ * (``app.core.intake.CommunityNoticeRule``): a support case always tells
+ * the community when access starts; a security or moderation case leaves
+ * it to whoever asks, who may tell it when access starts, once it has
+ * ended, or not at all.
+ */
+export type CommunityNotice = (typeof CommunityNotice)[keyof typeof CommunityNotice];
+
+export const CommunityNotice = {
+  none: "none",
+  when_granted: "when_granted",
+  when_ended: "when_ended",
+} as const;
+
+/**
  * A request for time-bound access to one guild.
  *
  * Two axes, and a request may name either or both. **Content** reaches what
@@ -225,6 +243,7 @@ export interface AccessGrantCreate {
    */
   reason: string;
   case_task_id?: number | null;
+  community_notice?: CommunityNotice | null;
 }
 
 /**
@@ -350,6 +369,7 @@ export interface AccessGrantRead {
   expires_at: string | null;
   revoked_at: string | null;
   case_task_id: number | null;
+  community_notice: CommunityNotice;
   user: UserIdentity | null;
   community_name: string | null;
   community_status: CommunityStatus | null;
@@ -1279,6 +1299,7 @@ export interface BreakGlassCreate {
    */
   reason: string;
   case_task_id?: number | null;
+  community_notice?: CommunityNotice | null;
 }
 
 /**
@@ -3654,6 +3675,18 @@ export interface CommunityNarrowingPending {
   auto_join: boolean;
   agreed: boolean;
 }
+
+/**
+ * Whether a community hears that platform staff were given access to it
+ * for one of a stream's cases (``AccessGrant.community_notice``).
+ */
+export type CommunityNoticeRule = (typeof CommunityNoticeRule)[keyof typeof CommunityNoticeRule];
+
+export const CommunityNoticeRule = {
+  never: "never",
+  optional: "optional",
+  always: "always",
+} as const;
 
 export type NotificationCategory = (typeof NotificationCategory)[keyof typeof NotificationCategory];
 
@@ -6468,6 +6501,7 @@ export interface GrantCaseRead {
   stream: IntakeStream;
   subject_community_id: number | null;
   mine: boolean;
+  community_notice: CommunityNoticeRule;
 }
 
 /**
