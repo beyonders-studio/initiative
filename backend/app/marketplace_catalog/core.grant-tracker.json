@@ -5,7 +5,7 @@
   "name": "Grant tracker",
   "publisher": "Initiative",
   "description": "Every application, its deadline, and what you owe the funder afterwards.",
-  "long_description": "Each grant or appeal is a card that moves from Prospects to Writing to Submitted, then Awarded or Declined. Cards hold the funder, what you asked for, what you got, the deadline and when the report is due, because winning a grant is how you find out you have to write a report about it.\n\nThe deadline is the card's due date, so My Tasks and the calendar remind the right person in time. The amounts are in US dollars. Change their currency in the project's properties if yours is something else.\n\nGrants, appeals and reports are each their own type. A report has a checklist of what funders ask for, so writing one is filling it in.",
+  "long_description": "Each grant or appeal is a card that moves from Prospects to Writing to Submitted, then Awarded or Declined. Cards hold the funder, what you asked for, what you got, the deadline and when the report is due, because winning a grant is how you find out you have to write a report about it.\n\nThe deadline is the card's due date, so My Tasks and the calendar remind the right person in time. The amounts are in US dollars. Change their currency in the project's layouts if yours is something else.\n\nGrants, appeals and reports are each their own type. A report has a checklist of what funders ask for, so writing one is filling it in.",
   "avatar_url": "/marketplace/core-grant-tracker.svg",
   "images": [],
   "version": "1.2.0",

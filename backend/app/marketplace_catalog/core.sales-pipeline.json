@@ -5,7 +5,7 @@
   "name": "Sales pipeline",
   "publisher": "Initiative",
   "description": "Every deal on one board, from first hello to signed.",
-  "long_description": "Each deal is a card, and each stage is a column: Lead, Contacted, Demo sent, Trial, Negotiating, Won and Lost. Cards carry the company, the person you are talking to, what the deal is worth, where it came from and the date of the next step, so the board doubles as a to-do list.\n\nInstall one per salesperson and everyone works their own pipeline with the usual board, filters and due dates. A manager in the same initiative sees them all.\n\nValue is in US dollars. Change its currency in the project's properties if you sell in something else.\n\nA customer who signed for a year comes back as a renewal, which repeats every year from the day you set it.",
+  "long_description": "Each deal is a card, and each stage is a column: Lead, Contacted, Demo sent, Trial, Negotiating, Won and Lost. Cards carry the company, the person you are talking to, what the deal is worth, where it came from and the date of the next step, so the board doubles as a to-do list.\n\nInstall one per salesperson and everyone works their own pipeline with the usual board, filters and due dates. A manager in the same initiative sees them all.\n\nValue is in US dollars. Change its currency in the project's layouts if you sell in something else.\n\nA customer who signed for a year comes back as a renewal, which repeats every year from the day you set it.",
   "avatar_url": "/marketplace/core-sales-pipeline.svg",
   "images": [],
   "version": "1.2.0",
