@@ -217,6 +217,14 @@
     "account": {
       "title": "An account notice",
       "body": "Open Initiative to read it."
+    },
+    "overdue": {
+      "title": "You have overdue tasks",
+      "body": "Open Initiative to see them."
+    },
+    "coming_up": {
+      "title": "You have things coming up",
+      "body": "Open Initiative to see them."
     }
   },
   "quietHours": {
