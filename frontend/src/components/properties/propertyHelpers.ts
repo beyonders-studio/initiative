@@ -1,9 +1,9 @@
 import {
   type ListLayoutDefinitionInputDisplays,
+  MetadataType,
   type PropertyDefinitionRead,
   type PropertyOption,
   type PropertySummary,
-  PropertyType,
 } from "@/api/generated/initiativeAPI.schemas";
 import type { MemberLike } from "@/components/members/MemberSearchSelect";
 
@@ -22,8 +22,22 @@ export const slugify = (raw: string): string =>
     .replace(/^_+|_+$/g, "")
     .slice(0, 64);
 
-/** How a list draws a rating: a number, five stars, or a bar. */
-export type RatingDisplay = NonNullable<ListLayoutDefinitionInputDisplays>[string];
+/** How a scale is drawn: a number, five stars, or a bar. */
+export type ScaleDisplay = NonNullable<ListLayoutDefinitionInputDisplays>[string];
+
+/** How each way of drawing a scale is offered, in order. */
+export const SCALE_DISPLAYS: ScaleDisplay[] = ["number", "stars", "bar"];
+
+/** The figure a scale holds, from 0 to 100, or null where it holds none. A
+ *  plug-in's may carry a state beside it, as `{value, state}`. */
+export const scaleValue = (raw: unknown): number | null => {
+  const figure =
+    raw !== null && typeof raw === "object" && "value" in raw
+      ? (raw as { value: unknown }).value
+      : raw;
+  const value = numericValue(figure);
+  return value === null ? null : Math.min(100, Math.max(0, value));
+};
 
 /** The amount a money or number value holds, or null where it holds none. */
 export const numericValue = (raw: unknown): number | null => {
@@ -35,8 +49,8 @@ export const numericValue = (raw: unknown): number | null => {
   return null;
 };
 
-export const typeRequiresOptions = (type: PropertyType): boolean =>
-  type === PropertyType.select || type === PropertyType.multi_select;
+export const typeRequiresOptions = (type: MetadataType): boolean =>
+  type === MetadataType.select || type === MetadataType.multi_select;
 
 export const isEmptyPropertyValue = (value: unknown): boolean => {
   if (value === null || value === undefined) return true;
@@ -100,21 +114,30 @@ export const findOptionByLabel = (
 };
 
 /**
- * Extract the list of a summary's "attached and non-empty" entries, in the
- * same order they were returned by the server. Used by card chip rows so
- * empty rows are omitted.
+ * The values an item's own properties list: its initiative's properties and,
+ * on a task, its project's metadata. A collection's metadata is the
+ * collection's to show and change, and a plug-in's values are drawn as its
+ * fields.
+ */
+export const ownProperties = (summaries: PropertySummary[]): PropertySummary[] =>
+  summaries.filter((summary) => summary.install_id === null && summary.collection_id === null);
+
+/**
+ * Extract the item's own values ({@link ownProperties}) that hold something,
+ * in the same order they were returned by the server. Used by card chip rows
+ * so empty rows are omitted.
  */
 export const nonEmptyPropertySummaries = (
   summaries: PropertySummary[] | undefined | null
 ): PropertySummary[] => {
   if (!summaries) return [];
-  return summaries.filter((summary) => !isEmptyPropertyValue(summary.value));
+  return ownProperties(summaries).filter((summary) => !isEmptyPropertyValue(summary.value));
 };
 
 /** The person a ``user_reference`` value carries (the server reads it back as
  *  ``{id, display_name, …}``), so a picker can render them without a search. */
 export const userReferenceValue = (property: PropertySummary): MemberLike | null => {
-  if (property.type !== PropertyType.user_reference) return null;
+  if (property.type !== MetadataType.user_reference) return null;
   const raw = property.value;
   if (raw && typeof raw === "object" && typeof (raw as { id?: unknown }).id === "number") {
     return raw as MemberLike;
@@ -126,7 +149,7 @@ export const userReferenceValue = (property: PropertySummary): MemberLike | null
  *  takes: ``user_reference`` collapses to its numeric id (``PropertyInput``
  *  round-trips the id), everything else passes through. */
 export const normalizePropertyValue = (property: PropertySummary): unknown =>
-  property.type === PropertyType.user_reference
+  property.type === MetadataType.user_reference
     ? (userReferenceValue(property)?.id ?? null)
     : (property.value ?? null);
 
@@ -137,6 +160,10 @@ export const propertyStubFromDefinition = (
   property_id: definition.id,
   name: definition.name,
   type: definition.type,
+  project_id: definition.project_id,
+  collection_id: definition.collection_id,
+  install_id: null,
+  key: null,
   options: definition.options ?? null,
   currency: definition.currency ?? null,
   value: null,

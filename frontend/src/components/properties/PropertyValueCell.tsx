@@ -3,9 +3,9 @@ import { useMemo } from "react";
 import { useTranslation } from "react-i18next";
 
 import {
+  MetadataType,
   type PropertyOption,
   type PropertySummary,
-  PropertyType,
 } from "@/api/generated/initiativeAPI.schemas";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { formatDate, formatDateTime } from "@/lib/formatDate";
@@ -13,7 +13,12 @@ import { numberFormat } from "@/lib/intl";
 import { getAvatarSrc, getInitialsForUser, getUserDisplayName } from "@/lib/userDisplay";
 import { cn } from "@/lib/utils";
 
-import { isEmptyPropertyValue, numericValue, type RatingDisplay } from "./propertyHelpers";
+import {
+  isEmptyPropertyValue,
+  numericValue,
+  type ScaleDisplay,
+  scaleValue,
+} from "./propertyHelpers";
 import { iconForPropertyType } from "./propertyTypeIcons";
 
 type CellVariant = "cell" | "chip";
@@ -26,8 +31,8 @@ export interface PropertyValueCellProps {
    * value opens via a programmatic handler instead of nesting an `<a>` in an
    * `<a>`, and stops the click from also triggering the outer link. */
   nested?: boolean;
-  /** How a rating is drawn, as the list showing it says; a number without. */
-  display?: RatingDisplay | null;
+  /** How a scale is drawn, as the layout showing it says; a number without. */
+  display?: ScaleDisplay | null;
   /** On one line, its chips past the end cut off: a card whose height is
    *  reserved without measuring it. */
   oneLine?: boolean;
@@ -38,17 +43,17 @@ const formatNumber = (raw: unknown, options?: Intl.NumberFormatOptions): string 
   return value === null ? "" : numberFormat(undefined, options).format(value);
 };
 
-/** How many of five stars a rating of 1–100 fills: one for each fifth begun. */
-const ratingStars = (rating: number): number => Math.min(5, Math.max(0, Math.ceil(rating / 20)));
+/** How many of five stars a scale of 0–100 fills: one for each fifth begun. */
+const scaleStars = (value: number): number => Math.min(5, Math.max(0, Math.ceil(value / 20)));
 
-/** A rating of 1–100 as a list draws it. */
-const Rating = ({ value, display }: { value: number; display: RatingDisplay }) => {
-  const { t } = useTranslation("properties");
-  const label = t("cell.rating", { value: formatNumber(value) });
+/** A scale of 0–100 as a number ("80%"), five stars or a bar. */
+export const ScaleValue = ({ value, display }: { value: number; display: ScaleDisplay }) => {
+  const { i18n } = useTranslation();
+  const percent = numberFormat(i18n.language, { style: "percent" }).format(value / 100);
   if (display === "stars") {
-    const filled = ratingStars(value);
+    const filled = scaleStars(value);
     return (
-      <span role="img" aria-label={label} title={label} className="inline-flex items-center">
+      <span role="img" aria-label={percent} title={percent} className="inline-flex items-center">
         {[1, 2, 3, 4, 5].map((star) => (
           <Star
             key={star}
@@ -66,18 +71,15 @@ const Rating = ({ value, display }: { value: number; display: RatingDisplay }) =
     return (
       <span
         role="img"
-        aria-label={label}
-        title={label}
+        aria-label={percent}
+        title={percent}
         className="inline-block h-1.5 w-16 overflow-hidden rounded-full bg-muted-foreground/20"
       >
-        <span
-          className="block h-full rounded-full bg-primary"
-          style={{ width: `${Math.min(100, Math.max(0, value))}%` }}
-        />
+        <span className="block h-full rounded-full bg-primary" style={{ width: `${value}%` }} />
       </span>
     );
   }
-  return <span className="tabular-nums">{formatNumber(value)}</span>;
+  return <span className="tabular-nums">{percent}</span>;
 };
 
 const coerceOptionMap = (options: PropertyOption[] | null | undefined) => {
@@ -173,11 +175,11 @@ export const PropertyValueCell = ({
   let body: React.ReactNode = null;
 
   switch (type) {
-    case PropertyType.text: {
+    case MetadataType.text: {
       body = <span className="truncate">{String(value ?? "")}</span>;
       break;
     }
-    case PropertyType.url: {
+    case MetadataType.url: {
       const href = typeof value === "string" ? value : "";
       const urlClassName =
         "inline-flex max-w-full items-center gap-1 truncate text-primary hover:underline";
@@ -221,11 +223,11 @@ export const PropertyValueCell = ({
       );
       break;
     }
-    case PropertyType.number: {
+    case MetadataType.number: {
       body = <span className="tabular-nums">{formatNumber(value)}</span>;
       break;
     }
-    case PropertyType.currency: {
+    case MetadataType.currency: {
       body = (
         <span className="tabular-nums">
           {summary.currency
@@ -235,12 +237,12 @@ export const PropertyValueCell = ({
       );
       break;
     }
-    case PropertyType.rating: {
-      const rating = numericValue(value);
-      body = rating === null ? null : <Rating value={rating} display={display ?? "number"} />;
+    case MetadataType.scale: {
+      const figure = scaleValue(value);
+      body = figure === null ? null : <ScaleValue value={figure} display={display ?? "number"} />;
       break;
     }
-    case PropertyType.checkbox: {
+    case MetadataType.checkbox: {
       body =
         value === true ? (
           <Check className="h-4 w-4" aria-hidden />
@@ -249,15 +251,15 @@ export const PropertyValueCell = ({
         );
       break;
     }
-    case PropertyType.date: {
+    case MetadataType.date: {
       body = <span>{formatDate(value)}</span>;
       break;
     }
-    case PropertyType.datetime: {
+    case MetadataType.datetime: {
       body = <span>{formatDateTime(value)}</span>;
       break;
     }
-    case PropertyType.select: {
+    case MetadataType.select: {
       const slug = String(value ?? "");
       const option = options.get(slug);
       body = (
@@ -270,7 +272,7 @@ export const PropertyValueCell = ({
       );
       break;
     }
-    case PropertyType.multi_select: {
+    case MetadataType.multi_select: {
       const slugs = Array.isArray(value)
         ? (value as unknown[]).filter((v): v is string => typeof v === "string")
         : [];
@@ -294,7 +296,7 @@ export const PropertyValueCell = ({
       );
       break;
     }
-    case PropertyType.user_reference: {
+    case MetadataType.user_reference: {
       const user = extractUser(value);
       if (!user) {
         body = <span className="text-muted-foreground italic">{t("cell.emptyValue")}</span>;

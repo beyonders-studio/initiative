@@ -235,7 +235,8 @@
   },
   "settings": {
     "tabTaskStatuses": "Estados de tarea",
-    "tabTaskTypes": "Tipos de tarea"
+    "tabTaskTypes": "Tipos de tarea",
+    "tabMetadata": "Metadatos"
   },
   "files": {
     "newFile": "Nuevo archivo"
@@ -420,5 +421,14 @@
     "unassigned": "Ya no estás en esta tarea",
     "assignError": "No se pudo cambiar quién está en esta tarea.",
     "moveTo": "Mover a"
+  },
+  "metadata": {
+    "description": "Lo que las tareas de este proyecto pueden tener además de las propiedades de la iniciativa. Una tarea movida a otro proyecto conserva un valor solo si ese proyecto tiene metadatos con el mismo nombre y tipo.",
+    "create": "Nuevos metadatos",
+    "edit": "Editar metadatos",
+    "delete": "Eliminar metadatos",
+    "deleteTitle": "¿Eliminar estos metadatos?",
+    "deleteBody": "Se eliminarán junto con el valor que cada tarea tenga en este proyecto.",
+    "none": "Aún no hay metadatos"
   }
 }

@@ -62,6 +62,8 @@ export type TaskFiltersScope =
       types?: TaskTypeRead[];
       /** Scopes the property filter's definitions. */
       initiativeId?: number;
+      /** The one project listed, whose metadata the filter offers too. */
+      projectId?: number;
     }
   | {
       kind: "mine";
@@ -335,6 +337,7 @@ export const TaskFilters = ({ scope, value, onChange, stacked = false }: TaskFil
       </div>
       <PropertyFilter
         initiativeId={project?.initiativeId}
+        owner={project?.projectId ? { kind: "project", id: project.projectId } : undefined}
         value={value.properties}
         plugins={{ fields: pluginFields, value: value.plugins }}
         onChange={(properties: PropertyFilterCondition[], plugins) =>

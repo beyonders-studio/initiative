@@ -61,9 +61,9 @@ describe("AddToCollectionDialog", () => {
                 name: "Catalog",
                 hint: "Things to choose from, priced and rated.",
                 lists: ["grid", "table"],
-                fields: [
+                metadata: [
                   { name: "Price", type: "currency", display: null, currency: "USD" },
-                  { name: "Rating", type: "rating", display: "stars", currency: null },
+                  { name: "Rating", type: "scale", display: "stars", currency: null },
                 ],
               },
             ],
@@ -86,7 +86,7 @@ describe("AddToCollectionDialog", () => {
     // Named, it asks how the collection starts: blank until a shape is picked.
     expect(screen.getByRole("button", { name: /^Blank/ })).toHaveAttribute("aria-pressed", "true");
     expect(await screen.findByRole("button", { name: /^Catalog/ })).toHaveTextContent(
-      "Fields: Price and Rating"
+      "Metadata: Price and Rating"
     );
     // The shapes are in the reader's language: another is read afresh.
     await act(() => i18n.changeLanguage("fr"));

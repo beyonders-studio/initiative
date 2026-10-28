@@ -235,7 +235,8 @@
   },
   "settings": {
     "tabTaskStatuses": "Task statuses",
-    "tabTaskTypes": "Task types"
+    "tabTaskTypes": "Task types",
+    "tabMetadata": "Metadata"
   },
   "files": {
     "newFile": "New file"
@@ -420,5 +421,14 @@
     "unassigned": "You're off this task",
     "assignError": "Couldn't change who's on this task.",
     "moveTo": "Move to"
+  },
+  "metadata": {
+    "description": "What this project's tasks can hold beside the initiative's properties. A task moved to another project keeps a value only where that project has metadata of the same name and type.",
+    "create": "New metadata",
+    "edit": "Edit metadata",
+    "delete": "Delete metadata",
+    "deleteTitle": "Delete this metadata?",
+    "deleteBody": "This removes it and every task's value of it in this project.",
+    "none": "No metadata yet"
   }
 }

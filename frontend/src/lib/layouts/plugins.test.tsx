@@ -3,11 +3,12 @@ import userEvent from "@testing-library/user-event";
 import { HttpResponse, http } from "msw";
 import { describe, expect, it } from "vitest";
 
-import { buildTask } from "@/__tests__/factories";
+import { buildPropertySummary, buildTask } from "@/__tests__/factories";
 import i18n from "@/__tests__/helpers/i18n-test";
 import { server } from "@/__tests__/helpers/msw-server";
 import { renderWithProviders } from "@/__tests__/helpers/render";
 import type { TaskListRead } from "@/api/generated/initiativeAPI.schemas";
+import { numberFormat } from "@/lib/intl";
 import {
   fieldsInParts,
   pluginFieldId,
@@ -92,22 +93,26 @@ const install = {
 
 const task = buildTask({
   id: 41,
-  plugin_values: [
-    { plugin_id: 3, key: "ci.state", value: { text: "passing" } },
-    { plugin_id: 3, key: "ci.url", value: { url: "https://ci.example/41", text: "#41" } },
-    {
-      plugin_id: 3,
+  properties: [
+    buildPropertySummary({ install_id: 3, key: "ci.state", value: { text: "passing" } }),
+    buildPropertySummary({
+      install_id: 3,
+      key: "ci.url",
+      value: { url: "https://ci.example/41", text: "#41" },
+    }),
+    buildPropertySummary({
+      install_id: 3,
       key: "ci.runs",
       value: [
         { ref: "r1", url: "https://ci.example/r/1", text: "run 1", state: { status: "queued" } },
         { ref: "r2", url: "javascript:alert(1)", text: "run 2" },
       ],
-    },
+    }),
   ],
 });
 
-const draw = (card: LayoutNode, item: TaskListRead = task) => {
-  const plugins = pluginsOnItems([install], 7);
+const draw = (card: LayoutNode, item: TaskListRead = task, installs = [install]) => {
+  const plugins = pluginsOnItems(installs, 7);
   const view = {
     fields: taskFields([], pluginFields(plugins, "en")),
     plugins,
@@ -207,6 +212,51 @@ describe("a plug-in on a card", () => {
     expect(screen.queryByRole("button", { name: "Purge" })).toBeNull();
   });
 
+  it("draws a scale as a bar of its figure, kept with or without a state", () => {
+    const coverage = {
+      ...install,
+      id: 8,
+      definition: {
+        fields: [{ key: "ci.coverage", name: { en: "Coverage" }, kind: "scale", on: ["task"] }],
+      },
+      item_fields: ["ci.coverage"],
+      item_parts: [],
+      item_actions: [],
+    };
+    const card: LayoutNode = {
+      type: "card",
+      children: [{ type: "field", props: { field: pluginFieldId(8, "ci.coverage") } }],
+    };
+    const percent = (figure: number) =>
+      numberFormat("en", { style: "percent" }).format(figure / 100);
+    const { unmount } = draw(
+      card,
+      buildTask({
+        properties: [buildPropertySummary({ install_id: 8, key: "ci.coverage", value: 80 })],
+      }),
+      [coverage]
+    );
+
+    expect(screen.getByRole("img", { name: percent(80) }).firstElementChild).toHaveStyle({
+      width: "80%",
+    });
+    unmount();
+    draw(
+      card,
+      buildTask({
+        properties: [
+          buildPropertySummary({
+            install_id: 8,
+            key: "ci.coverage",
+            value: { value: 35, state: { run: "late" } },
+          }),
+        ],
+      }),
+      [coverage]
+    );
+    expect(screen.getByRole("img", { name: percent(35) })).toBeInTheDocument();
+  });
+
   it("draws nothing for a value of the wrong shape or a link that is not the web", () => {
     draw(
       {
@@ -217,9 +267,13 @@ describe("a plug-in on a card", () => {
         ],
       },
       buildTask({
-        plugin_values: [
-          { plugin_id: 3, key: "ci.state", value: "passing" },
-          { plugin_id: 3, key: "ci.url", value: { url: "javascript:alert(1)" } },
+        properties: [
+          buildPropertySummary({ install_id: 3, key: "ci.state", value: "passing" }),
+          buildPropertySummary({
+            install_id: 3,
+            key: "ci.url",
+            value: { url: "javascript:alert(1)" },
+          }),
         ],
       })
     );

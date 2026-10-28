@@ -13,10 +13,10 @@
 
 import type {
   CurrencyCode,
+  MetadataType,
   PropertyDefinitionRead,
   PropertyOption,
   PropertySummary,
-  PropertyType,
   RecurrenceStrategy,
   TaskListRead,
   TaskPriority,
@@ -37,7 +37,7 @@ export interface ProjectListingStatus {
 
 export interface ProjectListingPropertyValue {
   property_name: string;
-  property_type: PropertyType;
+  property_type: MetadataType;
   value_text?: string | null;
   value_number?: number | null;
   value_boolean?: boolean | null;
@@ -46,7 +46,7 @@ export interface ProjectListingPropertyValue {
 
 export interface ProjectListingPropertyDefinition {
   name: string;
-  type: PropertyType;
+  type: MetadataType;
   position: number;
   color?: string | null;
   options?: PropertyOption[] | null;
@@ -219,6 +219,7 @@ export const projectListingBoard = (
       color: definition.color ?? null,
       options: definition.options ?? null,
       currency: definition.currency ?? null,
+      project_id: null,
       collection_id: null,
       created_at: "",
       updated_at: "",
@@ -233,6 +234,10 @@ export const projectListingBoard = (
         property_id: definition.id,
         name: definition.name,
         type: definition.type,
+        project_id: null,
+        collection_id: null,
+        install_id: null,
+        key: null,
         options: definition.options,
         currency: definition.currency,
         value: DATE_PROPERTY_TYPES.has(value.property_type)
@@ -295,7 +300,6 @@ export const projectListingBoard = (
       // A tag chip opens the community's own tag, and a listing's has none yet.
       tags: [],
       properties: task.properties.flatMap(summaryOf),
-      plugin_values: [],
     });
   });
   for (const tasks of Object.values(groupedTasks)) tasks.sort((a, b) => a.position - b.position);

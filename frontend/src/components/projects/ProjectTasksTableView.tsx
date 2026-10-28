@@ -20,6 +20,7 @@ import type {
   LayoutGrouping,
   ListLayoutDefinitionInputDisplays,
   ListTasksParams,
+  PropertyDefinitionRead,
   TaskListRead,
   TaskStatusRead,
 } from "@/api/generated/initiativeAPI.schemas";
@@ -35,7 +36,7 @@ import { TableRow } from "@/components/ui/table";
 import { type ColumnLimits, NO_COLUMN_LIMITS } from "@/hooks/useColumnLimits";
 import { useProjectTaskTypes } from "@/hooks/useProjects";
 import type { useProjectTaskTableState } from "@/hooks/useProjectTaskView";
-import { useProperties } from "@/hooks/useProperties";
+import { useOwnedDefinitions } from "@/hooks/useProperties";
 import { useTaskGroupings } from "@/hooks/useTaskGroupings";
 import { useMoveTaskToGroup } from "@/hooks/useTasks";
 import { fieldColumnId } from "@/lib/layouts/columns";
@@ -274,6 +275,7 @@ const GroupDropRowWrapper = ({
 };
 
 const NOT_GROUPED: string[] = [];
+const NO_DEFINITIONS: PropertyDefinitionRead[] = [];
 
 const subRowsOf = (row: TaskTreeRow) => row.subRows;
 
@@ -358,8 +360,12 @@ const ProjectTasksTableViewComponent = ({
   const env = useProjectLayoutEnv(taskHref);
   const { mutate: moveTask } = useMoveTaskToGroup();
 
-  // Scoped to the project's initiative so the column list stays focused.
-  const { data: propertyDefinitions = [] } = useProperties({ initiativeId });
+  // The project's metadata and its initiative's properties, so the column
+  // list stays focused.
+  const { data: propertyDefinitions = NO_DEFINITIONS } = useOwnedDefinitions({
+    initiativeId,
+    owner: { kind: "project", id: projectId },
+  });
   const plugins = usePluginsOnItems(initiativeId);
   // A project with one type shows none: it tells no task apart.
   const typed = (useProjectTaskTypes(projectId).data?.length ?? 0) > 1;

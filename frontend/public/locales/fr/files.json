@@ -465,17 +465,18 @@
     "noAccess": "Accès refusé",
     "noAccessDescription": "Vous n’avez pas la permission de voir cette collection.",
     "error": "Impossible de modifier la collection",
-    "fields": {
+    "metadata": {
+      "title": "Métadonnées",
       "description": "Ce que chaque fichier de cette collection peut porter ici : ses valeurs appartiennent à la collection, pas au fichier.",
-      "create": "Nouveau champ",
-      "edit": "Modifier le champ",
-      "delete": "Supprimer le champ",
-      "deleteTitle": "Supprimer ce champ ?",
-      "deleteBody": "Le champ et la valeur de chaque fichier dans cette collection seront supprimés.",
-      "none": "Aucun champ pour l'instant",
+      "create": "Nouvelles métadonnées",
+      "edit": "Modifier les métadonnées",
+      "delete": "Supprimer les métadonnées",
+      "deleteTitle": "Supprimer ces métadonnées ?",
+      "deleteBody": "Elles seront supprimées, avec la valeur de chaque fichier dans cette collection.",
+      "none": "Aucune métadonnée pour l'instant",
       "heading": "Dans cette collection",
       "saveError": "Impossible d'enregistrer la valeur",
-      "of": "Champs de {{name}}"
+      "of": "Métadonnées de {{name}}"
     },
     "addedOn": "Ajouté {{date}}",
     "createdOn": "Créé {{date}}",
@@ -488,12 +489,12 @@
     "shapes": {
       "name": "Nom",
       "blank": "Vierge",
-      "blankHint": "Une grille et un tableau, sans champs propres pour l'instant.",
+      "blankHint": "Une grille et un tableau, sans métadonnées propres pour l'instant.",
       "lists": "Affiche {{lists}}",
-      "fields": "Champs : {{fields}}",
+      "metadata": "Métadonnées : {{metadata}}",
       "copyLabel": "Ou copier la forme de",
       "copyPlaceholder": "Une autre collection",
-      "copyHint": "Ses champs et ce que montrent ses listes, sans ses fichiers ni leurs valeurs.",
+      "copyHint": "Ses métadonnées et ce que montrent ses listes, sans ses fichiers ni leurs valeurs.",
       "create": "Créer la collection"
     }
   }

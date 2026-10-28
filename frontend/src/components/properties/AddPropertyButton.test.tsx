@@ -1,13 +1,14 @@
-import { screen, waitFor } from "@testing-library/react";
+import { screen, waitFor, within } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { HttpResponse } from "msw";
 import { describe, expect, it, vi } from "vitest";
 
 import { buildPropertyDefinition } from "@/__tests__/factories/properties";
 import { communityHttp } from "@/__tests__/helpers/communityHttp";
+import { definitionsHandler } from "@/__tests__/helpers/handlers/property.handlers";
 import { server } from "@/__tests__/helpers/msw-server";
 import { renderWithProviders } from "@/__tests__/helpers/render";
-import type { PropertyDefinitionRead, PropertyType } from "@/api/generated/initiativeAPI.schemas";
+import type { MetadataType, PropertyDefinitionRead } from "@/api/generated/initiativeAPI.schemas";
 
 import { AddPropertyButton } from "./AddPropertyButton";
 
@@ -29,6 +30,29 @@ describe("AddPropertyButton", () => {
     await waitFor(() => expect(screen.getByText("Alpha")).toBeInTheDocument());
     expect(screen.getByText("Beta")).toBeInTheDocument();
     expect(screen.getByText("Gamma")).toBeInTheDocument();
+  });
+
+  it("offers a task's project metadata beside the properties, each under its own heading", async () => {
+    server.use(
+      definitionsHandler([buildPropertyDefinition({ id: 1, name: "Budget" })], {
+        project: [buildPropertyDefinition({ id: 2, name: "Sprint", project_id: 4 })],
+      })
+    );
+    renderWithProviders(
+      <AddPropertyButton
+        initiativeId={7}
+        owner={{ kind: "project", id: 4 }}
+        currentPropertyIds={[]}
+        onAdd={vi.fn()}
+      />
+    );
+    await userEvent.click(screen.getByRole("button", { name: "Add property or metadata" }));
+
+    const metadata = await screen.findByRole("group", { name: "This project's metadata" });
+    expect(within(metadata).getByText("Sprint")).toBeInTheDocument();
+    const properties = screen.getByRole("group", { name: "Properties" });
+    expect(within(properties).getByText("Budget")).toBeInTheDocument();
+    expect(within(properties).queryByText("Sprint")).not.toBeInTheDocument();
   });
 
   it("filters out definitions whose id is in currentPropertyIds", async () => {
@@ -87,7 +111,7 @@ describe("AddPropertyButton", () => {
           buildPropertyDefinition({
             id: 99,
             name: (body as { name: string }).name,
-            type: (body as { type: PropertyType }).type,
+            type: (body as { type: MetadataType }).type,
           })
         );
       })
@@ -104,7 +128,7 @@ describe("AddPropertyButton", () => {
     await userEvent.click(createEntry);
 
     // Fill in the name.
-    const nameInput = await screen.findByLabelText(/Property name/i);
+    const nameInput = await screen.findByLabelText(/^Name$/);
     await userEvent.type(nameInput, "Quarter");
     // Default type is text, so submit directly.
     const submit = screen.getByRole("button", { name: "Create" });

@@ -269,7 +269,6 @@ export const blankCounter = (groupId: number, color: string): CounterRead => ({
   view_mode: CounterViewMode.number,
   position: "0",
   properties: [],
-  plugin_values: [],
   created_at: "",
   updated_at: "",
 });

@@ -465,17 +465,18 @@
     "noAccess": "Acceso denegado",
     "noAccessDescription": "No tienes permiso para ver esta colección.",
     "error": "No se pudo cambiar la colección",
-    "fields": {
+    "metadata": {
+      "title": "Metadatos",
       "description": "Lo que cada archivo de esta colección puede tener aquí: sus valores pertenecen a la colección, no al archivo.",
-      "create": "Nuevo campo",
-      "edit": "Editar campo",
-      "delete": "Eliminar campo",
-      "deleteTitle": "¿Eliminar este campo?",
-      "deleteBody": "Se eliminarán el campo y el valor que cada archivo tenga en esta colección.",
-      "none": "Aún no hay campos",
+      "create": "Nuevos metadatos",
+      "edit": "Editar metadatos",
+      "delete": "Eliminar metadatos",
+      "deleteTitle": "¿Eliminar estos metadatos?",
+      "deleteBody": "Se eliminarán junto con el valor que cada archivo tenga en esta colección.",
+      "none": "Aún no hay metadatos",
       "heading": "En esta colección",
       "saveError": "No se pudo guardar el valor",
-      "of": "Campos de {{name}}"
+      "of": "Metadatos de {{name}}"
     },
     "addedOn": "Añadido {{date}}",
     "createdOn": "Creado {{date}}",
@@ -488,12 +489,12 @@
     "shapes": {
       "name": "Nombre",
       "blank": "En blanco",
-      "blankHint": "Una cuadrícula y una tabla, todavía sin campos propios.",
+      "blankHint": "Una cuadrícula y una tabla, todavía sin metadatos propios.",
       "lists": "Muestra {{lists}}",
-      "fields": "Campos: {{fields}}",
+      "metadata": "Metadatos: {{metadata}}",
       "copyLabel": "O copiar la forma de",
       "copyPlaceholder": "Otra colección",
-      "copyHint": "Sus campos y lo que muestran sus listas, sin sus archivos ni sus valores.",
+      "copyHint": "Sus metadatos y lo que muestran sus listas, sin sus archivos ni sus valores.",
       "create": "Crear colección"
     }
   }

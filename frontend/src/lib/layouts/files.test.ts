@@ -5,19 +5,19 @@ import {
   buildPropertyDefinition,
   buildPropertySummary,
 } from "@/__tests__/factories";
-import { PropertyType } from "@/api/generated/initiativeAPI.schemas";
+import { MetadataType } from "@/api/generated/initiativeAPI.schemas";
 
 import type { LayoutItem } from "./fields";
 import { cardLines, collectionFileFields } from "./files";
 import type { LayoutNode } from "./tree";
 
 const caption = buildPropertyDefinition({ id: 21, name: "Caption", collection_id: 5 });
-const price = buildPropertyDefinition({ id: 22, name: "Price", type: PropertyType.currency });
+const price = buildPropertyDefinition({ id: 22, name: "Price", type: MetadataType.currency });
 const fields = collectionFileFields([caption], [price]);
 
 const file = buildCollectionFile({
   name: "Harbour",
-  fields: [buildPropertySummary({ property_id: 21, name: "Caption", value: "Dusk" })],
+  metadata: [buildPropertySummary({ property_id: 21, name: "Caption", value: "Dusk" })],
   properties: [buildPropertySummary({ property_id: 22, name: "Price", value: null })],
 });
 const item = file as unknown as LayoutItem;
@@ -56,6 +56,6 @@ describe("cardLines", () => {
         { type: "stack", children: [field("name"), field("property:21")] },
       ],
     };
-    expect(cardLines(row, { ...item, properties: file.fields } as LayoutItem, fields)).toBe(2);
+    expect(cardLines(row, { ...item, properties: file.metadata } as LayoutItem, fields)).toBe(2);
   });
 });

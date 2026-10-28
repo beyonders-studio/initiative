@@ -235,7 +235,8 @@
   },
   "settings": {
     "tabTaskStatuses": "Statuts de tâche",
-    "tabTaskTypes": "Types de tâche"
+    "tabTaskTypes": "Types de tâche",
+    "tabMetadata": "Métadonnées"
   },
   "files": {
     "newFile": "Nouveau fichier"
@@ -420,5 +421,14 @@
     "unassigned": "Vous n'êtes plus sur cette tâche",
     "assignError": "Impossible de modifier les personnes assignées à cette tâche.",
     "moveTo": "Déplacer vers"
+  },
+  "metadata": {
+    "description": "Ce que les tâches de ce projet peuvent porter en plus des propriétés de l'initiative. Une tâche déplacée vers un autre projet ne garde une valeur que si ce projet a des métadonnées du même nom et du même type.",
+    "create": "Nouvelles métadonnées",
+    "edit": "Modifier les métadonnées",
+    "delete": "Supprimer les métadonnées",
+    "deleteTitle": "Supprimer ces métadonnées ?",
+    "deleteBody": "Elles seront supprimées, avec la valeur de chaque tâche dans ce projet.",
+    "none": "Aucune métadonnée pour l'instant"
   }
 }

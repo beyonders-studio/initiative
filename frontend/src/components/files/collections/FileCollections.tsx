@@ -1,17 +1,18 @@
 import { Link } from "@tanstack/react-router";
-import { ListPlus, Loader2 } from "lucide-react";
+import { ListPlus } from "lucide-react";
+import { useMemo } from "react";
 import { useTranslation } from "react-i18next";
 
-import type { CollectionRead, FileRead } from "@/api/generated/initiativeAPI.schemas";
+import type {
+  CollectionRead,
+  FileRead,
+  PropertySummary,
+} from "@/api/generated/initiativeAPI.schemas";
 import { AddToCollectionButton } from "@/components/files/collections/AddToCollectionButton";
 import { badgeVariants } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
-import {
-  collectionFieldSaves,
-  useCollectionFileFields,
-  useCollections,
-} from "@/hooks/useCollections";
+import { collectionMetadataSaves, useCollections } from "@/hooks/useCollections";
 import { useCommunityPath } from "@/lib/communityUrl";
 import { PlacedPropertyField } from "@/lib/layouts/fieldEditors";
 import { collectionRoute } from "@/lib/tools";
@@ -19,13 +20,13 @@ import { collectionRoute } from "@/lib/tools";
 /**
  * The collections a file is in, each a way to it, and the way to put it in
  * another. Only the collections the reader can see are named. Beside each
- * with fields of its own, the file's values of them, which whoever may
+ * with metadata of its own, the file's values of it, which whoever may
  * change the collection edits.
  */
 export const FileCollections = ({
   file,
 }: {
-  file: Pick<FileRead, "id" | "initiative_id" | "collection_ids">;
+  file: Pick<FileRead, "id" | "initiative_id" | "collection_ids" | "properties">;
 }) => {
   const { t } = useTranslation("common");
   const gp = useCommunityPath();
@@ -46,8 +47,8 @@ export const FileCollections = ({
               >
                 {collection.name}
               </Link>
-              {collection.fields.length > 0 ? (
-                <FieldsInCollection collection={collection} fileId={file.id} />
+              {collection.metadata.length > 0 ? (
+                <MetadataInCollection collection={collection} file={file} />
               ) : null}
             </span>
           ))}
@@ -60,13 +61,14 @@ export const FileCollections = ({
   );
 };
 
-/** The file's values of one collection's fields, opened from beside its name. */
-const FieldsInCollection = ({
+/** The file's values of one collection's metadata, opened from beside its
+ *  name. */
+const MetadataInCollection = ({
   collection,
-  fileId,
+  file,
 }: {
   collection: CollectionRead;
-  fileId: number;
+  file: Pick<FileRead, "id" | "properties">;
 }) => {
   const { t } = useTranslation("files");
   return (
@@ -75,38 +77,49 @@ const FieldsInCollection = ({
         <Button
           variant="ghost"
           size="icon-sm"
-          aria-label={t("collections.fields.of", { name: collection.name })}
+          aria-label={t("collections.metadata.of", { name: collection.name })}
         >
           <ListPlus className="h-4 w-4" />
         </Button>
       </PopoverTrigger>
       <PopoverContent align="start" className="w-80">
-        <Values collection={collection} fileId={fileId} />
+        <Values collection={collection} fileId={file.id} properties={file.properties} />
       </PopoverContent>
     </Popover>
   );
 };
 
-/** Read only once opened, each saved on its own. Whoever may change the
- *  collection edits them; anyone else reads those that hold a value. */
-const Values = ({ collection, fileId }: { collection: CollectionRead; fileId: number }) => {
+/** Each saved on its own, from the values the file's read carries. Whoever may
+ *  change the collection edits them; anyone else reads those that hold a
+ *  value. */
+const Values = ({
+  collection,
+  fileId,
+  properties,
+}: {
+  collection: CollectionRead;
+  fileId: number;
+  properties: PropertySummary[];
+}) => {
   const { t } = useTranslation("files");
-  const values = useCollectionFileFields(collection.id, fileId);
-  if (values.isError) return <p className="text-destructive text-sm">{t("loadError")}</p>;
-  if (!values.data) return <Loader2 className="h-4 w-4 animate-spin text-muted-foreground" />;
+  // One copy per read of the file, which a save's answer is held over.
+  const values = useMemo(
+    () => properties.filter((each) => each.collection_id === collection.id),
+    [properties, collection.id]
+  );
   return (
-    <section aria-label={t("collections.fields.heading")} className="space-y-3">
-      <h2 className="font-medium text-sm">{t("collections.fields.heading")}</h2>
-      {collection.fields.map((field) => (
+    <section aria-label={t("collections.metadata.heading")} className="space-y-3">
+      <h2 className="font-medium text-sm">{t("collections.metadata.heading")}</h2>
+      {collection.metadata.map((definition) => (
         <PlacedPropertyField
-          key={field.id}
-          kind={collectionFieldSaves(collection.id)}
+          key={definition.id}
+          kind={collectionMetadataSaves(collection.id)}
           id={fileId}
-          properties={values.data}
+          properties={values}
           readOnly={!collection.can.edit}
           initiativeId={collection.initiative_id}
-          propertyId={field.id}
-          definitions={collection.fields}
+          propertyId={definition.id}
+          definitions={collection.metadata}
         />
       ))}
     </section>

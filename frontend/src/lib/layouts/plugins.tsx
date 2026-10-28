@@ -14,12 +14,13 @@ import {
   type CommunityPluginRead,
   type DetailLayoutReadKind,
   ItemKind,
-  type PluginValueSummary,
-  PropertyType,
+  MetadataType,
+  type PropertySummary,
 } from "@/api/generated/initiativeAPI.schemas";
 import type { PluginDataParam } from "@/api/pluginData";
 import { PluginParamControl } from "@/components/plugins/PluginParamControl";
 import type { PluginFilterField } from "@/components/properties/PropertyFilter";
+import { ScaleValue } from "@/components/properties/PropertyValueCell";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { ConfirmDialog } from "@/components/ui/confirm-dialog";
@@ -32,7 +33,6 @@ import {
   DialogTitle,
 } from "@/components/ui/dialog";
 import { DropdownMenuItem } from "@/components/ui/dropdown-menu";
-import { Progress } from "@/components/ui/progress";
 import contract from "@/contract/manifest.contract.json";
 import { useCommunityPlugins, useRunPluginAction } from "@/hooks/useCommunityPlugins";
 import { formatDate, formatDateTime } from "@/lib/formatDate";
@@ -44,8 +44,9 @@ import { type LocalizedText, localized } from "@/lib/widgets/widgetMeta";
 import type { FieldDef, FieldRendererProps } from "./fields";
 import { Section } from "./section";
 
-/** What a plug-in draws on an item from: the item, and the values it carries. */
-export type PluginItem = { id: number; plugin_values?: PluginValueSummary[] };
+/** What a plug-in draws on an item from: the item, and the values it carries,
+ *  a plug-in's among them by its install and key. */
+export type PluginItem = { id: number; properties?: PropertySummary[] };
 
 import type { LayoutNode } from "./tree";
 
@@ -61,7 +62,7 @@ export type PluginFieldKind =
   | "datetime"
   | "link"
   | "badge"
-  | "progress"
+  | "scale"
   | "checkbox";
 
 /** One facet of a field's state: the keys a value may name, each a badge. */
@@ -238,17 +239,17 @@ export const usePluginsOnItems = (
 /** A plug-in field's id in a view: by install and key, as the server checks it. */
 export const pluginFieldId = (install: number, key: string) => `plugin:${install}:${key}`;
 
-/** The property type each kind of plug-in field is filtered like: by its
- *  words, or by its number (a progress bar's fraction, a date's day). */
-const FILTERED_AS: Record<PluginFieldKind, PropertyType> = {
-  text: PropertyType.text,
-  badge: PropertyType.text,
-  link: PropertyType.text,
-  number: PropertyType.number,
-  progress: PropertyType.number,
-  checkbox: PropertyType.checkbox,
-  date: PropertyType.date,
-  datetime: PropertyType.datetime,
+/** The type each kind of plug-in field is filtered like: by its words, or by
+ *  its number (a scale's figure, a date's day). */
+const FILTERED_AS: Record<PluginFieldKind, MetadataType> = {
+  text: MetadataType.text,
+  badge: MetadataType.text,
+  link: MetadataType.text,
+  number: MetadataType.number,
+  scale: MetadataType.scale,
+  checkbox: MetadataType.checkbox,
+  date: MetadataType.date,
+  datetime: MetadataType.datetime,
 };
 
 /** The plug-in fields a task list can be filtered by, as the reader is drawn
@@ -320,8 +321,9 @@ export const fieldsInParts = (
 /** What the page being drawn shows inside its parts ({@link fieldsInParts}). */
 export const FieldsInParts = createContext<ReadonlySet<string>>(new Set());
 
-const pluginValue = (values: PluginValueSummary[] | undefined, install: number, key: string) =>
-  values?.find((value) => value.plugin_id === install && value.key === key)?.value ?? null;
+/** The value an install keeps under `key` on an item, among its values. */
+const pluginValue = (values: PropertySummary[] | undefined, install: number, key: string) =>
+  values?.find((value) => value.install_id === install && value.key === key)?.value ?? null;
 
 /** Every field the installs show on a task, after the built-ins and properties. */
 export const pluginFields = (
@@ -338,7 +340,7 @@ export const pluginFields = (
         hideable: true,
         plugin: { install: plugin.id, field, on: plugin },
         value: (task) => {
-          const value = pluginValue(task.plugin_values, plugin.id, field.key);
+          const value = pluginValue(task.properties, plugin.id, field.key);
           return draws(field, value) ? value : null;
         },
       })
@@ -353,7 +355,14 @@ const isWebLink = (url: unknown): url is string =>
 
 /** The kinds whose value is one scalar, which a value kept beside a state,
  *  and a list's element, hold in `value`. */
-const SCALAR_KINDS = new Set<PluginFieldKind>(["text", "number", "date", "datetime", "checkbox"]);
+const SCALAR_KINDS = new Set<PluginFieldKind>([
+  "text",
+  "number",
+  "scale",
+  "date",
+  "datetime",
+  "checkbox",
+]);
 
 /** A value as its kind reads it. */
 const scalarOf = (kind: PluginFieldKind, value: unknown): unknown =>
@@ -384,6 +393,7 @@ const shows = (kind: PluginFieldKind, raw: unknown): boolean => {
     case "datetime":
       return typeof value === "string" && value !== "";
     case "number":
+    case "scale":
       return typeof value === "number" && Number.isFinite(value);
     case "checkbox":
       return typeof value === "boolean";
@@ -391,13 +401,6 @@ const shows = (kind: PluginFieldKind, raw: unknown): boolean => {
       return isObject(value) && isWebLink(value.url);
     case "badge":
       return isObject(value) && typeof value.text === "string" && value.text !== "";
-    case "progress":
-      return (
-        isObject(value) &&
-        typeof value.value === "number" &&
-        typeof value.max === "number" &&
-        value.max > 0
-      );
   }
 };
 
@@ -484,18 +487,8 @@ const PluginScalar = ({ field, value: raw }: { field: PluginFieldDecl; value: un
           </Badge>
         );
       }
-      case "progress": {
-        const progress = value as { value: number; max: number };
-        const percent = Math.min(100, Math.max(0, (progress.value / progress.max) * 100));
-        return (
-          <Progress
-            value={percent}
-            aria-label={field.key}
-            className="w-24"
-            title={`${numberFormat(i18n.language).format(progress.value)} / ${numberFormat(i18n.language).format(progress.max)}`}
-          />
-        );
-      }
+      case "scale":
+        return <ScaleValue value={Math.min(100, Math.max(0, value as number))} display="bar" />;
     }
   })();
   if (!states.length) return drawn;
@@ -598,7 +591,7 @@ export const PluginFieldOnDetail = ({ field, item }: { field: FieldDef; item: Pl
   const runner = useActionRunner(field.plugin?.on.kind ?? "task", item.id);
   if (!field.plugin || inParts.has(field.id)) return null;
   const { install, field: declared, on } = field.plugin;
-  const value = pluginValue(item.plugin_values, install, declared.key);
+  const value = pluginValue(item.properties, install, declared.key);
   if (!draws(declared, value)) return null;
   return (
     <div className="space-y-1">
@@ -845,7 +838,7 @@ const drawPart = (node: LayoutNode, drawing: Drawing): ReactNode => {
     case "value": {
       const field = plugin.fields.get(String(props.field));
       if (!field) return null;
-      const value = pluginValue(item.plugin_values, plugin.id, field.key);
+      const value = pluginValue(item.properties, plugin.id, field.key);
       if (!draws(field, value)) return null;
       const drawn = (
         <PluginValue

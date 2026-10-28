@@ -375,6 +375,7 @@ function TaskSettings({
           memberScope: { type: "initiative", initiativeId: query.initiative_id },
           statuses: query.project_id === null ? [] : statuses,
           initiativeId: query.initiative_id,
+          projectId: query.project_id ?? undefined,
         }}
         value={query.filters}
         onChange={(filters) => onQuery({ ...query, filters })}

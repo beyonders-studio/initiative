@@ -2,7 +2,7 @@ import { Plus, X } from "lucide-react";
 import { useCallback, useMemo } from "react";
 import { useTranslation } from "react-i18next";
 
-import { PropertyType } from "@/api/generated/initiativeAPI.schemas";
+import { MetadataType } from "@/api/generated/initiativeAPI.schemas";
 import { Button } from "@/components/ui/button";
 import {
   Select,
@@ -11,7 +11,7 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
-import { useProperties } from "@/hooks/useProperties";
+import { type MetadataOwner, useOwnedDefinitions } from "@/hooks/useProperties";
 import { cn } from "@/lib/utils";
 
 import { PropertyInput, type PropertyInputProps } from "./PropertyInput";
@@ -34,7 +34,7 @@ export interface PluginFilterCondition {
 export interface PluginFilterField {
   id: string;
   name: string;
-  type: PropertyType;
+  type: MetadataType;
 }
 
 export interface PropertyFilterProps {
@@ -48,6 +48,9 @@ export interface PropertyFilterProps {
    * (union across every initiative the caller can see).
    */
   initiativeId?: number;
+  /** The project whose metadata is offered beside the properties: a
+   *  project's own task list. */
+  owner?: MetadataOwner;
   maxFilters?: number;
   className?: string;
 }
@@ -70,25 +73,25 @@ const DEFAULT_MAX_FILTERS = 5;
  * Return the ordered list of operators that make sense for a property type.
  * The first entry is used as the default when adding a new filter.
  */
-export const opsForType = (type: PropertyType): BackendOp[] => {
+export const opsForType = (type: MetadataType): BackendOp[] => {
   switch (type) {
-    case PropertyType.text:
-    case PropertyType.url:
+    case MetadataType.text:
+    case MetadataType.url:
       return ["ilike", "eq", "is_null"];
-    case PropertyType.number:
-    case PropertyType.currency:
-    case PropertyType.rating:
-    case PropertyType.date:
-    case PropertyType.datetime:
+    case MetadataType.number:
+    case MetadataType.currency:
+    case MetadataType.scale:
+    case MetadataType.date:
+    case MetadataType.datetime:
       return ["eq", "lt", "lte", "gt", "gte", "is_null"];
-    case PropertyType.checkbox:
+    case MetadataType.checkbox:
       return ["eq", "is_null"];
-    case PropertyType.select:
+    case MetadataType.select:
       return ["eq", "in_", "is_null"];
-    case PropertyType.multi_select:
+    case MetadataType.multi_select:
       // Backend always uses JSONB ``@>`` for multi_select; we only need one row.
       return ["eq"];
-    case PropertyType.user_reference:
+    case MetadataType.user_reference:
       return ["eq", "in_", "is_null"];
     default:
       return ["eq"];
@@ -112,16 +115,16 @@ const useOpLabel = () => {
  * renders in a defined state. The backend treats "empty" conditions as
  * no-ops, so we don't need to coerce here — the user just edits the value.
  */
-const defaultValueForDefinition = (definition: { type: PropertyType }, op: BackendOp): unknown => {
+const defaultValueForDefinition = (definition: { type: MetadataType }, op: BackendOp): unknown => {
   if (op === "is_null") {
     return true;
   }
   switch (definition.type) {
-    case PropertyType.checkbox:
+    case MetadataType.checkbox:
       return false;
-    case PropertyType.multi_select:
+    case MetadataType.multi_select:
       return [];
-    case PropertyType.number:
+    case MetadataType.number:
       return null;
     default:
       return op === "in_" ? [] : null;
@@ -132,7 +135,7 @@ const defaultValueForDefinition = (definition: { type: PropertyType }, op: Backe
 type FilterOption = {
   key: string;
   name: string;
-  type: PropertyType;
+  type: MetadataType;
   /** What the value is entered as. */
   input: PropertyInputProps["definition"];
   /** A plug-in's value compares as text or as a number, never as one of many. */
@@ -148,6 +151,7 @@ export const PropertyFilter = ({
   onChange,
   plugins,
   initiativeId,
+  owner,
   maxFilters = DEFAULT_MAX_FILTERS,
   className,
 }: PropertyFilterProps) => {
@@ -157,7 +161,7 @@ export const PropertyFilter = ({
   // Pull the definitions the caller can see (scoped when ``initiativeId`` is
   // provided, union across accessible initiatives otherwise). The hook
   // caches cross-page so we don't incur a request per component.
-  const definitionsQuery = useProperties(initiativeId !== undefined ? { initiativeId } : undefined);
+  const definitionsQuery = useOwnedDefinitions({ initiativeId, owner });
 
   const options = useMemo<FilterOption[]>(
     () => [
@@ -176,6 +180,10 @@ export const PropertyFilter = ({
           property_id: 0,
           name: field.name,
           type: field.type,
+          project_id: null,
+          collection_id: null,
+          install_id: null,
+          key: null,
           options: null,
           currency: null,
           value: null,

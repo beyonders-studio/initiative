@@ -7,7 +7,7 @@ import { buildPropertyDefinition, buildPropertyOption } from "@/__tests__/factor
 import { communityHttp } from "@/__tests__/helpers/communityHttp";
 import { server } from "@/__tests__/helpers/msw-server";
 import { renderWithProviders } from "@/__tests__/helpers/render";
-import { type PropertyDefinitionRead, PropertyType } from "@/api/generated/initiativeAPI.schemas";
+import { MetadataType, type PropertyDefinitionRead } from "@/api/generated/initiativeAPI.schemas";
 
 import { opsForType, PropertyFilter, type PropertyFilterCondition } from "./PropertyFilter";
 
@@ -17,15 +17,15 @@ const mockDefinitions = (defs: PropertyDefinitionRead[]) => {
 
 describe("opsForType", () => {
   it("returns the expected operators for each property type", () => {
-    expect(opsForType(PropertyType.text)).toEqual(["ilike", "eq", "is_null"]);
-    expect(opsForType(PropertyType.url)).toEqual(["ilike", "eq", "is_null"]);
-    expect(opsForType(PropertyType.number)).toEqual(["eq", "lt", "lte", "gt", "gte", "is_null"]);
-    expect(opsForType(PropertyType.date)).toEqual(["eq", "lt", "lte", "gt", "gte", "is_null"]);
-    expect(opsForType(PropertyType.datetime)).toEqual(["eq", "lt", "lte", "gt", "gte", "is_null"]);
-    expect(opsForType(PropertyType.checkbox)).toEqual(["eq", "is_null"]);
-    expect(opsForType(PropertyType.select)).toEqual(["eq", "in_", "is_null"]);
-    expect(opsForType(PropertyType.multi_select)).toEqual(["eq"]);
-    expect(opsForType(PropertyType.user_reference)).toEqual(["eq", "in_", "is_null"]);
+    expect(opsForType(MetadataType.text)).toEqual(["ilike", "eq", "is_null"]);
+    expect(opsForType(MetadataType.url)).toEqual(["ilike", "eq", "is_null"]);
+    expect(opsForType(MetadataType.number)).toEqual(["eq", "lt", "lte", "gt", "gte", "is_null"]);
+    expect(opsForType(MetadataType.date)).toEqual(["eq", "lt", "lte", "gt", "gte", "is_null"]);
+    expect(opsForType(MetadataType.datetime)).toEqual(["eq", "lt", "lte", "gt", "gte", "is_null"]);
+    expect(opsForType(MetadataType.checkbox)).toEqual(["eq", "is_null"]);
+    expect(opsForType(MetadataType.select)).toEqual(["eq", "in_", "is_null"]);
+    expect(opsForType(MetadataType.multi_select)).toEqual(["eq"]);
+    expect(opsForType(MetadataType.user_reference)).toEqual(["eq", "in_", "is_null"]);
   });
 });
 
@@ -33,17 +33,17 @@ describe("PropertyFilter", () => {
   const textDef = buildPropertyDefinition({
     id: 1,
     name: "Owner",
-    type: PropertyType.text,
+    type: MetadataType.text,
   });
   const numberDef = buildPropertyDefinition({
     id: 2,
     name: "Hours",
-    type: PropertyType.number,
+    type: MetadataType.number,
   });
   const selectDef = buildPropertyDefinition({
     id: 3,
     name: "Status",
-    type: PropertyType.select,
+    type: MetadataType.select,
     options: [
       buildPropertyOption({ value: "draft", label: "Draft" }),
       buildPropertyOption({ value: "live", label: "Live" }),
@@ -77,17 +77,17 @@ describe("PropertyFilter", () => {
       buildPropertyDefinition({
         id: 4,
         name: "Extra",
-        type: PropertyType.text,
+        type: MetadataType.text,
       }),
       buildPropertyDefinition({
         id: 5,
         name: "Fifth",
-        type: PropertyType.text,
+        type: MetadataType.text,
       }),
       buildPropertyDefinition({
         id: 6,
         name: "Sixth",
-        type: PropertyType.text,
+        type: MetadataType.text,
       }),
     ]);
     const full: PropertyFilterCondition[] = [
@@ -177,7 +177,7 @@ describe("PropertyFilter", () => {
       <PropertyFilter
         value={[{ property_id: 1, op: "ilike", value: "ada" }]}
         plugins={{
-          fields: [{ id: "plugin:3:ci.issue", name: "Issue", type: PropertyType.number }],
+          fields: [{ id: "plugin:3:ci.issue", name: "Issue", type: MetadataType.number }],
           value: [],
         }}
         onChange={onChange}
@@ -196,7 +196,7 @@ describe("PropertyFilter", () => {
     const multiDef = buildPropertyDefinition({
       id: 10,
       name: "Tags",
-      type: PropertyType.multi_select,
+      type: MetadataType.multi_select,
       options: [buildPropertyOption({ value: "a", label: "A" })],
     });
     mockDefinitions([multiDef]);

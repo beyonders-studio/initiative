@@ -11,10 +11,11 @@ import type {
   LayoutPreset,
   ListLayoutDefinitionInput,
   ListLayoutReadKind,
+  PropertyDefinitionRead,
   ToolLayoutSetRead,
 } from "@/api/generated/initiativeAPI.schemas";
 import { listLayoutLooks } from "@/components/projects/projectTasksConfig";
-import type { RatingDisplay } from "@/components/properties/propertyHelpers";
+import type { ScaleDisplay } from "@/components/properties/propertyHelpers";
 import { Button } from "@/components/ui/button";
 import { ConfirmDialog } from "@/components/ui/confirm-dialog";
 import {
@@ -26,7 +27,7 @@ import {
   SelectValue,
 } from "@/components/ui/select";
 import { ToggleGroup, ToggleGroupItem } from "@/components/ui/toggle-group";
-import { useProperties } from "@/hooks/useProperties";
+import { type MetadataOwner, useOwnedDefinitions } from "@/hooks/useProperties";
 import {
   detailLayoutOf,
   type LayoutChange,
@@ -92,6 +93,7 @@ const noop = () => {};
 
 /** What the part edits change while nothing is open. */
 const EMPTY_TREE: LayoutNode = { type: "layout", children: [] };
+const NO_DEFINITIONS: PropertyDefinitionRead[] = [];
 
 const WIDTHS: { width: PreviewWidth; icon: typeof Laptop }[] = [
   { width: "desktop", icon: Laptop },
@@ -118,8 +120,8 @@ export type LayoutEdits = {
   removeColumn: (field: string) => void;
   /** At `index`, or last. */
   addColumn: (field: string, index?: number) => void;
-  /** The open list draws the rating `field` as `display`. */
-  changeDisplay: (field: string, display: RatingDisplay) => void;
+  /** The open list draws the scale `field` as `display`. */
+  changeDisplay: (field: string, display: ScaleDisplay) => void;
   /** The open list offers `presets`, in order. */
   changePresets: (presets: LayoutPreset[]) => void;
   /** The open list offers `groupings`, in order, and starts grouped by
@@ -137,10 +139,10 @@ export type LayoutEdits = {
 export type EditableLists = {
   fields: ReadonlyMap<string, FieldDef>;
   shape: ListShape;
-  /** `fields` as the open list draws them: its ratings as it says. */
+  /** `fields` as the open list draws them: its scales as it says. */
   preview: (layout: ListLayout, fields: ReadonlyMap<string, FieldDef>) => ReactNode;
-  /** Where a field made in the editor is made: this collection's own. */
-  collectionId?: number;
+  /** Whose metadata a field made in the editor may be: this collection's. */
+  owner?: MetadataOwner;
   /** What a list is, as a key: what its settings say of it. */
   help: (kind: ListLayoutReadKind) => string;
 };
@@ -253,6 +255,7 @@ export const LayoutEditor = ({
   presets,
   set,
   initialKind,
+  actions,
   onClose,
 }: {
   target: GetLayoutsParams;
@@ -268,6 +271,9 @@ export const LayoutEditor = ({
   set: ToolLayoutSetRead;
   /** The layout to open on: a list's kind, or the task's detail. */
   initialKind?: string;
+  /** What else the target offers from the top bar: a collection's
+   *  metadata. */
+  actions?: ReactNode;
   onClose: () => void;
 }) => {
   const { t, i18n } = useTranslation(["projects", "layouts", "common"]);
@@ -332,7 +338,14 @@ export const LayoutEditor = ({
     if (!dirty) adopt(set);
   }
 
-  const { data: definitions = [] } = useProperties({ initiativeId });
+  // The owner whose metadata its fields may be: a project's tasks', or a
+  // collection's files'.
+  const owner: MetadataOwner | undefined =
+    lists?.owner ?? (project ? { kind: "project", id: project.id } : undefined);
+  const { data: definitions = NO_DEFINITIONS } = useOwnedDefinitions({
+    initiativeId,
+    owner: project ? owner : undefined,
+  });
   // A detail's fields are its own; a list's are its target's.
   const fields = useMemo(
     () =>
@@ -473,12 +486,12 @@ export const LayoutEditor = ({
     : detail && openDetail
       ? detailChoices(detail, openDetail, fields, pickerPlugins, translate)
       : { fields: [], plugins: [], parts: [] };
-  // Wherever a field can be placed, a new one can be made: a property of the
-  // initiative's, placed where Add was opened.
+  // Wherever a field can be placed, a new one can be made, placed where Add
+  // was opened: the owner's metadata, or a property of the initiative's.
   const choices =
     current?.kind === "calendar" || current?.kind === "gantt" || (!current && !detail)
       ? listed
-      : { ...listed, newField: { initiativeId, collectionId: lists?.collectionId } };
+      : { ...listed, newField: { initiativeId, owner } };
   const addersAt = (place?: Place): Adders =>
     current?.kind === "table"
       ? { onField: (id) => edits.addColumn(id, place?.index), onPart: noop, onNode: noop }
@@ -650,6 +663,7 @@ export const LayoutEditor = ({
           </SelectContent>
         </Select>
         <div className="flex-1" />
+        {actions}
         <ToggleGroup
           type="single"
           value={width}

@@ -16,7 +16,7 @@ import {
 import { communityHttp } from "@/__tests__/helpers/communityHttp";
 import { server } from "@/__tests__/helpers/msw-server";
 import { renderPage } from "@/__tests__/helpers/render";
-import { type CalendarEventRead, PropertyType } from "@/api/generated/initiativeAPI.schemas";
+import { type CalendarEventRead, MetadataType } from "@/api/generated/initiativeAPI.schemas";
 import { eventSaveOptions } from "@/hooks/useCalendarEvents";
 import { toast } from "@/lib/mascotToast";
 
@@ -230,10 +230,14 @@ describe("an event's page", () => {
         id: 9,
         title: "Standup",
         can: { edit: false },
-        plugin_values: [
-          { plugin_id: 3, key: "ci.state", value: { text: "passing" } },
-          { plugin_id: 3, key: "ci.url", value: { url: "https://ci.example/9", text: "#9" } },
-          { plugin_id: 3, key: "task.only", value: "nope" },
+        properties: [
+          buildPropertySummary({ install_id: 3, key: "ci.state", value: { text: "passing" } }),
+          buildPropertySummary({
+            install_id: 3,
+            key: "ci.url",
+            value: { url: "https://ci.example/9", text: "#9" },
+          }),
+          buildPropertySummary({ install_id: 3, key: "task.only", value: "nope" }),
         ],
       })
     );
@@ -360,7 +364,7 @@ describe("an event's page", () => {
         properties: [
           buildPropertySummary({
             name: "Agenda",
-            type: PropertyType.url,
+            type: MetadataType.url,
             value: "https://example.com/agenda",
           }),
         ],

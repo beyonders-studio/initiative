@@ -24,6 +24,7 @@ import {
   type Tool,
   type ToolCan,
 } from "@/api/generated/initiativeAPI.schemas";
+import { ownProperties } from "@/components/properties/propertyHelpers";
 import { TagBadge, TagPicker } from "@/components/tags";
 import { ScrollArea, ScrollBar } from "@/components/ui/scroll-area";
 import {
@@ -102,7 +103,7 @@ export const ToolChest = ({ tool, entity, template, kind, children }: ToolChestP
   const canEdit = entity.can.edit;
   // Definitions belong to an initiative, so a community-level tool has none.
   const hasProperties = entity.initiative_id !== null;
-  const propertyCount = entity.properties?.length ?? 0;
+  const propertyCount = ownProperties(entity.properties ?? []).length;
 
   return (
     <div className="border-y bg-background/60 md:rounded-lg md:border md:bg-card">

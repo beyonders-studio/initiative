@@ -1,4 +1,5 @@
 import { useMutation, useQuery } from "@tanstack/react-query";
+import { useMemo } from "react";
 import { useTranslation } from "react-i18next";
 
 import type {
@@ -27,6 +28,20 @@ import type { MutationOpts } from "@/types/mutation";
 
 // ── Queries ──────────────────────────────────────────────────────────────────
 
+/** Who a definition belongs to where it is not the initiative's: a project
+ *  (its metadata, on its tasks) or a collection (its metadata, on its files). */
+export type MetadataOwner = { kind: "project" | "collection"; id: number };
+
+/** The owner columns a definition is created and listed with. */
+export const ownerColumns = (
+  owner: MetadataOwner | undefined
+): { project_id?: number; collection_id?: number } =>
+  owner === undefined
+    ? {}
+    : owner.kind === "project"
+      ? { project_id: owner.id }
+      : { collection_id: owner.id };
+
 /**
  * List property definitions.
  *
@@ -35,19 +50,20 @@ import type { MutationOpts } from "@/types/mutation";
  * - ``initiativeId`` omitted: returns the union across every initiative the
  *   caller is a member of — used by global views (My Tasks, Files list,
  *   events list) so property columns and filters aggregate across initiatives.
- * - ``collectionId`` bound: that collection's own fields instead, which are
- *   never among an initiative's properties.
+ * - ``owner`` bound: that project's or collection's metadata instead, which
+ *   are never among an initiative's properties.
  */
 export const useProperties = (options?: {
   initiativeId?: number;
-  collectionId?: number;
+  owner?: MetadataOwner;
   enabled?: boolean;
 }) => {
   const communityId = useActiveCommunityId();
   const initiativeId = options?.initiativeId;
-  const params: { initiative_id?: number; collection_id?: number } = {};
+  const params: { initiative_id?: number; project_id?: number; collection_id?: number } = {
+    ...ownerColumns(options?.owner),
+  };
   if (initiativeId !== undefined) params.initiative_id = initiativeId;
-  if (options?.collectionId !== undefined) params.collection_id = options.collectionId;
   const hasParams = Object.keys(params).length > 0;
   return useQuery<PropertyDefinitionRead[]>({
     queryKey: getListPropertyDefinitionsQueryKey(communityId, hasParams ? params : undefined),
@@ -55,6 +71,38 @@ export const useProperties = (options?: {
     enabled: options?.enabled ?? true,
     staleTime: 60 * 1000,
   });
+};
+
+/**
+ * What can be placed on an item where an owner keeps metadata beside the
+ * initiative's properties: the owner's metadata first, then the properties.
+ * Without an owner, the properties alone.
+ */
+export const useOwnedDefinitions = (options: {
+  initiativeId?: number;
+  owner?: MetadataOwner;
+  enabled?: boolean;
+}) => {
+  const enabled = options.enabled ?? true;
+  const owned = options.owner !== undefined;
+  const properties = useProperties({ initiativeId: options.initiativeId, enabled });
+  const metadata = useProperties({
+    owner: options.owner,
+    enabled: enabled && owned,
+  });
+  const data = useMemo(
+    () =>
+      properties.data && (!owned || metadata.data)
+        ? [...(owned ? (metadata.data ?? []) : []), ...properties.data]
+        : undefined,
+    [properties.data, metadata.data, owned]
+  );
+  return {
+    data,
+    isLoading: properties.isLoading || (owned && metadata.isLoading),
+    isError: properties.isError || (owned && metadata.isError),
+    refetch: () => Promise.all([properties.refetch(), metadata.refetch()]),
+  };
 };
 
 // ── Mutations ────────────────────────────────────────────────────────────────
@@ -65,7 +113,7 @@ export const useCreateProperty = (
   useCommunityMutation<PropertyDefinitionRead, PropertyDefinitionCreate>(
     {
       mutationFn: (communityId, data) => createPropertyDefinition(communityId, data),
-      // A collection's field is listed with the collection, and its lists.
+      // A collection's metadata is listed with the collection, and its lists.
       invalidate: (created) =>
         invalidate(q.allProperties(), ...(created.collection_id ? [q.allCollections()] : [])),
       errorKey: "properties:manager.createError",
@@ -87,7 +135,7 @@ export const useUpdateProperty = (
       mutationFn: (communityId, { propertyId, data }) =>
         updatePropertyDefinition(communityId, propertyId, data),
       // Every row's embedded summaries carry the definition's name, options
-      // and color, as a collection's files carry its fields'.
+      // and color, as a collection's files carry its metadata's.
       invalidate: () => invalidate(q.allProperties(), q.allPropertyHolders(), q.allCollections()),
       errorKey: "properties:manager.updateError",
     },

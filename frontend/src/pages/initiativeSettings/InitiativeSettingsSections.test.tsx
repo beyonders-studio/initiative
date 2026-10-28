@@ -14,6 +14,7 @@ import {
   buildInitiative,
   buildInitiativeJoinRequest,
   buildInitiativeRole,
+  buildPropertyDefinition,
   buildToolLayoutSet,
   buildUserSummary,
   initiativeCan,
@@ -250,15 +251,29 @@ describe("initiative settings sections", () => {
     expect(screen.getAllByText(/grant nothing until the tool is turned back on/)).toHaveLength(1);
   });
 
-  it("serves custom properties at /settings/properties", async () => {
+  it("serves the initiative's own properties at /settings/properties", async () => {
     stubInitiative();
-    server.use(communityHttp.get("/property-definitions/", () => HttpResponse.json([])));
+    server.use(
+      communityHttp.get("/property-definitions/", () =>
+        HttpResponse.json([
+          buildPropertyDefinition({ id: 1, name: "Budget" }),
+          // A project's or a collection's metadata is managed where its owner is.
+          buildPropertyDefinition({ id: 2, name: "Sprint", project_id: 3 }),
+          buildPropertyDefinition({ id: 3, name: "Caption", collection_id: 5 }),
+        ])
+      )
+    );
 
     renderSection(InitiativeSettingsPropertiesPage, "properties");
 
     expect(
-      await screen.findByText("Define reusable metadata for anything in this initiative.")
+      await screen.findByText(
+        "Properties hold values on anything in this initiative: its tasks, files, events and the rest."
+      )
     ).toBeInTheDocument();
+    expect(await screen.findByRole("cell", { name: "Budget" })).toBeInTheDocument();
+    expect(screen.queryByText("Sprint")).not.toBeInTheDocument();
+    expect(screen.queryByText("Caption")).not.toBeInTheDocument();
   });
 
   it("serves the export wizard at /settings/export", async () => {

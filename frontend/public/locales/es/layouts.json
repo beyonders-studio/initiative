@@ -204,9 +204,10 @@
   },
   "boxWith": "Caja con {{name}}",
   "newField": "Campo nuevo",
-  "fieldsGroup": "Campos",
+  "projectMetadata": "Metadatos de este proyecto",
+  "collectionMetadata": "Metadatos de esta colección",
+  "initiativeProperties": "Propiedades de la iniciativa",
   "panels": "Paneles",
-  "fromProperty": "Propiedad",
   "search": "Buscar",
   "noMatches": "No hay coincidencias.",
   "sectionHelp": "Con título se abre y se cierra; sin él es una caja.",
@@ -282,9 +283,8 @@
   },
   "calendarNote": "Un calendario no tiene tarjeta ni columnas que organizar. Si se muestra, y si el proyecto se abre en él, se ajusta a la derecha.",
   "makeOpensFirst": "Abrir primero con {{name}}",
-  "fromCollection": "Esta colección",
-  "ratingDisplay": {
-    "label": "Mostrar la valoración como",
+  "scaleDisplay": {
+    "label": "Mostrar la escala como",
     "number": "Un número",
     "stars": "Estrellas",
     "bar": "Una barra"

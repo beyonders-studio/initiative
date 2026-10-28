@@ -23,7 +23,7 @@ import { TaskBlockersHoverCard } from "@/components/projects/TaskBlockersHoverCa
 import { TaskDescriptionHoverCard } from "@/components/projects/TaskDescriptionHoverCard";
 import { TaskSubtasksHoverCard } from "@/components/projects/TaskSubtasksHoverCard";
 import { PropertyValueCell } from "@/components/properties/PropertyValueCell";
-import type { RatingDisplay } from "@/components/properties/propertyHelpers";
+import type { ScaleDisplay } from "@/components/properties/propertyHelpers";
 import { TagBadge } from "@/components/tags";
 import { TagBadgeList } from "@/components/tags/TagBadge";
 import { TaskChecklistProgress } from "@/components/tasks/TaskChecklistProgress";
@@ -96,8 +96,8 @@ export type FieldDef = {
   plugin?: { install: number; field: PluginFieldDecl; on: PluginOnItems };
   /** A property field's definition. */
   property?: PropertyDefinitionRead;
-  /** How a rating is drawn where the list showing it says. */
-  display?: RatingDisplay;
+  /** How a scale is drawn where the list showing it says. */
+  display?: ScaleDisplay;
   /** A property drawn on a card as its value alone, not named: a
    *  collection's card under a picture, which reads as a caption or a price
    *  rather than a row of labelled chips. */
@@ -413,10 +413,10 @@ const PropertyField = ({ value, field, variant, oneLine }: FieldRendererProps) =
   />
 );
 
-/** `fields`, each rating drawn as a list's `displays` say. */
+/** `fields`, each scale drawn as a list's `displays` say. */
 export const withDisplays = <F extends Pick<FieldDef, "display">>(
   fields: ReadonlyMap<string, F>,
-  displays: Readonly<Record<string, RatingDisplay>> | null | undefined
+  displays: Readonly<Record<string, ScaleDisplay>> | null | undefined
 ): ReadonlyMap<string, F> =>
   displays && Object.keys(displays).length > 0
     ? new Map(

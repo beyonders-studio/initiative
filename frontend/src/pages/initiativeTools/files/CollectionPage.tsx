@@ -188,14 +188,14 @@ export function CollectionPage() {
   const definition = (listLayout?.definition ?? {}) as ListLayoutDefinitionInput;
 
   // What the list can show of each file: its own fields, the collection's
-  // fields and the initiative's properties, each rating as the list says.
+  // metadata and the initiative's properties, each scale as the list says.
   const { data: properties = [] } = useProperties({
     initiativeId: collection?.initiative_id,
     enabled: collection !== undefined,
   });
   const allFields = useMemo(
-    () => collectionFileFields(collection?.fields ?? [], properties),
-    [collection?.fields, properties]
+    () => collectionFileFields(collection?.metadata ?? [], properties),
+    [collection?.metadata, properties]
   );
   const fields = useMemo(
     () => withDisplays(allFields, definition.displays),
@@ -344,11 +344,11 @@ export function CollectionPage() {
     (file: FileSummary) => gp(toolDetailRoute(Tool.file, file.initiative_id, file.id)),
     [gp]
   );
-  // Any other file, where the collection has fields, opens beside the wall
-  // with its values there, and from there on its own page.
+  // Any other file, where the collection has metadata, opens beside the
+  // wall with its values there, and from there on its own page.
   const [besideId, setBesideId] = useState<number | null>(null);
   const besideFile = rows.find((row) => row.id === besideId);
-  const hasFields = (collection?.fields.length ?? 0) > 0;
+  const hasMetadata = (collection?.metadata.length ?? 0) > 0;
   // A file beside the wall, or under a picture, is drawn as the collection's
   // file detail lays it out, measured against where it is drawn.
   const fileLayout = detailLayoutOf(layoutsQuery.data, "file") as StoredRegions | null;
@@ -368,13 +368,13 @@ export function CollectionPage() {
     (file: FileSummary, options: GridToggleOptions) => {
       if (selection.active) selection.toggle(file as FileRow, options);
       else if (file.kind === FileKind.image) setOpenId(file.id);
-      else if (hasFields) setBesideId(file.id);
+      else if (hasMetadata) setBesideId(file.id);
       else void navigate({ to: fileRoute(file) });
     },
-    [selection.active, selection.toggle, navigate, fileRoute, hasFields]
+    [selection.active, selection.toggle, navigate, fileRoute, hasMetadata]
   );
   // A table row's name opens it as the walls do, once the collection has
-  // fields of its own; until then it goes to the file's page.
+  // metadata of its own; until then it goes to the file's page.
   const openRow = useCallback((row: ToolIndexRow) => onActivate(row as FileRow, {}), [onActivate]);
   const lightboxItems = useMemo<LightboxItem[]>(
     () =>
@@ -667,7 +667,7 @@ export function CollectionPage() {
                 initiativeId={initiativeId ?? 0}
                 rows={rows}
                 laidOut={columns}
-                onOpen={hasFields ? openRow : undefined}
+                onOpen={hasMetadata ? openRow : undefined}
                 selection={selection}
                 sorting={view.sorting}
                 onSortingChange={setSorting}
@@ -712,7 +712,7 @@ export function CollectionPage() {
         index={Math.max(openIndex, 0)}
         onIndexChange={(index) => setOpenId(pictures[index]?.id ?? null)}
         onNearEnd={onNearEnd}
-        panel={lightboxFile && hasFields ? drawFile(lightboxFile) : undefined}
+        panel={lightboxFile && hasMetadata ? drawFile(lightboxFile) : undefined}
         actions={
           lightboxFile ? (
             <Button

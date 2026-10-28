@@ -1,6 +1,7 @@
 {
   "title": "Propiedades",
   "addProperty": "Agregar propiedad",
+  "addPropertyOrMetadata": "Añadir propiedad o metadatos",
   "noProperties": "Sin propiedades",
   "saving": "Guardando…",
   "saved": "Guardado",
@@ -17,13 +18,23 @@
     "multi_select": "Selección múltiple",
     "user_reference": "Persona",
     "currency": "Importe",
-    "rating": "Valoración"
+    "scale": "Escala",
+    "link": "Enlace",
+    "badge": "Insignia",
+    "json": "Datos"
   },
   "picker": {
     "placeholder": "Buscar propiedades…",
     "empty": "Ninguna propiedad coincide",
     "createHeading": "Crear nueva propiedad",
-    "namePlaceholder": "Nombre de la propiedad",
+    "createMetadataHeading": "Nuevos metadatos",
+    "ownerLabel": "Pertenece a",
+    "owner": {
+      "project": "Metadatos de este proyecto",
+      "collection": "Metadatos de esta colección",
+      "initiative": "Una propiedad de la iniciativa"
+    },
+    "namePlaceholder": "Nombre",
     "typeLabel": "Tipo",
     "createButton": "Crear",
     "optionLabelPlaceholder": "Etiqueta",
@@ -44,16 +55,17 @@
     "createOption": "Crear \"{{label}}\"",
     "optionAdded": "Opción agregada",
     "optionAddFailed": "No se pudo agregar la opción",
-    "ratingPlaceholder": "1–100"
+    "scalePlaceholder": "0–100",
+    "stars_one": "{{count}} estrella",
+    "stars_other": "{{count}} estrellas"
   },
   "cell": {
     "emptyValue": "—",
-    "none": "Ninguno",
-    "rating": "Valorado con {{value}} de 100"
+    "none": "Ninguno"
   },
   "manager": {
     "title": "Propiedades personalizadas",
-    "description": "Defina metadatos reutilizables para cualquier elemento de esta iniciativa.",
+    "description": "Las propiedades guardan valores en todo lo que hay en esta iniciativa: sus tareas, archivos, eventos y lo demás.",
     "newDefinition": "Nueva propiedad",
     "editDefinition": "Editar propiedad",
     "nameLabel": "Nombre",
@@ -67,9 +79,9 @@
     "deleteConfirmTitle": "¿Eliminar esta propiedad?",
     "deleteConfirmBody": "Esto eliminará la propiedad y todos sus valores en esta iniciativa.",
     "orphanedWarning": "{{count}} valores existentes hacen referencia a opciones eliminadas. Se mostrarán como 'Opción desconocida' hasta que se actualicen.",
-    "createError": "No se pudo crear la propiedad",
-    "updateError": "No se pudo actualizar la propiedad",
-    "deleteError": "No se pudo eliminar la propiedad",
+    "createError": "No se pudo crear",
+    "updateError": "No se pudo guardar el cambio",
+    "deleteError": "No se pudo eliminar",
     "setValuesError": "No se pudo guardar el valor de la propiedad",
     "moveUp": "Subir {{name}}",
     "moveDown": "Bajar {{name}}"

@@ -465,17 +465,18 @@
     "noAccess": "Zugriff verweigert",
     "noAccessDescription": "Du hast keine Berechtigung, diese Sammlung anzusehen.",
     "error": "Die Sammlung konnte nicht geändert werden",
-    "fields": {
+    "metadata": {
+      "title": "Metadaten",
       "description": "Was jede Datei in dieser Sammlung hier tragen kann: Die Werte gehören zur Sammlung, nicht zur Datei.",
-      "create": "Neues Feld",
-      "edit": "Feld bearbeiten",
-      "delete": "Feld löschen",
-      "deleteTitle": "Dieses Feld löschen?",
-      "deleteBody": "Damit werden das Feld und die Werte aller Dateien dafür in dieser Sammlung entfernt.",
-      "none": "Noch keine Felder",
+      "create": "Neue Metadaten",
+      "edit": "Metadaten bearbeiten",
+      "delete": "Metadaten löschen",
+      "deleteTitle": "Diese Metadaten löschen?",
+      "deleteBody": "Damit werden sie und die Werte aller Dateien dafür in dieser Sammlung entfernt.",
+      "none": "Noch keine Metadaten",
       "heading": "In dieser Sammlung",
       "saveError": "Der Wert konnte nicht gespeichert werden",
-      "of": "Felder von {{name}}"
+      "of": "Metadaten von {{name}}"
     },
     "addedOn": "Hinzugefügt {{date}}",
     "createdOn": "Erstellt {{date}}",
@@ -488,12 +489,12 @@
     "shapes": {
       "name": "Name",
       "blank": "Leer",
-      "blankHint": "Ein Raster und eine Tabelle, noch ohne eigene Felder.",
+      "blankHint": "Ein Raster und eine Tabelle, noch ohne eigene Metadaten.",
       "lists": "Zeigt {{lists}}",
-      "fields": "Felder: {{fields}}",
+      "metadata": "Metadaten: {{metadata}}",
       "copyLabel": "Oder die Form übernehmen von",
       "copyPlaceholder": "Einer anderen Sammlung",
-      "copyHint": "Ihre Felder und was ihre Listen zeigen, ohne ihre Dateien oder deren Werte.",
+      "copyHint": "Ihre Metadaten und was ihre Listen zeigen, ohne ihre Dateien oder deren Werte.",
       "create": "Sammlung erstellen"
     }
   }

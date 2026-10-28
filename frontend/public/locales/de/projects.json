@@ -235,7 +235,8 @@
   },
   "settings": {
     "tabTaskStatuses": "Aufgabenstatus",
-    "tabTaskTypes": "Aufgabentypen"
+    "tabTaskTypes": "Aufgabentypen",
+    "tabMetadata": "Metadaten"
   },
   "files": {
     "newFile": "Neue Datei"
@@ -420,5 +421,14 @@
     "unassigned": "Du bist nicht mehr bei dieser Aufgabe",
     "assignError": "Die Zuständigen dieser Aufgabe konnten nicht geändert werden.",
     "moveTo": "Verschieben nach"
+  },
+  "metadata": {
+    "description": "Was die Aufgaben dieses Projekts neben den Eigenschaften der Initiative tragen können. Eine Aufgabe, die in ein anderes Projekt verschoben wird, behält einen Wert nur, wenn dieses Projekt Metadaten mit demselben Namen und Typ hat.",
+    "create": "Neue Metadaten",
+    "edit": "Metadaten bearbeiten",
+    "delete": "Metadaten löschen",
+    "deleteTitle": "Diese Metadaten löschen?",
+    "deleteBody": "Damit werden sie und die Werte aller Aufgaben dafür in diesem Projekt entfernt.",
+    "none": "Noch keine Metadaten"
   }
 }

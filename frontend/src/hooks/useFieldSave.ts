@@ -73,7 +73,7 @@ export interface FieldSaveKind<I, P> {
   /** Where its properties are set. */
   properties: PropertyTarget;
   /** Sets its properties where they are not set as a target's: a file's
-   *  values of a collection's fields, which are the collection's. */
+   *  values of a collection's metadata, which are the collection's. */
   setProperties?: (
     communityId: number,
     id: number,

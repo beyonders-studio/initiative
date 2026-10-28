@@ -18,9 +18,9 @@ import {
   type LayoutGrouping,
   type ListLayoutDefinitionOutput,
   type ListLayoutReadKind,
+  MetadataType,
   type PropertyDefinitionRead,
   type PropertySummary,
-  PropertyType,
   type PropertyValuesSetRequest,
   type TaskListRead,
   type TaskPriority,
@@ -31,6 +31,7 @@ import {
 import { priorityVariant } from "@/components/projects/projectTasksConfig";
 import { TaskAssigneeList } from "@/components/projects/TaskAssigneeList";
 import { extractUser, PropertyValueCell } from "@/components/properties/PropertyValueCell";
+import { propertyStubFromDefinition } from "@/components/properties/propertyHelpers";
 import { TagBadge } from "@/components/tags/TagBadge";
 import { TaskStatusOption } from "@/components/tasks/TaskStatusOption";
 import { TaskTypeOption } from "@/components/tasks/TaskTypeOption";
@@ -113,12 +114,12 @@ const BOARD_COLUMNS = "task_status_id";
 const groupsBy = (kind: ListLayoutReadKind, id: string) => kind !== "board" || id !== BOARD_COLUMNS;
 
 const GROUPING_PROPERTIES: ReadonlySet<string> = new Set([
-  PropertyType.select,
-  PropertyType.multi_select,
-  PropertyType.user_reference,
-  PropertyType.checkbox,
+  MetadataType.select,
+  MetadataType.multi_select,
+  MetadataType.user_reference,
+  MetadataType.checkbox,
 ]);
-const DATE_PROPERTIES: ReadonlySet<string> = new Set([PropertyType.date, PropertyType.datetime]);
+const DATE_PROPERTIES: ReadonlySet<string> = new Set([MetadataType.date, MetadataType.datetime]);
 
 /**
  * What a project's tasks can be grouped by: the fields the catalog says group,
@@ -240,15 +241,15 @@ const propertyMove = (definition: PropertyDefinitionRead): TaskGrouping["move"] 
         : { merge: true, values: [{ property_id: id, value }] },
   });
   switch (definition.type) {
-    case PropertyType.select:
+    case MetadataType.select:
       return (_from, to) => write(to, to);
-    case PropertyType.multi_select:
+    case MetadataType.multi_select:
       return (from, to) => ({
         properties: { merge: true, options: [{ property_id: id, ...swap(from, to) }] },
       });
-    case PropertyType.user_reference:
+    case MetadataType.user_reference:
       return (_from, to) => write(to, Number(to));
-    case PropertyType.checkbox:
+    case MetadataType.checkbox:
       return (_from, to) => write(to, to === "true");
     default:
       return undefined;
@@ -301,32 +302,25 @@ export const offeredGroupings = ({
       if (field.id === "parent_task_id") return label(t("table.noParent"));
       return label(t("table.noValue", { name: field.label }));
     };
-    const summary = (value: unknown): PropertySummary => {
-      const definition = field.property as PropertyDefinitionRead;
-      return {
-        property_id: definition.id,
-        name: definition.name,
-        type: definition.type,
-        options: definition.options,
-        currency: definition.currency,
-        value,
-      };
-    };
+    const summary = (value: unknown): PropertySummary => ({
+      ...propertyStubFromDefinition(field.property as PropertyDefinitionRead),
+      value,
+    });
 
     const propertyHeader = (definition: PropertyDefinitionRead, key: string): ReactNode => {
       switch (definition.type) {
-        case PropertyType.checkbox:
+        case MetadataType.checkbox:
           return label(
             t(key === "true" ? "table.checked" : "table.unchecked", { name: field.label })
           );
-        case PropertyType.select:
-        case PropertyType.multi_select:
+        case MetadataType.select:
+        case MetadataType.multi_select:
           return (
             <PropertyValueCell
-              summary={summary(definition.type === PropertyType.select ? key : [key])}
+              summary={summary(definition.type === MetadataType.select ? key : [key])}
             />
           );
-        case PropertyType.user_reference: {
+        case MetadataType.user_reference: {
           const person = tasks
             .map((task) =>
               extractUser(
@@ -346,7 +340,7 @@ export const offeredGroupings = ({
       if (field.id === "date_group") {
         return label(getTaskDateStatusLabel(TASK_DATE_STATUSES[Number(key)], t));
       }
-      if (field.property?.type === PropertyType.checkbox) {
+      if (field.property?.type === MetadataType.checkbox) {
         return propertyHeader(field.property, key);
       }
       if (key === NO_GROUP) return empty();

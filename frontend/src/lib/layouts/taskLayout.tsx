@@ -719,6 +719,7 @@ export const TASK_DETAIL: DetailKind<TaskRead, TaskLayoutContext, TaskUpdate> = 
     readOnly: context.readOnly,
     initiativeId: context.initiativeId,
     canOpen: { tool: Tool.project, id: task.project_id },
+    owner: { kind: "project", id: task.project_id },
     links: {
       entity: { id: task.project_id, initiative_id: task.project?.initiative_id ?? null },
       target: { type: SearchEntityType.task, id: task.id },
@@ -777,5 +778,4 @@ export const blankTask = (
   subtask_progress: null,
   tags: [],
   properties: [],
-  plugin_values: [],
 });

@@ -1,6 +1,7 @@
 {
   "title": "Properties",
   "addProperty": "Add property",
+  "addPropertyOrMetadata": "Add property or metadata",
   "noProperties": "No properties",
   "saving": "Saving…",
   "saved": "Saved",
@@ -17,13 +18,23 @@
     "multi_select": "Multi-select",
     "user_reference": "Person",
     "currency": "Money",
-    "rating": "Rating"
+    "scale": "Scale",
+    "link": "Link",
+    "badge": "Badge",
+    "json": "Data"
   },
   "picker": {
     "placeholder": "Search properties…",
     "empty": "No properties match",
     "createHeading": "Create new property",
-    "namePlaceholder": "Property name",
+    "createMetadataHeading": "New metadata",
+    "ownerLabel": "Belongs to",
+    "owner": {
+      "project": "This project's metadata",
+      "collection": "This collection's metadata",
+      "initiative": "A property of the initiative"
+    },
+    "namePlaceholder": "Name",
     "typeLabel": "Type",
     "createButton": "Create",
     "optionLabelPlaceholder": "Option label",
@@ -44,16 +55,17 @@
     "createOption": "Create \"{{label}}\"",
     "optionAdded": "Option added",
     "optionAddFailed": "Could not add option",
-    "ratingPlaceholder": "1–100"
+    "scalePlaceholder": "0–100",
+    "stars_one": "{{count}} star",
+    "stars_other": "{{count}} stars"
   },
   "cell": {
     "emptyValue": "—",
-    "none": "None",
-    "rating": "Rated {{value}} out of 100"
+    "none": "None"
   },
   "manager": {
     "title": "Custom properties",
-    "description": "Define reusable metadata for anything in this initiative.",
+    "description": "Properties hold values on anything in this initiative: its tasks, files, events and the rest.",
     "newDefinition": "New property",
     "editDefinition": "Edit property",
     "nameLabel": "Name",
@@ -67,9 +79,9 @@
     "deleteConfirmTitle": "Delete this property?",
     "deleteConfirmBody": "This will remove the property and every value set for it in this initiative.",
     "orphanedWarning": "{{count}} existing values reference removed options. They'll show as 'Unknown option' until updated.",
-    "createError": "Failed to create property",
-    "updateError": "Failed to update property",
-    "deleteError": "Failed to delete property",
+    "createError": "Couldn't create it",
+    "updateError": "Couldn't save the change",
+    "deleteError": "Couldn't delete it",
     "setValuesError": "Failed to save property value",
     "moveUp": "Move {{name}} up",
     "moveDown": "Move {{name}} down"

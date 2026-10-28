@@ -9,9 +9,9 @@ import { communityHttp } from "@/__tests__/helpers/communityHttp";
 import { server } from "@/__tests__/helpers/msw-server";
 import { renderWithProviders } from "@/__tests__/helpers/render";
 import {
+  MetadataType,
   type PropertySummary,
   PropertyTarget,
-  PropertyType,
   Tool,
 } from "@/api/generated/initiativeAPI.schemas";
 import { propertySaves } from "@/hooks/useProperties";
@@ -21,13 +21,13 @@ import { PropertiesField } from "./fieldEditors";
 const status = buildPropertySummary({
   property_id: 1,
   name: "Status",
-  type: PropertyType.text,
+  type: MetadataType.text,
   value: "open",
 });
 const owner = buildPropertySummary({
   property_id: 2,
   name: "Owner",
-  type: PropertyType.text,
+  type: MetadataType.text,
   value: "Ada",
 });
 
@@ -163,5 +163,20 @@ describe("a row's properties, saved one at a time", () => {
     expect(screen.getByText("Ada")).toBeInTheDocument();
     expect(screen.queryByRole("textbox")).not.toBeInTheDocument();
     expect(screen.queryByRole("button", { name: /remove/i })).not.toBeInTheDocument();
+  });
+
+  it("lists the row's own values, not a collection's metadata or a plug-in's", () => {
+    panel(
+      [
+        status,
+        buildPropertySummary({ name: "Caption", collection_id: 5, value: "Dusk" }),
+        buildPropertySummary({ name: "Build", install_id: 3, key: "ci.state", value: "green" }),
+      ],
+      true
+    );
+
+    expect(screen.getByText("open")).toBeInTheDocument();
+    expect(screen.queryByText("Dusk")).not.toBeInTheDocument();
+    expect(screen.queryByText("green")).not.toBeInTheDocument();
   });
 });

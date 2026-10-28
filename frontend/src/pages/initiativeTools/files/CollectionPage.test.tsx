@@ -34,7 +34,7 @@ import {
 import { communityHttp } from "@/__tests__/helpers/communityHttp";
 import { server } from "@/__tests__/helpers/msw-server";
 import { renderPage } from "@/__tests__/helpers/render";
-import { PropertyType } from "@/api/generated/initiativeAPI.schemas";
+import { MetadataType } from "@/api/generated/initiativeAPI.schemas";
 import { numberFormat } from "@/lib/intl";
 
 import { CollectionPage } from "./CollectionPage";
@@ -132,7 +132,7 @@ describe("a collection's page", () => {
     const price = buildPropertyDefinition({
       id: 22,
       name: "Price",
-      type: PropertyType.currency,
+      type: MetadataType.currency,
       currency: "EUR",
       collection_id: 5,
     });
@@ -141,11 +141,11 @@ describe("a collection's page", () => {
         id: 4,
         name: "Lamp",
         file_size: 2048,
-        fields: [
+        metadata: [
           buildPropertySummary({
             property_id: 22,
             name: "Price",
-            type: PropertyType.currency,
+            type: MetadataType.currency,
             currency: "EUR",
             value: 12.5,
           }),
@@ -154,7 +154,7 @@ describe("a collection's page", () => {
     ];
     server.use(
       communityHttp.get("/collections/:id", () =>
-        HttpResponse.json(buildCollection({ id: 5, fields: [price] }))
+        HttpResponse.json(buildCollection({ id: 5, metadata: [price] }))
       ),
       communityHttp.get("/collections/:id/files", () =>
         HttpResponse.json({
@@ -208,7 +208,7 @@ describe("a collection's page", () => {
     const caption = buildPropertyDefinition({ id: 21, name: "Caption", collection_id: 5 });
     server.use(
       communityHttp.get("/collections/:id", () =>
-        HttpResponse.json(buildCollection({ id: 5, fields: [caption] }))
+        HttpResponse.json(buildCollection({ id: 5, metadata: [caption] }))
       ),
       communityHttp.get("/collections/:id/files", () =>
         HttpResponse.json({
@@ -216,7 +216,9 @@ describe("a collection's page", () => {
             buildCollectionFile({
               id: 4,
               name: "Price list",
-              fields: [buildPropertySummary({ property_id: 21, name: "Caption", value: "Spring" })],
+              metadata: [
+                buildPropertySummary({ property_id: 21, name: "Caption", value: "Spring" }),
+              ],
             }),
           ],
           total_count: 1,

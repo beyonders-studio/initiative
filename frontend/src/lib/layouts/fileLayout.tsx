@@ -8,7 +8,7 @@ import {
   Tool,
 } from "@/api/generated/initiativeAPI.schemas";
 import { nonEmptyPropertySummaries } from "@/components/properties/propertyHelpers";
-import { collectionFieldSaves } from "@/hooks/useCollections";
+import { collectionMetadataSaves } from "@/hooks/useCollections";
 import { propertySaves } from "@/hooks/useProperties";
 import type { TranslateFn } from "@/types/i18n";
 
@@ -22,14 +22,14 @@ import type { LayoutContext } from "./tree";
 
 /** What a file's detail shares with its parts, beside the file itself. */
 export interface FileLayoutContext {
-  /** The collection it is opened from: its fields, and whether the reader may
-   *  change them. */
+  /** The collection it is opened from: its metadata, and whether the reader
+   *  may change it. */
   collection: CollectionRead;
 }
 
 const useFileLayout = useItemContext<FileLayoutContext>;
 
-/** One of the collection's fields, saved as the collection's by whoever may
+/** One of the collection's metadata, saved as the collection's by whoever may
  *  change it; or one of the initiative's properties, which the file holds and
  *  its own page changes. */
 const FileProperty = ({
@@ -40,16 +40,16 @@ const FileProperty = ({
   propertyId: number;
 }) => {
   const { collection } = useFileLayout();
-  const own = collection.fields.some((each) => each.id === propertyId);
+  const own = collection.metadata.some((each) => each.id === propertyId);
   return own ? (
     <PlacedPropertyField
-      kind={collectionFieldSaves(collection.id)}
+      kind={collectionMetadataSaves(collection.id)}
       id={file.id}
-      properties={file.fields}
+      properties={file.metadata}
       readOnly={!collection.can.edit}
       initiativeId={collection.initiative_id}
       propertyId={propertyId}
-      definitions={collection.fields}
+      definitions={collection.metadata}
     />
   ) : (
     <PlacedPropertyField
@@ -94,14 +94,14 @@ const FileField = ({
   );
 };
 
-/** Every field of the collection's, then the properties the file holds, but
- *  for those the layout places on their own. A reader sees only the fields
- *  that hold a value. */
+/** The collection's metadata, then the properties the file holds, but for
+ *  those the layout places on their own. A reader sees only those that hold a
+ *  value. */
 const FileProperties = ({ file }: { file: CollectionFileSummary }) => {
   const { collection } = useFileLayout();
   const placed = useContext(PlacedProperties);
   const ids = [
-    ...collection.fields.map((each) => each.id),
+    ...collection.metadata.map((each) => each.id),
     ...nonEmptyPropertySummaries(file.properties).map((each) => each.property_id),
   ].filter((id) => !placed.has(id));
   return ids.map((id) => (
@@ -110,8 +110,8 @@ const FileProperties = ({ file }: { file: CollectionFileSummary }) => {
   ));
 };
 
-/** A file opened from a collection: its own fields, the collection's and the
- *  initiative's properties. */
+/** A file opened from a collection: its own fields, the collection's metadata
+ *  and the initiative's properties. */
 export const FILE_DETAIL: DetailKind<CollectionFileSummary, FileLayoutContext, never> = {
   spec: FILE_LAYOUT,
   fields: (definitions) => collectionFileFields([], definitions),
@@ -125,7 +125,7 @@ export const FILE_DETAIL: DetailKind<CollectionFileSummary, FileLayoutContext, n
     properties: (_node, file) => <FileProperties file={file} />,
   },
   home: (file, { collection }) => ({
-    saves: collectionFieldSaves(collection.id),
+    saves: collectionMetadataSaves(collection.id),
     readOnly: !collection.can.edit,
     initiativeId: collection.initiative_id,
     canOpen: { tool: Tool.file, id: file.id },

@@ -35,10 +35,10 @@ const draw = (
   );
 
 describe("a file's detail in a collection", () => {
-  it("saves a file's value of the collection's field as the collection's", async () => {
+  it("saves a file's value of the collection's metadata as the collection's", async () => {
     let sent: { path: string; body: PropertyValuesSetRequest } | null = null;
     server.use(
-      communityHttp.put("/collections/:id/files/:fileId/fields", async ({ request, params }) => {
+      communityHttp.put("/collections/:id/files/:fileId/metadata", async ({ request, params }) => {
         sent = {
           path: `${String(params.id)}/${String(params.fileId)}`,
           body: (await request.json()) as PropertyValuesSetRequest,
@@ -50,11 +50,11 @@ describe("a file's detail in a collection", () => {
     );
     const user = userEvent.setup();
     draw(
-      buildCollection({ id: 5, fields: [caption] }),
+      buildCollection({ id: 5, metadata: [caption] }),
       buildCollectionFile({ id: 4, name: "Harbour" })
     );
 
-    // As shipped: its name, then every field of the collection's.
+    // As shipped: its name, then the collection's metadata.
     expect(await screen.findByRole("heading", { name: "Harbour" })).toBeInTheDocument();
     await user.type(screen.getByPlaceholderText("Empty"), "Dusk{Enter}");
 
@@ -73,11 +73,11 @@ describe("a file's detail in a collection", () => {
     draw(
       buildCollection({
         id: 5,
-        fields: [caption, buildPropertyDefinition({ id: 22, name: "Credit", collection_id: 5 })],
+        metadata: [caption, buildPropertyDefinition({ id: 22, name: "Credit", collection_id: 5 })],
         can: { edit: false, unarchive: false },
       }),
       buildCollectionFile({
-        fields: [buildPropertySummary({ property_id: 21, name: "Caption", value: "Dusk" })],
+        metadata: [buildPropertySummary({ property_id: 21, name: "Caption", value: "Dusk" })],
         properties: [buildPropertySummary({ property_id: 9, name: "Client", value: "Acme" })],
       })
     );
@@ -87,13 +87,13 @@ describe("a file's detail in a collection", () => {
     expect(screen.queryByRole("textbox")).not.toBeInTheDocument();
   });
 
-  it("draws a file's own field and a field of the collection's where its layout puts them", async () => {
+  it("draws a file's own field and the collection's metadata where its layout puts them", async () => {
     draw(
-      buildCollection({ id: 5, fields: [caption] }),
+      buildCollection({ id: 5, metadata: [caption] }),
       buildCollectionFile({
         name: "Harbour",
         file_size: 2048,
-        fields: [buildPropertySummary({ property_id: 21, name: "Caption", value: "Dusk" })],
+        metadata: [buildPropertySummary({ property_id: 21, name: "Caption", value: "Dusk" })],
         properties: [buildPropertySummary({ property_id: 9, name: "Client", value: "Acme" })],
       }),
       {

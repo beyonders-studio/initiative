@@ -465,17 +465,18 @@
     "noAccess": "Access denied",
     "noAccessDescription": "You don't have permission to view this collection.",
     "error": "Couldn't change the collection",
-    "fields": {
+    "metadata": {
+      "title": "Metadata",
       "description": "What each file in this collection can hold here: its values belong to this collection, not to the file.",
-      "create": "New field",
-      "edit": "Edit field",
-      "delete": "Delete field",
-      "deleteTitle": "Delete this field?",
-      "deleteBody": "This removes the field and every file's value of it in this collection.",
-      "none": "No fields yet",
+      "create": "New metadata",
+      "edit": "Edit metadata",
+      "delete": "Delete metadata",
+      "deleteTitle": "Delete this metadata?",
+      "deleteBody": "This removes it and every file's value of it in this collection.",
+      "none": "No metadata yet",
       "heading": "In this collection",
       "saveError": "Couldn't save the value",
-      "of": "{{name}}'s fields"
+      "of": "{{name}}'s metadata"
     },
     "addedOn": "Added {{date}}",
     "createdOn": "Created {{date}}",
@@ -488,12 +489,12 @@
     "shapes": {
       "name": "Name",
       "blank": "Blank",
-      "blankHint": "A grid and a table, and no fields of its own yet.",
+      "blankHint": "A grid and a table, and no metadata of its own yet.",
       "lists": "Shows {{lists}}",
-      "fields": "Fields: {{fields}}",
+      "metadata": "Metadata: {{metadata}}",
       "copyLabel": "Or copy the shape of",
       "copyPlaceholder": "Another collection",
-      "copyHint": "Its fields and what its lists show, without its files or their values.",
+      "copyHint": "Its metadata and what its lists show, without its files or their values.",
       "create": "Create collection"
     }
   }

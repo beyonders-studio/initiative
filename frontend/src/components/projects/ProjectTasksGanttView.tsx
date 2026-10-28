@@ -43,7 +43,7 @@ import { Toggle } from "@/components/ui/toggle";
 import { ToggleGroup, ToggleGroupItem } from "@/components/ui/toggle-group";
 import { useActiveCommunityId } from "@/hooks/useActiveCommunityId";
 import { useProjectTaskTypes } from "@/hooks/useProjects";
-import { useProperties } from "@/hooks/useProperties";
+import { useOwnedDefinitions } from "@/hooks/useProperties";
 import { useRelate, useUnrelate } from "@/hooks/useRelationships";
 import { useTaskGroupings } from "@/hooks/useTaskGroupings";
 import { useCommunityPath } from "@/lib/communityUrl";
@@ -194,7 +194,10 @@ export const ProjectTasksGanttView = ({
   const navigate = useNavigate();
   const communityId = useActiveCommunityId();
 
-  const { data: definitions } = useProperties({ initiativeId });
+  const { data: definitions } = useOwnedDefinitions({
+    initiativeId,
+    owner: { kind: "project", id: projectId },
+  });
   const fields = useMemo(() => taskFields(definitions ?? []), [definitions]);
   const { offered, active } = useTaskGroupings({
     fields,

@@ -379,7 +379,7 @@ export const fileDetail = (
 ): EditableDetail => ({
   spec: FILE_DETAIL.spec,
   words: wordsOf("fileDetail"),
-  fields: (definitions) => collectionFileFields(collection.fields, definitions),
+  fields: (definitions) => collectionFileFields(collection.metadata, definitions),
   preview: (tree) => (
     <ItemPreview
       detail={FILE_DETAIL}
@@ -422,6 +422,7 @@ export const taskPresets = (project: LayoutProject) =>
           statuses: project.statuses,
           types: project.types,
           initiativeId: project.initiativeId,
+          projectId: project.id,
         }}
         value={value}
         onChange={onChange}

@@ -204,9 +204,10 @@
   },
   "boxWith": "Boîte avec {{name}}",
   "newField": "Nouveau champ",
-  "fieldsGroup": "Champs",
+  "projectMetadata": "Métadonnées de ce projet",
+  "collectionMetadata": "Métadonnées de cette collection",
+  "initiativeProperties": "Propriétés de l'initiative",
   "panels": "Panneaux",
-  "fromProperty": "Propriété",
   "search": "Rechercher",
   "noMatches": "Aucun résultat.",
   "sectionHelp": "Avec un titre, elle s'ouvre et se ferme ; sans titre, c'est une boîte.",
@@ -282,9 +283,8 @@
   },
   "calendarNote": "Un calendrier n’a ni carte ni colonnes à disposer. Son affichage, et le fait que le projet s’ouvre dessus, se règlent à droite.",
   "makeOpensFirst": "Ouvrir d’abord sur {{name}}",
-  "fromCollection": "Cette collection",
-  "ratingDisplay": {
-    "label": "Afficher la note comme",
+  "scaleDisplay": {
+    "label": "Afficher l'échelle comme",
     "number": "Un nombre",
     "stars": "Des étoiles",
     "bar": "Une barre"

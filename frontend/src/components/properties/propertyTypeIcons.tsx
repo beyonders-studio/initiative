@@ -1,33 +1,39 @@
 import {
   AlignLeft,
+  Badge,
   Banknote,
+  Braces,
   CalendarClock,
   CalendarDays,
   CircleCheck,
+  Gauge,
   Hash,
+  Link2,
   Link as LinkIcon,
   List,
   ListChecks,
   type LucideIcon,
-  Star,
   User,
 } from "lucide-react";
 
-import { PropertyType } from "@/api/generated/initiativeAPI.schemas";
+import { MetadataType } from "@/api/generated/initiativeAPI.schemas";
 
-export const PROPERTY_TYPE_ICONS: Record<PropertyType, LucideIcon> = {
-  [PropertyType.text]: AlignLeft,
-  [PropertyType.number]: Hash,
-  [PropertyType.checkbox]: CircleCheck,
-  [PropertyType.date]: CalendarDays,
-  [PropertyType.datetime]: CalendarClock,
-  [PropertyType.url]: LinkIcon,
-  [PropertyType.select]: List,
-  [PropertyType.multi_select]: ListChecks,
-  [PropertyType.user_reference]: User,
-  [PropertyType.currency]: Banknote,
-  [PropertyType.rating]: Star,
+export const PROPERTY_TYPE_ICONS: Record<MetadataType, LucideIcon> = {
+  [MetadataType.text]: AlignLeft,
+  [MetadataType.number]: Hash,
+  [MetadataType.checkbox]: CircleCheck,
+  [MetadataType.date]: CalendarDays,
+  [MetadataType.datetime]: CalendarClock,
+  [MetadataType.url]: LinkIcon,
+  [MetadataType.select]: List,
+  [MetadataType.multi_select]: ListChecks,
+  [MetadataType.user_reference]: User,
+  [MetadataType.currency]: Banknote,
+  [MetadataType.scale]: Gauge,
+  [MetadataType.link]: Link2,
+  [MetadataType.badge]: Badge,
+  [MetadataType.json]: Braces,
 };
 
-export const iconForPropertyType = (type: PropertyType): LucideIcon =>
+export const iconForPropertyType = (type: MetadataType): LucideIcon =>
   PROPERTY_TYPE_ICONS[type] ?? AlignLeft;

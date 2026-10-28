@@ -22,9 +22,11 @@ import type {
 import { EntityLinkField } from "@/components/entities/EntityLinkField";
 import type { RelationsLayout } from "@/components/entities/RelationsSection";
 import { ToolRelationsPanel } from "@/components/entities/ToolRelationsPanel";
+import { ownProperties } from "@/components/properties/propertyHelpers";
 import { Button } from "@/components/ui/button";
 import { useActiveCommunityId } from "@/hooks/useActiveCommunityId";
 import { type FieldSaveKind, ItemDraftContext } from "@/hooks/useFieldSave";
+import type { MetadataOwner } from "@/hooks/useProperties";
 import { useCommunityPath } from "@/lib/communityUrl";
 import type { LinkedRef } from "@/lib/relationships";
 import type { ToolRelationEntity } from "@/lib/tools";
@@ -67,6 +69,9 @@ export interface ItemHome<I, P> {
   initiativeId: number | null;
   /** The tool it is opened in: whose members a person-valued property names. */
   canOpen: { tool: Tool; id: number };
+  /** The project whose metadata it holds beside its initiative's properties:
+   *  a task's. */
+  owner?: MetadataOwner;
   /** What its links are kept under: the tool entity, and the item itself
    *  where it is not that entity. */
   links: {
@@ -136,6 +141,7 @@ const propertiesOf = (item: Item, home: ItemHome<Item, unknown>) => ({
   readOnly: home.readOnly,
   initiativeId: home.initiativeId,
   canOpen: home.canOpen,
+  owner: home.owner,
 });
 
 /** One field, by its id: one of its initiative's properties, a plug-in's, or
@@ -165,7 +171,8 @@ const ItemProperties = ({ item }: { item: Item }) => {
   const { home } = useDrawn();
   const placed = useContext(PlacedProperties);
   if (home.initiativeId === null) return null;
-  if (home.readOnly && item.properties.every((each) => placed.has(each.property_id))) return null;
+  if (home.readOnly && ownProperties(item.properties).every((each) => placed.has(each.property_id)))
+    return null;
   return <PropertiesField {...propertiesOf(item, home)} except={placed} />;
 };
 

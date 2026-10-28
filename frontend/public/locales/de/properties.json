@@ -1,6 +1,7 @@
 {
   "title": "Eigenschaften",
   "addProperty": "Eigenschaft hinzufügen",
+  "addPropertyOrMetadata": "Eigenschaft oder Metadaten hinzufügen",
   "noProperties": "Keine Eigenschaften",
   "saving": "Wird gespeichert…",
   "saved": "Gespeichert",
@@ -17,13 +18,23 @@
     "multi_select": "Mehrfachauswahl",
     "user_reference": "Person",
     "currency": "Geldbetrag",
-    "rating": "Bewertung"
+    "scale": "Skala",
+    "link": "Link",
+    "badge": "Abzeichen",
+    "json": "Daten"
   },
   "picker": {
     "placeholder": "Eigenschaften suchen…",
     "empty": "Keine Eigenschaft passt",
     "createHeading": "Neue Eigenschaft erstellen",
-    "namePlaceholder": "Eigenschaftsname",
+    "createMetadataHeading": "Neue Metadaten",
+    "ownerLabel": "Gehört zu",
+    "owner": {
+      "project": "Metadaten dieses Projekts",
+      "collection": "Metadaten dieser Sammlung",
+      "initiative": "Eine Eigenschaft der Initiative"
+    },
+    "namePlaceholder": "Name",
     "typeLabel": "Typ",
     "createButton": "Erstellen",
     "optionLabelPlaceholder": "Bezeichnung",
@@ -44,16 +55,17 @@
     "createOption": "„{{label}}“ erstellen",
     "optionAdded": "Option hinzugefügt",
     "optionAddFailed": "Option konnte nicht hinzugefügt werden",
-    "ratingPlaceholder": "1–100"
+    "scalePlaceholder": "0–100",
+    "stars_one": "{{count}} Stern",
+    "stars_other": "{{count}} Sterne"
   },
   "cell": {
     "emptyValue": "—",
-    "none": "Keine",
-    "rating": "Mit {{value}} von 100 bewertet"
+    "none": "Keine"
   },
   "manager": {
     "title": "Benutzerdefinierte Eigenschaften",
-    "description": "Definiere wiederverwendbare Metadaten für alles in dieser Initiative.",
+    "description": "Eigenschaften tragen Werte an allem in dieser Initiative: an Aufgaben, Dateien, Terminen und dem Rest.",
     "newDefinition": "Neue Eigenschaft",
     "editDefinition": "Eigenschaft bearbeiten",
     "nameLabel": "Name",
@@ -67,9 +79,9 @@
     "deleteConfirmTitle": "Diese Eigenschaft löschen?",
     "deleteConfirmBody": "Dadurch werden die Eigenschaft und alle ihre Werte in dieser Initiative entfernt.",
     "orphanedWarning": "{{count}} vorhandene Werte verweisen auf entfernte Optionen. Sie werden als „Unbekannte Option“ angezeigt, bis sie aktualisiert werden.",
-    "createError": "Eigenschaft konnte nicht erstellt werden",
-    "updateError": "Eigenschaft konnte nicht aktualisiert werden",
-    "deleteError": "Eigenschaft konnte nicht gelöscht werden",
+    "createError": "Konnte nicht erstellt werden",
+    "updateError": "Die Änderung konnte nicht gespeichert werden",
+    "deleteError": "Konnte nicht gelöscht werden",
     "setValuesError": "Eigenschaftswert konnte nicht gespeichert werden",
     "moveUp": "{{name}} nach oben verschieben",
     "moveDown": "{{name}} nach unten verschieben"

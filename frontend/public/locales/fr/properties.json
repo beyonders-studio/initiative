@@ -1,6 +1,7 @@
 {
   "title": "Propriétés",
   "addProperty": "Ajouter une propriété",
+  "addPropertyOrMetadata": "Ajouter une propriété ou des métadonnées",
   "noProperties": "Aucune propriété",
   "saving": "Enregistrement…",
   "saved": "Enregistré",
@@ -17,13 +18,23 @@
     "multi_select": "Sélection multiple",
     "user_reference": "Personne",
     "currency": "Montant",
-    "rating": "Note"
+    "scale": "Échelle",
+    "link": "Lien",
+    "badge": "Badge",
+    "json": "Données"
   },
   "picker": {
     "placeholder": "Rechercher des propriétés…",
     "empty": "Aucune propriété ne correspond",
     "createHeading": "Créer une nouvelle propriété",
-    "namePlaceholder": "Nom de la propriété",
+    "createMetadataHeading": "Nouvelles métadonnées",
+    "ownerLabel": "Appartient à",
+    "owner": {
+      "project": "Métadonnées de ce projet",
+      "collection": "Métadonnées de cette collection",
+      "initiative": "Une propriété de l'initiative"
+    },
+    "namePlaceholder": "Nom",
     "typeLabel": "Type",
     "createButton": "Créer",
     "optionLabelPlaceholder": "Libellé",
@@ -44,16 +55,17 @@
     "createOption": "Créer « {{label}} »",
     "optionAdded": "Option ajoutée",
     "optionAddFailed": "Impossible d'ajouter l'option",
-    "ratingPlaceholder": "1–100"
+    "scalePlaceholder": "0–100",
+    "stars_one": "{{count}} étoile",
+    "stars_other": "{{count}} étoiles"
   },
   "cell": {
     "emptyValue": "—",
-    "none": "Aucun",
-    "rating": "Noté {{value}} sur 100"
+    "none": "Aucun"
   },
   "manager": {
     "title": "Propriétés personnalisées",
-    "description": "Définissez des métadonnées réutilisables pour tout élément de cette initiative.",
+    "description": "Les propriétés portent des valeurs sur tout ce que contient cette initiative : ses tâches, fichiers, événements et le reste.",
     "newDefinition": "Nouvelle propriété",
     "editDefinition": "Modifier la propriété",
     "nameLabel": "Nom",
@@ -67,9 +79,9 @@
     "deleteConfirmTitle": "Supprimer cette propriété ?",
     "deleteConfirmBody": "Cela supprimera la propriété et toutes ses valeurs dans cette initiative.",
     "orphanedWarning": "{{count}} valeurs existantes font référence à des options supprimées. Elles s'afficheront comme « Option inconnue » jusqu'à leur mise à jour.",
-    "createError": "Échec de la création de la propriété",
-    "updateError": "Échec de la mise à jour de la propriété",
-    "deleteError": "Échec de la suppression de la propriété",
+    "createError": "Impossible de le créer",
+    "updateError": "Impossible d'enregistrer la modification",
+    "deleteError": "Impossible de le supprimer",
     "setValuesError": "Échec de l'enregistrement de la valeur de la propriété",
     "moveUp": "Monter {{name}}",
     "moveDown": "Descendre {{name}}"

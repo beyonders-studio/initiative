@@ -4,12 +4,11 @@ import { useTranslation } from "react-i18next";
 
 import {
   type CurrencyCode,
+  MetadataType,
   type PropertyDefinitionCreate,
   type PropertyDefinitionRead,
   type PropertyDefinitionUpdate,
   type PropertyOption,
-  PropertyType,
-  type PropertyType as PropertyTypeValue,
 } from "@/api/generated/initiativeAPI.schemas";
 import { CurrencySelect, useDefaultCurrency } from "@/components/properties/CurrencySelect";
 import { PROPERTY_TYPES } from "@/components/properties/NewPropertyForm";
@@ -39,6 +38,8 @@ import {
   TableRow,
 } from "@/components/ui/table";
 import {
+  type MetadataOwner,
+  ownerColumns,
   useCreateProperty,
   useDeleteProperty,
   useProperties,
@@ -56,7 +57,7 @@ interface DialogState {
 
 interface FormState {
   name: string;
-  type: PropertyTypeValue;
+  type: MetadataType;
   color: string | null;
   options: PropertyOption[];
   /** A money property's currency. */
@@ -65,7 +66,7 @@ interface FormState {
 
 const emptyFormState = (currency: CurrencyCode): FormState => ({
   name: "",
-  type: PropertyType.text,
+  type: MetadataType.text,
   color: null,
   options: [],
   currency,
@@ -162,7 +163,7 @@ const OptionListEditor = ({ options, onChange, disabled }: OptionListEditorProps
 };
 
 /** What the manager calls what it lists: an initiative's properties, or a
- *  collection's fields. */
+ *  project's or a collection's metadata. */
 const WORDS = {
   initiative: {
     description: "properties:manager.description",
@@ -173,14 +174,23 @@ const WORDS = {
     deleteBody: "properties:manager.deleteConfirmBody",
     none: "properties:noProperties",
   },
+  project: {
+    description: "projects:metadata.description",
+    create: "projects:metadata.create",
+    edit: "projects:metadata.edit",
+    delete: "projects:metadata.delete",
+    deleteTitle: "projects:metadata.deleteTitle",
+    deleteBody: "projects:metadata.deleteBody",
+    none: "projects:metadata.none",
+  },
   collection: {
-    description: "files:collections.fields.description",
-    create: "files:collections.fields.create",
-    edit: "files:collections.fields.edit",
-    delete: "files:collections.fields.delete",
-    deleteTitle: "files:collections.fields.deleteTitle",
-    deleteBody: "files:collections.fields.deleteBody",
-    none: "files:collections.fields.none",
+    description: "files:collections.metadata.description",
+    create: "files:collections.metadata.create",
+    edit: "files:collections.metadata.edit",
+    delete: "files:collections.metadata.delete",
+    deleteTitle: "files:collections.metadata.deleteTitle",
+    deleteBody: "files:collections.metadata.deleteBody",
+    none: "files:collections.metadata.none",
   },
 } as const;
 
@@ -191,23 +201,24 @@ const WORDS = {
  * ``PropertyFilter``/``PropertyList``/``PropertyInput`` which render
  * individual values on files and tasks.
  *
- * Given a ``collectionId``, it manages that collection's own fields instead,
- * which whoever may change the collection adds, renames, orders and removes.
+ * Given an ``owner``, it manages that project's or collection's metadata
+ * instead: a project's in its settings, a collection's on its layouts page.
+ * Without ``canManage`` it lists them and changes nothing.
  */
 export const InitiativeSettingsPropertiesTab = ({
   initiativeId,
-  collectionId,
+  owner,
+  canManage = true,
 }: {
   initiativeId: number;
-  collectionId?: number;
+  owner?: MetadataOwner;
+  canManage?: boolean;
 }) => {
-  const { t, i18n } = useTranslation(["properties", "common", "files"]);
-  const words = WORDS[collectionId === undefined ? "initiative" : "collection"];
+  const { t, i18n } = useTranslation(["properties", "common", "files", "projects"]);
+  const words = WORDS[owner?.kind ?? "initiative"];
   const defaultCurrency = useDefaultCurrency();
 
-  const propertiesQuery = useProperties(
-    collectionId === undefined ? { initiativeId } : { collectionId }
-  );
+  const propertiesQuery = useProperties(owner === undefined ? { initiativeId } : { owner });
   const createMutation = useCreateProperty();
   const updateMutation = useUpdateProperty();
   const deleteMutation = useDeleteProperty();
@@ -217,14 +228,18 @@ export const InitiativeSettingsPropertiesTab = ({
   const [deleteTarget, setDeleteTarget] = useState<PropertyDefinitionRead | null>(null);
   const [moving, setMoving] = useState(false);
 
+  const owned = owner !== undefined;
   const sortedDefinitions = useMemo(() => {
-    const list = propertiesQuery.data ?? [];
+    // The initiative's own: none a project or a collection keeps.
+    const list = (propertiesQuery.data ?? []).filter(
+      (definition) => owned || (definition.project_id === null && definition.collection_id === null)
+    );
     const byName = collator(i18n.language);
     return [...list].sort((a, b) => {
       if (a.position !== b.position) return a.position - b.position;
       return byName.compare(a.name, b.name);
     });
-  }, [propertiesQuery.data, i18n.language]);
+  }, [propertiesQuery.data, owned, i18n.language]);
 
   /** Move one a place up or down, numbering each in the order shown. */
   const move = async (index: number, by: -1 | 1) => {
@@ -266,7 +281,7 @@ export const InitiativeSettingsPropertiesTab = ({
     setDialogState({ mode: "edit", definition });
   const handleCloseDialog = () => setDialogState(null);
 
-  const handleTypeChange = (nextType: PropertyTypeValue) => {
+  const handleTypeChange = (nextType: MetadataType) => {
     setFormState((prev) => {
       // When switching into a select-style type, seed with a single empty
       // option so the editor renders a row to fill in. Switching away clears
@@ -302,10 +317,10 @@ export const InitiativeSettingsPropertiesTab = ({
         name: trimmedName,
         type: formState.type,
         initiative_id: initiativeId,
-        ...(collectionId !== undefined ? { collection_id: collectionId } : {}),
+        ...ownerColumns(owner),
         color: formState.color ?? null,
         options,
-        ...(formState.type === PropertyType.currency ? { currency: formState.currency } : {}),
+        ...(formState.type === MetadataType.currency ? { currency: formState.currency } : {}),
         // A new one goes last.
         position: sortedDefinitions.length,
       };
@@ -327,7 +342,7 @@ export const InitiativeSettingsPropertiesTab = ({
       // decide whether to include options in the PATCH payload.
       options: typeRequiresOptions(dialogState.definition.type) ? options : undefined,
       currency:
-        dialogState.definition.type === PropertyType.currency ? formState.currency : undefined,
+        dialogState.definition.type === MetadataType.currency ? formState.currency : undefined,
     };
     try {
       const response = await updateMutation.mutateAsync({
@@ -360,12 +375,12 @@ export const InitiativeSettingsPropertiesTab = ({
     }
   };
 
-  const newButton = (
+  const newButton = canManage ? (
     <Button onClick={handleOpenCreate}>
       <Plus className="h-4 w-4" />
       {t(words.create)}
     </Button>
-  );
+  ) : null;
   const list: ReactNode = propertiesQuery.isLoading ? (
     <div className="flex items-center gap-2 text-muted-foreground text-sm">
       <Loader2 className="h-4 w-4 animate-spin" />
@@ -382,7 +397,7 @@ export const InitiativeSettingsPropertiesTab = ({
             <TableHead>{t("properties:manager.typeLabel")}</TableHead>
             <TableHead>{t("properties:manager.optionsLabel")}</TableHead>
             <TableHead>{t("properties:manager.colorLabel")}</TableHead>
-            <TableHead className="w-40 text-right" />
+            {canManage ? <TableHead className="w-40 text-right" /> : null}
           </TableRow>
         </TableHeader>
         <TableBody>
@@ -418,48 +433,50 @@ export const InitiativeSettingsPropertiesTab = ({
                     "—"
                   )}
                 </TableCell>
-                <TableCell className="text-right">
-                  <div className="inline-flex items-center gap-1">
-                    <Button
-                      type="button"
-                      variant="ghost"
-                      size="icon-sm"
-                      onClick={() => void move(index, -1)}
-                      disabled={moving || index === 0}
-                      aria-label={t("properties:manager.moveUp", { name: definition.name })}
-                    >
-                      <ArrowUp className="h-4 w-4" />
-                    </Button>
-                    <Button
-                      type="button"
-                      variant="ghost"
-                      size="icon-sm"
-                      onClick={() => void move(index, 1)}
-                      disabled={moving || index === sortedDefinitions.length - 1}
-                      aria-label={t("properties:manager.moveDown", { name: definition.name })}
-                    >
-                      <ArrowDown className="h-4 w-4" />
-                    </Button>
-                    <Button
-                      type="button"
-                      variant="ghost"
-                      size="icon-sm"
-                      onClick={() => handleOpenEdit(definition)}
-                      aria-label={t(words.edit)}
-                    >
-                      <Pencil className="h-4 w-4" />
-                    </Button>
-                    <Button
-                      type="button"
-                      variant="ghost"
-                      size="icon-sm"
-                      onClick={() => setDeleteTarget(definition)}
-                      aria-label={t(words.delete)}
-                    >
-                      <Trash2 className="h-4 w-4" />
-                    </Button>
-                  </div>
-                </TableCell>
+                {canManage ? (
+                  <TableCell className="text-right">
+                    <div className="inline-flex items-center gap-1">
+                      <Button
+                        type="button"
+                        variant="ghost"
+                        size="icon-sm"
+                        onClick={() => void move(index, -1)}
+                        disabled={moving || index === 0}
+                        aria-label={t("properties:manager.moveUp", { name: definition.name })}
+                      >
+                        <ArrowUp className="h-4 w-4" />
+                      </Button>
+                      <Button
+                        type="button"
+                        variant="ghost"
+                        size="icon-sm"
+                        onClick={() => void move(index, 1)}
+                        disabled={moving || index === sortedDefinitions.length - 1}
+                        aria-label={t("properties:manager.moveDown", { name: definition.name })}
+                      >
+                        <ArrowDown className="h-4 w-4" />
+                      </Button>
+                      <Button
+                        type="button"
+                        variant="ghost"
+                        size="icon-sm"
+                        onClick={() => handleOpenEdit(definition)}
+                        aria-label={t(words.edit)}
+                      >
+                        <Pencil className="h-4 w-4" />
+                      </Button>
+                      <Button
+                        type="button"
+                        variant="ghost"
+                        size="icon-sm"
+                        onClick={() => setDeleteTarget(definition)}
+                        aria-label={t(words.delete)}
+                      >
+                        <Trash2 className="h-4 w-4" />
+                      </Button>
+                    </div>
+                  </TableCell>
+                ) : null}
               </TableRow>
             );
           })}
@@ -470,9 +487,9 @@ export const InitiativeSettingsPropertiesTab = ({
 
   return (
     <div className="space-y-6">
-      {/* A collection's fields are managed in a dialog of their own, which
-          is the frame a card would be. */}
-      {collectionId === undefined ? (
+      {/* A collection's metadata is managed in a dialog of its own, which is
+          the frame a card would be. */}
+      {owner?.kind !== "collection" ? (
         <Card>
           <CardHeader className="flex flex-row items-start justify-between gap-4">
             <div>
@@ -519,7 +536,7 @@ export const InitiativeSettingsPropertiesTab = ({
               <Label htmlFor="property-manager-type">{t("properties:manager.typeLabel")}</Label>
               <Select
                 value={formState.type}
-                onValueChange={(next) => handleTypeChange(next as PropertyTypeValue)}
+                onValueChange={(next) => handleTypeChange(next as MetadataType)}
                 disabled={isEditing}
               >
                 <SelectTrigger id="property-manager-type">
@@ -548,7 +565,7 @@ export const InitiativeSettingsPropertiesTab = ({
               </Select>
             </div>
 
-            {formState.type === PropertyType.currency ? (
+            {formState.type === MetadataType.currency ? (
               <div className="space-y-2">
                 <Label>{t("properties:currency.label")}</Label>
                 <CurrencySelect
