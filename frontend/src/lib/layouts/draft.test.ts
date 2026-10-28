@@ -1,11 +1,13 @@
 import { describe, expect, it } from "vitest";
 
 import { buildPropertyDefinition } from "@/__tests__/factories";
+import { MetadataType } from "@/api/generated/initiativeAPI.schemas";
 
 import { pageParts, type StoredRegions, storedLayout } from "./detailLayout";
 import {
   addableFields,
   addablePluginParts,
+  canRequire,
   changeAt,
   dropAt,
   dropInto,
@@ -109,6 +111,27 @@ describe("what the editor allows", () => {
     ).map((each) => each.id);
 
     expect(ids).toEqual(["assignees", "startDate", "priority", "comments", "tags", "property:12"]);
+  });
+
+  it("requires what a person fills in, and nothing a counter's page holds", () => {
+    const withCheckbox = taskFields([
+      buildPropertyDefinition({ id: 12, name: "Effort" }),
+      buildPropertyDefinition({ id: 13, name: "Done", type: MetadataType.checkbox }),
+    ]);
+    const can = (node: LayoutNode, parts = TASK_LAYOUT.requiredParts) =>
+      canRequire(node, withCheckbox, parts);
+
+    expect(can(field("description"))).toBe(true);
+    expect(can(field("property:12"))).toBe(true);
+    expect(can({ type: "dates" })).toBe(true);
+    // A title is always required; a type, a status and a byline are never empty
+    // or filled by nobody; a checkbox is always on or off.
+    expect(can(field("title"))).toBe(false);
+    expect(can(field("type"))).toBe(false);
+    expect(can({ type: "status" })).toBe(false);
+    expect(can({ type: "byline" })).toBe(false);
+    expect(can(field("property:13"))).toBe(false);
+    expect(can(field("description"), null)).toBe(false);
   });
 
   it("offers each of a plug-in's parts once, and none past the server's limit", () => {

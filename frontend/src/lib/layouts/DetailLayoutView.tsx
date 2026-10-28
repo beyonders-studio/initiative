@@ -215,21 +215,17 @@ const ItemActions = () => {
 const RequiredMark = ({
   node,
   item,
-  view,
   children,
 }: {
   node: LayoutNode;
   item: Item;
-  view: LayoutContext;
   children: ReactNode;
 }) => {
+  const { t } = useTranslation("layouts");
   const { detail, home } = useDrawn();
-  const t = useTranslation([...detail.namespaces, "layouts"]).t as TranslateFn;
   const adding = useContext(ItemDraftContext) !== null;
   const key = requiredKey(node);
   if (home.readOnly || (detail.filled?.(item, key) ?? true)) return children;
-  const field = node.type === "field" ? view.fields.get(key) : undefined;
-  const name = field ? t(field.label) : t(`layouts:parts.${node.type}`);
   return (
     <div className="flex min-w-0 flex-col gap-1" data-required-missing={key}>
       {children}
@@ -240,7 +236,7 @@ const RequiredMark = ({
         )}
       >
         <CircleAlert className="h-3.5 w-3.5 shrink-0" aria-hidden="true" />
-        {t(adding ? "layouts:required.toFill" : "layouts:required.missing", { name })}
+        {t(adding ? "required.label" : "required.missing")}
       </p>
     </div>
   );
@@ -253,7 +249,7 @@ const markRequired = <I,>(parts: Parts<I>): Parts<I> =>
       type,
       (node: LayoutNode, item: I, view: LayoutContext, all: Parts<I>) =>
         isRequired(node) ? (
-          <RequiredMark node={node} item={item as Item} view={view}>
+          <RequiredMark node={node} item={item as Item}>
             {draw(node, item, view, all)}
           </RequiredMark>
         ) : (

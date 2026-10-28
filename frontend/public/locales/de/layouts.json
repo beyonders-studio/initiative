@@ -305,8 +305,7 @@
     "help": "Wer eines hinzufügt, muss das ausfüllen und kann es später nicht leeren. Ausgeblendet entfällt die Pflicht.",
     "always": "Ein Titel ist immer Pflicht.",
     "part": "{{name}} (Pflicht)",
-    "missing": "{{name}} ist Pflicht und noch nicht ausgefüllt.",
-    "toFill": "{{name}} ist Pflicht.",
+    "missing": "Pflichtfeld, noch nicht ausgefüllt.",
     "toAdd": "Fülle die Pflichtfelder aus, um es hinzuzufügen."
   }
 }

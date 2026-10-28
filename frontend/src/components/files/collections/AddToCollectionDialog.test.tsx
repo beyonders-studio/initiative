@@ -1,9 +1,13 @@
-import { act, screen, waitFor } from "@testing-library/react";
+import { act, screen, waitFor, within } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { HttpResponse } from "msw";
 import { describe, expect, it } from "vitest";
 
-import { buildCollection } from "@/__tests__/factories";
+import {
+  buildCollection,
+  buildPropertyDefinition,
+  buildToolLayoutSet,
+} from "@/__tests__/factories";
 import { communityHttp } from "@/__tests__/helpers/communityHttp";
 import i18n from "@/__tests__/helpers/i18n-test";
 import { server } from "@/__tests__/helpers/msw-server";
@@ -43,6 +47,61 @@ describe("AddToCollectionDialog", () => {
     await user.click(await screen.findByRole("button", { name: "Store assets" }));
     expect(screen.queryByRole("button", { name: "Someone else's" })).not.toBeInTheDocument();
     await waitFor(() => expect(added).toEqual({ id: "2", file_ids: [4, 5] }));
+  });
+
+  it("asks for what the collection's file page requires, once for every file", async () => {
+    let added: unknown = null;
+    const credit = buildPropertyDefinition({ id: 21, name: "Credit", type: "text" });
+    server.use(
+      communityHttp.get("/collections/", () =>
+        HttpResponse.json({
+          items: [buildCollection({ id: 2, name: "Store assets", metadata: [credit] })],
+        })
+      ),
+      communityHttp.get("/layouts/", () =>
+        HttpResponse.json(
+          buildToolLayoutSet({
+            tool: "collection",
+            layouts: [
+              {
+                kind: "file",
+                task_type_id: null,
+                task_type_name: null,
+                definition: {
+                  side: [{ type: "field", props: { field: "property:21", required: true } }],
+                },
+                updated_at: "2026-10-01T12:00:00.000Z",
+              },
+            ],
+          })
+        )
+      ),
+      communityHttp.post("/collections/:id/files", async ({ request }) => {
+        added = await request.json();
+        return HttpResponse.json(buildCollection({ id: 2 }));
+      })
+    );
+    const user = userEvent.setup();
+    mount();
+
+    await user.click(await screen.findByRole("button", { name: "Store assets" }));
+    const asking = await screen.findByRole("dialog", { name: "What Store assets asks for" });
+    const go = within(asking).getByRole("button", { name: "Continue" });
+    expect(go).toBeDisabled();
+    expect(added).toBeNull();
+
+    await user.type(
+      within(within(asking).getByRole("group", { name: "Credit" })).getByRole("textbox"),
+      "Ada"
+    );
+    await user.click(go);
+
+    await waitFor(() =>
+      expect(added).toEqual({
+        file_ids: [4, 5],
+        metadata: [{ property_id: 21, value: "Ada" }],
+      })
+    );
   });
 
   it("makes a new collection of the files, never an empty one, as the shape picked", async () => {

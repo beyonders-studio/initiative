@@ -305,8 +305,7 @@
     "help": "Qui en ajoute un doit le remplir et ne peut plus le vider ensuite. Masqué, il n’est plus obligatoire.",
     "always": "Un titre est toujours obligatoire.",
     "part": "{{name}} (obligatoire)",
-    "missing": "{{name}} est obligatoire et n’est pas encore rempli.",
-    "toFill": "{{name}} est obligatoire.",
+    "missing": "Obligatoire, pas encore rempli.",
     "toAdd": "Remplissez ce qui est obligatoire pour l’ajouter."
   }
 }

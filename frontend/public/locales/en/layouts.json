@@ -305,8 +305,7 @@
     "help": "Whoever adds one has to fill this in, and cannot empty it later. Hiding it lifts the requirement.",
     "always": "A title is always required.",
     "part": "{{name}} (required)",
-    "missing": "{{name}} is required and not filled in yet.",
-    "toFill": "{{name}} is required.",
+    "missing": "Required, and not filled in yet.",
     "toAdd": "Fill in what is required to add it."
   }
 }
