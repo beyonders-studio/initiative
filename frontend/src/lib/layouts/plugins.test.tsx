@@ -3,11 +3,11 @@ import userEvent from "@testing-library/user-event";
 import { HttpResponse, http } from "msw";
 import { describe, expect, it } from "vitest";
 
-import { buildPropertySummary, buildTask } from "@/__tests__/factories";
+import { buildPropertyOption, buildPropertySummary, buildTask } from "@/__tests__/factories";
 import i18n from "@/__tests__/helpers/i18n-test";
 import { server } from "@/__tests__/helpers/msw-server";
 import { renderWithProviders } from "@/__tests__/helpers/render";
-import type { TaskListRead } from "@/api/generated/initiativeAPI.schemas";
+import { MetadataType, type TaskListRead } from "@/api/generated/initiativeAPI.schemas";
 import { numberFormat } from "@/lib/intl";
 import {
   fieldsInParts,
@@ -214,6 +214,89 @@ describe("a plug-in on a card", () => {
     );
     expect(screen.getByRole("button", { name: "Run again" })).toBeInTheDocument();
     expect(screen.queryByRole("button", { name: "Purge" })).toBeNull();
+  });
+
+  it("draws a property type's value as a property's, with the options and currency it carries", () => {
+    const kinds = {
+      ...install,
+      id: 8,
+      definition: {
+        fields: [
+          {
+            key: "deal.price",
+            name: { en: "Price" },
+            kind: "currency",
+            currency: "EUR",
+            on: ["task"],
+          },
+          { key: "deal.site", name: { en: "Site" }, kind: "url", on: ["task"] },
+          { key: "deal.stage", name: { en: "Stage" }, kind: "select", on: ["task"] },
+          { key: "deal.areas", name: { en: "Areas" }, kind: "multi_select", on: ["task"] },
+          { key: "deal.owner", name: { en: "Owner" }, kind: "user_reference", on: ["task"] },
+          { key: "deal.picks", name: { en: "Picks" }, kind: "select", list: true, on: ["task"] },
+        ],
+      },
+      item_fields: [
+        "deal.price",
+        "deal.site",
+        "deal.stage",
+        "deal.areas",
+        "deal.owner",
+        "deal.picks",
+      ],
+      item_parts: [],
+      item_actions: [],
+    };
+    const stages = [
+      buildPropertyOption({ value: "won", label: "Gewonnen" }),
+      buildPropertyOption({ value: "lost", label: "Verloren" }),
+    ];
+    const kept = (key: string, type: MetadataType, value: unknown, extra = {}) =>
+      buildPropertySummary({ install_id: 8, key, type, value, ...extra });
+    draw(
+      {
+        type: "card",
+        children: kinds.item_fields.map((key) => ({
+          type: "field",
+          props: { field: pluginFieldId(8, key) },
+        })),
+      },
+      buildTask({
+        properties: [
+          kept("deal.price", MetadataType.currency, 1250, { currency: "EUR" }),
+          kept("deal.site", MetadataType.url, "https://shop.example/12"),
+          kept("deal.stage", MetadataType.select, { value: "won", state: {} }, { options: stages }),
+          kept("deal.areas", MetadataType.multi_select, ["won", "lost"], { options: stages }),
+          kept("deal.owner", MetadataType.user_reference, {
+            id: 4,
+            display_name: "Ada Lovelace",
+          }),
+          kept(
+            "deal.picks",
+            MetadataType.select,
+            [
+              { ref: "a", value: "lost" },
+              { ref: "b", value: "won" },
+            ],
+            { options: stages }
+          ),
+        ],
+      }),
+      [kinds]
+    );
+
+    expect(
+      screen.getByText(numberFormat(undefined, { style: "currency", currency: "EUR" }).format(1250))
+    ).toBeInTheDocument();
+    expect(screen.getByRole("link", { name: /shop\.example\/12/ })).toHaveAttribute(
+      "href",
+      "https://shop.example/12"
+    );
+    // The stage, both areas, and each of the two picks, labelled as the
+    // reader reads them.
+    expect(screen.getAllByText("Gewonnen")).toHaveLength(3);
+    expect(screen.getAllByText("Verloren")).toHaveLength(2);
+    expect(screen.getByText("Ada Lovelace")).toBeInTheDocument();
   });
 
   it("draws a scale as a bar of its figure, kept with or without a state", () => {
