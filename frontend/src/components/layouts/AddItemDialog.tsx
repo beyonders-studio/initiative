@@ -17,10 +17,11 @@ import {
   DialogTitle,
 } from "@/components/ui/dialog";
 import { type ItemDraft, ItemDraftContext, type ItemEdit } from "@/hooks/useFieldSave";
+import { useOwnedDefinitions } from "@/hooks/useProperties";
 import { useSetItemLinks } from "@/hooks/useRelationships";
 import { detailLayoutOf, useToolLayouts } from "@/hooks/useToolLayouts";
 import { AddingLinks, type DetailKind, DetailLayoutView } from "@/lib/layouts/DetailLayoutView";
-import type { StoredRegions } from "@/lib/layouts/detailLayout";
+import { missingRequired, requiredKeys, type StoredRegions } from "@/lib/layouts/detailLayout";
 import type { PluginItem } from "@/lib/layouts/plugins";
 import type { LinkedRef } from "@/lib/relationships";
 import { cn } from "@/lib/utils";
@@ -49,7 +50,8 @@ type AddItemProps<I extends Item, C, P, R extends { id: number }> = {
   before?: (item: I) => ReactNode;
   /** The dialog's title, and what its button says. */
   title: string;
-  /** Whether it can be added as it stands: it has a name. */
+  /** Whether it can be added as it stands: it has a name. What its layout
+   *  requires is asked here as well. */
   ready: (item: I) => boolean;
   /** Makes it from what was changed, answering it. */
   create: (written: Written<I, P>) => Promise<R>;
@@ -110,7 +112,7 @@ const Adding = <I extends Item, C, P, R extends { id: number }>({
   onAdded,
   changed,
 }: AddItemProps<I, C, P, R> & { changed: RefObject<boolean> }) => {
-  const { t } = useTranslation("common");
+  const { t } = useTranslation(["common", "layouts"]);
   const [item, setItem] = useState(blank);
   const [links, setLinks] = useState<LinkedRef[]>([]);
   const [adding, setAdding] = useState(false);
@@ -124,12 +126,22 @@ const Adding = <I extends Item, C, P, R extends { id: number }>({
     values: new Map<number, unknown>(),
     holding: new Set<string>(),
   });
-  const layout = detailLayoutOf(
-    useToolLayouts(layouts(item)).data,
-    detail.spec.kind,
-    detail.typed?.typeOf(item)
-  );
+  const laidOut = useToolLayouts(layouts(item));
+  const layout = detailLayoutOf(laidOut.data, detail.spec.kind, detail.typed?.typeOf(item));
   const home = detail.home(item, context);
+  const definitions = useOwnedDefinitions({
+    initiativeId: home.initiativeId ?? undefined,
+    owner: home.owner,
+    enabled: home.initiativeId !== null,
+  }).data;
+  // What its layout requires that it leaves empty, which Add waits for.
+  const missingOf = (it: I) =>
+    missingRequired(
+      requiredKeys(layout as StoredRegions | null),
+      (key) => detail.filled?.(it, key, latest.current.fields) ?? true,
+      home.initiativeId === null ? [] : definitions
+    );
+  const missing = missingOf(item);
   const target = home.links.target;
   const setLinksOn = useSetItemLinks(home.canOpen.tool, home.canOpen.id);
   // The item this sitting made, whose links did not all land: Add again
@@ -154,7 +166,8 @@ const Adding = <I extends Item, C, P, R extends { id: number }>({
 
   const add = async () => {
     const { item: now, fields, values, holding: held } = latest.current;
-    if (adding || held.size > 0 || !ready(now)) return;
+    if (adding || held.size > 0 || !ready(now) || laidOut.isLoading || missingOf(now).length > 0)
+      return;
     setAdding(true);
     try {
       if (made.current === null) {
@@ -208,6 +221,7 @@ const Adding = <I extends Item, C, P, R extends { id: number }>({
         else held.delete(id);
         setHolding(new Set(held));
       },
+      sent: () => latest.current.fields as Record<string, unknown>,
     }),
     [changed]
   );
@@ -239,11 +253,21 @@ const Adding = <I extends Item, C, P, R extends { id: number }>({
           />
         </AddingLinks.Provider>
       </ItemDraftContext.Provider>
-      <DialogFooter>
+      <DialogFooter className="items-center">
+        {missing.length > 0 ? (
+          <p className="text-muted-foreground text-xs">{t("layouts:required.toAdd")}</p>
+        ) : null}
         <Button
           type="button"
           onClick={() => void add()}
-          disabled={adding || holding.size > 0 || !ready(item)}
+          disabled={
+            adding ||
+            holding.size > 0 ||
+            !ready(item) ||
+            // Until its layout is read, what it requires is not known.
+            laidOut.isLoading ||
+            missing.length > 0
+          }
         >
           {adding ? <Loader2 className="h-4 w-4 animate-spin" /> : null}
           {adding ? t("adding") : title}

@@ -58,6 +58,8 @@ export interface ItemDraft {
   /** Whether the field `id` shows a value it cannot take (a number left
    *  empty), which Add waits for. */
   hold: (id: string, holding: boolean) => void;
+  /** The fields changed so far, as Add sends them. */
+  sent: () => Record<string, unknown>;
 }
 
 export const ItemDraftContext = createContext<ItemDraft | null>(null);

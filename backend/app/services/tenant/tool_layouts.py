@@ -36,6 +36,7 @@ from app.core.tools import (
 )
 from app.db.advisory_locks import LockNamespace, advisory_lock
 from app.db.session import require_guild_context
+from app.models.tenant.metadata import MetadataDefinition, MetadataType
 from app.models.tenant.task import TaskType
 from app.models.tenant.tool_layout import ToolLayout
 from app.schemas.tenant.tool_layout import (
@@ -121,6 +122,53 @@ DETAIL_FIELDS: dict[str, frozenset[str]] = {
     "post": frozenset(field.value for field in PostDetailFieldId),
     "file": frozenset(field.value for field in FileFieldId),
 }
+
+
+#: What a person fills in on each kind of detail that can require it: its
+#: built-in fields, and its parts that edit one (a task's dates, as one). Any
+#: of its properties can be required there too. A title is always required;
+#: what is never empty (a task's type, status and priority, an event's dates),
+#: what a plug-in fills and what nobody fills (who made it, when) cannot be.
+REQUIREABLE: dict[str, frozenset[str]] = {
+    "task": frozenset(
+        {"description", "assignees", "checklist", "recurrence", "tags", "dates"}
+    ),
+    "calendar_event": frozenset(
+        {"description", "location", "recurrence", "attendees", "tags"}
+    ),
+    "post": frozenset({"tags"}),
+    #: A collection's file page requires the collection's own metadata alone.
+    "file": frozenset(),
+}
+
+
+def required_keys(definition: Mapping[str, Any]) -> list[str]:
+    """What a stored detail layout requires, in the order it places them: a
+    field by its id, a part by its type."""
+    found: list[str] = []
+
+    def walk(nodes: Any) -> None:
+        for node in nodes or ():
+            if not isinstance(node, dict):
+                continue
+            props = node.get("props") or {}
+            if props.get("required"):
+                found.append(
+                    str(props.get("field"))
+                    if node.get("type") == "field"
+                    else str(node.get("type"))
+                )
+            walk(node.get("children"))
+
+    for region in ("header", "main", "side"):
+        walk(definition.get(region))
+    return list(dict.fromkeys(found))
+
+
+def _requireable(kind: str, key: str) -> bool:
+    return kind in REQUIREABLE and (
+        key in REQUIREABLE[kind] or key.startswith(PROPERTY_FIELD_PREFIX)
+    )
 
 
 @dataclass(frozen=True)
@@ -374,7 +422,7 @@ def check(target: Target, write: ToolLayoutWrite) -> dict[str, Any]:
         _within_limits(stored, roots, 0)
         if not all(
             _drawn_on(part, write.kind) for root in roots for part, _ in _parts(root, 1)
-        ):
+        ) or not all(_requireable(write.kind, key) for key in required_keys(stored)):
             raise _bad_request(ToolLayoutMessages.KIND_NOT_ALLOWED)
     else:
         _require(write.kind, LIST_LAYOUTS.get(target.tool, ()))
@@ -594,11 +642,48 @@ async def start(
     await session.flush()
 
 
+async def _require_requireable_properties(
+    session: AsyncSession, target: Target, kind: str, definition: dict[str, Any]
+) -> None:
+    """A 400 unless each property the layout requires is one its items carry
+    and a person fills in: the initiative's (or on a task, its project's), or
+    on a file the collection's own metadata. A checkbox is never empty, so it
+    is never required. One the initiative no longer has requires nothing, as
+    at enforcement, so a page that places it still saves."""
+    ids = {
+        int(key.removeprefix(PROPERTY_FIELD_PREFIX))
+        for key in required_keys(definition)
+        if key.startswith(PROPERTY_FIELD_PREFIX)
+    }
+    if not ids:
+        return
+    collection_id = target.tool_id if kind == "file" else None
+    project_id = target.tool_id if target.tool == Tool.project.value else None
+    held = await session.exec(
+        select(
+            MetadataDefinition.collection_id,
+            MetadataDefinition.project_id,
+            MetadataDefinition.type,
+        ).where(
+            col(MetadataDefinition.id).in_(ids),
+            MetadataDefinition.initiative_id == target.initiative_id,
+        )
+    )
+    if any(
+        owner != collection_id
+        or project not in (None, project_id)
+        or kind_of is MetadataType.checkbox
+        for owner, project, kind_of in held.all()
+    ):
+        raise _bad_request(ToolLayoutMessages.KIND_NOT_ALLOWED)
+
+
 async def save(session: AsyncSession, target: Target, write: ToolLayoutWrite) -> None:
     """Change one of the target's layouts, so long as it still shows a list."""
     definition = check(target, write)
     task_type_id = getattr(write, "task_type_id", None)
     await _require_type(session, target, task_type_id)
+    await _require_requireable_properties(session, target, write.kind, definition)
     rows = await _locked_rows(session, target)
     _require_one_shown(target, rows, write.kind, definition)
     await _keep(session, target, write.kind, definition, task_type_id, rows=rows)

@@ -299,5 +299,13 @@
     "metadata": "Metadaten",
     "metadataHelp": "Das sind Metadaten der Initiative. Sie werden in ihren Einstellungen bearbeitet.",
     "openSettings": "Initiative-Einstellungen öffnen"
+  },
+  "required": {
+    "label": "Pflichtfeld",
+    "help": "Wer eines hinzufügt, muss das ausfüllen und kann es später nicht leeren. Ausgeblendet entfällt die Pflicht.",
+    "always": "Ein Titel ist immer Pflicht.",
+    "part": "{{name}} (Pflicht)",
+    "missing": "Pflichtfeld, noch nicht ausgefüllt.",
+    "toAdd": "Fülle die Pflichtfelder aus, um es hinzuzufügen."
   }
 }

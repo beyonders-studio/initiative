@@ -41,7 +41,7 @@ from app.schemas.tenant.collection import (
     MAX_FILES_PER_CHANGE,
     CollectionCan,
     CollectionCreate,
-    CollectionFiles,
+    CollectionFilesAdd,
     CollectionListResponse,
     CollectionRead,
     CollectionShapeGroup,
@@ -53,6 +53,7 @@ from app.services.permissions import Action
 from app.services.tenant import archive as archive_service
 from app.services.tenant import collections as collections_service
 from app.services.tenant import metadata as metadata_service
+from app.services.tenant import required_fields
 from app.services.tenant import share_requests as share_requests_service
 from app.services.tenant import tags as tags_service
 from app.services.tenant.soft_delete import trash
@@ -310,20 +311,39 @@ async def delete_collection(
 @router.post("/{collection_id}/files", response_model=CollectionRead)
 async def add_collection_files(
     collection_id: int,
-    payload: CollectionFiles,
+    payload: CollectionFilesAdd,
     session: ActorSessionDep,
     current_user: ActorUserDep,
     guild_context: FilesWrite,
 ) -> CollectionRead:
     """Put files in a collection: each a file of its initiative the reader can
-    open. One already in it stays as it is."""
+    open, starting with ``metadata``'s values of the collection's metadata.
+    One already in it stays as it is. A person gives each value the
+    collection's file page requires."""
     collection = await resource_access.load_child(
         session, Collection, collection_id, access="write"
     )
     await _require_readable(session, collection.initiative_id, payload.file_ids)
-    await collections_service.add_files(
+    added = await collections_service.add_files(
         session, collection, payload.file_ids, added_by=guild_context.user_id
     )
+    files = (await session.exec(select(File).where(col(File.id).in_(added)))).all()
+    try:
+        for file in files:
+            await metadata_service.set_values(
+                session,
+                file,
+                payload.metadata,
+                initiative_id=collection.initiative_id,
+                removed=[],
+                collection_id=collection.id,
+            )
+        await required_fields.refuse_missing(
+            session, guild_context, *files, collection_id=collection.id
+        )
+    except (HTTPException, CodedError):
+        await session.rollback()
+        raise
     await session.commit()
     return await _read(session, collection_id, guild_context)
 
@@ -375,6 +395,9 @@ async def set_collection_file_metadata(
             status_code=status.HTTP_422_UNPROCESSABLE_CONTENT,
             detail=CollectionMessages.FILE_NOT_IN_COLLECTION,
         )
+    required = await required_fields.required_of(
+        session, guild_context, file, collection_id=collection.id
+    )
     try:
         await metadata_service.set_values(
             session,
@@ -385,6 +408,7 @@ async def set_collection_file_metadata(
             options=payload.options,
             collection_id=collection.id,
         )
+        await required_fields.refuse_emptied(session, required)
     except (HTTPException, CodedError):
         await session.rollback()
         raise

@@ -85,6 +85,16 @@ export const useToolLayouts = (target: GetLayoutsParams | null) => {
 export const useInstanceLayouts = (tool: LayoutTarget, id: number | null) =>
   useToolLayouts(id !== null && Number.isFinite(id) ? instanceTarget(tool, id) : null);
 
+/** Reads a target's layouts when asked, from the cache where they are held:
+ *  for a decision made on a click, such as what a collection requires of the
+ *  files going in. */
+export const useReadToolLayouts = () => {
+  const communityId = useActiveCommunityId();
+  const queryClient = useQueryClient();
+  return (target: GetLayoutsParams) =>
+    queryClient.fetchQuery(toolLayoutsQuery(communityId, target));
+};
+
 /** Every project's layouts in an initiative the reader can open, for its
  *  settings, with whether the reader may change each. */
 export const useInitiativeLayouts = (initiativeId: number) => {

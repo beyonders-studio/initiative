@@ -32,6 +32,7 @@ export const queueItemFields = (
           label,
           source: "builtin",
           hideable: id !== "label",
+          requireable: false,
           value: () => null,
         })
       ),

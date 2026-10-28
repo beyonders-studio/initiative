@@ -109,4 +109,29 @@ describe("a file's detail in a collection", () => {
     expect(screen.queryByRole("heading", { name: "Harbour" })).not.toBeInTheDocument();
     expect(screen.queryByText("Acme")).not.toBeInTheDocument();
   });
+
+  it("marks a value its page requires while the file lacks it, for whoever can fill it in", async () => {
+    const layout: StoredRegions = {
+      header: [],
+      main: [{ type: "field", props: { field: "property:21", required: true } }],
+      side: [],
+    };
+    const file = buildCollectionFile({ id: 4 });
+    const { unmount } = draw(buildCollection({ id: 5, metadata: [caption] }), file, layout);
+
+    expect(await screen.findByText("Required, and not filled in yet.")).toBeInTheDocument();
+    unmount();
+
+    // Filled, it is not marked.
+    draw(
+      buildCollection({ id: 5, metadata: [caption] }),
+      {
+        ...file,
+        metadata: [buildPropertySummary({ property_id: 21, name: "Caption", value: "Dusk" })],
+      },
+      layout
+    );
+    expect(await screen.findByDisplayValue("Dusk")).toBeInTheDocument();
+    expect(screen.queryByText("Required, and not filled in yet.")).not.toBeInTheDocument();
+  });
 });

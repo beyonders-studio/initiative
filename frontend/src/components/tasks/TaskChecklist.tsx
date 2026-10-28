@@ -86,9 +86,18 @@ type TaskChecklistProps = {
   /** ``task.checklist`` — the whole list, in order. */
   items: ChecklistItem[];
   canEdit: boolean;
+  /** For a task being added, which nothing has saved yet: each change of the
+   *  list goes here, whole, rather than to the server. Its lines cannot yet
+   *  become tasks or be written for it. */
+  onDraftChange?: (items: ChecklistItem[]) => void;
 };
 
-export const TaskChecklist = ({ taskId, items: serverItems, canEdit }: TaskChecklistProps) => {
+export const TaskChecklist = ({
+  taskId,
+  items: serverItems,
+  canEdit,
+  onDraftChange,
+}: TaskChecklistProps) => {
   const { t } = useTranslation(["tasks", "common"]);
   const addInputRef = useRef<HTMLInputElement | null>(null);
   const [newText, setNewText] = useState("");
@@ -147,9 +156,10 @@ export const TaskChecklist = ({ taskId, items: serverItems, canEdit }: TaskCheck
         return;
       }
       sent.current = stamp;
-      updateTask.mutate({ taskId, data: { checklist: payload } });
+      if (onDraftChange) onDraftChange(payload);
+      else updateTask.mutate({ taskId, data: { checklist: payload } });
     },
-    [taskId, updateTask]
+    [taskId, updateTask, onDraftChange]
   );
 
   const generateChecklist = useGenerateChecklist({
@@ -216,6 +226,10 @@ export const TaskChecklist = ({ taskId, items: serverItems, canEdit }: TaskCheck
 
   const handleToggle = (item: ChecklistItem, done: boolean) => {
     if (!canEdit) {
+      return;
+    }
+    if (onDraftChange) {
+      save(itemsRef.current.map((entry) => (entry.id === item.id ? { ...entry, done } : entry)));
       return;
     }
     setItems((previous) =>
@@ -322,7 +336,7 @@ export const TaskChecklist = ({ taskId, items: serverItems, canEdit }: TaskCheck
             <SquareCheck className="h-4 w-4 text-muted-foreground" aria-hidden="true" />
             {t("checklist.title")}
           </CardTitle>
-          {canEdit && aiEnabled ? (
+          {canEdit && aiEnabled && !onDraftChange ? (
             <Button
               type="button"
               variant="ghost"
@@ -373,7 +387,9 @@ export const TaskChecklist = ({ taskId, items: serverItems, canEdit }: TaskCheck
                         save(itemsRef.current.filter((entry) => entry.id !== item.id))
                       }
                       onPromote={
-                        saved.get(item.id) === item.text.trim() && !promoteItem.isPending
+                        !onDraftChange &&
+                        saved.get(item.id) === item.text.trim() &&
+                        !promoteItem.isPending
                           ? () => handlePromote(item)
                           : undefined
                       }

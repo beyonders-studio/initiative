@@ -21,6 +21,7 @@ from app.schemas.tenant.property import (
     PropertiesOnUpdate,
     PropertyDefinitionRead,
     PropertySummary,
+    PropertyValueInput,
     annotated_properties,
 )
 from app.schemas.tenant.tag import TagSummary, annotated_tags
@@ -40,6 +41,13 @@ class CollectionFiles(SanitizedBaseModel):
     """Files to put in a collection or take out of it."""
 
     file_ids: List[int] = Field(min_length=1, max_length=MAX_FILES_PER_CHANGE)
+
+
+class CollectionFilesAdd(CollectionFiles):
+    """Files to put in a collection, and the values of the collection's
+    metadata each one it takes starts with: what its file page requires."""
+
+    metadata: List[PropertyValueInput] = Field(default_factory=list)
 
 
 #: A ready-made shape, by its key (``app.core.collection_shapes``).

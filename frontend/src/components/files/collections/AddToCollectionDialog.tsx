@@ -5,9 +5,14 @@ import { useTranslation } from "react-i18next";
 
 import type {
   CollectionCreate,
+  CollectionRead,
   CollectionShapeEntry,
   CollectionShapeKey,
 } from "@/api/generated/initiativeAPI.schemas";
+import {
+  asksForMetadata,
+  RequiredMetadataDialog,
+} from "@/components/files/collections/RequiredMetadataDialog";
 import { listLayoutLooks } from "@/components/projects/projectTasksConfig";
 import { ReadyMadeGallery } from "@/components/shared/ReadyMadeGallery";
 import { Button } from "@/components/ui/button";
@@ -34,9 +39,12 @@ import {
   useCollections,
   useCreateCollection,
 } from "@/hooks/useCollections";
+import { detailLayoutOf, instanceTarget, useReadToolLayouts } from "@/hooks/useToolLayouts";
 import { COLLECTION_ICON } from "@/lib/collections";
 import { useCommunityPath } from "@/lib/communityUrl";
+import { getErrorMessage } from "@/lib/errorMessage";
 import { listFormat } from "@/lib/intl";
+import { requiredKeys, type StoredRegions } from "@/lib/layouts/detailLayout";
 import { toast } from "@/lib/mascotToast";
 import { collectionRoute } from "@/lib/tools";
 
@@ -238,12 +246,7 @@ export const AddToCollectionDialog = ({
                 <ul className="space-y-0.5">
                   {changeable.map((collection) => (
                     <li key={collection.id}>
-                      <AddToOne
-                        collectionId={collection.id}
-                        name={collection.name}
-                        fileIds={fileIds}
-                        onAdded={finish}
-                      />
+                      <AddToOne collection={collection} fileIds={fileIds} onAdded={finish} />
                     </li>
                   ))}
                 </ul>
@@ -270,34 +273,62 @@ export const AddToCollectionDialog = ({
   );
 };
 
-/** One collection to put the files in. */
+/** One collection to put the files in, asking first for what its file page
+ *  requires of them. */
 const AddToOne = ({
-  collectionId,
-  name,
+  collection,
   fileIds,
   onAdded,
 }: {
-  collectionId: number;
-  name: string;
+  collection: CollectionRead;
   fileIds: number[];
   onAdded: () => void;
 }) => {
   const { t } = useTranslation("files");
-  const add = useAddCollectionFiles(collectionId, {
+  const readLayouts = useReadToolLayouts();
+  const [asking, setAsking] = useState<string[] | null>(null);
+  const [reading, setReading] = useState(false);
+  const add = useAddCollectionFiles(collection.id, {
     onSuccess: () => {
-      toast.success(t("collections.added", { count: fileIds.length, name }));
+      toast.success(t("collections.added", { count: fileIds.length, name: collection.name }));
+      setAsking(null);
       onAdded();
     },
   });
+  const choose = async () => {
+    setReading(true);
+    try {
+      const layouts = await readLayouts(instanceTarget("collection", collection.id));
+      const keys = requiredKeys(detailLayoutOf(layouts, "file") as StoredRegions | null);
+      if (asksForMetadata(collection, keys)) setAsking(keys);
+      else add.mutate({ fileIds });
+    } catch (error) {
+      toast.error(getErrorMessage(error, "files:collections.error"));
+    } finally {
+      setReading(false);
+    }
+  };
   return (
-    <Button
-      variant="ghost"
-      className="h-auto w-full justify-start px-3 py-2 text-left"
-      disabled={add.isPending}
-      onClick={() => add.mutate(fileIds)}
-    >
-      <COLLECTION_ICON className="size-4 shrink-0 text-muted-foreground" aria-hidden />
-      <span className="min-w-0 flex-1 truncate">{name}</span>
-    </Button>
+    <>
+      <Button
+        variant="ghost"
+        className="h-auto w-full justify-start px-3 py-2 text-left"
+        disabled={add.isPending || reading}
+        onClick={() => void choose()}
+      >
+        <COLLECTION_ICON className="size-4 shrink-0 text-muted-foreground" aria-hidden />
+        <span className="min-w-0 flex-1 truncate">{collection.name}</span>
+      </Button>
+      <RequiredMetadataDialog
+        collection={collection}
+        keys={asking ?? []}
+        open={asking !== null}
+        onOpenChange={(open) => {
+          if (!open) setAsking(null);
+        }}
+        pending={add.isPending}
+        onConfirm={(metadata) => add.mutate({ fileIds, metadata })}
+      />
+    </>
   );
 };

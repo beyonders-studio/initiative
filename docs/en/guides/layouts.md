@@ -66,6 +66,19 @@ Taking a part out hides it. It doesn't delete anything: the values are all still
 
 **Opens first**, on a project's lists, picks the one the project opens on for anybody who hasn't picked their own.
 
+## Required fields
+
+Some things are no use half filled in. A bug report with no steps. A booking with no room. A photo in the shop catalogue with no price, which is how the good teapot went for nothing at the last fete.
+
+So a page can say a field is **required**: select it in the editor and switch on **Required**. That works on a task type's page, the calendar's event page, the posts page and a collection's file page.
+
+- **What can be required:** anything somebody fills in. A description, a checklist, people, tags, dates, how it repeats, a property, a collection's own property. A task's start and due dates count as one, and either date fills them.
+- **What can't:** the title, because it always is, and shows as required and locked. Also anything that's never empty (a task's type, status and priority), anything nobody fills in (who made it, when), a checkbox, and a plug-in's fields, which the plug-in fills.
+- **What it does:** the add dialog puts required fields up top, never under **More options**, and waits until they're filled. Once filled, nobody can empty one. A required checklist needs one item. One will do.
+- **What it leaves alone:** everything that already exists. A task made last Tuesday without a description keeps going without one, and its page marks the gap so the next person to open it can fill it in. Imports, automations, plug-ins and the next copy of a repeating task go through too, and get the same mark.
+
+Hiding a field lifts the requirement with it. Nobody can fill in what they can't see.
+
 ## Presets
 
 A list can offer **presets**: named filters, plus a sort on a table, that anyone can pick from **Filters** as a starting point. Picking one makes those filters that person's own, to narrow further if they like. The preset itself stays as it was.

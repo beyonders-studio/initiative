@@ -351,6 +351,8 @@ export const pluginFields = (
         source: "plugin",
         label: localized(field.name, language) ?? field.key,
         hideable: true,
+        // What a plug-in fills is the plug-in's.
+        requireable: false,
         plugin: { install: plugin.id, field, on: plugin },
         value: (task) => {
           const value = pluginValue(task.properties, plugin.id, field.key);

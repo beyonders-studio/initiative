@@ -55,6 +55,14 @@ describe("getErrorMessage", () => {
     ).toBe("You don't have access to this event");
   });
 
+  it("names the fields a person left empty, built-ins in the reader's words", () => {
+    expect(
+      getErrorMessage(
+        apiError(400, { detail: "REQUIRED_FIELDS_MISSING", params: { fields: "dates\nSize" } })
+      )
+    ).toBe("Fill in what is required first: Start and due dates and Size.");
+  });
+
   it("keeps an unknown string detail verbatim", () => {
     expect(getErrorMessage(apiError(400, { detail: "Something specific" }))).toBe(
       "Something specific"

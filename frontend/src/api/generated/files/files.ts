@@ -29,7 +29,7 @@ import type {
   BodyUploadFileVersion,
   CollectionCreate,
   CollectionFileListResponse,
-  CollectionFiles,
+  CollectionFilesAdd,
   CollectionListResponse,
   CollectionRead,
   CollectionShapeGroup,
@@ -468,13 +468,15 @@ export function useListCollectionFiles<
 
 /**
  * Put files in a collection: each a file of its initiative the reader can
- * open. One already in it stays as it is.
+ * open, starting with ``metadata``'s values of the collection's metadata.
+ * One already in it stays as it is. A person gives each value the
+ * collection's file page requires.
  * @summary Add Collection Files
  */
 export const addCollectionFiles = (
   communityId: number,
   collectionId: number,
-  collectionFiles: BodyType<CollectionFiles>,
+  collectionFilesAdd: BodyType<CollectionFilesAdd>,
   options?: SecondParameter<typeof apiMutator>,
   signal?: AbortSignal
 ) => {
@@ -483,7 +485,7 @@ export const addCollectionFiles = (
       url: `/api/v1/c/${communityId}/collections/${collectionId}/files`,
       method: "POST",
       headers: { "Content-Type": "application/json" },
-      data: collectionFiles,
+      data: collectionFilesAdd,
       signal,
     },
     options
@@ -531,12 +533,12 @@ export const getAddCollectionFilesMutationOptions = <
 export type AddCollectionFilesMutationResult = NonNullable<
   Awaited<ReturnType<typeof addCollectionFiles>>
 >;
-export type AddCollectionFilesMutationBody = BodyType<CollectionFiles>;
+export type AddCollectionFilesMutationBody = BodyType<CollectionFilesAdd>;
 export type AddCollectionFilesMutationError = ErrorType<HTTPValidationError>;
 export type AddCollectionFilesMutationVariables = {
   communityId: number;
   collectionId: number;
-  data: BodyType<CollectionFiles>;
+  data: BodyType<CollectionFilesAdd>;
 };
 
 /**

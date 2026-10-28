@@ -1,5 +1,5 @@
 import type { FlatNamespace } from "i18next";
-import { ChevronDown } from "lucide-react";
+import { ChevronDown, CircleAlert } from "lucide-react";
 import {
   type ComponentType,
   createContext,
@@ -36,8 +36,11 @@ import type { TranslateFn } from "@/types/i18n";
 import {
   addingTree,
   type DetailLayoutSpec,
+  isRequired,
   PlacedProperties,
   placedProperties,
+  requiredKey,
+  requiredKeys,
   type StoredRegions,
 } from "./detailLayout";
 import { indexPaths } from "./draft";
@@ -112,9 +115,14 @@ export interface DetailKind<I extends Item, C, P> {
   /** Its own parts an item being added draws: those that need nothing saved. */
   addingParts?: readonly string[];
   /** Where an item being added is drawn on one column, with its side folded
-   *  under More options: the fields of its side drawn up front all the same.
-   *  Without it, one being added is drawn as its page is. */
+   *  under More options: the fields of its side drawn up front all the same,
+   *  and every field its layout requires. Without it, one being added is
+   *  drawn as its page is. */
   addingUpFront?: readonly string[];
+  /** Whether an item fills in what its layout can require, by its key
+   *  (`requiredKey`), with what is being sent for it (an item being added)
+   *  applied: a kind whose layout requires nothing has none. */
+  filled?: (item: I, key: string, sent?: Partial<P>) => boolean;
 }
 
 interface Drawn {
@@ -202,6 +210,56 @@ const ItemActions = () => {
   ) : null;
 };
 
+/** A part its layout requires, marked while it is empty for whoever can fill
+ *  it in: as required while the item is being added, and as missing on an
+ *  item that lacks it. */
+const RequiredMark = ({
+  node,
+  item,
+  children,
+}: {
+  node: LayoutNode;
+  item: Item;
+  children: ReactNode;
+}) => {
+  const { t } = useTranslation("layouts");
+  const { detail, home } = useDrawn();
+  const draft = useContext(ItemDraftContext);
+  const adding = draft !== null;
+  const key = requiredKey(node);
+  if (home.readOnly || (detail.filled?.(item, key, draft?.sent()) ?? true)) return children;
+  return (
+    <div className="flex min-w-0 flex-col gap-1" data-required-missing={key}>
+      {children}
+      <p
+        className={cn(
+          "flex items-center gap-1 text-xs",
+          adding ? "text-muted-foreground" : "text-destructive"
+        )}
+      >
+        <CircleAlert className="h-3.5 w-3.5 shrink-0" aria-hidden="true" />
+        {t(adding ? "required.label" : "required.missing")}
+      </p>
+    </div>
+  );
+};
+
+/** Each part drawn as `parts` draws it, marked where its layout requires it. */
+const markRequired = <I,>(parts: Parts<I>): Parts<I> =>
+  Object.fromEntries(
+    Object.entries(parts).map(([type, draw]) => [
+      type,
+      (node: LayoutNode, item: I, view: LayoutContext, all: Parts<I>) =>
+        isRequired(node) ? (
+          <RequiredMark node={node} item={item as Item}>
+            {draw(node, item, view, all)}
+          </RequiredMark>
+        ) : (
+          draw(node, item, view, all)
+        ),
+    ])
+  );
+
 /** The links an item being added is to be made with. */
 export const AddingLinks = createContext<{
   value: LinkedRef[];
@@ -288,11 +346,13 @@ const partsOf = <I extends Item>(own: Parts<I> = {}, adding?: readonly string[])
     actions: () => <ItemActions />,
     ...own,
   };
-  if (!adding) return parts;
+  if (!adding) return markRequired(parts);
   return {
-    ...Object.fromEntries(
-      Object.entries(parts).filter(([type]) =>
-        Object.hasOwn(own, type) ? adding.includes(type) : type !== "plugin" && type !== "actions"
+    ...markRequired(
+      Object.fromEntries(
+        Object.entries(parts).filter(([type]) =>
+          Object.hasOwn(own, type) ? adding.includes(type) : type !== "plugin" && type !== "actions"
+        )
       )
     ),
     ...ADDING_PARTS,
@@ -341,7 +401,7 @@ const ItemDetail = <I extends Item, C, P>({
   const upFront = adding ? detail.addingUpFront : undefined;
   const tree = useMemo(() => {
     const laidOut = spec.tree(layout, shippedPluginParts(plugins));
-    return upFront ? addingTree(laidOut, upFront) : laidOut;
+    return upFront ? addingTree(laidOut, [...upFront, ...requiredKeys(layout)]) : laidOut;
   }, [spec, layout, plugins, upFront]);
   const placed = useMemo(() => placedProperties(tree), [tree]);
   const inParts = useMemo(() => fieldsInParts(tree, plugins), [tree, plugins]);

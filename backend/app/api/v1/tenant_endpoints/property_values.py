@@ -29,6 +29,7 @@ from app.schemas.tenant.property import (
     PropertyValuesSetRequest,
 )
 from app.services.tenant import metadata as metadata_service
+from app.services.tenant import required_fields
 
 router = APIRouter(route_class=ActorRoute)
 
@@ -96,6 +97,7 @@ async def set_properties(
         )
         initiative_id = governing.initiative_id
 
+    required = await required_fields.required_of(session, guild_context, row)
     try:
         await metadata_service.set_values(
             session,
@@ -105,6 +107,7 @@ async def set_properties(
             removed=payload.removed if payload.merge else None,
             options=payload.options,
         )
+        await required_fields.refuse_emptied(session, required)
     except (HTTPException, CodedError):
         await session.rollback()
         raise

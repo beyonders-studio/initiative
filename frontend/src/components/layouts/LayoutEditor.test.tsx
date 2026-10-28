@@ -891,6 +891,54 @@ describe("LayoutEditor", () => {
       });
     });
 
+    it("marks a field required where it can be, and shows a title as always", async () => {
+      const { user } = editor("task:1");
+      const row = async (name: string) => within(await outline()).getByRole("button", { name });
+
+      await user.click(await row("Tags"));
+      await user.click(screen.getByRole("switch", { name: "Required" }));
+      expect(await row("Tags (required)")).toBeInTheDocument();
+
+      await user.click(await row("Task"));
+      const title = screen.getByRole("switch", { name: "Required" });
+      expect(title).toBeChecked();
+      expect(title).toBeDisabled();
+      // What nobody fills in, and what is never empty, cannot be.
+      for (const part of ["Created by", "Status"]) {
+        await user.click(await row(part));
+        expect(screen.queryByRole("switch", { name: "Required" })).not.toBeInTheDocument();
+      }
+
+      await user.click(screen.getByRole("button", { name: /^save$/i }));
+      await waitFor(() => expect(sent).toHaveLength(1));
+      expect(JSON.stringify(saved("task"))).toContain('{"field":"tags","required":true}');
+      expect(JSON.stringify(saved("task"))).not.toContain('{"field":"title","required"');
+    });
+
+    it("takes the flag off with the field it hides", async () => {
+      const { user } = editor(
+        "task:1",
+        vi.fn(),
+        buildToolLayoutSet({
+          layouts: [
+            {
+              kind: "task",
+              task_type_id: 1,
+              task_type_name: "Task",
+              definition: { side: [{ type: "field", props: { field: "tags", required: true } }] },
+              updated_at: "2026-10-01T12:00:00.000Z",
+            },
+          ],
+        })
+      );
+
+      await user.click(within(await outline()).getByRole("button", { name: /^hide tags$/i }));
+      await user.click(screen.getByRole("button", { name: /^save$/i }));
+
+      await waitFor(() => expect(sent).toHaveLength(1));
+      expect(JSON.stringify(saved("task"))).not.toContain("required");
+    });
+
     it("goes back to the shipped layout", async () => {
       const { user } = editor(
         "task:1",

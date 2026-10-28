@@ -19,6 +19,7 @@ from app.core import recurrence
 from app.services.tenant import attachments as attachments_service
 from app.services.tenant import overwrites
 from app.services.tenant import personal_items
+from app.services.tenant import required_fields
 from sqlmodel import select
 
 from app.api.actor_route import ActorRoute
@@ -409,6 +410,7 @@ async def create_calendar_event(
 
     await attachments_service.claim_uploads(session, event)
     await metadata_service.write_on_create(session, event, event_in.properties)
+    await required_fields.refuse_missing(session, guild_context, event)
     return await _event_committed(session, event.id, context=guild_context)
 
 
@@ -547,6 +549,7 @@ async def _apply_update(
 ) -> CalendarEventRead:
     """Write ``update_data`` to one event row, and to a series' overrides
     what they follow of it."""
+    required = await required_fields.required_of(session, guild_context, event)
     # Snapshot fields that drive the "updated"/"rescheduled" notification before
     # the in-place mutation below.
     old_title = event.title
@@ -706,6 +709,7 @@ async def _apply_update(
             and not attachments_service.shows_files(CalendarEvent, update_data),
         )
     session.add(event)
+    await required_fields.refuse_emptied(session, required)
     return await _event_committed(session, event.id, context=guild_context)
 
 
@@ -952,6 +956,7 @@ async def set_attendees(
         session, CalendarEvent, event_id, action=Action.contribute
     )
     event = await _scoped_list_target(session, event, "attendees", scope, occurrence)
+    required = await required_fields.required_of(session, guild_context, event)
     old_ids = {a.user_id for a in event.attendees}
     await events_service.set_event_attendees(
         session, event, attendee_ids, calendar=event.calendar
@@ -962,6 +967,7 @@ async def set_attendees(
     )
     await session.flush()
     await _followed(session, event, "attendees")
+    await required_fields.refuse_emptied(session, required)
     return await _event_committed(session, event.id, context=guild_context)
 
 

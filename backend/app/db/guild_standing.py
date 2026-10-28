@@ -1105,6 +1105,14 @@ class InstallContext:
 ActorContext = GuildContext | InstallContext
 
 
+def by_a_person(context: ActorContext) -> bool:
+    """Whether a person makes this request: through the app or the API, or
+    through a plug-in acting for them. A plug-in acting as itself is not one,
+    nor is anything that writes with no request (an import, an automation, a
+    repeating task's next one)."""
+    return not isinstance(context, InstallContext) or context.member_user_id is not None
+
+
 def _named(value: Any) -> dict[str, list[Any]]:
     """The statement's ``named_refs`` column. The driver hands a ``jsonb``
     column read through ``text()`` back as its text."""

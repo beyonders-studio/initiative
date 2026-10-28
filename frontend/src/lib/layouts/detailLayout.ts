@@ -9,7 +9,9 @@ import { createContext } from "react";
 import type {
   DetailLayoutDefinitionInput,
   DetailLayoutRead,
+  PropertySummary,
 } from "@/api/generated/initiativeAPI.schemas";
+import { isEmptyPropertyValue } from "@/components/properties/propertyHelpers";
 
 import { PROPERTY_FIELD_PREFIX } from "./fields";
 import type { LayoutNode } from "./tree";
@@ -34,6 +36,83 @@ export const placedProperties = (root: LayoutNode): Set<number> =>
 
 /** What the detail being drawn places on its own, for All properties. */
 export const PlacedProperties = createContext<ReadonlySet<number>>(new Set());
+
+/** What a part is required by, where it can be: a field by its id, one of
+ *  the detail's own parts (a task's dates) by its type. */
+export const requiredKey = (node: LayoutNode): string =>
+  node.type === "field" ? String(node.props?.field) : node.type;
+
+/** Whether the layout requires the part to be filled in. */
+export const isRequired = (node: LayoutNode): boolean => node.props?.required === true;
+
+/** What a stored detail requires, in the order it places them: each region as
+ *  stored, none where it is drawn as shipped, which requires nothing. */
+export const requiredKeys = (stored: StoredRegions | null | undefined): string[] => [
+  ...new Set(
+    LAYOUT_REGIONS.flatMap((region) => nodesIn(stored?.[region] ?? []))
+      .filter(isRequired)
+      .map(requiredKey)
+  ),
+];
+
+/** Whether one of `properties` holds a value for the property `key` names. */
+export const propertyFilled = (properties: readonly PropertySummary[], key: string): boolean =>
+  key.startsWith(PROPERTY_FIELD_PREFIX) &&
+  properties.some(
+    (each) =>
+      each.property_id === Number(key.slice(PROPERTY_FIELD_PREFIX.length)) &&
+      !isEmptyPropertyValue(each.value)
+  );
+
+/** A field's value once `sent` (changes not yet saved, as an item being added
+ *  holds them) is applied: what it sends for `key`, or else what `held` says. */
+export const sentOr = <P, K extends keyof P>(sent: Partial<P>, key: K, held: unknown): unknown =>
+  Object.hasOwn(sent, key) ? sent[key] : held;
+
+/** Whether a value holds text. */
+export const hasText = (value: unknown): boolean =>
+  typeof value === "string" && value.trim() !== "";
+
+/** Whether a value is a list holding something. */
+export const hasAny = (value: unknown): boolean => Array.isArray(value) && value.length > 0;
+
+/** How an item of one kind reads as filled for a required key, with what is
+ *  being sent for it applied: by its own reader for the key, or else by the
+ *  value its `properties` hold. */
+export const filledBy =
+  <I, P>(
+    readers: Readonly<Record<string, (item: I, sent: Partial<P>) => boolean>>,
+    properties: (item: I) => readonly PropertySummary[]
+  ) =>
+  (item: I, key: string, sent: Partial<P> = {}): boolean =>
+    Object.hasOwn(readers, key) ? readers[key](item, sent) : propertyFilled(properties(item), key);
+
+/**
+ * What of `keys` an item leaves empty, by `filled`. A property only while
+ * `definitions` still has it: one since deleted requires nothing, and until
+ * they are read, every property counts as empty.
+ */
+export const missingRequired = (
+  keys: readonly string[],
+  filled: (key: string) => boolean,
+  definitions: readonly { id: number }[] | undefined
+): string[] => {
+  const known = new Set(definitions?.map((each) => each.id));
+  return keys.filter((key) => {
+    if (definitions && key.startsWith(PROPERTY_FIELD_PREFIX)) {
+      if (!known.has(Number(key.slice(PROPERTY_FIELD_PREFIX.length)))) return false;
+    }
+    return !filled(key);
+  });
+};
+
+/** `node` marked required, or not: a part that is not keeps no flag. */
+export const withRequired = (node: LayoutNode, required: boolean): LayoutNode => {
+  const { required: _was, ...props } = node.props ?? {};
+  const kept = required ? { ...props, required: true } : props;
+  const { props: _props, ...rest } = node;
+  return Object.keys(kept).length > 0 ? { ...rest, props: kept } : rest;
+};
 
 /** A part of a detail's column, and where it falls once the detail is one column. */
 export const at = (order: number, node: LayoutNode): LayoutNode => ({
@@ -115,6 +194,9 @@ export interface DetailLayoutSpec {
   detailFields: ReadonlySet<string>;
   /** Whether a part edits a field: taken off, the field is hidden. */
   editsAField: (node: LayoutNode) => boolean;
+  /** Its own parts a layout can require (a task's dates), beside the fields
+   *  that are `requireable`; null for a detail that requires nothing. */
+  requiredParts: ReadonlySet<string> | null;
   /** The detail as one tree to edit by path: the detail, holding its header,
    *  main and side in that order. `more` is what a shipped side draws after
    *  its own: the placed plug-ins'. */
@@ -136,11 +218,14 @@ export const detailLayoutSpec = ({
   kind,
   shipped,
   fieldParts,
+  requiredParts = null,
   knows = shipped,
 }: {
   kind: DetailLayoutRead["kind"];
   shipped: Record<Region, LayoutNode[]>;
   fieldParts: readonly string[];
+  /** Its own parts a layout can require; none where it requires nothing. */
+  requiredParts?: readonly string[] | null;
   /** Every part and field the detail has, where `shipped` leaves some out: a
    *  task page shaped for an idea still has dates to place. */
   knows?: Record<Region, LayoutNode[]>;
@@ -189,6 +274,7 @@ export const detailLayoutSpec = ({
       knownNodes.filter((node) => node.type === "field").map((node) => String(node.props?.field))
     ),
     editsAField,
+    requiredParts: requiredParts ? new Set(requiredParts) : null,
     root: (stored, more) => {
       const regions = regionsOf(stored, more);
       return {
@@ -212,7 +298,8 @@ export const detailLayoutSpec = ({
 
 /**
  * A detail as an item being added draws it, on one column: its header, the
- * fields named up front wherever its side places them, then its main column,
+ * fields and parts named up front (by `requiredKey`) wherever its side places
+ * them, then its main column,
  * with the rest of its side folded under `more`. A group the fields up front
  * leave empty goes with them.
  */
@@ -222,7 +309,7 @@ export const addingTree = (tree: LayoutNode, upFront: readonly string[]): Layout
   const pulled: LayoutNode[] = [];
   const without = (nodes: LayoutNode[]): LayoutNode[] =>
     nodes.flatMap((node) => {
-      if (node.type === "field" && upFront.includes(String(node.props?.field))) {
+      if (!node.children && upFront.includes(requiredKey(node))) {
         pulled.push(node);
         return [];
       }

@@ -495,6 +495,11 @@
       "copyPlaceholder": "Another collection",
       "copyHint": "Its properties and what its lists show, without its files or their values.",
       "create": "Create collection"
+    },
+    "required": {
+      "title": "What {{name}} asks for",
+      "description": "Each file put in this collection starts with these values.",
+      "confirm": "Continue"
     }
   }
 }

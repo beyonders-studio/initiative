@@ -9,6 +9,7 @@ import { server } from "@/__tests__/helpers/msw-server";
 import { renderWithProviders } from "@/__tests__/helpers/render";
 import { MetadataType, type TaskListRead } from "@/api/generated/initiativeAPI.schemas";
 import { numberFormat } from "@/lib/intl";
+import { canRequire } from "@/lib/layouts/draft";
 import {
   fieldsInParts,
   pluginFieldId,
@@ -159,6 +160,21 @@ describe("pluginsOnItems", () => {
 });
 
 describe("a plug-in on a task's page", () => {
+  it("draws a field a page cannot require: the plug-in fills it", () => {
+    const fields = taskFields([], pluginFields(pluginsOnItems([install], 7), "en"));
+    const placed: LayoutNode = { type: "field", props: { field: "plugin:3:ci.state" } };
+
+    expect(fields.get("plugin:3:ci.state")?.requireable).toBe(false);
+    expect(canRequire(placed, fields, TASK_LAYOUT.requiredParts)).toBe(false);
+    expect(
+      canRequire(
+        { type: "plugin", props: { plugin: 3, part: "builds" } },
+        fields,
+        TASK_LAYOUT.requiredParts
+      )
+    ).toBe(false);
+  });
+
   it("shows its fields, then its parts, at the end of a side not saved", () => {
     const more = shippedPluginParts(pluginsOnItems([install], 7));
     const side = (stored: Parameters<typeof TASK_LAYOUT.root>[0]) =>

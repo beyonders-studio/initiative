@@ -299,5 +299,13 @@
     "metadata": "Métadonnée",
     "metadataHelp": "C'est une métadonnée de l'initiative, qui se modifie dans ses paramètres.",
     "openSettings": "Ouvrir les paramètres de l'initiative"
+  },
+  "required": {
+    "label": "Obligatoire",
+    "help": "Qui en ajoute un doit le remplir et ne peut plus le vider ensuite. Masqué, il n’est plus obligatoire.",
+    "always": "Un titre est toujours obligatoire.",
+    "part": "{{name}} (obligatoire)",
+    "missing": "Obligatoire, pas encore rempli.",
+    "toAdd": "Remplissez ce qui est obligatoire pour l’ajouter."
   }
 }

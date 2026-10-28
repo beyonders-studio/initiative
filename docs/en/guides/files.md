@@ -251,6 +251,8 @@ Click the layout's name at the top of the editor's outline and the collection's 
 
 Lists can also show the initiative's own [metadata](initiatives.md#metadata), which a file carries wherever it goes. Properties are for what only makes sense in this collection.
 
+The file page can make a property [required](layouts.md#required-fields). Then dropping files in, or adding ones already here, asks for it first, once for the whole batch, and a file in the collection can't have it emptied. Files already in it keep going without one, marked so somebody fills it in. Each collection asks only for its own properties, so a photo in three collections owes each of them its own answers.
+
 !!! tip "A collection doesn't change who sees a file"
     Each file keeps its own sharing. Somebody opening a collection sees the files in it they could already open, and nothing else. If they can't open any of them, the collection doesn't show up for them at all.
 

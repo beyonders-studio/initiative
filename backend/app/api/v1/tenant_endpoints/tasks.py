@@ -60,6 +60,7 @@ from app.services.tenant import archive as archive_service
 from app.services.tenant import attachments as attachments_service
 from app.services.tenant import column_limits
 from app.services.tenant import overwrites
+from app.services.tenant import required_fields
 from app.services.tenant import cases as cases_service
 from app.services.tenant import metadata as metadata_service
 from app.services.tenant import tags as tags_service
@@ -312,6 +313,7 @@ async def create_task(
     guild_context: ProjectsWrite,
 ) -> Task:
     task = await _insert_task(task_in, session, current_user, guild_context)
+    await required_fields.refuse_missing(session, guild_context, task)
     await session.commit()
     return await _response(session, task.id)
 
@@ -621,6 +623,7 @@ async def update_task(
 ) -> Task:
     task = await resource_access.load_child(session, Task, task_id, access="write")
     project = task.project
+    required = await required_fields.required_of(session, guild_context, task)
 
     update_data = task_in.model_dump(exclude_unset=True)
     if update_data.get("recurrence", task.recurrence) is None:
@@ -856,6 +859,7 @@ async def update_task(
                 previous_description
             ) - attachments_service.upload_urls_in_markdown(task.description)
     await attachments_service.claim_uploads(session, task)
+    await required_fields.refuse_emptied(session, required)
 
     _touch_project(project, now)
     await session.commit()
@@ -1250,6 +1254,7 @@ async def promote_checklist_item(
     the new task's description.
     """
     parent = await resource_access.load_child(session, Task, task_id, access="write")
+    required = await required_fields.required_of(session, guild_context, parent)
     item = next(
         (each for each in parent.checklist or [] if each.get("id") == item_id), None
     )
@@ -1293,8 +1298,10 @@ async def promote_checklist_item(
             status_code=status.HTTP_409_CONFLICT,
             detail=ChecklistMessages.ITEM_CHANGED,
         )
-    await session.commit()
     # The statement wrote behind the ORM's back, so the loaded row is stale.
+    await session.refresh(parent, ["checklist"])
+    await required_fields.refuse_emptied(session, required)
+    await session.commit()
     session.expire(parent)
     return await _response(session, task.id)
 

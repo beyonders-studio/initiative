@@ -27,8 +27,9 @@ import { MAX_COLUMN_LIMIT } from "@/hooks/useColumnLimits";
 import type { MetadataOwner } from "@/hooks/useProperties";
 import { useCommunityPath } from "@/lib/communityUrl";
 import { listFormat } from "@/lib/intl";
-import { LAYOUT_REGIONS } from "@/lib/layouts/detailLayout";
+import { isRequired, LAYOUT_REGIONS, withRequired } from "@/lib/layouts/detailLayout";
 import {
+  canRequire,
   cardOf,
   type ListLayout,
   MAX_TITLE_LENGTH,
@@ -505,8 +506,44 @@ const PartSettings = ({
   return (
     <Panel heading={translate("layouts:settings")}>
       <p className="text-muted-foreground text-sm">{translate(help)}</p>
+      {on ? <RequiredSetting node={node} fields={fields} on={on} onChange={change} /> : null}
       {canRemove ? remove : null}
     </Panel>
+  );
+};
+
+/** Whether an item's page requires the part to be filled in, where it can. A
+ *  title always is, and says so; hiding a part takes its flag with it. */
+const RequiredSetting = ({
+  node,
+  fields,
+  on,
+  onChange,
+}: {
+  node: LayoutNode;
+  fields: ReadonlyMap<string, FieldDef>;
+  on: EditableDetail;
+  onChange: (next: LayoutNode) => void;
+}) => {
+  const { t } = useTranslation("layouts");
+  if (on.spec.requiredParts === null) return null;
+  const always = node.type === "field" && fields.get(String(node.props?.field))?.kind === "title";
+  if (!always && !canRequire(node, fields, on.spec.requiredParts)) return null;
+  return (
+    <div className="space-y-1">
+      <div className="flex items-center justify-between gap-2">
+        <Label htmlFor="part-required">{t("required.label")}</Label>
+        <Switch
+          id="part-required"
+          checked={always || isRequired(node)}
+          disabled={always}
+          onCheckedChange={(checked) => onChange(withRequired(node, checked))}
+        />
+      </div>
+      <p className="text-muted-foreground text-xs">
+        {t(always ? "required.always" : "required.help")}
+      </p>
+    </div>
   );
 };
 

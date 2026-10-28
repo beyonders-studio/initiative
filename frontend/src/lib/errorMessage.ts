@@ -2,6 +2,7 @@ import type { AxiosError } from "axios";
 import { isAxiosError } from "axios";
 
 import i18n from "@/i18n";
+import { listFormat } from "@/lib/intl";
 import { kindNames } from "@/lib/tools";
 
 /** Loose translation function that accepts dynamic keys without strict type checking. */
@@ -16,13 +17,27 @@ interface ValidationDetail {
 /** The values a refusal's wording is filled in with, as the API sent them. */
 type ErrorParams = Record<string, string>;
 
+/** The fields a refusal names, one a line: a built-in field by its id, in the
+ *  reader's words, and a property by its own name. */
+const fieldList = (fields: string): string =>
+  listFormat(i18n.language).format(
+    fields
+      .split("\n")
+      .map((field) => translate(`requiredFields.${field}`, { ns: "errors", defaultValue: field }))
+  );
+
 /**
  * What a refusal's `params` fill its wording with. A `kind` names the thing
- * refused — "Project not found" — in the forms `kindNames` gives.
+ * refused — "Project not found" — in the forms `kindNames` gives; `fields`
+ * names the fields it lacks.
  */
 function interpolation(params: ErrorParams | undefined): Record<string, string> {
   if (!params) return {};
-  return params.kind ? { ...params, ...kindNames(params.kind, translate) } : params;
+  return {
+    ...params,
+    ...(params.kind ? kindNames(params.kind, translate) : {}),
+    ...(params.fields ? { fields: fieldList(params.fields) } : {}),
+  };
 }
 
 /**

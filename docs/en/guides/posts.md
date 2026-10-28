@@ -16,6 +16,8 @@ The editor is the same one text documents use, which means a notice can carry a 
 
 You can post a notice with no body at all. A headline and a poll is a perfectly good notice.
 
+If the initiative's posts page [requires](layouts.md#required-fields) tags or a property, **New Post** asks for them under the editor and waits until they're in.
+
 ![A board](../images/tools/posts.png)
 
 ## Who hears about it

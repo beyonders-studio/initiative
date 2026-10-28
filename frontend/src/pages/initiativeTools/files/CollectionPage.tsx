@@ -18,6 +18,7 @@ import {
   type FileSummary,
   type ListLayoutDefinitionInput,
   PropertyTarget,
+  type PropertyValueInput,
   SearchEntityType,
   type TimelineBucket,
   Tool,
@@ -34,6 +35,10 @@ import {
   type CollectionList,
   CollectionListView,
 } from "@/components/files/collections/collectionLists";
+import {
+  asksForMetadata,
+  RequiredMetadataDialog,
+} from "@/components/files/collections/RequiredMetadataDialog";
 import { UploadProgress } from "@/components/files/collections/UploadProgress";
 import { FileChooserDialog } from "@/components/files/FileChooserDialog";
 import { COLLECTION_SORT_FIELDS } from "@/components/files/fileColumns";
@@ -107,7 +112,7 @@ import {
 import { useCommunityPath } from "@/lib/communityUrl";
 import { formatPeriod } from "@/lib/formatDate";
 import { DetailLayoutView } from "@/lib/layouts/DetailLayoutView";
-import type { StoredRegions } from "@/lib/layouts/detailLayout";
+import { requiredKeys, type StoredRegions } from "@/lib/layouts/detailLayout";
 import { withDisplays } from "@/lib/layouts/fields";
 import { FILE_DETAIL } from "@/lib/layouts/fileLayout";
 import { collectionFileFields } from "@/lib/layouts/files";
@@ -366,6 +371,25 @@ export function CollectionPage() {
   // A file beside the wall, or under a picture, is drawn as the collection's
   // file detail lays it out, measured against where it is drawn.
   const fileLayout = detailLayoutOf(layoutsQuery.data, "file") as StoredRegions | null;
+  // What its file page requires of files going in: asked for once, before
+  // they go, for all of them.
+  const required = useMemo(() => requiredKeys(fileLayout), [fileLayout]);
+  const [goingIn, setGoingIn] = useState<{ files?: File[]; fileIds?: number[] } | null>(null);
+  const putIn = (
+    going: { files?: File[]; fileIds?: number[] },
+    metadata?: PropertyValueInput[]
+  ) => {
+    if (going.files) uploader.enqueue(going.files, metadata);
+    if (going.fileIds) addFile.mutate({ fileIds: going.fileIds, metadata });
+  };
+  const offer = (going: { files?: File[]; fileIds?: number[] }) => {
+    if (collection && asksForMetadata(collection, required)) {
+      setChoosing(false);
+      setGoingIn(going);
+    } else {
+      putIn(going);
+    }
+  };
   const fileContext = useMemo(() => (collection ? { collection } : null), [collection]);
   const drawFile = (file: FileRow) =>
     fileContext ? (
@@ -631,7 +655,7 @@ export function CollectionPage() {
       <CollectionDropzone
         ref={dropzoneRef}
         enabled={canEdit && !choosing}
-        onFiles={uploader.enqueue}
+        onFiles={(files) => offer({ files })}
         className="min-h-40 rounded-xl"
       >
         {feed.isLoading || layoutsQuery.isLoading ? (
@@ -770,12 +794,26 @@ export function CollectionPage() {
           exclude={inCollection}
           open={choosing}
           onOpenChange={setChoosing}
-          onPick={(fileId) => addFile.mutate([fileId])}
+          onPick={(fileId) => offer({ fileIds: [fileId] })}
           pending={addFile.isPending}
           text={{
             title: t("collections.addFiles"),
             description: t("collections.pickFile"),
             none: t("collections.noFilesToAdd"),
+          }}
+        />
+      ) : null}
+      {collection ? (
+        <RequiredMetadataDialog
+          collection={collection}
+          keys={required}
+          open={goingIn !== null}
+          onOpenChange={(open) => {
+            if (!open) setGoingIn(null);
+          }}
+          onConfirm={(metadata) => {
+            if (goingIn) putIn(goingIn, metadata);
+            setGoingIn(null);
           }}
         />
       ) : null}

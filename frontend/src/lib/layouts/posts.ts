@@ -27,6 +27,7 @@ export const postFields = (
           label,
           source: "builtin",
           hideable: true,
+          requireable: true,
           value: () => null,
         })
       ),
@@ -59,4 +60,5 @@ export const POST_LAYOUT = detailLayoutSpec({
   kind: "post",
   shipped: POST_DETAIL_REGIONS,
   fieldParts: ["field", "properties"],
+  requiredParts: [],
 });

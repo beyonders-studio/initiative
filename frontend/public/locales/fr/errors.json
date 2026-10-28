@@ -810,5 +810,16 @@
   "SHARE_REQUEST_ALREADY_SHARED": "Vous avez déjà cet accès",
   "SHARE_REQUEST_ALREADY_PENDING": "Vous avez déjà demandé, et personne n’a encore répondu",
   "SHARE_REQUEST_NOTHING_TO_ASK": "Vous pouvez déjà tout ouvrir ici",
-  "SHARE_REQUEST_CANNOT_ANSWER": "Cette demande a déjà une réponse, ou ce n’est pas à vous d’y répondre"
+  "SHARE_REQUEST_CANNOT_ANSWER": "Cette demande a déjà une réponse, ou ce n’est pas à vous d’y répondre",
+  "REQUIRED_FIELDS_MISSING": "Remplissez d’abord les champs obligatoires : {{fields}}.",
+  "requiredFields": {
+    "description": "Description",
+    "assignees": "Assignés",
+    "checklist": "Liste de contrôle",
+    "recurrence": "Récurrence",
+    "tags": "Étiquettes",
+    "dates": "Dates de début et d’échéance",
+    "location": "Lieu",
+    "attendees": "Participants"
+  }
 }

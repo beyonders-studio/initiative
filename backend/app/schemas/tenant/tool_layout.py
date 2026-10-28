@@ -439,8 +439,17 @@ CardPart.model_rebuild()
 StackPart.model_rebuild()
 
 
+def _unset(value: Any) -> bool:
+    return value is None
+
+
 class DetailFieldProps(_Strict):
     field: DetailFieldId
+    #: A person must fill it in to add the item, and cannot empty it once it
+    #: is filled. Only a field a person fills in can be required
+    #: (``app.services.tenant.tool_layouts.REQUIREABLE``); a title always is.
+    #: Left out of a read where it is not set, as it was before it existed.
+    required: Optional[bool] = Field(default=None, exclude_if=_unset)
 
 
 class DetailFieldPart(_Strict):
@@ -493,10 +502,17 @@ OwnPartType = Literal[
 ]
 
 
+class OwnPartProps(_Strict):
+    #: As a field's: a part that edits a value a person fills in (a task's
+    #: dates) can be required.
+    required: Optional[bool] = Field(default=None, exclude_if=_unset)
+
+
 class OwnPart(_Strict):
     """One of a detail's own parts."""
 
     type: OwnPartType
+    props: Optional[OwnPartProps] = Field(default=None, exclude_if=_unset)
 
 
 DetailPart = Annotated[

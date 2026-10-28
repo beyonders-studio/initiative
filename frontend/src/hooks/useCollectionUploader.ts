@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 
-import type { CollectionRead } from "@/api/generated/initiativeAPI.schemas";
+import type { CollectionRead, PropertyValueInput } from "@/api/generated/initiativeAPI.schemas";
 import { useAppConfig } from "@/hooks/useAppConfig";
 import { invalidateCollectionContents, useUploadToCollection } from "@/hooks/useCollections";
 import { getErrorMessage } from "@/lib/errorMessage";
@@ -10,6 +10,8 @@ export type UploadStatus = "queued" | "uploading" | "done" | "failed";
 export interface UploadJob {
   id: number;
   file: File;
+  /** The values of the collection's metadata it starts with there. */
+  metadata?: PropertyValueInput[];
   status: UploadStatus;
   /** Why it failed — the server's answer, or too big to send. */
   error?: string;
@@ -51,14 +53,14 @@ export function useCollectionUploader(
   const running = useRef(0);
 
   const enqueue = useCallback(
-    (files: File[]) => {
+    (files: File[], metadata?: PropertyValueInput[]) => {
       setJobs((current) => [
         ...current,
         ...files.map(
           (file): UploadJob =>
             maxUploadBytes !== null && file.size > maxUploadBytes
-              ? { id: nextId++, file, status: "failed", tooLarge: true }
-              : { id: nextId++, file, status: "queued" }
+              ? { id: nextId++, file, metadata, status: "failed", tooLarge: true }
+              : { id: nextId++, file, metadata, status: "queued" }
         ),
       ]);
     },
@@ -78,7 +80,7 @@ export function useCollectionUploader(
     );
     for (const job of starting) {
       uploadRef.current
-        .mutateAsync(job.file)
+        .mutateAsync({ file: job.file, metadata: job.metadata })
         .then(() => {
           setJobs((current) =>
             current.map((j) => (j.id === job.id ? { ...j, status: "done" } : j))
