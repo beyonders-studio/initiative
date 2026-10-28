@@ -13,7 +13,7 @@ Capability and ownership checks happen at the endpoint as well.
 from __future__ import annotations
 
 import logging
-from datetime import timedelta
+from datetime import datetime, timedelta
 from typing import Optional, Sequence, cast
 
 from fastapi import status
@@ -388,6 +388,7 @@ async def break_glass(
     purpose: AccessGrantPurpose = AccessGrantPurpose.content,
     level: str,
     community_notice: CommunityNotice = CommunityNotice.none,
+    issued_at: Optional[datetime] = None,
 ) -> AccessGrant:
     """Self-issue a time-bound break-glass grant for ``actor`` to one guild.
 
@@ -403,6 +404,8 @@ async def break_glass(
     already confer.
 
     A ``moderate`` grant is never self-issued: someone else approves it.
+    ``issued_at`` is shared by grants issued together, so they read as one
+    act.
     """
     if level == AccessLevel.moderate.value:
         raise AccessGrantError(
@@ -443,7 +446,7 @@ async def break_glass(
             ),
         )
     )
-    now = utcnow()
+    now = issued_at or utcnow()
     for grant in existing.all():
         if grant.status == AccessGrantStatus.pending.value:
             raise AccessGrantError(

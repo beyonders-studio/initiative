@@ -25,6 +25,7 @@ from app.api.deps import (
 )
 from app.api.v1.platform_endpoints.session_opening import prove_second_factor
 from app.core.capabilities import Capability
+from app.core.clock import utcnow
 from app.core.audit_events import AuditEventType
 from app.core.messages import AccessGrantMessages, AuthMessages
 from app.db.query import build_paginated_response
@@ -415,12 +416,15 @@ async def break_glass_access(
     replaced = await service.reconcile_break_glass_pair(
         session, actor=current_user, payload=payload
     )
+    # One act: both grants carry the same moment.
+    issued_at = utcnow()
     grant = await service.break_glass(
         session,
         actor=current_user,
         payload=payload,
         level=AccessLevel.read_write.value,
         community_notice=notice,
+        issued_at=issued_at,
     )
     settings_grant = await service.break_glass(
         session,
@@ -429,6 +433,7 @@ async def break_glass_access(
         purpose=AccessGrantPurpose.settings,
         level=SettingsLevel.superadmin.value,
         community_notice=notice,
+        issued_at=issued_at,
     )
     for prior in replaced:
         await audit_service.record(

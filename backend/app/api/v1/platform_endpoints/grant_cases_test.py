@@ -806,51 +806,62 @@ async def test_support_access_always_tells_the_community_when_it_starts(
 
 
 async def test_a_security_case_may_tell_the_community_once_access_ends(
-    client: AsyncClient, session: AsyncSession, desk, mail_on
+    client: AsyncClient, session: AsyncSession, desk, acting_user, mail_on
 ):
+    staff = desk["staff"]
     await set_rls_context(session, SystemGuild(desk["guild_id"]))
     session.add(
-        IntakeBinding(stream=IntakeStream.security, project_id=desk["staff"].project.id)
+        IntakeBinding(stream=IntakeStream.security, project_id=staff.project.id)
     )
     await session.commit()
+    await set_rls_context(session, Unattributed())
+    responder = await acting_user(
+        "operator",
+        guild_role=CommunityRole.member,
+        guild=staff.guild,
+        initiative=staff.initiative,
+        initiative_role="member",
+    )
+    await create_resource_grant(
+        session, staff.project, level=ResourceAccessLevel.write, user=responder.user
+    )
     await set_rls_context(session, Unattributed())
     seat_id = (await create_user(session)).id
     target = await create_guild(session, creator=await session.get(User, seat_id))
     task_id = await _case(IntakeStream.security)
 
-    requested = await _request(
-        client,
-        desk["agent"],
-        target.id,
-        case_task_id=task_id,
-        community_notice="when_ended",
-        access_level="read",
-        settings_level="admin",
+    broke = await client.post(
+        f"{GRANTS}break-glass",
+        json={
+            "community_id": target.id,
+            "reason": "an incident",
+            "case_task_id": task_id,
+            "community_notice": "when_ended",
+        },
+        headers=responder.headers,
     )
-    assert requested.status_code == 201, requested.text
+    assert broke.status_code == 201, broke.text
+    assert await _letters(session, seat_id) == []
+
+    # Both halves of the pair have since ended.
+    now = datetime.now(timezone.utc)
     grants = (
         await session.exec(
             select(AccessGrant).where(AccessGrant.case_task_id == task_id)
         )
     ).all()
     assert {grant.community_notice for grant in grants} == {"when_ended"}
-
-    # Both were given, together, and have since ended.
-    now = datetime.now(timezone.utc)
     for grant in grants:
-        grant.status = "approved"
-        grant.decided_at = now - timedelta(hours=2)
         grant.expires_at = now - timedelta(hours=1)
         session.add(grant)
     await session.commit()
-    assert await _letters(session, seat_id) == []
 
     await set_rls_context(session, Unattributed())
     await grant_cases.report_activity(session, now=now)
     (letter,) = await _letters(session, seat_id)
     assert letter.subject.startswith("Platform staff had access to")
-    assert "read-only" in letter.body
-    assert "community-settings (admin)" in letter.body
+    assert "read-write" in letter.body
+    assert "community-settings (superadmin)" in letter.body
     assert "security case" in letter.body
 
 

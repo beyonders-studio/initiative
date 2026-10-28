@@ -113,6 +113,17 @@ const useCaseChoice = (form: AccessGrantsForm) => {
     setChosenId(taskId);
     setFound(picked);
   };
+  const listed =
+    caseTaskId == null
+      ? undefined
+      : (items.find((item) => item.task_id === caseTaskId) ??
+        (found?.task_id === caseTaskId ? found : undefined));
+  // A case the page was opened for that is past the first page is looked up
+  // by its number, so the form knows what it allows.
+  const lookedUp = useGrantCases({
+    enabled: caseTaskId != null && cases.isSuccess && listed === undefined,
+    search: `#${caseTaskId}`,
+  });
   return {
     items,
     loading: cases.isLoading,
@@ -120,11 +131,7 @@ const useCaseChoice = (form: AccessGrantsForm) => {
     required: cases.data?.required ?? false,
     caseTaskId,
     setCaseTaskId,
-    chosen:
-      caseTaskId == null
-        ? undefined
-        : (items.find((item) => item.task_id === caseTaskId) ??
-          (found?.task_id === caseTaskId ? found : undefined)),
+    chosen: listed ?? lookedUp.data?.items.find((item) => item.task_id === caseTaskId),
   };
 };
 

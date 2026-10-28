@@ -612,6 +612,17 @@ describe("SettingsAccessGrantsPage", () => {
       });
     });
 
+    it("offers the choice for a case it was opened for past the first page", async () => {
+      grantCases = { items: [lostPhone], required: true };
+      searchedCases = { "#9": { items: [{ ...spamWave, task_id: 9 }], required: true } };
+      render(["access.request"], { case: 9, form: "request" });
+
+      expect(
+        await screen.findByRole("combobox", { name: "Tell the community" })
+      ).toBeInTheDocument();
+      searchedCases = {};
+    });
+
     it("says a support case always tells its community, and offers no choice", async () => {
       grantCases = { items: [spamWave, lostPhone], required: true };
       const user = userEvent.setup();
