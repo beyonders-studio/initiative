@@ -5,11 +5,11 @@
   "name": "Sales pipeline",
   "publisher": "Initiative",
   "description": "Every deal on one board, from first hello to signed.",
-  "long_description": "Each deal is a card, and each stage is a column: Lead, Contacted, Demo sent, Trial, Negotiating, Won and Lost. Cards carry the company, the person you are talking to, what the deal is worth, where it came from and the date of the next step, so the board doubles as a to-do list.\n\nInstall one per salesperson and everyone works their own pipeline with the usual board, filters and due dates. A manager in the same initiative sees them all.\n\nValue is a plain number with the currency in its name. Rename the field if you sell in something other than dollars.\n\nA customer who signed for a year comes back as a renewal, which repeats every year from the day you set it.",
+  "long_description": "Each deal is a card, and each stage is a column: Lead, Contacted, Demo sent, Trial, Negotiating, Won and Lost. Cards carry the company, the person you are talking to, what the deal is worth, where it came from and the date of the next step, so the board doubles as a to-do list.\n\nInstall one per salesperson and everyone works their own pipeline with the usual board, filters and due dates. A manager in the same initiative sees them all.\n\nValue is in US dollars. Change its currency in the project's properties if you sell in something else.\n\nA customer who signed for a year comes back as a renewal, which repeats every year from the day you set it.",
   "avatar_url": "/marketplace/core-sales-pipeline.svg",
   "images": [],
   "version": "1.2.0",
-  "release_notes": "Deals and renewals are each their own type, with a page of their own. A new renewal repeats every year, and a card shows its type beside its title.",
+  "release_notes": "Deals and renewals are each their own type, with a page of their own. A new renewal repeats every year, and a card shows its type beside its title. The project's fields are its own properties rather than the initiative's metadata. Value is money, in US dollars.",
   "definition": {
     "type": "initiative-project",
     "schema_version": 1,
@@ -110,28 +110,33 @@
         "type": "text",
         "position": 0.0,
         "color": null,
-        "options": null
+        "options": null,
+        "project": true
       },
       {
         "name": "Contact",
         "type": "text",
         "position": 1.0,
         "color": null,
-        "options": null
+        "options": null,
+        "project": true
       },
       {
-        "name": "Value (USD)",
-        "type": "number",
+        "name": "Value",
+        "type": "currency",
         "position": 2.0,
         "color": null,
-        "options": null
+        "options": null,
+        "currency": "USD",
+        "project": true
       },
       {
         "name": "Next step",
         "type": "date",
         "position": 3.0,
         "color": null,
-        "options": null
+        "options": null,
+        "project": true
       },
       {
         "name": "Source",
@@ -164,7 +169,8 @@
             "label": "Partner",
             "color": "#EC4899"
           }
-        ]
+        ],
+        "project": true
       }
     ],
     "tasks": [],
@@ -665,28 +671,33 @@
         "type": "text",
         "position": 0.0,
         "color": null,
-        "options": null
+        "options": null,
+        "project": true
       },
       {
         "name": "Contact",
         "type": "text",
         "position": 1.0,
         "color": null,
-        "options": null
+        "options": null,
+        "project": true
       },
       {
-        "name": "Value (USD)",
-        "type": "number",
+        "name": "Value",
+        "type": "currency",
         "position": 2.0,
         "color": null,
-        "options": null
+        "options": null,
+        "currency": "USD",
+        "project": true
       },
       {
         "name": "Next step",
         "type": "date",
         "position": 3.0,
         "color": null,
-        "options": null
+        "options": null,
+        "project": true
       },
       {
         "name": "Source",
@@ -719,7 +730,8 @@
             "label": "Partner",
             "color": "#EC4899"
           }
-        ]
+        ],
+        "project": true
       }
     ],
     "tasks": [
@@ -739,27 +751,33 @@
           {
             "property_name": "Company",
             "property_type": "text",
-            "value_text": "Copper Kettle Café"
+            "value_text": "Copper Kettle Café",
+            "project": true
           },
           {
             "property_name": "Contact",
             "property_type": "text",
-            "value_text": "Dana, owner"
+            "value_text": "Dana, owner",
+            "project": true
           },
           {
-            "property_name": "Value (USD)",
-            "property_type": "number",
-            "value_number": 1200.0
+            "property_name": "Value",
+            "property_type": "currency",
+            "value_number": 1200.0,
+            "currency": "USD",
+            "project": true
           },
           {
             "property_name": "Next step",
             "property_type": "date",
-            "value_text": "2000-01-04"
+            "value_text": "2000-01-04",
+            "project": true
           },
           {
             "property_name": "Source",
             "property_type": "select",
-            "value_text": "website"
+            "value_text": "website",
+            "project": true
           }
         ],
         "type_name": "Deal"
@@ -780,27 +798,33 @@
           {
             "property_name": "Company",
             "property_type": "text",
-            "value_text": "Ridgeline Climbing Gym"
+            "value_text": "Ridgeline Climbing Gym",
+            "project": true
           },
           {
             "property_name": "Contact",
             "property_type": "text",
-            "value_text": "Theo, general manager"
+            "value_text": "Theo, general manager",
+            "project": true
           },
           {
-            "property_name": "Value (USD)",
-            "property_type": "number",
-            "value_number": 4800.0
+            "property_name": "Value",
+            "property_type": "currency",
+            "value_number": 4800.0,
+            "currency": "USD",
+            "project": true
           },
           {
             "property_name": "Next step",
             "property_type": "date",
-            "value_text": "2000-01-05"
+            "value_text": "2000-01-05",
+            "project": true
           },
           {
             "property_name": "Source",
             "property_type": "select",
-            "value_text": "event"
+            "value_text": "event",
+            "project": true
           }
         ],
         "type_name": "Deal"
@@ -830,27 +854,33 @@
           {
             "property_name": "Company",
             "property_type": "text",
-            "value_text": "Bluebird Preschool"
+            "value_text": "Bluebird Preschool",
+            "project": true
           },
           {
             "property_name": "Contact",
             "property_type": "text",
-            "value_text": "Ms. Okafor, director"
+            "value_text": "Ms. Okafor, director",
+            "project": true
           },
           {
-            "property_name": "Value (USD)",
-            "property_type": "number",
-            "value_number": 2400.0
+            "property_name": "Value",
+            "property_type": "currency",
+            "value_number": 2400.0,
+            "currency": "USD",
+            "project": true
           },
           {
             "property_name": "Next step",
             "property_type": "date",
-            "value_text": "2000-01-06"
+            "value_text": "2000-01-06",
+            "project": true
           },
           {
             "property_name": "Source",
             "property_type": "select",
-            "value_text": "referral"
+            "value_text": "referral",
+            "project": true
           }
         ],
         "type_name": "Deal"
@@ -884,27 +914,33 @@
           {
             "property_name": "Company",
             "property_type": "text",
-            "value_text": "Halvorsen Freight"
+            "value_text": "Halvorsen Freight",
+            "project": true
           },
           {
             "property_name": "Contact",
             "property_type": "text",
-            "value_text": "Ingrid, operations lead"
+            "value_text": "Ingrid, operations lead",
+            "project": true
           },
           {
-            "property_name": "Value (USD)",
-            "property_type": "number",
-            "value_number": 18000.0
+            "property_name": "Value",
+            "property_type": "currency",
+            "value_number": 18000.0,
+            "currency": "USD",
+            "project": true
           },
           {
             "property_name": "Next step",
             "property_type": "date",
-            "value_text": "2000-01-07"
+            "value_text": "2000-01-07",
+            "project": true
           },
           {
             "property_name": "Source",
             "property_type": "select",
-            "value_text": "outbound"
+            "value_text": "outbound",
+            "project": true
           }
         ],
         "type_name": "Deal"
@@ -925,27 +961,33 @@
           {
             "property_name": "Company",
             "property_type": "text",
-            "value_text": "Marigold Yoga"
+            "value_text": "Marigold Yoga",
+            "project": true
           },
           {
             "property_name": "Contact",
             "property_type": "text",
-            "value_text": "Sam, studio owner"
+            "value_text": "Sam, studio owner",
+            "project": true
           },
           {
-            "property_name": "Value (USD)",
-            "property_type": "number",
-            "value_number": 900.0
+            "property_name": "Value",
+            "property_type": "currency",
+            "value_number": 900.0,
+            "currency": "USD",
+            "project": true
           },
           {
             "property_name": "Next step",
             "property_type": "date",
-            "value_text": "2000-01-08"
+            "value_text": "2000-01-08",
+            "project": true
           },
           {
             "property_name": "Source",
             "property_type": "select",
-            "value_text": "website"
+            "value_text": "website",
+            "project": true
           }
         ],
         "type_name": "Deal"
@@ -979,27 +1021,33 @@
           {
             "property_name": "Company",
             "property_type": "text",
-            "value_text": "Northwind Bicycles"
+            "value_text": "Northwind Bicycles",
+            "project": true
           },
           {
             "property_name": "Contact",
             "property_type": "text",
-            "value_text": "Luis, co-owner"
+            "value_text": "Luis, co-owner",
+            "project": true
           },
           {
-            "property_name": "Value (USD)",
-            "property_type": "number",
-            "value_number": 6500.0
+            "property_name": "Value",
+            "property_type": "currency",
+            "value_number": 6500.0,
+            "currency": "USD",
+            "project": true
           },
           {
             "property_name": "Next step",
             "property_type": "date",
-            "value_text": "2000-01-10"
+            "value_text": "2000-01-10",
+            "project": true
           },
           {
             "property_name": "Source",
             "property_type": "select",
-            "value_text": "partner"
+            "value_text": "partner",
+            "project": true
           }
         ],
         "type_name": "Deal"
@@ -1033,27 +1081,33 @@
           {
             "property_name": "Company",
             "property_type": "text",
-            "value_text": "Tidewater Brewing"
+            "value_text": "Tidewater Brewing",
+            "project": true
           },
           {
             "property_name": "Contact",
             "property_type": "text",
-            "value_text": "Priya, taproom manager"
+            "value_text": "Priya, taproom manager",
+            "project": true
           },
           {
-            "property_name": "Value (USD)",
-            "property_type": "number",
-            "value_number": 7200.0
+            "property_name": "Value",
+            "property_type": "currency",
+            "value_number": 7200.0,
+            "currency": "USD",
+            "project": true
           },
           {
             "property_name": "Next step",
             "property_type": "date",
-            "value_text": "2000-01-09"
+            "value_text": "2000-01-09",
+            "project": true
           },
           {
             "property_name": "Source",
             "property_type": "select",
-            "value_text": "referral"
+            "value_text": "referral",
+            "project": true
           }
         ],
         "type_name": "Deal"
@@ -1074,27 +1128,33 @@
           {
             "property_name": "Company",
             "property_type": "text",
-            "value_text": "Larkspur Dental"
+            "value_text": "Larkspur Dental",
+            "project": true
           },
           {
             "property_name": "Contact",
             "property_type": "text",
-            "value_text": "Dr. Reyes"
+            "value_text": "Dr. Reyes",
+            "project": true
           },
           {
-            "property_name": "Value (USD)",
-            "property_type": "number",
-            "value_number": 3600.0
+            "property_name": "Value",
+            "property_type": "currency",
+            "value_number": 3600.0,
+            "currency": "USD",
+            "project": true
           },
           {
             "property_name": "Next step",
             "property_type": "date",
-            "value_text": "2000-01-03"
+            "value_text": "2000-01-03",
+            "project": true
           },
           {
             "property_name": "Source",
             "property_type": "select",
-            "value_text": "event"
+            "value_text": "event",
+            "project": true
           }
         ],
         "type_name": "Deal"
@@ -1115,27 +1175,33 @@
           {
             "property_name": "Company",
             "property_type": "text",
-            "value_text": "Juniper & Co. Florists"
+            "value_text": "Juniper & Co. Florists",
+            "project": true
           },
           {
             "property_name": "Contact",
             "property_type": "text",
-            "value_text": "Mel, owner"
+            "value_text": "Mel, owner",
+            "project": true
           },
           {
-            "property_name": "Value (USD)",
-            "property_type": "number",
-            "value_number": 1500.0
+            "property_name": "Value",
+            "property_type": "currency",
+            "value_number": 1500.0,
+            "currency": "USD",
+            "project": true
           },
           {
             "property_name": "Next step",
             "property_type": "date",
-            "value_text": "2000-01-03"
+            "value_text": "2000-01-03",
+            "project": true
           },
           {
             "property_name": "Source",
             "property_type": "select",
-            "value_text": "outbound"
+            "value_text": "outbound",
+            "project": true
           }
         ],
         "type_name": "Deal"
@@ -1156,22 +1222,27 @@
           {
             "property_name": "Company",
             "property_type": "text",
-            "value_text": "Larkspur Dental"
+            "value_text": "Larkspur Dental",
+            "project": true
           },
           {
             "property_name": "Contact",
             "property_type": "text",
-            "value_text": "Dr. Reyes"
+            "value_text": "Dr. Reyes",
+            "project": true
           },
           {
-            "property_name": "Value (USD)",
-            "property_type": "number",
-            "value_number": 3600.0
+            "property_name": "Value",
+            "property_type": "currency",
+            "value_number": 3600.0,
+            "currency": "USD",
+            "project": true
           },
           {
             "property_name": "Next step",
             "property_type": "date",
-            "value_text": "2000-01-11"
+            "value_text": "2000-01-11",
+            "project": true
           }
         ],
         "type_name": "Renewal",
