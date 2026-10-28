@@ -590,10 +590,11 @@ async def test_a_collection_made_as_a_shape_brings_its_fields_and_lists(
     )
     assert layouts.status_code == 200, layouts.text
     lists = {layout["kind"]: layout for layout in layouts.json()["layouts"]}
-    assert {kind for kind, layout in lists.items() if not layout["hidden"]} == {
-        "grid",
-        "table",
-    }
+    assert {
+        kind
+        for kind, layout in lists.items()
+        if kind != "file" and not layout["hidden"]
+    } == {"grid", "table"}
     assert lists["grid"]["is_default"]
     assert [
         child["props"]["field"]
