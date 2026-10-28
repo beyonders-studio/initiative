@@ -23,11 +23,11 @@ from app.models.tenant.task import TaskStatus, TaskStatusCategory
 from app.models.tenant.task_assignment_digest import TaskAssignmentDigestItem
 from app.models.tenant.personal_item import PersonalItem
 from app.models.tenant.webhook_subscription import WebhookSubscription
-from app.models.platform.user_notification_prefs import EmailCadence
+from app.models.platform.user_notification_prefs import DigestCadence
 from app.services import notifications, sweep_timers
 from app.services.guild_sweeps import Scan, Scope
 from app.services.platform import notify_bus
-from app.services.platform.notification_prefs import EmailSchedule
+from app.services.platform.notification_prefs import DigestSchedule, digest_slot
 from app.services.tenant import outbox_poller, personal_items, post_publication
 from app.services.tenant.expiry import Expiring
 from app.testing import (
@@ -593,8 +593,18 @@ async def test_a_catalog_release_arms_the_communities_that_installed_it(
         (
             "PUT",
             "/api/v1/me/notification-preferences",
-            {"email": {"cadence": "daily", "at": "07:00"}},
+            {"digests": {"overdue": {"cadence": "daily", "at": "07:00"}}},
             "overdue",
+        ),
+        (
+            "PUT",
+            "/api/v1/me/notification-preferences",
+            {
+                "channels": [
+                    {"category": "coming_up", "channel": "email", "enabled": True}
+                ]
+            },
+            "coming_up",
         ),
     ],
 )
@@ -609,12 +619,11 @@ async def test_a_preference_that_brings_work_sooner_arms_it(
     assert [community for community, *_ in await _timers(session, kind)] == [a.guild.id]
 
 
-def test_a_weekly_overdue_digest_waits_for_its_day():
-    schedule = EmailSchedule(
-        cadence=EmailCadence.weekly, at="09:00", weekday=1, personal_instant=False
-    )
+def test_a_weekly_digest_waits_for_its_day():
+    schedule = DigestSchedule(cadence=DigestCadence.weekly, at="09:00", weekday=1)
     friday = datetime(2026, 10, 16, 9, tzinfo=timezone.utc)
 
-    assert notifications._following_digest(friday, schedule) == datetime(
-        2026, 10, 19, 9, tzinfo=timezone.utc
-    )
+    slot = digest_slot(schedule, tz_name="UTC", now=friday)
+
+    assert not slot.on_today
+    assert slot.following == datetime(2026, 10, 19, 9, tzinfo=timezone.utc)

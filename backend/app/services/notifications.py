@@ -17,7 +17,7 @@ there.
 from __future__ import annotations
 
 import logging
-from collections.abc import Callable, Iterable, Mapping, Sequence
+from collections.abc import Awaitable, Callable, Iterable, Mapping, Sequence
 from dataclasses import dataclass, replace
 from datetime import datetime, timedelta, timezone
 from functools import partial
@@ -55,10 +55,7 @@ from app.db.session import (
 from app.models.platform.notice_outbox import NoticeOutboxItem
 from app.models.platform.notification import Notification, NotificationType
 from app.models.platform.user import User
-from app.models.platform.user_notification_prefs import (
-    EmailCadence,
-    UserNotificationPrefs,
-)
+from app.models.platform.user_notification_prefs import UserNotificationPrefs
 from app.models.tenant.calendar_event import (
     CalendarEvent,
     CalendarEventAnswer,
@@ -597,11 +594,15 @@ def event_when(
     """An event's start as its reader reads it: the date for an all-day event,
     otherwise the time in their own zone (``Wed, Jul 1, 2026 at 2:30 PM PDT``).
     ``start`` names one occurrence of a repeating event."""
-    start = start or event.start_at
-    if event.all_day:
-        return start.strftime("%a, %b %-d, %Y")
-    local = start.astimezone(resolve_zone(recipient.timezone))
-    return local.strftime("%a, %b %-d, %Y at %-I:%M %p %Z")
+    return _when(start or event.start_at, recipient.timezone, all_day=event.all_day)
+
+
+def _when(at: datetime, zone: str | None, *, all_day: bool = False) -> str:
+    """A moment as its reader reads it: the date alone for an all-day one,
+    otherwise the time in their own zone."""
+    if all_day:
+        return at.strftime("%a, %b %-d, %Y")
+    return at.astimezone(resolve_zone(zone)).strftime("%a, %b %-d, %Y at %-I:%M %p %Z")
 
 
 def _normalize_target_path(target_path: str) -> str:
@@ -1846,18 +1847,20 @@ async def expire_reminder_dispatches(session: AsyncSession, expiring: Expiring) 
     )
 
 
-def _starting(lower: datetime, upper: datetime) -> Any:
-    """Events with a start in ``(lower, upper]``: their own, or, repeating,
-    possibly an occurrence's (``_starts``)."""
+def _starting(lower: datetime, upper: datetime | None = None) -> Any:
+    """Events with a start in ``(lower, upper]``, or after ``lower`` with no
+    ``upper``: their own, or, repeating, possibly an occurrence's
+    (``_starts``)."""
+    bounded = () if upper is None else (CalendarEvent.start_at <= upper,)
     return or_(
         and_(
             CalendarEvent.recurrence.is_(None),
             CalendarEvent.start_at > lower,
-            CalendarEvent.start_at <= upper,
+            *bounded,
         ),
         and_(
             CalendarEvent.recurrence.isnot(None),
-            CalendarEvent.start_at <= upper,
+            *bounded,
             or_(
                 CalendarEvent.recurrence_until.is_(None),
                 CalendarEvent.recurrence_until > lower,
@@ -1954,43 +1957,32 @@ def next_overdue(after: datetime | None = None) -> Any:
 
 
 async def _overdue_tasks_for_reader(
-    session: AsyncSession, guild_id: int
-) -> list[tuple[int, dict]]:
+    session: AsyncSession, guild_id: int, _until: datetime, _zone: str | None
+) -> list[dict]:
     """Overdue tasks assigned to the reader the session is routed as, *in the
-    routed guild schema*, each beside who they are.
-
-    Run once per guild and reader via ``gather_across_guilds``, so it only ever
-    sees one guild's rows, as that reader.
-    """
+    routed guild schema*."""
     user_id = require_guild_context(session).user_id
-    stmt = (
-        _overdue_assignments(Task, Project.name, Project.id)
-        .where(TaskAssignee.user_id == user_id)
-        .order_by(Task.due_date.asc())
-    )
-    result = await session.exec(stmt)
-    rows = result.all()
-    tasks: list[tuple[int, dict]] = []
-    for row in rows:
-        task, project_name, project_id = row
-        target_path = _task_target_path(task.id, project_id)
-        tasks.append(
-            (
-                user_id,
-                {
-                    "title": task.title,
-                    "project_name": project_name,
-                    "due_date": task.due_date.strftime("%Y-%m-%d %H:%M UTC")
-                    if task.due_date
-                    else "N/A",
-                    "link": _build_smart_link(
-                        target_path=target_path, guild_id=guild_id
-                    ),
-                    "community_id": guild_id,
-                },
-            )
+    rows = (
+        await session.exec(
+            _overdue_assignments(Task, Project.name, Project.id)
+            .where(TaskAssignee.user_id == user_id)
+            .order_by(Task.due_date.asc())
         )
-    return tasks
+    ).all()
+    return [
+        {
+            "title": task.title,
+            "project_name": project_name,
+            "due_date": task.due_date.strftime("%Y-%m-%d %H:%M UTC")
+            if task.due_date
+            else "N/A",
+            "link": _build_smart_link(
+                target_path=_task_target_path(task.id, project_id), guild_id=guild_id
+            ),
+            "community_id": guild_id,
+        }
+        for task, project_name, project_id in rows
+    ]
 
 
 def _overdue_push(user: User, tasks: list[dict]) -> push_notifications.Push:
@@ -2014,88 +2006,261 @@ def _overdue_push(user: User, tasks: list[dict]) -> push_notifications.Push:
     )
 
 
-def overdue_scan(*, now: datetime) -> Scan:
-    """Send overdue-task digests to opted-in users as of ``now``.
-
-    Starts from the work: each live community is asked once who has an overdue
-    task, and only those accounts are read. Each one's tasks are then gathered
-    from their own guild schemas with their membership context — no all-guild
-    access.
-
-    Both channels ship from this one pass: the digest email and a push. A user
-    opted into either channel is a candidate, so turning email off doesn't
-    silence push.
-    """
-    # Who has an overdue task anywhere, and in which communities.
-    overdue: dict[int, list[int]] = {}
-    # Each community's next deadline still to pass.
-    ahead: dict[int, datetime] = {}
-
-    async def _overdue_here(routed: AsyncSession, guild_id: int) -> None:
-        for user_id in (
-            await routed.exec(_overdue_assignments(TaskAssignee.user_id).distinct())
-        ).scalars():
-            overdue.setdefault(user_id, []).append(guild_id)
-        deadline = (await routed.exec(next_overdue(after=now))).scalar()
-        if deadline is not None:
-            ahead[guild_id] = deadline
-
-    async def _finish() -> dict[int, datetime]:
-        later: dict[int, datetime] = {}
-        if overdue:
-            async with cohorts.system_session(None) as session:
-                await set_rls_context(session, Unattributed())
-                later = await _send_overdue(session, overdue, now=now)
-        else:
-            logger.debug("overdue-digest: nothing overdue")
-        for guild_id, deadline in ahead.items():
-            later[guild_id] = min(later.get(guild_id, deadline), deadline)
-        return later
-
-    return Scan(Scope.LIVE, _overdue_here, _finish)
+#: How far ahead a visit looks for what may be coming up: a weekly digest's
+#: week, and a day beside it.
+COMING_UP_REACH = timedelta(days=8)
 
 
-def _following_digest(target_local: datetime, schedule: Any) -> datetime:
-    """The digest time after ``target_local``: the next day, or the next of
-    the chosen weekday on a weekly cadence."""
-    following = target_local + timedelta(days=1)
-    while (
-        schedule.cadence is EmailCadence.weekly
-        and following.isoweekday() != schedule.weekday
-    ):
-        following += timedelta(days=1)
-    return following
+def coming_up_tasks(*columns: Any, after: datetime, until: datetime | None) -> Any:
+    """Assigned, unfinished tasks due in ``(after, until]``, or after ``after``
+    with no ``until``."""
+    statement = _overdue_assignments(*columns, overdue=False).where(
+        Task.due_date > after
+    )
+    return statement if until is None else statement.where(Task.due_date <= until)
 
 
-async def _send_overdue(
-    session: AsyncSession, overdue: dict[int, list[int]], *, now: datetime
-) -> dict[int, datetime]:
-    """Send the digests of the accounts ``overdue`` names, in the communities
-    it names them in. Returns when each of those communities is next due: the
-    soonest digest time among its people."""
-    later: dict[int, datetime] = {}
+def attending(*columns: Any, after: datetime, until: datetime | None) -> Any:
+    """Attendance of events with a start in ``(after, until]`` (or after
+    ``after``), less those declined whole."""
+    from app.services.tenant import calendar_occurrences
 
-    def _next(user_id: int, at: datetime) -> None:
-        for guild_id in overdue[user_id]:
-            later[guild_id] = min(later.get(guild_id, at), at)
+    return (
+        select(*columns)
+        .select_from(CalendarEventAttendee)
+        .join(
+            CalendarEvent, CalendarEventAttendee.calendar_event_id == CalendarEvent.id
+        )
+        .where(
+            ~calendar_occurrences.answered(
+                CalendarEventAttendee.user_id, RSVPStatus.declined
+            ),
+            CalendarEvent.deleted_at.is_(None),
+            _starting(after, until),
+        )
+    )
 
-    users = (
-        (await session.exec(select(User).where(User.id.in_(list(overdue)))))
+
+async def _coming_up_for_reader(
+    session: AsyncSession, guild_id: int, until: datetime, zone: str | None
+) -> list[dict]:
+    """What the reader the session is routed as has due or starting before
+    ``until``, in the routed community, soonest first."""
+    user_id = require_guild_context(session).user_id
+    now = datetime.now(timezone.utc)
+    tasks = (
+        await session.exec(
+            coming_up_tasks(
+                Task, Project.name, Project.id, after=now, until=until
+            ).where(TaskAssignee.user_id == user_id)
+        )
+    ).all()
+    items = [
+        {
+            "kind": "task",
+            "title": task.title,
+            "project_name": project_name,
+            "at": task.due_date,
+            "when": _when(task.due_date, zone),
+            "link": _build_smart_link(
+                target_path=_task_target_path(task.id, project_id), guild_id=guild_id
+            ),
+            "community_id": guild_id,
+        }
+        for task, project_name, project_id in tasks
+    ]
+    events = (
+        (
+            await session.exec(
+                attending(CalendarEvent, after=now, until=until).where(
+                    CalendarEventAttendee.user_id == user_id
+                )
+            )
+        )
         .scalars()
         .all()
     )
-    # Settings are sparse and default to on, so filtering happens here through
-    # the same resolution the live path uses rather than as a second copy of it
-    # expressed in SQL.
-    all_prefs = await notification_prefs.load_prefs_for(session, [u.id for u in users])
-    users = [
-        u
-        for u in users
-        if wants_digest(all_prefs.get(u.id), NotificationCategory.assignments)
+    changed, declined = await _left_out(
+        session, {event.id for event in events if event.recurrence}
+    )
+    items += [
+        {
+            "kind": "event",
+            "title": event.title,
+            "at": start,
+            "when": _when(start, zone, all_day=event.all_day),
+            "link": _build_smart_link(
+                target_path=reference_path("calendar_event", event.id),
+                guild_id=guild_id,
+            ),
+            "community_id": guild_id,
+        }
+        for event in events
+        for start in _starts(
+            event.start_at, event.recurrence, event.recurrence_shift, now, until
+        )
+        if (event.id, user_id, start) not in declined
+        and start not in changed.get(event.id, ())
     ]
-    if not users:
-        logger.debug("overdue-digest: no users opted in")
+    return sorted(items, key=lambda item: item["at"])
+
+
+def _coming_up_push(user: User, items: list[dict]) -> push_notifications.Push:
+    """The coming-up digest as a push, landing on the app's home."""
+    locale = _recipient_locale(user)
+    title = _nt("comingUp.title", locale)
+    body = _nt("comingUp.body", locale, count=len(items), title=items[0]["title"])
+    data = {
+        "type": NotificationType.coming_up.value,
+        "count": str(len(items)),
+        "target_path": MY_TASKS_TARGET_PATH,
+    }
+    return push_notifications.Push(
+        cast(int, user.id), NotificationType.coming_up, title, body, data
+    )
+
+
+@dataclass(frozen=True)
+class ScheduledDigest:
+    """A digest that goes out at the time each account chose for it."""
+
+    category: NotificationCategory
+    #: The ``users`` column each day's is claimed on.
+    stamp: Any
+    #: What the reader the session is routed as has in it, in the routed
+    #: community, up to the next one; given that and the reader's zone.
+    read: Callable[[AsyncSession, int, datetime, str | None], Awaitable[list[dict]]]
+    pieces: Callable[[User, Sequence[dict]], email_service.EmailPieces]
+    push: Callable[[User, list[dict]], push_notifications.Push]
+
+
+OVERDUE_DIGEST = ScheduledDigest(
+    category=NotificationCategory.overdue,
+    stamp=User.last_overdue_notification_at,
+    read=_overdue_tasks_for_reader,
+    pieces=email_service.overdue_tasks_pieces,
+    push=_overdue_push,
+)
+
+COMING_UP_DIGEST = ScheduledDigest(
+    category=NotificationCategory.coming_up,
+    stamp=User.last_coming_up_digest_at,
+    read=_coming_up_for_reader,
+    pieces=email_service.coming_up_pieces,
+    push=_coming_up_push,
+)
+
+
+def _scheduled_scan(
+    digest: ScheduledDigest,
+    *,
+    now: datetime,
+    people_here: Callable[[AsyncSession], Awaitable[Iterable[int]]],
+    next_here: Callable[[AsyncSession], Awaitable[datetime | None]],
+) -> Scan:
+    """Send ``digest`` to the accounts that want it as of ``now``.
+
+    Starts from the work: each live community is asked once who has something
+    for it (``people_here``) and when it next will (``next_here``), and only
+    those accounts are read. Their items are then gathered from their own
+    communities with their membership context — no all-guild access.
+    """
+    # Who has something for it anywhere, and in which communities.
+    people: dict[int, list[int]] = {}
+    # Each community's next change still to come.
+    ahead: dict[int, datetime] = {}
+
+    async def _visit(routed: AsyncSession, guild_id: int) -> None:
+        for user_id in await people_here(routed):
+            people.setdefault(user_id, []).append(guild_id)
+        upcoming = await next_here(routed)
+        if upcoming is not None:
+            ahead[guild_id] = upcoming
+
+    async def _finish() -> dict[int, datetime]:
+        later: dict[int, datetime] = {}
+        if people:
+            async with cohorts.system_session(None) as session:
+                await set_rls_context(session, Unattributed())
+                later = await _send_scheduled(session, digest, people, now=now)
+        for guild_id, upcoming in ahead.items():
+            later[guild_id] = min(later.get(guild_id, upcoming), upcoming)
         return later
+
+    return Scan(Scope.LIVE, _visit, _finish)
+
+
+def overdue_scan(*, now: datetime) -> Scan:
+    """Send overdue-task digests as of ``now``."""
+
+    async def _people(routed: AsyncSession) -> Iterable[int]:
+        return (
+            await routed.exec(_overdue_assignments(TaskAssignee.user_id).distinct())
+        ).scalars()
+
+    async def _next(routed: AsyncSession) -> datetime | None:
+        return (await routed.exec(next_overdue(after=now))).scalar()
+
+    return _scheduled_scan(
+        OVERDUE_DIGEST, now=now, people_here=_people, next_here=_next
+    )
+
+
+def coming_up_scan(*, now: datetime) -> Scan:
+    """Send coming-up digests as of ``now``."""
+    reach = now + COMING_UP_REACH
+
+    async def _people(routed: AsyncSession) -> Iterable[int]:
+        tasks = await routed.exec(
+            coming_up_tasks(TaskAssignee.user_id, after=now, until=reach).distinct()
+        )
+        events = await routed.exec(
+            attending(CalendarEventAttendee.user_id, after=now, until=reach).distinct()
+        )
+        return {*tasks.scalars(), *events.scalars()}
+
+    async def _next(routed: AsyncSession) -> datetime | None:
+        # Work past the reach comes into it within a day.
+        further = await routed.exec(
+            select(
+                or_(
+                    exists(coming_up_tasks(Task.id, after=reach, until=None)),
+                    exists(attending(CalendarEvent.id, after=reach, until=None)),
+                )
+            )
+        )
+        return now + timedelta(days=1) if further.scalar() else None
+
+    return _scheduled_scan(
+        COMING_UP_DIGEST, now=now, people_here=_people, next_here=_next
+    )
+
+
+async def _send_scheduled(
+    session: AsyncSession,
+    digest: ScheduledDigest,
+    people: dict[int, list[int]],
+    *,
+    now: datetime,
+) -> dict[int, datetime]:
+    """Send ``digest`` to the accounts ``people`` names that want it and are
+    due. Returns when each of those communities is next due: the soonest
+    digest time among its people."""
+    later: dict[int, datetime] = {}
+
+    def _next(user_id: int, at: datetime) -> None:
+        for guild_id in people[user_id]:
+            later[guild_id] = min(later.get(guild_id, at), at)
+
+    users = (
+        (await session.exec(select(User).where(User.id.in_(list(people)))))
+        .scalars()
+        .all()
+    )
+    # Settings are sparse and default per category, so filtering happens here
+    # through the same resolution the live path uses rather than as a second
+    # copy of it expressed in SQL.
+    all_prefs = await notification_prefs.load_prefs_for(session, [u.id for u in users])
     # Capture plain fields up front: gathering routes per guild and expunges the
     # identity map, which would detach these ORM rows. The channel preferences
     # are deliberately NOT snapshotted here; they are read off the freshly
@@ -2104,51 +2269,47 @@ async def _send_overdue(
         (
             u.id,
             u.timezone,
-            notification_prefs.email_schedule(all_prefs.get(u.id)),
-            u.last_overdue_notification_at,
+            notification_prefs.digest_schedule(all_prefs.get(u.id), digest.category),
+            getattr(u, digest.stamp.key),
         )
         for u in users
+        if wants_digest(all_prefs.get(u.id), digest.category)
     ]
-    # Who is due now, and when each one is next due after that.
-    due: dict[int, tuple[datetime, datetime]] = {}
+    # Who is due now, at which of their days, and in which zone.
+    due: dict[int, tuple[notification_prefs.DigestSlot, str | None]] = {}
     for user_id, user_tz, schedule, last_at in candidates:
-        tz = resolve_zone(user_tz)
-        now_local = now.astimezone(tz)
-        try:
-            hour, minute = map(int, schedule.at.split(":"))
-        except ValueError:
-            hour, minute = 21, 0
-        target_local = now_local.replace(
-            hour=hour, minute=minute, second=0, microsecond=0
-        )
-        following = _following_digest(target_local, schedule)
-        # A weekly cadence gets this with its weekly mail rather than daily:
-        # somebody who asked to hear from us once a week did not ask to be
-        # chased about the same tasks on the other six days.
-        today = (
-            schedule.cadence is not EmailCadence.weekly
-            or now_local.isoweekday() == schedule.weekday
-        )
-        if now_local < target_local:
-            _next(user_id, target_local if today else following)
-            continue
-        if not today or (last_at and last_at.astimezone(tz).date() == now_local.date()):
-            _next(user_id, following)
-            continue
-        due[user_id] = (target_local, following)
-    # Each one's overdue tasks, read in each of their guild schemas as them.
-    # Every community they belong to, not only those this pass visited: today's
-    # digest is claimed once, so it has to hold them all.
-    overdue_tasks: dict[int, list[dict]] = {}
-    for user_id, task in await gather_across_guilds(
+        slot = notification_prefs.digest_slot(schedule, tz_name=user_tz, now=now)
+        if now < slot.today:
+            _next(user_id, slot.today if slot.on_today else slot.following)
+        elif not slot.on_today or (last_at and last_at >= slot.day_start):
+            _next(user_id, slot.following)
+        else:
+            due[user_id] = (slot, user_tz)
+
+    async def _read(routed: AsyncSession, guild_id: int) -> list[tuple[int, dict]]:
+        user_id = require_guild_context(routed).user_id
+        slot, zone = due[user_id]
+        return [
+            (user_id, item)
+            for item in await digest.read(routed, guild_id, slot.following, zone)
+        ]
+
+    # Each one's items, read in each of their communities as them. Every
+    # community they belong to, not only those this pass visited: today's is
+    # claimed once, so it has to hold them all.
+    found: dict[int, list[dict]] = {user_id: [] for user_id in due}
+    for user_id, item in await gather_across_guilds(
         session,
         {user_id: await member_guild_ids(session, user_id) for user_id in due},
-        _overdue_tasks_for_reader,
+        _read,
         on_behalf=True,
     ):
-        overdue_tasks.setdefault(user_id, []).append(task)
-    for user_id, tasks in overdue_tasks.items():
-        target_local, following = due[user_id]
+        found[user_id].append(item)
+    for user_id, items in found.items():
+        slot, _zone = due[user_id]
+        if not items:
+            _next(user_id, slot.following)
+            continue
         # Re-load the user, fresh, to send + stamp it. The
         # email/stamp touch only shared tables, so the user-only context is fine.
         session.expunge_all()
@@ -2160,24 +2321,20 @@ async def _send_overdue(
             user is None
         ):  # deleted between the snapshot and now — skip, don't abort the pass
             continue
-        # Today's digest is claimed by stamping it in the transaction that
-        # queues it, so it goes out once however many processes sweep at the
-        # same moment: another waits on the row, then finds the day taken.
+        # Today's is claimed by stamping it in the transaction that queues it,
+        # so it goes out once however many processes sweep at the same moment:
+        # another waits on the row, then finds the day taken.
         claimed = await session.exec(
             sa_update(User)
             .where(
                 User.id == user_id,
-                or_(
-                    User.last_overdue_notification_at.is_(None),
-                    User.last_overdue_notification_at
-                    < target_local.replace(hour=0, minute=0),
-                ),
+                or_(digest.stamp.is_(None), digest.stamp < slot.day_start),
             )
-            .values(last_overdue_notification_at=now)
+            .values({digest.stamp: now})
         )
         if not claimed.rowcount:
             await session.rollback()
-            _next(user_id, following)
+            _next(user_id, slot.following)
             continue
         # A channel that is merely unconfigured (no SMTP, no FCM) hands the day
         # back below, so the next poll tries again instead of the user's one
@@ -2185,41 +2342,42 @@ async def _send_overdue(
         # reloaded, not the snapshot taken before the cross-guild gather, so a
         # channel switched off meanwhile stays quiet.
         delivered = False
-        channels = await _channels(
-            session, user, category=NotificationCategory.assignments
-        )
-        email_tasks, push_tasks = await _digest_batch(session, tasks)
-        if channels.email and email_tasks:
+        channels = await _channels(session, user, category=digest.category)
+        email_items, push_items = await _digest_batch(session, items)
+        if channels.email and email_items:
             delivered = await email_outbox.enqueue(
                 session,
                 user,
-                category=NotificationCategory.assignments,
+                category=digest.category,
                 prefs=channels.prefs,
-                pieces=email_service.overdue_tasks_pieces(user, email_tasks),
+                pieces=digest.pieces(user, email_items),
             )
             if delivered:
                 logger.info(
-                    "overdue-digest: queued %d overdue task(s) for user %s",
-                    len(email_tasks),
+                    "%s digest: queued %d item(s) for user %s",
+                    digest.category.value,
+                    len(email_items),
                     user_id,
                 )
             else:
                 logger.warning(
-                    "SMTP not configured; skipping overdue digest for %s", user_id
+                    "SMTP not configured; skipping %s digest for %s",
+                    digest.category.value,
+                    user_id,
                 )
-        if channels.push and push_tasks:
+        if channels.push and push_items:
             delivered = (
                 await notice_outbox.queue_push(
                     session,
                     user,
-                    _overdue_push(user, push_tasks),
-                    {item.get("community_id") for item in push_tasks},
+                    digest.push(user, push_items),
+                    {item.get("community_id") for item in push_items},
                 )
                 or delivered
             )
         if delivered:
             await session.commit()
-            _next(user_id, following)
+            _next(user_id, slot.following)
         else:
             # Handed back: tried again on the next look.
             await session.rollback()

@@ -170,6 +170,15 @@
     "textBody_other": "Du hast {{count}} überfällige Aufgaben:",
     "redactedItem": "Eine Aufgabe ist überfällig"
   },
+  "comingUp": {
+    "subject": "Demnächst",
+    "title": "Demnächst",
+    "body_one": "Bei dir steht <strong>{{count}}</strong> Sache an:",
+    "body_other": "Bei dir stehen <strong>{{count}}</strong> Sachen an:",
+    "taskDetail": "fällig <strong>{{when}}</strong>, in <strong>{{projectName}}</strong>",
+    "eventDetail": "beginnt <strong>{{when}}</strong>",
+    "redactedItem": "Etwas steht an"
+  },
   "accessGrant": {
     "buttonLabel": "Zugriffs-Dashboard öffnen",
     "greeting": "Hallo <strong>{{name}}</strong>,",

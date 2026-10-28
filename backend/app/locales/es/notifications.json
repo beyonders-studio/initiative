@@ -11,6 +11,11 @@
       "body_other": "{{count}} tareas están vencidas, incluida {{title}}"
     }
   },
+  "comingUp": {
+    "title": "Próximamente",
+    "body_one": "{{count}} cosa próxima: {{title}}",
+    "body_other": "{{count}} cosas próximas, empezando por {{title}}"
+  },
   "initiative": {
     "added": {
       "title": "Agregado a la iniciativa",

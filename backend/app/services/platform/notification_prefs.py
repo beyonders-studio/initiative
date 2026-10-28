@@ -21,6 +21,7 @@ from app.core.notification_categories import (
     NotificationCategory,
 )
 from app.models.platform.user_notification_prefs import (
+    DigestCadence,
     EmailCadence,
     UserNotificationPrefs,
 )
@@ -267,9 +268,16 @@ PRESENT_WITHIN = timedelta(seconds=IDLE_AFTER_SECONDS)
 #: having stopped working.
 MAX_PAUSE_DAYS = 90
 
-#: The clock a scheduled email goes out at, absent a choice. Carried over from
-#: the overdue reminder this replaced, so nobody's daily mail moved.
+#: The clock a scheduled email, and the overdue digest, go out at absent a
+#: choice. Carried over from the overdue reminder, so nobody's mail moved.
 DEFAULT_DIGEST_CLOCK = "21:00"
+
+#: The clock each digest goes out at absent a choice: overdue in the evening,
+#: as it always has, and what is coming up first thing.
+DIGEST_CLOCKS: Mapping[NotificationCategory, str] = {
+    NotificationCategory.overdue: DEFAULT_DIGEST_CLOCK,
+    NotificationCategory.coming_up: "07:00",
+}
 
 #: ISO weekday for a weekly digest, absent a choice.
 DEFAULT_DIGEST_WEEKDAY = 1
@@ -468,8 +476,7 @@ class EmailSchedule:
     """When this account reads its mail."""
 
     cadence: EmailCadence
-    #: HH:MM in the account's own timezone, for the daily and weekly slots —
-    #: and, whatever the cadence, the clock the overdue reminder goes out on.
+    #: HH:MM in the account's own timezone, for the daily and weekly slots.
     at: str
     #: ISO weekday, 1–7, for the weekly slot.
     weekday: int
@@ -494,6 +501,70 @@ def email_schedule(prefs: Mapping[str, Any] | None) -> EmailSchedule:
         at=(at.strftime("%H:%M") if at else DEFAULT_DIGEST_CLOCK),
         weekday=weekday,
         personal_instant=lane if isinstance(lane, bool) else True,
+    )
+
+
+@dataclass(frozen=True)
+class DigestSchedule:
+    """When one digest goes out."""
+
+    cadence: DigestCadence
+    #: HH:MM in the account's own timezone.
+    at: str
+    #: ISO weekday, 1–7, for a weekly digest.
+    weekday: int
+
+
+def digest_schedule(
+    prefs: Mapping[str, Any] | None, category: NotificationCategory
+) -> DigestSchedule:
+    section = _section(_section(prefs or EMPTY, "digests"), category.value)
+    try:
+        cadence = DigestCadence(section.get("cadence"))
+    except ValueError:
+        cadence = DigestCadence.daily
+    at = _parse_clock(section.get("at"))
+    weekday = section.get("weekday")
+    if not isinstance(weekday, int) or not 1 <= weekday <= 7:
+        weekday = DEFAULT_DIGEST_WEEKDAY
+    return DigestSchedule(
+        cadence=cadence,
+        at=(at.strftime("%H:%M") if at else DIGEST_CLOCKS[category]),
+        weekday=weekday,
+    )
+
+
+@dataclass(frozen=True)
+class DigestSlot:
+    """Where a digest stands at one moment, in the account's own time."""
+
+    #: Today's time for it.
+    today: datetime
+    #: The one after today's: tomorrow's, or next week's on its day.
+    following: datetime
+    #: Whether today is one of its days at all.
+    on_today: bool
+
+    @property
+    def day_start(self) -> datetime:
+        """Today's midnight, before which a stamp is yesterday's."""
+        return self.today.replace(hour=0, minute=0)
+
+
+def digest_slot(
+    schedule: DigestSchedule, *, tz_name: str | None, now: datetime
+) -> DigestSlot:
+    local = now.astimezone(resolve_zone(tz_name))
+    hour, minute = map(int, schedule.at.split(":"))
+    today = local.replace(hour=hour, minute=minute, second=0, microsecond=0)
+    weekly = schedule.cadence is DigestCadence.weekly
+    following = today + timedelta(days=1)
+    while weekly and following.isoweekday() != schedule.weekday:
+        following += timedelta(days=1)
+    return DigestSlot(
+        today=today,
+        following=following,
+        on_today=not weekly or local.isoweekday() == schedule.weekday,
     )
 
 
@@ -540,8 +611,13 @@ def email_due_at(
     prefs = prefs or EMPTY
     now = now or datetime.now(timezone.utc)
     schedule = email_schedule(prefs)
-    immediate = schedule.cadence is EmailCadence.instant or (
-        schedule.personal_instant and CATEGORY_SPECS[category].personal
+    spec = CATEGORY_SPECS[category]
+    # A digest is written at the time the account chose for it, so it is not
+    # gathered again into the scheduled email.
+    immediate = (
+        schedule.cadence is EmailCadence.instant
+        or spec.digest
+        or (schedule.personal_instant and spec.personal)
     )
     due = now if immediate else _next_slot(schedule, tz_name=tz_name, now=now)
 

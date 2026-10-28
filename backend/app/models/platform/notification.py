@@ -8,7 +8,10 @@ from sqlmodel import Field, Index, SQLModel
 
 class NotificationType(str, Enum):
     task_assignment = "task_assignment"
+    #: The overdue digest: every task still overdue, on the account's schedule.
     overdue_tasks = "overdue_tasks"
+    #: The coming-up digest: tasks due and events starting before the next one.
+    coming_up = "coming_up"
     initiative_added = "initiative_added"
     initiative_join_requested = "initiative_join_requested"
     initiative_join_approved = "initiative_join_approved"

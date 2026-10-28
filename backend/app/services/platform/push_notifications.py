@@ -80,6 +80,9 @@ PUSH_CHANNELS: dict[NotificationType, str] = {
     NotificationType.event_cancelled: "calendar_events",
     NotificationType.event_rsvp: "calendar_events",
     NotificationType.event_reminder: "event_reminder",
+    # What is ahead, events among it, so the reminders channel rather than a
+    # new one — a new channel id would mean a native release.
+    NotificationType.coming_up: "event_reminder",
     NotificationType.access_grant_requested: "access_grants",
     NotificationType.access_grant_approved: "access_grants",
     NotificationType.access_grant_denied: "access_grants",

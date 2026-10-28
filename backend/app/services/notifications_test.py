@@ -37,6 +37,7 @@ from app.models.tenant.task import (
     TaskStatusCategory,
 )
 from app.models.tenant.task_assignment_digest import TaskAssignmentDigestItem
+from app.core.notification_categories import NotificationCategory
 from app.models.platform.user import User
 from app.services.platform import email_outbox
 from app.services.platform import push_config
@@ -50,6 +51,7 @@ from app.services.notifications import (
 from app.services.notifications import (
     ASSIGNMENT_DIGEST,
     REACTION_DIGEST,
+    coming_up_scan,
     expire_digest_items,
     digest_scan,
     event_when,
@@ -583,8 +585,10 @@ async def test_overdue_digest_gathers_tasks_across_user_guilds(
         email="multi-overdue@example.com",
         timezone="UTC",
     )
-    # The scheduled clock is a preference now; midnight is always past.
-    await set_notification_prefs(session, user, {"email": {"at": "00:00"}})
+    # The digest's clock is a preference; midnight is always past.
+    await set_notification_prefs(
+        session, user, {"digests": {"overdue": {"at": "00:00"}}}
+    )
     alpha = await _overdue_task_in_new_guild(session, user, label="Alpha")
     await _overdue_task_in_new_guild(session, user, label="Beta")
 
@@ -641,8 +645,10 @@ async def test_overdue_digest_pushes_alongside_email(
         email="overdue-both@example.com",
         timezone="UTC",
     )
-    # The scheduled clock is a preference now; midnight is always past.
-    await set_notification_prefs(session, user, {"email": {"at": "00:00"}})
+    # The digest's clock is a preference; midnight is always past.
+    await set_notification_prefs(
+        session, user, {"digests": {"overdue": {"at": "00:00"}}}
+    )
     await _overdue_task_in_new_guild(session, user, label="Alpha")
 
     emails: list[int] = []
@@ -681,14 +687,14 @@ async def test_overdue_digest_pushes_when_email_opted_out(
         email="overdue-push-only@example.com",
         timezone="UTC",
     )
-    # The scheduled clock is a preference now; midnight is always past. One
+    # The digest's clock is a preference; midnight is always past. One
     # call, because the document is written whole: a second would replace it.
     await set_notification_prefs(
         session,
         user,
         {
-            "email": {"at": "00:00"},
-            "categories": {"assignments": {"email": False}},
+            "digests": {"overdue": {"at": "00:00"}},
+            "categories": {"overdue": {"email": False}},
         },
     )
     await _overdue_task_in_new_guild(session, user, label="Alpha")
@@ -726,14 +732,14 @@ async def test_overdue_digest_skips_push_when_opted_out(
         email="overdue-email-only@example.com",
         timezone="UTC",
     )
-    # The scheduled clock is a preference now; midnight is always past. One
+    # The digest's clock is a preference; midnight is always past. One
     # call, because the document is written whole: a second would replace it.
     await set_notification_prefs(
         session,
         user,
         {
-            "email": {"at": "00:00"},
-            "categories": {"assignments": {"push": False}},
+            "digests": {"overdue": {"at": "00:00"}},
+            "categories": {"overdue": {"push": False}},
         },
     )
     await _overdue_task_in_new_guild(session, user, label="Alpha")
@@ -764,8 +770,10 @@ async def test_overdue_digest_skips_template_projects(
         email="template-overdue@example.com",
         timezone="UTC",
     )
-    # The scheduled clock is a preference now; midnight is always past.
-    await set_notification_prefs(session, user, {"email": {"at": "00:00"}})
+    # The digest's clock is a preference; midnight is always past.
+    await set_notification_prefs(
+        session, user, {"digests": {"overdue": {"at": "00:00"}}}
+    )
     await _overdue_task_in_new_guild(session, user, label="Real")
     await _overdue_task_in_new_guild(session, user, label="Template", is_template=True)
 
@@ -797,8 +805,10 @@ async def test_overdue_digest_skips_archived_projects_and_tasks(
         email="archived-overdue@example.com",
         timezone="UTC",
     )
-    # The scheduled clock is a preference now; midnight is always past.
-    await set_notification_prefs(session, user, {"email": {"at": "00:00"}})
+    # The digest's clock is a preference; midnight is always past.
+    await set_notification_prefs(
+        session, user, {"digests": {"overdue": {"at": "00:00"}}}
+    )
     await _overdue_task_in_new_guild(session, user, label="Live")
     await _overdue_task_in_new_guild(
         session, user, label="ArchivedProject", project_archived=True
@@ -831,7 +841,9 @@ async def test_overdue_digest_holds_only_what_its_reader_reaches(
     """A task stays assigned to somebody outside its initiative, and their
     digest is read as them: it names the task they can open and not that one."""
     user = await create_user(session, timezone="UTC")
-    await set_notification_prefs(session, user, {"email": {"at": "00:00"}})
+    await set_notification_prefs(
+        session, user, {"digests": {"overdue": {"at": "00:00"}}}
+    )
     await _overdue_task_in_new_guild(session, user, label="Reached")
     await _overdue_task_in_new_guild(session, user, label="Elsewhere", access="outside")
 
@@ -885,6 +897,69 @@ async def _assignment_item_in_new_guild(
     )
     await session.commit()
     return guild
+
+
+async def test_coming_up_digest_lists_what_is_due_and_starting(
+    session: AsyncSession, monkeypatch
+):
+    """Coming up names the reader's tasks due and events starting before the
+    next one, soonest first: nothing overdue, nothing further out, and nothing
+    for an account that never asked for it."""
+    now = datetime.now(timezone.utc)
+    user = await create_user(session, timezone="UTC")
+    # Weekly on today, so it covers the week ahead; midnight is always past.
+    await set_notification_prefs(
+        session,
+        user,
+        {
+            "categories": {"coming_up": {"email": True}},
+            "digests": {
+                "coming_up": {
+                    "cadence": "weekly",
+                    "at": "00:00",
+                    "weekday": now.isoweekday(),
+                }
+            },
+        },
+    )
+    owner = await create_user(session)
+    _guild, initiative, calendar = await _events_initiative(session, owner)
+    event = await create_calendar_event(
+        session,
+        calendar,
+        owner,
+        title="Standup",
+        start_at=now + timedelta(days=3),
+        end_at=now + timedelta(days=3, hours=1),
+    )
+    await _add_attendee(session, initiative, event, user)
+    project = await create_project(session, initiative, owner)
+    await create_resource_grant(session, project, user=user)
+    for title, due in (
+        ("Soon", now + timedelta(days=1)),
+        ("Later", now + timedelta(days=10)),
+        ("Late", now - timedelta(days=1)),
+    ):
+        await create_task(
+            session, project, title=title, due_date=due, assignees=[user, owner]
+        )
+
+    sent: dict[int, str] = {}
+
+    async def _capture_email(sess, recipient, **kwargs):
+        assert kwargs["category"] is NotificationCategory.coming_up
+        sent[recipient.id] = kwargs["pieces"].body
+        return True
+
+    monkeypatch.setattr(email_outbox, "enqueue", _capture_email)
+
+    await set_rls_context(session, Unattributed())
+    await _sweep(coming_up_scan(now=now))
+
+    assert list(sent) == [user.id]
+    body = sent[user.id]
+    assert body.index("Soon") < body.index("Standup")
+    assert {"Later", "Late"}.isdisjoint(_titles(body))
 
 
 async def test_assignment_digest_gathers_items_across_user_guilds(
