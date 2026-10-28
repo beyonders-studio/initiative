@@ -39,6 +39,7 @@ import { FileChooserDialog } from "@/components/files/FileChooserDialog";
 import { COLLECTION_SORT_FIELDS } from "@/components/files/fileColumns";
 import { ToolFilterPanel } from "@/components/initiativeTools/shared/ToolFilterPanel";
 import { ToolListToolbar } from "@/components/initiativeTools/shared/ToolListToolbar";
+import { LayoutsOverview } from "@/components/layouts/LayoutList";
 import { useRegisterPrimaryCreateAction } from "@/components/navigation/CreateActionContext";
 import { listLayoutLooks } from "@/components/projects/projectTasksConfig";
 import { Lightbox, type LightboxItem } from "@/components/shared/Lightbox";
@@ -59,6 +60,13 @@ import { TABLE_SORT_FIELDS, ToolIndexTable } from "@/components/tools/ToolIndexT
 import { ToolPageHeader } from "@/components/tools/ToolPageHeader";
 import { Button } from "@/components/ui/button";
 import { ConfirmDialog } from "@/components/ui/confirm-dialog";
+import {
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogHeader,
+  DialogTitle,
+} from "@/components/ui/dialog";
 import { DropdownMenuItem } from "@/components/ui/dropdown-menu";
 import { Label } from "@/components/ui/label";
 import { RelativeTime } from "@/components/ui/relative-time";
@@ -90,7 +98,12 @@ import { useReadOnOpen } from "@/hooks/useNotifications";
 import { useRecordOpen } from "@/hooks/usePersonalItems";
 import { propertySaves, useProperties } from "@/hooks/useProperties";
 import { useKnownTagIds } from "@/hooks/useTags";
-import { detailLayoutOf, listLayouts, useInstanceLayouts } from "@/hooks/useToolLayouts";
+import {
+  detailLayoutOf,
+  instanceTarget,
+  listLayouts,
+  useInstanceLayouts,
+} from "@/hooks/useToolLayouts";
 import { useCommunityPath } from "@/lib/communityUrl";
 import { formatPeriod } from "@/lib/formatDate";
 import { DetailLayoutView } from "@/lib/layouts/DetailLayoutView";
@@ -306,6 +319,7 @@ export function CollectionPage() {
 
   const update = useUpdateCollection(parsedId);
   const [trashing, setTrashing] = useState(false);
+  const [layoutsOpen, setLayoutsOpen] = useState(false);
   const trash = useDeleteCollection({
     onSuccess: () => {
       toast.success(t("collections.trashed"));
@@ -505,13 +519,7 @@ export function CollectionPage() {
                 </DropdownMenuItem>
               ) : null}
               {layoutsQuery.data?.can_configure && collection ? (
-                <DropdownMenuItem
-                  onSelect={() =>
-                    void navigate({
-                      to: gp(`${collectionRoute(collection.initiative_id, collection.id)}/layouts`),
-                    })
-                  }
-                >
+                <DropdownMenuItem onSelect={() => setLayoutsOpen(true)}>
                   <LayoutsIcon className="h-4 w-4" />
                   {t("layouts:tab")}
                 </DropdownMenuItem>
@@ -783,6 +791,22 @@ export function CollectionPage() {
         destructive
         onConfirm={() => trash.mutate(parsedId)}
       />
+
+      {collection && layoutsQuery.data?.can_configure ? (
+        <Dialog open={layoutsOpen} onOpenChange={setLayoutsOpen}>
+          <DialogContent className="sm:max-w-xl">
+            <DialogHeader>
+              <DialogTitle>{t("layouts:tab")}</DialogTitle>
+              <DialogDescription>{t("layouts:settingsDescription")}</DialogDescription>
+            </DialogHeader>
+            <LayoutsOverview
+              layouts={layoutsQuery.data.layouts}
+              target={instanceTarget("collection", collection.id)}
+              editor={gp(`${collectionRoute(collection.initiative_id, collection.id)}/layouts`)}
+            />
+          </DialogContent>
+        </Dialog>
+      ) : null}
     </div>
   );
 }

@@ -7,6 +7,7 @@ import {
   type TaskStatusRead,
   type TaskTypeRead,
 } from "@/api/generated/initiativeAPI.schemas";
+import { InitiativeSettingsPropertiesTab } from "@/components/initiatives/settings/InitiativeSettingsPropertiesTab";
 import { listLayoutLooks } from "@/components/projects/projectTasksConfig";
 import { SCALE_DISPLAYS, type ScaleDisplay } from "@/components/properties/propertyHelpers";
 import { TaskStatusOption } from "@/components/tasks/TaskStatusOption";
@@ -22,6 +23,8 @@ import {
 } from "@/components/ui/select";
 import { Switch } from "@/components/ui/switch";
 import { MAX_COLUMN_LIMIT } from "@/hooks/useColumnLimits";
+import type { MetadataOwner } from "@/hooks/useProperties";
+import { listFormat } from "@/lib/intl";
 import { LAYOUT_REGIONS } from "@/lib/layouts/detailLayout";
 import {
   cardOf,
@@ -321,6 +324,37 @@ export const DetailLayoutSettings = ({
         </Panel>
       )}
     </fieldset>
+  );
+};
+
+/** The target's own properties, managed beside its layouts: each with the
+ *  layouts that show it, as `shownOn` names them. */
+export const LayoutProperties = ({
+  initiativeId,
+  owner,
+  shownOn,
+}: {
+  initiativeId: number;
+  owner: MetadataOwner;
+  shownOn: (propertyId: number) => string[];
+}) => {
+  const { t, i18n } = useTranslation(["layouts"]);
+  return (
+    <Panel heading={t("layouts:properties")}>
+      <InitiativeSettingsPropertiesTab
+        initiativeId={initiativeId}
+        owner={owner}
+        placement={(definition) => {
+          const names = shownOn(definition.id);
+          return names.length > 0
+            ? t("layouts:propertiesShownOn", {
+                layouts: listFormat(i18n.language).format(names),
+              })
+            : t("layouts:propertiesNowhere");
+        }}
+      />
+      <p className="text-muted-foreground text-xs">{t("layouts:propertiesPlacementHelp")}</p>
+    </Panel>
   );
 };
 

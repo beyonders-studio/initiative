@@ -183,7 +183,7 @@ Hidden content is **held for the platform**:
 
 Metadata is the fields your initiative needs and Initiative didn't think of: "Budget code", "Squad", "Signed off by". It belongs to the initiative. Make it here, or from **Add metadata** on anything that has some. Once it exists, every project, task, file, event and the rest in this initiative can carry it.
 
-Something only one project or one collection cares about is a **property** of that project or collection instead, and lives there: [a project's](projects-and-tasks.md#project-properties) in its settings, [a collection's](files.md#a-collections-properties) on its layouts page. This list holds the initiative's own.
+Something only one project or one collection cares about is a **property** of that project or collection instead, and lives there: [a project's](projects-and-tasks.md#project-properties) in its settings, [a collection's](files.md#a-collections-properties) in its layout editor. This list holds the initiative's own.
 
 | Type | Holds |
 |---|---|

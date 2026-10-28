@@ -239,13 +239,15 @@ On a collection's page, drop files anywhere to upload them straight in, or **Add
 
 ![A collection of maps and handouts, in the Masonry view](../images/files/collection.png)
 
-**Layouts** in the collection's menu opens its layout editor, the same one a project's layouts use. Pick which views the collection offers and the one it opens on, the table's columns, what each card shows under the picture, and the **File detail**: what sits beside a file when you open it from the collection.
+**Layouts** in the collection's menu lists its views, which ones it offers and the one it opens on, and its **File page**: what sits beside a file when you open it from the collection. Click any of them to open the layout editor right there, the same one a project's layouts use, and set the table's columns, what each card shows under the picture, and what the file page holds.
 
 ### A collection's properties
 
-A collection can have **properties** of its own: a price, a rating, the day a photo was taken. Make one in the layout editor, with **Add** wherever a field can go, and it lands right there. The values belong to the collection, not the file, so the same photo can be "£40, four stars" in the shop catalogue and just a picture in the fete gallery. Open a file from the collection to fill them in; until the file detail is changed, it shows every property the collection has.
+A collection can have **properties** of its own: a price, a rating, the day a photo was taken. Make one in the layout editor, with **Add** wherever a field can go, and it lands right there. The values belong to the collection, not the file, so the same photo can be "£40, four stars" in the shop catalogue and just a picture in the fete gallery. Open a file from the collection to fill them in.
 
-**Properties**, at the top of the layout editor, is where they get renamed, put in order or deleted. Deleting one takes every file's value of it in this collection, so it asks first.
+Where a new one shows up is the bit that surprises people. The file page shows every property the collection has, so a new one appears there straight away. Cards and the table show only what you put on them, so a new one sits quietly off them until you add it.
+
+Click the layout's name at the top of the editor's outline and the collection's properties are listed on the right, each saying which layouts show it. That's where they get renamed, put in order or deleted. Deleting one takes every file's value of it in this collection, so it asks first.
 
 Lists can also show the initiative's own [metadata](initiatives.md#metadata), which a file carries wherever it goes. Properties are for what only makes sense in this collection.
 

@@ -91,7 +91,7 @@ describe("LayoutList", () => {
     expect(await screen.findByRole("button", { name: "Delete the Task task type" })).toBeDisabled();
   });
 
-  it("makes a shown view the one a collection opens on", async () => {
+  it("makes a shown view the one a collection opens on, and opens the editor on a layout", async () => {
     let opensOn: unknown = null;
     server.use(
       communityHttp.put("/layouts/default", async ({ request }) => {
@@ -108,9 +108,16 @@ describe("LayoutList", () => {
         <LayoutList
           layouts={buildToolLayoutSet({ tool: "collection", hidden: ["timeline"] }).layouts}
           target={instanceTarget("collection", 5)}
+          editor="/c/1/i/1/files/collections/5/layouts"
         />
       ),
       { initialRoute: "/c/1" }
+    );
+
+    // Each layout's name opens the editor on it, the file's page among them.
+    expect(await screen.findByRole("link", { name: "Edit File page" })).toHaveAttribute(
+      "href",
+      "/c/1/i/1/files/collections/5/layouts?layout=file"
     );
 
     // It opens on the masonry, and a hidden list cannot be what it opens on.
