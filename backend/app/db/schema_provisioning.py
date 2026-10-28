@@ -899,6 +899,18 @@ async def deprovision_guild(guild_id: int) -> None:
     await refuse_while_held(guild_id)
     async with db_session.provisioning_engine.begin() as conn:
         await drop_guild_schema(conn, guild_id)
+    # Destroy the guild's storage key first: that is what makes everything it
+    # stored encrypted unreadable — here, in the bucket's old versions, and in
+    # any copy anyone made — whatever becomes of the purge below.
+    try:
+        from app.services import storage_keys
+
+        async with db_session.SystemSessionLocal() as session:
+            if await storage_keys.destroy(session, guild_id):
+                logger.info("deprovision guild %s: destroyed its storage key", guild_id)
+            await session.commit()
+    except Exception:  # noqa: BLE001 — logged loudly; the row's FK cascades with the guild
+        logger.exception("failed to destroy the storage key of guild %s", guild_id)
     # Remove the guild's stored blobs (the ``guild_<id>/`` storage namespace).
     # Best-effort and after the schema drop succeeds: a storage hiccup must not
     # strand a half-deleted guild, and delete_prefix needs no DB so order is moot.

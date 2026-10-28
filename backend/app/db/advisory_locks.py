@@ -49,6 +49,9 @@ class LockNamespace(IntEnum):
     TEST_SUITE_MIGRATION = 0x1417A7E5
     #: Copying local uploads into S3 (``app.db.backfill_uploads_to_s3``).
     UPLOAD_BACKFILL = 0x1014_5311
+    #: Encrypting what was stored before STORAGE_ENCRYPTION was set
+    #: (``app.services.storage_encryption``).
+    STORAGE_ENCRYPTION = 0x53544F52454E43
     #: The first registrations taking turns, so one of them bootstraps.
     FIRST_ACCOUNT = 0x696E6974626F6F74
     #: Refreshing the marketplace registry's TUF metadata.

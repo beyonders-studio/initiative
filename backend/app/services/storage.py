@@ -177,7 +177,12 @@ class StorageBackend(Protocol):
     # the bytes kept as parts, ``tail`` those kept apart until the next, and
     # ``store`` the kind of store that holds them.
 
-    def start_parts(self, key: str, *, part_bytes: int) -> dict: ...
+    def start_parts(
+        self, key: str, *, part_bytes: int, length: int | None = None
+    ) -> dict:
+        """Begin a file of ``length`` bytes arriving in parts. Only
+        :class:`EncryptedStorage` reads ``length``: its header carries it."""
+        ...
 
     def holds_parts(self, state: dict) -> bool:
         """Whether this backend holds the parts ``state`` records: not when
@@ -263,8 +268,15 @@ class LocalFilesystemStorage:
         if target is None:
             raise ValueError(f"Invalid storage key: {key!r}")
         # copyfile, not move: the source may be on a different filesystem
-        # (a temp dir), and it streams rather than loading the file.
-        shutil.copyfile(path, target)
+        # (a temp dir), and it streams rather than loading the file. Into a
+        # file beside the target first, then renamed over it, so replacing an
+        # object in place (the encryption backfill) never leaves half of one.
+        staging = target.with_name(f".{target.name}.writing")
+        try:
+            shutil.copyfile(path, staging)
+            os.replace(staging, target)
+        finally:
+            staging.unlink(missing_ok=True)
 
     def delete(self, key: str) -> bool:
         target = self._safe_path(key)
@@ -322,6 +334,14 @@ class LocalFilesystemStorage:
         target = self._safe_path(key)
         return bool(target and target.is_file())
 
+    def iter_keys(self) -> Iterator[str]:
+        """Every object in this namespace."""
+        directory = self._root() / self._prefix
+        if directory.is_dir():
+            for entry in sorted(directory.iterdir()):
+                if entry.is_file() and not entry.name.startswith("."):
+                    yield entry.name
+
     def resolve_readable(self, key: str) -> Path | None:
         """Filesystem path for a key, or None. Retained for local-only callers."""
         target = self._safe_path(key)
@@ -345,7 +365,9 @@ class LocalFilesystemStorage:
             content_length=target.stat().st_size,
         )
 
-    def start_parts(self, key: str, *, part_bytes: int) -> dict:
+    def start_parts(
+        self, key: str, *, part_bytes: int, length: int | None = None
+    ) -> dict:
         target = self._safe_path(key)
         if target is None:
             raise ValueError(f"Invalid storage key: {key!r}")
@@ -526,6 +548,20 @@ class S3Storage:
     def exists(self, key: str) -> bool:
         return self._head(self._object_key(key))
 
+    def iter_keys(self) -> Iterator[str]:
+        """Every object in this namespace."""
+        token: str | None = None
+        while True:
+            kwargs: dict = {"Bucket": self._bucket, "Prefix": self._prefix}
+            if token:
+                kwargs["ContinuationToken"] = token
+            resp = self._client.list_objects_v2(**kwargs)
+            for item in resp.get("Contents", []):
+                yield item["Key"][len(self._prefix) :]
+            if not resp.get("IsTruncated"):
+                return
+            token = resp.get("NextContinuationToken")
+
     def open_readable(
         self, key: str, *, byte_range: str | None = None
     ) -> ReadableBlob | None:
@@ -557,7 +593,9 @@ class S3Storage:
     def _tail_key(self, key: str) -> str:
         return self._object_key(f"{Path(key).name}-tail")
 
-    def start_parts(self, key: str, *, part_bytes: int) -> dict:
+    def start_parts(
+        self, key: str, *, part_bytes: int, length: int | None = None
+    ) -> dict:
         upload = self._client.create_multipart_upload(
             Bucket=self._bucket, Key=self._object_key(key)
         )
@@ -720,6 +758,15 @@ class DualReadStorage:
     def exists(self, key: str) -> bool:
         return self._primary.exists(key) or self._fallback.exists(key)
 
+    def iter_keys(self) -> Iterator[str]:
+        """Every object in either store, once."""
+        seen: set[str] = set()
+        for store in (self._primary, self._fallback):
+            for key in store.iter_keys():  # type: ignore[attr-defined]
+                if key not in seen:
+                    seen.add(key)
+                    yield key
+
     def open_readable(
         self, key: str, *, byte_range: str | None = None
     ) -> ReadableBlob | None:
@@ -742,7 +789,9 @@ class DualReadStorage:
             blob = None
         return blob or self._fallback.open_readable(key, byte_range=byte_range)
 
-    def start_parts(self, key: str, *, part_bytes: int) -> dict:
+    def start_parts(
+        self, key: str, *, part_bytes: int, length: int | None = None
+    ) -> dict:
         return self._primary.start_parts(key, part_bytes=part_bytes)
 
     def _staging(self, state: dict) -> StorageBackend:
@@ -776,6 +825,410 @@ class DualReadStorage:
         if self._primary.exists(key):
             return self._primary.presign_get(key, ttl=ttl, filename=filename)
         return None
+
+
+#: Plaintext a stream is read in while an object is encrypted from disk.
+_SEAL_READ = 1024 * 1024
+_TAIL_NONCE_LEN = 12
+
+
+class EncryptedStorage:
+    """A community's store, with every object encrypted by the app.
+
+    Wraps whatever backend holds the community (local, S3, or the cutover's
+    dual read) when ``STORAGE_ENCRYPTION`` is set: :func:`get_guild_storage`
+    returns one of these, so no caller knows. Each object is written in the
+    format of :mod:`app.core.storage_crypto`, under a key of its own wrapped by
+    the community's storage key (:mod:`app.services.storage_keys`), and read
+    back the same way — a byte range reads only the chunks it covers.
+
+    Reads tell the formats apart by the header, so an object stored before
+    encryption was on reads as it is until the backfill encrypts it. Evidence
+    is encrypted already, under its own scheme (``app.core.blob_crypto``), and
+    passes through untouched; so do deletes, copies within the community and
+    the namespace purge, none of which reads a byte.
+
+    Nothing is ever signed for direct download: the store holds ciphertext.
+    """
+
+    def __init__(self, inner: StorageBackend, *, guild_id: int, keyring: Any) -> None:
+        self._inner = inner
+        self._guild_id = int(guild_id)
+        self._keyring = keyring
+
+    @property
+    def inner(self) -> StorageBackend:
+        return self._inner
+
+    @staticmethod
+    def _untouched(key: str) -> bool:
+        return Path(key).name.startswith(EVIDENCE_KEY_PREFIX)
+
+    def _writes_encrypted(self, key: str) -> bool:
+        return self._keyring.encrypts and not self._untouched(key)
+
+    def _key(self, *, create: bool) -> tuple[bytes, int]:
+        from app.core.storage_crypto import StorageCryptoError
+
+        found = self._keyring.key_for(self._guild_id, create=create)
+        if found is None:
+            raise StorageCryptoError(
+                f"community {self._guild_id} holds no storage key: its encrypted "
+                "objects were destroyed with it"
+            )
+        return found
+
+    def _dek(self, header: Any) -> bytes:
+        from app.core import storage_crypto
+
+        key, generation = self._key(create=False)
+        if header.generation != generation:
+            raise storage_crypto.StorageCryptoError(
+                f"the object is under key generation {header.generation}, the "
+                f"community holds {generation}"
+            )
+        return storage_crypto.unwrap(header, key, guild_id=self._guild_id)
+
+    # --- Untouched ----------------------------------------------------------
+
+    def delete(self, key: str) -> bool:
+        return self._inner.delete(key)
+
+    def copy(self, src_key: str, dst_key: str) -> bool:
+        # The header binds the community, not the key, so a copy within it
+        # stays server-side.
+        return self._inner.copy(src_key, dst_key)
+
+    def delete_prefix(self) -> int:
+        return self._inner.delete_prefix()
+
+    def exists(self, key: str) -> bool:
+        return self._inner.exists(key)
+
+    def presign_get(
+        self, key: str, *, ttl: int, filename: str | None = None
+    ) -> str | None:
+        # The store may hold ciphertext for any key: the caller proxy-serves.
+        return None
+
+    # --- Writes -------------------------------------------------------------
+
+    def write(self, key: str, data: bytes, *, content_type: str | None = None) -> None:
+        if not self._writes_encrypted(key):
+            self._inner.write(key, data, content_type=content_type)
+            return
+        from app.core import storage_crypto
+
+        community_key, generation = self._key(create=True)
+        self._inner.write(
+            key,
+            storage_crypto.encrypt(
+                data, community_key, guild_id=self._guild_id, generation=generation
+            ),
+            content_type=content_type,
+        )
+
+    def write_file(
+        self, key: str, path: Path, *, content_type: str | None = None
+    ) -> None:
+        if not self._writes_encrypted(key):
+            self._inner.write_file(key, path, content_type=content_type)
+            return
+        import tempfile
+
+        from app.core import storage_crypto
+
+        community_key, generation = self._key(create=True)
+        header, dek = storage_crypto.new_header(
+            community_key,
+            guild_id=self._guild_id,
+            length=path.stat().st_size,
+            generation=generation,
+        )
+        sealer = storage_crypto.Sealer(header, dek, guild_id=self._guild_id)
+        with tempfile.NamedTemporaryFile(delete=False) as out:
+            sealed_path = Path(out.name)
+            try:
+                out.write(header.pack())
+                with path.open("rb") as source:
+                    while piece := source.read(_SEAL_READ):
+                        out.write(sealer.feed(piece))
+                out.write(sealer.feed(b""))
+            except BaseException:
+                sealed_path.unlink(missing_ok=True)
+                raise
+        try:
+            self._inner.write_file(key, sealed_path, content_type=content_type)
+        finally:
+            sealed_path.unlink(missing_ok=True)
+
+    # --- Reads --------------------------------------------------------------
+
+    @staticmethod
+    def _leading(blob: ReadableBlob, size: int) -> bytes:
+        if blob.path is not None:
+            with blob.path.open("rb") as handle:
+                return handle.read(size)
+        data = bytearray()
+        for piece in blob.stream or ():
+            data += piece
+            if len(data) >= size:
+                break
+        return bytes(data[:size])
+
+    def _stored_range(
+        self, key: str, probe: ReadableBlob, start: int, end: int
+    ) -> Iterator[bytes]:
+        """Stored bytes ``start``..``end`` inclusive."""
+        if probe.path is not None:
+            with probe.path.open("rb") as handle:
+                handle.seek(start)
+                left = end - start + 1
+                while left > 0:
+                    piece = handle.read(min(_STREAM_CHUNK, left))
+                    if not piece:
+                        return
+                    left -= len(piece)
+                    yield piece
+            return
+        blob = self._inner.open_readable(key, byte_range=f"bytes={start}-{end}")
+        if blob is not None:
+            yield from blob.stream or ()
+
+    def _probe(self, key: str) -> tuple[ReadableBlob, Any] | None:
+        """The object's first bytes, and its header where it has one."""
+        from app.core import storage_crypto
+
+        probe = self._inner.open_readable(
+            key, byte_range=f"bytes=0-{storage_crypto.HEADER_SIZE - 1}"
+        )
+        if probe is None:
+            return None
+        lead = self._leading(probe, storage_crypto.HEADER_SIZE)
+        return probe, storage_crypto.parse_header(lead)
+
+    def open_readable(
+        self, key: str, *, byte_range: str | None = None
+    ) -> ReadableBlob | None:
+        if self._untouched(key):
+            return self._inner.open_readable(key, byte_range=byte_range)
+        from app.core import storage_crypto
+
+        probed = self._probe(key)
+        if probed is None:
+            return None
+        probe, header = probed
+        if header is None:
+            # Stored before encryption was on: as it is.
+            return self._inner.open_readable(key, byte_range=byte_range)
+        dek = self._dek(header)
+        wanted = storage_crypto.plaintext_range(header, byte_range)
+        start, end = wanted if wanted else (0, header.length - 1)
+        size = header.chunk_size
+        first, last = (start // size, end // size) if header.length else (0, 0)
+        stored_start = header.chunk_span(first)[0]
+        stored_end = header.chunk_span(last)[1] - 1
+        return ReadableBlob(
+            stream=storage_crypto.decrypt_range(
+                self._stored_range(key, probe, stored_start, stored_end),
+                header,
+                dek,
+                guild_id=self._guild_id,
+                first=first,
+                last=last,
+                start=start,
+                end=end,
+            ),
+            content_type=probe.content_type,
+            content_length=end - start + 1 if header.length else 0,
+            content_range=(
+                f"bytes {start}-{end}/{header.length}" if wanted is not None else None
+            ),
+        )
+
+    def is_encrypted(self, key: str) -> bool | None:
+        """Whether ``key`` is stored encrypted; ``None`` where it is missing."""
+        probed = self._probe(key)
+        return None if probed is None else probed[1] is not None
+
+    def encrypt_in_place(self, key: str) -> bool:
+        """Re-write ``key``, stored before encryption was on, encrypted.
+        Returns whether it did: not for an object already encrypted, missing,
+        or one encryption leaves alone (evidence)."""
+        if not self._writes_encrypted(key):
+            return False
+        import tempfile
+
+        probed = self._probe(key)
+        if probed is None or probed[1] is not None:
+            return False
+        blob = self._inner.open_readable(key)
+        if blob is None:
+            return False
+        if blob.path is not None:
+            self.write_file(key, blob.path, content_type=blob.content_type)
+            return True
+        with tempfile.NamedTemporaryFile() as plain:
+            for piece in blob.stream or ():
+                plain.write(piece)
+            plain.flush()
+            self.write_file(key, Path(plain.name), content_type=blob.content_type)
+        return True
+
+    # --- A file staged in parts ---------------------------------------------
+    # The plaintext state the caller keeps (``stored``, ``tail``,
+    # ``part_bytes``) sits beside the inner backend's own state (``inner``,
+    # counting stored bytes) and the object's header (``enc``), which carries
+    # its wrapped key from one request to the next. An upload begun before
+    # encryption was on has no ``enc``, and finishes as it began.
+
+    @staticmethod
+    def _tail_key(key: str) -> str:
+        return f"{Path(key).name}-etail"
+
+    def _tail_aad(self, key: str) -> bytes:
+        import struct
+
+        return b"tail" + struct.pack(">Q", self._guild_id) + Path(key).name.encode()
+
+    def _staged_header(self, state: dict) -> Any:
+        import base64
+
+        from app.core import storage_crypto
+
+        header = storage_crypto.parse_header(base64.b64decode(state["enc"]["header"]))
+        if header is None:
+            raise storage_crypto.StorageCryptoError("the upload's header is unreadable")
+        return header
+
+    def start_parts(
+        self, key: str, *, part_bytes: int, length: int | None = None
+    ) -> dict:
+        if length is None or not self._writes_encrypted(key):
+            return self._inner.start_parts(key, part_bytes=part_bytes)
+        import base64
+
+        from app.core import storage_crypto
+
+        community_key, generation = self._key(create=True)
+        header, dek = storage_crypto.new_header(
+            community_key, guild_id=self._guild_id, length=length, generation=generation
+        )
+        # Every part but the last ends on a chunk boundary, so none straddles two.
+        chunk = header.chunk_size
+        part = -(-part_bytes // chunk) * chunk
+        inner_state = self._inner.start_parts(key, part_bytes=part)
+        state = {
+            "store": inner_state.get("store"),
+            "stored": 0,
+            "tail": 0,
+            "part_bytes": part,
+            "inner": inner_state,
+            "enc": {"header": base64.b64encode(header.pack()).decode(), "index": 0},
+        }
+        if length == 0:
+            # Finished the moment it is created: its one empty chunk now.
+            sealer = storage_crypto.Sealer(header, dek, guild_id=self._guild_id)
+            state["inner"] = self._inner.add_part(
+                key, inner_state, header.pack() + sealer.feed(b"")
+            )
+            state["enc"]["index"] = sealer.index
+        return state
+
+    def holds_parts(self, state: dict) -> bool:
+        return self._inner.holds_parts(state["inner"] if "enc" in state else state)
+
+    def add_part(self, key: str, state: dict, data: bytes) -> dict:
+        if "enc" not in state:
+            return self._inner.add_part(key, state, data)
+        from app.core import storage_crypto
+
+        header = self._staged_header(state)
+        index = state["enc"]["index"]
+        sealer = storage_crypto.Sealer(
+            header, self._dek(header), guild_id=self._guild_id, index=index
+        )
+        sealed = sealer.feed(data)
+        if sealer.pending:
+            raise storage_crypto.StorageCryptoError(
+                "a part ends inside a chunk and is not the last"
+            )
+        if index == 0:
+            sealed = header.pack() + sealed
+        return {
+            **state,
+            "inner": self._inner.add_part(key, state["inner"], sealed),
+            "stored": state["stored"] + len(data),
+            "tail": 0,
+            "enc": {**state["enc"], "index": sealer.index},
+        }
+
+    def keep_tail(self, key: str, state: dict, data: bytes) -> dict:
+        if "enc" not in state:
+            return self._inner.keep_tail(key, state, data)
+        if not data:
+            return state
+        from cryptography.hazmat.primitives.ciphers.aead import AESGCM
+
+        dek = self._dek(self._staged_header(state))
+        nonce = os.urandom(_TAIL_NONCE_LEN)
+        self._inner.write(
+            self._tail_key(key),
+            nonce + AESGCM(dek).encrypt(nonce, data, self._tail_aad(key)),
+        )
+        return {**state, "tail": len(data)}
+
+    def take_tail(self, key: str, state: dict) -> tuple[bytes, dict]:
+        if "enc" not in state:
+            return self._inner.take_tail(key, state)
+        if not state["tail"]:
+            return b"", state
+        from cryptography.exceptions import InvalidTag
+        from cryptography.hazmat.primitives.ciphers.aead import AESGCM
+
+        from app.core.storage_crypto import StorageCryptoError
+
+        dek = self._dek(self._staged_header(state))
+        blob = self._inner.open_readable(self._tail_key(key))
+        if blob is None:
+            raise StorageCryptoError("the upload's kept tail is missing")
+        raw = (
+            blob.path.read_bytes()
+            if blob.path is not None
+            else b"".join(blob.stream or ())
+        )
+        try:
+            data = AESGCM(dek).decrypt(
+                raw[:_TAIL_NONCE_LEN], raw[_TAIL_NONCE_LEN:], self._tail_aad(key)
+            )
+        except InvalidTag as exc:
+            raise StorageCryptoError("the upload's kept tail does not decrypt") from exc
+        return data[: state["tail"]], {**state, "tail": 0}
+
+    def _drop_tail(self, key: str) -> None:
+        try:
+            self._inner.delete(self._tail_key(key))
+        except Exception:
+            # A tail left over costs storage and nothing else.
+            logger.warning("tail_delete_failed key=%s", key, exc_info=True)
+
+    def finish_parts(self, key: str, state: dict) -> None:
+        if "enc" not in state:
+            self._inner.finish_parts(key, state)
+            return
+        from app.core.storage_crypto import StorageCryptoError
+
+        if state["enc"]["index"] != self._staged_header(state).chunk_count:
+            raise StorageCryptoError("the upload is not all there")
+        self._inner.finish_parts(key, state["inner"])
+        self._drop_tail(key)
+
+    def drop_parts(self, key: str, state: dict) -> None:
+        if "enc" not in state:
+            self._inner.drop_parts(key, state)
+            return
+        self._inner.drop_parts(key, state["inner"])
+        self._drop_tail(key)
 
 
 class _RangeReader(io.RawIOBase):
@@ -995,8 +1448,18 @@ def get_guild_storage(guild_id: int) -> StorageBackend:
     object-store twin of the schema-per-guild boundary (design §6). Local writes
     them under ``UPLOADS_DIR/guild_<id>/``. Every guild shares the one configured
     credential.
+
+    Where storage is encrypted (``STORAGE_ENCRYPTION``, or keys left from when
+    it was), the backend comes wrapped in :class:`EncryptedStorage`; where it
+    is not — every deployment that leaves it unset — it is the backend itself.
     """
-    return _make(f"guild_{int(guild_id)}/")
+    from app.services.storage_keys import active_keyring
+
+    backend = _make(f"guild_{int(guild_id)}/")
+    keyring = active_keyring()
+    if keyring is None:
+        return backend
+    return EncryptedStorage(backend, guild_id=guild_id, keyring=keyring)
 
 
 #: What every evidence object's key starts with, in whichever community holds
@@ -1050,8 +1513,9 @@ def copy_between_guilds(src_guild_id: int, dst_guild_id: int, key: str) -> bool:
         raise ValueError("only an evidence object is copied between communities")
     if int(src_guild_id) == int(dst_guild_id):
         raise ValueError("source and destination are the same community")
+    # The raw backends: evidence is never wrapped by EncryptedStorage.
     return _copy_across(
-        get_guild_storage(src_guild_id), get_guild_storage(dst_guild_id), key
+        _make(f"guild_{int(src_guild_id)}/"), _make(f"guild_{int(dst_guild_id)}/"), key
     )
 
 

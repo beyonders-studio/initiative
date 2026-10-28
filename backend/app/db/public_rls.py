@@ -2410,6 +2410,16 @@ SHARED_TABLE_REGISTRY: dict[str, SharedTable] = {
             app_admin=DML,
         ),
     ),
+    # The key a community's stored objects are encrypted under, wrapped, when
+    # STORAGE_ENCRYPTION is set (app.services.storage_keys).
+    "guild_storage_keys": SharedTable(
+        rls=FORCED_NO_POLICY,
+        grants=Grants(
+            # Made, read and destroyed on the system engine alone. No request
+            # role holds a community's key, wrapped or not.
+            app_admin=DML,
+        ),
+    ),
     "storage_backfill_state": SharedTable(
         rls=FORCED_NO_POLICY,
         grants=Grants(

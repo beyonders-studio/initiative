@@ -281,7 +281,9 @@ async def create(
     key = f"{STAGING_PREFIX}{upload_id}"
     storage = get_guild_storage(guild_id)
     part_bytes = max(PART_BYTES, math.ceil(length / _MAX_PARTS))
-    state = await asyncio.to_thread(storage.start_parts, key, part_bytes=part_bytes)
+    state = await asyncio.to_thread(
+        storage.start_parts, key, part_bytes=part_bytes, length=length
+    )
     now = datetime.now(timezone.utc)
     upload = PendingUpload(
         id=upload_id,

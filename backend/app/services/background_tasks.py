@@ -272,4 +272,18 @@ def start_background_tasks() -> list[asyncio.Task]:
             )
         )
 
+    # Encrypting what was stored before STORAGE_ENCRYPTION was set. A
+    # deployment that leaves it unset runs no worker. The first pass is at
+    # boot; once every community is caught up a pass is one query.
+    if settings.STORAGE_ENCRYPTION:
+        from app.services import storage_encryption
+
+        tasks.append(
+            asyncio.create_task(
+                Loop(
+                    "storage-encryption", interval=storage_encryption.PASS_SECONDS
+                ).run(storage_encryption.encrypt_existing)
+            )
+        )
+
     return tasks

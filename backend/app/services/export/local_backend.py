@@ -187,7 +187,7 @@ def _blob_reader(guild_id: int):
             raise FileNotFoundError(key)
         if blob.path is not None:
             return Path(blob.path).read_bytes()
-        return blob.stream.read()  # type: ignore[union-attr]
+        return b"".join(blob.stream or ())
 
     return read
 

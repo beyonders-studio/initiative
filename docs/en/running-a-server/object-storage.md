@@ -49,7 +49,7 @@ Notes:
 - **`S3_REGION`** must match the region your store enforces in its request signature.
 - **Credentials** — set the access key id/secret, or leave them unset to use the ambient credential chain where your store supports it.
 - The **bucket must already exist**; Initiative reads and writes objects but doesn't create the bucket.
-- **Encryption at rest** belongs to the bucket. Turn on your store's default encryption there and every file Initiative writes picks it up.
+- **Encryption at rest** belongs to the bucket by default. Turn on your store's default encryption there and every file Initiative writes picks it up. If you want the files encrypted by Initiative itself, so the store only ever holds ciphertext, see [Encrypting stored files](#encrypting-stored-files).
 
 ## Migrating an existing deployment from local to S3
 
@@ -74,6 +74,31 @@ S3_LOCAL_FALLBACK=true
 With the fallback on, a read that misses in S3 falls back to local disk, so nothing 404s during the transition. New uploads now go to S3.
 
 **3. Finish.** Once everything serves from S3 and a final backfill reports `failed=0`, set `S3_LOCAL_FALLBACK=false` and retire the local uploads volume.
+
+## Encrypting stored files
+
+Off by default, and most deployments leave it off. Turn it on when the people who can reach your disk or bucket should not be able to read what communities store, for example to meet a compliance requirement.
+
+**What it does.** With `STORAGE_ENCRYPTION` set, Initiative encrypts every file a community stores before it reaches the backend: uploads, file versions, exports, staged imports, and a large file while it is still arriving in pieces. Each file gets its own key. That key is wrapped by a key belonging to the community, and the community's key is wrapped by a root you choose:
+
+| `STORAGE_ENCRYPTION` | The root |
+|---|---|
+| *(unset, the default)* | No encryption by Initiative. Files are stored as they arrive. |
+| `local` | Your `SECRET_KEY`. Nothing else to set up. |
+| `gcp_kms` | A Google Cloud KMS key, named in `STORAGE_ENCRYPTION_KMS_KEY` (`projects/<p>/locations/<l>/keyRings/<r>/cryptoKeys/<k>`). Initiative calls KMS as its own Google identity, so its service account needs `roles/cloudkms.cryptoKeyEncrypterDecrypter` on that key. |
+
+Downloads, previews and video seeking work as before: Initiative decrypts as it streams, and a byte range reads only the part of the file it needs.
+
+**Files you already have.** Turning it on doesn't make old files unreadable. They keep reading as they are, and a background pass re-writes each one encrypted, a community at a time, until everything is. On an S3 store the old plaintext stays as the object's previous version until your bucket's lifecycle rules remove it.
+
+**Deleting a community.** When a community is deleted, its key is destroyed first. Every file it stored becomes unreadable at once, wherever a copy of it sits, including old versions in a bucket and any copy someone made.
+
+**Things to know:**
+
+- **With `local`, your `SECRET_KEY` now protects your files.** Lose it and the files can't be read. Back it up wherever you back up your other secrets. Rotating it the documented way (`PREVIOUS_SECRET_KEY`) re-wraps the community keys and never touches the files.
+- **With `gcp_kms`, opening a file needs KMS.** Keys are cached in memory for a few minutes, so a brief KMS outage goes unnoticed. A long one stops files opening in communities whose keys aren't cached.
+- **Direct download links are off for encrypted files.** `EXPORT_PRESIGNED_DOWNLOADS` has no effect, because the store holds ciphertext. Exports stream through Initiative.
+- **Turning it off again** stops new files from being encrypted. Files stored encrypted still read, as long as their keys and `SECRET_KEY` (or the KMS key) are still there.
 
 ## Per-community storage limits
 
