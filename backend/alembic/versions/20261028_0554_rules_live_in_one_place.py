@@ -422,7 +422,11 @@ def downgrade() -> None:
         "ck_guilds_guest_max_days", "guilds", "guest_max_days >= 1", schema="public"
     )
     bind.exec_driver_sql(PREVIOUS_GUILD_AUTH_SATISFIED)
-    for table in ("app_settings", "guilds"):
+    # The copy back reads the rule tables and writes the settings rows, all of
+    # them policy-bound for this revision's own role, so each is unforced for
+    # it and forced again in the same transaction.
+    tables = ("app_settings", "guilds", "platform_rules", "community_rules")
+    for table in tables:
         bind.exec_driver_sql(f"ALTER TABLE public.{table} NO FORCE ROW LEVEL SECURITY")
     try:
         for column, slot, _default in PLATFORM:
@@ -430,14 +434,23 @@ def downgrade() -> None:
                 f"UPDATE public.app_settings s SET {column} = r.{slot}"
                 f" FROM public.platform_rules r WHERE r.key = '{column}'"
             )
-        for column, slot, _default in COMMUNITY:
+        for column, slot, default in COMMUNITY:
+            source = bind.exec_driver_sql(
+                f"SELECT count(*) FROM public.community_rules WHERE key = '{column}'"
+            ).scalar_one()
             bind.exec_driver_sql(
                 f"UPDATE public.guilds g SET {column} = r.{slot}"
                 f" FROM public.community_rules r"
                 f" WHERE r.guild_id = g.id AND r.key = '{column}'"
             )
+            copied = bind.exec_driver_sql(
+                f"SELECT count(*) FROM public.guilds g"
+                f" WHERE {_differs(column, default, 'g')}"
+            ).scalar_one()
+            if copied != source:
+                raise RuntimeError(f"guilds.{column}: restored {copied} of {source}")
     finally:
-        for table in ("app_settings", "guilds"):
+        for table in tables:
             bind.exec_driver_sql(f"ALTER TABLE public.{table} FORCE ROW LEVEL SECURITY")
     columns = ", ".join(column for column, _slot, _default in COMMUNITY)
     _on_seat_floor(f"GRANT UPDATE ({columns}) ON public.guilds TO {SEAT_FLOOR}")
