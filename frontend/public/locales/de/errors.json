@@ -808,5 +808,16 @@
   "SHARE_REQUEST_ALREADY_SHARED": "Du hast diesen Zugriff bereits",
   "SHARE_REQUEST_ALREADY_PENDING": "Du hast schon gefragt, und noch hat niemand geantwortet",
   "SHARE_REQUEST_NOTHING_TO_ASK": "Du kannst hier bereits alles öffnen",
-  "SHARE_REQUEST_CANNOT_ANSWER": "Diese Anfrage ist bereits beantwortet oder nicht deine zu beantworten"
+  "SHARE_REQUEST_CANNOT_ANSWER": "Diese Anfrage ist bereits beantwortet oder nicht deine zu beantworten",
+  "REQUIRED_FIELDS_MISSING": "Fülle zuerst die Pflichtfelder aus: {{fields}}.",
+  "requiredFields": {
+    "description": "Beschreibung",
+    "assignees": "Zugewiesen",
+    "checklist": "Checkliste",
+    "recurrence": "Wiederholung",
+    "tags": "Tags",
+    "dates": "Start- und Fälligkeitsdatum",
+    "location": "Ort",
+    "attendees": "Teilnehmer"
+  }
 }

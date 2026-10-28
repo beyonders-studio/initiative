@@ -808,5 +808,16 @@
   "SHARE_REQUEST_ALREADY_SHARED": "You already have that access",
   "SHARE_REQUEST_ALREADY_PENDING": "You've already asked, and nobody has answered yet",
   "SHARE_REQUEST_NOTHING_TO_ASK": "You can already open everything here",
-  "SHARE_REQUEST_CANNOT_ANSWER": "That request has been answered, or isn't yours to answer"
+  "SHARE_REQUEST_CANNOT_ANSWER": "That request has been answered, or isn't yours to answer",
+  "REQUIRED_FIELDS_MISSING": "Fill in what is required first: {{fields}}.",
+  "requiredFields": {
+    "description": "Description",
+    "assignees": "Assignees",
+    "checklist": "Checklist",
+    "recurrence": "Repeats",
+    "tags": "Tags",
+    "dates": "Start and due dates",
+    "location": "Location",
+    "attendees": "Attendees"
+  }
 }

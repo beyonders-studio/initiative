@@ -299,5 +299,14 @@
     "metadata": "Metadata",
     "metadataHelp": "This is the initiative's metadata, which is edited in its settings.",
     "openSettings": "Open initiative settings"
+  },
+  "required": {
+    "label": "Required",
+    "help": "Whoever adds one has to fill this in, and cannot empty it later. Hiding it lifts the requirement.",
+    "always": "A title is always required.",
+    "part": "{{name}} (required)",
+    "missing": "{{name}} is required and not filled in yet.",
+    "toFill": "{{name}} is required.",
+    "toAdd": "Fill in what is required to add it."
   }
 }

@@ -48,6 +48,7 @@ import { referenceRef } from "@/lib/smartChips";
 import { cn } from "@/lib/utils";
 
 import { type DetailKind, useItemContext } from "./DetailLayoutView";
+import { filledBy } from "./detailLayout";
 import { POST_LAYOUT, postFields } from "./posts";
 
 const Editor = lazy(() =>
@@ -343,4 +344,5 @@ export const POST_DETAIL: DetailKind<PostRead, PostLayoutContext, PostUpdate> = 
     links: { entity: post, title: post.name },
   }),
   Shell: PostShell,
+  filled: filledBy<PostRead>({ tags: (post) => post.tags.length > 0 }, (post) => post.properties),
 };

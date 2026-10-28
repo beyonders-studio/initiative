@@ -147,6 +147,10 @@ export type FieldDef = {
   typeOf?: (item: LayoutItem) => TaskTypeRead | null;
   /** A title cannot be hidden: a card with no title is not a card. */
   hideable: boolean;
+  /** Whether an item's page can require it: a value a person fills in that
+   *  can be left empty. A title is always required; what is never empty, what
+   *  a plug-in fills and what nobody fills cannot be. */
+  requireable: boolean;
   /** A plug-in field's install and declaration, and the install as the
    *  reader meets it on this kind of item. */
   plugin?: { install: number; field: PluginFieldDecl; on: PluginOnItems };

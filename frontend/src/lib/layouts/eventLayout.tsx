@@ -70,6 +70,7 @@ import { getUserDisplayName } from "@/lib/userDisplay";
 import type { TranslateFn } from "@/types/i18n";
 
 import { type DetailKind, useItemContext } from "./DetailLayoutView";
+import { filledBy } from "./detailLayout";
 import { FieldFrame, sameIds, sameJson, useFieldDraft } from "./editing";
 import { type EVENT_FIELDS, EVENT_LAYOUT, eventFields } from "./events";
 import { DescriptionField, TagsField, TitleField } from "./fieldEditors";
@@ -632,6 +633,16 @@ export const EVENT_DETAIL: DetailKind<CalendarEventRead, EventLayoutContext, Eve
     rsvp: (_node, event) => <MyAnswer event={event} />,
   },
   addingParts: ["dates"],
+  filled: filledBy<CalendarEventRead>(
+    {
+      description: (event) => Boolean(event.description?.trim()),
+      location: (event) => Boolean(event.location?.trim()),
+      recurrence: (event) => event.recurrence !== null,
+      attendees: (event) => event.attendees.length > 0,
+      tags: (event) => event.tags.length > 0,
+    },
+    (event) => event.properties
+  ),
   home: (event, context) => ({
     saves: eventSaves(context.occurrence),
     readOnly: context.readOnly,

@@ -82,6 +82,7 @@ export const FILE_LAYOUT = detailLayoutSpec({
   kind: "file",
   shipped: FILE_DETAIL_REGIONS,
   fieldParts: ["field", "properties"],
+  requiredParts: [],
   knows: {
     ...FILE_DETAIL_REGIONS,
     side: Object.keys(FILE_FIELDS)
@@ -112,6 +113,8 @@ export const collectionFileFields = (
         id,
         source: "builtin",
         hideable: true,
+        // A file's own fields are its, and nobody fills them in here.
+        requireable: false,
         value: (item) => read(fileOf(item)),
         ...field,
       })
@@ -119,7 +122,12 @@ export const collectionFileFields = (
     ...propertyFields([...metadata, ...properties], (item, id) => {
       const file = fileOf(item);
       return heldValue(own.has(id) ? file.metadata : file.properties, id);
-    }).map((field) => ({ ...field, plain: true })),
+    }).map((field) => ({
+      ...field,
+      plain: true,
+      // A collection requires its own metadata, not what the file holds.
+      requireable: field.requireable && own.has(Number(field.property?.id)),
+    })),
   ];
   return new Map(fields.map((field) => [field.id, field]));
 };

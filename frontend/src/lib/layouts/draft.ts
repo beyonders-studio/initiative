@@ -157,6 +157,19 @@ export const removable = (node: LayoutNode, fields: ReadonlyMap<string, FieldDef
     (each) => each.type === "field" && fields.get(String(each.props?.field))?.hideable === false
   );
 
+/** Whether a detail's layout can require a part: a field a person fills in,
+ *  or one of the detail's own parts that edits one (`requiredParts`). A
+ *  detail that requires nothing (`null`) requires none of them. */
+export const canRequire = (
+  node: LayoutNode,
+  fields: ReadonlyMap<string, FieldDef>,
+  requiredParts: ReadonlySet<string> | null
+): boolean =>
+  requiredParts !== null &&
+  (node.type === "field"
+    ? fields.get(String(node.props?.field))?.requireable === true
+    : requiredParts.has(node.type));
+
 /** The fields a list layout can still add: a card's not on it (and no
  *  property alone where it shows them all), a table's not among its columns
  *  and drawn as one. */

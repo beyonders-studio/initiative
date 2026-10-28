@@ -15,6 +15,16 @@ export const EVENT_FIELDS = {
   tags: { label: "common:toolSettings.tags", kind: "tags" },
 } as const satisfies Record<string, { label: string; kind: FieldKind }>;
 
+/** What a person fills in on an event, beside its title, which every event
+ *  has. */
+const EVENT_REQUIREABLE: ReadonlySet<string> = new Set([
+  "description",
+  "location",
+  "recurrence",
+  "attendees",
+  "tags",
+]);
+
 /** An event's fields as the editor names them, then the initiative's
  *  properties. An event is drawn in its detail alone so far, so none has a
  *  value to draw elsewhere. */
@@ -31,6 +41,7 @@ export const eventFields = (
           label,
           source: "builtin",
           hideable: id !== "title",
+          requireable: EVENT_REQUIREABLE.has(id),
           value: () => null,
         })
       ),
@@ -77,4 +88,6 @@ export const EVENT_LAYOUT = detailLayoutSpec({
   kind: "calendar_event",
   shipped: EVENT_DETAIL_REGIONS,
   fieldParts: ["field", "dates", "properties"],
+  // Its dates are never empty.
+  requiredParts: [],
 });

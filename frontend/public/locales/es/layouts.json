@@ -299,5 +299,14 @@
     "metadata": "Metadatos",
     "metadataHelp": "Son metadatos de la iniciativa, que se editan en su configuración.",
     "openSettings": "Abrir la configuración de la iniciativa"
+  },
+  "required": {
+    "label": "Obligatorio",
+    "help": "Quien añada uno tiene que rellenarlo y no puede vaciarlo después. Si se oculta, deja de ser obligatorio.",
+    "always": "El título siempre es obligatorio.",
+    "part": "{{name}} (obligatorio)",
+    "missing": "{{name}} es obligatorio y aún no está relleno.",
+    "toFill": "{{name}} es obligatorio.",
+    "toAdd": "Rellena lo obligatorio para añadirlo."
   }
 }

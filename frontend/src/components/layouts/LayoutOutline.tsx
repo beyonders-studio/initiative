@@ -38,7 +38,7 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
 import type { MetadataOwner } from "@/hooks/useProperties";
-import { LAYOUT_REGIONS } from "@/lib/layouts/detailLayout";
+import { isRequired, LAYOUT_REGIONS } from "@/lib/layouts/detailLayout";
 import {
   addableFields,
   addablePluginParts,
@@ -482,7 +482,11 @@ export const DetailLayoutOutline = ({
         <PartTree
           root={detail}
           depth={1}
-          partLabel={partLabel}
+          partLabel={(node) =>
+            isRequired(node)
+              ? translate("layouts:required.part", { name: partLabel(node) })
+              : partLabel(node)
+          }
           hideAction={(node) =>
             FIXED.has(node.type) || !removable(node, fields)
               ? null

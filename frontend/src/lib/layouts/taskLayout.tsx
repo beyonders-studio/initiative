@@ -76,6 +76,7 @@ import {
 } from "@/lib/userDisplay";
 
 import { type DetailKind, useItemContext } from "./DetailLayoutView";
+import { filledBy } from "./detailLayout";
 import { FieldFrame, sameIds, sameJson, useFieldDraft } from "./editing";
 import { DescriptionField, TagsField, TitleField } from "./fieldEditors";
 import { TASK_LAYOUT, taskFields, taskLayoutFor } from "./tasks";
@@ -732,6 +733,18 @@ export const TASK_DETAIL: DetailKind<TaskRead, TaskLayoutContext, TaskUpdate> = 
   addingParts: ["status", "dates"],
   // The type picks the page the rest is laid out as.
   addingUpFront: ["type"],
+  filled: filledBy<TaskRead>(
+    {
+      description: (task) => Boolean(task.description?.trim()),
+      assignees: (task) => task.assignees.length > 0,
+      checklist: (task) => task.checklist.length > 0,
+      recurrence: (task) => task.recurrence !== null,
+      tags: (task) => task.tags.length > 0,
+      // Either date fills them.
+      dates: (task) => task.start_date !== null || task.due_date !== null,
+    },
+    (task) => task.properties
+  ),
 };
 
 /** A task not yet added to `projectId`, in `status` and of `type`, as its

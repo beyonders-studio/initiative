@@ -13,7 +13,7 @@ import { propertySaves } from "@/hooks/useProperties";
 import type { TranslateFn } from "@/types/i18n";
 
 import { type DetailKind, useItemContext } from "./DetailLayoutView";
-import { PlacedProperties } from "./detailLayout";
+import { filledBy, PlacedProperties } from "./detailLayout";
 import { ReadField } from "./editing";
 import { PlacedPropertyField } from "./fieldEditors";
 import { FIELD_RENDERERS, isEmptyValue, type LayoutItem, PROPERTY_FIELD_PREFIX } from "./fields";
@@ -131,4 +131,6 @@ export const FILE_DETAIL: DetailKind<CollectionFileSummary, FileLayoutContext, n
     canOpen: { tool: Tool.file, id: file.id },
     links: { entity: file },
   }),
+  // A collection requires its own metadata, which the file holds there.
+  filled: filledBy<CollectionFileSummary>({}, (file) => file.metadata),
 };

@@ -495,6 +495,11 @@
       "copyPlaceholder": "Otra colección",
       "copyHint": "Sus propiedades y lo que muestran sus listas, sin sus archivos ni sus valores.",
       "create": "Crear colección"
+    },
+    "required": {
+      "title": "Lo que pide {{name}}",
+      "description": "Cada archivo que entra en esta colección empieza con estos valores.",
+      "confirm": "Continuar"
     }
   }
 }

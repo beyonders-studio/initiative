@@ -31,6 +31,7 @@ import type {
   GetCollectionFilesTimelineParams,
   ListCollectionFilesParams,
   PropertySummary,
+  PropertyValueInput,
   TimelineResponse,
 } from "@/api/generated/initiativeAPI.schemas";
 import { PropertyTarget } from "@/api/generated/initiativeAPI.schemas";
@@ -196,15 +197,22 @@ export const useDeleteCollection = (options?: MutationOpts<void, number>) =>
     options
   );
 
+/** Files to put in a collection, and the values of its metadata each starts
+ *  with: what its file page requires. */
+export interface FilesToAdd {
+  fileIds: number[];
+  metadata?: PropertyValueInput[];
+}
+
 /** Put files in a collection. One already in it stays as it is. */
 export const useAddCollectionFiles = (
   collectionId: number,
-  options?: MutationOpts<CollectionRead, number[]>
+  options?: MutationOpts<CollectionRead, FilesToAdd>
 ) =>
-  useCommunityMutation<CollectionRead, number[]>(
+  useCommunityMutation<CollectionRead, FilesToAdd>(
     {
-      mutationFn: (communityId, fileIds) =>
-        addCollectionFiles(communityId, collectionId, { file_ids: fileIds }),
+      mutationFn: (communityId, { fileIds, metadata }) =>
+        addCollectionFiles(communityId, collectionId, { file_ids: fileIds, metadata }),
       invalidate: invalidateCollectionContents,
       errorKey: "files:collections.error",
     },
@@ -227,6 +235,13 @@ export const useRemoveCollectionFiles = (
     options
   );
 
+/** A file to upload into a collection, with the values of its metadata it
+ *  starts with there. */
+export interface FileToUpload {
+  file: File;
+  metadata?: PropertyValueInput[];
+}
+
 /**
  * Upload one file into the collection's initiative and put it in the
  * collection. One pair of requests per file — a drop of forty is forty of
@@ -239,18 +254,21 @@ export const useRemoveCollectionFiles = (
  */
 export const useUploadToCollection = (
   collection: Pick<CollectionRead, "id" | "initiative_id"> | undefined,
-  options?: MutationOpts<FileRead, File>
+  options?: MutationOpts<FileRead, FileToUpload>
 ) =>
-  useCommunityMutation<FileRead, File>(
+  useCommunityMutation<FileRead, FileToUpload>(
     {
-      mutationFn: async (communityId, file) => {
+      mutationFn: async (communityId, { file, metadata }) => {
         if (!collection) throw new Error("no collection to upload into");
         const uploaded = await uploadFile(communityId, {
           file,
           name: nameWithoutExtension(file.name),
           initiative_id: collection.initiative_id,
         });
-        await addCollectionFiles(communityId, collection.id, { file_ids: [uploaded.id] });
+        await addCollectionFiles(communityId, collection.id, {
+          file_ids: [uploaded.id],
+          metadata,
+        });
         return uploaded;
       },
     },

@@ -808,5 +808,16 @@
   "SHARE_REQUEST_ALREADY_SHARED": "Ya tienes ese acceso",
   "SHARE_REQUEST_ALREADY_PENDING": "Ya lo has pedido y nadie ha respondido todavía",
   "SHARE_REQUEST_NOTHING_TO_ASK": "Ya puedes abrir todo lo que hay aquí",
-  "SHARE_REQUEST_CANNOT_ANSWER": "Esa solicitud ya tiene respuesta o no te corresponde responderla"
+  "SHARE_REQUEST_CANNOT_ANSWER": "Esa solicitud ya tiene respuesta o no te corresponde responderla",
+  "REQUIRED_FIELDS_MISSING": "Primero rellena lo obligatorio: {{fields}}.",
+  "requiredFields": {
+    "description": "Descripción",
+    "assignees": "Asignados",
+    "checklist": "Lista de tareas",
+    "recurrence": "Se repite",
+    "tags": "Etiquetas",
+    "dates": "Fechas de inicio y vencimiento",
+    "location": "Ubicación",
+    "attendees": "Asistentes"
+  }
 }

@@ -112,6 +112,7 @@ const UNLOADED_PROPERTY: FieldDef = {
   source: "property",
   label: "",
   hideable: false,
+  requireable: false,
   value: () => null,
 };
 
