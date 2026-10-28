@@ -170,6 +170,15 @@
     "textBody_other": "You have {{count}} overdue tasks:",
     "redactedItem": "A task is overdue"
   },
+  "comingUp": {
+    "subject": "Coming up",
+    "title": "Coming up",
+    "body_one": "You have <strong>{{count}}</strong> thing coming up:",
+    "body_other": "You have <strong>{{count}}</strong> things coming up:",
+    "taskDetail": "due <strong>{{when}}</strong>, in <strong>{{projectName}}</strong>",
+    "eventDetail": "starts <strong>{{when}}</strong>",
+    "redactedItem": "Something is coming up"
+  },
   "accessGrant": {
     "buttonLabel": "Open Access dashboard",
     "greeting": "Hi <strong>{{name}}</strong>,",

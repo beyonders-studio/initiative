@@ -15,7 +15,7 @@ from app.core.notification_categories import (
     Channel,
     NotificationCategory,
 )
-from app.models.platform.user_notification_prefs import EmailCadence
+from app.models.platform.user_notification_prefs import DigestCadence, EmailCadence
 from app.services.platform.notification_prefs import (
     DEFAULT_DIGEST_CLOCK,
     DEFAULT_DIGEST_WEEKDAY,
@@ -53,13 +53,29 @@ class EmailSchedule(SanitizedBaseModel):
     model_config = ConfigDict(json_schema_serialization_defaults_required=True)
 
     cadence: EmailCadence = EmailCadence.instant
-    #: HH:MM in the account's own timezone. Governs the daily and weekly slots
-    #: and, whatever the cadence, the time the overdue reminder goes out.
+    #: HH:MM in the account's own timezone, for the daily and weekly slots.
     at: str = DEFAULT_DIGEST_CLOCK
     #: ISO weekday, Monday is 1.
     weekday: int = Field(default=DEFAULT_DIGEST_WEEKDAY, ge=1, le=7)
     #: Whether what another person addressed to this account skips the queue.
     personal_instant: bool = True
+
+    @field_validator("at")
+    @classmethod
+    def _clock(cls, value: str) -> str:
+        return _valid_clock(value)
+
+
+class DigestSchedule(SanitizedBaseModel):
+    """When one digest goes out."""
+
+    model_config = ConfigDict(json_schema_serialization_defaults_required=True)
+
+    cadence: DigestCadence = DigestCadence.daily
+    #: HH:MM in the account's own timezone.
+    at: str
+    #: ISO weekday, Monday is 1, for a weekly digest.
+    weekday: int = Field(default=DEFAULT_DIGEST_WEEKDAY, ge=1, le=7)
 
     @field_validator("at")
     @classmethod
@@ -122,6 +138,9 @@ class NotificationPreferencesRead(SanitizedBaseModel):
     #: When email goes out. Always present — an account that has chosen nothing
     #: reads its own defaults here rather than the page carrying a copy.
     email: EmailSchedule = Field(default_factory=EmailSchedule)
+    #: When each digest goes out, for every digest category. Always present,
+    #: for the same reason ``email`` is.
+    digests: dict[NotificationCategory, DigestSchedule] = Field(default_factory=dict)
     #: The stand-down in force, or None. A lapsed one reads as None.
     pause: Optional[PauseRead] = None
     #: Whether to hold off while the account is plainly already looking.
@@ -167,6 +186,8 @@ class NotificationPreferencesUpdate(SanitizedBaseModel):
     #: "not mentioned" in a partial write.
     clear_quiet_hours: bool = False
     email: Optional[EmailSchedule] = None
+    #: Digests whose schedule moved, each stored whole.
+    digests: dict[NotificationCategory, DigestSchedule] = Field(default_factory=dict)
     #: When a stand-down begins. Omitted means now, which is the ordinary case;
     #: a date is how somebody books next week's holiday before they go.
     pause_from: Optional[datetime] = None

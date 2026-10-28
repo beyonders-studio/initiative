@@ -1536,8 +1536,8 @@ async def update_me(
         normalized_timezone = normalize_timezone(update_data["timezone"])
         if normalized_timezone:
             if normalized_timezone != current_user.timezone:
-                # The overdue digest goes out at a time of their day.
-                sooner.append("overdue")
+                # The digests go out at a time of their day.
+                sooner += ["overdue", "coming_up"]
             current_user.timezone = normalized_timezone
     if "event_reminder_minutes_before" in update_data:
         # ``None`` is a valid value here (reminders off), so assign directly.

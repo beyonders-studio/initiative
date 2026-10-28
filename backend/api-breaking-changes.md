@@ -1944,6 +1944,28 @@ for the detail of a file opened from a collection.
 - DELETE /api/v1/c/{community_id}/layouts/{kind} added `#/components/schemas/FileFieldId` to the `layouts/items/oneOf[subschema #2: DetailLayoutRead]/definition/side/anyOf[subschema #1]/items/oneOf[subschema #3: DetailFieldPart]/props/field` response property `anyOf` list for the response status `200`
 - DELETE /api/v1/c/{community_id}/layouts/{kind} added the new `file` enum value to the `layouts/items/oneOf[subschema #2: DetailLayoutRead]/kind` response property for the response status `200`
 
+### Digests have their own rows
+
+The overdue reminder is the `overdue` category, beside a new `coming_up`
+digest, both in a `digests` group, and `coming_up` is a notification type.
+A digest writes no bell line, so `coming_up` never appears in the
+notifications list; it is in the enum because the type is shared.
+
+- GET /api/v1/me/notification-preferences added the new `coming_up` enum value to the `categories/items/category` response property for the response status `200`
+- GET /api/v1/me/notification-preferences added the new `coming_up` enum value to the `communities/items/off/items/` response property for the response status `200`
+- GET /api/v1/me/notification-preferences added the new `digests` enum value to the `categories/items/group` response property for the response status `200`
+- GET /api/v1/me/notification-preferences added the new `overdue` enum value to the `categories/items/category` response property for the response status `200`
+- GET /api/v1/me/notification-preferences added the new `overdue` enum value to the `communities/items/off/items/` response property for the response status `200`
+- PUT /api/v1/me/notification-preferences added the new `coming_up` enum value to the `categories/items/category` response property for the response status `200`
+- PUT /api/v1/me/notification-preferences added the new `coming_up` enum value to the `communities/items/off/items/` response property for the response status `200`
+- PUT /api/v1/me/notification-preferences added the new `digests` enum value to the `categories/items/group` response property for the response status `200`
+- PUT /api/v1/me/notification-preferences added the new `overdue` enum value to the `categories/items/category` response property for the response status `200`
+- PUT /api/v1/me/notification-preferences added the new `overdue` enum value to the `communities/items/off/items/` response property for the response status `200`
+- GET /api/v1/notifications/ added the new `coming_up` enum value to the `notifications/items/type` response property for the response status `200`
+- GET /api/v1/notifications/{notification_id}/alert added the new `coming_up` enum value to the `notification/type` response property for the response status `200`
+- POST /api/v1/notifications/{notification_id}/read added the new `coming_up` enum value to the `type` response property for the response status `200`
+- POST /api/v1/notifications/{notification_id}/unread added the new `coming_up` enum value to the `type` response property for the response status `200`
+
 ## After 0.76.0
 
 ### New values in a response's enums

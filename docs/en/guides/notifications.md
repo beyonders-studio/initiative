@@ -55,7 +55,7 @@ The first four rows are about what happens in your communities, sorted by how it
 | Row | You hear about it when… |
 |---|---|
 | **Mentions and replies** | Somebody writes your name, replies to something you said, or reacts to your comment. |
-| **Assigned to you** | You're given a task or invited to something, or something you're on is due, changes, gets cancelled, or is about to start. |
+| **Assigned to you** | You're given a task or invited to something, or something you're on changes, gets cancelled, or is about to start. |
 | **Subscribed** | Somebody changes, comments on or reacts to something you [follow](your-space.md#subscribing). That includes everything you made. |
 | **New in your communities** | A post goes up where you can see it, you're added to an initiative or a project, or your request to join one is answered. |
 | **Waiting on you** | Somebody needs your decision — a join request, an access request. |
@@ -72,16 +72,29 @@ If you answer [cases](../running-a-server/platform-roles.md#where-operations-wor
 
 ![Notification settings](../images/notifications/settings.png)
 
-## When you hear about it
+## Digests
 
-Everything above is *whether*. This is *when*, and it's one setting: **Email arrives**, under **When you hear about it**.
+The grid is things as they happen. **Digests** are the summaries: one message, on a schedule, each with its own switches, its own day and its own time.
+
+| Digest | What's in it |
+|---|---|
+| **Overdue tasks** | Every task assigned to you that's past its due date, from every community, in one list. On until you say otherwise. |
+| **Coming up** | The tasks due and the events starting before the next one. Off until you ask for it. Weekly on a Monday at 08:00 is a decent way to meet the week before it meets you. |
+
+Each goes **every day** or **every week**, at the time you pick, by email, to your phone, or both. Everything in one is already in your bell, so a digest is the list rather than more news. An empty one doesn't arrive: no overdue tasks, no overdue email.
+
+### Gathered email
+
+Everything in the grid can reach your inbox the moment it happens, or wait and come as one message. That's **Email arrives**.
 
 | Email arrives | What lands in your inbox |
 |---|---|
 | **Right away** | One message per thing, as it happens. The default. |
 | **Once an hour** | On the hour, everything since the last one. |
-| **Once a day** | One message at a time you pick. |
+| **Once a day** | One message, at a time you pick. |
 | **Once a week** | One message on a day you pick. |
+
+The digests above keep their own times, whatever you pick here.
 
 Anything held comes as a **single** message, grouped by community and then by what it was:
 
@@ -109,7 +122,6 @@ Two things soften the edges of that:
 - **Mentions in a text document** arrive as one line too. Somebody tidying a page that names you in four places tells you once, until you've read it.
 - **Task assignments** arrive as one summary once the dust has settled. Somebody assigning you ten things reaches you as one message rather than ten.
 - **Reactions** work the same way, for the same reason: they arrive in flurries.
-- **Overdue tasks** ride along with your scheduled email. Chose weekly? You hear about them weekly, rather than being chased daily about the same list.
 - **Event reminders** are set per event — at the start, or a chosen number of minutes, hours or days before.
 
 !!! tip "Set your timezone. Genuinely."

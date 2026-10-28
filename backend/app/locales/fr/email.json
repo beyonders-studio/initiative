@@ -170,6 +170,15 @@
     "textBody_other": "Vous avez {{count}} tâches en retard :",
     "redactedItem": "Une tâche est en retard"
   },
+  "comingUp": {
+    "subject": "À venir",
+    "title": "À venir",
+    "body_one": "Vous avez <strong>{{count}}</strong> chose à venir :",
+    "body_other": "Vous avez <strong>{{count}}</strong> choses à venir :",
+    "taskDetail": "échéance <strong>{{when}}</strong>, dans <strong>{{projectName}}</strong>",
+    "eventDetail": "commence <strong>{{when}}</strong>",
+    "redactedItem": "Quelque chose arrive bientôt"
+  },
   "accessGrant": {
     "buttonLabel": "Ouvrir le tableau de bord des accès",
     "greeting": "Bonjour <strong>{{name}}</strong>,",

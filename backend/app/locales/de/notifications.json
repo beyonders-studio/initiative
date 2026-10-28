@@ -11,6 +11,11 @@
       "body_other": "{{count}} Aufgaben sind überfällig, darunter {{title}}"
     }
   },
+  "comingUp": {
+    "title": "Demnächst",
+    "body_one": "{{count}} Sache steht an: {{title}}",
+    "body_other": "{{count}} Sachen stehen an, zuerst {{title}}"
+  },
   "initiative": {
     "added": {
       "title": "Zur Initiative hinzugefügt",

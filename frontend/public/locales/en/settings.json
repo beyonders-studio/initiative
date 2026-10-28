@@ -375,7 +375,9 @@
       "cases": "Cases",
       "direct_messages": "Messages and connections",
       "jobs": "Exports and imports",
-      "account": "Your account"
+      "account": "Your account",
+      "overdue": "Overdue tasks",
+      "coming_up": "Coming up"
     },
     "reminderLeadTime": {
       "label": "Remind me",
@@ -399,11 +401,12 @@
     "groups": {
       "your_communities": "In your communities",
       "community": "Needs you",
-      "account": "Just you"
+      "account": "Just you",
+      "digests": "Digests"
     },
     "categoryDescriptions": {
       "mentions": "Somebody named you, replied to you or reacted to your comment.",
-      "assignments": "You were given a task or invited to something, or what you're on is due, changed, cancelled or about to start.",
+      "assignments": "You were given a task or invited to something, or what you're on changed, was cancelled or is about to start.",
       "subscriptions": "Changes, comments and reactions on what you follow, which includes what you made. The bell on anything stops it.",
       "news": "A post went up, you were added to an initiative or a project, or your request to join was answered.",
       "approvals": "Somebody is waiting on your decision. Always shows in the bell.",
@@ -411,7 +414,9 @@
       "cases": "A case opened where you work cases, or its requester answered and nobody has taken it.",
       "direct_messages": "Somebody messaged you, asked to connect, or accepted. Who and how many, never what a message says.",
       "jobs": "An export or import you asked for has finished.",
-      "account": "Something was done to your account. Always shows in the bell."
+      "account": "Something was done to your account. Always shows in the bell.",
+      "overdue": "Every task assigned to you that is past its due date, in one message.",
+      "coming_up": "Tasks due and events starting before the next one, in one message."
     },
     "quietHours": {
       "title": "Quiet hours",
@@ -431,19 +436,15 @@
       "offHere": "Off here: {{rows}}"
     },
     "timing": {
-      "title": "When you hear about it",
-      "description": "Email can arrive as it happens or gathered up. Nothing is held back that you have not asked us to hold.",
       "cadence": {
         "label": "Email arrives",
         "instant": "Right away",
         "hourly": "Once an hour",
         "daily": "Once a day",
-        "weekly": "Once a week",
-        "help": "Anything held is gathered into one message."
+        "weekly": "Once a week"
       },
       "day": "On",
       "time": "At",
-      "timeHelp": "Your scheduled email, and the overdue reminder, go out at this time.",
       "personalInstant": "Send things addressed to me right away",
       "personalInstantHelp": "Mentions, replies, tasks assigned to you, invitations and direct messages skip the queue.",
       "respectPresence": "Don't interrupt me while I'm using Initiative",
@@ -468,6 +469,16 @@
       "saveError": "Unable to update when you hear about things",
       "zone": "Times are in {{timezone}}.",
       "changeZone": "Change time zone"
+    },
+    "digests": {
+      "title": "Digests",
+      "description": "Summaries on a schedule. Everything in them is already in your bell.",
+      "frequency": "How often",
+      "daily": "Every day",
+      "weekly": "Every week",
+      "gatheredEmail": "Gathered email",
+      "gatheredEmailHelp": "Email from the rows above arrives right away, or gathered into one message.",
+      "afterPause": "When a pause or quiet hours end, you also get one summary of what came in."
     },
     "weekdays": {
       "1": "Monday",

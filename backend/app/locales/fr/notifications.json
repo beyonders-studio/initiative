@@ -11,6 +11,11 @@
       "body_other": "{{count}} tâches sont en retard, dont {{title}}"
     }
   },
+  "comingUp": {
+    "title": "À venir",
+    "body_one": "{{count}} chose à venir : {{title}}",
+    "body_other": "{{count}} choses à venir, à commencer par {{title}}"
+  },
   "initiative": {
     "added": {
       "title": "Ajouté à l'initiative",

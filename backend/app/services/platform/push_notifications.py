@@ -80,6 +80,9 @@ PUSH_CHANNELS: dict[NotificationType, str] = {
     NotificationType.event_cancelled: "calendar_events",
     NotificationType.event_rsvp: "calendar_events",
     NotificationType.event_reminder: "event_reminder",
+    # Tasks and events alike, which no channel the installed app registers
+    # describes, so the general one until the digests share a channel (#3065).
+    NotificationType.coming_up: DEFAULT_CHANNEL,
     NotificationType.access_grant_requested: "access_grants",
     NotificationType.access_grant_approved: "access_grants",
     NotificationType.access_grant_denied: "access_grants",

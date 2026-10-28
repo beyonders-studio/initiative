@@ -743,6 +743,54 @@ def sweeps() -> tuple[Sweep, ...]:
             ),
         ),
         Sweep(
+            kind="coming_up",
+            scope=Scope.LIVE,
+            every=timedelta(minutes=5),
+            # The finish answers each community's next digest time: the
+            # soonest of its people with something coming up.
+            prepare=_coming_up,
+            next_due=lambda now: least(
+                notifications.coming_up_tasks(
+                    func.min(Task.due_date) - notifications.COMING_UP_REACH,
+                    after=now,
+                    until=None,
+                ),
+                notifications.attending(
+                    func.min(CalendarEvent.start_at) - notifications.COMING_UP_REACH,
+                    after=now,
+                    until=None,
+                ),
+            ),
+            sources=(
+                on_row(
+                    "tasks",
+                    "{row}.due_date - interval '8 days'",
+                    events="INSERT OR UPDATE OF due_date, task_status_id, archived_at",
+                    when="NEW.due_date IS NOT NULL AND NEW.archived_at IS NULL",
+                ),
+                on_row("task_assignees", "now()"),
+                on_row(
+                    "calendar_events",
+                    "CASE WHEN {row}.recurrence IS NULL"
+                    " THEN {row}.start_at - interval '8 days' ELSE now() END",
+                    events=(
+                        "INSERT OR UPDATE OF start_at, recurrence,"
+                        " recurrence_until, deleted_at"
+                    ),
+                    when="NEW.deleted_at IS NULL",
+                ),
+                on_row("calendar_event_attendees", "now()"),
+                on_row("calendar_event_answers", "now()", events="INSERT OR UPDATE"),
+                on_row(
+                    "projects",
+                    "now()",
+                    events="UPDATE OF archived_at, is_template",
+                ),
+                # A status moved out of done reopens its tasks.
+                on_row("task_statuses", "now()", events="UPDATE OF category"),
+            ),
+        ),
+        Sweep(
             kind="plugin_updates",
             scope=Scope.ACTIVE,
             every=hour,
@@ -805,6 +853,12 @@ async def _overdue() -> Scan:
     from app.services import notifications
 
     return notifications.overdue_scan(now=datetime.now(timezone.utc))
+
+
+async def _coming_up() -> Scan:
+    from app.services import notifications
+
+    return notifications.coming_up_scan(now=datetime.now(timezone.utc))
 
 
 def _by_kind() -> dict[str, Sweep]:

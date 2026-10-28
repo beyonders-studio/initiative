@@ -170,6 +170,15 @@
     "textBody_other": "Tienes {{count}} tareas vencidas:",
     "redactedItem": "Una tarea está vencida"
   },
+  "comingUp": {
+    "subject": "Próximamente",
+    "title": "Próximamente",
+    "body_one": "Tienes <strong>{{count}}</strong> cosa próxima:",
+    "body_other": "Tienes <strong>{{count}}</strong> cosas próximas:",
+    "taskDetail": "vence <strong>{{when}}</strong>, en <strong>{{projectName}}</strong>",
+    "eventDetail": "empieza <strong>{{when}}</strong>",
+    "redactedItem": "Se acerca algo"
+  },
   "accessGrant": {
     "buttonLabel": "Abrir panel de accesos",
     "greeting": "Hola <strong>{{name}}</strong>:",

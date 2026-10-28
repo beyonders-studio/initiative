@@ -1544,6 +1544,49 @@ def direct_message_pieces(user: User, *, sender_name: str, link: str) -> EmailPi
     )
 
 
+def coming_up_pieces(user: User, items: Sequence[dict]) -> EmailPieces:
+    """What is due and what starts before the next one, soonest first."""
+    locale = _user_locale(user)
+
+    def item_html(item: dict) -> str:
+        if item.get("redacted"):
+            return _redacted_item(
+                email_t("comingUp.redactedItem", locale=locale), item.get("link")
+            )
+        # ``title`` is user-controlled and spliced into markup directly (not via
+        # email_t), so escape it here.
+        title = _html.escape(item.get("title") or "")
+        link = item.get("link")
+        title_markup = (
+            f'<a href="{link}"><strong>{title}</strong></a>'
+            if link
+            else f"<strong>{title}</strong>"
+        )
+        detail = (
+            email_t(
+                "comingUp.taskDetail",
+                locale=locale,
+                when=item.get("when") or "",
+                projectName=item.get("project_name") or "",
+            )
+            if item.get("kind") == "task"
+            else email_t(
+                "comingUp.eventDetail", locale=locale, when=item.get("when") or ""
+            )
+        )
+        return f"<li>{title_markup} ({detail})</li>"
+
+    items_html = "".join(item_html(item) for item in items)
+    return EmailPieces(
+        subject=email_t("comingUp.subject", locale=locale, escape=False),
+        headline=email_t("comingUp.title", locale=locale),
+        body=(
+            f"{email_t('comingUp.body', locale=locale, count=len(items))}"
+            f"<ul>{items_html}</ul>"
+        ),
+    )
+
+
 def overdue_tasks_pieces(user: User, tasks: Sequence[dict]) -> EmailPieces:
     """What is past due, as one list."""
     locale = _user_locale(user)

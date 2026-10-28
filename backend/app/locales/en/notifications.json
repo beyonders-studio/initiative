@@ -11,6 +11,11 @@
       "body_other": "{{count}} tasks are overdue, including {{title}}"
     }
   },
+  "comingUp": {
+    "title": "Coming up",
+    "body_one": "{{count}} thing coming up: {{title}}",
+    "body_other": "{{count}} things coming up, starting with {{title}}"
+  },
   "initiative": {
     "added": {
       "title": "Added to Initiative",
