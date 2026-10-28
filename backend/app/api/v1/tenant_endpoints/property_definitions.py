@@ -244,8 +244,10 @@ async def _definitions_or_404(
     owned: bool = False,
 ) -> list[MetadataDefinition]:
     """``ids``, each a definition of the initiative's that people define, in
-    the order named and locked for the change; with ``owned``, each a project's
-    or a collection's property. One that is not answers 404 for them all."""
+    the order named; with ``owned``, each a project's or a collection's
+    property. One that is not answers 404 for them all. Read, not locked: a
+    definition the request may read but not change is refused by name once
+    asked (:func:`_require_removable`), and then locked (:func:`_lock`)."""
     stmt = select(MetadataDefinition).where(
         col(MetadataDefinition.id).in_(ids),
         MetadataDefinition.initiative_id == initiative_id,
@@ -258,15 +260,34 @@ async def _definitions_or_404(
                 col(MetadataDefinition.collection_id).is_not(None),
             )
         )
-    found = {
-        defn.id: defn for defn in (await session.exec(stmt.with_for_update())).all()
-    }
+    found = {defn.id: defn for defn in (await session.exec(stmt)).all()}
     if set(found) != set(ids):
         raise HTTPException(
             status_code=status.HTTP_404_NOT_FOUND,
             detail=PropertyMessages.DEFINITION_NOT_FOUND,
         )
     return [found[definition_id] for definition_id in dict.fromkeys(ids)]
+
+
+async def _lock(
+    session: AsyncSession, definitions: Sequence[MetadataDefinition]
+) -> None:
+    """Lock ``definitions`` for the change, once the request may make it,
+    reading each again as it now stands. Locking takes the write policy, so
+    one gone or out of reach since it was read answers 404."""
+    ids = [defn.id for defn in definitions]
+    locked = await session.exec(
+        select(MetadataDefinition.id)
+        .where(col(MetadataDefinition.id).in_(ids))
+        .with_for_update()
+    )
+    if set(locked.all()) != set(ids):
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail=PropertyMessages.DEFINITION_NOT_FOUND,
+        )
+    for defn in definitions:
+        await session.refresh(defn)
 
 
 def _same_scope(defn: MetadataDefinition | PropertyDefinitionCreate) -> list:
@@ -280,10 +301,7 @@ def _same_scope(defn: MetadataDefinition | PropertyDefinitionCreate) -> list:
 
 
 async def _get_definition_or_404(
-    session: AsyncSession,
-    definition_id: int,
-    *,
-    lock: bool = False,
+    session: AsyncSession, definition_id: int
 ) -> MetadataDefinition:
     """Fetch a definition by id, relying on RLS for scope enforcement.
 
@@ -296,8 +314,6 @@ async def _get_definition_or_404(
         MetadataDefinition.id == definition_id,
         col(MetadataDefinition.install_id).is_(None),
     )
-    if lock:
-        stmt = stmt.with_for_update()
     result = await session.exec(stmt)
     defn = result.one_or_none()
     if defn is None:
@@ -502,6 +518,7 @@ async def delete_property_definitions(
     alone asks, none."""
     definitions = await _definitions_or_404(session, payload.initiative_id, payload.ids)
     await _require_removable(session, definitions, current_user, guild_context)
+    await _lock(session, definitions)
     await session.exec(
         delete(MetadataDefinition).where(col(MetadataDefinition.id).in_(payload.ids))
     )
@@ -531,6 +548,7 @@ async def promote_property_definitions(
     await _require_removable(session, sources, current_user, guild_context)
     _require_scope(guild_context, _PROPERTIES_WRITE)
     await _ensure_initiative_member(session, guild_context, payload.initiative_id)
+    await _lock(session, sources)
     target = await metadata_service.promote(session, sources, name=payload.name)
     await session.commit()
     await session.refresh(target)
@@ -600,13 +618,14 @@ async def update_property_definition(
     the SPA can warn about dangling values. A project's or a collection's
     metadata is changed by whoever may define it.
     """
-    defn = await _get_definition_or_404(session, definition_id, lock=True)
+    defn = await _get_definition_or_404(session, definition_id)
     _require_write_scope(guild_context, defn)
 
     data = payload.model_dump(exclude_unset=True)
-    if not await _require_owner_writable(
+    reshapes = await _require_owner_writable(
         session, defn, current_user, guild_context
-    ) and not _manages(guild_context, defn.initiative_id):
+    ) or _manages(guild_context, defn.initiative_id)
+    if not reshapes:
         # A member adds options and nothing else: the ones sent that are new
         # join the list as it stands, so two members adding at once both land,
         # and the options already there are left as they are.
@@ -615,8 +634,10 @@ async def update_property_definition(
             MetadataType.multi_select,
         }:
             raise _manager_required()
-        added = _added_options(defn, payload.options or [])
         await _ensure_initiative_member(session, guild_context, defn.initiative_id)
+    await _lock(session, [defn])
+    if not reshapes:
+        added = _added_options(defn, payload.options or [])
         defn.options = [*(defn.options or []), *added]
         defn.updated_at = datetime.now(timezone.utc)
         session.add(defn)

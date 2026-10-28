@@ -13,7 +13,10 @@ Covers /api/v1/property-definitions CRUD including:
 from datetime import datetime, timedelta, timezone
 from decimal import Decimal
 
+import pytest
 from httpx import AsyncClient
+from sqlalchemy import delete, update
+from sqlalchemy.exc import DBAPIError
 from sqlmodel import col, select
 from sqlmodel.ext.asyncio.session import AsyncSession
 
@@ -979,3 +982,65 @@ async def test_promote_moves_no_value_onto_what_the_reader_may_not_edit(
         )
     )
     assert kept.all() == [rating.id]
+
+
+async def test_the_database_refuses_a_projects_property_to_whoever_only_reads_it(
+    session: AsyncSession, acting_user, reading_as
+):
+    """Written on the request's own login and routing, with no route in front:
+    a member who reads project B and may not edit it reads B's property and
+    can't make, change or delete one; on project A, which they may edit, the
+    same statements land."""
+    owner = await acting_user(guild_role=CommunityRole.member, initiative=True)
+    member = await acting_user(
+        guild_role=CommunityRole.member,
+        guild=owner.guild,
+        initiative=owner.initiative,
+        initiative_role="member",
+    )
+    initiative = owner.initiative
+    editable = await create_project(session, initiative, owner.user, name="Alpha")
+    readable = await create_project(session, initiative, owner.user, name="Beta")
+    await create_resource_grant(
+        session, editable, user=member.user, level=ResourceAccessLevel.write
+    )
+    await create_resource_grant(session, readable, all_initiative_members=True)
+    alpha = await create_property_definition(session, initiative, project=editable)
+    beta = await create_property_definition(session, initiative, project=readable)
+
+    writer = await reading_as(member.user.id, owner.guild.id)
+    seen = await writer.exec(
+        select(MetadataDefinition.id).where(
+            col(MetadataDefinition.id).in_([alpha.id, beta.id])
+        )
+    )
+    assert sorted(seen.all()) == sorted([alpha.id, beta.id])
+
+    def renamed(definition: MetadataDefinition):
+        return (
+            update(MetadataDefinition)
+            .where(col(MetadataDefinition.id) == definition.id)
+            .values(name="Renamed")
+        )
+
+    assert (await writer.exec(renamed(beta))).rowcount == 0
+    removed = delete(MetadataDefinition).where(col(MetadataDefinition.id) == beta.id)
+    assert (await writer.exec(removed)).rowcount == 0
+    assert (await writer.exec(renamed(alpha))).rowcount == 1
+    await writer.commit()
+
+    for project, refused in ((editable, False), (readable, True)):
+        writer.add(
+            MetadataDefinition(
+                initiative_id=initiative.id,
+                project_id=project.id,
+                name=f"Made in {project.name}",
+                type=MetadataType.text,
+            )
+        )
+        if refused:
+            with pytest.raises(DBAPIError):
+                await writer.commit()
+            await writer.rollback()
+        else:
+            await writer.commit()
