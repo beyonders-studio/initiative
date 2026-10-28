@@ -15,7 +15,7 @@ Every custom value is one list on an item's read, `properties`: the
 initiative's properties, a project's or a collection's metadata, and the values
 installed plug-ins show, each saying whose it is. `plugin_values` is gone from
 every read. `PropertyType` is `MetadataType`, which takes a plug-in's `link`,
-`badge` and `json`.
+`badge` and `json`. Dashboards read the values as `metadata_definitions` and `metadata_values`.
 
 - GET /api/v1/c/{community_id}/calendar-entries/ added the new `badge` enum value to the `events/items/properties/items/type` response property for the response status `200`
 - GET /api/v1/c/{community_id}/calendar-entries/ added the new `badge` enum value to the `polls/items/properties/items/type` response property for the response status `200`
@@ -525,6 +525,8 @@ every read. `PropertyType` is `MetadataType`, which takes a plug-in's `link`,
 - GET /api/v1/me/wikis added the new `badge` enum value to the `items/items/properties/items/type` response property for the response status `200`
 - GET /api/v1/me/wikis added the new `json` enum value to the `items/items/properties/items/type` response property for the response status `200`
 - GET /api/v1/me/wikis added the new `link` enum value to the `items/items/properties/items/type` response property for the response status `200`
+- GET /api/v1/fields/{dataset} removed the enum value `property_definitions` from the `path` request parameter `dataset`
+- GET /api/v1/fields/{dataset} removed the enum value `property_values` from the `path` request parameter `dataset`
 
 ### Files take their categories
 
