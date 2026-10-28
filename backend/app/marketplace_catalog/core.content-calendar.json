@@ -9,7 +9,7 @@
   "avatar_url": "/marketplace/core-content-calendar.svg",
   "images": [],
   "version": "1.2.0",
-  "release_notes": "Posts, newsletters, videos and episodes are each their own type, with a page of their own. A new newsletter, video or episode starts with a checklist of its steps. The project's fields are its own properties rather than the initiative's metadata.",
+  "release_notes": "Posts, newsletters, videos and episodes are each their own type, with a page of their own. A new newsletter, video or episode starts with a checklist of its steps. The project's fields are its own properties rather than the initiative's metadata. The due date is the publish date, so the separate Publish date field is gone.",
   "definition": {
     "type": "initiative-project",
     "schema_version": 1,
@@ -162,17 +162,9 @@
         "project": true
       },
       {
-        "name": "Publish date",
-        "type": "date",
-        "position": 1.0,
-        "color": null,
-        "options": null,
-        "project": true
-      },
-      {
         "name": "Link",
         "type": "url",
-        "position": 2.0,
+        "position": 1.0,
         "color": null,
         "options": null,
         "project": true
@@ -230,12 +222,6 @@
                         "type": "field",
                         "props": {
                           "field": "property:1"
-                        }
-                      },
-                      {
-                        "type": "field",
-                        "props": {
-                          "field": "property:2"
                         }
                       },
                       {
@@ -317,7 +303,6 @@
             "title",
             "property:1",
             "property:2",
-            "property:3",
             "assignees",
             "dueDate",
             "priority",
@@ -355,12 +340,6 @@
                   "type": "field",
                   "props": {
                     "field": "property:2"
-                  }
-                },
-                {
-                  "type": "field",
-                  "props": {
-                    "field": "property:3"
                   }
                 }
               ]
@@ -430,12 +409,6 @@
                   "type": "field",
                   "props": {
                     "field": "property:2"
-                  }
-                },
-                {
-                  "type": "field",
-                  "props": {
-                    "field": "property:3"
                   }
                 }
               ]
@@ -512,12 +485,6 @@
                   "props": {
                     "field": "property:2"
                   }
-                },
-                {
-                  "type": "field",
-                  "props": {
-                    "field": "property:3"
-                  }
                 }
               ]
             },
@@ -592,12 +559,6 @@
                   "type": "field",
                   "props": {
                     "field": "property:2"
-                  }
-                },
-                {
-                  "type": "field",
-                  "props": {
-                    "field": "property:3"
                   }
                 }
               ]
@@ -803,17 +764,9 @@
         "project": true
       },
       {
-        "name": "Publish date",
-        "type": "date",
-        "position": 1.0,
-        "color": null,
-        "options": null,
-        "project": true
-      },
-      {
         "name": "Link",
         "type": "url",
-        "position": 2.0,
+        "position": 1.0,
         "color": null,
         "options": null,
         "project": true
@@ -907,12 +860,6 @@
               "newsletter"
             ],
             "project": true
-          },
-          {
-            "property_name": "Publish date",
-            "property_type": "date",
-            "value_text": "2000-01-13",
-            "project": true
           }
         ],
         "type_name": "Post"
@@ -955,12 +902,6 @@
               "blog"
             ],
             "project": true
-          },
-          {
-            "property_name": "Publish date",
-            "property_type": "date",
-            "value_text": "2000-01-10",
-            "project": true
           }
         ],
         "type_name": "Episode"
@@ -1002,12 +943,6 @@
               "newsletter"
             ],
             "project": true
-          },
-          {
-            "property_name": "Publish date",
-            "property_type": "date",
-            "value_text": "2000-01-06",
-            "project": true
           }
         ],
         "type_name": "Newsletter"
@@ -1031,12 +966,6 @@
             "value_json": [
               "social"
             ],
-            "project": true
-          },
-          {
-            "property_name": "Publish date",
-            "property_type": "date",
-            "value_text": "2000-01-05",
             "project": true
           }
         ],
@@ -1062,12 +991,6 @@
               "blog",
               "social"
             ],
-            "project": true
-          },
-          {
-            "property_name": "Publish date",
-            "property_type": "date",
-            "value_text": "2000-01-03",
             "project": true
           }
         ],
@@ -1125,12 +1048,6 @@
                         "type": "field",
                         "props": {
                           "field": "property:1"
-                        }
-                      },
-                      {
-                        "type": "field",
-                        "props": {
-                          "field": "property:2"
                         }
                       },
                       {
@@ -1212,7 +1129,6 @@
             "title",
             "property:1",
             "property:2",
-            "property:3",
             "assignees",
             "dueDate",
             "priority",
@@ -1250,12 +1166,6 @@
                   "type": "field",
                   "props": {
                     "field": "property:2"
-                  }
-                },
-                {
-                  "type": "field",
-                  "props": {
-                    "field": "property:3"
                   }
                 }
               ]
@@ -1325,12 +1235,6 @@
                   "type": "field",
                   "props": {
                     "field": "property:2"
-                  }
-                },
-                {
-                  "type": "field",
-                  "props": {
-                    "field": "property:3"
                   }
                 }
               ]
@@ -1407,12 +1311,6 @@
                   "props": {
                     "field": "property:2"
                   }
-                },
-                {
-                  "type": "field",
-                  "props": {
-                    "field": "property:3"
-                  }
                 }
               ]
             },
@@ -1487,12 +1385,6 @@
                   "type": "field",
                   "props": {
                     "field": "property:2"
-                  }
-                },
-                {
-                  "type": "field",
-                  "props": {
-                    "field": "property:3"
                   }
                 }
               ]

@@ -9,7 +9,7 @@
   "avatar_url": "/marketplace/core-grant-tracker.svg",
   "images": [],
   "version": "1.2.0",
-  "release_notes": "Grants, appeals and reports are each their own type, with a page of their own, and each starts with a checklist of its steps. The project's fields are its own properties rather than the initiative's metadata. The amounts are money, in US dollars.",
+  "release_notes": "Grants, appeals and reports are each their own type, with a page of their own, and each starts with a checklist of its steps. The project's fields are its own properties rather than the initiative's metadata. The amounts are money, in US dollars. The due date is the deadline, so the separate Deadline field is gone.",
   "definition": {
     "type": "initiative-project",
     "schema_version": 1,
@@ -178,17 +178,9 @@
         "project": true
       },
       {
-        "name": "Deadline",
-        "type": "date",
-        "position": 4.0,
-        "color": null,
-        "options": null,
-        "project": true
-      },
-      {
         "name": "Report due",
         "type": "date",
-        "position": 5.0,
+        "position": 4.0,
         "color": null,
         "options": null,
         "project": true
@@ -252,12 +244,6 @@
                         "type": "field",
                         "props": {
                           "field": "property:3"
-                        }
-                      },
-                      {
-                        "type": "field",
-                        "props": {
-                          "field": "property:5"
                         }
                       },
                       {
@@ -368,7 +354,6 @@
             "property:3",
             "property:4",
             "property:5",
-            "property:6",
             "assignees",
             "dueDate",
             "priority",
@@ -457,12 +442,6 @@
                   "props": {
                     "field": "property:5"
                   }
-                },
-                {
-                  "type": "field",
-                  "props": {
-                    "field": "property:6"
-                  }
                 }
               ]
             },
@@ -529,12 +508,6 @@
                   "props": {
                     "field": "property:4"
                   }
-                },
-                {
-                  "type": "field",
-                  "props": {
-                    "field": "property:5"
-                  }
                 }
               ]
             },
@@ -596,7 +569,7 @@
                 {
                   "type": "field",
                   "props": {
-                    "field": "property:6"
+                    "field": "property:5"
                   }
                 }
               ]
@@ -818,17 +791,9 @@
         "project": true
       },
       {
-        "name": "Deadline",
-        "type": "date",
-        "position": 4.0,
-        "color": null,
-        "options": null,
-        "project": true
-      },
-      {
         "name": "Report due",
         "type": "date",
-        "position": 5.0,
+        "position": 4.0,
         "color": null,
         "options": null,
         "project": true
@@ -891,12 +856,6 @@
             "value_number": 5000.0,
             "currency": "USD",
             "project": true
-          },
-          {
-            "property_name": "Deadline",
-            "property_type": "date",
-            "value_text": "2000-02-12",
-            "project": true
           }
         ],
         "type_name": "Grant"
@@ -956,12 +915,6 @@
             "property_type": "currency",
             "value_number": 12000.0,
             "currency": "USD",
-            "project": true
-          },
-          {
-            "property_name": "Deadline",
-            "property_type": "date",
-            "value_text": "2000-03-03",
             "project": true
           }
         ],
@@ -1023,12 +976,6 @@
             "value_number": 25000.0,
             "currency": "USD",
             "project": true
-          },
-          {
-            "property_name": "Deadline",
-            "property_type": "date",
-            "value_text": "2000-01-17",
-            "project": true
           }
         ],
         "type_name": "Grant"
@@ -1088,12 +1035,6 @@
             "property_type": "currency",
             "value_number": 8000.0,
             "currency": "USD",
-            "project": true
-          },
-          {
-            "property_name": "Deadline",
-            "property_type": "date",
-            "value_text": "2000-01-05",
             "project": true
           }
         ],
@@ -1164,12 +1105,6 @@
             "project": true
           },
           {
-            "property_name": "Deadline",
-            "property_type": "date",
-            "value_text": "2000-01-03",
-            "project": true
-          },
-          {
             "property_name": "Report due",
             "property_type": "date",
             "value_text": "2000-02-02",
@@ -1233,12 +1168,6 @@
             "property_type": "currency",
             "value_number": 40000.0,
             "currency": "USD",
-            "project": true
-          },
-          {
-            "property_name": "Deadline",
-            "property_type": "date",
-            "value_text": "2000-01-03",
             "project": true
           }
         ],
@@ -1363,12 +1292,6 @@
                       {
                         "type": "field",
                         "props": {
-                          "field": "property:5"
-                        }
-                      },
-                      {
-                        "type": "field",
-                        "props": {
                           "field": "assignees"
                         }
                       },
@@ -1474,7 +1397,6 @@
             "property:3",
             "property:4",
             "property:5",
-            "property:6",
             "assignees",
             "dueDate",
             "priority",
@@ -1563,12 +1485,6 @@
                   "props": {
                     "field": "property:5"
                   }
-                },
-                {
-                  "type": "field",
-                  "props": {
-                    "field": "property:6"
-                  }
                 }
               ]
             },
@@ -1635,12 +1551,6 @@
                   "props": {
                     "field": "property:4"
                   }
-                },
-                {
-                  "type": "field",
-                  "props": {
-                    "field": "property:5"
-                  }
                 }
               ]
             },
@@ -1702,7 +1612,7 @@
                 {
                   "type": "field",
                   "props": {
-                    "field": "property:6"
+                    "field": "property:5"
                   }
                 }
               ]
