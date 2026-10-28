@@ -5,7 +5,7 @@
     "version": "9.0.0",
     "x-initiative-source": {
       "version": "0.77.1",
-      "commit": "1a62d88cd3a0c85e71e391e2e6890f80a6fe277a"
+      "commit": "efa16ee25a363fd946adac3d4a3626d322922156"
     }
   },
   "servers": [
@@ -5172,7 +5172,7 @@
           "files"
         ],
         "summary": "List Collection Shapes",
-        "description": "The ready-made shapes a new collection can start as, grouped, in the\nreader's language: the lists each shows and opens on, and its fields.",
+        "description": "The ready-made shapes a new collection can start as, grouped, in the\nreader's language: the lists each shows and opens on, and its metadata.",
         "operationId": "list_collection_shapes",
         "security": [
           {
@@ -5313,7 +5313,7 @@
           "files"
         ],
         "summary": "Create Collection",
-        "description": "Make a collection of files. It starts with the files named, each one a\nfile of the initiative the reader can open. Takes the initiative role's\nright to create files. It starts blank, as a ready-made ``shape`` with\nits words in the maker's language, or with the fields and lists of\n``shape_from``, a collection of the same initiative the maker sees.",
+        "description": "Make a collection of files. It starts with the files named, each one a\nfile of the initiative the reader can open. Takes the initiative role's\nright to create files. It starts blank, as a ready-made ``shape`` with\nits words in the maker's language, or with the metadata and lists of\n``shape_from``, a collection of the same initiative the maker sees.",
         "operationId": "create_collection",
         "security": [
           {
@@ -5566,14 +5566,14 @@
         ]
       }
     },
-    "/collections/{collection_id}/files/{file_id}/fields": {
+    "/collections/{collection_id}/files/{file_id}/metadata": {
       "get": {
         "tags": [
           "files"
         ],
-        "summary": "Get Collection File Fields",
-        "description": "One file's values of the collection's own fields, for a file in the\ncollection the reader can open.",
-        "operationId": "get_collection_file_fields",
+        "summary": "Get Collection File Metadata",
+        "description": "One file's values of the collection's metadata, for a file in the\ncollection the reader can open.",
+        "operationId": "get_collection_file_metadata",
         "security": [
           {
             "PluginToken": []
@@ -5589,7 +5589,7 @@
                   "items": {
                     "$ref": "#/components/schemas/PropertySummary"
                   },
-                  "title": "Response Get Collection File Fields"
+                  "title": "Response Get Collection File Metadata"
                 }
               }
             }
@@ -5647,9 +5647,9 @@
         "tags": [
           "files"
         ],
-        "summary": "Set Collection File Fields",
-        "description": "Replace one file's values of the collection's own fields, or with\n``merge`` write only the ones named, as ``PUT /properties`` does for a\nproperty. The file is one in the collection the reader can open, and the\nvalues are the collection's: they take the right to change the\ncollection, not to edit the file. An empty list clears them all.",
-        "operationId": "set_collection_file_fields",
+        "summary": "Set Collection File Metadata",
+        "description": "Replace one file's values of the collection's metadata, or with\n``merge`` write only the ones named, as ``PUT /properties`` does for a\nproperty. The file is one in the collection the reader can open, and the\nvalues are the collection's: they take the right to change the\ncollection, not to edit the file. An empty list clears them all.",
+        "operationId": "set_collection_file_metadata",
         "security": [
           {
             "PluginToken": []
@@ -5675,7 +5675,7 @@
                   "items": {
                     "$ref": "#/components/schemas/PropertySummary"
                   },
-                  "title": "Response Set Collection File Fields"
+                  "title": "Response Set Collection File Metadata"
                 }
               }
             }
@@ -10600,7 +10600,7 @@
           "property-definitions"
         ],
         "summary": "List Property Definitions",
-        "description": "List property definitions.\n\nWith ``initiative_id``, returns definitions for that initiative only\n(filtered explicitly and subject to RLS). Without it, RLS returns the\nunion across every initiative the caller can see — used by global\nviews (My Tasks, Created Tasks, global Files list). A collection's own\nfields are listed only with its ``collection_id``, and only to whoever\nsees the collection.",
+        "description": "List property definitions, or a project's or a collection's metadata.\n\nWith ``initiative_id``, returns definitions for that initiative only\n(filtered explicitly and subject to RLS). Without it, RLS returns the\nunion across every initiative the caller can see — used by global\nviews (My Tasks, Created Tasks, global Files list). A project's metadata\nis listed only with its ``project_id``, and only to whoever can open the\nproject; a collection's only with its ``collection_id``, and only to\nwhoever sees the collection.",
         "operationId": "list_property_definitions",
         "security": [
           {
@@ -10665,6 +10665,24 @@
             }
           },
           {
+            "name": "project_id",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "integer"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "description": "List this project's metadata instead of properties.",
+              "title": "Project Id"
+            },
+            "description": "List this project's metadata instead of properties."
+          },
+          {
             "name": "collection_id",
             "in": "query",
             "required": false,
@@ -10677,10 +10695,10 @@
                   "type": "null"
                 }
               ],
-              "description": "List this collection's own fields instead of properties.",
+              "description": "List this collection's metadata instead of properties.",
               "title": "Collection Id"
             },
-            "description": "List this collection's own fields instead of properties."
+            "description": "List this collection's metadata instead of properties."
           },
           {
             "name": "session_token",
@@ -10705,7 +10723,7 @@
           "property-definitions"
         ],
         "summary": "Create Property Definition",
-        "description": "Create a new property definition on an initiative, or with\n``collection_id`` a field of that collection's own.\n\nA property requires the caller to be in the target initiative (or a guild\nadmin); an installed plug-in also needs ``properties:write``. A\ncollection's field requires the right to change the collection (and\n``files:write`` of a plug-in). A rating is a collection's field only.",
+        "description": "Create a new property definition on an initiative, or with\n``project_id`` or ``collection_id`` that project's or collection's\nmetadata.\n\nA property requires the caller to be in the target initiative (or a guild\nadmin); an installed plug-in also needs ``properties:write``. A project's\nmetadata requires the right to write the project's tasks (and\n``projects:write`` of a plug-in); a collection's the right to change the\ncollection (and ``files:write`` of a plug-in).",
         "operationId": "create_property_definition",
         "security": [
           {
@@ -10745,9 +10763,10 @@
           }
         },
         "x-plugin-scope": {
-          "per": "property_scope",
+          "per": "owner's_scope",
           "any_of": [
             "files:write",
+            "projects:write",
             "properties:write"
           ]
         },
@@ -10777,7 +10796,7 @@
           "property-definitions"
         ],
         "summary": "Update Property Definition",
-        "description": "Update a property definition.\n\nType changes are not allowed via this endpoint; callers should\ndelete the definition and re-create. Changing the option list on a\nselect / multi_select definition returns ``orphaned_value_count`` so\nthe SPA can warn about dangling values. A collection's field is changed\nby whoever may change the collection.",
+        "description": "Update a property definition.\n\nType changes are not allowed via this endpoint; callers should\ndelete the definition and re-create. Changing the option list on a\nselect / multi_select definition returns ``orphaned_value_count`` so\nthe SPA can warn about dangling values. A project's or a collection's\nmetadata is changed by whoever may define it.",
         "operationId": "update_property_definition",
         "security": [
           {
@@ -10817,9 +10836,10 @@
           }
         },
         "x-plugin-scope": {
-          "per": "property_scope",
+          "per": "owner's_scope",
           "any_of": [
             "files:write",
+            "projects:write",
             "properties:write"
           ]
         },
@@ -10856,7 +10876,7 @@
           "property-definitions"
         ],
         "summary": "Delete Property Definition",
-        "description": "Delete a property definition. Cascades to remove all attached values.\nA collection's field is removed by whoever may change the collection.",
+        "description": "Delete a property definition. Cascades to remove all attached values.\nA project's or a collection's metadata is removed by whoever may define\nit.",
         "operationId": "delete_property_definition",
         "security": [
           {
@@ -10879,9 +10899,10 @@
           }
         },
         "x-plugin-scope": {
-          "per": "property_scope",
+          "per": "owner's_scope",
           "any_of": [
             "files:write",
+            "projects:write",
             "properties:write"
           ]
         },
@@ -11906,13 +11927,6 @@
             },
             "type": "array",
             "title": "Extra Starts"
-          },
-          "plugin_values": {
-            "items": {
-              "$ref": "#/components/schemas/PluginValueSummary"
-            },
-            "type": "array",
-            "title": "Plugin Values"
           }
         },
         "type": "object",
@@ -11941,8 +11955,7 @@
           "attendees",
           "overridden_fields",
           "skipped_starts",
-          "extra_starts",
-          "plugin_values"
+          "extra_starts"
         ],
         "title": "CalendarEventRead"
       },
@@ -12781,7 +12794,7 @@
           "name"
         ],
         "title": "CollectionCreate",
-        "description": "A new collection, made with the files it starts with: a collection is\nnever empty. It starts blank (its grid and table, and no fields of its\nown), as a ready-made ``shape``, or with the fields and lists of another\ncollection in the initiative (``shape_from``), none of its values."
+        "description": "A new collection, made with the files it starts with: a collection is\nnever empty. It starts blank (its grid and table, and no metadata of its\nown), as a ready-made ``shape``, or with the metadata and lists of another\ncollection in the initiative (``shape_from``), none of its values."
       },
       "CollectionFileListResponse": {
         "properties": {
@@ -13060,12 +13073,12 @@
             "format": "date-time",
             "title": "Added At"
           },
-          "fields": {
+          "metadata": {
             "items": {
               "$ref": "#/components/schemas/PropertySummary"
             },
             "type": "array",
-            "title": "Fields"
+            "title": "Metadata"
           },
           "kind": {
             "$ref": "#/components/schemas/FileKind",
@@ -13104,11 +13117,11 @@
           "height",
           "smart_link_url",
           "added_at",
-          "fields",
+          "metadata",
           "kind"
         ],
         "title": "CollectionFileSummary",
-        "description": "A file as its collection lists it: with when it was added there, and\nits values of the collection's own fields."
+        "description": "A file as its collection lists it: with when it was added there, and\nits values of the collection's metadata."
       },
       "CollectionFiles": {
         "properties": {
@@ -13276,12 +13289,12 @@
             "type": "array",
             "title": "Properties"
           },
-          "fields": {
+          "metadata": {
             "items": {
               "$ref": "#/components/schemas/PropertyDefinitionRead"
             },
             "type": "array",
-            "title": "Fields"
+            "title": "Metadata"
           },
           "can": {
             "$ref": "#/components/schemas/CollectionCan"
@@ -13307,7 +13320,7 @@
           "comment_count",
           "tags",
           "properties",
-          "fields",
+          "metadata",
           "can"
         ],
         "title": "CollectionRead",
@@ -13342,12 +13355,12 @@
             "type": "array",
             "title": "Lists"
           },
-          "fields": {
+          "metadata": {
             "items": {
-              "$ref": "#/components/schemas/CollectionShapeField"
+              "$ref": "#/components/schemas/CollectionShapeMetadata"
             },
             "type": "array",
-            "title": "Fields"
+            "title": "Metadata"
           }
         },
         "type": "object",
@@ -13356,55 +13369,9 @@
           "name",
           "hint",
           "lists",
-          "fields"
+          "metadata"
         ],
         "title": "CollectionShapeEntry"
-      },
-      "CollectionShapeField": {
-        "properties": {
-          "name": {
-            "type": "string",
-            "title": "Name"
-          },
-          "type": {
-            "$ref": "#/components/schemas/PropertyType"
-          },
-          "display": {
-            "anyOf": [
-              {
-                "type": "string",
-                "enum": [
-                  "number",
-                  "stars",
-                  "bar"
-                ]
-              },
-              {
-                "type": "null"
-              }
-            ],
-            "title": "Display"
-          },
-          "currency": {
-            "anyOf": [
-              {
-                "$ref": "#/components/schemas/CurrencyCode"
-              },
-              {
-                "type": "null"
-              }
-            ]
-          }
-        },
-        "type": "object",
-        "required": [
-          "name",
-          "type",
-          "display",
-          "currency"
-        ],
-        "title": "CollectionShapeField",
-        "description": "A field a ready-made shape brings, in the reader's language."
       },
       "CollectionShapeGroup": {
         "properties": {
@@ -13441,6 +13408,52 @@
         ],
         "title": "CollectionShapeKey",
         "description": "A ready-made shape a collection can start as."
+      },
+      "CollectionShapeMetadata": {
+        "properties": {
+          "name": {
+            "type": "string",
+            "title": "Name"
+          },
+          "type": {
+            "$ref": "#/components/schemas/MetadataType"
+          },
+          "display": {
+            "anyOf": [
+              {
+                "type": "string",
+                "enum": [
+                  "number",
+                  "stars",
+                  "bar"
+                ]
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Display"
+          },
+          "currency": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/CurrencyCode"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          }
+        },
+        "type": "object",
+        "required": [
+          "name",
+          "type",
+          "display",
+          "currency"
+        ],
+        "title": "CollectionShapeMetadata",
+        "description": "Metadata a ready-made shape brings, in the reader's language."
       },
       "CollectionUpdate": {
         "properties": {
@@ -14694,13 +14707,6 @@
             "type": "array",
             "title": "Properties"
           },
-          "plugin_values": {
-            "items": {
-              "$ref": "#/components/schemas/PluginValueSummary"
-            },
-            "type": "array",
-            "title": "Plugin Values"
-          },
           "created_at": {
             "type": "string",
             "format": "date-time",
@@ -14727,7 +14733,6 @@
           "view_mode",
           "position",
           "properties",
-          "plugin_values",
           "created_at",
           "updated_at"
         ],
@@ -16554,6 +16559,27 @@
         "title": "InitiativeTaskStatusRead",
         "description": "A status column as it appears across one initiative's projects.\n\nEntries are aggregated by ``(name, category)``, so the same column\nconfigured in several projects collapses to a single row; ``color`` and\n``icon`` come from the first project that defines it. ``project_count`` is\nhow many of the projects the caller can read carry the column, out of\n``projects_total``."
       },
+      "MetadataType": {
+        "type": "string",
+        "enum": [
+          "text",
+          "number",
+          "checkbox",
+          "date",
+          "datetime",
+          "url",
+          "select",
+          "multi_select",
+          "user_reference",
+          "currency",
+          "scale",
+          "link",
+          "badge",
+          "json"
+        ],
+        "title": "MetadataType",
+        "description": "What a metadata definition's values are.\n\nThe property types, which every owner may define, and beside them the\nkinds only a plug-in's definitions take: ``link`` and ``badge``, and\n``json`` for a key its manifest declares no field for."
+      },
       "OccurrenceRequest": {
         "properties": {
           "start": {
@@ -16662,29 +16688,6 @@
         ],
         "title": "PluginPerson",
         "type": "object"
-      },
-      "PluginValueSummary": {
-        "properties": {
-          "plugin_id": {
-            "type": "integer",
-            "title": "Plugin Id"
-          },
-          "key": {
-            "type": "string",
-            "title": "Key"
-          },
-          "value": {
-            "title": "Value"
-          }
-        },
-        "type": "object",
-        "required": [
-          "plugin_id",
-          "key",
-          "value"
-        ],
-        "title": "PluginValueSummary",
-        "description": "One value an installed plug-in shows on an item: a key its pinned\nversion declares as a field there. A list field's value is an array of its\nelements, newest first, each with its ``ref``."
       },
       "PollOptionRead": {
         "properties": {
@@ -17269,13 +17272,6 @@
                 "type": "null"
               }
             ]
-          },
-          "plugin_values": {
-            "items": {
-              "$ref": "#/components/schemas/PluginValueSummary"
-            },
-            "type": "array",
-            "title": "Plugin Values"
           }
         },
         "type": "object",
@@ -17309,8 +17305,7 @@
           "comment_count",
           "reactions",
           "body",
-          "poll",
-          "plugin_values"
+          "poll"
         ],
         "title": "PostRead"
       },
@@ -17908,7 +17903,7 @@
             "title": "Name"
           },
           "type": {
-            "$ref": "#/components/schemas/PropertyType"
+            "$ref": "#/components/schemas/MetadataType"
           },
           "position": {
             "type": "number",
@@ -17955,6 +17950,17 @@
             "type": "integer",
             "title": "Initiative Id"
           },
+          "project_id": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Project Id"
+          },
           "collection_id": {
             "anyOf": [
               {
@@ -17984,7 +17990,7 @@
             "title": "Name"
           },
           "type": {
-            "$ref": "#/components/schemas/PropertyType"
+            "$ref": "#/components/schemas/MetadataType"
           },
           "position": {
             "type": "number",
@@ -18035,6 +18041,17 @@
             "type": "integer",
             "title": "Initiative Id"
           },
+          "project_id": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Project Id"
+          },
           "collection_id": {
             "anyOf": [
               {
@@ -18067,6 +18084,7 @@
           "currency",
           "id",
           "initiative_id",
+          "project_id",
           "collection_id",
           "created_at",
           "updated_at"
@@ -18236,7 +18254,51 @@
             "title": "Name"
           },
           "type": {
-            "$ref": "#/components/schemas/PropertyType"
+            "$ref": "#/components/schemas/MetadataType"
+          },
+          "project_id": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Project Id"
+          },
+          "collection_id": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Collection Id"
+          },
+          "install_id": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Install Id"
+          },
+          "key": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Key"
           },
           "options": {
             "anyOf": [
@@ -18264,7 +18326,7 @@
           },
           "value": {
             "title": "Value",
-            "description": "Shaped by the property's type. For user_reference, a person: id, username, discriminator, display_name and avatar_url, or an PluginPerson when the reader is an installed plug-in."
+            "description": "Shaped by the definition's type. For user_reference, a person: id, username, discriminator, display_name and avatar_url, or an PluginPerson when the reader is an installed plug-in. A plug-in's value is as the plug-in wrote it: a list field's an array of its elements, newest first, each with its ref, and a value with a state the state beside it."
           }
         },
         "type": "object",
@@ -18272,6 +18334,10 @@
           "property_id",
           "name",
           "type",
+          "project_id",
+          "collection_id",
+          "install_id",
+          "key",
           "options",
           "currency",
           "value"
@@ -18299,24 +18365,6 @@
         ],
         "title": "PropertyTarget",
         "description": "What can carry custom property values: every tool and sub-tool."
-      },
-      "PropertyType": {
-        "type": "string",
-        "enum": [
-          "text",
-          "number",
-          "checkbox",
-          "date",
-          "datetime",
-          "url",
-          "select",
-          "multi_select",
-          "user_reference",
-          "currency",
-          "rating"
-        ],
-        "title": "PropertyType",
-        "description": "Supported value types for a property definition."
       },
       "PropertyValueInput": {
         "properties": {
@@ -18631,13 +18679,6 @@
             "type": "string",
             "format": "date-time",
             "title": "Created At"
-          },
-          "plugin_values": {
-            "items": {
-              "$ref": "#/components/schemas/PluginValueSummary"
-            },
-            "type": "array",
-            "title": "Plugin Values"
           }
         },
         "type": "object",
@@ -18656,8 +18697,7 @@
           "attachment_count",
           "held_at_round",
           "created_by",
-          "created_at",
-          "plugin_values"
+          "created_at"
         ],
         "title": "QueueItemRead"
       },
@@ -20104,14 +20144,6 @@
             "type": "array",
             "title": "Properties",
             "default": []
-          },
-          "plugin_values": {
-            "items": {
-              "$ref": "#/components/schemas/PluginValueSummary"
-            },
-            "type": "array",
-            "title": "Plugin Values",
-            "default": []
           }
         },
         "type": "object",
@@ -20155,8 +20187,7 @@
           "parent",
           "subtask_progress",
           "tags",
-          "properties",
-          "plugin_values"
+          "properties"
         ],
         "title": "TaskListRead",
         "description": "Lightweight schema for task list endpoints - excludes heavy nested data"
@@ -20629,14 +20660,6 @@
             "type": "array",
             "title": "Properties",
             "default": []
-          },
-          "plugin_values": {
-            "items": {
-              "$ref": "#/components/schemas/PluginValueSummary"
-            },
-            "type": "array",
-            "title": "Plugin Values",
-            "default": []
           }
         },
         "type": "object",
@@ -20678,8 +20701,7 @@
           "parent",
           "subtask_progress",
           "tags",
-          "properties",
-          "plugin_values"
+          "properties"
         ],
         "title": "TaskRead"
       },
