@@ -58,7 +58,9 @@ async def _require(
 
 async def _task_type(session: AsyncSession, a: Any, project_id: int) -> int:
     await route_session_to_guild(session, a.guild.id)
-    return (await task_types_service.list_types(session, project_id))[0].id
+    type_id = (await task_types_service.list_types(session, project_id))[0].id
+    assert type_id is not None
+    return type_id
 
 
 async def _require_on_tasks(

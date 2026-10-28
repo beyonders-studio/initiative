@@ -18,7 +18,10 @@ import { CreatePostDialog } from "./CreatePostDialog";
 
 vi.mock("@/components/ui/editor/editor", () => ({ Editor: () => null }));
 
-const required = (field: string) => ({ type: "field", props: { field, required: true } });
+const required = (field: string) => ({
+  type: "field" as const,
+  props: { field, required: true },
+});
 
 describe("CreatePostDialog", () => {
   it("asks for what the posts page requires, and posts nothing until it has it", async () => {
