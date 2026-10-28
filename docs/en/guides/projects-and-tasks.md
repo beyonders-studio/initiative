@@ -55,6 +55,7 @@ A task can hold:
 | **Tags** | Labels for finding things later — see [Tags](tags.md). |
 | **Recurring** | Make it come back on a schedule. |
 | **Properties** | Your initiative's own fields — see [Custom properties](initiatives.md#custom-properties). |
+| **Metadata** | Fields only this project's tasks have — see [Project metadata](#project-metadata). |
 
 ![Editing a task's details](../images/projects/task-details.png)
 
@@ -316,11 +317,18 @@ Change any of it from **Project settings → Layouts → Edit layouts**. That's 
 - **Layouts** — how its lists and tasks are laid out, and which list it opens on. See [Layouts](#layouts).
 - **Task statuses** — your workflow.
 - **Task types** — the kinds of task the project holds, and a shortcut to each one's page. See [Task types](#task-types).
+- **Metadata** — fields of the project's own. See below.
 - **Advanced** — save as a template, [duplicate](tools.md#duplicating) it here or into another initiative, export, archive, delete.
+
+### Project metadata
+
+Some things only matter in one project. The sprint a bug landed in. Which van the delivery goes on. Nobody planning the summer fete needs a "Van" box on their tasks, so it doesn't belong to the whole initiative.
+
+That's **metadata**: fields that belong to the project and turn up on its tasks alone. Make it in **Project settings → Metadata**, or from **Add** in the layout editor, which asks whether a new field is the project's metadata or one of the initiative's [properties](initiatives.md#custom-properties). It takes the same types properties do. Whoever can change the project's tasks can change its metadata; everyone else sees the list.
 
 ### Moving a task to another project
 
-You can move a task from its menu. One thing that catches people out: because every project can have its own statuses, a moved task restarts at the new project's default status. Its type comes along if the new project has one with the same name, and becomes that project's default type if not.
+You can move a task from its menu. One thing that catches people out: because every project can have its own statuses, a moved task restarts at the new project's default status. Its type comes along if the new project has one with the same name, and becomes that project's default type if not. Its metadata keeps a value wherever the new project has metadata with the same name and type, and drops the rest.
 
 Nothing's broken and you haven't lost anything. Set the new status and carry on.
 

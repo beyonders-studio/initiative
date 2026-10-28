@@ -241,11 +241,13 @@ On a collection's page, drop files anywhere to upload them straight in, or **Add
 
 **Layouts** in the collection's menu opens its layout editor, the same one a project's layouts use. Pick which views the collection offers and the one it opens on, the table's columns, what each card shows under the picture, and the **File detail**: what sits beside a file when you open it from the collection.
 
-### A collection's fields
+### A collection's metadata
 
-A collection can have **fields** of its own: a price, a rating, the day a photo was taken. Make one in the layout editor, with **Add** wherever a field can go, and it lands right there. The values belong to the collection, not the file, so the same photo can be "£40, four stars" in the shop catalogue and just a picture in the fete gallery. Open a file from the collection to fill them in; until the file detail is changed, it shows every field the collection has.
+A collection can have **metadata** of its own: a price, a rating, the day a photo was taken. Make it in the layout editor, with **Add** wherever a field can go, and it lands right there. The values belong to the collection, not the file, so the same photo can be "£40, four stars" in the shop catalogue and just a picture in the fete gallery. Open a file from the collection to fill them in; until the file detail is changed, it shows all of the collection's metadata.
 
-Lists can also show the initiative's own [properties](initiatives.md#custom-properties), which a file carries wherever it goes. Fields are for what only makes sense in this collection.
+**Metadata**, at the top of the layout editor, is where it gets renamed, put in order or deleted. Deleting takes every file's value in this collection with it, so it asks first.
+
+Lists can also show the initiative's own [properties](initiatives.md#custom-properties), which a file carries wherever it goes. Metadata is for what only makes sense in this collection.
 
 !!! tip "A collection doesn't change who sees a file"
     Each file keeps its own sharing. Somebody opening a collection sees the files in it they could already open, and nothing else. If they can't open any of them, the collection doesn't show up for them at all.

@@ -181,7 +181,9 @@ Hidden content is **held for the platform**:
 
 ### Custom properties
 
-A property is a field your initiative needs and Initiative didn't think of: "Budget code", "Squad", "Signed off by". Make one here, or from **Add property** on anything that has properties. Once it exists, every project, task, file, event and the rest in this initiative can carry it.
+A property is a field your initiative needs and Initiative didn't think of: "Budget code", "Squad", "Signed off by". It belongs to the initiative. Make one here, or from **Add property** on anything that has properties. Once it exists, every project, task, file, event and the rest in this initiative can carry it.
+
+Something only one project or one collection cares about is its **metadata** instead, and lives there: [a project's](projects-and-tasks.md#project-metadata) in its settings, [a collection's](files.md#a-collections-metadata) on its layouts page. This list holds the initiative's own.
 
 | Type | Holds |
 |---|---|
@@ -195,7 +197,7 @@ A property is a field your initiative needs and Initiative didn't think of: "Bud
 | **Multi-select** | Several options from that list. |
 | **Person** | Somebody who can open the thing it's on. |
 | **Money** | An amount, in the one currency the property names. |
-| **Rating** | 1 to 100. A layout draws it as the number, stars or a bar. |
+| **Scale** | 0 to 100. A layout draws it as a percentage, stars or a bar. |
 
 Typing a new option into a select adds it to the list. Deleting a property deletes every value set for it in the initiative, so it asks first.
 
