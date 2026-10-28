@@ -121,7 +121,7 @@
     "graphology": "^0.26.0",
     "graphology-layout-forceatlas2": "^0.10.1",
     "i18next": "^26.5.7",
-    "i18next-http-backend": "^4.0.4",
+    "i18next-http-backend": "^4.0.5",
     "lexical": "^0.52.0",
     "lucide-react": "^1.61.0",
     "mermaid": "^12.2.0",
