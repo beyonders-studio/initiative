@@ -73,6 +73,9 @@ export const useProperties = (options?: {
   });
 };
 
+/** No definitions, as one list, for a read not yet answered. */
+export const NO_DEFINITIONS: PropertyDefinitionRead[] = [];
+
 /**
  * What can be placed on an item where an owner keeps metadata beside the
  * initiative's properties: the owner's metadata first, then the properties.

@@ -27,7 +27,7 @@ import {
   Search,
   Square,
 } from "lucide-react";
-import { type ReactNode, useRef, useState } from "react";
+import { createContext, type ReactNode, useContext, useRef, useState } from "react";
 import { useTranslation } from "react-i18next";
 
 import type { MetadataType } from "@/api/generated/initiativeAPI.schemas";
@@ -58,7 +58,12 @@ import {
   type Selection,
   sameSelection,
 } from "@/lib/layouts/draft";
-import { type FieldDef, LAYOUT_NAMESPACES, propertyFieldId } from "@/lib/layouts/fields";
+import {
+  type FieldDef,
+  groupFields,
+  LAYOUT_NAMESPACES,
+  propertyFieldId,
+} from "@/lib/layouts/fields";
 import type { PluginOnItems } from "@/lib/layouts/plugins";
 import type { LayoutNode } from "@/lib/layouts/tree";
 import { cn } from "@/lib/utils";
@@ -116,6 +121,10 @@ const row = (): LayoutNode => ({
 /** The title an accordion is added with, selected so typing names it. */
 export const accordionTitle = (translate: TranslateFn) => translate("layouts:blocks.accordion");
 
+/** What the part showing every property is called, as an i18n key: on a
+ *  project's tasks it shows the project's metadata as well. */
+export const PropertiesPartName = createContext("layouts:allProperties");
+
 /** What Add offers where something is added: the fields, each plug-in's
  *  parts, and the other parts. */
 export type AddChoices = {
@@ -141,7 +150,8 @@ export const listChoices = (
   layout: ListLayout,
   fields: ReadonlyMap<string, FieldDef>,
   plugins: PickerPlugin[],
-  translate: TranslateFn
+  translate: TranslateFn,
+  propertiesPart = "layouts:allProperties"
 ): AddChoices => {
   if (layout.kind === "calendar" || layout.kind === "gantt") {
     return { fields: [], plugins: [], parts: [] };
@@ -163,7 +173,7 @@ export const listChoices = (
             : [
                 {
                   group: "panel" as const,
-                  label: translate("layouts:allProperties"),
+                  label: translate(propertiesPart),
                   node: { type: "properties" },
                 },
               ]),
@@ -179,7 +189,8 @@ export const detailChoices = (
   { spec, words }: EditableDetail,
   fields: ReadonlyMap<string, FieldDef>,
   plugins: PickerPlugin[],
-  translate: TranslateFn
+  translate: TranslateFn,
+  propertiesPart = "layouts:allProperties"
 ): AddChoices => {
   const named = namedFields(detail);
   return {
@@ -214,7 +225,7 @@ export const detailChoices = (
         : [
             {
               group: "panel" as const,
-              label: translate("layouts:allProperties"),
+              label: translate(propertiesPart),
               node: { type: "properties" },
             },
           ]),
@@ -245,11 +256,16 @@ export const usePartLabel = (
   fields: ReadonlyMap<string, FieldDef>,
   plugins: ReadonlyMap<number, PluginOnItems>,
   /** Where the names of the open detail's own parts are. */
-  partWords = "layouts:"
+  partWords = "layouts:",
+  /** What the part showing every property is called, where the caller
+   *  provides {@link PropertiesPartName} rather than reading it. */
+  propertiesPartName?: string
 ) => {
   const { t } = useTranslation(LAYOUT_NAMESPACES);
   const translate = t as TranslateFn;
   const pickerPlugins = usePickerPlugins(plugins);
+  const provided = useContext(PropertiesPartName);
+  const propertiesPart = propertiesPartName ?? provided;
   const labelOf = (field: FieldDef) =>
     field.source === "builtin" ? translate(field.label) : field.label;
   const partLabel = (node: LayoutNode): string => {
@@ -269,7 +285,7 @@ export const usePartLabel = (
           : translate("layouts:blocks.box");
       }
       case "properties":
-        return translate("layouts:allProperties");
+        return translate(propertiesPart);
       case "plugin": {
         const plugin = pickerPlugins.find((each) => each.id === Number(node.props?.plugin));
         const part = plugin?.parts.find((each) => each.id === node.props?.part);
@@ -680,30 +696,6 @@ const OutlineRow = ({
 const matches = (query: string, ...shown: (string | undefined)[]) =>
   !query || shown.some((text) => text?.toLocaleLowerCase().includes(query));
 
-/** Who a field belongs to, which the picker groups it under: the tool's own,
- *  a project's or a collection's metadata, the initiative's properties, or a
- *  plug-in (grouped with its panels). */
-type FieldOwner = "builtIn" | "projectMetadata" | "collectionMetadata" | "properties" | "plugin";
-
-const ownerOf = (field: FieldDef): FieldOwner =>
-  field.source === "builtin"
-    ? "builtIn"
-    : field.source === "plugin"
-      ? "plugin"
-      : field.property?.project_id
-        ? "projectMetadata"
-        : field.property?.collection_id
-          ? "collectionMetadata"
-          : "properties";
-
-/** The groups of fields, in the order the picker shows them, by their heading. */
-const FIELD_GROUPS = [
-  ["builtIn", "layouts:builtIn"],
-  ["projectMetadata", "layouts:projectMetadata"],
-  ["collectionMetadata", "layouts:collectionMetadata"],
-  ["properties", "layouts:initiativeProperties"],
-] as const;
-
 /** What can be added, shown as things rather than ids: the layout blocks as
  *  tiles, then the fields grouped by who they belong to, then the tool's
  *  panels, then each plug-in's fields and panels. A search narrows all of
@@ -744,12 +736,10 @@ export const AddPicker = ({
   const blocks = parts.filter(
     (part) => part.group === "layout" && matches(query, part.label, part.description)
   );
-  const shownFields = fields.filter((field) => matches(query, labelOf(field)));
-  const fieldGroups = FIELD_GROUPS.map(([owner, heading]) => ({
-    owner,
-    heading,
-    fields: shownFields.filter((field) => ownerOf(field) === owner),
-  })).filter((group) => group.fields.length > 0);
+  // A plug-in's fields are listed with its panels, below.
+  const fieldGroups = groupFields(
+    fields.filter((field) => !field.plugin && matches(query, labelOf(field)))
+  );
   const panels = parts.filter((part) => part.group === "panel" && matches(query, part.label));
   // Each plug-in's fields, then its panels, under its name: one the search
   // names shows all of them.
@@ -884,7 +874,7 @@ export const AddPicker = ({
               </PickerGroup>
             ) : null}
             {fieldGroups.map((group) => (
-              <PickerGroup key={group.owner} heading={t(group.heading)}>
+              <PickerGroup key={group.key} heading={(t as TranslateFn)(group.heading)}>
                 {group.fields.map((field) => (
                   <FieldItem
                     key={field.id}

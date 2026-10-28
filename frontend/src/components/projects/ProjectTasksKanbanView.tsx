@@ -34,7 +34,7 @@ import { GroupBySelect } from "@/components/ui/data-table";
 import { MentionText } from "@/components/user/MentionText";
 import { type ColumnLimits, NO_COLUMN_LIMITS } from "@/hooks/useColumnLimits";
 import { useProjectTaskTypes } from "@/hooks/useProjects";
-import { useOwnedDefinitions } from "@/hooks/useProperties";
+import { NO_DEFINITIONS, useOwnedDefinitions } from "@/hooks/useProperties";
 import { useTaskGroupings } from "@/hooks/useTaskGroupings";
 import { useMoveTaskToGroup } from "@/hooks/useTasks";
 import { formatDateTime } from "@/lib/formatDate";
@@ -96,7 +96,6 @@ type ProjectTasksKanbanViewProps = {
 
 // One empty list while the definitions load, so the fields aren't rebuilt on
 // every pass until they arrive.
-const NO_DEFINITIONS: PropertyDefinitionRead[] = [];
 const NOT_GROUPED: GroupingState = [];
 
 export const ProjectTasksKanbanView = ({

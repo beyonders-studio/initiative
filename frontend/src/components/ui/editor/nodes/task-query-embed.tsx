@@ -14,7 +14,7 @@ import { DataTable } from "@/components/ui/data-table";
 import { EmbedCallout, useEmbedFold } from "@/components/ui/editor/nodes/embed-callout";
 import { Skeleton } from "@/components/ui/skeleton";
 import { useActiveCommunityId } from "@/hooks/useActiveCommunityId";
-import { useProperties } from "@/hooks/useProperties";
+import { NO_DEFINITIONS, useOwnedDefinitions } from "@/hooks/useProperties";
 import { useLiveClockValue } from "@/hooks/useRelativeTime";
 import { useKnownTagIds } from "@/hooks/useTags";
 import { useTasks } from "@/hooks/useTasks";
@@ -211,7 +211,11 @@ function TaskTable({
 }) {
   const { i18n } = useTranslation();
   const env = useProjectLayoutEnv(taskHref);
-  const { data: definitions = [] } = useProperties({ initiativeId: query.initiative_id });
+  // A query of one project's tasks can show its metadata too.
+  const { data: definitions = NO_DEFINITIONS } = useOwnedDefinitions({
+    initiativeId: query.initiative_id,
+    owner: query.project_id === null ? undefined : { kind: "project", id: query.project_id },
+  });
   const plugins = usePluginsOnItems(query.initiative_id);
   const fields = useMemo(
     () => taskFields(definitions, pluginFields(plugins, i18n.language)),

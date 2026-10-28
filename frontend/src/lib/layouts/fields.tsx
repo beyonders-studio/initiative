@@ -75,6 +75,62 @@ export type FieldKind =
 export const PROPERTY_FIELD_PREFIX = "property:";
 export const propertyFieldId = (definitionId: number) => `${PROPERTY_FIELD_PREFIX}${definitionId}`;
 
+/** Fields of one owner, under the heading a list of them shows. */
+export type FieldGroup = {
+  key: string;
+  /** An i18n key, or a plug-in's own name where `plugin` is set. */
+  heading: string;
+  /** The install whose fields these are. */
+  plugin?: number;
+  fields: FieldDef[];
+};
+
+/** The owners a field may have, in the order they are listed, by heading. */
+const OWNER_GROUPS = [
+  ["builtIn", "layouts:builtIn"],
+  ["projectMetadata", "layouts:projectMetadata"],
+  ["collectionMetadata", "layouts:collectionMetadata"],
+  ["properties", "layouts:initiativeProperties"],
+] as const;
+
+const ownerOf = (field: FieldDef): (typeof OWNER_GROUPS)[number][0] =>
+  field.source === "builtin"
+    ? "builtIn"
+    : field.property?.project_id
+      ? "projectMetadata"
+      : field.property?.collection_id
+        ? "collectionMetadata"
+        : "properties";
+
+/**
+ * `fields` grouped by who they belong to: the tool's own, a project's or a
+ * collection's metadata, the initiative's properties, then each plug-in's
+ * under its name. A group with nothing in it is left out.
+ */
+export const groupFields = (fields: readonly FieldDef[]): FieldGroup[] => {
+  const installs = new Map<number, FieldGroup>();
+  for (const field of fields) {
+    if (!field.plugin) continue;
+    const { install, on } = field.plugin;
+    const group = installs.get(install) ?? {
+      key: `plugin:${install}`,
+      heading: on.name,
+      plugin: install,
+      fields: [],
+    };
+    group.fields.push(field);
+    installs.set(install, group);
+  }
+  return [
+    ...OWNER_GROUPS.map(([owner, heading]) => ({
+      key: owner,
+      heading,
+      fields: fields.filter((field) => !field.plugin && ownerOf(field) === owner),
+    })),
+    ...installs.values(),
+  ].filter((group) => group.fields.length > 0);
+};
+
 /** Anything a view can show about an item. */
 export type FieldDef = {
   id: string;

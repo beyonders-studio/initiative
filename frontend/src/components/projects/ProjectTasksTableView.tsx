@@ -20,7 +20,6 @@ import type {
   LayoutGrouping,
   ListLayoutDefinitionInputDisplays,
   ListTasksParams,
-  PropertyDefinitionRead,
   TaskListRead,
   TaskStatusRead,
 } from "@/api/generated/initiativeAPI.schemas";
@@ -36,7 +35,7 @@ import { TableRow } from "@/components/ui/table";
 import { type ColumnLimits, NO_COLUMN_LIMITS } from "@/hooks/useColumnLimits";
 import { useProjectTaskTypes } from "@/hooks/useProjects";
 import type { useProjectTaskTableState } from "@/hooks/useProjectTaskView";
-import { useOwnedDefinitions } from "@/hooks/useProperties";
+import { NO_DEFINITIONS, useOwnedDefinitions } from "@/hooks/useProperties";
 import { useTaskGroupings } from "@/hooks/useTaskGroupings";
 import { useMoveTaskToGroup } from "@/hooks/useTasks";
 import { fieldColumnId } from "@/lib/layouts/columns";
@@ -275,7 +274,6 @@ const GroupDropRowWrapper = ({
 };
 
 const NOT_GROUPED: string[] = [];
-const NO_DEFINITIONS: PropertyDefinitionRead[] = [];
 
 const subRowsOf = (row: TaskTreeRow) => row.subRows;
 
