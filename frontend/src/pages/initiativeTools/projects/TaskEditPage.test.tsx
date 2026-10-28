@@ -21,6 +21,7 @@ import {
   buildPropertySummary,
   buildTag,
   buildTask,
+  buildTaskAssignee,
   buildTaskType,
   buildToolLayoutSet,
   buildUser,
@@ -71,6 +72,7 @@ const renderTaskPage = ({
   keepContentIn = false,
   description = null,
   dueDate = null,
+  assignees = [],
   canEdit = true,
   moderates = false,
   refuse,
@@ -87,6 +89,7 @@ const renderTaskPage = ({
   lastOccurrence?: boolean;
   description?: string | null;
   dueDate?: string | null;
+  assignees?: TaskRead["assignees"];
   canEdit?: boolean;
   /** Whether the reader moderates the task's initiative. */
   moderates?: boolean;
@@ -105,6 +108,7 @@ const renderTaskPage = ({
       recurrence,
       properties,
       due_date: dueDate,
+      assignees,
     }),
     description,
     series_size: 3,
@@ -253,7 +257,7 @@ describe("TaskEditPage", () => {
   });
 
   describe("what a new page requires", () => {
-    const required = (taskTypeId: number, name: string) =>
+    const required = (taskTypeId: number, name: string, fields = ["tags"]) =>
       buildToolLayoutSet({
         layouts: [
           {
@@ -261,10 +265,23 @@ describe("TaskEditPage", () => {
             task_type_id: taskTypeId,
             task_type_name: name,
             updated_at: "2026-10-01T12:00:00.000Z",
-            definition: { side: [{ type: "field", props: { field: "tags", required: true } }] },
+            definition: {
+              side: fields.map((field) => ({ type: "field", props: { field, required: true } })),
+            },
           },
         ],
       });
+    /** A project whose second type is Idea, laid out as `layouts` says. */
+    const withIdea = (layouts: ReturnType<typeof required>) =>
+      server.use(
+        communityHttp.get("/projects/:id/task-types/", () =>
+          HttpResponse.json([
+            buildTaskType({ id: 1, name: "Task", project_id: PROJECT_ID, is_default: true }),
+            buildTaskType({ id: 9, name: "Idea", project_id: PROJECT_ID, position: 1 }),
+          ])
+        ),
+        communityHttp.get("/layouts/", () => HttpResponse.json(layouts))
+      );
 
     /** Picks the tag Wiring in the dialog asking for what is required, and
      *  goes on with the change. */
@@ -286,15 +303,7 @@ describe("TaskEditPage", () => {
     });
 
     it("asks before the task becomes a type whose page needs more, and sends it with the change", async () => {
-      server.use(
-        communityHttp.get("/projects/:id/task-types/", () =>
-          HttpResponse.json([
-            buildTaskType({ id: 1, name: "Task", project_id: PROJECT_ID, is_default: true }),
-            buildTaskType({ id: 9, name: "Idea", project_id: PROJECT_ID, position: 1 }),
-          ])
-        ),
-        communityHttp.get("/layouts/", () => HttpResponse.json(required(9, "Idea")))
-      );
+      withIdea(required(9, "Idea"));
       const { sent } = renderTaskPage();
 
       await choose(/^type$/i, /idea/i);
@@ -303,6 +312,78 @@ describe("TaskEditPage", () => {
       await waitFor(() =>
         expect(sent).toEqual([expect.objectContaining({ task_type_id: 9, tag_ids: [7] })])
       );
+    });
+
+    it("keeps what was filled in when the change fails, on a page without the type picker", async () => {
+      // Idea's page holds the tags alone: the type picker is not on it.
+      withIdea(required(9, "Idea"));
+      const { sent } = renderTaskPage({
+        refuse: () => HttpResponse.json({ detail: "SOMETHING_WENT_WRONG" }, { status: 500 }),
+      });
+
+      await choose(/^type$/i, /idea/i);
+      await fillIn("What the Idea page asks for");
+
+      await waitFor(() => expect(sent).toHaveLength(1));
+      const asking = screen.getByRole("dialog", { name: "What the Idea page asks for" });
+      await waitFor(() =>
+        expect(within(asking).getByRole("button", { name: "Continue" })).toBeEnabled()
+      );
+      // The task is shown as the type it still is.
+      expect(
+        within(screen.getByRole("group", { name: /^type$/i, hidden: true })).getByRole("combobox", {
+          hidden: true,
+        })
+      ).toHaveTextContent("Task");
+    });
+
+    it("names the description it was written over, so a change made meanwhile is not lost", async () => {
+      withIdea(required(9, "Idea", ["description"]));
+      const { sent } = renderTaskPage();
+
+      await choose(/^type$/i, /idea/i);
+      const asking = await screen.findByRole("dialog", { name: "What the Idea page asks for" });
+      await userEvent.type(within(asking).getByRole("textbox"), "Two wires, one bell");
+      await userEvent.click(within(asking).getByRole("button", { name: "Continue" }));
+
+      await waitFor(() =>
+        expect(sent).toEqual([
+          expect.objectContaining({
+            task_type_id: 9,
+            description: "Two wires, one bell",
+            description_base: null,
+          }),
+        ])
+      );
+    });
+
+    it("starts the people a move asks for empty, as the move left them", async () => {
+      server.use(
+        communityHttp.post("/tasks/:taskId/move", () =>
+          HttpResponse.json(
+            {
+              detail: "REQUIRED_FIELDS_MISSING",
+              params: { fields: "assignees", keys: "assignees" },
+            },
+            { status: 400 }
+          )
+        )
+      );
+      renderTaskPage({
+        assignees: [buildTaskAssignee({ id: 4, display_name: "Sam Vimes" })],
+        destinations: [buildProject({ id: 8, initiative_id: INITIATIVE_ID, name: "Lighting" })],
+      });
+
+      await openActionsMenu();
+      await userEvent.click(await screen.findByRole("menuitem", { name: /move to project/i }));
+      const moving = await screen.findByRole("dialog", { name: "Move task to another project" });
+      await userEvent.click(within(moving).getByRole("combobox"));
+      await userEvent.click(await screen.findByRole("option", { name: "Lighting" }));
+      await userEvent.click(within(moving).getByRole("button", { name: "Move task" }));
+
+      const asking = await screen.findByRole("dialog", { name: "What Lighting asks for" });
+      expect(within(asking).queryByText("Sam Vimes")).not.toBeInTheDocument();
+      expect(within(asking).getByRole("button", { name: "Continue" })).toBeDisabled();
     });
 
     it("asks for what the destination requires when a move is refused for it, and moves with it", async () => {
