@@ -355,6 +355,7 @@ def store(
     :class:`Sealing`, which removes the objects if the rows never land.
     """
     storage = storage_service.get_guild_storage(guild_id)
+    version = blob_crypto.current_kek_version()
     rows: list[Evidence] = []
     for item in prepared:
         origin_id = uuid.uuid4()
@@ -381,9 +382,9 @@ def store(
             display_name=item.display_name,
             sha256=item.sha256,
             wrapped_dek=blob_crypto.wrap(
-                dek, holding_guild_id=guild_id, origin_id=origin_id
+                dek, holding_guild_id=guild_id, origin_id=origin_id, version=version
             ),
-            kek_version=blob_crypto.KEK_VERSION,
+            kek_version=version,
             created_by=created_by,
         )
         session.add(row)
@@ -612,6 +613,7 @@ async def transfer(
         ).all()
     )
     same_community = int(source_guild_id) == int(destination_guild_id)
+    version = blob_crypto.current_kek_version()
     carried: list[Evidence] = []
     for row in rows:
         if row.origin_id in already:
@@ -647,9 +649,12 @@ async def transfer(
             display_name=row.display_name,
             sha256=row.sha256,
             wrapped_dek=blob_crypto.wrap(
-                dek, holding_guild_id=destination_guild_id, origin_id=row.origin_id
+                dek,
+                holding_guild_id=destination_guild_id,
+                origin_id=row.origin_id,
+                version=version,
             ),
-            kek_version=blob_crypto.KEK_VERSION,
+            kek_version=version,
             created_by=row.created_by,
         )
         destination.add(copy)
@@ -933,13 +938,17 @@ async def rewrap_guild(
     new_secret_key: str,
     dry_run: bool = False,
 ) -> tuple[int, int, int]:
-    """Wrap every evidence key in ``guild_id`` under ``new_secret_key``.
-    Objects are not touched. Returns ``(rotated, skipped, failed)``: a key
-    that already unwraps under the new secret is skipped, one that unwraps
-    under neither is counted and left."""
+    """Wrap every evidence key in ``guild_id`` that ``SECRET_KEY`` wraps
+    (version 1) under ``new_secret_key``. Objects are not touched, nor are
+    keys under the community's storage key (version 2), which a rotation of
+    ``SECRET_KEY`` does not reach. Returns ``(rotated, skipped, failed)``: a
+    key that already unwraps under the new secret is skipped, one that
+    unwraps under neither is counted and left."""
     rows = (
         await session.exec(
-            select(Evidence.id, Evidence.origin_id, Evidence.wrapped_dek)
+            select(Evidence.id, Evidence.origin_id, Evidence.wrapped_dek).where(
+                Evidence.kek_version == blob_crypto.KEK_VERSION
+            )
         )
     ).all()
     rotated = skipped = failed = 0
@@ -974,3 +983,36 @@ async def rewrap_guild(
                 .values(wrapped_dek=new, kek_version=blob_crypto.KEK_VERSION)
             )
     return rotated, skipped, failed
+
+
+async def adopt_community_key(session: AsyncSession, guild_id: int) -> int:
+    """Re-wrap every evidence key in ``guild_id`` that ``SECRET_KEY`` wraps
+    under the community's storage key instead, so the evidence goes with that
+    key when the community does. Objects are not touched. ``session`` is
+    routed into the community; the caller commits. Returns how many it
+    re-wrapped."""
+    rows = (
+        await session.exec(
+            select(Evidence.id, Evidence.origin_id, Evidence.wrapped_dek).where(
+                Evidence.kek_version == blob_crypto.KEK_VERSION
+            )
+        )
+    ).all()
+    for evidence_id, origin_id, wrapped in rows:
+        dek = blob_crypto.unwrap(
+            wrapped, holding_guild_id=guild_id, origin_id=origin_id
+        )
+        await session.exec(
+            update(Evidence)
+            .where(Evidence.id == evidence_id)
+            .values(
+                wrapped_dek=blob_crypto.wrap(
+                    dek,
+                    holding_guild_id=guild_id,
+                    origin_id=origin_id,
+                    version=blob_crypto.COMMUNITY_KEK_VERSION,
+                ),
+                kek_version=blob_crypto.COMMUNITY_KEK_VERSION,
+            )
+        )
+    return len(rows)

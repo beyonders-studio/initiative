@@ -18,8 +18,13 @@ never encrypted under anything shared.
   only the key (``app.services.platform.evidence``): the object keeps the
   identity it was created with.
 
-The KEK is derived from ``SECRET_KEY``, so this protects stored bytes from
-anybody holding the store but not the application's configuration.
+The KEK comes in two versions, recorded on each row. Version 1 is derived
+from ``SECRET_KEY``, so it protects stored bytes from anybody holding the
+store but not the application's configuration. Version 2, used whenever
+``STORAGE_ENCRYPTION`` is set, is derived from the community's storage key
+(``app.services.storage_keys``): that key is wrapped by the deployment's root
+(a Cloud KMS key on the cloud) and destroyed with the community, which takes
+its evidence with it.
 """
 
 from __future__ import annotations
@@ -39,8 +44,11 @@ from app.core.config import settings
 #: The KEK's salt. Never change it: every wrapped key depends on it.
 EVIDENCE_KEK_SALT = b"evidence-kek"
 
-#: Which derivation a row's KEK came from, written beside its wrapped key.
+#: Which derivation a row's KEK came from, written beside its wrapped key:
+#: from SECRET_KEY.
 KEK_VERSION = 1
+#: From the community's storage key, where storage is encrypted.
+COMMUNITY_KEK_VERSION = 2
 
 #: The plaintext each chunk carries, but the last.
 CHUNK_SIZE = 64 * 1024
@@ -63,10 +71,40 @@ def new_dek() -> bytes:
     return AESGCM.generate_key(bit_length=256)
 
 
+def current_kek_version() -> int:
+    """The version a new wrap is made under: the community's storage key where
+    storage is encrypted, ``SECRET_KEY`` where it is not."""
+    from app.services.storage_keys import active_keyring
+
+    keyring = active_keyring()
+    return (
+        COMMUNITY_KEK_VERSION
+        if keyring is not None and keyring.encrypts
+        else KEK_VERSION
+    )
+
+
+def _community_kek(guild_id: int) -> bytes:
+    from app.services.storage_keys import active_keyring
+
+    keyring = active_keyring()
+    found = keyring.key_for(guild_id, create=True) if keyring is not None else None
+    if found is None:
+        raise BlobCryptoError("the community's storage key is gone")
+    return HKDF(
+        algorithm=hashes.SHA256(),
+        length=32,
+        salt=EVIDENCE_KEK_SALT,
+        info=f"evidence-kek:v{COMMUNITY_KEK_VERSION}:guild:{int(guild_id)}".encode(),
+    ).derive(found[0])
+
+
 def kek(
     guild_id: int, *, version: int = KEK_VERSION, secret_key: str | None = None
 ) -> bytes:
     """The key that wraps objects' keys in ``guild_id``."""
+    if version == COMMUNITY_KEK_VERSION:
+        return _community_kek(guild_id)
     return HKDF(
         algorithm=hashes.SHA256(),
         length=32,

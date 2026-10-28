@@ -16,6 +16,9 @@ names an object has to change.
   process that stores in the clear after encryption was unset clears the mark
   again (``EncryptedStorage``), so turning encryption off and on never leaves
   what was stored in between behind.
+- **Evidence moves onto the community's key.** Evidence is encrypted under
+  its own scheme; the pass re-wraps each row's key from ``SECRET_KEY`` onto
+  the community's storage key, so it is destroyed with the community too.
 - **What is still arriving is left alone.** A tus upload's staged object only
   becomes a file once it is complete (and keeps its ``resumable-`` key as its
   filename after that, so finished ones are encrypted like any other file).
@@ -107,6 +110,25 @@ async def _arriving(guild_id: int) -> tuple[frozenset[str], bool]:
     return keys, in_the_clear
 
 
+async def _adopt_evidence(guild_id: int) -> None:
+    """Move ``guild_id``'s evidence keys from ``SECRET_KEY`` onto the
+    community's storage key (``app.services.platform.evidence``)."""
+    from app.db import cohorts
+    from app.db.request_context import SystemGuild
+    from app.services.platform import evidence
+
+    async with cohorts.system_session(guild_id) as session:
+        await db_session.set_rls_context(session, SystemGuild(guild_id))
+        moved = await evidence.adopt_community_key(session, guild_id)
+        await session.commit()
+    if moved:
+        logger.info(
+            "storage encryption: moved %d evidence key(s) in guild %s onto its key",
+            moved,
+            guild_id,
+        )
+
+
 async def encrypt_existing() -> int:
     """One pass over every community not yet caught up. Returns how many
     objects it encrypted."""
@@ -145,6 +167,7 @@ async def encrypt_existing() -> int:
                     done = await asyncio.to_thread(
                         encrypt_community, guild_id, arriving
                     )
+                    await _adopt_evidence(guild_id)
                 except Exception:
                     logger.exception(
                         "storage encryption: guild %s not caught up", guild_id
