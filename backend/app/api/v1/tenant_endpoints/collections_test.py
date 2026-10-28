@@ -12,7 +12,7 @@ from app.db.soft_delete_filter import select_including_deleted
 from app.models.platform.guild import CommunityRole
 from app.models.tenant.collection import Collection, CollectionFile
 from app.models.tenant.file import FileVersion
-from app.models.tenant.property import PropertyValue
+from app.models.tenant.metadata import MetadataValue
 from app.services.tenant import collections as collections_service
 from app.testing import (
     create_collection,
@@ -576,7 +576,7 @@ async def test_a_collection_made_as_a_shape_brings_its_fields_and_lists(
         },
     )
     assert created.status_code == 201, created.text
-    fields = {field["name"]: field for field in created.json()["fields"]}
+    fields = {field["name"]: field for field in created.json()["metadata"]}
     assert {name: (f["type"], f["currency"]) for name, f in fields.items()} == {
         "Price": ("currency", "USD"),
         "Rating": ("scale", None),
@@ -616,7 +616,7 @@ async def test_the_shapes_are_offered_in_the_readers_language(
     entries = {e["key"]: e for group in listed.json() for e in group["entries"]}
     assert list(entries) == ["gallery", "catalog", "log"]
     assert entries["catalog"]["name"] == "Katalog"
-    assert entries["catalog"]["fields"][0] == {
+    assert entries["catalog"]["metadata"][0] == {
         "name": "Preis",
         "type": "currency",
         "display": None,
@@ -631,7 +631,9 @@ async def test_a_collection_can_start_with_another_collections_shape(
     source = await create_collection(
         session, owner.initiative, owner.user, files=[shared], shape="gallery"
     )
-    (caption,) = (await collections_service.fields_of(session, [source.id]))[source.id]
+    (caption,) = (await collections_service.metadata_of(session, [source.id]))[
+        source.id
+    ]
     await create_property_value(session, shared, caption, value_text="Dusk")
 
     created = await client.post(
@@ -645,7 +647,7 @@ async def test_a_collection_can_start_with_another_collections_shape(
         },
     )
     assert created.status_code == 201, created.text
-    (copied,) = created.json()["fields"]
+    (copied,) = created.json()["metadata"]
     assert (copied["name"], copied["type"]) == ("Caption", "text")
     assert copied["id"] != caption.id
 
@@ -665,7 +667,7 @@ async def test_a_collection_can_start_with_another_collections_shape(
     listed = await client.get(
         maker.g(f"/collections/{created.json()['id']}/files"), headers=maker.headers
     )
-    assert listed.json()["items"][0]["fields"] == []
+    assert listed.json()["items"][0]["metadata"] == []
 
 
 async def test_a_file_maker_fills_a_collections_fields_without_editing_the_file(
@@ -675,10 +677,10 @@ async def test_a_file_maker_fills_a_collections_fields_without_editing_the_file(
     collection = await create_collection(
         session, owner.initiative, owner.user, files=[shared, private], shape="catalog"
     )
-    price, rating = (await collections_service.fields_of(session, [collection.id]))[
+    price, rating = (await collections_service.metadata_of(session, [collection.id]))[
         collection.id
     ]
-    path = f"/collections/{collection.id}/files/{shared.id}/fields"
+    path = f"/collections/{collection.id}/files/{shared.id}/metadata"
 
     written = await client.put(
         maker.g(path),
@@ -702,18 +704,22 @@ async def test_a_file_maker_fills_a_collections_fields_without_editing_the_file(
     )
     assert out_of_range.status_code == 400
 
-    # Seen with the collection's files, and not among the file's properties.
+    # Seen with the collection's files, and among the file's values, as the
+    # collection's.
     listed = await client.get(
         maker.g(f"/collections/{collection.id}/files"), headers=maker.headers
     )
-    assert {v["name"] for v in listed.json()["items"][0]["fields"]} == {
+    assert {v["name"] for v in listed.json()["items"][0]["metadata"]} == {
         "Price",
         "Rating",
     }
     one = await client.get(maker.g(path), headers=maker.headers)
     assert {v["name"] for v in one.json()} == {"Price", "Rating"}
     opened = await client.get(maker.g(f"/files/{shared.id}"), headers=maker.headers)
-    assert opened.json()["properties"] == []
+    assert {(v["name"], v["collection_id"]) for v in opened.json()["properties"]} == {
+        ("Price", collection.id),
+        ("Rating", collection.id),
+    }
     # Nor written as one.
     as_property = await client.put(
         owner.g(f"/properties/file/{shared.id}"),
@@ -724,14 +730,14 @@ async def test_a_file_maker_fills_a_collections_fields_without_editing_the_file(
 
     # A file of the collection the maker cannot open is not one they fill.
     hidden = await client.put(
-        maker.g(f"/collections/{collection.id}/files/{private.id}/fields"),
+        maker.g(f"/collections/{collection.id}/files/{private.id}/metadata"),
         headers=maker.headers,
         json={"values": [{"property_id": rating.id, "value": 50}]},
     )
     assert hidden.status_code == 422
     assert hidden.json()["detail"] == CollectionMessages.FILE_NOT_IN_COLLECTION
     unseen = await client.get(
-        maker.g(f"/collections/{collection.id}/files/{private.id}/fields"),
+        maker.g(f"/collections/{collection.id}/files/{private.id}/metadata"),
         headers=maker.headers,
     )
     assert unseen.status_code == 404
@@ -744,7 +750,7 @@ async def test_a_file_taken_out_of_a_collection_leaves_its_values_behind(
     collection = await create_collection(
         session, owner.initiative, owner.user, files=[shared, private], shape="log"
     )
-    (day,) = (await collections_service.fields_of(session, [collection.id]))[
+    (day,) = (await collections_service.metadata_of(session, [collection.id]))[
         collection.id
     ]
     await create_property_value(session, shared, day, value_date=date(2026, 1, 2))
@@ -758,6 +764,6 @@ async def test_a_file_taken_out_of_a_collection_leaves_its_values_behind(
 
     await route_session_to_guild(session, owner.guild.id)
     left = await session.exec(
-        select(PropertyValue).where(PropertyValue.property_id == day.id)
+        select(MetadataValue).where(MetadataValue.property_id == day.id)
     )
     assert left.all() == []

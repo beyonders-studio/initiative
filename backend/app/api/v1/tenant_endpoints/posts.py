@@ -83,11 +83,10 @@ from app.services.tenant import archive as archive_service
 from app.services.tenant import attachments as attachments_service
 from app.services.tenant import comments as comments_service
 from app.services.tenant import content_references
-from app.services.tenant import plugin_metadata
 from app.services.tenant import post_polls as post_polls_service
 from app.services.tenant import post_publication
 from app.services.tenant import posts as posts_service
-from app.services.tenant import properties as properties_service
+from app.services.tenant import metadata as metadata_service
 from app.services.tenant import tags as tags_service
 from app.services.tenant import timeline as timeline_service
 from app.services.tenant import tool_listing
@@ -202,7 +201,7 @@ async def annotate_post_rows(
     the rest stay at their empty defaults.
     """
     await tags_service.annotate_tags(session, rows)
-    await properties_service.annotate_properties(session, rows)
+    await metadata_service.annotate_properties(session, rows)
     await comments_service.annotate_comment_counts(session, rows, column="post_id")
     if user_id is None:
         return
@@ -233,18 +232,10 @@ async def read_after_write(
 async def _post_read(
     session: AsyncSession, post: Post, guild_context: ActorContext
 ) -> PostRead:
-    """One notice as its own read answers it: annotated as a read is, with the
-    plug-ins' values on it."""
+    """One notice as its own read answers it: annotated as a read is."""
     await annotate_post_rows(session, [post], user_id=guild_context.user_id)
-    values = await plugin_metadata.values_on(
-        session, "post", {post.id: post.initiative_id}
-    )
     return serialize_tool(
-        PostRead,
-        post,
-        user_id=guild_context.user_id,
-        context=guild_context,
-        plugin_values=values.get(post.id, []),
+        PostRead, post, user_id=guild_context.user_id, context=guild_context
     )
 
 
@@ -267,7 +258,7 @@ def board_conditions(
     (:func:`tool_listing.base_conditions`), the archive state, then
     publication — a notice scheduled for later is on the board only for the
     people who could edit it. Property filters are not among them: every list
-    applies those itself (``properties_service.property_filter_clauses``), and
+    applies those itself (``metadata_service.property_filter_clauses``), and
     the timeline applies the same.
 
     An installed plug-in (``user_id`` ``None``) keeps no read markers, so ``unread``
@@ -340,7 +331,7 @@ async def get_post_timeline(
         archived=archived,
     )
     # The feed's property filters, as every list applies them.
-    scope += await properties_service.property_filter_clauses(
+    scope += await metadata_service.property_filter_clauses(
         session, Tool.post.value, property_filters, names_people=True
     )
     return TimelineResponse(
@@ -399,7 +390,7 @@ async def create_post(
     )
     session.add(post)
     await session.flush()
-    await properties_service.write_on_create(session, post, post_in.properties)
+    await metadata_service.write_on_create(session, post, post_in.properties)
 
     await resource_access.grant_initial_sharing(
         session,

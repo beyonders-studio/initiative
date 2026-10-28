@@ -12,7 +12,7 @@ from app.core.intake import (
     IntakeStream,
     meta,
 )
-from app.models.tenant.property import PropertyType
+from app.models.tenant.metadata import MetadataType
 from app.models.tenant.task import TaskStatusCategory
 
 pytestmark = pytest.mark.always
@@ -22,7 +22,7 @@ def test_every_case_field_names_a_property_type_the_writer_can_create():
     """Which fields exist at all is a row in ``core/registry_coverage_test.py``;
     this is the type each one declares."""
     for field, declared in CASE_FIELD_TYPES.items():
-        assert PropertyType(declared), field
+        assert MetadataType(declared), field
 
 
 def test_tracker_key_belongs_to_security_alone():
@@ -49,7 +49,7 @@ def test_a_blueprint_defines_exactly_the_streams_case_fields(stream: IntakeStrea
         definition.name: definition.type for definition in envelope.property_definitions
     }
     expected = {
-        field.value: PropertyType(CASE_FIELD_TYPES[field])
+        field.value: MetadataType(CASE_FIELD_TYPES[field])
         for field in STREAM_FIELDS[stream]
     }
     assert defined == expected

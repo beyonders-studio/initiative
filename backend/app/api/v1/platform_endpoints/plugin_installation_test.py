@@ -24,13 +24,14 @@ else in this build moves ``config_state`` off ``unverified``.
 """
 
 import json
-from datetime import datetime, timezone
+from datetime import date, datetime, timezone
 
 import pytest
 from httpx import AsyncClient
 from sqlalchemy import delete, update
 from sqlalchemy.exc import DBAPIError
-from sqlmodel import select
+from sqlalchemy.orm import selectinload
+from sqlmodel import col, select
 from sqlmodel.ext.asyncio.session import AsyncSession
 
 from app.core.plugin_access_token import seal_install_token
@@ -44,15 +45,18 @@ from app.models.tenant.initiative import InitiativeMember
 from app.models.tenant.plugin_event_outbox import PluginEventOutbox
 from app.models.tenant.guild_plugin import GuildPlugin
 from app.models.tenant.guild_plugin_user_connection import GuildPluginUserConnection
-from app.models.tenant.plugin_metadata import PluginMetadata
+from app.models.tenant.metadata import MetadataDefinition, MetadataType, MetadataValue
 from app.models.tenant.plugin_placement import PluginPlacement
 from app.models.tenant.project import Project
+from app.models.tenant.task import Task
 from app.services.marketplace.registration_lookup import invalidate_registrations
 from app.services.tenant import plugin_channels as channels_service
-from app.services.tenant import plugin_metadata as metadata_service
+from app.services.tenant import metadata as metadata_service
 from app.testing import (
     create_plugin_user_connection,
     create_plugin_service_registration,
+    create_property_definition,
+    create_property_value,
     create_guild,
     create_guild_plugin,
     create_project,
@@ -683,10 +687,20 @@ async def _with_task(
     return installed, task.json()["id"]
 
 
-async def _stored(session: AsyncSession, guild_id: int) -> list[PluginMetadata]:
+async def _stored(session: AsyncSession, guild_id: int) -> list[MetadataValue]:
+    """Every plug-in's values in the community, each with its definition."""
     await route_session_to_guild(session, guild_id)
     session.expunge_all()
-    return list(await session.exec(select(PluginMetadata)))
+    return list(
+        await session.exec(
+            select(MetadataValue)
+            .join(
+                MetadataDefinition, MetadataDefinition.id == MetadataValue.property_id
+            )
+            .where(col(MetadataDefinition.install_id).is_not(None))
+            .options(selectinload(MetadataValue.definition))
+        )
+    )
 
 
 class TestMetadata:
@@ -843,9 +857,9 @@ class TestMetadata:
 
         assert await change(values={PULLS: [draft]}) == [draft]
         assert [
-            (row.ref, row.lookup, row.text_form, row.shown)
+            (row.ref, row.value_text, row.value_json)
             for row in await _stored(session, installed.guild.id)
-        ] == [("813", "813", "https://github.test/pull/813", True)]
+        ] == [("813", "https://github.test/pull/813", {"url": draft["url"]})]
         assert await change(values={PULLS: None}) == []
         assert await _stored(session, installed.guild.id) == []
 
@@ -1035,18 +1049,15 @@ class TestMetadata:
             },
             listing_uid="OTHERLISTING01",
         )
-        await route_session_to_guild(session, installed.guild.id)
-        session.add_all(
-            PluginMetadata(
-                install_id=install_id,
-                entity_type="task",
-                entity_id=task_id,
-                key="k",
-                value=1,
+        task = await session.get(Task, task_id)
+        mine, theirs = [
+            await create_property_definition(
+                session, None, plugin=plugin, key="k", type=MetadataType.json
             )
-            for install_id in (installed.plugin.id, other.id)
-        )
-        await session.commit()
+            for plugin in (installed.plugin, other)
+        ]
+        for definition in (mine, theirs):
+            await create_property_value(session, task, definition, value_json=1)
 
         s = await role_session("app_user")
         await route_as_install(
@@ -1056,33 +1067,32 @@ class TestMetadata:
             client_id=CLIENT,
             scopes=["projects:read"],
         )
-        seen = await s.exec(select(PluginMetadata.install_id))
-        assert seen.all() == [installed.plugin.id]
+        seen = await s.exec(select(MetadataValue.property_id))
+        assert seen.all() == [mine.id]
         moved = await s.exec(
-            update(PluginMetadata)
-            .where(PluginMetadata.install_id == other.id)
-            .values(value=2)
+            update(MetadataValue)
+            .where(col(MetadataValue.property_id) == theirs.id)
+            .values(value_json=2)
         )
         assert moved.rowcount == 0
         s.add(
-            PluginMetadata(
-                install_id=other.id,
+            MetadataValue(
                 entity_type="task",
                 entity_id=task_id,
-                key="j",
-                value=1,
+                property_id=theirs.id,
+                ref="j",
+                value_json=1,
             )
         )
         with pytest.raises(DBAPIError, match="row-level security"):
             await s.commit()
         await s.rollback()
 
-        theirs = [
-            (row.key, row.value)
+        assert [
+            (row.definition.key, row.value_json)
             for row in await _stored(session, installed.guild.id)
-            if row.install_id == other.id
-        ]
-        assert theirs == [("k", 1)]
+            if row.definition.install_id == other.id
+        ] == [("k", 1)]
 
     async def test_the_install_keeps_values_of_its_own(
         self, client: AsyncClient, session: AsyncSession, acting_user, role_session
@@ -1200,8 +1210,17 @@ async def _shown_board(
     return installed, member, task
 
 
-def _shown(rows: list[PluginMetadata]) -> dict[str, bool]:
-    return {row.key: row.shown for row in rows}
+def _shown(rows: list[MetadataValue]) -> dict[str, bool]:
+    return {
+        str(row.definition.key): row.entity_type in row.definition.shown_on
+        for row in rows
+        if row.definition is not None
+    }
+
+
+def _drawn(values: list[dict]) -> list[tuple]:
+    """The plug-ins' values among an item's, as ``(install, key, value)``."""
+    return [(v["install_id"], v["key"], v["value"]) for v in values if v["install_id"]]
 
 
 class TestShownValues:
@@ -1238,14 +1257,14 @@ class TestShownValues:
                 definition={
                     **installed.plugin.definition,
                     "fields": [
-                        {**_FIELDS["fields"][0], "key": "sync.etag"},
+                        {**_FIELDS["fields"][1], "key": "sync.etag", "on": ["task"]},
                         {**_FIELDS["fields"][1], "on": ["queue_item", "task"]},
                     ],
                 }
             )
         )
         await session.commit()
-        await metadata_service.reconcile_shown(installed.guild.id, installed.plugin.id)
+        await metadata_service.sync_definitions(installed.guild.id, installed.plugin.id)
         stored = await _stored(session, installed.guild.id)
         assert _shown([r for r in stored if r.entity_type == "task"]) == {
             "github.issue": False,
@@ -1265,20 +1284,18 @@ class TestShownValues:
         installed, member, task = await _shown_board(
             client, session, acting_user, role_session
         )
-        shown = [
-            {"plugin_id": installed.plugin.id, "key": "github.issue", "value": 123}
-        ]
+        shown = [(installed.plugin.id, "github.issue", 123)]
 
         read = await client.get(member.g(f"/tasks/{task.id}"), headers=member.headers)
         assert read.status_code == 200, read.text
-        assert read.json()["plugin_values"] == shown
+        assert _drawn(read.json()["properties"]) == shown
         conditions = json.dumps(
             [{"field": "project_id", "op": "eq", "value": task.project_id}]
         )
         listed = await client.get(
             member.g(f"/tasks/?conditions={conditions}"), headers=member.headers
         )
-        assert [row["plugin_values"] for row in listed.json()["items"]] == [shown]
+        assert [_drawn(row["properties"]) for row in listed.json()["items"]] == [shown]
 
         outsider = await acting_user(
             guild_role=CommunityRole.member,
@@ -1289,7 +1306,11 @@ class TestShownValues:
         for actor, keys in ((member, ["github.issue"]), (outsider, [])):
             s = await role_session("app_user")
             await route_as(s, user_id=actor.user.id, guild_id=installed.guild.id)
-            seen = await s.exec(select(PluginMetadata.key))
+            seen = await s.exec(
+                select(MetadataDefinition.key).join(
+                    MetadataValue, MetadataValue.property_id == MetadataDefinition.id
+                )
+            )
             assert seen.all() == keys
             await s.rollback()
 
@@ -1307,14 +1328,12 @@ class TestShownValues:
             initiative=installed.placed,
             initiative_role="project_manager",
         )
-        shown = [
-            {"plugin_id": installed.plugin.id, "key": "github.issue", "value": 123}
-        ]
+        shown = [(installed.plugin.id, "github.issue", 123)]
 
         async def drawn(actor=member) -> list:
             read = await client.get(actor.g(f"/tasks/{task.id}"), headers=actor.headers)
             assert read.status_code == 200, read.text
-            return read.json()["plugin_values"]
+            return _drawn(read.json()["properties"])
 
         async def change(**values) -> None:
             await route_session_to_guild(session, installed.guild.id)
@@ -1387,8 +1406,8 @@ class TestShownValues:
             seat.g(f"/calendar-events/{event.id}"), headers=seat.headers
         )
         assert read.status_code == 200, read.text
-        assert read.json()["plugin_values"] == [
-            {"plugin_id": installed.plugin.id, "key": "venue.room", "value": "B2"}
+        assert _drawn(read.json()["properties"]) == [
+            (installed.plugin.id, "venue.room", "B2")
         ]
 
     async def test_a_task_list_filters_by_a_field_where_it_is_drawn(
@@ -1420,11 +1439,7 @@ class TestShownValues:
         )
         assert written.status_code == 200, written.text
         read = await client.get(member.g(f"/tasks/{task.id}"), headers=member.headers)
-        assert {
-            "plugin_id": installed.plugin.id,
-            "key": PULLS,
-            "value": pulls,
-        } in read.json()["plugin_values"]
+        assert (installed.plugin.id, PULLS, pulls) in _drawn(read.json()["properties"])
         await route_session_to_guild(session, installed.guild.id)
         project = await session.get(Project, task.project_id)
         assert project is not None
@@ -1473,24 +1488,73 @@ class TestShownValues:
             other.id,
         }
 
-    def test_a_value_is_compared_by_its_words_and_its_number(self):
-        assert metadata_service.forms("2026-10-11") == ("2026-10-11", 1791676800.0)
-        assert metadata_service.forms(True) == (None, 1.0)
-        assert metadata_service.forms({"text": "passing", "tone": "positive"}) == (
-            "passing",
-            None,
+    async def test_a_value_is_kept_in_its_types_column(
+        self, client: AsyncClient, session: AsyncSession, acting_user, role_session
+    ):
+        """Each declared kind in its column, a scale out of its ``max`` as a
+        figure out of 100, a value beside its state with the state kept apart,
+        and a value that is not one of its kind's refused."""
+        kinds = {"when": "date", "health": "badge", "done": "scale", "count": "number"}
+        installed = await install_plugin(
+            session,
+            acting_user,
+            role_session,
+            granted=["projects:read"],
+            declares={
+                "fields": [
+                    {"key": key, "name": {"en": key}, "kind": kind, "on": ["task"]}
+                    for key, kind in kinds.items()
+                ]
+            },
         )
-        assert metadata_service.forms({"url": "https://ci.example/1"}) == (
-            "https://ci.example/1",
-            None,
+        project = await create_project(session, installed.placed, installed.seat.user)
+        await create_resource_grant(session, project, all_initiative_members=True)
+        task = await create_task(session, project)
+
+        async def put(values: dict):
+            return await client.put(
+                f"{BASE}/metadata",
+                headers=install_headers(installed, ["projects:read"]),
+                json={"entity_type": "task", "entity_id": task.id, "values": values},
+            )
+
+        written = await put(
+            {
+                "when": "2026-10-11",
+                "health": {"text": "passing", "tone": "positive"},
+                "done": {"value": 3, "max": 4},
+                "count": {"value": 5, "state": {"status": "open"}},
+            }
         )
-        assert metadata_service.forms({"value": 3, "max": 4}) == (None, 0.75)
-        # A list's element, or a value beside its state, by its own value.
-        assert metadata_service.forms(
-            {"ref": "7", "value": "2026-10-11", "state": {"status": "open"}}
-        ) == ("2026-10-11", 1791676800.0)
-        # Too large to be a float, so kept with no number.
-        assert metadata_service.forms(10**400) == (None, None)
+        assert written.status_code == 200, written.text
+        assert written.json()["values"] == {
+            "when": "2026-10-11",
+            "health": {"text": "passing", "tone": "positive"},
+            "done": 75,
+            "count": {"value": 5, "state": {"status": "open"}},
+        }
+        stored = {
+            row.definition.key: (
+                row.value_date,
+                row.value_text,
+                row.value_number,
+                row.state,
+            )
+            for row in await _stored(session, installed.guild.id)
+        }
+        assert stored == {
+            "when": (date(2026, 10, 11), None, None, None),
+            "health": (None, "passing", None, None),
+            "done": (None, None, 75, None),
+            "count": (None, None, 5, {"status": "open"}),
+        }
+        for refused in ({"done": 101}, {"when": 3}, {"health": "passing"}):
+            response = await put(refused)
+            assert response.status_code == 400, response.text
+            assert (
+                response.json()["detail"]
+                == PluginChannelMessages.METADATA_VALUE_INVALID
+            )
 
     async def test_only_a_shown_value_is_heard_as_a_change_to_the_task(
         self, client: AsyncClient, session: AsyncSession, acting_user, role_session

@@ -59,7 +59,7 @@ from app.services.marketplace.installs import (
 from app.services.tenant import guild_plugins as guild_plugins_service
 from app.services.tenant import plugin_config as plugin_config_service
 from app.services.tenant import plugin_connections as connections_service
-from app.services.tenant import plugin_metadata, plugin_schedules
+from app.services.tenant import metadata, plugin_schedules
 from app.services.tenant import plugin_revocation as revocation_service
 
 logger = logging.getLogger(__name__)
@@ -315,7 +315,7 @@ async def reconcile_repinned(
     await plugin_schedules.reconcile(
         guild_id, plugin.id, plugin.definition, session=session
     )
-    await plugin_metadata.reconcile_shown(guild_id, plugin.id, session=session)
+    await metadata.sync_definitions(guild_id, plugin.id, session=session)
 
 
 def decline_version(plugin: GuildPlugin, version: str) -> None:

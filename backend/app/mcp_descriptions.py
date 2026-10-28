@@ -300,10 +300,10 @@ TOOL_DESCRIPTIONS: dict[str, str] = {
     ),
     "list_collection_shapes": (
         "The ready-made shapes a new collection can start as, with the lists "
-        "each shows and the fields it brings."
+        "each shows and the metadata it brings."
     ),
-    "get_collection_file_fields": (
-        "One file's values of a collection's own fields, for a file in the "
+    "get_collection_file_metadata": (
+        "One file's values of a collection's metadata, for a file in the "
         "collection the caller can open."
     ),
     "get_collection_files_timeline": (

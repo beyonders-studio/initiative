@@ -1150,13 +1150,13 @@ class _ScopeBuilder:
             return
         from sqlmodel import select
 
-        from app.models.tenant.property import PropertyDefinition
+        from app.models.tenant.metadata import MetadataDefinition
 
         rows = list(
             await self.session.exec(
-                select(PropertyDefinition)
-                .where(PropertyDefinition.of_initiative(initiative.id))
-                .order_by(PropertyDefinition.position.asc())
+                select(MetadataDefinition)
+                .where(MetadataDefinition.of_initiative(initiative.id))
+                .order_by(MetadataDefinition.position.asc())
             )
         )
         if not rows:
@@ -1203,7 +1203,7 @@ class _ScopeBuilder:
         from app.models.tenant.file import File
         from app.services.export.property_values import property_export_dict
         from app.services.tenant import collections as collections_service
-        from app.services.tenant import properties as properties_service
+        from app.services.tenant import metadata as metadata_service
         from app.services.tenant import tags as tags_service
 
         rows = list(
@@ -1224,12 +1224,12 @@ class _ScopeBuilder:
         ):
             held.setdefault(collection_id, []).append(file_id)
         await tags_service.annotate_tags(self.session, rows)
-        await properties_service.annotate_properties(self.session, rows)
-        fields = await collections_service.fields_of(
+        await metadata_service.annotate_properties(self.session, rows)
+        fields = await collections_service.metadata_of(
             self.session, [row.id for row in rows]
         )
         values = {
-            row.id: await properties_service.summaries_by_id(
+            row.id: await metadata_service.summaries_by_id(
                 self.session,
                 Tool.file.value,
                 held.get(row.id, []),

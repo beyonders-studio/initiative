@@ -17,10 +17,10 @@ from sqlmodel import select
 from sqlmodel.ext.asyncio.session import AsyncSession
 
 from app.models.platform.guild import CommunityRole
-from app.models.tenant.property import (
-    PropertyDefinition,
-    PropertyType,
-    PropertyValue,
+from app.models.tenant.metadata import (
+    MetadataDefinition,
+    MetadataType,
+    MetadataValue,
 )
 from app.testing import (
     create_collection,
@@ -363,7 +363,7 @@ async def test_patch_ignores_type_change_silently(
     """The Update schema has no `type` field, so sending one is ignored."""
     a = await acting_user(guild_role=CommunityRole.admin, initiative=True)
     defn = await create_property_definition(
-        session, a.initiative, name="Immutable", type=PropertyType.text
+        session, a.initiative, name="Immutable", type=MetadataType.text
     )
 
     payload = {"type": "number", "name": "Renamed"}
@@ -388,7 +388,7 @@ async def test_patch_removing_option_reports_orphaned_values(
         session,
         a.initiative,
         name="Stage",
-        type=PropertyType.select,
+        type=MetadataType.select,
         options=[
             {"value": "draft", "label": "Draft"},
             {"value": "live", "label": "Live"},
@@ -412,10 +412,10 @@ async def test_patch_removing_option_reports_orphaned_values(
 
     # DB value should still be present — orphans are preserved.
     result = await session.exec(
-        select(PropertyValue).where(
-            PropertyValue.property_id == defn.id,
-            PropertyValue.entity_type == "file",
-            PropertyValue.entity_id == doc.id,
+        select(MetadataValue).where(
+            MetadataValue.property_id == defn.id,
+            MetadataValue.entity_type == "file",
+            MetadataValue.entity_id == doc.id,
         )
     )
     assert result.one_or_none() is not None
@@ -441,7 +441,7 @@ async def test_a_member_adds_options_and_a_manager_reshapes(
     )
     stage = {"value": "todo", "label": "To do"}
     defn = await create_property_definition(
-        session, admin.initiative, type=PropertyType.select, options=[stage]
+        session, admin.initiative, type=MetadataType.select, options=[stage]
     )
     route = member.g(f"/property-definitions/{defn.id}")
     added = [stage, {"value": "done", "label": "Done"}]
@@ -500,13 +500,13 @@ async def test_delete_definition_cascades_to_values(
 
     # The doc's and the task's value rows are gone
     values = await session.exec(
-        select(PropertyValue).where(PropertyValue.property_id == defn.id)
+        select(MetadataValue).where(MetadataValue.property_id == defn.id)
     )
     assert values.all() == []
 
     # Definition gone
     defn_row = await session.exec(
-        select(PropertyDefinition).where(PropertyDefinition.id == defn.id)
+        select(MetadataDefinition).where(MetadataDefinition.id == defn.id)
     )
     assert defn_row.one_or_none() is None
 
@@ -603,8 +603,81 @@ async def test_money_names_its_currency_and_keeps_its_amount(
     assert written.status_code == 200, written.text
     assert [(v["value"], v["currency"]) for v in written.json()] == [(1234.56, "EUR")]
     stored = await session.exec(
-        select(PropertyValue.value_number).where(
-            PropertyValue.property_id == definition_id
+        select(MetadataValue.value_number).where(
+            MetadataValue.property_id == definition_id
         )
     )
     assert stored.one() == Decimal("1234.56")
+
+
+# ---------------------------------------------------------------------------
+# A project's metadata
+# ---------------------------------------------------------------------------
+
+
+async def test_a_projects_metadata_is_defined_by_whoever_may_write_its_tasks(
+    client: AsyncClient, session: AsyncSession, acting_user
+):
+    """Listed only with its project, unique by name there and not among the
+    initiative's properties, and gone with the project. Nobody types in a
+    plug-in's types."""
+    owner = await acting_user(guild_role=CommunityRole.member, initiative=True)
+    reader = await acting_user(
+        guild_role=CommunityRole.member,
+        guild=owner.guild,
+        initiative=owner.initiative,
+        initiative_role="member",
+    )
+    project = await create_project(session, owner.initiative, owner.user)
+    await create_resource_grant(session, project, all_initiative_members=True)
+    await create_property_definition(session, owner.initiative, name="Points")
+    payload = {
+        "name": "Points",
+        "type": "number",
+        "initiative_id": owner.initiative.id,
+        "project_id": project.id,
+    }
+
+    refused = await client.post(
+        reader.g("/property-definitions/"), headers=reader.headers, json=payload
+    )
+    assert refused.status_code == 403, refused.text
+    created = await client.post(
+        owner.g("/property-definitions/"), headers=owner.headers, json=payload
+    )
+    assert created.status_code == 201, created.text
+    assert created.json()["project_id"] == project.id
+    again = await client.post(
+        owner.g("/property-definitions/"), headers=owner.headers, json=payload
+    )
+    assert again.status_code == 409, again.text
+    for kind in ("link", "badge", "json"):
+        plugins = await client.post(
+            owner.g("/property-definitions/"),
+            headers=owner.headers,
+            json={**payload, "name": kind, "type": kind},
+        )
+        assert plugins.status_code == 422, plugins.text
+
+    async def listed(actor, **params) -> list[int]:
+        found = await client.get(
+            actor.g("/property-definitions/"), headers=actor.headers, params=params
+        )
+        return [item["id"] for item in found.json()]
+
+    metadata_id = created.json()["id"]
+    assert metadata_id not in await listed(owner, initiative_id=owner.initiative.id)
+    assert await listed(reader, project_id=project.id) == [metadata_id]
+    renamed = await client.patch(
+        reader.g(f"/property-definitions/{metadata_id}"),
+        headers=reader.headers,
+        json={"name": "Effort"},
+    )
+    assert renamed.status_code == 403, renamed.text
+
+    await session.delete(project)
+    await session.commit()
+    gone = await session.exec(
+        select(MetadataDefinition).where(MetadataDefinition.id == metadata_id)
+    )
+    assert gone.one_or_none() is None

@@ -43,7 +43,7 @@ from app.core.version import get_version
 from app.models.tenant.comment import Comment, in_thread
 from app.models.tenant.relationship import EntityRelationship
 from app.models.tenant.project import Project
-from app.models.tenant.property import PropertyType
+from app.models.tenant.metadata import MetadataType
 from app.models.platform.user_profile_view import MemberProfile
 from app.models.tenant.tag import Tag
 from app.models.tenant.task import Task, TaskStatus
@@ -68,7 +68,7 @@ from app.services.import_engine.mentions import (
 from app.services.import_engine.references import detach_markdown_references
 from app.core.tools import Tool
 from app.services.import_engine.common import load_initiative_properties
-from app.services.tenant import properties as properties_service
+from app.services.tenant import metadata as metadata_service
 from app.services.tenant import tags as tags_service
 from app.services.tenant import task_types as task_types_service
 from app.services.tenant import tool_layouts as tool_layouts_service
@@ -97,9 +97,9 @@ async def build_project_export(
         )
     )
     await tags_service.annotate_tags(session, [project])
-    await properties_service.annotate_properties(session, [project])
+    await metadata_service.annotate_properties(session, [project])
     await tags_service.annotate_tags(session, project_tasks)
-    await properties_service.annotate_properties(session, project_tasks)
+    await metadata_service.annotate_properties(session, project_tasks)
 
     task_ids = [task.id for task in project_tasks if task.id is not None]
     comments_by_task = await _load_comments(session, task_ids)
@@ -239,7 +239,7 @@ async def build_project_export(
                 )
             ).values()
         },
-        **await properties_service.load_definitions_by_ids(
+        **await metadata_service.load_definitions_by_ids(
             session, referenced_property_ids
         ),
     }
@@ -257,7 +257,7 @@ async def build_project_export(
     people = frozenset(
         property_id
         for property_id, definition in definitions.items()
-        if definition.type == PropertyType.user_reference
+        if definition.type == MetadataType.user_reference
     )
     layout_rows = await tool_layouts_service.list_rows(
         session,

@@ -31,7 +31,7 @@ from app.core.tools import (
     TYPED_DETAILS,
     Tool,
 )
-from app.models.tenant.property import PropertyType
+from app.models.tenant.metadata import MetadataType
 from app.models.tenant.task import TaskPriority, TaskStatusCategory
 from app.schemas.tenant.import_envelopes import EnvelopePropertyValue, _EnvelopeBase
 from app.schemas.tenant.tool_layout import (
@@ -93,7 +93,7 @@ class ProjectExportTaskType(SanitizedBaseModel):
 
 class ProjectExportPropertyDefinition(SanitizedBaseModel):
     name: str
-    type: PropertyType
+    type: MetadataType
     position: float = 0.0
     color: Optional[str] = None
     options: Optional[List[dict]] = None

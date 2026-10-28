@@ -34,7 +34,7 @@ class ShapeField:
 
     #: Its name's key (``collections.shapes.fields.<key>``).
     key: str
-    #: A ``PropertyType`` value.
+    #: A ``MetadataType`` value.
     type: str
     #: For a scale, how the shape's lists show it.
     display: Optional[ScaleDisplay] = None

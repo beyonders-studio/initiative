@@ -284,11 +284,13 @@ def _quiet_expr(
 
     A facet answers to the rule of the thing it is a facet OF: sharing a draft,
     or tagging one, is as quiet as the draft itself. Otherwise the row that
-    stays quiet would be announced by every child it acquires.
+    stays quiet would be announced by every child it acquires. A facet row
+    may also be quiet by its own rule, as a plug-in's value no reader is
+    shown is.
     """
+    own = event_source(table).quiet_when
     if facet is None:
-        quiet = event_source(table).quiet_when
-        return quiet(ROW) if quiet is not None else ""
+        return own(ROW) if own is not None else ""
 
     def quiet_of(parent: str, alias: str) -> str:
         quiet = event_source(parent).quiet_when
@@ -300,7 +302,11 @@ def _quiet_expr(
         resource_type_expr=resource_type_expr,
         of_parent=quiet_of,
     )
-    return f"COALESCE({borrowed}, false)" if borrowed else ""
+    legs = [
+        *([f"COALESCE({borrowed}, false)"] if borrowed else []),
+        *([f"({own(ROW)})"] if own is not None else []),
+    ]
+    return " OR ".join(legs)
 
 
 def build_specs() -> list[CaptureSpec]:

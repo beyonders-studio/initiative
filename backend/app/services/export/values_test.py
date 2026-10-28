@@ -9,9 +9,9 @@ def test_a_plug_in_value_is_written_as_the_page_draws_its_kind():
     assert plugin_value({"text": "Ready", "tone": "positive"}, "badge", "en", None) == (
         "Ready"
     )
-    assert plugin_value({"value": 3, "max": 4}, "progress", "en", None) == "3/4"
+    assert plugin_value(75, "scale", "en", None) == 75
     assert plugin_value(
-        {"url": "https://x.test", "title": "PR"}, "link", "en", None
+        {"url": "https://x.test", "text": "PR"}, "link", "en", None
     ) == ("PR")
     # A value kept beside a state, and a list's elements, zero among them.
     assert plugin_value({"value": 2, "state": {"ci": "ok"}}, "number", "en", None) == 2
@@ -21,7 +21,7 @@ def test_a_plug_in_value_is_written_as_the_page_draws_its_kind():
     # A value of another shape draws nothing, as on the page, rather than
     # failing the export.
     assert plugin_value("pending", "number", "en", None) is None
-    assert plugin_value({"value": "x", "max": 4}, "progress", "en", None) is None
+    assert plugin_value({"value": "x"}, "scale", "en", None) is None
     assert plugin_value({"url": "javascript:x"}, "link", "en", None) is None
     # An unset checkbox is no value, not "No".
     assert plugin_value(None, "checkbox", "en", None) is None

@@ -121,14 +121,14 @@ class WikiAdapter(ToolExportAdapter):
         """The wiki and its pages, with no filed files. An initiative or
         community backup writes those as entries of their own and places them
         in the wiki from there. The pages come in reading order."""
-        from app.services.tenant import properties as properties_service
+        from app.services.tenant import metadata as metadata_service
         from app.services.tenant import tags as tags_service
         from app.services.tenant.wikis import load_pages
 
         wiki = await super().fetch(session, user, guild_id, wiki_id, access=access)
         pages = await load_pages(session, wiki.id, page_order=wiki.page_order)
         await tags_service.annotate_tags(session, pages)
-        await properties_service.annotate_properties(session, pages)
+        await metadata_service.annotate_properties(session, pages)
         return wiki, pages, []
 
     async def reach(

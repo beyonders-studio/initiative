@@ -59,12 +59,12 @@ class PostAdapter(ToolExportAdapter):
         *,
         access: str = EXPORT_ACCESS,
     ) -> Post:
-        from app.services.tenant import properties as properties_service
+        from app.services.tenant import metadata as metadata_service
         from app.services.tenant import tags as tags_service
 
         post = await super().fetch(session, user, guild_id, post_id, access=access)
         await tags_service.annotate_tags(session, [post])
-        await properties_service.annotate_properties(session, [post])
+        await metadata_service.annotate_properties(session, [post])
         return post
 
     def in_initiative(self, initiative_id: int, /) -> list[ColumnElement[bool]]:

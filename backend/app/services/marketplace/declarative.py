@@ -808,7 +808,7 @@ async def action_change(
     not), the install's ``settings`` and ``aliases`` (``installed``) and
     ``now``. A change names no target: its item is the action's. The rest of
     the contract's ``change`` is held where the change is made
-    (``plugin_metadata.apply_changes``). An expression that fails, or an
+    (``metadata.apply_changes``). An expression that fails, or an
     answer that is not a change, raises :class:`PluginDataError` as the
     plug-in being unavailable.
     """
@@ -852,7 +852,7 @@ class Delivered:
     #: The emit endpoint's id and its payload.
     event: Optional[tuple[str, dict[str, Any]]] = None
     #: What the matched row's ``write`` answered: the changes the install makes
-    #: to its values (``plugin_metadata.apply_changes``), :data:`UNDEFINED`
+    #: to its values (``metadata.apply_changes``), :data:`UNDEFINED`
     #: when the row has no ``write`` or it answered nothing.
     writes: Any = UNDEFINED
     #: The connection and its state.
@@ -970,7 +970,7 @@ async def run_schedule(
     ``runSchedule`` makes it: its read is made as the installation, with the
     params its ``params`` answers, and its ``write`` answers, from the read's
     answer, the changes the install makes to its values
-    (``plugin_metadata.apply_changes``). Answers what ``write`` answered,
+    (``metadata.apply_changes``). Answers what ``write`` answered,
     :data:`UNDEFINED` for nothing.
 
     ``params`` reads ``since`` (when the schedule last succeeded in the

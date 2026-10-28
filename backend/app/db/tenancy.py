@@ -331,10 +331,8 @@ CREATED_BY_EXEMPT_TABLES: frozenset[str] = frozenset(
         # row and its whole content.
         "post_poll_votes",
         "personal_items",
-        # A property value belongs to the initiative, not to whoever set it.
-        "property_values",
-        # A plug-in's own values: ``install_id`` names who keeps them.
-        "plugin_metadata",
+        # A value belongs to its definition's owner, not to whoever set it.
+        "metadata_values",
         # Machinery. Written by a trigger, a poller or a scheduler rather than
         # by a person; each already records the actor it needs (the outbox
         # carries ``actor_user_id``) or has none to record.

@@ -952,7 +952,7 @@ async def _apply_collections(
     value names is placed as any property's is, and a value placing nobody is
     left out."""
     from app.models.tenant.collection import Collection
-    from app.models.tenant.property import PropertyDefinition, PropertyValue
+    from app.models.tenant.metadata import MetadataDefinition, MetadataValue
     from app.services.import_engine.importers._base import (
         PropertyRestore,
         TagRestore,
@@ -985,7 +985,7 @@ async def _apply_collections(
             session, collection, list(files.values()), added_by=user.id
         )
         fields = {
-            field.name: PropertyDefinition(
+            field.name: MetadataDefinition(
                 initiative_id=initiative.id,
                 collection_id=collection.id,
                 name=field.name,
@@ -1011,7 +1011,7 @@ async def _apply_collections(
                 )
                 if columns is not None:
                     session.add(
-                        PropertyValue(
+                        MetadataValue(
                             entity_type=Tool.file.value,
                             entity_id=files[source_id],
                             property_id=field.id,
@@ -1209,7 +1209,7 @@ async def _apply_gallery_entry(
     from app.core.collection_shapes import SHAPES_BY_KEY
     from app.models.tenant.collection import Collection
     from app.models.tenant.file import File
-    from app.models.tenant.property import PropertyValue
+    from app.models.tenant.metadata import MetadataValue
     from app.services.import_engine.importers._base import (
         PropertyRestore,
         TagRestore,
@@ -1296,7 +1296,7 @@ async def _apply_gallery_entry(
                     locale=user.locale or "en",
                 )
                 session.add_all(
-                    PropertyValue(
+                    MetadataValue(
                         entity_type=Tool.file.value,
                         entity_id=file_id,
                         property_id=shaped["caption"].id,

@@ -132,7 +132,7 @@ from app.services.tenant import counters as counters_service
 from app.services.tenant import dashboards as dashboards_service
 from app.services.tenant import files as files_service
 from app.services.tenant import posts as posts_service
-from app.services.tenant import properties as properties_service
+from app.services.tenant import metadata as metadata_service
 from app.services.tenant import queues as queues_service
 from app.services.tenant import tags as tags_service
 from app.services.tenant import timeline as timeline_service
@@ -247,7 +247,7 @@ def _property_filters() -> ListParam:
             description=(
                 "JSON-encoded list of property-value filters, e.g. "
                 '`[{"property_id": 12, "op": "eq", "value": "live"}]`. '
-                f"Maximum {properties_service.MAX_PROPERTY_FILTERS} "
+                f"Maximum {metadata_service.MAX_PROPERTY_FILTERS} "
                 "conditions per request."
             ),
         ),
@@ -452,7 +452,7 @@ async def list_conditions(spec: ToolListSpec, req: ListRequest) -> list:
     narrows by them the same way."""
     return [
         *await (spec.conditions or _default_conditions)(spec, req),
-        *await properties_service.property_filter_clauses(
+        *await metadata_service.property_filter_clauses(
             req.session,
             spec.tool.value,
             req.values.get("property_filters"),
@@ -475,7 +475,7 @@ def _summaries(
 
     async def serialize(spec: ToolListSpec, req: ListRequest, rows: list) -> list:
         await tags_service.annotate_tags(req.session, rows)
-        await properties_service.annotate_properties(req.session, rows)
+        await metadata_service.annotate_properties(req.session, rows)
         if "comment_count" in schema.model_fields:
             await comments_service.annotate_comment_counts(
                 req.session, rows, column=f"{spec.tool.value}_id"
@@ -1315,12 +1315,12 @@ async def _serialize_collection_files(
     collection_id = req.values["collection_id"]
     ids = [row.id for row in rows]
     added = await collections_service.added_at_of(req.session, collection_id, ids)
-    fields = await properties_service.summaries_by_id(
+    fields = await metadata_service.summaries_by_id(
         req.session, Tool.file.value, ids, collection_id=collection_id
     )
     for row in rows:
         object.__setattr__(row, "added_at", added[row.id])
-        object.__setattr__(row, "fields", fields.get(row.id, []))
+        object.__setattr__(row, "metadata", fields.get(row.id, []))
     return await files_endpoints.serialize_file_page(
         req.session, req.user_id, rows, CollectionFileSummary
     )

@@ -59,7 +59,7 @@ from app.models.tenant.initiative import (
     InitiativeRolePermission,
 )
 from app.models.tenant.calendar_event import CalendarEvent, CalendarEventAttendee
-from app.models.tenant.property import PropertyValue
+from app.models.tenant.metadata import MetadataValue
 from app.models.tenant.queue import QueueItem
 from app.models.tenant.resource_grant import ResourceGrant
 from app.models.tenant.task import Task, TaskAssignee
@@ -356,7 +356,7 @@ def _property_ref(tool: Tool) -> PersonRef | None:
     """A person-valued property on anything ``tool`` governs: the tool row
     itself and every sub-tool row inside it, read from the properties seam. A
     collection is governed by no one row, so it is not among them."""
-    from app.services.tenant.properties import PROPERTY_LINKS
+    from app.services.tenant.metadata import PROPERTY_LINKS
 
     specs = [
         spec for spec in PROPERTY_LINKS.values() if spec.tool is tool and spec.shared
@@ -368,10 +368,10 @@ def _property_ref(tool: Tool) -> PersonRef | None:
         return or_(
             *(
                 and_(
-                    PropertyValue.entity_type == spec.target,
-                    PropertyValue.entity_id == gid
+                    MetadataValue.entity_type == spec.target,
+                    MetadataValue.entity_id == gid
                     if spec.via is None
-                    else PropertyValue.entity_id.in_(
+                    else MetadataValue.entity_id.in_(
                         sa_select(spec.model.id).where(
                             getattr(spec.model, spec.via) == gid
                         )
@@ -381,7 +381,7 @@ def _property_ref(tool: Tool) -> PersonRef | None:
             )
         )
 
-    return PersonRef(PropertyValue.value_user_id, within, clears=True)
+    return PersonRef(MetadataValue.value_user_id, within, clears=True)
 
 
 def person_refs(tool: Tool) -> tuple[PersonRef, ...]:
@@ -413,7 +413,7 @@ async def sweep_collections(
     answer who that was. A collection is governed by its files rather than one
     row (:meth:`Governing.of_collection`), so the whole set is read at once."""
     from app.models.tenant.collection import Collection
-    from app.services.tenant.properties import link_for
+    from app.services.tenant.metadata import link_for
 
     rows = list(collections)
     if not rows:
@@ -421,12 +421,12 @@ async def sweep_collections(
     guild_id = routed_guild_id(session)
     if guild_id is None:
         raise RuntimeError("people are named on content inside a community")
-    on = PropertyValue.entity_type == link_for(Collection).target
+    on = MetadataValue.entity_type == link_for(Collection).target
     unreadable = or_(
         *(
             and_(
-                PropertyValue.entity_id == row.id,
-                PropertyValue.value_user_id.not_in(
+                MetadataValue.entity_id == row.id,
+                MetadataValue.value_user_id.not_in(
                     readers_of(Governing.of_collection(row), guild_id)
                 ),
             )
@@ -436,17 +436,17 @@ async def sweep_collections(
     async with roster_session(session) as reader:
         gone = (
             await reader.exec(
-                select(PropertyValue.entity_id, PropertyValue.value_user_id).where(
-                    on, PropertyValue.value_user_id.is_not(None), unreadable
+                select(MetadataValue.entity_id, MetadataValue.value_user_id).where(
+                    on, MetadataValue.value_user_id.is_not(None), unreadable
                 )
             )
         ).all()
     if gone:
         await session.exec(
-            sa_update(PropertyValue)
+            sa_update(MetadataValue)
             .where(
                 on,
-                tuple_(PropertyValue.entity_id, PropertyValue.value_user_id).in_(gone),
+                tuple_(MetadataValue.entity_id, MetadataValue.value_user_id).in_(gone),
             )
             .values(value_user_id=None)
         )

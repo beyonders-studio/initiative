@@ -26,7 +26,7 @@ from app.models.tenant.calendar_event import (
 )
 from app.services import permissions as permissions_service
 from app.services.tenant import ownership as ownership_service
-from app.services.tenant import properties as properties_service
+from app.services.tenant import metadata as metadata_service
 from app.services.tenant import tags as tags_service
 from app.services.tenant.tool_listing import initiative_switch_clause
 
@@ -64,10 +64,10 @@ async def get_calendar(
     calendar = result.one_or_none()
     if calendar is not None:
         await tags_service.annotate_tags(session, [calendar])
-        await properties_service.annotate_properties(session, [calendar])
+        await metadata_service.annotate_properties(session, [calendar])
         if with_events:
             await tags_service.annotate_tags(session, calendar.events or [])
-            await properties_service.annotate_properties(session, calendar.events or [])
+            await metadata_service.annotate_properties(session, calendar.events or [])
     return calendar
 
 

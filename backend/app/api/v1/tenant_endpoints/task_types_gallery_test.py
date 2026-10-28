@@ -9,7 +9,7 @@ from sqlmodel.ext.asyncio.session import AsyncSession
 
 from app.models.platform.guild import CommunityRole
 from app.models.platform.user import User
-from app.models.tenant.property import PropertyDefinition, PropertyType
+from app.models.tenant.metadata import MetadataDefinition, MetadataType
 from app.models.tenant.tool_layout import ToolLayout
 from app.services.tenant import task_types as task_types_service
 from app.testing import Actor, guild_of, route_session_to_guild
@@ -69,10 +69,10 @@ async def test_a_gallery_type_brings_its_look_its_start_and_its_fields(
     # One the initiative already has, one it has under another kind, and one
     # it lacks.
     cost = await create_property_definition(
-        session, a.initiative, name="cost", type=PropertyType.number
+        session, a.initiative, name="cost", type=MetadataType.number
     )
     await create_property_definition(
-        session, a.initiative, name="Link", type=PropertyType.text
+        session, a.initiative, name="Link", type=MetadataType.text
     )
     await session.commit()
 
@@ -107,13 +107,13 @@ async def test_a_gallery_type_brings_its_look_its_start_and_its_fields(
     await route_session_to_guild(session, guild_of(a.project))
     [location] = (
         await session.exec(
-            select(PropertyDefinition).where(
-                PropertyDefinition.initiative_id == a.initiative.id,
-                PropertyDefinition.name == "Location",
+            select(MetadataDefinition).where(
+                MetadataDefinition.initiative_id == a.initiative.id,
+                MetadataDefinition.name == "Location",
             )
         )
     ).all()
-    assert location.type == PropertyType.text
+    assert location.type == MetadataType.text
     assert event.json()["field_ids"] == [location.id]
 
 
@@ -218,7 +218,7 @@ async def test_types_copy_from_another_project_with_their_pages(
     far = await create_project(session, other_initiative, a.user, name="Far")
     await route_session_to_guild(session, guild_of(source))
     effort = await create_property_definition(
-        session, a.initiative, name="Effort", type=PropertyType.number
+        session, a.initiative, name="Effort", type=MetadataType.number
     )
     chore = (
         await client.post(

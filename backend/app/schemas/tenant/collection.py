@@ -13,7 +13,7 @@ from app.schemas.base import MentionStr, SanitizedBaseModel, TitleStr
 from app.schemas.query import PageMeta
 from app.schemas.tenant.archive import ContentCan
 from app.schemas.tenant.file import FileSummary
-from app.models.tenant.property import PropertyType
+from app.models.tenant.metadata import MetadataType
 from app.schemas.tenant.share_request import HiddenFiles
 from app.schemas.tenant.property import (
     CurrencyCode,
@@ -51,8 +51,8 @@ CollectionShapeKey.__doc__ = "A ready-made shape a collection can start as."
 
 class CollectionCreate(CollectionFiles, PropertiesOnCreate):
     """A new collection, made with the files it starts with: a collection is
-    never empty. It starts blank (its grid and table, and no fields of its
-    own), as a ready-made ``shape``, or with the fields and lists of another
+    never empty. It starts blank (its grid and table, and no metadata of its
+    own), as a ready-made ``shape``, or with the metadata and lists of another
     collection in the initiative (``shape_from``), none of its values."""
 
     initiative_id: int
@@ -120,10 +120,10 @@ def collection_cover(file: Optional["File"]) -> Optional[CollectionCover]:
 
 class CollectionFileSummary(FileSummary):
     """A file as its collection lists it: with when it was added there, and
-    its values of the collection's own fields."""
+    its values of the collection's metadata."""
 
     added_at: datetime
-    fields: List[PropertySummary] = Field(default_factory=list)
+    metadata: List[PropertySummary] = Field(default_factory=list)
 
 
 class CollectionFileListResponse(PageMeta):
@@ -167,19 +167,19 @@ class CollectionRead(SanitizedBaseModel):
     comment_count: int = 0
     tags: List[TagSummary] = Field(default_factory=list)
     properties: List[PropertySummary] = Field(default_factory=list)
-    #: Its own fields, in order, whose values its files carry here.
-    fields: List[PropertyDefinitionRead] = Field(default_factory=list)
+    #: Its metadata, in order, whose values its files carry here.
+    metadata: List[PropertyDefinitionRead] = Field(default_factory=list)
     #: Whether the reader may rename it, change what is in it, or trash it.
     can: CollectionCan = Field(default_factory=CollectionCan)
 
 
-class CollectionShapeField(SanitizedBaseModel):
-    """A field a ready-made shape brings, in the reader's language."""
+class CollectionShapeMetadata(SanitizedBaseModel):
+    """Metadata a ready-made shape brings, in the reader's language."""
 
     model_config = ConfigDict(json_schema_serialization_defaults_required=True)
 
     name: str
-    type: PropertyType
+    type: MetadataType
     #: For a scale, how the shape's lists show it.
     display: Optional[ScaleDisplay] = None
     #: For money, the currency it starts in.
@@ -194,7 +194,7 @@ class CollectionShapeEntry(SanitizedBaseModel):
     hint: str
     #: The lists it shows, in order; it opens on the first.
     lists: List[ListLayoutKind]
-    fields: List[CollectionShapeField]
+    metadata: List[CollectionShapeMetadata]
 
 
 class CollectionShapeGroup(SanitizedBaseModel):

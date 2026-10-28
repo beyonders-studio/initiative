@@ -352,12 +352,12 @@ async def test_a_tools_tags_and_properties_survive_export_and_import(
 
     from app.api.v1.tenant_endpoints.exports_test import _all_tools_enabled
     from app.core.config import settings
-    from app.models.tenant.property import (
-        PropertyDefinition,
-        PropertyType,
-        PropertyValue,
+    from app.models.tenant.metadata import (
+        MetadataDefinition,
+        MetadataType,
+        MetadataValue,
     )
-    from app.services.tenant.properties import PROPERTY_LINKS, link_for
+    from app.services.tenant.metadata import PROPERTY_LINKS, link_for
     from app.testing.factories import create_property_definition, create_property_value
 
     monkeypatch.setattr(settings, "UPLOADS_DIR", str(tmp_path))
@@ -367,7 +367,7 @@ async def test_a_tools_tags_and_properties_survive_export_and_import(
     await _all_tools_enabled(session, target)
     stage = await create_property_definition(session, a.initiative, name="Stage")
     owner = await create_property_definition(
-        session, a.initiative, name="Owner", type=PropertyType.user_reference
+        session, a.initiative, name="Owner", type=MetadataType.user_reference
     )
     row, inner = await _tool_with_a_row(session, a, tool)
     await assign_tag(session, row, await create_tag(session, a.guild, name="Flagship"))
@@ -399,15 +399,15 @@ async def test_a_tools_tags_and_properties_survive_export_and_import(
         return (
             await session.exec(
                 select(
-                    PropertyDefinition.name,
-                    PropertyDefinition.initiative_id,
-                    PropertyValue.value_text,
-                    PropertyValue.value_user_id,
+                    MetadataDefinition.name,
+                    MetadataDefinition.initiative_id,
+                    MetadataValue.value_text,
+                    MetadataValue.value_user_id,
                 )
-                .join(PropertyDefinition)
+                .join(MetadataDefinition)
                 .where(
-                    PropertyValue.entity_type == target_name,
-                    PropertyValue.entity_id == entity_id,
+                    MetadataValue.entity_type == target_name,
+                    MetadataValue.entity_id == entity_id,
                 )
             )
         ).all()
@@ -447,10 +447,10 @@ async def test_a_renamed_property_is_one_definition_for_every_row(
     from sqlmodel import select
 
     from app.api.v1.tenant_endpoints.exports_test import _all_tools_enabled
-    from app.models.tenant.property import (
-        PropertyDefinition,
-        PropertyType,
-        PropertyValue,
+    from app.models.tenant.metadata import (
+        MetadataDefinition,
+        MetadataType,
+        MetadataValue,
     )
     from app.testing.factories import (
         create_property_definition,
@@ -465,7 +465,7 @@ async def test_a_renamed_property_is_one_definition_for_every_row(
     await _all_tools_enabled(session, target)
     status = await create_property_definition(session, a.initiative, name="Status")
     await create_property_definition(
-        session, target, name="Status", type=PropertyType.number
+        session, target, name="Status", type=MetadataType.number
     )
     queue = await create_queue(session, a.initiative, a.user)
     for label in ("First", "Second"):
@@ -478,11 +478,11 @@ async def test_a_renamed_property_is_one_definition_for_every_row(
 
     names = (
         await session.exec(
-            select(PropertyDefinition.name)
-            .join(PropertyValue)
+            select(MetadataDefinition.name)
+            .join(MetadataValue)
             .where(
-                PropertyValue.entity_type == "queue_item",
-                PropertyDefinition.initiative_id == target.id,
+                MetadataValue.entity_type == "queue_item",
+                MetadataDefinition.initiative_id == target.id,
             )
         )
     ).all()
@@ -492,8 +492,8 @@ async def test_a_renamed_property_is_one_definition_for_every_row(
     assert again.status_code == 201, again.text
     definitions = (
         await session.exec(
-            select(PropertyDefinition.name).where(
-                PropertyDefinition.initiative_id == target.id
+            select(MetadataDefinition.name).where(
+                MetadataDefinition.initiative_id == target.id
             )
         )
     ).all()
@@ -1370,7 +1370,7 @@ async def test_an_archive_with_a_gallery_restores_it_as_files_in_a_collection(
 
     from app.models.tenant.collection import Collection, CollectionFile
     from app.models.tenant.file import File
-    from app.models.tenant.property import PropertyDefinition, PropertyValue
+    from app.models.tenant.metadata import MetadataDefinition, MetadataValue
 
     a = await acting_user(
         guild_role=CommunityRole.superadmin, initiative=True, project=True
@@ -1437,16 +1437,16 @@ async def test_an_archive_with_a_gallery_restores_it_as_files_in_a_collection(
     ).one()
     files = (
         await session.exec(
-            select(File.name, PropertyValue.value_text)
+            select(File.name, MetadataValue.value_text)
             .join(CollectionFile, CollectionFile.file_id == File.id)
-            .join(PropertyValue, PropertyValue.entity_id == File.id)
+            .join(MetadataValue, MetadataValue.entity_id == File.id)
             .join(
-                PropertyDefinition, PropertyDefinition.id == PropertyValue.property_id
+                MetadataDefinition, MetadataDefinition.id == MetadataValue.property_id
             )
             .where(
                 CollectionFile.collection_id == restored.id,
-                PropertyDefinition.collection_id == restored.id,
-                PropertyDefinition.name == "Caption",
+                MetadataDefinition.collection_id == restored.id,
+                MetadataDefinition.name == "Caption",
             )
         )
     ).all()
@@ -1465,7 +1465,7 @@ async def test_restored_collections_keep_their_own_files_and_cover(
 
     from app.models.tenant.collection import Collection, CollectionFile
     from app.models.tenant.file import File
-    from app.models.tenant.property import PropertyDefinition, PropertyValue
+    from app.models.tenant.metadata import MetadataDefinition, MetadataValue
     from app.services.tenant import collections as collections_service
     from app.testing import create_collection, create_property_value
 
@@ -1484,7 +1484,9 @@ async def test_restored_collections_keep_their_own_files_and_cover(
         cover_file_id=sunset.id,
         shape="catalog",
     )
-    price, _rating = (await collections_service.fields_of(session, [shop.id]))[shop.id]
+    price, _rating = (await collections_service.metadata_of(session, [shop.id]))[
+        shop.id
+    ]
     await create_property_value(session, sunset, price, value_number=Decimal("12.50"))
     await create_collection(session, a.initiative, a.user, files=[dunes], name="Photos")
 
@@ -1528,13 +1530,13 @@ async def test_restored_collections_keep_their_own_files_and_cover(
     values = (
         await session.exec(
             select(
-                PropertyDefinition.name,
-                PropertyDefinition.currency,
-                PropertyValue.entity_id,
-                PropertyValue.value_number,
+                MetadataDefinition.name,
+                MetadataDefinition.currency,
+                MetadataValue.entity_id,
+                MetadataValue.value_number,
             )
-            .join(PropertyValue, PropertyValue.property_id == PropertyDefinition.id)
-            .where(PropertyDefinition.collection_id == collections[0].id)
+            .join(MetadataValue, MetadataValue.property_id == MetadataDefinition.id)
+            .where(MetadataDefinition.collection_id == collections[0].id)
         )
     ).all()
     assert [(n, c, names[f], v) for n, c, f, v in values] == [
@@ -1551,7 +1553,7 @@ async def test_a_restored_collection_names_only_who_can_open_a_file_in_it(
     from sqlmodel import select
 
     from app.models.tenant.collection import Collection
-    from app.models.tenant.property import PropertyValue
+    from app.models.tenant.metadata import MetadataValue
     from app.models.tenant.resource_grant import ResourceGrant
 
     a = await acting_user(
@@ -1640,9 +1642,9 @@ async def test_a_restored_collection_names_only_who_can_open_a_file_in_it(
     assert shelf.id == secret.id
     assert (
         await session.exec(
-            select(PropertyValue.value_user_id).where(
-                PropertyValue.entity_type == "collection",
-                PropertyValue.entity_id == shelf.id,
+            select(MetadataValue.value_user_id).where(
+                MetadataValue.entity_type == "collection",
+                MetadataValue.entity_id == shelf.id,
             )
         )
     ).all() == [None]
@@ -2950,10 +2952,10 @@ async def test_two_properties_never_share_one_definition(client, acting_user, se
     then gets a definition of its own, so a task keeps both values."""
     from sqlmodel import select
 
-    from app.models.tenant.property import (
-        PropertyDefinition,
-        PropertyType,
-        PropertyValue,
+    from app.models.tenant.metadata import (
+        MetadataDefinition,
+        MetadataType,
+        MetadataValue,
     )
     from app.models.tenant.task import Task
     from app.testing import create_property_definition
@@ -2963,13 +2965,13 @@ async def test_two_properties_never_share_one_definition(client, acting_user, se
     )
     high = [{"value": "high", "label": "High"}]
     await create_property_definition(
-        session, a.initiative, name="Priority", type=PropertyType.number
+        session, a.initiative, name="Priority", type=MetadataType.number
     )
     await create_property_definition(
         session,
         a.initiative,
         name="Priority_select",
-        type=PropertyType.select,
+        type=MetadataType.select,
         options=high,
     )
     envelope = _project_envelope_with_comment("stranger#4321", "Alice Chen")
@@ -2990,10 +2992,10 @@ async def test_two_properties_never_share_one_definition(client, acting_user, se
     task = (await session.exec(select(Task).where(Task.title == "Fit the door"))).one()
     names = (
         await session.exec(
-            select(PropertyDefinition.name)
-            .join(PropertyValue)
+            select(MetadataDefinition.name)
+            .join(MetadataValue)
             .where(
-                PropertyValue.entity_type == "task", PropertyValue.entity_id == task.id
+                MetadataValue.entity_type == "task", MetadataValue.entity_id == task.id
             )
         )
     ).all()
@@ -3007,7 +3009,7 @@ async def test_a_user_property_is_placed_by_the_people_step(
     does, so it is asked about the same way, and the answer is what lands."""
     from sqlmodel import select
 
-    from app.models.tenant.property import PropertyValue
+    from app.models.tenant.metadata import MetadataValue
     from app.models.tenant.task import Task
 
     a = await acting_user(
@@ -3048,8 +3050,8 @@ async def test_a_user_property_is_placed_by_the_people_step(
     task = (await session.exec(select(Task).where(Task.title == "Fit the door"))).one()
     values = (
         await session.exec(
-            select(PropertyValue).where(
-                PropertyValue.entity_type == "task", PropertyValue.entity_id == task.id
+            select(MetadataValue).where(
+                MetadataValue.entity_type == "task", MetadataValue.entity_id == task.id
             )
         )
     ).all()
@@ -4349,12 +4351,12 @@ async def test_backup_restores_property_definitions_in_full(
     job = await _apply_backup(client, a, zip_bytes, monkeypatch, role_session)
     assert job["status"] == ImportJobStatus.done.value, job.get("error")
 
-    from app.models.tenant.property import PropertyDefinition
+    from app.models.tenant.metadata import MetadataDefinition
 
     await route_session_to_guild(session, a.guild.id)
     definitions = {
         d.name: d
-        for d in await session.exec(select(PropertyDefinition))
+        for d in await session.exec(select(MetadataDefinition))
         if d.name == "Region"
     }
     region = definitions["Region"]
@@ -4871,7 +4873,7 @@ async def test_a_jira_import_brings_its_fields_as_properties(
     mapped to."""
     from sqlmodel import select
 
-    from app.models.tenant.property import PropertyDefinition, PropertyValue
+    from app.models.tenant.metadata import MetadataDefinition, MetadataValue
     from app.models.tenant.task import Task
     from app.services.import_engine import atlassian as atlassian_service
 
@@ -4913,13 +4915,13 @@ async def test_a_jira_import_brings_its_fields_as_properties(
     task = (await session.exec(select(Task).where(Task.title == "Fit the frame"))).one()
     rows = (
         await session.exec(
-            select(PropertyValue, PropertyDefinition)
+            select(MetadataValue, MetadataDefinition)
             .join(
-                PropertyDefinition,
-                PropertyDefinition.id == PropertyValue.property_id,
+                MetadataDefinition,
+                MetadataDefinition.id == MetadataValue.property_id,
             )
             .where(
-                PropertyValue.entity_type == "task", PropertyValue.entity_id == task.id
+                MetadataValue.entity_type == "task", MetadataValue.entity_id == task.id
             )
         )
     ).all()
@@ -5319,7 +5321,7 @@ async def test_a_property_unticked_on_the_review_is_not_created(
     value for it. The rest arrive as usual."""
     from sqlmodel import select
 
-    from app.models.tenant.property import PropertyDefinition, PropertyValue
+    from app.models.tenant.metadata import MetadataDefinition, MetadataValue
     from app.models.tenant.task import Task
     from app.services.import_engine import atlassian as atlassian_service
 
@@ -5351,8 +5353,8 @@ async def test_a_property_unticked_on_the_review_is_not_created(
         d.name
         for d in (
             await session.exec(
-                select(PropertyDefinition).where(
-                    PropertyDefinition.initiative_id == a.initiative.id
+                select(MetadataDefinition).where(
+                    MetadataDefinition.initiative_id == a.initiative.id
                 )
             )
         ).all()
@@ -5365,13 +5367,13 @@ async def test_a_property_unticked_on_the_review_is_not_created(
     task = (await session.exec(select(Task).where(Task.title == "Fit the frame"))).one()
     values = (
         await session.exec(
-            select(PropertyValue, PropertyDefinition)
+            select(MetadataValue, MetadataDefinition)
             .join(
-                PropertyDefinition,
-                PropertyDefinition.id == PropertyValue.property_id,
+                MetadataDefinition,
+                MetadataDefinition.id == MetadataValue.property_id,
             )
             .where(
-                PropertyValue.entity_type == "task", PropertyValue.entity_id == task.id
+                MetadataValue.entity_type == "task", MetadataValue.entity_id == task.id
             )
         )
     ).all()

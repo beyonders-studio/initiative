@@ -658,30 +658,30 @@ async def _tasks_by_jira_key(session: AsyncSession, keys: set[str]) -> dict[str,
         return {}
     from sqlalchemy import or_
 
-    from app.models.tenant.property import PropertyDefinition, PropertyValue
+    from app.models.tenant.metadata import MetadataDefinition, MetadataValue
     from app.models.tenant.task import Task
     from app.services.import_engine.jira_fields import JIRA_KEY_PROPERTY
 
     rows = (
         await session.exec(
-            select(PropertyValue.value_text, Task.id)
+            select(MetadataValue.value_text, Task.id)
             .join(
-                PropertyDefinition,
-                PropertyDefinition.id == PropertyValue.property_id,
+                MetadataDefinition,
+                MetadataDefinition.id == MetadataValue.property_id,
             )
             .join(
                 Task,
-                (PropertyValue.entity_type == "task")
-                & (Task.id == PropertyValue.entity_id),
+                (MetadataValue.entity_type == "task")
+                & (Task.id == MetadataValue.entity_id),
             )
             .where(
                 # The name the import gave it, or the one it was renamed to
                 # when that name was already taken by a different kind.
                 or_(
-                    PropertyDefinition.name == JIRA_KEY_PROPERTY,
-                    PropertyDefinition.name.like(f"{JIRA_KEY_PROPERTY} (%"),
+                    MetadataDefinition.name == JIRA_KEY_PROPERTY,
+                    MetadataDefinition.name.like(f"{JIRA_KEY_PROPERTY} (%"),
                 ),
-                PropertyValue.value_text.in_(sorted(keys)),
+                MetadataValue.value_text.in_(sorted(keys)),
                 Task.deleted_at.is_(None),
             )
             .order_by(Task.id)

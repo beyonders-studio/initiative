@@ -301,7 +301,7 @@ class CaseField(str, Enum):
     subject_link = "subject_link"
 
 
-#: Each field's property type, as a ``PropertyType`` value. Declared as plain
+#: Each field's property type, as a ``MetadataType`` value. Declared as plain
 #: strings so this module stays free of model imports; ``intake_test`` checks
 #: every one against the real enum, and against what the blueprints declare.
 CASE_FIELD_TYPES: dict[CaseField, str] = {

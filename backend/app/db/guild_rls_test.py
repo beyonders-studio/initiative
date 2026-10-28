@@ -429,8 +429,7 @@ _NO_SINGLE_PARENT = {
     "reaction_digest_items": "gated exactly like the reaction it describes",
     "personal_items": "any tool or sub-tool, per row",
     "engagement_levels": "any tool or sub-tool, per row",
-    "property_values": "any tool or sub-tool, per row: read through its own table, written through entity_access",
-    "plugin_metadata": "any item, per row, read through its own table, or the install itself",
+    "metadata_values": "any tool or sub-tool, per row: read through its own table, written through entity_access, or the install itself",
     "search_entries": "names its tool in dac_tool",
     "tool_layouts": "any viewable tool, per row, or its initiative for a shared tool",
     "share_requests": "any shareable tool, per row: read by the requester and whoever shares it",
@@ -442,7 +441,7 @@ _NO_SINGLE_PARENT = {
     # No sharing leg at all — see the registry for each.
     "event_outbox": "names its tool in dac_tool",
     "plugin_event_outbox": "the events plug-ins emit are no tool's own table",
-    "property_definitions": "initiative configuration, not a tool's content",
+    "metadata_definitions": "initiative, project or collection configuration, or a plug-in's, not a tool's content",
     "resource_grants": "sharing itself; resource_access reads this table",
     "webhook_subscriptions": "integration config, gated by the initiative",
     "guest_invite_grants": "an invite's terms, the community's administration's",

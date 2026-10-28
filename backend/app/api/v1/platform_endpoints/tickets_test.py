@@ -151,13 +151,13 @@ async def test_the_case_names_who_asked_and_where_from(
 
     await set_rls_context(session, SystemGuild(operations["guild"].id))
     case = (await session.exec(select(IntakeCase))).one()
-    from app.models.tenant.property import PropertyValue
+    from app.models.tenant.metadata import MetadataValue
 
     values = (
         await session.exec(
-            select(PropertyValue).where(
-                PropertyValue.entity_type == "task",
-                PropertyValue.entity_id == case.task_id,
+            select(MetadataValue).where(
+                MetadataValue.entity_type == "task",
+                MetadataValue.entity_id == case.task_id,
             )
         )
     ).all()
@@ -455,19 +455,19 @@ async def test_an_account_question_from_inside_a_community_records_none(
 
     await set_rls_context(session, SystemGuild(operations["guild"].id))
     case = (await session.exec(select(IntakeCase))).one()
-    from app.models.tenant.property import PropertyDefinition, PropertyValue
+    from app.models.tenant.metadata import MetadataDefinition, MetadataValue
 
     held = dict(
         (
             await session.exec(
-                select(PropertyDefinition.name, PropertyValue.value_number)
+                select(MetadataDefinition.name, MetadataValue.value_number)
                 .join(
-                    PropertyDefinition,
-                    PropertyDefinition.id == PropertyValue.property_id,
+                    MetadataDefinition,
+                    MetadataDefinition.id == MetadataValue.property_id,
                 )
                 .where(
-                    PropertyValue.entity_type == "task",
-                    PropertyValue.entity_id == case.task_id,
+                    MetadataValue.entity_type == "task",
+                    MetadataValue.entity_id == case.task_id,
                 )
             )
         ).all()

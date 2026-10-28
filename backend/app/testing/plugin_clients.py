@@ -262,3 +262,25 @@ def assert_names_nobody(body: str, ids: Sequence[int]) -> None:
     :func:`lift_person_and_guild_ids` — appears anywhere in ``body``."""
     found = [value for value in ids if str(value) in body]
     assert not found, f"the response names {found}: {body[:2000]}"
+
+
+async def kept_plugin_values(session: AsyncSession) -> dict[tuple, tuple]:
+    """Every value the plug-ins keep in the routed community, as each plug-in
+    wrote it and whether it is shown, by ``(entity_type, entity_id, key,
+    ref)``."""
+    from app.models.tenant.metadata import MetadataDefinition, MetadataValue
+    from app.services.tenant import metadata
+
+    rows = await session.exec(
+        select(MetadataDefinition, MetadataValue)
+        .join(MetadataValue, MetadataValue.property_id == MetadataDefinition.id)
+        .where(MetadataDefinition.install_id.is_not(None))
+        .execution_options(populate_existing=True)
+    )
+    return {
+        (row.entity_type, row.entity_id, defn.key, row.ref): (
+            metadata._told(defn, row, metadata._ROW_IDS),
+            row.entity_type in defn.shown_on,
+        )
+        for defn, row in rows
+    }

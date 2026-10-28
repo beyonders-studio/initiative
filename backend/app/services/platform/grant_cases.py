@@ -40,7 +40,7 @@ from app.models.platform.access_grant import AccessGrant, AccessGrantStatus
 from app.models.platform.access_grant_activity import AccessGrantActivity
 from app.models.platform.user import User
 from app.models.tenant.intake import IntakeBinding, IntakeCase
-from app.models.tenant.property import PropertyDefinition, PropertyValue
+from app.models.tenant.metadata import MetadataDefinition, MetadataValue
 from app.models.tenant.task import Task, TaskAssignee, TaskStatus, TaskStatusCategory
 from app.services.platform import case_activity
 from app.services.platform.intake import configured_operations_guild_id
@@ -111,11 +111,11 @@ async def cases_required() -> bool:
 def _subject_guild():
     """The case's ``subject_guild`` reference, as a correlated read."""
     return (
-        select(PropertyValue.value_number)
-        .join(PropertyDefinition, PropertyDefinition.id == PropertyValue.property_id)
-        .where(PropertyDefinition.name == CaseField.subject_guild.value)
-        .where(PropertyValue.entity_type == "task")
-        .where(PropertyValue.entity_id == IntakeCase.task_id)
+        select(MetadataValue.value_number)
+        .join(MetadataDefinition, MetadataDefinition.id == MetadataValue.property_id)
+        .where(MetadataDefinition.name == CaseField.subject_guild.value)
+        .where(MetadataValue.entity_type == "task")
+        .where(MetadataValue.entity_id == IntakeCase.task_id)
         .correlate(IntakeCase)
         .limit(1)
         .scalar_subquery()

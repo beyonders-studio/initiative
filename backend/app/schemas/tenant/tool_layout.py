@@ -43,7 +43,7 @@ from app.services.marketplace.manifest_values import (
     MAX_METADATA_KEY_LENGTH,
     is_metadata_key,
 )
-from app.services.tenant.properties import MAX_PROPERTY_FILTERS
+from app.schemas.tenant.property import MAX_PROPERTY_FILTERS
 
 #: What one layout may hold. Every part of a tree counts as a
 #: node, as does every column.

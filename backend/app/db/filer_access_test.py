@@ -206,7 +206,7 @@ async def test_a_filer_reads_on_a_connection_whose_plans_are_kept(
         "initiatives",
         "initiative_members",
         "uploads",
-        "property_values",
+        "metadata_values",
         "task_assignees",
     ],
 )

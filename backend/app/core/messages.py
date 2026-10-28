@@ -1707,6 +1707,9 @@ class PluginChannelMessages:
     #: on the item's kind, or sets a list field to what is not a list of
     #: elements.
     METADATA_LIST_MISMATCH = "PLUGIN_CHANNEL_METADATA_LIST_MISMATCH"
+    #: A value that is not one of its key's kind: a field's, as the pinned
+    #: version declares it.
+    METADATA_VALUE_INVALID = "PLUGIN_CHANNEL_METADATA_VALUE_INVALID"
 
 
 class WebhookSubscriptionMessages:

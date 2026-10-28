@@ -39,6 +39,7 @@ _VERSIONS = Path(__file__).resolve().parents[2] / "alembic" / "versions"
 _REVISION = _VERSIONS / "20261002_0444_a_mention_keeps_no_name.py"
 _FILES = _VERSIONS / "20261006_0464_documents_are_files.py"
 _COLLECTIONS = _VERSIONS / "20261027_0546_galleries_are_collections.py"
+_METADATA = _VERSIONS / "20261027_0550_metadata_is_one_store.py"
 
 
 def _revision(path: Path = _REVISION) -> ModuleType:
@@ -98,6 +99,7 @@ async def test_a_mention_written_before_keeps_no_name(session):
         later = (
             _revision(_FILES)._apply,
             _revision(_COLLECTIONS)._apply,
+            _revision(_METADATA)._apply,
         )
 
         def renamed(forward: bool) -> None:

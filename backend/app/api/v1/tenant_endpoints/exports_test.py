@@ -38,7 +38,7 @@ from app.models.platform.notification import Notification, NotificationType
 from app.core.file_types import FileType
 from app.models.tenant.export_job import ExportJob, ExportJobStatus
 from app.models.tenant.initiative import Initiative, InitiativeMember
-from app.models.tenant.property import PropertyType
+from app.models.tenant.metadata import MetadataType
 from app.models.tenant.resource_grant import ResourceAccessLevel, ResourceGrant
 from app.models.tenant.task import TaskPriority, TaskStatusCategory
 from app.services import storage as storage_module
@@ -499,7 +499,7 @@ async def test_task_export_groups_by_each_kind_of_field(
         session,
         a.initiative,
         name="Region",
-        type=PropertyType.select,
+        type=MetadataType.select,
         options=[
             {"value": "north", "label": "North"},
             {"value": "south", "label": "South"},
@@ -557,7 +557,7 @@ async def test_task_export_shows_the_columns_its_view_shows(
         session,
         a.initiative,
         name="Effort",
-        type=PropertyType.select,
+        type=MetadataType.select,
         options=[{"value": "big", "label": "Big"}],
     )
     task = await create_task(
@@ -599,7 +599,7 @@ async def test_detailed_task_export_follows_the_task_page(
     a.membership.display_name = "Ada"
     session.add(a.membership)
     effort = await create_property_definition(
-        session, a.initiative, name="Effort", type=PropertyType.text
+        session, a.initiative, name="Effort", type=MetadataType.text
     )
     task = await create_task(
         session,
@@ -2818,14 +2818,14 @@ async def test_a_backup_lists_who_its_user_properties_name(
     so the manifest has to list whoever one names — or the step never asks,
     and the value lands only on an exact name match."""
     from app.core.user_display import handle_of
-    from app.models.tenant.property import PropertyType
+    from app.models.tenant.metadata import MetadataType
 
     a = await acting_user(
         guild_role=CommunityRole.member, initiative=True, project=True
     )
     task = await create_task(session, a.project, title="Report it")
     reporter = await create_property_definition(
-        session, a.initiative, name="Reporter", type=PropertyType.user_reference
+        session, a.initiative, name="Reporter", type=MetadataType.user_reference
     )
     await create_property_value(session, task, reporter, value_user_id=a.user.id)
 
@@ -3662,7 +3662,7 @@ async def test_backup_carries_property_definitions(
         session,
         a.initiative,
         name="Region",
-        type=PropertyType.select,
+        type=MetadataType.select,
         options=[
             {"id": "n", "label": "North", "color": "#112233"},
             {"id": "s", "label": "South", "color": "#445566"},
@@ -3678,7 +3678,7 @@ async def test_backup_carries_property_definitions(
     payload = json.loads(archive.read(path))
 
     region = next(p for p in payload["properties"] if p["name"] == "Region")
-    assert region["type"] == PropertyType.select.value
+    assert region["type"] == MetadataType.select.value
     # The whole option list, not just what happens to be in use.
     assert [o["label"] for o in region["options"]] == ["North", "South"]
 

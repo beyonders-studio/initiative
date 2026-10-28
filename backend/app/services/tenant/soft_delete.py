@@ -266,8 +266,8 @@ async def restore_entity(
 
 async def _purge_references(session: AsyncSession, doomed: Level) -> None:
     """Drop every row that names one of these by ``(kind, id)``: edges,
-    reactions, recent views, engagement levels, custom property values,
-    plug-ins' metadata and a tool's views.
+    reactions, recent views, engagement levels, metadata values (plug-ins'
+    among them) and a tool's views.
 
     Nothing carries those out with the row they name, and once it is gone
     their policies have nothing to ask, so they go first. Each kind is read
@@ -276,12 +276,11 @@ async def _purge_references(session: AsyncSession, doomed: Level) -> None:
     """
     from app.core.reactions import ReactionTarget
     from app.core.relationships import ENDPOINT_KINDS
-    from app.core.tools import ITEM_KINDS, KINDS, LAYOUT_INSTANCE_TABLES
+    from app.core.tools import LAYOUT_INSTANCE_TABLES
     from app.db.initiative_rls import CONTENT_KIND_TABLES
     from app.services.tenant import (
         engagement_levels,
-        plugin_metadata,
-        properties,
+        metadata,
         reactions,
         personal_items,
         relationships,
@@ -291,7 +290,6 @@ async def _purge_references(session: AsyncSession, doomed: Level) -> None:
     edge_kinds = {endpoint.table: kind for kind, endpoint in ENDPOINT_KINDS.items()}
     reaction_targets = {target.table: target for target in ReactionTarget}
     content_kinds = {table: kind for kind, table in CONTENT_KIND_TABLES.items()}
-    item_kinds = {KINDS[kind].table: kind for kind in ITEM_KINDS}
     layout_tools = {table: target for target, table in LAYOUT_INSTANCE_TABLES.items()}
     for model, ids in doomed.items():
         table = getattr(model, "__tablename__", "")
@@ -304,10 +302,8 @@ async def _purge_references(session: AsyncSession, doomed: Level) -> None:
         if (content := content_kinds.get(table)) is not None:
             await personal_items.purge_for_entities(session, content, ids)
             await engagement_levels.purge_for_entities(session, content, ids)
-        if (spec := properties.PROPERTY_LINKS_BY_MODEL.get(model)) is not None:
-            await properties.drop_values(session, spec.target, ids)
-        if (item := item_kinds.get(table)) is not None:
-            await plugin_metadata.drop_for_items(session, item, ids)
+        if (spec := metadata.PROPERTY_LINKS_BY_MODEL.get(model)) is not None:
+            await metadata.drop_values(session, spec.target, ids)
         if (tool := layout_tools.get(table)) is not None:
             await tool_layouts.drop_for_instances(session, tool, ids)
 

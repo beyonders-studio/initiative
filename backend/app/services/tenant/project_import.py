@@ -35,7 +35,7 @@ from app.core.search import SearchEntityType
 from app.models.tenant.comment import Comment
 from app.models.tenant.initiative import Initiative
 from app.models.tenant.project import Project
-from app.models.tenant.property import PropertyType
+from app.models.tenant.metadata import MetadataType
 
 from app.models.tenant.task import (
     Task,
@@ -255,7 +255,7 @@ async def import_project(
             people=frozenset(
                 place
                 for place, declared in enumerate(envelope.property_definitions, start=1)
-                if declared.type == PropertyType.user_reference
+                if declared.type == MetadataType.user_reference
             ),
             types=type_by_place.get,
         )

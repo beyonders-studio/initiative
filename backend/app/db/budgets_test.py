@@ -22,7 +22,7 @@ from app.models.platform.guild import CommunityRole
 from app.models.tenant.task import Task
 from app.schemas.query import FilterOp
 from app.services.tenant import activity_feed
-from app.services.tenant import properties as properties_service
+from app.services.tenant import metadata as metadata_service
 from app.testing import (
     create_guild,
     create_initiative,
@@ -222,7 +222,7 @@ async def test_a_property_filter_reads_only_the_listed_rows_values(
     member = await role_session("app_user")
     await establish_guild_access(member, a.user, a.guild.id)
     for op, value in ((FilterOp.eq, "live"), (FilterOp.is_null, True)):
-        clause = properties_service.build_single_property_clause(
+        clause = metadata_service.build_single_property_clause(
             "task", stage.id, op, value, stage
         )
         query = (

@@ -15,7 +15,7 @@ from typing import Any
 import pytest
 
 from app.core.messages import InitiativeMessages, PluginMessages, QueryMessages
-from app.models.tenant.property import PropertyType
+from app.models.tenant.metadata import MetadataType
 from app.services.marketplace import plugin_refs
 from app.testing import (
     guild_url,
@@ -122,7 +122,7 @@ async def test_setting_values_needs_the_tools_write(
         client, session, installed, install_headers(installed, scopes)
     )
     note = await create_property_definition(
-        session, installed.placed, name="Note", type=PropertyType.text
+        session, installed.placed, name="Note", type=MetadataType.text
     )
     url = guild_url(guild_id, f"/properties/{kind}/{item_id}")
     body = {"values": [{"property_id": note.id, "value": "Set by the plug-in"}]}
@@ -152,7 +152,7 @@ async def test_definitions_are_read_with_any_tool_and_written_with_properties(
         session,
         installed.placed,
         name="Stage",
-        type=PropertyType.select,
+        type=MetadataType.select,
         options=[{"value": "draft", "label": "Draft"}],
     )
 
@@ -223,7 +223,7 @@ async def test_a_person_valued_property_is_set_and_read_by_reference(
     guild_id = installed.guild.id
     item_id = await _KINDS[kind][1](client, session, installed, headers)
     owner = await create_property_definition(
-        session, installed.placed, name="Owner", type=PropertyType.user_reference
+        session, installed.placed, name="Owner", type=MetadataType.user_reference
     )
     seat_ref = await _seat_reference(client, installed, headers)
     path = f"{_KINDS[kind][2]}/{item_id}"
@@ -262,7 +262,7 @@ async def test_a_person_named_any_other_way_is_a_422(
     guild_id = installed.guild.id
     file_id = await _file(client, session, installed, headers)
     owner = await create_property_definition(
-        session, installed.placed, name="Owner", type=PropertyType.user_reference
+        session, installed.placed, name="Owner", type=MetadataType.user_reference
     )
     other = await create_guild_plugin(
         session,
@@ -300,7 +300,7 @@ async def test_a_file_list_filter_that_names_a_person_is_refused(
     guild_id = installed.guild.id
     await _file(client, session, installed, headers)
     owner = await create_property_definition(
-        session, installed.placed, name="Owner", type=PropertyType.user_reference
+        session, installed.placed, name="Owner", type=MetadataType.user_reference
     )
 
     def _filters(op: str, value: Any) -> dict:
@@ -335,7 +335,7 @@ async def test_a_file_list_filter_that_names_a_person_is_refused(
     assert as_person.status_code == 200, as_person.text
 
 
-async def test_a_collections_fields_are_written_with_the_files_scope(
+async def test_a_collections_metadata_is_written_with_the_files_scope(
     client, session, acting_user, role_session
 ):
     scopes = ["files:write", "properties:write"]
@@ -372,10 +372,57 @@ async def test_a_collections_fields_are_written_with_the_files_scope(
     written = await client.put(
         guild_url(
             installed.guild.id,
-            f"/collections/{collection_id}/files/{file_id}/fields",
+            f"/collections/{collection_id}/files/{file_id}/metadata",
         ),
         headers=files,
         json={"values": [{"property_id": created.json()["id"], "value": 42}]},
     )
     assert written.status_code == 200, written.text
     assert [v["value"] for v in written.json()] == [42]
+
+
+async def test_a_projects_metadata_is_written_with_the_projects_scope(
+    client, session, acting_user, role_session
+):
+    """Defined with ``projects:write``, not ``properties:write``, and its
+    values written on the project's tasks with the same scope."""
+    scopes = ["projects:write", "properties:write"]
+    installed = await install_plugin(session, acting_user, role_session, granted=scopes)
+    projects = install_headers(installed, ["projects:write"])
+    project = await client.post(
+        guild_url(installed.guild.id, "/projects/"),
+        headers=projects,
+        json={"name": "The plug-in's", "initiative_id": installed.placed.id},
+    )
+    assert project.status_code == 201, project.text
+    task = await client.post(
+        guild_url(installed.guild.id, "/tasks/"),
+        headers=projects,
+        json={"project_id": project.json()["id"], "title": "The plug-in's"},
+    )
+    assert task.status_code == 201, task.text
+    url = guild_url(installed.guild.id, "/property-definitions/")
+    body = {
+        "initiative_id": installed.placed.id,
+        "project_id": project.json()["id"],
+        "name": "Points",
+        "type": "number",
+    }
+
+    refused = await client.post(
+        url, headers=install_headers(installed, ["properties:write"]), json=body
+    )
+    assert refused.status_code == 403, refused.text
+    assert refused.json()["detail"] == PluginMessages.SCOPE_REQUIRED
+
+    created = await client.post(url, headers=projects, json=body)
+    assert created.status_code == 201, created.text
+    written = await client.put(
+        guild_url(installed.guild.id, f"/properties/task/{task.json()['id']}"),
+        headers=projects,
+        json={"values": [{"property_id": created.json()["id"], "value": 8}]},
+    )
+    assert written.status_code == 200, written.text
+    assert [(v["value"], v["project_id"]) for v in written.json()] == [
+        (8, project.json()["id"])
+    ]

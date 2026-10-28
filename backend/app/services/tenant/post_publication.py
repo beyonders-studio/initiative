@@ -50,7 +50,7 @@ from app.core.tools import Tool
 from app.services.platform import accounts as accounts_service
 from app.services.tenant import post_polls as post_polls_service
 from app.services.tenant import posts as posts_service
-from app.services.tenant import properties as properties_service
+from app.services.tenant import metadata as metadata_service
 from app.services.tenant import tags as tags_service
 
 logger = logging.getLogger(__name__)
@@ -168,7 +168,7 @@ async def publish_due_posts(session: AsyncSession, *, now: datetime) -> list[int
         .all()
     )
     await tags_service.annotate_tags(session, posts)
-    await properties_service.annotate_properties(session, posts)
+    await metadata_service.annotate_properties(session, posts)
     for post in posts:
         author = await _author_of(session, post)
         if author is None:

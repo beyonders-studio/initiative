@@ -21,7 +21,7 @@ from typing import Any, Optional
 
 from fastapi import HTTPException, status
 from sqlalchemy import or_
-from sqlmodel import select
+from sqlmodel import col, select
 from sqlmodel.ext.asyncio.session import AsyncSession
 
 from app.api import resource_access
@@ -39,6 +39,7 @@ from app.models.tenant._mixins import (
 from app.models.tenant.calendar import Calendar
 from app.models.tenant.calendar_event import CalendarEvent, CalendarEventAttendee
 from app.models.tenant.counter import Counter
+from app.models.tenant.metadata import MetadataDefinition
 from app.models.tenant.post import Post
 from app.models.tenant.post_poll import PostPoll, PostPollOption
 from app.models.tenant.project import Project
@@ -52,7 +53,7 @@ from app.services.tenant import attachments as attachments_service
 from app.services.tenant import calendar_occurrences as occurrences_service
 from app.services.tenant import files as files_service
 from app.services.tenant import named_people, project_grants
-from app.services.tenant import properties as properties_service
+from app.services.tenant import metadata as metadata_service
 from app.services.tenant import content_references, relationships
 from app.services.tenant.relationships import Endpoint
 from app.services.tenant import tags as tags_service
@@ -165,8 +166,8 @@ async def _copy_extras(
         await tags_service.copy_entity_tags(session, spec, copies)
         await relationships.copy_links(session, spec.kind, copies)
     await _record_references(session, [copy for _, copy in pairs])
-    if beside and model in properties_service.PROPERTY_LINKS_BY_MODEL:
-        await properties_service.copy_values(session, model, copies)
+    if beside and model in metadata_service.PROPERTY_LINKS_BY_MODEL:
+        await metadata_service.copy_values(session, model, copies)
 
 
 async def _copy_children(
@@ -294,8 +295,8 @@ async def duplicate(
     await relationships.copy_links(session, spec.kind, {source.id: copy.id})
     await _record_references(session, [copy])
     # Definitions belong to an initiative, so values only go where they apply.
-    if beside and model in properties_service.PROPERTY_LINKS_BY_MODEL:
-        await properties_service.copy_values(session, model, {source.id: copy.id})
+    if beside and model in metadata_service.PROPERTY_LINKS_BY_MODEL:
+        await metadata_service.copy_values(session, model, {source.id: copy.id})
     # Files kept for another initiative are copied for the copy's.
     await attachments_service.claim_uploads(session, copy, *rows)
     return copy
@@ -319,6 +320,18 @@ async def _project_contents(
     types = await task_types_service.ensure_default_types(
         session, copy.id, locale=locale
     )
+    metadata = await metadata_service.copy_definitions(
+        session,
+        (
+            await session.exec(
+                select(MetadataDefinition)
+                .where(MetadataDefinition.project_id == source.id)
+                .order_by(col(MetadataDefinition.position), col(MetadataDefinition.id))
+            )
+        ).all(),
+        initiative_id=copy.initiative_id,
+        project_id=copy.id,
+    )
     # A plug-in's copy has the shipped layouts: they are the initiative's own
     # drawing of its tools, which plug-ins do not read.
     if not isinstance(actor, InstallContext):
@@ -328,6 +341,7 @@ async def _project_contents(
             tool_layouts_service.Target(Tool.project, copy.id, copy.initiative_id),
             status_mapping=status_mapping,
             type_mapping=type_mapping,
+            fields=metadata,
         )
     return await task_creation.copy_project_tasks(
         session,

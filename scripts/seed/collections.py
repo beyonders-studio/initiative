@@ -25,7 +25,7 @@ from app.schemas.tenant.property import PropertyValueInput
 from app.services.tenant import attachments as attachments_service
 from app.services.tenant import collections as collections_service
 from app.services.tenant import file_versions
-from app.services.tenant import properties as properties_service
+from app.services.tenant import metadata as metadata_service
 
 from seed.common import Community, days_ago, photo, share, tag
 
@@ -430,7 +430,7 @@ async def seed(c: Community) -> None:
         for f, _, _, values in held:
             if not values:
                 continue
-            await properties_service.write_values(
+            await metadata_service.write_values(
                 c.session,
                 f,
                 [

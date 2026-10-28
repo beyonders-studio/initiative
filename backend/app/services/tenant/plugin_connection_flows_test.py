@@ -57,7 +57,7 @@ from app.models.tenant.guild_plugin_secret import GuildPluginSecret
 from app.models.tenant.guild_plugin_user_connection import GuildPluginUserConnection
 from app.models.tenant.plugin_event_outbox import PluginEventOutbox
 from app.models.tenant.plugin_hook_delivery import PluginHookDelivery
-from app.models.tenant.plugin_metadata import PluginMetadata
+from app.models.tenant.metadata import MetadataType
 from app.models.tenant.plugin_placement import PluginPlacement
 from app.models.tenant.plugin_schedule_run import PluginScheduleRun
 from app.services.marketplace import declarative as declarative_service
@@ -70,10 +70,10 @@ from app.services.tenant import (
     plugin_connection_flows,
     plugin_connections,
     plugin_hooks,
-    plugin_metadata,
     plugin_revocation,
     plugin_schedules,
 )
+from app.services.tenant import metadata as metadata_service
 from app.services.tenant.plugin_connections import load_connection_secrets
 from app.testing import (
     create_access_grant,
@@ -83,12 +83,15 @@ from app.testing import (
     create_plugin_service_registration,
     create_plugin_user_connection,
     create_project,
+    create_property_definition,
+    create_property_value,
     create_resource_grant,
     create_task,
     route_session_to_guild,
     sealed_vendor_values,
 )
 from app.testing.fake_vendor import FakeVendor, declarative_github
+from app.testing.plugin_clients import kept_plugin_values
 
 PUBLIC_ID = "tests.gh"
 LISTING_UID = "TESTAPP0000009"
@@ -2245,7 +2248,7 @@ class TestDeclarativePlugins:
         await _declarative_listing(session)
         seat = await acting_user(guild_role=CommunityRole.superadmin)
         await _declarative_install(session, seat, config=_connected("42"))
-        apply_changes = plugin_metadata.apply_changes
+        apply_changes = metadata_service.apply_changes
         failed = False
 
         async def failing_once(*args, **kwargs):
@@ -2255,7 +2258,7 @@ class TestDeclarativePlugins:
                 raise RuntimeError("the database went away")
             return await apply_changes(*args, **kwargs)
 
-        monkeypatch.setattr(plugin_metadata, "apply_changes", failing_once)
+        monkeypatch.setattr(metadata_service, "apply_changes", failing_once)
         body, headers = vendor.webhook(_issue())
         queued = await client.post(DECLARATIVE_HOOKS, content=body, headers=headers)
         assert queued.status_code == 202, queued.text
@@ -2306,29 +2309,26 @@ class TestDeclarativePlugins:
         session.add(
             PluginPlacement(install_id=plugin.id, initiative_id=seat.initiative.id)
         )
-        session.add_all(
-            PluginMetadata(
-                install_id=plugin.id,
-                entity_type="task",
-                entity_id=task.id,
-                key="github.repo",
-                value="acme/web",
-                lookup="acme/web",
-            )
-            for task in tasks
-        )
         await session.commit()
-        monkeypatch.setattr(plugin_metadata, "FIND_LIMIT", 1)
+        repo = await create_property_definition(
+            session, None, plugin=plugin, key="github.repo", type=MetadataType.json
+        )
+        for task in tasks:
+            await create_property_value(session, task, repo, value_json="acme/web")
+        monkeypatch.setattr(metadata_service, "FIND_LIMIT", 1)
         body, headers = vendor.webhook(_issue())
 
         response = await client.post(DECLARATIVE_HOOKS, content=body, headers=headers)
 
         assert response.status_code == 202, response.text
         await _delivered(session, seat.guild.id)
-        states = await session.exec(
-            select(PluginMetadata.entity_id).where(PluginMetadata.key == "github.state")
-        )
-        assert sorted(states.all()) == sorted(task.id for task in tasks)
+        await route_session_to_guild(session, seat.guild.id)
+        states = [
+            entity_id
+            for _, entity_id, key, _ in await kept_plugin_values(session)
+            if key == "github.state"
+        ]
+        assert sorted(states) == sorted(task.id for task in tasks)
 
     async def test_an_installs_writes_arm_the_index_sweep(
         self, client: AsyncClient, acting_user, session, declarative
@@ -2523,29 +2523,35 @@ class TestDeclarativePlugins:
         )
         pull = {"ref": "812", "url": "https://github.test/acme/web/pull/812"}
         await route_session_to_guild(session, seat.guild.id)
-        session.add_all(
-            [
-                PluginPlacement(install_id=plugin.id, initiative_id=seat.initiative.id),
-                PluginMetadata(
-                    install_id=plugin.id,
-                    entity_type="task",
-                    entity_id=linked.id,
-                    key="github.repo",
-                    value="acme/web",
-                    lookup="acme/web",
-                ),
-                PluginMetadata(
-                    install_id=plugin.id,
-                    entity_type="task",
-                    entity_id=linked.id,
-                    key="github.pulls",
-                    ref="812",
-                    value={**pull, "state": {"status": "open", "review": "approved"}},
-                    lookup="812",
-                ),
-            ]
+        session.add(
+            PluginPlacement(install_id=plugin.id, initiative_id=seat.initiative.id)
         )
         await session.commit()
+        await create_property_value(
+            session,
+            linked,
+            await create_property_definition(
+                session, None, plugin=plugin, key="github.repo", type=MetadataType.json
+            ),
+            value_json="acme/web",
+        )
+        await create_property_value(
+            session,
+            linked,
+            await create_property_definition(
+                session,
+                None,
+                plugin=plugin,
+                key="github.pulls",
+                type=MetadataType.link,
+                list=True,
+                shown_on=["task"],
+            ),
+            ref="812",
+            value_json={"url": pull["url"]},
+            value_text=pull["url"],
+            state={"status": "open", "review": "approved"},
+        )
         body, headers = vendor.webhook(
             {**_issue(), "task": task.id, "hidden": hidden.id}
         )
@@ -2557,10 +2563,8 @@ class TestDeclarativePlugins:
         assert [event for event, _, _ in await _events(session, seat.guild.id)] == [
             ISSUE_OPENED
         ]
-        kept = {
-            (row.entity_type, row.entity_id, row.key, row.ref): (row.value, row.shown)
-            for row in await session.exec(select(PluginMetadata))
-        }
+        await route_session_to_guild(session, seat.guild.id)
+        kept = await kept_plugin_values(session)
         assert kept == {
             ("task", task.id, "github.issue", ""): (12, True),
             ("task", linked.id, "github.repo", ""): ("acme/web", False),
@@ -2744,7 +2748,7 @@ class TestDeclarativePlugins:
         await _delivered(session, seat.guild.id)
 
         assert await _events(session, seat.guild.id) == []
-        assert (await session.exec(select(PluginMetadata))).all() == []
+        assert await kept_plugin_values(session) == {}
         stored = await _reload(session, seat.guild.id, plugin.id)
         assert stored.config_state_detail == "workspace_removed"
         [recorded] = await _deliveries(session, seat.guild.id)
@@ -2968,20 +2972,18 @@ class TestDeclarativeSchedules:
             granted_scopes=["projects:read"],
         )
         await route_session_to_guild(session, seat.guild.id)
-        session.add_all(
-            [
-                PluginPlacement(install_id=plugin.id, initiative_id=seat.initiative.id),
-                PluginMetadata(
-                    install_id=plugin.id,
-                    entity_type="task",
-                    entity_id=task.id,
-                    key="github.repo",
-                    value="acme/web",
-                    lookup="acme/web",
-                ),
-            ]
+        session.add(
+            PluginPlacement(install_id=plugin.id, initiative_id=seat.initiative.id)
         )
         await session.commit()
+        await create_property_value(
+            session,
+            task,
+            await create_property_definition(
+                session, None, plugin=plugin, key="github.repo", type=MetadataType.json
+            ),
+            value_json="acme/web",
+        )
         worker = await role_session()
 
         successes = []
@@ -3003,9 +3005,12 @@ class TestDeclarativeSchedules:
         assert vendor.api_requests[0]["headers"]["authorization"].startswith(
             "Bearer ghs_installation_"
         )
+        await route_session_to_guild(session, seat.guild.id)
         kept = {
-            (row.entity_type, row.entity_id, row.key): row.value
-            for row in await session.exec(select(PluginMetadata))
+            (entity_type, entity_id, key): value
+            for (entity_type, entity_id, key, _), (value, _) in (
+                await kept_plugin_values(session)
+            ).items()
         }
         assert kept == {
             ("task", task.id, "github.repo"): "acme/web",
@@ -3076,7 +3081,7 @@ class TestDeclarativeSchedules:
 
         assert waits == [(1, 60), (2, 120)]
         assert run.last_success_at is None
-        assert (await session.exec(select(PluginMetadata))).all() == []
+        assert await kept_plugin_values(session) == {}
         failure = (
             f"plug-in schedules: {DECLARATIVE_ID} did not run sync "
             f"for guild {guild_id} ({code})"

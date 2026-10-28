@@ -1,9 +1,12 @@
-"""CRUD endpoints for custom property definitions: an initiative's properties,
-and a collection's own fields.
+"""CRUD endpoints for metadata definitions: an initiative's properties, and a
+project's or a collection's metadata.
 
-A collection's field is made, changed and removed by whoever may change the
-collection (``resource_access.require_may_change``), and an installed plug-in
-does so with the files scope, since a collection is part of Files."""
+A project's metadata is made, changed and removed by whoever may write the
+project's tasks, as its task types are, and an installed plug-in does so with
+the projects scope. A collection's is by whoever may change the collection
+(``resource_access.require_may_change``), and an installed plug-in does so
+with the files scope, since a collection is part of Files. A plug-in's own
+metadata is declared by its manifest, and never made here."""
 
 from datetime import datetime, timezone
 from typing import Annotated, List, Optional, Sequence
@@ -18,6 +21,7 @@ from app.api.actor_route import ActorRoute
 from app.api.deps import (
     ActorContext,
     ActorSessionDep,
+    ActorUserDep,
     InstallContext,
     plugin_scope_checked,
 )
@@ -26,9 +30,11 @@ from app.core.plugin_scopes import tool_resource
 from app.core.tools import KINDS, Tool
 from app.models.tenant.collection import Collection
 from app.models.tenant.initiative import Initiative
-from app.models.tenant.property import (
-    PropertyDefinition,
-    PropertyType,
+from app.models.platform.user import User
+from app.models.tenant.project import Project
+from app.models.tenant.metadata import (
+    MetadataDefinition,
+    MetadataType,
 )
 from app.schemas.tenant.property import (
     PropertyDefinitionCreate,
@@ -36,7 +42,7 @@ from app.schemas.tenant.property import (
     PropertyDefinitionUpdate,
     PropertyDefinitionUpdateResponse,
 )
-from app.services.tenant import properties as properties_service
+from app.services.tenant import metadata as metadata_service
 from app.services.tenant.names import ensure_name_free
 
 router = APIRouter(route_class=ActorRoute)
@@ -52,23 +58,34 @@ PropertyDefinitionsRead = Annotated[
     ActorContext, Depends(plugin_scope_checked(_DEFINITION_READ_SCOPES, per="tool"))
 ]
 _PROPERTIES_WRITE = "properties:write"
-_FIELDS_WRITE = f"{tool_resource(Tool.file).value}:write"
+_PROJECTS_WRITE = f"{tool_resource(Tool.project).value}:write"
+_FILES_WRITE = f"{tool_resource(Tool.file).value}:write"
 #: An installed plug-in writes an initiative's properties with
-#: ``properties:write``, and a collection's own fields with ``files:write``.
+#: ``properties:write``, a project's metadata with ``projects:write``, and a
+#: collection's with ``files:write``.
 PropertyDefinitionsWrite = Annotated[
     ActorContext,
     Depends(
-        plugin_scope_checked((_PROPERTIES_WRITE, _FIELDS_WRITE), per="property scope")
+        plugin_scope_checked(
+            (_PROPERTIES_WRITE, _PROJECTS_WRITE, _FILES_WRITE), per="owner's scope"
+        )
     ),
 ]
 
 
 def _require_write_scope(
-    guild_context: ActorContext, collection_id: Optional[int]
+    guild_context: ActorContext,
+    defn: MetadataDefinition | PropertyDefinitionCreate,
 ) -> None:
     """A 403 for an installed plug-in without the scope this definition's
     writes take."""
-    scope = _PROPERTIES_WRITE if collection_id is None else _FIELDS_WRITE
+    scope = (
+        _PROJECTS_WRITE
+        if defn.project_id is not None
+        else _FILES_WRITE
+        if defn.collection_id is not None
+        else _PROPERTIES_WRITE
+    )
     if isinstance(guild_context, InstallContext) and not guild_context.holds(scope):
         raise HTTPException(
             status_code=status.HTTP_403_FORBIDDEN,
@@ -89,12 +106,55 @@ async def _changed_collection(
     return collection
 
 
-def _same_scope(defn: PropertyDefinition | PropertyDefinitionCreate) -> list:
+async def _configured_project(
+    session: AsyncSession,
+    project_id: int,
+    initiative_id: int,
+    user: User,
+    guild_context: ActorContext,
+) -> Project:
+    """The project a definition belongs to, once the request may write its
+    tasks, as its task types ask, in ``initiative_id``."""
+    project = await resource_access.load_authorized(
+        session,
+        resource_access.governing_tool("tasks"),
+        project_id,
+        user,
+        guild_context,
+        access="write",
+    )
+    if project.initiative_id != initiative_id:
+        raise Tool.project.not_found()
+    return project
+
+
+async def _require_owner_writable(
+    session: AsyncSession,
+    defn: MetadataDefinition | PropertyDefinitionCreate,
+    user: User,
+    guild_context: ActorContext,
+) -> bool:
+    """Raise unless the request may define a project's or a collection's
+    metadata, answering whether ``defn`` is one; an initiative's property is
+    the caller's to decide."""
+    if defn.project_id is not None:
+        await _configured_project(
+            session, defn.project_id, defn.initiative_id or 0, user, guild_context
+        )
+    elif defn.collection_id is not None:
+        await _changed_collection(session, defn.collection_id, defn.initiative_id or 0)
+    else:
+        return False
+    return True
+
+
+def _same_scope(defn: MetadataDefinition | PropertyDefinitionCreate) -> list:
     """What a definition's name is unique among: the initiative's properties,
-    or the collection's own fields."""
+    the project's metadata, or the collection's."""
     return [
-        PropertyDefinition.initiative_id == defn.initiative_id,
-        col(PropertyDefinition.collection_id).is_not_distinct_from(defn.collection_id),
+        MetadataDefinition.initiative_id == defn.initiative_id,
+        col(MetadataDefinition.project_id).is_not_distinct_from(defn.project_id),
+        col(MetadataDefinition.collection_id).is_not_distinct_from(defn.collection_id),
     ]
 
 
@@ -103,7 +163,7 @@ async def _get_definition_or_404(
     definition_id: int,
     *,
     lock: bool = False,
-) -> PropertyDefinition:
+) -> MetadataDefinition:
     """Fetch a definition by id, relying on RLS for scope enforcement.
 
     MUST be called with a routed session (``ActorSessionDep``). Under
@@ -111,7 +171,10 @@ async def _get_definition_or_404(
     guild's schema, and definition ids are unique per-guild — the routing is
     what decides which guild's row an id resolves to.
     """
-    stmt = select(PropertyDefinition).where(PropertyDefinition.id == definition_id)
+    stmt = select(MetadataDefinition).where(
+        MetadataDefinition.id == definition_id,
+        col(MetadataDefinition.install_id).is_(None),
+    )
     if lock:
         stmt = stmt.with_for_update()
     result = await session.exec(stmt)
@@ -160,7 +223,7 @@ def _manager_required() -> HTTPException:
     )
 
 
-def _added_options(defn: PropertyDefinition, options: list) -> list[dict]:
+def _added_options(defn: MetadataDefinition, options: list) -> list[dict]:
     """The options among ``options`` that ``defn`` does not have yet — what a
     member adds picking a value nobody has offered. One it already has stays
     as it is."""
@@ -188,19 +251,24 @@ async def list_property_definitions(
     session: ActorSessionDep,
     guild_context: PropertyDefinitionsRead,
     initiative_id: Optional[int] = Query(default=None),
+    project_id: Optional[int] = Query(
+        default=None,
+        description="List this project's metadata instead of properties.",
+    ),
     collection_id: Optional[int] = Query(
         default=None,
-        description="List this collection's own fields instead of properties.",
+        description="List this collection's metadata instead of properties.",
     ),
-) -> Sequence[PropertyDefinition]:
-    """List property definitions.
+) -> Sequence[MetadataDefinition]:
+    """List property definitions, or a project's or a collection's metadata.
 
     With ``initiative_id``, returns definitions for that initiative only
     (filtered explicitly and subject to RLS). Without it, RLS returns the
     union across every initiative the caller can see — used by global
-    views (My Tasks, Created Tasks, global Files list). A collection's own
-    fields are listed only with its ``collection_id``, and only to whoever
-    sees the collection.
+    views (My Tasks, Created Tasks, global Files list). A project's metadata
+    is listed only with its ``project_id``, and only to whoever can open the
+    project; a collection's only with its ``collection_id``, and only to
+    whoever sees the collection.
     """
     if isinstance(guild_context, InstallContext) and not any(
         guild_context.holds(scope) for scope in _DEFINITION_READ_SCOPES
@@ -209,13 +277,15 @@ async def list_property_definitions(
             status_code=status.HTTP_403_FORBIDDEN,
             detail=PluginMessages.SCOPE_REQUIRED,
         )
-    stmt = select(PropertyDefinition).where(
-        col(PropertyDefinition.collection_id).is_not_distinct_from(collection_id)
+    stmt = select(MetadataDefinition).where(
+        col(MetadataDefinition.project_id).is_not_distinct_from(project_id),
+        col(MetadataDefinition.collection_id).is_not_distinct_from(collection_id),
+        col(MetadataDefinition.install_id).is_(None),
     )
     if initiative_id is not None:
-        stmt = stmt.where(PropertyDefinition.initiative_id == initiative_id)
+        stmt = stmt.where(MetadataDefinition.initiative_id == initiative_id)
     stmt = stmt.order_by(
-        PropertyDefinition.position.asc(), PropertyDefinition.name.asc()
+        MetadataDefinition.position.asc(), MetadataDefinition.name.asc()
     )
     result = await session.exec(stmt)
     return result.all()
@@ -227,31 +297,33 @@ async def list_property_definitions(
 async def create_property_definition(
     payload: PropertyDefinitionCreate,
     session: ActorSessionDep,
+    current_user: ActorUserDep,
     guild_context: PropertyDefinitionsWrite,
-) -> PropertyDefinition:
+) -> MetadataDefinition:
     """Create a new property definition on an initiative, or with
-    ``collection_id`` a field of that collection's own.
+    ``project_id`` or ``collection_id`` that project's or collection's
+    metadata.
 
     A property requires the caller to be in the target initiative (or a guild
-    admin); an installed plug-in also needs ``properties:write``. A
-    collection's field requires the right to change the collection (and
-    ``files:write`` of a plug-in).
+    admin); an installed plug-in also needs ``properties:write``. A project's
+    metadata requires the right to write the project's tasks (and
+    ``projects:write`` of a plug-in); a collection's the right to change the
+    collection (and ``files:write`` of a plug-in).
     """
-    _require_write_scope(guild_context, payload.collection_id)
-    if payload.collection_id is None:
+    _require_write_scope(guild_context, payload)
+    if not await _require_owner_writable(session, payload, current_user, guild_context):
         await _ensure_initiative_member(session, guild_context, payload.initiative_id)
-    else:
-        await _changed_collection(session, payload.collection_id, payload.initiative_id)
     await ensure_name_free(
         session,
-        PropertyDefinition.name,
+        MetadataDefinition.name,
         payload.name,
         *_same_scope(payload),
         detail=PropertyMessages.NAME_ALREADY_EXISTS,
     )
 
-    defn = PropertyDefinition(
+    defn = MetadataDefinition(
         initiative_id=payload.initiative_id,
+        project_id=payload.project_id,
         collection_id=payload.collection_id,
         name=payload.name.strip(),
         type=payload.type,
@@ -271,6 +343,7 @@ async def update_property_definition(
     definition_id: int,
     payload: PropertyDefinitionUpdate,
     session: ActorSessionDep,
+    current_user: ActorUserDep,
     guild_context: PropertyDefinitionsWrite,
 ) -> PropertyDefinitionUpdateResponse:
     """Update a property definition.
@@ -278,22 +351,22 @@ async def update_property_definition(
     Type changes are not allowed via this endpoint; callers should
     delete the definition and re-create. Changing the option list on a
     select / multi_select definition returns ``orphaned_value_count`` so
-    the SPA can warn about dangling values. A collection's field is changed
-    by whoever may change the collection.
+    the SPA can warn about dangling values. A project's or a collection's
+    metadata is changed by whoever may define it.
     """
     defn = await _get_definition_or_404(session, definition_id, lock=True)
-    _require_write_scope(guild_context, defn.collection_id)
+    _require_write_scope(guild_context, defn)
 
     data = payload.model_dump(exclude_unset=True)
-    if defn.collection_id is not None:
-        await _changed_collection(session, defn.collection_id, defn.initiative_id)
-    elif not _manages(guild_context, defn.initiative_id):
+    if not await _require_owner_writable(
+        session, defn, current_user, guild_context
+    ) and not _manages(guild_context, defn.initiative_id):
         # A member adds options and nothing else: the ones sent that are new
         # join the list as it stands, so two members adding at once both land,
         # and the options already there are left as they are.
         if set(data) != {"options"} or defn.type not in {
-            PropertyType.select,
-            PropertyType.multi_select,
+            MetadataType.select,
+            MetadataType.multi_select,
         }:
             raise _manager_required()
         added = _added_options(defn, payload.options or [])
@@ -311,10 +384,10 @@ async def update_property_definition(
     if "name" in data and data["name"] is not None:
         await ensure_name_free(
             session,
-            PropertyDefinition.name,
+            MetadataDefinition.name,
             data["name"],
             *_same_scope(defn),
-            PropertyDefinition.id != defn.id,
+            MetadataDefinition.id != defn.id,
             detail=PropertyMessages.NAME_ALREADY_EXISTS,
         )
         defn.name = data["name"].strip()
@@ -325,12 +398,12 @@ async def update_property_definition(
     if "color" in data:
         defn.color = data["color"]
 
-    if payload.currency is not None and defn.type is PropertyType.currency:
+    if payload.currency is not None and defn.type is MetadataType.currency:
         defn.currency = payload.currency.value
 
     orphaned_value_count = 0
     if "options" in data:
-        if defn.type not in {PropertyType.select, PropertyType.multi_select}:
+        if defn.type not in {MetadataType.select, MetadataType.multi_select}:
             # Silently ignore options for non-select types to stay consistent
             # with the create-side behavior.
             defn.options = None
@@ -342,7 +415,7 @@ async def update_property_definition(
                     detail=PropertyMessages.OPTIONS_REQUIRED,
                 )
             new_slugs = {opt.value for opt in options_payload}
-            orphaned_value_count = await properties_service.count_orphaned_values(
+            orphaned_value_count = await metadata_service.count_orphaned_values(
                 session, defn.id, new_slugs
             )
             defn.options = _serialize_options(options_payload)
@@ -361,15 +434,17 @@ async def update_property_definition(
 async def delete_property_definition(
     definition_id: int,
     session: ActorSessionDep,
+    current_user: ActorUserDep,
     guild_context: PropertyDefinitionsWrite,
 ) -> None:
     """Delete a property definition. Cascades to remove all attached values.
-    A collection's field is removed by whoever may change the collection."""
+    A project's or a collection's metadata is removed by whoever may define
+    it."""
     defn = await _get_definition_or_404(session, definition_id)
-    _require_write_scope(guild_context, defn.collection_id)
-    if defn.collection_id is not None:
-        await _changed_collection(session, defn.collection_id, defn.initiative_id)
-    elif not _manages(guild_context, defn.initiative_id):
+    _require_write_scope(guild_context, defn)
+    if not await _require_owner_writable(
+        session, defn, current_user, guild_context
+    ) and not _manages(guild_context, defn.initiative_id):
         raise _manager_required()
     await session.delete(defn)
     await session.commit()

@@ -1,4 +1,5 @@
-"""Pydantic schemas for custom property definitions and values."""
+"""Pydantic schemas for metadata definitions and values: an initiative's
+properties, and a project's, a collection's or a plug-in's metadata."""
 
 from datetime import datetime
 from enum import Enum
@@ -19,11 +20,15 @@ from app.core.tools import PROPERTY_TARGETS
 from app.schemas.base import SanitizedBaseModel
 from app.schemas.platform.user import PluginPerson
 
-from app.models.tenant.property import PropertyType
+from app.models.tenant.metadata import PLUGIN_ONLY_TYPES, MetadataType
+
+# Cap on the number of property predicates accepted by list endpoints.
+# Bounds the per-request subquery count against the value table.
+MAX_PROPERTY_FILTERS = 5
 
 _SLUG_PATTERN = r"^[A-Za-z0-9][A-Za-z0-9_\-]*$"
 _HEX_COLOR_PATTERN = r"^#[0-9A-Fa-f]{6}$"
-_SELECT_TYPES = {PropertyType.select, PropertyType.multi_select}
+_SELECT_TYPES = {MetadataType.select, MetadataType.multi_select}
 
 # Derived, never re-declared: every Tool value plus every sub-tool (see
 # PROPERTY_TARGETS in app.core.tools). A new Tool lands here — and in the
@@ -49,7 +54,7 @@ class PropertyOption(SanitizedBaseModel):
 
 class PropertyDefinitionBase(SanitizedBaseModel):
     name: str = Field(..., min_length=1, max_length=100)
-    type: PropertyType
+    type: MetadataType
     position: float = 0.0
     color: Optional[str] = Field(default=None, pattern=_HEX_COLOR_PATTERN)
     options: Optional[List[PropertyOption]] = None
@@ -66,6 +71,8 @@ class PropertyDefinitionBase(SanitizedBaseModel):
 
     @model_validator(mode="after")
     def _validate_options(self) -> "PropertyDefinitionBase":
+        if self.type in PLUGIN_ONLY_TYPES:
+            raise ValueError("only a plug-in's metadata is of this type")
         if self.type in _SELECT_TYPES:
             if not self.options:
                 raise ValueError(PropertyMessages.OPTIONS_REQUIRED)
@@ -76,7 +83,7 @@ class PropertyDefinitionBase(SanitizedBaseModel):
             # Silently coerce away options on non-select types so create
             # calls from the client don't trip confusing errors.
             self.options = None
-        if self.type is not PropertyType.currency:
+        if self.type is not MetadataType.currency:
             self.currency = None
         elif self.currency is None:
             raise ValueError(PropertyMessages.CURRENCY_REQUIRED)
@@ -85,10 +92,20 @@ class PropertyDefinitionBase(SanitizedBaseModel):
 
 class PropertyDefinitionCreate(PropertyDefinitionBase):
     initiative_id: int
-    #: Make it this collection's own field rather than one of the
-    #: initiative's properties: shown only with the collection, its values
-    #: on the collection's files. The collection is in ``initiative_id``.
+    #: Make it this project's metadata rather than one of the initiative's
+    #: properties: its values on the project's tasks. The project is in
+    #: ``initiative_id``.
+    project_id: Optional[int] = None
+    #: Make it this collection's metadata: shown only with the collection,
+    #: its values on the collection's files. The collection is in
+    #: ``initiative_id``.
     collection_id: Optional[int] = None
+
+    @model_validator(mode="after")
+    def _one_owner(self) -> "PropertyDefinitionCreate":
+        if self.project_id is not None and self.collection_id is not None:
+            raise ValueError("a definition has one owner")
+        return self
 
 
 class PropertyDefinitionUpdate(SanitizedBaseModel):
@@ -135,8 +152,9 @@ class PropertyDefinitionRead(PropertyDefinitionBase):
 
     id: int
     initiative_id: int
-    #: The collection it is the own field of; None for an initiative's
-    #: property.
+    #: The project or the collection whose metadata it is; neither for an
+    #: initiative's property.
+    project_id: Optional[int] = None
     collection_id: Optional[int] = None
     created_at: datetime
     updated_at: datetime
@@ -235,16 +253,26 @@ class PropertySummary(SanitizedBaseModel):
 
     property_id: int
     name: str
-    type: PropertyType
+    type: MetadataType
+    #: Who owns the definition, at most one of these: the project or the
+    #: collection whose metadata it is, or the installed plug-in that keeps it
+    #: under ``key``. None of them for the initiative's property.
+    project_id: Optional[int] = None
+    collection_id: Optional[int] = None
+    install_id: Optional[int] = None
+    key: Optional[str] = None
     options: Optional[List[PropertyOption]] = None
     #: A money property's currency.
     currency: Optional[CurrencyCode] = None
     value: Any = Field(
         default=None,
         description=(
-            "Shaped by the property's type. For user_reference, a person: id, "
+            "Shaped by the definition's type. For user_reference, a person: id, "
             "username, discriminator, display_name and avatar_url, or an "
-            "PluginPerson when the reader is an installed plug-in."
+            "PluginPerson when the reader is an installed plug-in. A plug-in's "
+            "value is as the plug-in wrote it: a list field's an array of its "
+            "elements, newest first, each with its ref, and a value with a state "
+            "the state beside it."
         ),
     )
 
@@ -253,7 +281,7 @@ class PropertySummary(SanitizedBaseModel):
         """A person a ``user_reference`` value names, as the response's reader
         knows them: an installed plug-in gets an :class:`PluginPerson`."""
         if (
-            self.type is not PropertyType.user_reference
+            self.type is not MetadataType.user_reference
             or not isinstance(value, dict)
             or not responding_to_install()
         ):
@@ -262,7 +290,7 @@ class PropertySummary(SanitizedBaseModel):
 
 
 def annotated_properties(entity: Any) -> List[PropertySummary]:
-    """The summaries ``properties_service.annotate_properties`` put on this
+    """The summaries ``metadata_service.annotate_properties`` put on this
     entity — read rather than recomputed, since a page's values are fetched for
     the whole page at once."""
     return list(getattr(entity, "properties", None) or [])

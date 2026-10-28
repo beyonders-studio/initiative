@@ -22,7 +22,7 @@ from app.services.tenant import comments as comments_service
 from app.services.tenant import content_references
 from app.services.tenant import file_versions
 from app.services.tenant import ownership as ownership_service
-from app.services.tenant import properties as properties_service
+from app.services.tenant import metadata as metadata_service
 from app.services.tenant import tags as tags_service
 from app.services.tenant.collaboration import collaboration_manager, written_into
 from app.db.session import routed_guild_id
@@ -156,7 +156,7 @@ async def get_file_hydrated(
     file = (await session.exec(statement)).one_or_none()
     if file:
         await tags_service.annotate_tags(session, [file])
-        await properties_service.annotate_properties(session, [file])
+        await metadata_service.annotate_properties(session, [file])
         await comments_service.annotate_comment_counts(
             session, [file], column="file_id"
         )

@@ -19,10 +19,10 @@ from sqlmodel.ext.asyncio.session import AsyncSession
 from app.models.platform.guild import CommunityRole
 from app.models.tenant.plugin_placement import PluginPlacement
 from app.models.tenant.project import Project
-from app.models.tenant.property import (
-    PropertyDefinition,
-    PropertyType,
-    PropertyValue,
+from app.models.tenant.metadata import (
+    MetadataDefinition,
+    MetadataType,
+    MetadataValue,
 )
 from app.models.tenant.tag import Tag
 from app.models.tenant.tool_layout import ToolLayout
@@ -93,7 +93,7 @@ async def _seed_populated_project(session: AsyncSession):
         session,
         initiative,
         name="Severity",
-        type=PropertyType.select,
+        type=MetadataType.select,
         options=[{"value": "low", "label": "Low"}, {"value": "high", "label": "High"}],
     )
 
@@ -256,17 +256,17 @@ async def test_round_trip_into_different_initiative(session: AsyncSession):
     assert {t.name for t in new_task.tags} == {"blocker"}
     pv = (
         await session.exec(
-            select(PropertyValue)
+            select(MetadataValue)
             .where(
-                PropertyValue.entity_type == "task",
-                PropertyValue.entity_id == new_task.id,
+                MetadataValue.entity_type == "task",
+                MetadataValue.entity_id == new_task.id,
             )
-            .options(selectinload(PropertyValue.property_definition))
+            .options(selectinload(MetadataValue.definition))
         )
     ).one()
     assert pv.value_text == "high"
-    assert pv.property_definition.name == "Severity"
-    assert pv.property_definition.initiative_id == target_initiative.id
+    assert pv.definition.name == "Severity"
+    assert pv.definition.initiative_id == target_initiative.id
 
 
 async def test_a_project_brings_its_layouts(session: AsyncSession):
@@ -288,15 +288,15 @@ async def test_a_project_brings_its_layouts(session: AsyncSession):
     )
     severity = (
         await session.exec(
-            select(PropertyDefinition).where(PropertyDefinition.name == "Severity")
+            select(MetadataDefinition).where(MetadataDefinition.name == "Severity")
         )
     ).one()
     # Named by a layout and by no value.
     stage = await create_property_definition(
-        session, source_initiative, name="Stage", type=PropertyType.text
+        session, source_initiative, name="Stage", type=MetadataType.text
     )
     lead = await create_property_definition(
-        session, source_initiative, name="Lead", type=PropertyType.user_reference
+        session, source_initiative, name="Lead", type=MetadataType.user_reference
     )
     tag = (await session.exec(select(Tag))).one()
     plugin = await create_guild_plugin(
@@ -450,8 +450,8 @@ async def test_a_project_brings_its_layouts(session: AsyncSession):
         p.name: p.id
         for p in (
             await session.exec(
-                select(PropertyDefinition).where(
-                    PropertyDefinition.initiative_id == target_initiative.id
+                select(MetadataDefinition).where(
+                    MetadataDefinition.initiative_id == target_initiative.id
                 )
             )
         ).all()
@@ -594,7 +594,7 @@ async def test_property_type_collision_renames(session: AsyncSession):
         session,
         target_initiative,
         name="Severity",
-        type=PropertyType.text,
+        type=MetadataType.text,
     )
 
     result = await import_service.import_project(
@@ -607,17 +607,17 @@ async def test_property_type_collision_renames(session: AsyncSession):
     assert result.renamed_property_count == 1
 
     # Original definition unchanged
-    refreshed = await session.get(PropertyDefinition, existing_prop.id)
-    assert refreshed.type == PropertyType.text
+    refreshed = await session.get(MetadataDefinition, existing_prop.id)
+    assert refreshed.type == MetadataType.text
 
     # Renamed definition exists with the original type
-    stmt = select(PropertyDefinition).where(
-        PropertyDefinition.initiative_id == target_initiative.id,
-        PropertyDefinition.name == "Severity_select",
+    stmt = select(MetadataDefinition).where(
+        MetadataDefinition.initiative_id == target_initiative.id,
+        MetadataDefinition.name == "Severity_select",
     )
     renamed = (await session.exec(stmt)).one_or_none()
     assert renamed is not None
-    assert renamed.type == PropertyType.select
+    assert renamed.type == MetadataType.select
 
 
 async def test_property_options_mismatch_renames(session: AsyncSession):
@@ -641,7 +641,7 @@ async def test_property_options_mismatch_renames(session: AsyncSession):
         session,
         target_initiative,
         name="Severity",
-        type=PropertyType.select,
+        type=MetadataType.select,
         options=[
             {"value": "critical", "label": "Critical"},
             {"value": "minor", "label": "Minor"},
@@ -657,16 +657,16 @@ async def test_property_options_mismatch_renames(session: AsyncSession):
     assert result.renamed_property_count == 1
 
     # Original target definition unchanged
-    refreshed = await session.get(PropertyDefinition, existing_prop.id)
+    refreshed = await session.get(MetadataDefinition, existing_prop.id)
     assert refreshed.options == [
         {"value": "critical", "label": "Critical"},
         {"value": "minor", "label": "Minor"},
     ]
 
     # Renamed import lives alongside it with the source's options
-    stmt = select(PropertyDefinition).where(
-        PropertyDefinition.initiative_id == target_initiative.id,
-        PropertyDefinition.name == "Severity_select",
+    stmt = select(MetadataDefinition).where(
+        MetadataDefinition.initiative_id == target_initiative.id,
+        MetadataDefinition.name == "Severity_select",
     )
     renamed = (await session.exec(stmt)).one_or_none()
     assert renamed is not None
@@ -692,7 +692,7 @@ async def test_property_options_label_only_difference_matches(session: AsyncSess
         session,
         target_initiative,
         name="Severity",
-        type=PropertyType.select,
+        type=MetadataType.select,
         options=[
             {"value": "low", "label": "LOW PRIORITY"},
             {"value": "high", "label": "HIGH PRIORITY"},

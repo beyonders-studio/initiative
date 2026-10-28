@@ -24,7 +24,7 @@ from sqlmodel import col, select
 
 from app.models.platform.guild import CommunityRole
 from app.models.platform.marketplace import MarketplaceListing
-from app.models.tenant.property import PropertyValue
+from app.models.tenant.metadata import MetadataValue
 from app.models.tenant.task import Task, TaskType
 from app.models.tenant.tool_layout import ToolLayout
 from app.services.marketplace import catalog as catalog_service
@@ -93,9 +93,9 @@ async def _installed_tasks(session, guild_id: int, project_id: int):
     ).all()
     valued = (
         await session.exec(
-            select(PropertyValue.entity_id).where(
-                PropertyValue.entity_type == "task",
-                col(PropertyValue.entity_id).in_([task.id for task in tasks]),
+            select(MetadataValue.entity_id).where(
+                MetadataValue.entity_type == "task",
+                col(MetadataValue.entity_id).in_([task.id for task in tasks]),
             )
         )
     ).all()

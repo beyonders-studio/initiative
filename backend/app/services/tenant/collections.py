@@ -39,17 +39,17 @@ from app.db.session import guild_context, install_context, routed_guild_id
 from app.db.soft_delete_filter import select_including_deleted
 from app.models.tenant.collection import Collection, CollectionFile
 from app.models.tenant.file import File
-from app.models.tenant.property import PropertyDefinition, PropertyType
+from app.models.tenant.metadata import MetadataDefinition, MetadataType
 from app.schemas.tenant.collection import (
     CollectionShapeEntry,
-    CollectionShapeField,
+    CollectionShapeMetadata,
     CollectionShapeGroup,
 )
 from app.schemas.tenant.property import PropertyDefinitionRead
 from app.schemas.tenant.tool_layout import PROPERTY_FIELD_PREFIX
 from app.services.tenant import comments as comments_service
 from app.services.tenant import named_people
-from app.services.tenant import properties as properties_service
+from app.services.tenant import metadata as metadata_service
 from app.services.tenant import tags as tags_service
 from app.services.tenant import tool_layouts
 
@@ -163,13 +163,13 @@ async def remove_files(
     wanted = sorted(set(file_ids))
     # The collection first: taking out the last file its reader can open puts
     # it out of their sight, and so out of reach of an update after. Its
-    # fields' values on the files go while the files are still in it.
+    # metadata's values on the files go while the files are still in it.
     if collection.cover_file_id in wanted:
         collection.cover_file_id = None
     collection.updated_at = datetime.now(timezone.utc)
     session.add(collection)
     await session.flush()
-    await properties_service.drop_collection_values(session, collection.id, wanted)
+    await metadata_service.drop_collection_values(session, collection.id, wanted)
     await session.exec(
         delete(CollectionFile).where(
             col(CollectionFile.collection_id) == collection.id,
@@ -281,18 +281,18 @@ async def cards(session: AsyncSession, rows: Sequence[Collection]) -> dict[int, 
     }
 
 
-async def fields_of(
+async def metadata_of(
     session: AsyncSession, collection_ids: Sequence[int]
-) -> dict[int, list[PropertyDefinition]]:
-    """Each collection's own fields, in order."""
+) -> dict[int, list[MetadataDefinition]]:
+    """Each collection's metadata, in order."""
     if not collection_ids:
         return {}
     rows = await session.exec(
-        select(PropertyDefinition)
-        .where(ids_in(PropertyDefinition.collection_id, collection_ids))
-        .order_by(col(PropertyDefinition.position), col(PropertyDefinition.id))
+        select(MetadataDefinition)
+        .where(ids_in(MetadataDefinition.collection_id, collection_ids))
+        .order_by(col(MetadataDefinition.position), col(MetadataDefinition.id))
     )
-    found: dict[int, list[PropertyDefinition]] = {}
+    found: dict[int, list[MetadataDefinition]] = {}
     for row in rows.all():
         found.setdefault(row.collection_id or 0, []).append(row)
     return found
@@ -302,19 +302,19 @@ async def annotate(
     session: AsyncSession, rows: Sequence[Collection]
 ) -> dict[int, Card]:
     """Everything a serialized collection reads beside its row: its tags,
-    properties, own fields, comment count, and :func:`cards`."""
-    fields = await fields_of(session, [row.id for row in rows if row.id is not None])
+    properties, metadata, comment count, and :func:`cards`."""
+    fields = await metadata_of(session, [row.id for row in rows if row.id is not None])
     for row in rows:
         object.__setattr__(
             row,
-            "fields",
+            "metadata",
             [
                 PropertyDefinitionRead.model_validate(f)
                 for f in fields.get(row.id or 0, [])
             ],
         )
     await tags_service.annotate_tags(session, rows)
-    await properties_service.annotate_properties(session, rows)
+    await metadata_service.annotate_properties(session, rows)
     await comments_service.annotate_comment_counts(
         session, rows, column="collection_id"
     )
@@ -345,14 +345,14 @@ def shapes(locale: str) -> list[CollectionShapeGroup]:
                     name=shape_word(f"shapes.{shape.key}.name", locale),
                     hint=shape_word(f"shapes.{shape.key}.hint", locale),
                     lists=list(shape.lists),
-                    fields=[
-                        CollectionShapeField(
+                    metadata=[
+                        CollectionShapeMetadata(
                             name=shape_word(f"fields.{field.key}", locale),
-                            type=PropertyType(field.type),
+                            type=MetadataType(field.type),
                             display=field.display,
                             currency=(
                                 currency
-                                if field.type == PropertyType.currency.value
+                                if field.type == MetadataType.currency.value
                                 else None
                             ),
                         )
@@ -377,21 +377,21 @@ async def apply_shape(
     shape: CollectionShape,
     *,
     locale: str,
-) -> dict[str, PropertyDefinition]:
+) -> dict[str, MetadataDefinition]:
     """Give a collection made in this transaction a ready-made shape: its
     fields, named in ``locale``, and its lists, each showing what the shape
     has a card or the table show. Its files are in it already, so whoever
     makes it sees it. Answers the fields made, by the shape's key for each."""
     made = [
-        PropertyDefinition(
+        MetadataDefinition(
             initiative_id=collection.initiative_id,
             collection_id=collection.id,
             name=shape_word(f"fields.{field.key}", locale),
-            type=PropertyType(field.type),
+            type=MetadataType(field.type),
             position=float(position),
             currency=(
                 shape_word("currency", locale)
-                if field.type == PropertyType.currency.value
+                if field.type == MetadataType.currency.value
                 else None
             ),
         )
@@ -438,31 +438,19 @@ async def copy_shape(
 ) -> None:
     """Give a collection made in this transaction the fields and lists of
     ``source``, none of its values."""
-    fields = (await fields_of(session, [source.id or 0])).get(source.id or 0, [])
-    made = [
-        PropertyDefinition(
-            initiative_id=collection.initiative_id,
-            collection_id=collection.id,
-            name=field.name,
-            type=field.type,
-            position=field.position,
-            color=field.color,
-            options=field.options,
-            currency=field.currency,
-        )
-        for field in fields
-    ]
-    session.add_all(made)
-    await session.flush()
+    fields = await metadata_service.copy_definitions(
+        session,
+        (await metadata_of(session, [source.id or 0])).get(source.id or 0, []),
+        initiative_id=collection.initiative_id,
+        collection_id=collection.id,
+    )
     await tool_layouts.copy_layouts(
         session,
         _target(source),
         _target(collection),
         status_mapping={},
         type_mapping={},
-        fields={
-            field.id or 0: definition.id or 0 for field, definition in zip(fields, made)
-        },
+        fields=fields,
     )
 
 

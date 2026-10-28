@@ -5,9 +5,9 @@ from __future__ import annotations
 
 from datetime import timedelta
 
-from app.models.tenant.property import PropertyDefinition, PropertyType
+from app.models.tenant.metadata import MetadataDefinition, MetadataType
 from app.schemas.tenant.property import PropertyValueInput
-from app.services.tenant import properties as properties_service
+from app.services.tenant import metadata as metadata_service
 
 from seed.common import NOW, Community
 
@@ -19,7 +19,7 @@ DEFINITIONS: dict[str, dict[str, list[dict]]] = {
         "strahd": [
             {
                 "name": "Difficulty",
-                "type": PropertyType.select,
+                "type": MetadataType.select,
                 "color": "#DC2626",
                 "options": [
                     ("trivial", "Trivial", "#10B981"),
@@ -28,11 +28,11 @@ DEFINITIONS: dict[str, dict[str, list[dict]]] = {
                     ("deadly", "Deadly", "#7F1D1D"),
                 ],
             },
-            {"name": "XP Reward", "type": PropertyType.number, "color": "#F59E0B"},
-            {"name": "Prep Notes", "type": PropertyType.text},
+            {"name": "XP Reward", "type": MetadataType.number, "color": "#F59E0B"},
+            {"name": "Prep Notes", "type": MetadataType.text},
             {
                 "name": "Themes",
-                "type": PropertyType.multi_select,
+                "type": MetadataType.multi_select,
                 "options": [
                     ("horror", "Horror", "#7F1D1D"),
                     ("investigation", "Investigation", "#3B82F6"),
@@ -40,68 +40,68 @@ DEFINITIONS: dict[str, dict[str, list[dict]]] = {
                     ("combat", "Combat", "#DC2626"),
                 ],
             },
-            {"name": "Deadline", "type": PropertyType.date},
-            {"name": "Owner", "type": PropertyType.user_reference, "color": "#8B5CF6"},
-            {"name": "Public Knowledge", "type": PropertyType.checkbox},
-            {"name": "Session Rating", "type": PropertyType.rating, "color": "#F59E0B"},
+            {"name": "Deadline", "type": MetadataType.date},
+            {"name": "Owner", "type": MetadataType.user_reference, "color": "#8B5CF6"},
+            {"name": "Public Knowledge", "type": MetadataType.checkbox},
+            {"name": "Session Rating", "type": MetadataType.rating, "color": "#F59E0B"},
         ],
         "default": [
             {
                 "name": "Cost",
-                "type": PropertyType.currency,
+                "type": MetadataType.currency,
                 "currency": "USD",
                 "color": "#10B981",
             },
         ],
         "lmop": [
-            {"name": "Hook", "type": PropertyType.text},
-            {"name": "Quest Giver", "type": PropertyType.user_reference},
-            {"name": "Map Link", "type": PropertyType.url, "color": "#3B82F6"},
+            {"name": "Hook", "type": MetadataType.text},
+            {"name": "Quest Giver", "type": MetadataType.user_reference},
+            {"name": "Map Link", "type": MetadataType.url, "color": "#3B82F6"},
         ],
     },
     "starforge": {
         "starfall": [
             {
                 "name": "System",
-                "type": PropertyType.select,
+                "type": MetadataType.select,
                 "options": [
                     ("starfinder", "Starfinder", "#3B82F6"),
                     ("stars_without_number", "Stars Without Number", "#10B981"),
                     ("homebrew", "Homebrew", "#F59E0B"),
                 ],
             },
-            {"name": "Tech Level", "type": PropertyType.number, "color": "#0EA5E9"},
+            {"name": "Tech Level", "type": MetadataType.number, "color": "#0EA5E9"},
             {
                 "name": "Faction Tags",
-                "type": PropertyType.multi_select,
+                "type": MetadataType.multi_select,
                 "options": [
                     ("exodus_fleet", "Exodus Fleet", "#3B82F6"),
                     ("krellix", "Krellix Dominion", "#DC2626"),
                     ("merchant_guild", "Merchant Guild", "#F59E0B"),
                 ],
             },
-            {"name": "Briefing Required", "type": PropertyType.checkbox},
-            {"name": "Owner", "type": PropertyType.user_reference},
+            {"name": "Briefing Required", "type": MetadataType.checkbox},
+            {"name": "Owner", "type": MetadataType.user_reference},
         ],
         "fringe": [
             {
                 "name": "Mission Status",
-                "type": PropertyType.select,
+                "type": MetadataType.select,
                 "options": [
                     ("scoping", "Scoping"),
                     ("active", "Active", "#10B981"),
                     ("complete", "Complete", "#6B7280"),
                 ],
             },
-            {"name": "Payout (credits)", "type": PropertyType.number},
-            {"name": "Map Link", "type": PropertyType.url},
+            {"name": "Payout (credits)", "type": MetadataType.number},
+            {"name": "Map Link", "type": MetadataType.url},
         ],
     },
     "tides": {
         "crimson": [
             {
                 "name": "Arc",
-                "type": PropertyType.select,
+                "type": MetadataType.select,
                 "color": "#DC2626",
                 "options": [
                     ("shattered_seas", "Shattered Seas"),
@@ -111,12 +111,12 @@ DEFINITIONS: dict[str, dict[str, list[dict]]] = {
             },
             {
                 "name": "Crew Reward (gold)",
-                "type": PropertyType.number,
+                "type": MetadataType.number,
                 "color": "#F59E0B",
             },
             {
                 "name": "Quest Hooks",
-                "type": PropertyType.multi_select,
+                "type": MetadataType.multi_select,
                 "options": [
                     ("treasure", "Treasure", "#F59E0B"),
                     ("rescue", "Rescue", "#10B981"),
@@ -124,21 +124,21 @@ DEFINITIONS: dict[str, dict[str, list[dict]]] = {
                     ("exploration", "Exploration", "#0EA5E9"),
                 ],
             },
-            {"name": "Spoilers Allowed", "type": PropertyType.checkbox},
-            {"name": "Quest Giver", "type": PropertyType.user_reference},
-            {"name": "Map Link", "type": PropertyType.url},
+            {"name": "Spoilers Allowed", "type": MetadataType.checkbox},
+            {"name": "Quest Giver", "type": MetadataType.user_reference},
+            {"name": "Map Link", "type": MetadataType.url},
         ],
         "navy": [
             {
                 "name": "Threat Level",
-                "type": PropertyType.select,
+                "type": MetadataType.select,
                 "options": [
                     ("frigate", "Frigate", "#10B981"),
                     ("ship_of_the_line", "Ship of the Line", "#F59E0B"),
                     ("flagship", "Flagship", "#DC2626"),
                 ],
             },
-            {"name": "Engagement Date", "type": PropertyType.date},
+            {"name": "Engagement Date", "type": MetadataType.date},
         ],
     },
 }
@@ -296,9 +296,9 @@ _ROWS = {"task": "tasks", "file": "files", "calendar_event": "events"}
 async def seed(c: Community) -> None:
     for key, definitions in DEFINITIONS[c.key].items():
         initiative = c.initiatives[key]
-        by_name: dict[str, PropertyDefinition] = {}
+        by_name: dict[str, MetadataDefinition] = {}
         for position, d in enumerate(definitions, start=1):
-            definition = PropertyDefinition(
+            definition = MetadataDefinition(
                 initiative_id=initiative.id,
                 name=d["name"],
                 type=d["type"],
@@ -323,12 +323,12 @@ async def seed(c: Community) -> None:
                 PropertyValueInput(
                     property_id=by_name[name].id,
                     value=c.users[value].id
-                    if by_name[name].type is PropertyType.user_reference
+                    if by_name[name].type is MetadataType.user_reference
                     else value,
                 )
                 for name, value in values.items()
             ]
-            await properties_service.write_values(
+            await metadata_service.write_values(
                 c.session,
                 getattr(c, _ROWS[kind])[title],
                 inputs,

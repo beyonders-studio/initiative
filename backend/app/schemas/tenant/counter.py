@@ -3,7 +3,7 @@ from __future__ import annotations
 from datetime import datetime
 from decimal import Decimal
 from enum import Enum
-from typing import Annotated, Any, List, Literal, Optional, TYPE_CHECKING, Sequence
+from typing import Annotated, Any, List, Literal, Optional, TYPE_CHECKING
 
 from pydantic import AliasChoices, BeforeValidator, ConfigDict, Field, model_validator
 
@@ -12,7 +12,6 @@ from app.core.messages import CounterMessages
 from app.models.tenant.counter import COUNTER_DIGITS, COUNTER_PLACES, CounterViewMode
 from app.schemas.base import MentionStr, SanitizedBaseModel, TitleStr, reject_null
 from app.schemas.query import PageMeta
-from app.schemas.tenant.plugin_data import PluginValueSummary
 from app.schemas.tenant.property import (
     PropertiesOnCreate,
     PropertySummary,
@@ -168,10 +167,6 @@ class CounterRead(SanitizedBaseModel):
     view_mode: CounterViewMode
     position: DecimalText
     properties: List[PropertySummary] = Field(default_factory=list)
-    #: The values installed plug-ins show on the counter, from the installs on
-    #: and placed in its group's initiative. Its own read carries them; a
-    #: group's list of counters does not.
-    plugin_values: List[PluginValueSummary] = Field(default_factory=list)
     created_at: datetime
     updated_at: datetime
 
@@ -246,14 +241,12 @@ def serialize_counter(
     counter: "Counter",
     *,
     context: ActorContext,
-    plugin_values: Sequence[PluginValueSummary] = (),
 ) -> CounterRead:
     return from_row(
         CounterRead,
         counter,
         guild_id=context.guild_id,
         properties=annotated_properties(counter),
-        plugin_values=list(plugin_values),
     )
 
 

@@ -15,7 +15,7 @@ from app.core.messages import ImportEngineMessages
 from app.core.tools import Tool
 from app.models.platform.user import User
 from app.models.tenant.initiative import Initiative
-from app.models.tenant.property import PropertyDefinition, PropertyType, PropertyValue
+from app.models.tenant.metadata import MetadataDefinition, MetadataType, MetadataValue
 from app.models.tenant.resource_grant import ResourceAccessLevel, ResourceGrant
 from app.schemas.tenant.import_envelopes import (
     CURRENT_SCHEMA_VERSION,
@@ -38,7 +38,7 @@ from app.services.import_engine.contract import ImportEngineError
 from app.services.import_engine.people import bring_in_named
 from app.services.tenant import tags as tags_service
 from app.services.tenant import named_people
-from app.services.tenant.properties import link_for
+from app.services.tenant.metadata import link_for
 
 if TYPE_CHECKING:  # pragma: no cover - typing only
     from app.schemas.tenant.backup_export import ManifestPerson
@@ -206,9 +206,9 @@ def _options_for_value(pv: EnvelopePropertyValue) -> list[dict] | None:
     """Synthesize a minimal option set for a select/multi_select definition
     reconstructed from values alone (the flat by-name encoding carries no
     definition), so the stored value is a valid option on the target side."""
-    if pv.property_type == PropertyType.select and pv.value_text:
+    if pv.property_type == MetadataType.select and pv.value_text:
         return [{"value": pv.value_text, "label": pv.value_text}]
-    if pv.property_type == PropertyType.multi_select and isinstance(
+    if pv.property_type == MetadataType.multi_select and isinstance(
         pv.value_json, list
     ):
         return [{"value": v, "label": v} for v in pv.value_json if isinstance(v, str)]
@@ -259,10 +259,10 @@ class PropertyRestore:
         #: Person values whose handle landed on nobody.
         self.unmatched: set[str] = set()
         #: The target initiative's definitions by name, read once.
-        self._existing: dict[str, PropertyDefinition] | None = None
+        self._existing: dict[str, MetadataDefinition] | None = None
         #: What each envelope property became in the target, so every row
         #: naming it shares one definition — a renamed one included.
-        self._resolved: dict[tuple[str, PropertyType], PropertyDefinition] = {}
+        self._resolved: dict[tuple[str, MetadataType], MetadataDefinition] = {}
         #: The target definitions already standing for one envelope property.
         #: One definition holds one value a row, so no second property may
         #: bind to it — a ``Priority`` renamed onto ``Priority_select`` beside
@@ -276,7 +276,7 @@ class PropertyRestore:
             if declared.name not in self._excluded:
                 await self._definition(declared.name, declared.type, declared=declared)
 
-    def bound_id(self, name: str, prop_type: PropertyType) -> int | None:
+    def bound_id(self, name: str, prop_type: MetadataType) -> int | None:
         """The target definition an envelope property became, or None for one
         left out."""
         found = self._resolved.get((name, prop_type))
@@ -285,11 +285,11 @@ class PropertyRestore:
     async def _definition(
         self,
         name: str,
-        prop_type: PropertyType,
+        prop_type: MetadataType,
         *,
         declared: ProjectExportPropertyDefinition | None = None,
         value: EnvelopePropertyValue | None = None,
-    ) -> PropertyDefinition:
+    ) -> MetadataDefinition:
         """The target's definition for ``name`` and ``prop_type``, matched or
         made once for the whole import."""
         key = (name, prop_type)
@@ -327,7 +327,7 @@ class PropertyRestore:
                 desired_name=f"{name}_{prop_type.value}",
             )
             self.renamed.append(target_name)
-        definition = PropertyDefinition(
+        definition = MetadataDefinition(
             initiative_id=self._initiative_id,
             name=target_name,
             type=prop_type,
@@ -379,7 +379,7 @@ class PropertyRestore:
             column_kwargs_by_id[definition.id] = column_kwargs  # ty: ignore[invalid-assignment] — persisted row, id is set
         target = link_for(row).target
         self._session.add_all(
-            PropertyValue(
+            MetadataValue(
                 entity_type=target,
                 entity_id=row.id,
                 property_id=property_id,

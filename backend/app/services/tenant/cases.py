@@ -111,7 +111,7 @@ async def _subject(session: AsyncSession, task_id: int) -> dict[str, object]:
     """The case's subject, from the references it was opened with: the task's
     values for the case fields that name it."""
     from app.core.intake import CaseField
-    from app.services.tenant.properties import summaries_by_id
+    from app.services.tenant.metadata import summaries_by_id
 
     values = {
         summary.name: summary.value

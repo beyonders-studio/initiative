@@ -76,7 +76,7 @@ from app.services.tenant import content_references
 from app.services.tenant import relationships as relationships_service
 from app.services.tenant import share_requests as share_requests_service
 from app.services.tenant import soft_delete as soft_delete_service
-from app.services.tenant import properties as properties_service
+from app.services.tenant import metadata as metadata_service
 from app.services.tenant import tags as tags_service
 from app.services.tenant import wikis as wikis_service
 
@@ -102,7 +102,7 @@ async def _serialized_page(
     """A page as every page route answers with it: its tags and properties,
     and the body it reads as now with that body's version."""
     await tags_service.annotate_tags(session, [page])
-    await properties_service.annotate_properties(session, [page])
+    await metadata_service.annotate_properties(session, [page])
     return await versioned(
         serialize_wiki_page(page, context=guild_context),
         guild_context.guild_id,
@@ -181,7 +181,7 @@ async def create_wiki(
             tag_ids=wiki_in.tag_ids,
         )
     await attachments_service.claim_uploads(session, wiki)
-    await properties_service.write_on_create(session, wiki, wiki_in.properties)
+    await metadata_service.write_on_create(session, wiki, wiki_in.properties)
     await session.commit()
     return await read_after_write(session, wiki.id, current_user, guild_context)
 
@@ -286,7 +286,7 @@ async def list_wiki_pages(
     rows = await wikis_service.load_list(session, wiki)
     pages = [row for row, _ in rows if isinstance(row, WikiPage)]
     await tags_service.annotate_tags(session, pages)
-    await properties_service.annotate_properties(session, pages)
+    await metadata_service.annotate_properties(session, pages)
     # The position each row is SERVED with is its place in the list as drawn —
     # a file's is kept on the wiki and a page's in its own column, and
     # neither is what a client counts with.
@@ -486,7 +486,7 @@ async def create_wiki_page(
         author_id=guild_context.user_id,
     )
     await attachments_service.claim_uploads(session, page)
-    await properties_service.write_on_create(session, page, page_in.properties)
+    await metadata_service.write_on_create(session, page, page_in.properties)
     await session.commit()
     hydrated = await resource_access.reload_child(session, WikiPage, page.id)
     return await _serialized_page(session, hydrated, guild_context)
@@ -655,7 +655,7 @@ async def update_wiki_page(
             entity_id=page.id,
             tag_ids=data["tag_ids"],
         )
-    await properties_service.write_on_update(session, page, page_in.properties)
+    await metadata_service.write_on_update(session, page, page_in.properties)
     if "content" in data:
         await content_references.sync_for_entity(
             session,

@@ -14,7 +14,7 @@ from datetime import datetime, timedelta, timezone
 
 from app.core.messages import QueryMessages
 from app.models.platform.guild import CommunityRole
-from app.models.tenant.property import PropertyType
+from app.models.tenant.metadata import MetadataType
 from app.models.tenant.task import TaskStatusCategory
 from app.services.query import executor
 from app.services.tenant.view_as_test import dashboard_body, dashboards_on
@@ -161,7 +161,7 @@ async def test_a_property_is_reported_across_the_initiative(
     them. Another initiative's property of the same name stays out."""
     author, project = await _author_with_tasks(session, acting_user)
     points = await create_property_definition(
-        session, author.initiative, name="Points", type=PropertyType.number
+        session, author.initiative, name="Points", type=MetadataType.number
     )
     task = await create_task(session, project, title="Pointed")
     queue = await create_queue(session, author.initiative, author.user)
@@ -170,7 +170,7 @@ async def test_a_property_is_reported_across_the_initiative(
 
     elsewhere = await create_initiative(session, author.guild, author.user)
     elsewhere_points = await create_property_definition(
-        session, elsewhere, name="Points", type=PropertyType.number
+        session, elsewhere, name="Points", type=MetadataType.number
     )
     elsewhere_project = await create_project(session, elsewhere, author.user)
     elsewhere_task = await create_task(session, elsewhere_project)
@@ -182,25 +182,25 @@ async def test_a_property_is_reported_across_the_initiative(
         client,
         author,
         "SELECT property.name AS p, sum(value_number) AS total "
-        "FROM property_values GROUP BY property.name",
+        "FROM metadata_values GROUP BY property.name",
     )
     assert [(name, float(total)) for name, total in result["rows"]] == [("Points", 8.0)]
 
     releases = await create_property_definition(
-        session, author.initiative, name="Releases", type=PropertyType.multi_select
+        session, author.initiative, name="Releases", type=MetadataType.multi_select
     )
     await create_property_value(session, task, releases, value_json=["a", "b"])
     choices = await _one(
         client,
         author,
-        "SELECT value_json AS choices FROM property_values "
+        "SELECT value_json AS choices FROM metadata_values "
         "WHERE property.name = 'Releases'",
     )
     assert choices["rows"] == [['["a", "b"]']]
     one_choice = await _one(
         client,
         author,
-        "SELECT count(*) AS n FROM property_values WHERE value_json @> '[\"b\"]'",
+        "SELECT count(*) AS n FROM metadata_values WHERE value_json @> '[\"b\"]'",
     )
     assert one_choice["rows"] == [[1]]
 

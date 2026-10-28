@@ -562,7 +562,7 @@ NOT_SEARCHABLE: dict[str, str] = {
     "event_outbox": "change log, not content",
     "plugin_event_outbox": "plug-in events awaiting delivery, not content",
     "resource_grants": "sharing rows carry no text",
-    "property_definitions": "field config, reached from the tool it configures",
+    "metadata_definitions": "field config, reached from the tool it configures",
     "webhook_subscriptions": "integration config",
     "intake_bindings": "routing config, reached from the settings page",
     "guest_invite_grants": "an invite's terms, reached from the invite",

@@ -61,7 +61,7 @@ from app.services.tenant import attachments as attachments_service
 from app.services.tenant import column_limits
 from app.services.tenant import overwrites
 from app.services.tenant import cases as cases_service
-from app.services.tenant import properties as properties_service
+from app.services.tenant import metadata as metadata_service
 from app.services.tenant import tags as tags_service
 from app.services.tenant import task_checklist as checklist_service
 from app.services.tenant import task_hierarchy
@@ -422,7 +422,7 @@ async def _insert_task(
         )
 
     _touch_project(project, datetime.now(timezone.utc))
-    await properties_service.write_on_create(session, task, task_in.properties)
+    await metadata_service.write_on_create(session, task, task_in.properties)
     return task
 
 
@@ -812,7 +812,7 @@ async def update_task(
                 entity_id=task.id,
                 tag_ids=tag_ids,
             )
-        await properties_service.write_on_update(session, task, task_in.properties)
+        await metadata_service.write_on_update(session, task, task_in.properties)
         if parent_sent:
             await task_hierarchy.set_parent(
                 session, task, parent_task_id, user_id=guild_context.user_id
@@ -902,6 +902,11 @@ async def move_task(
     )
     now = datetime.now(timezone.utc)
     source_project = task.project
+    # Its project's metadata goes onto the destination's of the same name and
+    # type, and the rest is dropped.
+    carried = await metadata_service.lift_project_values(
+        session, task, target_project.id
+    )
     task.project_id = target_project.id
     task.task_type_id = await task_types_service.type_for_move(
         session, task.task_type_id, target_project.id
@@ -920,7 +925,9 @@ async def move_task(
     # their definitions belong to the old initiative and can't resolve in
     # the new one.
     if source_project.initiative_id != target_project.initiative_id:
-        await properties_service.drop_values(session, "task", [task.id])
+        await metadata_service.drop_values(session, "task", [task.id], moved=True)
+    await session.flush()
+    session.add_all(carried)
     # Only those who can open the destination stay assigned.
     await task_creation_service.set_task_assignees(
         session,

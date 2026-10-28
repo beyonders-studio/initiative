@@ -45,7 +45,7 @@ class ToolSummaryBase(ToolState):
     comments_enabled: bool = True
     tags: List[TagSummary] = Field(default_factory=list)
     # Every tool carries custom properties, filled by
-    # ``properties_service.annotate_properties`` beside the tags.
+    # ``metadata_service.annotate_properties`` beside the tags.
     properties: List[PropertySummary] = Field(default_factory=list)
     # The full sharing state — every resource_grants row for this tool. Exposed
     # on the summary so a list can manage sharing without a detail fetch.

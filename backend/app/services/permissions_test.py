@@ -33,7 +33,7 @@ from app.models.tenant.calendar_event import CalendarEventAttendee
 from app.models.tenant.file import File
 from app.models.tenant.initiative import InitiativeMember
 from app.models.tenant.project import Project
-from app.models.tenant.property import PropertyType, PropertyValue
+from app.models.tenant.metadata import MetadataType, MetadataValue
 from app.models.tenant.queue import QueueItem
 from app.models.tenant.personal_item import PersonalItem
 from app.models.tenant.resource_grant import ResourceAccessLevel, ResourceGrant
@@ -745,7 +745,7 @@ async def _named_on(session, initiative, owner, person, **calendar) -> dict:
     session.add(CalendarEventAttendee(calendar_event_id=event.id, user_id=person.id))
     file = await create_file(session, initiative, owner)
     field = await create_property_definition(
-        session, initiative, type=PropertyType.user_reference
+        session, initiative, type=MetadataType.user_reference
     )
     await create_property_value(session, file, field, value_user_id=person.id)
     queue = await create_queue(session, initiative, owner)
@@ -772,7 +772,7 @@ async def _still_named(session, person_id: int, named: dict) -> list[str]:
             CalendarEventAttendee.calendar_event_id == named["event"],
             CalendarEventAttendee.user_id == person_id,
         ),
-        "field": select(PropertyValue).where(PropertyValue.value_user_id == person_id),
+        "field": select(MetadataValue).where(MetadataValue.value_user_id == person_id),
         "queue item": select(QueueItem).where(
             QueueItem.id == named["item"], QueueItem.user_id == person_id
         ),
@@ -809,9 +809,9 @@ async def test_leaving_an_initiative_takes_you_off_its_content(
     # A person field and a queue item stay, with the person cleared.
     value = (
         await session.exec(
-            select(PropertyValue).where(
-                PropertyValue.entity_type == "file",
-                PropertyValue.entity_id == named["file"],
+            select(MetadataValue).where(
+                MetadataValue.entity_type == "file",
+                MetadataValue.entity_id == named["file"],
             )
         )
     ).one()

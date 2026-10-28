@@ -14,7 +14,7 @@ with one rule set:
 - user_reference   → ``value_handle``, and ``value_name`` beside it
 
 Reads the ``PropertySummary`` list every row carries once
-``properties_service.annotate_properties`` has run — the same values its read
+``metadata_service.annotate_properties`` has run — the same values its read
 shows.
 """
 

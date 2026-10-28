@@ -6,8 +6,10 @@ name, so a new tool is a new scope the moment it joins ``Tool``:
 
 - one resource per tool, spelled as the tool's plural;
 - ``comments``, ``relationships`` and ``tags``, the surfaces that span tools;
-- ``properties``, an initiative's custom property definitions. A value set on
-  an item answers to the scope of the tool that governs the item instead;
+- ``properties``, an initiative's custom property definitions. A project's or
+  a collection's metadata is defined with the scope of its tool (``projects``,
+  ``files``), and a value set on an item answers to the scope of the tool
+  that governs the item instead;
 - ``sharing``, a resource's grants: reading who has access, and changing it
   where the plug-in's own rung on the resource would let a person;
 - ``members`` and ``initiatives``, which are read-only.

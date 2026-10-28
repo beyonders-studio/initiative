@@ -80,10 +80,10 @@ from app.services.tenant.dashboard_definition import (
 from app.models.tenant.initiative import Initiative, InitiativeMember
 from app.models.tenant.project import Project
 from app.models.tenant.resource_grant import ResourceGrant, ResourceAccessLevel
-from app.models.tenant.property import (
-    PropertyDefinition,
-    PropertyType,
-    PropertyValue,
+from app.models.tenant.metadata import (
+    MetadataDefinition,
+    MetadataType,
+    MetadataValue,
 )
 from app.models.tenant.queue import Queue, QueueItem
 from app.models.tenant.reaction import Reaction
@@ -1024,24 +1024,30 @@ async def grant_role_permission(
 
 async def create_property_definition(
     session: AsyncSession,
-    initiative: Initiative,
+    initiative: Initiative | None,
     *,
     name: str | None = None,
-    type: PropertyType = PropertyType.text,
+    type: MetadataType = MetadataType.text,
     options: list[dict] | None = None,
     color: str | None = None,
     position: float = 0.0,
+    project: Project | None = None,
     collection: Collection | None = None,
+    plugin: GuildPlugin | None = None,
+    key: str | None = None,
     commit: bool = True,
     **overrides: Any,
-) -> PropertyDefinition:
+) -> MetadataDefinition:
     """
-    Create a test property definition with sensible defaults.
+    Create a test metadata definition with sensible defaults.
 
     Auto-generates a unique name if not provided. When ``type`` is a
     select/multi_select and ``options`` is None, seeds a default option
     list so the definition is valid; money is in US dollars. With
-    ``collection``, it is that collection's own field.
+    ``project`` or ``collection``, it is that project's or collection's
+    metadata. With ``plugin`` (and no ``initiative``), it is the install's
+    metadata under ``key``, named by it; ``list`` and ``shown_on`` go in
+    ``overrides``.
 
     Args:
         session: Database session
@@ -1055,35 +1061,38 @@ async def create_property_definition(
         **overrides: Override any default field values
 
     Returns:
-        Created PropertyDefinition instance
+        Created MetadataDefinition instance
     """
-    await route_session_to_guild(session, guild_of(initiative))
+    await route_session_to_guild(session, guild_of(initiative or plugin))
 
     if name is None:
-        name = f"Prop {datetime.now(timezone.utc).timestamp()}"
+        name = key or f"Prop {datetime.now(timezone.utc).timestamp()}"
 
-    if type in {PropertyType.select, PropertyType.multi_select} and options is None:
+    if type in {MetadataType.select, MetadataType.multi_select} and options is None:
         options = [
             {"value": "a", "label": "A"},
             {"value": "b", "label": "B"},
         ]
-    elif type not in {PropertyType.select, PropertyType.multi_select}:
+    elif type not in {MetadataType.select, MetadataType.multi_select}:
         # Non-select types don't store options.
         options = None
 
     defaults = {
-        "initiative_id": initiative.id,
+        "initiative_id": initiative.id if initiative is not None else None,
+        "project_id": project.id if project is not None else None,
         "collection_id": collection.id if collection is not None else None,
+        "install_id": plugin.id if plugin is not None else None,
+        "key": key,
         "name": name,
         "type": type,
         "position": position,
         "color": color,
         "options": options,
-        "currency": "USD" if type is PropertyType.currency else None,
+        "currency": "USD" if type is MetadataType.currency else None,
     }
 
     data = {**defaults, **overrides}
-    definition = PropertyDefinition(**data)
+    definition = MetadataDefinition(**data)
     session.add(definition)
 
     if commit:
@@ -1096,32 +1105,33 @@ async def create_property_definition(
 async def create_property_value(
     session: AsyncSession,
     entity: Any,
-    definition: PropertyDefinition,
+    definition: MetadataDefinition,
     *,
     commit: bool = True,
     **value_kwargs: Any,
-) -> PropertyValue:
+) -> MetadataValue:
     """
-    Attach a typed property value to any tool or sub-tool row.
+    Attach a typed metadata value to any tool or sub-tool row.
 
     Accepts any of ``value_text``, ``value_number``, ``value_boolean``,
-    ``value_date``, ``value_datetime``, ``value_user_id``, ``value_json``.
+    ``value_date``, ``value_datetime``, ``value_user_id``, ``value_json``,
+    and a plug-in value's ``ref`` and ``state``.
 
     Args:
         session: Database session
         entity: The row to attach the value to (a task, a file, a queue, …)
-        definition: PropertyDefinition the value references
+        definition: MetadataDefinition the value references
         commit: Whether to commit the transaction (default True)
         **value_kwargs: Typed column values
 
     Returns:
-        Created PropertyValue instance
+        Created MetadataValue instance
     """
-    from app.services.tenant.properties import link_for
+    from app.services.tenant.metadata import link_for
 
     await route_session_to_guild(session, guild_of(entity))
 
-    row = PropertyValue(
+    row = MetadataValue(
         entity_type=link_for(entity).target,
         entity_id=entity.id,
         property_id=definition.id,
