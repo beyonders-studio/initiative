@@ -19,11 +19,14 @@ In ``guild_template`` and every ``guild_<id>``:
 * A value gains ``ref``, which element of a plug-in's list field it holds
   (``''`` otherwise), in its key, and ``state``, the facets a plug-in's value
   is in.
+* An install's pinned definition names a progress bar field ``scale``, as the
+  plug-in kit now does, and so does every version of a listing in
+  ``public.marketplace_listing_versions``.
 * ``plugin_metadata``'s rows move across: a definition per install and key,
-  typed from the field the install's pinned version declares for the key
-  (a progress bar's as a scale), ``json`` where it declares none, and each
-  row's value into its typed column, with its ``ref`` and ``state``. A value
-  that is not one of its type's is left behind. The table is dropped.
+  typed from the field the install's pinned version declares for the key,
+  ``json`` where it declares none, and each row's value into its typed
+  column, with its ``ref`` and ``state``. A value that is not one of its
+  type's is left behind. The table is dropped.
 * A dashboard's statements read ``metadata_definitions`` and
   ``metadata_values``, as the datasets are named after the tables.
 * The triggers and policies a start renders are dropped from the renamed
@@ -43,6 +46,8 @@ from __future__ import annotations
 
 import json
 import re
+from collections.abc import Iterator
+from contextlib import contextmanager
 from datetime import date, datetime, timezone
 from decimal import Decimal, InvalidOperation
 from typing import Any, Optional
@@ -119,6 +124,11 @@ def upgrade() -> None:
         op.execute(f"ALTER TYPE public.property_type ADD VALUE IF NOT EXISTS '{label}'")
     op.execute("BEGIN")
     op.execute("ALTER TYPE public.property_type RENAME TO metadata_type")
+    # The listings' versions an install may move to say ``scale`` too.
+    with _unforced(bind, "public.marketplace_listing_versions"):
+        op.execute(
+            _field_kind("public.marketplace_listing_versions", "progress", "scale")
+        )
     run_for_each_guild_schema(bind, lambda: _apply(True))
 
 
@@ -251,29 +261,40 @@ def _upgrade(bind: Connection) -> None:
 
 
 def _respell_dashboards(pattern: str, replacement: str) -> None:
-    """A dashboard's statements read the datasets by the tables' names. Row
-    security is lifted for the rewrite and put back as it was, and the user
-    triggers held: nothing about the rows changed but their spelling."""
-    forced = (
-        op.get_bind()
-        .execute(
-            text(
-                "SELECT relforcerowsecurity FROM pg_class WHERE oid = 'dashboards'::regclass"
-            )
+    """A dashboard's statements read the datasets by the tables' names. The
+    user triggers are held: nothing about the rows changed but their
+    spelling."""
+    with _unforced(op.get_bind(), "dashboards"):
+        op.execute("ALTER TABLE dashboards DISABLE TRIGGER USER")
+        op.execute(
+            "UPDATE dashboards SET definition = CAST(regexp_replace(CAST(definition "
+            f"AS text), '{pattern}', '{replacement}', 'g') AS jsonb) "
+            f"WHERE CAST(definition AS text) ~ '{pattern}'"
         )
-        .scalar()
-    )
-    if forced:
-        op.execute("ALTER TABLE dashboards NO FORCE ROW LEVEL SECURITY")
-    op.execute("ALTER TABLE dashboards DISABLE TRIGGER USER")
-    op.execute(
-        "UPDATE dashboards SET definition = CAST(regexp_replace(CAST(definition "
-        f"AS text), '{pattern}', '{replacement}', 'g') AS jsonb) "
-        f"WHERE CAST(definition AS text) ~ '{pattern}'"
-    )
-    op.execute("ALTER TABLE dashboards ENABLE TRIGGER USER")
-    if forced:
-        op.execute("ALTER TABLE dashboards FORCE ROW LEVEL SECURITY")
+        op.execute("ALTER TABLE dashboards ENABLE TRIGGER USER")
+
+
+@contextmanager
+def _unforced(bind: Connection, *tables: str) -> Iterator[None]:
+    """Row security lifted from ``tables`` for the statements inside, and put
+    back as it was: it binds the owner too, and a migration has no standing to
+    meet it. A failure rolls the whole revision back, so nothing is restored
+    on that path."""
+    forced = [
+        table
+        for table in tables
+        if bind.execute(
+            text(
+                "SELECT relforcerowsecurity FROM pg_class WHERE oid = to_regclass(:t)"
+            ),
+            {"t": table},
+        ).scalar()
+    ]
+    for table in forced:
+        op.execute(f"ALTER TABLE {table} NO FORCE ROW LEVEL SECURITY")
+    yield
+    for table in forced:
+        op.execute(f"ALTER TABLE {table} FORCE ROW LEVEL SECURITY")
 
 
 def _drop_rendered(bind: Connection, table: str, keep: Optional[str] = None) -> None:
@@ -297,8 +318,34 @@ def _drop_rendered(bind: Connection, table: str, keep: Optional[str] = None) -> 
 
 def _move_plugin_metadata(bind: Connection) -> None:
     """A definition per install and key, and each row's value in its typed
-    column. Row security binds the owner too, and a migration has no standing
-    to meet it, so it is lifted for the writes and put back."""
+    column, read and written with row security lifted (:func:`_unforced`).
+    Each install's pinned fields say ``scale`` for a progress bar first."""
+    with _unforced(
+        bind,
+        "plugin_metadata",
+        "guild_plugins",
+        "metadata_definitions",
+        "metadata_values",
+    ):
+        op.execute(_field_kind("guild_plugins", "progress", "scale"))
+        _move_rows(bind)
+
+
+def _field_kind(table: str, old: str, new: str) -> str:
+    """The statement that names each ``old`` field ``new`` in each ``table``
+    row's definition, the fields keeping their order."""
+    return (
+        f"UPDATE {table} SET definition = jsonb_set(definition, '{{fields}}', "
+        f"(SELECT jsonb_agg(CASE WHEN f ->> 'kind' = '{old}' "
+        f"THEN jsonb_set(f, '{{kind}}', '\"{new}\"') ELSE f END ORDER BY n) "
+        "FROM jsonb_array_elements(definition -> 'fields') "
+        "WITH ORDINALITY AS e (f, n))) "
+        "WHERE jsonb_typeof(definition -> 'fields') = 'array' "
+        f"AND definition -> 'fields' @> '[{{\"kind\": \"{old}\"}}]'"
+    )
+
+
+def _move_rows(bind: Connection) -> None:
     rows = bind.execute(
         text(
             "SELECT pm.install_id, pm.entity_type, pm.entity_id, pm.key, pm.ref, "
@@ -307,10 +354,6 @@ def _move_plugin_metadata(bind: Connection) -> None:
             "ORDER BY pm.install_id, pm.key"
         )
     ).all()
-    if not rows:
-        return
-    op.execute("ALTER TABLE metadata_definitions NO FORCE ROW LEVEL SECURITY")
-    op.execute("ALTER TABLE metadata_values NO FORCE ROW LEVEL SECURITY")
     defined: dict[tuple[int, str], tuple[int, str, bool]] = {}
     for install_id, entity_type, entity_id, key, ref, value, updated, fields in rows:
         if (install_id, key) not in defined:
@@ -323,7 +366,6 @@ def _move_plugin_metadata(bind: Connection) -> None:
                 None,
             )
             kind = "json" if field is None else str(field.get("kind"))
-            kind = "scale" if kind == "progress" else kind
             listed = field is not None and field.get("list") is True
             shown = sorted(field.get("on") or ()) if field is not None else []
             defined[(install_id, key)] = (
@@ -368,8 +410,6 @@ def _move_plugin_metadata(bind: Connection) -> None:
                 **cols,
             },
         )
-    op.execute("ALTER TABLE metadata_values FORCE ROW LEVEL SECURITY")
-    op.execute("ALTER TABLE metadata_definitions FORCE ROW LEVEL SECURITY")
 
 
 def _number(raw: Any) -> Optional[Decimal]:
@@ -414,6 +454,8 @@ def _columns(kind: str, value: Any, *, element: bool) -> Optional[dict[str, Any]
             figure, whole = rest["value"], rest.get("max")
         else:
             return None
+    if kind in ("link", "badge") and not isinstance(figure, dict):
+        return None
     if kind == "link":
         url, words = figure.get("url"), figure.get("text")
         if not isinstance(url, str) or not (words is None or isinstance(words, str)):
@@ -463,12 +505,19 @@ def _columns(kind: str, value: Any, *, element: bool) -> Optional[dict[str, Any]
 
 
 def downgrade() -> None:
-    run_for_each_guild_schema(op.get_bind(), lambda: _apply(False))
+    bind = op.get_bind()
+    run_for_each_guild_schema(bind, lambda: _apply(False))
+    with _unforced(bind, "public.marketplace_listing_versions"):
+        op.execute(
+            _field_kind("public.marketplace_listing_versions", "scale", "progress")
+        )
     op.execute("ALTER TYPE public.metadata_type RENAME TO property_type")
 
 
 def _downgrade(bind: Connection) -> None:
     _respell_dashboards(r"\mmetadata_(values|definitions)\M", "property_\\1")
+    with _unforced(bind, "guild_plugins"):
+        op.execute(_field_kind("guild_plugins", "scale", "progress"))
     op.execute(
         "CREATE TABLE plugin_metadata ("
         "install_id integer NOT NULL REFERENCES guild_plugins (id) ON DELETE CASCADE, "
