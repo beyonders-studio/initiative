@@ -50,14 +50,15 @@ const withQueryKey = <T extends object, K>(query: T, queryKey: K): T & { queryKe
 };
 
 /**
- * List property definitions.
+ * List property definitions, or a project's or a collection's metadata.
  *
  * With ``initiative_id``, returns definitions for that initiative only
  * (filtered explicitly and subject to RLS). Without it, RLS returns the
  * union across every initiative the caller can see — used by global
- * views (My Tasks, Created Tasks, global Files list). A collection's own
- * fields are listed only with its ``collection_id``, and only to whoever
- * sees the collection.
+ * views (My Tasks, Created Tasks, global Files list). A project's metadata
+ * is listed only with its ``project_id``, and only to whoever can open the
+ * project; a collection's only with its ``collection_id``, and only to
+ * whoever sees the collection.
  * @summary List Property Definitions
  */
 export const listPropertyDefinitions = (
@@ -203,12 +204,14 @@ export function useListPropertyDefinitions<
 
 /**
  * Create a new property definition on an initiative, or with
- * ``collection_id`` a field of that collection's own.
+ * ``project_id`` or ``collection_id`` that project's or collection's
+ * metadata.
  *
  * A property requires the caller to be in the target initiative (or a guild
- * admin); an installed plug-in also needs ``properties:write``. A
- * collection's field requires the right to change the collection (and
- * ``files:write`` of a plug-in). A rating is a collection's field only.
+ * admin); an installed plug-in also needs ``properties:write``. A project's
+ * metadata requires the right to write the project's tasks (and
+ * ``projects:write`` of a plug-in); a collection's the right to change the
+ * collection (and ``files:write`` of a plug-in).
  * @summary Create Property Definition
  */
 export const createPropertyDefinition = (
@@ -308,8 +311,8 @@ export const useCreatePropertyDefinition = <
  * Type changes are not allowed via this endpoint; callers should
  * delete the definition and re-create. Changing the option list on a
  * select / multi_select definition returns ``orphaned_value_count`` so
- * the SPA can warn about dangling values. A collection's field is changed
- * by whoever may change the collection.
+ * the SPA can warn about dangling values. A project's or a collection's
+ * metadata is changed by whoever may define it.
  * @summary Update Property Definition
  */
 export const updatePropertyDefinition = (
@@ -407,7 +410,8 @@ export const useUpdatePropertyDefinition = <
 };
 /**
  * Delete a property definition. Cascades to remove all attached values.
- * A collection's field is removed by whoever may change the collection.
+ * A project's or a collection's metadata is removed by whoever may define
+ * it.
  * @summary Delete Property Definition
  */
 export const deletePropertyDefinition = (
