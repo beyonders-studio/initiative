@@ -1489,6 +1489,29 @@ class TestShownValues:
             task.id,
             other.id,
         }
+        # Nor does an ordinary property filter reach the plug-in's values.
+        issue_id = (
+            await session.exec(
+                select(MetadataDefinition.id).where(
+                    MetadataDefinition.install_id == installed.plugin.id,
+                    MetadataDefinition.key == "github.issue",
+                )
+            )
+        ).one()
+        conditions = json.dumps(
+            [
+                {"field": "project_id", "op": "eq", "value": task.project_id},
+                {
+                    "field": "property_values",
+                    "op": "eq",
+                    "value": {"property_id": issue_id, "value": 124},
+                },
+            ]
+        )
+        unfiltered = await client.get(
+            member.g(f"/tasks/?conditions={conditions}"), headers=member.headers
+        )
+        assert {row["id"] for row in unfiltered.json()["items"]} == {task.id, other.id}
 
     async def test_a_value_is_kept_in_its_types_column(
         self, client: AsyncClient, session: AsyncSession, acting_user, role_session
@@ -1524,6 +1547,13 @@ class TestShownValues:
             "kind": "user_reference",
             "on": ["task"],
         }
+        reviewers = {
+            "key": "reviewers",
+            "name": {"en": "Reviewers"},
+            "kind": "user_reference",
+            "list": True,
+            "on": ["task"],
+        }
         installed = await install_plugin(
             session,
             acting_user,
@@ -1538,6 +1568,7 @@ class TestShownValues:
                     stage,
                     price,
                     owner,
+                    reviewers,
                 ]
             },
         )
@@ -1591,6 +1622,31 @@ class TestShownValues:
         chosen = await put({"stage": "won", "price": 12.5, "owner": seat_ref})
         assert chosen.status_code == 200, chosen.text
         assert chosen.json()["values"]["owner"] == seat_ref
+        # A person a list's element holds stays when a later change, naming
+        # nobody, merges only a state into it.
+        listed = await client.put(
+            f"{BASE}/metadata",
+            headers=install_headers(installed, ["projects:read"]),
+            json={
+                "entity_type": "task",
+                "entity_id": task.id,
+                "upsert": {"reviewers": [{"ref": "a", "value": seat_ref}]},
+            },
+        )
+        assert listed.status_code == 200, listed.text
+        merged = await client.put(
+            f"{BASE}/metadata",
+            headers=install_headers(installed, ["projects:read"]),
+            json={
+                "entity_type": "task",
+                "entity_id": task.id,
+                "upsert": {"reviewers": [{"ref": "a", "state": {"review": "done"}}]},
+            },
+        )
+        assert merged.status_code == 200, merged.text
+        assert merged.json()["values"]["reviewers"] == [
+            {"ref": "a", "value": seat_ref, "state": {"review": "done"}}
+        ]
 
         async def shown_to(locale: str) -> dict:
             await session.exec(

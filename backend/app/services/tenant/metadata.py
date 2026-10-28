@@ -1512,7 +1512,10 @@ async def load_definitions_by_ids(
     session: AsyncSession,
     definition_ids: Iterable[int],
 ) -> Dict[int, MetadataDefinition]:
-    """Load property definitions by id.
+    """Load property definitions by id: the initiative's properties and a
+    project's or a collection's metadata, never a plug-in's, whose values a
+    list filters and groups by through its plug-in fields alone
+    (:func:`filter_fields`).
 
     Used by list filters so the endpoint can resolve the correct typed
     column per condition without issuing one query per condition. RLS
@@ -1521,7 +1524,9 @@ async def load_definitions_by_ids(
     ids = list({did for did in definition_ids if did is not None})
     if not ids:
         return {}
-    stmt = select(MetadataDefinition).where(MetadataDefinition.id.in_(ids))
+    stmt = select(MetadataDefinition).where(
+        MetadataDefinition.id.in_(ids), col(MetadataDefinition.install_id).is_(None)
+    )
     result = await session.exec(stmt)
     return {defn.id: defn for defn in result.all() if defn.id is not None}
 
@@ -1704,10 +1709,14 @@ async def _install_people(
         if minted and commit:
             await session.commit()
 
+    # The people the request names, and those the rows already hold, which
+    # an element merged into keeps.
+    known = {**{ref: user_id for user_id, ref in refs.items()}, **named}
+
     def takes(value: Any) -> int:
-        if not isinstance(value, str) or value not in named:
+        if not isinstance(value, str) or value not in known:
             raise _invalid()
-        return named[value]
+        return known[value]
 
     return _People(takes, lambda user_id: refs.get(user_id, user_id))
 
