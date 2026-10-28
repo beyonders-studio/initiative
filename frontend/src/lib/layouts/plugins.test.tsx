@@ -111,7 +111,11 @@ const task = buildTask({
   ],
 });
 
-const draw = (card: LayoutNode, item: TaskListRead = task, installs = [install]) => {
+const draw = (
+  card: LayoutNode,
+  item: TaskListRead = task,
+  installs: Parameters<typeof pluginsOnItems>[0] = [install]
+) => {
   const plugins = pluginsOnItems(installs, 7);
   const view = {
     fields: taskFields([], pluginFields(plugins, "en")),
