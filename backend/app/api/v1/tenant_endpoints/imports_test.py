@@ -1468,7 +1468,11 @@ async def test_restored_collections_keep_their_own_files_and_cover(
     from app.models.tenant.metadata import MetadataDefinition, MetadataValue
     from app.models.tenant.tool_layout import ToolLayout
     from app.services.tenant import collections as collections_service
-    from app.testing import create_collection, create_property_value
+    from app.testing import (
+        create_collection,
+        create_property_definition,
+        create_property_value,
+    )
 
     a = await acting_user(
         guild_role=CommunityRole.superadmin, initiative=True, project=True
@@ -1489,6 +1493,23 @@ async def test_restored_collections_keep_their_own_files_and_cover(
         shop.id
     ]
     await create_property_value(session, sunset, price, value_number=Decimal("12.50"))
+    # Its table shows one of the initiative's properties too.
+    shelf = await create_property_definition(session, a.initiative, name="Shelf")
+    table = (
+        await session.exec(
+            select(ToolLayout).where(
+                ToolLayout.tool == "collection",
+                ToolLayout.tool_id == shop.id,
+                ToolLayout.kind == "table",
+            )
+        )
+    ).one()
+    table.definition = {
+        **table.definition,
+        "columns": [*table.definition["columns"], f"property:{shelf.id}"],
+    }
+    session.add(table)
+    await session.commit()
     await create_collection(session, a.initiative, a.user, files=[dunes], name="Photos")
 
     restored_id = await _restore_referencing_backup(
@@ -1559,12 +1580,21 @@ async def test_restored_collections_keep_their_own_files_and_cover(
             )
         )
     ).all()
+    restored_shelf = (
+        await session.exec(
+            select(MetadataDefinition.id).where(
+                MetadataDefinition.of_initiative(restored_id),
+                MetadataDefinition.name == "Shelf",
+            )
+        )
+    ).one()
     assert [table["columns"] for table in tables] == [
         [
             "name",
             f"property:{restored['Price']}",
             f"property:{restored['Rating']}",
             "added",
+            f"property:{restored_shelf}",
         ]
     ]
 

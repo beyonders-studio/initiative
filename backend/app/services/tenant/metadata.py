@@ -102,6 +102,7 @@ from app.db.session import (
     set_rls_context,
 )
 from app.models.platform.identity_ref import IdentityEntity
+from app.models.platform.user import User
 from app.models.platform.user_profile_view import MemberProfile
 from app.models.tenant.guild_plugin import GuildPlugin
 from app.models.tenant.metadata import (
@@ -119,6 +120,7 @@ from app.services.marketplace import contract
 from app.services.marketplace.expressions import UNDEFINED
 from app.services.marketplace.manifest_values import is_identifier, is_metadata_key
 from app.services.marketplace.registration_lookup import RegistrationSnapshot
+from app.services.marketplace.widget_meta import in_language
 from app.schemas.tenant.property import (
     MAX_PROPERTY_FILTERS,
     PropertyOption,
@@ -369,7 +371,11 @@ def _option_slugs(defn: MetadataDefinition) -> Set[str]:
     return slugs
 
 
-def _parsed_options(defn: MetadataDefinition) -> List[PropertyOption]:
+def _parsed_options(
+    defn: MetadataDefinition, language: str = "en"
+) -> List[PropertyOption]:
+    """``defn``'s options, each labelled in ``language`` where it is labelled
+    in several (a plug-in's, :func:`_option`)."""
     if not defn.options:
         return []
     parsed: List[PropertyOption] = []
@@ -378,8 +384,13 @@ def _parsed_options(defn: MetadataDefinition) -> List[PropertyOption]:
             parsed.append(raw)
             continue
         if isinstance(raw, dict):
+            labelled = in_language(raw.get("labels"), language)
             try:
-                parsed.append(PropertyOption(**raw))
+                parsed.append(
+                    PropertyOption(
+                        **{**raw, **({"label": labelled} if labelled else {})}
+                    )
+                )
             except ValidationError:
                 # Options in the DB that fail schema validation are ignored
                 # at serialize time — they can't be produced through the API.
@@ -1960,15 +1971,18 @@ _OPTION_LABEL_LENGTH = 100
 
 
 def _option(declared: Mapping[str, Any]) -> Dict[str, Any]:
-    """A manifest field's option as a definition keeps one
-    (``PropertyOption``): its value, its label in English or else the first
-    language it names, and its colour."""
-    label = declared.get("label")
-    if isinstance(label, dict):
-        label = label.get("en") or next(iter(label.values()), None)
-    option = {
+    """A manifest field's option as a definition keeps one: a property's
+    option (``PropertyOption``), labelled as English reads it, with every
+    language the manifest labels it in beside, by tag (``labels``), which a
+    reader's read picks from (:func:`_plugin_summaries`)."""
+    labels = {
+        str(tag): str(text)[:_OPTION_LABEL_LENGTH]
+        for tag, text in (declared.get("label") or {}).items()
+    }
+    option: Dict[str, Any] = {
         "value": declared.get("value"),
-        "label": str(label or declared.get("value"))[:_OPTION_LABEL_LENGTH],
+        "label": in_language(labels, "en") or str(declared.get("value")),
+        "labels": labels,
     }
     if declared.get("color"):
         option["color"] = declared["color"]
@@ -2784,6 +2798,23 @@ async def _plugin_summaries(
         if await offered(int(defn.install_id or 0), initiative_id, roles, minimum):
             definitions[defn.id] = defn
             held[(row.entity_id, defn.id)].append(row)
+    # A select's options in the reader's language, read once for the page.
+    language = "en"
+    if any(
+        "labels" in option
+        for defn in definitions.values()
+        for option in defn.options or ()
+    ):
+        # Read when it is needed, as the session factory then stands.
+        from app.db.session import SystemSessionLocal
+
+        async with SystemSessionLocal() as system_session:
+            language = (
+                await system_session.scalar(
+                    select(User.locale).where(User.id == context.user_id)
+                )
+                or language
+            )
     found: dict[int, List[PropertySummary]] = defaultdict(list)
     for (item_id, defn_id), kept in held.items():
         defn = definitions[defn_id]
@@ -2795,7 +2826,7 @@ async def _plugin_summaries(
                 type=defn.type,
                 install_id=defn.install_id,
                 key=defn.key,
-                options=_parsed_options(defn) or None,
+                options=_parsed_options(defn, language) or None,
                 currency=defn.currency,
                 value=told if defn.list else told[0],
             )

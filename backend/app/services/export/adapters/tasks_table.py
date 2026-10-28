@@ -42,6 +42,7 @@ from app.services.export.adapters._common import (
     require_may_leave,
 )
 from app.services.export import values
+from app.services.marketplace.widget_meta import in_language
 from app.services.export.contract import RenderItem, RenderRequest
 from app.services.export.i18n import et, export_locale
 from app.services.export.markdown import blocks_from_markdown
@@ -421,11 +422,7 @@ async def task_columns(
                 continue
             given = decl.get("name")
             title = (
-                (
-                    given.get(locale)
-                    or given.get("en")
-                    or next(iter(given.values()), key)
-                )
+                in_language(given, locale) or key
                 if isinstance(given, dict)
                 else given or key
             )

@@ -37,6 +37,7 @@ from app.services.tenant import ownership as ownership_service
 from app.services.tenant import tags as tags_service
 from app.services.tenant import task_types as task_types_service
 from app.services.tenant.task_types import get_default_type
+from app.services.import_engine.context import ImportContext
 from app.testing import (
     assign_tag,
     checklist_items,
@@ -584,6 +585,61 @@ async def test_a_project_brings_its_metadata_and_its_values(session: AsyncSessio
     assert board["card"]["children"] == [
         {"type": "field", "props": {"field": f"property:{made['Points'].id}"}}
     ]
+
+
+async def test_an_unticked_property_leaves_project_metadata_of_its_name(
+    session: AsyncSession,
+):
+    """The review lists the initiative's properties: unticking ``Severity``
+    leaves out that property and its values, and keeps the project's own
+    ``Severity`` and its value."""
+    owner, _assignee, guild, initiative, project = await _seed_populated_project(
+        session
+    )
+    own = await create_property_definition(
+        session, initiative, project=project, name="Severity", type=MetadataType.number
+    )
+    task = (
+        await session.exec(select(Task).where(Task.project_id == project.id))
+    ).first()
+    assert task is not None
+    await create_property_value(session, task, own, value_number=3)
+    envelope = await export_service.build_project_export(
+        session, await get_project_hydrated(session, project.id)
+    )
+    target = await create_initiative(session, guild, owner, name="Target")
+
+    await route_as(session, user_id=owner.id, guild_id=guild.id)
+    result = await import_service.import_project(
+        session,
+        envelope=envelope,
+        target_initiative=target,
+        importer=owner,
+        context=ImportContext(excluded_properties=frozenset({"Severity"})),
+    )
+    await session.commit()
+
+    await route_session_to_guild(session, guild.id)
+    new_task = (
+        await session.exec(select(Task).where(Task.project_id == result.entity_id))
+    ).one()
+    kept = await session.exec(
+        select(MetadataDefinition.project_id, MetadataValue.value_number)
+        .join(MetadataValue, MetadataValue.property_id == MetadataDefinition.id)
+        .where(
+            MetadataValue.entity_type == "task",
+            MetadataValue.entity_id == new_task.id,
+        )
+    )
+    assert kept.all() == [(result.entity_id, 3)]
+    assert (
+        await session.exec(
+            select(MetadataDefinition).where(
+                MetadataDefinition.of_initiative(target.id),
+                MetadataDefinition.name == "Severity",
+            )
+        )
+    ).first() is None
 
 
 async def test_an_envelope_holds_one_layout_of_each_kind_as_read(

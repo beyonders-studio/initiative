@@ -923,7 +923,8 @@ async def _apply_property_definitions(
 class _CollectionRecord(SanitizedBaseModel):
     """One collection as a backup carries it: its files and cover by the ids
     they had where it was exported, its metadata, each file's values of it by
-    the file's id there, and its layouts, naming its metadata by place."""
+    the file's id there, and its layouts, naming its metadata by place and
+    then the initiative's properties they name (``layout_properties``)."""
 
     model_config = ConfigDict(extra="ignore")
 
@@ -937,6 +938,7 @@ class _CollectionRecord(SanitizedBaseModel):
     fields: list[ProjectExportPropertyDefinition] = []
     values: dict[int, list[EnvelopePropertyValue]] = {}
     layouts: list[dict] = []
+    layout_properties: list[ProjectExportPropertyDefinition] = []
 
 
 async def _apply_collections(
@@ -1017,6 +1019,17 @@ async def _apply_collections(
                             **columns,
                         )
                     )
+        # The initiative's properties its layouts name bind as an envelope's
+        # do, and are named at their places after its own metadata.
+        props = PropertyRestore(session, initiative_id=initiative.id, context=context)
+        await props.declare(record.layout_properties)
+        placed = {
+            **made_ids,
+            **{
+                len(record.fields) + place: props.bound_id(declared.name, declared.type)
+                for place, declared in enumerate(record.layout_properties, start=1)
+            },
+        }
         await tool_layouts_service.restore_layouts(
             session,
             tool_layouts_service.Target("collection", collection.id, initiative.id),
@@ -1026,7 +1039,7 @@ async def _apply_collections(
                     tool_layouts_service.remapped_definition(
                         layout.get("definition") or {},
                         tool_layouts_service.Remap(
-                            statuses=lambda _: None, properties=made_ids.get
+                            statuses=lambda _: None, properties=placed.get
                         ),
                     ),
                 )
@@ -1035,7 +1048,6 @@ async def _apply_collections(
             ),
         )
         await TagRestore(session).attach(collection, record.tags)
-        props = PropertyRestore(session, initiative_id=initiative.id, context=context)
         await props.attach(collection, record.properties)
         await props.settle(collection)
         context.links.register(

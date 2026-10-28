@@ -40,6 +40,7 @@ from app.core.messages import PluginChannelMessages, PluginMessages
 from app.models.platform.plugin_service_registration import PluginServiceRegistration
 from app.models.platform.guild import CommunityRole
 from app.models.platform.publisher import Publisher
+from app.models.platform.user import User
 from app.models.tenant.event_outbox import EventOutbox
 from app.models.tenant.initiative import InitiativeMember
 from app.models.tenant.plugin_event_outbox import PluginEventOutbox
@@ -1575,15 +1576,29 @@ class TestShownValues:
         }
         chosen = await put({"stage": "won", "price": 12.5})
         assert chosen.status_code == 200, chosen.text
-        read = await client.get(
-            installed.seat.g(f"/tasks/{task.id}"), headers=installed.seat.headers
-        )
-        shown = {v["key"]: v for v in read.json()["properties"] if v["install_id"]}
+
+        async def shown_to(locale: str) -> dict:
+            await session.exec(
+                update(User)
+                .where(User.id == installed.seat.user.id)
+                .values(locale=locale)
+            )
+            await session.commit()
+            read = await client.get(
+                installed.seat.g(f"/tasks/{task.id}"), headers=installed.seat.headers
+            )
+            return {v["key"]: v for v in read.json()["properties"] if v["install_id"]}
+
+        shown = await shown_to("en")
         assert (shown["stage"]["value"], shown["stage"]["options"]) == (
             "won",
             [{"value": "won", "label": "Won", "color": "#22aa55"}],
         )
         assert (shown["price"]["value"], shown["price"]["currency"]) == (12.5, "EUR")
+        # The same value, read by somebody reading German.
+        assert (await shown_to("de"))["stage"]["options"] == [
+            {"value": "won", "label": "Gewonnen", "color": "#22aa55"}
+        ]
         for refused in (
             {"done": 101},
             {"when": 3},

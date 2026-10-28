@@ -55,7 +55,7 @@ from __future__ import annotations
 from collections.abc import Awaitable, Callable, Mapping
 from dataclasses import dataclass, field, replace
 from datetime import datetime, timezone
-from typing import Any, cast
+from typing import Any, Optional, cast
 
 from sqlmodel.ext.asyncio.session import AsyncSession
 
@@ -1165,17 +1165,7 @@ class _ScopeBuilder:
             "type": "initiative-properties",
             "schema_version": 1,
             "initiative_id": initiative.id,
-            "properties": [
-                {
-                    "name": row.name,
-                    "type": row.type.value,
-                    "position": float(row.position),
-                    "color": row.color,
-                    "options": list(row.options or []),
-                    "currency": row.currency,
-                }
-                for row in rows
-            ],
+            "properties": [_definition_record(row) for row in rows],
         }
         path = f"{folder}/properties.json"
         await self._append_backup(
@@ -1203,6 +1193,7 @@ class _ScopeBuilder:
         from app.models.tenant.file import File
         from app.models.tenant.metadata import MetadataType
         from app.services.export.property_values import property_export_dict
+        from app.services.import_engine.common import load_initiative_properties
         from app.services.tenant import collections as collections_service
         from app.services.tenant import metadata as metadata_service
         from app.services.tenant import tags as tags_service
@@ -1240,22 +1231,40 @@ class _ScopeBuilder:
             for row in rows
         }
 
-        async def layouts(row) -> list[dict]:
-            places = {
-                field.id: place
-                for place, field in enumerate(fields.get(row.id, []), start=1)
-            }
+        properties = {
+            definition.id: definition
+            for definition in (
+                await load_initiative_properties(
+                    self.session, initiative_id=initiative.id
+                )
+            ).values()
+        }
+
+        async def layouts(row) -> dict:
+            """The collection's layouts, naming its metadata by place, and
+            the initiative's properties they name at the places after it
+            (``layout_properties``)."""
+            own = fields.get(row.id, [])
+            places = {field.id: place for place, field in enumerate(own, start=1)}
+            named: list = []
+
+            def place(property_id: int) -> Optional[int]:
+                if property_id not in places and property_id in properties:
+                    named.append(properties[property_id])
+                    places[property_id] = len(places) + 1
+                return places.get(property_id)
+
             remap = tool_layouts_service.Remap(
                 statuses=lambda _: None,
-                properties=places.get,
+                properties=place,
                 community=False,
                 people=frozenset(
-                    field.id
-                    for field in fields.get(row.id, [])
-                    if field.type == MetadataType.user_reference
+                    defn.id
+                    for defn in (*own, *properties.values())
+                    if defn.type == MetadataType.user_reference
                 ),
             )
-            return [
+            stored = [
                 {
                     "kind": layout.kind,
                     "definition": tool_layouts_service.remapped_definition(
@@ -1267,6 +1276,10 @@ class _ScopeBuilder:
                     tool_layouts_service.Target("collection", row.id, initiative.id),
                 )
             ]
+            return {
+                "layouts": stored,
+                "layout_properties": [_definition_record(defn) for defn in named],
+            }
 
         payload = {
             "type": "initiative-collections",
@@ -1283,21 +1296,13 @@ class _ScopeBuilder:
                     "file_ids": held.get(row.id, []),
                     **_file_metadata(row),
                     "fields": [
-                        {
-                            "name": field.name,
-                            "type": field.type.value,
-                            "position": float(field.position),
-                            "color": field.color,
-                            "options": list(field.options or []),
-                            "currency": field.currency,
-                        }
-                        for field in fields.get(row.id, [])
+                        _definition_record(field) for field in fields.get(row.id, [])
                     ],
                     "values": {
                         str(file_id): [property_export_dict(v) for v in summaries]
                         for file_id, summaries in values[row.id].items()
                     },
-                    "layouts": await layouts(row),
+                    **await layouts(row),
                 }
                 for row in rows
             ],
@@ -1479,6 +1484,19 @@ class _ScopeBuilder:
             )
         )
         return path
+
+
+def _definition_record(definition) -> dict:
+    """A definition as a backup carries it, by name
+    (``ProjectExportPropertyDefinition``)."""
+    return {
+        "name": definition.name,
+        "type": definition.type.value,
+        "position": float(definition.position),
+        "color": definition.color,
+        "options": list(definition.options or []),
+        "currency": definition.currency,
+    }
 
 
 def _file_metadata(file) -> dict:

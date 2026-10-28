@@ -386,7 +386,11 @@ class PropertyRestore:
 
     async def attach(self, row: Any, values: list[EnvelopePropertyValue]) -> None:
         """Write ``values`` onto ``row``, a persisted property target."""
-        values = [pv for pv in values if pv.property_name not in self._excluded]
+        # The review lists the initiative's properties an import would add,
+        # so an unticked name leaves a project's metadata of that name alone.
+        values = [
+            pv for pv in values if pv.project or pv.property_name not in self._excluded
+        ]
         if not values:
             return
         if self._member_handles is None:

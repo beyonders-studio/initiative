@@ -33,8 +33,9 @@ class ImportContext:
     people: PeopleMap = field(default_factory=PeopleMap)
     #: Property names somebody unticked on the review. Their definitions are
     #: not created, and every value naming one falls away with it — the
-    #: review lists what an import would add to an initiative somebody else
-    #: runs, and this is the answer to that list.
+    #: review lists the properties an import would add to an initiative
+    #: somebody else runs, and this is the answer to that list. A project's
+    #: metadata is the project's, made with it, and no name here touches it.
     excluded_properties: frozenset[str] = frozenset()
     #: The site the bundle was read from — an Atlassian site, for a fetch. A
     #: link in a task to a page there becomes a mention of the page, once the
