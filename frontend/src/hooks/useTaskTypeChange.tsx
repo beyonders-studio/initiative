@@ -1,9 +1,11 @@
 import { useTranslation } from "react-i18next";
 
-import type { TaskUpdate } from "@/api/generated/initiativeAPI.schemas";
+import { type TaskUpdate, Tool } from "@/api/generated/initiativeAPI.schemas";
 import { useFillRequired } from "@/components/layouts/FillRequiredDialog";
 import { useProjectTaskTypes } from "@/hooks/useProjects";
 import { useReadTaskNow } from "@/hooks/useTasks";
+import { detailLayoutOf, instanceTarget, useToolLayouts } from "@/hooks/useToolLayouts";
+import { requiredKeys, type StoredRegions } from "@/lib/layouts/detailLayout";
 import {
   TASK_DETAIL,
   taskChanges,
@@ -23,6 +25,11 @@ export const useTaskTypeChange = (projectId: number, initiativeId: number | null
   const fill = useFillRequired(TASK_DETAIL);
   const readTask = useReadTaskNow();
   const types = useProjectTaskTypes(projectId).data;
+  const layouts = useToolLayouts(instanceTarget(Tool.project, projectId)).data;
+  /** Whether the type's page requires anything at all: a change to one that
+   *  does waits for the task to be read. */
+  const requires = (typeId: number) =>
+    requiredKeys(detailLayoutOf(layouts, "task", typeId) as StoredRegions | null).length > 0;
   const change = async (
     taskId: number,
     typeId: number,
@@ -44,5 +51,5 @@ export const useTaskTypeChange = (projectId: number, initiativeId: number | null
       send: (written) => send(taskChanges(written)),
     });
   };
-  return { change, dialog: fill.dialog };
+  return { requires, change, dialog: fill.dialog };
 };
