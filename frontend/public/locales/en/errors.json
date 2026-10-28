@@ -165,6 +165,8 @@
   "VERSION_CONFLICT": "Someone else uploaded a version at the same moment. Try again.",
   "FILE_INVALID_FILE": "This file is empty or couldn't be read (max 50 MB).",
   "FILE_TYPE_NOT_ALLOWED": "Programs and scripts can't be uploaded.",
+  "FILE_REFUSED_BY_SCAN": "This file was refused by the malware scan.",
+  "FILE_SCANNER_UNAVAILABLE": "Uploads are paused while files can't be scanned. Try again in a few minutes.",
   "RESUMABLE_INVALID_REQUEST": "That upload request couldn't be read.",
   "RESUMABLE_VERSION_UNSUPPORTED": "This upload client isn't supported.",
   "RESUMABLE_NOT_FOUND": "That upload no longer exists.",

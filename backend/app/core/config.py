@@ -462,6 +462,29 @@ class Settings(BaseSettings):
             raise ValueError("must be at least 1")
         return value
 
+    @field_validator("STORAGE_ENCRYPTION")
+    @classmethod
+    def _storage_encryption_root(cls, value: str) -> str:
+        value = value.strip().lower()
+        if value not in ("", "local", "gcp_kms"):
+            raise ValueError('must be unset, "local" or "gcp_kms"')
+        return value
+
+    @model_validator(mode="after")
+    def _scanner_has_its_token(self) -> "Settings":
+        if self.UPLOAD_SCANNER_URL and not self.UPLOAD_SCANNER_TOKEN:
+            raise ValueError("UPLOAD_SCANNER_URL needs UPLOAD_SCANNER_TOKEN")
+        return self
+
+    @model_validator(mode="after")
+    def _kms_root_names_its_key(self) -> "Settings":
+        if self.STORAGE_ENCRYPTION == "gcp_kms" and not self.STORAGE_ENCRYPTION_KMS_KEY:
+            raise ValueError(
+                'STORAGE_ENCRYPTION="gcp_kms" needs STORAGE_ENCRYPTION_KMS_KEY: '
+                "projects/<p>/locations/<l>/keyRings/<r>/cryptoKeys/<k>"
+            )
+        return self
+
     @field_validator("DB_MAX_OVERFLOW")
     @classmethod
     def _not_negative(cls, value: int) -> int:
@@ -873,6 +896,24 @@ class Settings(BaseSettings):
     # (serves blobs not yet copied by the backfill). Turn off once the backfill is
     # verified complete. Only consulted when STORAGE_BACKEND="s3".
     S3_LOCAL_FALLBACK: bool = False
+    # Encrypt every object a community stores, in the app, under a key of the
+    # community's own (app.services.storage_keys, app.core.storage_crypto).
+    # Unset (the default): objects are stored as they arrive, as always.
+    #   "local"    the community keys are wrapped under SECRET_KEY.
+    #   "gcp_kms"  they are wrapped by the Cloud KMS key STORAGE_ENCRYPTION_KMS_KEY,
+    #              which the app reaches as its own Google identity.
+    # Deployment-level on purpose: nothing in the app's settings turns it off.
+    # Objects stored before it was set stay readable, and a background pass
+    # encrypts them; objects stored encrypted stay readable if it is unset again.
+    STORAGE_ENCRYPTION: str = ""
+    # projects/<p>/locations/<l>/keyRings/<r>/cryptoKeys/<k>, for "gcp_kms".
+    STORAGE_ENCRYPTION_KMS_KEY: str = ""
+    # Scan every upload before it is stored, at this scanner (initiative_infra
+    # scanner/: a hash list, archives, YARA and ClamAV), presenting the token.
+    # Unset (the default): nothing is scanned. Set, it fails closed: while the
+    # scanner cannot answer, uploads are refused (app.services.upload_scanning).
+    UPLOAD_SCANNER_URL: str = ""
+    UPLOAD_SCANNER_TOKEN: str = ""
 
     # --- Marketplace ------------------------------------------------------
     # A directory of listing manifests (*.json) this deployment publishes as

@@ -71,6 +71,10 @@ SALT_HOLD_NOTE = b"hold-note"
 # The words a moderator took down, kept in the community's moderation log so
 # a removal can be put back.
 SALT_MODERATION_SNAPSHOT = b"moderation-snapshot"
+# A community's storage key, where the deployment roots it in SECRET_KEY
+# (STORAGE_ENCRYPTION=local). Every object the community keeps is encrypted
+# under it (app.services.storage_keys).
+SALT_STORAGE_KEY = b"storage-key"
 # The API token one import job uses to read a foreign site. Held for the
 # length of that job and deleted with it.
 

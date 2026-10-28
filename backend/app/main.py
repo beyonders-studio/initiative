@@ -149,6 +149,11 @@ async def lifespan(app: FastAPI):
         from app.services import storage_config
 
         await storage_config.refresh_storage_config(session)
+        # Whether objects stored encrypted are left to read with
+        # STORAGE_ENCRYPTION unset; nothing to do where it is set or never was.
+        from app.services import storage_keys
+
+        await storage_keys.prime(session)
         # The same for the captcha secret and the FCM service account: both are
         # read from paths that hold no usable session (a synchronous predicate,
         # a background dispatch), so each keeps a process-wide snapshot, and it

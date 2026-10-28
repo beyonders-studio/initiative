@@ -165,6 +165,8 @@
   "VERSION_CONFLICT": "Otra persona subió una versión en el mismo momento. Inténtalo de nuevo.",
   "FILE_INVALID_FILE": "Este archivo está vacío o no se pudo leer (máx. 50 MB).",
   "FILE_TYPE_NOT_ALLOWED": "No se pueden subir programas ni scripts.",
+  "FILE_REFUSED_BY_SCAN": "El análisis de malware rechazó este archivo.",
+  "FILE_SCANNER_UNAVAILABLE": "Las subidas están en pausa mientras no se puedan analizar los archivos. Inténtalo de nuevo en unos minutos.",
   "RESUMABLE_INVALID_REQUEST": "No se pudo leer esa solicitud de subida.",
   "RESUMABLE_VERSION_UNSUPPORTED": "Este cliente de subida no es compatible.",
   "RESUMABLE_NOT_FOUND": "Esa subida ya no existe.",

@@ -165,6 +165,8 @@
   "VERSION_CONFLICT": "Quelqu'un d'autre a téléversé une version au même moment. Réessayez.",
   "FILE_INVALID_FILE": "Ce fichier est vide ou n'a pas pu être lu (max 50 Mo).",
   "FILE_TYPE_NOT_ALLOWED": "Les programmes et les scripts ne peuvent pas être téléversés.",
+  "FILE_REFUSED_BY_SCAN": "Ce fichier a été refusé par l’analyse antivirus.",
+  "FILE_SCANNER_UNAVAILABLE": "Les téléversements sont suspendus tant que les fichiers ne peuvent pas être analysés. Réessayez dans quelques minutes.",
   "RESUMABLE_INVALID_REQUEST": "Cette demande de téléversement n'a pas pu être lue.",
   "RESUMABLE_VERSION_UNSUPPORTED": "Ce client de téléversement n'est pas pris en charge.",
   "RESUMABLE_NOT_FOUND": "Ce téléversement n'existe plus.",
