@@ -780,6 +780,14 @@ def sweeps() -> tuple[Sweep, ...]:
                     when="NEW.deleted_at IS NULL",
                 ),
                 on_row("calendar_event_attendees", "now()"),
+                on_row("calendar_event_answers", "now()", events="INSERT OR UPDATE"),
+                on_row(
+                    "projects",
+                    "now()",
+                    events="UPDATE OF archived_at, is_template",
+                ),
+                # A status moved out of done reopens its tasks.
+                on_row("task_statuses", "now()", events="UPDATE OF category"),
             ),
         ),
         Sweep(

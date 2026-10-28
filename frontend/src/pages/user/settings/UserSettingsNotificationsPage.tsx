@@ -462,6 +462,7 @@ export const UserSettingsNotificationsPage = ({
                     {t("notifications.digests.frequency")}
                   </Label>
                   <Select
+                    disabled={writePreferences.isPending}
                     value={digest?.cadence ?? "daily"}
                     onValueChange={(value) =>
                       writeDigest(row.category, { cadence: value as DigestCadence })
@@ -485,6 +486,7 @@ export const UserSettingsNotificationsPage = ({
                       {t("notifications.timing.day")}
                     </Label>
                     <Select
+                      disabled={writePreferences.isPending}
                       value={String(digest.weekday)}
                       onValueChange={(value) =>
                         writeDigest(row.category, { weekday: Number(value) })
@@ -509,6 +511,7 @@ export const UserSettingsNotificationsPage = ({
                     key={digest?.at}
                     id={`${row.category}-time`}
                     type="time"
+                    disabled={writePreferences.isPending}
                     defaultValue={digest?.at}
                     onBlur={(event) => {
                       if (event.target.value && event.target.value !== digest?.at) {
@@ -533,6 +536,7 @@ export const UserSettingsNotificationsPage = ({
             <div className="space-y-2">
               <Label htmlFor="email-cadence">{t("notifications.timing.cadence.label")}</Label>
               <Select
+                disabled={writePreferences.isPending}
                 value={schedule?.cadence ?? "instant"}
                 onValueChange={(value) => writeEmail({ cadence: value as EmailCadence })}
               >
@@ -552,6 +556,7 @@ export const UserSettingsNotificationsPage = ({
               <div className="space-y-2">
                 <Label htmlFor="email-weekday">{t("notifications.timing.day")}</Label>
                 <Select
+                  disabled={writePreferences.isPending}
                   value={String(schedule.weekday)}
                   onValueChange={(value) => writeEmail({ weekday: Number(value) })}
                 >
@@ -575,6 +580,7 @@ export const UserSettingsNotificationsPage = ({
                   key={schedule.at}
                   id="email-time"
                   type="time"
+                  disabled={writePreferences.isPending}
                   defaultValue={schedule.at}
                   onBlur={(event) => {
                     if (event.target.value && event.target.value !== schedule.at) {

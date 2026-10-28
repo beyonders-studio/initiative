@@ -903,8 +903,8 @@ async def test_coming_up_digest_lists_what_is_due_and_starting(
     session: AsyncSession, monkeypatch
 ):
     """Coming up names the reader's tasks due and events starting before the
-    next one, soonest first: nothing overdue, nothing further out, and nothing
-    for an account that never asked for it."""
+    next one, soonest first across their communities: nothing overdue, nothing
+    further out, and nothing for an account that never asked for it."""
     now = datetime.now(timezone.utc)
     user = await create_user(session, timezone="UTC")
     # Weekly on today, so it covers the week ahead; midnight is always past.
@@ -923,7 +923,7 @@ async def test_coming_up_digest_lists_what_is_due_and_starting(
         },
     )
     owner = await create_user(session)
-    _guild, initiative, calendar = await _events_initiative(session, owner)
+    _first, initiative, calendar = await _events_initiative(session, owner)
     event = await create_calendar_event(
         session,
         calendar,
@@ -933,7 +933,11 @@ async def test_coming_up_digest_lists_what_is_due_and_starting(
         end_at=now + timedelta(days=3, hours=1),
     )
     await _add_attendee(session, initiative, event, user)
-    project = await create_project(session, initiative, owner)
+    # The tasks are in a community read after the event's.
+    guild, work, _calendar = await _events_initiative(session, owner)
+    await create_guild_membership(session, user=user, guild=guild)
+    await create_initiative_member(session, work, user, role_name="member")
+    project = await create_project(session, work, owner)
     await create_resource_grant(session, project, user=user)
     for title, due in (
         ("Soon", now + timedelta(days=1)),

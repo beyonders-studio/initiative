@@ -1964,14 +1964,15 @@ async def _overdue_tasks_for_reader(
     user_id = require_guild_context(session).user_id
     rows = (
         await session.exec(
-            _overdue_assignments(Task, Project.name, Project.id)
-            .where(TaskAssignee.user_id == user_id)
-            .order_by(Task.due_date.asc())
+            _overdue_assignments(Task, Project.name, Project.id).where(
+                TaskAssignee.user_id == user_id
+            )
         )
     ).all()
     return [
         {
             "title": task.title,
+            "at": task.due_date,
             "project_name": project_name,
             "due_date": task.due_date.strftime("%Y-%m-%d %H:%M UTC")
             if task.due_date
@@ -2045,7 +2046,7 @@ async def _coming_up_for_reader(
     session: AsyncSession, guild_id: int, until: datetime, zone: str | None
 ) -> list[dict]:
     """What the reader the session is routed as has due or starting before
-    ``until``, in the routed community, soonest first."""
+    ``until``, in the routed community."""
     user_id = require_guild_context(session).user_id
     now = datetime.now(timezone.utc)
     tasks = (
@@ -2102,7 +2103,7 @@ async def _coming_up_for_reader(
         if (event.id, user_id, start) not in declined
         and start not in changed.get(event.id, ())
     ]
-    return sorted(items, key=lambda item: item["at"])
+    return items
 
 
 def _coming_up_push(user: User, items: list[dict]) -> push_notifications.Push:
@@ -2128,7 +2129,8 @@ class ScheduledDigest:
     #: The ``users`` column each day's is claimed on.
     stamp: Any
     #: What the reader the session is routed as has in it, in the routed
-    #: community, up to the next one; given that and the reader's zone.
+    #: community, up to the next one; given that and the reader's zone. Each
+    #: item's ``at`` orders the list, soonest first, across communities.
     read: Callable[[AsyncSession, int, datetime, str | None], Awaitable[list[dict]]]
     pieces: Callable[[User, Sequence[dict]], email_service.EmailPieces]
     push: Callable[[User, list[dict]], push_notifications.Push]
@@ -2310,6 +2312,7 @@ async def _send_scheduled(
         if not items:
             _next(user_id, slot.following)
             continue
+        items.sort(key=lambda item: item["at"])
         # Re-load the user, fresh, to send + stamp it. The
         # email/stamp touch only shared tables, so the user-only context is fine.
         session.expunge_all()
