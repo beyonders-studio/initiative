@@ -244,6 +244,7 @@ _SIGIL_EXEMPT: frozenset[str] = frozenset(
         "app.schemas.tenant.initiative.InitiativeRoleCreate.name",
         "app.schemas.tenant.property.PropertyDefinitionCreate.name",
         "app.schemas.tenant.property.PropertyDefinitionUpdate.name",
+        "app.schemas.tenant.property.PropertyDefinitionPromote.name",
         "app.schemas.tenant.task_status.TaskStatusCreate.name",
         "app.schemas.tenant.task_status.TaskStatusUpdate.name",
         "app.schemas.tenant.task_type.TaskTypeCreate.name",
