@@ -624,13 +624,14 @@ async def update_task(
     task = await resource_access.load_child(session, Task, task_id, access="write")
     previous_type = task.task_type_id
     required = await required_fields.required_of(session, guild_context, task)
-    let_go = await _apply_update(
+    let_go, retyped = await _apply_update(
         task_in, task, task.project, session, current_user, guild_context
     )
-    # A task given another type meets what that type's page requires; any
-    # other edit only keeps what it held.
+    # A task given another type meets what that type's page requires, as does
+    # each task of its series the edit gave the type too; any other edit only
+    # keeps what it held.
     if task.task_type_id != previous_type:
-        await required_fields.refuse_missing(session, guild_context, task)
+        await required_fields.refuse_missing(session, guild_context, task, *retyped)
     else:
         await required_fields.refuse_emptied(session, required)
     await session.commit()
@@ -649,10 +650,11 @@ async def _apply_update(
     session: ActorSessionDep,
     current_user: ActorUserDep,
     guild_context: ProjectsWrite,
-) -> set[str]:
+) -> tuple[set[str], list[Task]]:
     """Write ``task_in`` to ``task``, in ``project``, in the session's
     transaction: what an update commits, and what a move sends with the task.
-    The uploads its description let go of, to release once it lands."""
+    The uploads its description let go of, to release once it lands, and the
+    other tasks of its series it gave its new type."""
     update_data = task_in.model_dump(exclude_unset=True)
     if update_data.get("recurrence", task.recurrence) is None:
         update_data.setdefault("recurrence_limit", None)
@@ -854,7 +856,11 @@ async def _apply_update(
     except (HTTPException, CodedError):
         await session.rollback()
         raise
+    retyped: list[Task] = []
     if series:
+        retyped = [
+            member for member in series if member.task_type_id != task.task_type_id
+        ]
         await task_series.apply_to_others(
             session,
             series,
@@ -891,7 +897,9 @@ async def _apply_update(
             ) - attachments_service.upload_urls_in_markdown(task.description)
     await attachments_service.claim_uploads(session, task)
     _touch_project(project, now)
-    return let_go
+    return let_go, [
+        member for member in retyped if member.task_type_id == task.task_type_id
+    ]
 
 
 @router.post("/{task_id}/move", response_model=TaskRead)
@@ -971,14 +979,14 @@ async def move_task(
     )
     # What the move is sent with is written once the task is there, and then
     # the task meets what its page in the destination requires.
-    let_go = (
+    let_go, retyped = (
         await _apply_update(
             move_in.changes, task, target_project, session, current_user, guild_context
         )
         if move_in.changes is not None
-        else set()
+        else (set(), [])
     )
-    await required_fields.refuse_missing(session, guild_context, task)
+    await required_fields.refuse_missing(session, guild_context, task, *retyped)
 
     _touch_project(source_project, now)
     _touch_project(target_project, now)

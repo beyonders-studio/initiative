@@ -425,6 +425,64 @@ async def test_a_task_given_another_type_meets_its_page(
     assert held == {"Size": "Large", "Note": "Mind the wasps"}
 
 
+async def test_every_task_of_a_series_given_the_type_meets_its_page(
+    client: AsyncClient, session: AsyncSession, acting_user
+):
+    a = await acting_user(guild_role=CommunityRole.admin, initiative=True, project=True)
+    size = await create_property_definition(session, a.initiative, name="Size")
+    plain, _, other, *_ = await _types(session, a, a.project.id)
+    await _require(
+        client,
+        a,
+        {"tool": "project", "tool_id": a.project.id},
+        "task",
+        _required("description"),
+        _required(f"property:{size.id}"),
+        task_type_id=other,
+    )
+    first = (
+        await client.post(
+            a.g("/tasks/"),
+            json={
+                "project_id": a.project.id,
+                "title": "Water the plants",
+                "task_type_id": plain,
+                "due_date": "2099-01-01T09:00:00Z",
+                "recurrence": "FREQ=WEEKLY",
+            },
+            headers=a.headers,
+        )
+    ).json()
+    done = await client.patch(
+        a.g(f"/tasks/{first['id']}"),
+        json={"status_category": "done"},
+        headers=a.headers,
+    )
+    assert done.status_code == 200, done.text
+    listed = await client.get(
+        a.g("/tasks/"), params={"project_id": a.project.id}, headers=a.headers
+    )
+    nxt = next(each for each in listed.json()["items"] if each["id"] != first["id"])
+    retype = {
+        "task_type_id": other,
+        "description": "Every pot, not just the big ones",
+        "properties": [{"property_id": size.id, "value": "Large"}],
+        "merge_properties": True,
+    }
+
+    # The description reaches every task of the series; this one's Size does
+    # not, so the first task would be of the type without it.
+    every = await client.patch(
+        a.g(f"/tasks/{nxt['id']}"), json={**retype, "scope": "all"}, headers=a.headers
+    )
+    _refused(every, "Size")
+
+    alone = await client.patch(
+        a.g(f"/tasks/{nxt['id']}"), json={**retype, "scope": "this"}, headers=a.headers
+    )
+    assert alone.status_code == 200, alone.text
+
+
 async def test_a_moved_task_meets_its_page_in_the_destination(
     client: AsyncClient, session: AsyncSession, acting_user
 ):
