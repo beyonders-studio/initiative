@@ -289,5 +289,11 @@
     "number": "Un nombre",
     "stars": "Des étoiles",
     "bar": "Une barre"
+  },
+  "fieldProperty": {
+    "property": "Propriété",
+    "metadata": "Métadonnée",
+    "metadataHelp": "C'est une métadonnée de l'initiative, qui se modifie dans ses paramètres.",
+    "openSettings": "Ouvrir les paramètres de l'initiative"
   }
 }

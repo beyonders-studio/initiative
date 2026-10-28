@@ -1,11 +1,12 @@
-import { ArrowDown, ArrowUp, Loader2, Pencil, Plus, Trash2, X } from "lucide-react";
-import { type ReactNode, useEffect, useMemo, useState } from "react";
+import { ArrowDown, ArrowUp, ArrowUpToLine, Loader2, Pencil, Plus, Trash2, X } from "lucide-react";
+import { useEffect, useMemo, useState } from "react";
 import { useTranslation } from "react-i18next";
 
 import {
   type CurrencyCode,
   MetadataType,
   type PropertyDefinitionCreate,
+  type PropertyDefinitionGroup,
   type PropertyDefinitionRead,
   type PropertyDefinitionUpdate,
   type PropertyOption,
@@ -14,8 +15,10 @@ import { CurrencySelect, useDefaultCurrency } from "@/components/properties/Curr
 import { PROPERTY_TYPES } from "@/components/properties/NewPropertyForm";
 import { normalizeOptionList, typeRequiresOptions } from "@/components/properties/propertyHelpers";
 import { iconForPropertyType } from "@/components/properties/propertyTypeIcons";
+import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
-import { Card, CardContent, CardDescription, CardHeader } from "@/components/ui/card";
+import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
+import { Checkbox } from "@/components/ui/checkbox";
 import { ColorPickerPopover } from "@/components/ui/color-picker-popover";
 import { ConfirmDialog } from "@/components/ui/confirm-dialog";
 import {
@@ -38,22 +41,16 @@ import {
   TableRow,
 } from "@/components/ui/table";
 import {
-  type MetadataOwner,
-  ownerColumns,
   useCreateProperty,
+  useDeleteProperties,
   useDeleteProperty,
-  useProperties,
+  usePromoteProperties,
+  usePropertyGroups,
   useUpdateProperty,
 } from "@/hooks/useProperties";
-import { collator } from "@/lib/intl";
 import { toast } from "@/lib/mascotToast";
 
 const DEFAULT_COLOR = "#64748B";
-
-interface DialogState {
-  mode: "create" | "edit";
-  definition?: PropertyDefinitionRead;
-}
 
 interface FormState {
   name: string;
@@ -89,7 +86,7 @@ const definitionToFormState = (
 
 /**
  * Sub-editor for select / multi_select option lists. Kept in-file because it
- * is only useful to the manager dialog — no other callers need it.
+ * is only useful to the property dialog — no other callers need it.
  */
 interface OptionListEditorProps {
   options: PropertyOption[];
@@ -162,124 +159,86 @@ const OptionListEditor = ({ options, onChange, disabled }: OptionListEditorProps
   );
 };
 
-/** What the manager calls what it lists: an initiative's properties, or a
- *  project's or a collection's metadata. */
+/** What a definition is called by its owner: the initiative's metadata, or a
+ *  project's or a collection's property. */
 const WORDS = {
   initiative: {
     description: "properties:manager.description",
-    create: "properties:manager.newDefinition",
     edit: "properties:manager.editDefinition",
     delete: "properties:manager.delete",
     deleteTitle: "properties:manager.deleteConfirmTitle",
     deleteBody: "properties:manager.deleteConfirmBody",
-    none: "properties:noMetadata",
   },
   project: {
     description: "projects:properties.description",
-    create: "projects:properties.create",
     edit: "projects:properties.edit",
     delete: "projects:properties.delete",
     deleteTitle: "projects:properties.deleteTitle",
     deleteBody: "projects:properties.deleteBody",
-    none: "projects:properties.none",
   },
   collection: {
     description: "files:collections.properties.description",
-    create: "files:collections.properties.create",
     edit: "files:collections.properties.edit",
     delete: "files:collections.properties.delete",
     deleteTitle: "files:collections.properties.deleteTitle",
     deleteBody: "files:collections.properties.deleteBody",
-    none: "files:collections.properties.none",
   },
 } as const;
 
-/**
- * Initiative-manager surface for listing and managing custom property
- * definitions. The panel behind the Properties tab of an initiative's
- * settings, which is its own route (``/settings/properties``). Pairs with
- * ``PropertyFilter``/``PropertyList``/``PropertyInput`` which render
- * individual values on files and tasks.
- *
- * Given an ``owner``, it manages that project's or collection's metadata
- * instead: a project's in its settings, a collection's on its layouts page.
- * Without ``canManage`` it lists them and changes nothing.
- */
-export const InitiativeSettingsPropertiesTab = ({
-  initiativeId,
-  owner,
-  canManage = true,
-}: {
-  initiativeId: number;
-  owner?: MetadataOwner;
-  canManage?: boolean;
-}) => {
-  const { t, i18n } = useTranslation(["properties", "common", "files", "projects"]);
-  const words = WORDS[owner?.kind ?? "initiative"];
-  const defaultCurrency = useDefaultCurrency();
+/** The words for `definition`, by whose it is; none is new metadata. */
+export const propertyWords = (definition?: PropertyDefinitionRead | null) =>
+  WORDS[
+    definition?.project_id != null
+      ? "project"
+      : definition?.collection_id != null
+        ? "collection"
+        : "initiative"
+  ];
 
-  const propertiesQuery = useProperties(owner === undefined ? { initiativeId } : { owner });
+const PROPERTY_NAMESPACES = ["properties", "common", "files", "projects"] as const;
+
+/**
+ * A definition's name, options and their colors, color and currency, saved
+ * as one change; or, given no `definition`, new metadata of the initiative's,
+ * whose type is chosen then and kept. Where one is edited: the initiative's
+ * settings, and the layout editor, from the field that shows it.
+ */
+export const PropertyDialog = ({
+  open,
+  definition,
+  initiativeId,
+  position = 0,
+  onClose,
+}: {
+  open: boolean;
+  /** The one to edit; left out, new metadata of the initiative's. */
+  definition?: PropertyDefinitionRead;
+  initiativeId: number;
+  /** Where new metadata goes among the initiative's. */
+  position?: number;
+  onClose: () => void;
+}) => {
+  const { t } = useTranslation(PROPERTY_NAMESPACES);
+  const words = propertyWords(definition);
+  const defaultCurrency = useDefaultCurrency();
   const createMutation = useCreateProperty();
   const updateMutation = useUpdateProperty();
-  const deleteMutation = useDeleteProperty();
-
-  const [dialogState, setDialogState] = useState<DialogState | null>(null);
   const [formState, setFormState] = useState<FormState>(() => emptyFormState(defaultCurrency));
-  const [deleteTarget, setDeleteTarget] = useState<PropertyDefinitionRead | null>(null);
-  const [moving, setMoving] = useState(false);
 
-  const owned = owner !== undefined;
-  const sortedDefinitions = useMemo(() => {
-    // The initiative's own: none a project or a collection keeps.
-    const list = (propertiesQuery.data ?? []).filter(
-      (definition) => owned || (definition.project_id === null && definition.collection_id === null)
-    );
-    const byName = collator(i18n.language);
-    return [...list].sort((a, b) => {
-      if (a.position !== b.position) return a.position - b.position;
-      return byName.compare(a.name, b.name);
-    });
-  }, [propertiesQuery.data, owned, i18n.language]);
-
-  /** Move one a place up or down, numbering each in the order shown. */
-  const move = async (index: number, by: -1 | 1) => {
-    const order = [...sortedDefinitions];
-    const [moved] = order.splice(index, 1);
-    order.splice(index + by, 0, moved);
-    setMoving(true);
-    try {
-      await Promise.all(
-        order.flatMap((definition, position) =>
-          definition.position === position
-            ? []
-            : [updateMutation.mutateAsync({ propertyId: definition.id, data: { position } })]
-        )
-      );
-    } catch {
-      // Error toast handled by the mutation hook.
-    } finally {
-      setMoving(false);
-    }
-  };
-
-  // Sync the form state when the dialog target changes. Using an effect
-  // here (rather than initializing via state) avoids stale form data when
-  // the user closes one edit dialog and opens another without remounting.
+  // Sync the form when the dialog opens, so one closed and another opened
+  // without remounting starts from what the new one holds.
   useEffect(() => {
-    if (dialogState?.mode === "edit" && dialogState.definition) {
-      setFormState(definitionToFormState(dialogState.definition, defaultCurrency));
-    } else {
-      setFormState(emptyFormState(defaultCurrency));
-    }
-  }, [dialogState, defaultCurrency]);
+    if (!open) return;
+    setFormState(
+      definition
+        ? definitionToFormState(definition, defaultCurrency)
+        : emptyFormState(defaultCurrency)
+    );
+  }, [open, definition, defaultCurrency]);
 
-  const isEditing = dialogState?.mode === "edit";
+  const isEditing = definition !== undefined;
+  const title = isEditing ? words.edit : "properties:manager.newDefinition";
   const submitting = createMutation.isPending || updateMutation.isPending;
-
-  const handleOpenCreate = () => setDialogState({ mode: "create" });
-  const handleOpenEdit = (definition: PropertyDefinitionRead) =>
-    setDialogState({ mode: "edit", definition });
-  const handleCloseDialog = () => setDialogState(null);
 
   const handleTypeChange = (nextType: MetadataType) => {
     setFormState((prev) => {
@@ -305,48 +264,44 @@ export const InitiativeSettingsPropertiesTab = ({
   }, [formState]);
 
   const handleSubmit = async () => {
-    if (!canSubmit || !dialogState) return;
+    if (!canSubmit) return;
 
     const trimmedName = formState.name.trim();
     const options = typeRequiresOptions(formState.type)
       ? normalizeOptionList(formState.options)
       : undefined;
 
-    if (dialogState.mode === "create") {
+    if (!definition) {
       const payload: PropertyDefinitionCreate = {
         name: trimmedName,
         type: formState.type,
         initiative_id: initiativeId,
-        ...ownerColumns(owner),
         color: formState.color ?? null,
         options,
         ...(formState.type === MetadataType.currency ? { currency: formState.currency } : {}),
-        // A new one goes last.
-        position: sortedDefinitions.length,
+        position,
       };
       try {
         await createMutation.mutateAsync(payload);
-        toast.success(t(words.create));
-        handleCloseDialog();
+        toast.success(t(title));
+        onClose();
       } catch {
         // Error toast handled by the mutation hook.
       }
       return;
     }
 
-    if (!dialogState.definition) return;
     const payload: PropertyDefinitionUpdate = {
       name: trimmedName,
       color: formState.color ?? null,
       // Type is immutable on edit, so use the existing definition's type to
       // decide whether to include options in the PATCH payload.
-      options: typeRequiresOptions(dialogState.definition.type) ? options : undefined,
-      currency:
-        dialogState.definition.type === MetadataType.currency ? formState.currency : undefined,
+      options: typeRequiresOptions(definition.type) ? options : undefined,
+      currency: definition.type === MetadataType.currency ? formState.currency : undefined,
     };
     try {
       const response = await updateMutation.mutateAsync({
-        propertyId: dialogState.definition.id,
+        propertyId: definition.id,
         data: payload,
       });
       if (response.orphaned_value_count > 0) {
@@ -356,56 +311,368 @@ export const InitiativeSettingsPropertiesTab = ({
           })
         );
       } else {
-        toast.success(t(words.edit));
+        toast.success(t(title));
       }
-      handleCloseDialog();
+      onClose();
     } catch {
       // Error toast handled by the mutation hook.
     }
   };
 
-  const handleConfirmDelete = async () => {
-    if (!deleteTarget) return;
+  return (
+    <Dialog
+      open={open}
+      onOpenChange={(next) => {
+        if (!next) onClose();
+      }}
+    >
+      <DialogContent className="sm:max-w-xl">
+        <DialogHeader>
+          <DialogTitle>{t(title)}</DialogTitle>
+          <DialogDescription>{t(words.description)}</DialogDescription>
+        </DialogHeader>
+
+        <div className="space-y-4">
+          <div className="space-y-2">
+            <Label htmlFor="property-manager-name">{t("properties:manager.nameLabel")}</Label>
+            <Input
+              id="property-manager-name"
+              value={formState.name}
+              onChange={(e) => setFormState((prev) => ({ ...prev, name: e.target.value }))}
+              autoFocus
+            />
+          </div>
+
+          <div className="space-y-2">
+            <Label htmlFor="property-manager-type">{t("properties:manager.typeLabel")}</Label>
+            <Select
+              value={formState.type}
+              onValueChange={(next) => handleTypeChange(next as MetadataType)}
+              disabled={isEditing}
+            >
+              <SelectTrigger id="property-manager-type">
+                <div className="flex min-w-0 items-center gap-2">
+                  {(() => {
+                    const Icon = iconForPropertyType(formState.type);
+                    return <Icon className="h-4 w-4 shrink-0" />;
+                  })()}
+                  <span className="truncate">{t(`properties:types.${formState.type}`)}</span>
+                </div>
+              </SelectTrigger>
+              <SelectContent>
+                {PROPERTY_TYPES.map((type) => {
+                  const Icon = iconForPropertyType(type);
+                  const label = t(`properties:types.${type}`);
+                  return (
+                    <SelectItem key={type} value={type} textValue={label}>
+                      <div className="flex items-center gap-2">
+                        <Icon className="h-4 w-4 shrink-0" />
+                        <span>{label}</span>
+                      </div>
+                    </SelectItem>
+                  );
+                })}
+              </SelectContent>
+            </Select>
+          </div>
+
+          {formState.type === MetadataType.currency ? (
+            <div className="space-y-2">
+              <Label>{t("properties:currency.label")}</Label>
+              <CurrencySelect
+                value={formState.currency}
+                onChange={(currency) => setFormState((prev) => ({ ...prev, currency }))}
+              />
+            </div>
+          ) : null}
+
+          <div className="space-y-2">
+            <Label>{t("properties:manager.colorLabel")}</Label>
+            <ColorPickerPopover
+              value={formState.color ?? DEFAULT_COLOR}
+              onChangeComplete={(value) => setFormState((prev) => ({ ...prev, color: value }))}
+            />
+          </div>
+
+          {typeRequiresOptions(formState.type) ? (
+            <div className="space-y-2">
+              <Label>{t("properties:manager.optionsLabel")}</Label>
+              <OptionListEditor
+                options={formState.options}
+                onChange={(next) => setFormState((prev) => ({ ...prev, options: next }))}
+              />
+            </div>
+          ) : null}
+        </div>
+
+        <DialogFooter>
+          <Button type="button" variant="outline" onClick={onClose}>
+            {t("common:cancel")}
+          </Button>
+          <Button
+            type="button"
+            onClick={() => void handleSubmit()}
+            disabled={!canSubmit || submitting}
+          >
+            {submitting ? t("common:submitting") : t("common:save")}
+          </Button>
+        </DialogFooter>
+      </DialogContent>
+    </Dialog>
+  );
+};
+
+/** Deleting `definition`, with every value of it, once asked; closed while
+ *  none is given. */
+export const PropertyDeleteDialog = ({
+  definition,
+  onClose,
+}: {
+  definition: PropertyDefinitionRead | null;
+  onClose: () => void;
+}) => {
+  const { t } = useTranslation(PROPERTY_NAMESPACES);
+  const words = propertyWords(definition);
+  const deleteMutation = useDeleteProperty();
+  const handleConfirm = async () => {
+    if (!definition) return;
     try {
-      await deleteMutation.mutateAsync(deleteTarget.id);
+      await deleteMutation.mutateAsync(definition.id);
       toast.success(t(words.delete));
-      setDeleteTarget(null);
+      onClose();
+    } catch {
+      // Error toast handled by the mutation hook.
+    }
+  };
+  return (
+    <ConfirmDialog
+      open={definition !== null}
+      onOpenChange={(next) => {
+        if (!next) onClose();
+      }}
+      title={t(words.deleteTitle)}
+      description={t(words.deleteBody)}
+      confirmLabel={t(words.delete)}
+      cancelLabel={t("common:cancel")}
+      onConfirm={() => void handleConfirm()}
+      isLoading={deleteMutation.isPending}
+      destructive
+    />
+  );
+};
+
+/**
+ * Merging the properties selected into one of the initiative's metadata,
+ * under a name: the metadata of that name and type if there is one, otherwise
+ * a new one.
+ */
+const PromoteDialog = ({
+  open,
+  initiativeId,
+  sources,
+  metadata,
+  onClose,
+  onPromoted,
+}: {
+  open: boolean;
+  initiativeId: number;
+  sources: PropertyDefinitionRead[];
+  /** The initiative's metadata, one of which a name may already be. */
+  metadata: PropertyDefinitionRead[];
+  onClose: () => void;
+  onPromoted: () => void;
+}) => {
+  const { t } = useTranslation(PROPERTY_NAMESPACES);
+  const promote = usePromoteProperties();
+  const [name, setName] = useState("");
+  const first = sources[0];
+  useEffect(() => {
+    if (open) setName(first?.name ?? "");
+  }, [open, first]);
+  const trimmed = name.trim();
+  const same = metadata.find(
+    (definition) => definition.name.toLocaleLowerCase() === trimmed.toLocaleLowerCase()
+  );
+  const fits =
+    same === undefined || (same.type === first?.type && same.currency === first?.currency);
+
+  const handleSubmit = async () => {
+    try {
+      await promote.mutateAsync({
+        initiative_id: initiativeId,
+        ids: sources.map((source) => source.id),
+        name: trimmed,
+      });
+      toast.success(t("properties:manager.promoted", { name: trimmed }));
+      onPromoted();
     } catch {
       // Error toast handled by the mutation hook.
     }
   };
 
-  const newButton = canManage ? (
-    <Button onClick={handleOpenCreate}>
-      <Plus className="h-4 w-4" />
-      {t(words.create)}
-    </Button>
-  ) : null;
-  const list: ReactNode = propertiesQuery.isLoading ? (
-    <div className="flex items-center gap-2 text-muted-foreground text-sm">
-      <Loader2 className="h-4 w-4 animate-spin" />
-      {t("common:loading")}
-    </div>
-  ) : sortedDefinitions.length === 0 ? (
-    <p className="text-muted-foreground text-sm">{t(words.none)}</p>
-  ) : (
+  return (
+    <Dialog
+      open={open}
+      onOpenChange={(next) => {
+        if (!next) onClose();
+      }}
+    >
+      <DialogContent className="sm:max-w-lg">
+        <DialogHeader>
+          <DialogTitle>{t("properties:manager.promote")}</DialogTitle>
+          <DialogDescription>
+            {t("properties:manager.promoteBody", { count: sources.length })}
+          </DialogDescription>
+        </DialogHeader>
+        <div className="space-y-2">
+          <Label htmlFor="promote-name">{t("properties:manager.nameLabel")}</Label>
+          <Input
+            id="promote-name"
+            value={name}
+            maxLength={100}
+            onChange={(event) => setName(event.target.value)}
+            autoFocus
+          />
+          {same !== undefined ? (
+            <p className={fits ? "text-muted-foreground text-sm" : "text-destructive text-sm"}>
+              {fits
+                ? t("properties:manager.promoteInto", { name: same.name })
+                : t("properties:manager.promoteTaken")}
+            </p>
+          ) : null}
+        </div>
+        <DialogFooter>
+          <Button type="button" variant="outline" onClick={onClose}>
+            {t("common:cancel")}
+          </Button>
+          <Button
+            type="button"
+            onClick={() => void handleSubmit()}
+            disabled={!trimmed || !fits || promote.isPending}
+          >
+            {promote.isPending ? t("common:submitting") : t("properties:manager.promote")}
+          </Button>
+        </DialogFooter>
+      </DialogContent>
+    </Dialog>
+  );
+};
+
+/** Whether `definition` is a project's or a collection's property. */
+const isToolProperty = (definition: PropertyDefinitionRead) =>
+  definition.project_id !== null || definition.collection_id !== null;
+
+/**
+ * Initiative settings › Metadata: the initiative's metadata, then each of its
+ * projects' and collections' properties under the owner's name. It lists what
+ * the server lists, which is only the properties of the tools the reader may
+ * edit, and offers what each group's `can_edit` allows: editing one,
+ * reordering, deleting several at once, and promoting properties of one type
+ * into one of the initiative's metadata. A project's or a collection's
+ * properties are made in its layout editor; the initiative's metadata here.
+ */
+export const InitiativeSettingsPropertiesTab = ({ initiativeId }: { initiativeId: number }) => {
+  const { t } = useTranslation(PROPERTY_NAMESPACES);
+  const groupsQuery = usePropertyGroups(initiativeId);
+  const updateMutation = useUpdateProperty();
+  const deleteMany = useDeleteProperties();
+
+  const [editing, setEditing] = useState<{ definition?: PropertyDefinitionRead } | null>(null);
+  const [deleteTarget, setDeleteTarget] = useState<PropertyDefinitionRead | null>(null);
+  const [selected, setSelected] = useState<ReadonlySet<number>>(() => new Set());
+  const [askingDelete, setAskingDelete] = useState(false);
+  const [promoting, setPromoting] = useState(false);
+  const [moving, setMoving] = useState(false);
+
+  const groups = groupsQuery.data?.groups ?? [];
+  const metadataGroup = groups.find((group) => group.owner === "initiative");
+  const toolGroups = groups.filter((group) => group.owner !== "initiative");
+  // What is selected, of what is still listed.
+  const chosen = groups.flatMap((group) =>
+    group.definitions.filter((definition) => selected.has(definition.id))
+  );
+  const promotable =
+    chosen.length > 0 &&
+    chosen.every(
+      (definition) =>
+        isToolProperty(definition) &&
+        definition.type === chosen[0].type &&
+        definition.currency === chosen[0].currency
+    );
+
+  const toggle = (id: number, on: boolean) =>
+    setSelected((prev) => {
+      const next = new Set(prev);
+      if (on) next.add(id);
+      else next.delete(id);
+      return next;
+    });
+
+  /** Move one of a group's a place up or down, numbering each in the order
+   *  shown. */
+  const move = async (definitions: PropertyDefinitionRead[], index: number, by: -1 | 1) => {
+    const order = [...definitions];
+    const [moved] = order.splice(index, 1);
+    order.splice(index + by, 0, moved);
+    setMoving(true);
+    try {
+      await Promise.all(
+        order.flatMap((definition, position) =>
+          definition.position === position
+            ? []
+            : [updateMutation.mutateAsync({ propertyId: definition.id, data: { position } })]
+        )
+      );
+    } catch {
+      // Error toast handled by the mutation hook.
+    } finally {
+      setMoving(false);
+    }
+  };
+
+  const handleDeleteSelected = async () => {
+    try {
+      await deleteMany.mutateAsync({
+        initiative_id: initiativeId,
+        ids: chosen.map((definition) => definition.id),
+      });
+      toast.success(t("properties:manager.bulkDeleted", { count: chosen.length }));
+      setSelected(new Set());
+      setAskingDelete(false);
+    } catch {
+      // Error toast handled by the mutation hook.
+    }
+  };
+
+  const table = ({ definitions, can_edit: canEdit }: PropertyDefinitionGroup) => (
     <div className="overflow-x-auto">
       <Table>
         <TableHeader>
           <TableRow>
+            {canEdit ? <TableHead className="w-10" /> : null}
             <TableHead>{t("properties:manager.nameLabel")}</TableHead>
             <TableHead>{t("properties:manager.typeLabel")}</TableHead>
             <TableHead>{t("properties:manager.optionsLabel")}</TableHead>
             <TableHead>{t("properties:manager.colorLabel")}</TableHead>
-            {canManage ? <TableHead className="w-40 text-right" /> : null}
+            {canEdit ? <TableHead className="w-40 text-right" /> : null}
           </TableRow>
         </TableHeader>
         <TableBody>
-          {sortedDefinitions.map((definition, index) => {
+          {definitions.map((definition, index) => {
             const optionCount = definition.options?.length ?? 0;
             const Icon = iconForPropertyType(definition.type);
+            const words = propertyWords(definition);
             return (
               <TableRow key={definition.id}>
+                {canEdit ? (
+                  <TableCell>
+                    <Checkbox
+                      checked={selected.has(definition.id)}
+                      onCheckedChange={(checked) => toggle(definition.id, checked === true)}
+                      aria-label={t("properties:manager.select", { name: definition.name })}
+                    />
+                  </TableCell>
+                ) : null}
                 <TableCell className="font-medium">{definition.name}</TableCell>
                 <TableCell>
                   <span className="inline-flex items-center gap-2">
@@ -433,14 +700,14 @@ export const InitiativeSettingsPropertiesTab = ({
                     "—"
                   )}
                 </TableCell>
-                {canManage ? (
+                {canEdit ? (
                   <TableCell className="text-right">
                     <div className="inline-flex items-center gap-1">
                       <Button
                         type="button"
                         variant="ghost"
                         size="icon-sm"
-                        onClick={() => void move(index, -1)}
+                        onClick={() => void move(definitions, index, -1)}
                         disabled={moving || index === 0}
                         aria-label={t("properties:manager.moveUp", { name: definition.name })}
                       >
@@ -450,8 +717,8 @@ export const InitiativeSettingsPropertiesTab = ({
                         type="button"
                         variant="ghost"
                         size="icon-sm"
-                        onClick={() => void move(index, 1)}
-                        disabled={moving || index === sortedDefinitions.length - 1}
+                        onClick={() => void move(definitions, index, 1)}
+                        disabled={moving || index === definitions.length - 1}
                         aria-label={t("properties:manager.moveDown", { name: definition.name })}
                       >
                         <ArrowDown className="h-4 w-4" />
@@ -460,7 +727,7 @@ export const InitiativeSettingsPropertiesTab = ({
                         type="button"
                         variant="ghost"
                         size="icon-sm"
-                        onClick={() => handleOpenEdit(definition)}
+                        onClick={() => setEditing({ definition })}
                         aria-label={t(words.edit)}
                       >
                         <Pencil className="h-4 w-4" />
@@ -485,142 +752,134 @@ export const InitiativeSettingsPropertiesTab = ({
     </div>
   );
 
+  if (groupsQuery.isLoading) {
+    return (
+      <div className="flex items-center gap-2 text-muted-foreground text-sm">
+        <Loader2 className="h-4 w-4 animate-spin" />
+        {t("common:loading")}
+      </div>
+    );
+  }
+
   return (
     <div className="space-y-6">
-      {/* A collection's metadata is managed in a dialog of its own, which is
-          the frame a card would be. */}
-      {owner?.kind !== "collection" ? (
-        <Card>
-          <CardHeader className="flex flex-row items-start justify-between gap-4">
-            <div>
-              <CardDescription>{t(words.description)}</CardDescription>
-            </div>
-            {newButton}
-          </CardHeader>
-          <CardContent>{list}</CardContent>
-        </Card>
-      ) : (
-        <div className="space-y-4">
-          <div className="flex flex-wrap items-start justify-between gap-4">
-            <p className="text-muted-foreground text-sm">{t(words.description)}</p>
-            {newButton}
-          </div>
-          {list}
+      {chosen.length > 0 ? (
+        <div
+          role="toolbar"
+          aria-label={t("properties:manager.selected", { count: chosen.length })}
+          className="flex flex-wrap items-center gap-2 rounded-md border bg-muted/40 p-2"
+        >
+          <span className="px-1 font-medium text-sm">
+            {t("properties:manager.selected", { count: chosen.length })}
+          </span>
+          <Button
+            type="button"
+            variant="outline"
+            size="sm"
+            disabled={!promotable}
+            onClick={() => setPromoting(true)}
+          >
+            <ArrowUpToLine className="h-4 w-4" />
+            {t("properties:manager.promote")}
+          </Button>
+          <Button
+            type="button"
+            variant="destructive"
+            size="sm"
+            onClick={() => setAskingDelete(true)}
+          >
+            <Trash2 className="h-4 w-4" />
+            {t("common:delete")}
+          </Button>
+          <Button type="button" variant="ghost" size="sm" onClick={() => setSelected(new Set())}>
+            {t("common:clear")}
+          </Button>
+          {!promotable ? (
+            <p className="basis-full px-1 text-muted-foreground text-xs">
+              {t("properties:manager.promoteHint")}
+            </p>
+          ) : null}
         </div>
-      )}
+      ) : null}
 
-      <Dialog
-        open={dialogState !== null}
-        onOpenChange={(next) => {
-          if (!next) handleCloseDialog();
-        }}
-      >
-        <DialogContent className="sm:max-w-xl">
-          <DialogHeader>
-            <DialogTitle>{isEditing ? t(words.edit) : t(words.create)}</DialogTitle>
-            <DialogDescription>{t(words.description)}</DialogDescription>
-          </DialogHeader>
+      {metadataGroup ? (
+        <Card>
+          <CardHeader className="flex flex-row flex-wrap items-start justify-between gap-4">
+            <CardDescription>{t("properties:manager.description")}</CardDescription>
+            {metadataGroup.can_edit ? (
+              <Button onClick={() => setEditing({})}>
+                <Plus className="h-4 w-4" />
+                {t("properties:manager.newDefinition")}
+              </Button>
+            ) : null}
+          </CardHeader>
+          <CardContent>
+            {metadataGroup.definitions.length === 0 ? (
+              <p className="text-muted-foreground text-sm">{t("properties:noMetadata")}</p>
+            ) : (
+              table(metadataGroup)
+            )}
+          </CardContent>
+        </Card>
+      ) : null}
 
-          <div className="space-y-4">
-            <div className="space-y-2">
-              <Label htmlFor="property-manager-name">{t("properties:manager.nameLabel")}</Label>
-              <Input
-                id="property-manager-name"
-                value={formState.name}
-                onChange={(e) => setFormState((prev) => ({ ...prev, name: e.target.value }))}
-                autoFocus
-              />
-            </div>
-
-            <div className="space-y-2">
-              <Label htmlFor="property-manager-type">{t("properties:manager.typeLabel")}</Label>
-              <Select
-                value={formState.type}
-                onValueChange={(next) => handleTypeChange(next as MetadataType)}
-                disabled={isEditing}
+      <Card>
+        <CardHeader>
+          <CardTitle className="text-base">{t("properties:manager.toolsTitle")}</CardTitle>
+          <CardDescription>{t("properties:manager.toolsDescription")}</CardDescription>
+        </CardHeader>
+        <CardContent className="space-y-6">
+          {toolGroups.length === 0 ? (
+            <p className="text-muted-foreground text-sm">{t("properties:manager.noTools")}</p>
+          ) : (
+            toolGroups.map((group) => (
+              <section
+                key={`${group.owner}:${group.owner_id}`}
+                aria-label={group.name ?? undefined}
+                className="space-y-2"
               >
-                <SelectTrigger id="property-manager-type">
-                  <div className="flex min-w-0 items-center gap-2">
-                    {(() => {
-                      const Icon = iconForPropertyType(formState.type);
-                      return <Icon className="h-4 w-4 shrink-0" />;
-                    })()}
-                    <span className="truncate">{t(`properties:types.${formState.type}`)}</span>
-                  </div>
-                </SelectTrigger>
-                <SelectContent>
-                  {PROPERTY_TYPES.map((type) => {
-                    const Icon = iconForPropertyType(type);
-                    const label = t(`properties:types.${type}`);
-                    return (
-                      <SelectItem key={type} value={type} textValue={label}>
-                        <div className="flex items-center gap-2">
-                          <Icon className="h-4 w-4 shrink-0" />
-                          <span>{label}</span>
-                        </div>
-                      </SelectItem>
-                    );
-                  })}
-                </SelectContent>
-              </Select>
-            </div>
+                <h3 className="flex flex-wrap items-center gap-2 font-medium text-sm">
+                  {group.name}
+                  <Badge variant="secondary">
+                    {t(`properties:manager.owner.${group.owner as "project" | "collection"}`)}
+                  </Badge>
+                </h3>
+                {table(group)}
+              </section>
+            ))
+          )}
+        </CardContent>
+      </Card>
 
-            {formState.type === MetadataType.currency ? (
-              <div className="space-y-2">
-                <Label>{t("properties:currency.label")}</Label>
-                <CurrencySelect
-                  value={formState.currency}
-                  onChange={(currency) => setFormState((prev) => ({ ...prev, currency }))}
-                />
-              </div>
-            ) : null}
-
-            <div className="space-y-2">
-              <Label>{t("properties:manager.colorLabel")}</Label>
-              <ColorPickerPopover
-                value={formState.color ?? DEFAULT_COLOR}
-                onChangeComplete={(value) => setFormState((prev) => ({ ...prev, color: value }))}
-              />
-            </div>
-
-            {typeRequiresOptions(formState.type) ? (
-              <div className="space-y-2">
-                <Label>{t("properties:manager.optionsLabel")}</Label>
-                <OptionListEditor
-                  options={formState.options}
-                  onChange={(next) => setFormState((prev) => ({ ...prev, options: next }))}
-                />
-              </div>
-            ) : null}
-          </div>
-
-          <DialogFooter>
-            <Button type="button" variant="outline" onClick={handleCloseDialog}>
-              {t("common:cancel")}
-            </Button>
-            <Button
-              type="button"
-              onClick={() => void handleSubmit()}
-              disabled={!canSubmit || submitting}
-            >
-              {submitting ? t("common:submitting") : t("common:save")}
-            </Button>
-          </DialogFooter>
-        </DialogContent>
-      </Dialog>
-
+      <PropertyDialog
+        open={editing !== null}
+        definition={editing?.definition}
+        initiativeId={initiativeId}
+        position={metadataGroup?.definitions.length ?? 0}
+        onClose={() => setEditing(null)}
+      />
+      <PropertyDeleteDialog definition={deleteTarget} onClose={() => setDeleteTarget(null)} />
       <ConfirmDialog
-        open={deleteTarget !== null}
-        onOpenChange={(next) => {
-          if (!next) setDeleteTarget(null);
-        }}
-        title={t(words.deleteTitle)}
-        description={t(words.deleteBody)}
-        confirmLabel={t(words.delete)}
+        open={askingDelete}
+        onOpenChange={setAskingDelete}
+        title={t("properties:manager.bulkDeleteTitle", { count: chosen.length })}
+        description={t("properties:manager.bulkDeleteBody")}
+        confirmLabel={t("common:delete")}
         cancelLabel={t("common:cancel")}
-        onConfirm={() => void handleConfirmDelete()}
-        isLoading={deleteMutation.isPending}
+        onConfirm={() => void handleDeleteSelected()}
+        isLoading={deleteMany.isPending}
         destructive
+      />
+      <PromoteDialog
+        open={promoting}
+        initiativeId={initiativeId}
+        sources={promotable ? chosen : []}
+        metadata={metadataGroup?.definitions ?? []}
+        onClose={() => setPromoting(false)}
+        onPromoted={() => {
+          setPromoting(false);
+          setSelected(new Set());
+        }}
       />
     </div>
   );

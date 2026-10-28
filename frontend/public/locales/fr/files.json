@@ -466,14 +466,11 @@
     "noAccessDescription": "Vous n’avez pas la permission de voir cette collection.",
     "error": "Impossible de modifier la collection",
     "properties": {
-      "title": "Propriétés",
       "description": "Ce que chaque fichier de cette collection peut porter ici : ses valeurs appartiennent à la collection, pas au fichier.",
-      "create": "Nouvelle propriété",
       "edit": "Modifier la propriété",
       "delete": "Supprimer la propriété",
       "deleteTitle": "Supprimer cette propriété ?",
       "deleteBody": "La propriété et la valeur de chaque fichier dans cette collection seront supprimées.",
-      "none": "Aucune propriété pour l'instant",
       "heading": "Dans cette collection",
       "saveError": "Impossible d'enregistrer la valeur",
       "of": "Propriétés de {{name}}"

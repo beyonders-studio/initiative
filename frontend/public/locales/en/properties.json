@@ -86,7 +86,31 @@
     "deleteError": "Couldn't delete it",
     "setValuesError": "Couldn't save the value",
     "moveUp": "Move {{name}} up",
-    "moveDown": "Move {{name}} down"
+    "moveDown": "Move {{name}} down",
+    "toolsTitle": "Project and collection properties",
+    "toolsDescription": "Each project's and collection's own properties that you may edit. They're also made, edited and deleted in its layout editor.",
+    "noTools": "No properties you can edit",
+    "owner": {
+      "project": "Project",
+      "collection": "Collection"
+    },
+    "select": "Select {{name}}",
+    "selected_one": "{{count}} selected",
+    "selected_other": "{{count}} selected",
+    "promote": "Promote to metadata",
+    "promoteBody_one": "It becomes metadata of this initiative, on everything in it. Its values move across, every layout that shows it shows the metadata instead, and it is deleted.",
+    "promoteBody_other": "They become one metadata field of this initiative, on everything in it. Their values move across, every layout that shows one shows the metadata instead, and they are deleted. Where something holds values of several, the most recently changed one is kept.",
+    "promoteInto": "Merges into the metadata “{{name}}”, which is of the same type.",
+    "promoteTaken": "This initiative already has metadata of this name, of another type.",
+    "promoteHint": "Select properties of one type to promote them to metadata.",
+    "promoted": "Promoted to “{{name}}”",
+    "promoteError": "Couldn't promote them",
+    "bulkDeleteTitle_one": "Delete {{count}} field?",
+    "bulkDeleteTitle_other": "Delete {{count}} fields?",
+    "bulkDeleteBody": "Each goes with every value set for it.",
+    "bulkDeleted_one": "Deleted {{count}} field",
+    "bulkDeleted_other": "Deleted {{count}} fields",
+    "bulkDeleteError": "Couldn't delete them"
   },
   "filter": {
     "addFilter": "Add filter",

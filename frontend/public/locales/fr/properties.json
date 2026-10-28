@@ -86,7 +86,31 @@
     "deleteError": "Impossible de le supprimer",
     "setValuesError": "Impossible d'enregistrer la valeur",
     "moveUp": "Monter {{name}}",
-    "moveDown": "Descendre {{name}}"
+    "moveDown": "Descendre {{name}}",
+    "toolsTitle": "Propriétés des projets et des collections",
+    "toolsDescription": "Les propriétés propres à chaque projet et collection que vous pouvez modifier. Elles se créent, se modifient et se suppriment aussi dans leur éditeur de mise en page.",
+    "noTools": "Aucune propriété que vous pouvez modifier",
+    "owner": {
+      "project": "Projet",
+      "collection": "Collection"
+    },
+    "select": "Sélectionner {{name}}",
+    "selected_one": "{{count}} sélectionné",
+    "selected_other": "{{count}} sélectionnés",
+    "promote": "Transformer en métadonnée",
+    "promoteBody_one": "Elle devient une métadonnée de cette initiative, sur tout ce qu'elle contient. Ses valeurs sont reprises, chaque mise en page qui l'affiche affiche la métadonnée à sa place, et elle est supprimée.",
+    "promoteBody_other": "Elles deviennent une seule métadonnée de cette initiative, sur tout ce qu'elle contient. Leurs valeurs sont reprises, chaque mise en page qui en affiche une affiche la métadonnée à sa place, et elles sont supprimées. Si un élément a des valeurs de plusieurs, la plus récemment modifiée est conservée.",
+    "promoteInto": "Fusionne avec la métadonnée « {{name}} », qui est du même type.",
+    "promoteTaken": "Cette initiative a déjà une métadonnée de ce nom, d'un autre type.",
+    "promoteHint": "Sélectionnez des propriétés d'un même type pour les transformer en métadonnée.",
+    "promoted": "Transformé en « {{name}} »",
+    "promoteError": "Impossible de les transformer",
+    "bulkDeleteTitle_one": "Supprimer {{count}} champ ?",
+    "bulkDeleteTitle_other": "Supprimer {{count}} champs ?",
+    "bulkDeleteBody": "Chacun est supprimé avec toutes ses valeurs.",
+    "bulkDeleted_one": "{{count}} champ supprimé",
+    "bulkDeleted_other": "{{count}} champs supprimés",
+    "bulkDeleteError": "Impossible de les supprimer"
   },
   "filter": {
     "addFilter": "Ajouter un filtre",

@@ -254,7 +254,7 @@ export const LayoutEditor = ({
   presets,
   set,
   initialKind,
-  actions,
+  ownPropertiesEditable = false,
   onClose,
 }: {
   target: GetLayoutsParams;
@@ -270,9 +270,9 @@ export const LayoutEditor = ({
   set: ToolLayoutSetRead;
   /** The layout to open on: a list's kind, or the task's detail. */
   initialKind?: string;
-  /** What else the target offers from the top bar: a collection's
-   *  metadata. */
-  actions?: ReactNode;
+  /** Whether the request may edit the target's own properties, the
+   *  project's or the collection's: the server's answer on it. */
+  ownPropertiesEditable?: boolean;
   onClose: () => void;
 }) => {
   const { t, i18n } = useTranslation(["projects", "layouts", "common"]);
@@ -341,6 +341,8 @@ export const LayoutEditor = ({
   // collection's files'.
   const owner: MetadataOwner | undefined =
     lists?.owner ?? (project ? { kind: "project", id: project.id } : undefined);
+  // The owner whose properties a selected field edits and deletes here.
+  const ownProperties = ownPropertiesEditable ? owner : undefined;
   const { data: definitions = NO_DEFINITIONS } = useOwnedDefinitions({
     initiativeId,
     owner: project ? owner : undefined,
@@ -667,7 +669,6 @@ export const LayoutEditor = ({
             </SelectContent>
           </Select>
           <div className="flex-1" />
-          {actions}
           <ToggleGroup
             type="single"
             value={width}
@@ -782,6 +783,7 @@ export const LayoutEditor = ({
                 selection={selection}
                 edits={edits}
                 locked={saving}
+                ownProperties={ownProperties}
               />
             </aside>
           </div>
@@ -831,6 +833,7 @@ export const LayoutEditor = ({
                 selection={selection}
                 edits={edits}
                 locked={saving}
+                ownProperties={ownProperties}
               />
             </aside>
           </div>

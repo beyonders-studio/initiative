@@ -148,6 +148,8 @@
   "PROPERTY_OPTIONS_REQUIRED": "Une sélection ou une sélection multiple a besoin d'au moins une option",
   "PROPERTY_DUPLICATE_OPTION_VALUE": "Chaque option a besoin de sa propre valeur",
   "PROPERTY_CURRENCY_REQUIRED": "Un montant a besoin d'une devise",
+  "PROPERTY_PROMOTE_TYPES_DIFFER": "Seules des propriétés d'un même type, et des montants dans une même devise, fusionnent en une métadonnée",
+  "PROPERTY_PROMOTE_VALUE_NOT_EDITABLE": "Certaines de ces valeurs sont sur des éléments que vous ne pouvez pas modifier",
   "ATTACHMENT_IMAGE_ONLY": "Seules les images peuvent être importées",
   "ATTACHMENT_INVALID_IMAGE": "Impossible de valider le contenu de l'image",
   "FILE_NAME_ALREADY_EXISTS": "Un fichier avec ce titre existe déjà dans cette initiative",

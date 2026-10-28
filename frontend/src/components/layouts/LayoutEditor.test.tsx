@@ -89,6 +89,7 @@ const editor = (kind: string, onClose = vi.fn(), set = buildToolLayoutSet(), cal
         presets={calendar ? CALENDAR_PRESETS : PROJECT_PRESETS}
         set={read}
         initialKind={kind}
+        ownPropertiesEditable={!calendar}
         onClose={onClose}
       />
     ) : null;
@@ -237,6 +238,54 @@ describe("LayoutEditor", () => {
 
     await waitFor(() => expect(sent).toHaveLength(1));
     expect(saved("table")?.columns).toContain("property:14");
+  });
+
+  it("edits and deletes the project's property from its field, and leaves metadata to settings", async () => {
+    const changed: Array<{ id: string; body: unknown }> = [];
+    const deleted: string[] = [];
+    server.use(
+      definitionsHandler([buildPropertyDefinition({ id: 12, name: "Effort" })], {
+        project: [buildPropertyDefinition({ id: 14, name: "Sprint", project_id: 1 })],
+      }),
+      communityHttp.patch("/property-definitions/:id", async ({ params, request }) => {
+        changed.push({ id: String(params.id), body: await request.json() });
+        return HttpResponse.json({
+          definition: buildPropertyDefinition({ id: 14, name: "Iteration", project_id: 1 }),
+          orphaned_value_count: 0,
+        });
+      }),
+      communityHttp.delete("/property-definitions/:id", ({ params }) => {
+        deleted.push(String(params.id));
+        return new HttpResponse(null, { status: 204 });
+      })
+    );
+    const { user } = editor("table");
+
+    await user.click(await within(await outline()).findByRole("button", { name: /^add$/i }));
+    await user.click(await screen.findByRole("button", { name: "Sprint" }));
+    // What was added is selected, and its settings edit the property itself.
+    await user.click(await screen.findByRole("button", { name: "Edit property" }));
+    const dialog = await screen.findByRole("dialog", { name: "Edit property" });
+    const name = within(dialog).getByRole("textbox", { name: "Name" });
+    await user.clear(name);
+    await user.type(name, "Iteration");
+    await user.click(within(dialog).getByRole("button", { name: /^save$/i }));
+    await waitFor(() => expect(changed).toHaveLength(1));
+    expect(changed[0]).toMatchObject({ id: "14", body: { name: "Iteration" } });
+
+    await user.click(screen.getByRole("button", { name: "Delete property" }));
+    const confirm = await screen.findByRole("alertdialog");
+    expect(within(confirm).getByText("Delete this property?")).toBeInTheDocument();
+    await user.click(within(confirm).getByRole("button", { name: "Delete property" }));
+    await waitFor(() => expect(deleted).toEqual(["14"]));
+
+    // The initiative's metadata is placed here and edited in its settings.
+    await user.click(within(await outline()).getByRole("button", { name: /^add$/i }));
+    await user.click(await screen.findByRole("button", { name: "Effort" }));
+    expect(
+      await screen.findByRole("link", { name: "Open initiative settings" })
+    ).toBeInTheDocument();
+    expect(screen.queryByRole("button", { name: "Edit property" })).not.toBeInTheDocument();
   });
 
   it("makes a new field the project's property, or the initiative's metadata if asked", async () => {

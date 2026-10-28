@@ -172,6 +172,8 @@ class MetadataOwnerKind(str, Enum):
 class PropertyDefinitionGroup(SanitizedBaseModel):
     """One owner's definitions, as the initiative's settings list them."""
 
+    model_config = ConfigDict(json_schema_serialization_defaults_required=True)
+
     owner: MetadataOwnerKind
     #: The project's or the collection's id; none for the initiative.
     owner_id: Optional[int] = None

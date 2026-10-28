@@ -3,7 +3,10 @@ import { useMemo } from "react";
 import { useTranslation } from "react-i18next";
 
 import type {
+  PropertyDefinitionBulkDelete,
   PropertyDefinitionCreate,
+  PropertyDefinitionGroups,
+  PropertyDefinitionPromote,
   PropertyDefinitionRead,
   PropertyDefinitionUpdate,
   PropertyDefinitionUpdateResponse,
@@ -14,8 +17,12 @@ import { PropertyTarget } from "@/api/generated/initiativeAPI.schemas";
 import {
   createPropertyDefinition,
   deletePropertyDefinition,
+  deletePropertyDefinitions,
+  getListPropertyDefinitionsByOwnerQueryKey,
   getListPropertyDefinitionsQueryKey,
   listPropertyDefinitions,
+  listPropertyDefinitionsByOwner,
+  promotePropertyDefinitions,
   updatePropertyDefinition,
 } from "@/api/generated/property-definitions/property-definitions";
 import { invalidate, q } from "@/api/query-keys";
@@ -69,6 +76,21 @@ export const useProperties = (options?: {
     queryKey: getListPropertyDefinitionsQueryKey(communityId, hasParams ? params : undefined),
     queryFn: () => listPropertyDefinitions(communityId, hasParams ? params : undefined),
     enabled: options?.enabled ?? true,
+    staleTime: 60 * 1000,
+  });
+};
+
+/**
+ * An initiative's metadata, then the properties of each of its projects and
+ * collections the reader may edit, each under its owner: what the server
+ * lists, and only that.
+ */
+export const usePropertyGroups = (initiativeId: number) => {
+  const communityId = useActiveCommunityId();
+  const params = { initiative_id: initiativeId };
+  return useQuery<PropertyDefinitionGroups>({
+    queryKey: getListPropertyDefinitionsByOwnerQueryKey(communityId, params),
+    queryFn: () => listPropertyDefinitionsByOwner(communityId, params),
     staleTime: 60 * 1000,
   });
 };
@@ -151,6 +173,32 @@ export const useDeleteProperty = (options?: MutationOpts<void, number>) =>
       mutationFn: (communityId, propertyId) => deletePropertyDefinition(communityId, propertyId),
       invalidate: () => invalidate(q.allProperties(), q.allPropertyHolders(), q.allCollections()),
       errorKey: "properties:manager.deleteError",
+    },
+    options
+  );
+
+/** Delete several definitions of one initiative at once, or none. */
+export const useDeleteProperties = (options?: MutationOpts<void, PropertyDefinitionBulkDelete>) =>
+  useCommunityMutation<void, PropertyDefinitionBulkDelete>(
+    {
+      mutationFn: (communityId, data) => deletePropertyDefinitions(communityId, data),
+      invalidate: () => invalidate(q.allProperties(), q.allPropertyHolders(), q.allCollections()),
+      errorKey: "properties:manager.bulkDeleteError",
+    },
+    options
+  );
+
+/** Merge properties of one type into one of the initiative's metadata. Their
+ *  values and the layouts that show them move with them. */
+export const usePromoteProperties = (
+  options?: MutationOpts<PropertyDefinitionRead, PropertyDefinitionPromote>
+) =>
+  useCommunityMutation<PropertyDefinitionRead, PropertyDefinitionPromote>(
+    {
+      mutationFn: (communityId, data) => promotePropertyDefinitions(communityId, data),
+      invalidate: () =>
+        invalidate(q.allProperties(), q.allPropertyHolders(), q.allCollections(), q.layouts()),
+      errorKey: "properties:manager.promoteError",
     },
     options
   );

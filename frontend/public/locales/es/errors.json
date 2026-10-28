@@ -148,6 +148,8 @@
   "PROPERTY_OPTIONS_REQUIRED": "Una selección o selección múltiple necesita al menos una opción",
   "PROPERTY_DUPLICATE_OPTION_VALUE": "Cada opción necesita un valor propio",
   "PROPERTY_CURRENCY_REQUIRED": "Un importe necesita una moneda",
+  "PROPERTY_PROMOTE_TYPES_DIFFER": "Solo las propiedades de un mismo tipo, y el dinero en una misma moneda, se combinan en un campo de metadatos",
+  "PROPERTY_PROMOTE_VALUE_NOT_EDITABLE": "Algunos de estos valores están en elementos que no puedes editar",
   "ATTACHMENT_IMAGE_ONLY": "Solo se admiten cargas de imágenes",
   "ATTACHMENT_INVALID_IMAGE": "No se pudo validar el contenido de la imagen",
   "FILE_NAME_ALREADY_EXISTS": "Ya existe un archivo con este título en esta iniciativa",

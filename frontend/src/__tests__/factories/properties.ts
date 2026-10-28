@@ -1,5 +1,6 @@
 import {
   MetadataType,
+  type PropertyDefinitionGroup,
   type PropertyDefinitionRead,
   type PropertyOption,
   type PropertySummary,
@@ -28,6 +29,21 @@ export function buildPropertyDefinition(
     collection_id: null,
     created_at: "2026-04-22T00:00:00.000Z",
     updated_at: "2026-04-22T00:00:00.000Z",
+    ...overrides,
+  };
+}
+
+/** One owner's definitions, as the initiative's settings list them: the
+ *  initiative's metadata unless an owner is given. */
+export function buildPropertyGroup(
+  overrides: Partial<PropertyDefinitionGroup> = {}
+): PropertyDefinitionGroup {
+  return {
+    owner: "initiative",
+    owner_id: null,
+    name: null,
+    can_edit: true,
+    definitions: [],
     ...overrides,
   };
 }

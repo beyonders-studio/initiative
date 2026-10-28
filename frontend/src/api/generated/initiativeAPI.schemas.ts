@@ -9741,8 +9741,8 @@ export interface PropertyDefinitionCreate {
  */
 export interface PropertyDefinitionGroup {
   owner: MetadataOwnerKind;
-  owner_id?: number | null;
-  name?: string | null;
+  owner_id: number | null;
+  name: string | null;
   can_edit: boolean;
   definitions: PropertyDefinitionRead[];
 }

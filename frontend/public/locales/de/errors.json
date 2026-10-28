@@ -150,6 +150,8 @@
   "PROPERTY_OPTIONS_REQUIRED": "Eine Einfach- oder Mehrfachauswahl braucht mindestens eine Option",
   "PROPERTY_DUPLICATE_OPTION_VALUE": "Jede Option braucht einen eigenen Wert",
   "PROPERTY_CURRENCY_REQUIRED": "Ein Geldbetrag braucht eine Währung",
+  "PROPERTY_PROMOTE_TYPES_DIFFER": "Nur Eigenschaften eines Typs, und Geldbeträge in einer Währung, lassen sich zu einem Metadatenfeld zusammenführen",
+  "PROPERTY_PROMOTE_VALUE_NOT_EDITABLE": "Einige dieser Werte stehen an Elementen, die du nicht bearbeiten kannst",
   "ATTACHMENT_IMAGE_ONLY": "Es werden nur Bild-Uploads unterstützt",
   "ATTACHMENT_INVALID_IMAGE": "Bildinhalt konnte nicht validiert werden",
   "FILE_NAME_ALREADY_EXISTS": "Eine Datei mit diesem Titel existiert bereits in dieser Initiative",

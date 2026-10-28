@@ -289,5 +289,11 @@
     "number": "A number",
     "stars": "Stars",
     "bar": "A bar"
+  },
+  "fieldProperty": {
+    "property": "Property",
+    "metadata": "Metadata",
+    "metadataHelp": "This is the initiative's metadata, which is edited in its settings.",
+    "openSettings": "Open initiative settings"
   }
 }

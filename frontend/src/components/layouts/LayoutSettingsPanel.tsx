@@ -1,4 +1,5 @@
-import { EyeClosed } from "lucide-react";
+import { Link } from "@tanstack/react-router";
+import { EyeClosed, Pencil, Trash2 } from "lucide-react";
 import { type ReactNode, useEffect, useRef, useState } from "react";
 import { useTranslation } from "react-i18next";
 
@@ -7,6 +8,11 @@ import {
   type TaskStatusRead,
   type TaskTypeRead,
 } from "@/api/generated/initiativeAPI.schemas";
+import {
+  PropertyDeleteDialog,
+  PropertyDialog,
+  propertyWords,
+} from "@/components/initiatives/settings/InitiativeSettingsPropertiesTab";
 import { listLayoutLooks } from "@/components/projects/projectTasksConfig";
 import { SCALE_DISPLAYS, type ScaleDisplay } from "@/components/properties/propertyHelpers";
 import { TaskStatusOption } from "@/components/tasks/TaskStatusOption";
@@ -22,6 +28,8 @@ import {
 } from "@/components/ui/select";
 import { Switch } from "@/components/ui/switch";
 import { MAX_COLUMN_LIMIT } from "@/hooks/useColumnLimits";
+import type { MetadataOwner } from "@/hooks/useProperties";
+import { useCommunityPath } from "@/lib/communityUrl";
 import { LAYOUT_REGIONS } from "@/lib/layouts/detailLayout";
 import {
   cardOf,
@@ -34,6 +42,7 @@ import {
 } from "@/lib/layouts/draft";
 import { type FieldDef, LAYOUT_NAMESPACES } from "@/lib/layouts/fields";
 import type { LayoutNode } from "@/lib/layouts/tree";
+import { initiativeRoute } from "@/lib/tools";
 import type { TranslateFn } from "@/types/i18n";
 
 import type { EditableDetail } from "./details";
@@ -59,6 +68,7 @@ export const ListLayoutSettings = ({
   selection,
   edits,
   locked,
+  ownProperties,
 }: {
   layout: ListLayout;
   /** The presets it offers, and the groupings with them; a list of files
@@ -80,6 +90,8 @@ export const ListLayoutSettings = ({
   edits: LayoutEdits;
   /** A save is under way, and nothing changes until it answers. */
   locked: boolean;
+  /** The owner whose properties a selected field edits and deletes here. */
+  ownProperties?: MetadataOwner;
 }) => {
   const { t } = useTranslation(LAYOUT_NAMESPACES);
   const translate = t as TranslateFn;
@@ -159,7 +171,75 @@ export const ListLayoutSettings = ({
           onChange={(display) => edits.changeDisplay(scale, display)}
         />
       ) : null}
+      {selectedField !== null ? (
+        <PropertySettings field={selectedField} fields={fields} ownProperties={ownProperties} />
+      ) : null}
     </fieldset>
+  );
+};
+
+/**
+ * The property or metadata a selected field shows. The layout's own
+ * project's or collection's property is edited and deleted here, where the
+ * request may; the initiative's metadata is edited in its settings, which
+ * this links to.
+ */
+const PropertySettings = ({
+  field,
+  fields,
+  ownProperties,
+}: {
+  field: string;
+  fields: ReadonlyMap<string, FieldDef>;
+  ownProperties?: MetadataOwner;
+}) => {
+  const { t } = useTranslation(["layouts", "properties", "projects", "files"]);
+  const gp = useCommunityPath();
+  const [editing, setEditing] = useState(false);
+  const [deleting, setDeleting] = useState(false);
+  const definition = fields.get(field)?.property;
+  if (!definition) return null;
+  if (definition.project_id === null && definition.collection_id === null) {
+    return (
+      <Panel heading={t("layouts:fieldProperty.metadata")}>
+        <p className="text-muted-foreground text-sm">{t("layouts:fieldProperty.metadataHelp")}</p>
+        <Button type="button" variant="outline" size="sm" asChild>
+          <Link to={gp(`${initiativeRoute(definition.initiative_id)}/settings/properties`)}>
+            {t("layouts:fieldProperty.openSettings")}
+          </Link>
+        </Button>
+      </Panel>
+    );
+  }
+  const own =
+    ownProperties !== undefined &&
+    (ownProperties.kind === "project" ? definition.project_id : definition.collection_id) ===
+      ownProperties.id;
+  if (!own) return null;
+  const words = propertyWords(definition);
+  return (
+    <Panel heading={t("layouts:fieldProperty.property")}>
+      <div className="flex flex-wrap gap-2">
+        <Button type="button" variant="outline" size="sm" onClick={() => setEditing(true)}>
+          <Pencil className="h-4 w-4" aria-hidden="true" />
+          {t(words.edit)}
+        </Button>
+        <Button type="button" variant="outline" size="sm" onClick={() => setDeleting(true)}>
+          <Trash2 className="h-4 w-4" aria-hidden="true" />
+          {t(words.delete)}
+        </Button>
+      </div>
+      <PropertyDialog
+        open={editing}
+        definition={definition}
+        initiativeId={definition.initiative_id}
+        onClose={() => setEditing(false)}
+      />
+      <PropertyDeleteDialog
+        definition={deleting ? definition : null}
+        onClose={() => setDeleting(false)}
+      />
+    </Panel>
   );
 };
 
@@ -297,6 +377,7 @@ export const DetailLayoutSettings = ({
   selection,
   edits,
   locked,
+  ownProperties,
 }: {
   /** The detail as one tree: the layout, holding its header, main and side. */
   detail: LayoutNode;
@@ -307,13 +388,25 @@ export const DetailLayoutSettings = ({
   selection: Selection;
   edits: LayoutEdits;
   locked: boolean;
+  /** The owner whose properties a selected field edits and deletes here. */
+  ownProperties?: MetadataOwner;
 }) => {
   const { t } = useTranslation(LAYOUT_NAMESPACES);
   const translate = t as TranslateFn;
+  const node = selection.kind === "part" ? nodeAt(detail, selection.path) : undefined;
   return (
     <fieldset disabled={locked} className="min-w-0">
       {selection.kind === "part" ? (
-        <PartSettings tree={detail} path={selection.path} fields={fields} edits={edits} on={of} />
+        <>
+          <PartSettings tree={detail} path={selection.path} fields={fields} edits={edits} on={of} />
+          {node?.type === "field" ? (
+            <PropertySettings
+              field={String(node.props?.field)}
+              fields={fields}
+              ownProperties={ownProperties}
+            />
+          ) : null}
+        </>
       ) : (
         <Panel heading={translate(of.words.name)}>
           <p className="text-muted-foreground text-sm">{translate(of.words.help)}</p>

@@ -466,14 +466,11 @@
     "noAccessDescription": "No tienes permiso para ver esta colección.",
     "error": "No se pudo cambiar la colección",
     "properties": {
-      "title": "Propiedades",
       "description": "Lo que cada archivo de esta colección puede tener aquí: sus valores pertenecen a la colección, no al archivo.",
-      "create": "Nueva propiedad",
       "edit": "Editar propiedad",
       "delete": "Eliminar propiedad",
       "deleteTitle": "¿Eliminar esta propiedad?",
       "deleteBody": "Se eliminarán la propiedad y el valor que cada archivo tenga en esta colección.",
-      "none": "Aún no hay propiedades",
       "heading": "En esta colección",
       "saveError": "No se pudo guardar el valor",
       "of": "Propiedades de {{name}}"

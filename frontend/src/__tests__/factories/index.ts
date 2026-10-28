@@ -57,6 +57,7 @@ export {
 } from "./project.factory";
 export {
   buildPropertyDefinition,
+  buildPropertyGroup,
   buildPropertyOption,
   buildPropertySummary,
   resetCounter as resetPropertyCounter,
