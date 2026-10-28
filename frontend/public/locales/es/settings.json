@@ -375,7 +375,9 @@
       "cases": "Casos",
       "direct_messages": "Mensajes y contactos",
       "jobs": "Exportaciones e importaciones",
-      "account": "Tu cuenta"
+      "account": "Tu cuenta",
+      "overdue": "Tareas vencidas",
+      "coming_up": "Próximamente"
     },
     "reminderLeadTime": {
       "label": "Recordarme",
@@ -399,11 +401,12 @@
     "groups": {
       "your_communities": "En tus comunidades",
       "community": "Te necesita",
-      "account": "Solo tú"
+      "account": "Solo tú",
+      "digests": "Resúmenes"
     },
     "categoryDescriptions": {
       "mentions": "Alguien te nombró, te respondió o reaccionó a tu comentario.",
-      "assignments": "Te dieron una tarea o te invitaron a algo, o aquello en lo que estás vence, cambió, se canceló o está por empezar.",
+      "assignments": "Te dieron una tarea o te invitaron a algo, o aquello en lo que estás cambió, se canceló o está por empezar.",
       "subscriptions": "Cambios, comentarios y reacciones en lo que sigues, incluido lo que creaste. La campana de cualquier elemento lo detiene.",
       "news": "Se publicó algo, te añadieron a una iniciativa o a un proyecto, o respondieron a tu solicitud para unirte.",
       "approvals": "Alguien espera tu decisión. Siempre aparece en la campana.",
@@ -411,7 +414,9 @@
       "cases": "Se abrió un caso donde atiendes casos, o quien lo presentó respondió y nadie lo ha tomado.",
       "direct_messages": "Alguien te escribió, pidió conectar o aceptó. Quién y cuántos, nunca lo que dice un mensaje.",
       "jobs": "Terminó una exportación o importación que pediste.",
-      "account": "Se hizo algo con tu cuenta. Siempre aparece en la campana."
+      "account": "Se hizo algo con tu cuenta. Siempre aparece en la campana.",
+      "overdue": "Todas las tareas asignadas a ti que ya pasaron su fecha de vencimiento, en un solo mensaje.",
+      "coming_up": "Tareas que vencen y eventos que empiezan antes del próximo resumen, en un solo mensaje."
     },
     "quietHours": {
       "title": "Horas de silencio",
@@ -431,19 +436,15 @@
       "offHere": "Desactivado aquí: {{rows}}"
     },
     "timing": {
-      "title": "Cuándo te enteras",
-      "description": "El correo puede llegar al instante o agrupado. Solo se retiene lo que hayas pedido retener.",
       "cadence": {
         "label": "El correo llega",
         "instant": "Al instante",
         "hourly": "Una vez por hora",
         "daily": "Una vez al día",
-        "weekly": "Una vez por semana",
-        "help": "Todo lo retenido llega en un solo mensaje."
+        "weekly": "Una vez por semana"
       },
       "day": "El",
       "time": "A las",
-      "timeHelp": "Tu correo programado, y el recordatorio de tareas vencidas, salen a esta hora.",
       "personalInstant": "Enviar al instante lo dirigido a mí",
       "personalInstantHelp": "Menciones, respuestas, tareas asignadas, invitaciones y mensajes directos se saltan la cola.",
       "respectPresence": "No me interrumpas mientras uso Initiative",
@@ -468,6 +469,16 @@
       "saveError": "No se pudo actualizar cuándo te enteras",
       "zone": "Las horas están en {{timezone}}.",
       "changeZone": "Cambiar zona horaria"
+    },
+    "digests": {
+      "title": "Resúmenes",
+      "description": "Resúmenes programados. Todo lo que incluyen ya está en tu campana.",
+      "frequency": "Con qué frecuencia",
+      "daily": "Cada día",
+      "weekly": "Cada semana",
+      "gatheredEmail": "Correo agrupado",
+      "gatheredEmailHelp": "El correo de las filas de arriba llega al momento o agrupado en un solo mensaje.",
+      "afterPause": "Cuando termina una pausa o las horas de silencio, también recibes un resumen de lo que llegó."
     },
     "weekdays": {
       "1": "lunes",

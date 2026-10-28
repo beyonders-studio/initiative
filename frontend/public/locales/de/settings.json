@@ -375,7 +375,9 @@
       "cases": "Fälle",
       "direct_messages": "Nachrichten und Kontakte",
       "jobs": "Exporte und Importe",
-      "account": "Dein Konto"
+      "account": "Dein Konto",
+      "overdue": "Überfällige Aufgaben",
+      "coming_up": "Demnächst"
     },
     "reminderLeadTime": {
       "label": "Erinnere mich",
@@ -399,11 +401,12 @@
     "groups": {
       "your_communities": "In deinen Communities",
       "community": "Braucht dich",
-      "account": "Nur du"
+      "account": "Nur du",
+      "digests": "Zusammenfassungen"
     },
     "categoryDescriptions": {
       "mentions": "Jemand hat dich genannt, dir geantwortet oder auf deinen Kommentar reagiert.",
-      "assignments": "Du hast eine Aufgabe bekommen oder wurdest zu etwas eingeladen, oder woran du beteiligt bist, ist fällig, hat sich geändert, wurde abgesagt oder beginnt gleich.",
+      "assignments": "Du hast eine Aufgabe bekommen oder wurdest zu etwas eingeladen, oder woran du beteiligt bist, hat sich geändert, wurde abgesagt oder beginnt gleich.",
       "subscriptions": "Änderungen, Kommentare und Reaktionen an dem, was du verfolgst, auch an dem, was du erstellt hast. Die Glocke an jedem Eintrag stellt es ab.",
       "news": "Ein Beitrag wurde veröffentlicht, du wurdest zu einer Initiative oder einem Projekt hinzugefügt, oder deine Beitrittsanfrage wurde beantwortet.",
       "approvals": "Jemand wartet auf deine Entscheidung. Erscheint immer in der Glocke.",
@@ -411,7 +414,9 @@
       "cases": "Ein Fall wurde dort eröffnet, wo du Fälle bearbeitest, oder seine anfragende Person hat geantwortet und niemand hat ihn übernommen.",
       "direct_messages": "Jemand hat dir geschrieben, möchte sich vernetzen oder hat angenommen. Wer und wie viele, nie der Inhalt einer Nachricht.",
       "jobs": "Ein Export oder Import, den du angefordert hast, ist fertig.",
-      "account": "An deinem Konto wurde etwas geändert. Erscheint immer in der Glocke."
+      "account": "An deinem Konto wurde etwas geändert. Erscheint immer in der Glocke.",
+      "overdue": "Alle dir zugewiesenen Aufgaben, deren Fälligkeit verstrichen ist, in einer Nachricht.",
+      "coming_up": "Fällige Aufgaben und beginnende Termine bis zur nächsten Zusammenfassung, in einer Nachricht."
     },
     "quietHours": {
       "title": "Ruhezeiten",
@@ -431,19 +436,15 @@
       "offHere": "Hier aus: {{rows}}"
     },
     "timing": {
-      "title": "Wann du davon erfährst",
-      "description": "E-Mails können sofort oder gesammelt ankommen. Zurückgehalten wird nur, worum du gebeten hast.",
       "cadence": {
         "label": "E-Mail kommt",
         "instant": "Sofort",
         "hourly": "Einmal pro Stunde",
         "daily": "Einmal pro Tag",
-        "weekly": "Einmal pro Woche",
-        "help": "Alles Zurückgehaltene kommt in einer Nachricht."
+        "weekly": "Einmal pro Woche"
       },
       "day": "Am",
       "time": "Um",
-      "timeHelp": "Deine geplante E-Mail und die Erinnerung an überfällige Aufgaben gehen zu dieser Zeit raus.",
       "personalInstant": "An mich gerichtetes sofort senden",
       "personalInstantHelp": "Erwähnungen, Antworten, dir zugewiesene Aufgaben, Einladungen und Direktnachrichten überspringen die Warteschlange.",
       "respectPresence": "Nicht stören, während ich Initiative nutze",
@@ -468,6 +469,16 @@
       "saveError": "Einstellung konnte nicht gespeichert werden",
       "zone": "Zeiten gelten für {{timezone}}.",
       "changeZone": "Zeitzone ändern"
+    },
+    "digests": {
+      "title": "Zusammenfassungen",
+      "description": "Zusammenfassungen nach Zeitplan. Alles darin steht schon in deiner Glocke.",
+      "frequency": "Wie oft",
+      "daily": "Jeden Tag",
+      "weekly": "Jede Woche",
+      "gatheredEmail": "Gesammelte E-Mails",
+      "gatheredEmailHelp": "E-Mails zu den Zeilen oben kommen sofort oder gesammelt in einer Nachricht.",
+      "afterPause": "Endet eine Pause oder die Ruhezeit, bekommst du außerdem eine Zusammenfassung dessen, was eingegangen ist."
     },
     "weekdays": {
       "1": "Montag",

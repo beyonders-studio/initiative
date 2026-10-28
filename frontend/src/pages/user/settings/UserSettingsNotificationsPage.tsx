@@ -7,8 +7,11 @@ import {
   CategoryGroup,
   type Channel,
   type CommunityNotificationSettings,
+  type DigestCadence,
+  type DigestScheduleInput,
   type EmailCadence,
   type EmailScheduleInput,
+  type NotificationCategory,
   type NotificationCategoryRead,
   type NotificationPreferencesUpdate,
   type UserRead,
@@ -46,8 +49,9 @@ const DEFAULT_REMINDER_MINUTES = 15;
 
 // The order the sections appear in, which is the registry's own. The registry
 // says which group each category belongs to, so a category added to the
-// backend lands in one of these without this file changing.
-const GROUP_ORDER = Object.values(CategoryGroup);
+// backend lands in one of these without this file changing. Digests have a
+// section of their own, with a schedule beside each.
+const GROUP_ORDER = Object.values(CategoryGroup).filter((group) => group !== CategoryGroup.digests);
 
 // Every channel, in column order.
 const CHANNELS: Channel[] = ["in_app", "email", "push", "desktop"];
@@ -62,6 +66,9 @@ const CHANNEL_ICONS: Record<Channel, LucideIcon> = {
 
 // How often email may arrive, in the order the control offers them.
 const CADENCES: EmailCadence[] = ["instant", "hourly", "daily", "weekly"];
+
+// How often a digest goes out.
+const DIGEST_CADENCES: DigestCadence[] = ["daily", "weekly"];
 
 const WEEKDAYS = [1, 2, 3, 4, 5, 6, 7] as const;
 
@@ -139,6 +146,21 @@ export const UserSettingsNotificationsPage = ({
       },
     });
 
+  // Each digest's schedule is written whole too, and on its own.
+  const writeDigest = (category: NotificationCategory, patch: Partial<DigestScheduleInput>) => {
+    const current = preferences?.digests?.[category];
+    writeTiming({
+      digests: {
+        [category]: {
+          cadence: current?.cadence ?? "daily",
+          at: current?.at ?? "21:00",
+          weekday: current?.weekday ?? 1,
+          ...patch,
+        },
+      },
+    });
+  };
+
   const pause = () => {
     if (!pauseUntilDay) return;
     writePreferences.mutate(
@@ -176,6 +198,10 @@ export const UserSettingsNotificationsPage = ({
   }, [preferences?.categories]);
 
   const visibleChannels = CHANNELS.filter((channel) => channel !== "push" || showPushColumn);
+
+  const digestRows = (preferences?.categories ?? []).filter(
+    (row) => row.group === CategoryGroup.digests
+  );
 
   // The rows each community can switch off on its own.
   const communityRows = grouped.flatMap((section) =>
@@ -383,82 +409,203 @@ export const UserSettingsNotificationsPage = ({
       </SettingsSection>
 
       <SettingsSection
-        title={t("notifications.timing.title")}
-        description={t("notifications.timing.description")}
+        title={t("notifications.digests.title")}
+        description={t("notifications.digests.description")}
       >
-        <div className="grid grid-cols-fill-48/3 gap-4">
-          <div className="space-y-2">
-            <Label htmlFor="email-cadence">{t("notifications.timing.cadence.label")}</Label>
-            <Select
-              value={schedule?.cadence ?? "instant"}
-              onValueChange={(value) => writeEmail({ cadence: value as EmailCadence })}
-            >
-              <SelectTrigger id="email-cadence">
-                <SelectValue />
-              </SelectTrigger>
-              <SelectContent>
-                {CADENCES.map((cadence) => (
-                  <SelectItem key={cadence} value={cadence}>
-                    {t(`notifications.timing.cadence.${cadence}`)}
-                  </SelectItem>
-                ))}
-              </SelectContent>
-            </Select>
+        {digestRows.map((row) => {
+          const digest = preferences?.digests?.[row.category];
+          const name = t(`notifications.categories.${row.category}`);
+          return (
+            <div key={row.category} className="space-y-3 border-b pb-4">
+              <div className="flex flex-wrap items-start justify-between gap-4">
+                <div>
+                  <p className="font-medium">{name}</p>
+                  <p className="text-muted-foreground text-sm">
+                    {t(`notifications.categoryDescriptions.${row.category}`)}
+                  </p>
+                </div>
+                <div className="flex gap-4">
+                  {visibleChannels
+                    .filter((channel) => row.mutable_channels.includes(channel))
+                    .map((channel) => {
+                      const Icon = CHANNEL_ICONS[channel];
+                      return (
+                        <div key={channel} className="flex flex-col items-center gap-2">
+                          <span
+                            className="flex items-center gap-1.5 text-muted-foreground text-xs"
+                            aria-hidden
+                          >
+                            <Icon className="size-3.5" />
+                            {t(`notifications.channels.${channel}`)}
+                          </span>
+                          <Switch
+                            checked={isOn(row, channel)}
+                            disabled={writePreferences.isPending}
+                            aria-label={t("notifications.switchLabel", {
+                              category: name,
+                              channel: t(`notifications.channels.${channel}`),
+                            })}
+                            onCheckedChange={(enabled) =>
+                              writeSwitch({
+                                channels: [{ category: row.category, channel, enabled }],
+                              })
+                            }
+                          />
+                        </div>
+                      );
+                    })}
+                </div>
+              </div>
+              <div className="grid grid-cols-fill-48/3 gap-4">
+                <div className="space-y-2">
+                  <Label htmlFor={`${row.category}-cadence`}>
+                    {t("notifications.digests.frequency")}
+                  </Label>
+                  <Select
+                    value={digest?.cadence ?? "daily"}
+                    onValueChange={(value) =>
+                      writeDigest(row.category, { cadence: value as DigestCadence })
+                    }
+                  >
+                    <SelectTrigger id={`${row.category}-cadence`}>
+                      <SelectValue />
+                    </SelectTrigger>
+                    <SelectContent>
+                      {DIGEST_CADENCES.map((cadence) => (
+                        <SelectItem key={cadence} value={cadence}>
+                          {t(`notifications.digests.${cadence}`)}
+                        </SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                </div>
+                {digest?.cadence === "weekly" && (
+                  <div className="space-y-2">
+                    <Label htmlFor={`${row.category}-weekday`}>
+                      {t("notifications.timing.day")}
+                    </Label>
+                    <Select
+                      value={String(digest.weekday)}
+                      onValueChange={(value) =>
+                        writeDigest(row.category, { weekday: Number(value) })
+                      }
+                    >
+                      <SelectTrigger id={`${row.category}-weekday`}>
+                        <SelectValue />
+                      </SelectTrigger>
+                      <SelectContent>
+                        {WEEKDAYS.map((day) => (
+                          <SelectItem key={day} value={String(day)}>
+                            {t(`notifications.weekdays.${day}`)}
+                          </SelectItem>
+                        ))}
+                      </SelectContent>
+                    </Select>
+                  </div>
+                )}
+                <div className="space-y-2">
+                  <Label htmlFor={`${row.category}-time`}>{t("notifications.timing.time")}</Label>
+                  <Input
+                    key={digest?.at}
+                    id={`${row.category}-time`}
+                    type="time"
+                    defaultValue={digest?.at}
+                    onBlur={(event) => {
+                      if (event.target.value && event.target.value !== digest?.at) {
+                        writeDigest(row.category, { at: event.target.value });
+                      }
+                    }}
+                  />
+                </div>
+              </div>
+            </div>
+          );
+        })}
+
+        <div className="space-y-3">
+          <div>
+            <p className="font-medium">{t("notifications.digests.gatheredEmail")}</p>
+            <p className="text-muted-foreground text-sm">
+              {t("notifications.digests.gatheredEmailHelp")}
+            </p>
           </div>
-          {schedule?.cadence === "weekly" && (
+          <div className="grid grid-cols-fill-48/3 gap-4">
             <div className="space-y-2">
-              <Label htmlFor="email-weekday">{t("notifications.timing.day")}</Label>
+              <Label htmlFor="email-cadence">{t("notifications.timing.cadence.label")}</Label>
               <Select
-                value={String(schedule?.weekday ?? 1)}
-                onValueChange={(value) => writeEmail({ weekday: Number(value) })}
+                value={schedule?.cadence ?? "instant"}
+                onValueChange={(value) => writeEmail({ cadence: value as EmailCadence })}
               >
-                <SelectTrigger id="email-weekday">
+                <SelectTrigger id="email-cadence">
                   <SelectValue />
                 </SelectTrigger>
                 <SelectContent>
-                  {WEEKDAYS.map((day) => (
-                    <SelectItem key={day} value={String(day)}>
-                      {t(`notifications.weekdays.${day}`)}
+                  {CADENCES.map((cadence) => (
+                    <SelectItem key={cadence} value={cadence}>
+                      {t(`notifications.timing.cadence.${cadence}`)}
                     </SelectItem>
                   ))}
                 </SelectContent>
               </Select>
             </div>
-          )}
-          <div className="space-y-2">
-            <Label htmlFor="email-time">{t("notifications.timing.time")}</Label>
-            <Input
-              id="email-time"
-              type="time"
-              defaultValue={schedule?.at ?? "21:00"}
-              onBlur={(event) => {
-                if (event.target.value && event.target.value !== schedule?.at) {
-                  writeEmail({ at: event.target.value });
-                }
-              }}
-            />
+            {schedule?.cadence === "weekly" && (
+              <div className="space-y-2">
+                <Label htmlFor="email-weekday">{t("notifications.timing.day")}</Label>
+                <Select
+                  value={String(schedule.weekday)}
+                  onValueChange={(value) => writeEmail({ weekday: Number(value) })}
+                >
+                  <SelectTrigger id="email-weekday">
+                    <SelectValue />
+                  </SelectTrigger>
+                  <SelectContent>
+                    {WEEKDAYS.map((day) => (
+                      <SelectItem key={day} value={String(day)}>
+                        {t(`notifications.weekdays.${day}`)}
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              </div>
+            )}
+            {(schedule?.cadence === "daily" || schedule?.cadence === "weekly") && (
+              <div className="space-y-2">
+                <Label htmlFor="email-time">{t("notifications.timing.time")}</Label>
+                <Input
+                  key={schedule.at}
+                  id="email-time"
+                  type="time"
+                  defaultValue={schedule.at}
+                  onBlur={(event) => {
+                    if (event.target.value && event.target.value !== schedule.at) {
+                      writeEmail({ at: event.target.value });
+                    }
+                  }}
+                />
+              </div>
+            )}
           </div>
+          {schedule && schedule.cadence !== "instant" && (
+            <SettingsRow
+              label={t("notifications.timing.personalInstant")}
+              description={t("notifications.timing.personalInstantHelp")}
+            >
+              <Switch
+                checked={schedule.personal_instant}
+                aria-label={t("notifications.timing.personalInstant")}
+                onCheckedChange={(personal_instant) => writeEmail({ personal_instant })}
+              />
+            </SettingsRow>
+          )}
         </div>
+
         <p className="text-muted-foreground text-xs">
-          {t("notifications.timing.cadence.help")} {t("notifications.timing.timeHelp")}{" "}
+          {t("notifications.digests.afterPause")}{" "}
           {t("notifications.timing.zone", { timezone: user.timezone ?? "UTC" })}{" "}
           <Link to="/profile/interface" className="underline underline-offset-2">
             {t("notifications.timing.changeZone")}
           </Link>
         </p>
-
-        {schedule && schedule.cadence !== "instant" && (
-          <SettingsRow
-            label={t("notifications.timing.personalInstant")}
-            description={t("notifications.timing.personalInstantHelp")}
-          >
-            <Switch
-              checked={schedule.personal_instant}
-              aria-label={t("notifications.timing.personalInstant")}
-              onCheckedChange={(personal_instant) => writeEmail({ personal_instant })}
-            />
-          </SettingsRow>
-        )}
       </SettingsSection>
 
       <SettingsSection title={t("notifications.quietTitle")}>

@@ -16,6 +16,8 @@ const EVERY_CHANNEL: Channel[] = ["in_app", "email", "push", "desktop"];
 // Being told your account was acted on, or that a queue waits on you, is not
 // an opt-in — the bell stays.
 const KEEPS_THE_BELL: Channel[] = ["email", "push", "desktop"];
+// A digest is a letter and a ping, with no line of its own.
+const DIGEST: Channel[] = ["email", "push"];
 
 const category = (
   name: string,
@@ -61,10 +63,20 @@ export const buildNotificationPreferences = (
       community_scoped: false,
       mutable_channels: KEEPS_THE_BELL,
     }),
+    category("overdue", "digests", { community_scoped: false, mutable_channels: DIGEST }),
+    category("coming_up", "digests", {
+      community_scoped: false,
+      mutable_channels: DIGEST,
+      defaults: { ...ALL_ON, email: false, push: false },
+    }),
   ],
   settings: {},
   quiet_hours: null,
   email: { cadence: "instant", at: "21:00", weekday: 1, personal_instant: true },
+  digests: {
+    overdue: { cadence: "daily", at: "21:00", weekday: 1 },
+    coming_up: { cadence: "daily", at: "07:00", weekday: 1 },
+  },
   pause: null,
   respect_presence: true,
   communities: [],

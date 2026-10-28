@@ -2490,6 +2490,7 @@ export const CategoryGroup = {
   your_communities: "your_communities",
   community: "community",
   account: "account",
+  digests: "digests",
 } as const;
 
 /**
@@ -3703,6 +3704,8 @@ export const NotificationCategory = {
   direct_messages: "direct_messages",
   jobs: "jobs",
   account: "account",
+  overdue: "overdue",
+  coming_up: "coming_up",
 } as const;
 
 export interface CommunityNotificationSettings {
@@ -5562,6 +5565,44 @@ export interface DetailLayoutWrite {
   kind: DetailLayoutWriteKind;
   task_type_id?: number | null;
   definition: DetailLayoutDefinitionInput;
+}
+
+/**
+ * How often one digest goes out. Each digest keeps its own, apart from
+ * the email's: a summary is read at a time of day, which is not when the
+ * rest of the mail arrives.
+ */
+export type DigestCadence = (typeof DigestCadence)[keyof typeof DigestCadence];
+
+export const DigestCadence = {
+  daily: "daily",
+  weekly: "weekly",
+} as const;
+
+/**
+ * When one digest goes out.
+ */
+export interface DigestScheduleInput {
+  cadence?: DigestCadence;
+  at: string;
+  /**
+   * @minimum 1
+   * @maximum 7
+   */
+  weekday?: number;
+}
+
+/**
+ * When one digest goes out.
+ */
+export interface DigestScheduleOutput {
+  cadence: DigestCadence;
+  at: string;
+  /**
+   * @minimum 1
+   * @maximum 7
+   */
+  weekday: number;
 }
 
 /**
@@ -8105,6 +8146,7 @@ export type NotificationType = (typeof NotificationType)[keyof typeof Notificati
 export const NotificationType = {
   task_assignment: "task_assignment",
   overdue_tasks: "overdue_tasks",
+  coming_up: "coming_up",
   initiative_added: "initiative_added",
   initiative_join_requested: "initiative_join_requested",
   initiative_join_approved: "initiative_join_approved",
@@ -8256,6 +8298,7 @@ export interface NotificationPreferencesRead {
   settings: NotificationPreferencesReadSettings;
   quiet_hours: QuietHours | null;
   email: EmailScheduleOutput;
+  digests: Partial<Record<NotificationCategory, DigestScheduleOutput>>;
   pause: PauseRead | null;
   respect_presence: boolean;
   communities: CommunityNotificationSettings[];
@@ -8274,6 +8317,7 @@ export interface NotificationPreferencesUpdate {
   quiet_hours?: QuietHours | null;
   clear_quiet_hours?: boolean;
   email?: EmailScheduleInput | null;
+  digests?: Partial<Record<NotificationCategory, DigestScheduleInput>>;
   pause_from?: string | null;
   pause_until?: string | null;
   clear_pause?: boolean;

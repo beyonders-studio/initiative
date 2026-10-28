@@ -375,7 +375,9 @@
       "cases": "Dossiers",
       "direct_messages": "Messages et contacts",
       "jobs": "Exports et imports",
-      "account": "Votre compte"
+      "account": "Votre compte",
+      "overdue": "Tâches en retard",
+      "coming_up": "À venir"
     },
     "reminderLeadTime": {
       "label": "Me rappeler",
@@ -399,11 +401,12 @@
     "groups": {
       "your_communities": "Dans vos communautés",
       "community": "A besoin de vous",
-      "account": "Vous uniquement"
+      "account": "Vous uniquement",
+      "digests": "Résumés"
     },
     "categoryDescriptions": {
       "mentions": "Quelqu'un vous a nommé, vous a répondu ou a réagi à votre commentaire.",
-      "assignments": "On vous a confié une tâche ou invité à quelque chose, ou ce dont vous faites partie arrive à échéance, a changé, a été annulé ou va commencer.",
+      "assignments": "On vous a confié une tâche ou invité à quelque chose, ou ce dont vous faites partie a changé, a été annulé ou va commencer.",
       "subscriptions": "Les modifications, commentaires et réactions sur ce que vous suivez, y compris ce que vous avez créé. La cloche sur chaque élément l'arrête.",
       "news": "Une annonce a été publiée, vous avez été ajouté à une initiative ou à un projet, ou votre demande d'adhésion a reçu une réponse.",
       "approvals": "Quelqu'un attend votre décision. Toujours visible dans la cloche.",
@@ -411,7 +414,9 @@
       "cases": "Un dossier a été ouvert là où vous traitez les dossiers, ou la personne qui l'a soumis a répondu et personne ne l'a pris.",
       "direct_messages": "Quelqu'un vous a écrit, a demandé à se connecter ou a accepté. Qui et combien, jamais le contenu d'un message.",
       "jobs": "Un export ou import que vous avez demandé est terminé.",
-      "account": "Quelque chose a été fait sur votre compte. Toujours visible dans la cloche."
+      "account": "Quelque chose a été fait sur votre compte. Toujours visible dans la cloche.",
+      "overdue": "Toutes les tâches qui vous sont assignées et dont l’échéance est passée, en un seul message.",
+      "coming_up": "Les tâches à échéance et les événements qui commencent avant le prochain résumé, en un seul message."
     },
     "quietHours": {
       "title": "Heures calmes",
@@ -431,19 +436,15 @@
       "offHere": "Désactivé ici : {{rows}}"
     },
     "timing": {
-      "title": "Quand vous êtes prévenu",
-      "description": "Les e-mails peuvent arriver aussitôt ou groupés. Rien n'est retenu sans que vous l'ayez demandé.",
       "cadence": {
         "label": "L'e-mail arrive",
         "instant": "Tout de suite",
         "hourly": "Une fois par heure",
         "daily": "Une fois par jour",
-        "weekly": "Une fois par semaine",
-        "help": "Tout ce qui est retenu arrive en un seul message."
+        "weekly": "Une fois par semaine"
       },
       "day": "Le",
       "time": "À",
-      "timeHelp": "Votre e-mail programmé, et le rappel des tâches en retard, partent à cette heure.",
       "personalInstant": "Envoyer tout de suite ce qui m'est adressé",
       "personalInstantHelp": "Mentions, réponses, tâches qui vous sont assignées, invitations et messages directs passent devant.",
       "respectPresence": "Ne pas me déranger pendant que j'utilise Initiative",
@@ -468,6 +469,16 @@
       "saveError": "Impossible de mettre à jour quand vous êtes prévenu",
       "zone": "Les heures sont celles du fuseau {{timezone}}.",
       "changeZone": "Changer de fuseau horaire"
+    },
+    "digests": {
+      "title": "Résumés",
+      "description": "Des résumés à heure fixe. Tout ce qu’ils contiennent est déjà dans votre cloche.",
+      "frequency": "Fréquence",
+      "daily": "Chaque jour",
+      "weekly": "Chaque semaine",
+      "gatheredEmail": "E-mails regroupés",
+      "gatheredEmailHelp": "Les e-mails des lignes ci-dessus arrivent tout de suite, ou regroupés en un seul message.",
+      "afterPause": "À la fin d’une pause ou des heures calmes, vous recevez aussi un résumé de ce qui est arrivé."
     },
     "weekdays": {
       "1": "lundi",

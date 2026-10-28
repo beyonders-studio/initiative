@@ -74,6 +74,57 @@ describe("UserSettingsNotificationsPage", () => {
     expect(await screen.findByText("At the time of the event")).toBeInTheDocument();
   });
 
+  describe("digests", () => {
+    const serve = () => {
+      const sent: NotificationPreferencesUpdate[] = [];
+      const preferences = buildNotificationPreferences();
+      server.use(
+        http.get("/api/v1/me/notification-preferences", () => HttpResponse.json(preferences)),
+        http.put("/api/v1/me/notification-preferences", async ({ request }) => {
+          sent.push((await request.json()) as NotificationPreferencesUpdate);
+          return HttpResponse.json(preferences);
+        })
+      );
+      return sent;
+    };
+
+    it("lists each digest apart from the grid, with no bell of its own", async () => {
+      serve();
+      renderPage();
+
+      expect(await screen.findByLabelText("Overdue tasks on Email")).toBeChecked();
+      // Asked for, never sent unbidden.
+      expect(screen.getByLabelText("Coming up on Email")).not.toBeChecked();
+      expect(screen.queryByLabelText("Overdue tasks on Bell")).not.toBeInTheDocument();
+    });
+
+    it("keeps a time for each digest, and writes the one that moved", async () => {
+      const user = userEvent.setup();
+      const sent = serve();
+      renderPage();
+
+      await screen.findByLabelText("Coming up on Email");
+      const time = document.getElementById("coming_up-time") as HTMLInputElement;
+      expect(time.value).toBe("07:00");
+      await user.clear(time);
+      await user.type(time, "06:30");
+      await user.tab();
+      await waitFor(() =>
+        expect(sent).toEqual([
+          { digests: { coming_up: { cadence: "daily", at: "06:30", weekday: 1 } } },
+        ])
+      );
+    });
+
+    it("asks for an email time only where email is gathered", async () => {
+      serve();
+      renderPage();
+
+      await screen.findByLabelText("Overdue tasks on Email");
+      expect(document.getElementById("email-time")).toBeNull();
+    });
+  });
+
   describe("per community", () => {
     const serve = (muted: boolean) => {
       const sent: NotificationPreferencesUpdate[] = [];
