@@ -512,7 +512,7 @@ async def test_delete_definition_cascades_to_values(
 
 
 # ---------------------------------------------------------------------------
-# A collection's own fields, ratings and money
+# A collection's own fields, scales and money
 # ---------------------------------------------------------------------------
 
 
@@ -533,7 +533,7 @@ async def test_a_collection_field_is_made_by_whoever_may_change_the_collection(
     )
     payload = {
         "name": "Rating",
-        "type": "rating",
+        "type": "scale",
         "initiative_id": owner.initiative.id,
         "collection_id": collection.id,
     }

@@ -188,11 +188,11 @@ def _fields_of(collection_id: Optional[int]) -> Any:
 
 #: The types whose value is ``value_number``.
 _NUMBER_TYPES = frozenset(
-    {PropertyType.number, PropertyType.currency, PropertyType.rating}
+    {PropertyType.number, PropertyType.currency, PropertyType.scale}
 )
 
-#: The range of a rating.
-RATING_RANGE = range(1, 101)
+#: The range of a scale.
+SCALE_RANGE = range(0, 101)
 
 
 # ---------------------------------------------------------------------------
@@ -233,8 +233,8 @@ def _coerce_number(raw: Any) -> Decimal:
     raise _bad_value()
 
 
-def _coerce_rating(raw: Any) -> Decimal:
-    if isinstance(raw, bool) or not isinstance(raw, int) or raw not in RATING_RANGE:
+def _coerce_scale(raw: Any) -> Decimal:
+    if isinstance(raw, bool) or not isinstance(raw, int) or raw not in SCALE_RANGE:
         raise _bad_value()
     return Decimal(raw)
 
@@ -358,8 +358,8 @@ def _validate_value_for_type(
         if not amount.is_finite():
             raise _bad_value()
         cols["value_number"] = amount
-    elif ptype is PropertyType.rating:
-        cols["value_number"] = _coerce_rating(raw_value)
+    elif ptype is PropertyType.scale:
+        cols["value_number"] = _coerce_scale(raw_value)
     elif ptype is PropertyType.checkbox:
         cols["value_boolean"] = _coerce_bool(raw_value)
     elif ptype is PropertyType.date:
@@ -762,7 +762,7 @@ def _rehydrate_value(
         return row.value_text
     if ptype in {PropertyType.number, PropertyType.currency}:
         return _number_to_json(row.value_number)
-    if ptype is PropertyType.rating:
+    if ptype is PropertyType.scale:
         return int(row.value_number) if row.value_number is not None else None
     if ptype is PropertyType.checkbox:
         return row.value_boolean

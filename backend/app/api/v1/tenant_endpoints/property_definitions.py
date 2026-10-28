@@ -235,7 +235,7 @@ async def create_property_definition(
     A property requires the caller to be in the target initiative (or a guild
     admin); an installed plug-in also needs ``properties:write``. A
     collection's field requires the right to change the collection (and
-    ``files:write`` of a plug-in). A rating is a collection's field only.
+    ``files:write`` of a plug-in).
     """
     _require_write_scope(guild_context, payload.collection_id)
     if payload.collection_id is None:

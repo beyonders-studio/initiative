@@ -409,7 +409,7 @@ def _check_list_fields(
 ) -> None:
     """Each built-in field a list shows one of what it lists. A collection's
     list holds whether it is shown and what it shows of each file — its table
-    its columns, its other lists a card — and how its ratings are drawn."""
+    its columns, its other lists a card — and how its scales are drawn."""
     cards = [definition.card] if definition.card is not None else []
     parts = [part for root in cards for part, _ in _parts(root, 1)]
     shown = [

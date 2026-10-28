@@ -358,7 +358,7 @@ async def test_a_collections_fields_are_written_with_the_files_scope(
         "initiative_id": installed.placed.id,
         "collection_id": collection_id,
         "name": "Score",
-        "type": "rating",
+        "type": "scale",
     }
 
     refused = await client.post(

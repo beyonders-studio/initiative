@@ -212,7 +212,7 @@ def decode_property_value(
     t = pv.property_type
     if t in (PropertyType.text, PropertyType.url, PropertyType.select):
         return {"value_text": pv.value_text}
-    if t in (PropertyType.number, PropertyType.currency, PropertyType.rating):
+    if t in (PropertyType.number, PropertyType.currency, PropertyType.scale):
         return {"value_number": pv.value_number}
     if t == PropertyType.checkbox:
         return {"value_boolean": pv.value_boolean}

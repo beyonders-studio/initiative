@@ -6,7 +6,7 @@ same type→field rules via its own pydantic model), so an import reads them all
 with one rule set:
 
 - text/url/select  → ``value_text``
-- number, currency, rating → ``value_number``, and a currency's code as
+- number, currency, scale → ``value_number``, and a currency's code as
   ``currency``
 - checkbox         → ``value_boolean``
 - date/datetime    → ``value_text`` (ISO 8601)
@@ -39,7 +39,7 @@ def property_export_dict(summary: PropertySummary) -> dict:
     record: dict = {"property_name": summary.name, "property_type": prop_type}
     if prop_type in ("text", "url", "select"):
         record["value_text"] = value
-    elif prop_type in ("number", "currency", "rating"):
+    elif prop_type in ("number", "currency", "scale"):
         record["value_number"] = float(value) if value is not None else None
     elif prop_type == "checkbox":
         record["value_boolean"] = value

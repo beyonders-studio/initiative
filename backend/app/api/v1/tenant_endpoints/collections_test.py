@@ -579,7 +579,7 @@ async def test_a_collection_made_as_a_shape_brings_its_fields_and_lists(
     fields = {field["name"]: field for field in created.json()["fields"]}
     assert {name: (f["type"], f["currency"]) for name, f in fields.items()} == {
         "Price": ("currency", "USD"),
-        "Rating": ("rating", None),
+        "Rating": ("scale", None),
     }
     price, rating = (f"property:{fields[name]['id']}" for name in ("Price", "Rating"))
 
@@ -686,14 +686,14 @@ async def test_a_file_maker_fills_a_collections_fields_without_editing_the_file(
         json={
             "values": [
                 {"property_id": price.id, "value": "19.99"},
-                {"property_id": rating.id, "value": 80},
+                {"property_id": rating.id, "value": 0},
             ]
         },
     )
     assert written.status_code == 200, written.text
     assert {(v["name"], v["value"], v["currency"]) for v in written.json()} == {
         ("Price", 19.99, "USD"),
-        ("Rating", 80, None),
+        ("Rating", 0, None),
     }
     out_of_range = await client.put(
         maker.g(path),

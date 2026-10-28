@@ -31,7 +31,7 @@ from typing import Annotated, Any, Dict, List, Literal, Optional, Union, get_arg
 
 from pydantic import AfterValidator, ConfigDict, Field, field_validator, model_validator
 
-from app.core.collection_shapes import RatingDisplay
+from app.core.collection_shapes import ScaleDisplay
 from app.core.tools import LAYOUT_KIND_TARGETS, Tool
 from app.models.tenant.task import TaskPriority, TaskStatusCategory
 from app.schemas.base import SanitizedBaseModel
@@ -607,9 +607,9 @@ class ListLayoutDefinition(_Strict):
     )
     #: Left out of the list's menu; none keeps what its tool ships.
     hidden: Optional[bool] = None
-    #: How each rating it shows is drawn, by the field's ``property:<id>``. A
-    #: rating with none is drawn as a number.
-    displays: Optional[Dict[PropertyFieldId, RatingDisplay]] = Field(
+    #: How each scale it shows is drawn, by the field's ``property:<id>``. A
+    #: scale with none is drawn as a number.
+    displays: Optional[Dict[PropertyFieldId, ScaleDisplay]] = Field(
         default=None, max_length=MAX_NODES
     )
 

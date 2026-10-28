@@ -47,9 +47,8 @@ class PropertyType(str, Enum):
     user_reference = "user_reference"
     #: An amount of money in the currency its definition names.
     currency = "currency"
-    #: 1 to 100, which a layout shows as a number, stars or a bar. Only a
-    #: collection's own fields are ratings.
-    rating = "rating"
+    #: 0 to 100, which a layout shows as a number, stars or a bar.
+    scale = "scale"
 
 
 class PropertyDefinition(CreatedByMixin, table=True):
