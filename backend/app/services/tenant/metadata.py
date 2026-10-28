@@ -91,6 +91,7 @@ from app.core.tools import (
 )
 from app.db import cohorts
 from app.db.advisory_locks import LockNamespace, advisory_lock
+from app.db.authorization import standing_arg
 from app.db.base import MODELS_BY_TABLE
 from app.db.guild_standing import GuildContext, InstallContext
 from app.db.initiative_rls import entity_tables, governing_path
@@ -128,7 +129,7 @@ from app.schemas.tenant.property import (
     PropertySummary,
     PropertyValueInput,
 )
-from app.services.tenant import named_people
+from app.services.tenant import named_people, tool_layouts
 
 
 _HTTP_URL_ADAPTER = TypeAdapter(AnyHttpUrl)
@@ -846,6 +847,139 @@ def _properties() -> Any:
         col(MetadataDefinition.collection_id).is_(None),
         col(MetadataDefinition.install_id).is_(None),
     )
+
+
+async def promote(
+    session: AsyncSession, sources: Sequence[MetadataDefinition], *, name: str
+) -> MetadataDefinition:
+    """Merge ``sources``, properties of one initiative's projects and
+    collections, into one of the initiative's metadata named ``name``: the one
+    of that name and type if there is one, otherwise a new one.
+
+    Its options gain theirs, by value. Their values move to it, and where an
+    item holds several (a file in two of the collections, or a value of the
+    one it merges into already), the most recently updated stands. Every
+    layout of theirs shows it in their place, and they are deleted. The
+    caller commits, so all of it happens or none does.
+
+    Every statement runs under the request's own policies: a value moves only
+    onto an item the request may edit, and one on an item it may not refuses
+    the whole merge first."""
+    first = sources[0]
+    shape = (first.type, first.currency)
+    if any((source.type, source.currency) != shape for source in sources):
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail=PropertyMessages.PROMOTE_TYPES_DIFFER,
+        )
+    ids = [int(source.id or 0) for source in sources]
+    held = (
+        await session.exec(
+            select(func.count())
+            .select_from(MetadataValue)
+            .where(
+                col(MetadataValue.property_id).in_(ids),
+                ~func.entity_access(
+                    MetadataValue.entity_type,
+                    MetadataValue.entity_id,
+                    True,
+                    True,
+                    standing_arg(),
+                ),
+            )
+        )
+    ).one()
+    if held:
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail=PropertyMessages.PROMOTE_VALUE_NOT_EDITABLE,
+        )
+
+    initiative_id = first.initiative_id
+    of_initiative = (MetadataDefinition.initiative_id == initiative_id, _properties())
+    target = (
+        await session.exec(
+            select(MetadataDefinition)
+            .where(*of_initiative, func.lower(MetadataDefinition.name) == name.lower())
+            .with_for_update()
+        )
+    ).one_or_none()
+    if target is None:
+        last = (
+            await session.exec(
+                select(func.max(MetadataDefinition.position)).where(*of_initiative)
+            )
+        ).one()
+        target = MetadataDefinition(
+            initiative_id=initiative_id,
+            name=name,
+            type=first.type,
+            position=0 if last is None else last + 1,
+            color=first.color,
+            currency=first.currency,
+        )
+    elif (target.type, target.currency) != shape:
+        raise HTTPException(
+            status_code=status.HTTP_409_CONFLICT,
+            detail=PropertyMessages.NAME_ALREADY_EXISTS,
+        )
+    if target.type in {MetadataType.select, MetadataType.multi_select}:
+        options = list(target.options or [])
+        offered = {option.get("value") for option in options}
+        for source in sources:
+            for option in source.options or []:
+                if option.get("value") not in offered:
+                    offered.add(option.get("value"))
+                    options.append(option)
+        target.options = options
+    target.updated_at = datetime.now(timezone.utc)
+    session.add(target)
+    await session.flush()
+
+    table = MetadataValue.__table__
+    key = ["entity_type", "entity_id", "property_id", "ref"]
+    kept = [*VALUE_COLUMNS, "state", "updated_at"]
+    newest = (
+        select(
+            table.c.entity_type,
+            table.c.entity_id,
+            literal(target.id),
+            table.c.ref,
+            *(table.c[column_name] for column_name in kept),
+            table.c.created_at,
+        )
+        .where(table.c.property_id.in_(ids))
+        .distinct(table.c.entity_type, table.c.entity_id, table.c.ref)
+        .order_by(
+            table.c.entity_type,
+            table.c.entity_id,
+            table.c.ref,
+            table.c.updated_at.desc(),
+        )
+    )
+    moved = pg_insert(table).from_select([*key, *kept, "created_at"], newest)
+    await session.exec(
+        moved.on_conflict_do_update(
+            index_elements=key,
+            set_={column_name: moved.excluded[column_name] for column_name in kept},
+            where=table.c.updated_at < moved.excluded.updated_at,
+        )
+    )
+    await tool_layouts.repoint_properties(
+        session,
+        initiative_id,
+        [
+            (Tool.project.value, source.project_id)
+            if source.project_id is not None
+            else ("collection", int(source.collection_id or 0))
+            for source in sources
+        ],
+        dict.fromkeys(ids, int(target.id or 0)),
+    )
+    await session.exec(
+        delete(MetadataDefinition).where(col(MetadataDefinition.id).in_(ids))
+    )
+    return target
 
 
 async def lift_project_values(

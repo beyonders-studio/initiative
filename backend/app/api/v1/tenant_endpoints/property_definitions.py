@@ -12,7 +12,8 @@ from datetime import datetime, timezone
 from typing import Annotated, List, Optional, Sequence
 
 from fastapi import APIRouter, Depends, HTTPException, Query, status
-from sqlmodel import col, select
+from sqlalchemy.orm import joinedload, selectinload, undefer
+from sqlmodel import col, delete, or_, select
 
 from sqlmodel.ext.asyncio.session import AsyncSession
 
@@ -25,9 +26,11 @@ from app.api.deps import (
     InstallContext,
     plugin_scope_checked,
 )
+from app.core.errors import CodedError
 from app.core.messages import InitiativeMessages, PluginMessages, PropertyMessages
 from app.core.plugin_scopes import tool_resource
 from app.core.tools import KINDS, Tool
+from app.db.frozen import row_is_frozen
 from app.models.tenant.collection import Collection
 from app.models.tenant.initiative import Initiative
 from app.models.platform.user import User
@@ -37,7 +40,12 @@ from app.models.tenant.metadata import (
     MetadataType,
 )
 from app.schemas.tenant.property import (
+    MetadataOwnerKind,
+    PropertyDefinitionBulkDelete,
     PropertyDefinitionCreate,
+    PropertyDefinitionGroup,
+    PropertyDefinitionGroups,
+    PropertyDefinitionPromote,
     PropertyDefinitionRead,
     PropertyDefinitionUpdate,
     PropertyDefinitionUpdateResponse,
@@ -73,24 +81,29 @@ PropertyDefinitionsWrite = Annotated[
 ]
 
 
+def _require_scope(guild_context: ActorContext, scope: str) -> None:
+    """A 403 for an installed plug-in without ``scope``."""
+    if isinstance(guild_context, InstallContext) and not guild_context.holds(scope):
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail=PluginMessages.SCOPE_REQUIRED,
+        )
+
+
 def _require_write_scope(
     guild_context: ActorContext,
     defn: MetadataDefinition | PropertyDefinitionCreate,
 ) -> None:
     """A 403 for an installed plug-in without the scope this definition's
     writes take."""
-    scope = (
+    _require_scope(
+        guild_context,
         _PROJECTS_WRITE
         if defn.project_id is not None
         else _FILES_WRITE
         if defn.collection_id is not None
-        else _PROPERTIES_WRITE
+        else _PROPERTIES_WRITE,
     )
-    if isinstance(guild_context, InstallContext) and not guild_context.holds(scope):
-        raise HTTPException(
-            status_code=status.HTTP_403_FORBIDDEN,
-            detail=PluginMessages.SCOPE_REQUIRED,
-        )
 
 
 async def _changed_collection(
@@ -146,6 +159,114 @@ async def _require_owner_writable(
     else:
         return False
     return True
+
+
+async def _require_removable(
+    session: AsyncSession,
+    definitions: Sequence[MetadataDefinition],
+    user: User,
+    guild_context: ActorContext,
+) -> None:
+    """Raise unless the request may remove every one of ``definitions``, as
+    removing each alone asks: its project or collection writable, or for the
+    initiative's metadata, a manager. Each owner is asked once."""
+    asked: set[tuple[Optional[int], Optional[int]]] = set()
+    for defn in definitions:
+        _require_write_scope(guild_context, defn)
+        owner = (defn.project_id, defn.collection_id)
+        if owner in asked:
+            continue
+        asked.add(owner)
+        if not await _require_owner_writable(
+            session, defn, user, guild_context
+        ) and not _manages(guild_context, defn.initiative_id):
+            raise _manager_required()
+
+
+async def _editable_projects(
+    session: AsyncSession, project_ids: set[int], guild_context: ActorContext
+) -> dict[int, str]:
+    """The name of each of these projects whose properties the request may
+    edit, by id: the projects it may write the tasks of, as defining a
+    project's property asks (:func:`_configured_project`)."""
+    if not project_ids:
+        return {}
+    rows = await session.exec(
+        select(Project)
+        .where(col(Project.id).in_(project_ids))
+        .options(joinedload(Project.initiative), undefer(Project.actions))
+    )
+    editable: dict[int, str] = {}
+    for project in rows.unique().all():
+        try:
+            resource_access.authorize(
+                Tool.project, project, context=guild_context, access="write"
+            )
+        except (HTTPException, CodedError):
+            continue
+        editable[int(project.id or 0)] = project.name
+    return editable
+
+
+async def _editable_collections(
+    session: AsyncSession, collection_ids: set[int], guild_context: ActorContext
+) -> dict[int, str]:
+    """The name of each of these collections whose properties the request may
+    edit, by id: the collections it may change, as defining a collection's
+    property asks (:func:`_changed_collection`). The answer is the
+    initiative's and whether the collection is put away, so it is asked once
+    for each."""
+    if not collection_ids:
+        return {}
+    rows = await session.exec(
+        select(Collection)
+        .where(col(Collection.id).in_(collection_ids))
+        .options(selectinload(Collection.initiative))
+    )
+    answers: dict[tuple[int, bool], bool] = {}
+    editable: dict[int, str] = {}
+    for collection in rows.all():
+        key = (collection.initiative_id, row_is_frozen(collection))
+        if key not in answers:
+            answers[key] = await resource_access.may_change(
+                session, collection, guild_context
+            )
+        if answers[key]:
+            editable[int(collection.id or 0)] = collection.name
+    return editable
+
+
+async def _definitions_or_404(
+    session: AsyncSession,
+    initiative_id: int,
+    ids: Sequence[int],
+    *,
+    owned: bool = False,
+) -> list[MetadataDefinition]:
+    """``ids``, each a definition of the initiative's that people define, in
+    the order named and locked for the change; with ``owned``, each a project's
+    or a collection's property. One that is not answers 404 for them all."""
+    stmt = select(MetadataDefinition).where(
+        col(MetadataDefinition.id).in_(ids),
+        MetadataDefinition.initiative_id == initiative_id,
+        col(MetadataDefinition.install_id).is_(None),
+    )
+    if owned:
+        stmt = stmt.where(
+            or_(
+                col(MetadataDefinition.project_id).is_not(None),
+                col(MetadataDefinition.collection_id).is_not(None),
+            )
+        )
+    found = {
+        defn.id: defn for defn in (await session.exec(stmt.with_for_update())).all()
+    }
+    if set(found) != set(ids):
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail=PropertyMessages.DEFINITION_NOT_FOUND,
+        )
+    return [found[definition_id] for definition_id in dict.fromkeys(ids)]
 
 
 def _same_scope(defn: MetadataDefinition | PropertyDefinitionCreate) -> list:
@@ -289,6 +410,131 @@ async def list_property_definitions(
     )
     result = await session.exec(stmt)
     return result.all()
+
+
+@router.get("/by-owner", response_model=PropertyDefinitionGroups)
+async def list_property_definitions_by_owner(
+    session: ActorSessionDep,
+    guild_context: PropertyDefinitionsRead,
+    initiative_id: int = Query(),
+) -> PropertyDefinitionGroups:
+    """The initiative's metadata, then the properties of each of its projects
+    and each of its collections, under the owner's name.
+
+    A project's or a collection's are listed only to whoever may edit them,
+    as making, changing and removing one asks; a role that reaches every
+    project and collection (the community's admin, a live grant) is listed
+    them all. ``can_edit`` says whether the reader may rename, reorder and
+    delete a group's: a project's and a collection's always, as listed, and
+    the initiative's for its managers and the community's admin.
+    """
+    if isinstance(guild_context, InstallContext) and not any(
+        guild_context.holds(scope) for scope in _DEFINITION_READ_SCOPES
+    ):
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail=PluginMessages.SCOPE_REQUIRED,
+        )
+    await _ensure_initiative_member(session, guild_context, initiative_id)
+    definitions = (
+        await session.exec(
+            select(MetadataDefinition)
+            .where(
+                MetadataDefinition.initiative_id == initiative_id,
+                col(MetadataDefinition.install_id).is_(None),
+            )
+            .order_by(MetadataDefinition.position.asc(), MetadataDefinition.name.asc())
+        )
+    ).all()
+    projects = await _editable_projects(
+        session,
+        {defn.project_id for defn in definitions if defn.project_id is not None},
+        guild_context,
+    )
+    collections = await _editable_collections(
+        session,
+        {defn.collection_id for defn in definitions if defn.collection_id is not None},
+        guild_context,
+    )
+    groups = [
+        PropertyDefinitionGroup(
+            owner=MetadataOwnerKind.initiative,
+            can_edit=_manages(guild_context, initiative_id),
+            definitions=[
+                PropertyDefinitionRead.model_validate(defn)
+                for defn in definitions
+                if defn.project_id is None and defn.collection_id is None
+            ],
+        )
+    ]
+    for kind, names, column in (
+        (MetadataOwnerKind.project, projects, "project_id"),
+        (MetadataOwnerKind.collection, collections, "collection_id"),
+    ):
+        for owner_id, name in sorted(
+            names.items(), key=lambda item: (item[1].casefold(), item[0])
+        ):
+            groups.append(
+                PropertyDefinitionGroup(
+                    owner=kind,
+                    owner_id=owner_id,
+                    name=name,
+                    can_edit=True,
+                    definitions=[
+                        PropertyDefinitionRead.model_validate(defn)
+                        for defn in definitions
+                        if getattr(defn, column) == owner_id
+                    ],
+                )
+            )
+    return PropertyDefinitionGroups(groups=groups)
+
+
+@router.post("/bulk-delete", status_code=status.HTTP_204_NO_CONTENT)
+async def delete_property_definitions(
+    payload: PropertyDefinitionBulkDelete,
+    session: ActorSessionDep,
+    current_user: ActorUserDep,
+    guild_context: PropertyDefinitionsWrite,
+) -> None:
+    """Delete several of the initiative's definitions at once, with every
+    value of each: all of them, or, when any may not be removed as deleting it
+    alone asks, none."""
+    definitions = await _definitions_or_404(session, payload.initiative_id, payload.ids)
+    await _require_removable(session, definitions, current_user, guild_context)
+    await session.exec(
+        delete(MetadataDefinition).where(col(MetadataDefinition.id).in_(payload.ids))
+    )
+    await session.commit()
+
+
+@router.post("/promote", response_model=PropertyDefinitionRead)
+async def promote_property_definitions(
+    payload: PropertyDefinitionPromote,
+    session: ActorSessionDep,
+    current_user: ActorUserDep,
+    guild_context: PropertyDefinitionsWrite,
+) -> MetadataDefinition:
+    """Merge properties of one type, from the initiative's projects and
+    collections, into one of its metadata named ``name``, answering it.
+
+    It is the initiative's metadata of that name and type if there is one, or
+    a new one. Its options gain theirs, their values move to it, every layout
+    showing one of them shows it instead, and they are deleted, in one
+    transaction (``metadata_service.promote``). It asks to remove each of them
+    as deleting it alone does, and to define the initiative's metadata, as
+    making one does; an installed plug-in also needs ``properties:write``.
+    """
+    sources = await _definitions_or_404(
+        session, payload.initiative_id, payload.ids, owned=True
+    )
+    await _require_removable(session, sources, current_user, guild_context)
+    _require_scope(guild_context, _PROPERTIES_WRITE)
+    await _ensure_initiative_member(session, guild_context, payload.initiative_id)
+    target = await metadata_service.promote(session, sources, name=payload.name)
+    await session.commit()
+    await session.refresh(target)
+    return target
 
 
 @router.post(
@@ -441,10 +687,6 @@ async def delete_property_definition(
     A project's or a collection's metadata is removed by whoever may define
     it."""
     defn = await _get_definition_or_404(session, definition_id)
-    _require_write_scope(guild_context, defn)
-    if not await _require_owner_writable(
-        session, defn, current_user, guild_context
-    ) and not _manages(guild_context, defn.initiative_id):
-        raise _manager_required()
+    await _require_removable(session, [defn], current_user, guild_context)
     await session.delete(defn)
     await session.commit()

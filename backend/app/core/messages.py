@@ -533,6 +533,11 @@ class PropertyMessages:
     DUPLICATE_OPTION_VALUE = "PROPERTY_DUPLICATE_OPTION_VALUE"
     #: A money property names the currency its amounts are in.
     CURRENCY_REQUIRED = "PROPERTY_CURRENCY_REQUIRED"
+    #: Properties merged into one metadata field are of one type, and money in
+    #: one currency.
+    PROMOTE_TYPES_DIFFER = "PROPERTY_PROMOTE_TYPES_DIFFER"
+    #: A value to move sits on something the request may not edit.
+    PROMOTE_VALUE_NOT_EDITABLE = "PROPERTY_PROMOTE_VALUE_NOT_EDITABLE"
 
 
 class AttachmentMessages:
