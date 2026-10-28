@@ -648,7 +648,8 @@ async def _require_requireable_properties(
     """A 400 unless each property the layout requires is one its items carry
     and a person fills in: the initiative's (or on a task, its project's), or
     on a file the collection's own metadata. A checkbox is never empty, so it
-    is never required."""
+    is never required. One the initiative no longer has requires nothing, as
+    at enforcement, so a page that places it still saves."""
     ids = {
         int(key.removeprefix(PROPERTY_FIELD_PREFIX))
         for key in required_keys(definition)
@@ -658,19 +659,22 @@ async def _require_requireable_properties(
         return
     collection_id = target.tool_id if kind == "file" else None
     project_id = target.tool_id if target.tool == Tool.project.value else None
-    found = await session.exec(
-        select(MetadataDefinition.id).where(
+    held = await session.exec(
+        select(
+            MetadataDefinition.collection_id,
+            MetadataDefinition.project_id,
+            MetadataDefinition.type,
+        ).where(
             col(MetadataDefinition.id).in_(ids),
             MetadataDefinition.initiative_id == target.initiative_id,
-            col(MetadataDefinition.collection_id).is_not_distinct_from(collection_id),
-            or_(
-                col(MetadataDefinition.project_id).is_(None),
-                col(MetadataDefinition.project_id).is_not_distinct_from(project_id),
-            ),
-            MetadataDefinition.type != MetadataType.checkbox,
         )
     )
-    if set(found.all()) != ids:
+    if any(
+        owner != collection_id
+        or project not in (None, project_id)
+        or kind_of is MetadataType.checkbox
+        for owner, project, kind_of in held.all()
+    ):
         raise _bad_request(ToolLayoutMessages.KIND_NOT_ALLOWED)
 
 

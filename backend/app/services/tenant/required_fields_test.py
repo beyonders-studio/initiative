@@ -167,6 +167,35 @@ async def test_a_required_property_is_one_its_items_carry_and_fill_in(
     )
 
 
+async def test_a_deleted_required_property_requires_nothing(
+    client: AsyncClient, session: AsyncSession, acting_user
+):
+    a = await acting_user(guild_role=CommunityRole.admin, initiative=True, project=True)
+    size = await create_property_definition(session, a.initiative, name="Size")
+    page = (_required("description"), _required(f"property:{size.id}"))
+    type_id = await _require_on_tasks(client, session, a, *page)
+    deleted = await client.delete(
+        a.g(f"/property-definitions/{size.id}"), headers=a.headers
+    )
+    assert deleted.status_code == 204, deleted.text
+
+    # The page still saves as it is, and asks only for what remains.
+    await _require(
+        client,
+        a,
+        {"tool": "project", "tool_id": a.project.id},
+        "task",
+        *page,
+        task_type_id=type_id,
+    )
+    refused = await client.post(
+        a.g("/tasks/"),
+        json={"project_id": a.project.id, "title": "Plan"},
+        headers=a.headers,
+    )
+    _refused(refused, "description")
+
+
 # -- Tasks --------------------------------------------------------------------
 
 

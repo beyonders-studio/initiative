@@ -67,7 +67,7 @@ def _layout_of(row: Any, collection_id: Optional[int]) -> Optional[Any]:
     """The query for the stored page layout that governs ``row``: its type's
     task page, its initiative's event or posts page, or the collection's file
     page. None for an item no layout requires anything of."""
-    definition = select(ToolLayout.definition)
+    definition = select(ToolLayout.definition, ToolLayout.initiative_id)
     if isinstance(row, Task):
         return definition.where(
             ToolLayout.tool == Tool.project.value,
@@ -204,7 +204,8 @@ async def required_of(
     query = _layout_of(row, collection_id)
     if query is None:
         return None
-    definition = (await session.exec(query)).first()
+    found_layout = (await session.exec(query)).first()
+    definition, initiative_id = found_layout or ({}, None)
     keys = required_keys(definition or {})
     if not keys:
         return None
@@ -214,6 +215,7 @@ async def required_of(
         found = await session.exec(
             select(MetadataDefinition.id, MetadataDefinition.name).where(
                 col(MetadataDefinition.id).in_(ids),
+                MetadataDefinition.initiative_id == initiative_id,
                 col(MetadataDefinition.collection_id).is_not_distinct_from(
                     collection_id
                 ),
