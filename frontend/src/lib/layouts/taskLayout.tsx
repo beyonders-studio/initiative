@@ -1,5 +1,6 @@
 import { format } from "date-fns";
 import {
+  createContext,
   type ReactNode,
   type RefObject,
   useContext,
@@ -56,6 +57,7 @@ import {
   useGenerateTaskDescription,
   useTaskFieldSave,
   useTaskSaveOptions,
+  useUpdateTask,
 } from "@/hooks/useTasks";
 import { detailLayoutOf, instanceTarget, useToolLayouts } from "@/hooks/useToolLayouts";
 import { dateRangeBounds } from "@/lib/dateRange";
@@ -91,6 +93,7 @@ import {
 } from "./detailLayout";
 import { FieldFrame, sameIds, sameJson, useFieldDraft } from "./editing";
 import { DescriptionField, TagsField, TitleField } from "./fieldEditors";
+import { PROPERTY_FIELD_PREFIX } from "./fields";
 import { TASK_LAYOUT, taskFields, taskLayoutFor } from "./tasks";
 
 /** What the task's detail shares with its parts, beside the task itself. */
@@ -334,6 +337,26 @@ export const taskFillContext = (initiativeId: number | null): TaskLayoutContext 
   leaving: { current: false },
 });
 
+/** `task` with what `keys` names left empty, as a change the server refused
+ *  for them leaves it: a move drops the people who cannot open the
+ *  destination and the values it cannot carry, so what is asked for starts
+ *  from nothing rather than from what the task held before. */
+export const withoutValues = (task: TaskRead, keys: readonly string[]): TaskRead => {
+  const asked = new Set(keys);
+  return {
+    ...task,
+    ...(asked.has("description") ? { description: null } : {}),
+    ...(asked.has("assignees") ? { assignees: [] } : {}),
+    ...(asked.has("checklist") ? { checklist: [] } : {}),
+    ...(asked.has("recurrence") ? { recurrence: null } : {}),
+    ...(asked.has("tags") ? { tags: [] } : {}),
+    ...(asked.has("dates") ? { start_date: null, due_date: null } : {}),
+    properties: task.properties.filter(
+      (each) => !asked.has(`${PROPERTY_FIELD_PREFIX}${each.property_id}`)
+    ),
+  };
+};
+
 /** What was filled in for a change of a task, as the change sends it: its
  *  fields, and the properties it was given beside those it holds. */
 export const taskChanges = ({ fields, properties }: Written<TaskRead, TaskUpdate>): TaskUpdate => ({
@@ -362,6 +385,47 @@ export const useMissingAsType = (projectId: number, initiativeId: number | null)
       : [];
 };
 
+/** Asks for what a type's page requires before a task becomes one, and makes
+ *  the change with it: the task page's own, above its layout. */
+const Retyping = createContext<
+  ((task: TaskRead, type: TaskTypeRead, keys: string[]) => void) | null
+>(null);
+
+/**
+ * Holds the question a change of type asks above the layout it changes, so a
+ * type whose page leaves out the type picker still keeps what was filled in
+ * until the change is saved. The task shows its new type once it is.
+ */
+const TaskShell = ({ context, children }: { context: TaskLayoutContext; children: ReactNode }) => {
+  const { t } = useTranslation("layouts");
+  const fill = useFillRequired(TASK_DETAIL);
+  const update = useUpdateTask(undefined, "common:error");
+  const retype = (task: TaskRead, type: TaskTypeRead, keys: string[]) =>
+    fill.ask({
+      item: { ...task, task_type_id: type.id, task_type: type },
+      context: taskFillContext(context.initiativeId),
+      keys,
+      title: t("required.retypeTitle", { type: type.name }),
+      send: async (written) => {
+        // A repeating task's type is its series', so whose it is asked first.
+        const scope = task.recurrence
+          ? await context.askScope("edit", { tool: "tasks", count: task.series_size })
+          : undefined;
+        if (scope === null) throw new Error("not sent");
+        return update.mutateAsync({
+          taskId: task.id,
+          data: { task_type_id: type.id, ...taskChanges(written), ...(scope ? { scope } : {}) },
+        });
+      },
+    });
+  return (
+    <Retyping.Provider value={retype}>
+      {children}
+      {fill.dialog}
+    </Retyping.Provider>
+  );
+};
+
 /** Which of the project's types the task is. Changing it redraws the page as
  *  the new type lays it out; nothing the task holds is lost, only what the new
  *  page leaves out is not shown. A type whose page requires what the task
@@ -369,12 +433,11 @@ export const useMissingAsType = (projectId: number, initiativeId: number | null)
  *  task is being added, what it starts with follows the type, until the
  *  person changes it. */
 const TypeEditor = ({ item: task, label }: EditorProps) => {
-  const { t } = useTranslation("layouts");
   const { readOnly, types, askScope, initiativeId } = useTaskLayout();
   const save = useTaskFieldSave(task, label, askScope);
   const adding = useContext(ItemDraftContext) !== null;
   const missingAs = useMissingAsType(task.project_id, initiativeId);
-  const fill = useFillRequired(TASK_DETAIL);
+  const retype = useContext(Retyping);
   if (types.length < 2) return null;
   const options = types.some((type) => type.id === task.task_type_id)
     ? types
@@ -394,27 +457,12 @@ const TypeEditor = ({ item: task, label }: EditorProps) => {
           const next = options.find((type) => String(type.id) === selected);
           if (!next || next.id === task.task_type_id) return;
           // One being added draws its whole page, required fields up front.
-          const keys = adding ? [] : missingAs(task, next.id);
+          const keys = adding || !retype ? [] : missingAs(task, next.id);
           if (keys.length === 0) {
             void save.save(edit(next), edit(task.task_type));
             return;
           }
-          fill.ask({
-            item: { ...task, task_type_id: next.id, task_type: next },
-            context: taskFillContext(initiativeId),
-            keys,
-            title: t("required.retypeTitle", { type: next.name }),
-            send: async (written) => {
-              const saved = await save.save(
-                {
-                  patch: { task_type_id: next.id, ...taskChanges(written) },
-                  shows: { ...written.item, task_type_id: next.id, task_type: next },
-                },
-                edit(task.task_type)
-              );
-              if (!saved) throw new Error("not saved");
-            },
-          });
+          retype?.(task, next, keys);
         }}
         disabled={readOnly}
       >
@@ -429,7 +477,6 @@ const TypeEditor = ({ item: task, label }: EditorProps) => {
           ))}
         </SelectContent>
       </Select>
-      {fill.dialog}
     </FieldFrame>
   );
 };
@@ -821,6 +868,7 @@ export const TASK_DETAIL: DetailKind<TaskRead, TaskLayoutContext, TaskUpdate> = 
     actions: context.actions,
   }),
   taskRoute: (task, context, taskId) => taskRoute(context.initiativeId, task.project_id, taskId),
+  Shell: TaskShell,
   addingParts: ["status", "dates"],
   // The type picks the page the rest is laid out as.
   addingUpFront: ["type"],
