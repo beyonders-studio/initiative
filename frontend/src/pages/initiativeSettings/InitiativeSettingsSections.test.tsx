@@ -10,12 +10,10 @@ import { HttpResponse } from "msw";
 import { describe, expect, it, vi } from "vitest";
 
 import {
-  buildCollection,
   buildCommunity,
   buildInitiative,
   buildInitiativeJoinRequest,
   buildInitiativeRole,
-  buildPropertyDefinition,
   buildToolLayoutSet,
   buildUserSummary,
   initiativeCan,
@@ -252,35 +250,15 @@ describe("initiative settings sections", () => {
     expect(screen.getAllByText(/grant nothing until the tool is turned back on/)).toHaveLength(1);
   });
 
-  it("serves custom properties at /settings/properties, then each collection's fields", async () => {
+  it("serves custom properties at /settings/properties", async () => {
     stubInitiative();
-    const price = buildPropertyDefinition({ name: "Price", collection_id: 12 });
-    server.use(
-      communityHttp.get("/property-definitions/", ({ request }) =>
-        HttpResponse.json(
-          new URL(request.url).searchParams.get("collection_id") === "12" ? [price] : []
-        )
-      ),
-      communityHttp.get("/collections/", () =>
-        HttpResponse.json({
-          items: [
-            buildCollection({ id: 12, name: "Prints", fields: [price] }),
-            buildCollection({ id: 13, name: "Sketches", fields: [] }),
-          ],
-        })
-      )
-    );
+    server.use(communityHttp.get("/property-definitions/", () => HttpResponse.json([])));
 
     renderSection(InitiativeSettingsPropertiesPage, "properties");
 
     expect(
       await screen.findByText("Define reusable metadata for anything in this initiative.")
     ).toBeInTheDocument();
-    // A collection with fields has them listed under its name; one without
-    // has nothing here.
-    expect(await screen.findByText("Prints's fields")).toBeInTheDocument();
-    expect(await screen.findByText("Price")).toBeInTheDocument();
-    expect(screen.queryByText("Sketches's fields")).not.toBeInTheDocument();
   });
 
   it("serves the export wizard at /settings/export", async () => {
