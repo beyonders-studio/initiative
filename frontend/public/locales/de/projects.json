@@ -236,7 +236,7 @@
   "settings": {
     "tabTaskStatuses": "Aufgabenstatus",
     "tabTaskTypes": "Aufgabentypen",
-    "tabMetadata": "Metadaten"
+    "tabProperties": "Eigenschaften"
   },
   "files": {
     "newFile": "Neue Datei"
@@ -422,13 +422,13 @@
     "assignError": "Die Zuständigen dieser Aufgabe konnten nicht geändert werden.",
     "moveTo": "Verschieben nach"
   },
-  "metadata": {
-    "description": "Was die Aufgaben dieses Projekts neben den Eigenschaften der Initiative tragen können. Eine Aufgabe, die in ein anderes Projekt verschoben wird, behält einen Wert nur, wenn dieses Projekt Metadaten mit demselben Namen und Typ hat.",
-    "create": "Neue Metadaten",
-    "edit": "Metadaten bearbeiten",
-    "delete": "Metadaten löschen",
-    "deleteTitle": "Diese Metadaten löschen?",
-    "deleteBody": "Damit werden sie und die Werte aller Aufgaben dafür in diesem Projekt entfernt.",
-    "none": "Noch keine Metadaten"
+  "properties": {
+    "description": "Was die Aufgaben dieses Projekts neben den Metadaten der Initiative tragen können. Eine Aufgabe, die in ein anderes Projekt verschoben wird, behält einen Wert nur, wenn dieses Projekt eine Eigenschaft mit demselben Namen und Typ hat.",
+    "create": "Neue Eigenschaft",
+    "edit": "Eigenschaft bearbeiten",
+    "delete": "Eigenschaft löschen",
+    "deleteTitle": "Diese Eigenschaft löschen?",
+    "deleteBody": "Damit werden die Eigenschaft und die Werte aller Aufgaben dafür in diesem Projekt entfernt.",
+    "none": "Noch keine Eigenschaften"
   }
 }

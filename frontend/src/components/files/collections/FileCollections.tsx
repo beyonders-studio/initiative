@@ -77,7 +77,7 @@ const MetadataInCollection = ({
         <Button
           variant="ghost"
           size="icon-sm"
-          aria-label={t("collections.metadata.of", { name: collection.name })}
+          aria-label={t("collections.properties.of", { name: collection.name })}
         >
           <ListPlus className="h-4 w-4" />
         </Button>
@@ -108,8 +108,8 @@ const Values = ({
     [properties, collection.id]
   );
   return (
-    <section aria-label={t("collections.metadata.heading")} className="space-y-3">
-      <h2 className="font-medium text-sm">{t("collections.metadata.heading")}</h2>
+    <section aria-label={t("collections.properties.heading")} className="space-y-3">
+      <h2 className="font-medium text-sm">{t("collections.properties.heading")}</h2>
       {collection.metadata.map((definition) => (
         <PlacedPropertyField
           key={definition.id}

@@ -84,7 +84,7 @@
     "people": {
       "prompt": "Who are these people here?",
       "note": "Pick who each person is here. Exact handle matches are filled in; leave one blank to keep just their name.",
-      "access": "Anyone assigned, invited or named in a property is added to the initiative if you manage it, and gets access to what's imported.",
+      "access": "Anyone assigned, invited or named in metadata is added to the initiative if you manage it, and gets access to what's imported.",
       "comments_one": "{{count}} comment",
       "comments_other": "{{count}} comments",
       "unmapped": "Nobody here",
@@ -172,7 +172,7 @@
         "files_other": "{{count}} attached files, each as a file on its task ({{size}})",
         "sprints_one": "{{count}} sprint on {{calendars}} calendar(s)",
         "sprints_other": "{{count}} sprints on {{calendars}} calendar(s)",
-        "propertiesTitle": "Fields that become properties",
+        "propertiesTitle": "Fields that become metadata",
         "propertiesHint": "Untick any you don't want added to this initiative.",
         "propertyCount_one": "{{count}} task",
         "propertyCount_other": "{{count}} tasks",

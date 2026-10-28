@@ -44,7 +44,7 @@ export const ProjectSettingsPage = () => {
       extraTabs={[
         { value: "task-statuses", label: t("settings.tabTaskStatuses") },
         { value: "task-types", label: t("settings.tabTaskTypes") },
-        { value: "metadata", label: t("settings.tabMetadata") },
+        { value: "properties", label: t("settings.tabProperties") },
       ]}
     />
   );

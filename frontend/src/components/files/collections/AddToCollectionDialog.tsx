@@ -133,8 +133,8 @@ export const AddToCollectionDialog = ({
         </span>
         {entry.metadata.length > 0 ? (
           <span className="block">
-            {t("collections.shapes.metadata", {
-              metadata: names.format(entry.metadata.map((each) => each.name)),
+            {t("collections.shapes.properties", {
+              properties: names.format(entry.metadata.map((each) => each.name)),
             })}
           </span>
         ) : null}

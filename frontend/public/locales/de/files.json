@@ -465,18 +465,18 @@
     "noAccess": "Zugriff verweigert",
     "noAccessDescription": "Du hast keine Berechtigung, diese Sammlung anzusehen.",
     "error": "Die Sammlung konnte nicht geändert werden",
-    "metadata": {
-      "title": "Metadaten",
+    "properties": {
+      "title": "Eigenschaften",
       "description": "Was jede Datei in dieser Sammlung hier tragen kann: Die Werte gehören zur Sammlung, nicht zur Datei.",
-      "create": "Neue Metadaten",
-      "edit": "Metadaten bearbeiten",
-      "delete": "Metadaten löschen",
-      "deleteTitle": "Diese Metadaten löschen?",
-      "deleteBody": "Damit werden sie und die Werte aller Dateien dafür in dieser Sammlung entfernt.",
-      "none": "Noch keine Metadaten",
+      "create": "Neue Eigenschaft",
+      "edit": "Eigenschaft bearbeiten",
+      "delete": "Eigenschaft löschen",
+      "deleteTitle": "Diese Eigenschaft löschen?",
+      "deleteBody": "Damit werden die Eigenschaft und die Werte aller Dateien dafür in dieser Sammlung entfernt.",
+      "none": "Noch keine Eigenschaften",
       "heading": "In dieser Sammlung",
       "saveError": "Der Wert konnte nicht gespeichert werden",
-      "of": "Metadaten von {{name}}"
+      "of": "Eigenschaften von {{name}}"
     },
     "addedOn": "Hinzugefügt {{date}}",
     "createdOn": "Erstellt {{date}}",
@@ -489,12 +489,12 @@
     "shapes": {
       "name": "Name",
       "blank": "Leer",
-      "blankHint": "Ein Raster und eine Tabelle, noch ohne eigene Metadaten.",
+      "blankHint": "Ein Raster und eine Tabelle, noch ohne eigene Eigenschaften.",
       "lists": "Zeigt {{lists}}",
-      "metadata": "Metadaten: {{metadata}}",
+      "properties": "Eigenschaften: {{properties}}",
       "copyLabel": "Oder die Form übernehmen von",
       "copyPlaceholder": "Einer anderen Sammlung",
-      "copyHint": "Ihre Metadaten und was ihre Listen zeigen, ohne ihre Dateien oder deren Werte.",
+      "copyHint": "Ihre Eigenschaften und was ihre Listen zeigen, ohne ihre Dateien oder deren Werte.",
       "create": "Sammlung erstellen"
     }
   }

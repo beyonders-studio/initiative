@@ -64,7 +64,7 @@ describe("choosing what an embed shows", () => {
     expect(embed.query).toMatchObject({ initiative_id: 7, project_id: null });
   });
 
-  it("offers one project's metadata as columns, under whose it is", async () => {
+  it("offers one project's properties as columns, under whose it is", async () => {
     server.use(
       communityHttp.get("/projects/", () =>
         HttpResponse.json({
@@ -89,10 +89,10 @@ describe("choosing what an embed shows", () => {
     await user.click(await screen.findByRole("option", { name: "Launch" }));
     await user.click(screen.getByRole("radio", { name: "Table" }));
 
-    const metadata = await screen.findByRole("group", { name: "This project's metadata" });
-    await user.click(within(metadata).getByRole("checkbox", { name: "Sprint" }));
+    const properties = await screen.findByRole("group", { name: "This project's properties" });
+    await user.click(within(properties).getByRole("checkbox", { name: "Sprint" }));
     expect(
-      within(screen.getByRole("group", { name: "Initiative properties" })).getByRole("checkbox", {
+      within(screen.getByRole("group", { name: "Initiative metadata" })).getByRole("checkbox", {
         name: "Budget",
       })
     ).toBeInTheDocument();

@@ -42,7 +42,7 @@
   "selectInitiative": "Seleccionar iniciativa",
   "deleteEventConfirm": "El evento se enviará a la papelera. Puedes restaurarlo desde Configuración → Papelera antes de que finalice el período de retención.",
   "dangerZoneDescription": "Acciones destructivas. Los eventos eliminados van a la papelera y pueden restaurarse antes de que finalice el período de retención.",
-  "properties": "Propiedades",
+  "properties": "Metadatos",
   "import": {
     "title": "Importar eventos del calendario",
     "importIcs": "Importar .ics",

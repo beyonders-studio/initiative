@@ -465,18 +465,18 @@
     "noAccess": "Accès refusé",
     "noAccessDescription": "Vous n’avez pas la permission de voir cette collection.",
     "error": "Impossible de modifier la collection",
-    "metadata": {
-      "title": "Métadonnées",
+    "properties": {
+      "title": "Propriétés",
       "description": "Ce que chaque fichier de cette collection peut porter ici : ses valeurs appartiennent à la collection, pas au fichier.",
-      "create": "Nouvelles métadonnées",
-      "edit": "Modifier les métadonnées",
-      "delete": "Supprimer les métadonnées",
-      "deleteTitle": "Supprimer ces métadonnées ?",
-      "deleteBody": "Elles seront supprimées, avec la valeur de chaque fichier dans cette collection.",
-      "none": "Aucune métadonnée pour l'instant",
+      "create": "Nouvelle propriété",
+      "edit": "Modifier la propriété",
+      "delete": "Supprimer la propriété",
+      "deleteTitle": "Supprimer cette propriété ?",
+      "deleteBody": "La propriété et la valeur de chaque fichier dans cette collection seront supprimées.",
+      "none": "Aucune propriété pour l'instant",
       "heading": "Dans cette collection",
       "saveError": "Impossible d'enregistrer la valeur",
-      "of": "Métadonnées de {{name}}"
+      "of": "Propriétés de {{name}}"
     },
     "addedOn": "Ajouté {{date}}",
     "createdOn": "Créé {{date}}",
@@ -489,12 +489,12 @@
     "shapes": {
       "name": "Nom",
       "blank": "Vierge",
-      "blankHint": "Une grille et un tableau, sans métadonnées propres pour l'instant.",
+      "blankHint": "Une grille et un tableau, sans propriétés propres pour l'instant.",
       "lists": "Affiche {{lists}}",
-      "metadata": "Métadonnées : {{metadata}}",
+      "properties": "Propriétés : {{properties}}",
       "copyLabel": "Ou copier la forme de",
       "copyPlaceholder": "Une autre collection",
-      "copyHint": "Ses métadonnées et ce que montrent ses listes, sans ses fichiers ni leurs valeurs.",
+      "copyHint": "Ses propriétés et ce que montrent ses listes, sans ses fichiers ni leurs valeurs.",
       "create": "Créer la collection"
     }
   }

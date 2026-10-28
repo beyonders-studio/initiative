@@ -77,7 +77,7 @@ export const AddPropertyButton = ({
     },
     {
       key: "properties",
-      heading: owner ? t("properties:title") : undefined,
+      heading: owner ? t("properties:picker.owner.initiative") : undefined,
       items: filteredCandidates.filter((definition) => !isOwned(definition)),
     },
   ].filter((group) => group.items.length > 0);
@@ -103,7 +103,7 @@ export const AddPropertyButton = ({
           disabled={disabled}
         >
           <Plus className="h-4 w-4" />
-          {t(owner ? "properties:addPropertyOrMetadata" : "properties:addProperty")}
+          {t(owner ? "properties:addPropertyOrMetadata" : "properties:addMetadata")}
         </Button>
       </PopoverTrigger>
       <PopoverContent className="w-80 p-0" align="start">

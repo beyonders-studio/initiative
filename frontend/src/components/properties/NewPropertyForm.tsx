@@ -123,7 +123,7 @@ export const NewPropertyForm = ({
   return (
     <div className="space-y-3 p-3">
       <div className="font-medium text-sm">
-        {t(owned ? "properties:picker.createMetadataHeading" : "properties:picker.createHeading")}
+        {t(owned ? "properties:picker.createPropertyHeading" : "properties:picker.createHeading")}
       </div>
       {owner !== undefined ? (
         <div className="space-y-2">

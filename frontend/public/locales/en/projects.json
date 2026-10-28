@@ -236,7 +236,7 @@
   "settings": {
     "tabTaskStatuses": "Task statuses",
     "tabTaskTypes": "Task types",
-    "tabMetadata": "Metadata"
+    "tabProperties": "Properties"
   },
   "files": {
     "newFile": "New file"
@@ -422,13 +422,13 @@
     "assignError": "Couldn't change who's on this task.",
     "moveTo": "Move to"
   },
-  "metadata": {
-    "description": "What this project's tasks can hold beside the initiative's properties. A task moved to another project keeps a value only where that project has metadata of the same name and type.",
-    "create": "New metadata",
-    "edit": "Edit metadata",
-    "delete": "Delete metadata",
-    "deleteTitle": "Delete this metadata?",
-    "deleteBody": "This removes it and every task's value of it in this project.",
-    "none": "No metadata yet"
+  "properties": {
+    "description": "What this project's tasks can hold beside the initiative's metadata. A task moved to another project keeps a value only where that project has a property of the same name and type.",
+    "create": "New property",
+    "edit": "Edit property",
+    "delete": "Delete property",
+    "deleteTitle": "Delete this property?",
+    "deleteBody": "This removes the property and every task's value of it in this project.",
+    "none": "No properties yet"
   }
 }

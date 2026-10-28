@@ -125,13 +125,13 @@ export const CollectionLayoutEditorPage = () => {
         <>
           <Button type="button" variant="outline" size="sm" onClick={() => setManaging(true)}>
             <Tags className="h-4 w-4" />
-            {t("collections.metadata.title")}
+            {t("collections.properties.title")}
           </Button>
           <Dialog open={managing} onOpenChange={setManaging}>
             {/* The manager says what it holds. */}
             <DialogContent className="sm:max-w-3xl" aria-describedby={undefined}>
               <DialogHeader>
-                <DialogTitle>{t("collections.metadata.title")}</DialogTitle>
+                <DialogTitle>{t("collections.properties.title")}</DialogTitle>
               </DialogHeader>
               <InitiativeSettingsPropertiesTab
                 initiativeId={collection.initiative_id}

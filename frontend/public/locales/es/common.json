@@ -170,7 +170,7 @@
     "tags": "Etiquetas",
     "tagsDescription": "Agrega etiquetas para organizar y filtrar.",
     "tagsNoAccess": "Necesitas acceso de escritura para administrar etiquetas.",
-    "propertiesDescription": "Valores de las propiedades personalizadas que define esta iniciativa.",
+    "propertiesDescription": "Valores de los metadatos que define esta iniciativa.",
     "comments": "Comentarios",
     "commentsDescription": "Permite que se comente esto. Si desactivas los comentarios, se conserva todo lo ya publicado y vuelve a aparecer cuando los actives de nuevo.",
     "commentsToggle": "Activar comentarios",

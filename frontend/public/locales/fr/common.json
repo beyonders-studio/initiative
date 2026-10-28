@@ -170,7 +170,7 @@
     "tags": "Étiquettes",
     "tagsDescription": "Ajoutez des étiquettes pour organiser et filtrer.",
     "tagsNoAccess": "Vous avez besoin d'un accès en écriture pour gérer les étiquettes.",
-    "propertiesDescription": "Valeurs des propriétés personnalisées définies par cette initiative.",
+    "propertiesDescription": "Valeurs des métadonnées définies par cette initiative.",
     "comments": "Commentaires",
     "commentsDescription": "Autorisez les commentaires sur cet élément. Si vous les désactivez, tout ce qui a déjà été publié est conservé et réapparaît lorsque vous les réactivez.",
     "commentsToggle": "Activer les commentaires",

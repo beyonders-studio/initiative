@@ -477,7 +477,7 @@ export const LayoutEditor = ({
   // pick does there.
   // On a project's tasks, the part showing every property shows its metadata
   // as well.
-  const propertiesPart = project ? "layouts:allPropertiesAndMetadata" : "layouts:allProperties";
+  const propertiesPart = project ? "layouts:allPropertiesAndMetadata" : "layouts:allMetadata";
   const { labelOf, partLabel, pickerPlugins } = usePartLabel(
     fields,
     plugins,

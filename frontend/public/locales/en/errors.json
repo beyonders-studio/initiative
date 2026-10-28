@@ -142,7 +142,7 @@
   "PROPERTY_NAME_ALREADY_EXISTS": "That name is already taken here",
   "PROPERTY_INVALID_VALUE_FOR_TYPE": "The value doesn't match its type",
   "PROPERTY_OPTION_NOT_IN_DEFINITION": "The selected option isn't one it offers",
-  "PROPERTY_NOT_INITIATIVE_MEMBER": "You need to be a member of this initiative to manage its properties",
+  "PROPERTY_NOT_INITIATIVE_MEMBER": "You need to be a member of this initiative to manage its metadata",
   "PROPERTY_OPTIONS_REQUIRED": "A select or multi-select needs at least one option",
   "PROPERTY_DUPLICATE_OPTION_VALUE": "Each option needs a value of its own",
   "PROPERTY_CURRENCY_REQUIRED": "Money needs a currency",

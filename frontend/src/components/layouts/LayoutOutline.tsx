@@ -123,7 +123,7 @@ export const accordionTitle = (translate: TranslateFn) => translate("layouts:blo
 
 /** What the part showing every property is called, as an i18n key: on a
  *  project's tasks it shows the project's metadata as well. */
-export const PropertiesPartName = createContext("layouts:allProperties");
+export const PropertiesPartName = createContext("layouts:allMetadata");
 
 /** What Add offers where something is added: the fields, each plug-in's
  *  parts, and the other parts. */
@@ -151,7 +151,7 @@ export const listChoices = (
   fields: ReadonlyMap<string, FieldDef>,
   plugins: PickerPlugin[],
   translate: TranslateFn,
-  propertiesPart = "layouts:allProperties"
+  propertiesPart = "layouts:allMetadata"
 ): AddChoices => {
   if (layout.kind === "calendar" || layout.kind === "gantt") {
     return { fields: [], plugins: [], parts: [] };
@@ -190,7 +190,7 @@ export const detailChoices = (
   fields: ReadonlyMap<string, FieldDef>,
   plugins: PickerPlugin[],
   translate: TranslateFn,
-  propertiesPart = "layouts:allProperties"
+  propertiesPart = "layouts:allMetadata"
 ): AddChoices => {
   const named = namedFields(detail);
   return {

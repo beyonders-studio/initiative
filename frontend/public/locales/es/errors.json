@@ -144,7 +144,7 @@
   "PROPERTY_NAME_ALREADY_EXISTS": "Ese nombre ya está en uso aquí",
   "PROPERTY_INVALID_VALUE_FOR_TYPE": "El valor no coincide con su tipo",
   "PROPERTY_OPTION_NOT_IN_DEFINITION": "La opción seleccionada no es una de las que ofrece",
-  "PROPERTY_NOT_INITIATIVE_MEMBER": "Debes ser miembro de esta iniciativa para gestionar sus propiedades",
+  "PROPERTY_NOT_INITIATIVE_MEMBER": "Debes ser miembro de esta iniciativa para gestionar sus metadatos",
   "PROPERTY_OPTIONS_REQUIRED": "Una selección o selección múltiple necesita al menos una opción",
   "PROPERTY_DUPLICATE_OPTION_VALUE": "Cada opción necesita un valor propio",
   "PROPERTY_CURRENCY_REQUIRED": "Un importe necesita una moneda",

@@ -250,7 +250,7 @@
       "comments": "Kommentare",
       "relationships": "Verknüpfungen",
       "tags": "Tags",
-      "properties": "Eigenschaften",
+      "properties": "Metadaten",
       "sharing": "Freigaben",
       "members": "Mitglieder",
       "initiatives": "Initiativen",
@@ -302,8 +302,8 @@
         "write": "Tags lesen und ändern"
       },
       "properties": {
-        "read": "Eigene Eigenschaften und ihre Optionen lesen",
-        "write": "Eigene Eigenschaften lesen, anlegen und ändern"
+        "read": "Metadaten der Initiative und ihre Optionen lesen",
+        "write": "Metadaten der Initiative lesen, anlegen und ändern"
       },
       "sharing": {
         "read": "Sehen, wer worauf Zugriff hat",

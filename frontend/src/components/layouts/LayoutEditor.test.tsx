@@ -217,7 +217,7 @@ describe("LayoutEditor", () => {
     ]);
   });
 
-  it("offers the project's metadata and the initiative's properties under whose they are", async () => {
+  it("offers the project's properties and the initiative's metadata under whose they are", async () => {
     server.use(
       definitionsHandler([buildPropertyDefinition({ id: 12, name: "Effort" })], {
         project: [buildPropertyDefinition({ id: 14, name: "Sprint", project_id: 1 })],
@@ -228,9 +228,9 @@ describe("LayoutEditor", () => {
     await user.click(await within(await outline()).findByRole("button", { name: /^add$/i }));
     const picker = await screen.findByRole("dialog", { name: "Add" });
     const sprint = await within(picker).findByRole("button", { name: "Sprint" });
-    expect(sprint.parentElement).toHaveTextContent("This project's metadata");
+    expect(sprint.parentElement).toHaveTextContent("This project's properties");
     const effort = within(picker).getByRole("button", { name: "Effort" });
-    expect(effort.parentElement).toHaveTextContent("Initiative properties");
+    expect(effort.parentElement).toHaveTextContent("Initiative metadata");
     expect(effort.parentElement).not.toHaveTextContent("Sprint");
     await user.click(sprint);
     await user.click(screen.getByRole("button", { name: /^save$/i }));
@@ -239,7 +239,7 @@ describe("LayoutEditor", () => {
     expect(saved("table")?.columns).toContain("property:14");
   });
 
-  it("makes a new field the project's metadata, or the initiative's property if asked", async () => {
+  it("makes a new field the project's property, or the initiative's metadata if asked", async () => {
     const made: Record<string, unknown>[] = [];
     server.use(
       communityHttp.post("/property-definitions/", async ({ request }) => {
@@ -258,13 +258,11 @@ describe("LayoutEditor", () => {
       await user.type(within(picker).getByRole("textbox", { name: /search/i }), name);
       await user.click(within(picker).getByRole("button", { name: /^text$/i }));
       expect(within(picker).getByRole("combobox", { name: "Belongs to" })).toHaveTextContent(
-        "This project's metadata"
+        "This project's properties"
       );
       if (initiatives) {
         await user.click(within(picker).getByRole("combobox", { name: "Belongs to" }));
-        await user.click(
-          await screen.findByRole("option", { name: "A property of the initiative" })
-        );
+        await user.click(await screen.findByRole("option", { name: "The initiative's metadata" }));
       }
       await user.click(within(picker).getByRole("button", { name: /^create$/i }));
     };
@@ -277,7 +275,7 @@ describe("LayoutEditor", () => {
     expect(made[1]).not.toHaveProperty("project_id");
   });
 
-  it("names the part showing every property for the project's metadata too", async () => {
+  it("names the part showing every value for the project's properties too", async () => {
     editor("board");
 
     // The shipped card holds it.
@@ -907,7 +905,7 @@ describe("LayoutEditor", () => {
       return userEvent.setup();
     };
 
-    it("puts the collection's metadata on a wall's card, drawn as stars", async () => {
+    it("puts the collection's property on a wall's card, drawn as stars", async () => {
       const rating = buildPropertyDefinition({
         id: 31,
         name: "Stars given",
@@ -920,7 +918,7 @@ describe("LayoutEditor", () => {
       const picker = await screen.findByRole("dialog", { name: "Add" });
       // Listed under whose it is.
       const field = await within(picker).findByRole("button", { name: "Stars given" });
-      expect(field.parentElement).toHaveTextContent("This collection's metadata");
+      expect(field.parentElement).toHaveTextContent("This collection's properties");
       await user.click(field);
       await user.click(screen.getByRole("combobox", { name: /show the scale as/i }));
       await user.click(await screen.findByRole("option", { name: "Stars" }));
@@ -933,7 +931,7 @@ describe("LayoutEditor", () => {
       });
     });
 
-    it("makes metadata of the collection's on a file's detail and places it", async () => {
+    it("makes a property of the collection's on a file's detail and places it", async () => {
       const made: Record<string, unknown>[] = [];
       server.use(
         communityHttp.post("/property-definitions/", async ({ request }) => {

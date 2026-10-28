@@ -170,7 +170,7 @@
     "tags": "Tags",
     "tagsDescription": "Füge Tags hinzu, um zu organisieren und zu filtern.",
     "tagsNoAccess": "Du benötigst Schreibzugriff, um Tags zu verwalten.",
-    "propertiesDescription": "Werte für die benutzerdefinierten Eigenschaften, die diese Initiative festlegt.",
+    "propertiesDescription": "Werte für die Metadaten, die diese Initiative festlegt.",
     "comments": "Kommentare",
     "commentsDescription": "Lass andere dies kommentieren. Wenn du Kommentare deaktivierst, bleibt alles bereits Verfasste erhalten und erscheint wieder, sobald du sie erneut aktivierst.",
     "commentsToggle": "Kommentare aktivieren",

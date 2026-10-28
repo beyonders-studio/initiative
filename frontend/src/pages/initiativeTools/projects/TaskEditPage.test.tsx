@@ -1002,7 +1002,7 @@ describe("TaskEditPage", () => {
     );
     renderTaskPage();
 
-    expect(await screen.findByText(/couldn't load this property/i)).toBeInTheDocument();
+    expect(await screen.findByText(/couldn't load this value/i)).toBeInTheDocument();
     fail = false;
     await userEvent.click(screen.getByRole("button", { name: /try again/i }));
     expect(await fieldNamed(/^risk$/i)).toBeInTheDocument();

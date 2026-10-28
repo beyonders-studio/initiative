@@ -88,9 +88,9 @@ export type FieldGroup = {
 /** The owners a field may have, in the order they are listed, by heading. */
 const OWNER_GROUPS = [
   ["builtIn", "layouts:builtIn"],
-  ["projectMetadata", "layouts:projectMetadata"],
-  ["collectionMetadata", "layouts:collectionMetadata"],
-  ["properties", "layouts:initiativeProperties"],
+  ["projectMetadata", "layouts:projectProperties"],
+  ["collectionMetadata", "layouts:collectionProperties"],
+  ["properties", "layouts:initiativeMetadata"],
 ] as const;
 
 const ownerOf = (field: FieldDef): (typeof OWNER_GROUPS)[number][0] =>

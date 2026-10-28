@@ -524,7 +524,7 @@ export const PropertiesField = <I extends { properties: PropertySummary[] }, P>(
   const listed = ownProperties(properties).filter((each) => !except?.has(each.property_id));
   // Where the item also holds its project's metadata, the panel says so.
   const label = t(props.owner ? "titleWithMetadata" : "title");
-  const none = t(props.owner ? "noPropertiesOrMetadata" : "noProperties");
+  const none = t(props.owner ? "noPropertiesOrMetadata" : "noMetadata");
   const save = useItemFieldSave(kind, id, label);
   const add = (definition: PropertyDefinitionRead) => {
     if (properties.some((p) => p.property_id === definition.id)) return;

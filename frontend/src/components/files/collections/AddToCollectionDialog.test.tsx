@@ -86,7 +86,7 @@ describe("AddToCollectionDialog", () => {
     // Named, it asks how the collection starts: blank until a shape is picked.
     expect(screen.getByRole("button", { name: /^Blank/ })).toHaveAttribute("aria-pressed", "true");
     expect(await screen.findByRole("button", { name: /^Catalog/ })).toHaveTextContent(
-      "Metadata: Price and Rating"
+      "Properties: Price and Rating"
     );
     // The shapes are in the reader's language: another is read afresh.
     await act(() => i18n.changeLanguage("fr"));

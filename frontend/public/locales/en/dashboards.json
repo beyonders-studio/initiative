@@ -107,7 +107,7 @@
     "pluginParamPlaceholder": "Choose…",
     "pluginParamNeedsSibling": "Choose the value above first.",
     "pluginParamListHint": "Separate values with commas.",
-    "all_property": "No property",
+    "all_property": "No metadata or property",
     "sqlHelp": "A read-only SELECT over this community's data. It runs as you, so it returns what you can already see."
   },
   "picker": {
@@ -169,8 +169,8 @@
     "description": "Description",
     "updated_at": "Updated",
     "created_by": "Created by",
-    "property": "Property",
-    "property_id": "Property",
+    "property": "Metadata or property",
+    "property_id": "Metadata or property",
     "value_text": "Text",
     "value_number": "Number",
     "value_boolean": "Checkbox",
@@ -307,8 +307,8 @@
     "counters": "Counters",
     "counter_groups": "Counter groups",
     "task_statuses": "Task statuses",
-    "property_values": "Property values",
-    "property_definitions": "Properties",
+    "metadata_values": "Metadata and property values",
+    "metadata_definitions": "Metadata and properties",
     "relationships": "Links"
   },
   "viewMode": {

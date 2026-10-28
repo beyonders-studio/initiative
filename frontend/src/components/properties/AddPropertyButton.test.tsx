@@ -26,13 +26,13 @@ describe("AddPropertyButton", () => {
     renderWithProviders(
       <AddPropertyButton initiativeId={7} currentPropertyIds={[]} onAdd={vi.fn()} />
     );
-    await userEvent.click(screen.getByRole("button", { name: /Add property/i }));
+    await userEvent.click(screen.getByRole("button", { name: /Add metadata/i }));
     await waitFor(() => expect(screen.getByText("Alpha")).toBeInTheDocument());
     expect(screen.getByText("Beta")).toBeInTheDocument();
     expect(screen.getByText("Gamma")).toBeInTheDocument();
   });
 
-  it("offers a task's project metadata beside the properties, each under its own heading", async () => {
+  it("offers a task's project properties beside the metadata, each under its own heading", async () => {
     server.use(
       definitionsHandler([buildPropertyDefinition({ id: 1, name: "Budget" })], {
         project: [buildPropertyDefinition({ id: 2, name: "Sprint", project_id: 4 })],
@@ -48,9 +48,9 @@ describe("AddPropertyButton", () => {
     );
     await userEvent.click(screen.getByRole("button", { name: "Add property or metadata" }));
 
-    const metadata = await screen.findByRole("group", { name: "This project's metadata" });
+    const metadata = await screen.findByRole("group", { name: "This project's properties" });
     expect(within(metadata).getByText("Sprint")).toBeInTheDocument();
-    const properties = screen.getByRole("group", { name: "Properties" });
+    const properties = screen.getByRole("group", { name: "The initiative's metadata" });
     expect(within(properties).getByText("Budget")).toBeInTheDocument();
     expect(within(properties).queryByText("Sprint")).not.toBeInTheDocument();
   });
@@ -63,7 +63,7 @@ describe("AddPropertyButton", () => {
     renderWithProviders(
       <AddPropertyButton initiativeId={7} currentPropertyIds={[1]} onAdd={vi.fn()} />
     );
-    await userEvent.click(screen.getByRole("button", { name: /Add property/i }));
+    await userEvent.click(screen.getByRole("button", { name: /Add metadata/i }));
     await waitFor(() => expect(screen.getByText("Beta")).toBeInTheDocument());
     expect(screen.queryByText("Alpha")).not.toBeInTheDocument();
   });
@@ -75,7 +75,7 @@ describe("AddPropertyButton", () => {
     renderWithProviders(
       <AddPropertyButton initiativeId={7} currentPropertyIds={[]} onAdd={onAdd} />
     );
-    await userEvent.click(screen.getByRole("button", { name: /Add property/i }));
+    await userEvent.click(screen.getByRole("button", { name: /Add metadata/i }));
     const item = await screen.findByText("Priority");
     await userEvent.click(item);
     expect(onAdd).toHaveBeenCalledTimes(1);
@@ -90,8 +90,8 @@ describe("AddPropertyButton", () => {
     renderWithProviders(
       <AddPropertyButton initiativeId={7} currentPropertyIds={[]} onAdd={vi.fn()} />
     );
-    await userEvent.click(screen.getByRole("button", { name: /Add property/i }));
-    const searchInput = await screen.findByPlaceholderText(/Search properties/i);
+    await userEvent.click(screen.getByRole("button", { name: /Add metadata/i }));
+    const searchInput = await screen.findByPlaceholderText(/Search/i);
     await userEvent.type(searchInput, "BET");
     await waitFor(() => {
       expect(screen.getByText("Beta")).toBeInTheDocument();
@@ -122,9 +122,9 @@ describe("AddPropertyButton", () => {
       <AddPropertyButton initiativeId={7} currentPropertyIds={[]} onAdd={onAdd} />
     );
 
-    await userEvent.click(screen.getByRole("button", { name: /Add property/i }));
-    // "Create new property" entry in the command list.
-    const createEntry = await screen.findByText(/Create new property/i);
+    await userEvent.click(screen.getByRole("button", { name: /Add metadata/i }));
+    // "New metadata" entry in the command list.
+    const createEntry = await screen.findByText(/New metadata/i);
     await userEvent.click(createEntry);
 
     // Fill in the name.
@@ -154,6 +154,6 @@ describe("AddPropertyButton", () => {
     renderWithProviders(
       <AddPropertyButton initiativeId={7} currentPropertyIds={[]} onAdd={vi.fn()} disabled />
     );
-    expect(screen.getByRole("button", { name: /Add property/i })).toBeDisabled();
+    expect(screen.getByRole("button", { name: /Add metadata/i })).toBeDisabled();
   });
 });

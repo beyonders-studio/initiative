@@ -16,7 +16,7 @@ import type { PropertyValuesSetRequest } from "@/api/generated/initiativeAPI.sch
 import { FileCollections } from "./FileCollections";
 
 describe("FileCollections", () => {
-  it("shows and saves the file's values of each collection's metadata", async () => {
+  it("shows and saves the file's values of each collection's properties", async () => {
     let sent: PropertyValuesSetRequest | null = null;
     server.use(
       communityHttp.get("/collections/", () =>
@@ -61,9 +61,9 @@ describe("FileCollections", () => {
     );
 
     await screen.findByRole("link", { name: "Plain" });
-    // Only a collection with metadata of its own has values to show.
-    expect(screen.queryByRole("button", { name: "Plain's metadata" })).not.toBeInTheDocument();
-    await user.click(screen.getByRole("button", { name: "Shop's metadata" }));
+    // Only a collection with properties of its own has values to show.
+    expect(screen.queryByRole("button", { name: "Plain's properties" })).not.toBeInTheDocument();
+    await user.click(screen.getByRole("button", { name: "Shop's properties" }));
     const caption = await screen.findByDisplayValue("Brass lamp");
     await user.clear(caption);
     await user.type(caption, "Copper lamp{Enter}");

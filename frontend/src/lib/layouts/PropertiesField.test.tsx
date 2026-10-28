@@ -123,7 +123,7 @@ describe("a row's properties, saved one at a time", () => {
     );
     const { rerender } = panel([status, owner]);
     const user = userEvent.setup();
-    await user.click(screen.getByRole("button", { name: /add property/i }));
+    await user.click(screen.getByRole("button", { name: /add metadata/i }));
     await user.click(await screen.findByRole("option", { name: /size/i }));
     expect(await screen.findByRole("button", { name: /try again/i })).toBeInTheDocument();
 

@@ -170,7 +170,7 @@
     "tags": "Tags",
     "tagsDescription": "Add tags to organize and filter.",
     "tagsNoAccess": "You need write access to manage tags.",
-    "propertiesDescription": "Values for the custom properties this initiative defines.",
+    "propertiesDescription": "Values for the metadata this initiative defines.",
     "comments": "Comments",
     "commentsDescription": "Let people comment on this. Turning comments off keeps everything already posted — it comes back when you turn them on again.",
     "commentsToggle": "Enable comments",

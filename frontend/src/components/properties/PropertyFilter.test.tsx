@@ -63,7 +63,7 @@ describe("PropertyFilter", () => {
     mockDefinitions([textDef]);
     const onChange = vi.fn();
     renderWithProviders(<PropertyFilter value={[]} onChange={onChange} />);
-    const addBtn = await screen.findByRole("button", { name: /Add property filter/i });
+    const addBtn = await screen.findByRole("button", { name: /Add filter/i });
     expect(addBtn).toBeEnabled();
     await userEvent.click(addBtn);
     expect(onChange).toHaveBeenCalledWith([{ property_id: 1, op: "ilike", value: null }], []);
@@ -98,7 +98,7 @@ describe("PropertyFilter", () => {
       { property_id: 5, op: "eq", value: "y" },
     ];
     renderWithProviders(<PropertyFilter value={full} onChange={vi.fn()} />);
-    const addBtn = await screen.findByRole("button", { name: /Add property filter/i });
+    const addBtn = await screen.findByRole("button", { name: /Add filter/i });
     expect(addBtn).toBeDisabled();
   });
 
@@ -108,7 +108,7 @@ describe("PropertyFilter", () => {
     const existing: PropertyFilterCondition[] = [{ property_id: 1, op: "ilike", value: "ada" }];
     renderWithProviders(<PropertyFilter value={existing} onChange={onChange} />);
     // The property dropdown is the first combobox in the row.
-    const propertyCombo = (await screen.findAllByLabelText(/Property/i))[0];
+    const propertyCombo = (await screen.findAllByLabelText(/Filter by/i))[0];
     await userEvent.click(propertyCombo);
     const hoursOption = await screen.findByRole("option", { name: "Hours" });
     await userEvent.click(hoursOption);
@@ -145,7 +145,7 @@ describe("PropertyFilter", () => {
     ];
     renderWithProviders(<PropertyFilter value={existing} onChange={onChange} />);
     const removeButtons = await screen.findAllByRole("button", {
-      name: /Remove property filter/i,
+      name: /Remove filter/i,
     });
     expect(removeButtons).toHaveLength(2);
     await userEvent.click(removeButtons[0]);
@@ -162,7 +162,7 @@ describe("PropertyFilter", () => {
     // Open the first row's property dropdown. "Hours" is used in the other
     // row, so when enumerating options here it must be disabled (and the
     // currently-selected "Owner" must stay enabled).
-    const propertyCombos = await screen.findAllByLabelText(/Property/i);
+    const propertyCombos = await screen.findAllByLabelText(/Filter by/i);
     await userEvent.click(propertyCombos[0]);
     const hoursOption = await screen.findByRole("option", { name: "Hours" });
     expect(hoursOption).toHaveAttribute("data-disabled");
@@ -183,7 +183,7 @@ describe("PropertyFilter", () => {
         onChange={onChange}
       />
     );
-    await userEvent.click(await screen.findByRole("button", { name: /Add property filter/i }));
+    await userEvent.click(await screen.findByRole("button", { name: /Add filter/i }));
 
     // The next field free is the plug-in's, compared as a number.
     expect(onChange).toHaveBeenCalledWith(
@@ -202,7 +202,7 @@ describe("PropertyFilter", () => {
     mockDefinitions([multiDef]);
     const onChange = vi.fn();
     renderWithProviders(<PropertyFilter value={[]} onChange={onChange} />);
-    const addBtn = await screen.findByRole("button", { name: /Add property filter/i });
+    const addBtn = await screen.findByRole("button", { name: /Add filter/i });
     await userEvent.click(addBtn);
     expect(onChange).toHaveBeenCalledWith([{ property_id: 10, op: "eq", value: [] }], []);
   });
