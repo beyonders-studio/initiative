@@ -205,9 +205,6 @@ class _LoopThread:
         return asyncio.run_coroutine_threadsafe(coroutine, loop).result(_WAIT_SECONDS)
 
 
-_COLUMNS = "guild_id, generation, local_sealed, kms_sealed, kms_key"
-
-
 class DatabaseKeyStore:
     """``guild_storage_keys``, on a connection of the key thread's own, as the
     system login (``app_admin``), the only one granted the table."""
@@ -234,7 +231,8 @@ class DatabaseKeyStore:
                 (
                     await conn.execute(
                         text(
-                            f"SELECT {_COLUMNS} FROM guild_storage_keys WHERE guild_id = :g"
+                            "SELECT guild_id, generation, local_sealed, kms_sealed, kms_key "
+                            "FROM guild_storage_keys WHERE guild_id = :g"
                         ),
                         {"g": int(guild_id)},
                     )
