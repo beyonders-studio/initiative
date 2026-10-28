@@ -22,6 +22,7 @@ from app.testing import (
     create_collection,
     create_file,
     create_post,
+    create_project,
     create_property_definition,
     create_resource_grant,
     create_tag,
@@ -362,6 +363,183 @@ async def test_a_plugin_acting_as_itself_is_not_held_to_it(
 
     by_a_person = await client.post(seat.g("/tasks/"), json=task, headers=seat.headers)
     _refused(by_a_person, "description")
+
+
+# -- A change of type or project ------------------------------------------------
+
+
+async def _types(session: AsyncSession, a: Any, project_id: int) -> list[int]:
+    await route_session_to_guild(session, a.guild.id)
+    ids = [t.id for t in await task_types_service.list_types(session, project_id)]
+    assert all(each is not None for each in ids)
+    return [each for each in ids if each is not None]
+
+
+async def test_a_task_given_another_type_meets_its_page(
+    client: AsyncClient, session: AsyncSession, acting_user
+):
+    a = await acting_user(guild_role=CommunityRole.admin, initiative=True, project=True)
+    size = await create_property_definition(session, a.initiative, name="Size")
+    note = await create_property_definition(session, a.initiative, name="Note")
+    plain, _, other, *_ = await _types(session, a, a.project.id)
+    await _require(
+        client,
+        a,
+        {"tool": "project", "tool_id": a.project.id},
+        "task",
+        _required("description"),
+        _required(f"property:{size.id}"),
+        task_type_id=other,
+    )
+    task = (
+        await client.post(
+            a.g("/tasks/"),
+            json={
+                "project_id": a.project.id,
+                "title": "Sort the shed",
+                "task_type_id": plain,
+                "properties": [{"property_id": note.id, "value": "Mind the wasps"}],
+            },
+            headers=a.headers,
+        )
+    ).json()
+    url = a.g(f"/tasks/{task['id']}")
+
+    refused = await client.patch(url, json={"task_type_id": other}, headers=a.headers)
+    _refused(refused, "description", "Size")
+
+    retyped = await client.patch(
+        url,
+        json={
+            "task_type_id": other,
+            "description": "Everything off the floor",
+            "properties": [{"property_id": size.id, "value": "Large"}],
+            "merge_properties": True,
+        },
+        headers=a.headers,
+    )
+    assert retyped.status_code == 200, retyped.text
+    assert retyped.json()["task_type_id"] == other
+    # The values it was given join the ones it held.
+    held = {each["name"]: each["value"] for each in retyped.json()["properties"]}
+    assert held == {"Size": "Large", "Note": "Mind the wasps"}
+
+
+async def test_a_moved_task_meets_its_page_in_the_destination(
+    client: AsyncClient, session: AsyncSession, acting_user
+):
+    a = await acting_user(guild_role=CommunityRole.admin, initiative=True, project=True)
+    there = await create_project(session, a.initiative, a.user, name="There")
+    here_size = await create_property_definition(
+        session, a.initiative, name="Size", project=a.project
+    )
+    there_size = await create_property_definition(
+        session, a.initiative, name="Size", project=there
+    )
+    destination = (await _types(session, a, there.id))[0]
+    await _require(
+        client,
+        a,
+        {"tool": "project", "tool_id": there.id},
+        "task",
+        _required(f"property:{there_size.id}"),
+        task_type_id=destination,
+    )
+
+    async def made(**fields: Any) -> int:
+        response = await client.post(
+            a.g("/tasks/"),
+            json={"project_id": a.project.id, "title": "Haul", **fields},
+            headers=a.headers,
+        )
+        assert response.status_code == 201, response.text
+        return response.json()["id"]
+
+    # Its own project's Size is carried across by name and type.
+    carried = await made(properties=[{"property_id": here_size.id, "value": "Small"}])
+    moved = await client.post(
+        a.g(f"/tasks/{carried}/move"),
+        json={"target_project_id": there.id},
+        headers=a.headers,
+    )
+    assert moved.status_code == 200, moved.text
+
+    lacking = await made()
+    refused = await client.post(
+        a.g(f"/tasks/{lacking}/move"),
+        json={"target_project_id": there.id},
+        headers=a.headers,
+    )
+    _refused(refused, "Size")
+
+    given = await client.post(
+        a.g(f"/tasks/{lacking}/move"),
+        json={
+            "target_project_id": there.id,
+            "changes": {
+                "properties": [{"property_id": there_size.id, "value": "Huge"}],
+                "merge_properties": True,
+            },
+        },
+        headers=a.headers,
+    )
+    assert given.status_code == 200, given.text
+    assert given.json()["project_id"] == there.id
+
+
+async def test_a_plugin_retypes_and_moves_without_meeting_a_page(
+    client: AsyncClient, session: AsyncSession, acting_user, role_session
+):
+    granted = ["projects:read", "projects:write"]
+    installed = await install_plugin(
+        session, acting_user, role_session, granted=granted
+    )
+    seat = installed.seat
+    headers = install_headers(installed, granted)
+
+    async def project(name: str) -> int:
+        made = await client.post(
+            guild_url(installed.guild.id, "/projects/"),
+            json={"name": name, "initiative_id": installed.placed.id},
+            headers=headers,
+        )
+        assert made.status_code == 201, made.text
+        return made.json()["id"]
+
+    here, there = await project("Here"), await project("There")
+    plain, _, other, *_ = await _types(session, seat, here)
+    for project_id, type_id in (
+        (here, other),
+        (there, (await _types(session, seat, there))[0]),
+    ):
+        await _require(
+            client,
+            seat,
+            {"tool": "project", "tool_id": project_id},
+            "task",
+            _required("description"),
+            task_type_id=type_id,
+        )
+    task = (
+        await client.post(
+            guild_url(installed.guild.id, "/tasks/"),
+            json={"project_id": here, "title": "Ping", "task_type_id": plain},
+            headers=headers,
+        )
+    ).json()
+
+    retyped = await client.patch(
+        guild_url(installed.guild.id, f"/tasks/{task['id']}"),
+        json={"task_type_id": other},
+        headers=headers,
+    )
+    assert retyped.status_code == 200, retyped.text
+    moved = await client.post(
+        guild_url(installed.guild.id, f"/tasks/{task['id']}/move"),
+        json={"target_project_id": there},
+        headers=headers,
+    )
+    assert moved.status_code == 200, moved.text
 
 
 # -- Events -------------------------------------------------------------------
