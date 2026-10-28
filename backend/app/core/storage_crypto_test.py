@@ -164,3 +164,23 @@ def test_ranges_are_read_as_the_store_reads_them(header, wanted):
 def test_an_empty_object_has_no_range():
     parsed = parse_header(encrypt(b"", KEY, guild_id=GUILD, generation=1))
     assert storage_crypto.plaintext_range(parsed, "bytes=0-5") is None
+
+
+def test_sealing_the_same_chunk_twice_never_repeats_a_nonce():
+    """A part retried after its first write landed is sealed again: under a
+    fresh nonce each time, whatever bytes the retry carries."""
+    header, dek = new_header(
+        KEY, guild_id=GUILD, length=CHUNK, generation=1, chunk_size=CHUNK
+    )
+    first = storage_crypto.seal_chunk(
+        header, dek, guild_id=GUILD, index=0, plaintext=b"a" * CHUNK
+    )
+    again = storage_crypto.seal_chunk(
+        header, dek, guild_id=GUILD, index=0, plaintext=b"b" * CHUNK
+    )
+    nonce = storage_crypto.NONCE_LEN
+    assert first[:nonce] != again[:nonce]
+    assert (
+        storage_crypto.open_chunk(header, dek, guild_id=GUILD, index=0, sealed=again)
+        == b"b" * CHUNK
+    )

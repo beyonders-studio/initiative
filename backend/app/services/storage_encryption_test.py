@@ -3,6 +3,9 @@ client, with an in-memory key store. No database."""
 
 import base64
 import os
+from collections.abc import Iterator
+from pathlib import Path
+from typing import Any
 
 import pytest
 
@@ -14,6 +17,7 @@ from app.services.storage import (
     EVIDENCE_KEY_PREFIX,
     EncryptedStorage,
     LocalFilesystemStorage,
+    ReadableBlob,
     S3Storage,
     get_guild_storage,
 )
@@ -27,11 +31,15 @@ CHUNK = storage_crypto.CHUNK_SIZE
 class MemoryKeyStore:
     def __init__(self) -> None:
         self.rows: dict[int, KeyRow] = {}
+        self.reopened: list[int] = []
 
-    def get(self, guild_id):
+    def get(self, guild_id: int) -> KeyRow | None:
         return self.rows.get(guild_id)
 
-    def add(self, guild_id, columns):
+    def reopen(self, guild_id: int) -> None:
+        self.reopened.append(guild_id)
+
+    def add(self, guild_id: int, columns: dict[str, str]) -> KeyRow:
         self.rows.setdefault(
             guild_id,
             KeyRow(
@@ -46,7 +54,7 @@ class MemoryKeyStore:
 
 
 @pytest.fixture(autouse=True)
-def _reset():
+def _reset() -> Iterator[None]:
     storage_config.reset_for_tests()
     yield
     storage_keys.use_keyring(None)
@@ -54,21 +62,24 @@ def _reset():
 
 
 @pytest.fixture
-def keys():
+def keys() -> MemoryKeyStore:
     return MemoryKeyStore()
 
 
 @pytest.fixture
-def keyring(keys):
+def keyring(keys: MemoryKeyStore) -> Keyring:
     return Keyring(keys, LocalRoot())
 
 
-def _local(tmp_path, keyring, guild_id=GUILD):
+def _local(
+    tmp_path: Path, keyring: Keyring, guild_id: int = GUILD
+) -> tuple[LocalFilesystemStorage, EncryptedStorage]:
     inner = LocalFilesystemStorage(base_dir=str(tmp_path), prefix=f"guild_{guild_id}/")
     return inner, EncryptedStorage(inner, guild_id=guild_id, keyring=keyring)
 
 
-def _read(blob):
+def _read(blob: ReadableBlob | None) -> bytes:
+    assert blob is not None
     if blob.path is not None:
         return blob.path.read_bytes()
     return b"".join(blob.stream)
@@ -159,7 +170,9 @@ def test_nothing_is_signed_for_direct_download(tmp_path, keyring):
     assert storage.presign_get("a.bin", ttl=60) is None
 
 
-def _upload(storage, key, plaintext, *, request_sizes):
+def _upload(
+    storage: EncryptedStorage, key: str, plaintext: bytes, *, request_sizes: list[int]
+) -> dict:
     """Drive the part methods the way ``app.services.resumable`` does."""
     state = storage.start_parts(key, part_bytes=CHUNK + 1, length=len(plaintext))
     at = 0
@@ -274,21 +287,21 @@ class _FakeKms:
     """Cloud KMS's encrypt and decrypt, keeping the plaintext and the
     associated data each ciphertext was made with."""
 
-    def __init__(self):
-        self.calls = []
-        self.sealed = {}
+    def __init__(self) -> None:
+        self.calls: list[tuple[str, dict[str, str]]] = []
+        self.sealed: dict[str, tuple[str, str]] = {}
 
-    def post(self, url, json, timeout):
+    def post(self, url: str, json: dict[str, str], timeout: float) -> Any:
         self.calls.append((url, json))
         verb = url.rsplit(":", 1)[1]
 
         class Answer:
             status_code = 200
 
-            def __init__(self, body):
+            def __init__(self, body: dict[str, str]) -> None:
                 self._body = body
 
-            def json(self):
+            def json(self) -> dict[str, str]:
                 return self._body
 
         if verb == "encrypt":
@@ -342,3 +355,47 @@ def test_an_encrypting_deployment_gets_the_wrapper(tmp_path, monkeypatch, keyrin
     storage.write("w.bin", b"through the resolver")
     assert _read(storage.open_readable("w.bin")) == b"through the resolver"
     assert storage_module.EncryptedStorage is EncryptedStorage
+
+
+def test_a_part_retried_after_its_write_landed_is_sealed_afresh(
+    tmp_path: Path, keyring: Keyring
+) -> None:
+    """The record of a part can fail after the part was written; the retry
+    starts from the same state, possibly with other bytes. It must not seal
+    them under the nonces the first attempt used."""
+    inner, storage = _local(tmp_path, keyring)
+    plaintext = os.urandom(2 * CHUNK)
+    state = storage.start_parts("resumable-r", part_bytes=CHUNK, length=len(plaintext))
+    storage.add_part("resumable-r", state, b"x" * CHUNK)
+    first = inner.resolve_readable("resumable-r").read_bytes()
+    state = storage.add_part("resumable-r", state, plaintext[:CHUNK])
+    retried = inner.resolve_readable("resumable-r").read_bytes()
+    span = slice(
+        storage_crypto.HEADER_SIZE,
+        storage_crypto.HEADER_SIZE + storage_crypto.NONCE_LEN,
+    )
+    assert first[span] != retried[span]
+    state = storage.add_part("resumable-r", state, plaintext[CHUNK:])
+    storage.finish_parts("resumable-r", state)
+    assert _read(storage.open_readable("resumable-r")) == plaintext
+
+
+def test_an_encrypting_store_refuses_a_file_of_unknown_length(
+    tmp_path: Path, keyring: Keyring
+) -> None:
+    _, storage = _local(tmp_path, keyring)
+    with pytest.raises(ValueError):
+        storage.start_parts("resumable-n", part_bytes=CHUNK)
+
+
+def test_storing_in_the_clear_with_keys_left_reopens_the_community(
+    tmp_path: Path, keys: MemoryKeyStore, keyring: Keyring
+) -> None:
+    _, storage = _local(tmp_path, keyring)
+    storage.write("then.bin", b"while it was on")
+    assert keys.reopened == []
+    _, after = _local(tmp_path, Keyring(keys, None))
+    after.write("now.bin", b"after it was unset")
+    after.start_parts("resumable-c", part_bytes=8, length=8)
+    after.write(f"{EVIDENCE_KEY_PREFIX}e", b"sealed anyway")
+    assert keys.reopened == [GUILD, GUILD]

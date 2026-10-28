@@ -176,6 +176,11 @@ class KeyStore(Protocol):
         """Insert the row unless one is there, and return whichever is."""
         ...
 
+    def reopen(self, guild_id: int) -> None:
+        """Clear the row's ``backfilled_at``: something was stored in the
+        clear since."""
+        ...
+
 
 class _LoopThread:
     """An event loop on a daemon thread of its own, to run coroutines on from
@@ -260,11 +265,24 @@ class DatabaseKeyStore:
             raise StorageKeyError(f"no storage key for community {guild_id}")
         return row
 
+    async def _reopen(self, guild_id: int) -> None:
+        async with self._connect().begin() as conn:
+            await conn.execute(
+                text(
+                    "UPDATE guild_storage_keys SET backfilled_at = NULL "
+                    "WHERE guild_id = :g AND backfilled_at IS NOT NULL"
+                ),
+                {"g": int(guild_id)},
+            )
+
     def get(self, guild_id: int) -> KeyRow | None:
         return self._thread.run(self._get(guild_id))
 
     def add(self, guild_id: int, columns: dict[str, str]) -> KeyRow:
         return self._thread.run(self._add(guild_id, columns))
+
+    def reopen(self, guild_id: int) -> None:
+        self._thread.run(self._reopen(guild_id))
 
 
 # --- The keyring ---------------------------------------------------------------
@@ -311,6 +329,15 @@ class Keyring:
     def forget(self, guild_id: int) -> None:
         with self._lock:
             self._cache.pop(int(guild_id), None)
+
+    def stored_in_the_clear(self, guild_id: int) -> None:
+        """Note that ``guild_id`` stored something unencrypted while this
+        keyring only reads (encryption unset, keys left), so the backfill
+        looks at the community again once encryption is back on. One update
+        per such write: a state a deployment passes through, not one it
+        lives in."""
+        if not self.encrypts:
+            self.store.reopen(guild_id)
 
 
 _keyring: Keyring | None = None

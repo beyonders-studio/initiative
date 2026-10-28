@@ -913,8 +913,15 @@ class EncryptedStorage:
 
     # --- Writes -------------------------------------------------------------
 
+    def _in_the_clear(self, key: str) -> None:
+        # Encryption unset with keys left: what is stored now is in the clear,
+        # so the community is not caught up any more.
+        if not self._untouched(key):
+            self._keyring.stored_in_the_clear(self._guild_id)
+
     def write(self, key: str, data: bytes, *, content_type: str | None = None) -> None:
         if not self._writes_encrypted(key):
+            self._in_the_clear(key)
             self._inner.write(key, data, content_type=content_type)
             return
         from app.core import storage_crypto
@@ -932,6 +939,7 @@ class EncryptedStorage:
         self, key: str, path: Path, *, content_type: str | None = None
     ) -> None:
         if not self._writes_encrypted(key):
+            self._in_the_clear(key)
             self._inner.write_file(key, path, content_type=content_type)
             return
         import tempfile
@@ -1104,8 +1112,15 @@ class EncryptedStorage:
     def start_parts(
         self, key: str, *, part_bytes: int, length: int | None = None
     ) -> dict:
-        if length is None or not self._writes_encrypted(key):
+        if not self._writes_encrypted(key):
+            self._in_the_clear(key)
             return self._inner.start_parts(key, part_bytes=part_bytes)
+        if length is None:
+            # The header carries the length; without it the file would have to
+            # be stored in the clear, which an encrypting store never does.
+            raise ValueError(
+                "an encrypted store starts a file in parts with its length"
+            )
         import base64
 
         from app.core import storage_crypto

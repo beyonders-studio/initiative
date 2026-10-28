@@ -9,12 +9,21 @@ names an object has to change.
 
 - **One process at a time**, under an advisory lock: a second one finds it
   taken and leaves it.
-- **Each community once.** When a community's namespace holds nothing in the
-  clear, its key row records ``backfilled_at`` and later passes skip it. New
-  objects in it are encrypted as they are written.
-- **Staging and evidence are left alone.** A file still arriving in parts
-  finishes as it began, and its parts and kept tail are thrown away with it;
-  evidence is encrypted under its own scheme already.
+- **Each community until it is caught up.** When a community's namespace holds
+  nothing in the clear, its key row records ``backfilled_at`` and later passes
+  skip it. New objects in it are encrypted as they are written. A community is
+  not marked while a file it began in the clear is still arriving, and a
+  process that stores in the clear after encryption was unset clears the mark
+  again (``EncryptedStorage``), so turning encryption off and on never leaves
+  what was stored in between behind.
+- **What is still arriving is left alone.** A tus upload's staged object only
+  becomes a file once it is complete (and keeps its ``resumable-`` key as its
+  filename after that, so finished ones are encrypted like any other file).
+  Until then its parts and kept tail are not a file; evidence is encrypted
+  under its own scheme already.
+- **Not at once on boot.** The first pass waits :data:`START_DELAY_SECONDS`,
+  so a rolling deploy that turns encryption on has replaced the processes
+  that would still store in the clear before any community is marked.
 
 On S3 a re-write leaves the plaintext as the object's previous version, which
 the bucket's own lifecycle removes (30 days on the cloud's uploads bucket).
@@ -24,6 +33,7 @@ from __future__ import annotations
 
 import asyncio
 import logging
+import time
 
 from sqlalchemy import text
 
@@ -34,20 +44,23 @@ logger = logging.getLogger(__name__)
 
 #: How often a process looks for something left to encrypt.
 PASS_SECONDS = 6 * 3600
+#: How long after this process started its first pass waits.
+START_DELAY_SECONDS = 600
+_STARTED = time.monotonic()
 
 
-def _left_alone(key: str) -> bool:
-    from app.services.resumable import STAGING_PREFIX
+def _left_alone(key: str, arriving: frozenset[str]) -> bool:
     from app.services.storage import EVIDENCE_KEY_PREFIX
 
-    return key.startswith((STAGING_PREFIX, EVIDENCE_KEY_PREFIX)) or key.endswith(
-        ("-tail", "-etail")
-    )
+    if key.startswith(EVIDENCE_KEY_PREFIX) or key.endswith("-etail"):
+        # Sealed already: evidence by blob_crypto, a kept tail by its upload.
+        return True
+    return key in arriving or key.removesuffix("-tail") in arriving
 
 
-def encrypt_community(guild_id: int) -> int:
-    """Encrypt every object ``guild_id`` stored in the clear. Blocks; returns
-    how many it re-wrote."""
+def encrypt_community(guild_id: int, arriving: frozenset[str] = frozenset()) -> int:
+    """Encrypt every object ``guild_id`` stored in the clear, but the uploads
+    still ``arriving``. Blocks; returns how many it re-wrote."""
     from app.services.storage import EncryptedStorage, get_guild_storage
 
     storage = get_guild_storage(guild_id)
@@ -57,7 +70,7 @@ def encrypt_community(guild_id: int) -> int:
     storage._keyring.key_for(guild_id, create=True)
     done = failed = 0
     for key in list(storage.inner.iter_keys()):  # type: ignore[attr-defined]
-        if _left_alone(key):
+        if _left_alone(key, arriving):
             continue
         try:
             if storage.encrypt_in_place(key):
@@ -72,6 +85,28 @@ def encrypt_community(guild_id: int) -> int:
     return done
 
 
+async def _arriving(guild_id: int) -> tuple[frozenset[str], bool]:
+    """The uploads still arriving in ``guild_id``, and whether any of them
+    began in the clear (and so will finish in the clear)."""
+    from app.db import cohorts
+    from app.db.request_context import SystemGuild
+
+    async with cohorts.system_session(guild_id) as session:
+        await db_session.set_rls_context(session, SystemGuild(guild_id, read_only=True))
+        rows = (
+            await session.exec(
+                text(
+                    "SELECT staging_key, blob_state FROM pending_uploads "
+                    "WHERE completed_at IS NULL"
+                )
+            )
+        ).all()
+        await session.rollback()
+    keys = frozenset(row.staging_key for row in rows)
+    in_the_clear = any("enc" not in (row.blob_state or {}) for row in rows)
+    return keys, in_the_clear
+
+
 async def encrypt_existing() -> int:
     """One pass over every community not yet caught up. Returns how many
     objects it encrypted."""
@@ -80,6 +115,9 @@ async def encrypt_existing() -> int:
     keyring = storage_keys.active_keyring()
     if keyring is None or not keyring.encrypts:
         return 0
+    wait = START_DELAY_SECONDS - (time.monotonic() - _STARTED)
+    if wait > 0:
+        await asyncio.sleep(wait)
     total = 0
     async with db_session.system_engine.connect() as conn:
         if not await advisory_lock(
@@ -103,12 +141,19 @@ async def encrypt_existing() -> int:
             await conn.rollback()
             for guild_id in guild_ids:
                 try:
-                    done = await asyncio.to_thread(encrypt_community, guild_id)
+                    arriving, in_the_clear = await _arriving(guild_id)
+                    done = await asyncio.to_thread(
+                        encrypt_community, guild_id, arriving
+                    )
                 except Exception:
+                    logger.exception(
+                        "storage encryption: guild %s not caught up", guild_id
+                    )
                     continue
-                async with db_session.SystemSessionLocal() as session:
-                    await storage_keys.mark_backfilled(session, guild_id)
-                    await session.commit()
+                if not in_the_clear:
+                    async with db_session.SystemSessionLocal() as session:
+                        await storage_keys.mark_backfilled(session, guild_id)
+                        await session.commit()
                 total += done
                 if done:
                     logger.info(
