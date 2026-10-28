@@ -18,6 +18,7 @@ from app.models.platform.access_grant import AccessGrant
 from app.models.platform.access_grant_activity import AccessGrantActivity
 from app.models.platform.app_setting import AppSetting
 from app.models.platform.guild import CommunityRole
+from app.models.platform.user import User
 from app.models.tenant.comment import Comment
 from app.models.tenant.intake import IntakeBinding
 from app.models.tenant.task import Task, TaskStatus, TaskStatusCategory
@@ -225,8 +226,8 @@ async def test_the_picker_lists_open_cases_the_reader_can_read(
     assert response.status_code == 200, response.text
     body = response.json()
     assert body["required"] is True
-    listed = [case["task_id"] for case in body["items"]]
-    assert support_case in listed
+    listed = {case["task_id"]: case for case in body["items"]}
+    assert listed[support_case]["community_notice"] == "always"
     assert feedback_case not in listed
 
 
@@ -744,3 +745,128 @@ async def test_a_grant_whose_case_is_gone_is_closed_out_untold(
         await session.exec(select(AccessGrant).where(AccessGrant.id == grant_id))
     ).one()
     assert closed.closed_out_at is not None
+
+
+# ── Telling the community ────────────────────────────────────────────────────
+
+
+async def _letters(session: AsyncSession, user_id: int) -> list:
+    from app.models.platform.email_outbox import EmailOutboxItem
+
+    session.expire_all()
+    return list(
+        (
+            await session.exec(
+                select(EmailOutboxItem).where(EmailOutboxItem.user_id == user_id)
+            )
+        ).all()
+    )
+
+
+@pytest.fixture
+def mail_on(monkeypatch):
+    from unittest.mock import AsyncMock
+
+    from app.services import email as email_service
+
+    monkeypatch.setattr(email_service, "email_configured", AsyncMock(return_value=True))
+
+
+async def test_support_access_always_tells_the_community_when_it_starts(
+    client: AsyncClient, session: AsyncSession, desk, acting_user, mail_on
+):
+    seat_id = (await create_user(session)).id
+    target = await create_guild(
+        session, creator=await session.get(User, seat_id), name="Lantern Club"
+    )
+    target_id = target.id
+    task_id = await _case()
+    requested = await _request(
+        client,
+        desk["agent"],
+        target_id,
+        case_task_id=task_id,
+        community_notice="none",
+    )
+    assert requested.status_code == 201, requested.text
+    assert requested.json()["community_notice"] == "when_granted"
+    # Asked for is not yet given: nothing is said until it is.
+    assert await _letters(session, seat_id) == []
+
+    owner = await acting_user("owner")
+    approved = await client.post(
+        f"{GRANTS}{requested.json()['id']}/approve", json={}, headers=owner.headers
+    )
+    assert approved.status_code == 200, approved.text
+    (letter,) = await _letters(session, seat_id)
+    assert letter.security is True
+    assert letter.subject == "Platform staff have access to Lantern Club"
+    assert "read-only" in letter.body
+    assert "support case" in letter.body
+
+
+async def test_a_security_case_may_tell_the_community_once_access_ends(
+    client: AsyncClient, session: AsyncSession, desk, mail_on
+):
+    await set_rls_context(session, SystemGuild(desk["guild_id"]))
+    session.add(
+        IntakeBinding(stream=IntakeStream.security, project_id=desk["staff"].project.id)
+    )
+    await session.commit()
+    await set_rls_context(session, Unattributed())
+    seat_id = (await create_user(session)).id
+    target = await create_guild(session, creator=await session.get(User, seat_id))
+    task_id = await _case(IntakeStream.security)
+
+    requested = await _request(
+        client,
+        desk["agent"],
+        target.id,
+        case_task_id=task_id,
+        community_notice="when_ended",
+        access_level="read",
+        settings_level="admin",
+    )
+    assert requested.status_code == 201, requested.text
+    grants = (
+        await session.exec(
+            select(AccessGrant).where(AccessGrant.case_task_id == task_id)
+        )
+    ).all()
+    assert {grant.community_notice for grant in grants} == {"when_ended"}
+
+    # Both were given, together, and have since ended.
+    now = datetime.now(timezone.utc)
+    for grant in grants:
+        grant.status = "approved"
+        grant.decided_at = now - timedelta(hours=2)
+        grant.expires_at = now - timedelta(hours=1)
+        session.add(grant)
+    await session.commit()
+    assert await _letters(session, seat_id) == []
+
+    await set_rls_context(session, Unattributed())
+    await grant_cases.report_activity(session, now=now)
+    (letter,) = await _letters(session, seat_id)
+    assert letter.subject.startswith("Platform staff had access to")
+    assert "read-only" in letter.body
+    assert "community-settings (admin)" in letter.body
+    assert "security case" in letter.body
+
+
+async def test_telling_the_community_is_chosen_only_where_offered(
+    client: AsyncClient, session: AsyncSession, desk, acting_user
+):
+    owner = await acting_user("operator")
+    target = await create_guild(session)
+    response = await client.post(
+        f"{GRANTS}break-glass",
+        json={
+            "community_id": target.id,
+            "reason": "an emergency",
+            "community_notice": "when_granted",
+        },
+        headers=owner.headers,
+    )
+    assert response.status_code == 400, response.text
+    assert response.json()["detail"] == AccessGrantMessages.COMMUNITY_NOTICE_NOT_OFFERED

@@ -787,6 +787,7 @@
   "ACCESS_GRANT_CASE_NOT_LINKABLE": "On ne peut pas demander d'accès pour un dossier de ce type.",
   "ACCESS_GRANT_CASE_CLOSED": "Ce dossier est clos.",
   "ACCESS_GRANT_CASE_OTHER_COMMUNITY": "Ce dossier concerne une autre communauté.",
+  "ACCESS_GRANT_COMMUNITY_NOTICE_NOT_OFFERED": "Prévenir la communauté ne peut être choisi que pour un dossier de sécurité ou de modération.",
   "HOLD_CASE_OTHER_COMMUNITY": "Ce dossier concerne une autre communauté que celle de ce contenu.",
   "DEMO_LINK_NOT_FOUND": "Ce lien de démonstration ne fonctionne plus. Demandez-en un nouveau à la personne qui vous l'a envoyé.",
   "DEMO_BUSY": "Tous les espaces de démonstration sont occupés. Réessayez dans une minute.",

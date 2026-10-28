@@ -455,6 +455,7 @@ describe("SettingsAccessGrantsPage", () => {
       stream: "moderation",
       subject_community_id: 7,
       mine: true,
+      community_notice: "optional",
     } as const;
     const lostPhone = {
       task_id: 32,
@@ -462,6 +463,7 @@ describe("SettingsAccessGrantsPage", () => {
       stream: "support",
       subject_community_id: null,
       mine: false,
+      community_notice: "always",
     } as const;
 
     /** Choose a case in the form's picker (the first, or the one given). */
@@ -590,6 +592,39 @@ describe("SettingsAccessGrantsPage", () => {
       await user.click(screen.getByRole("button", { name: /request access/i }));
 
       expect(createRequest.mock.calls[0][0]).toMatchObject({ community_id: 9, case_task_id: 31 });
+    });
+
+    it("lets a moderation case tell its community, once access has ended", async () => {
+      grantCases = { items: [spamWave, lostPhone], required: true };
+      const user = userEvent.setup();
+      render();
+
+      expect(screen.queryByRole("combobox", { name: "Tell the community" })).toBeNull();
+      await pickCase(user, /Spam wave/);
+      await user.click(screen.getByRole("combobox", { name: "Tell the community" }));
+      await user.click(await screen.findByRole("option", { name: "Once access has ended" }));
+      await user.type(screen.getByLabelText(/reason/i), "the spam wave");
+      await user.click(screen.getByRole("button", { name: /request access/i }));
+
+      expect(createRequest.mock.calls[0][0]).toMatchObject({
+        case_task_id: 31,
+        community_notice: "when_ended",
+      });
+    });
+
+    it("says a support case always tells its community, and offers no choice", async () => {
+      grantCases = { items: [spamWave, lostPhone], required: true };
+      const user = userEvent.setup();
+      render();
+
+      await pickCommunity(user);
+      await pickCase(user, /Lost phone/);
+      expect(screen.getByText(/always emailed to the community's superadmins/)).toBeInTheDocument();
+      expect(screen.queryByRole("combobox", { name: "Tell the community" })).toBeNull();
+      await user.type(screen.getByLabelText(/reason/i), "their lost phone");
+      await user.click(screen.getByRole("button", { name: /request access/i }));
+
+      expect(createRequest.mock.calls[0][0].community_notice).toBeUndefined();
     });
 
     it("breaks glass for the case chosen", async () => {

@@ -1296,6 +1296,64 @@ def project_added_pieces(
     )
 
 
+def community_access_pieces(
+    *,
+    community: str,
+    levels: Sequence[str],
+    stream: str | None,
+    started_at: datetime,
+    ends_at: datetime | None,
+    ended: bool,
+    contact: str | None,
+    locale: str,
+) -> EmailPieces:
+    """Platform staff's access to a community, as a letter to its seat
+    holders in ``locale``: the levels, the kind of case it serves, and when —
+    until when, while it is ``ended=False``; from when to when once it is
+    over. Queued as account mail."""
+    level_label = ", ".join(
+        email_t(LEVEL_LABEL_KEYS[level], locale=locale)
+        for level in levels
+        if level in LEVEL_LABEL_KEYS
+    )
+
+    def moment(value: datetime) -> str:
+        return email_t(
+            "communityAccess.moment",
+            locale=locale,
+            date=email_date(value, locale),
+            time=value.strftime("%H:%M"),
+        )
+
+    event = "ended" if ended else "granted"
+    body = email_t(
+        f"communityAccess.{event}.body",
+        locale=locale,
+        community=community,
+        level=level_label,
+        start=moment(started_at),
+        end=moment(ends_at) if ends_at is not None else "",
+    )
+    parts = [body]
+    if stream is not None:
+        parts.append(email_t(f"communityAccess.case.{stream}", locale=locale))
+    parts.append(email_t("communityAccess.recorded", locale=locale))
+    if contact:
+        parts.append(email_t("communityAccess.contact", locale=locale, contact=contact))
+    return EmailPieces(
+        subject=email_t(
+            f"communityAccess.{event}.subject",
+            locale=locale,
+            community=community,
+            escape=False,
+        ),
+        headline=email_t(
+            f"communityAccess.{event}.title", locale=locale, community=community
+        ),
+        body=" ".join(parts),
+    )
+
+
 def access_grant_pieces(
     user: User,
     *,

@@ -437,6 +437,26 @@
     "contactNobody": "Wende dich an die Betreiber dieses Servers, um das zu klären.",
     "buttonLabel": "Tarif wiederherstellen"
   },
+  "communityAccess": {
+    "granted": {
+      "subject": "Plattform-Mitarbeitende haben Zugriff auf {{community}}",
+      "title": "Plattform-Mitarbeitende haben Zugriff auf {{community}}",
+      "body": "Mitarbeitende dieses Servers haben am {{start}} Zugriff (<strong>{{level}}</strong>) auf <strong>{{community}}</strong> erhalten, bis {{end}}."
+    },
+    "ended": {
+      "subject": "Plattform-Mitarbeitende hatten Zugriff auf {{community}}",
+      "title": "Plattform-Mitarbeitende hatten Zugriff auf {{community}}",
+      "body": "Mitarbeitende dieses Servers hatten vom {{start}} bis {{end}} Zugriff (<strong>{{level}}</strong>) auf <strong>{{community}}</strong>. Dieser Zugriff ist beendet."
+    },
+    "case": {
+      "security": "Er galt einem Sicherheitsfall.",
+      "moderation": "Er galt einem Moderationsfall.",
+      "support": "Er galt einem Support-Fall."
+    },
+    "recorded": "Jede Anfrage, die damit gestellt wird, wird protokolliert.",
+    "contact": "Fragen dazu kannst du an <strong>{{contact}}</strong> richten.",
+    "moment": "{{date}}, {{time}} UTC"
+  },
   "communityTrialEnding": {
     "subject": "Die Testphase von {{community}} endet am {{date}}",
     "title": "Die Testphase von {{community}} endet am {{date}}",

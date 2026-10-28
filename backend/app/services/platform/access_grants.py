@@ -40,6 +40,7 @@ from app.models.platform.access_grant import (
     AccessGrantPurpose,
     AccessGrantStatus,
     AccessLevel,
+    CommunityNotice,
 )
 from app.models.platform.guild import Guild, CommunityStatus
 from app.models.platform.notification import NotificationType
@@ -233,11 +234,13 @@ async def request_grants(
     requester: User,
     payload: AccessGrantCreate,
     asks: list[tuple[str, str]],
+    community_notice: CommunityNotice = CommunityNotice.none,
 ) -> list[AccessGrant]:
     """Create the pending grants ``payload`` asks for, as one act.
 
     Validate every purpose first, create one row per purpose, and notify each
     approver once after the complete request is established.
+    ``community_notice`` is the notice the case it names settled on.
     """
     await _lock_user_guild_grants(
         session, user_id=requester.id, guild_id=payload.community_id
@@ -297,6 +300,7 @@ async def request_grants(
             requested_duration_minutes=duration,
             requested_by_id=requester.id,
             case_task_id=payload.case_task_id,
+            community_notice=community_notice.value,
         )
         session.add(grant)
         created.append(grant)
@@ -383,6 +387,7 @@ async def break_glass(
     allow_member: bool = False,
     purpose: AccessGrantPurpose = AccessGrantPurpose.content,
     level: str,
+    community_notice: CommunityNotice = CommunityNotice.none,
 ) -> AccessGrant:
     """Self-issue a time-bound break-glass grant for ``actor`` to one guild.
 
@@ -464,6 +469,7 @@ async def break_glass(
         decided_at=now,
         expires_at=now + timedelta(minutes=duration),
         case_task_id=getattr(payload, "case_task_id", None),
+        community_notice=community_notice.value,
     )
     session.add(grant)
     await session.flush()

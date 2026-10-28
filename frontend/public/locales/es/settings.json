@@ -1067,7 +1067,19 @@
     "caseRequiredNoneOpen": "Aquí el acceso se solicita para un caso, y no hay ningún caso abierto que puedas indicar. Abre uno primero.",
     "caseOptionalHint": "Opcional. Sin uno, anota después a mano en el caso lo que hiciste.",
     "caseOtherCommunity": "Este caso trata de la comunidad #{{community}}, no de la elegida.",
-    "caseMark": "Caso #{{id}}"
+    "caseMark": "Caso #{{id}}",
+    "notice": {
+      "label": "Avisar a la comunidad",
+      "none": "No avisar",
+      "when_granted": "Cuando empiece el acceso",
+      "when_ended": "Cuando el acceso haya terminado",
+      "help": "Sus superadministradores reciben por correo el nivel y el tipo de caso, nunca el motivo.",
+      "always": "El acceso para un caso de soporte siempre se comunica por correo a los superadministradores de la comunidad cuando empieza.",
+      "mark": {
+        "when_granted": "se avisa a la comunidad al empezar",
+        "when_ended": "se avisa a la comunidad al terminar"
+      }
+    }
   },
   "platformLayout": {
     "title": "Configuración de la plataforma",
