@@ -70,10 +70,12 @@ _PLUGIN_BINDING = {"source": "plugin", "params": {"document_id": 5}}
 
 def _guild_runner(schema: str):
     """Revision 0464 one way or the other, on one guild's schema only. The
-    galleries conversion (20261027_0546) comes off first and goes back last:
-    the checks 0464 restates name the permissions as they were then."""
+    metadata store (20261027_0550) and the galleries conversion
+    (20261027_0546) come off first and go back last: the checks 0464 restates
+    name the permissions as they were then."""
     files = _load("20261006_0464_documents_are_files.py")
     collections = _load("20261027_0546_galleries_are_collections.py")
+    metadata = _load("20261027_0550_metadata_is_one_store.py")
 
     def run(forward: bool):
         def apply(sync_session) -> None:
@@ -90,7 +92,9 @@ def _guild_runner(schema: str):
                 if forward:
                     files._convert(bind, True, in_schema)
                     collections._convert(bind, True, in_schema)
+                    in_schema(lambda: metadata._apply(True))
                 else:
+                    in_schema(lambda: metadata._apply(False))
                     collections._convert(bind, False, in_schema)
                     files._convert(bind, False, in_schema)
 
@@ -108,8 +112,17 @@ async def _guild_values(session, schema: str, ids: dict[str, int]) -> dict:
             "WHERE resource_id = :id AND resource_type IN ('file', 'document')",
             id=ids["file"],
         ),
+        # The values' table, by the name it has on either side.
         "property": await _rows(
-            session, f"SELECT entity_type FROM {s}.property_values"
+            session,
+            "SELECT entity_type FROM "
+            + (
+                await _rows(
+                    session,
+                    f"SELECT COALESCE(to_regclass('{s}.metadata_values'), "
+                    f"to_regclass('{s}.property_values'))::text",
+                )
+            )[0][0],
         ),
         "edge": await _rows(
             session,

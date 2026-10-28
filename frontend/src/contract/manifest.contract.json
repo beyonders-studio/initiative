@@ -3,7 +3,7 @@
   "schema": {
     "$id": "https://initiativetasks.com/schemas/plugin-manifest-v1.json",
     "title": "Initiative plug-in manifest (the 'definition' body)",
-    "description": "What a plug-in declares it can do. A plug-in is a container, which names its `service` and answers Initiative's calls, or declarative, which names its `hosts` and no service, and whose endpoints, connection checks, webhook events, schedules and actions Initiative runs itself from the requests and JSONata expressions written here, keeping the values they write on items; one plug-in is never both. This is the 'definition' field of the document served at /.well-known/initiative-plugin.json, NOT that whole document: a registrar also requires protocol_version, public_id and kind alongside it, and refuses a definition served bare. Generated from the platform's own validator vocabulary. A manifest that satisfies this schema is well-formed, not necessarily acceptable. Cross-references (the endpoint a widget binds, a requires term's connection, an endpoint's service prefix), the direction-specific rules on an endpoint, the features/blocks cross-check in both directions, UTF-8 byte-size caps, the rules tying a connection's flow and token to its scope and fields, what a webhooks block names, what a vendor setup writes to, whether every expression parses, what a declarative request and its steps name, the bounds, ids and endpoints of schedules, which terms each kind's schedules, actions, fields and webhook events take, the unique keys and ids of fields, parts, actions and settings, what a part's nodes, a field's element actions and an action's endpoint and params name, the placeholders in a part's text, and a part's size and depth are enforced by the platform on publish and are not expressible here."
+    "description": "What a plug-in declares it can do. A plug-in is a container, which names its `service` and answers Initiative's calls, or declarative, which names its `hosts` and no service, and whose endpoints, connection checks, webhook events, schedules and actions Initiative runs itself from the requests and JSONata expressions written here, keeping the values they write on items; one plug-in is never both. This is the 'definition' field of the document served at /.well-known/initiative-plugin.json, NOT that whole document: a registrar also requires protocol_version, public_id and kind alongside it, and refuses a definition served bare. Generated from the platform's own validator vocabulary. A manifest that satisfies this schema is well-formed, not necessarily acceptable. Cross-references (the endpoint a widget binds, a requires term's connection, an endpoint's service prefix), the direction-specific rules on an endpoint, the features/blocks cross-check in both directions, UTF-8 byte-size caps, the rules tying a connection's flow and token to its scope and fields, what a webhooks block names, what a vendor setup writes to, whether every expression parses, what a declarative request and its steps name, the bounds, ids and endpoints of schedules, which terms each kind's schedules, actions, fields and webhook events take, the unique keys and ids of fields, parts, actions and settings, the unique values of a field's options, what a part's nodes, a field's element actions and an action's endpoint and params name, the placeholders in a part's text, and a part's size and depth are enforced by the platform on publish and are not expressible here."
   },
   "charsets": {
     "identifier": "-0123456789_abcdefghijklmnopqrstuvwxyz",
@@ -168,8 +168,13 @@
       "datetime",
       "link",
       "badge",
-      "progress",
-      "checkbox"
+      "scale",
+      "checkbox",
+      "url",
+      "currency",
+      "select",
+      "multi_select",
+      "user_reference"
     ],
     "tone": [
       "accent",
@@ -231,6 +236,7 @@
     "authorizeParams": 12,
     "tokenLifetimeSeconds": 600,
     "selectOptions": 24,
+    "optionValueLength": 64,
     "accessHintScopes": 24,
     "requiresTerms": 10,
     "widgets": 12,
@@ -1270,12 +1276,12 @@
         },
         "kind": {
           "enum": "fieldKind",
-          "description": "What the value is, and so how it is drawn: 'text' a string; 'number' a number; 'date' a 'YYYY-MM-DD' string; 'datetime' an ISO 8601 string with its offset; 'link' {url, text?}; 'badge' {text, tone?}; 'progress' {value, max}; 'checkbox' a boolean."
+          "description": "What the value is, and so how it is drawn: 'text' a string; 'number' a number; 'date' a 'YYYY-MM-DD' string; 'datetime' an ISO 8601 string with its offset; 'link' {url, text?}; 'badge' {text, tone?}; 'scale' a number from 0 to 100, or {value, max}, which Initiative keeps as value \u00f7 max \u00d7 100, drawn as a number, stars or a bar; 'checkbox' a boolean; 'url' an address, as a string; 'currency' a number, an amount in the field's 'currency'; 'select' the value of one of the field's 'options'; 'multi_select' a list of them; 'user_reference' a person, as the install's own reference for them: the 'id' Initiative gives the person wherever the plug-in reads one."
         },
         "list": {
           "type": "boolean",
           "default": false,
-          "description": "Several values rather than one: the value is a list of elements, each one value of 'kind' with a 'ref' that tells it from the others ('listElement'). A change gives the whole list in 'set', or adds, replaces and removes elements by 'ref' with 'upsert' and 'remove'. Absent: one value, which a change sets."
+          "description": "Several values rather than one: the value is a list of elements, each one value of 'kind' with a 'ref' that tells it from the others ('listElement'). A change gives the whole list in 'set', or adds, replaces and removes elements by 'ref' with 'upsert' and 'remove'. Absent: one value, which a change sets. Every kind but 'multi_select', whose one value is already several."
         },
         "on": {
           "type": "array",
@@ -1297,6 +1303,20 @@
           "enum": "tone",
           "description": "A badge's tone when its value names none."
         },
+        "currency": {
+          "type": "string",
+          "pattern": "^[A-Z]{3}$",
+          "description": "A currency field's ISO 4217 code, such as 'EUR': what its amounts are in. Required on one."
+        },
+        "options": {
+          "type": "array",
+          "minItems": 1,
+          "maxItems": "selectOptions",
+          "items": {
+            "ref": "fieldOption"
+          },
+          "description": "A select or multi_select field's options, each value at most once. Required on one."
+        },
         "states": {
           "type": "object",
           "minProperties": 1,
@@ -1307,7 +1327,7 @@
           "additionalProperties": {
             "ref": "stateFacet"
           },
-          "description": "What state the value is in, as facets by id, at most {facetsPerField}, each with keys of its own. The value names a key of each facet it is in as 'state', {\"<facet>\": \"<key>\"}, and Initiative draws each as a badge, labelled in the reader's language. A list element, and a link, badge or progress value, carries 'state' beside its other properties; a text, number, date, datetime or checkbox value that carries one is written as an element is, without the 'ref': {\"value\": \u2026, \"state\": \u2026}."
+          "description": "What state the value is in, as facets by id, at most {facetsPerField}, each with keys of its own. The value names a key of each facet it is in as 'state', {\"<facet>\": \"<key>\"}, and Initiative draws each as a badge, labelled in the reader's language. A list element, and a link, badge or scale value written as an object, carries 'state' beside its other properties; any other value that carries one is written as an element is, without the 'ref': {\"value\": \u2026, \"state\": \u2026}."
         },
         "actions": {
           "type": "array",
@@ -1322,7 +1342,92 @@
         "requires": {
           "ref": "requires"
         }
-      }
+      },
+      "allOf": [
+        {
+          "if": {
+            "properties": {
+              "kind": {
+                "const": "currency"
+              }
+            },
+            "required": [
+              "kind"
+            ]
+          },
+          "then": {
+            "required": [
+              "currency"
+            ]
+          }
+        },
+        {
+          "if": {
+            "properties": {
+              "kind": {
+                "enum": [
+                  "select",
+                  "multi_select"
+                ]
+              }
+            },
+            "required": [
+              "kind"
+            ]
+          },
+          "then": {
+            "required": [
+              "options"
+            ]
+          }
+        },
+        {
+          "if": {
+            "properties": {
+              "kind": {
+                "const": "multi_select"
+              }
+            },
+            "required": [
+              "kind"
+            ]
+          },
+          "then": {
+            "properties": {
+              "list": {
+                "const": false
+              }
+            }
+          }
+        }
+      ]
+    },
+    "fieldOption": {
+      "type": "object",
+      "description": "One option of a select or multi_select field: the value a value names, and how Initiative shows it.",
+      "required": [
+        "value",
+        "label"
+      ],
+      "properties": {
+        "value": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": "optionValueLength",
+          "pattern": "^[A-Za-z0-9][A-Za-z0-9_\\-]*$",
+          "description": "What a value holds when it names this option: a letter or a digit, then letters, digits, '_' and '-'. Unique among the field's options."
+        },
+        "label": {
+          "ref": "localizedText",
+          "description": "The option's words, in the reader's language."
+        },
+        "color": {
+          "type": "string",
+          "pattern": "^#[0-9A-Fa-f]{6}$",
+          "description": "The option's colour, as '#rrggbb'."
+        }
+      },
+      "additionalProperties": false
     },
     "stateFacet": {
       "type": "object",
@@ -1883,7 +1988,7 @@
     },
     "listElement": {
       "type": "object",
-      "description": "One element of a list field's value: one value of the field's 'kind', with a 'ref' that tells it from the list's others. A text, number, date, datetime or checkbox element holds its value in 'value'; a link element is {ref, url, text?}, a badge element {ref, text, tone?} and a progress element {ref, value, max}. Initiative keeps each element as a value of its own, of at most {metadataValueBytes} bytes as JSON. An 'upsert' may give only some of an element's properties: they are merged into the element with its 'ref'.",
+      "description": "One element of a list field's value: one value of the field's 'kind', with a 'ref' that tells it from the list's others. A text, number, date, datetime, checkbox, url, currency, select or user_reference element holds its value in 'value'; a link element is {ref, url, text?}, a badge element {ref, text, tone?} and a scale element {ref, value, max?}. Initiative keeps each element as a value of its own, of at most {metadataValueBytes} bytes as JSON. An 'upsert' may give only some of an element's properties: they are merged into the element with its 'ref'.",
       "required": [
         "ref"
       ],
@@ -1897,7 +2002,7 @@
             "number",
             "boolean"
           ],
-          "description": "A text, number, date, datetime or checkbox element's value, or a progress element's figure."
+          "description": "A text, number, date, datetime, checkbox, url, currency, select or user_reference element's value, or a scale element's figure: from 0 to 100, or out of its 'max'."
         },
         "url": {
           "type": "string",
@@ -1913,7 +2018,8 @@
         },
         "max": {
           "type": "number",
-          "description": "A progress element's whole."
+          "exclusiveMinimum": 0,
+          "description": "A scale element's whole, when its figure is not already out of 100: Initiative keeps value \u00f7 max \u00d7 100."
         },
         "state": {
           "type": "object",

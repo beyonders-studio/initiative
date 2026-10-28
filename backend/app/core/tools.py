@@ -272,7 +272,7 @@ ARCHIVE_TARGETS: tuple[str, ...] = tuple(t.value for t in Tool) + ARCHIVABLE_EXT
 
 # Property surfaces: EVERY tool carries custom properties, plus every sub-tool —
 # the rows inside a tool that are things in their own right. The properties
-# seam (app.services.tenant.properties.PROPERTY_LINKS), the value table's
+# seam (app.services.tenant.metadata.PROPERTY_LINKS), the value table's
 # CHECK, its policies and the ``PropertyTarget`` schema enum all derive from
 # PROPERTY_TARGETS, so a new Tool carries properties with no per-surface edit.
 PROPERTY_TARGETS: tuple[str, ...] = CONTENT_KINDS
@@ -314,8 +314,9 @@ LAYOUT_TARGETS: tuple[str, ...] = (
 )
 # A target has one layout of each kind its tool draws: how it lists what it
 # holds (``LIST_LAYOUTS``), and how it shows one of them on its own
-# (``DETAIL_LAYOUTS``: a project's task, the calendar's event). A tool with none here yet stores
-# none. The list a target opens on is one more row (``LAYOUT_DEFAULT``).
+# (``DETAIL_LAYOUTS``: a project's task, the calendar's event, a collection's
+# file). A tool with none here yet stores none. The list a target opens on is
+# one more row (``LAYOUT_DEFAULT``).
 #: Every target that names an instance, and the table its ``tool_id`` points at.
 LAYOUT_INSTANCE_TABLES: dict[str, str] = {
     **{tool.value: tool.plural for tool in LAYOUTS_PER_INSTANCE},
@@ -337,6 +338,7 @@ DETAIL_LAYOUTS: dict[str, tuple[str, ...]] = {
     Tool.queue: ("queue_item",),
     Tool.counter_group: ("counter",),
     Tool.post: ("post",),
+    "collection": ("file",),
 }
 #: The details laid out once per type of item rather than once per target: a
 #: project's task page is one per task type (``tool_layouts.task_type_id``).

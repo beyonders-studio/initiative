@@ -28,7 +28,7 @@ from dataclasses import dataclass, field
 from datetime import datetime, timezone
 from typing import Any, Callable, Optional
 
-from app.models.tenant.property import PropertyType
+from app.models.tenant.metadata import MetadataType
 from app.services.import_engine.adf import adf_to_markdown
 
 #: The property every imported task carries, naming what it was called in Jira.
@@ -49,7 +49,7 @@ class FieldSpec:
 
     field_id: str
     name: str
-    property_type: PropertyType
+    property_type: MetadataType
     #: Jira's value → the envelope's, or ``None`` when there is nothing in it.
     read: Callable[[Any], Any]
 
@@ -171,23 +171,23 @@ def _cascade(value: Any) -> Optional[str]:
 #: The built-in fields with a property home, by field id, with the name §6.1
 #: gives each. The rest of Jira's system fields either have a home already
 #: (title, status, type, tags, assignee, dates, links) or none worth a column.
-_SYSTEM_FIELDS: dict[str, tuple[str, PropertyType, Callable[[Any], Any]]] = {
-    "priority": ("Priority", PropertyType.select, _label),
-    "resolution": ("Resolution", PropertyType.select, _label),
-    "resolutiondate": ("Resolved", PropertyType.datetime, _datetime),
-    "reporter": ("Reporter", PropertyType.user_reference, _person),
-    "components": ("Components", PropertyType.multi_select, _labels),
-    "fixVersions": ("Fix versions", PropertyType.multi_select, _labels),
-    "versions": ("Affects versions", PropertyType.multi_select, _labels),
-    "environment": ("Environment", PropertyType.text, _text),
-    "security": ("Security level", PropertyType.select, _label),
+_SYSTEM_FIELDS: dict[str, tuple[str, MetadataType, Callable[[Any], Any]]] = {
+    "priority": ("Priority", MetadataType.select, _label),
+    "resolution": ("Resolution", MetadataType.select, _label),
+    "resolutiondate": ("Resolved", MetadataType.datetime, _datetime),
+    "reporter": ("Reporter", MetadataType.user_reference, _person),
+    "components": ("Components", MetadataType.multi_select, _labels),
+    "fixVersions": ("Fix versions", MetadataType.multi_select, _labels),
+    "versions": ("Affects versions", MetadataType.multi_select, _labels),
+    "environment": ("Environment", MetadataType.text, _text),
+    "security": ("Security level", MetadataType.select, _label),
     "timeoriginalestimate": (
         "Original estimate (hours)",
-        PropertyType.number,
+        MetadataType.number,
         _hours,
     ),
-    "timespent": ("Time spent (hours)", PropertyType.number, _hours),
-    "timeestimate": ("Remaining estimate (hours)", PropertyType.number, _hours),
+    "timespent": ("Time spent (hours)", MetadataType.number, _hours),
+    "timeestimate": ("Remaining estimate (hours)", MetadataType.number, _hours),
 }
 
 #: Custom fields that are not properties, by ``schema.custom``: each is either
@@ -209,7 +209,7 @@ _HANDLED_ELSEWHERE = frozenset(
 _URL_CUSTOM = "com.atlassian.jira.plugin.system.customfieldtypes:url"
 
 
-def _custom_spec(entry: dict) -> tuple[Optional[PropertyType], Callable[[Any], Any]]:
+def _custom_spec(entry: dict) -> tuple[Optional[MetadataType], Callable[[Any], Any]]:
     """The property type and reader for a custom field, from its schema.
 
     ``(None, …)`` means the field has no home here and is dropped.
@@ -223,24 +223,24 @@ def _custom_spec(entry: dict) -> tuple[Optional[PropertyType], Callable[[Any], A
         return None, _text
     if kind == "string":
         if custom == _URL_CUSTOM:
-            return PropertyType.url, _text
-        return PropertyType.text, _text
+            return MetadataType.url, _text
+        return MetadataType.text, _text
     if kind == "number":
-        return PropertyType.number, _number
+        return MetadataType.number, _number
     if kind == "date":
-        return PropertyType.date, _date
+        return MetadataType.date, _date
     if kind == "datetime":
-        return PropertyType.datetime, _datetime
+        return MetadataType.datetime, _datetime
     if kind in ("option", "priority", "resolution", "issuetype", "securitylevel"):
-        return PropertyType.select, _label
+        return MetadataType.select, _label
     if kind in ("version", "component"):
-        return PropertyType.select, _label
+        return MetadataType.select, _label
     if kind == "option-with-child":
-        return PropertyType.text, _cascade
+        return MetadataType.text, _cascade
     if kind == "user":
-        return PropertyType.user_reference, _person
+        return MetadataType.user_reference, _person
     if kind == "array" and items in ("option", "string", "version", "component"):
-        return PropertyType.multi_select, _labels
+        return MetadataType.multi_select, _labels
     return None, _text
 
 
@@ -260,11 +260,11 @@ def _value_entry(spec: FieldSpec, value: Any) -> dict[str, Any]:
         "property_name": spec.name,
         "property_type": spec.property_type.value,
     }
-    if spec.property_type == PropertyType.number:
+    if spec.property_type == MetadataType.number:
         entry["value_number"] = value
-    elif spec.property_type == PropertyType.multi_select:
+    elif spec.property_type == MetadataType.multi_select:
         entry["value_json"] = value
-    elif spec.property_type == PropertyType.user_reference:
+    elif spec.property_type == MetadataType.user_reference:
         entry["value_handle"] = value
     else:
         entry["value_text"] = value
@@ -305,7 +305,7 @@ class FieldMapper:
             if str(schema.get("custom") or "") in _HANDLED_ELSEWHERE:
                 continue
             ptype, reader = _custom_spec(entry)
-            if ptype is PropertyType.date and name.lower() == START_DATE_FIELD_NAME:
+            if ptype is MetadataType.date and name.lower() == START_DATE_FIELD_NAME:
                 self._start_date_id = field_id
                 continue
             if ptype is None:
@@ -331,7 +331,7 @@ class FieldMapper:
             values = [
                 {
                     "property_name": JIRA_KEY_PROPERTY,
-                    "property_type": PropertyType.text.value,
+                    "property_type": MetadataType.text.value,
                     "value_text": key,
                 }
             ]
@@ -346,11 +346,11 @@ class FieldMapper:
                 result.issue_counts[spec.name] = (
                     result.issue_counts.get(spec.name, 0) + 1
                 )
-                if spec.property_type == PropertyType.select:
+                if spec.property_type == MetadataType.select:
                     seen = options.setdefault(spec.name, [])
                     if value not in seen:
                         seen.append(value)
-                elif spec.property_type == PropertyType.multi_select:
+                elif spec.property_type == MetadataType.multi_select:
                     seen = options.setdefault(spec.name, [])
                     for item in value:
                         if item not in seen:
@@ -374,7 +374,7 @@ class FieldMapper:
             result.definitions.append(
                 {
                     "name": JIRA_KEY_PROPERTY,
-                    "type": PropertyType.text.value,
+                    "type": MetadataType.text.value,
                     "position": 0,
                 }
             )

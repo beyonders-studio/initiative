@@ -32,6 +32,7 @@ import { PropertyValueCell } from "@/components/properties/PropertyValueCell";
 import {
   isEmptyPropertyValue,
   normalizePropertyValue,
+  ownProperties,
   propertyStubFromDefinition,
   userReferenceValue,
 } from "@/components/properties/propertyHelpers";
@@ -56,7 +57,7 @@ import {
   useItemFieldSave,
 } from "@/hooks/useFieldSave";
 import { usePastedImages } from "@/hooks/usePastedImages";
-import { useProperties } from "@/hooks/useProperties";
+import { type MetadataOwner, useOwnedDefinitions } from "@/hooks/useProperties";
 import type { MemberSearchScope } from "@/hooks/useUsers";
 import { getHttpStatus } from "@/lib/errorMessage";
 import { currentServerKey } from "@/lib/offlineSession";
@@ -297,6 +298,9 @@ type PropertiesProps<I extends { properties: PropertySummary[] }, P> = {
    *  Left out (a collection, which has no sharing of its own), the
    *  initiative's members. */
   canOpen?: { tool: Tool; id: number | null | undefined };
+  /** The project whose metadata the item holds beside the initiative's
+   *  properties: a task's. */
+  owner?: MetadataOwner;
 };
 
 /** The item's properties with `property` as it reads after `value`, added
@@ -456,13 +460,14 @@ export const PlacedPropertyField = <I extends { properties: PropertySummary[] },
   ...props
 }: PropertiesProps<I, P> & {
   propertyId: number;
-  /** Where its definition is, where not among the initiative's properties:
-   *  a collection's own fields. */
+  /** Where its definition is, where not among the initiative's properties
+   *  and the owner's metadata: a collection's metadata. */
   definitions?: PropertyDefinitionRead[];
 }) => {
   const { t } = useTranslation(["properties", "common"]);
-  const definitions = useProperties({
+  const definitions = useOwnedDefinitions({
     initiativeId: props.initiativeId ?? undefined,
+    owner: props.owner,
     enabled: props.initiativeId !== null && given === undefined,
   });
   const { properties } = useHeldItem(
@@ -514,8 +519,12 @@ export const PropertiesField = <I extends { properties: PropertySummary[] }, P>(
     id,
     holderOf(props.properties)
   );
-  const listed = except ? properties.filter((each) => !except.has(each.property_id)) : properties;
-  const label = t("title");
+  // Its own values: a collection's metadata is the collection's, and a
+  // plug-in's values are drawn as its fields.
+  const listed = ownProperties(properties).filter((each) => !except?.has(each.property_id));
+  // Where the item also holds its project's metadata, the panel says so.
+  const label = t(props.owner ? "titleWithMetadata" : "title");
+  const none = t(props.owner ? "noPropertiesOrMetadata" : "noMetadata");
   const save = useItemFieldSave(kind, id, label);
   const add = (definition: PropertyDefinitionRead) => {
     if (properties.some((p) => p.property_id === definition.id)) return;
@@ -533,7 +542,7 @@ export const PropertiesField = <I extends { properties: PropertySummary[] }, P>(
       <div className="space-y-2">
         {hideLabel ? null : <p className="font-medium text-sm">{label}</p>}
         {sorted.length === 0 ? (
-          <p className="text-muted-foreground text-sm">{t("noProperties")}</p>
+          <p className="text-muted-foreground text-sm">{none}</p>
         ) : (
           <ul className="space-y-2">
             {sorted.map((property) => {
@@ -559,7 +568,7 @@ export const PropertiesField = <I extends { properties: PropertySummary[] }, P>(
   return (
     <FieldFrame label={label} save={save} hideLabel={hideLabel}>
       {sorted.length === 0 ? (
-        <p className="text-muted-foreground text-sm">{t("noProperties")}</p>
+        <p className="text-muted-foreground text-sm">{none}</p>
       ) : (
         sorted.map((property) => (
           // Keyed by the row too: a host that moves to another row starts
@@ -574,6 +583,7 @@ export const PropertiesField = <I extends { properties: PropertySummary[] }, P>(
       )}
       <AddPropertyButton
         initiativeId={initiativeId ?? 0}
+        owner={props.owner}
         currentPropertyIds={[...listed.map((p) => p.property_id), ...(except ?? [])]}
         onAdd={add}
         disabled={readOnly || !initiativeId}

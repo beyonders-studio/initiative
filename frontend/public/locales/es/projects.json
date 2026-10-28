@@ -235,7 +235,8 @@
   },
   "settings": {
     "tabTaskStatuses": "Estados de tarea",
-    "tabTaskTypes": "Tipos de tarea"
+    "tabTaskTypes": "Tipos de tarea",
+    "tabProperties": "Propiedades"
   },
   "files": {
     "newFile": "Nuevo archivo"
@@ -420,5 +421,14 @@
     "unassigned": "Ya no estás en esta tarea",
     "assignError": "No se pudo cambiar quién está en esta tarea.",
     "moveTo": "Mover a"
+  },
+  "properties": {
+    "description": "Lo que las tareas de este proyecto pueden tener además de los metadatos de la iniciativa. Una tarea movida a otro proyecto conserva un valor solo si ese proyecto tiene una propiedad con el mismo nombre y tipo.",
+    "create": "Nueva propiedad",
+    "edit": "Editar propiedad",
+    "delete": "Eliminar propiedad",
+    "deleteTitle": "¿Eliminar esta propiedad?",
+    "deleteBody": "Se eliminarán la propiedad y el valor que cada tarea tenga en este proyecto.",
+    "none": "Aún no hay propiedades"
   }
 }

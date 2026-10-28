@@ -37,13 +37,15 @@ from app.core.relationships import RelationshipType, decode_node_id, node_id
 from app.core.search import SearchEntityType
 from app.core.user_display import display_name, handle_of
 from app.schemas.tenant.import_envelopes import EnvelopePropertyValue
-from app.schemas.tenant.property import annotated_properties
-from app.services.export.property_values import exported_properties
+from app.services.export.property_values import (
+    exported_properties,
+    portable_summaries,
+)
 from app.core.version import get_version
 from app.models.tenant.comment import Comment, in_thread
 from app.models.tenant.relationship import EntityRelationship
 from app.models.tenant.project import Project
-from app.models.tenant.property import PropertyType
+from app.models.tenant.metadata import MetadataDefinition, MetadataType
 from app.models.platform.user_profile_view import MemberProfile
 from app.models.tenant.tag import Tag
 from app.models.tenant.task import Task, TaskStatus
@@ -68,7 +70,7 @@ from app.services.import_engine.mentions import (
 from app.services.import_engine.references import detach_markdown_references
 from app.core.tools import Tool
 from app.services.import_engine.common import load_initiative_properties
-from app.services.tenant import properties as properties_service
+from app.services.tenant import metadata as metadata_service
 from app.services.tenant import tags as tags_service
 from app.services.tenant import task_types as task_types_service
 from app.services.tenant import tool_layouts as tool_layouts_service
@@ -97,9 +99,9 @@ async def build_project_export(
         )
     )
     await tags_service.annotate_tags(session, [project])
-    await properties_service.annotate_properties(session, [project])
+    await metadata_service.annotate_properties(session, [project])
     await tags_service.annotate_tags(session, project_tasks)
-    await properties_service.annotate_properties(session, project_tasks)
+    await metadata_service.annotate_properties(session, project_tasks)
 
     task_ids = [task.id for task in project_tasks if task.id is not None]
     comments_by_task = await _load_comments(session, task_ids)
@@ -151,14 +153,14 @@ async def build_project_export(
     # the project's own values first)
     tasks: list[ProjectExportTask] = []
     referenced_property_ids = {
-        summary.property_id for summary in annotated_properties(project)
+        summary.property_id for summary in portable_summaries(project)
     }
     status_names = {s.id: s.name for s in statuses_sorted}
     project_types = await task_types_service.list_types(session, project.id)
     type_names = {t.id: t.name for t in project_types}
     for task in project_tasks:
         referenced_property_ids.update(
-            summary.property_id for summary in annotated_properties(task)
+            summary.property_id for summary in portable_summaries(task)
         )
         properties = [
             EnvelopePropertyValue(**value) for value in exported_properties(task)
@@ -227,9 +229,9 @@ async def build_project_export(
             )
         )
 
-    # The initiative's properties are what a layout can name besides those a
-    # value names. Each one exported is written at its place in the envelope,
-    # which is how a layout names it.
+    # The initiative's properties and the project's own metadata are what a
+    # layout can name besides those a value names. Each one exported is
+    # written at its place in the envelope, which is how a layout names it.
     definitions = {
         **{
             definition.id: definition
@@ -239,7 +241,15 @@ async def build_project_export(
                 )
             ).values()
         },
-        **await properties_service.load_definitions_by_ids(
+        **{
+            definition.id: definition
+            for definition in await session.exec(
+                select(MetadataDefinition)
+                .where(MetadataDefinition.project_id == project.id)
+                .order_by(MetadataDefinition.position, MetadataDefinition.id)
+            )
+        },
+        **await metadata_service.load_definitions_by_ids(
             session, referenced_property_ids
         ),
     }
@@ -252,12 +262,16 @@ async def build_project_export(
 
     for property_id in sorted(referenced_property_ids):
         property_place(property_id)
+    # The project's metadata goes with it whether or not anything holds it.
+    for property_id, definition in definitions.items():
+        if definition.project_id is not None:
+            property_place(property_id)
     status_places = {s.id: place for place, s in enumerate(statuses_sorted, start=1)}
     type_places = {t.id: place for place, t in enumerate(project_types, start=1)}
     people = frozenset(
         property_id
         for property_id, definition in definitions.items()
-        if definition.type == PropertyType.user_reference
+        if definition.type == MetadataType.user_reference
     )
     layout_rows = await tool_layouts_service.list_rows(
         session,
@@ -295,6 +309,7 @@ async def build_project_export(
             color=definitions[property_id].color,
             options=definitions[property_id].options,
             currency=definitions[property_id].currency,
+            project=definitions[property_id].project_id is not None,
         )
         for property_id in property_places
     ]

@@ -1519,7 +1519,7 @@ def _strings_in(value: Any) -> list[str]:
     return found
 
 
-async def _named_refs(request: Request) -> list[str]:
+async def named_refs(request: Request) -> list[str]:
     """The references an installed plug-in's request names: in its path, its query
     string and its JSON body, a mention in its text included.
 
@@ -1568,7 +1568,7 @@ async def _establish_install_request(
         user_id=unsealed.user_id,
         purpose=unsealed.purpose,
     )
-    named = await _named_refs(request)
+    named = await named_refs(request)
     try:
         context = await establish_install_access(session, install, named)
     except InstallAccessError as exc:

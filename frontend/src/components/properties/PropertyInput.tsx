@@ -1,12 +1,12 @@
-import { Check, ChevronDown, Plus, X } from "lucide-react";
+import { Check, ChevronDown, Plus, Star, X } from "lucide-react";
 import { useMemo, useState } from "react";
 import { useTranslation } from "react-i18next";
 
 import {
+  MetadataType,
   type PropertyDefinitionRead,
   type PropertyOption,
   type PropertySummary,
-  PropertyType,
   type Tool,
 } from "@/api/generated/initiativeAPI.schemas";
 import { type MemberLike, MemberSelect } from "@/components/members/MemberSearchSelect";
@@ -24,8 +24,11 @@ import {
 import { DateTimePicker } from "@/components/ui/date-time-picker";
 import { Input } from "@/components/ui/input";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
+import { Slider } from "@/components/ui/slider";
 import { useAppendPropertyOption } from "@/hooks/useProperties";
 import { cn } from "@/lib/utils";
+
+import { type ScaleDisplay, scaleValue } from "./propertyHelpers";
 
 type PropertyDefinitionLike = PropertyDefinitionRead | PropertySummary;
 
@@ -48,6 +51,9 @@ export interface PropertyInputProps {
    *  name without a search round-trip (the server returns `{id, display_name}`
    *  on reads). */
   selectedUser?: MemberLike | null;
+  /** How a scale is set: as a number, by stars, or along a bar. A number
+   *  without. */
+  display?: ScaleDisplay | null;
 }
 
 // ── Type guards / coercion helpers ──────────────────────────────────────────
@@ -106,10 +112,96 @@ const toDefinitionForPatch = (defn: PropertyDefinitionLike): PropertyDefinitionR
     color: null,
     options: summary.options ?? null,
     currency: summary.currency ?? null,
-    collection_id: null,
+    project_id: summary.project_id,
+    collection_id: summary.collection_id,
     created_at: "",
     updated_at: "",
   } as PropertyDefinitionRead;
+};
+
+/** A scale of 0–100 set as its layout draws it: a number, one of five stars
+ *  (each a fifth), or a point along a bar. */
+const ScaleInput = ({
+  name,
+  value,
+  onChange,
+  display,
+  disabled,
+  className,
+}: {
+  name: string;
+  value: number | null;
+  onChange: (value: unknown) => void;
+  display: ScaleDisplay;
+  disabled: boolean;
+  className?: string;
+}) => {
+  const { t } = useTranslation("properties");
+  if (display === "stars") {
+    const filled = value === null ? 0 : Math.ceil(value / 20);
+    return (
+      <fieldset aria-label={name} className={cn("flex h-9 min-w-0 items-center", className)}>
+        {[1, 2, 3, 4, 5].map((star) => (
+          <button
+            key={star}
+            type="button"
+            aria-pressed={star === filled}
+            aria-label={t("input.stars", { count: star })}
+            disabled={disabled}
+            className="rounded-sm p-0.5 focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring disabled:cursor-not-allowed"
+            onClick={() => onChange(star * 20)}
+          >
+            <Star
+              aria-hidden
+              className={cn(
+                "h-4 w-4",
+                star <= filled ? "fill-current text-warning" : "text-muted-foreground/40"
+              )}
+            />
+          </button>
+        ))}
+      </fieldset>
+    );
+  }
+  if (display === "bar") {
+    return (
+      <div className={cn("flex h-9 items-center", className)}>
+        <Slider
+          min={0}
+          max={100}
+          step={1}
+          value={[value ?? 0]}
+          onValueChange={([next]) => onChange(next)}
+          disabled={disabled}
+          thumbLabel={name}
+        />
+      </div>
+    );
+  }
+  // A whole number from 0 to 100; anything outside is brought within.
+  return (
+    <div className={cn("flex items-center gap-2", className)}>
+      <Input
+        type="number"
+        inputMode="numeric"
+        min={0}
+        max={100}
+        step={1}
+        value={value === null ? "" : String(value)}
+        onChange={(e) => {
+          const raw = e.target.value;
+          const parsed = Math.round(Number(raw));
+          onChange(
+            raw === "" || !Number.isFinite(parsed) ? null : Math.min(100, Math.max(0, parsed))
+          );
+        }}
+        placeholder={t("input.scalePlaceholder")}
+        disabled={disabled}
+        className="bg-transparent"
+      />
+      <span className="shrink-0 text-muted-foreground text-sm">%</span>
+    </div>
+  );
 };
 
 // ── Component ──────────────────────────────────────────────────────────────
@@ -123,6 +215,7 @@ export const PropertyInput = ({
   initiativeId,
   canOpen,
   selectedUser,
+  display,
 }: PropertyInputProps) => {
   const { t } = useTranslation(["properties", "common"]);
 
@@ -132,7 +225,7 @@ export const PropertyInput = ({
   );
 
   switch (definition.type) {
-    case PropertyType.text: {
+    case MetadataType.text: {
       return (
         <Input
           type="text"
@@ -148,7 +241,7 @@ export const PropertyInput = ({
       );
     }
 
-    case PropertyType.number: {
+    case MetadataType.number: {
       return (
         <Input
           type="number"
@@ -170,7 +263,7 @@ export const PropertyInput = ({
       );
     }
 
-    case PropertyType.currency: {
+    case MetadataType.currency: {
       // An amount, in the currency the property names, beside it.
       return (
         <div className={cn("flex items-center gap-2", className)}>
@@ -195,31 +288,20 @@ export const PropertyInput = ({
       );
     }
 
-    case PropertyType.rating: {
-      // A whole number from 1 to 100; anything outside is brought within.
+    case MetadataType.scale: {
       return (
-        <Input
-          type="number"
-          inputMode="numeric"
-          min={1}
-          max={100}
-          step={1}
-          value={coerceNumber(value)}
-          onChange={(e) => {
-            const raw = e.target.value;
-            const parsed = Math.round(Number(raw));
-            onChange(
-              raw === "" || !Number.isFinite(parsed) ? null : Math.min(100, Math.max(1, parsed))
-            );
-          }}
-          placeholder={t("properties:input.ratingPlaceholder")}
+        <ScaleInput
+          name={definition.name}
+          value={scaleValue(value)}
+          onChange={onChange}
+          display={display ?? "number"}
           disabled={disabled}
-          className={cn("bg-transparent", className)}
+          className={className}
         />
       );
     }
 
-    case PropertyType.checkbox: {
+    case MetadataType.checkbox: {
       return (
         <div className={cn("flex h-9 items-center", className)}>
           <Checkbox
@@ -231,7 +313,7 @@ export const PropertyInput = ({
       );
     }
 
-    case PropertyType.url: {
+    case MetadataType.url: {
       return (
         <Input
           type="url"
@@ -247,7 +329,7 @@ export const PropertyInput = ({
       );
     }
 
-    case PropertyType.date: {
+    case MetadataType.date: {
       const stored = coerceString(value);
       return (
         <DateTimePicker
@@ -260,7 +342,7 @@ export const PropertyInput = ({
       );
     }
 
-    case PropertyType.datetime: {
+    case MetadataType.datetime: {
       // DateTimePicker stores `yyyy-MM-dd'T'HH:mm` as a local-time string.
       // Convert to a fully-qualified ISO string (with TZ offset) on write so
       // the backend stores an unambiguous instant.
@@ -288,7 +370,7 @@ export const PropertyInput = ({
       );
     }
 
-    case PropertyType.select: {
+    case MetadataType.select: {
       return (
         <PropertyOptionPicker
           definition={definition}
@@ -302,7 +384,7 @@ export const PropertyInput = ({
       );
     }
 
-    case PropertyType.multi_select: {
+    case MetadataType.multi_select: {
       return (
         <PropertyOptionPicker
           definition={definition}
@@ -316,7 +398,7 @@ export const PropertyInput = ({
       );
     }
 
-    case PropertyType.user_reference: {
+    case MetadataType.user_reference: {
       const currentId = coerceUserId(value);
       // The people who can open the row the value sits on; without that row
       // (a filter), the property's initiative. Prefer the explicit prop,

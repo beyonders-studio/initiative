@@ -84,7 +84,7 @@
     "people": {
       "prompt": "Qui sont ces personnes ici ?",
       "note": "Indiquez qui est chaque personne ici. Les identifiants identiques sont déjà remplis ; laissez vide pour ne garder que le nom.",
-      "access": "Toute personne assignée, invitée ou nommée dans une propriété est ajoutée à l'initiative si vous la gérez, et obtient l'accès à ce qui est importé.",
+      "access": "Toute personne assignée, invitée ou nommée dans des métadonnées est ajoutée à l'initiative si vous la gérez, et obtient l'accès à ce qui est importé.",
       "comments_one": "{{count}} commentaire",
       "comments_other": "{{count}} commentaires",
       "unmapped": "Personne ici",
@@ -172,7 +172,7 @@
         "files_other": "{{count}} fichiers joints, chacun en fichier sur sa tâche ({{size}})",
         "sprints_one": "{{count}} sprint dans {{calendars}} calendrier(s)",
         "sprints_other": "{{count}} sprints dans {{calendars}} calendrier(s)",
-        "propertiesTitle": "Champs qui deviennent des propriétés",
+        "propertiesTitle": "Champs qui deviennent des métadonnées",
         "propertiesHint": "Décochez ceux que vous ne voulez pas ajouter à cette initiative.",
         "propertyCount_one": "{{count}} tâche",
         "propertyCount_other": "{{count}} tâches",

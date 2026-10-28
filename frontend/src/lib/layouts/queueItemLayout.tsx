@@ -246,7 +246,6 @@ export const blankQueueItem = (queueId: number): QueueItemRead => ({
   held_at_round: null,
   created_by: null,
   created_at: "",
-  plugin_values: [],
   color: "#6366F1",
   is_visible: true,
 });

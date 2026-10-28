@@ -20,7 +20,7 @@ from app.core.task_type_gallery import (
     GalleryType,
 )
 from app.core.task_types import DEFAULT_TASK_TYPES, MAX_TASK_TYPES
-from app.models.tenant.property import PropertyDefinition, PropertyType
+from app.models.tenant.metadata import MetadataDefinition, MetadataType
 from app.models.tenant.task import TaskType
 from app.schemas.tenant.task_type import (
     TaskTypeGalleryEntry,
@@ -120,8 +120,8 @@ async def gallery_fields(
     existing = list(
         (
             await session.exec(
-                select(PropertyDefinition).where(
-                    PropertyDefinition.of_initiative(initiative_id)
+                select(MetadataDefinition).where(
+                    MetadataDefinition.of_initiative(initiative_id)
                 )
             )
         ).all()
@@ -134,16 +134,16 @@ async def gallery_fields(
         found = by_name.get(name.lower())
         if found is None:
             position += 1
-            found = PropertyDefinition(
+            found = MetadataDefinition(
                 initiative_id=initiative_id,
                 name=name,
-                type=PropertyType(field.type),
+                type=MetadataType(field.type),
                 position=position,
             )
             session.add(found)
             await session.flush()
             by_name[name.lower()] = found
-        elif found.type != PropertyType(field.type):
+        elif found.type != MetadataType(field.type):
             continue
         assert found.id is not None
         ids.append(found.id)

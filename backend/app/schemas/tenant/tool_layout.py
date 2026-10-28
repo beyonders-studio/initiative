@@ -31,7 +31,7 @@ from typing import Annotated, Any, Dict, List, Literal, Optional, Union, get_arg
 
 from pydantic import AfterValidator, ConfigDict, Field, field_validator, model_validator
 
-from app.core.collection_shapes import RatingDisplay
+from app.core.collection_shapes import ScaleDisplay
 from app.core.tools import LAYOUT_KIND_TARGETS, Tool
 from app.models.tenant.task import TaskPriority, TaskStatusCategory
 from app.schemas.base import SanitizedBaseModel
@@ -43,7 +43,7 @@ from app.services.marketplace.manifest_values import (
     MAX_METADATA_KEY_LENGTH,
     is_metadata_key,
 )
-from app.services.tenant.properties import MAX_PROPERTY_FILTERS
+from app.schemas.tenant.property import MAX_PROPERTY_FILTERS
 
 #: What one layout may hold. Every part of a tree counts as a
 #: node, as does every column.
@@ -192,7 +192,8 @@ class TaskFieldId(str, Enum):
 
 
 class FileFieldId(str, Enum):
-    """A file's own fields, as a collection's lists show them."""
+    """A file's own fields, as a collection's lists and its file detail show
+    them."""
 
     name = "name"
     #: What kind of file it is.
@@ -363,6 +364,7 @@ DetailFieldId = Union[
     QueueItemDetailFieldId,
     CounterDetailFieldId,
     PostDetailFieldId,
+    FileFieldId,
     NamedFieldId,
 ]
 
@@ -522,7 +524,9 @@ ListLayoutKind = Literal[
 ]
 #: Every kind of thing a detail layout shows one of; which a tool holds is
 #: ``app.core.tools.DETAIL_LAYOUTS``.
-DetailLayoutKind = Literal["task", "calendar_event", "queue_item", "counter", "post"]
+DetailLayoutKind = Literal[
+    "task", "calendar_event", "queue_item", "counter", "post", "file"
+]
 
 
 #: What a table can be sorted by, as the task list takes it.
@@ -603,9 +607,9 @@ class ListLayoutDefinition(_Strict):
     )
     #: Left out of the list's menu; none keeps what its tool ships.
     hidden: Optional[bool] = None
-    #: How each rating it shows is drawn, by the field's ``property:<id>``. A
-    #: rating with none is drawn as a number.
-    displays: Optional[Dict[PropertyFieldId, RatingDisplay]] = Field(
+    #: How each scale it shows is drawn, by the field's ``property:<id>``. A
+    #: scale with none is drawn as a number.
+    displays: Optional[Dict[PropertyFieldId, ScaleDisplay]] = Field(
         default=None, max_length=MAX_NODES
     )
 

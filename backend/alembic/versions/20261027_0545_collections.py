@@ -18,13 +18,12 @@ number of them. In ``guild_template`` and every ``guild_<id>``:
   lays it out by.
 * ``property_definitions.collection_id`` — a collection's own field, keyed
   with its ``initiative_id`` to the collection, so the field is in the
-  collection's initiative and goes with it. A rating is one only a
-  collection's field may be (a CHECK). A name is unique among the
+  collection's initiative and goes with it. A name is unique among the
   initiative's properties, as it was, and among a collection's fields.
 * ``property_definitions.currency`` — the ISO 4217 code a money field's
   amounts are in, set exactly when the field is money (a CHECK). An amount is
   kept in ``property_values.value_number``, a ``numeric``, as any number is.
-* ``public.property_type`` gains ``currency`` and ``rating``. The labels are
+* ``public.property_type`` gains ``currency`` and ``scale``. The labels are
   committed on their own first, since a label cannot be used in the
   transaction that adds it, and a downgrade leaves them: Postgres cannot drop
   a label, and no row holds one after it.
@@ -50,7 +49,7 @@ depends_on = None
 
 def upgrade() -> None:
     op.execute("COMMIT")
-    for label in ("currency", "rating"):
+    for label in ("currency", "scale"):
         op.execute(f"ALTER TYPE public.property_type ADD VALUE IF NOT EXISTS '{label}'")
     op.execute("BEGIN")
     run_for_each_guild_schema(op.get_bind(), _apply_upgrade)
@@ -182,7 +181,7 @@ def _apply_downgrade() -> None:
     op.execute("ALTER TABLE property_definitions NO FORCE ROW LEVEL SECURITY")
     op.execute(
         "DELETE FROM property_definitions WHERE collection_id IS NOT NULL "
-        "OR type::text IN ('currency', 'rating')"
+        "OR type::text IN ('currency', 'scale')"
     )
     op.execute("ALTER TABLE property_definitions FORCE ROW LEVEL SECURITY")
     op.drop_constraint(

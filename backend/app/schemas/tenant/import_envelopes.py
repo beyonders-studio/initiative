@@ -18,7 +18,7 @@ from typing import Any, Literal, Optional
 
 from pydantic import ConfigDict, Field, model_validator
 
-from app.models.tenant.property import PropertyType
+from app.models.tenant.metadata import MetadataType
 from app.models.tenant.wiki import WikiPageOrder, WikiReadingWidth
 from app.schemas.base import SanitizedBaseModel
 
@@ -45,7 +45,7 @@ class EnvelopePropertyValue(SanitizedBaseModel):
     model_config = ConfigDict(extra="ignore")
 
     property_name: str
-    property_type: PropertyType
+    property_type: MetadataType
     value_text: Optional[str] = None
     value_number: Optional[float] = None
     value_boolean: Optional[bool] = None
@@ -54,6 +54,9 @@ class EnvelopePropertyValue(SanitizedBaseModel):
     value_name: Optional[str] = None
     #: A money value's currency, which is its property's.
     currency: Optional[str] = None
+    #: A value of its project's metadata, not of one of the initiative's
+    #: properties.
+    project: bool = False
 
 
 class FileEnvelope(_EnvelopeBase):

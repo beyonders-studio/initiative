@@ -11,7 +11,7 @@ import {
 import { communityHttp } from "@/__tests__/helpers/communityHttp";
 import { server } from "@/__tests__/helpers/msw-server";
 import { renderWithProviders } from "@/__tests__/helpers/render";
-import { type PropertyDefinitionRead, PropertyType } from "@/api/generated/initiativeAPI.schemas";
+import { MetadataType, type PropertyDefinitionRead } from "@/api/generated/initiativeAPI.schemas";
 
 import { PropertyInput } from "./PropertyInput";
 
@@ -24,7 +24,7 @@ describe("PropertyInput", () => {
       const onChange = vi.fn();
       renderWithProviders(
         <PropertyInput
-          definition={def({ type: PropertyType.text, name: "Owner" })}
+          definition={def({ type: MetadataType.text, name: "Owner" })}
           value=""
           onChange={onChange}
         />
@@ -41,7 +41,7 @@ describe("PropertyInput", () => {
       const onChange = vi.fn();
       renderWithProviders(
         <PropertyInput
-          definition={def({ type: PropertyType.number, name: "Count" })}
+          definition={def({ type: MetadataType.number, name: "Count" })}
           value={null}
           onChange={onChange}
         />
@@ -60,7 +60,7 @@ describe("PropertyInput", () => {
       const onChange = vi.fn();
       renderWithProviders(
         <PropertyInput
-          definition={def({ type: PropertyType.currency, name: "Price", currency: "EUR" })}
+          definition={def({ type: MetadataType.currency, name: "Price", currency: "EUR" })}
           value={null}
           onChange={onChange}
         />
@@ -71,21 +71,57 @@ describe("PropertyInput", () => {
     });
   });
 
-  describe("rating type", () => {
-    it("keeps a rating within 1 to 100", () => {
+  describe("scale type", () => {
+    it("takes a number, kept within 0 to 100", () => {
       const onChange = vi.fn();
       renderWithProviders(
         <PropertyInput
-          definition={def({ type: PropertyType.rating, name: "Rating" })}
+          definition={def({ type: MetadataType.scale, name: "Score" })}
           value={null}
           onChange={onChange}
         />
       );
-      const input = screen.getByPlaceholderText("1–100");
+      const input = screen.getByPlaceholderText("0–100");
       fireEvent.change(input, { target: { value: "140" } });
       expect(onChange).toHaveBeenLastCalledWith(100);
-      fireEvent.change(input, { target: { value: "0" } });
-      expect(onChange).toHaveBeenLastCalledWith(1);
+      fireEvent.change(input, { target: { value: "-5" } });
+      expect(onChange).toHaveBeenLastCalledWith(0);
+    });
+
+    it("is set by stars, each a fifth, where it is drawn as stars", async () => {
+      const onChange = vi.fn();
+      renderWithProviders(
+        <PropertyInput
+          definition={def({ type: MetadataType.scale, name: "Score" })}
+          value={61}
+          onChange={onChange}
+          display="stars"
+        />
+      );
+      const stars = screen.getByRole("group", { name: "Score" });
+      // 61 begins the fourth fifth.
+      expect(within(stars).getByRole("button", { name: "4 stars" })).toHaveAttribute(
+        "aria-pressed",
+        "true"
+      );
+      await userEvent.click(within(stars).getByRole("button", { name: "2 stars" }));
+      expect(onChange).toHaveBeenCalledWith(40);
+    });
+
+    it("is set along a bar where it is drawn as one", () => {
+      const onChange = vi.fn();
+      renderWithProviders(
+        <PropertyInput
+          definition={def({ type: MetadataType.scale, name: "Score" })}
+          value={30}
+          onChange={onChange}
+          display="bar"
+        />
+      );
+      const thumb = screen.getByRole("slider", { name: "Score" });
+      expect(thumb).toHaveAttribute("aria-valuenow", "30");
+      fireEvent.keyDown(thumb, { key: "ArrowRight" });
+      expect(onChange).toHaveBeenCalledWith(31);
     });
   });
 
@@ -94,7 +130,7 @@ describe("PropertyInput", () => {
       const onChange = vi.fn();
       renderWithProviders(
         <PropertyInput
-          definition={def({ type: PropertyType.checkbox, name: "Done" })}
+          definition={def({ type: MetadataType.checkbox, name: "Done" })}
           value={false}
           onChange={onChange}
         />
@@ -109,7 +145,7 @@ describe("PropertyInput", () => {
     it("renders a DateTimePicker (includeTime=false)", () => {
       renderWithProviders(
         <PropertyInput
-          definition={def({ type: PropertyType.date, name: "Deadline" })}
+          definition={def({ type: MetadataType.date, name: "Deadline" })}
           value=""
           onChange={vi.fn()}
         />
@@ -123,7 +159,7 @@ describe("PropertyInput", () => {
     it("renders a DateTimePicker with time support", () => {
       renderWithProviders(
         <PropertyInput
-          definition={def({ type: PropertyType.datetime, name: "When" })}
+          definition={def({ type: MetadataType.datetime, name: "When" })}
           value=""
           onChange={vi.fn()}
         />
@@ -137,7 +173,7 @@ describe("PropertyInput", () => {
       const onChange = vi.fn();
       renderWithProviders(
         <PropertyInput
-          definition={def({ type: PropertyType.url, name: "Website" })}
+          definition={def({ type: MetadataType.url, name: "Website" })}
           value=""
           onChange={onChange}
         />
@@ -151,7 +187,7 @@ describe("PropertyInput", () => {
 
   describe("select type", () => {
     const selectDef = def({
-      type: PropertyType.select,
+      type: MetadataType.select,
       name: "Status",
       options: [
         buildPropertyOption({ value: "draft", label: "Draft" }),
@@ -181,7 +217,7 @@ describe("PropertyInput", () => {
   describe("multi_select type", () => {
     it("renders a multi-select and emits an array of slugs on change", async () => {
       const multiDef = def({
-        type: PropertyType.multi_select,
+        type: MetadataType.multi_select,
         name: "Tags",
         options: [
           buildPropertyOption({ value: "alpha", label: "Alpha" }),
@@ -229,7 +265,7 @@ describe("PropertyInput", () => {
       );
       renderWithProviders(
         <PropertyInput
-          definition={def({ type: PropertyType.user_reference, name: "Owner" })}
+          definition={def({ type: MetadataType.user_reference, name: "Owner" })}
           value={null}
           onChange={vi.fn()}
         />
@@ -248,7 +284,7 @@ describe("PropertyInput", () => {
     it("disables a text input", () => {
       renderWithProviders(
         <PropertyInput
-          definition={def({ type: PropertyType.text })}
+          definition={def({ type: MetadataType.text })}
           value=""
           onChange={vi.fn()}
           disabled
@@ -260,7 +296,7 @@ describe("PropertyInput", () => {
     it("disables a checkbox", () => {
       renderWithProviders(
         <PropertyInput
-          definition={def({ type: PropertyType.checkbox })}
+          definition={def({ type: MetadataType.checkbox })}
           value={false}
           onChange={vi.fn()}
           disabled
@@ -273,7 +309,7 @@ describe("PropertyInput", () => {
       renderWithProviders(
         <PropertyInput
           definition={def({
-            type: PropertyType.select,
+            type: MetadataType.select,
             options: [buildPropertyOption({ value: "a", label: "A" })],
           })}
           value=""
@@ -288,7 +324,7 @@ describe("PropertyInput", () => {
     it("disables a number input", () => {
       renderWithProviders(
         <PropertyInput
-          definition={def({ type: PropertyType.number })}
+          definition={def({ type: MetadataType.number })}
           value={null}
           onChange={vi.fn()}
           disabled
@@ -314,7 +350,7 @@ describe("PropertyInput", () => {
   describe("select options rendering", () => {
     it("shows each option label in the dropdown", async () => {
       const multi = def({
-        type: PropertyType.select,
+        type: MetadataType.select,
         options: [
           buildPropertyOption({ value: "one", label: "One" }),
           buildPropertyOption({ value: "two", label: "Two" }),
@@ -333,7 +369,7 @@ describe("PropertyInput", () => {
     it("offers a 'Create' command when typing a new label, and appends + selects it on click", async () => {
       const definition = def({
         id: 33,
-        type: PropertyType.select,
+        type: MetadataType.select,
         name: "Status",
         options: [buildPropertyOption({ value: "draft", label: "Draft" })],
       });
@@ -367,7 +403,7 @@ describe("PropertyInput", () => {
 
     it("does NOT offer Create when the typed label matches an existing option (case-insensitive)", async () => {
       const definition = def({
-        type: PropertyType.select,
+        type: MetadataType.select,
         options: [buildPropertyOption({ value: "live", label: "Live" })],
       });
       renderWithProviders(<PropertyInput definition={definition} value="" onChange={vi.fn()} />);

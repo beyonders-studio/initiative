@@ -14,8 +14,7 @@ and the module the browser will run in its sandbox. It is read off each
 install's **pinned** definition, so a canvas is authored against the version the
 guild chose rather than whatever the catalog says today.
 
-:class:`PluginValueSummary` is one value a plug-in shows on an item, which
-comes back with the item; :class:`PluginActionRun` runs one of a plug-in's
+:class:`PluginActionRun` runs one of a plug-in's
 actions on an item, and :class:`PluginActionResult` is the item's values for
 that plug-in afterwards.
 """
@@ -25,7 +24,7 @@ from enum import Enum
 from typing import Any, Dict, List, Optional
 
 
-from pydantic import ConfigDict, Field
+from pydantic import Field
 
 from app.core.tools import ITEM_KINDS
 from app.schemas.base import RawTextStr, SanitizedBaseModel
@@ -232,19 +231,6 @@ class PluginParamOptionsResponse(SanitizedBaseModel):
     options: List[PluginParamOption] = []
     #: ``no-source``, ``needs-sibling`` or ``unresolved``.
     unavailable: Optional[str] = None
-
-
-class PluginValueSummary(SanitizedBaseModel):
-    """One value an installed plug-in shows on an item: a key its pinned
-    version declares as a field there. A list field's value is an array of its
-    elements, newest first, each with its ``ref``."""
-
-    model_config = ConfigDict(json_schema_serialization_defaults_required=True)
-
-    #: The install, as the community's plug-in routes name it.
-    plugin_id: int
-    key: str
-    value: Any
 
 
 ItemKind = Enum("ItemKind", {name: name for name in ITEM_KINDS}, type=str)

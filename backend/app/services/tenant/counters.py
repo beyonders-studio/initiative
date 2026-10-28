@@ -27,7 +27,7 @@ from app.schemas.tenant.counter import (
 )
 from app.schemas.tenant.tool import from_row
 from app.services.permissions import with_tool
-from app.services.tenant import properties as properties_service
+from app.services.tenant import metadata as metadata_service
 from app.services.tenant import tags as tags_service
 
 
@@ -108,8 +108,8 @@ async def get_counter_group(
     group = result.one_or_none()
     if group is not None:
         await tags_service.annotate_tags(session, [group])
-        await properties_service.annotate_properties(session, [group])
-        await properties_service.annotate_properties(session, group.counters or [])
+        await metadata_service.annotate_properties(session, [group])
+        await metadata_service.annotate_properties(session, group.counters or [])
     return group
 
 
@@ -128,7 +128,7 @@ async def get_counter(
     if populate_existing:
         stmt = stmt.execution_options(populate_existing=True)
     counter = (await session.exec(stmt)).one_or_none()
-    await properties_service.annotate_properties(session, [counter])
+    await metadata_service.annotate_properties(session, [counter])
     return counter
 
 

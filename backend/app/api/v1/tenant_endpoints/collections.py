@@ -6,9 +6,9 @@ role creates files in its initiative. Adding a file also takes being able to
 open it. What is in a collection is listed by the Files list itself
 (``GET /collections/{id}/files``, in ``tool_lists``).
 
-A collection's own fields are property definitions of its own
-(``/property-definitions`` with ``collection_id``); their values on its files
-are written here, by whoever may change the collection.
+A collection's metadata is defined at ``/property-definitions`` with
+``collection_id``; its values on the collection's files are written here, by
+whoever may change the collection.
 """
 
 from datetime import datetime, timezone
@@ -52,7 +52,7 @@ from app.schemas.tenant.property import PropertySummary, PropertyValuesSetReques
 from app.services.permissions import Action
 from app.services.tenant import archive as archive_service
 from app.services.tenant import collections as collections_service
-from app.services.tenant import properties as properties_service
+from app.services.tenant import metadata as metadata_service
 from app.services.tenant import share_requests as share_requests_service
 from app.services.tenant import tags as tags_service
 from app.services.tenant.soft_delete import trash
@@ -145,7 +145,7 @@ async def list_collection_shapes(
     guild_context: FilesRead,
 ) -> List[CollectionShapeGroup]:
     """The ready-made shapes a new collection can start as, grouped, in the
-    reader's language: the lists each shows and opens on, and its fields."""
+    reader's language: the lists each shows and opens on, and its metadata."""
     return collections_service.shapes(getattr(current_user, "locale", None) or "en")
 
 
@@ -190,7 +190,7 @@ async def create_collection(
     """Make a collection of files. It starts with the files named, each one a
     file of the initiative the reader can open. Takes the initiative role's
     right to create files. It starts blank, as a ready-made ``shape`` with
-    its words in the maker's language, or with the fields and lists of
+    its words in the maker's language, or with the metadata and lists of
     ``shape_from``, a collection of the same initiative the maker sees."""
     initiative = await resource_access.prepare_create(
         session, Tool.file, payload.initiative_id, current_user, guild_context
@@ -231,7 +231,7 @@ async def create_collection(
             entity_id=collection.id,
             tag_ids=payload.tag_ids,
         )
-    await properties_service.write_on_create(session, collection, payload.properties)
+    await metadata_service.write_on_create(session, collection, payload.properties)
     await session.commit()
     return await _read(session, collection.id, guild_context)
 
@@ -285,7 +285,7 @@ async def update_collection(
             entity_id=collection.id,
             tag_ids=payload.tag_ids,
         )
-    await properties_service.write_on_update(session, collection, payload.properties)
+    await metadata_service.write_on_update(session, collection, payload.properties)
     collection.updated_at = datetime.now(timezone.utc)
     session.add(collection)
     await session.commit()
@@ -329,29 +329,29 @@ async def add_collection_files(
 
 
 @router.get(
-    "/{collection_id}/files/{file_id}/fields", response_model=List[PropertySummary]
+    "/{collection_id}/files/{file_id}/metadata", response_model=List[PropertySummary]
 )
-async def get_collection_file_fields(
+async def get_collection_file_metadata(
     collection_id: int,
     file_id: int,
     session: ActorSessionDep,
     guild_context: FilesRead,
 ) -> List[PropertySummary]:
-    """One file's values of the collection's own fields, for a file in the
+    """One file's values of the collection's metadata, for a file in the
     collection the reader can open."""
     collection = await resource_access.load_child(session, Collection, collection_id)
     if not await collections_service.holds(session, collection.id, file_id):
         raise Tool.file.not_found()
-    summaries = await properties_service.summaries_by_id(
+    summaries = await metadata_service.summaries_by_id(
         session, Tool.file.value, [file_id], collection_id=collection.id
     )
     return summaries.get(file_id, [])
 
 
 @router.put(
-    "/{collection_id}/files/{file_id}/fields", response_model=List[PropertySummary]
+    "/{collection_id}/files/{file_id}/metadata", response_model=List[PropertySummary]
 )
-async def set_collection_file_fields(
+async def set_collection_file_metadata(
     collection_id: int,
     file_id: int,
     payload: PropertyValuesSetRequest,
@@ -359,7 +359,7 @@ async def set_collection_file_fields(
     current_user: ActorUserDep,
     guild_context: FilesWrite,
 ) -> List[PropertySummary]:
-    """Replace one file's values of the collection's own fields, or with
+    """Replace one file's values of the collection's metadata, or with
     ``merge`` write only the ones named, as ``PUT /properties`` does for a
     property. The file is one in the collection the reader can open, and the
     values are the collection's: they take the right to change the
@@ -376,7 +376,7 @@ async def set_collection_file_fields(
             detail=CollectionMessages.FILE_NOT_IN_COLLECTION,
         )
     try:
-        await properties_service.set_values(
+        await metadata_service.set_values(
             session,
             file,
             payload.values,
@@ -389,7 +389,7 @@ async def set_collection_file_fields(
         await session.rollback()
         raise
     await session.commit()
-    summaries = await properties_service.summaries_by_id(
+    summaries = await metadata_service.summaries_by_id(
         session, Tool.file.value, [file_id], collection_id=collection_id
     )
     return summaries.get(file_id, [])

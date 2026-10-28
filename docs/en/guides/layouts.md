@@ -46,7 +46,7 @@ Nothing changes for anyone until you save, and leaving with unsaved changes asks
 
 ### What goes in
 
-- **Fields.** The built-ins, and the initiative's [custom properties](initiatives.md#custom-properties) one at a time, or **All properties** for every property a thing has a value for. Pick a type under **New field** to make a property without leaving the editor.
+- **Fields.** The built-ins, a project's or a collection's properties, and the initiative's [metadata](initiatives.md#metadata), each under its own heading, or **All metadata** (**All properties and metadata** on a project's tasks) for every value a thing has. Pick a type under **New field** to make one without leaving the editor; in a project or a collection, it asks whose it is.
 - **Plug-in parts**, from plug-ins installed in your community, on a card or a detail.
 - **Row**, which puts what it holds side by side. A detail also takes an **Accordion** (a titled section that opens and closes, and can **Start closed**) and a **Box** (a border round what it holds).
 

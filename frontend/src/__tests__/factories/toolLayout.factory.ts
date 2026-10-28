@@ -23,8 +23,8 @@ const sameLayout = (
  *  every one shown, then
  *  the page of its task type 1, "Task"; with `tool: "calendar"`, the
  *  initiative calendar's calendar and its event's detail; or, with
- *  `tool: "collection"`, a collection's four lists and no page. `hidden` names lists
- *  the target hides, as stored, and it opens on the first still shown.
+ *  `tool: "collection"`, a collection's four lists and its file's detail.
+ *  `hidden` names lists the target hides, as stored, and it opens on the first still shown.
  *  `layouts` replaces those of the same kind (and type), and another type's
  *  page is added. */
 export function buildToolLayoutSet(
@@ -52,17 +52,15 @@ export function buildToolLayoutSet(
             updated_at: null,
           },
         ]
-      : tool === "calendar"
-        ? [
-            {
-              kind: "calendar_event",
-              task_type_id: null,
-              task_type_name: null,
-              definition: {},
-              updated_at: null,
-            },
-          ]
-        : [];
+      : [
+          {
+            kind: tool === "calendar" ? "calendar_event" : "file",
+            task_type_id: null,
+            task_type_name: null,
+            definition: {},
+            updated_at: null,
+          },
+        ];
   // A target shows every list it does not hide, and opens on the first.
   const opensOn = lists.find((kind) => !hidden.includes(kind));
   const shipped: (ListLayoutRead | DetailLayoutRead)[] = [

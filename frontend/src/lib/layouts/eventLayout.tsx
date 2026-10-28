@@ -679,5 +679,4 @@ export const blankEvent = (
   overridden_fields: [],
   skipped_starts: [],
   extra_starts: [],
-  plugin_values: [],
 });

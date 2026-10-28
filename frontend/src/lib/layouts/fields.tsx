@@ -23,7 +23,7 @@ import { TaskBlockersHoverCard } from "@/components/projects/TaskBlockersHoverCa
 import { TaskDescriptionHoverCard } from "@/components/projects/TaskDescriptionHoverCard";
 import { TaskSubtasksHoverCard } from "@/components/projects/TaskSubtasksHoverCard";
 import { PropertyValueCell } from "@/components/properties/PropertyValueCell";
-import type { RatingDisplay } from "@/components/properties/propertyHelpers";
+import type { ScaleDisplay } from "@/components/properties/propertyHelpers";
 import { TagBadge } from "@/components/tags";
 import { TagBadgeList } from "@/components/tags/TagBadge";
 import { TaskChecklistProgress } from "@/components/tasks/TaskChecklistProgress";
@@ -75,6 +75,62 @@ export type FieldKind =
 export const PROPERTY_FIELD_PREFIX = "property:";
 export const propertyFieldId = (definitionId: number) => `${PROPERTY_FIELD_PREFIX}${definitionId}`;
 
+/** Fields of one owner, under the heading a list of them shows. */
+export type FieldGroup = {
+  key: string;
+  /** An i18n key, or a plug-in's own name where `plugin` is set. */
+  heading: string;
+  /** The install whose fields these are. */
+  plugin?: number;
+  fields: FieldDef[];
+};
+
+/** The owners a field may have, in the order they are listed, by heading. */
+const OWNER_GROUPS = [
+  ["builtIn", "layouts:builtIn"],
+  ["projectMetadata", "layouts:projectProperties"],
+  ["collectionMetadata", "layouts:collectionProperties"],
+  ["properties", "layouts:initiativeMetadata"],
+] as const;
+
+const ownerOf = (field: FieldDef): (typeof OWNER_GROUPS)[number][0] =>
+  field.source === "builtin"
+    ? "builtIn"
+    : field.property?.project_id
+      ? "projectMetadata"
+      : field.property?.collection_id
+        ? "collectionMetadata"
+        : "properties";
+
+/**
+ * `fields` grouped by who they belong to: the tool's own, a project's or a
+ * collection's metadata, the initiative's properties, then each plug-in's
+ * under its name. A group with nothing in it is left out.
+ */
+export const groupFields = (fields: readonly FieldDef[]): FieldGroup[] => {
+  const installs = new Map<number, FieldGroup>();
+  for (const field of fields) {
+    if (!field.plugin) continue;
+    const { install, on } = field.plugin;
+    const group = installs.get(install) ?? {
+      key: `plugin:${install}`,
+      heading: on.name,
+      plugin: install,
+      fields: [],
+    };
+    group.fields.push(field);
+    installs.set(install, group);
+  }
+  return [
+    ...OWNER_GROUPS.map(([owner, heading]) => ({
+      key: owner,
+      heading,
+      fields: fields.filter((field) => !field.plugin && ownerOf(field) === owner),
+    })),
+    ...installs.values(),
+  ].filter((group) => group.fields.length > 0);
+};
+
 /** Anything a view can show about an item. */
 export type FieldDef = {
   id: string;
@@ -96,8 +152,8 @@ export type FieldDef = {
   plugin?: { install: number; field: PluginFieldDecl; on: PluginOnItems };
   /** A property field's definition. */
   property?: PropertyDefinitionRead;
-  /** How a rating is drawn where the list showing it says. */
-  display?: RatingDisplay;
+  /** How a scale is drawn where the list showing it says. */
+  display?: ScaleDisplay;
   /** A property drawn on a card as its value alone, not named: a
    *  collection's card under a picture, which reads as a caption or a price
    *  rather than a row of labelled chips. */
@@ -413,10 +469,10 @@ const PropertyField = ({ value, field, variant, oneLine }: FieldRendererProps) =
   />
 );
 
-/** `fields`, each rating drawn as a list's `displays` say. */
+/** `fields`, each scale drawn as a list's `displays` say. */
 export const withDisplays = <F extends Pick<FieldDef, "display">>(
   fields: ReadonlyMap<string, F>,
-  displays: Readonly<Record<string, RatingDisplay>> | null | undefined
+  displays: Readonly<Record<string, ScaleDisplay>> | null | undefined
 ): ReadonlyMap<string, F> =>
   displays && Object.keys(displays).length > 0
     ? new Map(

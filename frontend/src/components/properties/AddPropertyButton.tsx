@@ -13,7 +13,7 @@ import {
   CommandSeparator,
 } from "@/components/ui/command";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
-import { useProperties } from "@/hooks/useProperties";
+import { type MetadataOwner, useOwnedDefinitions } from "@/hooks/useProperties";
 
 import { NewPropertyForm } from "./NewPropertyForm";
 import { iconForPropertyType } from "./propertyTypeIcons";
@@ -26,13 +26,22 @@ export interface AddPropertyButtonProps {
    * payload).
    */
   initiativeId: number;
+  /** The project whose metadata the item may also hold (a task's), offered
+   *  beside the properties and made from here as well. */
+  owner?: MetadataOwner;
   currentPropertyIds: number[];
   onAdd: (definition: PropertyDefinitionRead) => void;
   disabled?: boolean;
 }
 
+/** Whether a definition is a project's or a collection's metadata rather than
+ *  one of the initiative's properties. */
+const isOwned = (definition: PropertyDefinitionRead) =>
+  definition.project_id !== null || definition.collection_id !== null;
+
 export const AddPropertyButton = ({
   initiativeId,
+  owner,
   currentPropertyIds,
   onAdd,
   disabled = false,
@@ -44,7 +53,7 @@ export const AddPropertyButton = ({
   // The inline "create a property" form, in place of the list.
   const [isCreating, setIsCreating] = useState(false);
 
-  const propertiesQuery = useProperties({ initiativeId });
+  const propertiesQuery = useOwnedDefinitions({ initiativeId, owner });
 
   const currentIdSet = useMemo(() => new Set(currentPropertyIds), [currentPropertyIds]);
 
@@ -58,6 +67,20 @@ export const AddPropertyButton = ({
     if (!term) return candidates;
     return candidates.filter((definition) => definition.name.toLowerCase().includes(term));
   }, [candidates, search]);
+  // The owner's metadata, then the initiative's properties, each under its
+  // own heading where there are both.
+  const groups = [
+    {
+      key: "metadata",
+      heading: owner ? t(`properties:picker.owner.${owner.kind}`) : undefined,
+      items: filteredCandidates.filter((definition) => isOwned(definition)),
+    },
+    {
+      key: "properties",
+      heading: owner ? t("properties:picker.owner.initiative") : undefined,
+      items: filteredCandidates.filter((definition) => !isOwned(definition)),
+    },
+  ].filter((group) => group.items.length > 0);
 
   const handleOpenChange = useCallback((next: boolean) => {
     setOpen(next);
@@ -80,13 +103,14 @@ export const AddPropertyButton = ({
           disabled={disabled}
         >
           <Plus className="h-4 w-4" />
-          {t("properties:addProperty")}
+          {t(owner ? "properties:addPropertyOrMetadata" : "properties:addMetadata")}
         </Button>
       </PopoverTrigger>
       <PopoverContent className="w-80 p-0" align="start">
         {isCreating ? (
           <NewPropertyForm
             initiativeId={initiativeId}
+            owner={owner}
             name={search.trim()}
             onCreated={(created) => {
               onAdd(created);
@@ -113,30 +137,32 @@ export const AddPropertyButton = ({
                       {t("properties:picker.empty")}
                     </div>
                   ) : (
-                    <CommandGroup>
-                      {filteredCandidates.map((definition) => {
-                        const Icon = iconForPropertyType(definition.type);
-                        return (
-                          <CommandItem
-                            key={definition.id}
-                            value={`property-${definition.id}`}
-                            onSelect={() => {
-                              onAdd(definition);
-                              handleOpenChange(false);
-                            }}
-                            className="cursor-pointer"
-                          >
-                            <Icon className="h-4 w-4 shrink-0 text-muted-foreground" />
-                            <div className="flex flex-col">
-                              <span>{definition.name}</span>
-                              <span className="text-muted-foreground text-xs">
-                                {t(`properties:types.${definition.type}`)}
-                              </span>
-                            </div>
-                          </CommandItem>
-                        );
-                      })}
-                    </CommandGroup>
+                    groups.map((group) => (
+                      <CommandGroup key={group.key} heading={group.heading}>
+                        {group.items.map((definition) => {
+                          const Icon = iconForPropertyType(definition.type);
+                          return (
+                            <CommandItem
+                              key={definition.id}
+                              value={`property-${definition.id}`}
+                              onSelect={() => {
+                                onAdd(definition);
+                                handleOpenChange(false);
+                              }}
+                              className="cursor-pointer"
+                            >
+                              <Icon className="h-4 w-4 shrink-0 text-muted-foreground" />
+                              <div className="flex flex-col">
+                                <span>{definition.name}</span>
+                                <span className="text-muted-foreground text-xs">
+                                  {t(`properties:types.${definition.type}`)}
+                                </span>
+                              </div>
+                            </CommandItem>
+                          );
+                        })}
+                      </CommandGroup>
+                    ))
                   )}
                   <CommandSeparator />
                   <CommandGroup>

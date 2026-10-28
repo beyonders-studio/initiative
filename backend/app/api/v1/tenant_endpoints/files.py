@@ -93,7 +93,7 @@ from app.services.tenant import body_states
 from app.services.tenant import comments as comments_service
 from app.services.tenant import files as files_service
 from app.services.tenant import ownership as ownership_service
-from app.services.tenant import properties as properties_service
+from app.services.tenant import metadata as metadata_service
 from app.services.tenant import tags as tags_service
 from app.services.tenant.names import ensure_name_free
 from app.services.tenant import tool_listing
@@ -248,7 +248,7 @@ async def serialize_file_page(
     ``me_tools.MY_TOOL_LISTS``; a collection's, in its own ``schema``.
     """
     await tags_service.annotate_tags(session, files)
-    await properties_service.annotate_properties(session, files)
+    await metadata_service.annotate_properties(session, files)
     await comments_service.annotate_comment_counts(session, files, column="file_id")
     await ownership_service.annotate_owner_plugins(session, files)
     context = require_actor_context(session)
@@ -321,7 +321,7 @@ async def create_file(
     )
     await attachments_service.claim_uploads(session, file)
 
-    await properties_service.write_on_create(session, file, file_in.properties)
+    await metadata_service.write_on_create(session, file, file_in.properties)
     await session.commit()
     return await read_after_write(session, file.id, current_user, guild_context)
 

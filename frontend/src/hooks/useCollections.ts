@@ -5,9 +5,7 @@ import {
   addCollectionFiles,
   createCollection,
   deleteCollection,
-  getCollectionFileFields,
   getCollectionFilesTimeline,
-  getGetCollectionFileFieldsQueryKey,
   getGetCollectionFilesTimelineQueryKey,
   getListCollectionFilesQueryKey,
   getListCollectionShapesQueryKey,
@@ -18,7 +16,7 @@ import {
   listCollections,
   readCollection,
   removeCollectionFiles,
-  setCollectionFileFields,
+  setCollectionFileMetadata,
   updateCollection,
   uploadFile,
 } from "@/api/generated/files/files";
@@ -85,16 +83,6 @@ export const useCollection = (collectionId: number | null) => {
   });
 };
 
-/** One file's values of a collection's fields, where it is not read from the
- *  collection's list: on the file's own page. */
-export const useCollectionFileFields = (collectionId: number, fileId: number) => {
-  const communityId = useActiveCommunityId();
-  return useQuery<PropertySummary[]>({
-    queryKey: getGetCollectionFileFieldsQueryKey(communityId, collectionId, fileId),
-    queryFn: () => getCollectionFileFields(communityId, collectionId, fileId),
-  });
-};
-
 /** The filters a collection's file list takes, without the page. */
 export type CollectionFilesParams = Omit<ListCollectionFilesParams, "page" | "page_size">;
 
@@ -147,28 +135,28 @@ export const useCollectionFilesTimeline = (
   });
 };
 
-const fieldSaves = new Map<number, FieldSaveKind<{ properties: PropertySummary[] }, never>>();
+const metadataSaves = new Map<number, FieldSaveKind<{ properties: PropertySummary[] }, never>>();
 
 /**
- * How a file's values of a collection's fields are saved, one at a time:
+ * How a file's values of a collection's metadata are saved, one at a time:
  * they are the collection's, so whoever may change it sets them, and its
- * lists show them.
+ * lists and the file's own read show them.
  */
-export const collectionFieldSaves = (collectionId: number) => {
-  let kind = fieldSaves.get(collectionId);
+export const collectionMetadataSaves = (collectionId: number) => {
+  let kind = metadataSaves.get(collectionId);
   if (!kind) {
-    const name = `collection-fields-${collectionId}`;
+    const name = `collection-metadata-${collectionId}`;
     kind = {
       name,
       readKey: (communityId, id) => heldKey(name, communityId, id),
-      patch: () => Promise.reject(new Error("a file's collection fields take no patch")),
+      patch: () => Promise.reject(new Error("a file's collection metadata takes no patch")),
       properties: PropertyTarget.file,
       setProperties: (communityId, fileId, body) =>
-        setCollectionFileFields(communityId, collectionId, fileId, body),
+        setCollectionFileMetadata(communityId, collectionId, fileId, body),
       lists: () => q.allCollections(),
-      itself: () => ({}),
+      itself: (fileId) => q.file(fileId),
     };
-    fieldSaves.set(collectionId, kind);
+    metadataSaves.set(collectionId, kind);
   }
   return kind;
 };

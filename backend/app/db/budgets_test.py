@@ -22,7 +22,7 @@ from app.models.platform.guild import CommunityRole
 from app.models.tenant.task import Task
 from app.schemas.query import FilterOp
 from app.services.tenant import activity_feed
-from app.services.tenant import properties as properties_service
+from app.services.tenant import metadata as metadata_service
 from app.testing import (
     create_guild,
     create_initiative,
@@ -42,7 +42,7 @@ pytestmark = pytest.mark.budget
 #: of these for every community it has served. 5.69 MB on 2026-10-15.
 POLICY_MEMORY_PER_COMMUNITY = 6_144 * 1024
 
-#: The same for one table. 240 KB (``task_assignees``) on 2026-10-01.
+#: The same for one table. 264 KB (``metadata_values``) on 2026-10-27.
 POLICY_MEMORY_PER_TABLE = 280 * 1024
 
 _POLICY_MEMORY = (
@@ -208,21 +208,21 @@ async def test_a_property_filter_reads_only_the_listed_rows_values(
     await _many_tasks(session, small, 3)
     await session.exec(
         text(
-            "INSERT INTO property_values "
+            "INSERT INTO metadata_values "
             "(entity_type, entity_id, property_id, value_text, created_at, updated_at) "
             "SELECT 'task', id, :stage, 'live', now(), now() FROM tasks"
         ).bindparams(stage=stage.id)
     )
     await session.commit()
     await route_session_to_guild(session, a.guild.id)
-    for table in ("tasks", "property_values"):
+    for table in ("tasks", "metadata_values"):
         await session.exec(text(f"ANALYZE {table}"))
     await session.commit()
 
     member = await role_session("app_user")
     await establish_guild_access(member, a.user, a.guild.id)
     for op, value in ((FilterOp.eq, "live"), (FilterOp.is_null, True)):
-        clause = properties_service.build_single_property_clause(
+        clause = metadata_service.build_single_property_clause(
             "task", stage.id, op, value, stage
         )
         query = (
@@ -239,7 +239,7 @@ async def test_a_property_filter_reads_only_the_listed_rows_values(
             await member.exec(text(f"EXPLAIN (ANALYZE, FORMAT JSON) {sql}"))
         ).one()
         plan = plan if isinstance(plan, list) else json.loads(plan)
-        read = _rows_read(plan[0]["Plan"], "property_values")
+        read = _rows_read(plan[0]["Plan"], "metadata_values")
         assert read <= 3, f"{op.value} on 3 tasks read {read} values"
 
 

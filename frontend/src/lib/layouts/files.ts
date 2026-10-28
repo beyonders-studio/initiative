@@ -1,7 +1,7 @@
 /**
  * What a collection's lists show of each file: the file's own fields, the
- * collection's fields and the initiative's properties, drawn through the same
- * fields, cards and columns a project's lists draw tasks with.
+ * collection's metadata and the initiative's properties, drawn through the
+ * same fields, cards and columns a project's lists draw tasks with.
  */
 
 import type {
@@ -14,6 +14,7 @@ import {
   nonEmptyPropertySummaries,
 } from "@/components/properties/propertyHelpers";
 
+import { at, detailLayoutSpec, type Region } from "./detailLayout";
 import type { ListShape } from "./draft";
 import { type FieldDef, type FieldKind, isEmptyValue, type LayoutItem } from "./fields";
 import { propertyFields } from "./tasks";
@@ -64,6 +65,31 @@ export const FILE_LIST_SHAPE: ListShape = {
   columnFields: new Set(Object.keys(FILE_FIELDS)),
 };
 
+const field = (id: string): LayoutNode => ({ type: "field", props: { field: id } });
+
+/** A file opened from a collection as shipped: its name, then the
+ *  collection's metadata and the properties it holds. */
+const FILE_DETAIL_REGIONS: Record<Region, LayoutNode[]> = {
+  header: [field("name")],
+  main: [at(1, { type: "section", children: [{ type: "properties" }] })],
+  side: [],
+};
+
+/** A file opened from a collection: its own fields, which it does not edit,
+ *  can be placed beside the collection's metadata and the initiative's
+ *  properties. */
+export const FILE_LAYOUT = detailLayoutSpec({
+  kind: "file",
+  shipped: FILE_DETAIL_REGIONS,
+  fieldParts: ["field", "properties"],
+  knows: {
+    ...FILE_DETAIL_REGIONS,
+    side: Object.keys(FILE_FIELDS)
+      .filter((id) => id !== "name")
+      .map(field),
+  },
+});
+
 const heldValue = (summaries: PropertySummary[] | undefined, id: number) => {
   const summary = summaries?.find((each) => each.property_id === id);
   return summary && !isEmptyPropertyValue(summary.value) ? summary : null;
@@ -71,15 +97,15 @@ const heldValue = (summaries: PropertySummary[] | undefined, id: number) => {
 
 /**
  * Everything a collection's list can show of a file: its own fields, then the
- * collection's (its values in the collection's list), then the initiative's
- * properties (its own values). Two that share a name are told apart in their
- * labels, as properties are.
+ * collection's metadata (its values in the collection's list), then the
+ * initiative's properties (its own values). Two that share a name are told
+ * apart in their labels, as properties are.
  */
 export const collectionFileFields = (
-  collectionFields: PropertyDefinitionRead[],
+  metadata: PropertyDefinitionRead[],
   properties: PropertyDefinitionRead[]
 ): Map<string, FieldDef> => {
-  const own = new Set(collectionFields.map((definition) => definition.id));
+  const own = new Set(metadata.map((definition) => definition.id));
   const fields: FieldDef[] = [
     ...Object.entries(FILE_FIELDS).map(
       ([id, { read, ...field }]): FieldDef => ({
@@ -90,9 +116,9 @@ export const collectionFileFields = (
         ...field,
       })
     ),
-    ...propertyFields([...collectionFields, ...properties], (item, id) => {
+    ...propertyFields([...metadata, ...properties], (item, id) => {
       const file = fileOf(item);
-      return heldValue(own.has(id) ? file.fields : file.properties, id);
+      return heldValue(own.has(id) ? file.metadata : file.properties, id);
     }).map((field) => ({ ...field, plain: true })),
   ];
   return new Map(fields.map((field) => [field.id, field]));

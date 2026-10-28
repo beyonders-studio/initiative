@@ -19,10 +19,10 @@ from sqlmodel.ext.asyncio.session import AsyncSession
 from app.models.platform.guild import CommunityRole
 from app.models.tenant.plugin_placement import PluginPlacement
 from app.models.tenant.project import Project
-from app.models.tenant.property import (
-    PropertyDefinition,
-    PropertyType,
-    PropertyValue,
+from app.models.tenant.metadata import (
+    MetadataDefinition,
+    MetadataType,
+    MetadataValue,
 )
 from app.models.tenant.tag import Tag
 from app.models.tenant.tool_layout import ToolLayout
@@ -37,6 +37,7 @@ from app.services.tenant import ownership as ownership_service
 from app.services.tenant import tags as tags_service
 from app.services.tenant import task_types as task_types_service
 from app.services.tenant.task_types import get_default_type
+from app.services.import_engine.context import ImportContext
 from app.testing import (
     assign_tag,
     checklist_items,
@@ -93,7 +94,7 @@ async def _seed_populated_project(session: AsyncSession):
         session,
         initiative,
         name="Severity",
-        type=PropertyType.select,
+        type=MetadataType.select,
         options=[{"value": "low", "label": "Low"}, {"value": "high", "label": "High"}],
     )
 
@@ -256,17 +257,17 @@ async def test_round_trip_into_different_initiative(session: AsyncSession):
     assert {t.name for t in new_task.tags} == {"blocker"}
     pv = (
         await session.exec(
-            select(PropertyValue)
+            select(MetadataValue)
             .where(
-                PropertyValue.entity_type == "task",
-                PropertyValue.entity_id == new_task.id,
+                MetadataValue.entity_type == "task",
+                MetadataValue.entity_id == new_task.id,
             )
-            .options(selectinload(PropertyValue.property_definition))
+            .options(selectinload(MetadataValue.definition))
         )
     ).one()
     assert pv.value_text == "high"
-    assert pv.property_definition.name == "Severity"
-    assert pv.property_definition.initiative_id == target_initiative.id
+    assert pv.definition.name == "Severity"
+    assert pv.definition.initiative_id == target_initiative.id
 
 
 async def test_a_project_brings_its_layouts(session: AsyncSession):
@@ -288,15 +289,15 @@ async def test_a_project_brings_its_layouts(session: AsyncSession):
     )
     severity = (
         await session.exec(
-            select(PropertyDefinition).where(PropertyDefinition.name == "Severity")
+            select(MetadataDefinition).where(MetadataDefinition.name == "Severity")
         )
     ).one()
     # Named by a layout and by no value.
     stage = await create_property_definition(
-        session, source_initiative, name="Stage", type=PropertyType.text
+        session, source_initiative, name="Stage", type=MetadataType.text
     )
     lead = await create_property_definition(
-        session, source_initiative, name="Lead", type=PropertyType.user_reference
+        session, source_initiative, name="Lead", type=MetadataType.user_reference
     )
     tag = (await session.exec(select(Tag))).one()
     plugin = await create_guild_plugin(
@@ -450,8 +451,8 @@ async def test_a_project_brings_its_layouts(session: AsyncSession):
         p.name: p.id
         for p in (
             await session.exec(
-                select(PropertyDefinition).where(
-                    PropertyDefinition.initiative_id == target_initiative.id
+                select(MetadataDefinition).where(
+                    MetadataDefinition.initiative_id == target_initiative.id
                 )
             )
         ).all()
@@ -491,6 +492,156 @@ async def test_a_project_brings_its_layouts(session: AsyncSession):
     assert imported["default"] == {"kind": "board"}
 
 
+async def test_a_project_brings_its_metadata_and_its_values(session: AsyncSession):
+    """The project's metadata goes with it, held or not, marked as its own; a
+    task's value of it says so; and an import makes it again on the new
+    project, with the values and the layouts that place it, beside the
+    initiative's properties rather than among them."""
+    owner, _assignee, guild, initiative, project = await _seed_populated_project(
+        session
+    )
+    points = await create_property_definition(
+        session, initiative, project=project, name="Points", type=MetadataType.number
+    )
+    await create_property_definition(
+        session, initiative, project=project, name="Phase", type=MetadataType.text
+    )
+    task = (
+        await session.exec(select(Task).where(Task.project_id == project.id))
+    ).first()
+    assert task is not None
+    await create_property_value(session, task, points, value_number=5)
+    session.add(
+        ToolLayout(
+            initiative_id=project.initiative_id,
+            tool="project",
+            tool_id=project.id,
+            kind="board",
+            definition={
+                "card": {
+                    "type": "card",
+                    "children": [
+                        {"type": "field", "props": {"field": f"property:{points.id}"}}
+                    ],
+                }
+            },
+        )
+    )
+    await session.commit()
+
+    envelope = await export_service.build_project_export(
+        session, await get_project_hydrated(session, project.id)
+    )
+
+    assert {(p.name, p.project) for p in envelope.property_definitions} == {
+        ("Severity", False),
+        ("Points", True),
+        ("Phase", True),
+    }
+    assert {(v.property_name, v.project) for v in envelope.tasks[0].properties} == {
+        ("Severity", False),
+        ("Points", True),
+    }
+
+    target = await create_initiative(session, guild, owner, name="Target")
+    await route_as(session, user_id=owner.id, guild_id=guild.id)
+    result = await import_service.import_project(
+        session, envelope=envelope, target_initiative=target, importer=owner
+    )
+    await session.commit()
+
+    await route_session_to_guild(session, guild.id)
+    made = {
+        defn.name: defn
+        for defn in await session.exec(
+            select(MetadataDefinition).where(
+                MetadataDefinition.project_id == result.entity_id
+            )
+        )
+    }
+    assert {name: d.type for name, d in made.items()} == {
+        "Points": MetadataType.number,
+        "Phase": MetadataType.text,
+    }
+    assert all(d.initiative_id == target.id for d in made.values())
+    new_task = (
+        await session.exec(select(Task).where(Task.project_id == result.entity_id))
+    ).one()
+    values = await session.exec(
+        select(MetadataValue.property_id, MetadataValue.value_number).where(
+            MetadataValue.entity_type == "task",
+            MetadataValue.entity_id == new_task.id,
+            MetadataValue.property_id == made["Points"].id,
+        )
+    )
+    assert values.all() == [(made["Points"].id, 5)]
+    board = (
+        await session.exec(
+            select(ToolLayout.definition).where(
+                ToolLayout.tool_id == result.entity_id, ToolLayout.kind == "board"
+            )
+        )
+    ).one()
+    assert board["card"]["children"] == [
+        {"type": "field", "props": {"field": f"property:{made['Points'].id}"}}
+    ]
+
+
+async def test_an_unticked_property_leaves_project_metadata_of_its_name(
+    session: AsyncSession,
+):
+    """The review lists the initiative's properties: unticking ``Severity``
+    leaves out that property and its values, and keeps the project's own
+    ``Severity`` and its value."""
+    owner, _assignee, guild, initiative, project = await _seed_populated_project(
+        session
+    )
+    own = await create_property_definition(
+        session, initiative, project=project, name="Severity", type=MetadataType.number
+    )
+    task = (
+        await session.exec(select(Task).where(Task.project_id == project.id))
+    ).first()
+    assert task is not None
+    await create_property_value(session, task, own, value_number=3)
+    envelope = await export_service.build_project_export(
+        session, await get_project_hydrated(session, project.id)
+    )
+    target = await create_initiative(session, guild, owner, name="Target")
+
+    await route_as(session, user_id=owner.id, guild_id=guild.id)
+    result = await import_service.import_project(
+        session,
+        envelope=envelope,
+        target_initiative=target,
+        importer=owner,
+        context=ImportContext(excluded_properties=frozenset({"Severity"})),
+    )
+    await session.commit()
+
+    await route_session_to_guild(session, guild.id)
+    new_task = (
+        await session.exec(select(Task).where(Task.project_id == result.entity_id))
+    ).one()
+    kept = await session.exec(
+        select(MetadataDefinition.project_id, MetadataValue.value_number)
+        .join(MetadataValue, MetadataValue.property_id == MetadataDefinition.id)
+        .where(
+            MetadataValue.entity_type == "task",
+            MetadataValue.entity_id == new_task.id,
+        )
+    )
+    assert kept.all() == [(result.entity_id, 3)]
+    assert (
+        await session.exec(
+            select(MetadataDefinition).where(
+                MetadataDefinition.of_initiative(target.id),
+                MetadataDefinition.name == "Severity",
+            )
+        )
+    ).first() is None
+
+
 async def test_an_envelope_holds_one_layout_of_each_kind_as_read(
     session: AsyncSession,
 ):
@@ -517,7 +668,7 @@ async def test_an_envelope_holds_one_layout_of_each_kind_as_read(
 
 
 async def test_an_envelope_holds_a_task_page_for_each_type(session: AsyncSession):
-    owner, _assignee, guild, _initiative, project = await _seed_populated_project(
+    owner, _assignee, guild, initiative, project = await _seed_populated_project(
         session
     )
     body = (
@@ -594,7 +745,7 @@ async def test_property_type_collision_renames(session: AsyncSession):
         session,
         target_initiative,
         name="Severity",
-        type=PropertyType.text,
+        type=MetadataType.text,
     )
 
     result = await import_service.import_project(
@@ -607,17 +758,17 @@ async def test_property_type_collision_renames(session: AsyncSession):
     assert result.renamed_property_count == 1
 
     # Original definition unchanged
-    refreshed = await session.get(PropertyDefinition, existing_prop.id)
-    assert refreshed.type == PropertyType.text
+    refreshed = await session.get(MetadataDefinition, existing_prop.id)
+    assert refreshed.type == MetadataType.text
 
     # Renamed definition exists with the original type
-    stmt = select(PropertyDefinition).where(
-        PropertyDefinition.initiative_id == target_initiative.id,
-        PropertyDefinition.name == "Severity_select",
+    stmt = select(MetadataDefinition).where(
+        MetadataDefinition.initiative_id == target_initiative.id,
+        MetadataDefinition.name == "Severity_select",
     )
     renamed = (await session.exec(stmt)).one_or_none()
     assert renamed is not None
-    assert renamed.type == PropertyType.select
+    assert renamed.type == MetadataType.select
 
 
 async def test_property_options_mismatch_renames(session: AsyncSession):
@@ -641,7 +792,7 @@ async def test_property_options_mismatch_renames(session: AsyncSession):
         session,
         target_initiative,
         name="Severity",
-        type=PropertyType.select,
+        type=MetadataType.select,
         options=[
             {"value": "critical", "label": "Critical"},
             {"value": "minor", "label": "Minor"},
@@ -657,16 +808,16 @@ async def test_property_options_mismatch_renames(session: AsyncSession):
     assert result.renamed_property_count == 1
 
     # Original target definition unchanged
-    refreshed = await session.get(PropertyDefinition, existing_prop.id)
+    refreshed = await session.get(MetadataDefinition, existing_prop.id)
     assert refreshed.options == [
         {"value": "critical", "label": "Critical"},
         {"value": "minor", "label": "Minor"},
     ]
 
     # Renamed import lives alongside it with the source's options
-    stmt = select(PropertyDefinition).where(
-        PropertyDefinition.initiative_id == target_initiative.id,
-        PropertyDefinition.name == "Severity_select",
+    stmt = select(MetadataDefinition).where(
+        MetadataDefinition.initiative_id == target_initiative.id,
+        MetadataDefinition.name == "Severity_select",
     )
     renamed = (await session.exec(stmt)).one_or_none()
     assert renamed is not None
@@ -692,7 +843,7 @@ async def test_property_options_label_only_difference_matches(session: AsyncSess
         session,
         target_initiative,
         name="Severity",
-        type=PropertyType.select,
+        type=MetadataType.select,
         options=[
             {"value": "low", "label": "LOW PRIORITY"},
             {"value": "high", "label": "HIGH PRIORITY"},
@@ -857,7 +1008,7 @@ async def test_task_types_survive_the_round_trip(session: AsyncSession):
     """A project's types come back as they were, and each task as its type."""
     from app.models.tenant.task import TaskType
 
-    owner, _assignee, guild, _initiative, project = await _seed_populated_project(
+    owner, _assignee, guild, initiative, project = await _seed_populated_project(
         session
     )
     types = await task_types_service.list_types(session, project.id)

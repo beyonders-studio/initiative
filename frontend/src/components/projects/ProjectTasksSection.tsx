@@ -987,6 +987,7 @@ export const ProjectTasksSection = ({
               memberScope: { type: "canOpen", tool: Tool.project, id: projectId },
               statuses: sortedTaskStatuses,
               types: taskTypes,
+              projectId,
             }}
             value={appliedSpec}
             onChange={setFilters}

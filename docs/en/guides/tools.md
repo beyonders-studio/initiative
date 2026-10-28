@@ -100,9 +100,9 @@ Open a project, a queue, a dashboard or any other tool and the top of the page i
 
 - **A band in the initiative's colour**, so you always know which initiative you're standing in. It holds the breadcrumb back out, and **Settings** across from it if you're allowed to change things.
 - **The name and description.** Click the name to rename it. A file is the one exception: its title is the field at the top of the file. The bookmark beside the name adds it to your [Bookmarks](your-space.md#bookmarks), and the bell beside that [subscribes](your-space.md#subscribing) you to it.
-- **A strip underneath**, with **Status**, **Tags** and **Properties**, all changeable right there, beside whatever only that tool has — a project's progress and dates, a queue's turn controls.
+- **A strip underneath**, with **Status**, **Tags** and **Metadata**, all changeable right there, beside whatever only that tool has — a project's progress and dates, a queue's turn controls.
 
-![The top of a project: the initiative's band with the breadcrumb and Settings, the name, and the strip with status, progress, dates, tags and properties](../images/tools/connections.png)
+![The top of a project: the initiative's band with the breadcrumb and Settings, the name, and the strip with status, progress, dates, tags and metadata](../images/tools/connections.png)
 
 **Status** is **Active** or **Archived**. Archiving marks a thing finished: it, and everything inside it, turns read-only until you take it back out. Projects and files can also be a **Template**, and that's where you make one.
 
@@ -127,7 +127,7 @@ Some cards show what's inside without opening anything: a dashboard's card is a 
 Along the top of a list:
 
 - **Show** switches between **Active** and **Archived** — and, for projects and files, **Templates** — each with how many are in it.
-- **Filters** narrows the list by name, by tag, and by the initiative's own [properties](initiatives.md#custom-properties).
+- **Filters** narrows the list by name, by tag, and by the initiative's own [metadata](initiatives.md#metadata).
 - **More actions** holds the rest: **Select items**, for doing something to several at once: tag them, duplicate them, delete them, or change who can see or edit them (click the first, hold ++shift++, click the last — see [Sharing & access](../sharing/index.md)); **Import from file**, for bringing back something exported; and, where the [marketplace](plugins-and-marketplace.md) has ready-made ones, **Browse the marketplace**.
 
 There's one button for making a new one. On a phone it lives at the bottom of the screen.
@@ -146,7 +146,7 @@ Every tool but a notice can be copied from **Settings → Advanced → Duplicate
 
 A notice is posted once. The next one is a new notice.
 
-The things inside a tool copy on their own, too: a task, a counter, a queue item, an event, a wiki page. The copy lands in the same place as the original, with "(Copy)" on its name, and brings its tags, links and properties. Each tool's own page says where its **Duplicate** lives.
+The things inside a tool copy on their own, too: a task, a counter, a queue item, an event, a wiki page. The copy lands in the same place as the original, with "(Copy)" on its name, and brings its tags, links and metadata. Each tool's own page says where its **Duplicate** lives.
 
 ## Related
 

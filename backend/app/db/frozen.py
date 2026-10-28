@@ -867,8 +867,8 @@ def _reactions_leg(alias: str, trashed_ok: str) -> str:
     return f"COALESCE((CASE {alias}.target_type {arms} ELSE false END), false)"
 
 
-def _property_values_leg(alias: str, trashed_ok: str) -> str:
-    """A property value freezes with the thing it is on."""
+def _metadata_values_leg(alias: str, trashed_ok: str) -> str:
+    """A metadata value freezes with the thing it is on."""
     tables = entity_tables()
     arms = " ".join(
         f"WHEN '{target}' THEN resource_frozen("
@@ -947,7 +947,7 @@ _UNFROZEN_ROWS: dict[str, Callable[[str], str]] = {
 _FREEZE_DEVIATIONS: dict[str, Callable[[str, str], str]] = {
     "comments": _comments_leg,
     "reactions": _reactions_leg,
-    "property_values": _property_values_leg,
+    "metadata_values": _metadata_values_leg,
     "relationships": _edge_leg,
     "resource_grants": _resource_grants_leg,
     "tool_layouts": _tool_layouts_leg,

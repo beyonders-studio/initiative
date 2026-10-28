@@ -24,7 +24,7 @@ be imported by ``tenancy`` and by the build-time generator alike.
 from __future__ import annotations
 
 import re
-from dataclasses import dataclass
+from dataclasses import dataclass, replace
 from typing import Callable, Iterable
 
 from app.db import gucs
@@ -1054,77 +1054,76 @@ def _entity_readable(t: str, kinds: Iterable[str]) -> str:
     return f"(CASE {t}.entity_type {arms} ELSE false END)"
 
 
-def property_values_path() -> InitiativePath:
-    """A property value is read by whoever can read the thing it is on and its
-    definition, and written by whoever can edit that thing.
+def metadata_values_path() -> InitiativePath:
+    """A metadata value is reached through the thing it is on and what its
+    definition's owner adds, read off the definition in one ``EXISTS``.
 
-    Polymorphic over ``(entity_type, entity_id)``. A read is one ``EXISTS`` per
-    kind (:func:`_entity_readable`) and one into the definition, whose own
-    policy answers for it; a write is one :data:`ENTITY_ACCESS_FN` call, since
-    a write touches a row at a time. A write also asks that the definition
-    belongs to the thing's own initiative: definitions are initiative-level, so
-    a value from another initiative's definition — or on a thing that belongs
-    to none — is refused.
+    Polymorphic over ``(entity_type, entity_id)``. Reading asks that the thing
+    can be read: one ``EXISTS`` per kind (:func:`_entity_readable`). Writing
+    asks one :data:`ENTITY_ACCESS_FN` call, since a write touches a row at a
+    time. Then, by the definition's owner:
 
-    A collection's own field is the collection's: its value is on a file in
-    the collection, and written by whoever may change the collection, with no
-    edit on the file asked.
+    * the initiative (a property): a write edits the thing, and the definition
+      belongs to the thing's own initiative, so a value from another
+      initiative's definition, or on a thing that belongs to none, is refused;
+    * a project: as a property, on a task in that project;
+    * a collection: its value is on a file in the collection, and written by
+      whoever may change the collection, with no edit on the file asked;
+    * a plug-in: written by the install that keeps it, on an item it can read,
+      and on the install itself (``entity_type = 'plugin'``), which belongs to
+      no initiative and is reached by that install alone. On an item, the
+      community's admin reaches it too (as the item is purged), and whoever
+      can read the item reads it where its definition is shown on the item's
+      kind.
+
+    The system engine reaches every value.
     """
 
     def build(t: str, w: bool) -> str:
-        definition = f"EXISTS (SELECT 1 FROM property_definitions pd WHERE pd.id = {t}.property_id"  # noqa: S608
+        own = f"(md.install_id = {_P.install_id} AND {_P.this_guild} AND {_P.auth_ok})"
+        on_install = f"{t}.entity_type = '{INSTALL_METADATA_KIND}'"
         if not w:
-            return f"({_entity_readable(t, PROPERTY_TARGETS)} AND {definition}))"
-        reach = _entity_call(f"{t}.entity_type", f"{t}.entity_id", w, w)
+            # The thing a value is on is read once, whoever owns the value: a
+            # plug-in's is on an item, or on the install itself, which only
+            # the install reads; on an item, its install, the community's
+            # admin, and whoever reads it where the definition is shown.
+            items = ", ".join(f"'{kind}'" for kind in ITEM_KINDS)
+            return (
+                f"({_P.system} OR EXISTS (SELECT 1 FROM metadata_definitions md "  # noqa: S608
+                f"WHERE md.id = {t}.property_id AND (CASE WHEN {on_install}"
+                f" THEN md.install_id IS NOT NULL AND {t}.entity_id = md.install_id"
+                f" ELSE (md.install_id IS NULL OR {t}.entity_type IN ({items}))"
+                f" AND {_entity_readable(t, PROPERTY_TARGETS)} END)"
+                f" AND (md.install_id IS NULL OR {own} OR (NOT {on_install}"
+                f" AND ({_P.admin} OR {t}.entity_type = ANY (md.shown_on))))))"
+            )
+        held = f"{ENTITY_INITIATIVE_FN}({t}.entity_type, {t}.entity_id)"
         field = (
             f"{t}.entity_type = '{Tool.file.value}' AND EXISTS (SELECT 1 "  # noqa: S608
-            f"FROM collection_files cf WHERE cf.collection_id = pd.collection_id "
-            f"AND cf.file_id = {t}.entity_id) AND {_access('pd.initiative_id', True)}"
-            f" AND {_collection_writer('pd.initiative_id')}"
+            f"FROM collection_files cf WHERE cf.collection_id = md.collection_id "
+            f"AND cf.file_id = {t}.entity_id) AND {_access('md.initiative_id', True)}"
+            f" AND {_collection_writer('md.initiative_id')}"
         )
-        return (
-            f"({_P.system} OR {definition} AND (CASE WHEN pd.collection_id IS NULL"
-            f" THEN ({reach} AND pd.initiative_id = "
-            f"{ENTITY_INITIATIVE_FN}({t}.entity_type, {t}.entity_id))"
-            f" ELSE ({field}) END)))"
+        on_task = (
+            f"{t}.entity_type = 'task' AND EXISTS (SELECT 1 FROM tasks tk "  # noqa: S608
+            f"WHERE tk.id = {t}.entity_id AND tk.project_id = md.project_id)"
         )
-
-    return InitiativePath(
-        predicate=build,
-        initiative_expr=lambda r: (
-            f"{ENTITY_INITIATIVE_FN}({r}.entity_type, {r}.entity_id)"
-        ),
-    )
-
-
-def plugin_metadata_path() -> InitiativePath:
-    """An install's values are reached by the install that keeps them, and on
-    an item by the community's admin too, in each case only while the item
-    itself can be read. A shown value on an item is also read by whoever can
-    read the item. The install's own values (``entity_type = 'plugin'``)
-    belong to no initiative and are reached by that install alone. The system
-    engine reaches both.
-
-    Otherwise reading and writing ask the same: writing a value changes
-    nothing on the item. A read is one ``EXISTS`` per kind
-    (:func:`_entity_readable`); a write asks the same of one read-only
-    :data:`ENTITY_ACCESS_FN` call, as a property value's write does. What an
-    install also needs, the read scope of the item's tool, is its
-    ``plugin_scope_*`` policies (``app.db.guild_ddl``).
-    """
-
-    def build(t: str, w: bool) -> str:
-        own = f"({t}.install_id = {_P.install_id} AND {_P.this_guild} AND {_P.auth_ok})"
-        reach = f"{own} OR {_P.admin}" if w else f"{own} OR {_P.admin} OR {t}.shown"
+        # One call asks of the item what its owner's values take: an edit of
+        # it, and of a plug-in's, only that it can be read.
+        unowned = "md.install_id IS NULL"
+        need = unowned if w is True else f"({unowned} AND {_sql_bool(w)})"
         item = (
-            _entity_call(f"{t}.entity_type", f"{t}.entity_id", False, False)
-            if w
-            else _entity_readable(t, ITEM_KINDS)
+            f"{ENTITY_ACCESS_FN}({t}.entity_type, {t}.entity_id, {need}, "
+            f"{need}, {STANDING})"
         )
         return (
-            f"({_P.system} OR (CASE WHEN {t}.entity_type = '{INSTALL_METADATA_KIND}'"
-            f" THEN ({own} AND {t}.entity_id = {t}.install_id)"
-            f" ELSE (({reach}) AND {item}) END))"
+            f"({_P.system} OR EXISTS (SELECT 1 FROM metadata_definitions md "  # noqa: S608
+            f"WHERE md.id = {t}.property_id AND ({unowned} OR {own}"
+            f" OR ({_P.admin} AND NOT {on_install})) AND (CASE"
+            f" WHEN md.collection_id IS NOT NULL THEN ({field})"
+            f" WHEN {on_install} THEN NOT {unowned} AND {t}.entity_id = md.install_id"
+            f" ELSE {item} AND (NOT {unowned} OR (CASE WHEN md.project_id IS NOT NULL"
+            f" THEN {on_task} ELSE md.initiative_id = {held} END)) END)))"
         )
 
     return InitiativePath(
@@ -1466,19 +1465,36 @@ def _collection_writer(initiative: str) -> str:
     )
 
 
-def property_definitions_path() -> InitiativePath:
-    """An initiative's property is read and written by its members. A
-    collection's own field is also read only by whoever sees the collection —
-    one ``EXISTS`` into it, whose own policy answers — and written only by
-    whoever may change it (:func:`_collection_writer`)."""
+def metadata_definitions_path() -> InitiativePath:
+    """Who may read and define metadata, by the definition's owner.
+
+    * The initiative's property: read and written by its members.
+    * A collection's: also read only by whoever sees the collection — one
+      ``EXISTS`` into it, whose own policy answers — and written only by
+      whoever may change it (:func:`_collection_writer`).
+    * A project's: what the project's task types ask, through the project.
+    * A plug-in's: declared by its manifest and kept by its install, which
+      alone writes it besides the system engine. It belongs to no
+      initiative, and anybody in the community reads it, as they read which
+      plug-ins are installed.
+    """
+    project = via("projects", "project_id")
 
     def predicate(t: str, w: bool) -> str:
         seen = f"EXISTS (SELECT 1 FROM collections c WHERE c.id = {t}.collection_id)"  # noqa: S608
         if w:
             seen = f"({seen} AND {_collection_writer(f'{t}.initiative_id')})"
+        plugin = (
+            f"({_P.system} OR ({t}.install_id = {_P.install_id} AND {_P.this_guild}"
+            f" AND {_P.auth_ok}))"
+            if w
+            else "true"
+        )
         return (
-            f"({_access(f'{t}.initiative_id', w)}"
-            f" AND ({t}.collection_id IS NULL OR {seen}))"
+            f"(CASE WHEN {t}.install_id IS NOT NULL THEN {plugin}"
+            f" WHEN {t}.project_id IS NOT NULL THEN {project.predicate(t, w)}"
+            f" ELSE ({_access(f'{t}.initiative_id', w)}"
+            f" AND ({t}.collection_id IS NULL OR {seen})) END)"
         )
 
     return InitiativePath(
@@ -1581,7 +1597,7 @@ INITIATIVE_PATHS: dict[str, InitiativePath] = {
         tool.plural: direct_or_guild() if tool is Tool.calendar else direct()
         for tool in Tool
     },
-    "property_definitions": property_definitions_path(),
+    "metadata_definitions": metadata_definitions_path(),
     # Sharing itself. It carries no sharing leg of its own: resource_access
     # reads this table, so a policy here that called it would not resolve.
     # ``direct()`` derives none, because the table is no tool's own.
@@ -1653,11 +1669,9 @@ INITIATIVE_PATHS: dict[str, InitiativePath] = {
     # Two hops -> calendar_events -> calendars
     "calendar_event_attendees": via_event_calendar("calendar_event_id"),
     "calendar_event_answers": via_event_calendar("calendar_event_id"),
-    # Every tool and sub-tool's custom property values, by (entity_type, entity_id)
-    "property_values": property_values_path(),
-    # What an installed plug-in keeps on items and on itself, by (entity_type,
-    # entity_id).
-    "plugin_metadata": plugin_metadata_path(),
+    # Every metadata value, properties included, on any tool and sub-tool and
+    # on an install, by (entity_type, entity_id).
+    "metadata_values": metadata_values_path(),
     # An initiative's views of one tool instance, or of a shared page.
     "tool_layouts": tool_layouts_path(),
     "comments": comments_path(),
@@ -1694,7 +1708,7 @@ NAMED_PEOPLE: tuple[NamedPerson, ...] = (
     NamedPerson("task_assignees", "user_id"),
     NamedPerson("calendar_event_attendees", "user_id"),
     NamedPerson("calendar_event_answers", "user_id"),
-    NamedPerson("property_values", "value_user_id", clear=True),
+    NamedPerson("metadata_values", "value_user_id", clear=True),
     NamedPerson("queue_items", "user_id", clear=True),
     # What somebody asked for goes with them: nobody is left to answer for.
     NamedPerson("share_requests", "user_id"),
@@ -2207,15 +2221,19 @@ EVENT_SOURCES: dict[str, Emit | Silent] = {
     "task_types": Emit(reports_as=reports_as("projects", "project_id", "types")),
     # A property definition is read in its initiative's list, not at an
     # address of its own, so a change to one reports as that initiative; a
-    # collection's own field is read with the collection, and reports as it.
-    "property_definitions": Emit(
+    # project's or a collection's metadata is read with its owner, and
+    # reports as it. A plug-in's is its manifest's, and reports as nothing.
+    "metadata_definitions": Emit(
         reports_as=ReportsAs(
-            resource_types=frozenset({"initiatives", "collections"}),
-            id_expr=lambda r: f"COALESCE({r}.collection_id, {r}.initiative_id)",
+            resource_types=frozenset({"initiatives", "projects", "collections"}),
+            id_expr=lambda r: (
+                f"COALESCE({r}.project_id, {r}.collection_id, {r}.initiative_id)"
+            ),
             facet="properties",
             type_expr=lambda r: (
-                f"(CASE WHEN {r}.collection_id IS NULL THEN 'initiatives'"
-                " ELSE 'collections' END)"
+                f"(CASE WHEN {r}.project_id IS NOT NULL THEN 'projects'"
+                f" WHEN {r}.collection_id IS NOT NULL THEN 'collections'"
+                " ELSE 'initiatives' END)"
             ),
         )
     ),
@@ -2283,16 +2301,25 @@ def event_source(table: str) -> Emit:
 # endpoints report against, so it can only be built once every endpoint's own
 # entry above exists.
 EVENT_SOURCES["relationships"] = Emit(reports_as=relationships_report_on_both_ends())
-# The same, for whatever a property value is on.
-EVENT_SOURCES["property_values"] = Emit(
-    reports_as=values_report_on_their_target(PROPERTY_TARGETS, "properties")
-)
-# A plug-in's shown values on an item; its values on itself name no item, and
-# are skipped.
-EVENT_SOURCES["plugin_metadata"] = Emit(
-    reports_as=values_report_on_their_target(ITEM_KINDS, "plugin_values"),
-    # A private value is the plug-in's own and changes nothing a reader sees.
-    when=lambda r: f"{r}.shown",
+# The same, for whatever a metadata value is on; an install's values on itself
+# name no item, and are skipped. A plug-in's values report as ``plugin_values``,
+# which is no news about the item (``activity_feed.QUIET_FACETS``), and one no
+# reader is shown is the plug-in's own and changes nothing a reader sees.
+EVENT_SOURCES["metadata_values"] = Emit(
+    quiet_when=lambda r: (
+        "EXISTS (SELECT 1 FROM metadata_definitions md "  # noqa: S608
+        f"WHERE md.id = {r}.property_id AND md.install_id IS NOT NULL"
+        f" AND NOT {r}.entity_type = ANY (md.shown_on))"
+    ),
+    reports_as=replace(
+        values_report_on_their_target(PROPERTY_TARGETS, "properties"),
+        facet_expr=lambda r: (
+            "(CASE WHEN EXISTS (SELECT 1 FROM metadata_definitions md "  # noqa: S608
+            f"WHERE md.id = {r}.property_id AND md.install_id IS NOT NULL)"
+            " THEN 'plugin_values' ELSE 'properties' END)"
+        ),
+        facet_values=frozenset({"properties", "plugin_values"}),
+    ),
 )
 
 

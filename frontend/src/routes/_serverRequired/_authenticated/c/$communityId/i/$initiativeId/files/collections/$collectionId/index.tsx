@@ -7,7 +7,7 @@ import { getReadCollectionQueryKey, readCollection } from "@/api/generated/files
  * one of them, since a file can be in any number of collections.
  */
 export const Route = createFileRoute(
-  "/_serverRequired/_authenticated/c/$communityId/i/$initiativeId/files/collections/$collectionId"
+  "/_serverRequired/_authenticated/c/$communityId/i/$initiativeId/files/collections/$collectionId/"
 )({
   loader: ({ context, params }) => {
     const collectionId = Number(params.collectionId);

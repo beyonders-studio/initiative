@@ -34,7 +34,7 @@ import { GroupBySelect } from "@/components/ui/data-table";
 import { MentionText } from "@/components/user/MentionText";
 import { type ColumnLimits, NO_COLUMN_LIMITS } from "@/hooks/useColumnLimits";
 import { useProjectTaskTypes } from "@/hooks/useProjects";
-import { useProperties } from "@/hooks/useProperties";
+import { NO_DEFINITIONS, useOwnedDefinitions } from "@/hooks/useProperties";
 import { useTaskGroupings } from "@/hooks/useTaskGroupings";
 import { useMoveTaskToGroup } from "@/hooks/useTasks";
 import { formatDateTime } from "@/lib/formatDate";
@@ -80,7 +80,7 @@ type ProjectTasksKanbanViewProps = {
   /** The view's card, where it has its own. */
   /** The project's own card; none draws the shipped one. */
   card?: LayoutNode | null;
-  /** How the card draws each rating, as the layout says. */
+  /** How the card draws each scale, as the layout says. */
   displays?: ListLayoutDefinitionInputDisplays;
   /** What the board is grouped by, as its reader's view keeps it. */
   grouping?: GroupingState;
@@ -96,7 +96,6 @@ type ProjectTasksKanbanViewProps = {
 
 // One empty list while the definitions load, so the fields aren't rebuilt on
 // every pass until they arrive.
-const NO_DEFINITIONS: PropertyDefinitionRead[] = [];
 const NOT_GROUPED: GroupingState = [];
 
 export const ProjectTasksKanbanView = ({
@@ -131,10 +130,11 @@ export const ProjectTasksKanbanView = ({
   const scrollContainerRef = useRef<HTMLDivElement | null>(null);
   useHorizontalDragScroll(scrollContainerRef);
 
-  // The properties the cards can show, scoped to this project's initiative.
-  // What a card shows is its view's card.
-  const { data: fetchedDefinitions = NO_DEFINITIONS } = useProperties({
+  // The project's metadata and its initiative's properties, which the cards
+  // can show. What a card shows is its view's card.
+  const { data: fetchedDefinitions = NO_DEFINITIONS } = useOwnedDefinitions({
     initiativeId,
+    owner: { kind: "project", id: projectId },
     enabled: !givenDefinitions,
   });
   const propertyDefinitions = givenDefinitions ?? fetchedDefinitions;

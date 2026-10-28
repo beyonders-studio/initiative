@@ -38,6 +38,7 @@ _MIGRATION = _VERSIONS / "20260928_0414_an_upload_belongs_to_an_initiative.py"
 _FILE_VERSIONS = _VERSIONS / "20261005_0459_file_versions_by_pointer.py"
 _FILES = _VERSIONS / "20261006_0464_documents_are_files.py"
 _COLLECTIONS = _VERSIONS / "20261027_0546_galleries_are_collections.py"
+_METADATA = _VERSIONS / "20261027_0550_metadata_is_one_store.py"
 
 
 def _load(path: Path = _MIGRATION) -> ModuleType:
@@ -96,6 +97,7 @@ async def test_the_backfill_places_copies_and_leaves_alone(
         )
         files = _load(_FILES)
         with Operations.context(MigrationContext.configure(bind)):
+            _load(_METADATA)._apply(False)
             _load(_COLLECTIONS)._apply(False)
             files._apply(False)
             _load(_FILE_VERSIONS)._apply_downgrade()

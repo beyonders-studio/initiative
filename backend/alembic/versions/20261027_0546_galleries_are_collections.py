@@ -56,12 +56,12 @@ pictures a file. In ``guild_template`` and every ``guild_<id>``:
 * **Structure** — the CHECKs that list a kind or a permission are restated
   without the gallery values, with ``collection`` where the gallery kind was
   (not as a bookmark), the comment single-parent rule over ``collection_id``,
-  and the list layouts masonry, grid and timeline. Then the three gallery
-  tables, ``comments.gallery_id`` and ``initiatives.galleries_enabled`` are
-  dropped. The policies and triggers that read them are dropped first; a start
-  renders the policies of every table again from the registries, before any
-  request is served, and the search generation is cleared so that start
-  re-sweeps the index.
+  the list layouts masonry, grid and timeline, and the file detail. Then the
+  three gallery tables, ``comments.gallery_id`` and
+  ``initiatives.galleries_enabled`` are dropped. The policies and triggers
+  that read them are dropped first; a start renders the policies of every
+  table again from the registries, before any request is served, and the
+  search generation is cleared so that start re-sweeps the index.
 
 The writes run with each table's row security unforced and its user triggers
 held, both restored in the same transaction once they are done.
@@ -217,6 +217,9 @@ _COLLECTION_LAYOUTS = (
     ("default", "jsonb_build_object('kind', 'masonry')"),
 )
 _LIST_KINDS = ("masonry", "grid", "timeline")
+#: The layout kinds a collection brings: its lists, and the detail of a file
+#: opened from it.
+_COLLECTION_KINDS = (*_LIST_KINDS, "file")
 
 #: A picture's format, from its current version's media type, as
 #: 20261026_0540 names it for an uploaded file.
@@ -397,13 +400,14 @@ def _forward_check(name: str, definition: str) -> str:
         definition = definition.replace(f"'{_GALLERY}'::", f"'{_COLLECTION}'::")
     definition = _respell_name(definition, "gallery_id", "collection_id")
     if name == _LAYOUT_KIND_CHECK:
-        definition = _add_elements(definition, _LIST_KINDS)
+        definition = _add_elements(definition, _COLLECTION_KINDS)
     return definition
 
 
 def _backward_check(name: str, definition: str) -> str:
-    for value in _LIST_KINDS:
-        definition = _drop_element(definition, value)
+    if name == _LAYOUT_KIND_CHECK:
+        for value in _COLLECTION_KINDS:
+            definition = _drop_element(definition, value)
     if f"'{_COLLECTION}'::" in definition:
         definition = definition.replace(f"'{_COLLECTION}'::", f"'{_GALLERY}'::")
         if name != _LAYOUT_TOOL_CHECK:
@@ -1240,7 +1244,7 @@ def _downgrade_schema(bind: Connection) -> None:
                 )
             bind.exec_driver_sql(
                 "DELETE FROM tool_layouts WHERE kind IN "
-                f"({', '.join(repr(k) for k in _LIST_KINDS)})"
+                f"({', '.join(repr(k) for k in _COLLECTION_KINDS)})"
             )
             bind.exec_driver_sql("DELETE FROM comments WHERE collection_id IS NOT NULL")
             template = (

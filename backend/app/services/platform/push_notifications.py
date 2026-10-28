@@ -45,6 +45,11 @@ PUSH_CHANNELS: dict[NotificationType, str] = {
     NotificationType.initiative_join_requested: "initiative_added",
     NotificationType.initiative_join_approved: "initiative_added",
     NotificationType.initiative_join_denied: "initiative_added",
+    # Asking for something in an initiative is the same kind of news, one
+    # level down.
+    NotificationType.share_requested: "initiative_added",
+    NotificationType.share_granted: "initiative_added",
+    NotificationType.share_declined: "initiative_added",
     NotificationType.project_added: "project_added",
     NotificationType.mention: "mention",
     NotificationType.comment_on_task: "comments",

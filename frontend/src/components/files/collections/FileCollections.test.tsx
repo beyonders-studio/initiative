@@ -16,7 +16,7 @@ import type { PropertyValuesSetRequest } from "@/api/generated/initiativeAPI.sch
 import { FileCollections } from "./FileCollections";
 
 describe("FileCollections", () => {
-  it("shows and saves the file's values of each collection's own fields", async () => {
+  it("shows and saves the file's values of each collection's properties", async () => {
     let sent: PropertyValuesSetRequest | null = null;
     server.use(
       communityHttp.get("/collections/", () =>
@@ -25,32 +25,45 @@ describe("FileCollections", () => {
             buildCollection({
               id: 5,
               name: "Shop",
-              fields: [buildPropertyDefinition({ id: 21, name: "Caption", collection_id: 5 })],
+              metadata: [buildPropertyDefinition({ id: 21, name: "Caption", collection_id: 5 })],
             }),
             buildCollection({ id: 6, name: "Plain" }),
           ],
         })
       ),
-      communityHttp.get("/collections/:id/files/:fileId/fields", () =>
-        HttpResponse.json([
-          buildPropertySummary({ property_id: 21, name: "Caption", value: "Brass lamp" }),
-        ])
-      ),
-      communityHttp.put("/collections/:id/files/:fileId/fields", async ({ request }) => {
+      communityHttp.put("/collections/:id/files/:fileId/metadata", async ({ request }) => {
         sent = (await request.json()) as PropertyValuesSetRequest;
         return HttpResponse.json([]);
       })
     );
     const user = userEvent.setup();
     renderPage(
-      () => <FileCollections file={{ id: 4, initiative_id: 1, collection_ids: [5, 6] }} />,
+      () => (
+        <FileCollections
+          file={{
+            id: 4,
+            initiative_id: 1,
+            collection_ids: [5, 6],
+            // The file's read carries each collection's metadata beside its
+            // properties.
+            properties: [
+              buildPropertySummary({
+                property_id: 21,
+                name: "Caption",
+                collection_id: 5,
+                value: "Brass lamp",
+              }),
+            ],
+          }}
+        />
+      ),
       { initialRoute: "/c/1" }
     );
 
     await screen.findByRole("link", { name: "Plain" });
-    // Only a collection with fields of its own has values to show.
-    expect(screen.queryByRole("button", { name: "Plain's fields" })).not.toBeInTheDocument();
-    await user.click(screen.getByRole("button", { name: "Shop's fields" }));
+    // Only a collection with properties of its own has values to show.
+    expect(screen.queryByRole("button", { name: "Plain's properties" })).not.toBeInTheDocument();
+    await user.click(screen.getByRole("button", { name: "Shop's properties" }));
     const caption = await screen.findByDisplayValue("Brass lamp");
     await user.clear(caption);
     await user.type(caption, "Copper lamp{Enter}");

@@ -797,7 +797,7 @@ async def held_cases(session: AsyncSession, task_ids: Sequence[int]) -> set[int]
     from app.db.session import SystemSessionLocal
     from app.models.platform.guild import Guild
     from app.models.tenant.content_hold import ContentHold
-    from app.services.tenant.properties import summaries_by_id
+    from app.services.tenant.metadata import summaries_by_id
 
     by_subject: dict[int, list[int]] = {}
     for task_id, summaries in (

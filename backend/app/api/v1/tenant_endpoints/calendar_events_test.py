@@ -27,7 +27,7 @@ from app.core.messages import (
 from app.models.platform.guild import CommunityRole
 from app.models.platform.notification import Notification, NotificationType
 from app.models.tenant.calendar_event import CalendarEvent
-from app.models.tenant.property import PropertyValue
+from app.models.tenant.metadata import MetadataValue
 from app.models.tenant.resource_grant import ResourceAccessLevel, ResourceGrant
 from app.testing import (
     create_calendar,
@@ -833,10 +833,10 @@ async def test_a_move_into_another_initiative_drops_property_values(
     async def holding_values(property_id: int | None) -> list[int]:
         await route_session_to_guild(session, guild.id)
         rows = await session.exec(
-            select(PropertyValue.entity_id).where(
-                PropertyValue.entity_type == "calendar_event",
-                PropertyValue.entity_id.in_([series.id, override.id]),
-                PropertyValue.property_id == property_id,
+            select(MetadataValue.entity_id).where(
+                MetadataValue.entity_type == "calendar_event",
+                MetadataValue.entity_id.in_([series.id, override.id]),
+                MetadataValue.property_id == property_id,
             )
         )
         return sorted(rows.all())

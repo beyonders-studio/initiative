@@ -27,16 +27,17 @@ import {
   Search,
   Square,
 } from "lucide-react";
-import { type ReactNode, useRef, useState } from "react";
+import { createContext, type ReactNode, useContext, useRef, useState } from "react";
 import { useTranslation } from "react-i18next";
 
-import type { PropertyType as PropertyTypeValue } from "@/api/generated/initiativeAPI.schemas";
+import type { MetadataType } from "@/api/generated/initiativeAPI.schemas";
 import { listLayoutLooks } from "@/components/projects/projectTasksConfig";
 import { NewPropertyForm, PROPERTY_TYPES } from "@/components/properties/NewPropertyForm";
 import { iconForPropertyType } from "@/components/properties/propertyTypeIcons";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
+import type { MetadataOwner } from "@/hooks/useProperties";
 import { LAYOUT_REGIONS } from "@/lib/layouts/detailLayout";
 import {
   addableFields,
@@ -57,7 +58,12 @@ import {
   type Selection,
   sameSelection,
 } from "@/lib/layouts/draft";
-import { type FieldDef, LAYOUT_NAMESPACES, propertyFieldId } from "@/lib/layouts/fields";
+import {
+  type FieldDef,
+  groupFields,
+  LAYOUT_NAMESPACES,
+  propertyFieldId,
+} from "@/lib/layouts/fields";
 import type { PluginOnItems } from "@/lib/layouts/plugins";
 import type { LayoutNode } from "@/lib/layouts/tree";
 import { cn } from "@/lib/utils";
@@ -115,15 +121,19 @@ const row = (): LayoutNode => ({
 /** The title an accordion is added with, selected so typing names it. */
 export const accordionTitle = (translate: TranslateFn) => translate("layouts:blocks.accordion");
 
+/** What the part showing every property is called, as an i18n key: on a
+ *  project's tasks it shows the project's metadata as well. */
+export const PropertiesPartName = createContext("layouts:allMetadata");
+
 /** What Add offers where something is added: the fields, each plug-in's
  *  parts, and the other parts. */
 export type AddChoices = {
   fields: FieldDef[];
   plugins: PickerPlugin[];
   parts: PickerPart[];
-  /** Where a new field is made, where one can be placed: the initiative's
-   *  properties, or a collection's own fields. */
-  newField?: { initiativeId: number; collectionId?: number };
+  /** Where a new field is made, where one can be placed: among the
+   *  initiative's properties, or the project's or collection's metadata. */
+  newField?: { initiativeId: number; owner?: MetadataOwner };
 };
 
 /** What a pick in the Add picker does. */
@@ -140,7 +150,8 @@ export const listChoices = (
   layout: ListLayout,
   fields: ReadonlyMap<string, FieldDef>,
   plugins: PickerPlugin[],
-  translate: TranslateFn
+  translate: TranslateFn,
+  propertiesPart = "layouts:allMetadata"
 ): AddChoices => {
   if (layout.kind === "calendar" || layout.kind === "gantt") {
     return { fields: [], plugins: [], parts: [] };
@@ -162,7 +173,7 @@ export const listChoices = (
             : [
                 {
                   group: "panel" as const,
-                  label: translate("layouts:allProperties"),
+                  label: translate(propertiesPart),
                   node: { type: "properties" },
                 },
               ]),
@@ -178,7 +189,8 @@ export const detailChoices = (
   { spec, words }: EditableDetail,
   fields: ReadonlyMap<string, FieldDef>,
   plugins: PickerPlugin[],
-  translate: TranslateFn
+  translate: TranslateFn,
+  propertiesPart = "layouts:allMetadata"
 ): AddChoices => {
   const named = namedFields(detail);
   return {
@@ -213,7 +225,7 @@ export const detailChoices = (
         : [
             {
               group: "panel" as const,
-              label: translate("layouts:allProperties"),
+              label: translate(propertiesPart),
               node: { type: "properties" },
             },
           ]),
@@ -244,11 +256,16 @@ export const usePartLabel = (
   fields: ReadonlyMap<string, FieldDef>,
   plugins: ReadonlyMap<number, PluginOnItems>,
   /** Where the names of the open detail's own parts are. */
-  partWords = "layouts:"
+  partWords = "layouts:",
+  /** What the part showing every property is called, where the caller
+   *  provides {@link PropertiesPartName} rather than reading it. */
+  propertiesPartName?: string
 ) => {
   const { t } = useTranslation(LAYOUT_NAMESPACES);
   const translate = t as TranslateFn;
   const pickerPlugins = usePickerPlugins(plugins);
+  const provided = useContext(PropertiesPartName);
+  const propertiesPart = propertiesPartName ?? provided;
   const labelOf = (field: FieldDef) =>
     field.source === "builtin" ? translate(field.label) : field.label;
   const partLabel = (node: LayoutNode): string => {
@@ -268,7 +285,7 @@ export const usePartLabel = (
           : translate("layouts:blocks.box");
       }
       case "properties":
-        return translate("layouts:allProperties");
+        return translate(propertiesPart);
       case "plugin": {
         const plugin = pickerPlugins.find((each) => each.id === Number(node.props?.plugin));
         const part = plugin?.parts.find((each) => each.id === node.props?.part);
@@ -680,9 +697,9 @@ const matches = (query: string, ...shown: (string | undefined)[]) =>
   !query || shown.some((text) => text?.toLocaleLowerCase().includes(query));
 
 /** What can be added, shown as things rather than ids: the layout blocks as
- *  tiles, then every field in one list, each with where it comes from, then
- *  the panels, the tool's and each plug-in's. A search narrows all of it.
- *  Opened from the outline's Add, or from a point on the canvas. */
+ *  tiles, then the fields grouped by who they belong to, then the tool's
+ *  panels, then each plug-in's fields and panels. A search narrows all of
+ *  it. Opened from the outline's Add, or from a point on the canvas. */
 export const AddPicker = ({
   choices: { fields, plugins, parts, newField },
   labelOf,
@@ -703,7 +720,7 @@ export const AddPicker = ({
   const [open, setOpenState] = useState(false);
   const [search, setSearch] = useState("");
   // The kind of field being made, while its form is open.
-  const [making, setMaking] = useState<PropertyTypeValue | null>(null);
+  const [making, setMaking] = useState<MetadataType | null>(null);
   // While a field is being made the picker stays open, so no other edit lands
   // before it is placed.
   const [creating, setCreating] = useState(false);
@@ -716,31 +733,38 @@ export const AddPicker = ({
     onOpenChange?.(next);
   };
   const query = search.trim().toLocaleLowerCase();
-  const pluginName = new Map(plugins.map((plugin) => [plugin.id, plugin.name]));
-  const sourceOf = (field: FieldDef) =>
-    field.source === "plugin"
-      ? (pluginName.get(field.plugin?.install ?? 0) ?? "")
-      : t(
-          field.property?.collection_id
-            ? "layouts:fromCollection"
-            : field.source === "property"
-              ? "layouts:fromProperty"
-              : "layouts:builtIn"
-        );
   const blocks = parts.filter(
     (part) => part.group === "layout" && matches(query, part.label, part.description)
   );
-  const shownFields = fields.filter((field) => matches(query, labelOf(field), sourceOf(field)));
+  // A plug-in's fields are listed with its panels, below.
+  const fieldGroups = groupFields(
+    fields.filter((field) => !field.plugin && matches(query, labelOf(field)))
+  );
   const panels = parts.filter((part) => part.group === "panel" && matches(query, part.label));
-  const pluginPanels = plugins
+  // Each plug-in's fields, then its panels, under its name: one the search
+  // names shows all of them.
+  const pluginFieldsOf = (install: number, name: string) =>
+    fields.filter(
+      (field) => field.plugin?.install === install && matches(query, labelOf(field), name)
+    );
+  const installs = [
+    ...plugins,
+    ...fields.flatMap((field) =>
+      field.plugin && !plugins.some((each) => each.id === field.plugin?.install)
+        ? [{ id: field.plugin.install, name: field.plugin.on.name, parts: [] }]
+        : []
+    ),
+  ].filter((plugin, index, all) => all.findIndex((each) => each.id === plugin.id) === index);
+  const pluginGroups = installs
     .map((plugin) => ({
       ...plugin,
+      fields: pluginFieldsOf(plugin.id, plugin.name),
       parts: plugin.parts.filter((part) =>
         matches(query, part.name, part.description, plugin.name)
       ),
     }))
-    .filter((plugin) => plugin.parts.length > 0);
-  const typeName = (type: PropertyTypeValue) => t(`properties:types.${type}`);
+    .filter((plugin) => plugin.fields.length > 0 || plugin.parts.length > 0);
+  const typeName = (type: MetadataType) => t(`properties:types.${type}`);
   // A search no kind matches may be the new field's name, so every kind stays.
   const typesFound = PROPERTY_TYPES.filter((type) => matches(query, typeName(type)));
   const newTypes =
@@ -751,7 +775,7 @@ export const AddPicker = ({
     (newField === undefined ? 0 : PROPERTY_TYPES.length) +
     plugins.reduce((count, each) => count + each.parts.length, 0);
   const found =
-    blocks.length + newTypes.length + shownFields.length + panels.length + pluginPanels.length;
+    blocks.length + newTypes.length + fieldGroups.length + panels.length + pluginGroups.length;
   // A pick leaves focus where adding put it (a new accordion's title), rather
   // than back on Add; closing without one returns it there.
   const picked = useRef(false);
@@ -787,7 +811,7 @@ export const AddPicker = ({
         {making !== null && newField !== undefined ? (
           <NewPropertyForm
             initiativeId={newField.initiativeId}
-            collectionId={newField.collectionId}
+            owner={newField.owner}
             type={making}
             name={search.trim()}
             onCreated={(created) => pick(() => onField(propertyFieldId(created.id)))}
@@ -849,25 +873,18 @@ export const AddPicker = ({
                 })}
               </PickerGroup>
             ) : null}
-            {shownFields.length > 0 ? (
-              <PickerGroup heading={t("layouts:fieldsGroup")}>
-                {shownFields.map((field) => {
-                  const Icon = field.icon;
-                  return (
-                    <PickerItem
-                      key={field.id}
-                      note={sourceOf(field)}
-                      onClick={() => pick(() => onField(field.id))}
-                    >
-                      {Icon ? (
-                        <Icon className="h-4 w-4 text-muted-foreground" aria-hidden="true" />
-                      ) : null}
-                      {labelOf(field)}
-                    </PickerItem>
-                  );
-                })}
+            {fieldGroups.map((group) => (
+              <PickerGroup key={group.key} heading={(t as TranslateFn)(group.heading)}>
+                {group.fields.map((field) => (
+                  <FieldItem
+                    key={field.id}
+                    field={field}
+                    label={labelOf(field)}
+                    onClick={() => pick(() => onField(field.id))}
+                  />
+                ))}
               </PickerGroup>
-            ) : null}
+            ))}
             {panels.length > 0 ? (
               <PickerGroup heading={t("layouts:panels")}>
                 {panels.map((part) => (
@@ -877,8 +894,16 @@ export const AddPicker = ({
                 ))}
               </PickerGroup>
             ) : null}
-            {pluginPanels.map((plugin) => (
+            {pluginGroups.map((plugin) => (
               <PickerGroup key={`plugin:${plugin.id}`} heading={plugin.name}>
+                {plugin.fields.map((field) => (
+                  <FieldItem
+                    key={field.id}
+                    field={field}
+                    label={labelOf(field)}
+                    onClick={() => pick(() => onField(field.id))}
+                  />
+                ))}
                 {plugin.parts.map((part) => (
                   <PickerItem
                     key={`part:${part.id}`}
@@ -909,13 +934,10 @@ const PickerGroup = ({ heading, children }: { heading: string; children: ReactNo
 
 const PickerItem = ({
   description,
-  note,
   onClick,
   children,
 }: {
   description?: string;
-  /** Where it comes from, set apart at the end of the row. */
-  note?: string;
   onClick: () => void;
   children: ReactNode;
 }) => (
@@ -924,10 +946,26 @@ const PickerItem = ({
     className="flex w-full flex-col items-start rounded-sm px-2 py-1.5 text-left text-sm hover:bg-muted focus-visible:bg-muted focus-visible:outline-none"
     onClick={onClick}
   >
-    <span className="flex w-full items-center gap-2">
-      {children}
-      {note ? <span className="ml-auto truncate text-muted-foreground text-xs">{note}</span> : null}
-    </span>
+    <span className="flex w-full items-center gap-2">{children}</span>
     {description ? <span className="text-muted-foreground text-xs">{description}</span> : null}
   </button>
 );
+
+/** A field as the picker lists it: its icon, then its name. */
+const FieldItem = ({
+  field,
+  label,
+  onClick,
+}: {
+  field: FieldDef;
+  label: string;
+  onClick: () => void;
+}) => {
+  const Icon = field.icon;
+  return (
+    <PickerItem onClick={onClick}>
+      {Icon ? <Icon className="h-4 w-4 text-muted-foreground" aria-hidden="true" /> : null}
+      {label}
+    </PickerItem>
+  );
+};

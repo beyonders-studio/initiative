@@ -22,20 +22,22 @@ import {
   TASK_GROUPINGS,
 } from "@/__tests__/factories";
 import { communityHttp } from "@/__tests__/helpers/communityHttp";
+import { definitionsHandler } from "@/__tests__/helpers/handlers/property.handlers";
 import { server } from "@/__tests__/helpers/msw-server";
 import { renderPage } from "@/__tests__/helpers/render";
 import {
+  type CollectionRead,
   type DetailLayoutWrite,
   type ListLayoutWrite,
-  PropertyType,
+  MetadataType,
   Tool,
   type ToolLayoutSetRead,
 } from "@/api/generated/initiativeAPI.schemas";
-import { CollectionLayoutEditor } from "@/components/files/collections/CollectionLayoutEditor";
 import { instanceTarget, sharedTarget, useToolLayouts } from "@/hooks/useToolLayouts";
 import { MAX_PRESETS } from "@/lib/layouts/presets";
 import { TASK_COLUMNS } from "@/lib/layouts/tasks";
 import type { LayoutNode } from "@/lib/layouts/tree";
+import { CollectionLayoutEditorPage } from "@/pages/initiativeTools/files/CollectionLayoutEditorPage";
 
 import { calendarPresets, eventDetail, taskDetails, taskPresets } from "./details";
 import { LayoutEditor } from "./LayoutEditor";
@@ -138,9 +140,7 @@ beforeEach(() => {
         ])
       )
     ),
-    communityHttp.get("/property-definitions/", () =>
-      HttpResponse.json([buildPropertyDefinition({ id: 12, name: "Effort" })])
-    ),
+    definitionsHandler([buildPropertyDefinition({ id: 12, name: "Effort" })]),
     communityHttp.put("/layouts/", async ({ request }) => {
       const body = (await request.json()) as Write;
       sent.push({ save: body });
@@ -217,20 +217,85 @@ describe("LayoutEditor", () => {
     ]);
   });
 
-  it("draws a rating column as the layout picks", async () => {
+  it("offers the project's properties and the initiative's metadata under whose they are", async () => {
     server.use(
-      communityHttp.get("/property-definitions/", () =>
-        HttpResponse.json([
-          buildPropertyDefinition({ id: 13, name: "Score", type: PropertyType.rating }),
-        ])
-      )
+      definitionsHandler([buildPropertyDefinition({ id: 12, name: "Effort" })], {
+        project: [buildPropertyDefinition({ id: 14, name: "Sprint", project_id: 1 })],
+      })
+    );
+    const { user } = editor("table");
+
+    await user.click(await within(await outline()).findByRole("button", { name: /^add$/i }));
+    const picker = await screen.findByRole("dialog", { name: "Add" });
+    const sprint = await within(picker).findByRole("button", { name: "Sprint" });
+    expect(sprint.parentElement).toHaveTextContent("This project's properties");
+    const effort = within(picker).getByRole("button", { name: "Effort" });
+    expect(effort.parentElement).toHaveTextContent("Initiative metadata");
+    expect(effort.parentElement).not.toHaveTextContent("Sprint");
+    await user.click(sprint);
+    await user.click(screen.getByRole("button", { name: /^save$/i }));
+
+    await waitFor(() => expect(sent).toHaveLength(1));
+    expect(saved("table")?.columns).toContain("property:14");
+  });
+
+  it("makes a new field the project's property, or the initiative's metadata if asked", async () => {
+    const made: Record<string, unknown>[] = [];
+    server.use(
+      communityHttp.post("/property-definitions/", async ({ request }) => {
+        const body = (await request.json()) as Record<string, unknown>;
+        made.push(body);
+        return HttpResponse.json(
+          buildPropertyDefinition({ id: 40 + made.length, name: String(body.name) })
+        );
+      })
+    );
+    const { user } = editor("table");
+
+    const add = async (name: string, initiatives: boolean) => {
+      await user.click(await within(await outline()).findByRole("button", { name: /^add$/i }));
+      const picker = await screen.findByRole("dialog", { name: "Add" });
+      await user.type(within(picker).getByRole("textbox", { name: /search/i }), name);
+      await user.click(within(picker).getByRole("button", { name: /^text$/i }));
+      expect(within(picker).getByRole("combobox", { name: "Belongs to" })).toHaveTextContent(
+        "This project's properties"
+      );
+      if (initiatives) {
+        await user.click(within(picker).getByRole("combobox", { name: "Belongs to" }));
+        await user.click(await screen.findByRole("option", { name: "The initiative's metadata" }));
+      }
+      await user.click(within(picker).getByRole("button", { name: /^create$/i }));
+    };
+    await add("Sprint", false);
+    await add("Budget", true);
+
+    await waitFor(() => expect(made).toHaveLength(2));
+    expect(made[0]).toMatchObject({ name: "Sprint", initiative_id: 1, project_id: 1 });
+    expect(made[1]).toMatchObject({ name: "Budget", initiative_id: 1 });
+    expect(made[1]).not.toHaveProperty("project_id");
+  });
+
+  it("names the part showing every value for the project's properties too", async () => {
+    editor("board");
+
+    // The shipped card holds it.
+    expect(
+      await within(await outline()).findByRole("button", { name: "All properties and metadata" })
+    ).toBeInTheDocument();
+  });
+
+  it("draws a scale column as the layout picks", async () => {
+    server.use(
+      definitionsHandler([
+        buildPropertyDefinition({ id: 13, name: "Score", type: MetadataType.scale }),
+      ])
     );
     const { user } = editor("table");
 
     await user.click(await within(await outline()).findByRole("button", { name: /^add$/i }));
     await user.click(await screen.findByRole("button", { name: /^score/i }));
     // What was added is selected, and its settings say how it is drawn.
-    await user.click(screen.getByRole("combobox", { name: /show the rating as/i }));
+    await user.click(screen.getByRole("combobox", { name: /show the scale as/i }));
     await user.click(await screen.findByRole("option", { name: "Stars" }));
     await user.click(screen.getByRole("button", { name: /^save$/i }));
 
@@ -392,16 +457,14 @@ describe("LayoutEditor", () => {
 
   it("offers a property's grouping once it is ticked, and starts the table on it", async () => {
     server.use(
-      communityHttp.get("/property-definitions/", () =>
-        HttpResponse.json([
-          buildPropertyDefinition({
-            id: 12,
-            name: "Sprint",
-            type: PropertyType.select,
-            options: [buildPropertyOption({ value: "s1", label: "Sprint 1" })],
-          }),
-        ])
-      )
+      definitionsHandler([
+        buildPropertyDefinition({
+          id: 12,
+          name: "Sprint",
+          type: MetadataType.select,
+          options: [buildPropertyOption({ value: "s1", label: "Sprint 1" })],
+        }),
+      ])
     );
     const { user } = editor("table");
     await outline();
@@ -704,7 +767,7 @@ describe("LayoutEditor", () => {
       // A search no kind matches keeps every kind, and names the field.
       await user.type(within(picker).getByRole("textbox", { name: /search/i }), "Budget");
       await user.click(within(picker).getByRole("button", { name: /^number$/i }));
-      expect(within(picker).getByLabelText(/property name/i)).toHaveValue("Budget");
+      expect(within(picker).getByLabelText(/^Name$/)).toHaveValue("Budget");
       await user.click(within(picker).getByRole("button", { name: /^create$/i }));
       await user.click(screen.getByRole("button", { name: /^save$/i }));
 
@@ -814,31 +877,50 @@ describe("LayoutEditor", () => {
     });
   });
 
-  describe("a collection's lists", () => {
-    it("puts the collection's own field on a wall's card, its rating drawn as stars", async () => {
+  describe("a collection's layouts", () => {
+    /** The collection's layouts page, for `collection` (id 5) holding one file. */
+    const collectionEditor = (collection: CollectionRead) => {
+      server.use(
+        communityHttp.get("/collections/:id", () => HttpResponse.json(collection)),
+        communityHttp.get("/collections/:id/files", () =>
+          HttpResponse.json({
+            items: [buildCollectionFile({ id: 4, name: "Harbour" })],
+            total_count: 1,
+            page: 1,
+            page_size: 60,
+            has_next: false,
+            has_prev: false,
+          })
+        ),
+        communityHttp.get("/layouts/", () =>
+          HttpResponse.json(
+            buildToolLayoutSet({ tool: "collection", hidden: ["masonry", "timeline"] })
+          )
+        )
+      );
+      renderPage(CollectionLayoutEditorPage, {
+        initialRoute: "/c/$communityId/i/$initiativeId/files/collections/$collectionId/layouts",
+        routeParams: { communityId: "1", initiativeId: "1", collectionId: "5" },
+      });
+      return userEvent.setup();
+    };
+
+    it("puts the collection's property on a wall's card, drawn as stars", async () => {
       const rating = buildPropertyDefinition({
         id: 31,
         name: "Stars given",
-        type: PropertyType.rating,
+        type: MetadataType.scale,
         collection_id: 5,
       });
-      const collection = buildCollection({ id: 5, fields: [rating] });
-      const set = buildToolLayoutSet({ tool: "collection", hidden: ["masonry", "timeline"] });
-      renderPage(() => (
-        <CollectionLayoutEditor
-          collection={collection}
-          set={set}
-          files={[buildCollectionFile({ id: 4 })]}
-          onClose={vi.fn()}
-        />
-      ));
-      const user = userEvent.setup();
+      const user = collectionEditor(buildCollection({ id: 5, metadata: [rating] }));
 
       await user.click(await within(await outline()).findByRole("button", { name: /^add$/i }));
-      const field = await screen.findByRole("button", { name: /^stars given/i });
-      expect(field).toHaveTextContent("This collection");
+      const picker = await screen.findByRole("dialog", { name: "Add" });
+      // Listed under whose it is.
+      const field = await within(picker).findByRole("button", { name: "Stars given" });
+      expect(field.parentElement).toHaveTextContent("This collection's properties");
       await user.click(field);
-      await user.click(screen.getByRole("combobox", { name: /show the rating as/i }));
+      await user.click(screen.getByRole("combobox", { name: /show the scale as/i }));
       await user.click(await screen.findByRole("option", { name: "Stars" }));
       await user.click(screen.getByRole("button", { name: /^save$/i }));
 
@@ -846,6 +928,43 @@ describe("LayoutEditor", () => {
       expect(saved("grid")).toMatchObject({
         card: { type: "card", children: [{ type: "field", props: { field: "property:31" } }] },
         displays: { "property:31": "stars" },
+      });
+    });
+
+    it("makes a property of the collection's on a file's detail and places it", async () => {
+      const made: Record<string, unknown>[] = [];
+      server.use(
+        communityHttp.post("/property-definitions/", async ({ request }) => {
+          const body = (await request.json()) as Record<string, unknown>;
+          made.push(body);
+          return HttpResponse.json(
+            buildPropertyDefinition({ id: 32, name: String(body.name), collection_id: 5 }),
+            { status: 201 }
+          );
+        })
+      );
+      const user = collectionEditor(buildCollection({ id: 5, initiative_id: 1 }));
+
+      await user.click(await screen.findByRole("combobox", { name: "Layout being edited" }));
+      await user.click(await screen.findByRole("option", { name: "File detail" }));
+      // Drawn with the collection's first file.
+      expect(
+        await within(await canvas()).findByRole("heading", { name: "Harbour" })
+      ).toBeInTheDocument();
+      await user.click(within(await outline()).getByRole("button", { name: /^add$/i }));
+      const picker = await screen.findByRole("dialog", { name: "Add" });
+      await user.type(within(picker).getByRole("textbox", { name: /search/i }), "Credit");
+      await user.click(within(picker).getByRole("button", { name: /^text$/i }));
+      await user.click(within(picker).getByRole("button", { name: /^create$/i }));
+      await user.click(screen.getByRole("button", { name: /^save$/i }));
+
+      await waitFor(() => expect(saved("file")).toBeDefined());
+      expect(made).toEqual([
+        expect.objectContaining({ name: "Credit", initiative_id: 1, collection_id: 5 }),
+      ]);
+      expect((saved("file")?.main as LayoutNode[] | undefined)?.at(-1)).toEqual({
+        type: "field",
+        props: { field: "property:32" },
       });
     });
   });

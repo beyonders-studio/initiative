@@ -45,7 +45,7 @@ from typing import Any, Optional
 
 import httpx
 from sqlalchemy import exists
-from sqlmodel import SQLModel, select
+from sqlmodel import SQLModel
 from sqlmodel.ext.asyncio.session import AsyncSession
 
 from app.api import resource_access
@@ -55,7 +55,6 @@ from app.core.tools import KINDS
 from app.db import cohorts
 from app.db.guild_standing import GuildContext
 from app.models.tenant.guild_plugin import GuildPlugin
-from app.models.tenant.plugin_metadata import PluginMetadata
 from app.services.marketplace import plugin_data
 from app.services.marketplace.declarative import (
     action_change,
@@ -70,7 +69,7 @@ from app.services.marketplace.registration_lookup import (
     is_declarative,
 )
 from app.services.marketplace.service_plugins import PLATFORM_CODES, is_admin_only
-from app.services.tenant import guild_plugins, plugin_config, plugin_metadata
+from app.services.tenant import guild_plugins, metadata, plugin_config
 from app.services.tenant.guild_plugins import SurfaceAccess
 from app.services.tenant.plugin_channels import PluginChannelError
 
@@ -158,7 +157,7 @@ def _on_elements(
     """Whether a list field on this kind of item offers the action on each of
     its elements, and ``element`` is one's ``ref``."""
     fields = (definition or {}).get("fields")
-    return plugin_metadata.is_ref(element) and any(
+    return metadata.is_ref(element) and any(
         isinstance(field, dict)
         and field.get("list") is True
         and action_id in (field.get("actions") or ())
@@ -235,7 +234,7 @@ async def _act(
     and ``element``; then the change its ``write`` answers, when it has one
     (:func:`action_change`), reading the plug-in's values on the item as
     they stand once the call is answered, made to them as the install
-    (:func:`~app.services.tenant.plugin_metadata.change_item`).
+    (:func:`~app.services.tenant.metadata.change_item`).
 
     The endpoint refusing or answering unavailable, a ``write`` answering
     what is not a change, and a change that is refused, the install no longer
@@ -299,7 +298,7 @@ async def _act(
         )
 
     try:
-        await plugin_metadata.change_item(
+        await metadata.change_item(
             plugin, registration, item["kind"], item["id"], made, guild_id=guild_id
         )
     except PluginChannelError as exc:
@@ -451,14 +450,4 @@ async def run_action(
     # The action may have changed what the install's reads answer.
     plugin_data.clear_plugin_data_cache(guild_id=context.guild_id, plugin_id=install_id)
 
-    rows = await session.exec(
-        select(PluginMetadata.key, PluginMetadata.ref, PluginMetadata.value)
-        .where(
-            PluginMetadata.install_id == install_id,
-            PluginMetadata.entity_type == kind,
-            PluginMetadata.entity_id == entity_id,
-            PluginMetadata.shown.is_(True),
-        )
-        .order_by(*plugin_metadata.NEWEST_FIRST)
-    )
-    return plugin_metadata.assembled(rows.all())
+    return await metadata.shown_values(session, install_id, kind, entity_id)

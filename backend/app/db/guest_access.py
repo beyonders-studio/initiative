@@ -71,8 +71,8 @@ _NAMED: dict[str, GuestAccess] = {
     # How widely what they reach was engaged with, read beside it.
     "engagement_levels": GuestAccess.read,
     "relationships": GuestAccess.write,
-    "property_values": GuestAccess.write,
-    "property_definitions": GuestAccess.read,
+    "metadata_values": GuestAccess.write,
+    "metadata_definitions": GuestAccess.read,
     # Read beside a task, and refused to a guest row by row (GUEST_ROWS).
     "intake_cases": GuestAccess.read,
     # The files content shows, stored and claimed as a step of saving it.

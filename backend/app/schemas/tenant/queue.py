@@ -1,7 +1,7 @@
 from __future__ import annotations
 
 from datetime import datetime
-from typing import List, Mapping, Optional, Sequence, TYPE_CHECKING
+from typing import List, Mapping, Optional, TYPE_CHECKING
 
 from pydantic import ConfigDict, Field
 
@@ -22,7 +22,6 @@ from app.schemas.tenant.property import (
     PropertySummary,
     annotated_properties,
 )
-from app.schemas.tenant.plugin_data import PluginValueSummary
 from app.schemas.tenant.tag import TagSummary, annotated_tags
 from app.schemas.tenant.tool import ToolSummaryBase, from_row, serialize_tool
 from app.schemas.platform.user import UserPublic
@@ -89,9 +88,6 @@ class QueueItemRead(QueueItemBase):
     #: Who added it: whoever wrote it is not offered a report of it.
     created_by: Optional[PersonId] = None
     created_at: datetime
-    #: The values installed plug-ins show on the item, from the installs on
-    #: and placed in its queue's initiative.
-    plugin_values: List[PluginValueSummary] = Field(default_factory=list)
 
 
 class QueueReleaseRequest(SanitizedBaseModel):
@@ -173,7 +169,6 @@ def serialize_queue_item(
     item: "QueueItem",
     *,
     attachment_count: int = 0,
-    plugin_values: Sequence[PluginValueSummary] = (),
 ) -> QueueItemRead:
     """One queue item.
 
@@ -187,7 +182,6 @@ def serialize_queue_item(
         tags=annotated_tags(item),
         properties=annotated_properties(item),
         attachment_count=attachment_count,
-        plugin_values=list(plugin_values),
     )
 
 
@@ -197,7 +191,6 @@ def serialize_queue(
     context: ActorContext,
     user_id: Optional[int] = None,
     attachment_counts: Optional[Mapping[int, int]] = None,
-    plugin_values: Optional[Mapping[int, Sequence[PluginValueSummary]]] = None,
 ) -> QueueRead:
     """A queue and the items in it that are not in the trash.
 
@@ -215,7 +208,6 @@ def serialize_queue(
             serialize_queue_item(
                 item,
                 attachment_count=(attachment_counts or {}).get(item.id, 0),
-                plugin_values=(plugin_values or {}).get(item.id, ()),
             )
             for item in active_items(queue)
         ],

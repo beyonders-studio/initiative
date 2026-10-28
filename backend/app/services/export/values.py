@@ -23,7 +23,7 @@ from typing import Any
 
 from app.core.user_display import display_name
 from app.core.user_input_validators import resolve_zone
-from app.models.tenant.property import PropertyType
+from app.models.tenant.metadata import MetadataType
 from app.services.export.i18n import et
 
 
@@ -107,11 +107,11 @@ def property_value(summary: Any, locale: str, tz: str | None) -> Any:
     value = summary.value
     labels = {o.value: o.label for o in summary.options or ()}
     kind = summary.type
-    if kind is PropertyType.select:
+    if kind is MetadataType.select:
         return labels.get(value, value)
-    if kind is PropertyType.multi_select:
+    if kind is MetadataType.multi_select:
         return ", ".join(labels.get(each, each) for each in value)
-    if kind is PropertyType.user_reference:
+    if kind is MetadataType.user_reference:
         if not isinstance(value, dict):
             return None
         return display_name(
@@ -121,13 +121,13 @@ def property_value(summary: Any, locale: str, tz: str | None) -> Any:
                 display_name=value.get("display_name"),
             )
         )
-    if kind is PropertyType.checkbox:
+    if kind is MetadataType.checkbox:
         return yes_no(value, locale)
-    if kind is PropertyType.date:
+    if kind is MetadataType.date:
         return date(value)
-    if kind is PropertyType.datetime:
+    if kind is MetadataType.datetime:
         return moment(value, tz)
-    if kind in (PropertyType.number, PropertyType.currency, PropertyType.rating):
+    if kind in (MetadataType.number, MetadataType.currency, MetadataType.scale):
         # An amount stays a number a sheet can add up; its currency is the
         # property's.
         return number(value)
@@ -136,12 +136,24 @@ def property_value(summary: Any, locale: str, tz: str | None) -> Any:
 
 #: The plug-in field kinds whose value is one scalar, which a value kept
 #: beside a state, and a list's element, hold in ``value``.
-_SCALAR_KINDS = frozenset({"text", "number", "date", "datetime", "checkbox"})
+_SCALAR_KINDS = frozenset(
+    {
+        "text",
+        "number",
+        "date",
+        "datetime",
+        "checkbox",
+        "scale",
+        "url",
+        "currency",
+        "select",
+    }
+)
 
 
 def plugin_value(value: Any, kind: str, locale: str, tz: str | None) -> Any:
     """A plug-in field's value as the page draws it, by its kind: a badge by
-    its text, a link by its title, progress out of its most, a list's
+    its text, a link by its title, a scale as its figure out of 100, a list's
     elements one after another. A value of another shape draws nothing, as on
     the page."""
     if isinstance(value, list):
@@ -152,24 +164,19 @@ def plugin_value(value: Any, kind: str, locale: str, tz: str | None) -> Any:
         )
     if kind in _SCALAR_KINDS and isinstance(value, dict):
         value = value.get("value")
-    if kind in ("badge", "link", "progress"):
+    if kind in ("badge", "link"):
         if not isinstance(value, dict):
             return None
         if kind == "badge":
             return value.get("text") if isinstance(value.get("text"), str) else None
-        if kind == "link":
-            url = value.get("url")
-            if not isinstance(url, str) or not url.startswith(("https://", "http://")):
-                return None
-            title = value.get("title")
-            return title if isinstance(title, str) and title else url
-        done, most = value.get("value"), value.get("max")
-        if not (_is_number(done) and _is_number(most) and most > 0):
+        url = value.get("url")
+        if not isinstance(url, str) or not url.startswith(("https://", "http://")):
             return None
-        return f"{number(done)}/{number(most)}"
+        title = value.get("text")
+        return title if isinstance(title, str) and title else url
     if kind == "checkbox":
         return yes_no(value, locale) if isinstance(value, bool) else None
-    if kind == "number":
+    if kind in ("number", "scale", "currency"):
         return number(value) if _is_number(value) else None
     if not isinstance(value, str) or not value:
         return None

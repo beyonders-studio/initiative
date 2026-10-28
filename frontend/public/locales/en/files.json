@@ -459,29 +459,27 @@
       "dismiss": "Dismiss",
       "tooLarge": "larger than this server takes"
     },
-    "layoutsDescription": "Which lists this collection shows, and the one it opens on. Each person picks among those shown.",
     "backToFiles": "Back to Files",
     "notFound": "Collection not found",
     "notFoundDescription": "The collection you're looking for doesn't exist, or none of its files are ones you can open.",
     "noAccess": "Access denied",
     "noAccessDescription": "You don't have permission to view this collection.",
     "error": "Couldn't change the collection",
-    "fields": {
-      "title": "Fields",
+    "properties": {
+      "title": "Properties",
       "description": "What each file in this collection can hold here: its values belong to this collection, not to the file.",
-      "create": "New field",
-      "edit": "Edit field",
-      "delete": "Delete field",
-      "deleteTitle": "Delete this field?",
-      "deleteBody": "This removes the field and every file's value of it in this collection.",
-      "none": "No fields yet",
+      "create": "New property",
+      "edit": "Edit property",
+      "delete": "Delete property",
+      "deleteTitle": "Delete this property?",
+      "deleteBody": "This removes the property and every file's value of it in this collection.",
+      "none": "No properties yet",
       "heading": "In this collection",
       "saveError": "Couldn't save the value",
-      "of": "{{name}}'s fields"
+      "of": "{{name}}'s properties"
     },
     "addedOn": "Added {{date}}",
     "createdOn": "Created {{date}}",
-    "editLayouts": "Edit what the lists show",
     "listHelp": {
       "masonry": "Each file at its own shape, packed into columns: what its card shows under the picture.",
       "grid": "Each file as a square tile: what its card shows under the picture.",
@@ -491,12 +489,12 @@
     "shapes": {
       "name": "Name",
       "blank": "Blank",
-      "blankHint": "A grid and a table, and no fields of its own yet.",
+      "blankHint": "A grid and a table, and no properties of its own yet.",
       "lists": "Shows {{lists}}",
-      "fields": "Fields: {{fields}}",
+      "properties": "Properties: {{properties}}",
       "copyLabel": "Or copy the shape of",
       "copyPlaceholder": "Another collection",
-      "copyHint": "Its fields and what its lists show, without its files or their values.",
+      "copyHint": "Its properties and what its lists show, without its files or their values.",
       "create": "Create collection"
     }
   }

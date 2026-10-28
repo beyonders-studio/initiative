@@ -23,7 +23,8 @@
   "card": "Karte",
   "row": "Zeile",
   "group": "Gruppe",
-  "allProperties": "Alle Eigenschaften",
+  "allMetadata": "Alle Metadaten",
+  "allPropertiesAndMetadata": "Alle Eigenschaften und Metadaten",
   "missingPart": "Ein Teil, der nicht mehr verfügbar ist",
   "missingField": "Ein Feld, das nicht mehr verfügbar ist",
   "columns": "Spalten",
@@ -42,7 +43,7 @@
   "hidePart": "Ausblenden",
   "settings": "Einstellungen",
   "cardHelp": "Was jede Aufgabe auf dem Board zeigt. Wähle einen Teil aus, um ihn zu ändern, oder füge unter der Gliederung einen hinzu.",
-  "propertiesHelp": "Zeigt jede Eigenschaft, für die eine Aufgabe einen Wert hat.",
+  "propertiesHelp": "Zeigt jede Eigenschaft und alle Metadaten, für die eine Aufgabe einen Wert hat.",
   "pluginPartHelp": "Vom Plug-in aus seinen eigenen Werten und Aktionen gezeichnet.",
   "fieldHelp": "Zeigt dieses Feld, wenn eine Aufgabe einen Wert dafür hat.",
   "layout": "Bearbeitetes Layout",
@@ -204,9 +205,10 @@
   },
   "boxWith": "Box mit {{name}}",
   "newField": "Neues Feld",
-  "fieldsGroup": "Felder",
+  "projectProperties": "Eigenschaften dieses Projekts",
+  "collectionProperties": "Eigenschaften dieser Sammlung",
+  "initiativeMetadata": "Metadaten der Initiative",
   "panels": "Bereiche",
-  "fromProperty": "Eigenschaft",
   "search": "Suchen",
   "noMatches": "Nichts gefunden.",
   "sectionHelp": "Mit Titel lässt er sich auf- und zuklappen; ohne ist er eine Box.",
@@ -246,6 +248,14 @@
     },
     "noItems": "Füge der Gruppe einen Zähler hinzu, um hier sein Layout zu sehen."
   },
+  "fileDetail": {
+    "name": "Datei-Detailansicht",
+    "help": "Wie eine aus dieser Sammlung geöffnete Datei daneben angezeigt wird. Was es weglässt, ist ausgeblendet.",
+    "shipped": "Das ist das Layout wie ausgeliefert. Eine Änderung macht es zum Layout der Sammlung.",
+    "titleHelp": "Jede Datei zeigt ihren Namen.",
+    "hiddenHelp": "Jede Datei kann dies zeigen. Entfernt ist es ausgeblendet, und Hinzufügen bringt es zurück.",
+    "noItems": "Füge der Sammlung eine Datei hinzu, um hier ihr Layout zu sehen."
+  },
   "postDetail": {
     "name": "Mitteilungs-Detailansicht",
     "help": "Wie jede Mitteilung dieser Initiative auf ihrer eigenen Seite angezeigt wird. Was es weglässt, ist ausgeblendet.",
@@ -274,9 +284,8 @@
   },
   "calendarNote": "Ein Kalender hat keine Karte und keine Spalten zum Anordnen. Ob er angezeigt wird und ob das Projekt damit öffnet, stellst du rechts ein.",
   "makeOpensFirst": "Zuerst mit {{name}} öffnen",
-  "fromCollection": "Diese Sammlung",
-  "ratingDisplay": {
-    "label": "Bewertung anzeigen als",
+  "scaleDisplay": {
+    "label": "Skala anzeigen als",
     "number": "Zahl",
     "stars": "Sterne",
     "bar": "Balken"

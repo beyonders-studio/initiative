@@ -9,6 +9,525 @@ matter and can be deleted.
 
 ## After 0.77.1
 
+### Metadata is one store
+
+Every custom value is one list on an item's read, `properties`: the
+initiative's properties, a project's or a collection's metadata, and the values
+installed plug-ins show, each saying whose it is. `plugin_values` is gone from
+every read. `PropertyType` is `MetadataType`, which takes a plug-in's `link`,
+`badge` and `json`. Dashboards read the values as `metadata_definitions` and `metadata_values`.
+
+- GET /api/v1/c/{community_id}/calendar-entries/ added the new `badge` enum value to the `events/items/properties/items/type` response property for the response status `200`
+- GET /api/v1/c/{community_id}/calendar-entries/ added the new `badge` enum value to the `polls/items/properties/items/type` response property for the response status `200`
+- GET /api/v1/c/{community_id}/calendar-entries/ added the new `badge` enum value to the `projects/items/properties/items/type` response property for the response status `200`
+- GET /api/v1/c/{community_id}/calendar-entries/ added the new `badge` enum value to the `task_occurrences/items/properties/items/type` response property for the response status `200`
+- GET /api/v1/c/{community_id}/calendar-entries/ added the new `badge` enum value to the `tasks/items/properties/items/type` response property for the response status `200`
+- GET /api/v1/c/{community_id}/calendar-entries/ added the new `json` enum value to the `events/items/properties/items/type` response property for the response status `200`
+- GET /api/v1/c/{community_id}/calendar-entries/ added the new `json` enum value to the `polls/items/properties/items/type` response property for the response status `200`
+- GET /api/v1/c/{community_id}/calendar-entries/ added the new `json` enum value to the `projects/items/properties/items/type` response property for the response status `200`
+- GET /api/v1/c/{community_id}/calendar-entries/ added the new `json` enum value to the `task_occurrences/items/properties/items/type` response property for the response status `200`
+- GET /api/v1/c/{community_id}/calendar-entries/ added the new `json` enum value to the `tasks/items/properties/items/type` response property for the response status `200`
+- GET /api/v1/c/{community_id}/calendar-entries/ added the new `link` enum value to the `events/items/properties/items/type` response property for the response status `200`
+- GET /api/v1/c/{community_id}/calendar-entries/ added the new `link` enum value to the `polls/items/properties/items/type` response property for the response status `200`
+- GET /api/v1/c/{community_id}/calendar-entries/ added the new `link` enum value to the `projects/items/properties/items/type` response property for the response status `200`
+- GET /api/v1/c/{community_id}/calendar-entries/ added the new `link` enum value to the `task_occurrences/items/properties/items/type` response property for the response status `200`
+- GET /api/v1/c/{community_id}/calendar-entries/ added the new `link` enum value to the `tasks/items/properties/items/type` response property for the response status `200`
+- GET /api/v1/c/{community_id}/calendar-entries/ removed the required property `polls/items/plugin_values` from the response with the `200` status
+- GET /api/v1/c/{community_id}/calendar-entries/ removed the required property `task_occurrences/items/plugin_values` from the response with the `200` status
+- GET /api/v1/c/{community_id}/calendar-entries/ removed the required property `tasks/items/plugin_values` from the response with the `200` status
+- POST /api/v1/c/{community_id}/calendar-events/ added the new `badge` enum value to the `properties/items/type` response property for the response status `201`
+- POST /api/v1/c/{community_id}/calendar-events/ added the new `json` enum value to the `properties/items/type` response property for the response status `201`
+- POST /api/v1/c/{community_id}/calendar-events/ added the new `link` enum value to the `properties/items/type` response property for the response status `201`
+- POST /api/v1/c/{community_id}/calendar-events/ removed the required property `plugin_values` from the response with the `201` status
+- GET /api/v1/c/{community_id}/calendar-events/{event_id} added the new `badge` enum value to the `properties/items/type` response property for the response status `200`
+- GET /api/v1/c/{community_id}/calendar-events/{event_id} added the new `json` enum value to the `properties/items/type` response property for the response status `200`
+- GET /api/v1/c/{community_id}/calendar-events/{event_id} added the new `link` enum value to the `properties/items/type` response property for the response status `200`
+- GET /api/v1/c/{community_id}/calendar-events/{event_id} removed the required property `plugin_values` from the response with the `200` status
+- PATCH /api/v1/c/{community_id}/calendar-events/{event_id} added the new `badge` enum value to the `properties/items/type` response property for the response status `200`
+- PATCH /api/v1/c/{community_id}/calendar-events/{event_id} added the new `json` enum value to the `properties/items/type` response property for the response status `200`
+- PATCH /api/v1/c/{community_id}/calendar-events/{event_id} added the new `link` enum value to the `properties/items/type` response property for the response status `200`
+- PATCH /api/v1/c/{community_id}/calendar-events/{event_id} removed the required property `plugin_values` from the response with the `200` status
+- PUT /api/v1/c/{community_id}/calendar-events/{event_id}/attendees added the new `badge` enum value to the `properties/items/type` response property for the response status `200`
+- PUT /api/v1/c/{community_id}/calendar-events/{event_id}/attendees added the new `json` enum value to the `properties/items/type` response property for the response status `200`
+- PUT /api/v1/c/{community_id}/calendar-events/{event_id}/attendees added the new `link` enum value to the `properties/items/type` response property for the response status `200`
+- PUT /api/v1/c/{community_id}/calendar-events/{event_id}/attendees removed the required property `plugin_values` from the response with the `200` status
+- POST /api/v1/c/{community_id}/calendar-events/{event_id}/duplicate added the new `badge` enum value to the `properties/items/type` response property for the response status `201`
+- POST /api/v1/c/{community_id}/calendar-events/{event_id}/duplicate added the new `json` enum value to the `properties/items/type` response property for the response status `201`
+- POST /api/v1/c/{community_id}/calendar-events/{event_id}/duplicate added the new `link` enum value to the `properties/items/type` response property for the response status `201`
+- POST /api/v1/c/{community_id}/calendar-events/{event_id}/duplicate removed the required property `plugin_values` from the response with the `201` status
+- POST /api/v1/c/{community_id}/calendar-events/{event_id}/occurrences added the new `badge` enum value to the `properties/items/type` response property for the response status `200`
+- POST /api/v1/c/{community_id}/calendar-events/{event_id}/occurrences added the new `json` enum value to the `properties/items/type` response property for the response status `200`
+- POST /api/v1/c/{community_id}/calendar-events/{event_id}/occurrences added the new `link` enum value to the `properties/items/type` response property for the response status `200`
+- POST /api/v1/c/{community_id}/calendar-events/{event_id}/occurrences removed the required property `plugin_values` from the response with the `200` status
+- POST /api/v1/c/{community_id}/calendar-events/{event_id}/occurrences/add added the new `badge` enum value to the `properties/items/type` response property for the response status `200`
+- POST /api/v1/c/{community_id}/calendar-events/{event_id}/occurrences/add added the new `json` enum value to the `properties/items/type` response property for the response status `200`
+- POST /api/v1/c/{community_id}/calendar-events/{event_id}/occurrences/add added the new `link` enum value to the `properties/items/type` response property for the response status `200`
+- POST /api/v1/c/{community_id}/calendar-events/{event_id}/occurrences/add removed the required property `plugin_values` from the response with the `200` status
+- POST /api/v1/c/{community_id}/calendar-events/{event_id}/occurrences/detach added the new `badge` enum value to the `properties/items/type` response property for the response status `200`
+- POST /api/v1/c/{community_id}/calendar-events/{event_id}/occurrences/detach added the new `json` enum value to the `properties/items/type` response property for the response status `200`
+- POST /api/v1/c/{community_id}/calendar-events/{event_id}/occurrences/detach added the new `link` enum value to the `properties/items/type` response property for the response status `200`
+- POST /api/v1/c/{community_id}/calendar-events/{event_id}/occurrences/detach removed the required property `plugin_values` from the response with the `200` status
+- POST /api/v1/c/{community_id}/calendar-events/{event_id}/occurrences/restore added the new `badge` enum value to the `properties/items/type` response property for the response status `200`
+- POST /api/v1/c/{community_id}/calendar-events/{event_id}/occurrences/restore added the new `json` enum value to the `properties/items/type` response property for the response status `200`
+- POST /api/v1/c/{community_id}/calendar-events/{event_id}/occurrences/restore added the new `link` enum value to the `properties/items/type` response property for the response status `200`
+- POST /api/v1/c/{community_id}/calendar-events/{event_id}/occurrences/restore removed the required property `plugin_values` from the response with the `200` status
+- PATCH /api/v1/c/{community_id}/calendar-events/{event_id}/rsvp added the new `badge` enum value to the `properties/items/type` response property for the response status `200`
+- PATCH /api/v1/c/{community_id}/calendar-events/{event_id}/rsvp added the new `json` enum value to the `properties/items/type` response property for the response status `200`
+- PATCH /api/v1/c/{community_id}/calendar-events/{event_id}/rsvp added the new `link` enum value to the `properties/items/type` response property for the response status `200`
+- PATCH /api/v1/c/{community_id}/calendar-events/{event_id}/rsvp removed the required property `plugin_values` from the response with the `200` status
+- GET /api/v1/c/{community_id}/calendars/ added the new `badge` enum value to the `items/items/properties/items/type` response property for the response status `200`
+- GET /api/v1/c/{community_id}/calendars/ added the new `json` enum value to the `items/items/properties/items/type` response property for the response status `200`
+- GET /api/v1/c/{community_id}/calendars/ added the new `link` enum value to the `items/items/properties/items/type` response property for the response status `200`
+- POST /api/v1/c/{community_id}/calendars/ added the new `badge` enum value to the `properties/items/type` response property for the response status `201`
+- POST /api/v1/c/{community_id}/calendars/ added the new `json` enum value to the `properties/items/type` response property for the response status `201`
+- POST /api/v1/c/{community_id}/calendars/ added the new `link` enum value to the `properties/items/type` response property for the response status `201`
+- GET /api/v1/c/{community_id}/calendars/{calendar_id} added the new `badge` enum value to the `properties/items/type` response property for the response status `200`
+- GET /api/v1/c/{community_id}/calendars/{calendar_id} added the new `json` enum value to the `properties/items/type` response property for the response status `200`
+- GET /api/v1/c/{community_id}/calendars/{calendar_id} added the new `link` enum value to the `properties/items/type` response property for the response status `200`
+- PATCH /api/v1/c/{community_id}/calendars/{calendar_id} added the new `badge` enum value to the `properties/items/type` response property for the response status `200`
+- PATCH /api/v1/c/{community_id}/calendars/{calendar_id} added the new `json` enum value to the `properties/items/type` response property for the response status `200`
+- PATCH /api/v1/c/{community_id}/calendars/{calendar_id} added the new `link` enum value to the `properties/items/type` response property for the response status `200`
+- POST /api/v1/c/{community_id}/calendars/{calendar_id}/duplicate added the new `badge` enum value to the `properties/items/type` response property for the response status `201`
+- POST /api/v1/c/{community_id}/calendars/{calendar_id}/duplicate added the new `json` enum value to the `properties/items/type` response property for the response status `201`
+- POST /api/v1/c/{community_id}/calendars/{calendar_id}/duplicate added the new `link` enum value to the `properties/items/type` response property for the response status `201`
+- PUT /api/v1/c/{community_id}/calendars/{calendar_id}/grants added the new `badge` enum value to the `properties/items/type` response property for the response status `200`
+- PUT /api/v1/c/{community_id}/calendars/{calendar_id}/grants added the new `json` enum value to the `properties/items/type` response property for the response status `200`
+- PUT /api/v1/c/{community_id}/calendars/{calendar_id}/grants added the new `link` enum value to the `properties/items/type` response property for the response status `200`
+- GET /api/v1/c/{community_id}/counter-groups/ added the new `badge` enum value to the `items/items/properties/items/type` response property for the response status `200`
+- GET /api/v1/c/{community_id}/counter-groups/ added the new `json` enum value to the `items/items/properties/items/type` response property for the response status `200`
+- GET /api/v1/c/{community_id}/counter-groups/ added the new `link` enum value to the `items/items/properties/items/type` response property for the response status `200`
+- POST /api/v1/c/{community_id}/counter-groups/ added the new `badge` enum value to the `counters/items/properties/items/type` response property for the response status `201`
+- POST /api/v1/c/{community_id}/counter-groups/ added the new `badge` enum value to the `properties/items/type` response property for the response status `201`
+- POST /api/v1/c/{community_id}/counter-groups/ added the new `json` enum value to the `counters/items/properties/items/type` response property for the response status `201`
+- POST /api/v1/c/{community_id}/counter-groups/ added the new `json` enum value to the `properties/items/type` response property for the response status `201`
+- POST /api/v1/c/{community_id}/counter-groups/ added the new `link` enum value to the `counters/items/properties/items/type` response property for the response status `201`
+- POST /api/v1/c/{community_id}/counter-groups/ added the new `link` enum value to the `properties/items/type` response property for the response status `201`
+- POST /api/v1/c/{community_id}/counter-groups/ removed the required property `counters/items/plugin_values` from the response with the `201` status
+- GET /api/v1/c/{community_id}/counter-groups/{group_id} added the new `badge` enum value to the `counters/items/properties/items/type` response property for the response status `200`
+- GET /api/v1/c/{community_id}/counter-groups/{group_id} added the new `badge` enum value to the `properties/items/type` response property for the response status `200`
+- GET /api/v1/c/{community_id}/counter-groups/{group_id} added the new `json` enum value to the `counters/items/properties/items/type` response property for the response status `200`
+- GET /api/v1/c/{community_id}/counter-groups/{group_id} added the new `json` enum value to the `properties/items/type` response property for the response status `200`
+- GET /api/v1/c/{community_id}/counter-groups/{group_id} added the new `link` enum value to the `counters/items/properties/items/type` response property for the response status `200`
+- GET /api/v1/c/{community_id}/counter-groups/{group_id} added the new `link` enum value to the `properties/items/type` response property for the response status `200`
+- GET /api/v1/c/{community_id}/counter-groups/{group_id} removed the required property `counters/items/plugin_values` from the response with the `200` status
+- PATCH /api/v1/c/{community_id}/counter-groups/{group_id} added the new `badge` enum value to the `counters/items/properties/items/type` response property for the response status `200`
+- PATCH /api/v1/c/{community_id}/counter-groups/{group_id} added the new `badge` enum value to the `properties/items/type` response property for the response status `200`
+- PATCH /api/v1/c/{community_id}/counter-groups/{group_id} added the new `json` enum value to the `counters/items/properties/items/type` response property for the response status `200`
+- PATCH /api/v1/c/{community_id}/counter-groups/{group_id} added the new `json` enum value to the `properties/items/type` response property for the response status `200`
+- PATCH /api/v1/c/{community_id}/counter-groups/{group_id} added the new `link` enum value to the `counters/items/properties/items/type` response property for the response status `200`
+- PATCH /api/v1/c/{community_id}/counter-groups/{group_id} added the new `link` enum value to the `properties/items/type` response property for the response status `200`
+- PATCH /api/v1/c/{community_id}/counter-groups/{group_id} removed the required property `counters/items/plugin_values` from the response with the `200` status
+- POST /api/v1/c/{community_id}/counter-groups/{group_id}/counters added the new `badge` enum value to the `properties/items/type` response property for the response status `201`
+- POST /api/v1/c/{community_id}/counter-groups/{group_id}/counters added the new `json` enum value to the `properties/items/type` response property for the response status `201`
+- POST /api/v1/c/{community_id}/counter-groups/{group_id}/counters added the new `link` enum value to the `properties/items/type` response property for the response status `201`
+- POST /api/v1/c/{community_id}/counter-groups/{group_id}/counters removed the required property `plugin_values` from the response with the `201` status
+- POST /api/v1/c/{community_id}/counter-groups/{group_id}/duplicate added the new `badge` enum value to the `counters/items/properties/items/type` response property for the response status `201`
+- POST /api/v1/c/{community_id}/counter-groups/{group_id}/duplicate added the new `badge` enum value to the `properties/items/type` response property for the response status `201`
+- POST /api/v1/c/{community_id}/counter-groups/{group_id}/duplicate added the new `json` enum value to the `counters/items/properties/items/type` response property for the response status `201`
+- POST /api/v1/c/{community_id}/counter-groups/{group_id}/duplicate added the new `json` enum value to the `properties/items/type` response property for the response status `201`
+- POST /api/v1/c/{community_id}/counter-groups/{group_id}/duplicate added the new `link` enum value to the `counters/items/properties/items/type` response property for the response status `201`
+- POST /api/v1/c/{community_id}/counter-groups/{group_id}/duplicate added the new `link` enum value to the `properties/items/type` response property for the response status `201`
+- POST /api/v1/c/{community_id}/counter-groups/{group_id}/duplicate removed the required property `counters/items/plugin_values` from the response with the `201` status
+- PUT /api/v1/c/{community_id}/counter-groups/{group_id}/grants added the new `badge` enum value to the `counters/items/properties/items/type` response property for the response status `200`
+- PUT /api/v1/c/{community_id}/counter-groups/{group_id}/grants added the new `badge` enum value to the `properties/items/type` response property for the response status `200`
+- PUT /api/v1/c/{community_id}/counter-groups/{group_id}/grants added the new `json` enum value to the `counters/items/properties/items/type` response property for the response status `200`
+- PUT /api/v1/c/{community_id}/counter-groups/{group_id}/grants added the new `json` enum value to the `properties/items/type` response property for the response status `200`
+- PUT /api/v1/c/{community_id}/counter-groups/{group_id}/grants added the new `link` enum value to the `counters/items/properties/items/type` response property for the response status `200`
+- PUT /api/v1/c/{community_id}/counter-groups/{group_id}/grants added the new `link` enum value to the `properties/items/type` response property for the response status `200`
+- PUT /api/v1/c/{community_id}/counter-groups/{group_id}/grants removed the required property `counters/items/plugin_values` from the response with the `200` status
+- POST /api/v1/c/{community_id}/counter-groups/{group_id}/reset-all added the new `badge` enum value to the `counters/items/properties/items/type` response property for the response status `200`
+- POST /api/v1/c/{community_id}/counter-groups/{group_id}/reset-all added the new `badge` enum value to the `properties/items/type` response property for the response status `200`
+- POST /api/v1/c/{community_id}/counter-groups/{group_id}/reset-all added the new `json` enum value to the `counters/items/properties/items/type` response property for the response status `200`
+- POST /api/v1/c/{community_id}/counter-groups/{group_id}/reset-all added the new `json` enum value to the `properties/items/type` response property for the response status `200`
+- POST /api/v1/c/{community_id}/counter-groups/{group_id}/reset-all added the new `link` enum value to the `counters/items/properties/items/type` response property for the response status `200`
+- POST /api/v1/c/{community_id}/counter-groups/{group_id}/reset-all added the new `link` enum value to the `properties/items/type` response property for the response status `200`
+- POST /api/v1/c/{community_id}/counter-groups/{group_id}/reset-all removed the required property `counters/items/plugin_values` from the response with the `200` status
+- POST /api/v1/c/{community_id}/counter-groups/{group_id}/sort added the new `badge` enum value to the `counters/items/properties/items/type` response property for the response status `200`
+- POST /api/v1/c/{community_id}/counter-groups/{group_id}/sort added the new `badge` enum value to the `properties/items/type` response property for the response status `200`
+- POST /api/v1/c/{community_id}/counter-groups/{group_id}/sort added the new `json` enum value to the `counters/items/properties/items/type` response property for the response status `200`
+- POST /api/v1/c/{community_id}/counter-groups/{group_id}/sort added the new `json` enum value to the `properties/items/type` response property for the response status `200`
+- POST /api/v1/c/{community_id}/counter-groups/{group_id}/sort added the new `link` enum value to the `counters/items/properties/items/type` response property for the response status `200`
+- POST /api/v1/c/{community_id}/counter-groups/{group_id}/sort added the new `link` enum value to the `properties/items/type` response property for the response status `200`
+- POST /api/v1/c/{community_id}/counter-groups/{group_id}/sort removed the required property `counters/items/plugin_values` from the response with the `200` status
+- GET /api/v1/c/{community_id}/counters/{counter_id} added the new `badge` enum value to the `properties/items/type` response property for the response status `200`
+- GET /api/v1/c/{community_id}/counters/{counter_id} added the new `json` enum value to the `properties/items/type` response property for the response status `200`
+- GET /api/v1/c/{community_id}/counters/{counter_id} added the new `link` enum value to the `properties/items/type` response property for the response status `200`
+- GET /api/v1/c/{community_id}/counters/{counter_id} removed the required property `plugin_values` from the response with the `200` status
+- PATCH /api/v1/c/{community_id}/counters/{counter_id} added the new `badge` enum value to the `properties/items/type` response property for the response status `200`
+- PATCH /api/v1/c/{community_id}/counters/{counter_id} added the new `json` enum value to the `properties/items/type` response property for the response status `200`
+- PATCH /api/v1/c/{community_id}/counters/{counter_id} added the new `link` enum value to the `properties/items/type` response property for the response status `200`
+- PATCH /api/v1/c/{community_id}/counters/{counter_id} removed the required property `plugin_values` from the response with the `200` status
+- POST /api/v1/c/{community_id}/counters/{counter_id}/duplicate added the new `badge` enum value to the `properties/items/type` response property for the response status `201`
+- POST /api/v1/c/{community_id}/counters/{counter_id}/duplicate added the new `json` enum value to the `properties/items/type` response property for the response status `201`
+- POST /api/v1/c/{community_id}/counters/{counter_id}/duplicate added the new `link` enum value to the `properties/items/type` response property for the response status `201`
+- POST /api/v1/c/{community_id}/counters/{counter_id}/duplicate removed the required property `plugin_values` from the response with the `201` status
+- POST /api/v1/c/{community_id}/counters/{counter_id}/reset added the new `badge` enum value to the `properties/items/type` response property for the response status `200`
+- POST /api/v1/c/{community_id}/counters/{counter_id}/reset added the new `json` enum value to the `properties/items/type` response property for the response status `200`
+- POST /api/v1/c/{community_id}/counters/{counter_id}/reset added the new `link` enum value to the `properties/items/type` response property for the response status `200`
+- POST /api/v1/c/{community_id}/counters/{counter_id}/reset removed the required property `plugin_values` from the response with the `200` status
+- POST /api/v1/c/{community_id}/counters/{counter_id}/set added the new `badge` enum value to the `properties/items/type` response property for the response status `200`
+- POST /api/v1/c/{community_id}/counters/{counter_id}/set added the new `json` enum value to the `properties/items/type` response property for the response status `200`
+- POST /api/v1/c/{community_id}/counters/{counter_id}/set added the new `link` enum value to the `properties/items/type` response property for the response status `200`
+- POST /api/v1/c/{community_id}/counters/{counter_id}/set removed the required property `plugin_values` from the response with the `200` status
+- POST /api/v1/c/{community_id}/counters/{counter_id}/step added the new `badge` enum value to the `properties/items/type` response property for the response status `200`
+- POST /api/v1/c/{community_id}/counters/{counter_id}/step added the new `json` enum value to the `properties/items/type` response property for the response status `200`
+- POST /api/v1/c/{community_id}/counters/{counter_id}/step added the new `link` enum value to the `properties/items/type` response property for the response status `200`
+- POST /api/v1/c/{community_id}/counters/{counter_id}/step removed the required property `plugin_values` from the response with the `200` status
+- GET /api/v1/c/{community_id}/dashboards/ added the new `badge` enum value to the `items/items/properties/items/type` response property for the response status `200`
+- GET /api/v1/c/{community_id}/dashboards/ added the new `json` enum value to the `items/items/properties/items/type` response property for the response status `200`
+- GET /api/v1/c/{community_id}/dashboards/ added the new `link` enum value to the `items/items/properties/items/type` response property for the response status `200`
+- POST /api/v1/c/{community_id}/dashboards/ added the new `badge` enum value to the `properties/items/type` response property for the response status `201`
+- POST /api/v1/c/{community_id}/dashboards/ added the new `json` enum value to the `properties/items/type` response property for the response status `201`
+- POST /api/v1/c/{community_id}/dashboards/ added the new `link` enum value to the `properties/items/type` response property for the response status `201`
+- GET /api/v1/c/{community_id}/dashboards/{dashboard_id} added the new `badge` enum value to the `properties/items/type` response property for the response status `200`
+- GET /api/v1/c/{community_id}/dashboards/{dashboard_id} added the new `json` enum value to the `properties/items/type` response property for the response status `200`
+- GET /api/v1/c/{community_id}/dashboards/{dashboard_id} added the new `link` enum value to the `properties/items/type` response property for the response status `200`
+- PATCH /api/v1/c/{community_id}/dashboards/{dashboard_id} added the new `badge` enum value to the `properties/items/type` response property for the response status `200`
+- PATCH /api/v1/c/{community_id}/dashboards/{dashboard_id} added the new `json` enum value to the `properties/items/type` response property for the response status `200`
+- PATCH /api/v1/c/{community_id}/dashboards/{dashboard_id} added the new `link` enum value to the `properties/items/type` response property for the response status `200`
+- POST /api/v1/c/{community_id}/dashboards/{dashboard_id}/duplicate added the new `badge` enum value to the `properties/items/type` response property for the response status `201`
+- POST /api/v1/c/{community_id}/dashboards/{dashboard_id}/duplicate added the new `json` enum value to the `properties/items/type` response property for the response status `201`
+- POST /api/v1/c/{community_id}/dashboards/{dashboard_id}/duplicate added the new `link` enum value to the `properties/items/type` response property for the response status `201`
+- PUT /api/v1/c/{community_id}/dashboards/{dashboard_id}/grants added the new `badge` enum value to the `properties/items/type` response property for the response status `200`
+- PUT /api/v1/c/{community_id}/dashboards/{dashboard_id}/grants added the new `json` enum value to the `properties/items/type` response property for the response status `200`
+- PUT /api/v1/c/{community_id}/dashboards/{dashboard_id}/grants added the new `link` enum value to the `properties/items/type` response property for the response status `200`
+- POST /api/v1/c/{community_id}/dashboards/{dashboard_id}/upgrade added the new `badge` enum value to the `properties/items/type` response property for the response status `200`
+- POST /api/v1/c/{community_id}/dashboards/{dashboard_id}/upgrade added the new `json` enum value to the `properties/items/type` response property for the response status `200`
+- POST /api/v1/c/{community_id}/dashboards/{dashboard_id}/upgrade added the new `link` enum value to the `properties/items/type` response property for the response status `200`
+- PUT /api/v1/c/{community_id}/dashboards/{dashboard_id}/view-mode added the new `badge` enum value to the `properties/items/type` response property for the response status `200`
+- PUT /api/v1/c/{community_id}/dashboards/{dashboard_id}/view-mode added the new `json` enum value to the `properties/items/type` response property for the response status `200`
+- PUT /api/v1/c/{community_id}/dashboards/{dashboard_id}/view-mode added the new `link` enum value to the `properties/items/type` response property for the response status `200`
+- GET /api/v1/c/{community_id}/files/ added the new `badge` enum value to the `items/items/properties/items/type` response property for the response status `200`
+- GET /api/v1/c/{community_id}/files/ added the new `json` enum value to the `items/items/properties/items/type` response property for the response status `200`
+- GET /api/v1/c/{community_id}/files/ added the new `link` enum value to the `items/items/properties/items/type` response property for the response status `200`
+- POST /api/v1/c/{community_id}/files/ added the new `badge` enum value to the `properties/items/type` response property for the response status `201`
+- POST /api/v1/c/{community_id}/files/ added the new `json` enum value to the `properties/items/type` response property for the response status `201`
+- POST /api/v1/c/{community_id}/files/ added the new `link` enum value to the `properties/items/type` response property for the response status `201`
+- POST /api/v1/c/{community_id}/files/upload added the new `badge` enum value to the `properties/items/type` response property for the response status `201`
+- POST /api/v1/c/{community_id}/files/upload added the new `json` enum value to the `properties/items/type` response property for the response status `201`
+- POST /api/v1/c/{community_id}/files/upload added the new `link` enum value to the `properties/items/type` response property for the response status `201`
+- GET /api/v1/c/{community_id}/files/{file_id} added the new `badge` enum value to the `properties/items/type` response property for the response status `200`
+- GET /api/v1/c/{community_id}/files/{file_id} added the new `json` enum value to the `properties/items/type` response property for the response status `200`
+- GET /api/v1/c/{community_id}/files/{file_id} added the new `link` enum value to the `properties/items/type` response property for the response status `200`
+- PATCH /api/v1/c/{community_id}/files/{file_id} added the new `badge` enum value to the `properties/items/type` response property for the response status `200`
+- PATCH /api/v1/c/{community_id}/files/{file_id} added the new `json` enum value to the `properties/items/type` response property for the response status `200`
+- PATCH /api/v1/c/{community_id}/files/{file_id} added the new `link` enum value to the `properties/items/type` response property for the response status `200`
+- POST /api/v1/c/{community_id}/files/{file_id}/duplicate added the new `badge` enum value to the `properties/items/type` response property for the response status `201`
+- POST /api/v1/c/{community_id}/files/{file_id}/duplicate added the new `json` enum value to the `properties/items/type` response property for the response status `201`
+- POST /api/v1/c/{community_id}/files/{file_id}/duplicate added the new `link` enum value to the `properties/items/type` response property for the response status `201`
+- PUT /api/v1/c/{community_id}/files/{file_id}/grants added the new `badge` enum value to the `properties/items/type` response property for the response status `200`
+- PUT /api/v1/c/{community_id}/files/{file_id}/grants added the new `json` enum value to the `properties/items/type` response property for the response status `200`
+- PUT /api/v1/c/{community_id}/files/{file_id}/grants added the new `link` enum value to the `properties/items/type` response property for the response status `200`
+- GET /api/v1/c/{community_id}/posts/ added the new `badge` enum value to the `items/items/properties/items/type` response property for the response status `200`
+- GET /api/v1/c/{community_id}/posts/ added the new `json` enum value to the `items/items/properties/items/type` response property for the response status `200`
+- GET /api/v1/c/{community_id}/posts/ added the new `link` enum value to the `items/items/properties/items/type` response property for the response status `200`
+- GET /api/v1/c/{community_id}/posts/ removed the required property `items/items/plugin_values` from the response with the `200` status
+- POST /api/v1/c/{community_id}/posts/ added the new `badge` enum value to the `properties/items/type` response property for the response status `201`
+- POST /api/v1/c/{community_id}/posts/ added the new `json` enum value to the `properties/items/type` response property for the response status `201`
+- POST /api/v1/c/{community_id}/posts/ added the new `link` enum value to the `properties/items/type` response property for the response status `201`
+- POST /api/v1/c/{community_id}/posts/ removed the required property `plugin_values` from the response with the `201` status
+- GET /api/v1/c/{community_id}/posts/{post_id} added the new `badge` enum value to the `properties/items/type` response property for the response status `200`
+- GET /api/v1/c/{community_id}/posts/{post_id} added the new `json` enum value to the `properties/items/type` response property for the response status `200`
+- GET /api/v1/c/{community_id}/posts/{post_id} added the new `link` enum value to the `properties/items/type` response property for the response status `200`
+- GET /api/v1/c/{community_id}/posts/{post_id} removed the required property `plugin_values` from the response with the `200` status
+- PATCH /api/v1/c/{community_id}/posts/{post_id} added the new `badge` enum value to the `properties/items/type` response property for the response status `200`
+- PATCH /api/v1/c/{community_id}/posts/{post_id} added the new `json` enum value to the `properties/items/type` response property for the response status `200`
+- PATCH /api/v1/c/{community_id}/posts/{post_id} added the new `link` enum value to the `properties/items/type` response property for the response status `200`
+- PATCH /api/v1/c/{community_id}/posts/{post_id} removed the required property `plugin_values` from the response with the `200` status
+- POST /api/v1/c/{community_id}/posts/{post_id}/duplicate added the new `badge` enum value to the `properties/items/type` response property for the response status `201`
+- POST /api/v1/c/{community_id}/posts/{post_id}/duplicate added the new `json` enum value to the `properties/items/type` response property for the response status `201`
+- POST /api/v1/c/{community_id}/posts/{post_id}/duplicate added the new `link` enum value to the `properties/items/type` response property for the response status `201`
+- POST /api/v1/c/{community_id}/posts/{post_id}/duplicate removed the required property `plugin_values` from the response with the `201` status
+- PUT /api/v1/c/{community_id}/posts/{post_id}/grants added the new `badge` enum value to the `properties/items/type` response property for the response status `200`
+- PUT /api/v1/c/{community_id}/posts/{post_id}/grants added the new `json` enum value to the `properties/items/type` response property for the response status `200`
+- PUT /api/v1/c/{community_id}/posts/{post_id}/grants added the new `link` enum value to the `properties/items/type` response property for the response status `200`
+- PUT /api/v1/c/{community_id}/posts/{post_id}/grants removed the required property `plugin_values` from the response with the `200` status
+- PUT /api/v1/c/{community_id}/posts/{post_id}/pin added the new `badge` enum value to the `properties/items/type` response property for the response status `200`
+- PUT /api/v1/c/{community_id}/posts/{post_id}/pin added the new `json` enum value to the `properties/items/type` response property for the response status `200`
+- PUT /api/v1/c/{community_id}/posts/{post_id}/pin added the new `link` enum value to the `properties/items/type` response property for the response status `200`
+- PUT /api/v1/c/{community_id}/posts/{post_id}/pin removed the required property `plugin_values` from the response with the `200` status
+- DELETE /api/v1/c/{community_id}/posts/{post_id}/poll added the new `badge` enum value to the `properties/items/type` response property for the response status `200`
+- DELETE /api/v1/c/{community_id}/posts/{post_id}/poll added the new `json` enum value to the `properties/items/type` response property for the response status `200`
+- DELETE /api/v1/c/{community_id}/posts/{post_id}/poll added the new `link` enum value to the `properties/items/type` response property for the response status `200`
+- DELETE /api/v1/c/{community_id}/posts/{post_id}/poll removed the required property `plugin_values` from the response with the `200` status
+- PUT /api/v1/c/{community_id}/posts/{post_id}/poll added the new `badge` enum value to the `properties/items/type` response property for the response status `200`
+- PUT /api/v1/c/{community_id}/posts/{post_id}/poll added the new `json` enum value to the `properties/items/type` response property for the response status `200`
+- PUT /api/v1/c/{community_id}/posts/{post_id}/poll added the new `link` enum value to the `properties/items/type` response property for the response status `200`
+- PUT /api/v1/c/{community_id}/posts/{post_id}/poll removed the required property `plugin_values` from the response with the `200` status
+- DELETE /api/v1/c/{community_id}/posts/{post_id}/poll/vote added the new `badge` enum value to the `properties/items/type` response property for the response status `200`
+- DELETE /api/v1/c/{community_id}/posts/{post_id}/poll/vote added the new `json` enum value to the `properties/items/type` response property for the response status `200`
+- DELETE /api/v1/c/{community_id}/posts/{post_id}/poll/vote added the new `link` enum value to the `properties/items/type` response property for the response status `200`
+- DELETE /api/v1/c/{community_id}/posts/{post_id}/poll/vote removed the required property `plugin_values` from the response with the `200` status
+- PUT /api/v1/c/{community_id}/posts/{post_id}/poll/vote added the new `badge` enum value to the `properties/items/type` response property for the response status `200`
+- PUT /api/v1/c/{community_id}/posts/{post_id}/poll/vote added the new `json` enum value to the `properties/items/type` response property for the response status `200`
+- PUT /api/v1/c/{community_id}/posts/{post_id}/poll/vote added the new `link` enum value to the `properties/items/type` response property for the response status `200`
+- PUT /api/v1/c/{community_id}/posts/{post_id}/poll/vote removed the required property `plugin_values` from the response with the `200` status
+- GET /api/v1/c/{community_id}/projects/ added the new `badge` enum value to the `items/items/properties/items/type` response property for the response status `200`
+- GET /api/v1/c/{community_id}/projects/ added the new `json` enum value to the `items/items/properties/items/type` response property for the response status `200`
+- GET /api/v1/c/{community_id}/projects/ added the new `link` enum value to the `items/items/properties/items/type` response property for the response status `200`
+- POST /api/v1/c/{community_id}/projects/ added the new `badge` enum value to the `properties/items/type` response property for the response status `201`
+- POST /api/v1/c/{community_id}/projects/ added the new `json` enum value to the `properties/items/type` response property for the response status `201`
+- POST /api/v1/c/{community_id}/projects/ added the new `link` enum value to the `properties/items/type` response property for the response status `201`
+- GET /api/v1/c/{community_id}/projects/{project_id} added the new `badge` enum value to the `properties/items/type` response property for the response status `200`
+- GET /api/v1/c/{community_id}/projects/{project_id} added the new `json` enum value to the `properties/items/type` response property for the response status `200`
+- GET /api/v1/c/{community_id}/projects/{project_id} added the new `link` enum value to the `properties/items/type` response property for the response status `200`
+- PATCH /api/v1/c/{community_id}/projects/{project_id} added the new `badge` enum value to the `properties/items/type` response property for the response status `200`
+- PATCH /api/v1/c/{community_id}/projects/{project_id} added the new `json` enum value to the `properties/items/type` response property for the response status `200`
+- PATCH /api/v1/c/{community_id}/projects/{project_id} added the new `link` enum value to the `properties/items/type` response property for the response status `200`
+- POST /api/v1/c/{community_id}/projects/{project_id}/duplicate added the new `badge` enum value to the `properties/items/type` response property for the response status `201`
+- POST /api/v1/c/{community_id}/projects/{project_id}/duplicate added the new `json` enum value to the `properties/items/type` response property for the response status `201`
+- POST /api/v1/c/{community_id}/projects/{project_id}/duplicate added the new `link` enum value to the `properties/items/type` response property for the response status `201`
+- PUT /api/v1/c/{community_id}/projects/{project_id}/grants added the new `badge` enum value to the `properties/items/type` response property for the response status `200`
+- PUT /api/v1/c/{community_id}/projects/{project_id}/grants added the new `json` enum value to the `properties/items/type` response property for the response status `200`
+- PUT /api/v1/c/{community_id}/projects/{project_id}/grants added the new `link` enum value to the `properties/items/type` response property for the response status `200`
+- PUT /api/v1/c/{community_id}/properties/{target}/{entity_id} added the new `badge` enum value to the `items/type` response property for the response status `200`
+- PUT /api/v1/c/{community_id}/properties/{target}/{entity_id} added the new `json` enum value to the `items/type` response property for the response status `200`
+- PUT /api/v1/c/{community_id}/properties/{target}/{entity_id} added the new `link` enum value to the `items/type` response property for the response status `200`
+- GET /api/v1/c/{community_id}/property-definitions/ added the new `badge` enum value to the `items/type` response property for the response status `200`
+- GET /api/v1/c/{community_id}/property-definitions/ added the new `json` enum value to the `items/type` response property for the response status `200`
+- GET /api/v1/c/{community_id}/property-definitions/ added the new `link` enum value to the `items/type` response property for the response status `200`
+- POST /api/v1/c/{community_id}/property-definitions/ added the new `badge` enum value to the `type` response property for the response status `201`
+- POST /api/v1/c/{community_id}/property-definitions/ added the new `json` enum value to the `type` response property for the response status `201`
+- POST /api/v1/c/{community_id}/property-definitions/ added the new `link` enum value to the `type` response property for the response status `201`
+- PATCH /api/v1/c/{community_id}/property-definitions/{definition_id} added the new `badge` enum value to the `definition/type` response property for the response status `200`
+- PATCH /api/v1/c/{community_id}/property-definitions/{definition_id} added the new `json` enum value to the `definition/type` response property for the response status `200`
+- PATCH /api/v1/c/{community_id}/property-definitions/{definition_id} added the new `link` enum value to the `definition/type` response property for the response status `200`
+- GET /api/v1/c/{community_id}/queue-items/{item_id} added the new `badge` enum value to the `properties/items/type` response property for the response status `200`
+- GET /api/v1/c/{community_id}/queue-items/{item_id} added the new `json` enum value to the `properties/items/type` response property for the response status `200`
+- GET /api/v1/c/{community_id}/queue-items/{item_id} added the new `link` enum value to the `properties/items/type` response property for the response status `200`
+- GET /api/v1/c/{community_id}/queue-items/{item_id} removed the required property `plugin_values` from the response with the `200` status
+- PATCH /api/v1/c/{community_id}/queue-items/{item_id} added the new `badge` enum value to the `properties/items/type` response property for the response status `200`
+- PATCH /api/v1/c/{community_id}/queue-items/{item_id} added the new `json` enum value to the `properties/items/type` response property for the response status `200`
+- PATCH /api/v1/c/{community_id}/queue-items/{item_id} added the new `link` enum value to the `properties/items/type` response property for the response status `200`
+- PATCH /api/v1/c/{community_id}/queue-items/{item_id} removed the required property `plugin_values` from the response with the `200` status
+- POST /api/v1/c/{community_id}/queue-items/{item_id}/duplicate added the new `badge` enum value to the `properties/items/type` response property for the response status `201`
+- POST /api/v1/c/{community_id}/queue-items/{item_id}/duplicate added the new `json` enum value to the `properties/items/type` response property for the response status `201`
+- POST /api/v1/c/{community_id}/queue-items/{item_id}/duplicate added the new `link` enum value to the `properties/items/type` response property for the response status `201`
+- POST /api/v1/c/{community_id}/queue-items/{item_id}/duplicate removed the required property `plugin_values` from the response with the `201` status
+- GET /api/v1/c/{community_id}/queues/ added the new `badge` enum value to the `items/items/properties/items/type` response property for the response status `200`
+- GET /api/v1/c/{community_id}/queues/ added the new `json` enum value to the `items/items/properties/items/type` response property for the response status `200`
+- GET /api/v1/c/{community_id}/queues/ added the new `link` enum value to the `items/items/properties/items/type` response property for the response status `200`
+- POST /api/v1/c/{community_id}/queues/ added the new `badge` enum value to the `items/items/properties/items/type` response property for the response status `201`
+- POST /api/v1/c/{community_id}/queues/ added the new `badge` enum value to the `properties/items/type` response property for the response status `201`
+- POST /api/v1/c/{community_id}/queues/ added the new `json` enum value to the `items/items/properties/items/type` response property for the response status `201`
+- POST /api/v1/c/{community_id}/queues/ added the new `json` enum value to the `properties/items/type` response property for the response status `201`
+- POST /api/v1/c/{community_id}/queues/ added the new `link` enum value to the `items/items/properties/items/type` response property for the response status `201`
+- POST /api/v1/c/{community_id}/queues/ added the new `link` enum value to the `properties/items/type` response property for the response status `201`
+- POST /api/v1/c/{community_id}/queues/ removed the required property `items/items/plugin_values` from the response with the `201` status
+- GET /api/v1/c/{community_id}/queues/{queue_id} added the new `badge` enum value to the `items/items/properties/items/type` response property for the response status `200`
+- GET /api/v1/c/{community_id}/queues/{queue_id} added the new `badge` enum value to the `properties/items/type` response property for the response status `200`
+- GET /api/v1/c/{community_id}/queues/{queue_id} added the new `json` enum value to the `items/items/properties/items/type` response property for the response status `200`
+- GET /api/v1/c/{community_id}/queues/{queue_id} added the new `json` enum value to the `properties/items/type` response property for the response status `200`
+- GET /api/v1/c/{community_id}/queues/{queue_id} added the new `link` enum value to the `items/items/properties/items/type` response property for the response status `200`
+- GET /api/v1/c/{community_id}/queues/{queue_id} added the new `link` enum value to the `properties/items/type` response property for the response status `200`
+- GET /api/v1/c/{community_id}/queues/{queue_id} removed the required property `items/items/plugin_values` from the response with the `200` status
+- PATCH /api/v1/c/{community_id}/queues/{queue_id} added the new `badge` enum value to the `items/items/properties/items/type` response property for the response status `200`
+- PATCH /api/v1/c/{community_id}/queues/{queue_id} added the new `badge` enum value to the `properties/items/type` response property for the response status `200`
+- PATCH /api/v1/c/{community_id}/queues/{queue_id} added the new `json` enum value to the `items/items/properties/items/type` response property for the response status `200`
+- PATCH /api/v1/c/{community_id}/queues/{queue_id} added the new `json` enum value to the `properties/items/type` response property for the response status `200`
+- PATCH /api/v1/c/{community_id}/queues/{queue_id} added the new `link` enum value to the `items/items/properties/items/type` response property for the response status `200`
+- PATCH /api/v1/c/{community_id}/queues/{queue_id} added the new `link` enum value to the `properties/items/type` response property for the response status `200`
+- PATCH /api/v1/c/{community_id}/queues/{queue_id} removed the required property `items/items/plugin_values` from the response with the `200` status
+- POST /api/v1/c/{community_id}/queues/{queue_id}/duplicate added the new `badge` enum value to the `items/items/properties/items/type` response property for the response status `201`
+- POST /api/v1/c/{community_id}/queues/{queue_id}/duplicate added the new `badge` enum value to the `properties/items/type` response property for the response status `201`
+- POST /api/v1/c/{community_id}/queues/{queue_id}/duplicate added the new `json` enum value to the `items/items/properties/items/type` response property for the response status `201`
+- POST /api/v1/c/{community_id}/queues/{queue_id}/duplicate added the new `json` enum value to the `properties/items/type` response property for the response status `201`
+- POST /api/v1/c/{community_id}/queues/{queue_id}/duplicate added the new `link` enum value to the `items/items/properties/items/type` response property for the response status `201`
+- POST /api/v1/c/{community_id}/queues/{queue_id}/duplicate added the new `link` enum value to the `properties/items/type` response property for the response status `201`
+- POST /api/v1/c/{community_id}/queues/{queue_id}/duplicate removed the required property `items/items/plugin_values` from the response with the `201` status
+- PUT /api/v1/c/{community_id}/queues/{queue_id}/grants added the new `badge` enum value to the `items/items/properties/items/type` response property for the response status `200`
+- PUT /api/v1/c/{community_id}/queues/{queue_id}/grants added the new `badge` enum value to the `properties/items/type` response property for the response status `200`
+- PUT /api/v1/c/{community_id}/queues/{queue_id}/grants added the new `json` enum value to the `items/items/properties/items/type` response property for the response status `200`
+- PUT /api/v1/c/{community_id}/queues/{queue_id}/grants added the new `json` enum value to the `properties/items/type` response property for the response status `200`
+- PUT /api/v1/c/{community_id}/queues/{queue_id}/grants added the new `link` enum value to the `items/items/properties/items/type` response property for the response status `200`
+- PUT /api/v1/c/{community_id}/queues/{queue_id}/grants added the new `link` enum value to the `properties/items/type` response property for the response status `200`
+- PUT /api/v1/c/{community_id}/queues/{queue_id}/grants removed the required property `items/items/plugin_values` from the response with the `200` status
+- POST /api/v1/c/{community_id}/queues/{queue_id}/hold added the new `badge` enum value to the `items/items/properties/items/type` response property for the response status `200`
+- POST /api/v1/c/{community_id}/queues/{queue_id}/hold added the new `badge` enum value to the `properties/items/type` response property for the response status `200`
+- POST /api/v1/c/{community_id}/queues/{queue_id}/hold added the new `json` enum value to the `items/items/properties/items/type` response property for the response status `200`
+- POST /api/v1/c/{community_id}/queues/{queue_id}/hold added the new `json` enum value to the `properties/items/type` response property for the response status `200`
+- POST /api/v1/c/{community_id}/queues/{queue_id}/hold added the new `link` enum value to the `items/items/properties/items/type` response property for the response status `200`
+- POST /api/v1/c/{community_id}/queues/{queue_id}/hold added the new `link` enum value to the `properties/items/type` response property for the response status `200`
+- POST /api/v1/c/{community_id}/queues/{queue_id}/hold removed the required property `items/items/plugin_values` from the response with the `200` status
+- POST /api/v1/c/{community_id}/queues/{queue_id}/items added the new `badge` enum value to the `properties/items/type` response property for the response status `201`
+- POST /api/v1/c/{community_id}/queues/{queue_id}/items added the new `json` enum value to the `properties/items/type` response property for the response status `201`
+- POST /api/v1/c/{community_id}/queues/{queue_id}/items added the new `link` enum value to the `properties/items/type` response property for the response status `201`
+- POST /api/v1/c/{community_id}/queues/{queue_id}/items removed the required property `plugin_values` from the response with the `201` status
+- POST /api/v1/c/{community_id}/queues/{queue_id}/next added the new `badge` enum value to the `items/items/properties/items/type` response property for the response status `200`
+- POST /api/v1/c/{community_id}/queues/{queue_id}/next added the new `badge` enum value to the `properties/items/type` response property for the response status `200`
+- POST /api/v1/c/{community_id}/queues/{queue_id}/next added the new `json` enum value to the `items/items/properties/items/type` response property for the response status `200`
+- POST /api/v1/c/{community_id}/queues/{queue_id}/next added the new `json` enum value to the `properties/items/type` response property for the response status `200`
+- POST /api/v1/c/{community_id}/queues/{queue_id}/next added the new `link` enum value to the `items/items/properties/items/type` response property for the response status `200`
+- POST /api/v1/c/{community_id}/queues/{queue_id}/next added the new `link` enum value to the `properties/items/type` response property for the response status `200`
+- POST /api/v1/c/{community_id}/queues/{queue_id}/next removed the required property `items/items/plugin_values` from the response with the `200` status
+- POST /api/v1/c/{community_id}/queues/{queue_id}/previous added the new `badge` enum value to the `items/items/properties/items/type` response property for the response status `200`
+- POST /api/v1/c/{community_id}/queues/{queue_id}/previous added the new `badge` enum value to the `properties/items/type` response property for the response status `200`
+- POST /api/v1/c/{community_id}/queues/{queue_id}/previous added the new `json` enum value to the `items/items/properties/items/type` response property for the response status `200`
+- POST /api/v1/c/{community_id}/queues/{queue_id}/previous added the new `json` enum value to the `properties/items/type` response property for the response status `200`
+- POST /api/v1/c/{community_id}/queues/{queue_id}/previous added the new `link` enum value to the `items/items/properties/items/type` response property for the response status `200`
+- POST /api/v1/c/{community_id}/queues/{queue_id}/previous added the new `link` enum value to the `properties/items/type` response property for the response status `200`
+- POST /api/v1/c/{community_id}/queues/{queue_id}/previous removed the required property `items/items/plugin_values` from the response with the `200` status
+- POST /api/v1/c/{community_id}/queues/{queue_id}/release/{item_id} added the new `badge` enum value to the `items/items/properties/items/type` response property for the response status `200`
+- POST /api/v1/c/{community_id}/queues/{queue_id}/release/{item_id} added the new `badge` enum value to the `properties/items/type` response property for the response status `200`
+- POST /api/v1/c/{community_id}/queues/{queue_id}/release/{item_id} added the new `json` enum value to the `items/items/properties/items/type` response property for the response status `200`
+- POST /api/v1/c/{community_id}/queues/{queue_id}/release/{item_id} added the new `json` enum value to the `properties/items/type` response property for the response status `200`
+- POST /api/v1/c/{community_id}/queues/{queue_id}/release/{item_id} added the new `link` enum value to the `items/items/properties/items/type` response property for the response status `200`
+- POST /api/v1/c/{community_id}/queues/{queue_id}/release/{item_id} added the new `link` enum value to the `properties/items/type` response property for the response status `200`
+- POST /api/v1/c/{community_id}/queues/{queue_id}/release/{item_id} removed the required property `items/items/plugin_values` from the response with the `200` status
+- POST /api/v1/c/{community_id}/queues/{queue_id}/reset added the new `badge` enum value to the `items/items/properties/items/type` response property for the response status `200`
+- POST /api/v1/c/{community_id}/queues/{queue_id}/reset added the new `badge` enum value to the `properties/items/type` response property for the response status `200`
+- POST /api/v1/c/{community_id}/queues/{queue_id}/reset added the new `json` enum value to the `items/items/properties/items/type` response property for the response status `200`
+- POST /api/v1/c/{community_id}/queues/{queue_id}/reset added the new `json` enum value to the `properties/items/type` response property for the response status `200`
+- POST /api/v1/c/{community_id}/queues/{queue_id}/reset added the new `link` enum value to the `items/items/properties/items/type` response property for the response status `200`
+- POST /api/v1/c/{community_id}/queues/{queue_id}/reset added the new `link` enum value to the `properties/items/type` response property for the response status `200`
+- POST /api/v1/c/{community_id}/queues/{queue_id}/reset removed the required property `items/items/plugin_values` from the response with the `200` status
+- POST /api/v1/c/{community_id}/queues/{queue_id}/set-active/{item_id} added the new `badge` enum value to the `items/items/properties/items/type` response property for the response status `200`
+- POST /api/v1/c/{community_id}/queues/{queue_id}/set-active/{item_id} added the new `badge` enum value to the `properties/items/type` response property for the response status `200`
+- POST /api/v1/c/{community_id}/queues/{queue_id}/set-active/{item_id} added the new `json` enum value to the `items/items/properties/items/type` response property for the response status `200`
+- POST /api/v1/c/{community_id}/queues/{queue_id}/set-active/{item_id} added the new `json` enum value to the `properties/items/type` response property for the response status `200`
+- POST /api/v1/c/{community_id}/queues/{queue_id}/set-active/{item_id} added the new `link` enum value to the `items/items/properties/items/type` response property for the response status `200`
+- POST /api/v1/c/{community_id}/queues/{queue_id}/set-active/{item_id} added the new `link` enum value to the `properties/items/type` response property for the response status `200`
+- POST /api/v1/c/{community_id}/queues/{queue_id}/set-active/{item_id} removed the required property `items/items/plugin_values` from the response with the `200` status
+- POST /api/v1/c/{community_id}/queues/{queue_id}/start added the new `badge` enum value to the `items/items/properties/items/type` response property for the response status `200`
+- POST /api/v1/c/{community_id}/queues/{queue_id}/start added the new `badge` enum value to the `properties/items/type` response property for the response status `200`
+- POST /api/v1/c/{community_id}/queues/{queue_id}/start added the new `json` enum value to the `items/items/properties/items/type` response property for the response status `200`
+- POST /api/v1/c/{community_id}/queues/{queue_id}/start added the new `json` enum value to the `properties/items/type` response property for the response status `200`
+- POST /api/v1/c/{community_id}/queues/{queue_id}/start added the new `link` enum value to the `items/items/properties/items/type` response property for the response status `200`
+- POST /api/v1/c/{community_id}/queues/{queue_id}/start added the new `link` enum value to the `properties/items/type` response property for the response status `200`
+- POST /api/v1/c/{community_id}/queues/{queue_id}/start removed the required property `items/items/plugin_values` from the response with the `200` status
+- POST /api/v1/c/{community_id}/queues/{queue_id}/stop added the new `badge` enum value to the `items/items/properties/items/type` response property for the response status `200`
+- POST /api/v1/c/{community_id}/queues/{queue_id}/stop added the new `badge` enum value to the `properties/items/type` response property for the response status `200`
+- POST /api/v1/c/{community_id}/queues/{queue_id}/stop added the new `json` enum value to the `items/items/properties/items/type` response property for the response status `200`
+- POST /api/v1/c/{community_id}/queues/{queue_id}/stop added the new `json` enum value to the `properties/items/type` response property for the response status `200`
+- POST /api/v1/c/{community_id}/queues/{queue_id}/stop added the new `link` enum value to the `items/items/properties/items/type` response property for the response status `200`
+- POST /api/v1/c/{community_id}/queues/{queue_id}/stop added the new `link` enum value to the `properties/items/type` response property for the response status `200`
+- POST /api/v1/c/{community_id}/queues/{queue_id}/stop removed the required property `items/items/plugin_values` from the response with the `200` status
+- GET /api/v1/c/{community_id}/tasks/ added the new `badge` enum value to the `items/items/properties/items/type` response property for the response status `200`
+- GET /api/v1/c/{community_id}/tasks/ added the new `json` enum value to the `items/items/properties/items/type` response property for the response status `200`
+- GET /api/v1/c/{community_id}/tasks/ added the new `link` enum value to the `items/items/properties/items/type` response property for the response status `200`
+- GET /api/v1/c/{community_id}/tasks/ removed the required property `items/items/plugin_values` from the response with the `200` status
+- POST /api/v1/c/{community_id}/tasks/ added the new `badge` enum value to the `properties/items/type` response property for the response status `201`
+- POST /api/v1/c/{community_id}/tasks/ added the new `json` enum value to the `properties/items/type` response property for the response status `201`
+- POST /api/v1/c/{community_id}/tasks/ added the new `link` enum value to the `properties/items/type` response property for the response status `201`
+- POST /api/v1/c/{community_id}/tasks/ removed the required property `plugin_values` from the response with the `201` status
+- POST /api/v1/c/{community_id}/tasks/reorder added the new `badge` enum value to the `items/properties/items/type` response property for the response status `200`
+- POST /api/v1/c/{community_id}/tasks/reorder added the new `json` enum value to the `items/properties/items/type` response property for the response status `200`
+- POST /api/v1/c/{community_id}/tasks/reorder added the new `link` enum value to the `items/properties/items/type` response property for the response status `200`
+- POST /api/v1/c/{community_id}/tasks/reorder removed the required property `items/plugin_values` from the response with the `200` status
+- GET /api/v1/c/{community_id}/tasks/{task_id} added the new `badge` enum value to the `properties/items/type` response property for the response status `200`
+- GET /api/v1/c/{community_id}/tasks/{task_id} added the new `json` enum value to the `properties/items/type` response property for the response status `200`
+- GET /api/v1/c/{community_id}/tasks/{task_id} added the new `link` enum value to the `properties/items/type` response property for the response status `200`
+- GET /api/v1/c/{community_id}/tasks/{task_id} removed the required property `plugin_values` from the response with the `200` status
+- PATCH /api/v1/c/{community_id}/tasks/{task_id} added the new `badge` enum value to the `properties/items/type` response property for the response status `200`
+- PATCH /api/v1/c/{community_id}/tasks/{task_id} added the new `json` enum value to the `properties/items/type` response property for the response status `200`
+- PATCH /api/v1/c/{community_id}/tasks/{task_id} added the new `link` enum value to the `properties/items/type` response property for the response status `200`
+- PATCH /api/v1/c/{community_id}/tasks/{task_id} removed the required property `plugin_values` from the response with the `200` status
+- POST /api/v1/c/{community_id}/tasks/{task_id}/case/take added the new `badge` enum value to the `properties/items/type` response property for the response status `200`
+- POST /api/v1/c/{community_id}/tasks/{task_id}/case/take added the new `json` enum value to the `properties/items/type` response property for the response status `200`
+- POST /api/v1/c/{community_id}/tasks/{task_id}/case/take added the new `link` enum value to the `properties/items/type` response property for the response status `200`
+- POST /api/v1/c/{community_id}/tasks/{task_id}/case/take removed the required property `plugin_values` from the response with the `200` status
+- POST /api/v1/c/{community_id}/tasks/{task_id}/checklist/{item_id}/promote added the new `badge` enum value to the `properties/items/type` response property for the response status `201`
+- POST /api/v1/c/{community_id}/tasks/{task_id}/checklist/{item_id}/promote added the new `json` enum value to the `properties/items/type` response property for the response status `201`
+- POST /api/v1/c/{community_id}/tasks/{task_id}/checklist/{item_id}/promote added the new `link` enum value to the `properties/items/type` response property for the response status `201`
+- POST /api/v1/c/{community_id}/tasks/{task_id}/checklist/{item_id}/promote removed the required property `plugin_values` from the response with the `201` status
+- POST /api/v1/c/{community_id}/tasks/{task_id}/duplicate added the new `badge` enum value to the `properties/items/type` response property for the response status `201`
+- POST /api/v1/c/{community_id}/tasks/{task_id}/duplicate added the new `json` enum value to the `properties/items/type` response property for the response status `201`
+- POST /api/v1/c/{community_id}/tasks/{task_id}/duplicate added the new `link` enum value to the `properties/items/type` response property for the response status `201`
+- POST /api/v1/c/{community_id}/tasks/{task_id}/duplicate removed the required property `plugin_values` from the response with the `201` status
+- POST /api/v1/c/{community_id}/tasks/{task_id}/move added the new `badge` enum value to the `properties/items/type` response property for the response status `200`
+- POST /api/v1/c/{community_id}/tasks/{task_id}/move added the new `json` enum value to the `properties/items/type` response property for the response status `200`
+- POST /api/v1/c/{community_id}/tasks/{task_id}/move added the new `link` enum value to the `properties/items/type` response property for the response status `200`
+- POST /api/v1/c/{community_id}/tasks/{task_id}/move removed the required property `plugin_values` from the response with the `200` status
+- POST /api/v1/c/{community_id}/tasks/{task_id}/skip added the new `badge` enum value to the `properties/items/type` response property for the response status `200`
+- POST /api/v1/c/{community_id}/tasks/{task_id}/skip added the new `json` enum value to the `properties/items/type` response property for the response status `200`
+- POST /api/v1/c/{community_id}/tasks/{task_id}/skip added the new `link` enum value to the `properties/items/type` response property for the response status `200`
+- POST /api/v1/c/{community_id}/tasks/{task_id}/skip removed the required property `plugin_values` from the response with the `200` status
+- GET /api/v1/c/{community_id}/wiki-pages/{page_id} added the new `badge` enum value to the `properties/items/type` response property for the response status `200`
+- GET /api/v1/c/{community_id}/wiki-pages/{page_id} added the new `json` enum value to the `properties/items/type` response property for the response status `200`
+- GET /api/v1/c/{community_id}/wiki-pages/{page_id} added the new `link` enum value to the `properties/items/type` response property for the response status `200`
+- PATCH /api/v1/c/{community_id}/wiki-pages/{page_id} added the new `badge` enum value to the `properties/items/type` response property for the response status `200`
+- PATCH /api/v1/c/{community_id}/wiki-pages/{page_id} added the new `json` enum value to the `properties/items/type` response property for the response status `200`
+- PATCH /api/v1/c/{community_id}/wiki-pages/{page_id} added the new `link` enum value to the `properties/items/type` response property for the response status `200`
+- POST /api/v1/c/{community_id}/wiki-pages/{page_id}/duplicate added the new `badge` enum value to the `properties/items/type` response property for the response status `201`
+- POST /api/v1/c/{community_id}/wiki-pages/{page_id}/duplicate added the new `json` enum value to the `properties/items/type` response property for the response status `201`
+- POST /api/v1/c/{community_id}/wiki-pages/{page_id}/duplicate added the new `link` enum value to the `properties/items/type` response property for the response status `201`
+- POST /api/v1/c/{community_id}/wiki-pages/{page_id}/move added the new `badge` enum value to the `properties/items/type` response property for the response status `200`
+- POST /api/v1/c/{community_id}/wiki-pages/{page_id}/move added the new `json` enum value to the `properties/items/type` response property for the response status `200`
+- POST /api/v1/c/{community_id}/wiki-pages/{page_id}/move added the new `link` enum value to the `properties/items/type` response property for the response status `200`
+- GET /api/v1/c/{community_id}/wikis/ added the new `badge` enum value to the `items/items/properties/items/type` response property for the response status `200`
+- GET /api/v1/c/{community_id}/wikis/ added the new `json` enum value to the `items/items/properties/items/type` response property for the response status `200`
+- GET /api/v1/c/{community_id}/wikis/ added the new `link` enum value to the `items/items/properties/items/type` response property for the response status `200`
+- POST /api/v1/c/{community_id}/wikis/ added the new `badge` enum value to the `properties/items/type` response property for the response status `201`
+- POST /api/v1/c/{community_id}/wikis/ added the new `json` enum value to the `properties/items/type` response property for the response status `201`
+- POST /api/v1/c/{community_id}/wikis/ added the new `link` enum value to the `properties/items/type` response property for the response status `201`
+- GET /api/v1/c/{community_id}/wikis/{wiki_id} added the new `badge` enum value to the `properties/items/type` response property for the response status `200`
+- GET /api/v1/c/{community_id}/wikis/{wiki_id} added the new `json` enum value to the `properties/items/type` response property for the response status `200`
+- GET /api/v1/c/{community_id}/wikis/{wiki_id} added the new `link` enum value to the `properties/items/type` response property for the response status `200`
+- PATCH /api/v1/c/{community_id}/wikis/{wiki_id} added the new `badge` enum value to the `properties/items/type` response property for the response status `200`
+- PATCH /api/v1/c/{community_id}/wikis/{wiki_id} added the new `json` enum value to the `properties/items/type` response property for the response status `200`
+- PATCH /api/v1/c/{community_id}/wikis/{wiki_id} added the new `link` enum value to the `properties/items/type` response property for the response status `200`
+- POST /api/v1/c/{community_id}/wikis/{wiki_id}/duplicate added the new `badge` enum value to the `properties/items/type` response property for the response status `201`
+- POST /api/v1/c/{community_id}/wikis/{wiki_id}/duplicate added the new `json` enum value to the `properties/items/type` response property for the response status `201`
+- POST /api/v1/c/{community_id}/wikis/{wiki_id}/duplicate added the new `link` enum value to the `properties/items/type` response property for the response status `201`
+- PUT /api/v1/c/{community_id}/wikis/{wiki_id}/grants added the new `badge` enum value to the `properties/items/type` response property for the response status `200`
+- PUT /api/v1/c/{community_id}/wikis/{wiki_id}/grants added the new `json` enum value to the `properties/items/type` response property for the response status `200`
+- PUT /api/v1/c/{community_id}/wikis/{wiki_id}/grants added the new `link` enum value to the `properties/items/type` response property for the response status `200`
+- GET /api/v1/c/{community_id}/wikis/{wiki_id}/pages added the new `badge` enum value to the `items/items/properties/items/type` response property for the response status `200`
+- GET /api/v1/c/{community_id}/wikis/{wiki_id}/pages added the new `json` enum value to the `items/items/properties/items/type` response property for the response status `200`
+- GET /api/v1/c/{community_id}/wikis/{wiki_id}/pages added the new `link` enum value to the `items/items/properties/items/type` response property for the response status `200`
+- POST /api/v1/c/{community_id}/wikis/{wiki_id}/pages added the new `badge` enum value to the `properties/items/type` response property for the response status `201`
+- POST /api/v1/c/{community_id}/wikis/{wiki_id}/pages added the new `json` enum value to the `properties/items/type` response property for the response status `201`
+- POST /api/v1/c/{community_id}/wikis/{wiki_id}/pages added the new `link` enum value to the `properties/items/type` response property for the response status `201`
+- GET /api/v1/me/calendar-entries added the new `badge` enum value to the `events/items/properties/items/type` response property for the response status `200`
+- GET /api/v1/me/calendar-entries added the new `badge` enum value to the `polls/items/properties/items/type` response property for the response status `200`
+- GET /api/v1/me/calendar-entries added the new `badge` enum value to the `projects/items/properties/items/type` response property for the response status `200`
+- GET /api/v1/me/calendar-entries added the new `badge` enum value to the `task_occurrences/items/properties/items/type` response property for the response status `200`
+- GET /api/v1/me/calendar-entries added the new `badge` enum value to the `tasks/items/properties/items/type` response property for the response status `200`
+- GET /api/v1/me/calendar-entries added the new `json` enum value to the `events/items/properties/items/type` response property for the response status `200`
+- GET /api/v1/me/calendar-entries added the new `json` enum value to the `polls/items/properties/items/type` response property for the response status `200`
+- GET /api/v1/me/calendar-entries added the new `json` enum value to the `projects/items/properties/items/type` response property for the response status `200`
+- GET /api/v1/me/calendar-entries added the new `json` enum value to the `task_occurrences/items/properties/items/type` response property for the response status `200`
+- GET /api/v1/me/calendar-entries added the new `json` enum value to the `tasks/items/properties/items/type` response property for the response status `200`
+- GET /api/v1/me/calendar-entries added the new `link` enum value to the `events/items/properties/items/type` response property for the response status `200`
+- GET /api/v1/me/calendar-entries added the new `link` enum value to the `polls/items/properties/items/type` response property for the response status `200`
+- GET /api/v1/me/calendar-entries added the new `link` enum value to the `projects/items/properties/items/type` response property for the response status `200`
+- GET /api/v1/me/calendar-entries added the new `link` enum value to the `task_occurrences/items/properties/items/type` response property for the response status `200`
+- GET /api/v1/me/calendar-entries added the new `link` enum value to the `tasks/items/properties/items/type` response property for the response status `200`
+- GET /api/v1/me/calendar-entries removed the required property `polls/items/plugin_values` from the response with the `200` status
+- GET /api/v1/me/calendar-entries removed the required property `task_occurrences/items/plugin_values` from the response with the `200` status
+- GET /api/v1/me/calendar-entries removed the required property `tasks/items/plugin_values` from the response with the `200` status
+- GET /api/v1/me/calendars added the new `badge` enum value to the `items/items/properties/items/type` response property for the response status `200`
+- GET /api/v1/me/calendars added the new `json` enum value to the `items/items/properties/items/type` response property for the response status `200`
+- GET /api/v1/me/calendars added the new `link` enum value to the `items/items/properties/items/type` response property for the response status `200`
+- GET /api/v1/me/counter-groups added the new `badge` enum value to the `items/items/properties/items/type` response property for the response status `200`
+- GET /api/v1/me/counter-groups added the new `json` enum value to the `items/items/properties/items/type` response property for the response status `200`
+- GET /api/v1/me/counter-groups added the new `link` enum value to the `items/items/properties/items/type` response property for the response status `200`
+- GET /api/v1/me/dashboards added the new `badge` enum value to the `items/items/properties/items/type` response property for the response status `200`
+- GET /api/v1/me/dashboards added the new `json` enum value to the `items/items/properties/items/type` response property for the response status `200`
+- GET /api/v1/me/dashboards added the new `link` enum value to the `items/items/properties/items/type` response property for the response status `200`
+- GET /api/v1/me/files added the new `badge` enum value to the `items/items/properties/items/type` response property for the response status `200`
+- GET /api/v1/me/files added the new `json` enum value to the `items/items/properties/items/type` response property for the response status `200`
+- GET /api/v1/me/files added the new `link` enum value to the `items/items/properties/items/type` response property for the response status `200`
+- GET /api/v1/me/posts added the new `badge` enum value to the `items/items/properties/items/type` response property for the response status `200`
+- GET /api/v1/me/posts added the new `json` enum value to the `items/items/properties/items/type` response property for the response status `200`
+- GET /api/v1/me/posts added the new `link` enum value to the `items/items/properties/items/type` response property for the response status `200`
+- GET /api/v1/me/posts removed the required property `items/items/plugin_values` from the response with the `200` status
+- GET /api/v1/me/projects added the new `badge` enum value to the `items/items/properties/items/type` response property for the response status `200`
+- GET /api/v1/me/projects added the new `json` enum value to the `items/items/properties/items/type` response property for the response status `200`
+- GET /api/v1/me/projects added the new `link` enum value to the `items/items/properties/items/type` response property for the response status `200`
+- GET /api/v1/me/queues added the new `badge` enum value to the `items/items/properties/items/type` response property for the response status `200`
+- GET /api/v1/me/queues added the new `json` enum value to the `items/items/properties/items/type` response property for the response status `200`
+- GET /api/v1/me/queues added the new `link` enum value to the `items/items/properties/items/type` response property for the response status `200`
+- GET /api/v1/me/tasks added the new `badge` enum value to the `items/items/properties/items/type` response property for the response status `200`
+- GET /api/v1/me/tasks added the new `json` enum value to the `items/items/properties/items/type` response property for the response status `200`
+- GET /api/v1/me/tasks added the new `link` enum value to the `items/items/properties/items/type` response property for the response status `200`
+- GET /api/v1/me/tasks removed the required property `items/items/plugin_values` from the response with the `200` status
+- GET /api/v1/me/wikis added the new `badge` enum value to the `items/items/properties/items/type` response property for the response status `200`
+- GET /api/v1/me/wikis added the new `json` enum value to the `items/items/properties/items/type` response property for the response status `200`
+- GET /api/v1/me/wikis added the new `link` enum value to the `items/items/properties/items/type` response property for the response status `200`
+- GET /api/v1/fields/{dataset} removed the enum value `property_definitions` from the `path` request parameter `dataset`
+- GET /api/v1/fields/{dataset} removed the enum value `property_values` from the `path` request parameter `dataset`
+
 ### Files take their categories
 
 A file's `kind` names more categories, and the kind of a zip, a tarball and the
@@ -1022,9 +1541,9 @@ files list filters by `kind`.
 - GET /api/v1/me/files added the new `xls` enum value to the `items/items/file_type` response property for the response status `200`
 - GET /api/v1/me/files added the new `xlsx` enum value to the `items/items/file_type` response property for the response status `200`
 
-### Collection fields, money and ratings
+### Collection metadata, money and scales
 
-`PropertyType` takes `currency` and `rating`, so every response carrying a
+`PropertyType` takes `currency` and `scale`, so every response carrying a
 property's type may name either. A collection's list layouts may show a file's
 own fields (`FileFieldId`) in a card or a table.
 
@@ -1033,117 +1552,117 @@ own fields (`FileFieldId`) in a card or a table.
 - GET /api/v1/c/{community_id}/calendar-entries/ added the new `currency` enum value to the `projects/items/properties/items/type` response property for the response status `200`
 - GET /api/v1/c/{community_id}/calendar-entries/ added the new `currency` enum value to the `task_occurrences/items/properties/items/type` response property for the response status `200`
 - GET /api/v1/c/{community_id}/calendar-entries/ added the new `currency` enum value to the `tasks/items/properties/items/type` response property for the response status `200`
-- GET /api/v1/c/{community_id}/calendar-entries/ added the new `rating` enum value to the `events/items/properties/items/type` response property for the response status `200`
-- GET /api/v1/c/{community_id}/calendar-entries/ added the new `rating` enum value to the `polls/items/properties/items/type` response property for the response status `200`
-- GET /api/v1/c/{community_id}/calendar-entries/ added the new `rating` enum value to the `projects/items/properties/items/type` response property for the response status `200`
-- GET /api/v1/c/{community_id}/calendar-entries/ added the new `rating` enum value to the `task_occurrences/items/properties/items/type` response property for the response status `200`
-- GET /api/v1/c/{community_id}/calendar-entries/ added the new `rating` enum value to the `tasks/items/properties/items/type` response property for the response status `200`
+- GET /api/v1/c/{community_id}/calendar-entries/ added the new `scale` enum value to the `events/items/properties/items/type` response property for the response status `200`
+- GET /api/v1/c/{community_id}/calendar-entries/ added the new `scale` enum value to the `polls/items/properties/items/type` response property for the response status `200`
+- GET /api/v1/c/{community_id}/calendar-entries/ added the new `scale` enum value to the `projects/items/properties/items/type` response property for the response status `200`
+- GET /api/v1/c/{community_id}/calendar-entries/ added the new `scale` enum value to the `task_occurrences/items/properties/items/type` response property for the response status `200`
+- GET /api/v1/c/{community_id}/calendar-entries/ added the new `scale` enum value to the `tasks/items/properties/items/type` response property for the response status `200`
 - POST /api/v1/c/{community_id}/calendar-events/ added the new `currency` enum value to the `properties/items/type` response property for the response status `201`
-- POST /api/v1/c/{community_id}/calendar-events/ added the new `rating` enum value to the `properties/items/type` response property for the response status `201`
+- POST /api/v1/c/{community_id}/calendar-events/ added the new `scale` enum value to the `properties/items/type` response property for the response status `201`
 - GET /api/v1/c/{community_id}/calendar-events/{event_id} added the new `currency` enum value to the `properties/items/type` response property for the response status `200`
-- GET /api/v1/c/{community_id}/calendar-events/{event_id} added the new `rating` enum value to the `properties/items/type` response property for the response status `200`
+- GET /api/v1/c/{community_id}/calendar-events/{event_id} added the new `scale` enum value to the `properties/items/type` response property for the response status `200`
 - PATCH /api/v1/c/{community_id}/calendar-events/{event_id} added the new `currency` enum value to the `properties/items/type` response property for the response status `200`
-- PATCH /api/v1/c/{community_id}/calendar-events/{event_id} added the new `rating` enum value to the `properties/items/type` response property for the response status `200`
+- PATCH /api/v1/c/{community_id}/calendar-events/{event_id} added the new `scale` enum value to the `properties/items/type` response property for the response status `200`
 - PUT /api/v1/c/{community_id}/calendar-events/{event_id}/attendees added the new `currency` enum value to the `properties/items/type` response property for the response status `200`
-- PUT /api/v1/c/{community_id}/calendar-events/{event_id}/attendees added the new `rating` enum value to the `properties/items/type` response property for the response status `200`
+- PUT /api/v1/c/{community_id}/calendar-events/{event_id}/attendees added the new `scale` enum value to the `properties/items/type` response property for the response status `200`
 - POST /api/v1/c/{community_id}/calendar-events/{event_id}/duplicate added the new `currency` enum value to the `properties/items/type` response property for the response status `201`
-- POST /api/v1/c/{community_id}/calendar-events/{event_id}/duplicate added the new `rating` enum value to the `properties/items/type` response property for the response status `201`
+- POST /api/v1/c/{community_id}/calendar-events/{event_id}/duplicate added the new `scale` enum value to the `properties/items/type` response property for the response status `201`
 - POST /api/v1/c/{community_id}/calendar-events/{event_id}/occurrences added the new `currency` enum value to the `properties/items/type` response property for the response status `200`
-- POST /api/v1/c/{community_id}/calendar-events/{event_id}/occurrences added the new `rating` enum value to the `properties/items/type` response property for the response status `200`
+- POST /api/v1/c/{community_id}/calendar-events/{event_id}/occurrences added the new `scale` enum value to the `properties/items/type` response property for the response status `200`
 - POST /api/v1/c/{community_id}/calendar-events/{event_id}/occurrences/add added the new `currency` enum value to the `properties/items/type` response property for the response status `200`
-- POST /api/v1/c/{community_id}/calendar-events/{event_id}/occurrences/add added the new `rating` enum value to the `properties/items/type` response property for the response status `200`
+- POST /api/v1/c/{community_id}/calendar-events/{event_id}/occurrences/add added the new `scale` enum value to the `properties/items/type` response property for the response status `200`
 - POST /api/v1/c/{community_id}/calendar-events/{event_id}/occurrences/detach added the new `currency` enum value to the `properties/items/type` response property for the response status `200`
-- POST /api/v1/c/{community_id}/calendar-events/{event_id}/occurrences/detach added the new `rating` enum value to the `properties/items/type` response property for the response status `200`
+- POST /api/v1/c/{community_id}/calendar-events/{event_id}/occurrences/detach added the new `scale` enum value to the `properties/items/type` response property for the response status `200`
 - POST /api/v1/c/{community_id}/calendar-events/{event_id}/occurrences/restore added the new `currency` enum value to the `properties/items/type` response property for the response status `200`
-- POST /api/v1/c/{community_id}/calendar-events/{event_id}/occurrences/restore added the new `rating` enum value to the `properties/items/type` response property for the response status `200`
+- POST /api/v1/c/{community_id}/calendar-events/{event_id}/occurrences/restore added the new `scale` enum value to the `properties/items/type` response property for the response status `200`
 - PATCH /api/v1/c/{community_id}/calendar-events/{event_id}/rsvp added the new `currency` enum value to the `properties/items/type` response property for the response status `200`
-- PATCH /api/v1/c/{community_id}/calendar-events/{event_id}/rsvp added the new `rating` enum value to the `properties/items/type` response property for the response status `200`
+- PATCH /api/v1/c/{community_id}/calendar-events/{event_id}/rsvp added the new `scale` enum value to the `properties/items/type` response property for the response status `200`
 - GET /api/v1/c/{community_id}/calendars/ added the new `currency` enum value to the `items/items/properties/items/type` response property for the response status `200`
-- GET /api/v1/c/{community_id}/calendars/ added the new `rating` enum value to the `items/items/properties/items/type` response property for the response status `200`
+- GET /api/v1/c/{community_id}/calendars/ added the new `scale` enum value to the `items/items/properties/items/type` response property for the response status `200`
 - POST /api/v1/c/{community_id}/calendars/ added the new `currency` enum value to the `properties/items/type` response property for the response status `201`
-- POST /api/v1/c/{community_id}/calendars/ added the new `rating` enum value to the `properties/items/type` response property for the response status `201`
+- POST /api/v1/c/{community_id}/calendars/ added the new `scale` enum value to the `properties/items/type` response property for the response status `201`
 - GET /api/v1/c/{community_id}/calendars/{calendar_id} added the new `currency` enum value to the `properties/items/type` response property for the response status `200`
-- GET /api/v1/c/{community_id}/calendars/{calendar_id} added the new `rating` enum value to the `properties/items/type` response property for the response status `200`
+- GET /api/v1/c/{community_id}/calendars/{calendar_id} added the new `scale` enum value to the `properties/items/type` response property for the response status `200`
 - PATCH /api/v1/c/{community_id}/calendars/{calendar_id} added the new `currency` enum value to the `properties/items/type` response property for the response status `200`
-- PATCH /api/v1/c/{community_id}/calendars/{calendar_id} added the new `rating` enum value to the `properties/items/type` response property for the response status `200`
+- PATCH /api/v1/c/{community_id}/calendars/{calendar_id} added the new `scale` enum value to the `properties/items/type` response property for the response status `200`
 - POST /api/v1/c/{community_id}/calendars/{calendar_id}/duplicate added the new `currency` enum value to the `properties/items/type` response property for the response status `201`
-- POST /api/v1/c/{community_id}/calendars/{calendar_id}/duplicate added the new `rating` enum value to the `properties/items/type` response property for the response status `201`
+- POST /api/v1/c/{community_id}/calendars/{calendar_id}/duplicate added the new `scale` enum value to the `properties/items/type` response property for the response status `201`
 - PUT /api/v1/c/{community_id}/calendars/{calendar_id}/grants added the new `currency` enum value to the `properties/items/type` response property for the response status `200`
-- PUT /api/v1/c/{community_id}/calendars/{calendar_id}/grants added the new `rating` enum value to the `properties/items/type` response property for the response status `200`
+- PUT /api/v1/c/{community_id}/calendars/{calendar_id}/grants added the new `scale` enum value to the `properties/items/type` response property for the response status `200`
 - GET /api/v1/c/{community_id}/counter-groups/ added the new `currency` enum value to the `items/items/properties/items/type` response property for the response status `200`
-- GET /api/v1/c/{community_id}/counter-groups/ added the new `rating` enum value to the `items/items/properties/items/type` response property for the response status `200`
+- GET /api/v1/c/{community_id}/counter-groups/ added the new `scale` enum value to the `items/items/properties/items/type` response property for the response status `200`
 - POST /api/v1/c/{community_id}/counter-groups/ added the new `currency` enum value to the `counters/items/properties/items/type` response property for the response status `201`
 - POST /api/v1/c/{community_id}/counter-groups/ added the new `currency` enum value to the `properties/items/type` response property for the response status `201`
-- POST /api/v1/c/{community_id}/counter-groups/ added the new `rating` enum value to the `counters/items/properties/items/type` response property for the response status `201`
-- POST /api/v1/c/{community_id}/counter-groups/ added the new `rating` enum value to the `properties/items/type` response property for the response status `201`
+- POST /api/v1/c/{community_id}/counter-groups/ added the new `scale` enum value to the `counters/items/properties/items/type` response property for the response status `201`
+- POST /api/v1/c/{community_id}/counter-groups/ added the new `scale` enum value to the `properties/items/type` response property for the response status `201`
 - GET /api/v1/c/{community_id}/counter-groups/{group_id} added the new `currency` enum value to the `counters/items/properties/items/type` response property for the response status `200`
 - GET /api/v1/c/{community_id}/counter-groups/{group_id} added the new `currency` enum value to the `properties/items/type` response property for the response status `200`
-- GET /api/v1/c/{community_id}/counter-groups/{group_id} added the new `rating` enum value to the `counters/items/properties/items/type` response property for the response status `200`
-- GET /api/v1/c/{community_id}/counter-groups/{group_id} added the new `rating` enum value to the `properties/items/type` response property for the response status `200`
+- GET /api/v1/c/{community_id}/counter-groups/{group_id} added the new `scale` enum value to the `counters/items/properties/items/type` response property for the response status `200`
+- GET /api/v1/c/{community_id}/counter-groups/{group_id} added the new `scale` enum value to the `properties/items/type` response property for the response status `200`
 - PATCH /api/v1/c/{community_id}/counter-groups/{group_id} added the new `currency` enum value to the `counters/items/properties/items/type` response property for the response status `200`
 - PATCH /api/v1/c/{community_id}/counter-groups/{group_id} added the new `currency` enum value to the `properties/items/type` response property for the response status `200`
-- PATCH /api/v1/c/{community_id}/counter-groups/{group_id} added the new `rating` enum value to the `counters/items/properties/items/type` response property for the response status `200`
-- PATCH /api/v1/c/{community_id}/counter-groups/{group_id} added the new `rating` enum value to the `properties/items/type` response property for the response status `200`
+- PATCH /api/v1/c/{community_id}/counter-groups/{group_id} added the new `scale` enum value to the `counters/items/properties/items/type` response property for the response status `200`
+- PATCH /api/v1/c/{community_id}/counter-groups/{group_id} added the new `scale` enum value to the `properties/items/type` response property for the response status `200`
 - POST /api/v1/c/{community_id}/counter-groups/{group_id}/counters added the new `currency` enum value to the `properties/items/type` response property for the response status `201`
-- POST /api/v1/c/{community_id}/counter-groups/{group_id}/counters added the new `rating` enum value to the `properties/items/type` response property for the response status `201`
+- POST /api/v1/c/{community_id}/counter-groups/{group_id}/counters added the new `scale` enum value to the `properties/items/type` response property for the response status `201`
 - POST /api/v1/c/{community_id}/counter-groups/{group_id}/duplicate added the new `currency` enum value to the `counters/items/properties/items/type` response property for the response status `201`
 - POST /api/v1/c/{community_id}/counter-groups/{group_id}/duplicate added the new `currency` enum value to the `properties/items/type` response property for the response status `201`
-- POST /api/v1/c/{community_id}/counter-groups/{group_id}/duplicate added the new `rating` enum value to the `counters/items/properties/items/type` response property for the response status `201`
-- POST /api/v1/c/{community_id}/counter-groups/{group_id}/duplicate added the new `rating` enum value to the `properties/items/type` response property for the response status `201`
+- POST /api/v1/c/{community_id}/counter-groups/{group_id}/duplicate added the new `scale` enum value to the `counters/items/properties/items/type` response property for the response status `201`
+- POST /api/v1/c/{community_id}/counter-groups/{group_id}/duplicate added the new `scale` enum value to the `properties/items/type` response property for the response status `201`
 - PUT /api/v1/c/{community_id}/counter-groups/{group_id}/grants added the new `currency` enum value to the `counters/items/properties/items/type` response property for the response status `200`
 - PUT /api/v1/c/{community_id}/counter-groups/{group_id}/grants added the new `currency` enum value to the `properties/items/type` response property for the response status `200`
-- PUT /api/v1/c/{community_id}/counter-groups/{group_id}/grants added the new `rating` enum value to the `counters/items/properties/items/type` response property for the response status `200`
-- PUT /api/v1/c/{community_id}/counter-groups/{group_id}/grants added the new `rating` enum value to the `properties/items/type` response property for the response status `200`
+- PUT /api/v1/c/{community_id}/counter-groups/{group_id}/grants added the new `scale` enum value to the `counters/items/properties/items/type` response property for the response status `200`
+- PUT /api/v1/c/{community_id}/counter-groups/{group_id}/grants added the new `scale` enum value to the `properties/items/type` response property for the response status `200`
 - POST /api/v1/c/{community_id}/counter-groups/{group_id}/reset-all added the new `currency` enum value to the `counters/items/properties/items/type` response property for the response status `200`
 - POST /api/v1/c/{community_id}/counter-groups/{group_id}/reset-all added the new `currency` enum value to the `properties/items/type` response property for the response status `200`
-- POST /api/v1/c/{community_id}/counter-groups/{group_id}/reset-all added the new `rating` enum value to the `counters/items/properties/items/type` response property for the response status `200`
-- POST /api/v1/c/{community_id}/counter-groups/{group_id}/reset-all added the new `rating` enum value to the `properties/items/type` response property for the response status `200`
+- POST /api/v1/c/{community_id}/counter-groups/{group_id}/reset-all added the new `scale` enum value to the `counters/items/properties/items/type` response property for the response status `200`
+- POST /api/v1/c/{community_id}/counter-groups/{group_id}/reset-all added the new `scale` enum value to the `properties/items/type` response property for the response status `200`
 - POST /api/v1/c/{community_id}/counter-groups/{group_id}/sort added the new `currency` enum value to the `counters/items/properties/items/type` response property for the response status `200`
 - POST /api/v1/c/{community_id}/counter-groups/{group_id}/sort added the new `currency` enum value to the `properties/items/type` response property for the response status `200`
-- POST /api/v1/c/{community_id}/counter-groups/{group_id}/sort added the new `rating` enum value to the `counters/items/properties/items/type` response property for the response status `200`
-- POST /api/v1/c/{community_id}/counter-groups/{group_id}/sort added the new `rating` enum value to the `properties/items/type` response property for the response status `200`
+- POST /api/v1/c/{community_id}/counter-groups/{group_id}/sort added the new `scale` enum value to the `counters/items/properties/items/type` response property for the response status `200`
+- POST /api/v1/c/{community_id}/counter-groups/{group_id}/sort added the new `scale` enum value to the `properties/items/type` response property for the response status `200`
 - GET /api/v1/c/{community_id}/counters/{counter_id} added the new `currency` enum value to the `properties/items/type` response property for the response status `200`
-- GET /api/v1/c/{community_id}/counters/{counter_id} added the new `rating` enum value to the `properties/items/type` response property for the response status `200`
+- GET /api/v1/c/{community_id}/counters/{counter_id} added the new `scale` enum value to the `properties/items/type` response property for the response status `200`
 - PATCH /api/v1/c/{community_id}/counters/{counter_id} added the new `currency` enum value to the `properties/items/type` response property for the response status `200`
-- PATCH /api/v1/c/{community_id}/counters/{counter_id} added the new `rating` enum value to the `properties/items/type` response property for the response status `200`
+- PATCH /api/v1/c/{community_id}/counters/{counter_id} added the new `scale` enum value to the `properties/items/type` response property for the response status `200`
 - POST /api/v1/c/{community_id}/counters/{counter_id}/duplicate added the new `currency` enum value to the `properties/items/type` response property for the response status `201`
-- POST /api/v1/c/{community_id}/counters/{counter_id}/duplicate added the new `rating` enum value to the `properties/items/type` response property for the response status `201`
+- POST /api/v1/c/{community_id}/counters/{counter_id}/duplicate added the new `scale` enum value to the `properties/items/type` response property for the response status `201`
 - POST /api/v1/c/{community_id}/counters/{counter_id}/reset added the new `currency` enum value to the `properties/items/type` response property for the response status `200`
-- POST /api/v1/c/{community_id}/counters/{counter_id}/reset added the new `rating` enum value to the `properties/items/type` response property for the response status `200`
+- POST /api/v1/c/{community_id}/counters/{counter_id}/reset added the new `scale` enum value to the `properties/items/type` response property for the response status `200`
 - POST /api/v1/c/{community_id}/counters/{counter_id}/set added the new `currency` enum value to the `properties/items/type` response property for the response status `200`
-- POST /api/v1/c/{community_id}/counters/{counter_id}/set added the new `rating` enum value to the `properties/items/type` response property for the response status `200`
+- POST /api/v1/c/{community_id}/counters/{counter_id}/set added the new `scale` enum value to the `properties/items/type` response property for the response status `200`
 - POST /api/v1/c/{community_id}/counters/{counter_id}/step added the new `currency` enum value to the `properties/items/type` response property for the response status `200`
-- POST /api/v1/c/{community_id}/counters/{counter_id}/step added the new `rating` enum value to the `properties/items/type` response property for the response status `200`
+- POST /api/v1/c/{community_id}/counters/{counter_id}/step added the new `scale` enum value to the `properties/items/type` response property for the response status `200`
 - GET /api/v1/c/{community_id}/dashboards/ added the new `currency` enum value to the `items/items/properties/items/type` response property for the response status `200`
-- GET /api/v1/c/{community_id}/dashboards/ added the new `rating` enum value to the `items/items/properties/items/type` response property for the response status `200`
+- GET /api/v1/c/{community_id}/dashboards/ added the new `scale` enum value to the `items/items/properties/items/type` response property for the response status `200`
 - POST /api/v1/c/{community_id}/dashboards/ added the new `currency` enum value to the `properties/items/type` response property for the response status `201`
-- POST /api/v1/c/{community_id}/dashboards/ added the new `rating` enum value to the `properties/items/type` response property for the response status `201`
+- POST /api/v1/c/{community_id}/dashboards/ added the new `scale` enum value to the `properties/items/type` response property for the response status `201`
 - GET /api/v1/c/{community_id}/dashboards/{dashboard_id} added the new `currency` enum value to the `properties/items/type` response property for the response status `200`
-- GET /api/v1/c/{community_id}/dashboards/{dashboard_id} added the new `rating` enum value to the `properties/items/type` response property for the response status `200`
+- GET /api/v1/c/{community_id}/dashboards/{dashboard_id} added the new `scale` enum value to the `properties/items/type` response property for the response status `200`
 - PATCH /api/v1/c/{community_id}/dashboards/{dashboard_id} added the new `currency` enum value to the `properties/items/type` response property for the response status `200`
-- PATCH /api/v1/c/{community_id}/dashboards/{dashboard_id} added the new `rating` enum value to the `properties/items/type` response property for the response status `200`
+- PATCH /api/v1/c/{community_id}/dashboards/{dashboard_id} added the new `scale` enum value to the `properties/items/type` response property for the response status `200`
 - POST /api/v1/c/{community_id}/dashboards/{dashboard_id}/duplicate added the new `currency` enum value to the `properties/items/type` response property for the response status `201`
-- POST /api/v1/c/{community_id}/dashboards/{dashboard_id}/duplicate added the new `rating` enum value to the `properties/items/type` response property for the response status `201`
+- POST /api/v1/c/{community_id}/dashboards/{dashboard_id}/duplicate added the new `scale` enum value to the `properties/items/type` response property for the response status `201`
 - PUT /api/v1/c/{community_id}/dashboards/{dashboard_id}/grants added the new `currency` enum value to the `properties/items/type` response property for the response status `200`
-- PUT /api/v1/c/{community_id}/dashboards/{dashboard_id}/grants added the new `rating` enum value to the `properties/items/type` response property for the response status `200`
+- PUT /api/v1/c/{community_id}/dashboards/{dashboard_id}/grants added the new `scale` enum value to the `properties/items/type` response property for the response status `200`
 - POST /api/v1/c/{community_id}/dashboards/{dashboard_id}/upgrade added the new `currency` enum value to the `properties/items/type` response property for the response status `200`
-- POST /api/v1/c/{community_id}/dashboards/{dashboard_id}/upgrade added the new `rating` enum value to the `properties/items/type` response property for the response status `200`
+- POST /api/v1/c/{community_id}/dashboards/{dashboard_id}/upgrade added the new `scale` enum value to the `properties/items/type` response property for the response status `200`
 - PUT /api/v1/c/{community_id}/dashboards/{dashboard_id}/view-mode added the new `currency` enum value to the `properties/items/type` response property for the response status `200`
-- PUT /api/v1/c/{community_id}/dashboards/{dashboard_id}/view-mode added the new `rating` enum value to the `properties/items/type` response property for the response status `200`
+- PUT /api/v1/c/{community_id}/dashboards/{dashboard_id}/view-mode added the new `scale` enum value to the `properties/items/type` response property for the response status `200`
 - GET /api/v1/c/{community_id}/files/ added the new `currency` enum value to the `items/items/properties/items/type` response property for the response status `200`
-- GET /api/v1/c/{community_id}/files/ added the new `rating` enum value to the `items/items/properties/items/type` response property for the response status `200`
+- GET /api/v1/c/{community_id}/files/ added the new `scale` enum value to the `items/items/properties/items/type` response property for the response status `200`
 - POST /api/v1/c/{community_id}/files/ added the new `currency` enum value to the `properties/items/type` response property for the response status `201`
-- POST /api/v1/c/{community_id}/files/ added the new `rating` enum value to the `properties/items/type` response property for the response status `201`
+- POST /api/v1/c/{community_id}/files/ added the new `scale` enum value to the `properties/items/type` response property for the response status `201`
 - POST /api/v1/c/{community_id}/files/upload added the new `currency` enum value to the `properties/items/type` response property for the response status `201`
-- POST /api/v1/c/{community_id}/files/upload added the new `rating` enum value to the `properties/items/type` response property for the response status `201`
+- POST /api/v1/c/{community_id}/files/upload added the new `scale` enum value to the `properties/items/type` response property for the response status `201`
 - GET /api/v1/c/{community_id}/files/{file_id} added the new `currency` enum value to the `properties/items/type` response property for the response status `200`
-- GET /api/v1/c/{community_id}/files/{file_id} added the new `rating` enum value to the `properties/items/type` response property for the response status `200`
+- GET /api/v1/c/{community_id}/files/{file_id} added the new `scale` enum value to the `properties/items/type` response property for the response status `200`
 - PATCH /api/v1/c/{community_id}/files/{file_id} added the new `currency` enum value to the `properties/items/type` response property for the response status `200`
-- PATCH /api/v1/c/{community_id}/files/{file_id} added the new `rating` enum value to the `properties/items/type` response property for the response status `200`
+- PATCH /api/v1/c/{community_id}/files/{file_id} added the new `scale` enum value to the `properties/items/type` response property for the response status `200`
 - POST /api/v1/c/{community_id}/files/{file_id}/duplicate added the new `currency` enum value to the `properties/items/type` response property for the response status `201`
-- POST /api/v1/c/{community_id}/files/{file_id}/duplicate added the new `rating` enum value to the `properties/items/type` response property for the response status `201`
+- POST /api/v1/c/{community_id}/files/{file_id}/duplicate added the new `scale` enum value to the `properties/items/type` response property for the response status `201`
 - PUT /api/v1/c/{community_id}/files/{file_id}/grants added the new `currency` enum value to the `properties/items/type` response property for the response status `200`
-- PUT /api/v1/c/{community_id}/files/{file_id}/grants added the new `rating` enum value to the `properties/items/type` response property for the response status `200`
+- PUT /api/v1/c/{community_id}/files/{file_id}/grants added the new `scale` enum value to the `properties/items/type` response property for the response status `200`
 - GET /api/v1/c/{community_id}/layouts/ added `#/components/schemas/FileFieldId` to the `layouts/items/oneOf[subschema #1: ListLayoutRead]/definition/card/anyOf[subschema #1: CardPart]/children/items/oneOf[subschema #2: StackPart]/children/items/oneOf[subschema #3: FieldPart]/props/field` response property `anyOf` list for the response status `200`
 - GET /api/v1/c/{community_id}/layouts/ added `#/components/schemas/FileFieldId` to the `layouts/items/oneOf[subschema #1: ListLayoutRead]/definition/card/anyOf[subschema #1: CardPart]/children/items/oneOf[subschema #3: FieldPart]/props/field` response property `anyOf` list for the response status `200`
 - GET /api/v1/c/{community_id}/layouts/ added `#/components/schemas/FileFieldId` to the `layouts/items/oneOf[subschema #1: ListLayoutRead]/definition/columns/anyOf[subschema #1]/items/` response property `anyOf` list for the response status `200`
@@ -1160,181 +1679,181 @@ own fields (`FileFieldId`) in a card or a table.
 - DELETE /api/v1/c/{community_id}/layouts/{kind} added `#/components/schemas/FileFieldId` to the `layouts/items/oneOf[subschema #1: ListLayoutRead]/definition/card/anyOf[subschema #1: CardPart]/children/items/oneOf[subschema #3: FieldPart]/props/field` response property `anyOf` list for the response status `200`
 - DELETE /api/v1/c/{community_id}/layouts/{kind} added `#/components/schemas/FileFieldId` to the `layouts/items/oneOf[subschema #1: ListLayoutRead]/definition/columns/anyOf[subschema #1]/items/` response property `anyOf` list for the response status `200`
 - GET /api/v1/c/{community_id}/posts/ added the new `currency` enum value to the `items/items/properties/items/type` response property for the response status `200`
-- GET /api/v1/c/{community_id}/posts/ added the new `rating` enum value to the `items/items/properties/items/type` response property for the response status `200`
+- GET /api/v1/c/{community_id}/posts/ added the new `scale` enum value to the `items/items/properties/items/type` response property for the response status `200`
 - POST /api/v1/c/{community_id}/posts/ added the new `currency` enum value to the `properties/items/type` response property for the response status `201`
-- POST /api/v1/c/{community_id}/posts/ added the new `rating` enum value to the `properties/items/type` response property for the response status `201`
+- POST /api/v1/c/{community_id}/posts/ added the new `scale` enum value to the `properties/items/type` response property for the response status `201`
 - GET /api/v1/c/{community_id}/posts/{post_id} added the new `currency` enum value to the `properties/items/type` response property for the response status `200`
-- GET /api/v1/c/{community_id}/posts/{post_id} added the new `rating` enum value to the `properties/items/type` response property for the response status `200`
+- GET /api/v1/c/{community_id}/posts/{post_id} added the new `scale` enum value to the `properties/items/type` response property for the response status `200`
 - PATCH /api/v1/c/{community_id}/posts/{post_id} added the new `currency` enum value to the `properties/items/type` response property for the response status `200`
-- PATCH /api/v1/c/{community_id}/posts/{post_id} added the new `rating` enum value to the `properties/items/type` response property for the response status `200`
+- PATCH /api/v1/c/{community_id}/posts/{post_id} added the new `scale` enum value to the `properties/items/type` response property for the response status `200`
 - POST /api/v1/c/{community_id}/posts/{post_id}/duplicate added the new `currency` enum value to the `properties/items/type` response property for the response status `201`
-- POST /api/v1/c/{community_id}/posts/{post_id}/duplicate added the new `rating` enum value to the `properties/items/type` response property for the response status `201`
+- POST /api/v1/c/{community_id}/posts/{post_id}/duplicate added the new `scale` enum value to the `properties/items/type` response property for the response status `201`
 - PUT /api/v1/c/{community_id}/posts/{post_id}/grants added the new `currency` enum value to the `properties/items/type` response property for the response status `200`
-- PUT /api/v1/c/{community_id}/posts/{post_id}/grants added the new `rating` enum value to the `properties/items/type` response property for the response status `200`
+- PUT /api/v1/c/{community_id}/posts/{post_id}/grants added the new `scale` enum value to the `properties/items/type` response property for the response status `200`
 - PUT /api/v1/c/{community_id}/posts/{post_id}/pin added the new `currency` enum value to the `properties/items/type` response property for the response status `200`
-- PUT /api/v1/c/{community_id}/posts/{post_id}/pin added the new `rating` enum value to the `properties/items/type` response property for the response status `200`
+- PUT /api/v1/c/{community_id}/posts/{post_id}/pin added the new `scale` enum value to the `properties/items/type` response property for the response status `200`
 - DELETE /api/v1/c/{community_id}/posts/{post_id}/poll added the new `currency` enum value to the `properties/items/type` response property for the response status `200`
-- DELETE /api/v1/c/{community_id}/posts/{post_id}/poll added the new `rating` enum value to the `properties/items/type` response property for the response status `200`
+- DELETE /api/v1/c/{community_id}/posts/{post_id}/poll added the new `scale` enum value to the `properties/items/type` response property for the response status `200`
 - PUT /api/v1/c/{community_id}/posts/{post_id}/poll added the new `currency` enum value to the `properties/items/type` response property for the response status `200`
-- PUT /api/v1/c/{community_id}/posts/{post_id}/poll added the new `rating` enum value to the `properties/items/type` response property for the response status `200`
+- PUT /api/v1/c/{community_id}/posts/{post_id}/poll added the new `scale` enum value to the `properties/items/type` response property for the response status `200`
 - DELETE /api/v1/c/{community_id}/posts/{post_id}/poll/vote added the new `currency` enum value to the `properties/items/type` response property for the response status `200`
-- DELETE /api/v1/c/{community_id}/posts/{post_id}/poll/vote added the new `rating` enum value to the `properties/items/type` response property for the response status `200`
+- DELETE /api/v1/c/{community_id}/posts/{post_id}/poll/vote added the new `scale` enum value to the `properties/items/type` response property for the response status `200`
 - PUT /api/v1/c/{community_id}/posts/{post_id}/poll/vote added the new `currency` enum value to the `properties/items/type` response property for the response status `200`
-- PUT /api/v1/c/{community_id}/posts/{post_id}/poll/vote added the new `rating` enum value to the `properties/items/type` response property for the response status `200`
+- PUT /api/v1/c/{community_id}/posts/{post_id}/poll/vote added the new `scale` enum value to the `properties/items/type` response property for the response status `200`
 - GET /api/v1/c/{community_id}/projects/ added the new `currency` enum value to the `items/items/properties/items/type` response property for the response status `200`
-- GET /api/v1/c/{community_id}/projects/ added the new `rating` enum value to the `items/items/properties/items/type` response property for the response status `200`
+- GET /api/v1/c/{community_id}/projects/ added the new `scale` enum value to the `items/items/properties/items/type` response property for the response status `200`
 - POST /api/v1/c/{community_id}/projects/ added the new `currency` enum value to the `properties/items/type` response property for the response status `201`
-- POST /api/v1/c/{community_id}/projects/ added the new `rating` enum value to the `properties/items/type` response property for the response status `201`
+- POST /api/v1/c/{community_id}/projects/ added the new `scale` enum value to the `properties/items/type` response property for the response status `201`
 - GET /api/v1/c/{community_id}/projects/{project_id} added the new `currency` enum value to the `properties/items/type` response property for the response status `200`
-- GET /api/v1/c/{community_id}/projects/{project_id} added the new `rating` enum value to the `properties/items/type` response property for the response status `200`
+- GET /api/v1/c/{community_id}/projects/{project_id} added the new `scale` enum value to the `properties/items/type` response property for the response status `200`
 - PATCH /api/v1/c/{community_id}/projects/{project_id} added the new `currency` enum value to the `properties/items/type` response property for the response status `200`
-- PATCH /api/v1/c/{community_id}/projects/{project_id} added the new `rating` enum value to the `properties/items/type` response property for the response status `200`
+- PATCH /api/v1/c/{community_id}/projects/{project_id} added the new `scale` enum value to the `properties/items/type` response property for the response status `200`
 - POST /api/v1/c/{community_id}/projects/{project_id}/duplicate added the new `currency` enum value to the `properties/items/type` response property for the response status `201`
-- POST /api/v1/c/{community_id}/projects/{project_id}/duplicate added the new `rating` enum value to the `properties/items/type` response property for the response status `201`
+- POST /api/v1/c/{community_id}/projects/{project_id}/duplicate added the new `scale` enum value to the `properties/items/type` response property for the response status `201`
 - PUT /api/v1/c/{community_id}/projects/{project_id}/grants added the new `currency` enum value to the `properties/items/type` response property for the response status `200`
-- PUT /api/v1/c/{community_id}/projects/{project_id}/grants added the new `rating` enum value to the `properties/items/type` response property for the response status `200`
+- PUT /api/v1/c/{community_id}/projects/{project_id}/grants added the new `scale` enum value to the `properties/items/type` response property for the response status `200`
 - PUT /api/v1/c/{community_id}/properties/{target}/{entity_id} added the new `currency` enum value to the `items/type` response property for the response status `200`
-- PUT /api/v1/c/{community_id}/properties/{target}/{entity_id} added the new `rating` enum value to the `items/type` response property for the response status `200`
+- PUT /api/v1/c/{community_id}/properties/{target}/{entity_id} added the new `scale` enum value to the `items/type` response property for the response status `200`
 - GET /api/v1/c/{community_id}/property-definitions/ added the new `currency` enum value to the `items/type` response property for the response status `200`
-- GET /api/v1/c/{community_id}/property-definitions/ added the new `rating` enum value to the `items/type` response property for the response status `200`
+- GET /api/v1/c/{community_id}/property-definitions/ added the new `scale` enum value to the `items/type` response property for the response status `200`
 - POST /api/v1/c/{community_id}/property-definitions/ added the new `currency` enum value to the `type` response property for the response status `201`
-- POST /api/v1/c/{community_id}/property-definitions/ added the new `rating` enum value to the `type` response property for the response status `201`
+- POST /api/v1/c/{community_id}/property-definitions/ added the new `scale` enum value to the `type` response property for the response status `201`
 - PATCH /api/v1/c/{community_id}/property-definitions/{definition_id} added the new `currency` enum value to the `definition/type` response property for the response status `200`
-- PATCH /api/v1/c/{community_id}/property-definitions/{definition_id} added the new `rating` enum value to the `definition/type` response property for the response status `200`
+- PATCH /api/v1/c/{community_id}/property-definitions/{definition_id} added the new `scale` enum value to the `definition/type` response property for the response status `200`
 - GET /api/v1/c/{community_id}/queue-items/{item_id} added the new `currency` enum value to the `properties/items/type` response property for the response status `200`
-- GET /api/v1/c/{community_id}/queue-items/{item_id} added the new `rating` enum value to the `properties/items/type` response property for the response status `200`
+- GET /api/v1/c/{community_id}/queue-items/{item_id} added the new `scale` enum value to the `properties/items/type` response property for the response status `200`
 - PATCH /api/v1/c/{community_id}/queue-items/{item_id} added the new `currency` enum value to the `properties/items/type` response property for the response status `200`
-- PATCH /api/v1/c/{community_id}/queue-items/{item_id} added the new `rating` enum value to the `properties/items/type` response property for the response status `200`
+- PATCH /api/v1/c/{community_id}/queue-items/{item_id} added the new `scale` enum value to the `properties/items/type` response property for the response status `200`
 - POST /api/v1/c/{community_id}/queue-items/{item_id}/duplicate added the new `currency` enum value to the `properties/items/type` response property for the response status `201`
-- POST /api/v1/c/{community_id}/queue-items/{item_id}/duplicate added the new `rating` enum value to the `properties/items/type` response property for the response status `201`
+- POST /api/v1/c/{community_id}/queue-items/{item_id}/duplicate added the new `scale` enum value to the `properties/items/type` response property for the response status `201`
 - GET /api/v1/c/{community_id}/queues/ added the new `currency` enum value to the `items/items/properties/items/type` response property for the response status `200`
-- GET /api/v1/c/{community_id}/queues/ added the new `rating` enum value to the `items/items/properties/items/type` response property for the response status `200`
+- GET /api/v1/c/{community_id}/queues/ added the new `scale` enum value to the `items/items/properties/items/type` response property for the response status `200`
 - POST /api/v1/c/{community_id}/queues/ added the new `currency` enum value to the `items/items/properties/items/type` response property for the response status `201`
 - POST /api/v1/c/{community_id}/queues/ added the new `currency` enum value to the `properties/items/type` response property for the response status `201`
-- POST /api/v1/c/{community_id}/queues/ added the new `rating` enum value to the `items/items/properties/items/type` response property for the response status `201`
-- POST /api/v1/c/{community_id}/queues/ added the new `rating` enum value to the `properties/items/type` response property for the response status `201`
+- POST /api/v1/c/{community_id}/queues/ added the new `scale` enum value to the `items/items/properties/items/type` response property for the response status `201`
+- POST /api/v1/c/{community_id}/queues/ added the new `scale` enum value to the `properties/items/type` response property for the response status `201`
 - GET /api/v1/c/{community_id}/queues/{queue_id} added the new `currency` enum value to the `items/items/properties/items/type` response property for the response status `200`
 - GET /api/v1/c/{community_id}/queues/{queue_id} added the new `currency` enum value to the `properties/items/type` response property for the response status `200`
-- GET /api/v1/c/{community_id}/queues/{queue_id} added the new `rating` enum value to the `items/items/properties/items/type` response property for the response status `200`
-- GET /api/v1/c/{community_id}/queues/{queue_id} added the new `rating` enum value to the `properties/items/type` response property for the response status `200`
+- GET /api/v1/c/{community_id}/queues/{queue_id} added the new `scale` enum value to the `items/items/properties/items/type` response property for the response status `200`
+- GET /api/v1/c/{community_id}/queues/{queue_id} added the new `scale` enum value to the `properties/items/type` response property for the response status `200`
 - PATCH /api/v1/c/{community_id}/queues/{queue_id} added the new `currency` enum value to the `items/items/properties/items/type` response property for the response status `200`
 - PATCH /api/v1/c/{community_id}/queues/{queue_id} added the new `currency` enum value to the `properties/items/type` response property for the response status `200`
-- PATCH /api/v1/c/{community_id}/queues/{queue_id} added the new `rating` enum value to the `items/items/properties/items/type` response property for the response status `200`
-- PATCH /api/v1/c/{community_id}/queues/{queue_id} added the new `rating` enum value to the `properties/items/type` response property for the response status `200`
+- PATCH /api/v1/c/{community_id}/queues/{queue_id} added the new `scale` enum value to the `items/items/properties/items/type` response property for the response status `200`
+- PATCH /api/v1/c/{community_id}/queues/{queue_id} added the new `scale` enum value to the `properties/items/type` response property for the response status `200`
 - POST /api/v1/c/{community_id}/queues/{queue_id}/duplicate added the new `currency` enum value to the `items/items/properties/items/type` response property for the response status `201`
 - POST /api/v1/c/{community_id}/queues/{queue_id}/duplicate added the new `currency` enum value to the `properties/items/type` response property for the response status `201`
-- POST /api/v1/c/{community_id}/queues/{queue_id}/duplicate added the new `rating` enum value to the `items/items/properties/items/type` response property for the response status `201`
-- POST /api/v1/c/{community_id}/queues/{queue_id}/duplicate added the new `rating` enum value to the `properties/items/type` response property for the response status `201`
+- POST /api/v1/c/{community_id}/queues/{queue_id}/duplicate added the new `scale` enum value to the `items/items/properties/items/type` response property for the response status `201`
+- POST /api/v1/c/{community_id}/queues/{queue_id}/duplicate added the new `scale` enum value to the `properties/items/type` response property for the response status `201`
 - PUT /api/v1/c/{community_id}/queues/{queue_id}/grants added the new `currency` enum value to the `items/items/properties/items/type` response property for the response status `200`
 - PUT /api/v1/c/{community_id}/queues/{queue_id}/grants added the new `currency` enum value to the `properties/items/type` response property for the response status `200`
-- PUT /api/v1/c/{community_id}/queues/{queue_id}/grants added the new `rating` enum value to the `items/items/properties/items/type` response property for the response status `200`
-- PUT /api/v1/c/{community_id}/queues/{queue_id}/grants added the new `rating` enum value to the `properties/items/type` response property for the response status `200`
+- PUT /api/v1/c/{community_id}/queues/{queue_id}/grants added the new `scale` enum value to the `items/items/properties/items/type` response property for the response status `200`
+- PUT /api/v1/c/{community_id}/queues/{queue_id}/grants added the new `scale` enum value to the `properties/items/type` response property for the response status `200`
 - POST /api/v1/c/{community_id}/queues/{queue_id}/hold added the new `currency` enum value to the `items/items/properties/items/type` response property for the response status `200`
 - POST /api/v1/c/{community_id}/queues/{queue_id}/hold added the new `currency` enum value to the `properties/items/type` response property for the response status `200`
-- POST /api/v1/c/{community_id}/queues/{queue_id}/hold added the new `rating` enum value to the `items/items/properties/items/type` response property for the response status `200`
-- POST /api/v1/c/{community_id}/queues/{queue_id}/hold added the new `rating` enum value to the `properties/items/type` response property for the response status `200`
+- POST /api/v1/c/{community_id}/queues/{queue_id}/hold added the new `scale` enum value to the `items/items/properties/items/type` response property for the response status `200`
+- POST /api/v1/c/{community_id}/queues/{queue_id}/hold added the new `scale` enum value to the `properties/items/type` response property for the response status `200`
 - POST /api/v1/c/{community_id}/queues/{queue_id}/items added the new `currency` enum value to the `properties/items/type` response property for the response status `201`
-- POST /api/v1/c/{community_id}/queues/{queue_id}/items added the new `rating` enum value to the `properties/items/type` response property for the response status `201`
+- POST /api/v1/c/{community_id}/queues/{queue_id}/items added the new `scale` enum value to the `properties/items/type` response property for the response status `201`
 - POST /api/v1/c/{community_id}/queues/{queue_id}/next added the new `currency` enum value to the `items/items/properties/items/type` response property for the response status `200`
 - POST /api/v1/c/{community_id}/queues/{queue_id}/next added the new `currency` enum value to the `properties/items/type` response property for the response status `200`
-- POST /api/v1/c/{community_id}/queues/{queue_id}/next added the new `rating` enum value to the `items/items/properties/items/type` response property for the response status `200`
-- POST /api/v1/c/{community_id}/queues/{queue_id}/next added the new `rating` enum value to the `properties/items/type` response property for the response status `200`
+- POST /api/v1/c/{community_id}/queues/{queue_id}/next added the new `scale` enum value to the `items/items/properties/items/type` response property for the response status `200`
+- POST /api/v1/c/{community_id}/queues/{queue_id}/next added the new `scale` enum value to the `properties/items/type` response property for the response status `200`
 - POST /api/v1/c/{community_id}/queues/{queue_id}/previous added the new `currency` enum value to the `items/items/properties/items/type` response property for the response status `200`
 - POST /api/v1/c/{community_id}/queues/{queue_id}/previous added the new `currency` enum value to the `properties/items/type` response property for the response status `200`
-- POST /api/v1/c/{community_id}/queues/{queue_id}/previous added the new `rating` enum value to the `items/items/properties/items/type` response property for the response status `200`
-- POST /api/v1/c/{community_id}/queues/{queue_id}/previous added the new `rating` enum value to the `properties/items/type` response property for the response status `200`
+- POST /api/v1/c/{community_id}/queues/{queue_id}/previous added the new `scale` enum value to the `items/items/properties/items/type` response property for the response status `200`
+- POST /api/v1/c/{community_id}/queues/{queue_id}/previous added the new `scale` enum value to the `properties/items/type` response property for the response status `200`
 - POST /api/v1/c/{community_id}/queues/{queue_id}/release/{item_id} added the new `currency` enum value to the `items/items/properties/items/type` response property for the response status `200`
 - POST /api/v1/c/{community_id}/queues/{queue_id}/release/{item_id} added the new `currency` enum value to the `properties/items/type` response property for the response status `200`
-- POST /api/v1/c/{community_id}/queues/{queue_id}/release/{item_id} added the new `rating` enum value to the `items/items/properties/items/type` response property for the response status `200`
-- POST /api/v1/c/{community_id}/queues/{queue_id}/release/{item_id} added the new `rating` enum value to the `properties/items/type` response property for the response status `200`
+- POST /api/v1/c/{community_id}/queues/{queue_id}/release/{item_id} added the new `scale` enum value to the `items/items/properties/items/type` response property for the response status `200`
+- POST /api/v1/c/{community_id}/queues/{queue_id}/release/{item_id} added the new `scale` enum value to the `properties/items/type` response property for the response status `200`
 - POST /api/v1/c/{community_id}/queues/{queue_id}/reset added the new `currency` enum value to the `items/items/properties/items/type` response property for the response status `200`
 - POST /api/v1/c/{community_id}/queues/{queue_id}/reset added the new `currency` enum value to the `properties/items/type` response property for the response status `200`
-- POST /api/v1/c/{community_id}/queues/{queue_id}/reset added the new `rating` enum value to the `items/items/properties/items/type` response property for the response status `200`
-- POST /api/v1/c/{community_id}/queues/{queue_id}/reset added the new `rating` enum value to the `properties/items/type` response property for the response status `200`
+- POST /api/v1/c/{community_id}/queues/{queue_id}/reset added the new `scale` enum value to the `items/items/properties/items/type` response property for the response status `200`
+- POST /api/v1/c/{community_id}/queues/{queue_id}/reset added the new `scale` enum value to the `properties/items/type` response property for the response status `200`
 - POST /api/v1/c/{community_id}/queues/{queue_id}/set-active/{item_id} added the new `currency` enum value to the `items/items/properties/items/type` response property for the response status `200`
 - POST /api/v1/c/{community_id}/queues/{queue_id}/set-active/{item_id} added the new `currency` enum value to the `properties/items/type` response property for the response status `200`
-- POST /api/v1/c/{community_id}/queues/{queue_id}/set-active/{item_id} added the new `rating` enum value to the `items/items/properties/items/type` response property for the response status `200`
-- POST /api/v1/c/{community_id}/queues/{queue_id}/set-active/{item_id} added the new `rating` enum value to the `properties/items/type` response property for the response status `200`
+- POST /api/v1/c/{community_id}/queues/{queue_id}/set-active/{item_id} added the new `scale` enum value to the `items/items/properties/items/type` response property for the response status `200`
+- POST /api/v1/c/{community_id}/queues/{queue_id}/set-active/{item_id} added the new `scale` enum value to the `properties/items/type` response property for the response status `200`
 - POST /api/v1/c/{community_id}/queues/{queue_id}/start added the new `currency` enum value to the `items/items/properties/items/type` response property for the response status `200`
 - POST /api/v1/c/{community_id}/queues/{queue_id}/start added the new `currency` enum value to the `properties/items/type` response property for the response status `200`
-- POST /api/v1/c/{community_id}/queues/{queue_id}/start added the new `rating` enum value to the `items/items/properties/items/type` response property for the response status `200`
-- POST /api/v1/c/{community_id}/queues/{queue_id}/start added the new `rating` enum value to the `properties/items/type` response property for the response status `200`
+- POST /api/v1/c/{community_id}/queues/{queue_id}/start added the new `scale` enum value to the `items/items/properties/items/type` response property for the response status `200`
+- POST /api/v1/c/{community_id}/queues/{queue_id}/start added the new `scale` enum value to the `properties/items/type` response property for the response status `200`
 - POST /api/v1/c/{community_id}/queues/{queue_id}/stop added the new `currency` enum value to the `items/items/properties/items/type` response property for the response status `200`
 - POST /api/v1/c/{community_id}/queues/{queue_id}/stop added the new `currency` enum value to the `properties/items/type` response property for the response status `200`
-- POST /api/v1/c/{community_id}/queues/{queue_id}/stop added the new `rating` enum value to the `items/items/properties/items/type` response property for the response status `200`
-- POST /api/v1/c/{community_id}/queues/{queue_id}/stop added the new `rating` enum value to the `properties/items/type` response property for the response status `200`
+- POST /api/v1/c/{community_id}/queues/{queue_id}/stop added the new `scale` enum value to the `items/items/properties/items/type` response property for the response status `200`
+- POST /api/v1/c/{community_id}/queues/{queue_id}/stop added the new `scale` enum value to the `properties/items/type` response property for the response status `200`
 - GET /api/v1/c/{community_id}/tasks/ added the new `currency` enum value to the `items/items/properties/items/type` response property for the response status `200`
-- GET /api/v1/c/{community_id}/tasks/ added the new `rating` enum value to the `items/items/properties/items/type` response property for the response status `200`
+- GET /api/v1/c/{community_id}/tasks/ added the new `scale` enum value to the `items/items/properties/items/type` response property for the response status `200`
 - POST /api/v1/c/{community_id}/tasks/ added the new `currency` enum value to the `properties/items/type` response property for the response status `201`
-- POST /api/v1/c/{community_id}/tasks/ added the new `rating` enum value to the `properties/items/type` response property for the response status `201`
+- POST /api/v1/c/{community_id}/tasks/ added the new `scale` enum value to the `properties/items/type` response property for the response status `201`
 - POST /api/v1/c/{community_id}/tasks/reorder added the new `currency` enum value to the `items/properties/items/type` response property for the response status `200`
-- POST /api/v1/c/{community_id}/tasks/reorder added the new `rating` enum value to the `items/properties/items/type` response property for the response status `200`
+- POST /api/v1/c/{community_id}/tasks/reorder added the new `scale` enum value to the `items/properties/items/type` response property for the response status `200`
 - GET /api/v1/c/{community_id}/tasks/{task_id} added the new `currency` enum value to the `properties/items/type` response property for the response status `200`
-- GET /api/v1/c/{community_id}/tasks/{task_id} added the new `rating` enum value to the `properties/items/type` response property for the response status `200`
+- GET /api/v1/c/{community_id}/tasks/{task_id} added the new `scale` enum value to the `properties/items/type` response property for the response status `200`
 - PATCH /api/v1/c/{community_id}/tasks/{task_id} added the new `currency` enum value to the `properties/items/type` response property for the response status `200`
-- PATCH /api/v1/c/{community_id}/tasks/{task_id} added the new `rating` enum value to the `properties/items/type` response property for the response status `200`
+- PATCH /api/v1/c/{community_id}/tasks/{task_id} added the new `scale` enum value to the `properties/items/type` response property for the response status `200`
 - POST /api/v1/c/{community_id}/tasks/{task_id}/case/take added the new `currency` enum value to the `properties/items/type` response property for the response status `200`
-- POST /api/v1/c/{community_id}/tasks/{task_id}/case/take added the new `rating` enum value to the `properties/items/type` response property for the response status `200`
+- POST /api/v1/c/{community_id}/tasks/{task_id}/case/take added the new `scale` enum value to the `properties/items/type` response property for the response status `200`
 - POST /api/v1/c/{community_id}/tasks/{task_id}/checklist/{item_id}/promote added the new `currency` enum value to the `properties/items/type` response property for the response status `201`
-- POST /api/v1/c/{community_id}/tasks/{task_id}/checklist/{item_id}/promote added the new `rating` enum value to the `properties/items/type` response property for the response status `201`
+- POST /api/v1/c/{community_id}/tasks/{task_id}/checklist/{item_id}/promote added the new `scale` enum value to the `properties/items/type` response property for the response status `201`
 - POST /api/v1/c/{community_id}/tasks/{task_id}/duplicate added the new `currency` enum value to the `properties/items/type` response property for the response status `201`
-- POST /api/v1/c/{community_id}/tasks/{task_id}/duplicate added the new `rating` enum value to the `properties/items/type` response property for the response status `201`
+- POST /api/v1/c/{community_id}/tasks/{task_id}/duplicate added the new `scale` enum value to the `properties/items/type` response property for the response status `201`
 - POST /api/v1/c/{community_id}/tasks/{task_id}/move added the new `currency` enum value to the `properties/items/type` response property for the response status `200`
-- POST /api/v1/c/{community_id}/tasks/{task_id}/move added the new `rating` enum value to the `properties/items/type` response property for the response status `200`
+- POST /api/v1/c/{community_id}/tasks/{task_id}/move added the new `scale` enum value to the `properties/items/type` response property for the response status `200`
 - POST /api/v1/c/{community_id}/tasks/{task_id}/skip added the new `currency` enum value to the `properties/items/type` response property for the response status `200`
-- POST /api/v1/c/{community_id}/tasks/{task_id}/skip added the new `rating` enum value to the `properties/items/type` response property for the response status `200`
+- POST /api/v1/c/{community_id}/tasks/{task_id}/skip added the new `scale` enum value to the `properties/items/type` response property for the response status `200`
 - GET /api/v1/c/{community_id}/wiki-pages/{page_id} added the new `currency` enum value to the `properties/items/type` response property for the response status `200`
-- GET /api/v1/c/{community_id}/wiki-pages/{page_id} added the new `rating` enum value to the `properties/items/type` response property for the response status `200`
+- GET /api/v1/c/{community_id}/wiki-pages/{page_id} added the new `scale` enum value to the `properties/items/type` response property for the response status `200`
 - PATCH /api/v1/c/{community_id}/wiki-pages/{page_id} added the new `currency` enum value to the `properties/items/type` response property for the response status `200`
-- PATCH /api/v1/c/{community_id}/wiki-pages/{page_id} added the new `rating` enum value to the `properties/items/type` response property for the response status `200`
+- PATCH /api/v1/c/{community_id}/wiki-pages/{page_id} added the new `scale` enum value to the `properties/items/type` response property for the response status `200`
 - POST /api/v1/c/{community_id}/wiki-pages/{page_id}/duplicate added the new `currency` enum value to the `properties/items/type` response property for the response status `201`
-- POST /api/v1/c/{community_id}/wiki-pages/{page_id}/duplicate added the new `rating` enum value to the `properties/items/type` response property for the response status `201`
+- POST /api/v1/c/{community_id}/wiki-pages/{page_id}/duplicate added the new `scale` enum value to the `properties/items/type` response property for the response status `201`
 - POST /api/v1/c/{community_id}/wiki-pages/{page_id}/move added the new `currency` enum value to the `properties/items/type` response property for the response status `200`
-- POST /api/v1/c/{community_id}/wiki-pages/{page_id}/move added the new `rating` enum value to the `properties/items/type` response property for the response status `200`
+- POST /api/v1/c/{community_id}/wiki-pages/{page_id}/move added the new `scale` enum value to the `properties/items/type` response property for the response status `200`
 - GET /api/v1/c/{community_id}/wikis/ added the new `currency` enum value to the `items/items/properties/items/type` response property for the response status `200`
-- GET /api/v1/c/{community_id}/wikis/ added the new `rating` enum value to the `items/items/properties/items/type` response property for the response status `200`
+- GET /api/v1/c/{community_id}/wikis/ added the new `scale` enum value to the `items/items/properties/items/type` response property for the response status `200`
 - POST /api/v1/c/{community_id}/wikis/ added the new `currency` enum value to the `properties/items/type` response property for the response status `201`
-- POST /api/v1/c/{community_id}/wikis/ added the new `rating` enum value to the `properties/items/type` response property for the response status `201`
+- POST /api/v1/c/{community_id}/wikis/ added the new `scale` enum value to the `properties/items/type` response property for the response status `201`
 - GET /api/v1/c/{community_id}/wikis/{wiki_id} added the new `currency` enum value to the `properties/items/type` response property for the response status `200`
-- GET /api/v1/c/{community_id}/wikis/{wiki_id} added the new `rating` enum value to the `properties/items/type` response property for the response status `200`
+- GET /api/v1/c/{community_id}/wikis/{wiki_id} added the new `scale` enum value to the `properties/items/type` response property for the response status `200`
 - PATCH /api/v1/c/{community_id}/wikis/{wiki_id} added the new `currency` enum value to the `properties/items/type` response property for the response status `200`
-- PATCH /api/v1/c/{community_id}/wikis/{wiki_id} added the new `rating` enum value to the `properties/items/type` response property for the response status `200`
+- PATCH /api/v1/c/{community_id}/wikis/{wiki_id} added the new `scale` enum value to the `properties/items/type` response property for the response status `200`
 - POST /api/v1/c/{community_id}/wikis/{wiki_id}/duplicate added the new `currency` enum value to the `properties/items/type` response property for the response status `201`
-- POST /api/v1/c/{community_id}/wikis/{wiki_id}/duplicate added the new `rating` enum value to the `properties/items/type` response property for the response status `201`
+- POST /api/v1/c/{community_id}/wikis/{wiki_id}/duplicate added the new `scale` enum value to the `properties/items/type` response property for the response status `201`
 - PUT /api/v1/c/{community_id}/wikis/{wiki_id}/grants added the new `currency` enum value to the `properties/items/type` response property for the response status `200`
-- PUT /api/v1/c/{community_id}/wikis/{wiki_id}/grants added the new `rating` enum value to the `properties/items/type` response property for the response status `200`
+- PUT /api/v1/c/{community_id}/wikis/{wiki_id}/grants added the new `scale` enum value to the `properties/items/type` response property for the response status `200`
 - GET /api/v1/c/{community_id}/wikis/{wiki_id}/pages added the new `currency` enum value to the `items/items/properties/items/type` response property for the response status `200`
-- GET /api/v1/c/{community_id}/wikis/{wiki_id}/pages added the new `rating` enum value to the `items/items/properties/items/type` response property for the response status `200`
+- GET /api/v1/c/{community_id}/wikis/{wiki_id}/pages added the new `scale` enum value to the `items/items/properties/items/type` response property for the response status `200`
 - POST /api/v1/c/{community_id}/wikis/{wiki_id}/pages added the new `currency` enum value to the `properties/items/type` response property for the response status `201`
-- POST /api/v1/c/{community_id}/wikis/{wiki_id}/pages added the new `rating` enum value to the `properties/items/type` response property for the response status `201`
+- POST /api/v1/c/{community_id}/wikis/{wiki_id}/pages added the new `scale` enum value to the `properties/items/type` response property for the response status `201`
 - GET /api/v1/me/calendar-entries added the new `currency` enum value to the `events/items/properties/items/type` response property for the response status `200`
 - GET /api/v1/me/calendar-entries added the new `currency` enum value to the `polls/items/properties/items/type` response property for the response status `200`
 - GET /api/v1/me/calendar-entries added the new `currency` enum value to the `projects/items/properties/items/type` response property for the response status `200`
 - GET /api/v1/me/calendar-entries added the new `currency` enum value to the `task_occurrences/items/properties/items/type` response property for the response status `200`
 - GET /api/v1/me/calendar-entries added the new `currency` enum value to the `tasks/items/properties/items/type` response property for the response status `200`
-- GET /api/v1/me/calendar-entries added the new `rating` enum value to the `events/items/properties/items/type` response property for the response status `200`
-- GET /api/v1/me/calendar-entries added the new `rating` enum value to the `polls/items/properties/items/type` response property for the response status `200`
-- GET /api/v1/me/calendar-entries added the new `rating` enum value to the `projects/items/properties/items/type` response property for the response status `200`
-- GET /api/v1/me/calendar-entries added the new `rating` enum value to the `task_occurrences/items/properties/items/type` response property for the response status `200`
-- GET /api/v1/me/calendar-entries added the new `rating` enum value to the `tasks/items/properties/items/type` response property for the response status `200`
+- GET /api/v1/me/calendar-entries added the new `scale` enum value to the `events/items/properties/items/type` response property for the response status `200`
+- GET /api/v1/me/calendar-entries added the new `scale` enum value to the `polls/items/properties/items/type` response property for the response status `200`
+- GET /api/v1/me/calendar-entries added the new `scale` enum value to the `projects/items/properties/items/type` response property for the response status `200`
+- GET /api/v1/me/calendar-entries added the new `scale` enum value to the `task_occurrences/items/properties/items/type` response property for the response status `200`
+- GET /api/v1/me/calendar-entries added the new `scale` enum value to the `tasks/items/properties/items/type` response property for the response status `200`
 - GET /api/v1/me/calendars added the new `currency` enum value to the `items/items/properties/items/type` response property for the response status `200`
-- GET /api/v1/me/calendars added the new `rating` enum value to the `items/items/properties/items/type` response property for the response status `200`
+- GET /api/v1/me/calendars added the new `scale` enum value to the `items/items/properties/items/type` response property for the response status `200`
 - GET /api/v1/me/counter-groups added the new `currency` enum value to the `items/items/properties/items/type` response property for the response status `200`
-- GET /api/v1/me/counter-groups added the new `rating` enum value to the `items/items/properties/items/type` response property for the response status `200`
+- GET /api/v1/me/counter-groups added the new `scale` enum value to the `items/items/properties/items/type` response property for the response status `200`
 - GET /api/v1/me/dashboards added the new `currency` enum value to the `items/items/properties/items/type` response property for the response status `200`
-- GET /api/v1/me/dashboards added the new `rating` enum value to the `items/items/properties/items/type` response property for the response status `200`
+- GET /api/v1/me/dashboards added the new `scale` enum value to the `items/items/properties/items/type` response property for the response status `200`
 - GET /api/v1/me/files added the new `currency` enum value to the `items/items/properties/items/type` response property for the response status `200`
-- GET /api/v1/me/files added the new `rating` enum value to the `items/items/properties/items/type` response property for the response status `200`
+- GET /api/v1/me/files added the new `scale` enum value to the `items/items/properties/items/type` response property for the response status `200`
 - GET /api/v1/me/posts added the new `currency` enum value to the `items/items/properties/items/type` response property for the response status `200`
-- GET /api/v1/me/posts added the new `rating` enum value to the `items/items/properties/items/type` response property for the response status `200`
+- GET /api/v1/me/posts added the new `scale` enum value to the `items/items/properties/items/type` response property for the response status `200`
 - GET /api/v1/me/projects added the new `currency` enum value to the `items/items/properties/items/type` response property for the response status `200`
-- GET /api/v1/me/projects added the new `rating` enum value to the `items/items/properties/items/type` response property for the response status `200`
+- GET /api/v1/me/projects added the new `scale` enum value to the `items/items/properties/items/type` response property for the response status `200`
 - GET /api/v1/me/queues added the new `currency` enum value to the `items/items/properties/items/type` response property for the response status `200`
-- GET /api/v1/me/queues added the new `rating` enum value to the `items/items/properties/items/type` response property for the response status `200`
+- GET /api/v1/me/queues added the new `scale` enum value to the `items/items/properties/items/type` response property for the response status `200`
 - GET /api/v1/me/tasks added the new `currency` enum value to the `items/items/properties/items/type` response property for the response status `200`
-- GET /api/v1/me/tasks added the new `rating` enum value to the `items/items/properties/items/type` response property for the response status `200`
+- GET /api/v1/me/tasks added the new `scale` enum value to the `items/items/properties/items/type` response property for the response status `200`
 - GET /api/v1/me/wikis added the new `currency` enum value to the `items/items/properties/items/type` response property for the response status `200`
-- GET /api/v1/me/wikis added the new `rating` enum value to the `items/items/properties/items/type` response property for the response status `200`
+- GET /api/v1/me/wikis added the new `scale` enum value to the `items/items/properties/items/type` response property for the response status `200`
 
 ### Share requests
 
@@ -1353,6 +1872,77 @@ Three notification types are new: `share_requested`, `share_granted` and
 - POST /api/v1/notifications/{notification_id}/unread added the new `share_declined` enum value to the `type` response property for the response status `200`
 - POST /api/v1/notifications/{notification_id}/unread added the new `share_granted` enum value to the `type` response property for the response status `200`
 - POST /api/v1/notifications/{notification_id}/unread added the new `share_requested` enum value to the `type` response property for the response status `200`
+
+### A file opened from a collection is laid out
+
+A detail layout's field may name one of a file's own fields (`FileFieldId`),
+for the detail of a file opened from a collection.
+
+- GET /api/v1/c/{community_id}/layouts/ added `#/components/schemas/FileFieldId` to the `layouts/items/oneOf[subschema #2: DetailLayoutRead]/definition/header/anyOf[subschema #1]/items/oneOf[subschema #1: DetailStackPart]/children/items/oneOf[subschema #2: SectionPart]/children/items/oneOf[subschema #3: DetailFieldPart]/props/field` response property `anyOf` list for the response status `200`
+- GET /api/v1/c/{community_id}/layouts/ added `#/components/schemas/FileFieldId` to the `layouts/items/oneOf[subschema #2: DetailLayoutRead]/definition/header/anyOf[subschema #1]/items/oneOf[subschema #1: DetailStackPart]/children/items/oneOf[subschema #3: DetailFieldPart]/props/field` response property `anyOf` list for the response status `200`
+- GET /api/v1/c/{community_id}/layouts/ added `#/components/schemas/FileFieldId` to the `layouts/items/oneOf[subschema #2: DetailLayoutRead]/definition/header/anyOf[subschema #1]/items/oneOf[subschema #2: SectionPart]/children/items/oneOf[subschema #3: DetailFieldPart]/props/field` response property `anyOf` list for the response status `200`
+- GET /api/v1/c/{community_id}/layouts/ added `#/components/schemas/FileFieldId` to the `layouts/items/oneOf[subschema #2: DetailLayoutRead]/definition/header/anyOf[subschema #1]/items/oneOf[subschema #3: DetailFieldPart]/props/field` response property `anyOf` list for the response status `200`
+- GET /api/v1/c/{community_id}/layouts/ added `#/components/schemas/FileFieldId` to the `layouts/items/oneOf[subschema #2: DetailLayoutRead]/definition/main/anyOf[subschema #1]/items/oneOf[subschema #1: DetailStackPart]/children/items/oneOf[subschema #2: SectionPart]/children/items/oneOf[subschema #3: DetailFieldPart]/props/field` response property `anyOf` list for the response status `200`
+- GET /api/v1/c/{community_id}/layouts/ added `#/components/schemas/FileFieldId` to the `layouts/items/oneOf[subschema #2: DetailLayoutRead]/definition/main/anyOf[subschema #1]/items/oneOf[subschema #1: DetailStackPart]/children/items/oneOf[subschema #3: DetailFieldPart]/props/field` response property `anyOf` list for the response status `200`
+- GET /api/v1/c/{community_id}/layouts/ added `#/components/schemas/FileFieldId` to the `layouts/items/oneOf[subschema #2: DetailLayoutRead]/definition/main/anyOf[subschema #1]/items/oneOf[subschema #2: SectionPart]/children/items/oneOf[subschema #3: DetailFieldPart]/props/field` response property `anyOf` list for the response status `200`
+- GET /api/v1/c/{community_id}/layouts/ added `#/components/schemas/FileFieldId` to the `layouts/items/oneOf[subschema #2: DetailLayoutRead]/definition/main/anyOf[subschema #1]/items/oneOf[subschema #3: DetailFieldPart]/props/field` response property `anyOf` list for the response status `200`
+- GET /api/v1/c/{community_id}/layouts/ added `#/components/schemas/FileFieldId` to the `layouts/items/oneOf[subschema #2: DetailLayoutRead]/definition/side/anyOf[subschema #1]/items/oneOf[subschema #1: DetailStackPart]/children/items/oneOf[subschema #2: SectionPart]/children/items/oneOf[subschema #3: DetailFieldPart]/props/field` response property `anyOf` list for the response status `200`
+- GET /api/v1/c/{community_id}/layouts/ added `#/components/schemas/FileFieldId` to the `layouts/items/oneOf[subschema #2: DetailLayoutRead]/definition/side/anyOf[subschema #1]/items/oneOf[subschema #1: DetailStackPart]/children/items/oneOf[subschema #3: DetailFieldPart]/props/field` response property `anyOf` list for the response status `200`
+- GET /api/v1/c/{community_id}/layouts/ added `#/components/schemas/FileFieldId` to the `layouts/items/oneOf[subschema #2: DetailLayoutRead]/definition/side/anyOf[subschema #1]/items/oneOf[subschema #2: SectionPart]/children/items/oneOf[subschema #3: DetailFieldPart]/props/field` response property `anyOf` list for the response status `200`
+- GET /api/v1/c/{community_id}/layouts/ added `#/components/schemas/FileFieldId` to the `layouts/items/oneOf[subschema #2: DetailLayoutRead]/definition/side/anyOf[subschema #1]/items/oneOf[subschema #3: DetailFieldPart]/props/field` response property `anyOf` list for the response status `200`
+- GET /api/v1/c/{community_id}/layouts/ added the new `file` enum value to the `layouts/items/oneOf[subschema #2: DetailLayoutRead]/kind` response property for the response status `200`
+- PUT /api/v1/c/{community_id}/layouts/ added `#/components/schemas/FileFieldId` to the `layouts/items/oneOf[subschema #2: DetailLayoutRead]/definition/header/anyOf[subschema #1]/items/oneOf[subschema #1: DetailStackPart]/children/items/oneOf[subschema #2: SectionPart]/children/items/oneOf[subschema #3: DetailFieldPart]/props/field` response property `anyOf` list for the response status `200`
+- PUT /api/v1/c/{community_id}/layouts/ added `#/components/schemas/FileFieldId` to the `layouts/items/oneOf[subschema #2: DetailLayoutRead]/definition/header/anyOf[subschema #1]/items/oneOf[subschema #1: DetailStackPart]/children/items/oneOf[subschema #3: DetailFieldPart]/props/field` response property `anyOf` list for the response status `200`
+- PUT /api/v1/c/{community_id}/layouts/ added `#/components/schemas/FileFieldId` to the `layouts/items/oneOf[subschema #2: DetailLayoutRead]/definition/header/anyOf[subschema #1]/items/oneOf[subschema #2: SectionPart]/children/items/oneOf[subschema #3: DetailFieldPart]/props/field` response property `anyOf` list for the response status `200`
+- PUT /api/v1/c/{community_id}/layouts/ added `#/components/schemas/FileFieldId` to the `layouts/items/oneOf[subschema #2: DetailLayoutRead]/definition/header/anyOf[subschema #1]/items/oneOf[subschema #3: DetailFieldPart]/props/field` response property `anyOf` list for the response status `200`
+- PUT /api/v1/c/{community_id}/layouts/ added `#/components/schemas/FileFieldId` to the `layouts/items/oneOf[subschema #2: DetailLayoutRead]/definition/main/anyOf[subschema #1]/items/oneOf[subschema #1: DetailStackPart]/children/items/oneOf[subschema #2: SectionPart]/children/items/oneOf[subschema #3: DetailFieldPart]/props/field` response property `anyOf` list for the response status `200`
+- PUT /api/v1/c/{community_id}/layouts/ added `#/components/schemas/FileFieldId` to the `layouts/items/oneOf[subschema #2: DetailLayoutRead]/definition/main/anyOf[subschema #1]/items/oneOf[subschema #1: DetailStackPart]/children/items/oneOf[subschema #3: DetailFieldPart]/props/field` response property `anyOf` list for the response status `200`
+- PUT /api/v1/c/{community_id}/layouts/ added `#/components/schemas/FileFieldId` to the `layouts/items/oneOf[subschema #2: DetailLayoutRead]/definition/main/anyOf[subschema #1]/items/oneOf[subschema #2: SectionPart]/children/items/oneOf[subschema #3: DetailFieldPart]/props/field` response property `anyOf` list for the response status `200`
+- PUT /api/v1/c/{community_id}/layouts/ added `#/components/schemas/FileFieldId` to the `layouts/items/oneOf[subschema #2: DetailLayoutRead]/definition/main/anyOf[subschema #1]/items/oneOf[subschema #3: DetailFieldPart]/props/field` response property `anyOf` list for the response status `200`
+- PUT /api/v1/c/{community_id}/layouts/ added `#/components/schemas/FileFieldId` to the `layouts/items/oneOf[subschema #2: DetailLayoutRead]/definition/side/anyOf[subschema #1]/items/oneOf[subschema #1: DetailStackPart]/children/items/oneOf[subschema #2: SectionPart]/children/items/oneOf[subschema #3: DetailFieldPart]/props/field` response property `anyOf` list for the response status `200`
+- PUT /api/v1/c/{community_id}/layouts/ added `#/components/schemas/FileFieldId` to the `layouts/items/oneOf[subschema #2: DetailLayoutRead]/definition/side/anyOf[subschema #1]/items/oneOf[subschema #1: DetailStackPart]/children/items/oneOf[subschema #3: DetailFieldPart]/props/field` response property `anyOf` list for the response status `200`
+- PUT /api/v1/c/{community_id}/layouts/ added `#/components/schemas/FileFieldId` to the `layouts/items/oneOf[subschema #2: DetailLayoutRead]/definition/side/anyOf[subschema #1]/items/oneOf[subschema #2: SectionPart]/children/items/oneOf[subschema #3: DetailFieldPart]/props/field` response property `anyOf` list for the response status `200`
+- PUT /api/v1/c/{community_id}/layouts/ added `#/components/schemas/FileFieldId` to the `layouts/items/oneOf[subschema #2: DetailLayoutRead]/definition/side/anyOf[subschema #1]/items/oneOf[subschema #3: DetailFieldPart]/props/field` response property `anyOf` list for the response status `200`
+- PUT /api/v1/c/{community_id}/layouts/ added the new `file` enum value to the `layouts/items/oneOf[subschema #2: DetailLayoutRead]/kind` response property for the response status `200`
+- PUT /api/v1/c/{community_id}/layouts/default added `#/components/schemas/FileFieldId` to the `layouts/items/oneOf[subschema #2: DetailLayoutRead]/definition/header/anyOf[subschema #1]/items/oneOf[subschema #1: DetailStackPart]/children/items/oneOf[subschema #2: SectionPart]/children/items/oneOf[subschema #3: DetailFieldPart]/props/field` response property `anyOf` list for the response status `200`
+- PUT /api/v1/c/{community_id}/layouts/default added `#/components/schemas/FileFieldId` to the `layouts/items/oneOf[subschema #2: DetailLayoutRead]/definition/header/anyOf[subschema #1]/items/oneOf[subschema #1: DetailStackPart]/children/items/oneOf[subschema #3: DetailFieldPart]/props/field` response property `anyOf` list for the response status `200`
+- PUT /api/v1/c/{community_id}/layouts/default added `#/components/schemas/FileFieldId` to the `layouts/items/oneOf[subschema #2: DetailLayoutRead]/definition/header/anyOf[subschema #1]/items/oneOf[subschema #2: SectionPart]/children/items/oneOf[subschema #3: DetailFieldPart]/props/field` response property `anyOf` list for the response status `200`
+- PUT /api/v1/c/{community_id}/layouts/default added `#/components/schemas/FileFieldId` to the `layouts/items/oneOf[subschema #2: DetailLayoutRead]/definition/header/anyOf[subschema #1]/items/oneOf[subschema #3: DetailFieldPart]/props/field` response property `anyOf` list for the response status `200`
+- PUT /api/v1/c/{community_id}/layouts/default added `#/components/schemas/FileFieldId` to the `layouts/items/oneOf[subschema #2: DetailLayoutRead]/definition/main/anyOf[subschema #1]/items/oneOf[subschema #1: DetailStackPart]/children/items/oneOf[subschema #2: SectionPart]/children/items/oneOf[subschema #3: DetailFieldPart]/props/field` response property `anyOf` list for the response status `200`
+- PUT /api/v1/c/{community_id}/layouts/default added `#/components/schemas/FileFieldId` to the `layouts/items/oneOf[subschema #2: DetailLayoutRead]/definition/main/anyOf[subschema #1]/items/oneOf[subschema #1: DetailStackPart]/children/items/oneOf[subschema #3: DetailFieldPart]/props/field` response property `anyOf` list for the response status `200`
+- PUT /api/v1/c/{community_id}/layouts/default added `#/components/schemas/FileFieldId` to the `layouts/items/oneOf[subschema #2: DetailLayoutRead]/definition/main/anyOf[subschema #1]/items/oneOf[subschema #2: SectionPart]/children/items/oneOf[subschema #3: DetailFieldPart]/props/field` response property `anyOf` list for the response status `200`
+- PUT /api/v1/c/{community_id}/layouts/default added `#/components/schemas/FileFieldId` to the `layouts/items/oneOf[subschema #2: DetailLayoutRead]/definition/main/anyOf[subschema #1]/items/oneOf[subschema #3: DetailFieldPart]/props/field` response property `anyOf` list for the response status `200`
+- PUT /api/v1/c/{community_id}/layouts/default added `#/components/schemas/FileFieldId` to the `layouts/items/oneOf[subschema #2: DetailLayoutRead]/definition/side/anyOf[subschema #1]/items/oneOf[subschema #1: DetailStackPart]/children/items/oneOf[subschema #2: SectionPart]/children/items/oneOf[subschema #3: DetailFieldPart]/props/field` response property `anyOf` list for the response status `200`
+- PUT /api/v1/c/{community_id}/layouts/default added `#/components/schemas/FileFieldId` to the `layouts/items/oneOf[subschema #2: DetailLayoutRead]/definition/side/anyOf[subschema #1]/items/oneOf[subschema #1: DetailStackPart]/children/items/oneOf[subschema #3: DetailFieldPart]/props/field` response property `anyOf` list for the response status `200`
+- PUT /api/v1/c/{community_id}/layouts/default added `#/components/schemas/FileFieldId` to the `layouts/items/oneOf[subschema #2: DetailLayoutRead]/definition/side/anyOf[subschema #1]/items/oneOf[subschema #2: SectionPart]/children/items/oneOf[subschema #3: DetailFieldPart]/props/field` response property `anyOf` list for the response status `200`
+- PUT /api/v1/c/{community_id}/layouts/default added `#/components/schemas/FileFieldId` to the `layouts/items/oneOf[subschema #2: DetailLayoutRead]/definition/side/anyOf[subschema #1]/items/oneOf[subschema #3: DetailFieldPart]/props/field` response property `anyOf` list for the response status `200`
+- PUT /api/v1/c/{community_id}/layouts/default added the new `file` enum value to the `layouts/items/oneOf[subschema #2: DetailLayoutRead]/kind` response property for the response status `200`
+- GET /api/v1/c/{community_id}/layouts/initiative added `#/components/schemas/FileFieldId` to the `items/layouts/items/oneOf[subschema #2: DetailLayoutRead]/definition/header/anyOf[subschema #1]/items/oneOf[subschema #1: DetailStackPart]/children/items/oneOf[subschema #2: SectionPart]/children/items/oneOf[subschema #3: DetailFieldPart]/props/field` response property `anyOf` list for the response status `200`
+- GET /api/v1/c/{community_id}/layouts/initiative added `#/components/schemas/FileFieldId` to the `items/layouts/items/oneOf[subschema #2: DetailLayoutRead]/definition/header/anyOf[subschema #1]/items/oneOf[subschema #1: DetailStackPart]/children/items/oneOf[subschema #3: DetailFieldPart]/props/field` response property `anyOf` list for the response status `200`
+- GET /api/v1/c/{community_id}/layouts/initiative added `#/components/schemas/FileFieldId` to the `items/layouts/items/oneOf[subschema #2: DetailLayoutRead]/definition/header/anyOf[subschema #1]/items/oneOf[subschema #2: SectionPart]/children/items/oneOf[subschema #3: DetailFieldPart]/props/field` response property `anyOf` list for the response status `200`
+- GET /api/v1/c/{community_id}/layouts/initiative added `#/components/schemas/FileFieldId` to the `items/layouts/items/oneOf[subschema #2: DetailLayoutRead]/definition/header/anyOf[subschema #1]/items/oneOf[subschema #3: DetailFieldPart]/props/field` response property `anyOf` list for the response status `200`
+- GET /api/v1/c/{community_id}/layouts/initiative added `#/components/schemas/FileFieldId` to the `items/layouts/items/oneOf[subschema #2: DetailLayoutRead]/definition/main/anyOf[subschema #1]/items/oneOf[subschema #1: DetailStackPart]/children/items/oneOf[subschema #2: SectionPart]/children/items/oneOf[subschema #3: DetailFieldPart]/props/field` response property `anyOf` list for the response status `200`
+- GET /api/v1/c/{community_id}/layouts/initiative added `#/components/schemas/FileFieldId` to the `items/layouts/items/oneOf[subschema #2: DetailLayoutRead]/definition/main/anyOf[subschema #1]/items/oneOf[subschema #1: DetailStackPart]/children/items/oneOf[subschema #3: DetailFieldPart]/props/field` response property `anyOf` list for the response status `200`
+- GET /api/v1/c/{community_id}/layouts/initiative added `#/components/schemas/FileFieldId` to the `items/layouts/items/oneOf[subschema #2: DetailLayoutRead]/definition/main/anyOf[subschema #1]/items/oneOf[subschema #2: SectionPart]/children/items/oneOf[subschema #3: DetailFieldPart]/props/field` response property `anyOf` list for the response status `200`
+- GET /api/v1/c/{community_id}/layouts/initiative added `#/components/schemas/FileFieldId` to the `items/layouts/items/oneOf[subschema #2: DetailLayoutRead]/definition/main/anyOf[subschema #1]/items/oneOf[subschema #3: DetailFieldPart]/props/field` response property `anyOf` list for the response status `200`
+- GET /api/v1/c/{community_id}/layouts/initiative added `#/components/schemas/FileFieldId` to the `items/layouts/items/oneOf[subschema #2: DetailLayoutRead]/definition/side/anyOf[subschema #1]/items/oneOf[subschema #1: DetailStackPart]/children/items/oneOf[subschema #2: SectionPart]/children/items/oneOf[subschema #3: DetailFieldPart]/props/field` response property `anyOf` list for the response status `200`
+- GET /api/v1/c/{community_id}/layouts/initiative added `#/components/schemas/FileFieldId` to the `items/layouts/items/oneOf[subschema #2: DetailLayoutRead]/definition/side/anyOf[subschema #1]/items/oneOf[subschema #1: DetailStackPart]/children/items/oneOf[subschema #3: DetailFieldPart]/props/field` response property `anyOf` list for the response status `200`
+- GET /api/v1/c/{community_id}/layouts/initiative added `#/components/schemas/FileFieldId` to the `items/layouts/items/oneOf[subschema #2: DetailLayoutRead]/definition/side/anyOf[subschema #1]/items/oneOf[subschema #2: SectionPart]/children/items/oneOf[subschema #3: DetailFieldPart]/props/field` response property `anyOf` list for the response status `200`
+- GET /api/v1/c/{community_id}/layouts/initiative added `#/components/schemas/FileFieldId` to the `items/layouts/items/oneOf[subschema #2: DetailLayoutRead]/definition/side/anyOf[subschema #1]/items/oneOf[subschema #3: DetailFieldPart]/props/field` response property `anyOf` list for the response status `200`
+- GET /api/v1/c/{community_id}/layouts/initiative added the new `file` enum value to the `items/layouts/items/oneOf[subschema #2: DetailLayoutRead]/kind` response property for the response status `200`
+- DELETE /api/v1/c/{community_id}/layouts/{kind} added `#/components/schemas/FileFieldId` to the `layouts/items/oneOf[subschema #2: DetailLayoutRead]/definition/header/anyOf[subschema #1]/items/oneOf[subschema #1: DetailStackPart]/children/items/oneOf[subschema #2: SectionPart]/children/items/oneOf[subschema #3: DetailFieldPart]/props/field` response property `anyOf` list for the response status `200`
+- DELETE /api/v1/c/{community_id}/layouts/{kind} added `#/components/schemas/FileFieldId` to the `layouts/items/oneOf[subschema #2: DetailLayoutRead]/definition/header/anyOf[subschema #1]/items/oneOf[subschema #1: DetailStackPart]/children/items/oneOf[subschema #3: DetailFieldPart]/props/field` response property `anyOf` list for the response status `200`
+- DELETE /api/v1/c/{community_id}/layouts/{kind} added `#/components/schemas/FileFieldId` to the `layouts/items/oneOf[subschema #2: DetailLayoutRead]/definition/header/anyOf[subschema #1]/items/oneOf[subschema #2: SectionPart]/children/items/oneOf[subschema #3: DetailFieldPart]/props/field` response property `anyOf` list for the response status `200`
+- DELETE /api/v1/c/{community_id}/layouts/{kind} added `#/components/schemas/FileFieldId` to the `layouts/items/oneOf[subschema #2: DetailLayoutRead]/definition/header/anyOf[subschema #1]/items/oneOf[subschema #3: DetailFieldPart]/props/field` response property `anyOf` list for the response status `200`
+- DELETE /api/v1/c/{community_id}/layouts/{kind} added `#/components/schemas/FileFieldId` to the `layouts/items/oneOf[subschema #2: DetailLayoutRead]/definition/main/anyOf[subschema #1]/items/oneOf[subschema #1: DetailStackPart]/children/items/oneOf[subschema #2: SectionPart]/children/items/oneOf[subschema #3: DetailFieldPart]/props/field` response property `anyOf` list for the response status `200`
+- DELETE /api/v1/c/{community_id}/layouts/{kind} added `#/components/schemas/FileFieldId` to the `layouts/items/oneOf[subschema #2: DetailLayoutRead]/definition/main/anyOf[subschema #1]/items/oneOf[subschema #1: DetailStackPart]/children/items/oneOf[subschema #3: DetailFieldPart]/props/field` response property `anyOf` list for the response status `200`
+- DELETE /api/v1/c/{community_id}/layouts/{kind} added `#/components/schemas/FileFieldId` to the `layouts/items/oneOf[subschema #2: DetailLayoutRead]/definition/main/anyOf[subschema #1]/items/oneOf[subschema #2: SectionPart]/children/items/oneOf[subschema #3: DetailFieldPart]/props/field` response property `anyOf` list for the response status `200`
+- DELETE /api/v1/c/{community_id}/layouts/{kind} added `#/components/schemas/FileFieldId` to the `layouts/items/oneOf[subschema #2: DetailLayoutRead]/definition/main/anyOf[subschema #1]/items/oneOf[subschema #3: DetailFieldPart]/props/field` response property `anyOf` list for the response status `200`
+- DELETE /api/v1/c/{community_id}/layouts/{kind} added `#/components/schemas/FileFieldId` to the `layouts/items/oneOf[subschema #2: DetailLayoutRead]/definition/side/anyOf[subschema #1]/items/oneOf[subschema #1: DetailStackPart]/children/items/oneOf[subschema #2: SectionPart]/children/items/oneOf[subschema #3: DetailFieldPart]/props/field` response property `anyOf` list for the response status `200`
+- DELETE /api/v1/c/{community_id}/layouts/{kind} added `#/components/schemas/FileFieldId` to the `layouts/items/oneOf[subschema #2: DetailLayoutRead]/definition/side/anyOf[subschema #1]/items/oneOf[subschema #1: DetailStackPart]/children/items/oneOf[subschema #3: DetailFieldPart]/props/field` response property `anyOf` list for the response status `200`
+- DELETE /api/v1/c/{community_id}/layouts/{kind} added `#/components/schemas/FileFieldId` to the `layouts/items/oneOf[subschema #2: DetailLayoutRead]/definition/side/anyOf[subschema #1]/items/oneOf[subschema #2: SectionPart]/children/items/oneOf[subschema #3: DetailFieldPart]/props/field` response property `anyOf` list for the response status `200`
+- DELETE /api/v1/c/{community_id}/layouts/{kind} added `#/components/schemas/FileFieldId` to the `layouts/items/oneOf[subschema #2: DetailLayoutRead]/definition/side/anyOf[subschema #1]/items/oneOf[subschema #3: DetailFieldPart]/props/field` response property `anyOf` list for the response status `200`
+- DELETE /api/v1/c/{community_id}/layouts/{kind} added the new `file` enum value to the `layouts/items/oneOf[subschema #2: DetailLayoutRead]/kind` response property for the response status `200`
 
 ## After 0.76.0
 

@@ -99,7 +99,6 @@ export function buildPost(overrides: Partial<PostRead> = {}): PostRead {
     grants: [],
     // Most notices ask nothing, which is what makes a poll worth noticing.
     poll: null,
-    plugin_values: [],
     ...overrides,
   };
 }

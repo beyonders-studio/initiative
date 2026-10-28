@@ -46,7 +46,7 @@ from app.models.tenant.task import (
     TaskType,
 )
 from app.schemas.recurrence import OccurrenceScope
-from app.services.tenant import properties as properties_service
+from app.services.tenant import metadata as metadata_service
 from app.services.tenant import tags as tags_service
 from app.services.tenant import task_checklist as checklist_service
 from app.services.tenant import descriptions as descriptions_service
@@ -486,7 +486,7 @@ async def advance_recurrence_if_needed(
         .execution_options(populate_existing=True)
     )
     await tags_service.annotate_tags(session, [new_task])
-    await properties_service.annotate_properties(session, [new_task])
+    await metadata_service.annotate_properties(session, [new_task])
 
     task.recurrence = None
     task.recurrence_strategy = RecurrenceStrategy.fixed

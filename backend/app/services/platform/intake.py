@@ -55,11 +55,11 @@ from app.models.platform.user import User
 from app.models.tenant.comment import Comment, CommentAudience
 from app.models.tenant.intake import DEDUPE_KEY_LENGTH, IntakeBinding, IntakeCase
 from app.models.tenant.project import Project
-from app.models.tenant.property import PropertyDefinition, PropertyType, PropertyValue
+from app.models.tenant.metadata import MetadataDefinition, MetadataType, MetadataValue
 from app.models.tenant.task import Task, TaskStatus, TaskStatusCategory, TaskType
 from app.schemas.tenant.property import PropertyValueInput
 from app.services.platform import case_activity, case_notices
-from app.services.tenant import properties as properties_service
+from app.services.tenant import metadata as metadata_service
 from app.services.tenant import task_creation as task_creation_service
 from app.services.tenant import descriptions as descriptions_service
 from app.services.tenant import task_types as task_types_service
@@ -356,7 +356,7 @@ async def _open_case_for_key(
 
 async def _ensure_field_definitions(
     session: AsyncSession, *, initiative_id: int, stream: IntakeStream
-) -> dict[CaseField, PropertyDefinition]:
+) -> dict[CaseField, MetadataDefinition]:
     """The stream's case fields as property definitions on this initiative.
 
     A blueprint-created project already has them. One a team made by hand, or
@@ -369,19 +369,19 @@ async def _ensure_field_definitions(
     existing = {
         definition.name: definition
         for definition in await session.exec(
-            select(PropertyDefinition).where(
-                PropertyDefinition.of_initiative(initiative_id),
-                PropertyDefinition.name.in_([field.value for field in wanted]),
+            select(MetadataDefinition).where(
+                MetadataDefinition.of_initiative(initiative_id),
+                MetadataDefinition.name.in_([field.value for field in wanted]),
             )
         )
     }
 
-    resolved: dict[CaseField, PropertyDefinition] = {}
+    resolved: dict[CaseField, MetadataDefinition] = {}
     for field in wanted:
         definition = existing.get(field.value)
-        expected = PropertyType(CASE_FIELD_TYPES[field])
+        expected = MetadataType(CASE_FIELD_TYPES[field])
         if definition is None:
-            definition = PropertyDefinition(
+            definition = MetadataDefinition(
                 initiative_id=initiative_id, name=field.value, type=expected
             )
             session.add(definition)
@@ -416,7 +416,7 @@ async def _record_refs(
         if field in definitions
     ]
     if inputs:
-        await properties_service.write_values(
+        await metadata_service.write_values(
             session, task, inputs, initiative_id=initiative_id
         )
 
@@ -845,7 +845,7 @@ async def _cases_about(
 ) -> dict[int, dict[int, tuple[str, bool]]]:
     """For each of ``user_ids``, its open cases by task: the stream, and
     whether it filed the case. Two reads, whatever the number of accounts."""
-    from app.models.tenant.property import PropertyValue
+    from app.models.tenant.metadata import MetadataValue
 
     found: dict[int, dict[int, tuple[str, bool]]] = {}
     filed = await session.exec(
@@ -855,15 +855,15 @@ async def _cases_about(
         found.setdefault(int(filer), {})[int(task_id)] = (stream, True)
     subjects = await session.exec(
         _open_case_task()
-        .add_columns(PropertyValue.value_number)
+        .add_columns(MetadataValue.value_number)
         .join(
-            PropertyValue,
-            (PropertyValue.entity_type == "task")
-            & (PropertyValue.entity_id == IntakeCase.task_id),
+            MetadataValue,
+            (MetadataValue.entity_type == "task")
+            & (MetadataValue.entity_id == IntakeCase.task_id),
         )
-        .join(PropertyDefinition, PropertyDefinition.id == PropertyValue.property_id)
-        .where(PropertyDefinition.name == CaseField.subject_user.value)
-        .where(PropertyValue.value_number.in_(list(user_ids)))
+        .join(MetadataDefinition, MetadataDefinition.id == MetadataValue.property_id)
+        .where(MetadataDefinition.name == CaseField.subject_user.value)
+        .where(MetadataValue.value_number.in_(list(user_ids)))
     )
     for task_id, stream, _filer, subject in subjects.all():
         cases = found.setdefault(int(subject), {})
@@ -948,10 +948,10 @@ async def claim_subject_guild(task_id: int, guild_id: int) -> ClaimOutcome:
             return "other"
         named = (
             await session.exec(
-                select(PropertyValue.value_number)
-                .where(PropertyValue.property_id == field.id)
-                .where(PropertyValue.entity_type == "task")
-                .where(PropertyValue.entity_id == task_id)
+                select(MetadataValue.value_number)
+                .where(MetadataValue.property_id == field.id)
+                .where(MetadataValue.entity_type == "task")
+                .where(MetadataValue.entity_id == task_id)
             )
         ).first()
         if named is not None:
@@ -959,7 +959,7 @@ async def claim_subject_guild(task_id: int, guild_id: int) -> ClaimOutcome:
             return "held" if int(named) == guild_id else "other"
         # This one value alone: everything else the team set on the case
         # stays as it is.
-        await properties_service.write_values(
+        await metadata_service.write_values(
             session,
             task,
             [PropertyValueInput(property_id=field.id, value=guild_id)],
@@ -1019,14 +1019,14 @@ async def release_subject_guild(task_id: int, guild_id: int) -> None:
             return
         named = (
             await session.exec(
-                select(PropertyValue)
+                select(MetadataValue)
                 .join(
-                    PropertyDefinition,
-                    PropertyDefinition.id == PropertyValue.property_id,
+                    MetadataDefinition,
+                    MetadataDefinition.id == MetadataValue.property_id,
                 )
-                .where(PropertyDefinition.name == CaseField.subject_guild.value)
-                .where(PropertyValue.entity_type == "task")
-                .where(PropertyValue.entity_id == task_id)
+                .where(MetadataDefinition.name == CaseField.subject_guild.value)
+                .where(MetadataValue.entity_type == "task")
+                .where(MetadataValue.entity_id == task_id)
             )
         ).first()
         if named is None or named.value_number != guild_id:

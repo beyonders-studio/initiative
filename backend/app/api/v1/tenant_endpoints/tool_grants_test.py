@@ -37,7 +37,7 @@ from app.core.tools import Tool
 from app.db import post_commit
 from app.models.platform.guild import CommunityRole
 from app.models.tenant.initiative import InitiativeRoleModel
-from app.models.tenant.property import PropertyType, PropertyValue
+from app.models.tenant.metadata import MetadataType, MetadataValue
 from app.models.tenant.resource_grant import ResourceAccessLevel
 from app.services.tenant import named_people
 from app.testing import (
@@ -216,7 +216,7 @@ async def _queue_up(session: AsyncSession, actor, queue, person) -> None:
 
 async def _person_field(session: AsyncSession, actor, entity, person) -> None:
     definition = await create_property_definition(
-        session, actor.initiative, type=PropertyType.user_reference
+        session, actor.initiative, type=MetadataType.user_reference
     )
     await create_property_value(session, entity, definition, value_user_id=person.id)
 
@@ -304,9 +304,9 @@ async def test_a_collection_names_whoever_can_open_a_file_in_it(
         return list(
             (
                 await session.exec(
-                    select(PropertyValue.value_user_id).where(
-                        PropertyValue.entity_type == "collection",
-                        PropertyValue.entity_id == collection.id,
+                    select(MetadataValue.value_user_id).where(
+                        MetadataValue.entity_type == "collection",
+                        MetadataValue.entity_id == collection.id,
                     )
                 )
             ).all()

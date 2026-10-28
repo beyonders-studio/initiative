@@ -459,29 +459,27 @@
       "dismiss": "Ausblenden",
       "tooLarge": "größer, als dieser Server annimmt"
     },
-    "layoutsDescription": "Welche Listen diese Sammlung zeigt und mit welcher sie öffnet. Jede Person wählt unter den gezeigten.",
     "backToFiles": "Zurück zu Dateien",
     "notFound": "Sammlung nicht gefunden",
     "notFoundDescription": "Die gesuchte Sammlung existiert nicht, oder du kannst keine ihrer Dateien öffnen.",
     "noAccess": "Zugriff verweigert",
     "noAccessDescription": "Du hast keine Berechtigung, diese Sammlung anzusehen.",
     "error": "Die Sammlung konnte nicht geändert werden",
-    "fields": {
-      "title": "Felder",
+    "properties": {
+      "title": "Eigenschaften",
       "description": "Was jede Datei in dieser Sammlung hier tragen kann: Die Werte gehören zur Sammlung, nicht zur Datei.",
-      "create": "Neues Feld",
-      "edit": "Feld bearbeiten",
-      "delete": "Feld löschen",
-      "deleteTitle": "Dieses Feld löschen?",
-      "deleteBody": "Damit werden das Feld und die Werte aller Dateien dafür in dieser Sammlung entfernt.",
-      "none": "Noch keine Felder",
+      "create": "Neue Eigenschaft",
+      "edit": "Eigenschaft bearbeiten",
+      "delete": "Eigenschaft löschen",
+      "deleteTitle": "Diese Eigenschaft löschen?",
+      "deleteBody": "Damit werden die Eigenschaft und die Werte aller Dateien dafür in dieser Sammlung entfernt.",
+      "none": "Noch keine Eigenschaften",
       "heading": "In dieser Sammlung",
       "saveError": "Der Wert konnte nicht gespeichert werden",
-      "of": "Felder von {{name}}"
+      "of": "Eigenschaften von {{name}}"
     },
     "addedOn": "Hinzugefügt {{date}}",
     "createdOn": "Erstellt {{date}}",
-    "editLayouts": "Bearbeiten, was die Listen zeigen",
     "listHelp": {
       "masonry": "Jede Datei in ihrer eigenen Form, in Spalten gepackt: was ihre Karte unter dem Bild zeigt.",
       "grid": "Jede Datei als quadratische Kachel: was ihre Karte unter dem Bild zeigt.",
@@ -491,12 +489,12 @@
     "shapes": {
       "name": "Name",
       "blank": "Leer",
-      "blankHint": "Ein Raster und eine Tabelle, noch ohne eigene Felder.",
+      "blankHint": "Ein Raster und eine Tabelle, noch ohne eigene Eigenschaften.",
       "lists": "Zeigt {{lists}}",
-      "fields": "Felder: {{fields}}",
+      "properties": "Eigenschaften: {{properties}}",
       "copyLabel": "Oder die Form übernehmen von",
       "copyPlaceholder": "Einer anderen Sammlung",
-      "copyHint": "Ihre Felder und was ihre Listen zeigen, ohne ihre Dateien oder deren Werte.",
+      "copyHint": "Ihre Eigenschaften und was ihre Listen zeigen, ohne ihre Dateien oder deren Werte.",
       "create": "Sammlung erstellen"
     }
   }

@@ -89,7 +89,7 @@ ALLOWED_DYNAMIC_SQL: dict[str, str] = {
     "app/testing/guild_pool.py::drop": (
         "test harness: int-derived test_pool_<id> schema name"
     ),
-    "app/models/tenant/property.py::PropertyValue": (
+    "app/models/tenant/metadata.py::MetadataValue": (
         "model DDL: the CHECK lists the PROPERTY_TARGETS constant, the partial "
         "indexes name the model's own value columns"
     ),

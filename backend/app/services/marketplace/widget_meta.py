@@ -96,6 +96,22 @@ def localized_text(raw: Any, max_length: int) -> dict[str, str] | None:
     return out or None
 
 
+def in_language(text: Any, language: str) -> str | None:
+    """The best string of a language-tag → text map for ``language``, as the
+    browser picks one (``localized`` in ``widgetMeta.ts``): the tag itself,
+    then its base language, then English, then the first the map holds."""
+    if not isinstance(text, dict) or not text:
+        return None
+    base = language.split("-")[0]
+    found = (
+        text.get(language)
+        or text.get(base)
+        or text.get("en")
+        or next(iter(text.values()), None)
+    )
+    return found if isinstance(found, str) else None
+
+
 def _option_meta(raw: Any) -> dict[str, Any] | None:
     if not isinstance(raw, dict):
         return None

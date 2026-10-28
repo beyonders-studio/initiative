@@ -13,12 +13,14 @@ import { useTranslation } from "react-i18next";
 import {
   type CommunityPluginRead,
   type DetailLayoutReadKind,
-  type PluginValueSummary,
-  PropertyType,
+  ItemKind,
+  MetadataType,
+  type PropertySummary,
 } from "@/api/generated/initiativeAPI.schemas";
 import type { PluginDataParam } from "@/api/pluginData";
 import { PluginParamControl } from "@/components/plugins/PluginParamControl";
 import type { PluginFilterField } from "@/components/properties/PropertyFilter";
+import { PropertyValueCell, ScaleValue } from "@/components/properties/PropertyValueCell";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { ConfirmDialog } from "@/components/ui/confirm-dialog";
@@ -31,7 +33,6 @@ import {
   DialogTitle,
 } from "@/components/ui/dialog";
 import { DropdownMenuItem } from "@/components/ui/dropdown-menu";
-import { Progress } from "@/components/ui/progress";
 import contract from "@/contract/manifest.contract.json";
 import { useCommunityPlugins, useRunPluginAction } from "@/hooks/useCommunityPlugins";
 import { formatDate, formatDateTime } from "@/lib/formatDate";
@@ -43,8 +44,9 @@ import { type LocalizedText, localized } from "@/lib/widgets/widgetMeta";
 import type { FieldDef, FieldRendererProps } from "./fields";
 import { Section } from "./section";
 
-/** What a plug-in draws on an item from: the item, and the values it carries. */
-export type PluginItem = { id: number; plugin_values?: PluginValueSummary[] };
+/** What a plug-in draws on an item from: the item, and the values it carries,
+ *  a plug-in's among them by its install and key. */
+export type PluginItem = { id: number; properties?: PropertySummary[] };
 
 import type { LayoutNode } from "./tree";
 
@@ -60,8 +62,13 @@ export type PluginFieldKind =
   | "datetime"
   | "link"
   | "badge"
-  | "progress"
-  | "checkbox";
+  | "scale"
+  | "checkbox"
+  | "url"
+  | "currency"
+  | "select"
+  | "multi_select"
+  | "user_reference";
 
 /** One facet of a field's state: the keys a value may name, each a badge. */
 type StateFacet = {
@@ -121,9 +128,13 @@ export type PluginOnItems = {
   settings: Record<string, unknown>;
 };
 
-/** The kinds of item whose pages draw plug-ins, as the manifest names them:
- *  every kind with a detail layout. */
-export type PluginItemKind = DetailLayoutReadKind;
+/** The kinds of item whose pages draw plug-ins, as the manifest names them. */
+export type PluginItemKind = ItemKind;
+
+/** The kind of item plug-ins draw on that a detail lays out, or null for one
+ *  they draw nothing on (a file opened from a collection). */
+export const pluginKindOf = (kind: DetailLayoutReadKind): PluginItemKind | null =>
+  Object.hasOwn(ItemKind, kind) ? (kind as PluginItemKind) : null;
 
 /** What a block declares on one kind of item, of what the server offers the
  *  reader. */
@@ -211,16 +222,21 @@ export const pluginsOnItems = (
 
 const NO_PLUGINS: ReadonlyMap<number, PluginOnItems> = new Map();
 
-/** {@link pluginsOnItems} for the community's installs, once they load. */
+/** {@link pluginsOnItems} for the community's installs, once they load. A
+ *  kind plug-ins draw nothing on (null) has none. */
 export const usePluginsOnItems = (
   initiativeId: number | null | undefined,
   enabled = true,
-  kind: PluginItemKind = "task"
+  kind: PluginItemKind | null = "task"
 ): ReadonlyMap<number, PluginOnItems> => {
-  const { data } = useCommunityPlugins({ enabled: enabled && initiativeId != null });
+  const { data } = useCommunityPlugins({
+    enabled: enabled && initiativeId != null && kind !== null,
+  });
   return useMemo(
     () =>
-      data && initiativeId != null ? pluginsOnItems(data.items, initiativeId, kind) : NO_PLUGINS,
+      data && initiativeId != null && kind !== null
+        ? pluginsOnItems(data.items, initiativeId, kind)
+        : NO_PLUGINS,
     [data, initiativeId, kind]
   );
 };
@@ -228,17 +244,20 @@ export const usePluginsOnItems = (
 /** A plug-in field's id in a view: by install and key, as the server checks it. */
 export const pluginFieldId = (install: number, key: string) => `plugin:${install}:${key}`;
 
-/** The property type each kind of plug-in field is filtered like: by its
- *  words, or by its number (a progress bar's fraction, a date's day). */
-const FILTERED_AS: Record<PluginFieldKind, PropertyType> = {
-  text: PropertyType.text,
-  badge: PropertyType.text,
-  link: PropertyType.text,
-  number: PropertyType.number,
-  progress: PropertyType.number,
-  checkbox: PropertyType.checkbox,
-  date: PropertyType.date,
-  datetime: PropertyType.datetime,
+/** The type each kind of plug-in field is filtered like: by its words, or by
+ *  its number (a scale's figure, an amount, a date's day). A kind not here is
+ *  not offered as a filter. */
+const FILTERED_AS: Partial<Record<PluginFieldKind, MetadataType>> = {
+  text: MetadataType.text,
+  badge: MetadataType.text,
+  link: MetadataType.text,
+  url: MetadataType.text,
+  number: MetadataType.number,
+  currency: MetadataType.number,
+  scale: MetadataType.scale,
+  checkbox: MetadataType.checkbox,
+  date: MetadataType.date,
+  datetime: MetadataType.datetime,
 };
 
 /** The plug-in fields a task list can be filtered by, as the reader is drawn
@@ -253,7 +272,7 @@ export const pluginFilterFields = (
       .map((field) => ({
         id: pluginFieldId(id, field.key),
         name: localized(field.name, language) ?? field.key,
-        type: FILTERED_AS[field.kind],
+        type: FILTERED_AS[field.kind] as MetadataType,
       }))
   );
 
@@ -310,8 +329,14 @@ export const fieldsInParts = (
 /** What the page being drawn shows inside its parts ({@link fieldsInParts}). */
 export const FieldsInParts = createContext<ReadonlySet<string>>(new Set());
 
-const pluginValue = (values: PluginValueSummary[] | undefined, install: number, key: string) =>
-  values?.find((value) => value.plugin_id === install && value.key === key)?.value ?? null;
+/** What an install keeps under `key` on an item, among its values: the value,
+ *  with the options and currency its definition reads with. */
+const pluginSummary = (values: PropertySummary[] | undefined, install: number, key: string) =>
+  values?.find((value) => value.install_id === install && value.key === key);
+
+/** The value an install keeps under `key` on an item. */
+const pluginValue = (values: PropertySummary[] | undefined, install: number, key: string) =>
+  pluginSummary(values, install, key)?.value ?? null;
 
 /** Every field the installs show on a task, after the built-ins and properties. */
 export const pluginFields = (
@@ -328,7 +353,7 @@ export const pluginFields = (
         hideable: true,
         plugin: { install: plugin.id, field, on: plugin },
         value: (task) => {
-          const value = pluginValue(task.plugin_values, plugin.id, field.key);
+          const value = pluginValue(task.properties, plugin.id, field.key);
           return draws(field, value) ? value : null;
         },
       })
@@ -343,7 +368,29 @@ const isWebLink = (url: unknown): url is string =>
 
 /** The kinds whose value is one scalar, which a value kept beside a state,
  *  and a list's element, hold in `value`. */
-const SCALAR_KINDS = new Set<PluginFieldKind>(["text", "number", "date", "datetime", "checkbox"]);
+const SCALAR_KINDS = new Set<PluginFieldKind>([
+  "text",
+  "number",
+  "scale",
+  "date",
+  "datetime",
+  "checkbox",
+  "url",
+  "currency",
+  "select",
+  "multi_select",
+  "user_reference",
+]);
+
+/** The kinds that are property types, drawn as a property's value is, with
+ *  the options and currency the value is read with. */
+const PROPERTY_KINDS = new Set<PluginFieldKind>([
+  "url",
+  "currency",
+  "select",
+  "multi_select",
+  "user_reference",
+]);
 
 /** A value as its kind reads it. */
 const scalarOf = (kind: PluginFieldKind, value: unknown): unknown =>
@@ -372,22 +419,23 @@ const shows = (kind: PluginFieldKind, raw: unknown): boolean => {
     case "text":
     case "date":
     case "datetime":
+    case "url":
+    case "select":
       return typeof value === "string" && value !== "";
     case "number":
+    case "scale":
+    case "currency":
       return typeof value === "number" && Number.isFinite(value);
+    case "multi_select":
+      return Array.isArray(value) && value.some((each) => typeof each === "string");
+    case "user_reference":
+      return (typeof value === "number" && Number.isFinite(value)) || isObject(value);
     case "checkbox":
       return typeof value === "boolean";
     case "link":
       return isObject(value) && isWebLink(value.url);
     case "badge":
       return isObject(value) && typeof value.text === "string" && value.text !== "";
-    case "progress":
-      return (
-        isObject(value) &&
-        typeof value.value === "number" &&
-        typeof value.max === "number" &&
-        value.max > 0
-      );
   }
 };
 
@@ -425,15 +473,40 @@ const toneOf = (tone: unknown, fallback: Tone | undefined): Tone =>
     ? (tone as Tone)
     : (fallback ?? "neutral");
 
-/** One value of a field's kind, with the badge of each state it is in. */
-const PluginScalar = ({ field, value: raw }: { field: PluginFieldDecl; value: unknown }) => {
+/** One value of a field's kind, with the badge of each state it is in. A
+ *  property type's is drawn as a property's, read with what `kept` carries. */
+const PluginScalar = ({
+  field,
+  value: raw,
+  kept,
+}: {
+  field: PluginFieldDecl;
+  value: unknown;
+  kept?: PropertySummary;
+}) => {
   const { t, i18n } = useTranslation("common");
   if (!shows(field.kind, raw)) return null;
   const value = scalarOf(field.kind, raw);
-  const states = Object.entries(stateOf(raw) ?? {}).flatMap(([facet, key]) => {
-    const state = field.states?.[facet]?.values[key];
-    return state ? [{ facet, key, ...state }] : [];
-  });
+  if (PROPERTY_KINDS.has(field.kind)) {
+    return (
+      <StatedValue field={field} raw={raw}>
+        <PropertyValueCell
+          summary={{
+            property_id: kept?.property_id ?? 0,
+            name: kept?.name ?? field.key,
+            type: field.kind as MetadataType,
+            project_id: null,
+            collection_id: null,
+            install_id: kept?.install_id ?? null,
+            key: field.key,
+            options: kept?.options ?? null,
+            currency: kept?.currency ?? null,
+            value,
+          }}
+        />
+      </StatedValue>
+    );
+  }
   const drawn = (() => {
     switch (field.kind) {
       case "text":
@@ -474,24 +547,37 @@ const PluginScalar = ({ field, value: raw }: { field: PluginFieldDecl; value: un
           </Badge>
         );
       }
-      case "progress": {
-        const progress = value as { value: number; max: number };
-        const percent = Math.min(100, Math.max(0, (progress.value / progress.max) * 100));
-        return (
-          <Progress
-            value={percent}
-            aria-label={field.key}
-            className="w-24"
-            title={`${numberFormat(i18n.language).format(progress.value)} / ${numberFormat(i18n.language).format(progress.max)}`}
-          />
-        );
-      }
+      case "scale":
+        return <ScaleValue value={Math.min(100, Math.max(0, value as number))} display="bar" />;
     }
   })();
-  if (!states.length) return drawn;
+  return (
+    <StatedValue field={field} raw={raw}>
+      {drawn}
+    </StatedValue>
+  );
+};
+
+/** A value drawn beside the badge of each state it is in, as its field names
+ *  them. */
+const StatedValue = ({
+  field,
+  raw,
+  children,
+}: {
+  field: PluginFieldDecl;
+  raw: unknown;
+  children: ReactNode;
+}) => {
+  const { i18n } = useTranslation();
+  const states = Object.entries(stateOf(raw) ?? {}).flatMap(([facet, key]) => {
+    const state = field.states?.[facet]?.values[key];
+    return state ? [{ facet, key, ...state }] : [];
+  });
+  if (!states.length) return children;
   return (
     <span className="inline-flex min-w-0 flex-wrap items-center gap-1">
-      {drawn}
+      {children}
       {states.map((state) => (
         <Badge
           key={state.facet}
@@ -533,22 +619,24 @@ const elementActions = (
  *  them. */
 const PluginValue = ({
   field,
-  value,
+  kept,
   elements,
 }: {
   field: PluginFieldDecl;
-  value: unknown;
+  /** What the install keeps under the field's key on the item. */
+  kept: PropertySummary | undefined;
   elements?: ElementActions;
 }) => {
   const { i18n } = useTranslation();
-  if (!field.list) return <PluginScalar field={field} value={value} />;
+  const value = kept?.value ?? null;
+  if (!field.list) return <PluginScalar field={field} value={value} kept={kept} />;
   const drawn = elementsOf(field, value);
   if (!drawn.length) return null;
   return (
     <ul className="space-y-1">
       {drawn.map((element) => (
         <li key={element.ref} className="flex min-w-0 flex-wrap items-center gap-2">
-          <PluginScalar field={field} value={element} />
+          <PluginScalar field={field} value={element} kept={kept} />
           {elements?.offered.map((action) => (
             <Button
               key={action.id}
@@ -569,9 +657,12 @@ const PluginValue = ({
 
 /** A plug-in field as a view draws it: its value in a cell, and its name
  *  beside its value on a card. */
-export const PluginField = ({ value, field, variant }: FieldRendererProps) => {
-  if (!field.plugin) return null;
-  const drawn = <PluginValue field={field.plugin.field} value={value} />;
+export const PluginField = ({ value, item, field, variant }: FieldRendererProps) => {
+  if (!field.plugin || value === null) return null;
+  const { install, field: declared } = field.plugin;
+  const drawn = (
+    <PluginValue field={declared} kept={pluginSummary(item.properties, install, declared.key)} />
+  );
   if (variant === "cell") return drawn;
   return (
     <span className="inline-flex min-w-0 items-center gap-1 text-xs">
@@ -588,15 +679,15 @@ export const PluginFieldOnDetail = ({ field, item }: { field: FieldDef; item: Pl
   const runner = useActionRunner(field.plugin?.on.kind ?? "task", item.id);
   if (!field.plugin || inParts.has(field.id)) return null;
   const { install, field: declared, on } = field.plugin;
-  const value = pluginValue(item.plugin_values, install, declared.key);
-  if (!draws(declared, value)) return null;
+  const kept = pluginSummary(item.properties, install, declared.key);
+  if (!draws(declared, kept?.value ?? null)) return null;
   return (
     <div className="space-y-1">
       <p className="text-muted-foreground text-xs">{field.label}</p>
       <div className="text-sm">
         <PluginValue
           field={declared}
-          value={value}
+          kept={kept}
           elements={elementActions(on, declared, runner.start, runner.pending)}
         />
       </div>
@@ -835,12 +926,12 @@ const drawPart = (node: LayoutNode, drawing: Drawing): ReactNode => {
     case "value": {
       const field = plugin.fields.get(String(props.field));
       if (!field) return null;
-      const value = pluginValue(item.plugin_values, plugin.id, field.key);
-      if (!draws(field, value)) return null;
+      const kept = pluginSummary(item.properties, plugin.id, field.key);
+      if (!draws(field, kept?.value ?? null)) return null;
       const drawn = (
         <PluginValue
           field={field}
-          value={value}
+          kept={kept}
           elements={elementActions(plugin, field, drawing.start, drawing.pending)}
         />
       );

@@ -23,7 +23,8 @@
   "card": "Tarjeta",
   "row": "Fila",
   "group": "Grupo",
-  "allProperties": "Todas las propiedades",
+  "allMetadata": "Todos los metadatos",
+  "allPropertiesAndMetadata": "Todas las propiedades y metadatos",
   "missingPart": "Una parte que ya no está disponible",
   "missingField": "Un campo que ya no está disponible",
   "columns": "Columnas",
@@ -42,7 +43,7 @@
   "hidePart": "Ocultar",
   "settings": "Ajustes",
   "cardHelp": "Lo que muestra cada tarea en el tablero. Selecciona una parte para cambiarla o añade una bajo el esquema.",
-  "propertiesHelp": "Muestra cada propiedad para la que una tarea tiene un valor.",
+  "propertiesHelp": "Muestra cada propiedad y cada metadato para los que una tarea tiene un valor.",
   "pluginPartHelp": "La dibuja el plug-in con sus propios valores y acciones.",
   "fieldHelp": "Muestra este campo cuando una tarea tiene un valor para él.",
   "layout": "Diseño que se edita",
@@ -204,9 +205,10 @@
   },
   "boxWith": "Caja con {{name}}",
   "newField": "Campo nuevo",
-  "fieldsGroup": "Campos",
+  "projectProperties": "Propiedades de este proyecto",
+  "collectionProperties": "Propiedades de esta colección",
+  "initiativeMetadata": "Metadatos de la iniciativa",
   "panels": "Paneles",
-  "fromProperty": "Propiedad",
   "search": "Buscar",
   "noMatches": "No hay coincidencias.",
   "sectionHelp": "Con título se abre y se cierra; sin él es una caja.",
@@ -246,6 +248,14 @@
     },
     "noItems": "Añade un contador al grupo para ver aquí su diseño."
   },
+  "fileDetail": {
+    "name": "Detalle del archivo",
+    "help": "Cómo se muestra junto a la colección un archivo abierto desde ella. Lo que deja fuera queda oculto.",
+    "shipped": "Este es el diseño tal como viene. Cambiarlo lo convierte en el de la colección.",
+    "titleHelp": "Cada archivo muestra su nombre.",
+    "hiddenHelp": "Cada archivo puede mostrar esto. Si se quita, queda oculto, y Añadir lo vuelve a poner.",
+    "noItems": "Añade un archivo a la colección para ver aquí su diseño."
+  },
   "postDetail": {
     "name": "Detalle del aviso",
     "help": "Cómo se muestra cada aviso de esta iniciativa en su propia página. Lo que deja fuera queda oculto.",
@@ -274,9 +284,8 @@
   },
   "calendarNote": "Un calendario no tiene tarjeta ni columnas que organizar. Si se muestra, y si el proyecto se abre en él, se ajusta a la derecha.",
   "makeOpensFirst": "Abrir primero con {{name}}",
-  "fromCollection": "Esta colección",
-  "ratingDisplay": {
-    "label": "Mostrar la valoración como",
+  "scaleDisplay": {
+    "label": "Mostrar la escala como",
     "number": "Un número",
     "stars": "Estrellas",
     "bar": "Una barra"

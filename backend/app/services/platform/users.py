@@ -220,7 +220,7 @@ async def _erase_in_guild(
     ``guild_session`` is a system session routed into ``guild_id``.
     """
     from app.models.tenant.calendar_event import CalendarEventAttendee
-    from app.models.tenant.property import PropertyValue
+    from app.models.tenant.metadata import MetadataValue
     from app.models.tenant.queue import QueueItem
     from app.services.tenant.mention_parser import anonymize_user_mentions
 
@@ -290,8 +290,8 @@ async def _erase_in_guild(
     # Person-valued properties: NULL the reference (a value belongs to the
     # initiative, not to the person it names).
     await guild_session.exec(
-        update(PropertyValue)
-        .where(PropertyValue.value_user_id == user_id)
+        update(MetadataValue)
+        .where(MetadataValue.value_user_id == user_id)
         .values(value_user_id=None)
     )
 

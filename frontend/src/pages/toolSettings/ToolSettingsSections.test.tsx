@@ -132,7 +132,7 @@ describe("ToolSettingsDetailsPage properties", () => {
     );
 
     expect(await screen.findByText("Budget")).toBeInTheDocument();
-    expect(screen.getByRole("group", { name: "Properties" })).toBeInTheDocument();
+    expect(screen.getByRole("group", { name: "Metadata" })).toBeInTheDocument();
   });
 
   it("offers none on a community-level tool, which has no definitions to add", async () => {
@@ -140,7 +140,7 @@ describe("ToolSettingsDetailsPage properties", () => {
     renderSection(ToolSettingsDetailsPage, buildEntity({ initiative_id: null }));
 
     await screen.findByRole("switch", { name: "Enable comments" });
-    expect(screen.queryByText("Properties")).not.toBeInTheDocument();
+    expect(screen.queryByText("Metadata")).not.toBeInTheDocument();
   });
 });
 

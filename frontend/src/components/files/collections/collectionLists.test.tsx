@@ -8,7 +8,7 @@ import {
   buildPropertySummary,
 } from "@/__tests__/factories";
 import { renderWithProviders } from "@/__tests__/helpers/render";
-import { PropertyType } from "@/api/generated/initiativeAPI.schemas";
+import { MetadataType } from "@/api/generated/initiativeAPI.schemas";
 import { collectionFileFields } from "@/lib/layouts/files";
 import type { LayoutNode } from "@/lib/layouts/tree";
 
@@ -23,7 +23,7 @@ const fields = collectionFileFields(
     buildPropertyDefinition({
       id: 22,
       name: "Mood",
-      type: PropertyType.multi_select,
+      type: MetadataType.multi_select,
       options: moods,
       collection_id: 5,
     }),
@@ -32,12 +32,12 @@ const fields = collectionFileFields(
 );
 const harbour = buildCollectionFile({
   name: "Harbour",
-  fields: [
+  metadata: [
     buildPropertySummary({ property_id: 21, name: "Caption", value: "Dusk on the water" }),
     buildPropertySummary({
       property_id: 22,
       name: "Mood",
-      type: PropertyType.multi_select,
+      type: MetadataType.multi_select,
       options: moods,
       value: ["calm", "grey", "windy"],
     }),

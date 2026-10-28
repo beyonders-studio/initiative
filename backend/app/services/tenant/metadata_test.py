@@ -12,9 +12,9 @@ from decimal import Decimal
 import pytest
 from fastapi import HTTPException
 
-from app.models.tenant.property import PropertyDefinition, PropertyType
+from app.models.tenant.metadata import MetadataDefinition, MetadataType
 from app.schemas.query import FilterOp
-from app.services.tenant.properties import (
+from app.services.tenant.metadata import (
     MAX_PROPERTY_FILTERS,
     _validate_value_for_type,
     parse_property_filters,
@@ -22,13 +22,13 @@ from app.services.tenant.properties import (
 
 
 def _make_definition(
-    type: PropertyType,
+    type: MetadataType,
     *,
     options: list[dict] | None = None,
     initiative_id: int = 1,
-) -> PropertyDefinition:
-    """Build a non-persisted PropertyDefinition for pure-function tests."""
-    defn = PropertyDefinition(
+) -> MetadataDefinition:
+    """Build a non-persisted MetadataDefinition for pure-function tests."""
+    defn = MetadataDefinition(
         initiative_id=initiative_id,
         name="Prop",
         type=type,
@@ -44,14 +44,14 @@ def _make_definition(
 
 
 def test_validate_text_accepts_string():
-    defn = _make_definition(PropertyType.text)
+    defn = _make_definition(MetadataType.text)
     cols = _validate_value_for_type(defn, "hello")
     assert cols["value_text"] == "hello"
     assert cols["value_number"] is None
 
 
 def test_validate_text_rejects_non_string():
-    defn = _make_definition(PropertyType.text)
+    defn = _make_definition(MetadataType.text)
     with pytest.raises(HTTPException) as exc_info:
         _validate_value_for_type(defn, 123)
     assert exc_info.value.status_code == 400
@@ -64,7 +64,7 @@ def test_validate_text_rejects_non_string():
 
 
 def test_validate_number_accepts_int_float_and_string():
-    defn = _make_definition(PropertyType.number)
+    defn = _make_definition(MetadataType.number)
 
     cols_int = _validate_value_for_type(defn, 10)
     assert cols_int["value_number"] == Decimal("10")
@@ -77,7 +77,7 @@ def test_validate_number_accepts_int_float_and_string():
 
 
 def test_validate_number_rejects_non_numeric():
-    defn = _make_definition(PropertyType.number)
+    defn = _make_definition(MetadataType.number)
     with pytest.raises(HTTPException) as exc_info:
         _validate_value_for_type(defn, "abc")
     assert exc_info.value.detail == "PROPERTY_INVALID_VALUE_FOR_TYPE"
@@ -89,7 +89,7 @@ def test_validate_number_rejects_non_numeric():
 
 
 def test_validate_checkbox_accepts_bool():
-    defn = _make_definition(PropertyType.checkbox)
+    defn = _make_definition(MetadataType.checkbox)
     cols = _validate_value_for_type(defn, True)
     assert cols["value_boolean"] is True
 
@@ -100,7 +100,7 @@ def test_validate_checkbox_accepts_bool():
 
 
 def test_validate_date_accepts_iso_string():
-    defn = _make_definition(PropertyType.date)
+    defn = _make_definition(MetadataType.date)
     cols = _validate_value_for_type(defn, "2026-04-22")
     assert cols["value_date"] == date(2026, 4, 22)
 
@@ -111,7 +111,7 @@ def test_validate_date_accepts_iso_string():
 
 
 def test_validate_datetime_accepts_iso_with_tz():
-    defn = _make_definition(PropertyType.datetime)
+    defn = _make_definition(MetadataType.datetime)
     cols = _validate_value_for_type(defn, "2026-04-22T10:00:00+00:00")
     assert isinstance(cols["value_datetime"], datetime)
     assert cols["value_datetime"].tzinfo is not None
@@ -123,7 +123,7 @@ def test_validate_datetime_accepts_iso_with_tz():
 
 
 def test_validate_url_accepts_http_https():
-    defn = _make_definition(PropertyType.url)
+    defn = _make_definition(MetadataType.url)
 
     for ok_url in ("https://example.com", "http://example.com/path?q=1"):
         cols = _validate_value_for_type(defn, ok_url)
@@ -136,10 +136,10 @@ def test_validate_empty_values_are_attached_but_empty():
     This lets a user attach a property definition to a doc/task without
     supplying a value (the "is empty" filter then matches the row).
     """
-    text_defn = _make_definition(PropertyType.text)
-    url_defn = _make_definition(PropertyType.url)
+    text_defn = _make_definition(MetadataType.text)
+    url_defn = _make_definition(MetadataType.url)
     multi_defn = _make_definition(
-        PropertyType.multi_select,
+        MetadataType.multi_select,
         options=[{"value": "a", "label": "A"}],
     )
 
@@ -167,7 +167,7 @@ def test_validate_empty_values_are_attached_but_empty():
 
 def test_validate_select_slug_in_options():
     defn = _make_definition(
-        PropertyType.select,
+        MetadataType.select,
         options=[{"value": "live", "label": "Live"}],
     )
     cols = _validate_value_for_type(defn, "live")
@@ -176,7 +176,7 @@ def test_validate_select_slug_in_options():
 
 def test_validate_select_rejects_unknown_slug():
     defn = _make_definition(
-        PropertyType.select,
+        MetadataType.select,
         options=[{"value": "live", "label": "Live"}],
     )
     with pytest.raises(HTTPException) as exc_info:
@@ -191,7 +191,7 @@ def test_validate_select_rejects_unknown_slug():
 
 def test_validate_multi_select_all_slugs_valid_and_deduped():
     defn = _make_definition(
-        PropertyType.multi_select,
+        MetadataType.multi_select,
         options=[
             {"value": "a", "label": "A"},
             {"value": "b", "label": "B"},
@@ -203,7 +203,7 @@ def test_validate_multi_select_all_slugs_valid_and_deduped():
 
 def test_validate_multi_select_rejects_unknown_slug():
     defn = _make_definition(
-        PropertyType.multi_select,
+        MetadataType.multi_select,
         options=[{"value": "a", "label": "A"}],
     )
     with pytest.raises(HTTPException) as exc_info:
@@ -219,7 +219,7 @@ def test_validate_multi_select_rejects_unknown_slug():
 def test_validate_user_reference_takes_a_row_id():
     """A person value is the person's id; who may be named is asked of the
     whole set by ``named_people``."""
-    defn = _make_definition(PropertyType.user_reference, initiative_id=1)
+    defn = _make_definition(MetadataType.user_reference, initiative_id=1)
     assert _validate_value_for_type(defn, 7)["value_user_id"] == 7
     with pytest.raises(HTTPException):
         _validate_value_for_type(defn, True)
@@ -229,18 +229,18 @@ def test_validate_user_reference_takes_a_row_id():
     ("prop_type", "bad"),
     [
         # Strict: no string or integer coercion into a bool.
-        *((PropertyType.checkbox, v) for v in ("true", "false", 1, 0, "garbage")),
-        (PropertyType.date, "notadate"),
-        (PropertyType.datetime, "notadatetime"),
-        (PropertyType.url, "ftp://example.com"),
-        (PropertyType.url, "not a url"),
+        *((MetadataType.checkbox, v) for v in ("true", "false", 1, 0, "garbage")),
+        (MetadataType.date, "notadate"),
+        (MetadataType.datetime, "notadatetime"),
+        (MetadataType.url, "ftp://example.com"),
+        (MetadataType.url, "not a url"),
         # A user reference is an id, not the string form of one.
-        (PropertyType.user_reference, "1"),
+        (MetadataType.user_reference, "1"),
     ],
     ids=lambda v: str(getattr(v, "value", v)),
 )
 def test_validate_value_rejects_a_value_of_the_wrong_shape(
-    prop_type: PropertyType, bad
+    prop_type: MetadataType, bad
 ):
     """A value the column cannot hold is refused at validation rather than
     stored in a coerced form."""

@@ -107,7 +107,7 @@
     "pluginParamPlaceholder": "Elige…",
     "pluginParamNeedsSibling": "Elige primero el valor de arriba.",
     "pluginParamListHint": "Separa los valores con comas.",
-    "all_property": "Sin propiedad",
+    "all_property": "Sin metadatos ni propiedad",
     "sqlHelp": "Un SELECT de solo lectura sobre los datos de esta comunidad. Se ejecuta como tú, así que devuelve lo que ya puedes ver."
   },
   "picker": {
@@ -169,8 +169,8 @@
     "description": "Descripción",
     "updated_at": "Actualizado",
     "created_by": "Creado por",
-    "property": "Propiedad",
-    "property_id": "Propiedad",
+    "property": "Metadatos o propiedad",
+    "property_id": "Metadatos o propiedad",
     "value_text": "Texto",
     "value_number": "Número",
     "value_boolean": "Casilla",
@@ -307,8 +307,8 @@
     "counters": "Contadores",
     "counter_groups": "Grupos de contadores",
     "task_statuses": "Estados de tarea",
-    "property_values": "Valores de propiedades",
-    "property_definitions": "Propiedades",
+    "metadata_values": "Valores de metadatos y propiedades",
+    "metadata_definitions": "Metadatos y propiedades",
     "relationships": "Vínculos"
   },
   "viewMode": {

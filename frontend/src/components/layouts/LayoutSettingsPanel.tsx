@@ -3,12 +3,12 @@ import { type ReactNode, useEffect, useRef, useState } from "react";
 import { useTranslation } from "react-i18next";
 
 import {
-  PropertyType,
+  MetadataType,
   type TaskStatusRead,
   type TaskTypeRead,
 } from "@/api/generated/initiativeAPI.schemas";
 import { listLayoutLooks } from "@/components/projects/projectTasksConfig";
-import type { RatingDisplay } from "@/components/properties/propertyHelpers";
+import { SCALE_DISPLAYS, type ScaleDisplay } from "@/components/properties/propertyHelpers";
 import { TaskStatusOption } from "@/components/tasks/TaskStatusOption";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -93,8 +93,8 @@ export const ListLayoutSettings = ({
             return node?.type === "field" ? String(node.props?.field) : null;
           })()
         : null;
-  const rating =
-    selectedField !== null && fields.get(selectedField)?.property?.type === PropertyType.rating
+  const scale =
+    selectedField !== null && fields.get(selectedField)?.property?.type === MetadataType.scale
       ? selectedField
       : null;
   return (
@@ -153,38 +153,36 @@ export const ListLayoutSettings = ({
           edits={edits}
         />
       )}
-      {rating !== null ? (
-        <RatingDisplaySetting
-          value={layout.definition.displays?.[rating] ?? "number"}
-          onChange={(display) => edits.changeDisplay(rating, display)}
+      {scale !== null ? (
+        <ScaleDisplaySetting
+          value={layout.definition.displays?.[scale] ?? "number"}
+          onChange={(display) => edits.changeDisplay(scale, display)}
         />
       ) : null}
     </fieldset>
   );
 };
 
-const RATING_DISPLAYS: RatingDisplay[] = ["number", "stars", "bar"];
-
-/** How the list draws the rating selected: a number, five stars, or a bar. */
-const RatingDisplaySetting = ({
+/** How the list draws the scale selected: a number, five stars, or a bar. */
+const ScaleDisplaySetting = ({
   value,
   onChange,
 }: {
-  value: RatingDisplay;
-  onChange: (display: RatingDisplay) => void;
+  value: ScaleDisplay;
+  onChange: (display: ScaleDisplay) => void;
 }) => {
   const { t } = useTranslation(["layouts"]);
   return (
     <div className="space-y-2 px-4 pb-4">
-      <Label htmlFor="rating-display">{t("layouts:ratingDisplay.label")}</Label>
-      <Select value={value} onValueChange={(next) => onChange(next as RatingDisplay)}>
-        <SelectTrigger id="rating-display">
+      <Label htmlFor="scale-display">{t("layouts:scaleDisplay.label")}</Label>
+      <Select value={value} onValueChange={(next) => onChange(next as ScaleDisplay)}>
+        <SelectTrigger id="scale-display">
           <SelectValue />
         </SelectTrigger>
         <SelectContent>
-          {RATING_DISPLAYS.map((display) => (
+          {SCALE_DISPLAYS.map((display) => (
             <SelectItem key={display} value={display}>
-              {t(`layouts:ratingDisplay.${display}`)}
+              {t(`layouts:scaleDisplay.${display}`)}
             </SelectItem>
           ))}
         </SelectContent>

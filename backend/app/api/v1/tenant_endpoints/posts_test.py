@@ -241,10 +241,6 @@ async def test_list_carries_bodies_and_read_matches(
     detail = await client.get(board.g(f"/posts/{post.id}"), headers=board.headers)
     assert detail.status_code == 200
     assert detail.json()["body"] == item["body"]
-    # Its own read carries the plug-ins' values on it; a board's rows leave
-    # them empty.
-    assert detail.json()["plugin_values"] == []
-    assert item["plugin_values"] == []
 
 
 async def test_board_pages_in_fives_by_default(

@@ -42,13 +42,14 @@ from app.services.export.adapters._common import (
     require_may_leave,
 )
 from app.services.export import values
+from app.services.marketplace.widget_meta import in_language
 from app.services.export.contract import RenderItem, RenderRequest
 from app.services.export.i18n import et, export_locale
 from app.services.export.markdown import blocks_from_markdown
 from app.services.import_engine.mentions import mention_namer
 from app.core.user_display import display_name
 from app.services.export import limits as export_limits
-from app.services.tenant import properties as properties_service
+from app.services.tenant import metadata as metadata_service
 from app.services.tenant import task_queries
 
 # A person's mention reaches a report as ``@[Display Name](id)``, the name
@@ -363,7 +364,7 @@ async def task_columns(
         and name.removeprefix(PROPERTY_FIELD_PREFIX).isdigit()
         and int(name.removeprefix(PROPERTY_FIELD_PREFIX)) <= _MAX_ROW_ID
     }
-    definitions = await properties_service.load_definitions_by_ids(
+    definitions = await metadata_service.load_definitions_by_ids(
         session, list(property_ids.values())
     )
     plugin_keys = {
@@ -421,11 +422,7 @@ async def task_columns(
                 continue
             given = decl.get("name")
             title = (
-                (
-                    given.get(locale)
-                    or given.get("en")
-                    or next(iter(given.values()), key)
-                )
+                in_language(given, locale) or key
                 if isinstance(given, dict)
                 else given or key
             )
@@ -434,8 +431,8 @@ async def task_columns(
                     next(
                         (
                             v.value
-                            for v in t.plugin_values
-                            if v.plugin_id == install and v.key == key
+                            for v in t.properties
+                            if v.install_id == install and v.key == key
                         ),
                         None,
                     ),

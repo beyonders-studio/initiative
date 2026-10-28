@@ -459,29 +459,27 @@
       "dismiss": "Fermer",
       "tooLarge": "plus volumineux que ce que ce serveur accepte"
     },
-    "layoutsDescription": "Les listes que cette collection affiche, et celle sur laquelle elle s’ouvre. Chacun choisit parmi celles affichées.",
     "backToFiles": "Retour aux fichiers",
     "notFound": "Collection introuvable",
     "notFoundDescription": "La collection que vous cherchez n’existe pas, ou aucun de ses fichiers ne vous est accessible.",
     "noAccess": "Accès refusé",
     "noAccessDescription": "Vous n’avez pas la permission de voir cette collection.",
     "error": "Impossible de modifier la collection",
-    "fields": {
-      "title": "Champs",
+    "properties": {
+      "title": "Propriétés",
       "description": "Ce que chaque fichier de cette collection peut porter ici : ses valeurs appartiennent à la collection, pas au fichier.",
-      "create": "Nouveau champ",
-      "edit": "Modifier le champ",
-      "delete": "Supprimer le champ",
-      "deleteTitle": "Supprimer ce champ ?",
-      "deleteBody": "Le champ et la valeur de chaque fichier dans cette collection seront supprimés.",
-      "none": "Aucun champ pour l'instant",
+      "create": "Nouvelle propriété",
+      "edit": "Modifier la propriété",
+      "delete": "Supprimer la propriété",
+      "deleteTitle": "Supprimer cette propriété ?",
+      "deleteBody": "La propriété et la valeur de chaque fichier dans cette collection seront supprimées.",
+      "none": "Aucune propriété pour l'instant",
       "heading": "Dans cette collection",
       "saveError": "Impossible d'enregistrer la valeur",
-      "of": "Champs de {{name}}"
+      "of": "Propriétés de {{name}}"
     },
     "addedOn": "Ajouté {{date}}",
     "createdOn": "Créé {{date}}",
-    "editLayouts": "Modifier ce que montrent les listes",
     "listHelp": {
       "masonry": "Chaque fichier dans sa propre forme, rangé en colonnes : ce que sa carte montre sous l'image.",
       "grid": "Chaque fichier en vignette carrée : ce que sa carte montre sous l'image.",
@@ -491,12 +489,12 @@
     "shapes": {
       "name": "Nom",
       "blank": "Vierge",
-      "blankHint": "Une grille et un tableau, sans champs propres pour l'instant.",
+      "blankHint": "Une grille et un tableau, sans propriétés propres pour l'instant.",
       "lists": "Affiche {{lists}}",
-      "fields": "Champs : {{fields}}",
+      "properties": "Propriétés : {{properties}}",
       "copyLabel": "Ou copier la forme de",
       "copyPlaceholder": "Une autre collection",
-      "copyHint": "Ses champs et ce que montrent ses listes, sans ses fichiers ni leurs valeurs.",
+      "copyHint": "Ses propriétés et ce que montrent ses listes, sans ses fichiers ni leurs valeurs.",
       "create": "Créer la collection"
     }
   }

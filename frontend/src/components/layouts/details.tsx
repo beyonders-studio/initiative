@@ -1,7 +1,7 @@
 /**
- * The details the layout editor lays out: a project's task, and the initiative
- * calendar's event; and the presets each tool's lists offer, with its own
- * filter controls. Each says what kind of detail it is, what the editor calls
+ * The details the layout editor lays out: a project's task, the initiative
+ * calendar's event and a collection's file; and the presets each tool's lists
+ * offer, with its own filter controls. Each says what kind of detail it is, what the editor calls
  * it and its parts, what its fields are, whether plug-ins draw on it, and
  * draws itself with one of its own while it is laid out.
  */
@@ -12,6 +12,8 @@ import { useTranslation } from "react-i18next";
 
 import { useReadCounter } from "@/api/generated/counters/counters";
 import {
+  type CollectionFileSummary,
+  type CollectionRead,
   type PropertyDefinitionRead,
   type PropertySummary,
   type TaskTypeRead,
@@ -37,6 +39,8 @@ import { type DetailKind, DetailLayoutView } from "@/lib/layouts/DetailLayoutVie
 import type { DetailLayoutSpec, StoredRegions } from "@/lib/layouts/detailLayout";
 import { EVENT_DETAIL } from "@/lib/layouts/eventLayout";
 import type { FieldDef } from "@/lib/layouts/fields";
+import { FILE_DETAIL } from "@/lib/layouts/fileLayout";
+import { collectionFileFields } from "@/lib/layouts/files";
 import { POST_DETAIL } from "@/lib/layouts/postLayout";
 import { CALENDAR_PRESETS, TASK_PRESETS } from "@/lib/layouts/presets";
 import { QUEUE_ITEM_DETAIL } from "@/lib/layouts/queueItemLayout";
@@ -366,6 +370,28 @@ export const counterDetail = (groupId: number, initiativeId: number): EditableDe
   preview: (tree) => <CounterPreview groupId={groupId} initiativeId={initiativeId} tree={tree} />,
 });
 
+/** A file opened from a collection, drawn with `first`, the first of its
+ *  files, once they are `loaded`. Its fields are the collection's lists'. */
+export const fileDetail = (
+  collection: CollectionRead,
+  first: CollectionFileSummary | undefined,
+  loaded: boolean
+): EditableDetail => ({
+  spec: FILE_DETAIL.spec,
+  words: wordsOf("fileDetail"),
+  fields: (definitions) => collectionFileFields(collection.metadata, definitions),
+  preview: (tree) => (
+    <ItemPreview
+      detail={FILE_DETAIL}
+      tree={tree}
+      item={first}
+      none={loaded}
+      empty="fileDetail.noItems"
+      context={() => ({ collection })}
+    />
+  ),
+});
+
 /** The initiative's notice detail, which every notice in it shares. */
 export const postDetail = (initiativeId: number): EditableDetail => ({
   spec: POST_DETAIL.spec,
@@ -396,6 +422,7 @@ export const taskPresets = (project: LayoutProject) =>
           statuses: project.statuses,
           types: project.types,
           initiativeId: project.initiativeId,
+          projectId: project.id,
         }}
         value={value}
         onChange={onChange}

@@ -23,6 +23,8 @@ migrations (``scripts/gen_guild_migration.py``).
 
 from __future__ import annotations
 
+import json
+
 import re
 
 from sqlalchemy import MetaData, text
@@ -33,7 +35,6 @@ from sqlalchemy.schema import CheckConstraint, CreateTable
 from app.core.plugin_scopes import PluginScopeResource, tool_resource
 from app.core.tools import (
     INSTALL_METADATA_KIND,
-    ITEM_KINDS,
     KINDS,
     PROPERTY_TARGETS,
     Tool,
@@ -1034,36 +1035,38 @@ def _plugin_search_read() -> str:
 
 def _entity_tool_scope(table: str, kinds: tuple[str, ...]) -> str:
     """The scope resource of the tool that governs the thing a ``table`` row
-    names by ``(entity_type, entity_id)`` — a task's is ``projects``."""
-    arms = " ".join(
-        f"WHEN '{kind}' THEN '{tool_resource(KINDS[kind].tool).value}'"
-        for kind in kinds
+    names by ``(entity_type, entity_id)`` — a task's is ``projects`` — read
+    from one constant map, which parses far smaller than a branch per kind;
+    a kind it does not hold reads as ``NULL``."""
+    resources = json.dumps(
+        {kind: tool_resource(KINDS[kind].tool).value for kind in kinds},
+        separators=(",", ":"),
     )
-    return f"(CASE {table}.entity_type {arms} END)"
+    return f"(CAST('{resources}' AS jsonb) ->> {table}.entity_type::text)"
 
 
-def _property_values_scope(write: bool) -> str:
-    """An installed plug-in reaches a property value with the scope of the tool
-    that governs the row it is on — a task's with ``projects``."""
+def _metadata_values_scope(write: bool) -> str:
+    """What an installed plug-in reaches of a metadata value, by its
+    definition's owner. A value no plug-in owns takes the scope of the tool
+    that governs the row it is on, a task's ``projects``. A plug-in's own
+    values it reaches on an item with that tool's read scope, for writing
+    too, and on the install itself with none; it writes none while the
+    community's content is on hold. Another install's values it never
+    reaches."""
     held = IN_POLICY.field("install_write" if write else "install_read")
-    scope = _entity_tool_scope("property_values", PROPERTY_TARGETS)
-    return f"({_IID} IS NULL OR {scope} = ANY ({held}))"
-
-
-def _plugin_metadata_scope(write: bool) -> str:
-    """An installed plug-in reaches its own values and no other install's: on
-    an item with the read scope of the tool that governs it, for writing too,
-    and on the install itself with none. It writes none while the community's
-    content is on hold."""
-    held = IN_POLICY.field("install_read")
-    scope = _entity_tool_scope("plugin_metadata", ITEM_KINDS)
-    reach = (
-        f"(plugin_metadata.entity_type = '{INSTALL_METADATA_KIND}'"
-        f" OR COALESCE({scope} = ANY ({held}), false))"
-    )
+    read = IN_POLICY.field("install_read")
+    scope = _entity_tool_scope("metadata_values", PROPERTY_TARGETS)
     hold = f" AND NOT {IN_POLICY.content_hold}" if write else ""
+    # The tool's scope is named once: the one a value no plug-in owns is
+    # written with, or the read scope an install keeps its own with.
     return (
-        f"({_IID} IS NULL OR (plugin_metadata.install_id = {_IID}{hold} AND {reach}))"
+        f"({_IID} IS NULL OR COALESCE((SELECT (md.install_id IS NULL"  # noqa: S608
+        f" OR md.install_id = {_IID}{hold}) AND ((md.install_id IS NOT NULL"
+        f" AND metadata_values.entity_type = '{INSTALL_METADATA_KIND}')"
+        f" OR COALESCE({scope} = ANY (CASE WHEN md.install_id IS NULL THEN {held}"
+        f" ELSE {read} END), false))"
+        " FROM metadata_definitions md WHERE md.id = metadata_values.property_id),"
+        " false))"
     )
 
 
@@ -1086,18 +1089,10 @@ def _plugin_predicates(table: str) -> dict[str, str]:
         }
     if table in PLUGIN_REFUSED_TABLES:
         return dict.fromkeys(("SELECT", "INSERT", "UPDATE", "DELETE"), refused)
-    if table == "property_values":
-        write = _property_values_scope(True)
+    if table == "metadata_values":
+        write = _metadata_values_scope(True)
         return {
-            "SELECT": _property_values_scope(False),
-            "INSERT": write,
-            "UPDATE": write,
-            "DELETE": write,
-        }
-    if table == "plugin_metadata":
-        write = _plugin_metadata_scope(True)
-        return {
-            "SELECT": _plugin_metadata_scope(False),
+            "SELECT": _metadata_values_scope(False),
             "INSERT": write,
             "UPDATE": write,
             "DELETE": write,
@@ -1134,23 +1129,35 @@ def _plugin_predicates(table: str) -> dict[str, str]:
     read = plugin_scope(access.resource, False, IN_POLICY)
     if table == "initiatives":
         read = f"({read} OR initiatives.id IN {_plugin_placed_initiatives()})"
-    elif table == "property_definitions":
+    elif table == "metadata_definitions":
         # A value is set with the scope of the tool its item belongs to, and
-        # any item in the initiative may carry any of its definitions.
+        # any item in the initiative may carry any of its definitions. An
+        # install reads its own definitions and no other install's.
         tools = ", ".join(f"'{tool_resource(tool).value}'" for tool in Tool)
         held = IN_POLICY.field("install_read")
-        read = f"({read} OR {held} && ARRAY[{tools}]::text[])"
+        read = (
+            f"(CASE WHEN metadata_definitions.install_id IS NULL"
+            f" THEN ({read} OR {held} && ARRAY[{tools}]::text[])"
+            f" ELSE ({_IID} IS NULL OR metadata_definitions.install_id = {_IID}) END)"
+        )
     elif table in _PLUGIN_MEMBER_OWN_READ:
         read = f"({read} OR {_PLUGIN_MEMBER_OWN_READ[table]})"
     write = (
         plugin_scope(access.resource, True, IN_POLICY) if access.writable else refused
     )
-    if table == "property_definitions":
-        # A collection's own field is part of Files, written with its scope.
+    if table == "metadata_definitions":
+        # A project's metadata is part of the project and a collection's of
+        # Files, each written with that tool's scope; an install keeps its
+        # own while the community's content is not on hold.
+        projects = plugin_scope(tool_resource(Tool.project), True, IN_POLICY)
         files = plugin_scope(tool_resource(Tool.file), True, IN_POLICY)
         write = (
-            f"(CASE WHEN property_definitions.collection_id IS NULL"
-            f" THEN {write} ELSE {files} END)"
+            f"(CASE WHEN metadata_definitions.install_id IS NOT NULL"
+            f" THEN ({_IID} IS NULL OR (metadata_definitions.install_id = {_IID}"
+            f" AND NOT {IN_POLICY.content_hold}))"
+            f" WHEN metadata_definitions.project_id IS NOT NULL THEN {projects}"
+            f" WHEN metadata_definitions.collection_id IS NOT NULL THEN {files}"
+            f" ELSE {write} END)"
         )
     return {"SELECT": read, "INSERT": write, "UPDATE": write, "DELETE": write}
 

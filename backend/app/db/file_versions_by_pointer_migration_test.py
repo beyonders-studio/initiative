@@ -25,6 +25,7 @@ _VERSIONS = Path(__file__).resolve().parents[2] / "alembic" / "versions"
 _MIGRATION = _VERSIONS / "20261005_0459_file_versions_by_pointer.py"
 _FILES = _VERSIONS / "20261006_0464_documents_are_files.py"
 _COLLECTIONS = _VERSIONS / "20261027_0546_galleries_are_collections.py"
+_METADATA = _VERSIONS / "20261027_0550_metadata_is_one_store.py"
 
 
 def _load(path: Path = _MIGRATION) -> ModuleType:
@@ -110,6 +111,7 @@ async def test_old_files_get_versions_types_and_pointers(
 
         return apply
 
+    await session.run_sync(run(lambda: _load(_METADATA)._apply(False)))
     await session.run_sync(run(lambda: collections._apply(False)))
     picture = await _picture(session, schema, initiative.id, user.id)
     await session.run_sync(run(lambda: files._apply(False)))
@@ -184,3 +186,4 @@ async def test_old_files_get_versions_types_and_pointers(
     assert leftover == 0
     await session.run_sync(run(lambda: files._apply(True)))
     await session.run_sync(run(lambda: collections._apply(True)))
+    await session.run_sync(run(lambda: _load(_METADATA)._apply(True)))

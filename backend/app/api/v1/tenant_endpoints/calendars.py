@@ -48,7 +48,7 @@ from app.schemas.tenant.calendar import (
 from app.schemas.tenant.tool import serialize_tool
 from app.services.export.adapters.calendar_events import event_dicts
 from app.services.export.engine import count_within_bound, get_adapter
-from app.services.tenant import properties as properties_service
+from app.services.tenant import metadata as metadata_service
 from app.services.tenant import attachments as attachments_service
 from app.services.tenant import calendars as calendars_service
 from app.services.tenant import guild_plugins as guild_plugins_service
@@ -249,7 +249,7 @@ async def create_calendar(
         )
 
     await attachments_service.claim_uploads(session, calendar)
-    await properties_service.write_on_create(session, calendar, calendar_in.properties)
+    await metadata_service.write_on_create(session, calendar, calendar_in.properties)
     await session.commit()
     return await read_after_write(session, calendar.id, current_user, guild_context)
 

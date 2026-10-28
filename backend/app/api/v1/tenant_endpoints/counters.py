@@ -47,10 +47,9 @@ from app.schemas.tenant.counter import (
     _validate_counter_constraints,
 )
 from app.schemas.tenant.tool import serialize_tool
-from app.services.tenant import properties as properties_service
+from app.services.tenant import metadata as metadata_service
 from app.services.tenant import attachments as attachments_service
 from app.services.tenant import counters as counters_service
-from app.services.tenant import plugin_metadata
 from app.api import resource_access, tool_copy
 from app.core.tools import Tool
 from app.services.content_sockets import sockets
@@ -133,15 +132,8 @@ async def _counter_committed(
 async def _serialized_counter(
     session: AsyncSession, counter: Counter, context: ActorContext
 ) -> CounterRead:
-    """One counter as its own read answers it: with the plug-ins' values on it."""
-    values = await plugin_metadata.values_on(
-        session,
-        "counter",
-        {counter.id: resource_access.parent_of(counter).initiative_id},
-    )
-    return serialize_counter(
-        counter, context=context, plugin_values=values.get(counter.id, ())
-    )
+    """One counter as its own read answers it."""
+    return serialize_counter(counter, context=context)
 
 
 # ---------------------------------------------------------------------------
@@ -199,7 +191,7 @@ async def create_counter_group(
         grants=group_in.grants,
     )
     await attachments_service.claim_uploads(session, group)
-    await properties_service.write_on_create(session, group, group_in.properties)
+    await metadata_service.write_on_create(session, group, group_in.properties)
     await session.commit()
     return await read_after_write(session, group.id, current_user, guild_context)
 
@@ -274,7 +266,7 @@ async def add_counter(
         position=counter_in.position,
     )
     session.add(counter)
-    await properties_service.write_on_create(session, counter, counter_in.properties)
+    await metadata_service.write_on_create(session, counter, counter_in.properties)
     return await _counter_committed(
         session, counter, "counter_added", context=guild_context
     )

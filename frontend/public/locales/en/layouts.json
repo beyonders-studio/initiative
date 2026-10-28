@@ -23,7 +23,8 @@
   "card": "Card",
   "row": "Row",
   "group": "Group",
-  "allProperties": "All properties",
+  "allMetadata": "All metadata",
+  "allPropertiesAndMetadata": "All properties and metadata",
   "missingPart": "A part that's no longer available",
   "missingField": "A field that's no longer available",
   "columns": "Columns",
@@ -42,7 +43,7 @@
   "hidePart": "Hide",
   "settings": "Settings",
   "cardHelp": "What each task shows on the board. Select a part to change it, or add one below the outline.",
-  "propertiesHelp": "Shows every property a task has a value for.",
+  "propertiesHelp": "Shows every property and metadata value a task holds.",
   "pluginPartHelp": "Drawn by the plug-in from its own values and actions.",
   "fieldHelp": "Shows this field when a task has a value for it.",
   "layout": "Layout being edited",
@@ -204,9 +205,10 @@
   },
   "boxWith": "Box with {{name}}",
   "newField": "New field",
-  "fieldsGroup": "Fields",
+  "projectProperties": "This project's properties",
+  "collectionProperties": "This collection's properties",
+  "initiativeMetadata": "Initiative metadata",
   "panels": "Panels",
-  "fromProperty": "Property",
   "search": "Search",
   "noMatches": "Nothing matches.",
   "sectionHelp": "With a title it opens and closes; without one it's a box.",
@@ -246,6 +248,14 @@
     },
     "noItems": "Add a counter to the group to see its layout here."
   },
+  "fileDetail": {
+    "name": "File detail",
+    "help": "How a file opened from this collection is shown beside it. What it leaves out is hidden.",
+    "shipped": "This is the layout as shipped. Changing it makes it the collection's own.",
+    "titleHelp": "Every file shows its name.",
+    "hiddenHelp": "Every file can show this. Taken off, it is hidden, and Add puts it back.",
+    "noItems": "Add a file to the collection to see its layout here."
+  },
   "postDetail": {
     "name": "Notice detail",
     "help": "How every notice in this initiative is shown on its own page. What it leaves out is hidden.",
@@ -274,9 +284,8 @@
   },
   "calendarNote": "A calendar has no card or columns to lay out. Whether it shows, and whether the project opens on it, is set on the right.",
   "makeOpensFirst": "Open on {{name}} first",
-  "fromCollection": "This collection",
-  "ratingDisplay": {
-    "label": "Show the rating as",
+  "scaleDisplay": {
+    "label": "Show the scale as",
     "number": "A number",
     "stars": "Stars",
     "bar": "A bar"

@@ -31,9 +31,9 @@ import { server } from "@/__tests__/helpers/msw-server";
 import { renderPage } from "@/__tests__/helpers/render";
 import type { DetailLayoutRead } from "@/api/generated/initiativeAPI.schemas";
 import {
+  MetadataType,
   type ProjectRead,
   type PropertySummary,
-  PropertyType,
   type TaskRead,
   type TaskStatusRead,
 } from "@/api/generated/initiativeAPI.schemas";
@@ -755,7 +755,7 @@ describe("TaskEditPage", () => {
         buildPropertySummary({
           property_id: 6,
           name: "Notes",
-          type: PropertyType.text,
+          type: MetadataType.text,
           value: "x",
         }),
       ],
@@ -797,13 +797,13 @@ describe("TaskEditPage", () => {
         buildPropertySummary({
           property_id: 4,
           name: "Hours",
-          type: PropertyType.number,
+          type: MetadataType.number,
           value: 1,
         }),
         buildPropertySummary({
           property_id: 6,
           name: "Notes",
-          type: PropertyType.text,
+          type: MetadataType.text,
           value: "x",
         }),
       ],
@@ -917,7 +917,7 @@ describe("TaskEditPage", () => {
     server.use(
       communityHttp.get("/property-definitions/", () =>
         HttpResponse.json([
-          buildPropertyDefinition({ id: 9, name: "Risk", type: PropertyType.text }),
+          buildPropertyDefinition({ id: 9, name: "Risk", type: MetadataType.text }),
         ])
       ),
       communityHttp.get("/layouts/", () =>
@@ -949,7 +949,7 @@ describe("TaskEditPage", () => {
           buildPropertySummary({
             property_id: 9,
             name: "Risk",
-            type: PropertyType.text,
+            type: MetadataType.text,
             value: body.values[0]?.value,
           }),
         ];
@@ -981,7 +981,7 @@ describe("TaskEditPage", () => {
         fail
           ? new HttpResponse(null, { status: 500 })
           : HttpResponse.json([
-              buildPropertyDefinition({ id: 9, name: "Risk", type: PropertyType.text }),
+              buildPropertyDefinition({ id: 9, name: "Risk", type: MetadataType.text }),
             ])
       ),
       communityHttp.get("/layouts/", () =>
@@ -1002,7 +1002,7 @@ describe("TaskEditPage", () => {
     );
     renderTaskPage();
 
-    expect(await screen.findByText(/couldn't load this property/i)).toBeInTheDocument();
+    expect(await screen.findByText(/couldn't load this value/i)).toBeInTheDocument();
     fail = false;
     await userEvent.click(screen.getByRole("button", { name: /try again/i }));
     expect(await fieldNamed(/^risk$/i)).toBeInTheDocument();

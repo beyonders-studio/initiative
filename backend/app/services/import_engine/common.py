@@ -24,7 +24,7 @@ from sqlmodel.ext.asyncio.session import AsyncSession
 from app.core.user_display import handle_of
 from app.models.platform.user_profile_view import MemberProfile
 from app.models.tenant.initiative import InitiativeMember
-from app.models.tenant.property import PropertyDefinition, PropertyType
+from app.models.tenant.metadata import MetadataDefinition, MetadataType
 from app.models.tenant.tag import Tag
 
 if TYPE_CHECKING:  # pragma: no cover - typing only
@@ -39,11 +39,11 @@ class TagResolved:
         self.created = created
 
 
-_SELECT_TYPES = {PropertyType.select, PropertyType.multi_select}
+_SELECT_TYPES = {MetadataType.select, MetadataType.multi_select}
 
 
 def options_compatible(
-    prop_type: PropertyType,
+    prop_type: MetadataType,
     target_options: list[dict] | None,
     source_options: list[dict] | None,
 ) -> bool:
@@ -115,8 +115,8 @@ async def unique_name_in_initiative(
 async def unique_property_name(
     session: AsyncSession, *, initiative_id: int, desired_name: str
 ) -> str:
-    stmt = select(PropertyDefinition.name).where(
-        PropertyDefinition.of_initiative(initiative_id)
+    stmt = select(MetadataDefinition.name).where(
+        MetadataDefinition.of_initiative(initiative_id)
     )
     existing = {row for row in (await session.exec(stmt)).all()}
     if desired_name not in existing:
@@ -176,15 +176,15 @@ def handle_key(handle: str | None) -> str:
 
 async def load_initiative_properties(
     session: AsyncSession, *, initiative_id: int
-) -> dict[str, PropertyDefinition]:
-    stmt = select(PropertyDefinition).where(
-        PropertyDefinition.of_initiative(initiative_id)
+) -> dict[str, MetadataDefinition]:
+    stmt = select(MetadataDefinition).where(
+        MetadataDefinition.of_initiative(initiative_id)
     )
     return {pd.name: pd for pd in (await session.exec(stmt)).all()}
 
 
 class _EnvelopePropertyValue(Protocol):
-    property_type: PropertyType
+    property_type: MetadataType
     value_text: str | None
     value_number: float | None
     value_boolean: bool | None
@@ -210,19 +210,19 @@ def decode_property_value(
     that one value, and the property reads as empty.
     """
     t = pv.property_type
-    if t in (PropertyType.text, PropertyType.url, PropertyType.select):
+    if t in (MetadataType.text, MetadataType.url, MetadataType.select):
         return {"value_text": pv.value_text}
-    if t in (PropertyType.number, PropertyType.currency, PropertyType.rating):
+    if t in (MetadataType.number, MetadataType.currency, MetadataType.scale):
         return {"value_number": pv.value_number}
-    if t == PropertyType.checkbox:
+    if t == MetadataType.checkbox:
         return {"value_boolean": pv.value_boolean}
-    if t == PropertyType.date:
+    if t == MetadataType.date:
         return {"value_date": parse_date(pv.value_text)}
-    if t == PropertyType.datetime:
+    if t == MetadataType.datetime:
         return {"value_datetime": parse_datetime(pv.value_text)}
-    if t == PropertyType.multi_select:
+    if t == MetadataType.multi_select:
         return {"value_json": pv.value_json}
-    if t == PropertyType.user_reference:
+    if t == MetadataType.user_reference:
         if not pv.value_handle:
             return {"value_user_id": None}
         from app.services.import_engine.people import PeopleMap, initiative_member_id

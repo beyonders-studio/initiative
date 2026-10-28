@@ -1,11 +1,16 @@
 import { useLexicalComposerContext } from "@lexical/react/LexicalComposerContext";
 import { LexicalExtensionComposer } from "@lexical/react/LexicalExtensionComposer";
-import { screen, waitFor } from "@testing-library/react";
+import { screen, waitFor, within } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { $getRoot, type LexicalEditor } from "lexical";
+import { HttpResponse } from "msw";
 import { useMemo } from "react";
 import { describe, expect, it, vi } from "vitest";
 
+import { buildProject, buildPropertyDefinition } from "@/__tests__/factories";
+import { communityHttp } from "@/__tests__/helpers/communityHttp";
+import { definitionsHandler } from "@/__tests__/helpers/handlers/property.handlers";
+import { server } from "@/__tests__/helpers/msw-server";
 import { renderPage } from "@/__tests__/helpers/render";
 import { EditorInitiativeContext } from "@/components/ui/editor/context/editor-initiative-context";
 import { documentExtension } from "@/components/ui/editor/document-extension";
@@ -57,5 +62,45 @@ describe("choosing what an embed shows", () => {
     expect(embed.text).toBe("Open launch tasks");
     expect(embed.display).toEqual({ mode: "count" });
     expect(embed.query).toMatchObject({ initiative_id: 7, project_id: null });
+  });
+
+  it("offers one project's properties as columns, under whose it is", async () => {
+    server.use(
+      communityHttp.get("/projects/", () =>
+        HttpResponse.json({
+          items: [buildProject({ id: 3, name: "Launch", initiative_id: 7 })],
+          total_count: 1,
+          page: 1,
+          page_size: 0,
+          has_next: false,
+          has_prev: false,
+        })
+      ),
+      definitionsHandler([buildPropertyDefinition({ id: 12, name: "Budget" })], {
+        project: [buildPropertyDefinition({ id: 14, name: "Sprint", project_id: 3 })],
+      })
+    );
+    const onClose = vi.fn();
+    renderPage(() => <Harness onClose={onClose} />);
+    const user = userEvent.setup();
+
+    await user.click(await screen.findByRole("tab", { name: "Tasks matching a filter" }));
+    await user.click(screen.getByRole("combobox", { name: "From" }));
+    await user.click(await screen.findByRole("option", { name: "Launch" }));
+    await user.click(screen.getByRole("radio", { name: "Table" }));
+
+    const properties = await screen.findByRole("group", { name: "This project's properties" });
+    await user.click(within(properties).getByRole("checkbox", { name: "Sprint" }));
+    expect(
+      within(screen.getByRole("group", { name: "Initiative metadata" })).getByRole("checkbox", {
+        name: "Budget",
+      })
+    ).toBeInTheDocument();
+    await user.click(screen.getByRole("button", { name: "Embed" }));
+
+    await waitFor(() => expect(onClose).toHaveBeenCalled());
+    const [embed] = embeds();
+    expect(embed.query).toMatchObject({ initiative_id: 7, project_id: 3 });
+    expect((embed.display as { columns: string[] }).columns).toContain("property:14");
   });
 });

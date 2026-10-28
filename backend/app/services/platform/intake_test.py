@@ -15,7 +15,7 @@ from app.models.tenant.intake import IntakeBinding, IntakeCase
 from app.models.tenant.project import Project
 from app.models.tenant.task import Task, TaskStatus, TaskStatusCategory
 from app.services.tenant import task_statuses as task_statuses_service
-from app.models.tenant.property import PropertyDefinition
+from app.models.tenant.metadata import MetadataDefinition
 from app.services.platform import case_activity
 from app.services.platform import intake as intake_service
 from app.services.platform.intake import CaseFiler, CaseRefs
@@ -245,8 +245,8 @@ async def test_refs_land_as_property_values(session, bound):
     definitions = {
         definition.name: definition
         for definition in await session.exec(
-            select(PropertyDefinition).where(
-                PropertyDefinition.initiative_id == bound["initiative"].id
+            select(MetadataDefinition).where(
+                MetadataDefinition.initiative_id == bound["initiative"].id
             )
         )
     }
@@ -534,7 +534,7 @@ async def test_a_moderation_case_links_to_what_it_is_about(
     """The link a case carries opens the thing in its community, through the
     app's resolver; a kind with no page of its own gets none."""
     from app.core.config import settings
-    from app.services.tenant.properties import summaries_by_id
+    from app.services.tenant.metadata import summaries_by_id
 
     await _bind(
         session,

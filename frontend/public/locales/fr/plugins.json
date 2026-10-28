@@ -250,7 +250,7 @@
       "comments": "Commentaires",
       "relationships": "Liens",
       "tags": "Étiquettes",
-      "properties": "Propriétés",
+      "properties": "Métadonnées",
       "sharing": "Partage",
       "members": "Membres",
       "initiatives": "Initiatives",
@@ -302,8 +302,8 @@
         "write": "Lire et modifier les étiquettes"
       },
       "properties": {
-        "read": "Lire les propriétés personnalisées et leurs options",
-        "write": "Lire, créer et modifier les propriétés personnalisées"
+        "read": "Lire les métadonnées de l'initiative et leurs options",
+        "write": "Lire, créer et modifier les métadonnées de l'initiative"
       },
       "sharing": {
         "read": "Voir qui a accès à quoi",

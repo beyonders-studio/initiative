@@ -48,7 +48,8 @@ from app.models.platform.plugin_service_registration import PluginServiceRegistr
 from app.models.platform.guild import CommunityRole, CommunityStatus, Guild
 from app.models.tenant.guild_plugin_user_connection import GuildPluginUserConnection
 from app.models.tenant.initiative import InitiativeMember
-from app.models.tenant.plugin_metadata import PluginMetadata
+from app.models.tenant.metadata import MetadataDefinition, MetadataType, MetadataValue
+from app.models.tenant.task import Task
 from app.models.tenant.plugin_placement import PluginPlacement
 from app.services.marketplace.plugin_refs import (
     ensure_plugin_guild_ref,
@@ -68,6 +69,8 @@ from app.testing import (
     create_access_grant,
     create_initiative,
     create_project,
+    create_property_definition,
+    create_property_value,
     create_resource_grant,
     create_task,
     create_user,
@@ -1999,6 +2002,23 @@ async def _action_board(
     return admin, member, plugin, tasks
 
 
+async def _kept(session: AsyncSession) -> dict:
+    """The plug-ins' values, by key, each as its column keeps it."""
+    rows = await session.exec(
+        select(MetadataDefinition.key, MetadataValue)
+        .join(MetadataValue, MetadataValue.property_id == MetadataDefinition.id)
+        .where(MetadataDefinition.install_id.is_not(None))
+    )
+    return {
+        key: next(
+            held
+            for held in (row.value_number, row.value_json, row.value_text)
+            if held is not None
+        )
+        for key, row in rows
+    }
+
+
 def _run(actor, plugin, action: str = "link") -> str:
     return actor.g(f"/plugins/{plugin.id}/actions/{action}")
 
@@ -2011,23 +2031,28 @@ class TestActions:
 
         async def the_plugin_writes() -> None:
             await route_session_to_guild(session, member.guild.id)
-            session.add_all(
-                PluginMetadata(
-                    install_id=plugin.id,
-                    entity_type="task",
-                    entity_id=tasks["shared"],
+            task = await session.get(Task, tasks["shared"])
+            for key, kind, listed, shown, value in (
+                ("issue", MetadataType.number, False, ["task"], {"value_number": 7}),
+                ("etag", MetadataType.json, False, [], {"value_json": 7}),
+                (
+                    "pulls",
+                    MetadataType.json,
+                    True,
+                    ["task"],
+                    {"ref": "812", "value_json": {}},
+                ),
+            ):
+                definition = await create_property_definition(
+                    session,
+                    None,
+                    plugin=plugin,
                     key=key,
-                    ref=ref,
-                    value=value,
-                    shown=shown,
+                    type=kind,
+                    list=listed,
+                    shown_on=shown,
                 )
-                for key, ref, value, shown in (
-                    ("issue", "", 7, True),
-                    ("etag", "", 7, False),
-                    ("pulls", "812", {"ref": "812"}, True),
-                )
-            )
-            await session.commit()
+                await create_property_value(session, task, definition, **value)
 
         plugin_write.then = the_plugin_writes
         response = await client.post(
@@ -2200,9 +2225,7 @@ class TestActions:
         assert labelling["method"] == "PUT"
         assert labelling["headers"]["authorization"] == "Bearer tok"
         await route_session_to_guild(session, member.guild.id)
-        kept = {
-            row.key: row.value for row in await session.exec(select(PluginMetadata))
-        }
+        kept = await _kept(session)
         assert kept == {"task": tasks["shared"], "was": 12}
 
     @pytest.mark.parametrize(
@@ -2236,15 +2259,18 @@ class TestActions:
                     )
                 )
             else:
-                session.add(
-                    PluginMetadata(
-                        install_id=plugin.id,
-                        entity_type="task",
-                        entity_id=tasks["shared"],
+                await create_property_value(
+                    session,
+                    await session.get(Task, tasks["shared"]),
+                    await create_property_definition(
+                        session,
+                        None,
+                        plugin=plugin,
                         key="issue",
-                        value=5,
-                        shown=True,
-                    )
+                        type=MetadataType.number,
+                        shown_on=["task"],
+                    ),
+                    value_number=5,
                 )
             await session.commit()
             return vendor.handle(request)
@@ -2260,9 +2286,7 @@ class TestActions:
 
         assert response.status_code == status_code, response.text
         await route_session_to_guild(session, member.guild.id)
-        assert {
-            row.key: row.value for row in await session.exec(select(PluginMetadata))
-        } == kept
+        assert await _kept(session) == kept
 
     @pytest.mark.parametrize(
         ("who", "task", "action", "status_code", "detail"),
@@ -2309,7 +2333,7 @@ class TestActions:
         assert response.json()["detail"] == getattr(PluginDataMessages, detail)
         assert vendor.api_requests == []
         await route_session_to_guild(session, admin.guild.id)
-        assert (await session.exec(select(PluginMetadata))).all() == []
+        assert await _kept(session) == {}
 
     async def test_a_declarative_action_is_sent_what_the_reader_answered(
         self, client, acting_user, session, monkeypatch
@@ -2341,9 +2365,7 @@ class TestActions:
             f"https://{API_HOST}/repos/acme/widgets/issues/7/labels"
         )
         await route_session_to_guild(session, member.guild.id)
-        assert {
-            row.key: row.value for row in await session.exec(select(PluginMetadata))
-        } == {"issue": 7, "repo": "acme/widgets"}
+        assert await _kept(session) == {"issue": 7, "repo": "acme/widgets"}
 
     async def test_a_declarative_action_run_from_an_element_reads_it(
         self, client, acting_user, session, monkeypatch
@@ -2356,19 +2378,24 @@ class TestActions:
             session, acting_user, _declarative_action_definition()
         )
         await route_session_to_guild(session, member.guild.id)
+        links = await create_property_definition(
+            session,
+            None,
+            plugin=plugin,
+            key="links",
+            type=MetadataType.link,
+            list=True,
+            shown_on=["task"],
+        )
         for ref in ("a", "b"):
-            session.add(
-                PluginMetadata(
-                    install_id=plugin.id,
-                    entity_type="task",
-                    entity_id=tasks["shared"],
-                    key="links",
-                    ref=ref,
-                    value={"ref": ref, "url": f"https://x.example/{ref}"},
-                    shown=True,
-                )
+            await create_property_value(
+                session,
+                await session.get(Task, tasks["shared"]),
+                links,
+                ref=ref,
+                value_json={"url": f"https://x.example/{ref}"},
+                value_text=f"https://x.example/{ref}",
             )
-        await session.commit()
 
         response = await client.post(
             _run(member, plugin, "drop"),
@@ -2419,4 +2446,4 @@ class TestActions:
         assert response.json()["detail"] == PluginDataMessages.INVALID_PARAMS
         assert vendor.api_requests == []
         await route_session_to_guild(session, member.guild.id)
-        assert (await session.exec(select(PluginMetadata))).all() == []
+        assert await _kept(session) == {}

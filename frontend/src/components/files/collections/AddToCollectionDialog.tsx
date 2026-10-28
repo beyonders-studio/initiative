@@ -61,7 +61,7 @@ type Start =
  * Put files in a collection: one of the initiative's the reader may change,
  * or a new one made of them. A collection is never made empty, so making one
  * is always making it of these files. A new one is named, then started blank,
- * as a ready-made shape (its lists and fields), or with the shape of another
+ * as a ready-made shape (its lists and metadata), or with the shape of another
  * collection in the initiative.
  */
 export const AddToCollectionDialog = ({
@@ -116,7 +116,7 @@ export const AddToCollectionDialog = ({
     create.mutate(body);
   };
 
-  /** A glimpse of what a shape brings: the lists it shows, then its fields. */
+  /** A glimpse of what a shape brings: the lists it shows, then its metadata. */
   const brings = (entry: CollectionShapeEntry) => {
     const lists = entry.lists.map((kind) => t(listLayoutLooks[kind].labelKey as never));
     const names = listFormat(i18n.language, { type: "conjunction" });
@@ -131,10 +131,10 @@ export const AddToCollectionDialog = ({
         <span className="sr-only">
           {t("collections.shapes.lists", { lists: names.format(lists) })}
         </span>
-        {entry.fields.length > 0 ? (
+        {entry.metadata.length > 0 ? (
           <span className="block">
-            {t("collections.shapes.fields", {
-              fields: names.format(entry.fields.map((field) => field.name)),
+            {t("collections.shapes.properties", {
+              properties: names.format(entry.metadata.map((each) => each.name)),
             })}
           </span>
         ) : null}

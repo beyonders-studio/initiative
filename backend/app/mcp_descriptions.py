@@ -141,7 +141,7 @@ TOOL_DESCRIPTIONS: dict[str, str] = {
     ),
     "list_task_groups": (
         "The groups the tasks `conditions` match fall into, grouped by one "
-        "field (`group_by`, or `property:<id>` for a custom property), in the "
+        "field (`group_by`, or `property:<id>` for a property or metadata), in the "
         "order a grouped list shows them, and the groups each task id is in. "
         "A date groups by `bucket`."
     ),
@@ -153,7 +153,9 @@ TOOL_DESCRIPTIONS: dict[str, str] = {
     ),
     "read_task": (
         "Read one task by id: its status, people, dates, checklist, tags and "
-        "properties."
+        "custom values. `properties` lists them all: the initiative's "
+        "properties, its project's metadata (`project_id` set) and what "
+        "installed plug-ins show on it (`install_id` and `key` set)."
     ),
     "create_task": (
         "Create a task in a project (`project_id`). Left without "
@@ -174,7 +176,8 @@ TOOL_DESCRIPTIONS: dict[str, str] = {
     "move_task": (
         "Move a task to another project (`target_project_id`), into that "
         "project's default column. It keeps a type of the same name there, or "
-        "takes that project's default type."
+        "takes that project's default type, and its values of its project's "
+        "metadata where that project has metadata of the same name and type."
     ),
     "toggle_checklist_item": (
         "Tick or untick one checklist item on a task, by the item's `id` from "
@@ -199,7 +202,9 @@ TOOL_DESCRIPTIONS: dict[str, str] = {
     # --- Files --------------------------------------------------------------
     "read_file": (
         "Read one file by id, with its body. A body can be large: pass "
-        "`include_content=false` for the name, tags and properties alone."
+        "`include_content=false` for the name, tags and custom values alone. "
+        "`properties` lists the initiative's properties and the metadata of "
+        "each collection the file is in (`collection_id` set)."
     ),
     "update_file": (
         "Change a file. Only the fields sent change. To change its body, send "
@@ -300,10 +305,10 @@ TOOL_DESCRIPTIONS: dict[str, str] = {
     ),
     "list_collection_shapes": (
         "The ready-made shapes a new collection can start as, with the lists "
-        "each shows and the fields it brings."
+        "each shows and the metadata it brings."
     ),
-    "get_collection_file_fields": (
-        "One file's values of a collection's own fields, for a file in the "
+    "get_collection_file_metadata": (
+        "One file's values of a collection's metadata, for a file in the "
         "collection the caller can open."
     ),
     "get_collection_files_timeline": (

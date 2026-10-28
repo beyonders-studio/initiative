@@ -31,7 +31,7 @@ from app.core.tools import Tool
 from app.core.user_display import display_name
 from app.models.platform.user_profile_view import MemberProfile
 from app.models.tenant.comment import Comment, in_thread
-from app.models.tenant.property import PropertyType
+from app.models.tenant.metadata import MetadataType
 from app.models.tenant.task import Task, TaskStatus, TaskStatusCategory
 from app.schemas.tenant.property import PropertySummary
 from app.schemas.tenant.task import TaskRead
@@ -167,7 +167,7 @@ def _shown(field: PropertySummary) -> Any:
         if isinstance(value, list):
             return [labels.get(item, item) for item in value]
         return labels.get(value, value)
-    if field.type is PropertyType.user_reference and isinstance(value, dict):
+    if field.type is MetadataType.user_reference and isinstance(value, dict):
         return display_name(SimpleNamespace(**value))
     return value
 

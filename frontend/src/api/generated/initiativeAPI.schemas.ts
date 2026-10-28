@@ -1354,11 +1354,15 @@ export interface CalendarCreate {
 }
 
 /**
- * Supported value types for a property definition.
+ * What a metadata definition's values are.
+ *
+ * The property types, which every owner may define, and beside them the
+ * kinds only a plug-in's definitions take: ``link`` and ``badge``, and
+ * ``json`` for a key its manifest declares no field for.
  */
-export type PropertyType = (typeof PropertyType)[keyof typeof PropertyType];
+export type MetadataType = (typeof MetadataType)[keyof typeof MetadataType];
 
-export const PropertyType = {
+export const MetadataType = {
   text: "text",
   number: "number",
   checkbox: "checkbox",
@@ -1369,7 +1373,10 @@ export const PropertyType = {
   multi_select: "multi_select",
   user_reference: "user_reference",
   currency: "currency",
-  rating: "rating",
+  scale: "scale",
+  link: "link",
+  badge: "badge",
+  json: "json",
 } as const;
 
 /**
@@ -1563,10 +1570,14 @@ export const CurrencyCode = {
 export interface PropertySummary {
   property_id: number;
   name: string;
-  type: PropertyType;
+  type: MetadataType;
+  project_id: number | null;
+  collection_id: number | null;
+  install_id: number | null;
+  key: string | null;
   options: PropertyOption[] | null;
   currency: CurrencyCode | null;
-  /** Shaped by the property's type. For user_reference, a person: id, username, discriminator, display_name and avatar_url, or an PluginPerson when the reader is an installed plug-in. */
+  /** Shaped by the definition's type. For user_reference, a person: id, username, discriminator, display_name and avatar_url, or an PluginPerson when the reader is an installed plug-in. A plug-in's value is as the plug-in wrote it: a list field's an array of its elements, newest first, each with its ref, and a value with a state the state beside it. */
   value: unknown;
 }
 
@@ -1750,17 +1761,6 @@ export interface TaskParentSummary {
 }
 
 /**
- * One value an installed plug-in shows on an item: a key its pinned
- * version declares as a field there. A list field's value is an array of its
- * elements, newest first, each with its ``ref``.
- */
-export interface PluginValueSummary {
-  plugin_id: number;
-  key: string;
-  value: unknown;
-}
-
-/**
  * Lightweight schema for task list endpoints - excludes heavy nested data
  */
 export interface TaskListRead {
@@ -1805,7 +1805,6 @@ export interface TaskListRead {
   subtask_progress: ChecklistProgress | null;
   tags: TagSummary[];
   properties: PropertySummary[];
-  plugin_values: PluginValueSummary[];
 }
 
 export interface ProjectCan {
@@ -2047,7 +2046,6 @@ export interface PostRead {
   reactions: ReactionGroup[];
   body: PostReadBody;
   poll: PollRead | null;
-  plugin_values: PluginValueSummary[];
 }
 
 export interface CalendarEntriesResponse {
@@ -2129,7 +2127,6 @@ export interface CalendarEventRead {
   overridden_fields: string[];
   skipped_starts: string[];
   extra_starts: string[];
-  plugin_values: PluginValueSummary[];
 }
 
 export type CalendarEventUpdateScope =
@@ -2365,7 +2362,8 @@ export const TaskFieldId = {
 } as const;
 
 /**
- * A file's own fields, as a collection's lists show them.
+ * A file's own fields, as a collection's lists and its file detail show
+ * them.
  */
 export type FileFieldId = (typeof FileFieldId)[keyof typeof FileFieldId];
 
@@ -2694,8 +2692,8 @@ export const CollectionShapeKey = {
 
 /**
  * A new collection, made with the files it starts with: a collection is
- * never empty. It starts blank (its grid and table, and no fields of its
- * own), as a ready-made ``shape``, or with the fields and lists of another
+ * never empty. It starts blank (its grid and table, and no metadata of its
+ * own), as a ready-made ``shape``, or with the metadata and lists of another
  * collection in the initiative (``shape_from``), none of its values.
  */
 export interface CollectionCreate {
@@ -2743,7 +2741,7 @@ export const FileKind = {
 
 /**
  * A file as its collection lists it: with when it was added there, and
- * its values of the collection's own fields.
+ * its values of the collection's metadata.
  */
 export interface CollectionFileSummary {
   archived_at: string | null;
@@ -2775,7 +2773,7 @@ export interface CollectionFileSummary {
   height: number | null;
   smart_link_url: string | null;
   added_at: string;
-  fields: PropertySummary[];
+  metadata: PropertySummary[];
   /** How the file is shown, which follows from its type. */
   readonly kind: FileKind;
 }
@@ -2815,13 +2813,14 @@ export interface PropertyDefinitionRead {
    * @maxLength 100
    */
   name: string;
-  type: PropertyType;
+  type: MetadataType;
   position: number;
   color: string | null;
   options: PropertyOption[] | null;
   currency: CurrencyCode | null;
   id: number;
   initiative_id: number;
+  project_id: number | null;
   collection_id: number | null;
   created_at: string;
   updated_at: string;
@@ -2850,7 +2849,7 @@ export interface CollectionRead {
   comment_count: number;
   tags: TagSummary[];
   properties: PropertySummary[];
-  fields: PropertyDefinitionRead[];
+  metadata: PropertyDefinitionRead[];
   can: CollectionCan;
 }
 
@@ -2871,23 +2870,23 @@ export const CollectionShapeEntryListsItem = {
   timeline: "timeline",
 } as const;
 
-export type CollectionShapeFieldDisplay =
-  | (typeof CollectionShapeFieldDisplay)[keyof typeof CollectionShapeFieldDisplay]
+export type CollectionShapeMetadataDisplay =
+  | (typeof CollectionShapeMetadataDisplay)[keyof typeof CollectionShapeMetadataDisplay]
   | null;
 
-export const CollectionShapeFieldDisplay = {
+export const CollectionShapeMetadataDisplay = {
   number: "number",
   stars: "stars",
   bar: "bar",
 } as const;
 
 /**
- * A field a ready-made shape brings, in the reader's language.
+ * Metadata a ready-made shape brings, in the reader's language.
  */
-export interface CollectionShapeField {
+export interface CollectionShapeMetadata {
   name: string;
-  type: PropertyType;
-  display: CollectionShapeFieldDisplay;
+  type: MetadataType;
+  display: CollectionShapeMetadataDisplay;
   currency: CurrencyCode | null;
 }
 
@@ -2896,7 +2895,7 @@ export interface CollectionShapeEntry {
   name: string;
   hint: string;
   lists: CollectionShapeEntryListsItem[];
-  fields: CollectionShapeField[];
+  metadata: CollectionShapeMetadata[];
 }
 
 export interface CollectionShapeGroup {
@@ -4786,7 +4785,6 @@ export interface CounterRead {
   view_mode: CounterViewMode;
   position: string;
   properties: PropertySummary[];
-  plugin_values: PluginValueSummary[];
   created_at: string;
   updated_at: string;
 }
@@ -5101,8 +5099,8 @@ export const DatasetName = {
   task_types: "task_types",
   task_assignees: "task_assignees",
   members: "members",
-  property_definitions: "property_definitions",
-  property_values: "property_values",
+  metadata_definitions: "metadata_definitions",
+  metadata_values: "metadata_values",
   relationships: "relationships",
   files: "files",
   file_versions: "file_versions",
@@ -5311,6 +5309,7 @@ export interface DetailFieldProps {
     | QueueItemDetailFieldId
     | CounterDetailFieldId
     | PostDetailFieldId
+    | FileFieldId
     | string;
 }
 
@@ -5492,6 +5491,7 @@ export const DetailLayoutReadKind = {
   queue_item: "queue_item",
   counter: "counter",
   post: "post",
+  file: "file",
 } as const;
 
 /**
@@ -5514,6 +5514,7 @@ export const DetailLayoutWriteKind = {
   queue_item: "queue_item",
   counter: "counter",
   post: "post",
+  file: "file",
 } as const;
 
 export interface DetailLayoutWrite {
@@ -9701,12 +9702,13 @@ export interface PropertyDefinitionCreate {
    * @maxLength 100
    */
   name: string;
-  type: PropertyType;
+  type: MetadataType;
   position?: number;
   color?: string | null;
   options?: PropertyOption[] | null;
   currency?: CurrencyCode | null;
   initiative_id: number;
+  project_id?: number | null;
   collection_id?: number | null;
 }
 
@@ -10054,7 +10056,6 @@ export interface QueueItemRead {
   held_at_round: number | null;
   created_by: number | null;
   created_at: string;
-  plugin_values: PluginValueSummary[];
 }
 
 export interface QueueItemUpdate {
@@ -11102,7 +11103,6 @@ export interface TaskRead {
   subtask_progress: ChecklistProgress | null;
   tags: TagSummary[];
   properties: PropertySummary[];
-  plugin_values: PluginValueSummary[];
 }
 
 export interface TaskReorderItem {
@@ -14055,7 +14055,11 @@ export type SuggestCommunityParams = {
 export type ListPropertyDefinitionsParams = {
   initiative_id?: number | null;
   /**
-   * List this collection's own fields instead of properties.
+   * List this project's metadata instead of properties.
+   */
+  project_id?: number | null;
+  /**
+   * List this collection's metadata instead of properties.
    */
   collection_id?: number | null;
 };

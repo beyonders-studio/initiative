@@ -12,11 +12,11 @@ import pytest
 from sqlalchemy import text
 from sqlmodel.ext.asyncio.session import AsyncSession
 
-from app.core.tools import PROPERTY_TARGETS
+from app.core.tools import INSTALL_METADATA_KIND, PROPERTY_TARGETS
 from app.schemas.tenant.property import PropertiesOnCreate, PropertiesOnUpdate
 from app.db.frozen import render_resource_frozen_fn
 from app.db.initiative_rls import entity_tables, render_entity_initiative_fn
-from app.services.tenant.properties import PROPERTY_LINKS
+from app.services.tenant.metadata import PROPERTY_LINKS
 
 pytestmark = pytest.mark.always
 
@@ -53,9 +53,12 @@ async def test_the_template_takes_a_value_on_every_target(session: AsyncSession)
         await session.exec(
             text(
                 "SELECT pg_get_constraintdef(oid) FROM pg_constraint "
-                "WHERE conname = 'ck_property_values_entity_type' "
+                "WHERE conname = 'ck_metadata_values_entity_type' "
                 "AND connamespace = 'guild_template'::regnamespace"
             )
         )
     ).one()[0]
-    assert set(re.findall(r"'(\w+)'", definition)) == set(PROPERTY_TARGETS)
+    assert set(re.findall(r"'(\w+)'", definition)) == {
+        *PROPERTY_TARGETS,
+        INSTALL_METADATA_KIND,
+    }

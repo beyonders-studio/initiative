@@ -23,7 +23,8 @@
   "card": "Carte",
   "row": "Ligne",
   "group": "Groupe",
-  "allProperties": "Toutes les propriétés",
+  "allMetadata": "Toutes les métadonnées",
+  "allPropertiesAndMetadata": "Toutes les propriétés et métadonnées",
   "missingPart": "Un élément qui n’est plus disponible",
   "missingField": "Un champ qui n’est plus disponible",
   "columns": "Colonnes",
@@ -42,7 +43,7 @@
   "hidePart": "Masquer",
   "settings": "Réglages",
   "cardHelp": "Ce que chaque tâche affiche sur le tableau. Sélectionnez un élément pour le modifier, ou ajoutez-en un sous le plan.",
-  "propertiesHelp": "Affiche chaque propriété pour laquelle une tâche a une valeur.",
+  "propertiesHelp": "Affiche chaque propriété et chaque métadonnée pour lesquelles une tâche a une valeur.",
   "pluginPartHelp": "Dessiné par le plug-in à partir de ses propres valeurs et actions.",
   "fieldHelp": "Affiche ce champ quand une tâche a une valeur pour lui.",
   "layout": "Disposition modifiée",
@@ -204,9 +205,10 @@
   },
   "boxWith": "Boîte avec {{name}}",
   "newField": "Nouveau champ",
-  "fieldsGroup": "Champs",
+  "projectProperties": "Propriétés de ce projet",
+  "collectionProperties": "Propriétés de cette collection",
+  "initiativeMetadata": "Métadonnées de l'initiative",
   "panels": "Panneaux",
-  "fromProperty": "Propriété",
   "search": "Rechercher",
   "noMatches": "Aucun résultat.",
   "sectionHelp": "Avec un titre, elle s'ouvre et se ferme ; sans titre, c'est une boîte.",
@@ -246,6 +248,14 @@
     },
     "noItems": "Ajoutez un compteur au groupe pour voir sa mise en page ici."
   },
+  "fileDetail": {
+    "name": "Détail du fichier",
+    "help": "Comment un fichier ouvert depuis cette collection s'affiche à côté d'elle. Ce qu'il laisse de côté est masqué.",
+    "shipped": "Voici la mise en page d'origine. La modifier en fait celle de la collection.",
+    "titleHelp": "Chaque fichier affiche son nom.",
+    "hiddenHelp": "Chaque fichier peut afficher ceci. Retiré, il est masqué, et Ajouter le remet.",
+    "noItems": "Ajoutez un fichier à la collection pour voir sa mise en page ici."
+  },
   "postDetail": {
     "name": "Détail de l'annonce",
     "help": "Comment chaque annonce de cette initiative s'affiche sur sa propre page. Ce qu'il laisse de côté est masqué.",
@@ -274,9 +284,8 @@
   },
   "calendarNote": "Un calendrier n’a ni carte ni colonnes à disposer. Son affichage, et le fait que le projet s’ouvre dessus, se règlent à droite.",
   "makeOpensFirst": "Ouvrir d’abord sur {{name}}",
-  "fromCollection": "Cette collection",
-  "ratingDisplay": {
-    "label": "Afficher la note comme",
+  "scaleDisplay": {
+    "label": "Afficher l'échelle comme",
     "number": "Un nombre",
     "stars": "Des étoiles",
     "bar": "Une barre"

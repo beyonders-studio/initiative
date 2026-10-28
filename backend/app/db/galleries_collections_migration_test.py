@@ -49,8 +49,10 @@ async def _one(session, sql: str, **params: Any) -> Any:
 
 
 def _runner(schema: str):
-    """Revision 0546 one way or the other, on one guild's schema only."""
+    """Revision 0546 one way or the other, on one guild's schema only, with
+    the metadata store (20261027_0550) off first and back on last."""
     migration = _load("20261027_0546_galleries_are_collections.py")
+    metadata = _load("20261027_0550_metadata_is_one_store.py")
 
     def run(forward: bool):
         def apply(sync_session) -> None:
@@ -64,7 +66,11 @@ def _runner(schema: str):
                 step()
 
             with Operations.context(MigrationContext.configure(bind)):
+                if not forward:
+                    in_schema(lambda: metadata._apply(False))
                 migration._convert(bind, forward, in_schema)
+                if forward:
+                    in_schema(lambda: metadata._apply(True))
 
         return apply
 
@@ -417,14 +423,14 @@ async def test_a_gallery_becomes_a_collection_of_files(session) -> None:
     # caption that says something, which its lists show as the gallery did.
     ((caption, name, kind),) = await _rows(
         session,
-        f"SELECT id, name, CAST(type AS text) FROM {s}.property_definitions "
+        f"SELECT id, name, CAST(type AS text) FROM {s}.metadata_definitions "
         "WHERE collection_id = :g",
         g=gallery,
     )
     assert (name, kind) == ("Caption", "text")
     assert await _rows(
         session,
-        f"SELECT entity_type, entity_id, value_text FROM {s}.property_values "
+        f"SELECT entity_type, entity_id, value_text FROM {s}.metadata_values "
         "WHERE property_id = :p",
         p=caption,
     ) == [("file", sunset_file, "Golden hour")]

@@ -13,7 +13,7 @@ import {
   type GroupsResponse,
   type LayoutGrouping,
   type ListLayoutReadKind,
-  PropertyType,
+  MetadataType,
   type TaskListRead,
 } from "@/api/generated/initiativeAPI.schemas";
 import { propertyFieldId } from "@/lib/layouts/fields";
@@ -49,10 +49,10 @@ const BUILT_INS = [
 
 const sprint = buildPropertyDefinition({
   name: "Sprint",
-  type: PropertyType.multi_select,
+  type: MetadataType.multi_select,
   options: [buildPropertyOption({ value: "s1" }), buildPropertyOption({ value: "s2" })],
 });
-const note = buildPropertyDefinition({ name: "Note", type: PropertyType.text });
+const note = buildPropertyDefinition({ name: "Note", type: MetadataType.text });
 const sprintField = propertyFieldId(sprint.id);
 
 const all = groupables(TASK_GROUPINGS, taskFields([sprint, note]), t);

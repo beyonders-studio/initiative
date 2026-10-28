@@ -35,7 +35,7 @@ from app.core.search import SearchEntityType
 from app.models.tenant.comment import Comment
 from app.models.tenant.initiative import Initiative
 from app.models.tenant.project import Project
-from app.models.tenant.property import PropertyType
+from app.models.tenant.metadata import MetadataType
 
 from app.models.tenant.task import (
     Task,
@@ -208,7 +208,7 @@ async def import_project(
         context=context,
         member_handles=initiative_member_handles,
     )
-    await props.declare(envelope.property_definitions)
+    await props.declare(envelope.property_definitions, project_id=project.id)
     await props.attach(project, envelope.project.properties)
 
     # 5. Its tasks
@@ -245,7 +245,9 @@ async def import_project(
     # plug-ins placed here shown on them as they are on every saved layout.
     if envelope.layouts:
         property_by_place = {
-            place: props.bound_id(declared.name, declared.type)
+            place: props.bound_id(
+                declared.name, declared.type, project=declared.project
+            )
             for place, declared in enumerate(envelope.property_definitions, start=1)
         }
         remap = tool_layouts_service.Remap(
@@ -255,7 +257,7 @@ async def import_project(
             people=frozenset(
                 place
                 for place, declared in enumerate(envelope.property_definitions, start=1)
-                if declared.type == PropertyType.user_reference
+                if declared.type == MetadataType.user_reference
             ),
             types=type_by_place.get,
         )

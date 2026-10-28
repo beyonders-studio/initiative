@@ -84,7 +84,7 @@
     "people": {
       "prompt": "¿Quiénes son estas personas aquí?",
       "note": "Elige quién es cada persona aquí. Las coincidencias exactas de identificador ya están rellenadas; si dejas una en blanco, solo se conserva su nombre.",
-      "access": "Quien quede asignado, invitado o nombrado en una propiedad se añade a la iniciativa si la gestionas, y obtiene acceso a lo importado.",
+      "access": "Quien quede asignado, invitado o nombrado en los metadatos se añade a la iniciativa si la gestionas, y obtiene acceso a lo importado.",
       "comments_one": "{{count}} comentario",
       "comments_other": "{{count}} comentarios",
       "unmapped": "Nadie aquí",
@@ -172,7 +172,7 @@
         "files_other": "{{count}} archivos adjuntos, cada uno como archivo en su tarea ({{size}})",
         "sprints_one": "{{count}} sprint en {{calendars}} calendario(s)",
         "sprints_other": "{{count}} sprints en {{calendars}} calendario(s)",
-        "propertiesTitle": "Campos que se convierten en propiedades",
+        "propertiesTitle": "Campos que se convierten en metadatos",
         "propertiesHint": "Desmarca los que no quieras añadir a esta iniciativa.",
         "propertyCount_one": "{{count}} tarea",
         "propertyCount_other": "{{count}} tareas",

@@ -21,8 +21,8 @@ from __future__ import annotations
 from dataclasses import dataclass
 from typing import Literal, Optional, Union
 
-#: How a list shows a rating.
-RatingDisplay = Literal["number", "stars", "bar"]
+#: How a list shows a scale.
+ScaleDisplay = Literal["number", "stars", "bar"]
 
 #: The groups shapes are offered in, in order.
 SHAPE_GROUPS: tuple[str, ...] = ("starters",)
@@ -34,10 +34,10 @@ class ShapeField:
 
     #: Its name's key (``collections.shapes.fields.<key>``).
     key: str
-    #: A ``PropertyType`` value.
+    #: A ``MetadataType`` value.
     type: str
-    #: For a rating, how the shape's lists show it.
-    display: Optional[RatingDisplay] = None
+    #: For a scale, how the shape's lists show it.
+    display: Optional[ScaleDisplay] = None
 
 
 #: What a card or a table column shows: a file's own field, by the id a
@@ -61,7 +61,7 @@ class CollectionShape:
 
 _CAPTION = ShapeField("caption", "text")
 _PRICE = ShapeField("price", "currency")
-_RATING = ShapeField("rating", "rating", display="stars")
+_RATING = ShapeField("rating", "scale", display="stars")
 _DATE = ShapeField("date", "date")
 
 #: Every ready-made shape, in the order a group lists them.
