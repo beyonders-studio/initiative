@@ -38,6 +38,7 @@ import type { useProjectTaskTableState } from "@/hooks/useProjectTaskView";
 import { NO_DEFINITIONS, useOwnedDefinitions } from "@/hooks/useProperties";
 import { useTaskGroupings } from "@/hooks/useTaskGroupings";
 import { useMoveTaskToGroup } from "@/hooks/useTasks";
+import { useTaskTypeChange } from "@/hooks/useTaskTypeChange";
 import { fieldColumnId } from "@/lib/layouts/columns";
 import { columnsOf } from "@/lib/layouts/draft";
 import { useProjectLayoutEnv, withDisplays } from "@/lib/layouts/fields";
@@ -356,7 +357,9 @@ const ProjectTasksTableViewComponent = ({
   const { t, i18n } = useTranslation(["projects", "comments", "tasks"]);
   const statusDisabled = !canEditTaskDetails || taskActionsDisabled;
   const env = useProjectLayoutEnv(taskHref);
-  const { mutate: moveTask } = useMoveTaskToGroup();
+  const { mutate: moveTask, mutateAsync: moveTaskNow } = useMoveTaskToGroup();
+  // A drop into another type asks first for what that type's page requires.
+  const typeChange = useTaskTypeChange(projectId, initiativeId);
 
   // The project's metadata and its initiative's properties, so the column
   // list stays focused.
@@ -700,11 +703,15 @@ const ProjectTasksTableViewComponent = ({
       const move = grouped.move(from, to);
       if ("status" in move) {
         onStatusChange(task.id, move.status);
+      } else if ("patch" in move && typeof move.patch.task_type_id === "number") {
+        void typeChange.change(task.id, move.patch.task_type_id, (changes) =>
+          moveTaskNow({ taskId: task.id, move: { patch: { ...move.patch, ...changes } } })
+        );
       } else {
         moveTask({ taskId: task.id, move });
       }
     },
-    [grouped, tasksById, onStatusChange, moveTask]
+    [grouped, tasksById, onStatusChange, moveTask, moveTaskNow, typeChange]
   );
 
   return (
@@ -774,6 +781,7 @@ const ProjectTasksTableViewComponent = ({
           onExitSelection={onExitSelection}
         />
       </SortableContext>
+      {typeChange.dialog}
     </DndContext>
   );
 };

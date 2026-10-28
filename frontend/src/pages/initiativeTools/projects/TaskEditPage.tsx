@@ -17,6 +17,7 @@ import type { TaskRead } from "@/api/generated/initiativeAPI.schemas";
 import { ContentKind, Tool } from "@/api/generated/initiativeAPI.schemas";
 import { getReadTaskQueryKey, readTask } from "@/api/generated/tasks/tasks";
 import { invalidate, q } from "@/api/query-keys";
+import { useFillRequired } from "@/components/layouts/FillRequiredDialog";
 import { ModerationMenu } from "@/components/moderation/ModerationMenu";
 import { useScopePrompt } from "@/components/recurrence/OccurrenceScopeDialog";
 import { StatusMessage } from "@/components/StatusMessage";
@@ -58,11 +59,11 @@ import {
 } from "@/hooks/useTasks";
 import { detailLayoutOf, useInstanceLayouts } from "@/hooks/useToolLayouts";
 import { useCommunityPath } from "@/lib/communityUrl";
-import { getHttpStatus } from "@/lib/errorMessage";
+import { getErrorMessage, getHttpStatus, requiredKeysIn } from "@/lib/errorMessage";
 import { DetailLayoutView } from "@/lib/layouts/DetailLayoutView";
 import type { StoredRegions } from "@/lib/layouts/detailLayout";
 import { usePluginMenuActions } from "@/lib/layouts/plugins";
-import { TASK_DETAIL } from "@/lib/layouts/taskLayout";
+import { TASK_DETAIL, taskChanges, taskFillContext, withoutValues } from "@/lib/layouts/taskLayout";
 import { toast } from "@/lib/mascotToast";
 import { queryClient } from "@/lib/queryClient";
 import { taskRoute, toolDetailRoute, toolListRoute } from "@/lib/tools";
@@ -83,7 +84,7 @@ export const TaskEditPage = () => {
   const communityId = useActiveCommunityId();
   const { user: currentUser } = useAuth();
   useCommunities();
-  const { t } = useTranslation(["tasks", "common"]);
+  const { t } = useTranslation(["tasks", "common", "layouts"]);
   const gp = useCommunityPath();
 
   // Set by the delete, which leaves a page a description draft would hold.
@@ -183,7 +184,27 @@ export const TaskEditPage = () => {
     },
   });
 
+  // A move its page in the destination refuses for what the task leaves
+  // empty asks for that, and is sent again with it.
+  const fillForMove = useFillRequired(TASK_DETAIL);
   const moveTask = useMoveTask({
+    onError: (error, { taskId, targetProjectId }) => {
+      const keys = requiredKeysIn(error);
+      const target = writableProjects.find((each) => each.id === targetProjectId);
+      if (!keys || !task || !target) {
+        toast.error(getErrorMessage(error, "tasks:edit.moveError"));
+        return;
+      }
+      setIsMoveDialogOpen(false);
+      fillForMove.ask({
+        item: withoutValues({ ...task, project_id: target.id }, keys),
+        context: taskFillContext(target.initiative_id),
+        keys,
+        title: t("layouts:required.moveTitle", { project: target.name }),
+        send: (written) =>
+          moveTask.mutateAsync({ taskId, targetProjectId, changes: taskChanges(written) }),
+      });
+    },
     onSuccess: (updatedTask) => {
       showTask(updatedTask);
       const previousProjectId = moveContext?.previousProjectId;
@@ -455,6 +476,7 @@ export const TaskEditPage = () => {
       />
 
       {pluginActions.dialog}
+      {fillForMove.dialog}
       <MoveTaskDialog
         open={isMoveDialogOpen}
         onOpenChange={setIsMoveDialogOpen}

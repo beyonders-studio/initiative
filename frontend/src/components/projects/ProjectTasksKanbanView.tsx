@@ -37,6 +37,7 @@ import { useProjectTaskTypes } from "@/hooks/useProjects";
 import { NO_DEFINITIONS, useOwnedDefinitions } from "@/hooks/useProperties";
 import { useTaskGroupings } from "@/hooks/useTaskGroupings";
 import { useMoveTaskToGroup } from "@/hooks/useTasks";
+import { useTaskTypeChange } from "@/hooks/useTaskTypeChange";
 import { formatDateTime } from "@/lib/formatDate";
 import { cardOf } from "@/lib/layouts/draft";
 import { useProjectLayoutEnv, withDisplays } from "@/lib/layouts/fields";
@@ -97,6 +98,16 @@ type ProjectTasksKanbanViewProps = {
 // One empty list while the definitions load, so the fields aren't rebuilt on
 // every pass until they arrive.
 const NOT_GROUPED: GroupingState = [];
+
+/** A drop as it was released, kept to be placed after something is asked:
+ *  where the card was let go, which the drag stops holding once it ends. */
+const heldDrop = (event: DragEndEvent): DragEndEvent => ({
+  ...event,
+  active: {
+    ...event.active,
+    rect: { current: { ...event.active.rect.current } },
+  },
+});
 
 export const ProjectTasksKanbanView = ({
   projectId,
@@ -224,7 +235,9 @@ export const ProjectTasksKanbanView = ({
   // A card dropped into another band changes the field the board is grouped
   // by, beside what the drop does to its column and its place in it. One
   // dropped on an empty part of a cell in its own column changes only that.
-  const { mutate: moveTask } = useMoveTaskToGroup();
+  const { mutate: moveTask, mutateAsync: moveTaskNow } = useMoveTaskToGroup();
+  // A drop into another type asks first for what that type's page requires.
+  const typeChange = useTaskTypeChange(projectId, initiativeId);
   const lastOver = useRef<DragOverEvent["over"] | null>(null);
   const handleDragOver = (event: DragOverEvent) => {
     if (event.over) lastOver.current = event.over;
@@ -247,14 +260,53 @@ export const ProjectTasksKanbanView = ({
       typeof from === "string" &&
       typeof to === "string" &&
       from !== to;
-    if (intoBand && target?.data?.type === "column" && target.data.statusId === dragged?.statusId) {
+    const move =
+      intoBand && typeof from === "string" && typeof to === "string"
+        ? active?.grouping.move?.(from, to)
+        : undefined;
+    // Into its own column's empty cell, only the band changes.
+    const inPlace = target?.data?.type === "column" && target.data.statusId === dragged?.statusId;
+    const typeId = move && "patch" in move ? move.patch.task_type_id : undefined;
+    if (
+      move &&
+      "patch" in move &&
+      typeof typeId === "number" &&
+      typeof dragged?.taskId === "number" &&
+      typeChange.requires(typeId)
+    ) {
+      // A type whose page requires something is checked first, and asked for
+      // when the task lacks it: until the drop is saved, whole, the card stays
+      // where it was, and leaving the question leaves the task as it was.
+      onDragCancel();
+      const taskId = dragged.taskId;
+      const statusId = target?.data?.statusId;
+      const later = heldDrop(event);
+      void typeChange.change(taskId, typeId, async (changes) => {
+        await moveTaskNow({
+          taskId,
+          move: {
+            patch: {
+              ...move.patch,
+              ...changes,
+              ...(statusId !== undefined && statusId !== dragged.statusId
+                ? { task_status_id: statusId }
+                : {}),
+            },
+          },
+        });
+        // Its place in the column, once it is of the type.
+        if (!inPlace) onDragEnd(later);
+      });
+      return;
+    }
+    if (intoBand && inPlace) {
       onDragCancel();
     } else {
       onDragEnd(event);
     }
-    if (!intoBand || typeof dragged?.taskId !== "number") return;
-    const move = active.grouping.move?.(from, to);
-    if (move && !("status" in move)) moveTask({ taskId: dragged.taskId, move });
+    if (move && !("status" in move) && typeof dragged?.taskId === "number") {
+      moveTask({ taskId: dragged.taskId, move });
+    }
   };
 
   const taskStatusesLength = taskStatuses.length;
@@ -266,6 +318,7 @@ export const ProjectTasksKanbanView = ({
 
   return (
     <BoardActionsContext.Provider value={boardActions}>
+      {typeChange.dialog}
       {onGroupingChange && offered.length > 0 && !editing ? (
         <div className="mb-3 flex justify-end">
           <GroupBySelect

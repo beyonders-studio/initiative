@@ -240,11 +240,14 @@ async def required_of(
 
 
 def _refuse(required: Required, missing: frozenset[str]) -> None:
-    named = [required.names.get(key, key) for key in required.keys if key in missing]
-    if named:
+    keys = [key for key in required.keys if key in missing]
+    if keys:
         raise CodedError(
             ToolLayoutMessages.REQUIRED_FIELDS_MISSING,
-            params={"fields": "\n".join(named)},
+            params={
+                "fields": "\n".join(required.names.get(key, key) for key in keys),
+                "keys": "\n".join(keys),
+            },
         )
 
 

@@ -11151,9 +11151,43 @@ export interface TaskListResponse {
   sorting: string | null;
 }
 
+export type TaskUpdateScope = (typeof TaskUpdateScope)[keyof typeof TaskUpdateScope] | null;
+
+export const TaskUpdateScope = {
+  this: "this",
+  following: "following",
+  all: "all",
+} as const;
+
+export interface TaskUpdate {
+  properties?: PropertyValueInput[] | null;
+  title?: string | null;
+  description?: string | null;
+  description_base?: string | null;
+  task_status_id?: number | null;
+  task_type_id?: number | null;
+  status_category?: TaskStatusCategory | null;
+  priority?: TaskPriority | null;
+  assignee_ids?: number[] | null;
+  add_assignee_ids?: number[] | null;
+  remove_assignee_ids?: number[] | null;
+  start_date?: string | null;
+  due_date?: string | null;
+  recurrence?: string | null;
+  tz?: string | null;
+  recurrence_strategy?: RecurrenceStrategy | null;
+  recurrence_limit?: number | null;
+  merge_properties?: boolean;
+  tag_ids?: number[] | null;
+  checklist?: ChecklistItemInput[] | null;
+  parent_task_id?: number | null;
+  scope?: TaskUpdateScope;
+}
+
 export interface TaskMoveRequest {
   /** @exclusiveMinimum 0 */
   target_project_id: number;
+  changes?: TaskUpdate | null;
 }
 
 export interface TaskProjectSummary {
@@ -11347,38 +11381,6 @@ export interface TaskTypeUpdate {
   icon?: string | null;
   layout_preset?: string | null;
   starting_values?: TaskTypeStartingValues | null;
-}
-
-export type TaskUpdateScope = (typeof TaskUpdateScope)[keyof typeof TaskUpdateScope] | null;
-
-export const TaskUpdateScope = {
-  this: "this",
-  following: "following",
-  all: "all",
-} as const;
-
-export interface TaskUpdate {
-  properties?: PropertyValueInput[] | null;
-  title?: string | null;
-  description?: string | null;
-  description_base?: string | null;
-  task_status_id?: number | null;
-  task_type_id?: number | null;
-  status_category?: TaskStatusCategory | null;
-  priority?: TaskPriority | null;
-  assignee_ids?: number[] | null;
-  add_assignee_ids?: number[] | null;
-  remove_assignee_ids?: number[] | null;
-  start_date?: string | null;
-  due_date?: string | null;
-  recurrence?: string | null;
-  tz?: string | null;
-  recurrence_strategy?: RecurrenceStrategy | null;
-  recurrence_limit?: number | null;
-  tag_ids?: number[] | null;
-  checklist?: ChecklistItemInput[] | null;
-  parent_task_id?: number | null;
-  scope?: TaskUpdateScope;
 }
 
 /**

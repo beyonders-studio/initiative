@@ -306,6 +306,10 @@
     "always": "Ein Titel ist immer Pflicht.",
     "part": "{{name}} (Pflicht)",
     "missing": "Pflichtfeld, noch nicht ausgefüllt.",
-    "toAdd": "Fülle die Pflichtfelder aus, um es hinzuzufügen."
+    "toAdd": "Fülle die Pflichtfelder aus, um es hinzuzufügen.",
+    "ask": "Die neue Seite verlangt diese Felder, und sie sind noch leer. Fülle sie aus, dann wird die Änderung mit ihnen gespeichert.",
+    "confirm": "Weiter",
+    "retypeTitle": "Was die Seite {{type}} verlangt",
+    "moveTitle": "Was {{project}} verlangt"
   }
 }

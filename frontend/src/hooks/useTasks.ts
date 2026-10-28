@@ -89,6 +89,18 @@ export const useTask = (taskId: number | null, options?: QueryOpts<TaskRead>) =>
   return useShownWithPending(TASK_SAVES, taskId, query);
 };
 
+/** Reads a task when asked, from the cache where it is held: for a decision
+ *  made on a drop, such as what a change of its type asks for. */
+export const useReadTaskNow = () => {
+  const communityId = useActiveCommunityId();
+  const queryClient = useQueryClient();
+  return (taskId: number) =>
+    queryClient.fetchQuery<TaskRead>({
+      queryKey: getReadTaskQueryKey(communityId, taskId),
+      queryFn: () => readTask(communityId, taskId),
+    });
+};
+
 /** The complete task list for `params`: the one key and fetch every reader of it shares. */
 export const tasksQuery = (communityId: number, params: ListTasksParams) => ({
   queryKey: getListTasksQueryKey(communityId, params),
@@ -535,17 +547,25 @@ export const useBulkArchiveTasks = (options?: MutationOpts<ArchiveResponse[], nu
     options
   );
 
-export const useMoveTask = (
-  options?: MutationOpts<TaskRead, { taskId: number; targetProjectId: number }>
-) =>
-  useCommunityMutation<TaskRead, { taskId: number; targetProjectId: number }>(
+/** A task to move to another project, and what to write to it there: the
+ *  fields its page there requires that it leaves empty. */
+export interface TaskMove {
+  taskId: number;
+  targetProjectId: number;
+  changes?: TaskUpdate;
+}
+
+/** Move a task to another project. A refusal is the caller's to say: one for
+ *  what the task's page there requires is answered by asking for it. */
+export const useMoveTask = (options?: MutationOpts<TaskRead, TaskMove>) =>
+  useCommunityMutation<TaskRead, TaskMove>(
     {
-      mutationFn: (communityId, { taskId, targetProjectId }) =>
+      mutationFn: (communityId, { taskId, targetProjectId, changes }) =>
         moveTask(communityId, taskId, {
           target_project_id: targetProjectId,
+          ...(changes ? { changes } : {}),
         }),
       invalidate: () => invalidate(q.allTasks()),
-      errorKey: "tasks:edit.moveError",
     },
     options
   );

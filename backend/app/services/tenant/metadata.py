@@ -702,15 +702,22 @@ async def write_on_update(
     session: AsyncSession,
     row: Any,
     values: Optional[Sequence[PropertyValueInput]],
+    *,
+    merge: bool = False,
 ) -> None:
     """The values an update sent with its row, replacing the ones it holds in
-    the same transaction. ``None`` leaves them as they are."""
+    the same transaction, or with ``merge`` only those it names. ``None``
+    leaves them as they are."""
     if values is not None:
-        await _write_in_place(session, row, values)
+        await _write_in_place(session, row, values, removed=[] if merge else None)
 
 
 async def _write_in_place(
-    session: AsyncSession, row: Any, values: Sequence[PropertyValueInput]
+    session: AsyncSession,
+    row: Any,
+    values: Sequence[PropertyValueInput],
+    *,
+    removed: Optional[Sequence[int]] = None,
 ) -> None:
     """``values`` onto ``row`` in the caller's transaction, held to the row's
     own initiative as the policies read it."""
@@ -723,6 +730,7 @@ async def _write_in_place(
         row,
         await property_values_by_row_id(session, values),
         initiative_id=initiative_id,
+        removed=removed,
     )
 
 

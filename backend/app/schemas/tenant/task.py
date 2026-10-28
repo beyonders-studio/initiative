@@ -196,6 +196,9 @@ class TaskUpdate(PropertiesOnUpdate):
     tz: Optional[str] = Field(default=None, max_length=64)
     recurrence_strategy: Optional[RecurrenceStrategy] = None
     recurrence_limit: Optional[int] = Field(default=None, ge=1, le=24, strict=True)
+    #: ``properties`` writes only the values it names, leaving the rest: what
+    #: a change of type (or a move) sends for the fields the new page requires.
+    merge_properties: bool = False
     # PATCH semantics: None = "leave unchanged"; a list (incl. []) = replace-all.
     tag_ids: Optional[List[int]] = Field(default=None, max_length=100)
     checklist: Optional[List[ChecklistItemInput]] = None
@@ -223,6 +226,9 @@ class TaskUpdate(PropertiesOnUpdate):
 
 class TaskMoveRequest(SanitizedBaseModel):
     target_project_id: int = Field(gt=0)
+    #: Written to the task once it is in the destination, in the same
+    #: request: the fields its page there requires that it does not fill.
+    changes: Optional[TaskUpdate] = None
 
 
 class TaskProjectSummary(SanitizedBaseModel):

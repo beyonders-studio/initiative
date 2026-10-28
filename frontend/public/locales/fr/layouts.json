@@ -306,6 +306,10 @@
     "always": "Un titre est toujours obligatoire.",
     "part": "{{name}} (obligatoire)",
     "missing": "Obligatoire, pas encore rempli.",
-    "toAdd": "Remplissez ce qui est obligatoire pour l’ajouter."
+    "toAdd": "Remplissez ce qui est obligatoire pour l’ajouter.",
+    "ask": "Sa nouvelle page demande ces champs, encore vides. Remplissez-les et la modification se fait avec eux.",
+    "confirm": "Continuer",
+    "retypeTitle": "Ce que demande la page {{type}}",
+    "moveTitle": "Ce que demande {{project}}"
   }
 }

@@ -115,6 +115,18 @@ export function getErrorMessage(error: unknown, fallbackKey?: string): string {
 }
 
 /**
+ * What a change was refused for leaving empty that the page it would be on
+ * requires (`REQUIRED_FIELDS_MISSING`), each by its key (`requiredKey`), for a
+ * caller that asks for them and sends the change again; null for any other
+ * failure.
+ */
+export function requiredKeysIn(error: unknown): string[] | null {
+  if (getErrorCode(error) !== "REQUIRED_FIELDS_MISSING" || !isAxiosError(error)) return null;
+  const keys = (error.response?.data as { params?: ErrorParams } | undefined)?.params?.keys;
+  return keys ? keys.split("\n") : null;
+}
+
+/**
  * The backend error code carried in `detail`, if the error has one.
  *
  * For the callers that have to branch on *which* failure it was rather than

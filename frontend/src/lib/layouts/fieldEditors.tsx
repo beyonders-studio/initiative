@@ -701,10 +701,13 @@ export const DescriptionField = <I, P>({
 
   const current = value ?? "";
   // One being added is written straight into it: nothing is saved until Add.
+  // It names what it held when it was opened, so a change of an item that
+  // exists is refused where somebody wrote over it meanwhile.
   const adding = useContext(ItemDraftContext) !== null;
+  const openedOn = useRef(value ?? null);
   const write = (text: string) =>
     void save.save({
-      patch: { [field]: text || null } as P,
+      patch: { [field]: text || null, [`${field}_base`]: openedOn.current } as P,
       shows: { [field]: text || null } as Partial<I>,
     });
   // A reader who can no longer edit keeps the draft on the device, but sees
