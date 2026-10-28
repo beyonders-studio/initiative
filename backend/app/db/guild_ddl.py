@@ -23,6 +23,8 @@ migrations (``scripts/gen_guild_migration.py``).
 
 from __future__ import annotations
 
+import json
+
 import re
 
 from sqlalchemy import MetaData, text
@@ -1033,12 +1035,14 @@ def _plugin_search_read() -> str:
 
 def _entity_tool_scope(table: str, kinds: tuple[str, ...]) -> str:
     """The scope resource of the tool that governs the thing a ``table`` row
-    names by ``(entity_type, entity_id)`` — a task's is ``projects``."""
-    arms = " ".join(
-        f"WHEN '{kind}' THEN '{tool_resource(KINDS[kind].tool).value}'"
-        for kind in kinds
+    names by ``(entity_type, entity_id)`` — a task's is ``projects`` — read
+    from one constant map, which parses far smaller than a branch per kind;
+    a kind it does not hold reads as ``NULL``."""
+    resources = json.dumps(
+        {kind: tool_resource(KINDS[kind].tool).value for kind in kinds},
+        separators=(",", ":"),
     )
-    return f"(CASE {table}.entity_type {arms} END)"
+    return f"(CAST('{resources}' AS jsonb) ->> {table}.entity_type::text)"
 
 
 def _metadata_values_scope(write: bool) -> str:
@@ -1053,11 +1057,14 @@ def _metadata_values_scope(write: bool) -> str:
     read = IN_POLICY.field("install_read")
     scope = _entity_tool_scope("metadata_values", PROPERTY_TARGETS)
     hold = f" AND NOT {IN_POLICY.content_hold}" if write else ""
+    # The tool's scope is named once: the one a value no plug-in owns is
+    # written with, or the read scope an install keeps its own with.
     return (
-        f"({_IID} IS NULL OR COALESCE((SELECT CASE WHEN md.install_id IS NULL"  # noqa: S608
-        f" THEN {scope} = ANY ({held}) ELSE md.install_id = {_IID}{hold}"
-        f" AND (metadata_values.entity_type = '{INSTALL_METADATA_KIND}'"
-        f" OR COALESCE({scope} = ANY ({read}), false)) END"
+        f"({_IID} IS NULL OR COALESCE((SELECT (md.install_id IS NULL"  # noqa: S608
+        f" OR md.install_id = {_IID}{hold}) AND ((md.install_id IS NOT NULL"
+        f" AND metadata_values.entity_type = '{INSTALL_METADATA_KIND}')"
+        f" OR COALESCE({scope} = ANY (CASE WHEN md.install_id IS NULL THEN {held}"
+        f" ELSE {read} END), false))"
         " FROM metadata_definitions md WHERE md.id = metadata_values.property_id),"
         " false))"
     )

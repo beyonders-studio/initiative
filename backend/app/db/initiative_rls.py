@@ -1081,20 +1081,22 @@ def metadata_values_path() -> InitiativePath:
 
     def build(t: str, w: bool) -> str:
         own = f"(md.install_id = {_P.install_id} AND {_P.this_guild} AND {_P.auth_ok})"
-        plugin = (
-            f"(CASE WHEN {t}.entity_type = '{INSTALL_METADATA_KIND}'"
-            f" THEN ({own} AND {t}.entity_id = md.install_id)"
-        )
+        on_install = f"{t}.entity_type = '{INSTALL_METADATA_KIND}'"
         if not w:
+            # The thing a value is on is read once, whoever owns the value: a
+            # plug-in's is on an item, or on the install itself, which only
+            # the install reads; on an item, its install, the community's
+            # admin, and whoever reads it where the definition is shown.
+            items = ", ".join(f"'{kind}'" for kind in ITEM_KINDS)
             return (
                 f"({_P.system} OR EXISTS (SELECT 1 FROM metadata_definitions md "  # noqa: S608
-                f"WHERE md.id = {t}.property_id AND (CASE WHEN md.install_id IS NULL"
-                f" THEN {_entity_readable(t, PROPERTY_TARGETS)}"
-                f" ELSE {plugin} ELSE (({own} OR {_P.admin}"
-                f" OR {t}.entity_type = ANY (md.shown_on))"
-                f" AND {_entity_readable(t, ITEM_KINDS)}) END) END)))"
+                f"WHERE md.id = {t}.property_id AND (CASE WHEN {on_install}"
+                f" THEN md.install_id IS NOT NULL AND {t}.entity_id = md.install_id"
+                f" ELSE (md.install_id IS NULL OR {t}.entity_type IN ({items}))"
+                f" AND {_entity_readable(t, PROPERTY_TARGETS)} END)"
+                f" AND (md.install_id IS NULL OR {own} OR (NOT {on_install}"
+                f" AND ({_P.admin} OR {t}.entity_type = ANY (md.shown_on))))))"
             )
-        reach = _entity_call(f"{t}.entity_type", f"{t}.entity_id", w, w)
         held = f"{ENTITY_INITIATIVE_FN}({t}.entity_type, {t}.entity_id)"
         field = (
             f"{t}.entity_type = '{Tool.file.value}' AND EXISTS (SELECT 1 "  # noqa: S608
@@ -1106,15 +1108,22 @@ def metadata_values_path() -> InitiativePath:
             f"{t}.entity_type = 'task' AND EXISTS (SELECT 1 FROM tasks tk "  # noqa: S608
             f"WHERE tk.id = {t}.entity_id AND tk.project_id = md.project_id)"
         )
-        item = _entity_call(f"{t}.entity_type", f"{t}.entity_id", False, False)
+        # One call asks of the item what its owner's values take: an edit of
+        # it, and of a plug-in's, only that it can be read.
+        unowned = "md.install_id IS NULL"
+        need = unowned if w is True else f"({unowned} AND {_sql_bool(w)})"
+        item = (
+            f"{ENTITY_ACCESS_FN}({t}.entity_type, {t}.entity_id, {need}, "
+            f"{need}, {STANDING})"
+        )
         return (
             f"({_P.system} OR EXISTS (SELECT 1 FROM metadata_definitions md "  # noqa: S608
-            f"WHERE md.id = {t}.property_id AND (CASE"
-            f" WHEN md.install_id IS NOT NULL THEN {plugin}"
-            f" ELSE (({own} OR {_P.admin}) AND {item}) END)"
+            f"WHERE md.id = {t}.property_id AND ({unowned} OR {own}"
+            f" OR ({_P.admin} AND NOT {on_install})) AND (CASE"
             f" WHEN md.collection_id IS NOT NULL THEN ({field})"
-            f" WHEN md.project_id IS NOT NULL THEN ({on_task} AND {reach})"
-            f" ELSE ({reach} AND md.initiative_id = {held}) END)))"
+            f" WHEN {on_install} THEN NOT {unowned} AND {t}.entity_id = md.install_id"
+            f" ELSE {item} AND (NOT {unowned} OR (CASE WHEN md.project_id IS NOT NULL"
+            f" THEN {on_task} ELSE md.initiative_id = {held} END)) END)))"
         )
 
     return InitiativePath(
