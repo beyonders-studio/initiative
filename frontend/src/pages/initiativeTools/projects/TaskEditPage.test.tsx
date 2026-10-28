@@ -19,6 +19,7 @@ import {
   buildProjectTaskStatus,
   buildPropertyDefinition,
   buildPropertySummary,
+  buildTag,
   buildTask,
   buildTaskType,
   buildToolLayoutSet,
@@ -249,6 +250,95 @@ describe("TaskEditPage", () => {
       expect(await screen.findByRole("menuitem", { name })).toBeInTheDocument();
     }
     expect(screen.queryByRole("button", { name: /^save/i })).not.toBeInTheDocument();
+  });
+
+  describe("what a new page requires", () => {
+    const required = (taskTypeId: number, name: string) =>
+      buildToolLayoutSet({
+        layouts: [
+          {
+            kind: "task",
+            task_type_id: taskTypeId,
+            task_type_name: name,
+            updated_at: "2026-10-01T12:00:00.000Z",
+            definition: { side: [{ type: "field", props: { field: "tags", required: true } }] },
+          },
+        ],
+      });
+
+    /** Picks the tag Wiring in the dialog asking for what is required, and
+     *  goes on with the change. */
+    const fillIn = async (title: string) => {
+      const asking = await screen.findByRole("dialog", { name: title });
+      const go = within(asking).getByRole("button", { name: "Continue" });
+      expect(go).toBeDisabled();
+      await userEvent.click(within(asking).getByRole("combobox"));
+      await userEvent.click(await screen.findByRole("option", { name: "Wiring" }));
+      await waitFor(() => expect(go).toBeEnabled());
+      await userEvent.click(go);
+    };
+
+    beforeEach(() => {
+      toasts.error.mockClear();
+      server.use(
+        communityHttp.get("/tags/", () => HttpResponse.json([buildTag({ id: 7, name: "Wiring" })]))
+      );
+    });
+
+    it("asks before the task becomes a type whose page needs more, and sends it with the change", async () => {
+      server.use(
+        communityHttp.get("/projects/:id/task-types/", () =>
+          HttpResponse.json([
+            buildTaskType({ id: 1, name: "Task", project_id: PROJECT_ID, is_default: true }),
+            buildTaskType({ id: 9, name: "Idea", project_id: PROJECT_ID, position: 1 }),
+          ])
+        ),
+        communityHttp.get("/layouts/", () => HttpResponse.json(required(9, "Idea")))
+      );
+      const { sent } = renderTaskPage();
+
+      await choose(/^type$/i, /idea/i);
+      await fillIn("What the Idea page asks for");
+
+      await waitFor(() =>
+        expect(sent).toEqual([expect.objectContaining({ task_type_id: 9, tag_ids: [7] })])
+      );
+    });
+
+    it("asks for what the destination requires when a move is refused for it, and moves with it", async () => {
+      const moves: Record<string, unknown>[] = [];
+      server.use(
+        communityHttp.post("/tasks/:taskId/move", async ({ request }) => {
+          const body = (await request.json()) as Record<string, unknown>;
+          moves.push(body);
+          return body.changes
+            ? HttpResponse.json(buildTask({ id: TASK_ID, project_id: 8 }))
+            : HttpResponse.json(
+                { detail: "REQUIRED_FIELDS_MISSING", params: { fields: "tags", keys: "tags" } },
+                { status: 400 }
+              );
+        })
+      );
+      renderTaskPage({
+        destinations: [buildProject({ id: 8, initiative_id: INITIATIVE_ID, name: "Lighting" })],
+      });
+
+      await openActionsMenu();
+      await userEvent.click(await screen.findByRole("menuitem", { name: /move to project/i }));
+      const moving = await screen.findByRole("dialog", { name: "Move task to another project" });
+      await userEvent.click(within(moving).getByRole("combobox"));
+      await userEvent.click(await screen.findByRole("option", { name: "Lighting" }));
+      await userEvent.click(within(moving).getByRole("button", { name: "Move task" }));
+      await fillIn("What Lighting asks for");
+
+      await waitFor(() =>
+        expect(moves).toEqual([
+          { target_project_id: 8 },
+          { target_project_id: 8, changes: { tag_ids: [7] } },
+        ])
+      );
+      expect(toasts.error).not.toHaveBeenCalled();
+    });
   });
 
   it("gives a moderator a shield on the task, even read-only", async () => {

@@ -76,6 +76,7 @@ So a page can say a field is **required**: select it in the editor and switch on
 - **What can't:** the title, because it always is, and shows as required and locked. Also anything that's never empty (a task's type, status and priority), anything nobody fills in (who made it, when), a checkbox, and a plug-in's fields, which the plug-in fills.
 - **What it does:** the add dialog puts required fields up top, never under **More options**, and waits until they're filled. Once filled, nobody can empty one. A required checklist needs one item. One will do.
 - **What it leaves alone:** everything that already exists. A task made last Tuesday without a description keeps going without one, and its page marks the gap so the next person to open it can fill it in. Imports, automations, plug-ins and the next copy of a repeating task go through too, and get the same mark.
+- **What counts as arriving:** a task changing type, or moving to another project, meets the new page's requirements as if it were new. Anything its new page wants and it hasn't got, Initiative asks for on the spot, in a small box listing only those, and the change goes through with them. Values that came along from the old project count.
 
 Hiding a field lifts the requirement with it. Nobody can fill in what they can't see.
 
