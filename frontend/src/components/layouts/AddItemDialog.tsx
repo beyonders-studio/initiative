@@ -101,15 +101,14 @@ export const useItemDraft = <I extends Item, P>(
     }),
     []
   );
-  /** What it holds now, as it is sent: a description written over is named
-   *  with its base, which a new one has none of. */
+  /** What it holds now, as it is sent. A description is named with what it
+   *  was written over, so a change of an item that exists is refused where
+   *  somebody else wrote it meanwhile. */
   const written = (): Written<I, P> => {
     const { item: now, fields, values } = latest.current;
     return {
       item: now,
-      fields: Object.fromEntries(
-        Object.entries(fields).filter(([key]) => !key.endsWith("_base"))
-      ) as Partial<P>,
+      fields,
       properties: [...values].map(([property_id, value]) => ({ property_id, value })),
     };
   };
@@ -244,7 +243,16 @@ const Adding = <I extends Item, C, P, R extends { id: number }>({
       return;
     setAdding(true);
     try {
-      if (made.current === null) made.current = await create(written());
+      if (made.current === null) {
+        // A new item was written over nothing, so it names no base.
+        const { fields, ...rest } = written();
+        made.current = await create({
+          ...rest,
+          fields: Object.fromEntries(
+            Object.entries(fields).filter(([key]) => !key.endsWith("_base"))
+          ) as Partial<P>,
+        });
+      }
       await finish(made.current);
     } catch {
       // What failed has said so; everything changed is still here to try again.

@@ -227,19 +227,24 @@ const RequiredMark = ({
   const draft = useContext(ItemDraftContext);
   const adding = draft !== null;
   const key = requiredKey(node);
-  if (home.readOnly || (detail.filled?.(item, key, draft?.sent()) ?? true)) return children;
+  if (home.readOnly) return children;
+  const missing = !(detail.filled?.(item, key, draft?.sent()) ?? true);
+  // One frame whether or not it is filled, so filling it in keeps the editor
+  // (and what is being typed in it) where it is.
   return (
-    <div className="flex min-w-0 flex-col gap-1" data-required-missing={key}>
+    <div className="flex min-w-0 flex-col gap-1" data-required-missing={missing ? key : undefined}>
       {children}
-      <p
-        className={cn(
-          "flex items-center gap-1 text-xs",
-          adding ? "text-muted-foreground" : "text-destructive"
-        )}
-      >
-        <CircleAlert className="h-3.5 w-3.5 shrink-0" aria-hidden="true" />
-        {t(adding ? "required.label" : "required.missing")}
-      </p>
+      {missing ? (
+        <p
+          className={cn(
+            "flex items-center gap-1 text-xs",
+            adding ? "text-muted-foreground" : "text-destructive"
+          )}
+        >
+          <CircleAlert className="h-3.5 w-3.5 shrink-0" aria-hidden="true" />
+          {t(adding ? "required.label" : "required.missing")}
+        </p>
+      ) : null}
     </div>
   );
 };
