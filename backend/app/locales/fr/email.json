@@ -437,6 +437,26 @@
     "contactNobody": "Contactez la personne qui gère ce serveur pour régler la situation.",
     "buttonLabel": "Rétablir le forfait"
   },
+  "communityAccess": {
+    "granted": {
+      "subject": "L’équipe de la plateforme a accès à {{community}}",
+      "title": "L’équipe de la plateforme a accès à {{community}}",
+      "body": "L’équipe de ce serveur a reçu un accès <strong>{{level}}</strong> à <strong>{{community}}</strong> le {{start}}, jusqu’au {{end}}."
+    },
+    "ended": {
+      "subject": "L’équipe de la plateforme a eu accès à {{community}}",
+      "title": "L’équipe de la plateforme a eu accès à {{community}}",
+      "body": "L’équipe de ce serveur a eu un accès <strong>{{level}}</strong> à <strong>{{community}}</strong> du {{start}} au {{end}}. Cet accès a pris fin."
+    },
+    "case": {
+      "security": "Il servait un dossier de sécurité.",
+      "moderation": "Il servait un dossier de modération.",
+      "support": "Il servait un dossier d’assistance."
+    },
+    "recorded": "Chaque requête faite avec lui est enregistrée.",
+    "contact": "Pour toute question, écrivez à <strong>{{contact}}</strong>.",
+    "moment": "{{date}}, {{time}} UTC"
+  },
   "communityTrialEnding": {
     "subject": "L’essai de {{community}} se termine le {{date}}",
     "title": "L’essai de {{community}} se termine le {{date}}",

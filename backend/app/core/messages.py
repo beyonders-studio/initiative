@@ -862,6 +862,9 @@ class AccessGrantMessages:
     CASE_CLOSED = "ACCESS_GRANT_CASE_CLOSED"
     #: The case is about another community.
     CASE_OTHER_COMMUNITY = "ACCESS_GRANT_CASE_OTHER_COMMUNITY"
+    #: Telling the community was chosen for a grant whose case does not offer
+    #: it, or that serves no case.
+    COMMUNITY_NOTICE_NOT_OFFERED = "ACCESS_GRANT_COMMUNITY_NOTICE_NOT_OFFERED"
     #: A settings rung reads; changing what it reaches takes a read_write
     #: content grant beside it.
     WRITE_GRANT_REQUIRED = "ACCESS_GRANT_WRITE_REQUIRED"

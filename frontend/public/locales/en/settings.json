@@ -1067,7 +1067,19 @@
     "caseRequiredNoneOpen": "Access is asked for on a case here, and there is no open case you can name. Open one first.",
     "caseOptionalHint": "Optional. Without one, record what you did on the case by hand afterwards.",
     "caseOtherCommunity": "This case is about community #{{community}}, not the one chosen.",
-    "caseMark": "Case #{{id}}"
+    "caseMark": "Case #{{id}}",
+    "notice": {
+      "label": "Tell the community",
+      "none": "Don't tell it",
+      "when_granted": "When access starts",
+      "when_ended": "Once access has ended",
+      "help": "Its superadmins are emailed the level and the kind of case, never the reason.",
+      "always": "Access for a support case is always emailed to the community's superadmins when it starts.",
+      "mark": {
+        "when_granted": "community told when it starts",
+        "when_ended": "community told once it ends"
+      }
+    }
   },
   "platformLayout": {
     "title": "Platform settings",

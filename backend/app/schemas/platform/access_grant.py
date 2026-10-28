@@ -10,11 +10,12 @@ from pydantic import (
 
 from app.models.platform.access_grant import (
     AccessGrantStatus,
+    CommunityNotice,
     grant_is_live,
     AccessLevel,
     SettingsLevel,
 )
-from app.core.intake import IntakeStream
+from app.core.intake import CommunityNoticeRule, IntakeStream
 from app.models.platform.guild import CommunityStatus
 from app.schemas.base import SanitizedBaseModel
 from app.schemas.platform.user import UserIdentity
@@ -53,6 +54,10 @@ class AccessGrantCreate(SanitizedBaseModel):
     #: The operations case this access is for. Required wherever the
     #: operations community takes cases a grant may serve.
     case_task_id: Optional[int] = Field(default=None, gt=0)
+    #: Whether, and when, the community's superadmins are emailed about the
+    #: access. Chosen only for a case whose stream leaves it open; a support
+    #: case always tells them when it starts.
+    community_notice: Optional[CommunityNotice] = None
 
     @property
     def wanted(self) -> list[tuple[str, str]]:
@@ -103,6 +108,8 @@ class BreakGlassCreate(SecondFactorAnswer):
     #: emergency may come before its case, and the steps are then written on
     #: the case by hand.
     case_task_id: Optional[int] = Field(default=None, gt=0)
+    #: As on a request: whether, and when, the community is told.
+    community_notice: Optional[CommunityNotice] = None
 
 
 class AccessGrantApprove(SanitizedBaseModel):
@@ -142,6 +149,8 @@ class AccessGrantRead(SanitizedBaseModel):
     revoked_at: Optional[datetime] = None
     #: The operations case this grant serves, where it names one.
     case_task_id: Optional[int] = None
+    #: Whether, and when, the community's superadmins are told of it.
+    community_notice: CommunityNotice = CommunityNotice.none
 
     # Enrichment populated by the service for display (avoids the client
     # re-fetching users/guilds). Optional so ``model_validate`` over a bare
@@ -197,6 +206,8 @@ class GrantCaseRead(SanitizedBaseModel):
     subject_community_id: Optional[int] = None
     #: Assigned to the reader.
     mine: bool = False
+    #: Whether a grant for the case tells the community it reaches.
+    community_notice: CommunityNoticeRule = CommunityNoticeRule.never
 
 
 class GrantCaseList(SanitizedBaseModel):

@@ -118,6 +118,19 @@ DOCUMENT_TYPES = frozenset({"application/pdf", "text/plain"})
 _MB = 1024 * 1024
 
 
+class CommunityNoticeRule(str, Enum):
+    """Whether a community hears that platform staff were given access to it
+    for one of a stream's cases (``AccessGrant.community_notice``)."""
+
+    #: Never: the stream's cases are not ones a grant serves.
+    never = "never"
+    #: As whoever asks for the access chooses: when it starts, once it has
+    #: ended, or not at all.
+    optional = "optional"
+    #: Always, when it starts.
+    always = "always"
+
+
 @dataclass(frozen=True)
 class EvidencePolicy:
     """What a person may attach when filing into a stream, or answering on a
@@ -164,6 +177,9 @@ class IntakeStreamMeta:
     #: Whether staff may name one of the stream's cases as the reason for an
     #: access grant, which then reports what the grant did on the case.
     grant_linkable: bool = False
+    #: Whether the community a grant for one of the stream's cases reaches has
+    #: its superadmins told of it.
+    community_notice: CommunityNoticeRule = CommunityNoticeRule.never
     #: Topics whose cases talk differently from the stream's own.
     topic_conversation: Mapping[str, Conversation] = field(default_factory=dict)
     #: Topics with a cap of their own on one account's open cases, counted
@@ -208,6 +224,7 @@ STREAMS: dict[IntakeStream, IntakeStreamMeta] = {
         retention_days=365,
         isolated=True,
         grant_linkable=True,
+        community_notice=CommunityNoticeRule.optional,
     ),
     IntakeStream.moderation: IntakeStreamMeta(
         sources=frozenset({Source.submitted, Source.manual}),
@@ -220,6 +237,7 @@ STREAMS: dict[IntakeStream, IntakeStreamMeta] = {
         retention_days=90,
         isolated=True,
         grant_linkable=True,
+        community_notice=CommunityNoticeRule.optional,
         # A report is not a conversation; an appeal is one, with the person
         # whose account it is, and they keep one open at a time. It is
         # written from the time-out screen, which opens nothing but itself,
@@ -240,6 +258,8 @@ STREAMS: dict[IntakeStream, IntakeStreamMeta] = {
         evidence=EvidencePolicy(5, 10 * _MB, IMAGE_TYPES | DOCUMENT_TYPES),
         retention_days=90,
         grant_linkable=True,
+        # Support works on the community's behalf, so it always hears.
+        community_notice=CommunityNoticeRule.always,
     ),
     IntakeStream.feedback: IntakeStreamMeta(
         sources=frozenset({Source.submitted, Source.manual}),

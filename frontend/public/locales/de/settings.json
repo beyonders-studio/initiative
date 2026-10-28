@@ -1067,7 +1067,19 @@
     "caseRequiredNoneOpen": "Zugriff wird hier für einen Fall beantragt, und es gibt keinen offenen Fall, den du angeben kannst. Eröffne zuerst einen.",
     "caseOptionalHint": "Optional. Ohne Fall hältst du danach von Hand im Fall fest, was du getan hast.",
     "caseOtherCommunity": "Dieser Fall betrifft Community #{{community}}, nicht die ausgewählte.",
-    "caseMark": "Fall #{{id}}"
+    "caseMark": "Fall #{{id}}",
+    "notice": {
+      "label": "Community benachrichtigen",
+      "none": "Nicht benachrichtigen",
+      "when_granted": "Wenn der Zugriff beginnt",
+      "when_ended": "Wenn der Zugriff beendet ist",
+      "help": "Ihre Superadmins erhalten per E-Mail die Stufe und die Art des Falls, nie die Begründung.",
+      "always": "Über Zugriff für einen Support-Fall werden die Superadmins der Community immer per E-Mail informiert, sobald er beginnt.",
+      "mark": {
+        "when_granted": "Community wird bei Beginn informiert",
+        "when_ended": "Community wird nach dem Ende informiert"
+      }
+    }
   },
   "platformLayout": {
     "title": "Plattformeinstellungen",

@@ -1067,7 +1067,19 @@
     "caseRequiredNoneOpen": "Ici, l'accès se demande pour un dossier, et aucun dossier ouvert ne peut être indiqué. Ouvrez-en un d'abord.",
     "caseOptionalHint": "Facultatif. Sans dossier, notez ensuite à la main dans le dossier ce que vous avez fait.",
     "caseOtherCommunity": "Ce dossier concerne la communauté #{{community}}, pas celle choisie.",
-    "caseMark": "Dossier #{{id}}"
+    "caseMark": "Dossier #{{id}}",
+    "notice": {
+      "label": "Prévenir la communauté",
+      "none": "Ne pas prévenir",
+      "when_granted": "Quand l’accès commence",
+      "when_ended": "Une fois l’accès terminé",
+      "help": "Ses superadmins reçoivent par e-mail le niveau et le type de dossier, jamais le motif.",
+      "always": "Un accès pour un dossier d’assistance est toujours signalé par e-mail aux superadmins de la communauté dès qu’il commence.",
+      "mark": {
+        "when_granted": "communauté prévenue au début",
+        "when_ended": "communauté prévenue à la fin"
+      }
+    }
   },
   "platformLayout": {
     "title": "Paramètres de la plateforme",

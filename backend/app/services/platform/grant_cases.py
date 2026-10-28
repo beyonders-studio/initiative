@@ -10,6 +10,10 @@ What the case is told is ids, counts, route templates and the names of acts,
 never anything from the community the grant reaches: the case is read by
 staff of the operations community, who may not be cleared for it.
 
+The case also decides whether the community hears of the grant: its
+superadmins are emailed the level, the kind of case and when, as its stream's
+rule says (``CommunityNoticeRule``).
+
 Whoever names a case must be able to read it, as themselves: their own
 session, routed into the operations community through the ordinary entry
 point, reads it, so a case they cannot see answers exactly as one that does
@@ -29,14 +33,18 @@ from sqlmodel import select
 from sqlmodel.ext.asyncio.session import AsyncSession
 
 from app.core.clock import utcnow
-from app.core.intake import STREAMS, CaseField, IntakeStream
+from app.core.intake import STREAMS, CaseField, CommunityNoticeRule, IntakeStream
 from app.core.messages import AccessGrantMessages
 from app.core.user_display import handle_of
 from app.db import cohorts
 from app.db.request_context import SystemGuild
 from app.db.session import set_rls_context
 from app.db.soft_delete_filter import select_including_deleted
-from app.models.platform.access_grant import AccessGrant, AccessGrantStatus
+from app.models.platform.access_grant import (
+    AccessGrant,
+    AccessGrantStatus,
+    CommunityNotice,
+)
 from app.models.platform.access_grant_activity import AccessGrantActivity
 from app.models.platform.user import User
 from app.models.tenant.intake import IntakeBinding, IntakeCase
@@ -243,15 +251,127 @@ async def _readable_case(user: User, case_task_id: int) -> tuple[str, str, objec
     return stream, category, subject
 
 
-async def check_case(user: User, *, case_task_id: int, guild_id: int) -> bool:
+async def check_case(user: User, *, case_task_id: int, guild_id: int) -> IntakeStream:
     """Refuse ``case_task_id`` as the reason ``user`` asks for access to
     ``guild_id``, unless they can read it, it is open, it is a kind a grant may
-    serve, and it is about that community or no community yet. Returns
-    whether it names no community, so the link can name it."""
-    _stream, _category, subject = await _readable_case(user, case_task_id)
+    serve, and it is about that community or no community yet. Returns its
+    stream."""
+    stream, _category, subject = await _readable_case(user, case_task_id)
     if subject is not None and int(subject) != guild_id:
         raise GrantCaseError(AccessGrantMessages.CASE_OTHER_COMMUNITY)
-    return subject is None
+    return IntakeStream(stream)
+
+
+def notice_rule(stream: Optional[IntakeStream]) -> CommunityNoticeRule:
+    """Whether a grant for a case in ``stream`` tells its community, where it
+    serves a case at all."""
+    if stream is None:
+        return CommunityNoticeRule.never
+    return STREAMS[stream].community_notice
+
+
+def community_notice(
+    stream: Optional[IntakeStream], asked: Optional[CommunityNotice]
+) -> CommunityNotice:
+    """The notice a grant for a case in ``stream`` carries, given what its
+    asker chose: always when it starts for a stream that always tells,
+    refused where the stream never does, and as chosen otherwise."""
+    rule = notice_rule(stream)
+    if rule is CommunityNoticeRule.always:
+        return CommunityNotice.when_granted
+    if rule is CommunityNoticeRule.never:
+        if asked not in (None, CommunityNotice.none):
+            raise GrantCaseError(AccessGrantMessages.COMMUNITY_NOTICE_NOT_OFFERED)
+        return CommunityNotice.none
+    return asked or CommunityNotice.none
+
+
+async def _case_stream(task_id: Optional[int]) -> Optional[IntakeStream]:
+    """The stream of case ``task_id``, read as the platform, or ``None`` where
+    there is no case to read."""
+    guild_id = await configured_operations_guild_id()
+    if task_id is None or guild_id is None:
+        return None
+    try:
+        async with cohorts.system_session(guild_id) as session:
+            await set_rls_context(session, SystemGuild(guild_id, read_only=True))
+            stream = (
+                await session.exec(
+                    select(IntakeCase.stream).where(IntakeCase.task_id == task_id)
+                )
+            ).first()
+            await session.rollback()
+    except Exception:  # noqa: BLE001 — logged; the letter names no kind
+        logger.exception("grant cases: could not read case %s", task_id)
+        return None
+    return IntakeStream(stream) if stream is not None else None
+
+
+async def tell_community(
+    session: AsyncSession,
+    grants: Sequence[AccessGrant],
+    *,
+    ended: bool,
+    guild_name: Optional[str] = None,
+) -> None:
+    """Email the superadmins of the community ``grants`` reach that platform
+    staff were given them (``ended=False``) or had them (``ended=True``).
+
+    ``grants`` are one act's — the same holder, community and case — and one
+    letter names every level among them. Queued as account mail on
+    ``session``, a system-engine session the caller commits, so the letter
+    stands or falls with what it reports.
+    """
+    from app.models.platform.guild import CommunityRole, Guild, GuildMembership
+    from app.services import email as email_service
+    from app.services.platform import email_outbox
+    from app.services.platform import intake as intake_service
+
+    if not grants:
+        return
+    first = grants[0]
+    if guild_name is None:
+        guild_name = (
+            await session.exec(select(Guild.name).where(Guild.id == first.guild_id))
+        ).first()
+    seat_holders = (
+        await session.exec(
+            select(User)
+            .join(GuildMembership, GuildMembership.user_id == User.id)
+            .where(GuildMembership.guild_id == first.guild_id)
+            .where(GuildMembership.role == CommunityRole.superadmin)
+        )
+    ).all()
+    if not seat_holders:
+        return
+    stream = await _case_stream(first.case_task_id)
+    contact = await intake_service.contact_for(session, IntakeStream.support)
+    # Each letter in a savepoint of its own: one that cannot be queued is
+    # logged and leaves the others to commit.
+    for user in seat_holders:
+        try:
+            async with session.begin_nested():
+                await email_outbox.enqueue_account_letter(
+                    user,
+                    email_service.community_access_pieces(
+                        community=guild_name or f"#{first.guild_id}",
+                        levels=[grant.access_level for grant in grants],
+                        stream=stream.value if stream is not None else None,
+                        started_at=first.decided_at or utcnow(),
+                        ends_at=first.revoked_at or first.expires_at,
+                        ended=ended,
+                        contact=contact,
+                        locale=user.locale or "en",
+                    ),
+                    session=session,
+                )
+        except Exception:  # noqa: BLE001 — logged; the grant stands
+            logger.exception(
+                "grant cases: community letter for user %s of community %s "
+                "was not queued",
+                user.id,
+                first.guild_id,
+            )
 
 
 async def check_account_case(user: User, *, case_task_id: int) -> None:
@@ -592,6 +712,9 @@ async def report_activity(
             )
         ).all()
     }
+    # Grants closed out this pass whose community is told once they end, by
+    # the act that issued them: one letter for a pair issued together.
+    to_tell: dict[tuple[int, int, Optional[datetime]], list[AccessGrant]] = {}
     for grant in ended:
         summary = await _activity(session, int(grant.id), None)
         if grant.status == AccessGrantStatus.denied.value:
@@ -617,6 +740,14 @@ async def report_activity(
             grant.closed_out_at = _accounted_to(grant, summary)
             session.add(grant)
             told += outcome is True
+            if grant.community_notice == CommunityNotice.when_ended.value:
+                to_tell.setdefault(
+                    (grant.user_id, grant.guild_id, grant.decided_at), []
+                ).append(grant)
+    for grants in to_tell.values():
+        await tell_community(
+            session, grants, ended=True, guild_name=names.get(grants[0].guild_id)
+        )
     for grant in live:
         since = grant.activity_noted_at or grant.decided_at
         summary = await _activity(session, int(grant.id), since)

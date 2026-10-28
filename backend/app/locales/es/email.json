@@ -437,6 +437,26 @@
     "contactNobody": "Ponte en contacto con quien gestiona este servidor para resolverlo.",
     "buttonLabel": "Restablecer el plan"
   },
+  "communityAccess": {
+    "granted": {
+      "subject": "El personal de la plataforma tiene acceso a {{community}}",
+      "title": "El personal de la plataforma tiene acceso a {{community}}",
+      "body": "El personal de este servidor recibió acceso <strong>{{level}}</strong> a <strong>{{community}}</strong> el {{start}}, hasta el {{end}}."
+    },
+    "ended": {
+      "subject": "El personal de la plataforma tuvo acceso a {{community}}",
+      "title": "El personal de la plataforma tuvo acceso a {{community}}",
+      "body": "El personal de este servidor tuvo acceso <strong>{{level}}</strong> a <strong>{{community}}</strong> desde el {{start}} hasta el {{end}}. Ese acceso ha terminado."
+    },
+    "case": {
+      "security": "Era para un caso de seguridad.",
+      "moderation": "Era para un caso de moderación.",
+      "support": "Era para un caso de soporte."
+    },
+    "recorded": "Cada solicitud hecha con él queda registrada.",
+    "contact": "Si tienes preguntas, escribe a <strong>{{contact}}</strong>.",
+    "moment": "{{date}}, {{time}} UTC"
+  },
   "communityTrialEnding": {
     "subject": "La prueba de {{community}} termina el {{date}}",
     "title": "La prueba de {{community}} termina el {{date}}",

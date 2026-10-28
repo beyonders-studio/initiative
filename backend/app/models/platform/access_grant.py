@@ -64,6 +64,24 @@ class AccessGrantStatus(str, Enum):
     expired = "expired"
 
 
+class CommunityNotice(str, Enum):
+    """Whether, and when, a community's superadmins are emailed that platform
+    staff hold a grant to it.
+
+    The case a grant serves decides what may be chosen
+    (``app.core.intake.CommunityNoticeRule``): a support case always tells
+    the community when access starts; a security or moderation case leaves
+    it to whoever asks, who may tell it when access starts, once it has
+    ended, or not at all.
+    """
+
+    none = "none"
+    #: When the grant takes effect: on approval, or when glass is broken.
+    when_granted = "when_granted"
+    #: Once the grant has ended, with when it started.
+    when_ended = "when_ended"
+
+
 def grant_is_live(
     status: "str | AccessGrantStatus", expires_at: Optional[datetime], now: datetime
 ) -> bool:
@@ -217,6 +235,15 @@ class AccessGrant(SQLModel, table=True):
     #: Set once; a grant with no case is closed out with nothing to tell.
     closed_out_at: Optional[datetime] = Field(
         default=None, sa_column=Column(DateTime(timezone=True), nullable=True)
+    )
+    #: Whether, and when, the community's superadmins are emailed about this
+    #: grant (:class:`CommunityNotice`). Settled when it is asked for, from
+    #: the case it serves.
+    community_notice: str = Field(
+        default=CommunityNotice.none.value,
+        sa_column=Column(
+            String(16), nullable=False, server_default=CommunityNotice.none.value
+        ),
     )
     created_at: datetime = Field(
         default_factory=lambda: datetime.now(timezone.utc),
