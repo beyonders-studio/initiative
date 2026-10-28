@@ -100,6 +100,16 @@ Downloads, previews and video seeking work as before: Initiative decrypts as it 
 - **Direct download links are off for encrypted files.** `EXPORT_PRESIGNED_DOWNLOADS` has no effect, because the store holds ciphertext. Exports stream through Initiative.
 - **Turning it off again** stops new files from being encrypted. Files stored encrypted still read, as long as their keys and `SECRET_KEY` (or the KMS key) are still there.
 
+## Scanning uploads
+
+Off by default. Turn it on when uploads should be checked for malware before anything keeps them.
+
+**What it does.** With `UPLOAD_SCANNER_URL` (and its `UPLOAD_SCANNER_TOKEN`) set, Initiative streams every file a person or an import brings in to a scanner before storing it: uploads, new versions, pasted pictures, evidence, and a large file once it has finished arriving. A file the scanner refuses is refused with **This file was refused by the malware scan**, and nothing of it is kept.
+
+**The scanner** is a separate service Initiative calls over HTTP (`POST /v1/scan`, with the file as the body and the token as a bearer token). It answers `{"verdict": "clean"}` or `{"verdict": "refused", "engine": …, "reason": …}`. The one Beyonders Studio runs checks a malware hash list, looks inside zip archives for programs, and runs YARA rules and ClamAV. Any service that answers the same way will work.
+
+**It fails closed.** While the scanner can't answer, uploads are refused with **Uploads are paused while files can't be scanned**, so a deployment that asked for scanning never stores an unscanned file. A file larger than the scanner accepts is refused too.
+
 ## Per-community storage limits
 
 Separately from *where* files are stored, the [owner](platform-roles.md) can cap **how much** each community may store, from **Settings → Platform → Communities**. Lowering a limit below a community's current usage blocks *new* uploads but never deletes existing files.

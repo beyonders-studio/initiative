@@ -165,6 +165,8 @@
   "VERSION_CONFLICT": "Jemand anderes hat im selben Moment eine Version hochgeladen. Versuche es erneut.",
   "FILE_INVALID_FILE": "Diese Datei ist leer oder konnte nicht gelesen werden (max. 50 MB).",
   "FILE_TYPE_NOT_ALLOWED": "Programme und Skripte können nicht hochgeladen werden.",
+  "FILE_REFUSED_BY_SCAN": "Diese Datei wurde von der Malware-Prüfung abgelehnt.",
+  "FILE_SCANNER_UNAVAILABLE": "Uploads sind pausiert, solange Dateien nicht geprüft werden können. Versuche es in ein paar Minuten erneut.",
   "RESUMABLE_INVALID_REQUEST": "Diese Upload-Anfrage konnte nicht gelesen werden.",
   "RESUMABLE_VERSION_UNSUPPORTED": "Dieser Upload-Client wird nicht unterstützt.",
   "RESUMABLE_NOT_FOUND": "Dieser Upload existiert nicht mehr.",

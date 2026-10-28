@@ -52,6 +52,7 @@ from app.db.session import set_rls_context
 from app.db.soft_delete_filter import select_including_deleted
 from app.models.tenant.evidence import DISPLAY_NAME_LENGTH, Evidence, EvidenceKind
 from app.services import storage as storage_service
+from app.services import upload_scanning
 
 logger = logging.getLogger(__name__)
 
@@ -319,6 +320,9 @@ def prepare(
         content_type = _sniff(incoming.data)
         if content_type not in policy.types:
             raise EvidenceRefused(EvidenceMessages.TYPE_NOT_ALLOWED)
+        # Staff open evidence: it is scanned like any upload, where the
+        # deployment scans, and refused (or held back) the same way.
+        upload_scanning.scan_bytes(incoming.data)
         data = _without_location(incoming.data, content_type)
         prepared.append(
             PreparedEvidence(

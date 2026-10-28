@@ -471,6 +471,12 @@ class Settings(BaseSettings):
         return value
 
     @model_validator(mode="after")
+    def _scanner_has_its_token(self) -> "Settings":
+        if self.UPLOAD_SCANNER_URL and not self.UPLOAD_SCANNER_TOKEN:
+            raise ValueError("UPLOAD_SCANNER_URL needs UPLOAD_SCANNER_TOKEN")
+        return self
+
+    @model_validator(mode="after")
     def _kms_root_names_its_key(self) -> "Settings":
         if self.STORAGE_ENCRYPTION == "gcp_kms" and not self.STORAGE_ENCRYPTION_KMS_KEY:
             raise ValueError(
@@ -902,6 +908,12 @@ class Settings(BaseSettings):
     STORAGE_ENCRYPTION: str = ""
     # projects/<p>/locations/<l>/keyRings/<r>/cryptoKeys/<k>, for "gcp_kms".
     STORAGE_ENCRYPTION_KMS_KEY: str = ""
+    # Scan every upload before it is stored, at this scanner (initiative_infra
+    # scanner/: a hash list, archives, YARA and ClamAV), presenting the token.
+    # Unset (the default): nothing is scanned. Set, it fails closed: while the
+    # scanner cannot answer, uploads are refused (app.services.upload_scanning).
+    UPLOAD_SCANNER_URL: str = ""
+    UPLOAD_SCANNER_TOKEN: str = ""
 
     # --- Marketplace ------------------------------------------------------
     # A directory of listing manifests (*.json) this deployment publishes as

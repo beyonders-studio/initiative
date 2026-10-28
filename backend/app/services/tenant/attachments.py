@@ -18,6 +18,7 @@ from typing import (
     BinaryIO,
     Dict,
     Iterable,
+    Iterator,
     Mapping,
     Set,
     Tuple,
@@ -41,7 +42,7 @@ from app.core.image_headers import read_image_header
 from app.db.advisory_locks import LockNamespace, advisory_lock
 from app.db.query import ids_in
 from app.services.platform import billing_changes
-from app.services.storage import get_guild_storage, open_seekable
+from app.services.storage import ReadableBlob, get_guild_storage, open_seekable
 
 logger = logging.getLogger(__name__)
 
@@ -854,15 +855,39 @@ def validate_stored(guild_id: int, key: str, size: int, filename: str | None) ->
     """The type of a file already in the guild's storage under ``key``, a
     finished resumable upload, read as :func:`validate_file` reads one: from
     its first bytes, and from a zip's own list of what it holds, without
-    fetching the rest. Raises as :func:`validate_file` does."""
+    fetching the rest. Raises as :func:`validate_file` does.
+
+    Then, where the deployment scans uploads, the whole file is streamed to
+    the scanner (``app.services.upload_scanning``), which raises unless it is
+    clean: a file that arrived in parts is checked like any other before it
+    is taken."""
     if not size:
         raise ValueError("Uploaded file is empty")
-    source = open_seekable(get_guild_storage(guild_id), key, size)
+    storage = get_guild_storage(guild_id)
+    source = open_seekable(storage, key, size)
     if source is None:
         raise ValueError("Uploaded file is missing")
     with source:
         detected = detect_mime_type(source.read(_head_bytes()))
-        return _type_of(detected, source, filename)[0]
+        mime = _type_of(detected, source, filename)[0]
+    from app.services import upload_scanning
+
+    if upload_scanning.enabled():
+        blob = storage.open_readable(key)
+        if blob is None:
+            raise ValueError("Uploaded file is missing")
+        upload_scanning.scan_stream(_pieces(blob), size)
+    return mime
+
+
+def _pieces(blob: ReadableBlob) -> Iterator[bytes]:
+    """A stored file's bytes a piece at a time, from disk or from a stream."""
+    if blob.path is None:
+        yield from blob.stream or ()
+        return
+    with blob.path.open("rb") as handle:
+        while piece := handle.read(1024 * 1024):
+            yield piece
 
 
 def _type_of(
@@ -933,7 +958,16 @@ async def store_upload(
     and the commit. ``initiative_id`` is the initiative a file written together
     with what shows it is kept for; without it the file waits to be claimed
     (:func:`claim_uploads`).
+
+    Scanned first where the deployment scans uploads
+    (``app.services.upload_scanning``): a file the scanner refuses, or any
+    file while it cannot answer, is never written. The pictures the app draws
+    itself (:data:`THUMBNAIL_PREFIX`) are not uploads and are not sent.
     """
+    from app.services import upload_scanning
+
+    if upload_scanning.enabled() and not filename.startswith(THUMBNAIL_PREFIX):
+        await asyncio.to_thread(upload_scanning.scan_bytes, data)
     await asyncio.to_thread(
         get_guild_storage(guild_id).write,
         filename,
