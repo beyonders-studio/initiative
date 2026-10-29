@@ -95,6 +95,22 @@ CASES: dict[tuple[str, str], Case] = {
     ("platform", "email_notifications_enabled"): Case(True, False, PLATFORM_SETTINGS),
     ("platform", "redact_notification_content"): Case(False, True, PLATFORM_SETTINGS),
     ("platform", "engagement_ranking_enabled"): Case(True, False, PLATFORM_SETTINGS),
+    ("platform", "cookie_consent_enabled"): Case(False, True, PLATFORM_SETTINGS),
+    ("platform", "community_directory_enabled"): Case(False, True, PLATFORM_SETTINGS),
+    ("platform", "community_age_gate_enabled"): Case(True, False, PLATFORM_SETTINGS),
+    ("platform", "direct_messages_enabled"): Case(True, False, PLATFORM_SETTINGS),
+    ("platform", "guests_enabled"): Case(False, True, PLATFORM_SETTINGS),
+    ("platform", "max_guest_days"): Case(90, 30, PLATFORM_SETTINGS),
+    ("platform", "erase_deleted_accounts"): Case(True, False, PLATFORM_SETTINGS),
+    ("platform", "deleted_account_retention_days"): Case(30, 7, PLATFORM_SETTINGS),
+    ("platform", "destroy_deleted_communities"): Case(True, False, PLATFORM_SETTINGS),
+    ("platform", "deleted_community_retention_days"): Case(90, 7, PLATFORM_SETTINGS),
+    ("platform", "delete_held_communities"): Case(True, False, PLATFORM_SETTINGS),
+    ("platform", "on_hold_community_deletion_days"): Case(30, 7, PLATFORM_SETTINGS),
+    ("platform", "marketplace_members_publish_directly"): Case(
+        False, True, PLATFORM_SETTINGS
+    ),
+    ("platform", "marketplace_registry_enabled"): Case(True, False, PLATFORM_SETTINGS),
     ("community", "auth_policy"): Case(
         SignInRequirement(),
         FACTOR_REQUIREMENT,
