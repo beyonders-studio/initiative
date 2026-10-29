@@ -496,15 +496,6 @@ class GuildMembership(SQLModel, table=True):
         default=None,
         sa_column=Column(String(MEMBER_DISPLAY_NAME_MAX_LENGTH), nullable=True),
     )
-    #: Whether this person's personal API keys reach this community. True
-    #: unless its superadmin turned it off for them, and read only while the
-    #: community holds the ``restrictions`` option: without it every member's
-    #: keys reach it. Read by the guild-access gate, by key creation and by the
-    #: cross-guild aggregates, so turning it off stops a key already made.
-    api_keys_allowed: bool = Field(
-        default=True,
-        sa_column=Column(Boolean, nullable=False, server_default="true"),
-    )
     #: The provider whose claims put this person here, and the only one whose
     #: sign-in may take it away again. NULL is a membership nobody manages —
     #: an invite, a join request, an admin adding somebody — which group sync

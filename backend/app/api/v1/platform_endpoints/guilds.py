@@ -131,7 +131,7 @@ logger = logging.getLogger(__name__)
 def _can_of(guild_context: GuildContext, *, use_api: bool) -> CommunityCan:
     """What the caller may do in the community, by the standing: each flag is
     what the guard on the routes that do the thing asks. ``use_api`` is
-    :func:`guild_entitlements.accepts_api_keys` for the caller's membership."""
+    the member's ``api_keys`` rule for the caller's membership."""
     return CommunityCan(
         # The seam admitted the request, which a community in time out refuses.
         enter=True,
@@ -299,8 +299,8 @@ async def _guild_read(
     elif membership is None:
         raise TypeError("_guild_read needs a standing or a membership")
     # A grantee holds no membership, and a grant is never reached with a key.
-    use_api = membership is not None and not (
-        await guild_entitlements.refuses_api_keys(system_session, membership)
+    use_api = membership is not None and await rules.member_value(
+        system_session, membership.guild_id, membership.user_id, "api_keys"
     )
     if standing is not None:
         role = standing.rung
@@ -1700,10 +1700,18 @@ async def set_member_api_access(
             status_code=status.HTTP_404_NOT_FOUND,
             detail=GuildMessages.USER_NOT_FOUND_IN_COMMUNITY,
         )
-    if membership.api_keys_allowed == payload.api_keys_allowed:
+    stored = await rules.member_value(
+        session, guild_id, user_id, "api_keys", applied=False
+    )
+    if stored == payload.api_keys_allowed:
         return Response(status_code=status.HTTP_204_NO_CONTENT)
-    membership.api_keys_allowed = payload.api_keys_allowed
-    session.add(membership)
+    await rules.put(
+        session,
+        "api_keys",
+        payload.api_keys_allowed,
+        guild_id=guild_id,
+        user_id=user_id,
+    )
     await audit_service.record(
         session,
         event_type=AuditEventType.GUILD_MEMBER_API_ACCESS_CHANGED,

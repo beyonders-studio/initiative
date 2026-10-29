@@ -660,7 +660,7 @@ async def _enforce_guild_api_access(
     session: AsyncSession, membership: GuildMembership
 ) -> None:
     """A member whose API access the community turned off does not reach it
-    with a personal API key (:func:`guild_entitlements.accepts_api_keys`).
+    with a personal API key (the ``api_keys`` rule).
 
     Runs beside the sign-in gate, for members. A grantee is never reached with
     a personal API key at all; the grant branch refuses one before this. The
@@ -672,8 +672,10 @@ async def _enforce_guild_api_access(
     feeds, the realtime sockets and the keepalive. The cross-guild aggregates,
     which pick their guilds themselves, ask the same question where they do it.
     """
-    if auth_context.current().api_key_credential and (
-        await guild_entitlements.refuses_api_keys(session, membership)
+    if auth_context.current().api_key_credential and not (
+        await rules.member_value(
+            session, membership.guild_id, membership.user_id, "api_keys"
+        )
     ):
         raise GuildAccessError(detail=GuildMessages.COMMUNITY_API_KEYS_REFUSED)
 

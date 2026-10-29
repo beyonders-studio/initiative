@@ -146,6 +146,7 @@ async def _build_members(ctx: SectionContext) -> tuple[dict[str, Any], int] | No
 
     from app.core.user_display import handle_of
     from app.models.platform.guild import GuildMembership
+    from app.models.platform.rule import CommunityRule
     from app.models.platform.user_profile_view import GuildMember
 
     memberships = list(
@@ -160,6 +161,17 @@ async def _build_members(ctx: SectionContext) -> tuple[dict[str, Any], int] | No
     profiles = {
         profile.id: profile for profile in await ctx.session.exec(select(GuildMember))
     }
+    # The members whose keys the seat turned off; everybody else's reach it.
+    keys_off = set(
+        await ctx.session.exec(
+            select(CommunityRule.user_id).where(
+                CommunityRule.guild_id == ctx.guild_id,
+                CommunityRule.key == "api_keys",
+                CommunityRule.user_id.is_not(None),  # type: ignore[union-attr]
+                CommunityRule.enabled.is_(False),  # type: ignore[union-attr]
+            )
+        )
+    )
     members = []
     for membership in memberships:
         profile = profiles.get(membership.user_id)
@@ -169,7 +181,7 @@ async def _build_members(ctx: SectionContext) -> tuple[dict[str, Any], int] | No
                 "handle": handle_of(profile) if profile else None,
                 "name": membership.display_name,
                 "role": _enum_value(membership.role),
-                "api_keys_allowed": membership.api_keys_allowed,
+                "api_keys_allowed": membership.user_id not in keys_off,
                 "joined_at": _iso(getattr(membership, "created_at", None)),
             }
         )

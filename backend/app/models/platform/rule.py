@@ -4,13 +4,17 @@ from datetime import datetime, timezone
 from typing import Optional
 
 from sqlalchemy import (
+    BigInteger,
     Boolean,
     CheckConstraint,
     Column,
     DateTime,
     ForeignKey,
+    ForeignKeyConstraint,
+    Identity,
     Integer,
     String,
+    UniqueConstraint,
 )
 from sqlmodel import Field, SQLModel
 
@@ -46,20 +50,43 @@ class PlatformRule(SQLModel, table=True):
 
 
 class CommunityRule(SQLModel, table=True):
-    """One of a community's rules that says something other than its default.
+    """One of a community's rules that says something other than its default,
+    for the whole community or for one member of it.
 
-    Goes with its community.
+    Goes with its community, and a member's with their membership.
     """
 
     __tablename__ = "community_rules"
-    __table_args__ = (CheckConstraint(_ONE_SLOT, name="ck_community_rules_one_slot"),)
+    __table_args__ = (
+        CheckConstraint(_ONE_SLOT, name="ck_community_rules_one_slot"),
+        ForeignKeyConstraint(
+            ["guild_id", "user_id"],
+            ["guild_memberships.guild_id", "guild_memberships.user_id"],
+            ondelete="CASCADE",
+            name="fk_community_rules_member",
+        ),
+        UniqueConstraint(
+            "guild_id",
+            "key",
+            "user_id",
+            name="uq_community_rules_subject",
+            postgresql_nulls_not_distinct=True,
+        ),
+    )
 
+    id: Optional[int] = Field(
+        default=None, sa_column=Column(BigInteger, Identity(), primary_key=True)
+    )
     guild_id: int = Field(
         sa_column=Column(
-            Integer, ForeignKey("guilds.id", ondelete="CASCADE"), primary_key=True
+            Integer, ForeignKey("guilds.id", ondelete="CASCADE"), nullable=False
         )
     )
-    key: str = Field(sa_column=Column(String(64), primary_key=True))
+    key: str = Field(sa_column=Column(String(64), nullable=False))
+    #: The member the row is about, or ``None`` for the whole community.
+    user_id: Optional[int] = Field(
+        default=None, sa_column=Column(Integer, nullable=True)
+    )
     enabled: Optional[bool] = Field(
         default=None, sa_column=Column(Boolean, nullable=True)
     )

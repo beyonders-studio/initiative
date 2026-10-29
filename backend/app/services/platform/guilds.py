@@ -57,7 +57,7 @@ from app.services.platform import billing as billing_service
 
 from app.services.platform import account_stream, user_stream
 from app.services.platform import api_keys as api_keys_service
-from app.services.platform import guild_entitlements, rules
+from app.services.platform import rules
 from app.services.platform import contact_grants as contact_grants_service
 from app.services.platform.retention import COMMUNITY_DELETION, COMMUNITY_HOLD
 from app.db.request_context import Platform, SystemGuild, Unattributed
@@ -799,8 +799,8 @@ async def list_memberships(
       settings surface (:func:`gather_across_guilds`). A guild the seam does not
       admit the caller to right now reports ``None``; a member's entry is
       ``None`` and costs no query.
-    * ``accepts_api_keys`` is :func:`guild_entitlements.accepts_api_keys`,
-      selected beside the membership row.
+    * ``accepts_api_keys`` is the member's ``api_keys`` rule, selected beside
+      the membership row.
     """
     # lazy: avoids a circular import
     from app.db.session import SystemSessionLocal, set_rls_context
@@ -812,8 +812,8 @@ async def list_memberships(
             select(
                 Guild,
                 GuildMembership,
-                guild_entitlements.accepts_api_keys(
-                    Guild.id, GuildMembership.api_keys_allowed
+                rules.community_rule_sql(
+                    Guild.id, "api_keys", user_id=GuildMembership.user_id
                 ),
             )
             .join(GuildMembership, GuildMembership.guild_id == Guild.id)

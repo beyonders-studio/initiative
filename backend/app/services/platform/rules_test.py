@@ -65,3 +65,26 @@ async def test_a_community_value_applies_while_it_holds_the_option(
     assert await rules.community_value(
         session, guild.id, "enforce_compliance_session", applied=False
     )
+
+
+async def test_a_member_keeps_a_value_that_differs_from_the_community(
+    session: AsyncSession,
+):
+    """A member's row equal to the default still says something when the
+    community says otherwise, so it stays; equal to the community's, it goes."""
+    user = await create_user(session)
+    guild = await create_guild(session, creator=user)
+    await rules.put(session, "api_keys", False, guild_id=guild.id)
+    await rules.put(session, "api_keys", True, guild_id=guild.id, user_id=user.id)
+    await session.commit()
+    assert await rules.member_value(session, guild.id, user.id, "api_keys") is True
+
+    await rules.put(session, "api_keys", False, guild_id=guild.id, user_id=user.id)
+    await session.commit()
+    assert await rules.member_value(session, guild.id, user.id, "api_keys") is False
+    members = (
+        await session.exec(
+            select(CommunityRule).where(CommunityRule.user_id.is_not(None))
+        )
+    ).all()
+    assert members == []

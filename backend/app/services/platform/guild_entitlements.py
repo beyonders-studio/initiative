@@ -10,14 +10,12 @@ from __future__ import annotations
 from typing import Any
 
 from fastapi import HTTPException, status
-from sqlalchemy import literal, or_
 from sqlalchemy.sql.elements import ColumnElement
 from sqlmodel import func, select
 from sqlmodel.ext.asyncio.session import AsyncSession
 
 from app.core.guild_auth_options import CommunityAuthOption, effective_options
 from app.core.messages import GuildMessages
-from app.models.platform.guild import GuildMembership
 from app.models.platform.guild_administration import GuildAdministration
 
 
@@ -45,31 +43,6 @@ def holds_option(guild_id: Any, option: CommunityAuthOption) -> ColumnElement[bo
     ``public.guild_holds_option``, the answer the sign-in gate gives. True
     unless the row the session reads shows the option withdrawn."""
     return func.public.guild_holds_option(guild_id, option.value)
-
-
-def accepts_api_keys(guild_id: Any, api_keys_allowed: Any) -> ColumnElement[bool]:
-    """Whether a community accepts its member's personal API keys: unless its
-    superadmin turned them off for that member, which applies while the
-    community holds the ``restrictions`` option.
-
-    The one statement of the rule. The guild-access gate and key creation ask
-    it through :func:`refuses_api_keys`; the cross-guild aggregates and the
-    community list select it beside the membership row they read.
-    """
-    return or_(
-        api_keys_allowed.is_(True),
-        ~holds_option(guild_id, CommunityAuthOption.restrictions),
-    )
-
-
-async def refuses_api_keys(session: AsyncSession, membership: GuildMembership) -> bool:
-    """:func:`accepts_api_keys`, refused, for one membership row already read.
-    A member whose keys are allowed is answered without a query."""
-    if membership.api_keys_allowed:
-        return False
-    return not await session.scalar(
-        select(accepts_api_keys(membership.guild_id, literal(False)))
-    )
 
 
 async def has_auth_option(
