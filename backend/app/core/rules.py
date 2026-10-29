@@ -93,4 +93,7 @@ COMMUNITY_RULES: dict[str, StoredRule] = _catalog(
     StoredRule("allow_ai", _ON, True, _RESTRICTIONS),
     # The longest a guest may stay, in days, under the deployment's ceiling.
     StoredRule("guest_max_days", Slot.amount, None, _RESTRICTIONS),
+    # Whether a member's personal API keys reach the community. The seat sets
+    # it member by member.
+    StoredRule("api_keys", _ON, True, _RESTRICTIONS),
 )

@@ -5,15 +5,18 @@ counts only while it holds the option the rule needs, which every reader that
 enforces a rule asks for (``applied``); the seat's own settings page reads
 what it wrote whether or not it applies (``applied=False``).
 
+A community's row says something of the whole community, or of one member
+(``user_id``). For a member, their own row wins over the community's.
+
 :func:`community_rule_sql` is the same answer as a SQL expression, for a query
-that has to ask it of many communities at once.
+that has to ask it of many communities or members at once.
 """
 
 from __future__ import annotations
 
 from typing import Any, Iterable
 
-from sqlalchemy import and_, func, select as sa_select
+from sqlalchemy import and_, func, literal, or_, select as sa_select
 from sqlalchemy.sql.elements import ColumnElement
 from sqlmodel import delete, select
 from sqlmodel.ext.asyncio.session import AsyncSession
@@ -66,7 +69,8 @@ async def community_values(
     rows = (
         await session.exec(
             sa_select(CommunityRule, *held_columns).where(
-                CommunityRule.guild_id.in_(wanted)  # type: ignore[attr-defined]
+                CommunityRule.guild_id.in_(wanted),  # type: ignore[attr-defined]
+                CommunityRule.user_id.is_(None),  # type: ignore[union-attr]
             )
         )
     ).all()
@@ -88,30 +92,73 @@ async def community_value(
     return (await community_values(session, [guild_id], applied=applied))[guild_id][key]
 
 
-def community_rule_sql(guild_id: Any, key: str) -> ColumnElement[Any]:
-    """:func:`community_value`, applied, as an expression over ``guild_id``."""
+def community_rule_sql(
+    guild_id: Any, key: str, *, user_id: Any = None, applied: bool = True
+) -> ColumnElement[Any]:
+    """:func:`community_value` as an expression over ``guild_id``, or
+    :func:`member_value` over ``guild_id`` and ``user_id``."""
     rule = COMMUNITY_RULES[key]
     stored = getattr(CommunityRule, rule.slot.value)
-    conditions = [CommunityRule.guild_id == guild_id, CommunityRule.key == key]
-    if rule.entitlement is not None:
+    subject = CommunityRule.user_id.is_(None)  # type: ignore[union-attr]
+    if user_id is not None:
+        subject = or_(subject, CommunityRule.user_id == user_id)
+    conditions = [CommunityRule.guild_id == guild_id, CommunityRule.key == key, subject]
+    if applied and rule.entitlement is not None:
         conditions.append(guild_entitlements.holds_option(guild_id, rule.entitlement))
-    found = sa_select(stored).where(and_(*conditions)).scalar_subquery()
+    found = (
+        sa_select(stored)
+        .where(and_(*conditions))
+        # The member's own row first.
+        .order_by(CommunityRule.user_id.is_(None))  # type: ignore[union-attr]
+        .limit(1)
+        .scalar_subquery()
+    )
     if rule.default is None:
         return found
     return func.coalesce(found, rule.default)
 
 
+async def member_value(
+    session: AsyncSession,
+    guild_id: int,
+    user_id: int,
+    key: str,
+    *,
+    applied: bool = True,
+) -> Any:
+    """One rule as it stands for one member: their own row, the community's,
+    or the default."""
+    return await session.scalar(
+        sa_select(
+            community_rule_sql(
+                literal(guild_id), key, user_id=literal(user_id), applied=applied
+            )
+        )
+    )
+
+
 async def put(
-    session: AsyncSession, key: str, value: Any, *, guild_id: int | None = None
+    session: AsyncSession,
+    key: str,
+    value: Any,
+    *,
+    guild_id: int | None = None,
+    user_id: int | None = None,
 ) -> None:
-    """Write one rule of the deployment, or of ``guild_id``. Its default
-    removes the row, so a rule that says nothing holds nothing."""
+    """Write one rule of the deployment, of ``guild_id``, or of one of its
+    members. Its default removes the row, so a rule that says nothing holds
+    nothing."""
     catalog = PLATFORM_RULES if guild_id is None else COMMUNITY_RULES
     rule = catalog[key]
     model = PlatformRule if guild_id is None else CommunityRule
     where = [model.key == key]
     if guild_id is not None:
-        where.append(CommunityRule.guild_id == guild_id)
+        where += [
+            CommunityRule.guild_id == guild_id,
+            CommunityRule.user_id.is_(None)  # type: ignore[union-attr]
+            if user_id is None
+            else CommunityRule.user_id == user_id,
+        ]
     if value == rule.default:
         await session.exec(delete(model).where(*where))  # type: ignore[arg-type]
         return
@@ -120,7 +167,7 @@ async def put(
         row = (
             PlatformRule(key=key)
             if guild_id is None
-            else CommunityRule(guild_id=guild_id, key=key)
+            else CommunityRule(guild_id=guild_id, key=key, user_id=user_id)
         )
     for slot in Slot:
         setattr(row, slot.value, value if slot is rule.slot else None)

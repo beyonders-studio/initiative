@@ -35,6 +35,7 @@ from app.core.relationships import Provenance, RelationshipType
 from app.core.search import SearchEntityType
 from app.models.tenant.relationship import EntityRelationship
 from app.services.tenant import relationships as relationships_service
+from app.services.platform import rules
 from app.core.tools import CHILD_KINDS, Tool
 from app.core.security import (
     get_password_hash,
@@ -138,7 +139,8 @@ async def create_user(
     Args:
         session: Database session
         commit: Whether to commit the transaction (default True)
-        **overrides: Override any default field values
+        **overrides: Override any default field values. ``api_keys_allowed``
+            sets the member's ``api_keys`` rule instead.
 
     Returns:
         Created User instance
@@ -421,6 +423,7 @@ async def create_guild_membership(
         "position": 0,
     }
 
+    api_keys_allowed = overrides.pop("api_keys_allowed", True)
     membership_data = {**defaults, **overrides}
     # The creator already has one (``create_guild`` seats them), so asking for
     # theirs again says what role they should hold rather than adding a second
@@ -440,6 +443,9 @@ async def create_guild_membership(
     else:
         membership = GuildMembership(**membership_data)
     session.add(membership)
+    if not api_keys_allowed:
+        await session.flush()
+        await rules.put(session, "api_keys", False, guild_id=guild.id, user_id=user.id)
 
     if commit:
         await session.commit()

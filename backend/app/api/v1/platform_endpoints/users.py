@@ -143,7 +143,7 @@ from app.services.tenant import initiatives as initiatives_service
 from app.services.tenant import named_people
 from app.services.tenant import ownership as ownership_service
 from app.services.platform import cookie_consent as cookie_consent_service
-from app.services.platform import guild_entitlements
+from app.services.platform import rules
 from app.services.platform import guilds as guilds_service
 from app.services.platform import guild_images as images_service
 from app.services.platform import legal as legal_service
@@ -332,7 +332,12 @@ async def list_users(
             GuildMembership.role,
             GuildMembership.oidc_provider_id,
             GuildMembership.display_name,
-            GuildMembership.api_keys_allowed,
+            rules.community_rule_sql(
+                GuildMembership.guild_id,
+                "api_keys",
+                user_id=GuildMembership.user_id,
+                applied=False,
+            ),
             GuildMembership.guest_until,
         ),
         guild_id=guild_context.guild_id,
@@ -1768,7 +1773,9 @@ async def create_my_api_key(
         # And the guild has to accept this member's keys at all. Asked here as
         # well as at the gate so a key that could never be used is never handed
         # over.
-        if await guild_entitlements.refuses_api_keys(session, membership):
+        if not await rules.member_value(
+            session, membership.guild_id, membership.user_id, "api_keys"
+        ):
             raise HTTPException(
                 status_code=status.HTTP_403_FORBIDDEN,
                 detail=GuildMessages.COMMUNITY_API_KEYS_REFUSED,
