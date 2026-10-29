@@ -16,6 +16,7 @@ import {
 } from "@dnd-kit/sortable";
 import { CSS } from "@dnd-kit/utilities";
 import {
+  Asterisk,
   Columns2,
   EyeClosed,
   FileText,
@@ -37,12 +38,14 @@ import { iconForPropertyType } from "@/components/properties/propertyTypeIcons";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
+import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip";
 import type { MetadataOwner } from "@/hooks/useProperties";
-import { isRequired, LAYOUT_REGIONS } from "@/lib/layouts/detailLayout";
+import { isRequired, LAYOUT_REGIONS, withRequired } from "@/lib/layouts/detailLayout";
 import {
   addableFields,
   addablePluginParts,
   CARD_LISTS,
+  canRequire,
   cardOf,
   columnsOf,
   dropInto,
@@ -467,40 +470,48 @@ export const DetailLayoutOutline = ({
   const { t } = useTranslation(LAYOUT_NAMESPACES);
   const translate = t as TranslateFn;
   const { labelOf, partLabel } = usePartLabel(fields, plugins, of.words.parts);
+  const { requiredParts } = of.spec;
   return (
-    <nav aria-label={translate("layouts:outline")} className="flex h-full flex-col">
-      <div className="flex-1 space-y-1 overflow-y-auto p-3">
-        <OutlineRow
-          id="layout"
-          depth={0}
-          label={translate(of.words.name)}
-          icon={<FileText className="h-4 w-4" aria-hidden="true" />}
-          selected={sameSelection(selection, { kind: "layout" })}
-          onSelect={() => edits.select({ kind: "layout" })}
-          fixed
-        />
-        <PartTree
-          root={detail}
-          depth={1}
-          partLabel={(node) =>
-            isRequired(node)
-              ? translate("layouts:required.part", { name: partLabel(node) })
-              : partLabel(node)
-          }
-          hideAction={(node) =>
-            FIXED.has(node.type) || !removable(node, fields)
-              ? null
-              : translate("layouts:hide", { name: partLabel(node) })
-          }
-          selection={selection}
-          edits={edits}
-          locked={locked}
-        />
-      </div>
-      <div className="border-t p-3">
-        <AddPicker choices={choices} labelOf={labelOf} adders={adders} locked={locked} />
-      </div>
-    </nav>
+    <TooltipProvider delayDuration={300}>
+      <nav aria-label={translate("layouts:outline")} className="flex h-full flex-col">
+        <div className="flex-1 space-y-1 overflow-y-auto p-3">
+          <OutlineRow
+            id="layout"
+            depth={0}
+            label={translate(of.words.name)}
+            icon={<FileText className="h-4 w-4" aria-hidden="true" />}
+            selected={sameSelection(selection, { kind: "layout" })}
+            onSelect={() => edits.select({ kind: "layout" })}
+            fixed
+          />
+          <PartTree
+            root={detail}
+            depth={1}
+            partLabel={partLabel}
+            hideAction={(node) =>
+              FIXED.has(node.type) || !removable(node, fields)
+                ? null
+                : translate("layouts:hide", { name: partLabel(node) })
+            }
+            requirement={(node) =>
+              requiredParts === null
+                ? null
+                : node.type === "field" && fields.get(String(node.props?.field))?.kind === "title"
+                  ? "always"
+                  : canRequire(node, fields, requiredParts)
+                    ? isRequired(node)
+                    : null
+            }
+            selection={selection}
+            edits={edits}
+            locked={locked}
+          />
+        </div>
+        <div className="border-t p-3">
+          <AddPicker choices={choices} labelOf={labelOf} adders={adders} locked={locked} />
+        </div>
+      </nav>
+    </TooltipProvider>
   );
 };
 
@@ -515,6 +526,7 @@ const PartTree = ({
   depth,
   partLabel,
   hideAction,
+  requirement = () => null,
   selection,
   edits,
   locked,
@@ -524,6 +536,9 @@ const PartTree = ({
   partLabel: (node: LayoutNode) => string;
   /** What hiding the part is called, or null when it stays. */
   hideAction: (node: LayoutNode) => string | null;
+  /** Whether an item's page requires the part, "always" for its title, or
+   *  null where it cannot. */
+  requirement?: (node: LayoutNode) => Requirement | null;
   selection: Selection;
   edits: LayoutEdits;
   locked: boolean;
@@ -553,6 +568,7 @@ const PartTree = ({
         {children.map((child, index) => {
           const path = [...parentPath, index];
           const hide = hideAction(child);
+          const required = requirement(child);
           return (
             <div key={keys[index]}>
               <OutlineRow
@@ -562,6 +578,14 @@ const PartTree = ({
                 selected={sameSelection(selection, { kind: "part", path })}
                 onSelect={() => edits.select({ kind: "part", path })}
                 hide={hide ? { label: hide, run: () => edits.removePart(path) } : undefined}
+                required={
+                  required === null
+                    ? undefined
+                    : {
+                        state: required,
+                        toggle: () => edits.changePart(path, withRequired(child, !required)),
+                      }
+                }
                 fixed={FIXED.has(child.type)}
                 locked={locked}
               />
@@ -625,6 +649,7 @@ const OutlineRow = ({
   selected,
   onSelect,
   hide,
+  required,
   fixed = false,
   locked = false,
 }: {
@@ -636,6 +661,8 @@ const OutlineRow = ({
   onSelect: () => void;
   /** Absent: the row cannot be hidden. */
   hide?: { label: string; run: () => void };
+  /** Absent: the part cannot be required. */
+  required?: { state: Requirement; toggle: () => void };
   /** It has no place to move to. */
   fixed?: boolean;
   locked?: boolean;
@@ -693,7 +720,62 @@ const OutlineRow = ({
           <EyeClosed className="h-4 w-4" />
         </Button>
       ) : null}
+      {required ? <RequiredButton name={label} {...required} disabled={locked} /> : null}
     </div>
+  );
+};
+
+/** Whether an item's page requires a part: "always" is a title. */
+type Requirement = boolean | "always";
+
+/** A part's requirement, pressed while its page requires it, and pressed for
+ *  good on a title. Its tooltip says what pressing does and what it means. */
+const RequiredButton = ({
+  name,
+  state,
+  toggle,
+  disabled,
+}: {
+  name: string;
+  state: Requirement;
+  toggle: () => void;
+  disabled: boolean;
+}) => {
+  const { t } = useTranslation("layouts");
+  const always = state === "always";
+  const button = (
+    <Button
+      type="button"
+      variant="ghost"
+      size="icon"
+      className="h-7 w-7 text-muted-foreground aria-pressed:bg-primary/10 aria-pressed:text-primary"
+      aria-pressed={state !== false}
+      aria-label={t(always ? "required.alwaysFor" : state ? "required.onFor" : "required.offFor", {
+        name,
+      })}
+      disabled={disabled || always}
+      onClick={toggle}
+    >
+      <Asterisk className="h-4 w-4" strokeWidth={state ? 2.5 : 2} />
+    </Button>
+  );
+  // A disabled button takes no pointer, so a title's wrapper shows the tooltip.
+  return (
+    <Tooltip>
+      <TooltipTrigger asChild>
+        {always ? <span className="inline-flex">{button}</span> : button}
+      </TooltipTrigger>
+      <TooltipContent className="max-w-64">
+        {always ? (
+          t("required.always")
+        ) : (
+          <>
+            <p className="font-medium">{t(state ? "required.on" : "required.off")}</p>
+            <p>{t("required.help")}</p>
+          </>
+        )}
+      </TooltipContent>
+    </Tooltip>
   );
 };
 
