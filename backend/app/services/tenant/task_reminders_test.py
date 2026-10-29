@@ -15,6 +15,7 @@ from app.models.platform.notification import Notification, NotificationType
 from app.models.tenant.personal_item import PersonalItem
 from app.services.guild_sweeps import each_guild
 from app.services.notifications import task_reminder_scan
+from app.services.tenant import personal_items
 from app.testing import (
     create_task,
     drain_notices,
@@ -260,3 +261,40 @@ async def test_a_reminder_is_switched_off_with_subscriptions(
 
     await _sweep(session, now)
     assert await _reminders(session, a.user.id) == []
+
+
+async def test_a_series_moved_on_twice_carries_the_reminder_to_its_newest_task(
+    client, session, acting_user
+):
+    a = await acting_user(guild_role="member", initiative=True, project=True)
+    due = datetime(2026, 10, 5, 9, tzinfo=timezone.utc)
+    first = await create_task(
+        session, a.project, due_date=due, recurrence="RRULE:FREQ=WEEKLY"
+    )
+    second = await create_task(
+        session,
+        a.project,
+        due_date=due + timedelta(weeks=1),
+        recurrence="RRULE:FREQ=WEEKLY",
+        series_id=first.id,
+        recurrence_occurrence_count=1,
+    )
+    third = await create_task(
+        session,
+        a.project,
+        due_date=due + timedelta(weeks=2),
+        recurrence="RRULE:FREQ=WEEKLY",
+        series_id=first.id,
+        recurrence_occurrence_count=2,
+    )
+    await _set(client, a, first.id, due - timedelta(hours=3))
+
+    # The second move runs before the first, and finds nothing yet.
+    await route_session_to_guild(session, a.guild.id)
+    await personal_items._move_reminders(session, first.id, second.id, second.due_date)
+    await personal_items._move_reminders(session, first.id, first.id, due)
+    await session.commit()
+
+    (moved,) = await _rows(session, a.guild.id)
+    assert moved.entity_id == third.id
+    assert moved.remind_at == due + timedelta(weeks=2) - timedelta(hours=3)

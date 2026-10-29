@@ -2885,8 +2885,9 @@ def task_reminder_scan(*, now: datetime) -> Scan:
 
     Each community visited is asked who has a reminder due and not yet sent;
     only they are routed into only those communities, as themselves, to send
-    them. A reminder is claimed by marking it sent before it goes, so it goes
-    once whoever else is sweeping. A task finished, archived or trashed by then,
+    them. A reminder is claimed by marking it sent in the transaction that
+    records its notice, so it goes once whoever else is sweeping, and a sweep
+    that fails before the notice is saved leaves it for the next. A task finished, archived or trashed by then,
     or one the member can no longer open, reminds of nothing. A reminder is
     told as subscription news, so it is switched off where they are.
     """
@@ -2934,7 +2935,6 @@ def task_reminder_scan(*, now: datetime) -> Scan:
                 .returning(PersonalItem.entity_id)
             )
         ).all()
-        await session.commit()
         task_ids = [task_id for (task_id,) in claimed]
         if not task_ids:
             return []

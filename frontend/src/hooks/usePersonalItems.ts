@@ -408,7 +408,13 @@ export const useTaskReminder = (taskId: number, communityId?: number) => {
   const qc = useQueryClient();
   const { data } = useItemState("task", taskId, communityId);
   const queryKey = getReadPersonalItemQueryKey(id, "task", taskId);
+  const mutationKey = ["taskReminder", id, taskId];
+  // The latest choice is written last: writes for one task wait their turn,
+  // and only the last one settles what is shown.
+  const latest = () => qc.isMutating({ mutationKey }) <= 1;
   const mutation = useMutation({
+    mutationKey,
+    scope: { id: `taskReminder:${id}:${taskId}` },
     mutationFn: async (remindAt: string | null) => {
       if (remindAt) return setTaskReminder(id, taskId, { remind_at: remindAt });
       await clearTaskReminder(id, taskId);
@@ -430,10 +436,10 @@ export const useTaskReminder = (taskId: number, communityId?: number) => {
       if (context?.before) qc.setQueryData(queryKey, context.before);
     },
     onSuccess: (state) => {
-      if (state) qc.setQueryData(queryKey, state);
+      if (state && latest()) qc.setQueryData(queryKey, state);
     },
     onSettled: () => {
-      void qc.invalidateQueries({ queryKey });
+      if (latest()) void qc.invalidateQueries({ queryKey });
     },
   });
   return {

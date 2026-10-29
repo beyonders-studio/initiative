@@ -26,11 +26,13 @@ and whoever triggers a purge cannot reach rows that are someone else's alone.
 
 from __future__ import annotations
 
+import asyncio
 from collections.abc import AsyncIterator
 from contextlib import asynccontextmanager
 from dataclasses import dataclass
 from datetime import datetime, timezone
 from enum import Enum
+from weakref import WeakValueDictionary
 from typing import (
     TYPE_CHECKING,
     Any,
@@ -288,21 +290,24 @@ async def clear_reminder(session: AsyncSession, *, user_id: int, task_id: int) -
 async def move_reminders(
     session: AsyncSession,
     *,
+    series: int,
     from_task: int,
-    to_task: int,
     due: datetime,
-    next_due: datetime,
 ) -> None:
-    """Everyone's reminder of a repeating task, onto the next task of its
-    series: as far before or after ``next_due`` as it was from ``due``, the
-    rule its start date follows (``task_series.moved_with``). It is the next
-    task's to send, so it is armed again, and leaves the task it was on: a
-    finished task reminds nobody. ``from_task`` and ``to_task`` are one task
-    when it is moved on in place (a skip).
+    """Everyone's reminder of ``from_task``, a task of a repeating series that
+    has just moved on, onto the series' newest task: as far before or after
+    that task's due date as it was from ``due``, the rule its start date follows
+    (``task_series.moved_with``). It is the next task's to send, so it is armed
+    again, and leaves the task it was on: a finished task reminds nobody.
+    ``from_task`` is the newest task itself when it is moved on in place (a
+    skip).
 
     The rows are each member's own, so they are moved as the platform, once
     the caller's transaction commits: the next task is not there to see before
-    it does. A transaction that rolls back moves nothing."""
+    it does. A transaction that rolls back moves nothing. The newest task is
+    read when the move runs, so a series that moves on twice before its first
+    move runs still ends with the reminder on its newest task, and one series'
+    moves run one at a time, in the order their transactions committed."""
     from app.db import cohorts
     from app.db.post_commit import after_commit
     from app.db.request_context import SystemGuild
@@ -310,26 +315,33 @@ async def move_reminders(
 
     context = guild_context(session) or install_context(session)
     if context is None:
-        await _move_reminders(session, from_task, to_task, due, next_due)
+        await _move_reminders(session, series, from_task, due)
         return
     guild_id = context.guild_id
+    # Taken here, in commit order, rather than when the move starts.
+    lock = _series_locks.setdefault((guild_id, series), asyncio.Lock())
 
     async def _move() -> None:
-        async with cohorts.system_session(guild_id) as system:
-            await set_rls_context(system, SystemGuild(guild_id))
-            await _move_reminders(system, from_task, to_task, due, next_due)
-            await system.commit()
+        async with lock:
+            async with cohorts.system_session(guild_id) as system:
+                await set_rls_context(system, SystemGuild(guild_id))
+                await _move_reminders(system, series, from_task, due)
+                await system.commit()
 
     after_commit(session, _move)
 
 
+#: One lock per series being moved on in this process, so its moves run in
+#: the order they were registered.
+_series_locks: WeakValueDictionary[tuple[int, int], asyncio.Lock] = (
+    WeakValueDictionary()
+)
+
+
 async def _move_reminders(
-    session: AsyncSession,
-    from_task: int,
-    to_task: int,
-    due: datetime,
-    next_due: datetime,
+    session: AsyncSession, series: int, from_task: int, due: datetime
 ) -> None:
+    from app.models.tenant.task import Task
     from app.services.tenant.task_series import moved_with
 
     rows = (
@@ -343,6 +355,19 @@ async def _move_reminders(
             .with_for_update()
         )
     ).all()
+    if not rows:
+        return
+    newest = (
+        await session.exec(
+            select(Task.id, Task.due_date)
+            .where(or_(col(Task.series_id) == series, col(Task.id) == series))
+            .order_by(col(Task.recurrence_occurrence_count).desc(), col(Task.id).desc())
+            .limit(1)
+        )
+    ).first()
+    if newest is None or newest[1] is None:
+        return
+    to_task, next_due = newest
     for row in rows:
         remind_at = moved_with(cast(datetime, row.remind_at), due, next_due)
         user_id = row.user_id

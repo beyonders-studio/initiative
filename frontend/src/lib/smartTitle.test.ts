@@ -232,6 +232,18 @@ describe("readTitle — task types", () => {
     expect(read("  bug: spaced in").title).toBe("spaced in");
   });
 
+  it("reads the type a name spells before one it matches without accents", () => {
+    const plain = buildTaskType({ id: 33, name: "Etape" });
+    const types = [plain, MILESTONE];
+    expect(read("Étape: Ship", { types }).type?.id).toBe(MILESTONE.id);
+    expect(read("etape: Ship", { types }).type?.id).toBe(plain.id);
+    const both = [
+      buildTaskType({ id: 34, name: "Étape" }),
+      buildTaskType({ id: 35, name: "Ètape" }),
+    ];
+    expect(read("etape: Ship", { types: both }).type).toBeNull();
+  });
+
   it("reads it only at the very start, straight before a colon", () => {
     expect(read("Fix bug: login").type).toBeNull();
     expect(read("bug : login").type).toBeNull();

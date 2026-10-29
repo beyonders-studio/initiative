@@ -6,6 +6,7 @@ import { describe, expect, it } from "vitest";
 import { buildTask } from "@/__tests__/factories";
 import { server } from "@/__tests__/helpers/msw-server";
 import { renderWithProviders } from "@/__tests__/helpers/render";
+import { useTaskReminder } from "@/hooks/usePersonalItems";
 
 import { TaskReminderField } from "./TaskReminderField";
 
@@ -89,5 +90,51 @@ describe("TaskReminderField", () => {
       communities: { activeCommunityId: 3 },
     });
     expect(await screen.findByText("Reminder sent.")).toBeInTheDocument();
+  });
+
+  it("writes a later choice after an earlier one, and keeps the later", async () => {
+    const user = userEvent.setup();
+    let remindAt: string | null = null;
+    const written: string[] = [];
+    server.use(
+      http.get("/api/v1/c/3/personal-items/task/7", () => HttpResponse.json(state(remindAt))),
+      http.put("/api/v1/c/3/personal-items/reminder/task/7", async ({ request }) => {
+        const body = (await request.json()) as { remind_at: string };
+        written.push(`start ${body.remind_at}`);
+        // The first write is slow to arrive.
+        if (written.length === 1) await new Promise((done) => setTimeout(done, 150));
+        remindAt = body.remind_at;
+        written.push(`end ${body.remind_at}`);
+        return HttpResponse.json(state(remindAt));
+      })
+    );
+    const Picker = () => {
+      const reminder = useTaskReminder(7);
+      return (
+        <>
+          <output>{reminder.remindAt ?? "none"}</output>
+          <button type="button" onClick={() => reminder.set("2026-11-02T09:00:00Z")}>
+            first
+          </button>
+          <button type="button" onClick={() => reminder.set("2026-11-02T10:00:00Z")}>
+            second
+          </button>
+        </>
+      );
+    };
+    renderWithProviders(<Picker />, { communities: { activeCommunityId: 3 } });
+    await screen.findByText("none");
+    await user.click(screen.getByRole("button", { name: "first" }));
+    await user.click(screen.getByRole("button", { name: "second" }));
+
+    await waitFor(() =>
+      expect(written).toEqual([
+        "start 2026-11-02T09:00:00Z",
+        "end 2026-11-02T09:00:00Z",
+        "start 2026-11-02T10:00:00Z",
+        "end 2026-11-02T10:00:00Z",
+      ])
+    );
+    await waitFor(() => expect(screen.getByText("2026-11-02T10:00:00Z")).toBeInTheDocument());
   });
 });

@@ -1087,16 +1087,25 @@ const personAt = (
 /** A name as it is compared, its spaces as one. */
 const typeName = (value: string) => normalizeWord(value).trim().replace(/\s+/g, " ");
 
+/** A name as written, but for its case and its spaces. */
+const exactTypeName = (value: string) => value.toLowerCase().trim().replace(/\s+/g, " ");
+
 /** The task type a title starts with, named in full and followed straight
- *  away by a colon ("bug:", "user story:"), and where the colon ends. */
+ *  away by a colon ("bug:", "user story:"), and where the colon ends. A name
+ *  written as a type spells it is that type; one that matches only without its
+ *  accents names a type when it names just one. */
 const typeAt = (
   text: string,
   types: TaskTypeRead[]
 ): { type: TaskTypeRead; end: number } | null => {
   const match = text.match(/^\s*([^\s:][^:]*):(?=\s|$)/);
   if (!match || /\s$/.test(match[1])) return null;
+  const written = exactTypeName(match[1]);
   const said = typeName(match[1]);
-  const type = types.find((each) => typeName(each.name) === said);
+  const loose = types.filter((each) => typeName(each.name) === said);
+  const type =
+    types.find((each) => exactTypeName(each.name) === written) ??
+    (loose.length === 1 ? loose[0] : undefined);
   return type ? { type, end: match[0].length } : null;
 };
 
