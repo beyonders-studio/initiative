@@ -753,18 +753,17 @@ const RequiredButton = ({
       aria-label={t(always ? "required.alwaysFor" : state ? "required.onFor" : "required.offFor", {
         name,
       })}
-      disabled={disabled || always}
-      onClick={toggle}
+      disabled={disabled}
+      aria-disabled={always || undefined}
+      onClick={always ? undefined : toggle}
     >
       <Asterisk className="h-4 w-4" strokeWidth={state ? 2.5 : 2} />
     </Button>
   );
-  // A disabled button takes no pointer, so a title's wrapper shows the tooltip.
+  // A title's asterisk stays focusable, so its tooltip opens from the keyboard.
   return (
     <Tooltip>
-      <TooltipTrigger asChild>
-        {always ? <span className="inline-flex">{button}</span> : button}
-      </TooltipTrigger>
+      <TooltipTrigger asChild>{button}</TooltipTrigger>
       <TooltipContent className="max-w-64">
         {always ? (
           t("required.always")

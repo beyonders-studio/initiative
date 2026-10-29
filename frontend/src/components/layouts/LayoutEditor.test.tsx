@@ -914,7 +914,13 @@ describe("LayoutEditor", () => {
       const title = await required("Task");
       expect(title).toHaveAccessibleName("Task: required. A title is always required.");
       expect(title).toHaveAttribute("aria-pressed", "true");
-      expect(title).toBeDisabled();
+      expect(title).toHaveAttribute("aria-disabled", "true");
+      // It still takes focus, so its explanation opens from the keyboard, and
+      // pressing it changes nothing.
+      (title as HTMLElement).focus();
+      expect(title).toHaveFocus();
+      await user.click(title as HTMLElement);
+      expect(await required("Task")).toHaveAttribute("aria-pressed", "true");
       // What nobody fills in, what is never empty, and what a plug-in fills
       // cannot be.
       expect(await within(await outline()).findByRole("button", { name: "Build" })).toBeVisible();
