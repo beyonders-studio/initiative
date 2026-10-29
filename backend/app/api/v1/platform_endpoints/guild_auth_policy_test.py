@@ -1253,14 +1253,14 @@ async def test_a_community_cannot_ask_for_what_the_deployment_withholds(
 ):
     """A community's rule reaches only as far as the deployment's own list of
     login methods, and the header names the one that is not on it."""
-    from app.services.platform import app_settings as app_settings_service
-
     seat = await acting_user(guild_role=CommunityRole.superadmin)
     headers = await ask.met_by(session, seat.guild, seat.user)
-    row = await app_settings_service.get_app_settings(session)
     assert ask.withheld_by_the_deployment is not None
-    row.login_methods = ask.withheld_by_the_deployment
-    session.add(row)
+    await rules.put(
+        session,
+        "login_methods",
+        frozenset(LoginMethod(m) for m in ask.withheld_by_the_deployment),
+    )
     await session.commit()
 
     refused = await client.patch(
@@ -1283,7 +1283,6 @@ async def test_a_community_is_told_when_the_deployment_asks_everybody(
 
     from app.core.login_methods import SecondFactorRequirement
     from app.models.platform.user_totp import UserTotp
-    from app.services.platform import app_settings as app_settings_service
 
     seat = await acting_user(guild_role=CommunityRole.superadmin)
     # Under ``everyone`` this admin is asked for a factor like anybody else,
@@ -1292,13 +1291,11 @@ async def test_a_community_is_told_when_the_deployment_asks_everybody(
     await session.commit()
     url = _settings(seat.guild.id)
 
-    row = await app_settings_service.get_app_settings(session)
     for level, told in (
         (SecondFactorRequirement.platform_roles, False),
         (SecondFactorRequirement.everyone, True),
     ):
-        row.second_factor_requirement = level
-        session.add(row)
+        await rules.put(session, "second_factor_requirement", level)
         await session.commit()
 
         read = await client.get(url, headers=seat.headers)

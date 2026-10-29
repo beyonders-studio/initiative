@@ -12,6 +12,7 @@ from httpx import AsyncClient, Response
 from sqlmodel import select
 from sqlmodel.ext.asyncio.session import AsyncSession
 
+from app.core.login_methods import LoginMethod
 from app.core.audit_events import AuditEventType
 from app.core.messages import PasswordMessages
 from app.core.security import (
@@ -32,6 +33,7 @@ from app.services.auth import sessions as session_service
 from app.services.auth import sign_in_locks
 from app.services.auth import totp as totp_service
 from app.services.platform import app_settings as app_settings_service
+from app.services.platform import rules
 from app.services.platform import user_tokens
 from app.testing import (
     create_guild,
@@ -91,9 +93,11 @@ async def _seed_passkey(
 
 async def _withdraw_passkeys(session: AsyncSession) -> None:
     """Leave the deployment permitting the other three."""
-    row = await app_settings_service.get_app_settings(session)
-    row.login_methods = ["password", "sso", "totp"]
-    session.add(row)
+    await rules.put(
+        session,
+        "login_methods",
+        frozenset({LoginMethod.password, LoginMethod.sso, LoginMethod.totp}),
+    )
     await session.commit()
 
 
@@ -895,9 +899,11 @@ async def test_a_renewed_session_is_read_back_to_the_sign_in_it_began_at(
 
 async def _withdraw_passwords(session: AsyncSession) -> None:
     """Leave the deployment signing nobody in with a password."""
-    row = await app_settings_service.get_app_settings(session)
-    row.login_methods = ["sso", "totp", "passkey"]
-    session.add(row)
+    await rules.put(
+        session,
+        "login_methods",
+        frozenset({LoginMethod.sso, LoginMethod.totp, LoginMethod.passkey}),
+    )
     await session.commit()
 
 

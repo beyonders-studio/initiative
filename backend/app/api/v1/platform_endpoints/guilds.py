@@ -46,6 +46,7 @@ from app.db.query import build_paginated_response
 from app.core.capabilities import Capability, user_has_capability
 from app.core.config import settings
 from app.core.login_methods import SecondFactorRequirement
+from app.schemas.ai_settings import AIConfigMode
 from app.core.image_headers import validate_image
 from app.core.messages import BillingMessages, GuildMessages, ImageMessages
 from app.core.rate_limit import limiter
@@ -109,7 +110,6 @@ from app.schemas.platform.guild import (
 from app.models.platform.auth_provider import AuthProvider
 from app.core.rules import SignInRequirement
 from app.core.guild_auth_options import CommunityAuthOption, effective_options
-from app.services.platform import app_settings as app_settings_service
 from app.services.platform import auth_posture
 from app.services.platform import rules
 from app.services.platform import billing_ping
@@ -1169,7 +1169,6 @@ async def _auth_settings_response(
     community = (await rules.community_values(seat_session, [guild_id], applied=False))[
         guild_id
     ]
-    settings_row = await app_settings_service.get_app_settings(seat_session)
     return CommunityAuthSettingsRead(
         auth_options=sorted(effective_options(administration.auth_options))
         if administration
@@ -1190,7 +1189,7 @@ async def _auth_settings_response(
         email_allowed_by_platform=platform["email_notifications_enabled"],
         redacted_by_platform=platform["redact_notification_content"],
         engagement_ranking_allowed_by_platform=platform["engagement_ranking_enabled"],
-        ai_offered_by_platform=settings_row.ai_config_mode != "disabled",
+        ai_offered_by_platform=platform["ai_config_mode"] is not AIConfigMode.disabled,
         guest_max_days_by_platform=platform["max_guest_days"],
     )
 

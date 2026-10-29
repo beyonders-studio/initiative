@@ -227,9 +227,10 @@ $function$
 
 #: Gate 0, first half: the deployment's own second-factor rule.
 #:
-#: The level is read from the settings row rather than from a GUC — what the
-#: deployment asks is a fact it holds, and the singleton is readable under
-#: every routed role, the SELECT-only guild floor included. Which rung the
+#: The level is read from the rule ``second_factor_requirement`` rather than
+#: from a GUC — what the deployment asks is a fact it holds, and
+#: ``platform_rules`` is readable under every routed role, the SELECT-only
+#: guild floor included. No row asks nobody. Which rung the
 #: session holds arrives as ``app.platform_role``, because ``public.users`` is
 #: not on a guild request's path, and whether the account answers the rule
 #: arrives as ``app.platform_factor`` — the second factor it holds, or one
@@ -245,11 +246,11 @@ CREATE OR REPLACE FUNCTION public.platform_factor_satisfied()
  STABLE
 AS $function$
     SELECT NOT EXISTS (
-        SELECT 1 FROM public.app_settings s
-        WHERE s.id = 1
-          AND s.second_factor_requirement <> 'nobody'
+        SELECT 1 FROM public.platform_rules r
+        WHERE r.key = 'second_factor_requirement'
+          AND r.choice <> 'nobody'
           AND (
-              s.second_factor_requirement = 'everyone'
+              r.choice = 'everyone'
               OR {gucs.PLATFORM_ROLE} IS DISTINCT FROM '{UserRole.member.value}'
           )
           AND ({gucs.PLATFORM_FACTOR}) IS NOT TRUE

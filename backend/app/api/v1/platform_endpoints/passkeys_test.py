@@ -16,6 +16,7 @@ from sqlmodel import select
 from sqlmodel.ext.asyncio.session import AsyncSession
 from webauthn.helpers import bytes_to_base64url
 
+from app.core.login_methods import LoginMethod
 from app.core.audit_events import AuditEventType
 from app.core.security import (
     REFRESH_COOKIE_NAME,
@@ -678,11 +679,13 @@ async def _begin_sign_in(client: AsyncClient, **payload) -> str:
 
 async def _withdraw_passkeys(session: AsyncSession) -> None:
     """Leave the deployment permitting the other three."""
-    from app.services.platform import app_settings as app_settings_service
+    from app.services.platform import rules
 
-    row = await app_settings_service.get_app_settings(session)
-    row.login_methods = ["password", "sso", "totp"]
-    session.add(row)
+    await rules.put(
+        session,
+        "login_methods",
+        frozenset({LoginMethod.password, LoginMethod.sso, LoginMethod.totp}),
+    )
     await session.commit()
 
 

@@ -4,7 +4,7 @@ The one read of each setting, and the one write. Everything that gates a
 sign-in route asks here, so the rules live in exactly one place. (A fresh
 deployment's first value is the env's, ``AUTH_LOGIN_METHODS`` — seeded once
 into the settings row when it is created, see
-``app_settings._seeded_login_methods`` — and every change after that goes
+``app_settings._seeded_login_methods``, as the rule ``login_methods`` — and every change after that goes
 through :func:`change`.)
 
 **Writing a rule.** Every rule about how somebody reaches the deployment or a
@@ -49,7 +49,6 @@ from app.core.login_methods import (
     PRIMARY_LOGIN_METHODS,
     LoginMethod,
     SecondFactorRequirement,
-    methods_from_values,
 )
 from app.core.guild_auth_options import CommunityAuthOption
 from app.core.messages import AuthMessages, GuildMessages, SettingsMessages
@@ -76,23 +75,9 @@ from app.services.platform.app_settings import GLOBAL_SETTINGS_ID
 logger = logging.getLogger(__name__)
 
 
-def methods_from_row(row: AppSetting) -> frozenset[LoginMethod]:
-    """The sign-in methods one ``app_settings`` row permits.
-
-    Never empty. The column is constrained non-empty and the write path refuses
-    to empty it; should this read one anyway, it resolves to the default set.
-    Conservative for a *gate* and conservative for an *account* point opposite
-    ways here, and this resolves in the account's favour.
-
-    Pure, so a caller that already holds the settings row does not fetch it
-    twice; :func:`resolve_login_methods` is the form for callers that do not.
-    """
-    return methods_from_values(row.login_methods)
-
-
 async def resolve_login_methods(session: AsyncSession) -> frozenset[LoginMethod]:
-    """The sign-in methods this deployment permits. See :func:`methods_from_row`."""
-    return methods_from_row(await app_settings_service.get_app_settings(session))
+    """The sign-in methods this deployment permits (the rule ``login_methods``)."""
+    return (await rules_service.platform_values(session))["login_methods"]
 
 
 async def login_method_allowed(session: AsyncSession, method: LoginMethod) -> bool:
@@ -113,23 +98,10 @@ async def password_confirms(session: AsyncSession, user: User) -> bool:
     )
 
 
-def requirement_from_row(row: AppSetting) -> SecondFactorRequirement:
-    """What this ``app_settings`` row asks of an account.
-
-    Pure, so a caller holding the row does not fetch it twice. A value this
-    version does not recognise reads as ``nobody``: the column is a database
-    enum, so that can only be a row written by a later version, and asking for
-    something this one cannot describe is worse than asking for nothing.
-    """
-    try:
-        return SecondFactorRequirement(row.second_factor_requirement)
-    except ValueError:
-        return SecondFactorRequirement.nobody
-
-
 async def second_factor_requirement(session: AsyncSession) -> SecondFactorRequirement:
-    """What this deployment asks of an account. See :func:`requirement_from_row`."""
-    return requirement_from_row(await app_settings_service.get_app_settings(session))
+    """What this deployment asks of an account (the rule
+    ``second_factor_requirement``)."""
+    return (await rules_service.platform_values(session))["second_factor_requirement"]
 
 
 def rule_covers(level: SecondFactorRequirement, role: UserRole) -> bool:
@@ -379,7 +351,6 @@ class RuleContext:
     guild_id: int | None = None
     #: The stranded-account count the writer was shown (``login_methods``).
     acknowledge_stranded: int | None = None
-    settings: AppSetting = field(init=False)
     guild: Guild = field(init=False)
     #: The layer's stored rules as written, whether or not each applies.
     rules: dict[str, Any] = field(default_factory=dict, init=False)
@@ -461,6 +432,15 @@ class Rule:
         )
 
 
+async def _ai_mode_moved(ctx: RuleContext, before: Any, after: Any) -> None:
+    # Every worker reads the version beside the mode and reloads the
+    # operator's connections when it moves.
+    from app.services import ai_settings
+
+    await ai_settings.bump_ai_config_version(ctx.system)
+    ai_settings.invalidate_platform_ai_cache()
+
+
 async def _drop_push_tokens(ctx: RuleContext, before: Any, after: Any) -> None:
     # The deployment stops keeping the addresses it was sending to. Devices
     # register again the next time the app starts, once push is back on.
@@ -483,9 +463,6 @@ class _LoginMethods(Rule):
     number; the writer's own account is refused outright, and adds another way
     in first. Withdrawing a method signs nobody out.
     """
-
-    async def read(self, ctx: RuleContext) -> frozenset[LoginMethod]:
-        return methods_from_row(ctx.settings)
 
     def tightens(self, before: Any, after: Any) -> bool:
         return bool(before - after)
@@ -530,7 +507,8 @@ class _LoginMethods(Rule):
         if (
             withdrawn.intersection(FACTOR_METHODS)
             and not after.intersection(FACTOR_METHODS)
-            and requirement_from_row(ctx.settings) is not SecondFactorRequirement.nobody
+            and ctx.rules["second_factor_requirement"]
+            is not SecondFactorRequirement.nobody
         ):
             raise HTTPException(
                 status_code=status.HTTP_409_CONFLICT,
@@ -554,10 +532,6 @@ class _LoginMethods(Rule):
                 ),
                 headers={"X-Affected-Count": str(ctx.stranded)},
             )
-
-    async def write(self, ctx: RuleContext, after: Any) -> None:
-        ctx.settings.login_methods = sorted(m.value for m in after)
-        ctx.session.add(ctx.settings)
 
     async def audit(self, ctx: RuleContext, moved: dict[str, tuple[Any, Any]]) -> None:
         before, after = moved[self.key]
@@ -590,14 +564,11 @@ class _FactorRequirement(Rule):
     """Who the deployment asks to hold a second factor. Nobody is signed out:
     an account the rule covers is asked at its next request."""
 
-    async def read(self, ctx: RuleContext) -> SecondFactorRequirement:
-        return requirement_from_row(ctx.settings)
-
     def tightens(self, before: Any, after: Any) -> bool:
         return _FACTOR_ORDER[after] > _FACTOR_ORDER[before]
 
     async def offered(self, ctx: RuleContext, after: Any) -> None:
-        if not methods_from_row(ctx.settings).intersection(FACTOR_METHODS):
+        if not ctx.rules["login_methods"].intersection(FACTOR_METHODS):
             raise not_offered()
 
     async def writer_meets(self, ctx: RuleContext, after: Any) -> None:
@@ -607,10 +578,6 @@ class _FactorRequirement(Rule):
             and not await answers_the_rule(ctx.system, user=ctx.actor)
         ):
             raise self_unsatisfied(LoginMethod.totp.value)
-
-    async def write(self, ctx: RuleContext, after: Any) -> None:
-        ctx.settings.second_factor_requirement = after
-        ctx.session.add(ctx.settings)
 
     async def audit(self, ctx: RuleContext, moved: dict[str, tuple[Any, Any]]) -> None:
         before, after = moved[self.key]
@@ -787,6 +754,9 @@ PLATFORM_RULES: dict[str, Rule] = {
         _platform("redact_notification_content", "notifications"),
         _platform("engagement_ranking_enabled", "engagement_ranking"),
         _platform("cookie_consent_enabled", "cookie_consent"),
+        # Read once, when an account is made, so changing it moves nobody.
+        _platform("default_dm_policy", "community"),
+        _platform("ai_config_mode", "ai_mode", follow_up=_ai_mode_moved),
         _platform("community_directory_enabled", "community"),
         _platform("community_age_gate_enabled", "community"),
         _platform("direct_messages_enabled", "community"),
@@ -837,11 +807,11 @@ def _rules(ctx: RuleContext) -> dict[str, Rule]:
 
 
 async def _load(ctx: RuleContext) -> None:
-    """Take the rows the rules read: the settings row, held, and the stored
-    rules for the deployment's; the community's row and its stored rules for a
-    community's."""
+    """Take the rows the rules read: the deployment's stored rules, with the
+    settings row held so its changes take turns; the community's row and its
+    stored rules for a community's."""
     if ctx.guild_id is None:
-        ctx.settings = await app_settings_service.locked_settings(ctx.session)
+        await app_settings_service.locked_settings(ctx.session)
         ctx.rules = await rules_service.platform_values(ctx.session)
         return
     guild = await ctx.session.get(Guild, ctx.guild_id)

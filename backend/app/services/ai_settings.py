@@ -51,7 +51,6 @@ from app.schemas.ai_settings import (
     AIProvider,
     ConnectionScope,
     PlatformAIModeResponse,
-    PlatformAIModeUpdate,
     ResolvedAISettings,
     ResolvedAISettingsResponse,
 )
@@ -132,8 +131,8 @@ class _PlatformConfig:
 
 
 # Only the owner-only platform CONNECTIONS are cached (the expensive read). The
-# mode + a monotonic version live on app_settings, which every role can read, so
-# each request reads them fresh on its own (guild) session and reloads the cached
+# mode (the rule ai_config_mode) and a monotonic version (on app_settings) are
+# read by every role, so each request reads them fresh on its own (guild) session and reloads the cached
 # connections only when the version moves. An operator change therefore reaches
 # every worker/replica at once — there is no per-process staleness window.
 _cache: _PlatformConfig | None = None
@@ -172,13 +171,14 @@ async def _load_platform_connections() -> tuple[_ConnRow, ...]:
 async def get_platform_ai_config(session: AsyncSession) -> _PlatformConfig:
     """Resolve the global mode + (in platform mode) operator connections.
 
-    ``mode`` + ``version`` come from ``app_settings`` on the caller's own session
+    ``mode`` (the rule ``ai_config_mode``) and ``version`` (on ``app_settings``)
+    come from the caller's own session
     (cheap, always fresh, seen by every worker). Only platform mode needs the
     operator connections, cached and reloaded whenever ``version`` changes.
     """
     global _cache
-    settings = await get_app_settings(session)
-    mode, version = settings.ai_config_mode, settings.ai_config_version
+    mode = (await rules.platform_values(session))["ai_config_mode"].value
+    version = (await get_app_settings(session)).ai_config_version
     if mode != AIConfigMode.platform.value:
         return _PlatformConfig(mode=mode, version=version, connections=())
     if _cache is not None and _cache.version == version:
@@ -199,10 +199,10 @@ def invalidate_platform_ai_cache() -> None:
     _cache = None
 
 
-async def _bump_ai_config_version(session: AsyncSession) -> None:
+async def bump_ai_config_version(session: AsyncSession) -> None:
     """Advance the version so every worker's cache reloads on its next read.
-    Called on every operator write that changes the mode or a platform
-    connection. The caller owns the commit."""
+    Called on every operator write that changes the mode (as the rule's
+    follow-up) or a platform connection. The caller owns the commit."""
     settings = await get_app_settings(session)
     settings.ai_config_version += 1
     session.add(settings)
@@ -420,34 +420,8 @@ async def get_resolved_ai_settings_response(
 # Platform mode + connection CRUD (config.manage — owner only)
 # ---------------------------------------------------------------------------
 async def get_platform_ai_mode(session: AsyncSession) -> PlatformAIModeResponse:
-    settings = await get_app_settings(session)
-    return PlatformAIModeResponse(mode=AIConfigMode(settings.ai_config_mode))
-
-
-async def update_platform_ai_mode(
-    session: AsyncSession,
-    payload: PlatformAIModeUpdate,
-    *,
-    actor_user_id: int | None = None,
-) -> PlatformAIModeResponse:
-    settings = await get_app_settings(session)
-    before = {"ai_config_mode": settings.ai_config_mode}
-    settings.ai_config_mode = payload.mode.value
-    settings.ai_config_version += 1
-    session.add(settings)
-    changed = audit_service.changed_fields(
-        before, {"ai_config_mode": settings.ai_config_mode}
-    )
-    if actor_user_id is not None and changed["changed"]:
-        await audit_service.record(
-            session,
-            event_type=AuditEventType.PLATFORM_SETTINGS_CHANGED,
-            actor_user_id=actor_user_id,
-            detail={"area": "ai_mode", **changed},
-        )
-    await session.commit()
-    invalidate_platform_ai_cache()
-    return PlatformAIModeResponse(mode=payload.mode)
+    mode = (await rules.platform_values(session))["ai_config_mode"]
+    return PlatformAIModeResponse(mode=mode)
 
 
 def _platform_conn_response(
@@ -568,7 +542,7 @@ async def create_platform_connection(
     session.add(row)
     await session.flush()
     await _give_communities(session, row, payload.community_ids)
-    await _bump_ai_config_version(session)
+    await bump_ai_config_version(session)
     await audit_service.record(
         session,
         event_type=AuditEventType.AI_CONNECTION_CREATED,
@@ -646,7 +620,7 @@ async def update_platform_connection(
     if payload.community_ids is not None:
         await _give_communities(session, row, payload.community_ids)
     session.add(row)
-    await _bump_ai_config_version(session)
+    await bump_ai_config_version(session)
     secret_changed = row.api_key_encrypted != key_before
     changed = audit_service.changed_fields(
         before, audit_service.snapshot(row, AUDITED_PLATFORM_FIELDS)
@@ -677,7 +651,7 @@ async def delete_platform_connection(
     if row is None:
         raise HTTPException(status_code=404, detail=AIMessages.CONNECTION_NOT_FOUND)
     await session.delete(row)
-    await _bump_ai_config_version(session)
+    await bump_ai_config_version(session)
     await audit_service.record(
         session,
         event_type=AuditEventType.AI_CONNECTION_DELETED,

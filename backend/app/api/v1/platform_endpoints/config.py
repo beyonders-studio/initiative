@@ -33,7 +33,6 @@ from app.core.version import get_min_desktop_version, get_min_native_version
 from app.services import captcha as captcha_service
 from app.services.platform import app_settings as app_settings_service
 from app.services.platform import rules
-from app.services.platform import auth_posture
 from app.services.tenant.attachments import MAX_FILE_SIZE
 
 router = APIRouter()
@@ -204,9 +203,7 @@ async def get_app_config(session: SessionDep) -> AppConfig:
         light_accent_color=app_settings.light_accent_color,
         dark_accent_color=app_settings.dark_accent_color,
         cookie_categories=[c.value for c in active_cookie_categories(settings)],
-        login_methods=sorted(
-            m.value for m in auth_posture.methods_from_row(app_settings)
-        ),
+        login_methods=sorted(m.value for m in stored["login_methods"]),
         min_native_version=get_min_native_version(),
         min_desktop_version=get_min_desktop_version(),
     )

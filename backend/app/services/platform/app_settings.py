@@ -39,7 +39,6 @@ from app.db.session import guild_context
 from app.db.session import set_rls_context
 from app.models.platform.app_setting import AppSetting
 from app.models.platform.app_setting_secret import AppSettingSecret
-from app.models.platform.user_dm_settings import DmPolicy
 from app.models.tenant.guild_setting import GuildSetting
 from app.services.marketplace import context_jwt
 from app.services.platform import guilds as guilds_service
@@ -90,18 +89,22 @@ async def get_or_create_guild_settings(
     return await _ensure_guild_setting(session, resolved_guild_id)
 
 
-def _seeded_login_methods(*, mail_configured: bool) -> list[str]:
+def _seeded_login_methods() -> frozenset[LoginMethod]:
     """The ways in a fresh deployment permits, from ``AUTH_LOGIN_METHODS``.
 
     First-boot only, like everything else the builder below takes from the
-    env: the row is seeded once and Settings owns it from then on. Held to the
+    env: the rule is seeded once and Settings owns it from then on. Held to the
     two rules the settings surface enforces on a write — something must be
     able to begin a session, and the emailed code needs somewhere to send
     from — but by falling back rather than refusing: a typo in an env file
     must not hold up boot, and a row the column's CHECK would refuse is a
     deployment nobody can configure. Each fallback says so in the log.
     """
-    default = [m.value for m in DEFAULT_LOGIN_METHODS]
+    default = frozenset(DEFAULT_LOGIN_METHODS)
+    mail_configured = bool(
+        _normalize_optional_string(app_config.SMTP_HOST)
+        and _normalize_optional_string(app_config.SMTP_FROM_ADDRESS)
+    )
     configured = app_config.AUTH_LOGIN_METHODS
     if not configured:
         return default
@@ -125,8 +128,7 @@ def _seeded_login_methods(*, mail_configured: bool) -> list[str]:
             ",".join(configured),
         )
         return default
-    # Sorted, as the settings page stores it.
-    return sorted(m.value for m in resolved)
+    return frozenset(resolved)
 
 
 def _build_default_app_settings() -> AppSetting:
@@ -141,9 +143,6 @@ def _build_default_app_settings() -> AppSetting:
         id=GLOBAL_SETTINGS_ID,
         light_accent_color="#2563eb",
         dark_accent_color="#60a5fa",
-        login_methods=_seeded_login_methods(
-            mail_configured=bool(_smtp_host and _smtp_from)
-        ),
         smtp_host=_smtp_host,
         smtp_port=app_config.SMTP_PORT if app_config.SMTP_HOST else None,
         smtp_secure=bool(app_config.SMTP_SECURE),
@@ -355,6 +354,9 @@ async def seed_app_settings(session: AsyncSession) -> AppSetting:
         if not await _session_can_write_app_settings(session):
             return _build_default_app_settings()
         settings_row = await ensure_settings_row(session)
+        # The first boot is the one moment the environment says which ways
+        # in the deployment permits.
+        await rules.put(session, "login_methods", _seeded_login_methods())
         await session.commit()
         await session.refresh(settings_row)
     # The credentials row, beside it. Checked separately: a settings row made
@@ -537,7 +539,6 @@ async def get_app_settings(session: AsyncSession) -> AppSetting:
 # page can move. A record names the ones that actually moved; a value rides
 # along only where its type rules out a secret.
 INTERFACE_FIELDS: tuple[str, ...] = ("light_accent_color", "dark_accent_color")
-COMMUNITY_FIELDS: tuple[str, ...] = ("default_dm_policy",)
 EMAIL_FIELDS: tuple[str, ...] = (
     "smtp_host",
     "smtp_port",
@@ -736,29 +737,6 @@ async def marketplace_registry_enabled(session: AsyncSession) -> bool:
     button both ask it before fetching anything.
     """
     return (await rules.platform_values(session))["marketplace_registry_enabled"]
-
-
-async def update_community_settings(
-    session: AsyncSession,
-    *,
-    default_dm_policy: "DmPolicy",
-    actor_user_id: int | None = None,
-) -> None:
-    """The direct-message policy a newly created account starts on, staged
-    for the caller's commit: the page saves it with its rules in one change.
-
-    Read once, when an account is made. Changing it moves no existing account:
-    raising it would open accounts that never chose to be open, and lowering
-    it would revoke channels people are using.
-    """
-    async with _settings_area(
-        session,
-        area="community",
-        fields=COMMUNITY_FIELDS,
-        actor_user_id=actor_user_id,
-        commit=False,
-    ) as settings_row:
-        settings_row.default_dm_policy = default_dm_policy
 
 
 async def update_email_settings(

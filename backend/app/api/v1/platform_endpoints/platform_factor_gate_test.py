@@ -22,7 +22,7 @@ from app.models.platform.user import UserRole
 from app.models.platform.api_key import UserApiKey
 from app.models.platform.user_totp import UserTotp
 from app.services.platform import api_keys as api_keys_service
-from app.services.platform import app_settings as app_settings_service
+from app.services.platform import rules
 from app.testing.factories import (
     create_guild,
     create_guild_membership,
@@ -38,9 +38,7 @@ GUILDS_URL = "/api/v1/communities/"
 
 async def _ask(session: AsyncSession, level: SecondFactorRequirement) -> None:
     """Make the deployment ask this of its accounts."""
-    row = await app_settings_service.get_app_settings(session)
-    row.second_factor_requirement = level
-    session.add(row)
+    await rules.put(session, "second_factor_requirement", level)
     await session.commit()
 
 

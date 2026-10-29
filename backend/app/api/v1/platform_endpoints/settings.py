@@ -215,9 +215,8 @@ async def _platform_auth_payload(session) -> PlatformAuthSettingsResponse:
     consequence before the write instead of after a refusal — and so the figure
     an operator acknowledges is one the page actually showed them.
     """
-    row = await app_settings_service.get_app_settings(session)
     stored = await rules.platform_values(session)
-    permitted = auth_posture.methods_from_row(row)
+    permitted = stored["login_methods"]
     stranding, without_factor = await auth_posture.account_figures(
         session, permitted=permitted
     )
@@ -238,7 +237,7 @@ async def _platform_auth_payload(session) -> PlatformAuthSettingsResponse:
         factor_methods_permitted=bool(permitted.intersection(FACTOR_METHODS)),
         session_max_hours=stored["session_max_hours"],
         session_idle_minutes=stored["session_idle_minutes"],
-        second_factor_requirement=auth_posture.requirement_from_row(row),
+        second_factor_requirement=stored["second_factor_requirement"],
         accounts_without_factor=AccountsWithoutFactor(
             platform_roles=without_factor[SecondFactorRequirement.platform_roles],
             everyone=without_factor[SecondFactorRequirement.everyone],
@@ -381,6 +380,7 @@ async def update_interface_settings(
 #: by field and the rule each writes.
 _COMMUNITY_RULE_FIELDS = (
     ("age_gate_enabled", "community_age_gate_enabled"),
+    ("default_dm_policy", "default_dm_policy"),
     ("direct_messages_enabled", "direct_messages_enabled"),
     ("engagement_ranking_enabled", "engagement_ranking_enabled"),
     ("guests_enabled", "guests_enabled"),
@@ -390,11 +390,10 @@ _COMMUNITY_RULE_FIELDS = (
 
 async def _community_payload(session: AsyncSession) -> CommunitySettingsResponse:
     stored = await rules.platform_values(session)
-    settings_obj = await app_settings_service.get_app_settings(session)
     return CommunitySettingsResponse(
         community_directory_enabled=stored["community_directory_enabled"],
         age_gate_enabled=stored["community_age_gate_enabled"],
-        default_dm_policy=settings_obj.default_dm_policy,
+        default_dm_policy=stored["default_dm_policy"],
         direct_messages_enabled=stored["direct_messages_enabled"],
         deleted_community_retention_days=COMMUNITY_DELETION.days(stored),
         deleted_account_retention_days=ACCOUNT_DELETION.days(stored),
@@ -485,11 +484,6 @@ async def update_community_settings(
             changes[switch] = days is not None
             if days is not None:
                 changes[key] = days
-    if payload.default_dm_policy is not None:
-        await app_settings_service.update_community_settings(
-            session, default_dm_policy=payload.default_dm_policy, actor_user_id=owner.id
-        )
-    # Commits the direct-message default with the rules.
     await auth_posture.change(
         auth_posture.RuleContext.platform(session, owner), changes
     )
