@@ -9,7 +9,9 @@ finished one stops repeating.
 The next task's date is counted by the task's ``recurrence_strategy``
 (:func:`next_dates`): "On schedule" (``fixed``) from the due date, "After
 completion" (``rolling``) from when the task was finished. Skipping a task
-(:func:`skip`) moves it to the date the next task would have had.
+(:func:`skip`) moves it to the date the next task would have had. Its start
+date, and each member's reminder of it, keep their distance from the due date
+(:func:`moved_with`).
 
 An edit asks which tasks it is for:
 
@@ -50,6 +52,7 @@ from app.services.tenant import metadata as metadata_service
 from app.services.tenant import tags as tags_service
 from app.services.tenant import task_checklist as checklist_service
 from app.services.tenant import descriptions as descriptions_service
+from app.services.tenant import personal_items
 from app.services.tenant import task_statuses as task_statuses_service
 from app.services.tenant.task_completion import sync_completed_at
 from app.services.tenant.task_creation import next_position, set_task_assignees
@@ -214,6 +217,13 @@ def repeat_edited(
     )
 
 
+def moved_with(value: datetime, due: datetime, next_due: datetime) -> datetime:
+    """``value`` moved with a due date from ``due`` to ``next_due``: as far
+    before or after it as it was. A task's start date and every reminder of it
+    follow its due date this way."""
+    return next_due - (due - value)
+
+
 async def next_dates(
     session: AsyncSession,
     task: Task,
@@ -294,8 +304,7 @@ async def next_dates(
             until = recurrence.last_start(task.recurrence, due, task.recurrence_shift)
             if until is not None and next_due > until:
                 return None
-    length: timedelta | None = due - start if start and due else None
-    return (next_due - length if length is not None else None), next_due
+    return (moved_with(start, due, next_due) if start and due else None), next_due
 
 
 async def _limited_hourly_due(
@@ -430,13 +439,16 @@ async def reschedule_hourly(
                 if not starts:
                     raise ValueError("INVALID_RECURRENCE_LIMIT")
                 minimum = starts[0]
-        length = (
-            task.due_date - task.start_date
-            if task.due_date and task.start_date
-            else None
-        )
+        due = task.due_date
+        if due is not None:
+            if task.start_date is not None:
+                task.start_date = moved_with(task.start_date, due, minimum)
+            await personal_items.move_reminders(
+                session, from_task=task.id, to_task=task.id, due=due, next_due=minimum
+            )
+        else:
+            task.start_date = None
         task.due_date = minimum
-        task.start_date = minimum - length if length is not None else None
 
 
 async def retag(session: AsyncSession, task_id: int, tag_ids: list[int]) -> None:
@@ -534,6 +546,8 @@ async def _next_task(
         # Save the effective baseline before advancing dates or releasing carry.
         task.recurrence_anchor, task.recurrence_anchor_count = anchor_from_dates(task)
     values = carried(task)
+    # What a reminder of this task was measured from.
+    due = task.due_date
     task.series_id = task.series_id or task.id
     default_status = await task_statuses_service.get_default_status(
         session, task.project_id
@@ -589,6 +603,14 @@ async def _next_task(
             values.get("assignee_ids", [assignee.id for assignee in task.assignees]),
             project=project,
             carried=True,
+        )
+    if due is not None:
+        await personal_items.move_reminders(
+            session,
+            from_task=task.id,
+            to_task=following.id,
+            due=due,
+            next_due=dates[1],
         )
     if "tag_ids" in values:
         await retag(session, following.id, values["tag_ids"])

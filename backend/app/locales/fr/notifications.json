@@ -9,6 +9,10 @@
       "title": "Tâches en retard",
       "body_one": "{{count}} tâche est en retard : {{title}}",
       "body_other": "{{count}} tâches sont en retard, dont {{title}}"
+    },
+    "reminder": {
+      "title": "Rappel",
+      "body": "{{task}}"
     }
   },
   "comingUp": {

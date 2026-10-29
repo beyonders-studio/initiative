@@ -9,6 +9,10 @@
       "title": "Overdue tasks",
       "body_one": "{{count}} task is overdue: {{title}}",
       "body_other": "{{count}} tasks are overdue, including {{title}}"
+    },
+    "reminder": {
+      "title": "Reminder",
+      "body": "{{task}}"
     }
   },
   "comingUp": {

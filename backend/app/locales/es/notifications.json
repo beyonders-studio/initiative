@@ -9,6 +9,10 @@
       "title": "Tareas vencidas",
       "body_one": "{{count}} tarea está vencida: {{title}}",
       "body_other": "{{count}} tareas están vencidas, incluida {{title}}"
+    },
+    "reminder": {
+      "title": "Recordatorio",
+      "body": "{{task}}"
     }
   },
   "comingUp": {

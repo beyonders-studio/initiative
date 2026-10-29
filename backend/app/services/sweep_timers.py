@@ -718,6 +718,25 @@ def sweeps() -> tuple[Sweep, ...]:
             ),
         ),
         Sweep(
+            kind="task_reminders",
+            scope=Scope.LIVE,
+            every=minute,
+            prepare=_task_reminders,
+            answers=True,
+            next_due=lambda _now: select(func.min(PersonalItem.remind_at)).where(
+                col(PersonalItem.remind_at).is_not(None),
+                col(PersonalItem.reminded_at).is_(None),
+            ),
+            sources=(
+                on_row(
+                    "personal_items",
+                    "{row}.remind_at",
+                    events="INSERT OR UPDATE OF remind_at, reminded_at",
+                    when="NEW.remind_at IS NOT NULL AND NEW.reminded_at IS NULL",
+                ),
+            ),
+        ),
+        Sweep(
             kind="overdue",
             scope=Scope.LIVE,
             every=timedelta(minutes=5),
@@ -847,6 +866,12 @@ async def _reminders() -> Scan:
     from app.services import notifications
 
     return await notifications.reminder_scan(now=datetime.now(timezone.utc))
+
+
+async def _task_reminders() -> Scan:
+    from app.services import notifications
+
+    return notifications.task_reminder_scan(now=datetime.now(timezone.utc))
 
 
 async def _overdue() -> Scan:

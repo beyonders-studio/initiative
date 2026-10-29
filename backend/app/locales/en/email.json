@@ -590,5 +590,12 @@
       "body_one": "<strong>{{answerer}}</strong> declined your request",
       "body_other": "<strong>{{answerer}}</strong> declined your request for {{count}} files"
     }
+  },
+  "task": {
+    "reminder": {
+      "subject": "Reminder: {{task}}",
+      "title": "Reminder",
+      "body": "You asked to be reminded of <strong>{{task}}</strong>."
+    }
   }
 }

@@ -83,6 +83,9 @@ PUSH_CHANNELS: dict[NotificationType, str] = {
     # Tasks and events alike, which no channel the installed app registers
     # describes, so the general one until the digests share a channel (#3065).
     NotificationType.coming_up: DEFAULT_CHANNEL,
+    # A reminder too, so it rides the channel event reminders already register:
+    # a new channel id would mean a native release.
+    NotificationType.task_reminder: "event_reminder",
     NotificationType.access_grant_requested: "access_grants",
     NotificationType.access_grant_approved: "access_grants",
     NotificationType.access_grant_denied: "access_grants",

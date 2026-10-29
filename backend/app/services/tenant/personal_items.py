@@ -1,10 +1,13 @@
 """What each member keeps about the items in a community: their opens, bookmarks,
-subscriptions and their own order of projects, one ``personal_items`` row per item.
+subscriptions, reminders and their own order of projects, one ``personal_items``
+row per item.
 
 Opening any tool, or anything inside one, records a view; the tools' views are
 the layout header's tabs. Every view is kept for :data:`WINDOW`; past it, a
 tool is kept while it is among the person's newest tabs, and anything else goes.
 A bookmark is on a tool, a subscription on anything, and both last until taken off.
+A reminder is on a task, and stays after it is sent, so the next task of a
+repeating series takes it on (:func:`move_reminders`).
 
 Who is subscribed to an item is worked out, not only kept (:func:`subscribers_of`):
 whoever made it or is named on it (an assignee, an attendee, :data:`NAMING`), and
@@ -23,10 +26,20 @@ and whoever triggers a purge cannot reach rows that are someone else's alone.
 
 from __future__ import annotations
 
+from collections.abc import AsyncIterator
+from contextlib import asynccontextmanager
 from dataclasses import dataclass
 from datetime import datetime, timezone
 from enum import Enum
-from typing import TYPE_CHECKING, Any, Iterable, Mapping, Optional, Sequence
+from typing import (
+    TYPE_CHECKING,
+    Any,
+    Iterable,
+    Mapping,
+    Optional,
+    Sequence,
+    cast,
+)
 
 from sqlalchemy import Table, and_, func, or_, text
 from sqlalchemy.dialects.postgresql import insert as pg_insert
@@ -63,14 +76,15 @@ MARK_COLUMNS: dict[Mark, tuple[str, ...]] = {
     Mark.subscribe: ("subscribed_at",),
 }
 
-#: Every column that keeps a row: each mark's time, an unsubscription, and the
-#: project order.
+#: Every column that keeps a row: each mark's time, an unsubscription, the
+#: project order and a reminder.
 _HOLDING = (
     "viewed_at",
     "bookmarked_at",
     "subscribed_at",
     "unsubscribed_at",
     "sort_order",
+    "remind_at",
 )
 
 # Per-user cap on tabs kept and shown. The user's ``recent_tabs_limit``
@@ -217,6 +231,21 @@ async def clear_mark(
     something the reader has lost can still come off. Run as the platform and
     limited to the reader's own row, which is locked while it is decided
     whether anything else keeps it, so two marks let go at once both go."""
+
+    async with _own_row(session, user_id, kind, entity_id) as row:
+        if row is not None:
+            for column in MARK_COLUMNS[mark]:
+                setattr(row, column, None)
+    await session.commit()
+
+
+@asynccontextmanager
+async def _own_row(
+    session: AsyncSession, user_id: int, kind: str, entity_id: int
+) -> AsyncIterator[Optional[PersonalItem]]:
+    """The reader's row on an item, locked, to let go of something on it: run
+    as the platform and limited to that row, so it comes off something they can
+    no longer open. Kept if it still holds anything, deleted if not."""
     from app.db.cohorts import as_system
 
     async with as_system(session) as system:
@@ -227,15 +256,108 @@ async def clear_mark(
                 .with_for_update()
             )
         ).one_or_none()
+        yield row
         if row is not None:
-            for column in MARK_COLUMNS[mark]:
-                setattr(row, column, None)
             if all(getattr(row, column) is None for column in _HOLDING):
                 await system.delete(row)
             else:
                 system.add(row)
             await system.flush()
+
+
+async def set_reminder(
+    session: AsyncSession, *, user_id: int, task_id: int, remind_at: datetime
+) -> None:
+    """Remind the reader of a task at ``remind_at``. A reminder already sent
+    is armed again."""
+    await _upsert(
+        session, user_id, "task", task_id, remind_at=remind_at, reminded_at=None
+    )
     await session.commit()
+
+
+async def clear_reminder(session: AsyncSession, *, user_id: int, task_id: int) -> None:
+    """Take the reader's reminder of a task off. Idempotent."""
+    async with _own_row(session, user_id, "task", task_id) as row:
+        if row is not None:
+            row.remind_at = None
+            row.reminded_at = None
+    await session.commit()
+
+
+async def move_reminders(
+    session: AsyncSession,
+    *,
+    from_task: int,
+    to_task: int,
+    due: datetime,
+    next_due: datetime,
+) -> None:
+    """Everyone's reminder of a repeating task, onto the next task of its
+    series: as far before or after ``next_due`` as it was from ``due``, the
+    rule its start date follows (``task_series.moved_with``). It is the next
+    task's to send, so it is armed again, and leaves the task it was on: a
+    finished task reminds nobody. ``from_task`` and ``to_task`` are one task
+    when it is moved on in place (a skip).
+
+    The rows are each member's own, so they are moved as the platform, once
+    the caller's transaction commits: the next task is not there to see before
+    it does. A transaction that rolls back moves nothing."""
+    from app.db import cohorts
+    from app.db.post_commit import after_commit
+    from app.db.request_context import SystemGuild
+    from app.db.session import guild_context, install_context, set_rls_context
+
+    context = guild_context(session) or install_context(session)
+    if context is None:
+        await _move_reminders(session, from_task, to_task, due, next_due)
+        return
+    guild_id = context.guild_id
+
+    async def _move() -> None:
+        async with cohorts.system_session(guild_id) as system:
+            await set_rls_context(system, SystemGuild(guild_id))
+            await _move_reminders(system, from_task, to_task, due, next_due)
+            await system.commit()
+
+    after_commit(session, _move)
+
+
+async def _move_reminders(
+    session: AsyncSession,
+    from_task: int,
+    to_task: int,
+    due: datetime,
+    next_due: datetime,
+) -> None:
+    from app.services.tenant.task_series import moved_with
+
+    rows = (
+        await session.exec(
+            select(PersonalItem)
+            .where(
+                col(PersonalItem.entity_type) == "task",
+                col(PersonalItem.entity_id) == from_task,
+                col(PersonalItem.remind_at).is_not(None),
+            )
+            .with_for_update()
+        )
+    ).all()
+    for row in rows:
+        remind_at = moved_with(cast(datetime, row.remind_at), due, next_due)
+        user_id = row.user_id
+        if to_task != from_task:
+            row.remind_at = None
+            row.reminded_at = None
+            if all(getattr(row, column) is None for column in _HOLDING):
+                await session.delete(row)
+            else:
+                session.add(row)
+            await session.flush()
+        await _upsert(
+            session, user_id, "task", to_task, remind_at=remind_at, reminded_at=None
+        )
+    await session.flush()
 
 
 async def item_state(
@@ -561,13 +683,15 @@ _EXPIRE = f"""
              = (d.user_id, d.entity_type, d.entity_id, d.viewed_at)
            AND p.bookmarked_at IS NULL AND p.subscribed_at IS NULL
            AND p.unsubscribed_at IS NULL AND p.sort_order IS NULL
+           AND p.remind_at IS NULL
     )
     UPDATE personal_items p SET viewed_at = NULL, view_source = NULL
       FROM doomed d
      WHERE (p.user_id, p.entity_type, p.entity_id, p.viewed_at)
          = (d.user_id, d.entity_type, d.entity_id, d.viewed_at)
        AND num_nonnulls(
-               p.bookmarked_at, p.subscribed_at, p.unsubscribed_at, p.sort_order
+               p.bookmarked_at, p.subscribed_at, p.unsubscribed_at, p.sort_order,
+               p.remind_at
            ) > 0
 """
 

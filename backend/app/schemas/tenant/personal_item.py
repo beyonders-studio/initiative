@@ -1,4 +1,5 @@
-"""Schemas for what a member keeps about items: opens, bookmarks, subscriptions."""
+"""Schemas for what a member keeps about items: opens, bookmarks, subscriptions,
+reminders."""
 
 from __future__ import annotations
 
@@ -40,6 +41,16 @@ class PersonalItemState(SanitizedBaseModel):
     #: it (``personal_items.subscribers_of``). Left out of a recorded open,
     #: which does not ask.
     subscribed: Optional[bool] = None
+    #: When to remind them of it: tasks only.
+    remind_at: Optional[datetime] = None
+    #: When that reminder went out, if it has.
+    reminded_at: Optional[datetime] = None
+
+
+class ReminderSet(SanitizedBaseModel):
+    """When to remind the reader of a task."""
+
+    remind_at: datetime
 
 
 class PersonalItemRead(SanitizedBaseModel):

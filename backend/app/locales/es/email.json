@@ -590,5 +590,12 @@
       "body_one": "<strong>{{answerer}}</strong> rechazó tu solicitud",
       "body_other": "<strong>{{answerer}}</strong> rechazó tu solicitud de {{count}} archivos"
     }
+  },
+  "task": {
+    "reminder": {
+      "subject": "Recordatorio: {{task}}",
+      "title": "Recordatorio",
+      "body": "Pediste que te recordáramos <strong>{{task}}</strong>."
+    }
   }
 }
