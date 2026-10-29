@@ -38,7 +38,9 @@ branch_labels = None
 depends_on = None
 
 SEAT_FLOOR = "app_superadmin"
-TABLES = ("guild_auth_policies", "community_rules")
+#: Policy-bound for this revision's role, so unforced while the rows cross:
+#: the downgrade also reads each provider's slug.
+TABLES = ("guild_auth_policies", "community_rules", "auth_providers")
 LOGIN_METHOD = ENUM(name="login_method", create_type=False)
 
 #: (rule key, the old table's column prefix) for each half.
