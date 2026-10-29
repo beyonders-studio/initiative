@@ -1707,11 +1707,11 @@ class TestMinimumAge:
     async def test_no_age_check_opens_it_with_no_date_on_file(
         self, client: AsyncClient, acting_user, session: AsyncSession, registration
     ):
-        from app.services.platform import app_settings as app_settings_service
+        from app.services.platform import rules
 
-        await app_settings_service.update_community_settings(
-            session, community_directory_enabled=False, community_age_gate_enabled=False
-        )
+        await rules.put(session, "community_directory_enabled", False)
+        await rules.put(session, "community_age_gate_enabled", False)
+        await session.commit()
         a = await acting_user(guild_role=CommunityRole.superadmin)
         plugin = await self._aged(session, a, None)
 

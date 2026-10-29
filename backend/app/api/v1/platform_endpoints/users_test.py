@@ -26,7 +26,7 @@ from app.models.tenant.task_assignment_digest import TaskAssignmentDigestItem
 from app.schemas.platform.user import STATUS_TEXT_MAX_LENGTH
 from app.services.marketplace import catalog as marketplace_catalog
 from app.services.marketplace.builtin import load_builtin_manifests
-from app.services.platform import app_settings as app_settings_service
+from app.services.platform import rules
 from app.services.platform import profile_decorations as profile_decorations_service
 from app.services.content_sockets import sockets as content_sockets
 from app.testing.sockets import (
@@ -538,9 +538,9 @@ async def test_roster_lists_everyone_where_direct_messages_are_off(
     """With no direct messages on the deployment there is no policy to keep."""
     reader = await acting_user(guild_role=CommunityRole.member)
     other = await acting_user(guild=reader.guild)
-    await app_settings_service.update_community_settings(
-        session, community_directory_enabled=False, direct_messages_enabled=False
-    )
+    await rules.put(session, "community_directory_enabled", False)
+    await rules.put(session, "direct_messages_enabled", False)
+    await session.commit()
 
     response = await client.get(reader.g("/users/roster"), headers=reader.headers)
 

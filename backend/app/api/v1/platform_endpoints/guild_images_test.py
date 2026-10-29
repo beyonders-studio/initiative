@@ -27,7 +27,7 @@ from app.models.platform.guild_image import (
     GuildImageVariant,
 )
 from app.models.platform.user import UserRole
-from app.services.platform import app_settings as app_settings_service
+from app.services.platform import rules
 from app.testing.factories import (
     create_access_grant,
     create_user,
@@ -140,9 +140,8 @@ async def _card_url(session: AsyncSession, guild_id: int) -> str:
 
 @pytest.fixture
 async def community_directory_on(session: AsyncSession) -> None:
-    await app_settings_service.update_community_settings(
-        session, community_directory_enabled=True
-    )
+    await rules.put(session, "community_directory_enabled", True)
+    await session.commit()
 
 
 # --- setting one -------------------------------------------------------------

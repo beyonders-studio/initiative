@@ -786,6 +786,22 @@ PLATFORM_RULES: dict[str, Rule] = {
         _platform("email_notifications_enabled", "notifications"),
         _platform("redact_notification_content", "notifications"),
         _platform("engagement_ranking_enabled", "engagement_ranking"),
+        _platform("cookie_consent_enabled", "cookie_consent"),
+        _platform("community_directory_enabled", "community"),
+        _platform("community_age_gate_enabled", "community"),
+        _platform("direct_messages_enabled", "community"),
+        # Guests made or extended after the ceiling changes are held to it.
+        _platform("guests_enabled", "community"),
+        _platform("max_guest_days", "community"),
+        # Each window is counted from each deletion or hold, so changing one
+        # moves the date for every row already waiting.
+        *(
+            _platform(key, "community")
+            for window in rule_catalog.RETENTION_WINDOWS.items()
+            for key in window
+        ),
+        _platform("marketplace_members_publish_directly", "marketplace"),
+        _platform("marketplace_registry_enabled", "marketplace_registry"),
     )
 }
 

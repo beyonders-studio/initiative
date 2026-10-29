@@ -566,11 +566,11 @@ async def test_claim_sync_keeps_an_under_age_answer_out_of_a_listed_guild(
     """
     from datetime import datetime, timezone
 
-    from app.services.platform import app_settings as app_settings_service
+    from app.services.platform import rules
 
-    await app_settings_service.update_community_settings(
-        session, community_directory_enabled=True, community_age_gate_enabled=True
-    )
+    await rules.put(session, "community_directory_enabled", True)
+    await rules.put(session, "community_age_gate_enabled", True)
+    await session.commit()
     provider = await create_auth_provider(session)
     owner = await create_user(session)
     guild = await create_guild(session, creator=owner)
@@ -660,11 +660,9 @@ async def test_a_provider_rule_places_where_the_community_accepts_it(
 async def test_a_provider_rule_places_everywhere_when_the_deployment_says_so(
     session: AsyncSession,
 ):
-    from app.services.platform import app_settings as app_settings_service
+    from app.services.platform import rules
 
-    settings_row = await app_settings_service.get_app_settings(session)
-    settings_row.provider_placement_everywhere = True
-    session.add(settings_row)
+    await rules.put(session, "provider_placement_everywhere", True)
     owner = await create_user(session)
     unconnected = await create_guild(session, creator=owner)
     provider = await create_auth_provider(session, slug="org")

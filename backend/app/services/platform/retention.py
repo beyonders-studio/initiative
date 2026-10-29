@@ -2,8 +2,8 @@
 out before the hourly sweep acts on them.
 
 A window is a status on a row, the ``status_changed_at`` stamp written when the
-row entered it, and the deployment setting that says how many days it lasts
-(``None`` where nothing acts on a timer). :class:`RetentionWindow` answers from
+row entered it, and the deployment rule that says how many days it lasts, with
+the one beside it that says whether it runs at all (``app.core.rules``). :class:`RetentionWindow` answers from
 those three alone when a row's window ends, which rows are due, and runs the
 sweep that takes each due row in turn.
 """
@@ -20,11 +20,13 @@ from sqlalchemy import ColumnElement, and_
 from sqlmodel import col, select
 from sqlmodel.ext.asyncio.session import AsyncSession
 
+from app.core.rules import RETENTION_WINDOWS
 from app.db.request_context import Unattributed
 from app.db.session import set_rls_context
-from app.models.platform.app_setting import AppSetting
 from app.models.platform.guild import CommunityStatus, Guild
 from app.models.platform.user import User, UserStatus
+from app.services.platform import rules
+from app.services.platform.rules import Values
 
 
 logger = logging.getLogger(__name__)
@@ -35,7 +37,7 @@ RowT = TypeVar("RowT", User, Guild)
 @dataclass(frozen=True)
 class RetentionWindow(Generic[RowT]):
     """One window: rows of ``model`` in ``status``, kept for the number of days
-    the ``AppSetting`` field ``setting`` holds."""
+    the deployment's rule ``setting`` holds."""
 
     #: What the sweep does to one row, for its log lines.
     action: str
@@ -43,9 +45,12 @@ class RetentionWindow(Generic[RowT]):
     status: str
     setting: str
 
-    def days(self, settings: AppSetting) -> int | None:
-        """The window's length, or None where nothing ends it."""
-        return getattr(settings, self.setting)
+    def days(self, deployment: Values) -> int | None:
+        """The window's length in the deployment's rules
+        (``rules.platform_values``), or None where nothing ends it."""
+        if not deployment[RETENTION_WINDOWS[self.setting]]:
+            return None
+        return deployment[self.setting]
 
     def due(self, *, now: datetime, days: int) -> ColumnElement[bool]:
         """Rows whose window has run out by ``now``. A row with no stamp never
@@ -55,10 +60,10 @@ class RetentionWindow(Generic[RowT]):
             col(self.model.status_changed_at) <= now - timedelta(days=days),
         )
 
-    def ends_at(self, row: RowT, settings: AppSetting) -> datetime | None:
+    def ends_at(self, row: RowT, deployment: Values) -> datetime | None:
         """When ``row``'s window ends, or None if it is not in this window or
         nothing ends it."""
-        days = self.days(settings)
+        days = self.days(deployment)
         if days is None or row.status != self.status or row.status_changed_at is None:
             return None
         return row.status_changed_at + timedelta(days=days)
@@ -80,10 +85,8 @@ class RetentionWindow(Generic[RowT]):
         longer due. A row whose ``act`` fails is rolled back, logged and left
         for the next sweep, and the rows behind it still run.
         """
-        from app.services.platform import app_settings as app_settings_service
-
         await set_rls_context(session, Unattributed())
-        days = self.days(await app_settings_service.get_app_settings(session))
+        days = self.days(await rules.platform_values(session))
         if days is None:
             return 0
         due = self.due(now=now, days=days)

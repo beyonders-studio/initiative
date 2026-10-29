@@ -438,8 +438,9 @@ LIVE_GRANT = f"g.status = '{AccessGrantStatus.approved.value}' AND g.expires_at 
 
 
 #: Whether a guest's membership admits them now: before its end, while the
-#: platform allows guests, and above the ``guest`` rung only on the demo
-#: deployment. ``app_settings`` is one row (``GLOBAL_SETTINGS_ID``).
+#: platform allows guests (the rule ``guests_enabled``, off without a row),
+#: and above the ``guest`` rung only on the demo deployment. ``app_settings``
+#: is one row (``GLOBAL_SETTINGS_ID``).
 GUEST_MEMBERSHIP_LIVE = f"""\
 CREATE OR REPLACE FUNCTION public.guest_membership_live(p_until timestamp with time zone, p_role guild_role)
  RETURNS boolean
@@ -451,7 +452,11 @@ BEGIN
         SELECT 1
         FROM public.app_settings s
         WHERE s.id = 1
-          AND s.guests_enabled
+          AND COALESCE(
+              (SELECT r.enabled FROM public.platform_rules r
+                WHERE r.key = 'guests_enabled'),
+              false
+          )
           AND (p_role = '{CommunityRole.guest.value}' OR s.demo_mode)
     );
 END

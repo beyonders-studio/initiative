@@ -130,9 +130,8 @@ async def test_a_guest_is_asked_the_guests_rule_and_a_member_the_members(
 ):
     """Two halves, each asked of its own people. The seat writes the guests'
     half without meeting it, since it is not asked it."""
-    settings_row = await app_settings_service.ensure_settings_row(session)
-    settings_row.guests_enabled = True
-    session.add(settings_row)
+    await app_settings_service.ensure_settings_row(session)
+    await rules.put(session, "guests_enabled", True)
     await session.commit()
     seat = await acting_user(guild_role=CommunityRole.superadmin)
     provider = await create_auth_provider(session, slug="corp")

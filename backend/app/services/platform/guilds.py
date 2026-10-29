@@ -573,13 +573,11 @@ async def _guest_days(session: AsyncSession, *, guild_id: int, days: int) -> int
     """``days`` held to the community's longest guest stay and the
     deployment's. Raises ``GuestsDisabledError`` while the deployment allows no
     guests."""
-    from app.services.platform import app_settings as app_settings_service
-
-    settings_row = await app_settings_service.get_app_settings(session)
-    if not settings_row.guests_enabled:
+    platform = await rules.platform_values(session)
+    if not platform["guests_enabled"]:
         raise GuestsDisabledError(GuildMessages.COMMUNITY_GUESTS_DISABLED)
     guild_limit = await rules.community_value(session, guild_id, "guest_max_days")
-    limits = (days, settings_row.max_guest_days, guild_limit)
+    limits = (days, platform["max_guest_days"], guild_limit)
     return min(limit for limit in limits if limit is not None)
 
 
@@ -1889,7 +1887,6 @@ async def announce_on_hold(session: AsyncSession, guild_id: int) -> None:
     """
     from app.db.session import set_rls_context
     from app.services import email as email_service
-    from app.services.platform import app_settings as app_settings_service
     from app.services.platform import email_outbox, notice_outbox
     from app.services.platform import intake as intake_service
 
@@ -1900,9 +1897,7 @@ async def announce_on_hold(session: AsyncSession, guild_id: int) -> None:
     if guild is None or guild.status != CommunityStatus.on_hold.value:
         return
     contact = await intake_service.contact_for(session, IntakeStream.support)
-    delete_at = COMMUNITY_HOLD.ends_at(
-        guild, await app_settings_service.get_app_settings(session)
-    )
+    delete_at = COMMUNITY_HOLD.ends_at(guild, await rules.platform_values(session))
     seat_holders = (
         await session.exec(
             select(User).where(
@@ -2164,7 +2159,6 @@ async def soft_delete_guild(
     by the time this returns, every one of those people has an account that
     says something different.
     """
-    from app.services.platform import app_settings as app_settings_service
 
     guild_id = guild.id
     # Read while the roster is still there: a community of one loses it below.
@@ -2195,7 +2189,7 @@ async def soft_delete_guild(
         community_name=guild.name,
         recipients=recipients,
         purge_at=COMMUNITY_DELETION.ends_at(
-            guild, await app_settings_service.get_app_settings(session)
+            guild, await rules.platform_values(session)
         ),
     )
 

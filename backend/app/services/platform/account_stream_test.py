@@ -9,7 +9,7 @@ import pytest
 
 from app.models.platform.guild import CommunityRole
 from app.services.platform import account_stream, user_stream
-from app.services.platform import app_settings as app_settings_service
+from app.services.platform import rules
 from app.services.platform import guilds as guilds_service
 from app.testing.sockets import settle
 from app.testing import create_guild, create_guild_membership, create_user
@@ -169,9 +169,8 @@ async def test_listing_a_community_pokes_every_member(
 
     # The directory is a platform-owner switch and starts off, so listing a
     # community is refused until it is on.
-    await app_settings_service.update_community_settings(
-        session, community_directory_enabled=True
-    )
+    await rules.put(session, "community_directory_enabled", True)
+    await session.commit()
 
     tab = account_socket(here.id)
 

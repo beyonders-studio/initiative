@@ -9,7 +9,7 @@ sync reads them together.
 
 A provider rule places people in a community when that community accepts the
 provider's rules on its connection, or when the deployment applies them to
-every community (``app_settings.provider_placement_everywhere``, recorded on
+every community (the rule ``provider_placement_everywhere``, recorded on
 every change). Rules for a community that does neither are kept and shown, and
 place nobody.
 
@@ -57,7 +57,7 @@ from app.schemas.platform.settings import (
     ProviderPlacementRuleUpdate,
 )
 from app.services import audit as audit_service
-from app.services.platform import app_settings as app_settings_service
+from app.services.platform import rules
 from app.db.request_context import SystemGuild
 
 logger = logging.getLogger(__name__)
@@ -89,9 +89,7 @@ COMMUNITY_SEARCH_LIMIT = 25
 
 async def placement_everywhere(session: AsyncSession) -> bool:
     """Whether the deployment applies provider rules to every community."""
-    return (
-        await app_settings_service.get_app_settings(session)
-    ).provider_placement_everywhere
+    return (await rules.platform_values(session))["provider_placement_everywhere"]
 
 
 async def set_placement_everywhere(
@@ -102,11 +100,9 @@ async def set_placement_everywhere(
     Nobody is signed out and no membership moves now: the next sync through
     each provider reconciles against what applies then.
     """
-    row = await app_settings_service.get_app_settings(session)
-    was = row.provider_placement_everywhere
+    was = await placement_everywhere(session)
     if was != enabled:
-        row.provider_placement_everywhere = enabled
-        session.add(row)
+        await rules.put(session, "provider_placement_everywhere", enabled)
         await audit_service.record(
             session,
             event_type=AuditEventType.PROVIDER_PLACEMENT_EVERYWHERE_CHANGED,

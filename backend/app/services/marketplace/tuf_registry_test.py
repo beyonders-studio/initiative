@@ -32,7 +32,6 @@ from app.core.config import settings
 from app.core.messages import PluginServiceMessages
 from app.core.messages import MarketplaceRegistryMessages as Codes
 from app.models.platform.plugin_service_registration import PluginServiceRegistration
-from app.models.platform.app_setting import AppSetting
 from app.models.platform.marketplace import (
     MarketplaceListing,
     MarketplaceListingVersion,
@@ -45,7 +44,7 @@ from app.models.platform.publisher import Publisher
 from app.services.marketplace import registrations as registrations_service
 from app.services.marketplace import tuf_registry
 from app.services.marketplace.catalog import upsert_listing
-from app.services.platform.app_settings import ensure_settings_row
+from app.services.platform import rules
 from app.testing import (
     create_plugin_service_registration,
     create_publisher,
@@ -653,9 +652,7 @@ class TestWithdrawal:
 
 class TestConfiguration:
     async def test_switched_off_nothing_is_fetched(self, session, repo, trusted):
-        row = await ensure_settings_row(session)
-        row.marketplace_registry_enabled = False
-        session.add(row)
+        await rules.put(session, "marketplace_registry_enabled", False)
         await session.commit()
         repo.add_listing("acme", PLUGIN_UID, slug="tracker")
         repo.publish()
@@ -666,7 +663,6 @@ class TestConfiguration:
         assert result.code == Codes.DISABLED
         assert fetcher.requested == []
         assert await _listing(session, PLUGIN_UID) is None
-        assert isinstance(row, AppSetting)
 
     async def test_a_placeholder_root_is_not_configured(
         self, session, repo, trusted, monkeypatch, tmp_path
@@ -775,9 +771,7 @@ class TestBundle:
         assert status is not None and status.source == tuf_registry.BUNDLE_SOURCE
 
     async def test_a_bundle_applies_with_the_switch_off(self, session, repo, trusted):
-        row = await ensure_settings_row(session)
-        row.marketplace_registry_enabled = False
-        session.add(row)
+        await rules.put(session, "marketplace_registry_enabled", False)
         await session.commit()
         repo.add_listing("acme", PLUGIN_UID, slug="tracker")
         repo.publish()

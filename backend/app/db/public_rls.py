@@ -1662,6 +1662,9 @@ SHARED_TABLE_REGISTRY: dict[str, SharedTable] = {
             app_user=frozenset({SELECT}),
             app_guild_base=frozenset({SELECT}),
             platform_base=frozenset({SELECT}),
+            # Whether guests are on, which every guest membership is read
+            # under, a plug-in's reads included.
+            plugin_install_base=frozenset({SELECT}),
             guest_base=frozenset({SELECT}),
         ),
         tiers={

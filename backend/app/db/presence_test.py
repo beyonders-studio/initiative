@@ -8,6 +8,7 @@ from sqlalchemy import text
 
 from app.models.platform.guild import CommunityRole
 from app.services.platform import app_settings as app_settings_service
+from app.services.platform import rules
 from app.testing import (
     create_file,
     create_guest,
@@ -24,9 +25,8 @@ from app.testing.routing import route_as
 
 @pytest.fixture(autouse=True)
 async def _guests_on(session):
-    row = await app_settings_service.ensure_settings_row(session)
-    row.guests_enabled = True
-    session.add(row)
+    await app_settings_service.ensure_settings_row(session)
+    await rules.put(session, "guests_enabled", True)
     await session.commit()
 
 

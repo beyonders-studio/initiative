@@ -10,7 +10,7 @@ from httpx import AsyncClient
 from sqlmodel.ext.asyncio.session import AsyncSession
 
 from app.models.platform.guild import CommunityRole
-from app.services.platform import app_settings as app_settings_service
+from app.services.platform import rules
 from app.testing.factories import create_guild
 
 
@@ -182,9 +182,8 @@ async def test_a_member_cannot_set_the_location(
 async def test_members_and_the_directory_read_the_location(
     client: AsyncClient, session: AsyncSession, acting_user
 ):
-    await app_settings_service.update_community_settings(
-        session, community_directory_enabled=True
-    )
+    await rules.put(session, "community_directory_enabled", True)
+    await session.commit()
     guild = await create_guild(
         session,
         name="Queen Anne Gardeners",
@@ -234,9 +233,8 @@ async def _directory_names(client: AsyncClient, headers: dict, **params) -> set[
 
 @pytest.fixture
 async def located_directory(session: AsyncSession):
-    await app_settings_service.update_community_settings(
-        session, community_directory_enabled=True
-    )
+    await rules.put(session, "community_directory_enabled", True)
+    await session.commit()
     await _listed_at(
         session,
         "Gardeners",
@@ -306,9 +304,8 @@ async def _directory_order(client: AsyncClient, headers: dict, **params) -> list
 
 @pytest.fixture
 async def spread_directory(session: AsyncSession):
-    await app_settings_service.update_community_settings(
-        session, community_directory_enabled=True
-    )
+    await rules.put(session, "community_directory_enabled", True)
+    await session.commit()
     places = {
         "Kyoto Go": {
             "text": "Kyoto",

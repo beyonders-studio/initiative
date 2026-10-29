@@ -21,7 +21,7 @@ from app.models.platform.guild import (
 )
 from app.models.platform.user import User, UserRole, UserStatus
 from app.models.tenant.initiative import InitiativeMember
-from app.services.platform import app_settings as app_settings_service
+from app.services.platform import rules
 from app.services.platform import guilds as guilds_service
 from app.testing.factories import (
     create_guild,
@@ -44,9 +44,8 @@ async def community_directory_on(session: AsyncSession) -> None:
     instead of in each test; the tests about the switch itself set it
     themselves.
     """
-    await app_settings_service.update_community_settings(
-        session, community_directory_enabled=True
-    )
+    await rules.put(session, "community_directory_enabled", True)
+    await session.commit()
 
 
 async def _list_as_community(
@@ -641,9 +640,8 @@ async def test_an_accepted_listing_patch_is_stored_as_it_reads_back(
 
 
 async def _switch_directory_off(session: AsyncSession) -> None:
-    await app_settings_service.update_community_settings(
-        session, community_directory_enabled=False
-    )
+    await rules.put(session, "community_directory_enabled", False)
+    await session.commit()
 
 
 @pytest.mark.parametrize("surface", ["browsing", "joining", "listing itself"])
@@ -714,9 +712,8 @@ async def test_switching_the_directory_off_keeps_the_guilds_opt_in(
     browser = await acting_user("member")
     await _a_listed_guild(session, name="Open Table")
     await _switch_directory_off(session)
-    await app_settings_service.update_community_settings(
-        session, community_directory_enabled=True
-    )
+    await rules.put(session, "community_directory_enabled", True)
+    await session.commit()
 
     response = await client.get(
         "/api/v1/communities/directory", headers=browser.headers
@@ -1027,9 +1024,9 @@ async def test_join_allows_an_unconfirmed_account_when_the_gate_is_off(
     client: AsyncClient, session: AsyncSession, acting_user
 ):
     """An owner who asserts every account here is an adult is not asking."""
-    await app_settings_service.update_community_settings(
-        session, community_directory_enabled=True, community_age_gate_enabled=False
-    )
+    await rules.put(session, "community_directory_enabled", True)
+    await rules.put(session, "community_age_gate_enabled", False)
+    await session.commit()
     a = await acting_user("member", age_confirmed_at=None)
     guild = await _a_listed_guild(session, name="Open Table")
 
@@ -1725,9 +1722,9 @@ async def test_a_deployment_that_does_not_check_age_closes_nothing(
 ):
     """With the check off nothing is asked, and nothing answered may close an
     account."""
-    await app_settings_service.update_community_settings(
-        session, community_directory_enabled=False, community_age_gate_enabled=False
-    )
+    await rules.put(session, "community_directory_enabled", False)
+    await rules.put(session, "community_age_gate_enabled", False)
+    await session.commit()
     a = await acting_user("member", age_confirmed_at=None)
 
     response = await client.post(

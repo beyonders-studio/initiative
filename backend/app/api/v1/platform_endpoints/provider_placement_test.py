@@ -7,7 +7,7 @@ from sqlmodel.ext.asyncio.session import AsyncSession
 
 from app.models.platform.oidc_claim_mapping import ClaimRuleAuthor, OIDCClaimMapping
 from app.models.platform.user import UserRole
-from app.services.platform import app_settings as app_settings_service
+from app.services.platform import rules
 from app.services.tenant.initiatives import get_role_by_name
 from app.testing.factories import (
     create_auth_provider,
@@ -88,9 +88,7 @@ async def test_a_community_that_has_not_accepted_is_refused_until_everywhere(
         f"{BASE}/everywhere", headers=owner, json={"enabled": True}
     )
     assert turned_on.status_code == 200, turned_on.text
-    assert (
-        await app_settings_service.get_app_settings(session)
-    ).provider_placement_everywhere
+    assert (await rules.platform_values(session))["provider_placement_everywhere"]
 
     written = await client.post(f"{BASE}/rules", headers=operator, json=rule)
     assert written.status_code == 201, written.text

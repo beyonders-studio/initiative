@@ -6,6 +6,7 @@ from sqlmodel import select
 from app.models.platform.guild import CommunityRole
 from app.models.platform.notification import Notification, NotificationType
 from app.services.platform import app_settings as app_settings_service
+from app.services.platform import rules
 from app.testing import (
     create_collection,
     create_file,
@@ -217,9 +218,8 @@ async def test_a_silent_no_tells_the_requester_nothing(client, session, two):
 async def test_an_item_guest_asks_to_edit_and_a_share_with_everyone_reaches_them(
     client, session, acting_user
 ):
-    row = await app_settings_service.ensure_settings_row(session)
-    row.guests_enabled = True
-    session.add(row)
+    await app_settings_service.ensure_settings_row(session)
+    await rules.put(session, "guests_enabled", True)
     await session.commit()
     owner = await acting_user(guild_role=CommunityRole.member, initiative=True)
     given = await create_file(session, owner.initiative, owner.user)

@@ -706,7 +706,12 @@ async def _read_membership_gate(
     """
     row = (
         await session.exec(
-            select(GuildMembership, Guild, AppSetting)
+            select(
+                GuildMembership,
+                Guild,
+                AppSetting,
+                rules.platform_rule_sql("community_age_gate_enabled"),
+            )
             .select_from(GuildMembership)
             .outerjoin(Guild, Guild.id == GuildMembership.guild_id)
             .outerjoin(AppSetting, AppSetting.id == GLOBAL_SETTINGS_ID)
@@ -719,16 +724,13 @@ async def _read_membership_gate(
     ).one_or_none()
     if row is None:
         return None
-    membership, guild, settings_row = row
+    membership, guild, settings_row, age_gate_on = row
     if guild is None:
         raise ValueError(GuildMessages.COMMUNITY_NOT_FOUND)
-    # The age switch rides along for the same reason the factor requirement
-    # does: it is decided from this same row, and reading it separately would
-    # be a round trip on every guild request there is.
-    age_gate_on = bool(
-        settings_row is not None and settings_row.community_age_gate_enabled
-    )
-    return membership, guild, asked_of_an_account(settings_row), age_gate_on
+    # The age rule rides along for the same reason the factor requirement
+    # does: reading it separately would be a round trip on every guild
+    # request there is.
+    return membership, guild, asked_of_an_account(settings_row), bool(age_gate_on)
 
 
 async def _read_grant_gate(
