@@ -15,8 +15,10 @@ keeping the membership GUCs, so the gate runs in full — which is the case here
 from sqlalchemy import text
 
 from app.db.schema_provisioning import GuildRoleKind, guild_role_name
-from app.models.platform.guild_auth_policy import GuildAuthPolicy
 from app.testing.factories import create_auth_provider, create_guild
+from app.core.login_methods import LoginMethod
+from app.core.rules import SignInRequirement
+from app.services.platform import rules
 
 
 async def test_the_read_floor_can_answer_the_gate(session, engine):
@@ -28,13 +30,11 @@ async def test_the_read_floor_can_answer_the_gate(session, engine):
     guild = await create_guild(session)
     provider = await create_auth_provider(session, slug="gate-floor")
     guild_id, provider_id = guild.id, provider.id
-    session.add(
-        GuildAuthPolicy(
-            guild_id=guild_id,
-            policy="required",
-            provider_id=provider_id,
-            require_methods=["sso"],
-        )
+    await rules.put(
+        session,
+        "auth_policy",
+        SignInRequirement("required", provider_id, frozenset({LoginMethod.sso})),
+        guild_id=guild_id,
     )
     await session.commit()
 
@@ -71,8 +71,11 @@ async def test_the_read_floor_reads_a_deployment_wide_answer(session, engine):
             enabled=True,
         )
     )
-    session.add(
-        GuildAuthPolicy(guild_id=guild_id, policy="required", require_methods=["sso"])
+    await rules.put(
+        session,
+        "auth_policy",
+        SignInRequirement("required", None, frozenset({LoginMethod.sso})),
+        guild_id=guild_id,
     )
     await session.commit()
 

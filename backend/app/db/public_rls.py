@@ -1078,67 +1078,6 @@ SHARED_TABLE_REGISTRY: dict[str, SharedTable] = {
         ),
     ),
     # A community's sign-in requirement, read before routing by the gate.
-    "guild_auth_policies": SharedTable(
-        rls=TableRls(
-            policies=(
-                # The gate reads a community's rule before any routing exists.
-                Policy("guild_auth_policies_read", SELECT, ("app_user",), using=OPEN),
-                # The platform path reads the rules of the communities the reader
-                # belongs to.
-                Policy(
-                    "guild_auth_policies_member_read",
-                    SELECT,
-                    ("platform_base",),
-                    using=member_of_guild("guild_id"),
-                ),
-                # A routed request, the seat's and a guest's included, reads its
-                # own community's rule.
-                Policy(
-                    "guild_auth_policies_routed_read",
-                    SELECT,
-                    (
-                        "app_guild_base",
-                        "app_guild_base_ro",
-                        "app_superadmin",
-                        "guest_base",
-                    ),
-                    using=routed_or_pam("guild_id"),
-                ),
-                Policy(
-                    "guild_auth_policies_seat_delete",
-                    DELETE,
-                    ("public",),
-                    using=seat_write("guild_id"),
-                ),
-                Policy(
-                    "guild_auth_policies_seat_insert",
-                    INSERT,
-                    ("public",),
-                    check=seat_write("guild_id"),
-                ),
-                Policy(
-                    "guild_auth_policies_seat_update",
-                    UPDATE,
-                    ("public",),
-                    using=seat_write("guild_id"),
-                ),
-            ),
-        ),
-        grants=Grants(
-            # per-guild sign-in requirement — written via the guild-admin endpoint
-            # (provider validation happens on the system engine)
-            app_admin=DML,
-            # the guild-access gate reads the policy on the bare login role, pre-routing
-            app_user=frozenset({SELECT}),
-            # 0147 granted SELECT: the routed community's gate reads its requirement
-            # (guild_auth_policies_routed_read, 0360). 0297 added the three writes and
-            # 0349 moved them to app_superadmin, the floor only a seat route inherits.
-            app_guild_base=frozenset({SELECT}),
-            platform_base=frozenset({SELECT}),
-            app_superadmin=DML,
-            guest_base=frozenset({SELECT}),
-        ),
-    ),
     # The pictures a guild is known by — its icon, and the two renditions of its banner.
     # Identity, like the name and description they sit beside, and read by people
     # browsing the directory, who hold no role in any guild schema.

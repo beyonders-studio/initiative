@@ -11,7 +11,6 @@ from httpx import AsyncClient
 from sqlmodel.ext.asyncio.session import AsyncSession
 
 from app.core.messages import AuthProviderMessages
-from app.models.platform.guild_auth_policy import GuildAuthPolicy
 from app.models.platform.guild import CommunityRole
 from app.testing.factories import (
     create_auth_provider,
@@ -21,6 +20,9 @@ from app.testing.factories import (
     create_user,
     get_auth_headers,
 )
+from app.core.login_methods import LoginMethod
+from app.core.rules import SignInRequirement
+from app.services.platform import rules
 
 
 async def _seat(session: AsyncSession, *, auth_options: list[str] | None = None):
@@ -252,16 +254,11 @@ async def test_a_required_provider_cannot_be_disconnected(
     connection = await create_guild_provider_connection(
         session, guild=guild, provider=provider
     )
-    session.add(
-        GuildAuthPolicy(
-            guild_id=guild.id,
-            **{
-                "policy": "open",
-                f"{half}policy": "required",
-                f"{half}provider_id": provider.id,
-                f"{half}provider_slug": provider.slug,
-            },
-        )
+    await rules.put(
+        session,
+        f"{half}auth_policy",
+        SignInRequirement("required", provider.id),
+        guild_id=guild.id,
     )
     await session.commit()
 
@@ -281,13 +278,11 @@ async def test_a_required_provider_cannot_be_disabled(
     connection = await create_guild_provider_connection(
         session, guild=guild, provider=provider
     )
-    session.add(
-        GuildAuthPolicy(
-            guild_id=guild.id,
-            policy="required",
-            provider_id=provider.id,
-            provider_slug=provider.slug,
-        )
+    await rules.put(
+        session,
+        "auth_policy",
+        SignInRequirement("required", provider.id),
+        guild_id=guild.id,
     )
     await session.commit()
 
@@ -309,12 +304,11 @@ async def test_the_last_connection_for_an_sso_requirement_cannot_be_removed(
     connection = await create_guild_provider_connection(
         session, guild=guild, provider=provider
     )
-    session.add(
-        GuildAuthPolicy(
-            guild_id=guild.id,
-            policy="required",
-            require_methods=["sso"],
-        )
+    await rules.put(
+        session,
+        "auth_policy",
+        SignInRequirement("required", None, frozenset({LoginMethod.sso})),
+        guild_id=guild.id,
     )
     await session.commit()
 
@@ -336,12 +330,11 @@ async def test_an_sso_requirement_allows_one_of_multiple_connections_to_be_remov
         session, guild=guild, provider=first
     )
     await create_guild_provider_connection(session, guild=guild, provider=second)
-    session.add(
-        GuildAuthPolicy(
-            guild_id=guild.id,
-            policy="required",
-            require_methods=["sso"],
-        )
+    await rules.put(
+        session,
+        "auth_policy",
+        SignInRequirement("required", None, frozenset({LoginMethod.sso})),
+        guild_id=guild.id,
     )
     await session.commit()
 

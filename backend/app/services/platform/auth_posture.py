@@ -37,12 +37,12 @@ from dataclasses import dataclass, field
 from typing import Any, Awaitable, Callable
 
 from fastapi import HTTPException, status
-from sqlalchemy import and_, or_
 from sqlalchemy import select as sa_select
 from sqlmodel import func, select
 from sqlmodel.ext.asyncio.session import AsyncSession
 
 from app.core import rules as rule_catalog
+from app.core.rules import SignInRequirement
 from app.core.audit_events import AuditEventType
 from app.core.login_methods import (
     FACTOR_METHODS,
@@ -57,7 +57,7 @@ from app.core.security import AUTH_POLICY_UNMET_HEADER, has_usable_password
 from app.models.platform.app_setting import AppSetting
 from app.models.platform.auth_provider import AuthProvider
 from app.models.platform.guild import Guild
-from app.models.platform.guild_auth_policy import GuildAuthPolicy, SignInHalf
+from app.models.platform.rule import CommunityRule
 from app.models.platform.user import User, UserRole, UserStatus
 from app.models.platform.user_passkey import UserPasskey
 from app.models.platform.user_totp import UserTotp
@@ -225,28 +225,28 @@ async def account_figures(
     return stranding, dict(zip(_FACTOR_LEVELS, row[len(withdrawable) :]))
 
 
+#: The rule keys that hold a community's sign-in requirements.
+_REQUIREMENTS = ("auth_policy", "guest_auth_policy")
+
+
 async def guilds_requiring_sign_in(session: AsyncSession) -> int:
     """How many guilds require a sign-in of their own.
 
-    A requirement is enforced from the policy row alone — the gate in
-    ``deps.py`` and ``public.guild_auth_satisfied()`` read nothing else — so it
-    stands whatever happens to the route that satisfies it. Counted before
-    single sign-on is withdrawn for that reason.
+    A requirement is enforced from its rule alone — the gate in ``deps.py``
+    and ``public.guild_auth_satisfied()`` read nothing else — so it stands
+    whatever happens to the route that satisfies it. Counted before single
+    sign-on is withdrawn for that reason.
 
-    Any row with a half that is not ``open`` counts, its members' or its
-    guests'. A requirement names a provider, or a way in, or both, and a table
-    constraint is what makes that list complete — so this stays right when a
-    third thing becomes requirable, rather than quietly skipping it.
+    A requirement of its members or of its guests counts. It names a provider,
+    or a way in, or both, and a table constraint is what makes that list
+    complete — so this stays right when a third thing becomes requirable,
+    rather than quietly skipping it.
     """
     return (
         await session.exec(
-            select(func.count())
-            .select_from(GuildAuthPolicy)
-            .where(
-                or_(
-                    GuildAuthPolicy.policy != "open",
-                    GuildAuthPolicy.guest_policy != "open",
-                )
+            select(func.count(func.distinct(CommunityRule.guild_id))).where(
+                CommunityRule.key.in_(_REQUIREMENTS),  # type: ignore[attr-defined]
+                CommunityRule.user_id.is_(None),  # type: ignore[union-attr]
             )
         )
     ).one()
@@ -262,19 +262,10 @@ async def guilds_requiring_method(session: AsyncSession, method: LoginMethod) ->
     """
     return (
         await session.exec(
-            select(func.count())
-            .select_from(GuildAuthPolicy)
-            .where(
-                or_(
-                    and_(
-                        GuildAuthPolicy.policy != "open",
-                        GuildAuthPolicy.require_methods.contains([method.value]),
-                    ),
-                    and_(
-                        GuildAuthPolicy.guest_policy != "open",
-                        GuildAuthPolicy.guest_require_methods.contains([method.value]),
-                    ),
-                )
+            select(func.count(func.distinct(CommunityRule.guild_id))).where(
+                CommunityRule.key.in_(_REQUIREMENTS),  # type: ignore[attr-defined]
+                CommunityRule.user_id.is_(None),  # type: ignore[union-attr]
+                CommunityRule.methods.contains([method.value]),  # type: ignore[union-attr]
             )
         )
     ).one()
@@ -390,7 +381,6 @@ class RuleContext:
     acknowledge_stranded: int | None = None
     settings: AppSetting = field(init=False)
     guild: Guild = field(init=False)
-    policy: GuildAuthPolicy | None = field(default=None, init=False)
     #: The layer's stored rules as written, whether or not each applies.
     rules: dict[str, Any] = field(default_factory=dict, init=False)
     stranded: int = field(default=0, init=False)
@@ -632,16 +622,6 @@ class _FactorRequirement(Rule):
         )
 
 
-@dataclass(frozen=True)
-class SignInRequirement:
-    """A community's sign-in requirement: ``open``, or ``required`` naming a
-    provider its members arrive through, methods they must use, or both."""
-
-    policy: str = "open"
-    provider_id: int | None = None
-    methods: frozenset[LoginMethod] = frozenset()
-
-
 _OPEN = SignInRequirement()
 
 #: The methods of a requirement that are a second factor rather than a way in.
@@ -660,18 +640,6 @@ class _SignInRequirement(Rule):
     """
 
     guest: bool = False
-
-    async def read(self, ctx: RuleContext) -> SignInRequirement:
-        if ctx.policy is None:
-            return _OPEN
-        half = ctx.policy.half(self.guest)
-        if half.policy == "open":
-            return _OPEN
-        return SignInRequirement(
-            "required",
-            half.provider_id,
-            frozenset(LoginMethod(m) for m in half.require_methods),
-        )
 
     def tightens(self, before: Any, after: Any) -> bool:
         return after.policy == "required" and (
@@ -753,32 +721,6 @@ class _SignInRequirement(Rule):
         # holding a key.
         if LoginMethod.passkey in after.methods and not carries_passkey(amr):
             raise self_unsatisfied(LoginMethod.passkey.value)
-
-    async def write(self, ctx: RuleContext, after: Any) -> None:
-        provider = (
-            await ctx.system.get(AuthProvider, after.provider_id)
-            if after.provider_id is not None
-            else None
-        )
-        half = SignInHalf(
-            after.policy,
-            after.provider_id,
-            provider.slug if provider else None,
-            tuple(sorted(m.value for m in after.methods)),
-        )
-        row = ctx.policy or GuildAuthPolicy(guild_id=ctx.guild_id, policy="open")
-        row.set_half(self.guest, half)
-        # No row is open, for members and guests alike.
-        if row.policy == "open" and row.guest_policy == "open":
-            if ctx.policy is not None:
-                await ctx.session.delete(ctx.policy)
-                # Flushed now, so the other half writing in the same change
-                # inserts its row after this one is gone.
-                await ctx.session.flush()
-                ctx.policy = None
-            return
-        ctx.policy = row
-        ctx.session.add(row)
 
     async def audit(self, ctx: RuleContext, moved: dict[str, tuple[Any, Any]]) -> None:
         before, after = moved[self.key]
@@ -880,8 +822,8 @@ def _rules(ctx: RuleContext) -> dict[str, Rule]:
 
 async def _load(ctx: RuleContext) -> None:
     """Take the rows the rules read: the settings row, held, and the stored
-    rules for the deployment's; the community's row, its requirement and its
-    stored rules for a community's."""
+    rules for the deployment's; the community's row and its stored rules for a
+    community's."""
     if ctx.guild_id is None:
         ctx.settings = await app_settings_service.locked_settings(ctx.session)
         ctx.rules = await rules_service.platform_values(ctx.session)
@@ -893,7 +835,6 @@ async def _load(ctx: RuleContext) -> None:
             detail=GuildMessages.COMMUNITY_NOT_FOUND,
         )
     ctx.guild = guild
-    ctx.policy = await ctx.session.get(GuildAuthPolicy, ctx.guild_id)
     ctx.rules = (
         await rules_service.community_values(ctx.session, [ctx.guild_id], applied=False)
     )[ctx.guild_id]

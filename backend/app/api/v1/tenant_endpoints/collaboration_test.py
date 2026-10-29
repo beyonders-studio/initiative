@@ -24,7 +24,6 @@ from app.api.v1.tenant_endpoints.collaboration import MSG_AWARENESS
 from app.core.security import create_upload_token
 from app.core.user_display import handle_of
 from app.models.platform.access_grant import AccessGrant
-from app.models.platform.guild_auth_policy import GuildAuthPolicy
 from app.core.file_types import FileType
 from app.models.tenant.file import File
 from app.models.tenant.wiki import WikiPage
@@ -50,6 +49,9 @@ from app.models.platform.guild import CommunityRole
 from app.models.platform.user import UserRole
 from app.services import permissions as permissions_service
 from app.testing import route_as
+from app.core.login_methods import LoginMethod
+from app.core.rules import SignInRequirement
+from app.services.platform import rules
 
 WHITEBOARD = {"elements": [], "appState": {}, "files": {}}
 
@@ -415,10 +417,11 @@ async def test_a_handover_answers_a_community_that_asks_for_a_passkey(
     opened with a password is refused."""
     owner = await acting_user(guild_role=CommunityRole.member, initiative=True)
     doc = await create_file(session, owner.initiative, owner.user)
-    session.add(
-        GuildAuthPolicy(
-            guild_id=owner.guild.id, policy="required", require_methods=["passkey"]
-        )
+    await rules.put(
+        session,
+        "auth_policy",
+        SignInRequirement("required", None, frozenset({LoginMethod.passkey})),
+        guild_id=owner.guild.id,
     )
     await session.commit()
 

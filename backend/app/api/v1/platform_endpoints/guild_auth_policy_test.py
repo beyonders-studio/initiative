@@ -21,7 +21,9 @@ from app.core import auth_context
 from app.db.schema_provisioning import GuildRoleKind, guild_role_name
 from app.db.session import set_rls_context
 from app.models.platform.guild import Guild, CommunityRole
-from app.models.platform.guild_auth_policy import GuildAuthPolicy
+from app.core.login_methods import LoginMethod
+from app.core.rules import SignInRequirement
+from app.models.platform.rule import CommunityRule
 from app.models.platform.user import User, UserRole
 from app.models.tenant.project import Project
 from app.services.auth.assurance import SECOND_FACTOR_AMR
@@ -71,6 +73,18 @@ def _settings(guild_id: int) -> str:
     return f"/api/v1/communities/{guild_id}/auth-settings"
 
 
+async def _both_open(session: AsyncSession, guild_id: int) -> bool:
+    """Whether the community asks nothing of its members or its guests."""
+    stored = (await rules.community_values(session, [guild_id], applied=False))[
+        guild_id
+    ]
+    return stored["auth_policy"] == stored["guest_auth_policy"] == SignInRequirement()
+
+
+async def _members_rule(session: AsyncSession, guild_id: int) -> SignInRequirement:
+    return await rules.community_value(session, guild_id, "auth_policy", applied=False)
+
+
 # --- Setting, reading and lifting a requirement ------------------------------
 
 
@@ -108,7 +122,7 @@ async def test_the_seat_sets_reads_and_clears_the_policy(
     )
     assert cleared.json()["auth_policy"]["policy"] == "open"
     session.expire_all()
-    assert await session.get(GuildAuthPolicy, guild_id) is None
+    assert await _both_open(session, guild_id)
 
 
 async def test_a_guest_is_asked_the_guests_rule_and_a_member_the_members(
@@ -165,7 +179,7 @@ async def test_a_guest_is_asked_the_guests_rule_and_a_member_the_members(
         json={"auth_policy": {"policy": "open"}},
     )
     session.expire_all()
-    assert await session.get(GuildAuthPolicy, guild_id) is None
+    assert await _both_open(session, guild_id)
 
 
 @pytest.mark.parametrize("connected", [True, False])
@@ -323,8 +337,7 @@ async def test_without_the_entitlement_a_requirement_is_read_and_lifted_only(
     assert put.status_code == 404
     assert put.json()["detail"] == "COMMUNITY_AUTH_NOT_ENABLED"
     session.expire_all()
-    untouched = await session.get(GuildAuthPolicy, guild_id)
-    assert untouched is not None and untouched.policy == "required"
+    assert (await _members_rule(session, guild_id)).policy == "required"
 
     cleared = await client.patch(
         _settings(guild_id), headers=headers, json={"auth_policy": {"policy": "open"}}
@@ -332,7 +345,7 @@ async def test_without_the_entitlement_a_requirement_is_read_and_lifted_only(
     assert cleared.status_code == 200
     assert cleared.json()["auth_policy"]["policy"] == "open"
     session.expire_all()
-    assert await session.get(GuildAuthPolicy, guild_id) is None
+    assert await _both_open(session, guild_id)
 
 
 # --- The gate: what a standing requirement does to a session -----------------
@@ -423,10 +436,7 @@ async def _require_one_named_provider(session: AsyncSession, guild: Guild) -> No
 async def _require_any_of_ours(session: AsyncSession, guild: Guild) -> None:
     provider = await create_auth_provider(session, slug="corp")
     await create_guild_provider_connection(session, guild=guild, provider=provider)
-    session.add(
-        GuildAuthPolicy(guild_id=guild.id, policy="required", require_methods=["sso"])
-    )
-    await session.commit()
+    await create_guild_auth_policy(session, guild, methods=[LoginMethod.sso])
 
 
 @pytest.mark.parametrize(
@@ -516,8 +526,7 @@ async def test_an_ordinary_admin_reads_the_connections_and_writes_neither(
 
     # And the row is untouched.
     session.expire_all()
-    still_required = await session.get(GuildAuthPolicy, guild_id)
-    assert still_required is not None and still_required.policy == "required"
+    assert (await _members_rule(session, guild_id)).policy == "required"
 
 
 async def test_the_last_seat_cannot_be_vacated_while_a_requirement_stands(
@@ -546,8 +555,9 @@ async def test_the_last_seat_stays_even_with_no_requirement(
     another — so a guild keeps one whatever its sign-in rule says.
     """
     keyholder = await _a_seat_and_a_requirement(session, acting_user)
-    policy_row = await session.get(GuildAuthPolicy, keyholder.guild.id)
-    await session.delete(policy_row)
+    await rules.put(
+        session, "auth_policy", SignInRequirement(), guild_id=keyholder.guild.id
+    )
     await session.commit()
 
     refused = await client.delete(
@@ -657,12 +667,7 @@ async def test_ws_token_carries_the_passkey_to_the_gate(
     the ``establish_guild_access`` that follows reads it — so a socket is
     admitted on the terms a page is."""
     member = await acting_user(guild_role=CommunityRole.member)
-    session.add(
-        GuildAuthPolicy(
-            guild_id=member.guild.id, policy="required", require_methods=["passkey"]
-        )
-    )
-    await session.commit()
+    await create_guild_auth_policy(session, member.guild, methods=[LoginMethod.passkey])
     guild_id = member.guild.id
 
     with_a_password = await authenticate_ws_token(
@@ -692,19 +697,11 @@ async def test_system_sentinel_passes_policy_gate(session: AsyncSession, acting_
     assert ctx.guild_id == guild_id
 
 
-async def test_required_row_needs_provider_and_slug(session: AsyncSession):
-    """The check constraint: a required policy must carry both the provider id
-    and its denormalized slug — the step-up response depends on the slug."""
+async def test_a_required_rule_names_something(session: AsyncSession):
+    """The check constraint: a requirement names a provider or a method; one
+    naming neither would ask nothing and refuse nobody."""
     guild = await create_guild(session)
-    provider = await create_auth_provider(session, slug="corp")
-    session.add(
-        GuildAuthPolicy(
-            guild_id=guild.id,
-            policy="required",
-            provider_id=provider.id,
-            provider_slug=None,
-        )
-    )
+    session.add(CommunityRule(guild_id=guild.id, key="auth_policy", methods=[]))
     with pytest.raises(IntegrityError):
         await session.commit()
     await session.rollback()
@@ -715,9 +712,7 @@ async def test_the_database_refuses_a_password_requirement(session: AsyncSession
     constraint so it holds for every writer rather than only the endpoint."""
     guild = await create_guild(session)
     session.add(
-        GuildAuthPolicy(
-            guild_id=guild.id, policy="required", require_methods=["password"]
-        )
+        CommunityRule(guild_id=guild.id, key="auth_policy", methods=["password"])
     )
     with pytest.raises(IntegrityError):
         await session.commit()
@@ -915,28 +910,17 @@ async def test_the_gate_and_the_database_agree_on_every_rule(
             **proved,
         )
 
-    rules: list[tuple[str, dict]] = [
-        ("open", {"policy": "open"}),
-        (
-            "one named provider",
-            {"policy": "required", "provider_id": provider_id, "provider_slug": "corp"},
-        ),
-        ("any of ours", {"policy": "required", "require_methods": ["sso"]}),
-        ("a second factor", {"policy": "required", "require_methods": ["totp"]}),
-        ("a passkey", {"policy": "required", "require_methods": ["passkey"]}),
-        (
-            "any of ours, and a second factor",
-            {"policy": "required", "require_methods": ["sso", "totp"]},
-        ),
-        (
-            "that provider, and any of ours",
-            {
-                "policy": "required",
-                "provider_id": provider_id,
-                "provider_slug": "corp",
-                "require_methods": ["sso"],
-            },
-        ),
+    def asks(*methods: LoginMethod, provider: int | None = None) -> SignInRequirement:
+        return SignInRequirement("required", provider, frozenset(methods))
+
+    shapes: list[tuple[str, SignInRequirement]] = [
+        ("open", SignInRequirement()),
+        ("one named provider", asks(provider=provider_id)),
+        ("any of ours", asks(LoginMethod.sso)),
+        ("a second factor", asks(LoginMethod.totp)),
+        ("a passkey", asks(LoginMethod.passkey)),
+        ("any of ours, and a second factor", asks(LoginMethod.sso, LoginMethod.totp)),
+        ("that provider, and any of ours", asks(LoginMethod.sso, provider=provider_id)),
     ]
     ours = {str(provider_id): {"hd": ["acme.com"]}}
     theirs = {str(provider_id): {"hd": ["elsewhere.com"]}}
@@ -977,29 +961,22 @@ async def test_the_gate_and_the_database_agree_on_every_rule(
     # A provider no standing below came through, for the members' half the
     # guests are never asked.
     elsewhere_id = int((await create_auth_provider(session, slug="elsewhere")).id)
-    for rule_name, fields in rules:
-        row = await session.get(GuildAuthPolicy, guild_id)
-        if row is not None:
-            await session.delete(row)
-            await session.commit()
-        stored = (
-            GuildAuthPolicy(
-                guild_id=guild_id,
-                policy="required",
-                provider_id=elsewhere_id,
-                provider_slug="elsewhere",
-                **{f"guest_{name}": value for name, value in fields.items()},
-            )
-            if guest
-            else GuildAuthPolicy(guild_id=guild_id, **fields)
+    for rule_name, requirement in shapes:
+        # The guests' rule is asked while the members' one asks for something
+        # no standing below has.
+        members = asks(provider=elsewhere_id) if guest else requirement
+        await rules.put(session, "auth_policy", members, guild_id=guild_id)
+        await rules.put(
+            session,
+            "guest_auth_policy",
+            requirement if guest else SignInRequirement(),
+            guild_id=guild_id,
         )
-        session.add(stored)
         await session.commit()
-        await session.refresh(stored)
 
         for standing, satisfied, asserted, markers in standings:
             in_app = await _app_admits(
-                session, stored.half(guest), guild_id, satisfied, asserted, markers
+                session, requirement, guild_id, satisfied, asserted, markers
             )
             in_db = await _database_admits(
                 session,
@@ -1020,20 +997,11 @@ async def test_the_gate_and_the_database_agree_on_every_rule(
     # The matrix says the two layers agree; it does not say what they agree
     # on. Name one answer outright: a community asking for a passkey takes the
     # key and takes nothing else for it.
-    await session.exec(
-        text("DELETE FROM guild_auth_policies WHERE guild_id = :g"),
-        params={"g": guild_id},
-    )
+    key_rule = asks(LoginMethod.passkey)
+    await rules.put(session, "auth_policy", key_rule, guild_id=guild_id)
     await session.commit()
-    asking_for_a_key = GuildAuthPolicy(
-        guild_id=guild_id, policy="required", require_methods=["passkey"]
-    )
-    session.add(asking_for_a_key)
-    await session.commit()
-    await session.refresh(asking_for_a_key)
     a_key = frozenset({"hwk", SECOND_FACTOR_AMR})
     a_code = frozenset({SECOND_FACTOR_AMR})
-    key_rule = asking_for_a_key.half(False)
     assert await _app_admits(session, key_rule, guild_id, [], None, a_key)
     assert await db_admits(markers=a_key)
     assert not await _app_admits(session, key_rule, guild_id, [], None, a_code)
@@ -1041,15 +1009,10 @@ async def test_the_gate_and_the_database_agree_on_every_rule(
 
     # The matrix would pass if both layers refused everything, so pin the two
     # ends of it: an open community admits a bare session, and a rule refuses one.
-    await session.exec(
-        text("DELETE FROM guild_auth_policies WHERE guild_id = :g"),
-        params={"g": guild_id},
-    )
+    await rules.put(session, "auth_policy", SignInRequirement(), guild_id=guild_id)
     await session.commit()
     assert await db_admits()
-    session.add(
-        GuildAuthPolicy(guild_id=guild_id, policy="required", require_methods=["sso"])
-    )
+    await rules.put(session, "auth_policy", asks(LoginMethod.sso), guild_id=guild_id)
     await session.commit()
     assert not await db_admits()
 
@@ -1160,12 +1123,9 @@ async def _a_community_asking_for(
 ) -> Actor:
     """A member of a community whose rule names ``ask``."""
     member = await acting_user(guild_role=CommunityRole.member)
-    session.add(
-        GuildAuthPolicy(
-            guild_id=member.guild.id, policy="required", require_methods=[ask.method]
-        )
+    await create_guild_auth_policy(
+        session, member.guild, methods=[LoginMethod(ask.method)]
     )
-    await session.commit()
     return member
 
 
@@ -1398,12 +1358,7 @@ async def test_a_community_asks_for_a_factor_without_asking_about_arrival(
         session, seat.guild, auth_options=["providers", "restrictions"]
     )
     await rules.put(session, "require_second_factor", False, guild_id=seat.guild.id)
-    session.add(
-        GuildAuthPolicy(
-            guild_id=seat.guild.id, policy="required", require_methods=["totp"]
-        )
-    )
-    await session.commit()
+    await create_guild_auth_policy(session, seat.guild, methods=[LoginMethod.totp])
     assert await asked()
     await guild_administration(session, seat.guild, auth_options=["restrictions"])
     assert not await asked()

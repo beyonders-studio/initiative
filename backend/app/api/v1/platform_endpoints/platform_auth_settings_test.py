@@ -6,6 +6,7 @@ from sqlmodel.ext.asyncio.session import AsyncSession
 
 from app.models.platform.user import UserRole
 from app.core.audit_events import AuditEventType
+from app.core.login_methods import LoginMethod
 from app.testing.audit import emitted
 from app.testing import (
     create_guild_provider_connection,
@@ -16,6 +17,8 @@ from app.testing import (
     create_user,
     get_auth_headers,
 )
+from app.core.rules import SignInRequirement
+from app.services.platform import rules
 
 
 URL = "/api/v1/settings/auth/platform"
@@ -171,7 +174,7 @@ async def test_withdrawing_sso_waits_for_guild_requirements(
     guild = await create_guild(session)
     provider = await create_auth_provider(session, slug="corp")
     await create_guild_provider_connection(session, guild=guild, provider=provider)
-    policy = await create_guild_auth_policy(session, guild, provider)
+    await create_guild_auth_policy(session, guild, provider)
 
     refused = await client.patch(URL, headers=headers, json={"methods": ["password"]})
     assert refused.status_code == 409
@@ -181,7 +184,7 @@ async def test_withdrawing_sso_waits_for_guild_requirements(
     got = await client.get(URL, headers=headers)
     assert got.json()["communities_requiring_sign_in"] == 1
 
-    await session.delete(policy)
+    await rules.put(session, "auth_policy", SignInRequirement(), guild_id=guild.id)
     await session.commit()
 
     allowed = await client.patch(URL, headers=headers, json={"methods": ["password"]})
@@ -362,21 +365,11 @@ async def test_withdrawing_sso_counts_a_guild_that_requires_a_method(
     """A requirement can name a way in rather than a provider, and the guard
     that holds single sign-on back has to see both kinds, of members and of
     guests."""
-    from app.models.platform.guild_auth_policy import GuildAuthPolicy
-
     _, headers = await _owner(session)
     guild = await create_guild(session)
-    session.add(
-        GuildAuthPolicy(
-            guild_id=guild.id,
-            **{
-                "policy": "open",
-                f"{half}policy": "required",
-                f"{half}require_methods": ["sso"],
-            },
-        )
+    await create_guild_auth_policy(
+        session, guild, guest=half == "guest_", methods=[LoginMethod.sso]
     )
-    await session.commit()
 
     refused = await client.patch(URL, headers=headers, json={"methods": ["password"]})
     assert refused.status_code == 409, refused.text

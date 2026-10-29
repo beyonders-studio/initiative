@@ -217,20 +217,20 @@ async def test_the_seat_floor_alone_writes_the_sign_in_rule(engine):
                 held = await conn.scalar(
                     text(
                         "SELECT has_table_privilege(:role,"
-                        " 'public.guild_auth_policies', :verb)"
+                        " 'public.community_rules', :verb)"
                     ),
                     {"role": role, "verb": verb},
                 )
-                assert not held, f"{role} must not hold {verb} on guild_auth_policies"
+                assert not held, f"{role} must not hold {verb} on community_rules"
         for verb in ("SELECT", "INSERT", "UPDATE", "DELETE"):
             held = await conn.scalar(
                 text(
                     "SELECT has_table_privilege('app_superadmin',"
-                    " 'public.guild_auth_policies', :verb)"
+                    " 'public.community_rules', :verb)"
                 ),
                 {"verb": verb},
             )
-            assert held, f"app_superadmin must hold {verb} on guild_auth_policies"
+            assert held, f"app_superadmin must hold {verb} on community_rules"
 
 
 async def test_the_seat_writes_its_rules_and_nothing_of_the_guild_row(engine):

@@ -105,7 +105,8 @@ from app.models.platform.guild import (
     CommunityRole,
     CommunityStatus,
 )
-from app.models.platform.guild_auth_policy import GuildAuthPolicy, SignInHalf
+from app.core.rules import SignInRequirement
+from app.models.platform.auth_provider import AuthProvider
 from app.models.platform.user import (
     LOGIN_STATUSES,
     User,
@@ -546,7 +547,7 @@ def _sign_in(satisfied: frozenset[int], on_behalf: bool) -> SignIn:
 
 async def _enforce_guild_auth_policy(
     session: AsyncSession,
-    policy: SignInHalf | None,
+    policy: SignInRequirement,
     guild_id: int,
     satisfied: frozenset[int],
     markers: frozenset[str] = frozenset(),
@@ -555,21 +556,20 @@ async def _enforce_guild_auth_policy(
 ) -> None:
     """Gate 0 of guild access: the guild's
     sign-in policy must be satisfied by THIS session — membership and PAM
-    grants alike. No policy row (or ``open``) admits any authenticated
-    session.
+    grants alike. An ``open`` requirement admits any authenticated session.
 
     Decided by ``public.guild_auth_satisfied()``, which the standing statement
     asks for every request. This is the same rule read in Python, run once the
     standing has said no, to name the step-up the session owes.
 
-    A row can ask two things and a session has to answer both. ``provider_id``
-    names one provider the session must have come through; ``require_methods``
-    asks for any of this community's connections without naming which. Both
-    are one question to ``guild_connection_admits``, which also applies the
-    narrowing a community put on the connection.
+    A requirement can ask two things and a session has to answer both.
+    ``provider_id`` names one provider the session must have come through;
+    ``methods`` asks for any of this community's connections without naming
+    which. Both are one question to ``guild_connection_admits``, which also
+    applies the narrowing a community put on the connection.
 
-    ``policy`` is the half of the guild's row that applies to this request
-    (its guests' for a guest), read under the routed session. A second factor
+    ``policy`` is the requirement that applies to this request (its guests'
+    for a guest), read under the routed session. A second factor
     the community asks for applies while it holds the option it needs, read as
     the database gate reads it.
     """
@@ -594,13 +594,20 @@ async def _enforce_guild_auth_policy(
             GuildMessages.COMMUNITY_AUTH_FACTOR_REQUIRED,
             step_up_guild_id=guild_id,
         )
-    if policy is None or policy.policy == "open":
+    if policy.policy == "open":
         return
 
-    def _refuse() -> None:
+    async def _refuse() -> NoReturn:
+        # The step-up names the provider by its slug, which the registry
+        # holds and the request path does not read.
+        slug = None
+        if policy.provider_id is not None:
+            async with cohorts.system_session(guild_id) as system_session:
+                provider = await system_session.get(AuthProvider, policy.provider_id)
+                slug = provider.slug if provider else None
         raise GuildAccessError(
             detail=GuildMessages.COMMUNITY_AUTH_STEP_UP_REQUIRED,
-            step_up_provider_slug=policy.provider_slug,
+            step_up_provider_slug=slug,
             step_up_guild_id=guild_id,
         )
 
@@ -610,23 +617,23 @@ async def _enforce_guild_auth_policy(
             session, guild_id=guild_id, provider_id=policy.provider_id
         )
     ):
-        _refuse()
+        await _refuse()
 
     # "Any of ours": any connection this community holds, narrowing included.
-    # Named rather than counted: ``require_methods`` may hold more than one
+    # Named rather than counted: ``methods`` may hold more than one
     # method, and each is read as itself. The matching leg in
-    # ``public.guild_auth_satisfied()`` reads the same row.
-    if LoginMethod.sso in policy.require_methods and not (
+    # ``public.guild_auth_satisfied()`` reads the same rule.
+    if LoginMethod.sso in policy.methods and not (
         await guild_connections.admits_this_session(session, guild_id=guild_id)
     ):
-        _refuse()
+        await _refuse()
 
     # And the account's own second factor, where the community asks for one.
     # The answer names no provider, so the step-up says a factor is what is
     # wanted rather than pointing at a sign-in page.
     if (
         factors_apply
-        and LoginMethod.totp in policy.require_methods
+        and LoginMethod.totp in policy.methods
         and SECOND_FACTOR_AMR not in markers
     ):
         raise GuildAccessError(
@@ -639,7 +646,7 @@ async def _enforce_guild_auth_policy(
     # an assertion records the second factor as well as the key.
     if (
         factors_apply
-        and LoginMethod.passkey in policy.require_methods
+        and LoginMethod.passkey in policy.methods
         and not carries_passkey(markers)
     ):
         raise GuildAccessError(
@@ -1325,10 +1332,14 @@ async def _refuse_sign_in(
     rule, under the routing, to name the step-up the caller owes.
     """
     guild_id = guild_context.guild_id
-    row = await session.get(GuildAuthPolicy, guild_id)
     await _enforce_guild_auth_policy(
         session,
-        row.half(guild_context.routes_as_guest) if row is not None else None,
+        await rules.community_value(
+            session,
+            guild_id,
+            "guest_auth_policy" if guild_context.routes_as_guest else "auth_policy",
+            applied=False,
+        ),
         guild_id,
         satisfied,
         auth_context.current().session_amr,

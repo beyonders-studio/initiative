@@ -300,8 +300,8 @@ AS $function$
         public.platform_factor_satisfied()
         AND NOT EXISTS (
             SELECT 1
-            FROM public.guild_auth_policies r
-            -- The half that applies: a request routed into one of the
+            FROM public.community_rules p
+            -- The requirement that applies: a request routed into one of the
             -- community's guest roles, each granted the guest floor, is asked
             -- what the community asks of its guests.
             CROSS JOIN LATERAL (
@@ -311,19 +311,12 @@ AS $function$
                       AND m.roleid = to_regrole('guest_base')
                 ) AS guest
             ) routed
-            CROSS JOIN LATERAL (
-                SELECT
-                    r.guild_id,
-                    CASE WHEN routed.guest THEN r.guest_policy ELSE r.policy END
-                        AS policy,
-                    CASE WHEN routed.guest THEN r.guest_provider_id ELSE r.provider_id END
-                        AS provider_id,
-                    CASE WHEN routed.guest THEN r.guest_require_methods
-                        ELSE r.require_methods END
-                        AS require_methods
-            ) p
-            WHERE r.guild_id = {gucs.ROUTED_GUILD_ID}
-              AND p.policy <> 'open'
+            -- A requirement is a row, so there is one only where it asks
+            -- something.
+            WHERE p.guild_id = {gucs.ROUTED_GUILD_ID}
+              AND p.user_id IS NULL
+              AND p.key = CASE WHEN routed.guest
+                  THEN 'guest_auth_policy' ELSE 'auth_policy' END
               AND (
                   -- The provider this guild names, if it names one: the
                   -- session came through it, and this community counts the
@@ -340,7 +333,7 @@ AS $function$
                   -- Both factor legs apply while the community holds
                   -- ``providers``; the arrival legs apply whatever it holds.
                   OR (
-                      'totp' = ANY(p.require_methods)
+                      'totp' = ANY(p.methods)
                       AND NOT ('mfa' = ANY(public.session_amr()))
                       AND public.guild_holds_option(p.guild_id, 'providers')
                   )
@@ -349,7 +342,7 @@ AS $function$
                   -- second factor too, so the two are asked for separately.
                   -- Either kind of key answers, which is what the overlap says.
                   OR (
-                      'passkey' = ANY(p.require_methods)
+                      'passkey' = ANY(p.methods)
                       AND NOT (public.session_amr() && ARRAY['hwk', 'swk'])
                       AND public.guild_holds_option(p.guild_id, 'providers')
                   )
@@ -357,21 +350,22 @@ AS $function$
                   -- rather than counted, so a list holding some other method
                   -- is not read as this one.
                   OR (
-                      'sso' = ANY(p.require_methods)
+                      'sso' = ANY(p.methods)
                       AND NOT public.guild_connection_satisfied(p.guild_id)
                   )
               )
         )
         AND NOT EXISTS (
             -- Asked of everybody reaching this community, whatever it says
-            -- about how they arrive. One of its stored rules rather than the
-            -- policy's, because a community that asks nothing about arrival
-            -- holds no policy row and still asks this, while it holds
+            -- about how they arrive. A rule of its own rather than part of the
+            -- requirement, because a community that asks nothing about arrival
+            -- holds no requirement and still asks this, while it holds
             -- ``restrictions``. Unsatisfied is what this finds, like the leg
             -- above it.
             SELECT 1
             FROM public.community_rules r
             WHERE r.guild_id = {gucs.ROUTED_GUILD_ID}
+              AND r.user_id IS NULL
               AND r.key = 'require_second_factor'
               AND r.enabled
               AND NOT ('mfa' = ANY(public.session_amr()))
@@ -1325,7 +1319,7 @@ $function$
 #: A live ``superadmin`` settings grant satisfies the same predicate for the
 #: duration of its grant.
 #:
-#: The one definition of the rule. The policies on ``guild_auth_policies`` call
+#: The one definition of the rule. The seat's policies on ``community_rules`` call
 #: it, and so does the app — ``func.guild_superadmin(...)`` where an endpoint
 #: has to decide before it writes, the way ``initiative_scope_clause`` already
 #: defers to ``initiative_access`` rather than restating it in Python.

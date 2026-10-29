@@ -31,7 +31,6 @@ from app.core.login_methods import LoginMethod
 from app.core.messages import AuthProviderMessages
 from app.db.errors import UNIQUE_VIOLATION_SQLSTATE, dbapi_sqlstate
 from app.models.platform.auth_provider import AuthProvider
-from app.models.platform.guild_auth_policy import GuildAuthPolicy
 from app.models.platform.guild_provider_connection import (
     GuildProviderConnection,
     narrowing_admits,
@@ -44,6 +43,7 @@ from app.schemas.platform.settings import (
     CommunityProviderConnectionUpdate,
 )
 from app.services import audit as audit_service
+from app.services.platform import rules
 from app.services.auth import narrowing_approval
 
 logger = logging.getLogger(__name__)
@@ -214,18 +214,18 @@ async def _ensure_not_required(
     through a provider needs the connection that says the provider is theirs.
     Lifting the requirement first is the way round it.
     """
-    policy = await session.get(GuildAuthPolicy, guild_id)
+    stored = (await rules.community_values(session, [guild_id], applied=False))[
+        guild_id
+    ]
     # Its members' requirement and its guests' alike.
-    halves = (
-        [h for h in (policy.half(False), policy.half(True)) if h.policy == "required"]
-        if policy is not None
-        else []
-    )
+    halves = [
+        stored[key]
+        for key in ("auth_policy", "guest_auth_policy")
+        if stored[key].policy == "required"
+    ]
     names_this_provider = any(h.provider_id == connection.provider_id for h in halves)
     is_last_live_connection = False
-    if connection.enabled and any(
-        LoginMethod.sso.value in h.require_methods for h in halves
-    ):
+    if connection.enabled and any(LoginMethod.sso in h.methods for h in halves):
         another = (
             await session.exec(
                 select(GuildProviderConnection.id).where(
