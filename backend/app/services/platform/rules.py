@@ -146,8 +146,9 @@ async def put(
     user_id: int | None = None,
 ) -> None:
     """Write one rule of the deployment, of ``guild_id``, or of one of its
-    members. Its default removes the row, so a rule that says nothing holds
-    nothing."""
+    members. A value that is what the row would inherit removes it, so a rule
+    that says nothing holds nothing: the default for the deployment and a
+    community, and the community's own value for a member."""
     catalog = PLATFORM_RULES if guild_id is None else COMMUNITY_RULES
     rule = catalog[key]
     model = PlatformRule if guild_id is None else CommunityRule
@@ -159,7 +160,12 @@ async def put(
             if user_id is None
             else CommunityRule.user_id == user_id,
         ]
-    if value == rule.default:
+    inherited = rule.default
+    if user_id is not None:
+        # What the community says, this session's own writes included.
+        await session.flush()
+        inherited = await community_value(session, guild_id, key, applied=False)
+    if value == inherited:
         await session.exec(delete(model).where(*where))  # type: ignore[arg-type]
         return
     row = (await session.exec(select(model).where(*where))).one_or_none()

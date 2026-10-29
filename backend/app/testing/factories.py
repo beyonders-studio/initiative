@@ -139,8 +139,7 @@ async def create_user(
     Args:
         session: Database session
         commit: Whether to commit the transaction (default True)
-        **overrides: Override any default field values. ``api_keys_allowed``
-            sets the member's ``api_keys`` rule instead.
+        **overrides: Override any default field values
 
     Returns:
         Created User instance
@@ -397,7 +396,8 @@ async def create_guild_membership(
         guild: Guild to add user to (will be created if not provided)
         role: Guild role for the user (default: member)
         commit: Whether to commit the transaction (default True)
-        **overrides: Override any default field values
+        **overrides: Override any default field values. ``api_keys_allowed``,
+            when given, sets the member's ``api_keys`` rule instead.
 
     Returns:
         Created GuildMembership instance
@@ -423,7 +423,7 @@ async def create_guild_membership(
         "position": 0,
     }
 
-    api_keys_allowed = overrides.pop("api_keys_allowed", True)
+    api_keys_allowed = overrides.pop("api_keys_allowed", None)
     membership_data = {**defaults, **overrides}
     # The creator already has one (``create_guild`` seats them), so asking for
     # theirs again says what role they should hold rather than adding a second
@@ -443,9 +443,11 @@ async def create_guild_membership(
     else:
         membership = GuildMembership(**membership_data)
     session.add(membership)
-    if not api_keys_allowed:
+    if api_keys_allowed is not None:
         await session.flush()
-        await rules.put(session, "api_keys", False, guild_id=guild.id, user_id=user.id)
+        await rules.put(
+            session, "api_keys", api_keys_allowed, guild_id=guild.id, user_id=user.id
+        )
 
     if commit:
         await session.commit()
