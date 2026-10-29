@@ -96,6 +96,7 @@ export const notificationLink = (notification: NotificationRead): string | null 
     // These hold ids and nothing else, so they address the `/go` resolver,
     // which reads the entity and works out where it lives.
     case "task_assignment":
+    case "task_reminder":
     case "case_opened":
     case "case_replied": {
       const taskId = Number(data.task_id);
@@ -439,6 +440,10 @@ export const notificationText = (
     case "event_reminder":
       return t("notifications.eventReminder", {
         eventTitle: data.event_title ?? t("notifications.plain.event"),
+      });
+    case "task_reminder":
+      return t("notifications.taskReminder", {
+        taskTitle: data.task_title ?? t("notifications.plain.task"),
       });
     // A request names what it is for — the thing, or for several files the
     // collection or wiki they are in — and a yes names what was shared.

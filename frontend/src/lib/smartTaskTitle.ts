@@ -9,31 +9,40 @@ import type {
   TaskCreate,
   TaskPriority,
   TaskRead,
+  TaskTypeRead,
   TaskUpdate,
 } from "@/api/generated/initiativeAPI.schemas";
 import { rulePayload, shiftFor, toRRule } from "@/lib/recurrence";
 import type { TitlePerson, TitleReading } from "@/lib/smartTitle";
+import { startedFrom } from "@/lib/taskTypeStart";
 
 /** What a title last set on a task being added, and what each field held
  *  before it did, which it goes back to when the words are taken out. */
 export interface Applied {
   title: string | null;
+  /** The task type's id. */
+  type: number | null;
   due: string | null;
   priority: TaskPriority | null;
   repeat: string | null;
   tags: number[];
   people: number[];
-  before: { due_date: string | null; priority: TaskPriority | null };
+  before: {
+    task_type: TaskTypeRead | null;
+    due_date: string | null;
+    priority: TaskPriority | null;
+  };
 }
 
 export const NOTHING_APPLIED: Applied = {
   title: null,
+  type: null,
   due: null,
   priority: null,
   repeat: null,
   tags: [],
   people: [],
-  before: { due_date: null, priority: null },
+  before: { task_type: null, due_date: null, priority: null },
 };
 
 const sameIds = (a: number[], b: number[]) =>
@@ -54,6 +63,8 @@ const assignee = (person: TitlePerson): TaskAssigneeSummary => ({
  * changed is touched, and only while it still holds what the title last set
  * there: one picked by hand since stays as picked, even once its words go.
  * The tags and people picked by hand stay beside the ones the title names.
+ * A type the title names brings what that type starts with, as picking it
+ * would; a priority the title also names is set over it.
  */
 export const readingEdit = (
   task: TaskRead,
@@ -69,6 +80,44 @@ export const readingEdit = (
     next.title = reading.title;
   }
 
+  // The task as the type leaves it, which the priority below is measured on.
+  let current = task;
+  const type = reading.type?.id ?? null;
+  if (type !== applied.type) {
+    if (applied.type === null) next.before.task_type = task.task_type;
+    const value = reading.type ?? next.before.task_type;
+    if (
+      value &&
+      value.id !== task.task_type_id &&
+      (applied.type === null || task.task_type_id === applied.type)
+    ) {
+      // A priority the title set is not what the type started with: the type
+      // moves the one it would go back to instead.
+      const titled = applied.priority !== null && task.priority === applied.priority;
+      const started = startedFrom(
+        { ...task, priority: titled ? (applied.before.priority ?? task.priority) : task.priority },
+        task.task_type,
+        value
+      );
+      patch.task_type_id = value.id;
+      shows.task_type_id = value.id;
+      shows.task_type = value;
+      if ("description" in started) {
+        patch.description = started.description;
+        shows.description = started.description;
+      }
+      if (started.priority) {
+        if (titled) next.before.priority = started.priority;
+        else {
+          patch.priority = started.priority;
+          shows.priority = started.priority;
+        }
+      }
+      current = { ...task, ...shows };
+    }
+    next.type = type;
+  }
+
   const due = reading.due?.toISOString() ?? null;
   if (due !== applied.due) {
     if (applied.due === null) next.before.due_date = task.due_date;
@@ -81,9 +130,9 @@ export const readingEdit = (
   }
 
   if (reading.priority !== applied.priority) {
-    if (applied.priority === null) next.before.priority = task.priority;
+    if (applied.priority === null) next.before.priority = current.priority;
     const value = reading.priority ?? next.before.priority;
-    if (value && (applied.priority === null || task.priority === applied.priority)) {
+    if (value && (applied.priority === null || current.priority === applied.priority)) {
       patch.priority = value;
       shows.priority = value;
     }
@@ -153,6 +202,7 @@ export const readingCreate = (
   const people = [...new Set([...assigneeIds, ...reading.people.map((person) => person.id)])];
   return {
     title: reading.title,
+    ...(reading.type ? { task_type_id: reading.type.id } : {}),
     ...(reading.due ? { due_date: reading.due.toISOString() } : {}),
     ...(reading.priority ? { priority: reading.priority } : {}),
     ...(reading.repeat

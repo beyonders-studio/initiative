@@ -1,6 +1,6 @@
 /**
  * What the reader keeps about items, one seam for all of it: their opens (the
- * header's tabs), their bookmarks and what they subscribe to.
+ * header's tabs), their bookmarks, what they subscribe to and their reminders.
  *
  * Tabs and bookmarks are lists of tools: `/me/personal-items?mark=…` across every
  * community, `/c/{id}/personal-items?mark=bookmark` for one community's sidebar and
@@ -23,6 +23,7 @@ import {
 } from "@/api/generated/initiativeAPI.schemas";
 import {
   bookmarkItem,
+  clearTaskReminder,
   clearView,
   getListMyPersonalItemsQueryKey,
   getListPersonalItemsQueryKey,
@@ -31,6 +32,7 @@ import {
   listPersonalItems,
   readPersonalItem,
   recordView,
+  setTaskReminder,
   subscribeItem,
   unbookmarkItem,
   unsubscribeItem,
@@ -392,5 +394,53 @@ export const useSubscription = (kind: ContentKind, entityId: number, communityId
     subscribed,
     ready: Boolean(data) && !toggle.isPending,
     toggle: () => toggle.mutate({ kind, entityId, next: !subscribed, communityId }),
+  };
+};
+
+/**
+ * The reader's own reminder of a task, and setting or clearing it: `remindAt`
+ * an instant, or null to take it off. The field moves at once and is put back
+ * if the write fails.
+ */
+export const useTaskReminder = (taskId: number, communityId?: number) => {
+  const active = useActiveCommunityId();
+  const id = communityId ?? active;
+  const qc = useQueryClient();
+  const { data } = useItemState("task", taskId, communityId);
+  const queryKey = getReadPersonalItemQueryKey(id, "task", taskId);
+  const mutation = useMutation({
+    mutationFn: async (remindAt: string | null) => {
+      if (remindAt) return setTaskReminder(id, taskId, { remind_at: remindAt });
+      await clearTaskReminder(id, taskId);
+      return null;
+    },
+    onMutate: async (remindAt) => {
+      await qc.cancelQueries({ queryKey });
+      const before = qc.getQueryData<PersonalItemState>(queryKey);
+      if (before) {
+        qc.setQueryData<PersonalItemState>(queryKey, {
+          ...before,
+          remind_at: remindAt,
+          reminded_at: null,
+        });
+      }
+      return { before };
+    },
+    onError: (_error, _remindAt, context) => {
+      if (context?.before) qc.setQueryData(queryKey, context.before);
+    },
+    onSuccess: (state) => {
+      if (state) qc.setQueryData(queryKey, state);
+    },
+    onSettled: () => {
+      void qc.invalidateQueries({ queryKey });
+    },
+  });
+  return {
+    remindAt: data?.remind_at ?? null,
+    remindedAt: data?.reminded_at ?? null,
+    ready: Boolean(data),
+    pending: mutation.isPending,
+    set: (remindAt: string | null) => mutation.mutate(remindAt),
   };
 };

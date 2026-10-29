@@ -145,6 +145,7 @@ export const TitleField = <I, P>({
   subscribe,
   marks,
   below,
+  trailing,
   mention,
 }: {
   id: string;
@@ -163,6 +164,8 @@ export const TitleField = <I, P>({
   marks?: readonly { start: number; end: number; className: string }[];
   /** Drawn under the title, inside its frame. */
   below?: ReactNode;
+  /** Drawn at the end of the title's first line, beside the field. */
+  trailing?: ReactNode;
   /** `@` offers these people, and writes the picked one's handle. */
   mention?: { members: MemberSearchScope; onPick?: (member: UserSummary) => void };
 }) => {
@@ -212,30 +215,34 @@ export const TitleField = <I, P>({
       className="grow basis-72"
     >
       <h1 className="sr-only">{value}</h1>
-      <div className="relative">
-        {marks?.length ? <TitleMarks text={draft.value} marks={marks} /> : null}
-        {/* One line of text that wraps, so a long title shows whole on a phone. */}
-        <Textarea
-          ref={box}
-          id={id}
-          rows={1}
-          aria-multiline="false"
-          value={draft.value}
-          onChange={(event) => {
-            const text = event.target.value.replace(/\s*[\r\n]+\s*/g, " ");
-            draft.change(text);
-            people.sync(event.target, text);
-          }}
-          {...people.handlers}
-          // A list open under the field takes Escape for itself.
-          data-picking={people.open || undefined}
-          placeholder={placeholder}
-          className={cn(
-            TITLE_TEXT,
-            "relative min-h-0 resize-none shadow-none focus-visible:ring-0"
-          )}
-        />
-        {people.popover}
+      <div className="flex items-start gap-1">
+        <div className="relative min-w-0 grow">
+          {marks?.length ? <TitleMarks text={draft.value} marks={marks} /> : null}
+          {/* One line of text that wraps, so a long title shows whole on a phone. */}
+          <Textarea
+            ref={box}
+            id={id}
+            rows={1}
+            aria-multiline="false"
+            value={draft.value}
+            onChange={(event) => {
+              const text = event.target.value.replace(/\s*[\r\n]+\s*/g, " ");
+              draft.change(text);
+              people.sync(event.target, text);
+            }}
+            {...people.handlers}
+            // A list open under the field takes Escape for itself.
+            data-picking={people.open || undefined}
+            placeholder={placeholder}
+            className={cn(
+              TITLE_TEXT,
+              "relative min-h-0 resize-none shadow-none focus-visible:ring-0"
+            )}
+          />
+          {people.popover}
+        </div>
+        {/* Centred on the first line of the title, as tall as it is set. */}
+        {trailing ? <div className="mt-1.5 shrink-0 sm:mt-2">{trailing}</div> : null}
       </div>
       {below}
     </FieldFrame>

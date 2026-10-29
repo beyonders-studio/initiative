@@ -469,6 +469,47 @@ describe("adding a task with its title read", () => {
     expect(item.priority).toBe("medium");
   });
 
+  it("sets the type a title starts with, and adds it without its name", async () => {
+    const plain = buildTaskType({ name: "Task" });
+    const bug = buildTaskType({ name: "Bug" });
+    server.use(
+      communityHttp.get("/projects/:id/task-types/", () => HttpResponse.json([plain, bug]))
+    );
+    const create = vi.fn(async () => ({ id: 5 }));
+    renderPage(() => <AddingTask types={[plain, bug]} create={create} />, reader);
+    const user = userEvent.setup();
+
+    await user.type(await screen.findByPlaceholderText(/task title/i), "bug: login broken");
+    const read = await screen.findByRole("list", { name: "Read from the title" });
+    await waitFor(() => expect(read).toHaveTextContent("Bug"));
+    await waitFor(() =>
+      expect(screen.getByRole("combobox", { name: "Type" })).toHaveTextContent("Bug")
+    );
+    await user.click(screen.getByRole("button", { name: "Create task" }));
+
+    await waitFor(() => expect(create).toHaveBeenCalled());
+    const { item, fields } = sent(create);
+    expect(fields.title).toBe("login broken");
+    expect(item.task_type_id).toBe(bug.id);
+  });
+
+  it("says what a title can say, on a pointer and on a tap", async () => {
+    renderPage(() => <AddingTask types={[buildTaskType()]} create={vi.fn()} />, reader);
+    const user = userEvent.setup();
+
+    const help = await screen.findByRole("button", { name: "What a title can say" });
+    await user.click(help);
+    expect(await screen.findByText("Type the details into the title")).toBeInTheDocument();
+    expect(screen.getByText("bug:")).toBeInTheDocument();
+    // A tap on it again closes it.
+    await user.pointer({ keys: "[TouchA]", target: help });
+    await waitFor(() =>
+      expect(screen.queryByText("Type the details into the title")).not.toBeInTheDocument()
+    );
+    await user.pointer({ keys: "[TouchA]", target: help });
+    expect(await screen.findByText("Type the details into the title")).toBeInTheDocument();
+  });
+
   it("adds the title as typed where the reader has it off", async () => {
     const create = vi.fn(async () => ({ id: 5 }));
     renderPage(() => <AddingTask types={[buildTaskType()]} create={create} />, asTyped);
@@ -476,6 +517,7 @@ describe("adding a task with its title read", () => {
 
     await user.type(await screen.findByPlaceholderText(/task title/i), "Fix the login !urgent");
     expect(screen.queryByRole("list", { name: "Read from the title" })).not.toBeInTheDocument();
+    expect(screen.queryByRole("button", { name: "What a title can say" })).not.toBeInTheDocument();
     await user.click(screen.getByRole("button", { name: "Create task" }));
 
     await waitFor(() => expect(create).toHaveBeenCalled());

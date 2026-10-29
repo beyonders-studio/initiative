@@ -312,6 +312,7 @@
     "eventCancelled": "{{canceller}} hat {{eventTitle}} abgesagt.",
     "eventRsvp": "{{responder}} hat mit {{status}} auf {{eventTitle}} geantwortet.",
     "eventReminder": "{{eventTitle}} steht bald an.",
+    "taskReminder": "Erinnerung: {{taskTitle}}",
     "accessLevelRead": "schreibgeschützt",
     "accessLevelReadWrite": "Lesen und Schreiben",
     "usernameChanged": "Ein Moderator hat deinen Benutzernamen geändert. Du warst {{previousHandle}}.",

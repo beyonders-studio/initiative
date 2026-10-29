@@ -407,7 +407,7 @@
     "categoryDescriptions": {
       "mentions": "Somebody named you, replied to you or reacted to your comment.",
       "assignments": "You were given a task or invited to something, or what you're on changed, was cancelled or is about to start.",
-      "subscriptions": "Changes, comments and reactions on what you follow, which includes what you made. The bell on anything stops it.",
+      "subscriptions": "Changes, comments and reactions on what you follow, which includes what you made, and the reminders you set on tasks. The bell on anything stops its changes.",
       "news": "A post went up, you were added to an initiative or a project, or your request to join was answered.",
       "approvals": "Somebody is waiting on your decision. Always shows in the bell.",
       "moderation": "A community's moderators took down or warned you about something you wrote. Always shows in the bell.",

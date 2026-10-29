@@ -3,7 +3,9 @@ import path from "node:path";
 
 import { describe, expect, it } from "vitest";
 
+import { buildTaskType } from "@/__tests__/factories";
 import type { TagSummary } from "@/api/generated/initiativeAPI.schemas";
+import { HINTS } from "@/components/tasks/SmartTitleHints";
 import { fromStored, isValidTaskRecurrence, shiftFor, toRRule } from "@/lib/recurrence";
 
 import {
@@ -42,11 +44,16 @@ const person = (id: number, username: string, discriminator = 1): TitlePerson =>
 const ME = person(1, "jordan");
 const SAM = person(2, "sam");
 
+const BUG = buildTaskType({ id: 30, name: "Bug" });
+const STORY = buildTaskType({ id: 31, name: "User story" });
+const MILESTONE = buildTaskType({ id: 32, name: "Étape" });
+
 const context = (overrides: Partial<TitleContext> = {}): TitleContext => ({
   now: NOW,
   words: EN,
   weekStartsOn: 1,
   tags: [tag(10, "billing"), tag(11, "Bug fix"), tag(12, "bug")],
+  types: [BUG, STORY, MILESTONE],
   people: [SAM],
   me: ME,
   ...overrides,
@@ -206,6 +213,79 @@ describe("readTitle — tags and people", () => {
       "sam#0042",
     ]);
   });
+});
+
+describe("readTitle — task types", () => {
+  it("reads the type a title starts with, by its whole name", () => {
+    const reading = read("Bug: login broken");
+    expect(reading.type?.id).toBe(BUG.id);
+    expect(reading.title).toBe("login broken");
+    expect(reading.parts).toEqual([
+      { type: "type", start: 0, end: 4, text: "Bug:", key: "type:bug:", id: BUG.id },
+    ]);
+  });
+
+  it("reads a name of several words, whatever its case and accents", () => {
+    expect(read("user  STORY: Sign in with a passkey").type?.id).toBe(STORY.id);
+    expect(read("etape: Ship v2 friday").type?.id).toBe(MILESTONE.id);
+    expect(read("etape: Ship v2 friday").title).toBe("Ship v2");
+    expect(read("  bug: spaced in").title).toBe("spaced in");
+  });
+
+  it("reads it only at the very start, straight before a colon", () => {
+    expect(read("Fix bug: login").type).toBeNull();
+    expect(read("bug : login").type).toBeNull();
+    expect(read("bug:login").type).toBeNull();
+    expect(read("Meeting at 15:00").type).toBeNull();
+    expect(read("Bug report: draft").type).toBeNull();
+  });
+
+  it("leaves a name the project has no type of, and a type with nothing after it", () => {
+    expect(read("Note: buy milk").title).toBe("Note: buy milk");
+    const alone = read("bug:");
+    expect(alone.type).toBeNull();
+    expect(alone.title).toBe("bug:");
+  });
+
+  it("reads the rest of the title after it", () => {
+    const reading = read("bug: login broken tomorrow !high #billing");
+    expect(reading.type?.id).toBe(BUG.id);
+    expect(reading.priority).toBe("high");
+    expect(reading.tags.map((each) => each.id)).toEqual([10]);
+    expect(reading.title).toBe("login broken");
+  });
+
+  it("keeps a type kept as typed", () => {
+    const kept = new Set(read("bug: login").parts.map((part) => part.key));
+    const reading = read("bug: login", { kept });
+    expect(reading.type).toBeNull();
+    expect(reading.title).toBe("bug: login");
+  });
+});
+
+describe("the hints' examples", () => {
+  for (const locale of ["en", "de", "es", "fr"]) {
+    it(`reads every example the ${locale} hints give`, () => {
+      const { smartTitle } = catalogue(locale);
+      const examples = (key: string) => (smartTitle.hints[key].examples as string).split("|");
+      const words = wordsFor(locale);
+      const tags = examples("tags").map((each, index) => tag(100 + index, each.slice(1)));
+      const types = examples("type").map((each, index) =>
+        buildTaskType({ id: 200 + index, name: each.slice(0, -1) })
+      );
+      for (const { key, type } of HINTS) {
+        for (const example of examples(key)) {
+          const text = type === "type" ? `${example} Task` : `Task ${example}`;
+          const reading = read(text, { words, tags, types });
+          expect(
+            reading.parts.map((part) => part.type),
+            `${locale} ${key}: ${example}`
+          ).toEqual([type]);
+          expect(reading.title, `${locale} ${key}: ${example}`).toBe("Task");
+        }
+      }
+    });
+  }
 });
 
 describe("readTitle — repeats", () => {

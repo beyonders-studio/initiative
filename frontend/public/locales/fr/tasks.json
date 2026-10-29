@@ -243,6 +243,42 @@
     "due": "Échéance {{when}}",
     "priority": "Priorité {{priority}}",
     "keep": "Garder « {{text}} » dans le titre",
+    "hints": {
+      "button": "Ce qu’un titre peut dire",
+      "title": "Tapez les détails dans le titre",
+      "dates": {
+        "label": "Dates",
+        "examples": "vendredi|semaine prochaine|dans 3 jours|le 3 novembre"
+      },
+      "times": {
+        "label": "Heures",
+        "examples": "à 17h|demain à 9h30"
+      },
+      "repeats": {
+        "label": "Répétitions",
+        "examples": "chaque semaine|chaque lundi|chaque! 2 jours",
+        "note": "Avec « chaque! », la suivante compte à partir du moment où la précédente est faite."
+      },
+      "priority": {
+        "label": "Priorité",
+        "examples": "!haute|!1",
+        "note": "!1 est urgente, jusqu’à !4 pour faible."
+      },
+      "tags": {
+        "label": "Étiquettes",
+        "examples": "#facturation"
+      },
+      "people": {
+        "label": "Personnes",
+        "examples": "@sam|@moi"
+      },
+      "type": {
+        "label": "Type de tâche",
+        "examples": "bug:|jalon:",
+        "note": "Tout au début, l’un des types du projet."
+      },
+      "footer": "Chacun est retiré du titre et appliqué à la tâche. Retirez sa pastille pour garder les mots tels que tapés."
+    },
     "words": {
       "today": "aujourd'hui",
       "tomorrow": "demain",
@@ -282,5 +318,13 @@
       "until": "jusqu'au|jusqu'à",
       "times": "fois"
     }
+  },
+  "reminder": {
+    "label": "Me le rappeler",
+    "placeholder": "Aucun rappel",
+    "clear": "Aucun rappel",
+    "private": "Le rappel n’est que pour vous.",
+    "repeats": "À chaque répétition, le rappel suit la date d’échéance.",
+    "sent": "Rappel envoyé."
   }
 }
