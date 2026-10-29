@@ -444,7 +444,12 @@ async def reschedule_hourly(
             if task.start_date is not None:
                 task.start_date = moved_with(task.start_date, due, minimum)
             await personal_items.move_reminders(
-                session, series=task.series_id or task.id, from_task=task.id, due=due
+                session,
+                series=task.series_id or task.id,
+                from_task=task.id,
+                to_task=task.id,
+                due=due,
+                next_due=minimum,
             )
         else:
             task.start_date = None
@@ -606,7 +611,12 @@ async def _next_task(
         )
     if due is not None:
         await personal_items.move_reminders(
-            session, series=task.series_id, from_task=task.id, due=due
+            session,
+            series=task.series_id,
+            from_task=task.id,
+            to_task=following.id,
+            due=due,
+            next_due=dates[1],
         )
     if "tag_ids" in values:
         await retag(session, following.id, values["tag_ids"])
