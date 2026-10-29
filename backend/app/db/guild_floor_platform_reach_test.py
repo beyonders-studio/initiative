@@ -54,7 +54,7 @@ GUILD_KEYED = {
     "guild_memberships": "guild_id",
     "guild_administration": "guild_id",
     "guild_images": "guild_id",
-    "guild_auth_policies": "guild_id",
+    "community_rules": "guild_id",
     "guild_provider_connections": "guild_id",
 }
 
@@ -91,7 +91,7 @@ async def _two_guilds(session):
     # to: the pictures are written the way the system engine writes them.
     await set_rls_context(session, Unattributed())
     for guild in (one, two):
-        await create_guild_auth_policy(session, guild, provider, policy="open")
+        await create_guild_auth_policy(session, guild, provider, guest=True)
         data = f"icon-{guild.id}".encode()
         await session.exec(
             text(

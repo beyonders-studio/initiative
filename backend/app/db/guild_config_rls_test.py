@@ -10,12 +10,12 @@ policies allow.
 from __future__ import annotations
 
 import pytest
-from sqlalchemy import update
+from sqlalchemy import delete
 from sqlalchemy.exc import DBAPIError
 from sqlmodel import select
 
 from app.models.platform.guild import GuildInvite, CommunityRole
-from app.models.platform.guild_auth_policy import GuildAuthPolicy
+from app.models.platform.rule import CommunityRule
 from app.models.platform.user import UserRole
 from app.testing import (
     create_access_grant,
@@ -116,14 +116,19 @@ async def test_a_settings_grant_beside_read_write_writes_an_invite(
     assert await _invite_exists(session, "by-the-pair")
 
 
+#: The members' sign-in requirement, which is a row only where it asks something.
+_REQUIREMENT = (CommunityRule.key == "auth_policy", CommunityRule.user_id.is_(None))
+
+
 async def _sign_in_rule(session, guild_id: int) -> str:
-    row = (
+    asks = (
         await session.exec(
-            select(GuildAuthPolicy).where(GuildAuthPolicy.guild_id == guild_id)
+            select(CommunityRule.id).where(
+                CommunityRule.guild_id == guild_id, *_REQUIREMENT
+            )
         )
-    ).one()
-    await session.refresh(row)
-    return row.policy
+    ).first()
+    return "open" if asks is None else "required"
 
 
 async def _seat_session(role_session, *, user_id: int, guild_id: int):
@@ -152,11 +157,9 @@ async def test_a_lent_seat_changes_the_sign_in_rule_only_beside_read_write(
     )
 
     s = await _seat_session(role_session, user_id=support.id, guild_id=a.guild.id)
-    assert (await s.exec(select(GuildAuthPolicy.policy))).one() == before
+    assert (await s.exec(select(CommunityRule.id).where(*_REQUIREMENT))).first()
     await s.exec(
-        update(GuildAuthPolicy)
-        .where(GuildAuthPolicy.guild_id == a.guild.id)
-        .values(policy="open")
+        delete(CommunityRule).where(CommunityRule.guild_id == a.guild.id, *_REQUIREMENT)
     )
     await s.commit()
     assert await _sign_in_rule(session, a.guild.id) == before
@@ -166,9 +169,7 @@ async def test_a_lent_seat_changes_the_sign_in_rule_only_beside_read_write(
     )
     s = await _seat_session(role_session, user_id=support.id, guild_id=a.guild.id)
     await s.exec(
-        update(GuildAuthPolicy)
-        .where(GuildAuthPolicy.guild_id == a.guild.id)
-        .values(policy="open")
+        delete(CommunityRule).where(CommunityRule.guild_id == a.guild.id, *_REQUIREMENT)
     )
     await s.commit()
     assert await _sign_in_rule(session, a.guild.id) == "open"

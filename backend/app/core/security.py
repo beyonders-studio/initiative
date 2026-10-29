@@ -306,7 +306,7 @@ AUTH_ACCESS_AUDIENCE = "initiative:access"
 #: and ``AuthMessages``/``errors.json`` carry what a person reads.
 #:
 #: RFC 9470 also defines ``acr_values`` and ``max_age``, both optional and both
-#: absent here. ``guild_auth_policies`` names a provider and nothing about
+#: absent here. A community's sign-in requirement names a provider and nothing about
 #: assurance or freshness, so there is no value to put in either; they arrive
 #: with the columns that hold one (phases E and C2b).
 STEP_UP_CHALLENGE = 'Bearer error="insufficient_user_authentication"'

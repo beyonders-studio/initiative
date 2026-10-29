@@ -17,7 +17,6 @@ from sqlmodel.ext.asyncio.session import AsyncSession
 from app.api.v1.platform_endpoints.auth_test import _wire_fake_idp
 from app.models.platform.auth_session import AuthSession
 from app.models.platform.guild import GuildMembership, CommunityRole
-from app.models.platform.guild_auth_policy import GuildAuthPolicy
 from app.testing.factories import (
     guild_administration,
     create_auth_provider,
@@ -31,6 +30,9 @@ from app.testing.factories import (
 )
 from app.testing.factories import NARROWED_CLAIM, NARROWED_VALUE
 from app.testing.oidc import ISSUER as OIDC_ISSUER, FakeIdp, mint_id_token
+from app.core.login_methods import LoginMethod
+from app.core.rules import SignInRequirement
+from app.services.platform import rules
 
 
 # ── Arriving ───────────────────────────────────────────────────────────────
@@ -357,8 +359,11 @@ async def test_any_of_ours_is_answered_by_the_connections(
     ours = await create_auth_provider(session, slug="corp")
     await create_guild_provider_connection(session, guild=guild, provider=ours)
     theirs = await create_auth_provider(session, slug="other-corp")
-    session.add(
-        GuildAuthPolicy(guild_id=guild.id, policy="required", require_methods=["sso"])
+    await rules.put(
+        session,
+        "auth_policy",
+        SignInRequirement("required", None, frozenset({LoginMethod.sso})),
+        guild_id=guild.id,
     )
     await session.commit()
 

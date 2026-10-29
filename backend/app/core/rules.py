@@ -24,6 +24,7 @@ from dataclasses import dataclass
 from enum import Enum
 
 from app.core.guild_auth_options import CommunityAuthOption
+from app.core.login_methods import LoginMethod
 
 
 class Slot(str, Enum):
@@ -33,6 +34,19 @@ class Slot(str, Enum):
     enabled = "enabled"
     #: A figure: hours, minutes, days.
     amount = "amount"
+    #: A sign-in requirement: the methods it asks for, and beside them the
+    #: provider it names, if any.
+    methods = "methods"
+
+
+@dataclass(frozen=True)
+class SignInRequirement:
+    """A community's sign-in requirement: ``open``, or ``required`` naming a
+    provider its members arrive through, methods they must use, or both."""
+
+    policy: str = "open"
+    provider_id: int | None = None
+    methods: frozenset[LoginMethod] = frozenset()
 
 
 @dataclass(frozen=True)
@@ -41,7 +55,7 @@ class StoredRule:
     slot: Slot
     #: What the rule says while no row does. Also its loosest value: every rule
     #: here starts out asking nothing.
-    default: bool | int | None
+    default: bool | int | SignInRequirement | None
     #: The option a community must hold for its value to apply, and to tighten
     #: it. Withdrawing the option stops the rule and leaves its row, so it
     #: applies again when the option comes back.
@@ -96,4 +110,11 @@ COMMUNITY_RULES: dict[str, StoredRule] = _catalog(
     # Whether a member's personal API keys reach the community. The seat sets
     # it member by member.
     StoredRule("api_keys", _ON, True, _RESTRICTIONS),
+    # What reaching the community asks of its members, and of its guests.
+    # Tightening one needs ``providers``. The provider or single sign-on it
+    # names applies whatever the community holds, and the second factor it
+    # asks for only while it holds ``providers``: the gate asks that part by
+    # part, so these carry no option of their own.
+    StoredRule("auth_policy", Slot.methods, SignInRequirement()),
+    StoredRule("guest_auth_policy", Slot.methods, SignInRequirement()),
 )

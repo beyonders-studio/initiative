@@ -16,7 +16,6 @@ from sqlmodel.ext.asyncio.session import AsyncSession
 from app.core.audit_events import AuditEventType
 from app.core.login_methods import LoginMethod, SecondFactorRequirement
 from app.core.security import AUTH_POLICY_UNMET_HEADER
-from app.models.platform.guild_auth_policy import GuildAuthPolicy
 from app.models.platform.user import UserRole
 from app.services.platform import app_settings as app_settings_service
 from app.core import rules as rule_catalog
@@ -56,25 +55,6 @@ async def _put(session: AsyncSession, guild_id: int | None, key: str, value: Any
         if key == "login_methods":
             value = sorted(m.value for m in value)
         await _settings(session, **{key: value})
-    elif key == "auth_policy":
-        session.add(
-            GuildAuthPolicy(
-                guild_id=guild_id,
-                policy=value.policy,
-                require_methods=sorted(m.value for m in value.methods),
-            )
-        )
-        await session.commit()
-    elif key == "guest_auth_policy":
-        session.add(
-            GuildAuthPolicy(
-                guild_id=guild_id,
-                policy="open",
-                guest_policy=value.policy,
-                guest_require_methods=sorted(m.value for m in value.methods),
-            )
-        )
-        await session.commit()
 
 
 @dataclass(frozen=True)

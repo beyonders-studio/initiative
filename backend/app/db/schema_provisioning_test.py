@@ -255,10 +255,10 @@ async def test_the_seat_role_is_the_guild_role_plus_the_communitys_own_settings(
                 assert (
                     await conn.scalar(
                         text("SELECT has_table_privilege(:r, :t, :p)"),
-                        {"r": seat, "t": "public.guild_auth_policies", "p": verb},
+                        {"r": seat, "t": "public.community_rules", "p": verb},
                     )
                     is True
-                ), f"the seat role must hold {verb} on guild_auth_policies"
+                ), f"the seat role must hold {verb} on community_rules"
                 # The community's own role reaches its content as before, and
                 # the seat role inherits that reach.
                 assert (
@@ -273,10 +273,10 @@ async def test_the_seat_role_is_the_guild_role_plus_the_communitys_own_settings(
                 assert (
                     await conn.scalar(
                         text("SELECT has_table_privilege(:r, :t, :p)"),
-                        {"r": role, "t": "public.guild_auth_policies", "p": verb},
+                        {"r": role, "t": "public.community_rules", "p": verb},
                     )
                     is False
-                ), f"the guild role must not hold {verb} on guild_auth_policies"
+                ), f"the guild role must not hold {verb} on community_rules"
     finally:
         async with engine.begin() as conn:
             await drop_guild_schema(conn, gid)

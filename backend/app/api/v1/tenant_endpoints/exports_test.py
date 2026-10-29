@@ -29,6 +29,7 @@ from sqlmodel import select
 from app.api import deps as api_deps
 from app.core.config import settings
 from app.core.relationships import RelationshipType
+from app.core.login_methods import LoginMethod
 from app.core.search import SearchEntityType
 from app.core.tools import Tool
 from app.core.user_display import handle_of
@@ -68,6 +69,7 @@ from app.testing.factories import (
     create_queue_item,
     create_relationship,
     create_tag,
+    create_guild_auth_policy,
     create_task,
     create_tool_entity,
     create_upload,
@@ -3434,6 +3436,10 @@ async def test_guild_backup_carries_the_community_itself(
         guild_role=CommunityRole.superadmin, initiative=True, project=True
     )
     await create_tag(session, a.guild, name="worldbuilding", color="#ff0000")
+    # The guests' requirement, which leaves the member exporting unasked.
+    await create_guild_auth_policy(
+        session, a.guild, guest=True, methods=[LoginMethod.sso]
+    )
 
     resp = await _export(client, a, "community")
     archive = await _rendered_zip(client, a, monkeypatch, role_session, resp)
@@ -3443,6 +3449,12 @@ async def test_guild_backup_carries_the_community_itself(
     settings_payload = json.loads(archive.read("guild/settings.json"))
     assert settings_payload["type"] == "guild-settings"
     assert settings_payload["name"] == a.guild.name
+    assert settings_payload["guest_auth_policy"] == {
+        "policy": "required",
+        "provider_id": None,
+        "require_methods": ["sso"],
+    }
+    assert settings_payload["auth_policy"]["policy"] == "open"
 
     tags = json.loads(archive.read("guild/tags.json"))["tags"]
     # The colour is the point: envelopes reference tags by name alone, so the

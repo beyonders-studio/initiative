@@ -16,10 +16,27 @@ from sqlalchemy import (
     String,
     UniqueConstraint,
 )
+from sqlalchemy.dialects.postgresql import ARRAY, ENUM as PGEnum
 from sqlmodel import Field, SQLModel
+
+from app.core.login_methods import LoginMethod
 
 #: A row holds its value in exactly one slot; ``app.core.rules`` says which.
 _ONE_SLOT = "num_nonnulls(enabled, amount) = 1"
+#: A community's may also hold a sign-in requirement: its methods, and beside
+#: them, only there, the provider it names.
+_ONE_COMMUNITY_SLOT = (
+    "num_nonnulls(enabled, amount, methods) = 1"
+    " AND (provider_id IS NULL OR methods IS NOT NULL)"
+)
+#: A sign-in requirement asks for something, and never for a password or an
+#: emailed code: whether those exist is the deployment's question.
+_REQUIREMENT = (
+    "methods IS NULL OR ("
+    "NOT ('password'::login_method = ANY (methods))"
+    " AND NOT ('email_otp'::login_method = ANY (methods))"
+    " AND (provider_id IS NOT NULL OR cardinality(methods) > 0))"
+)
 
 
 def _updated_at() -> Column:
@@ -58,7 +75,8 @@ class CommunityRule(SQLModel, table=True):
 
     __tablename__ = "community_rules"
     __table_args__ = (
-        CheckConstraint(_ONE_SLOT, name="ck_community_rules_one_slot"),
+        CheckConstraint(_ONE_COMMUNITY_SLOT, name="ck_community_rules_one_slot"),
+        CheckConstraint(_REQUIREMENT, name="ck_community_rules_requirement"),
         ForeignKeyConstraint(
             ["guild_id", "user_id"],
             ["guild_memberships.guild_id", "guild_memberships.user_id"],
@@ -92,6 +110,23 @@ class CommunityRule(SQLModel, table=True):
     )
     amount: Optional[int] = Field(
         default=None, sa_column=Column(Integer, nullable=True)
+    )
+    methods: Optional[list[str]] = Field(
+        default=None,
+        sa_column=Column(
+            ARRAY(PGEnum(LoginMethod, name="login_method", create_type=False)),
+            nullable=True,
+        ),
+    )
+    #: RESTRICT: deleting a provider a community requires must surface the
+    #: conflict, never silently reopen the community.
+    provider_id: Optional[int] = Field(
+        default=None,
+        sa_column=Column(
+            Integer,
+            ForeignKey("auth_providers.id", ondelete="RESTRICT"),
+            nullable=True,
+        ),
     )
     updated_at: datetime = Field(
         default_factory=lambda: datetime.now(timezone.utc), sa_column=_updated_at()

@@ -79,6 +79,7 @@ async def _build_settings(ctx: SectionContext) -> tuple[dict[str, Any], int] | N
     plus the guild-level flags that live on the ``guilds`` row itself."""
     from sqlmodel import select
 
+    from app.core.rules import SignInRequirement
     from app.models.platform.guild import Guild
     from app.models.tenant.guild_setting import GuildSetting
     from app.services.platform import rules
@@ -99,8 +100,18 @@ async def _build_settings(ctx: SectionContext) -> tuple[dict[str, Any], int] | N
         "categories": list(guild.categories or []),
         "location": guild.location,
         "has_adult_content": guild.has_adult_content,
-        # Every rule the community keeps, as it wrote them.
-        **stored,
+        # Every rule the community keeps, as it wrote them; a sign-in
+        # requirement in the shape the settings page reads it.
+        **{
+            key: {
+                "policy": value.policy,
+                "provider_id": value.provider_id,
+                "require_methods": sorted(m.value for m in value.methods),
+            }
+            if isinstance(value, SignInRequirement)
+            else value
+            for key, value in stored.items()
+        },
         "banner": dict(guild.banner or {}),
         "retention_days": setting.retention_days if setting else None,
     }

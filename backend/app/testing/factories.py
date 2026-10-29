@@ -21,7 +21,7 @@ import functools
 import json
 import uuid
 from datetime import datetime, timedelta, timezone
-from typing import Any, Sequence
+from typing import Any, Iterable, Sequence
 
 from cryptography.hazmat.primitives import serialization
 from cryptography.hazmat.primitives.asymmetric import ed25519
@@ -102,7 +102,8 @@ from app.models.tenant.import_job import ImportJob
 from app.models.platform.auth_provider import AuthProvider, AuthProviderKind
 from app.models.platform.guild_provider_connection import GuildProviderConnection
 from app.models.platform.federated_identity import FederatedIdentity
-from app.models.platform.guild_auth_policy import GuildAuthPolicy
+from app.core.login_methods import LoginMethod
+from app.core.rules import SignInRequirement
 from app.models.platform.user import User, UserRole, UserStatus
 from app.services.auth.platform_provider import PLATFORM_OIDC_SLUG
 from app.core import usernames
@@ -2405,47 +2406,45 @@ async def create_guild_provider_connection(
 async def create_guild_auth_policy(
     session: AsyncSession,
     guild: "Guild",
-    provider: "AuthProvider",
+    provider: "AuthProvider | None" = None,
     *,
     commit: bool = True,
-    **overrides: Any,
-) -> GuildAuthPolicy:
-    """Make ``guild`` require a sign-in through ``provider``.
+    guest: bool = False,
+    methods: Iterable[LoginMethod] = (),
+) -> SignInRequirement:
+    """Make ``guild`` require a sign-in of its members or, with ``guest``, of
+    its guests: through ``provider``, by ``methods``, or both.
 
     Connects the community to the provider first where it is not connected
     already: the endpoint refuses a requirement naming a provider the
     community does not count as its own, and the gate answers the same way, so
-    a policy without a connection is a state production cannot reach.
-
-    ``provider_slug`` is denormalised onto the row in production so a step-up
-    response can name the provider without a registry read; this keeps the two
-    in step the same way.
+    a requirement without a connection is a state production cannot reach.
     """
-    connected = (
-        await session.exec(
-            select(GuildProviderConnection).where(
-                GuildProviderConnection.guild_id == guild.id,
-                GuildProviderConnection.provider_id == provider.id,
+    if provider is not None:
+        connected = (
+            await session.exec(
+                select(GuildProviderConnection).where(
+                    GuildProviderConnection.guild_id == guild.id,
+                    GuildProviderConnection.provider_id == provider.id,
+                )
             )
-        )
-    ).first()
-    if connected is None:
-        await create_guild_provider_connection(
-            session, guild=guild, provider=provider, commit=commit
-        )
-
-    defaults = {
-        "guild_id": guild.id,
-        "policy": "required",
-        "provider_id": provider.id,
-        "provider_slug": provider.slug,
-    }
-    policy = GuildAuthPolicy(**{**defaults, **overrides})
-    session.add(policy)
+        ).first()
+        if connected is None:
+            await create_guild_provider_connection(
+                session, guild=guild, provider=provider, commit=commit
+            )
+    requirement = SignInRequirement(
+        "required", provider.id if provider else None, frozenset(methods)
+    )
+    await rules.put(
+        session,
+        "guest_auth_policy" if guest else "auth_policy",
+        requirement,
+        guild_id=guild.id,
+    )
     if commit:
         await session.commit()
-        await session.refresh(policy)
-    return policy
+    return requirement
 
 
 async def create_federated_identity(

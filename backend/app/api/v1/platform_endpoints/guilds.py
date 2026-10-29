@@ -107,7 +107,7 @@ from app.schemas.platform.guild import (
     MemberDisplayNameUpdate,
 )
 from app.models.platform.auth_provider import AuthProvider
-from app.models.platform.guild_auth_policy import GuildAuthPolicy, SignInHalf
+from app.core.rules import SignInRequirement
 from app.core.guild_auth_options import CommunityAuthOption, effective_options
 from app.services.platform import app_settings as app_settings_service
 from app.services.platform import auth_posture
@@ -1124,21 +1124,21 @@ async def read_community_billing_summary(
 
 
 def _auth_policy_read(
-    half: SignInHalf | None,
-    provider_display_name: str | None = None,
+    requirement: SignInRequirement,
+    provider: AuthProvider | None = None,
     *,
     factor_required_by_platform: bool = False,
 ) -> CommunityAuthPolicyRead:
-    if half is None or half.policy == "open":
+    if requirement.policy == "open":
         return CommunityAuthPolicyRead(
             policy="open", factor_required_by_platform=factor_required_by_platform
         )
     return CommunityAuthPolicyRead(
         policy="required",
-        provider_id=half.provider_id,
-        provider_slug=half.provider_slug,
-        provider_display_name=provider_display_name,
-        require_methods=list(half.require_methods),
+        provider_id=requirement.provider_id,
+        provider_slug=provider.slug if provider else None,
+        provider_display_name=provider.display_name if provider else None,
+        require_methods=sorted(m.value for m in requirement.methods),
         factor_required_by_platform=factor_required_by_platform,
     )
 
@@ -1178,7 +1178,14 @@ async def _auth_settings_response(
         guest_auth_policy=await _auth_policy_response(
             system_session, guild_id, guest=True
         ),
-        **community,
+        # The seat's switches and limits, as it wrote them. Its sign-in
+        # requirements are read above, with the providers they name.
+        **{
+            key: value
+            for key, value in community.items()
+            if key in CommunityAuthSettingsRead.model_fields
+            and key not in ("auth_policy", "guest_auth_policy")
+        },
         push_allowed_by_platform=platform["push_notifications_enabled"],
         email_allowed_by_platform=platform["email_notifications_enabled"],
         redacted_by_platform=platform["redact_notification_content"],
@@ -1201,15 +1208,20 @@ async def get_community_auth_settings(
 async def _auth_policy_response(
     system_session: AsyncSession, guild_id: int, *, guest: bool = False
 ) -> CommunityAuthPolicyRead:
-    policy_row = await system_session.get(GuildAuthPolicy, guild_id)
-    half = policy_row.half(guest) if policy_row is not None else None
-    display_name = None
-    if half is not None and half.provider_id is not None:
-        provider = await system_session.get(AuthProvider, half.provider_id)
-        display_name = provider.display_name if provider else None
+    requirement = await rules.community_value(
+        system_session,
+        guild_id,
+        "guest_auth_policy" if guest else "auth_policy",
+        applied=False,
+    )
+    provider = (
+        await system_session.get(AuthProvider, requirement.provider_id)
+        if requirement.provider_id is not None
+        else None
+    )
     return _auth_policy_read(
-        half,
-        display_name,
+        requirement,
+        provider,
         factor_required_by_platform=await _platform_asks_everyone(system_session),
     )
 

@@ -21,7 +21,14 @@ from sqlalchemy.sql.elements import ColumnElement
 from sqlmodel import delete, select
 from sqlmodel.ext.asyncio.session import AsyncSession
 
-from app.core.rules import COMMUNITY_RULES, PLATFORM_RULES, Slot, StoredRule
+from app.core.login_methods import LoginMethod
+from app.core.rules import (
+    COMMUNITY_RULES,
+    PLATFORM_RULES,
+    SignInRequirement,
+    Slot,
+    StoredRule,
+)
 from app.models.platform.rule import CommunityRule, PlatformRule
 from app.services.platform import guild_entitlements
 
@@ -29,7 +36,24 @@ Values = dict[str, Any]
 
 
 def _value(rule: StoredRule, row: PlatformRule | CommunityRule) -> Any:
+    if rule.slot is Slot.methods:
+        assert isinstance(row, CommunityRule)
+        return SignInRequirement(
+            "required",
+            row.provider_id,
+            frozenset(LoginMethod(m) for m in row.methods or ()),
+        )
     return getattr(row, rule.slot.value)
+
+
+def _slots(rule: StoredRule, value: Any) -> dict[str, Any]:
+    """The columns a row of ``rule`` holding ``value`` sets."""
+    if rule.slot is Slot.methods:
+        return {
+            "methods": sorted(m.value for m in value.methods),
+            "provider_id": value.provider_id,
+        }
+    return {rule.slot.value: value}
 
 
 async def platform_values(session: AsyncSession) -> Values:
@@ -175,6 +199,8 @@ async def put(
             if guild_id is None
             else CommunityRule(guild_id=guild_id, key=key, user_id=user_id)
         )
-    for slot in Slot:
-        setattr(row, slot.value, value if slot is rule.slot else None)
+    held = _slots(rule, value)
+    for column in ("enabled", "amount", "methods", "provider_id"):
+        if hasattr(row, column):
+            setattr(row, column, held.get(column))
     session.add(row)
