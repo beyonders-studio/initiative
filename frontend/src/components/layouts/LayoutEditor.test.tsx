@@ -110,6 +110,26 @@ const firePointer = (
 };
 
 const outline = () => screen.findByRole("navigation", { name: /outline/i });
+
+/** A plug-in placed on the initiative's tasks, with a field of its own. */
+const ciPlugin = communityHttp.get("/plugins/", () =>
+  HttpResponse.json({
+    items: [
+      {
+        id: 3,
+        name: "CI",
+        enabled: true,
+        definition: {
+          fields: [{ key: "ci.state", name: { en: "Build" }, kind: "badge", on: ["task"] }],
+        },
+        item_initiatives: [1],
+        item_fields: ["ci.state"],
+        item_parts: [],
+        item_actions: [],
+      },
+    ],
+  })
+);
 const canvas = () => screen.findByRole("region", { name: /preview/i });
 
 beforeEach(() => {
@@ -164,6 +184,8 @@ describe("LayoutEditor", () => {
   it("takes a field off the card at once, and stores it only on Save", async () => {
     const { user } = editor("board");
     expect(await within(await canvas()).findByText(/priority: medium/i)).toBeInTheDocument();
+    // A card requires nothing: only an item's page does.
+    expect(within(await outline()).queryByRole("button", { name: /required/i })).toBeNull();
 
     await user.click(within(await outline()).getByRole("button", { name: /hide priority/i }));
 
@@ -393,30 +415,12 @@ describe("LayoutEditor", () => {
   });
 
   it("shows a placed plug-in's field on a table as shipped, and takes it off", async () => {
-    server.use(
-      communityHttp.get("/plugins/", () =>
-        HttpResponse.json({
-          items: [
-            {
-              id: 3,
-              name: "CI",
-              enabled: true,
-              definition: {
-                fields: [{ key: "ci.state", name: { en: "Build" }, kind: "badge", on: ["task"] }],
-              },
-              item_initiatives: [1],
-              item_fields: ["ci.state"],
-              item_parts: [],
-              item_actions: [],
-            },
-          ],
-        })
-      )
-    );
+    server.use(ciPlugin);
     const { user } = editor("table");
 
     // It shows as it arrives, after the shipped columns; taken off, it stays off.
     await user.click(await within(await outline()).findByRole("button", { name: /^hide build/i }));
+    expect(within(await outline()).queryByRole("button", { name: /required/i })).toBeNull();
     await user.click(screen.getByRole("button", { name: /^save$/i }));
 
     await waitFor(() => expect(sent).toHaveLength(1));
@@ -891,28 +895,58 @@ describe("LayoutEditor", () => {
       });
     });
 
-    it("marks a field required where it can be, and shows a title as always", async () => {
+    it("requires a field from its row in the outline, and shows a title as always", async () => {
+      server.use(ciPlugin);
       const { user } = editor("task:1");
-      const row = async (name: string) => within(await outline()).getByRole("button", { name });
+      const required = async (name: string) =>
+        within(await outline()).queryByRole("button", { name: new RegExp(`^${name}: `) });
 
-      await user.click(await row("Tags"));
-      await user.click(screen.getByRole("switch", { name: "Required" }));
-      expect(await row("Tags (required)")).toBeInTheDocument();
+      const tags = await required("Tags");
+      expect(tags).toHaveAccessibleName("Tags: not required. Press to require it.");
+      expect(tags).toHaveAttribute("aria-pressed", "false");
+      await user.click(tags as HTMLElement);
+      expect(await required("Tags")).toHaveAttribute("aria-pressed", "true");
+      // A part of the page's own that edits a field can be too.
+      await user.click((await required("When")) as HTMLElement);
+      // Pressed twice, it is not required again.
+      await user.click((await required("When")) as HTMLElement);
 
-      await user.click(await row("Task"));
-      const title = screen.getByRole("switch", { name: "Required" });
-      expect(title).toBeChecked();
-      expect(title).toBeDisabled();
-      // What nobody fills in, and what is never empty, cannot be.
-      for (const part of ["Created by", "Status"]) {
-        await user.click(await row(part));
-        expect(screen.queryByRole("switch", { name: "Required" })).not.toBeInTheDocument();
+      const title = await required("Task");
+      expect(title).toHaveAccessibleName("Task: required. A title is always required.");
+      expect(title).toHaveAttribute("aria-pressed", "true");
+      expect(title).toHaveAttribute("aria-disabled", "true");
+      // It still takes focus, so its explanation opens from the keyboard, and
+      // pressing it changes nothing.
+      (title as HTMLElement).focus();
+      expect(title).toHaveFocus();
+      await user.click(title as HTMLElement);
+      expect(await required("Task")).toHaveAttribute("aria-pressed", "true");
+      // What nobody fills in, what is never empty, and what a plug-in fills
+      // cannot be.
+      expect(await within(await outline()).findByRole("button", { name: "Build" })).toBeVisible();
+      for (const part of ["Created by", "Status", "Build"]) {
+        expect(await required(part)).not.toBeInTheDocument();
       }
+      // The part's settings hold no second control.
+      await user.click(within(await outline()).getByRole("button", { name: "Tags" }));
+      expect(screen.queryByRole("switch", { name: /required/i })).not.toBeInTheDocument();
 
       await user.click(screen.getByRole("button", { name: /^save$/i }));
       await waitFor(() => expect(sent).toHaveLength(1));
       expect(JSON.stringify(saved("task"))).toContain('{"field":"tags","required":true}');
       expect(JSON.stringify(saved("task"))).not.toContain('{"field":"title","required"');
+      expect(JSON.stringify(saved("task"))).not.toContain('"type":"dates","props":{"required"');
+    });
+
+    it("explains a requirement in its tooltip", async () => {
+      const { user } = editor("task:1");
+
+      await user.hover(
+        within(await outline()).getByRole("button", { name: /^Tags: not required/ })
+      );
+      expect(await screen.findByRole("tooltip")).toHaveTextContent(
+        /Not required\. Press to require it\.Whoever adds one has to fill this in/
+      );
     });
 
     it("takes the flag off with the field it hides", async () => {
