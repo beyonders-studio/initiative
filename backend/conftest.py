@@ -120,6 +120,11 @@ _base_url = (
     f"{quote(_su_password, safe='')}@{_su_netloc}"
 )
 
+#: Shared tables the migrations fill with catalog data and no test writes, so
+#: the reset between tests leaves them alone (``rule_choices``: the values each
+#: ``choice`` rule may take).
+_CATALOG_TABLES = frozenset({"rule_choices"})
+
 # Per-run database so a worker's TRUNCATE/DROP never clobbers another worker's —
 # or another checkout's — data.
 TEST_DB_NAME = f"initiative_test_{RUN_ID}"
@@ -1025,7 +1030,7 @@ async def session(engine) -> AsyncGenerator[AsyncSession, None]:
         shared_tables = ", ".join(
             f'"{table.name}"'
             for table in SQLModel.metadata.sorted_tables
-            if table.name in SHARED_TABLES
+            if table.name in SHARED_TABLES and table.name not in _CATALOG_TABLES
         )
         await conn.execute(
             text(f"TRUNCATE TABLE {shared_tables} RESTART IDENTITY CASCADE")

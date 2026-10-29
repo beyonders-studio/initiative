@@ -16,11 +16,9 @@ from app.testing import create_user
 
 
 async def _set_default(session, policy: DmPolicy) -> None:
-    from app.services.platform import app_settings as app_settings_service
+    from app.services.platform import rules
 
-    row = await app_settings_service.get_app_settings(session)
-    row.default_dm_policy = policy
-    session.add(row)
+    await rules.put(session, "default_dm_policy", policy)
     await session.flush()
 
 

@@ -24,7 +24,13 @@ from dataclasses import dataclass
 from enum import Enum
 
 from app.core.guild_auth_options import CommunityAuthOption
-from app.core.login_methods import LoginMethod
+from app.core.login_methods import (
+    DEFAULT_LOGIN_METHODS,
+    LoginMethod,
+    SecondFactorRequirement,
+)
+from app.models.platform.user_dm_settings import DmPolicy
+from app.schemas.ai_settings import AIConfigMode
 
 
 class Slot(str, Enum):
@@ -34,8 +40,11 @@ class Slot(str, Enum):
     enabled = "enabled"
     #: A figure: hours, minutes, days.
     amount = "amount"
-    #: A sign-in requirement: the methods it asks for, and beside them the
-    #: provider it names, if any.
+    #: One of a fixed set of values, the set ``rule_choices`` holds.
+    choice = "choice"
+    #: Sign-in methods: the deployment's, the ways in it permits; a
+    #: community's, a sign-in requirement, the methods it asks for and beside
+    #: them the provider it names, if any.
     methods = "methods"
 
 
@@ -55,11 +64,17 @@ class StoredRule:
     slot: Slot
     #: What the rule says while no row does. A community's is also its loosest
     #: value: every community rule starts out asking nothing.
-    default: bool | int | SignInRequirement | None
+    default: bool | int | Enum | frozenset[LoginMethod] | SignInRequirement | None
     #: The option a community must hold for its value to apply, and to tighten
     #: it. Withdrawing the option stops the rule and leaves its row, so it
     #: applies again when the option comes back.
     entitlement: CommunityAuthOption | None = None
+
+
+def choices(rule: StoredRule) -> tuple[str, ...]:
+    """The values a ``choice`` rule may take: its default's enum."""
+    assert isinstance(rule.default, Enum)
+    return tuple(member.value for member in type(rule.default))
 
 
 def _catalog(*rules: StoredRule) -> dict[str, StoredRule]:
@@ -132,6 +147,20 @@ PLATFORM_RULES: dict[str, StoredRule] = _catalog(
     StoredRule("redact_notification_content", _ON, False),
     # Whether search may order content by how many members engaged with it.
     StoredRule("engagement_ranking_enabled", _ON, True),
+    # Which ways in the deployment permits. At least one, and one of them a
+    # way to begin a session. A fresh deployment's first value is the
+    # environment's (``AUTH_LOGIN_METHODS``), seeded once at its first boot.
+    StoredRule("login_methods", Slot.methods, frozenset(DEFAULT_LOGIN_METHODS)),
+    # Who the deployment asks to hold a second factor.
+    StoredRule(
+        "second_factor_requirement", Slot.choice, SecondFactorRequirement.nobody
+    ),
+    # The direct-message policy a newly created account starts on. Read once,
+    # when the account is made; changing it moves no existing account.
+    StoredRule("default_dm_policy", Slot.choice, DmPolicy.private),
+    # Who owns AI configuration: the operator for every community, each
+    # community for itself, or nobody.
+    StoredRule("ai_config_mode", Slot.choice, AIConfigMode.disabled),
     # Whether an arriving visitor is asked what this deployment may keep in
     # their browser. Most deployments are a group's own server, reached by
     # people who were sent a link; an owner running a public front door turns

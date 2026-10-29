@@ -102,13 +102,12 @@ async def test_the_read_floor_reads_what_the_deployment_asks(session, engine):
     """The gate now asks the deployment's own question first, and that one
     reads ``app_settings`` — so the floor has to reach that too."""
     from app.core.login_methods import SecondFactorRequirement
-    from app.services.platform import app_settings as app_settings_service
 
     guild = await create_guild(session)
     guild_id = guild.id
-    row = await app_settings_service.get_app_settings(session)
-    row.second_factor_requirement = SecondFactorRequirement.everyone
-    session.add(row)
+    await rules.put(
+        session, "second_factor_requirement", SecondFactorRequirement.everyone
+    )
     await session.commit()
 
     async with engine.connect() as conn:

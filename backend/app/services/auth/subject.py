@@ -15,7 +15,6 @@ from __future__ import annotations
 from sqlmodel import select
 from sqlmodel.ext.asyncio.session import AsyncSession
 
-from app.models.platform.app_setting import AppSetting
 from app.models.platform.identity_ref import (
     REF_MAX_LENGTH,
     IdentityEntity,
@@ -23,7 +22,7 @@ from app.models.platform.identity_ref import (
     IdentityRef,
 )
 from app.models.platform.user import User
-from app.services.platform.app_settings import GLOBAL_SETTINGS_ID
+from app.services.platform import rules
 from app.services.platform.identity_refs import ensure_ref
 
 __all__ = ["account_for_subject", "subject_for_user", "user_for_subject"]
@@ -46,14 +45,13 @@ async def subject_for_user(session: AsyncSession, *, user_id: int) -> str:
 
 async def account_for_subject(
     session: AsyncSession, *, subject: str
-) -> tuple[User, AppSetting | None] | None:
-    """Which account a token's ``sub`` names, with the deployment's settings
-    row beside it, or None.
+) -> tuple[User, str] | None:
+    """Which account a token's ``sub`` names, with the deployment's
+    second-factor rule beside it, or None.
 
-    The settings singleton rides along because every request that
-    authenticates by session asks what the deployment requires of an account
-    next, and reading it here is one statement rather than two. ``None`` in
-    its place means no singleton the session can see.
+    The rule rides along because every request that authenticates by session
+    asks what the deployment requires of an account next, and reading it here
+    is one statement rather than two.
 
     Live references only, and nothing re-issues one in this sector. A token
     holding a replaced reference resolves to nobody until it lapses: the
@@ -64,9 +62,8 @@ async def account_for_subject(
         return None
 
     statement = (
-        select(User, AppSetting)
+        select(User, rules.platform_rule_sql("second_factor_requirement"))
         .join(IdentityRef, IdentityRef.entity_id == User.id)
-        .outerjoin(AppSetting, AppSetting.id == GLOBAL_SETTINGS_ID)
         .where(
             IdentityRef.ref == subject,
             IdentityRef.entity_type == IdentityEntity.user,

@@ -37,11 +37,11 @@ from sqlmodel.ext.asyncio.session import AsyncSession
 from app.core.audit_events import AuditEventType
 from app.core.config import settings
 from app.core.encryption import encrypt_token, normalize_email
-from app.core.login_methods import LoginMethod, methods_from_values
+from app.core.login_methods import LoginMethod
 from app.services.auth import addresses
+from app.services.platform import rules
 from app.core.security import USABLE_HASH_PREFIXES
 from app.db.advisory_locks import LockNamespace, advisory_lock
-from app.models.platform.app_setting import AppSetting
 from app.models.platform.auth_provider import AuthProvider
 from app.models.platform.federated_identity import FederatedIdentity
 from app.models.platform.federated_identity_secret import FederatedIdentitySecret
@@ -52,7 +52,6 @@ from app.services import audit as audit_service
 from app.services.auth.platform_provider import can_serve_login_clause
 from app.services.platform import dm_settings as dm_settings_service
 from app.services.platform import usernames as username_service
-from app.services.platform.app_settings import GLOBAL_SETTINGS_ID
 
 logger = logging.getLogger(__name__)
 
@@ -401,17 +400,10 @@ async def stranded_between(
 async def _permitted_methods(session: AsyncSession) -> frozenset[LoginMethod]:
     """Which ways in this deployment permits.
 
-    Read from the settings row here rather than through ``auth_posture``, which
-    is the module that answers this everywhere else and reads this one. The
-    same resolution: a row holding nothing this version recognises falls back
-    to the default set.
+    Read from the rules here rather than through ``auth_posture``, which is
+    the module that answers this everywhere else and reads this one.
     """
-    row = (
-        await session.exec(
-            select(AppSetting.login_methods).where(AppSetting.id == GLOBAL_SETTINGS_ID)
-        )
-    ).first()
-    return methods_from_values(row)
+    return (await rules.platform_values(session))["login_methods"]
 
 
 async def ways_in(session: AsyncSession, *, user_id: int) -> frozenset[LoginMethod]:

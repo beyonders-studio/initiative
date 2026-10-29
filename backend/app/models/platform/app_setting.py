@@ -1,7 +1,6 @@
 from typing import Optional
 
 from sqlalchemy import (
-    ARRAY,
     Boolean,
     Column,
     ForeignKey,
@@ -9,27 +8,14 @@ from sqlalchemy import (
     String,
     text,
 )
-from sqlalchemy.dialects.postgresql import ENUM as PGEnum, JSONB
-from sqlmodel import Enum as SQLEnum, Field, SQLModel
+from sqlalchemy.dialects.postgresql import JSONB
+from sqlmodel import Field, SQLModel
 from pydantic import ConfigDict
 
-from app.core.login_methods import (
-    DEFAULT_LOGIN_METHODS,
-    LoginMethod,
-    SecondFactorRequirement,
-)
-from app.models.platform.user_dm_settings import DmPolicy
 
 # Platform OIDC config lives on the provider registry row (``auth_providers``
-# slug ``oidc``), not here. Which ways in the deployment permits does — see
-# ``login_methods`` below and ``app.services.platform.auth_posture``.
-
-
-#: ``DEFAULT_LOGIN_METHODS`` as Postgres writes an array literal, so the set is
-#: stated once rather than here and in ``login_methods`` below. The migrations
-#: that moved this default keep their own copies: a migration is the record of
-#: what changed when, and is not read for what the default is now.
-_DEFAULT_LOGIN_METHODS_SQL = "{%s}" % ",".join(m.value for m in DEFAULT_LOGIN_METHODS)
+# slug ``oidc``), not here. Which ways in the deployment permits is the rule
+# ``login_methods`` (``app.core.rules``).
 
 
 class AppSetting(SQLModel, table=True):
@@ -68,44 +54,6 @@ class AppSetting(SQLModel, table=True):
         sa_column=Column(JSONB, nullable=False, server_default=text("'{}'::jsonb")),
     )
 
-    # Which ways in this deployment permits. A Postgres enum array: adding a
-    # method later is a value on the type, not a column per method, and the
-    # database validates the elements rather than a hand-kept CHECK list. The
-    # non-empty constraint is the "at least one" rule — see
-    # ``app.core.login_methods``.
-    login_methods: list[str] = Field(
-        default_factory=lambda: [m.value for m in DEFAULT_LOGIN_METHODS],
-        sa_column=Column(
-            ARRAY(PGEnum(LoginMethod, name="login_method", create_type=False)),
-            nullable=False,
-            server_default=_DEFAULT_LOGIN_METHODS_SQL,
-        ),
-    )
-
-    # Who this deployment asks to hold a second factor. A Postgres enum for
-    # the same reason ``login_methods`` is one: the database validates the
-    # value, and a rung added later is a value on the type rather than a
-    # column here. ``nobody`` on every fresh and upgraded install, so an
-    # upgrade asks nothing of anybody it was not already asking.
-    #
-    # What answers it is the account holding one — a confirmed authenticator
-    # or a registered passkey — or a session that presented one, which is what
-    # an identity provider's own second factor looks like from here. The
-    # per-session reading is a community's question (``require_methods``);
-    # this one is about the account.
-    second_factor_requirement: SecondFactorRequirement = Field(
-        default=SecondFactorRequirement.nobody,
-        sa_column=Column(
-            PGEnum(
-                SecondFactorRequirement,
-                name="second_factor_requirement",
-                create_type=False,
-            ),
-            nullable=False,
-            server_default=SecondFactorRequirement.nobody.value,
-        ),
-    )
-
     smtp_host: Optional[str] = Field(
         default=None, sa_column=Column(String(255), nullable=True)
     )
@@ -139,27 +87,6 @@ class AppSetting(SQLModel, table=True):
         sa_column=Column(Boolean, nullable=False, server_default="false"),
     )
 
-    # The direct-message policy a newly created account starts on. Read once,
-    # when the account is created, and copied into its ``user_dm_settings`` row;
-    # changing it later moves nobody, so raising it opens no existing account
-    # and lowering it revokes no channel anybody is using.
-    default_dm_policy: DmPolicy = Field(
-        default=DmPolicy.private,
-        sa_column=Column(
-            SQLEnum(DmPolicy, name="user_dm_policy", create_type=False),
-            nullable=False,
-            server_default=DmPolicy.private.value,
-        ),
-    )
-
-    # AI config ownership mode: "platform" (the operator's connections apply to
-    # every guild), "guild" (each guild admin configures its own), or "disabled".
-    # Provider config itself lives in platform_ai_connections /
-    # guild_ai_connections; only the global mode lives here.
-    ai_config_mode: str = Field(
-        default="disabled",
-        sa_column=Column(String(20), nullable=False, server_default="disabled"),
-    )
     # Monotonic counter bumped on every operator AI-config write (mode or
     # platform connection). Read on the request's own (guild) session as the
     # cross-worker cache-freshness signal, so a change is picked up by every

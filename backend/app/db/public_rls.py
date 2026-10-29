@@ -1645,6 +1645,10 @@ SHARED_TABLE_REGISTRY: dict[str, SharedTable] = {
     ),
     # The picture on a user's profile. Public-plane identity like the row it hangs off:
     # one user spans guilds, and the bytes are served to anyone holding the URL.
+    # The values each ``choice`` rule may take (app.core.rules). Written by the
+    # migrations and read by no role: the foreign key that holds a rule's
+    # ``choice`` to them checks it as the table's owner.
+    "rule_choices": SharedTable(rls=FORCED_NO_POLICY, grants=Grants()),
     "platform_rules": SharedTable(
         rls=TableRls(
             policies=(

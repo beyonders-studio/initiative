@@ -16,6 +16,7 @@ something else.
 
 from __future__ import annotations
 
+from enum import Enum
 from typing import Any, Iterable
 
 from sqlalchemy import and_, func, literal, or_, select as sa_select
@@ -37,24 +38,34 @@ from app.services.platform import guild_entitlements
 Values = dict[str, Any]
 
 
+def _choice(rule: StoredRule, value: Any) -> Enum:
+    """``value`` as the member of the enum its ``choice`` rule takes."""
+    assert isinstance(rule.default, Enum)
+    return type(rule.default)(value)
+
+
 def _value(rule: StoredRule, row: PlatformRule | CommunityRule) -> Any:
+    if rule.slot is Slot.choice:
+        return _choice(rule, getattr(row, "choice"))
     if rule.slot is Slot.methods:
-        assert isinstance(row, CommunityRule)
-        return SignInRequirement(
-            "required",
-            row.provider_id,
-            frozenset(LoginMethod(m) for m in row.methods or ()),
-        )
+        methods = frozenset(LoginMethod(m) for m in row.methods or ())
+        if isinstance(row, PlatformRule):
+            return methods
+        return SignInRequirement("required", row.provider_id, methods)
     return getattr(row, rule.slot.value)
 
 
 def _slots(rule: StoredRule, value: Any) -> dict[str, Any]:
     """The columns a row of ``rule`` holding ``value`` sets."""
+    if rule.slot is Slot.choice:
+        return {"choice": _choice(rule, value).value}
     if rule.slot is Slot.methods:
-        return {
-            "methods": sorted(m.value for m in value.methods),
-            "provider_id": value.provider_id,
-        }
+        if isinstance(value, SignInRequirement):
+            return {
+                "methods": sorted(m.value for m in value.methods),
+                "provider_id": value.provider_id,
+            }
+        return {"methods": sorted(m.value for m in value)}
     return {rule.slot.value: value}
 
 
@@ -79,7 +90,8 @@ def platform_rule_sql(key: str) -> ColumnElement[Any]:
     )
     if rule.default is None:
         return found
-    return func.coalesce(found, rule.default)
+    default = rule.default.value if isinstance(rule.default, Enum) else rule.default
+    return func.coalesce(found, default)
 
 
 async def community_values(
@@ -216,7 +228,7 @@ async def put(
             else CommunityRule(guild_id=guild_id, key=key, user_id=user_id)
         )
     held = _slots(rule, value)
-    for column in ("enabled", "amount", "methods", "provider_id"):
+    for column in ("enabled", "amount", "choice", "methods", "provider_id"):
         if hasattr(row, column):
             setattr(row, column, held.get(column))
     session.add(row)

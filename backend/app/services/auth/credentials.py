@@ -33,13 +33,11 @@ from app.core.security import UploadTokenClaims
 from app.core.login_methods import SecondFactorRequirement
 from app.core.messages import AuthMessages
 from app.models.platform.api_key import UserApiKey
-from app.models.platform.app_setting import AppSetting
 from app.models.platform.user import User
 from app.schemas.platform.token import TokenPayload
 from app.services.auth.assurance import policy_markers
 from app.services.auth.subject import account_for_subject
 from app.services.platform import api_keys as api_keys_service
-from app.services.platform import auth_posture
 
 
 @dataclass(frozen=True)
@@ -80,16 +78,18 @@ class CredentialRefused(Exception):
         )
 
 
-def asked_of_an_account(settings_row: AppSetting | None) -> SecondFactorRequirement:
-    """What the deployment asks of an account, from the settings row.
+def asked_of_an_account(value: str | None) -> SecondFactorRequirement:
+    """What the deployment asks of an account, from the rule
+    ``second_factor_requirement`` as a query read it alongside something else
+    (``rules.platform_rule_sql``).
 
-    A database with no singleton yet asks nothing — the same conclusion
-    ``public.platform_factor_satisfied()`` reaches from the same absence, so
-    the two layers agree on a deployment that has not finished starting.
+    A value this version does not recognise reads as ``nobody``: asking for
+    something this one cannot describe is worse than asking for nothing.
     """
-    if settings_row is None:
+    try:
+        return SecondFactorRequirement(value)
+    except ValueError:
         return SecondFactorRequirement.nobody
-    return auth_posture.requirement_from_row(settings_row)
 
 
 def _session_row_id(sid: str | None) -> uuid.UUID | None:
@@ -110,7 +110,7 @@ async def _session(session: AsyncSession, token_data: TokenPayload) -> Authentic
         raise CredentialRefused(
             AuthMessages.USER_NOT_FOUND, status_code=status.HTTP_404_NOT_FOUND
         )
-    user, settings_row = account
+    user, asked = account
     # ``ver`` is what signing out everywhere moves.
     if token_data.ver is None or token_data.ver != user.token_version:
         raise CredentialRefused(AuthMessages.INVALID_TOKEN)
@@ -122,7 +122,7 @@ async def _session(session: AsyncSession, token_data: TokenPayload) -> Authentic
         # marker where a code was presented, the passkey markers where a key
         # answered.
         session_amr=policy_markers(token_data.amr),
-        asked_of_account=asked_of_an_account(settings_row),
+        asked_of_account=asked_of_an_account(asked),
         session_credential=(
             SessionCredential(session_id=session_id, token_version=token_data.ver)
             if session_id is not None
