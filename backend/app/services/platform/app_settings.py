@@ -614,11 +614,13 @@ async def _settings_area(
     fields: tuple[str, ...],
     actor_user_id: int | None,
     secret: _SecretChange | None = None,
+    commit: bool = True,
 ) -> AsyncIterator[AppSetting]:
     """Save one area of the settings row with its record, in one commit.
 
     Yields the stored row for the caller to change. On leaving, the fields
-    that moved are recorded and the row is committed. ``secret`` is the
+    that moved are recorded and the row is committed, or with ``commit``
+    off staged for the caller's own commit. ``secret`` is the
     area's credential: named in the record when it moves, never valued, and
     stored afterwards by :func:`_store_secret`, once the row it hangs off is
     committed.
@@ -642,6 +644,9 @@ async def _settings_area(
         after=after,
         extras=extras,
     )
+    if not commit:
+        await session.flush()
+        return
     await session.commit()
     await session.refresh(row)
 
@@ -666,14 +671,18 @@ async def update_interface_settings(
     light_accent_color: str,
     dark_accent_color: str,
     actor_user_id: int | None = None,
-) -> AppSetting:
-    """The two accent colours."""
+) -> None:
+    """The two accent colours, staged for the caller's commit: the page saves
+    them with its rule in one change (``auth_posture.change``)."""
     async with _settings_area(
-        session, area="interface", fields=INTERFACE_FIELDS, actor_user_id=actor_user_id
+        session,
+        area="interface",
+        fields=INTERFACE_FIELDS,
+        actor_user_id=actor_user_id,
+        commit=False,
     ) as settings_row:
         settings_row.light_accent_color = light_accent_color.strip() or "#2563eb"
         settings_row.dark_accent_color = dark_accent_color.strip() or "#60a5fa"
-    return settings_row
 
 
 async def community_directory_enabled(session: AsyncSession) -> bool:
@@ -734,18 +743,22 @@ async def update_community_settings(
     *,
     default_dm_policy: "DmPolicy",
     actor_user_id: int | None = None,
-) -> AppSetting:
-    """The direct-message policy a newly created account starts on.
+) -> None:
+    """The direct-message policy a newly created account starts on, staged
+    for the caller's commit: the page saves it with its rules in one change.
 
     Read once, when an account is made. Changing it moves no existing account:
     raising it would open accounts that never chose to be open, and lowering
     it would revoke channels people are using.
     """
     async with _settings_area(
-        session, area="community", fields=COMMUNITY_FIELDS, actor_user_id=actor_user_id
+        session,
+        area="community",
+        fields=COMMUNITY_FIELDS,
+        actor_user_id=actor_user_id,
+        commit=False,
     ) as settings_row:
         settings_row.default_dm_policy = default_dm_policy
-    return settings_row
 
 
 async def update_email_settings(

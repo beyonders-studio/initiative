@@ -354,17 +354,20 @@ async def update_interface_settings(
     """The accent colours, and whether arriving visitors are asked about
     cookies. ``cookie_consent_enabled`` is left alone when omitted, so saving a
     colour does not silently answer it."""
-    settings_obj = await app_settings_service.update_interface_settings(
+    await app_settings_service.update_interface_settings(
         session,
         light_accent_color=payload.light_accent_color,
         dark_accent_color=payload.dark_accent_color,
         actor_user_id=owner.id,
     )
+    changes: dict[str, object] = {}
     if payload.cookie_consent_enabled is not None:
-        await auth_posture.change(
-            auth_posture.RuleContext.platform(session, owner),
-            {"cookie_consent_enabled": payload.cookie_consent_enabled},
-        )
+        changes["cookie_consent_enabled"] = payload.cookie_consent_enabled
+    # Commits the colours with the rule.
+    await auth_posture.change(
+        auth_posture.RuleContext.platform(session, owner), changes
+    )
+    settings_obj = await app_settings_service.get_app_settings(session)
     return InterfaceSettingsResponse(
         light_accent_color=settings_obj.light_accent_color,
         dark_accent_color=settings_obj.dark_accent_color,
@@ -385,7 +388,7 @@ _COMMUNITY_RULE_FIELDS = (
 )
 
 
-async def _community_payload(session) -> CommunitySettingsResponse:
+async def _community_payload(session: AsyncSession) -> CommunitySettingsResponse:
     stored = await rules.platform_values(session)
     settings_obj = await app_settings_service.get_app_settings(session)
     return CommunitySettingsResponse(
@@ -486,6 +489,7 @@ async def update_community_settings(
         await app_settings_service.update_community_settings(
             session, default_dm_policy=payload.default_dm_policy, actor_user_id=owner.id
         )
+    # Commits the direct-message default with the rules.
     await auth_posture.change(
         auth_posture.RuleContext.platform(session, owner), changes
     )

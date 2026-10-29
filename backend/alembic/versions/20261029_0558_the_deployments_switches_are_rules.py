@@ -29,6 +29,7 @@ Revises: 20261029_0557
 Create Date: 2026-10-29
 """
 
+from collections.abc import Iterator
 from contextlib import contextmanager
 
 import sqlalchemy as sa
@@ -159,7 +160,7 @@ MOVED_KEYS = "ARRAY[" + ", ".join(f"'{key}'" for key in KEYS) + "]"
 
 
 @contextmanager
-def _unforced():
+def _unforced() -> Iterator[sa.engine.Connection]:
     """Both tables unforced for this revision's role, forced again after."""
     bind = op.get_bind()
     for table in TABLES:
@@ -194,7 +195,7 @@ def upgrade() -> None:
     with _unforced() as bind:
         source = bind.exec_driver_sql(
             "SELECT "
-            + " + ".join(f"({condition})::int" for *_, condition in copies)
+            + " + ".join(f"COALESCE(({condition})::int, 0)" for *_, condition in copies)
             + " FROM public.app_settings s WHERE s.id = 1"
         ).scalar()
         for key, slot, value, condition in copies:
