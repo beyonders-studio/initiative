@@ -19,8 +19,8 @@ for the copy and forced again in the same transaction, and the copy is counted
 against its source. ``guild_auth_policies`` is then dropped; its policies go
 with it.
 
-Revision ID: 20261029_0556
-Revises: 20261029_0555
+Revision ID: 20261029_0557
+Revises: 20261029_0556
 Create Date: 2026-10-29
 """
 
@@ -32,8 +32,8 @@ from sqlalchemy.dialects.postgresql import ARRAY, ENUM
 
 from app.core.config import settings
 
-revision = "20261029_0556"
-down_revision = "20261029_0555"
+revision = "20261029_0557"
+down_revision = "20261029_0556"
 branch_labels = None
 depends_on = None
 
