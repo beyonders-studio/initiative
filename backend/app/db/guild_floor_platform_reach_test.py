@@ -91,7 +91,7 @@ async def _two_guilds(session):
     # to: the pictures are written the way the system engine writes them.
     await set_rls_context(session, Unattributed())
     for guild in (one, two):
-        await create_guild_auth_policy(session, guild, provider)
+        await create_guild_auth_policy(session, guild, provider, guest=True)
         data = f"icon-{guild.id}".encode()
         await session.exec(
             text(

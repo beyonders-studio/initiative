@@ -121,7 +121,6 @@ _REQUIREMENT = (CommunityRule.key == "auth_policy", CommunityRule.user_id.is_(No
 
 
 async def _sign_in_rule(session, guild_id: int) -> str:
-    session.expire_all()
     asks = (
         await session.exec(
             select(CommunityRule.id).where(
