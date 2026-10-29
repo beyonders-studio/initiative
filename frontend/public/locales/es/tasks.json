@@ -243,6 +243,42 @@
     "due": "Vence {{when}}",
     "priority": "Prioridad {{priority}}",
     "keep": "Dejar «{{text}}» en el título",
+    "hints": {
+      "button": "Lo que puede decir un título",
+      "title": "Escribe los detalles en el título",
+      "dates": {
+        "label": "Fechas",
+        "examples": "viernes|próxima semana|dentro de 3 días|el 30 de octubre"
+      },
+      "times": {
+        "label": "Horas",
+        "examples": "a las 17:00|mañana a las 9:30"
+      },
+      "repeats": {
+        "label": "Repeticiones",
+        "examples": "cada semana|cada lunes|cada! 2 días",
+        "note": "Con «cada!», la siguiente se cuenta desde que se completa la anterior."
+      },
+      "priority": {
+        "label": "Prioridad",
+        "examples": "!alta|!1",
+        "note": "!1 es urgente, hasta !4 para baja."
+      },
+      "tags": {
+        "label": "Etiquetas",
+        "examples": "#facturas"
+      },
+      "people": {
+        "label": "Personas",
+        "examples": "@sam|@yo"
+      },
+      "type": {
+        "label": "Tipo de tarea",
+        "examples": "error:|hito:",
+        "note": "Al principio del todo, uno de los tipos del proyecto."
+      },
+      "footer": "Cada uno se quita del título y se pone en la tarea. Quita su etiqueta para dejar las palabras como se escribieron."
+    },
     "words": {
       "today": "hoy",
       "tomorrow": "mañana",
@@ -282,5 +318,13 @@
       "until": "hasta|hasta el",
       "times": "veces"
     }
+  },
+  "reminder": {
+    "label": "Recuérdame",
+    "placeholder": "Sin recordatorio",
+    "clear": "Sin recordatorio",
+    "private": "Solo te lo recordamos a ti.",
+    "repeats": "Cada vez que se repite, el recordatorio se mueve con su fecha de vencimiento.",
+    "sent": "Recordatorio enviado."
   }
 }

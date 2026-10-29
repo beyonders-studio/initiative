@@ -243,6 +243,42 @@
     "due": "Fällig {{when}}",
     "priority": "Priorität: {{priority}}",
     "keep": "„{{text}}“ im Titel lassen",
+    "hints": {
+      "button": "Was ein Titel sagen kann",
+      "title": "Details direkt in den Titel schreiben",
+      "dates": {
+        "label": "Daten",
+        "examples": "freitag|nächste woche|in 3 tagen|am 30. oktober"
+      },
+      "times": {
+        "label": "Uhrzeiten",
+        "examples": "um 17 uhr|morgen um 9:30"
+      },
+      "repeats": {
+        "label": "Wiederholungen",
+        "examples": "jede woche|jeden montag|alle! 2 tage",
+        "note": "Mit „alle!“ zählt die nächste ab dem Erledigen der letzten."
+      },
+      "priority": {
+        "label": "Priorität",
+        "examples": "!hoch|!1",
+        "note": "!1 ist dringend, bis !4 für niedrig."
+      },
+      "tags": {
+        "label": "Tags",
+        "examples": "#rechnung"
+      },
+      "people": {
+        "label": "Personen",
+        "examples": "@sam|@ich"
+      },
+      "type": {
+        "label": "Aufgabentyp",
+        "examples": "bug:|meilenstein:",
+        "note": "Ganz am Anfang, einer der Typen des Projekts."
+      },
+      "footer": "Alles wird aus dem Titel genommen und an der Aufgabe gesetzt. Entferne den Chip, um die Wörter so zu lassen, wie sie getippt wurden."
+    },
     "words": {
       "today": "heute",
       "tomorrow": "morgen",
@@ -282,5 +318,13 @@
       "until": "bis|bis zum",
       "times": "mal"
     }
+  },
+  "reminder": {
+    "label": "Erinnere mich",
+    "placeholder": "Keine Erinnerung",
+    "clear": "Keine Erinnerung",
+    "private": "Nur du wirst erinnert.",
+    "repeats": "Bei jeder Wiederholung wandert die Erinnerung mit dem Fälligkeitsdatum.",
+    "sent": "Erinnerung gesendet."
   }
 }

@@ -4,6 +4,7 @@ import type { ReactNode } from "react";
 import { useTranslation } from "react-i18next";
 
 import { priorityDotClass } from "@/components/projects/projectTasksConfig";
+import { TaskTypeIcon } from "@/components/tasks/TaskTypeOption";
 import { useDateLocale } from "@/hooks/useDateLocale";
 import { summarizeRecurrence } from "@/lib/recurrence";
 import type { TitlePart, TitlePartType, TitleReading } from "@/lib/smartTitle";
@@ -14,6 +15,7 @@ import type { TranslateFn } from "@/types/i18n";
 
 /** The marks drawn behind what a title's parts say, by their type. */
 export const PART_MARK: Record<TitlePartType, string> = {
+  type: "bg-indigo-500/20",
   due: "bg-sky-500/20",
   repeat: "bg-violet-500/20",
   priority: "bg-amber-500/25",
@@ -82,6 +84,18 @@ export const SmartTitleParts = ({
   const icon = "size-3 shrink-0 text-muted-foreground";
 
   const chips: ReactNode[] = [];
+  const type = of("type");
+  if (reading.type && type.length) {
+    chips.push(
+      <Chip
+        key="type"
+        type="type"
+        label={reading.type.name}
+        icon={<TaskTypeIcon type={reading.type} className="size-3" />}
+        {...keep(type)}
+      />
+    );
+  }
   const due = of("due");
   if (reading.due && due.length) {
     const when = format(

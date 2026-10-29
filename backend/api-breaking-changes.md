@@ -1993,6 +1993,16 @@ notifications list; it is in the enum because the type is shared.
 - POST /api/v1/notifications/{notification_id}/read added the new `coming_up` enum value to the `type` response property for the response status `200`
 - POST /api/v1/notifications/{notification_id}/unread added the new `coming_up` enum value to the `type` response property for the response status `200`
 
+### A task reminds its reader
+
+A member's own reminder of a task is told to them as a `task_reminder`
+notification, a new notification type in the `subscriptions` category.
+
+- GET /api/v1/notifications/ added the new `task_reminder` enum value to the `notifications/items/type` response property for the response status `200`
+- GET /api/v1/notifications/{notification_id}/alert added the new `task_reminder` enum value to the `notification/type` response property for the response status `200`
+- POST /api/v1/notifications/{notification_id}/read added the new `task_reminder` enum value to the `type` response property for the response status `200`
+- POST /api/v1/notifications/{notification_id}/unread added the new `task_reminder` enum value to the `type` response property for the response status `200`
+
 ## After 0.76.0
 
 ### New values in a response's enums

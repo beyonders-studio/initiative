@@ -243,6 +243,42 @@
     "due": "Due {{when}}",
     "priority": "{{priority}} priority",
     "keep": "Keep “{{text}}” in the title",
+    "hints": {
+      "button": "What a title can say",
+      "title": "Type the details into the title",
+      "dates": {
+        "label": "Dates",
+        "examples": "friday|next week|in 3 days|on oct 30"
+      },
+      "times": {
+        "label": "Times",
+        "examples": "at 5pm|tomorrow at 9:30"
+      },
+      "repeats": {
+        "label": "Repeats",
+        "examples": "every week|every monday|every! 2 days",
+        "note": "With “every!”, the next one is counted from when the last is done."
+      },
+      "priority": {
+        "label": "Priority",
+        "examples": "!high|!1",
+        "note": "!1 is urgent, down to !4 for low."
+      },
+      "tags": {
+        "label": "Tags",
+        "examples": "#billing"
+      },
+      "people": {
+        "label": "People",
+        "examples": "@sam|@me"
+      },
+      "type": {
+        "label": "Task type",
+        "examples": "bug:|milestone:",
+        "note": "At the very start, one of the project's types."
+      },
+      "footer": "Each is taken out of the title and set on the task. Take its chip off to keep the words as typed."
+    },
     "words": {
       "today": "today",
       "tomorrow": "tomorrow|tmrw|tmr",
@@ -282,5 +318,13 @@
       "until": "until|till|through",
       "times": "times"
     }
+  },
+  "reminder": {
+    "label": "Remind me",
+    "placeholder": "No reminder",
+    "clear": "No reminder",
+    "private": "Only you are reminded.",
+    "repeats": "Each time it repeats, the reminder moves with its due date.",
+    "sent": "Reminder sent."
   }
 }

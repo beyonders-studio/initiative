@@ -181,11 +181,13 @@ CATEGORY_SPECS: Mapping[NotificationCategory, CategorySpec] = {
     # What you follow, which includes what you made
     # (``personal_items.subscribers_of``): changes, comments, reactions to a
     # post and answers to an event. Ambient: it scales with how busy the
-    # thing is.
+    # thing is. A reminder you set on a task is kept with it, in the same
+    # personal row as a subscription.
     NotificationCategory.subscriptions: CategorySpec(
         types=frozenset(
             {
                 NotificationType.subscription_activity,
+                NotificationType.task_reminder,
                 NotificationType.comment_on_task,
                 NotificationType.comment_on_resource,
                 NotificationType.event_rsvp,

@@ -42,6 +42,8 @@ class NotificationType(str, Enum):
     event_cancelled = "event_cancelled"
     event_rsvp = "event_rsvp"
     event_reminder = "event_reminder"
+    #: A reminder the recipient set on a task came due.
+    task_reminder = "task_reminder"
     export_ready = "export_ready"
     export_failed = "export_failed"
     import_ready = "import_ready"

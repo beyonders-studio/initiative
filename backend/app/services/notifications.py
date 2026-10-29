@@ -4,7 +4,7 @@
 email and push — and it decides who may hear it from what the notice is about.
 Below it: the reaction and assignment notices (their bell line is written at
 once, email and push wait for a digest), the digests themselves, and the
-time-driven sweeps (overdue tasks, hold summaries, event reminders), each of
+time-driven sweeps (overdue tasks, hold summaries, event and task reminders), each of
 which starts from what is waiting in each community and claims its work before
 sending it.
 
@@ -28,6 +28,7 @@ from sqlalchemy import and_, delete, exists, func, or_, select
 from sqlalchemy import update as sa_update
 from sqlalchemy.dialects import postgresql
 from sqlalchemy.dialects.postgresql import insert as pg_insert
+from sqlmodel import col
 from sqlmodel.ext.asyncio.session import AsyncSession
 
 from app.core import recurrence
@@ -65,6 +66,7 @@ from app.models.tenant.calendar_event import (
 from app.models.tenant.event_reminder_dispatch import EventReminderDispatch
 from app.models.tenant.guild_plugin import GuildPlugin
 from app.models.tenant.initiative import Initiative
+from app.models.tenant.personal_item import PersonalItem
 from app.models.tenant.project import Project
 from app.models.tenant.reaction_digest import ReactionDigestItem
 from app.models.tenant.task import Task, TaskAssignee, TaskStatus, TaskStatusCategory
@@ -2861,6 +2863,107 @@ async def reminder_scan(*, now: datetime) -> Scan:
                 },
             )
             await session.commit()
+        return []
+
+    async def _finish() -> None:
+        async with cohorts.system_session(None) as session:
+            # Through the seam, as each account whose reminders these are: what
+            # the sweep may see of a community is what that account may see.
+            await gather_across_guilds(
+                session,
+                {user_id: sorted(guild_ids) for user_id, guild_ids in due_in.items()},
+                _dispatch,
+                on_behalf=True,
+                writes=True,
+            )
+
+    return Scan(Scope.LIVE, _visit, _finish)
+
+
+def task_reminder_scan(*, now: datetime) -> Scan:
+    """Send each member the reminders they set on tasks, as of ``now``.
+
+    Each community visited is asked who has a reminder due and not yet sent;
+    only they are routed into only those communities, as themselves, to send
+    them. A reminder is claimed by marking it sent in the transaction that
+    records its notice, so it goes once whoever else is sweeping, and a sweep
+    that fails before the notice is saved leaves it for the next. A task finished, archived or trashed by then,
+    or one the member can no longer open, reminds of nothing. A reminder is
+    told as subscription news, so it is switched off where they are.
+    """
+    due_in: dict[int, set[int]] = {}
+    due = and_(
+        col(PersonalItem.remind_at).is_not(None),
+        col(PersonalItem.reminded_at).is_(None),
+    )
+
+    async def _visit(routed: AsyncSession, guild_id: int) -> datetime | None:
+        """Note who has a reminder due here, and answer when the next one is."""
+        people = (
+            await routed.exec(
+                select(PersonalItem.user_id)
+                .where(due, col(PersonalItem.remind_at) <= now)
+                .distinct()
+            )
+        ).all()
+        for (user_id,) in people:
+            due_in.setdefault(user_id, set()).add(guild_id)
+        return (
+            await routed.exec(
+                select(func.min(PersonalItem.remind_at)).where(
+                    due, col(PersonalItem.remind_at) > now
+                )
+            )
+        ).scalar_one()
+
+    async def _dispatch(session: AsyncSession, guild_id: int) -> list:
+        reader = require_guild_context(session)
+        # A community whose content is on hold records nothing, so it reminds
+        # of nothing until the hold lifts.
+        if reader.content_read_only:
+            return []
+        user_id = reader.user_id
+        claimed = (
+            await session.exec(
+                sa_update(PersonalItem)
+                .where(
+                    due,
+                    col(PersonalItem.user_id) == user_id,
+                    col(PersonalItem.remind_at) <= now,
+                )
+                .values(reminded_at=datetime.now(timezone.utc))
+                .returning(PersonalItem.entity_id)
+            )
+        ).all()
+        task_ids = [task_id for (task_id,) in claimed]
+        if not task_ids:
+            return []
+        tasks = (
+            (
+                await session.exec(
+                    select(Task)
+                    .join(TaskStatus, TaskStatus.id == Task.task_status_id)
+                    .where(
+                        col(Task.id).in_(task_ids),
+                        col(Task.archived_at).is_(None),
+                        TaskStatus.category != TaskStatusCategory.done,
+                    )
+                )
+            )
+            .scalars()
+            .all()
+        )
+        for task in tasks:
+            await notify(
+                session,
+                NotificationType.task_reminder,
+                [user_id],
+                about=("task", task.id),
+                key="task.reminder",
+                values={"task": task.title},
+                data={"task_id": task.id},
+            )
+        await session.commit()
         return []
 
     async def _finish() -> None:

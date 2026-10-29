@@ -460,3 +460,12 @@ describe("notificationText — access requests", () => {
     expect(notificationLink(notice("share_declined", {}))).toBeNull();
   });
 });
+
+describe("task reminders", () => {
+  it("names the task and opens it", () => {
+    const line = notice("task_reminder", { task_id: 12, task_title: "Water the plants" });
+    expect(notificationText(line, t)).toContain("notifications.taskReminder");
+    expect(notificationText(line, t)).toContain("Water the plants");
+    expect(notificationLink(line)).toContain("/go/task/12");
+  });
+});

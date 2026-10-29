@@ -1,9 +1,10 @@
 /**
  * Reading a task's title for what else it says: "Send the invoice friday at
  * 3pm !high #billing @sam" is a task called "Send the invoice", due Friday at
- * three, high priority, tagged billing and given to Sam.
+ * three, high priority, tagged billing and given to Sam. "Bug: login broken"
+ * is a bug, where the project has a type of that name.
  *
- * Pure: the words it knows, the tags and people it may name and the moment it
+ * Pure: the words it knows, the tags, types and people it may name and the moment it
  * reads from are all handed in, so the same title always reads the same way.
  * The words come from the reader's language (`tasks:smartTitle.words`) and the
  * weekday and month names from the browser's, so a title is read in the
@@ -25,7 +26,7 @@ import {
   startOfYear,
 } from "date-fns";
 
-import type { TagSummary, TaskPriority } from "@/api/generated/initiativeAPI.schemas";
+import type { TagSummary, TaskPriority, TaskTypeRead } from "@/api/generated/initiativeAPI.schemas";
 import { dateTimeFormat } from "@/lib/intl";
 import {
   createRecurrenceFromPreset,
@@ -214,7 +215,7 @@ export interface TitlePerson {
   status: string;
 }
 
-export type TitlePartType = "due" | "priority" | "repeat" | "tag" | "person";
+export type TitlePartType = "type" | "due" | "priority" | "repeat" | "tag" | "person";
 
 /** A stretch of the title that was read as something. */
 export interface TitlePart {
@@ -225,7 +226,7 @@ export interface TitlePart {
   text: string;
   /** Names it for {@link TitleReading.kept}: the same words read the same way. */
   key: string;
-  /** The tag or person it names. */
+  /** The tag, person or task type it names. */
   id?: number;
 }
 
@@ -242,6 +243,8 @@ export interface TitleReading {
   repeatStrategy: "fixed" | "rolling";
   tags: TagSummary[];
   people: TitlePerson[];
+  /** The project's task type the title starts with: "bug: …". */
+  type: TaskTypeRead | null;
 }
 
 export interface TitleContext {
@@ -251,6 +254,8 @@ export interface TitleContext {
   weekStartsOn: number;
   /** The community's tags, which `#` names. */
   tags: TagSummary[];
+  /** The project's task types, which a title may start with: "bug: …". */
+  types: TaskTypeRead[];
   /** Who `@` may name, as far as they are known. */
   people: TitlePerson[];
   /** Who "@me" is. */
@@ -271,6 +276,7 @@ const asTyped = (text: string): TitleReading => ({
   repeatStrategy: "fixed",
   tags: [],
   people: [],
+  type: null,
 });
 
 // ── Words in the title ──────────────────────────────────────────────────────
@@ -1076,6 +1082,33 @@ const personAt = (
   return named.length === 1 ? named[0] : null;
 };
 
+// ── Task types ──────────────────────────────────────────────────────────────
+
+/** A name as it is compared, its spaces as one. */
+const typeName = (value: string) => normalizeWord(value).trim().replace(/\s+/g, " ");
+
+/** A name as written, but for its case and its spaces. */
+const exactTypeName = (value: string) => value.toLowerCase().trim().replace(/\s+/g, " ");
+
+/** The task type a title starts with, named in full and followed straight
+ *  away by a colon ("bug:", "user story:"), and where the colon ends. A name
+ *  written as a type spells it is that type; one that matches only without its
+ *  accents names a type when it names just one. */
+const typeAt = (
+  text: string,
+  types: TaskTypeRead[]
+): { type: TaskTypeRead; end: number } | null => {
+  const match = text.match(/^\s*([^\s:][^:]*):(?=\s|$)/);
+  if (!match || /\s$/.test(match[1])) return null;
+  const written = exactTypeName(match[1]);
+  const said = typeName(match[1]);
+  const loose = types.filter((each) => typeName(each.name) === said);
+  const type =
+    types.find((each) => exactTypeName(each.name) === written) ??
+    (loose.length === 1 ? loose[0] : undefined);
+  return type ? { type, end: match[0].length } : null;
+};
+
 // ── Reading ─────────────────────────────────────────────────────────────────
 
 /** The end of the day a date without a time is due: done any time that day. */
@@ -1101,8 +1134,8 @@ const without = (text: string, parts: TitlePart[]): string => {
 };
 
 /**
- * What `text` says. The first date, time, priority and repeat count; every
- * tag and person does. A part `context.kept` names stays in the title. A title
+ * What `text` says. The type it starts with, and the first date, time,
+ * priority and repeat count; every tag and person does. A part `context.kept` names stays in the title. A title
  * that would be left with nothing keeps all of it, so "Tomorrow" alone is a
  * task called "Tomorrow".
  */
@@ -1137,7 +1170,18 @@ export const readTitle = (text: string, context: TitleContext): TitleReading => 
     return true;
   };
 
-  for (let at = 0; at < all.length; at = Math.max(at + 1, taken)) {
+  // Only the very start of a title names its type.
+  const prefix = typeAt(text, context.types);
+  if (prefix) {
+    const after = all.findIndex((word) => word.start >= prefix.end);
+    const count = after === -1 ? all.length : after;
+    if (take("type", 0, count, prefix.end, prefix.type.id)) {
+      reading.type = prefix.type;
+      taken = count;
+    }
+  }
+
+  for (let at = taken; at < all.length; at = Math.max(at + 1, taken)) {
     const word = all[at];
     const core = word.core;
 

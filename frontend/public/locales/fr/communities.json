@@ -312,6 +312,7 @@
     "eventCancelled": "{{canceller}} a annulé {{eventTitle}}.",
     "eventRsvp": "{{responder}} a répondu {{status}} à {{eventTitle}}.",
     "eventReminder": "{{eventTitle}} approche.",
+    "taskReminder": "Rappel : {{taskTitle}}",
     "accessLevelRead": "en lecture seule",
     "accessLevelReadWrite": "en lecture-écriture",
     "usernameChanged": "Un modérateur a changé votre nom d'utilisateur. Vous étiez {{previousHandle}}.",

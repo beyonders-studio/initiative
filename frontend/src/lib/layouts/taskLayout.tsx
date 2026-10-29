@@ -26,9 +26,11 @@ import { useFillRequired } from "@/components/layouts/FillRequiredDialog";
 import { MemberMultiSelect } from "@/components/members/MemberSearchSelect";
 import type { useScopePrompt } from "@/components/recurrence/OccurrenceScopeDialog";
 import { RecurrenceEditor } from "@/components/recurrence/RecurrenceEditor";
+import { SmartTitleHints } from "@/components/tasks/SmartTitleHints";
 import { PART_MARK, SmartTitleParts } from "@/components/tasks/SmartTitleParts";
 import { TaskChecklist } from "@/components/tasks/TaskChecklist";
 import { TaskPriorityOption } from "@/components/tasks/TaskPriorityOption";
+import { TaskReminderField } from "@/components/tasks/TaskReminderField";
 import { statusTriggerStyle, TaskStatusOption } from "@/components/tasks/TaskStatusOption";
 import { TaskTypeOption } from "@/components/tasks/TaskTypeOption";
 import { CasePanel } from "@/components/tickets/CasePanel";
@@ -61,6 +63,7 @@ import {
 } from "@/hooks/useTasks";
 import { detailLayoutOf, instanceTarget, useToolLayouts } from "@/hooks/useToolLayouts";
 import { dateRangeBounds } from "@/lib/dateRange";
+import { fromPickerValue, toPickerValue } from "@/lib/localDateTime";
 import { toast } from "@/lib/mascotToast";
 import {
   fromStored,
@@ -72,6 +75,7 @@ import {
 import { referenceRef } from "@/lib/smartChips";
 import { type Applied, NOTHING_APPLIED, readingEdit } from "@/lib/smartTaskTitle";
 import { PRIORITY_ORDER } from "@/lib/sorting";
+import { startedFrom, startsWith } from "@/lib/taskTypeStart";
 import { dateTimePattern } from "@/lib/timeFormat";
 import { taskRoute } from "@/lib/tools";
 import {
@@ -197,6 +201,7 @@ const SmartTitleEditor = ({ item: task, label }: EditorProps) => {
       placeholder={t("taskForm.titlePlaceholder")}
       marks={parts.map((part) => ({ ...part, className: PART_MARK[part.type] }))}
       below={<SmartTitleParts reading={smart.reading} onKeep={smart.keep} className="px-3 pt-1" />}
+      trailing={<SmartTitleHints />}
       mention={{
         members: { type: "canOpen", tool: Tool.project, id: task.project_id },
         onPick: smart.picked,
@@ -301,27 +306,6 @@ const StatusEditor = ({ task }: { task: TaskRead }) => {
       </Select>
     </FieldFrame>
   );
-};
-
-/** What a new task of `type` starts with where it is drawn: its description
- *  outline and its priority. (Its checklist lines and repeat are added by the
- *  server when it is made.) */
-const startsWith = (type: TaskTypeRead) => ({
-  description: type.starting_values?.description ?? null,
-  priority: type.starting_values?.priority ?? "medium",
-});
-
-/** What a task being added takes from `type` in place of what it took from
- *  `was`: each of the fields above the person has left as it started. */
-const startedFrom = (task: TaskRead, was: TaskTypeRead, type: TaskTypeRead) => {
-  const before = startsWith(was);
-  const after = startsWith(type);
-  return {
-    ...((task.description ?? "") === (before.description ?? "")
-      ? { description: after.description }
-      : {}),
-    ...(task.priority === before.priority ? { priority: after.priority } : {}),
-  };
 };
 
 /** What the fields a change of a task asks for are drawn in: writable, and
@@ -560,14 +544,6 @@ const TagsEditor = ({ item: task, label }: EditorProps) => {
   );
 };
 
-/** A stored date as the pickers hold it: local, to the minute. */
-const toLocalInputValue = (value: string | null) => {
-  const date = value ? new Date(value) : null;
-  if (!date || Number.isNaN(date.getTime())) return "";
-  const pad = (segment: number) => segment.toString().padStart(2, "0");
-  return `${date.getFullYear()}-${pad(date.getMonth() + 1)}-${pad(date.getDate())}T${pad(date.getHours())}:${pad(date.getMinutes())}`;
-};
-
 const DATE_FIELDS = [
   { key: "start", field: "start_date", label: "taskForm.startDateLabel", id: "task-start-date" },
   { key: "due", field: "due_date", label: "taskForm.dueDateLabel", id: "task-due-date" },
@@ -581,8 +557,8 @@ const DatesEditor = ({ task }: { task: TaskRead }) => {
   const { readOnly, askScope } = useTaskLayout();
   const save = useTaskFieldSave(task, t("taskForm.sections.schedule"), askScope);
   const saved: DatePair = {
-    start: toLocalInputValue(task.start_date),
-    due: toLocalInputValue(task.due_date),
+    start: toPickerValue(task.start_date),
+    due: toPickerValue(task.due_date),
   };
   const inverted = (pair: DatePair) => dateRangeBounds(pair.start, pair.due).isInverted;
   // Only the dates that moved are sent; Undo puts back what was stored.
@@ -590,7 +566,7 @@ const DatesEditor = ({ task }: { task: TaskRead }) => {
     saved,
     (pair) => {
       const moved = DATE_FIELDS.filter(({ key }) => pair[key] !== saved[key]);
-      const at = (local: string) => (local ? new Date(local).toISOString() : null);
+      const at = fromPickerValue;
       const edit: TaskEdit = { patch: {}, shows: {} };
       const undo: TaskEdit = { patch: {}, shows: {} };
       for (const { key, field } of moved) {
@@ -635,6 +611,9 @@ const DatesEditor = ({ task }: { task: TaskRead }) => {
           {t("dates:invalidRange")}
         </p>
       ) : null}
+      {/* The reader's own, so it is theirs to set where the task is read-only,
+          and there once the task is. */}
+      {task.id > 0 ? <TaskReminderField task={task} /> : null}
     </FieldFrame>
   );
 };

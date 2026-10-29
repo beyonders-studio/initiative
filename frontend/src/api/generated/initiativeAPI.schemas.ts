@@ -8169,6 +8169,7 @@ export const NotificationType = {
   event_cancelled: "event_cancelled",
   event_rsvp: "event_rsvp",
   event_reminder: "event_reminder",
+  task_reminder: "task_reminder",
   export_ready: "export_ready",
   export_failed: "export_failed",
   import_ready: "import_ready",
@@ -8888,6 +8889,8 @@ export interface PersonalItemState {
   bookmarked_at: string | null;
   subscribed_at: string | null;
   subscribed: boolean | null;
+  remind_at: string | null;
+  reminded_at: string | null;
 }
 
 /**
@@ -10496,6 +10499,13 @@ export interface RelationshipRead {
   confidence: number | null;
   created_by: number | null;
   created_at: string;
+}
+
+/**
+ * When to remind the reader of a task.
+ */
+export interface ReminderSet {
+  remind_at: string;
 }
 
 /**

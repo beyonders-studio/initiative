@@ -9,6 +9,10 @@
       "title": "Überfällige Aufgaben",
       "body_one": "{{count}} Aufgabe ist überfällig: {{title}}",
       "body_other": "{{count}} Aufgaben sind überfällig, darunter {{title}}"
+    },
+    "reminder": {
+      "title": "Erinnerung",
+      "body": "{{task}}"
     }
   },
   "comingUp": {

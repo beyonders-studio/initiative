@@ -1,4 +1,5 @@
-"""What a member keeps about items: opens, bookmarks and subscriptions.
+"""What a member keeps about items: opens, bookmarks, subscriptions and
+reminders.
 
 A subscription is also worked out: making something or being named on it
 subscribes the reader, so unsubscribing is kept as a mark of its own.
@@ -11,6 +12,10 @@ nothing of the item, so a mark on something the reader has lost still comes
 off. A community's bookmarks serve its sidebar and the bookmarks on its pages;
 ``/me/personal-items`` gathers every community's tabs or bookmarks, names and
 icons only, each community's read inside that community's routed session.
+
+A reminder is on a task, and is the reader's alone: it is told to them when it
+comes due (``notifications.task_reminder_scan``), and a repeating task's next
+task takes it on.
 """
 
 from __future__ import annotations
@@ -31,6 +36,7 @@ from app.schemas.tenant.personal_item import (
     ListedMark,
     PersonalItemRead,
     PersonalItemState,
+    ReminderSet,
 )
 from app.services.cross_guild import gather_across_guilds
 from app.services.tenant import personal_items as service
@@ -100,6 +106,8 @@ async def _state(
         bookmarked_at=row.bookmarked_at if row else None,
         subscribed_at=row.subscribed_at if row else None,
         subscribed=subscribed,
+        remind_at=row.remind_at if row else None,
+        reminded_at=row.reminded_at if row else None,
     )
 
 
@@ -204,6 +212,42 @@ async def subscribe_item(
     return await _set(
         Mark.subscribe, kind.value, entity_id, session, current_user, guild_context
     )
+
+
+@guild_router.put("/reminder/task/{task_id}", response_model=PersonalItemState)
+async def set_task_reminder(
+    task_id: int,
+    reminder: ReminderSet,
+    session: RLSSessionDep,
+    current_user: CurrentUser,
+    guild_context: GuildContextDep,
+) -> PersonalItemState:
+    """Remind the reader of a task at a time of their choosing. Setting it again
+    moves it, and arms one already sent. A platform grantee is not a member, so
+    nothing is kept for them."""
+    row = await resource_access.load_kind(
+        session, "task", task_id, current_user, guild_context
+    )
+    if not guild_context.is_pam:
+        await service.set_reminder(
+            session,
+            user_id=current_user.id,
+            task_id=row.id,
+            remind_at=reminder.remind_at,
+        )
+    return await _state(session, current_user.id, "task", row.id)
+
+
+@guild_router.delete("/reminder/task/{task_id}", status_code=status.HTTP_204_NO_CONTENT)
+async def clear_task_reminder(
+    task_id: int,
+    session: RLSSessionDep,
+    current_user: CurrentUser,
+    guild_context: GuildContextDep,
+) -> None:
+    """Take the reader's reminder of a task off. Idempotent."""
+    del guild_context
+    await service.clear_reminder(session, user_id=current_user.id, task_id=task_id)
 
 
 async def _clear(mark: Mark, kind: str, entity_id: int, session, user_id: int) -> None:

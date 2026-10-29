@@ -26,6 +26,7 @@ import { Input } from "@/components/ui/input";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
 import { Slider } from "@/components/ui/slider";
 import { useAppendPropertyOption } from "@/hooks/useProperties";
+import { toPickerValue } from "@/lib/localDateTime";
 import { cn } from "@/lib/utils";
 
 import { type ScaleDisplay, scaleValue } from "./propertyHelpers";
@@ -347,7 +348,7 @@ export const PropertyInput = ({
       // Convert to a fully-qualified ISO string (with TZ offset) on write so
       // the backend stores an unambiguous instant.
       const stored = coerceString(value);
-      const localValue = stored ? localFromIso(stored) : "";
+      const localValue = stored ? toPickerValue(stored) : "";
       return (
         <DateTimePicker
           value={localValue}
@@ -673,17 +674,3 @@ const PropertyOptionPicker = ({
 };
 
 // ── Helpers ─────────────────────────────────────────────────────────────────
-
-/**
- * Convert a stored ISO-8601 timestamp into the local-time `yyyy-MM-dd'T'HH:mm`
- * format the DateTimePicker primitive expects.
- */
-const localFromIso = (iso: string): string => {
-  const date = new Date(iso);
-  if (Number.isNaN(date.getTime())) return "";
-  const pad = (n: number) => String(n).padStart(2, "0");
-  return (
-    `${date.getFullYear()}-${pad(date.getMonth() + 1)}-${pad(date.getDate())}` +
-    `T${pad(date.getHours())}:${pad(date.getMinutes())}`
-  );
-};

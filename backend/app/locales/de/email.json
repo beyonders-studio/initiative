@@ -590,5 +590,12 @@
       "body_one": "<strong>{{answerer}}</strong> hat deine Anfrage abgelehnt",
       "body_other": "<strong>{{answerer}}</strong> hat deine Anfrage für {{count}} Dateien abgelehnt"
     }
+  },
+  "task": {
+    "reminder": {
+      "subject": "Erinnerung: {{task}}",
+      "title": "Erinnerung",
+      "body": "Du wolltest an <strong>{{task}}</strong> erinnert werden."
+    }
   }
 }
