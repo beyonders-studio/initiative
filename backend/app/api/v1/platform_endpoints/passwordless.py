@@ -181,7 +181,7 @@ async def recover_with_code(
     await require_login_method(session, LoginMethod.password)
     # The policy runs before anything is spent: a candidate this deployment
     # would not take must not cost the account one of its codes.
-    await validate_new_password(payload.password)
+    await validate_new_password(session, payload.password)
 
     # Counted by the address typed in as well as by the account, the same way
     # a password is, so an address nobody holds runs out like one somebody does.

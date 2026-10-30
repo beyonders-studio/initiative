@@ -238,6 +238,7 @@ async def _platform_auth_payload(session) -> PlatformAuthSettingsResponse:
         session_max_hours=stored["session_max_hours"],
         session_idle_minutes=stored["session_idle_minutes"],
         second_factor_requirement=stored["second_factor_requirement"],
+        breached_password_check_enabled=stored["breached_password_check_enabled"],
         accounts_without_factor=AccountsWithoutFactor(
             platform_roles=without_factor[SecondFactorRequirement.platform_roles],
             everyone=without_factor[SecondFactorRequirement.everyone],
@@ -280,6 +281,10 @@ async def update_platform_auth_settings(
         for key in ("session_max_hours", "session_idle_minutes")
         if key in payload.model_fields_set
     }
+    if payload.breached_password_check_enabled is not None:
+        changes["breached_password_check_enabled"] = (
+            payload.breached_password_check_enabled
+        )
     if payload.methods is not None:
         changes["login_methods"] = frozenset(payload.methods)
     if payload.second_factor_requirement is not None:
@@ -385,6 +390,10 @@ _COMMUNITY_RULE_FIELDS = (
     ("engagement_ranking_enabled", "engagement_ranking_enabled"),
     ("guests_enabled", "guests_enabled"),
     ("max_guest_days", "max_guest_days"),
+    ("public_registration_enabled", "public_registration_enabled"),
+    ("community_creation_enabled", "community_creation_enabled"),
+    ("community_creation_daily_limit", "community_creation_daily_limit"),
+    ("community_export_cooldown_hours", "community_export_cooldown_hours"),
 )
 
 
@@ -401,6 +410,10 @@ async def _community_payload(session: AsyncSession) -> CommunitySettingsResponse
         engagement_ranking_enabled=stored["engagement_ranking_enabled"],
         guests_enabled=stored["guests_enabled"],
         max_guest_days=stored["max_guest_days"],
+        public_registration_enabled=stored["public_registration_enabled"],
+        community_creation_enabled=stored["community_creation_enabled"],
+        community_creation_daily_limit=stored["community_creation_daily_limit"],
+        community_export_cooldown_hours=stored["community_export_cooldown_hours"],
     )
 
 

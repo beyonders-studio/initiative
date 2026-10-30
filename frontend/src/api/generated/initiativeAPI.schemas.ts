@@ -4405,6 +4405,10 @@ export interface CommunitySettingsResponse {
   engagement_ranking_enabled: boolean;
   guests_enabled: boolean;
   max_guest_days: number;
+  public_registration_enabled: boolean;
+  community_creation_enabled: boolean;
+  community_creation_daily_limit: number;
+  community_export_cooldown_hours: number;
 }
 
 export interface CommunitySettingsUpdate {
@@ -4418,6 +4422,10 @@ export interface CommunitySettingsUpdate {
   on_hold_community_deletion_days?: number | null;
   guests_enabled?: boolean | null;
   max_guest_days?: number | null;
+  public_registration_enabled?: boolean | null;
+  community_creation_enabled?: boolean | null;
+  community_creation_daily_limit?: number | null;
+  community_export_cooldown_hours?: number | null;
 }
 
 export interface CommunityStorageUsageRead {
@@ -8528,6 +8536,7 @@ export interface OperatorUserRead {
   password_required: boolean;
   demo_expires_at: string | null;
   demo_community_id: number | null;
+  can_create_communities: boolean;
   initiative_roles: UserInitiativeRole[];
   purge_at: string | null;
   sign_in_locked_until: string | null;
@@ -8535,7 +8544,6 @@ export interface OperatorUserRead {
   api_key_count: number;
   allowed_actions: UserAction[];
   open_case_count: number;
-  readonly can_create_communities: boolean;
   /**
    * Platform capabilities granted by this user's standing role — none
    * while the account is suspended.
@@ -8971,6 +8979,7 @@ export interface PlatformAuthSettingsResponse {
   session_max_hours: number | null;
   session_idle_minutes: number | null;
   second_factor_requirement: SecondFactorRequirement;
+  breached_password_check_enabled: boolean;
   accounts_without_factor: AccountsWithoutFactor;
 }
 
@@ -8987,6 +8996,7 @@ export interface PlatformAuthSettingsUpdate {
   second_factor_requirement?: SecondFactorRequirement | null;
   session_max_hours?: number | null;
   session_idle_minutes?: number | null;
+  breached_password_check_enabled?: boolean | null;
 }
 
 /**
@@ -11742,8 +11752,8 @@ export interface UserRead {
   password_required: boolean;
   demo_expires_at: string | null;
   demo_community_id: number | null;
+  can_create_communities: boolean;
   initiative_roles: UserInitiativeRole[];
-  readonly can_create_communities: boolean;
   /**
    * Platform capabilities granted by this user's standing role — none
    * while the account is suspended.

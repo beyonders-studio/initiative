@@ -26,6 +26,8 @@ from pypdf import PdfReader
 from sqlalchemy import delete as sa_delete
 from sqlmodel import select
 
+from app.services.platform import rules
+from app.core.rules import PLATFORM_RULES
 from app.api import deps as api_deps
 from app.core.config import settings
 from app.core.relationships import RelationshipType
@@ -3725,7 +3727,8 @@ async def test_whole_community_export_has_a_cooldown(
 async def test_cooldown_can_be_switched_off(
     client: AsyncClient, acting_user, session, monkeypatch
 ):
-    monkeypatch.setattr(settings, "EXPORT_GUILD_COOLDOWN_HOURS", 0)
+    await rules.put(session, "community_export_cooldown_hours", 0)
+    await session.commit()
     a = await acting_user(
         guild_role=CommunityRole.superadmin, initiative=True, project=True
     )
@@ -3752,7 +3755,10 @@ async def test_guild_export_status_says_who_took_the_last_one_and_when(
     assert body["latest"] is None
     assert body["latest_started_by"] is None
     assert body["next_available_at"] is None
-    assert body["cooldown_hours"] == settings.EXPORT_GUILD_COOLDOWN_HOURS
+    assert (
+        body["cooldown_hours"]
+        == PLATFORM_RULES["community_export_cooldown_hours"].default
+    )
 
     started = await _export(client, a, "community")
     assert started.status_code == 202, started.text
@@ -3770,7 +3776,7 @@ async def test_guild_export_status_says_who_took_the_last_one_and_when(
     created_at = datetime.fromisoformat(body["latest"]["created_at"])
     available_at = datetime.fromisoformat(body["next_available_at"])
     assert available_at == created_at + timedelta(
-        hours=settings.EXPORT_GUILD_COOLDOWN_HOURS
+        hours=PLATFORM_RULES["community_export_cooldown_hours"].default
     )
 
     refused = await _export(client, a, "community")

@@ -563,6 +563,9 @@ class PlatformAuthSettingsResponse(SanitizedBaseModel):
     session_idle_minutes: Optional[int] = None
     #: Who this deployment asks to hold a second factor.
     second_factor_requirement: SecondFactorRequirement = SecondFactorRequirement.nobody
+    #: Whether a new password is checked against the breach corpus. Only the
+    #: first five characters of its hash leave the server.
+    breached_password_check_enabled: bool = True
     #: What each level would ask for, as things stand.
     accounts_without_factor: AccountsWithoutFactor
 
@@ -598,6 +601,9 @@ class PlatformAuthSettingsUpdate(SanitizedBaseModel):
     #: which leaves ``AUTH_REFRESH_TTL_DAYS``. Floored at a minute — anything
     #: less ends a session while somebody is still reading the page.
     session_idle_minutes: Optional[int] = Field(default=None, ge=1, le=525600)
+    #: Whether a new password is checked against the breach corpus. Off, for
+    #: a deployment that cannot reach it.
+    breached_password_check_enabled: Optional[bool] = None
 
 
 class InterfaceSettingsResponse(SanitizedBaseModel):
@@ -657,6 +663,17 @@ class CommunitySettingsResponse(SanitizedBaseModel):
     #: in days. Off, no guest reaches anything until it is back on.
     guests_enabled: bool
     max_guest_days: int
+    #: Whether somebody may register without an invite. Registration also
+    #: closes while community creation is off.
+    public_registration_enabled: bool
+    #: Whether any account may create a community. Off, only an account that
+    #: manages communities may.
+    community_creation_enabled: bool
+    #: How many communities one account may create in a day; 0 is no limit.
+    community_creation_daily_limit: int
+    #: How long a community waits between whole-community exports, in hours;
+    #: 0 is no wait.
+    community_export_cooldown_hours: int
 
 
 class NotificationSettingsResponse(SanitizedBaseModel):
@@ -732,6 +749,11 @@ class CommunitySettingsUpdate(SanitizedBaseModel):
     max_guest_days: Optional[int] = Field(
         default=None, ge=1, le=MAX_GUILD_RETENTION_DAYS
     )
+    #: Omitted, each is left as it was.
+    public_registration_enabled: Optional[bool] = None
+    community_creation_enabled: Optional[bool] = None
+    community_creation_daily_limit: Optional[int] = Field(default=None, ge=0, le=1000)
+    community_export_cooldown_hours: Optional[int] = Field(default=None, ge=0, le=8760)
 
 
 class EmailSettingsResponse(SanitizedBaseModel):

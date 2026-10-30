@@ -772,6 +772,13 @@ PLATFORM_RULES: dict[str, Rule] = {
         ),
         _platform("marketplace_members_publish_directly", "marketplace"),
         _platform("marketplace_registry_enabled", "marketplace_registry"),
+        _platform("public_registration_enabled", "community"),
+        _platform("community_creation_enabled", "community"),
+        _platform("community_creation_daily_limit", "community"),
+        # Counted from each community's last export, so changing it moves the
+        # date for one already waiting.
+        _platform("community_export_cooldown_hours", "community"),
+        _platform("breached_password_check_enabled", "passwords"),
     )
 }
 

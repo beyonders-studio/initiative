@@ -11,8 +11,10 @@ import hashlib
 import httpx
 import pytest
 
-from app.core.config import settings as app_settings
 from app.services import hibp
+
+#: The client itself, before the suite-wide stub replaces it.
+_LOOKUP = hibp.is_password_breached
 
 
 def _sha1(password: str) -> str:
@@ -29,10 +31,9 @@ def _sha1(password: str) -> str:
 
 @pytest.fixture
 def enable_hibp(monkeypatch):
-    """Re-enable the breach check — the global conftest fixture turns
-    it off so other tests don't make network calls. These tests
-    explicitly exercise the client, so they flip it back on."""
-    monkeypatch.setattr(app_settings, "HIBP_CHECK_ENABLED", True)
+    """Put the client back — the global conftest fixture stubs it so other
+    tests don't make network calls. These tests exercise the client."""
+    monkeypatch.setattr(hibp, "is_password_breached", _LOOKUP)
 
 
 def _install_transport(monkeypatch, handler):
@@ -52,10 +53,6 @@ def _install_transport(monkeypatch, handler):
 
 
 class TestIsPasswordBreached:
-    async def test_returns_false_when_disabled(self, monkeypatch):
-        monkeypatch.setattr(app_settings, "HIBP_CHECK_ENABLED", False)
-        assert await hibp.is_password_breached("anything") is False
-
     async def test_returns_false_for_empty_password(self, enable_hibp):
         assert await hibp.is_password_breached("") is False
 

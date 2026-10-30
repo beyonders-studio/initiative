@@ -990,15 +990,15 @@ async def create_guild_settings(session: AsyncSession, guild_id: int) -> GuildSe
 
 
 async def may_create_another_guild(session: AsyncSession, *, user_id: int) -> bool:
-    """Has this account created fewer than ``GUILD_CREATION_DAILY_LIMIT``
-    communities in the last day?
+    """Has this account created fewer than the deployment's
+    ``community_creation_daily_limit`` communities in the last day?
 
     Takes a per-account lock held until the transaction ends, so the guild the
     caller then inserts is committed before the next creation for this account
     counts. A deleted community still counts: its row stays for at least
     ``MIN_GUILD_RETENTION_DAYS`` after deletion, which is at least this window.
     """
-    limit = settings.GUILD_CREATION_DAILY_LIMIT
+    limit = (await rules.platform_values(session))["community_creation_daily_limit"]
     if not limit:
         return True
     await advisory_lock(session, LockNamespace.GUILD_CREATION, user_id)

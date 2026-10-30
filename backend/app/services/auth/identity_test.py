@@ -11,7 +11,7 @@ import secrets
 
 from sqlmodel import select
 
-from app.core.config import settings
+from app.services.platform import rules
 from app.core.encryption import hash_email
 from app.core.login_methods import LoginMethod
 from app.models.platform.auth_provider import AuthProvider, AuthProviderKind
@@ -316,7 +316,8 @@ async def test_provision_email_race_unverified_is_refused(session):
 async def test_closed_registration_refuses_unknown_user(session, monkeypatch):
     provider = await _create_provider(session)
     await create_user(session)  # instance is not empty → no bootstrap exception
-    monkeypatch.setattr(settings, "ENABLE_PUBLIC_REGISTRATION", False)
+    await rules.put(session, "public_registration_enabled", False)
+    await session.commit()
 
     result = await _resolve(session, provider, email="stranger@example.com")
     assert result.outcome is ResolutionOutcome.REGISTRATION_DISABLED
@@ -586,7 +587,6 @@ async def test_two_ways_in_withdrawn_together_strand_the_account(session):
 
 async def _withdraw_passkeys(session) -> None:
     """Leave the deployment permitting the other three."""
-    from app.services.platform import rules
 
     await rules.put(
         session,
@@ -640,7 +640,6 @@ async def test_an_account_holding_nothing_has_no_way_in(session):
 
 async def _permit_the_emailed_code(session) -> None:
     """A deployment that offers it alongside the rest."""
-    from app.services.platform import rules
 
     await rules.put(
         session,
