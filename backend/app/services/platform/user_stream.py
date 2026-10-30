@@ -194,6 +194,20 @@ async def _publish_to_everyone(frame: Dict[str, Any]) -> bool:
         return False
 
 
+async def publish_to_everyone(frame: Dict[str, Any]) -> None:
+    """``frame`` for every connected reader, on this worker and the others.
+
+    For a change every account's answer is read from, such as a deployment
+    rule. Each reader refetches once, so it is for rare writes only. Where the
+    bus refuses it, everybody is told again once it is back.
+    """
+    global _dropped_remote
+
+    _deliver_local(None, frame)
+    if not await _publish_to_everyone(frame):
+        _dropped_remote = True
+
+
 async def on_bus_connected() -> None:
     """The bus is up, so it was down, and both directions of it were.
 

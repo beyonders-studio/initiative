@@ -65,6 +65,7 @@ from app.services import email as email_service
 from app.services.auth import guild_provider_connections as guild_connections
 from app.services.auth import identity as identity_service
 from app.services.auth.platform_provider import is_login_ready
+from app.services.platform import account_stream
 from app.services.platform import app_settings as app_settings_service
 from app.services.platform import guild_entitlements
 from app.services.platform import guilds as guilds_service
@@ -432,6 +433,14 @@ class Rule:
         )
 
 
+async def _everyone_rereads_their_account(
+    ctx: RuleContext, before: Any, after: Any
+) -> None:
+    # Whether an account may create a community is part of what ``/me``
+    # answers, so every open tab reads it again.
+    account_stream.queue_signal_to_everyone(ctx.system)
+
+
 async def _ai_mode_moved(ctx: RuleContext, before: Any, after: Any) -> None:
     # Every worker reads the version beside the mode and reloads the
     # operator's connections when it moves.
@@ -773,7 +782,11 @@ PLATFORM_RULES: dict[str, Rule] = {
         _platform("marketplace_members_publish_directly", "marketplace"),
         _platform("marketplace_registry_enabled", "marketplace_registry"),
         _platform("public_registration_enabled", "community"),
-        _platform("community_creation_enabled", "community"),
+        _platform(
+            "community_creation_enabled",
+            "community",
+            follow_up=_everyone_rereads_their_account,
+        ),
         _platform("community_creation_daily_limit", "community"),
         # Counted from each community's last export, so changing it moves the
         # date for one already waiting.

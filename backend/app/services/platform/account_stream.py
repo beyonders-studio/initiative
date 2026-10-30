@@ -20,10 +20,23 @@ The socket, the after-commit queueing and the cross-worker bus belong to
 
 from typing import Any
 
+from app.db import post_commit
 from app.services.platform import user_stream
 
 #: What the client switches on to tell this channel from the inbox one.
 RESOURCE = "account"
+
+
+def queue_signal_to_everyone(session: Any, action: str = "changed") -> None:
+    """Note that this session changed what ``/me`` would answer for every
+    account, such as a deployment rule it reads. Sent once the transaction
+    commits; every connected reader refetches once."""
+    frame = user_stream.build_frame(RESOURCE, action)
+    post_commit.after_commit(
+        session,
+        lambda: user_stream.publish_to_everyone(frame),
+        key=("account_signal_to_everyone", action),
+    )
 
 
 def queue_account_signal(
