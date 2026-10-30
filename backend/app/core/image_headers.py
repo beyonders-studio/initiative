@@ -25,6 +25,8 @@ from __future__ import annotations
 import hashlib
 from dataclasses import dataclass
 
+from fastapi import Response
+
 from app.core.errors import CodedError
 from app.core.messages import ImageMessages
 
@@ -113,6 +115,25 @@ def validate_image(spec: ImageSpec, data: bytes) -> ValidatedImage:
         content_type=header.content_type,
         width=header.width,
         height=header.height,
+    )
+
+
+def image_response(data: bytes, content_type: str, *, shared: bool) -> Response:
+    """Serve stored image bytes addressed by their digest.
+
+    The digest is in the URL, so these bytes are these bytes forever and the
+    response is cached for a year. ``shared`` is whether every caller gets the
+    same answer: a shared cache may then hand it on, and otherwise only the
+    browser that asked keeps it.
+    """
+    scope = "public" if shared else "private"
+    return Response(
+        content=data,
+        media_type=content_type,
+        headers={
+            "Cache-Control": f"{scope}, max-age=31536000, immutable",
+            "X-Content-Type-Options": "nosniff",
+        },
     )
 
 
