@@ -157,7 +157,7 @@ The person who should be sending out invites is not always the person who should
 
 | A role on… | Does |
 |---|---|
-| **Member** | Gives a member a few jobs: the community's profile, invites, the member list, community-wide calendars, or the usage page. "Door person" is a member role with invites. |
+| **Member** | Gives a member a few jobs: the community's profile, invites, the member list, community-wide calendars, or the usage page. "Door person" is a member role with invites. Guest invites stay with admins, since a guest can be let into any initiative. |
 | **Admin** | Narrows an admin to the jobs it lists. They still see everything in the community; they just can't run the parts left out. |
 
 - **One role each.** A role only counts while the person is still on its rung, so demoting an admin quietly retires their admin role. Somebody who leaves and comes back starts with none.
