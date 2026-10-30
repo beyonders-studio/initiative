@@ -42,6 +42,7 @@ const STAGED_JOB = {
   id: 55,
   community_id: 1,
   created_by: 1,
+  direction: "import",
   source: "backup",
   params: {},
   status: "staged",

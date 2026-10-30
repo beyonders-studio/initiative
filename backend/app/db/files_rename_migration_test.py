@@ -70,13 +70,15 @@ _PLUGIN_BINDING = {"source": "plugin", "params": {"document_id": 5}}
 
 def _guild_runner(schema: str):
     """Revision 0464 one way or the other, on one guild's schema only. The
-    metadata store (20261027_0550), the galleries conversion (20261027_0546)
-    and the data jobs table (20261030_0564) come off first and go back last:
+    metadata store (20261027_0550), the galleries conversion (20261027_0546),
+    the batched notices (20261030_0563) and the data jobs table
+    (20261030_0564) come off first and go back last:
     the checks 0464 restates name the permissions as they were then, and it
     respells the exports in the table they had then."""
     files = _load("20261006_0464_documents_are_files.py")
     collections = _load("20261027_0546_galleries_are_collections.py")
     metadata = _load("20261027_0550_metadata_is_one_store.py")
+    batched = _load("20261030_0563_assignment_and_reaction_lines_are_one_table.py")
     data_jobs = _load("20261030_0564_imports_and_exports_are_data_jobs.py")
 
     def run(forward: bool):
@@ -95,9 +97,11 @@ def _guild_runner(schema: str):
                     files._convert(bind, True, in_schema)
                     collections._convert(bind, True, in_schema)
                     in_schema(lambda: metadata._apply(True))
+                    in_schema(lambda: batched._upgrade(bind))
                     in_schema(data_jobs._upgrade_schema)
                 else:
                     in_schema(data_jobs._downgrade_schema)
+                    in_schema(lambda: batched._downgrade(bind))
                     in_schema(lambda: metadata._apply(False))
                     collections._convert(bind, False, in_schema)
                     files._convert(bind, False, in_schema)
