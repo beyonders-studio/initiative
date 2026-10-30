@@ -48,7 +48,7 @@ from sqlalchemy.exc import IntegrityError
 from sqlmodel import select
 from sqlmodel.ext.asyncio.session import AsyncSession
 
-from app.api.deps import require_surface_open
+from app.api.deps import refuse_closed_surface, require_surface_open
 from app.core.rules import SURFACE_PLUGINS
 from app.api.deps import (
     AgeViewerDep,
@@ -1267,7 +1267,6 @@ def _handoff_response(handoff: handoff_service.PageHandoff) -> CommunityPluginHa
 @router.post(
     "/{plugin_id}/connections/{connection_id}/connect",
     response_model=CommunityPluginConnectStart,
-    dependencies=[_SURFACE_OPEN],
 )
 async def connect_community_plugin(
     plugin_id: int,
@@ -1312,6 +1311,9 @@ async def connect_community_plugin(
     if guild_wide:
         require_seat(guild_context)
         require_grant_writes(guild_context)
+        # The community's own credential is its configuration; a member's own
+        # account is theirs whatever the deployment leaves the seat.
+        await refuse_closed_surface(session, guild_context.guild_id, SURFACE_PLUGINS)
 
     registration = await handoff_service.require_live_registration(
         plugin, guild_context.guild_id
@@ -1361,7 +1363,6 @@ async def connect_community_plugin(
 @router.delete(
     "/{plugin_id}/connections/{connection_id}",
     status_code=status.HTTP_204_NO_CONTENT,
-    dependencies=[_SURFACE_OPEN],
 )
 async def disconnect_community_plugin(
     plugin_id: int,
@@ -1382,6 +1383,7 @@ async def disconnect_community_plugin(
 
     if connection.get("scope") == "static":
         require_seat(guild_context)
+        await refuse_closed_surface(session, guild_context.guild_id, SURFACE_PLUGINS)
         require_grant_writes(guild_context)
         # Clearing rewrites both configuration maps, so it takes the row: a plug-in
         # writing back at the same moment must not put back what was cleared.

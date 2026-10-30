@@ -2170,15 +2170,22 @@ def require_surface_open(key: str) -> Callable[..., Awaitable[None]]:
     """
 
     async def _open(guild_id: CommunityIdPath, session: SystemSessionDep) -> None:
-        from app.services.platform import rules
-
-        if not await rules.community_value(session, guild_id, key):
-            raise HTTPException(
-                status_code=status.HTTP_403_FORBIDDEN,
-                detail=GuildMessages.COMMUNITY_SURFACE_CLOSED,
-            )
+        await refuse_closed_surface(session, guild_id, key)
 
     return _open
+
+
+async def refuse_closed_surface(session: AsyncSession, guild_id: int, key: str) -> None:
+    """Refuse while the deployment has closed surface ``key`` for the
+    community: :func:`require_surface_open`, for a route that configures the
+    surface on only one of its branches."""
+    from app.services.platform import rules
+
+    if not await rules.community_value(session, guild_id, key):
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail=GuildMessages.COMMUNITY_SURFACE_CLOSED,
+        )
 
 
 async def require_direct_messages_enabled(session: UserSessionDep) -> None:

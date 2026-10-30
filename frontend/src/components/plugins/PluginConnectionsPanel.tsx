@@ -73,12 +73,16 @@ export interface PluginConnectionsPanelProps {
   connections: CommunityPluginConnectionRead[];
   /** Holds the seat, which sets the community-wide connections. */
   canManage: boolean;
+  /** Plug-ins are managed by whoever runs the server: the community-wide
+   * connections are read-only. A member's own account still connects. */
+  closed?: boolean;
 }
 
 export function PluginConnectionsPanel({
   pluginId,
   connections,
   canManage,
+  closed = false,
 }: PluginConnectionsPanelProps) {
   const { t } = useTranslation(["plugins"]);
 
@@ -94,7 +98,7 @@ export function PluginConnectionsPanel({
             key={connection.id}
             pluginId={pluginId}
             connection={connection}
-            canManage={canManage}
+            canManage={canManage && !closed}
           />
         ) : (
           <PersonalConnection key={connection.id} pluginId={pluginId} connection={connection} />

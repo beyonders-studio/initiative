@@ -35,7 +35,8 @@
     "upToDate": "Up to date",
     "upgraded": "Updated to {{version}}.",
     "removeManagedNeutral": "Charges for this plug-in are managed by your provider.",
-    "removeManagedAction": "Manage"
+    "removeManagedAction": "Manage",
+    "closed": "Whoever runs this server manages plug-ins for this community."
   },
   "updates": {
     "wants": "Version {{version}} wants to:",

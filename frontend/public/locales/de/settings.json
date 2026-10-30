@@ -214,6 +214,7 @@
     "connectionsDescription": "Definiere die KI-Verbindungen, die Mitglieder dieser Community verwenden können.",
     "disabledDescription": "KI-Funktionen sind für die Plattform deaktiviert.",
     "managedByPlatform": "KI-Verbindungen werden auf Plattformebene verwaltet. Mitglieder legen ihren eigenen Schlüssel in ihren Profileinstellungen fest.",
+    "managedByServer": "Die Betreiber dieses Servers verwalten die KI für diese Community.",
     "switchTitle": "KI in dieser Community",
     "switchLabel": "KI-Funktionen erlauben",
     "switchHelp": "Ausgeschaltet wird nichts aus dieser Community an einen KI-Anbieter gesendet, egal welche Verbindung der Server oder die Community einrichtet.",
@@ -1379,6 +1380,10 @@
       "supportLabel": "Hilfeanfragen",
       "supportHelp": "Erlaubt den Mitgliedern, eine Hilfeanfrage zu senden. Aus öffnet „Hilfe anfordern“ stattdessen die FAQ.",
       "supportNeedsIntake": "Hilfeanfragen können derzeit nirgendwohin gesendet werden. Verknüpfen Sie den Support-Stream unter Plattformeinstellungen › Eingang mit einem Projekt, dann lässt sich dies einschalten.",
+      "aiConnectionsLabel": "Eigene KI-Verbindungen",
+      "aiConnectionsHelp": "Erlaubt der Community, eigene KI-Anbieter einzurichten. Aus bleiben die vorhandenen erhalten und werden nicht genutzt.",
+      "pluginsLabel": "Eigene Plug-ins",
+      "pluginsHelp": "Erlaubt der Community, Plug-ins zu installieren und einzurichten. Aus laufen die vorhandenen unverändert weiter.",
       "authOption": {
         "restrictions": {
           "label": "Eigener Sicherheitsstandard",

@@ -9041,6 +9041,8 @@ export interface PlatformCommunityStorageRead {
   auth_options: CommunityAuthOption[];
   banner_image_enabled: boolean;
   support_enabled: boolean;
+  ai_connections_open: boolean;
+  plugins_open: boolean;
   lifts_to: CommunityStatus | null;
   allowed_actions: CommunityAction[];
 }
@@ -9075,6 +9077,8 @@ export interface PlatformCommunityStorageUpdate {
   auth_options?: CommunityAuthOption[] | null;
   banner_image_enabled?: boolean | null;
   support_enabled?: boolean | null;
+  ai_connections_open?: boolean | null;
+  plugins_open?: boolean | null;
 }
 
 /**
