@@ -43,6 +43,10 @@ import { readOptionalWholeNumber } from "@/lib/text";
 
 /** The most days the server takes for the longest guest stay. */
 const MAX_GUEST_DAYS = 3650;
+/** The most communities a day the server takes for one account. */
+const MAX_CREATION_DAILY_LIMIT = 1000;
+/** The most hours the server takes between two exports of a community: a year. */
+const MAX_EXPORT_COOLDOWN_HOURS = 8760;
 
 export const SettingsPlatformCommunityPage = () => {
   const { t } = useTranslation(["settings", "common"]);
@@ -63,6 +67,27 @@ export const SettingsPlatformCommunityPage = () => {
     "max_guest_days"
   );
   const guestDays = readOptionalWholeNumber(guestDaysForm.values.days, 1, MAX_GUEST_DAYS);
+  // 0 is a figure here, not a blank: it means no limit, and no wait.
+  const creationLimitForm = useServerForm(
+    community,
+    (loaded) => ({ count: loaded ? String(loaded.community_creation_daily_limit) : "" }),
+    "community_creation_daily_limit"
+  );
+  const creationLimit = readOptionalWholeNumber(
+    creationLimitForm.values.count,
+    0,
+    MAX_CREATION_DAILY_LIMIT
+  );
+  const exportCooldownForm = useServerForm(
+    community,
+    (loaded) => ({ hours: loaded ? String(loaded.community_export_cooldown_hours) : "" }),
+    "community_export_cooldown_hours"
+  );
+  const exportCooldown = readOptionalWholeNumber(
+    exportCooldownForm.values.hours,
+    0,
+    MAX_EXPORT_COOLDOWN_HOURS
+  );
   // Turning the age gate off is an assertion about every account here, not a
   // preference, so it is confirmed. Turning it back on is not.
   const [confirmingAgeGateOff, setConfirmingAgeGateOff] = useState(false);
@@ -94,6 +119,44 @@ export const SettingsPlatformCommunityPage = () => {
       if (variables.max_guest_days !== undefined) {
         guestDaysForm.settle({ days: String(variables.max_guest_days) });
         toast.success(t("community.maxGuestDaysSaved", { count: result.max_guest_days }));
+        return;
+      }
+      if (variables.public_registration_enabled !== undefined) {
+        toast.success(
+          result.public_registration_enabled
+            ? t("community.publicRegistrationEnabledToast")
+            : t("community.publicRegistrationDisabledToast")
+        );
+        return;
+      }
+      if (variables.community_creation_enabled !== undefined) {
+        toast.success(
+          result.community_creation_enabled
+            ? t("community.communityCreationEnabledToast")
+            : t("community.communityCreationDisabledToast")
+        );
+        return;
+      }
+      if (variables.community_creation_daily_limit !== undefined) {
+        creationLimitForm.settle({ count: String(variables.community_creation_daily_limit) });
+        toast.success(
+          result.community_creation_daily_limit === 0
+            ? t("community.creationDailyLimitSavedNone")
+            : t("community.creationDailyLimitSaved", {
+                count: result.community_creation_daily_limit,
+              })
+        );
+        return;
+      }
+      if (variables.community_export_cooldown_hours !== undefined) {
+        exportCooldownForm.settle({ hours: String(variables.community_export_cooldown_hours) });
+        toast.success(
+          result.community_export_cooldown_hours === 0
+            ? t("community.exportCooldownSavedNone")
+            : t("community.exportCooldownSaved", {
+                count: result.community_export_cooldown_hours,
+              })
+        );
         return;
       }
       if (variables.engagement_ranking_enabled !== undefined) {
@@ -318,6 +381,124 @@ export const SettingsPlatformCommunityPage = () => {
             </div>
             <p className="text-muted-foreground text-sm">{t("community.maxGuestDaysHelpText")}</p>
           </div>
+        </div>
+
+        {/* Who may arrive without an invite, and who may start a community
+            once here. Registration closes with community creation, so the two
+            sit together. */}
+        <div className="space-y-4 border-t pt-4">
+          <h3 className="font-semibold text-sm">{t("community.joinAndCreateTitle")}</h3>
+          <div className="flex items-center gap-3">
+            <Switch
+              id="public-registration-enabled"
+              checked={community?.public_registration_enabled ?? true}
+              disabled={isLoading || update.isPending || !community}
+              onCheckedChange={(checked) =>
+                update.mutate({
+                  community_directory_enabled: communityDirectoryEnabled,
+                  public_registration_enabled: Boolean(checked),
+                })
+              }
+            />
+            <Label htmlFor="public-registration-enabled">
+              {t("community.publicRegistrationLabel")}
+            </Label>
+          </div>
+          <p className="text-muted-foreground text-sm">
+            {t("community.publicRegistrationHelpText")}
+          </p>
+          <div className="flex items-center gap-3">
+            <Switch
+              id="community-creation-enabled"
+              checked={community?.community_creation_enabled ?? true}
+              disabled={isLoading || update.isPending || !community}
+              onCheckedChange={(checked) =>
+                update.mutate({
+                  community_directory_enabled: communityDirectoryEnabled,
+                  community_creation_enabled: Boolean(checked),
+                })
+              }
+            />
+            <Label htmlFor="community-creation-enabled">
+              {t("community.communityCreationLabel")}
+            </Label>
+          </div>
+          <p className="text-muted-foreground text-sm">
+            {t("community.communityCreationHelpText")}
+          </p>
+          <div className="ms-7 space-y-2 border-s ps-4">
+            <Label htmlFor="community-creation-daily-limit">
+              {t("community.creationDailyLimitLabel")}
+            </Label>
+            <div className="flex flex-wrap items-center gap-3">
+              <Input
+                id="community-creation-daily-limit"
+                type="number"
+                min={0}
+                max={MAX_CREATION_DAILY_LIMIT}
+                className="w-40"
+                value={creationLimitForm.values.count}
+                disabled={!community?.community_creation_enabled}
+                onChange={(event) => creationLimitForm.set({ count: event.target.value })}
+              />
+              <Button
+                aria-label={t("community.creationDailyLimitSave")}
+                disabled={
+                  !community?.community_creation_enabled ||
+                  creationLimit.value === null ||
+                  !creationLimit.valid ||
+                  creationLimit.value === community.community_creation_daily_limit ||
+                  update.isPending
+                }
+                onClick={() =>
+                  update.mutate({
+                    community_directory_enabled: communityDirectoryEnabled,
+                    community_creation_daily_limit: creationLimit.value,
+                  })
+                }
+              >
+                {update.isPending ? t("common:submitting") : t("common:save")}
+              </Button>
+            </div>
+            <p className="text-muted-foreground text-sm">
+              {t("community.creationDailyLimitHelpText")}
+            </p>
+          </div>
+        </div>
+
+        <div className="space-y-2 border-t pt-4">
+          <Label htmlFor="community-export-cooldown">{t("community.exportCooldownLabel")}</Label>
+          <div className="flex flex-wrap items-center gap-3">
+            <Input
+              id="community-export-cooldown"
+              type="number"
+              min={0}
+              max={MAX_EXPORT_COOLDOWN_HOURS}
+              className="w-40"
+              value={exportCooldownForm.values.hours}
+              disabled={!community}
+              onChange={(event) => exportCooldownForm.set({ hours: event.target.value })}
+            />
+            <Button
+              aria-label={t("community.exportCooldownSave")}
+              disabled={
+                !community ||
+                exportCooldown.value === null ||
+                !exportCooldown.valid ||
+                exportCooldown.value === community.community_export_cooldown_hours ||
+                update.isPending
+              }
+              onClick={() =>
+                update.mutate({
+                  community_directory_enabled: communityDirectoryEnabled,
+                  community_export_cooldown_hours: exportCooldown.value,
+                })
+              }
+            >
+              {update.isPending ? t("common:submitting") : t("common:save")}
+            </Button>
+          </div>
+          <p className="text-muted-foreground text-sm">{t("community.exportCooldownHelpText")}</p>
         </div>
 
         <DeletedCommunityRetentionSection directoryEnabled={communityDirectoryEnabled} />

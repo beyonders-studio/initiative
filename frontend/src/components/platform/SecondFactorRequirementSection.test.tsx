@@ -46,6 +46,7 @@ const base: PlatformAuthSettingsResponse = {
   session_max_hours: null,
   session_idle_minutes: null,
   second_factor_requirement: "nobody",
+  breached_password_check_enabled: true,
   accounts_without_factor: { platform_roles: 2, everyone: 9 },
   // Something can answer the requirement; the case where nothing can has its
   // own test below.

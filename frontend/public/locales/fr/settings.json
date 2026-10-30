@@ -762,6 +762,16 @@
       "idlePlaceholder": "Aucune limite",
       "idleHint": "Combien de temps une session peut rester intouchée avant de se terminer. Laissez vide pour conserver la fenêtre définie au déploiement. Utiliser l'application compte comme y toucher : le délai ne s'écoule qu'une fois arrêté. Une communauté tenue au standard de conformité le raccourcit davantage pour ses membres."
     },
+    "breachedPasswordCheck": {
+      "title": "Mots de passe compromis",
+      "description": "Refuser un nouveau mot de passe déjà apparu dans une fuite de données.",
+      "label": "Vérifier les nouveaux mots de passe parmi les fuites connues",
+      "onHelp": "Seuls les cinq premiers caractères de l'empreinte du mot de passe quittent ce serveur. Jamais le mot de passe lui-même.",
+      "offHelp": "Les nouveaux mots de passe ne sont pas vérifiés. Désactivez-le uniquement si ce serveur ne peut pas accéder à internet.",
+      "enabledToast": "Les nouveaux mots de passe sont vérifiés parmi les fuites connues.",
+      "disabledToast": "Les nouveaux mots de passe ne sont plus vérifiés parmi les fuites connues.",
+      "error": "Nous n'avons pas pu modifier la vérification des mots de passe compromis."
+    },
     "secondFactorRequirement": {
       "title": "Authentification à deux facteurs",
       "description": "Si les personnes ici doivent posséder un second facteur — une application d'authentification ou une clé d'accès — en plus d'un moyen de se connecter.",
@@ -1886,7 +1896,28 @@
     "maxGuestDaysHelpText": "Aucun invité ne reste plus longtemps que cela, quel que soit le réglage d'une communauté.",
     "maxGuestDaysSave": "Enregistrer le séjour maximal des invités",
     "maxGuestDaysSaved_one": "Les invités restent {{count}} jour au plus.",
-    "maxGuestDaysSaved_other": "Les invités restent {{count}} jours au plus."
+    "maxGuestDaysSaved_other": "Les invités restent {{count}} jours au plus.",
+    "joinAndCreateTitle": "Qui peut rejoindre et créer",
+    "publicRegistrationLabel": "Permettre à tout le monde de s'inscrire",
+    "publicRegistrationHelpText": "Chacun peut créer un compte sans invitation. Tant que la création de communautés est désactivée, seules les personnes invitées peuvent s'inscrire.",
+    "publicRegistrationEnabledToast": "Tout le monde peut s'inscrire.",
+    "publicRegistrationDisabledToast": "Seules les personnes invitées peuvent s'inscrire.",
+    "communityCreationLabel": "Permettre à tout le monde de créer une communauté",
+    "communityCreationHelpText": "Désactivé, seules les personnes qui gèrent les communautés de ce serveur peuvent en créer une, et seules les personnes invitées peuvent s'inscrire.",
+    "communityCreationEnabledToast": "Tout le monde peut créer une communauté.",
+    "communityCreationDisabledToast": "Seules les personnes qui gèrent les communautés peuvent en créer une.",
+    "creationDailyLimitLabel": "Communautés qu'un compte peut créer par jour",
+    "creationDailyLimitHelpText": "0 signifie aucune limite. Les personnes qui gèrent les communautés n'y sont pas soumises.",
+    "creationDailyLimitSave": "Enregistrer la limite quotidienne de communautés",
+    "creationDailyLimitSaved_one": "Chaque compte peut créer {{count}} communauté par jour.",
+    "creationDailyLimitSaved_other": "Chaque compte peut créer {{count}} communautés par jour.",
+    "creationDailyLimitSavedNone": "Il n'y a pas de limite quotidienne pour les nouvelles communautés.",
+    "exportCooldownLabel": "Heures entre deux exports d'une communauté",
+    "exportCooldownHelpText": "Le temps qu'une communauté attend avant de pouvoir tout exporter à nouveau. 0 signifie aucune attente.",
+    "exportCooldownSave": "Enregistrer le délai entre les exports de communauté",
+    "exportCooldownSaved_one": "Les communautés attendent {{count}} heure entre deux exports.",
+    "exportCooldownSaved_other": "Les communautés attendent {{count}} heures entre deux exports.",
+    "exportCooldownSavedNone": "Les communautés peuvent exporter sans attendre."
   },
   "account": {
     "passwordTitle": "Mot de passe",

@@ -762,6 +762,16 @@
       "idlePlaceholder": "Kein Limit",
       "idleHint": "Wie lange eine Sitzung unberührt bleiben darf, bevor sie endet. Leer lassen, um das beim Deployment gesetzte Fenster zu behalten. Die App zu benutzen zählt als Berührung, die Zeit läuft also erst, wenn jemand aufhört. Eine Community, die dem Compliance-Standard folgt, verkürzt es für ihre Mitglieder weiter."
     },
+    "breachedPasswordCheck": {
+      "title": "Kompromittierte Passwörter",
+      "description": "Ein neues Passwort ablehnen, das bereits in einem Datenleck aufgetaucht ist.",
+      "label": "Neue Passwörter mit bekannten Datenlecks abgleichen",
+      "onHelp": "Nur die ersten fünf Zeichen des Passwort-Hashes verlassen diesen Server. Das Passwort selbst nie.",
+      "offHelp": "Neue Passwörter werden nicht geprüft. Schalte dies nur aus, wenn dieser Server das Internet nicht erreichen kann.",
+      "enabledToast": "Neue Passwörter werden mit bekannten Datenlecks abgeglichen.",
+      "disabledToast": "Neue Passwörter werden nicht mehr mit bekannten Datenlecks abgeglichen.",
+      "error": "Die Prüfung auf kompromittierte Passwörter konnte nicht geändert werden."
+    },
     "secondFactorRequirement": {
       "title": "Zwei-Faktor-Authentifizierung",
       "description": "Ob Personen hier zusätzlich zur Anmeldung einen zweiten Faktor besitzen müssen — eine Authenticator-App oder einen Passkey.",
@@ -1886,7 +1896,28 @@
     "maxGuestDaysHelpText": "Kein Gast bleibt länger als das, egal was eine Community einstellt.",
     "maxGuestDaysSave": "Längsten Gastaufenthalt speichern",
     "maxGuestDaysSaved_one": "Gäste bleiben höchstens {{count}} Tag.",
-    "maxGuestDaysSaved_other": "Gäste bleiben höchstens {{count}} Tage."
+    "maxGuestDaysSaved_other": "Gäste bleiben höchstens {{count}} Tage.",
+    "joinAndCreateTitle": "Wer beitreten und erstellen darf",
+    "publicRegistrationLabel": "Jedem die Registrierung erlauben",
+    "publicRegistrationHelpText": "Personen können ohne Einladung ein Konto anlegen. Solange das Erstellen von Communities aus ist, können sich nur Eingeladene registrieren.",
+    "publicRegistrationEnabledToast": "Jeder kann sich registrieren.",
+    "publicRegistrationDisabledToast": "Nur Eingeladene können sich registrieren.",
+    "communityCreationLabel": "Jedem das Erstellen von Communities erlauben",
+    "communityCreationHelpText": "Wenn aus, können nur Personen, die auf diesem Server Communities verwalten, eine erstellen, und nur Eingeladene können sich registrieren.",
+    "communityCreationEnabledToast": "Jeder kann eine Community erstellen.",
+    "communityCreationDisabledToast": "Nur Personen, die Communities verwalten, können eine erstellen.",
+    "creationDailyLimitLabel": "Communities pro Konto und Tag",
+    "creationDailyLimitHelpText": "0 bedeutet kein Limit. Für Personen, die Communities verwalten, gilt es nicht.",
+    "creationDailyLimitSave": "Tageslimit für Communities speichern",
+    "creationDailyLimitSaved_one": "Jedes Konto kann {{count}} Community pro Tag erstellen.",
+    "creationDailyLimitSaved_other": "Jedes Konto kann {{count}} Communities pro Tag erstellen.",
+    "creationDailyLimitSavedNone": "Für neue Communities gibt es kein Tageslimit.",
+    "exportCooldownLabel": "Stunden zwischen Community-Exporten",
+    "exportCooldownHelpText": "Wie lange eine Community wartet, bevor sie wieder alles exportieren kann. 0 bedeutet keine Wartezeit.",
+    "exportCooldownSave": "Zeit zwischen Community-Exporten speichern",
+    "exportCooldownSaved_one": "Communities warten {{count}} Stunde zwischen Exporten.",
+    "exportCooldownSaved_other": "Communities warten {{count}} Stunden zwischen Exporten.",
+    "exportCooldownSavedNone": "Communities können ohne Wartezeit exportieren."
   },
   "account": {
     "passwordTitle": "Passwort",

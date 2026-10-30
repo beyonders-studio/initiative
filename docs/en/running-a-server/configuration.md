@@ -21,13 +21,18 @@ See [Installation](installation.md#the-database-connection) for what it's used f
 
 ## Who can sign up
 
-| Variable | What it does | Default |
-|---|---|---|
-| `ENABLE_PUBLIC_REGISTRATION` | Allow people to register without an invite link. Set `false` for invite-only. | `true` |
-| `DISABLE_GUILD_CREATION` | Stop regular users from creating new communities (they must be invited to one). | `false` |
-| `GUILD_CREATION_DAILY_LIMIT` | How many communities one person can create in a day. Operators and owners have no limit. `0` turns the limit off. | `5` |
+Under **Settings → Platform → Community**, in **Who may join and create**:
 
-Between them, you can run anything from a wide-open public server to a locked-down, invite-only, one-organization deployment.
+| Setting | What it does | Starts as |
+|---|---|---|
+| **Let anyone sign up** | People make an account without an invite. Off, only invited people can. | On |
+| **Let anyone create a community** | Off, only the people who manage communities on this server can make one — and sign-up closes to invited people too. | On |
+| **Communities one account may create per day** | `0` means no limit. People who manage communities aren't counted. | 5 |
+
+Between them, you can run anything from a wide-open public server to a locked-down, invite-only, one-organization deployment. Nothing needs a restart.
+
+??? techspec "Pre-filling from environment variables"
+    The first time a server starts with these settings, `ENABLE_PUBLIC_REGISTRATION`, `DISABLE_GUILD_CREATION`, `GUILD_CREATION_DAILY_LIMIT`, `HIBP_CHECK_ENABLED` and `EXPORT_GUILD_COOLDOWN_HOURS` fill them in. After that the settings pages own them and the variables are ignored.
 
 ### The community directory
 
@@ -140,6 +145,10 @@ When a community's window ends, its plug-ins are asked to erase what they hold a
 
 A restored community reconnects its installed plug-ins itself. It authorised those connections in the first place, so it authorises them again.
 
+## How often a community can export everything
+
+A whole-community export reads every last thing the community holds, so each community waits 48 hours between them. Change it with **Hours between community exports**, under **Settings → Platform → Community**. `0` means no wait. The wait is counted from the community's last export, so changing it moves the next date for everyone already waiting.
+
 ## Running behind a reverse proxy
 
 For any real deployment you'll put Initiative behind a reverse proxy that handles HTTPS.
@@ -212,6 +221,10 @@ The captcha switches on once all three are saved, and the section's badge says w
 
 ??? techspec "Pre-filling from environment variables"
     On a fresh install's **first boot**, `CAPTCHA_PROVIDER`, `CAPTCHA_SITE_KEY` and `CAPTCHA_SECRET_KEY` fill these settings in. After that the settings page owns them and the variables are ignored.
+
+## Checking passwords against known breaches
+
+A new password that has already turned up in a data breach is turned away. Only the first five characters of the password's hash leave the server; the password never does. The switch is **Check new passwords against known breaches**, under **Settings → Platform → Security**, and it's on to begin with. Turn it off on a server that can't reach the internet.
 
 ## AI assistant access (MCP)
 
