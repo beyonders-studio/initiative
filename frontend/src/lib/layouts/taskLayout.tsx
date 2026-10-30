@@ -13,6 +13,7 @@ import { useTranslation } from "react-i18next";
 
 import {
   SearchEntityType,
+  type TaskListRead,
   type TaskPriority,
   type TaskRead,
   type TaskStatusRead,
@@ -353,21 +354,55 @@ export const taskChanges = ({ fields, properties }: Written<TaskRead, TaskUpdate
  *  project's layouts and fields are read, when the server still holds it to
  *  them. */
 export const useMissingAsType = (projectId: number, initiativeId: number | null) => {
+  const missing = useMissingByType(projectId, initiativeId);
+  return (task: TaskRead, typeId: number, patch: Partial<TaskUpdate> = {}): string[] =>
+    missing(typeId, (key) => TASK_DETAIL.filled?.(task, key, patch) ?? true);
+};
+
+/** The same, of a task as a list reads it: what a change of type made to many
+ *  tasks at once checks, without reading each one. */
+export const useListedMissingAsType = (projectId: number, initiativeId: number | null) => {
+  const missing = useMissingByType(projectId, initiativeId);
+  return (task: TaskListRead, typeId: number, patch: Partial<TaskUpdate> = {}): string[] =>
+    missing(typeId, (key) => filledInList(task, key, patch));
+};
+
+/** What a type's page requires that `filled` says is empty, once the
+ *  project's layouts and fields are read. */
+const useMissingByType = (projectId: number, initiativeId: number | null) => {
   const layouts = useToolLayouts(instanceTarget(Tool.project, projectId)).data;
   const definitions = useOwnedDefinitions({
     initiativeId: initiativeId ?? undefined,
     owner: { kind: "project", id: projectId },
     enabled: initiativeId !== null,
   }).data;
-  return (task: TaskRead, typeId: number, patch: Partial<TaskUpdate> = {}): string[] =>
+  return (typeId: number, filled: (key: string) => boolean): string[] =>
     layouts && definitions
       ? missingRequired(
           requiredKeys(detailLayoutOf(layouts, "task", typeId) as StoredRegions | null),
-          (key) => TASK_DETAIL.filled?.(task, key, patch) ?? true,
+          filled,
           definitions
         )
       : [];
 };
+
+/** How a listed task reads as filled, as `TASK_DETAIL.filled` reads a whole
+ *  one: the list carries whether it has a description and checklist, not
+ *  their text. */
+const filledInList = filledBy<TaskListRead, TaskUpdate>(
+  {
+    description: (task, sent) =>
+      Object.hasOwn(sent, "description") ? hasText(sent.description) : task.has_description,
+    assignees: (task, sent) => hasAny(sentOr(sent, "assignee_ids", task.assignees)),
+    checklist: (task) => (task.checklist_progress?.total ?? 0) > 0,
+    recurrence: (task, sent) => sentOr(sent, "recurrence", task.recurrence) != null,
+    tags: (task) => hasAny(task.tags),
+    dates: (task, sent) =>
+      sentOr(sent, "start_date", task.start_date) != null ||
+      sentOr(sent, "due_date", task.due_date) != null,
+  },
+  (task) => task.properties
+);
 
 /** Asks for what a type's page requires before a task becomes one, and makes
  *  the change with it: the task page's own, above its layout. */

@@ -1184,6 +1184,7 @@ export const ProjectTasksSection = ({
             <TaskBulkEditDialog
               selectedTasks={selectedTasks}
               taskStatuses={sortedTaskStatuses}
+              taskTypes={taskTypes ?? []}
               isFull={(statusId) =>
                 columnLimits.isFull(
                   statusId,
@@ -1191,6 +1192,7 @@ export const ProjectTasksSection = ({
                 )
               }
               projectId={projectId}
+              initiativeId={initiativeId}
               isSubmitting={bulkUpdateTasks.isPending}
               onApply={(changes) => {
                 bulkUpdateTasks.mutate({

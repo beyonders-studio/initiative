@@ -7,11 +7,13 @@ import type {
   TaskListRead,
   TaskPriority,
   TaskStatusRead,
+  TaskTypeRead,
 } from "@/api/generated/initiativeAPI.schemas";
 import { Tool } from "@/api/generated/initiativeAPI.schemas";
 import { MemberMultiSelect } from "@/components/members/MemberSearchSelect";
 import { RecurrenceEditor } from "@/components/recurrence/RecurrenceEditor";
 import { TaskPriorityOption } from "@/components/tasks/TaskPriorityOption";
+import { TaskTypeOption } from "@/components/tasks/TaskTypeOption";
 import {
   Accordion,
   AccordionContent,
@@ -36,6 +38,7 @@ import {
   SelectValue,
 } from "@/components/ui/select";
 import { useAuth } from "@/hooks/useAuth";
+import { useListedMissingAsType } from "@/lib/layouts/taskLayout";
 import {
   isHourlyRule,
   isValidTaskRecurrence,
@@ -49,6 +52,7 @@ export type TaskBulkUpdate = {
   due_date: string | null;
   assignee_ids: number[];
   task_status_id: number;
+  task_type_id: number;
   priority: TaskPriority;
   recurrence: string | null;
   /** The zone the rule's days are in; each task's rule is stored from its own start. */
@@ -60,9 +64,12 @@ export type TaskBulkUpdate = {
 interface TaskBulkEditDialogProps {
   selectedTasks: TaskListRead[];
   taskStatuses: TaskStatusRead[];
+  /** The project's task types. One alone is not offered: it tells nothing apart. */
+  taskTypes: TaskTypeRead[];
   /** Whether a column takes every selected task not already in it. */
   isFull?: (taskStatusId: number) => boolean;
   projectId: number;
+  initiativeId: number;
   isSubmitting: boolean;
   onApply: (changes: Partial<TaskBulkUpdate>) => void;
   onCancel: () => void;
@@ -71,8 +78,10 @@ interface TaskBulkEditDialogProps {
 export const TaskBulkEditDialog = ({
   selectedTasks,
   taskStatuses,
+  taskTypes,
   isFull,
   projectId,
+  initiativeId,
   isSubmitting,
   onApply,
   onCancel,
@@ -83,6 +92,7 @@ export const TaskBulkEditDialog = ({
   const [dueDate, setDueDate] = useState<string>("");
   const [assigneeIds, setAssigneeIds] = useState<number[]>([]);
   const [statusId, setStatusId] = useState<string>("");
+  const [typeId, setTypeId] = useState<string>("");
   const [priority, setPriority] = useState<string>("");
   const [repeat, setRepeat] = useState<TaskRecurrenceValue>({
     rule: null,
@@ -91,6 +101,21 @@ export const TaskBulkEditDialog = ({
   });
   const { rule: recurrence, strategy: recurrenceStrategy, limit } = repeat;
   const hasDueDate = Boolean(dueDate) || selectedTasks.every((task) => Boolean(task.due_date));
+  const missingAs = useListedMissingAsType(projectId, initiativeId);
+  // What else this edit fills counts toward what the new type's page requires.
+  const filling = {
+    ...(startDate ? { start_date: startDate } : {}),
+    ...(dueDate ? { due_date: dueDate } : {}),
+    ...(assigneeIds.length > 0 ? { assignee_ids: assigneeIds } : {}),
+    ...(recurrence ? rulePayload(recurrence) : {}),
+  };
+  /** How many of the tasks the type's page requires something of that they
+   *  leave empty: the server refuses each, so the type isn't offered. */
+  const leavingEmpty = (id: number) =>
+    selectedTasks.filter(
+      (task) => task.task_type_id !== id && missingAs(task, id, filling).length > 0
+    ).length;
+  const typeBlocked = typeId !== "" && leavingEmpty(Number(typeId)) > 0;
 
   const handleSubmit = (event: FormEvent<HTMLFormElement>) => {
     event.preventDefault();
@@ -113,6 +138,11 @@ export const TaskBulkEditDialog = ({
       changes.task_status_id = Number(statusId);
     }
 
+    if (typeId) {
+      if (typeBlocked) return;
+      changes.task_type_id = Number(typeId);
+    }
+
     if (priority) {
       changes.priority = priority as TaskPriority;
     }
@@ -130,7 +160,7 @@ export const TaskBulkEditDialog = ({
   };
 
   const hasChanges =
-    startDate || dueDate || assigneeIds.length > 0 || statusId || priority || recurrence;
+    startDate || dueDate || assigneeIds.length > 0 || statusId || typeId || priority || recurrence;
 
   return (
     <DialogContent className="bg-card">
@@ -183,6 +213,39 @@ export const TaskBulkEditDialog = ({
           <AccordionItem value="details">
             <AccordionTrigger>{t("bulkEdit.detailsSection")}</AccordionTrigger>
             <AccordionContent className="space-y-4 pb-4">
+              {taskTypes.length > 1 ? (
+                <div className="space-y-2">
+                  <Label htmlFor="bulk-type">{t("bulkEdit.typeLabel")}</Label>
+                  <Select value={typeId} onValueChange={setTypeId}>
+                    <SelectTrigger id="bulk-type">
+                      <SelectValue placeholder={t("bulkEdit.selectType")} />
+                    </SelectTrigger>
+                    <SelectContent>
+                      {taskTypes.map((type) => {
+                        const count = leavingEmpty(type.id);
+                        return (
+                          <SelectItem key={type.id} value={String(type.id)} disabled={count > 0}>
+                            <TaskTypeOption
+                              type={
+                                count > 0
+                                  ? {
+                                      ...type,
+                                      name: t("bulkEdit.typeLeavesEmpty", {
+                                        name: type.name,
+                                        count,
+                                      }),
+                                    }
+                                  : type
+                              }
+                            />
+                          </SelectItem>
+                        );
+                      })}
+                    </SelectContent>
+                  </Select>
+                </div>
+              ) : null}
+
               <div className="space-y-2">
                 <Label htmlFor="bulk-status">{t("bulkEdit.statusLabel")}</Label>
                 <Select value={statusId} onValueChange={setStatusId}>
@@ -245,7 +308,7 @@ export const TaskBulkEditDialog = ({
           <Button type="button" variant="ghost" onClick={onCancel} disabled={isSubmitting}>
             {t("common:cancel")}
           </Button>
-          <Button type="submit" disabled={!hasChanges || isSubmitting}>
+          <Button type="submit" disabled={!hasChanges || typeBlocked || isSubmitting}>
             {isSubmitting ? (
               <>
                 <Loader2 className="h-4 w-4 animate-spin" />
