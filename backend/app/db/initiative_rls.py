@@ -1191,8 +1191,12 @@ def managed_write(initiative_expr: str) -> str:
 def administration_path() -> InitiativePath:
     """A row the community's administration of its invites alone reads and
     writes, whatever initiative it names: what a guest invite gives, which the
-    invites themselves answer to."""
-    predicate = _administration(AdminSurface.invites)
+    invites themselves answer to. Naming any initiative takes the admin rung's
+    reach into all of them beside the surface."""
+    predicate = (
+        f"({_P.system} OR ({POLICY_SETTINGS_ADMIN} AND {_P.pam_write})"
+        f" OR ({_P.holds(AdminSurface.invites)} AND {_P.admin}))"
+    )
     return InitiativePath(
         predicate=lambda t, w: predicate,
         initiative_expr=lambda r: f"{r}.initiative_id",

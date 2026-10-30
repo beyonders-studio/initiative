@@ -124,13 +124,14 @@ describe("CommunitySettingsLayout", () => {
     ]);
   });
 
-  it("gives a member holding invites the Users and Guests tabs, and nothing else", async () => {
+  it("gives a member holding invites the Users tab and nothing else", async () => {
     communityRole = "member";
     held = ["invites"];
     render();
 
     await screen.findByRole("tab", { name: "Users" });
-    expect(screen.getAllByRole("tab").map((tab) => tab.textContent)).toEqual(["Users", "Guests"]);
+    // Guest invites can open any initiative, which takes the admin rung.
+    expect(screen.getAllByRole("tab").map((tab) => tab.textContent)).toEqual(["Users"]);
     // What they hold, they may change.
     expect(screen.getByRole("group")).toBeEnabled();
   });

@@ -110,6 +110,8 @@ export const useHeldSurfaces = (
     queryFn: () => readHeldSurfaces(communityId),
     enabled: asked,
     staleTime: STALE_TIME,
+    // Never another community's answer while this one's is on its way.
+    placeholderData: undefined,
   });
 
   const administers = Boolean(entry?.can.administer);

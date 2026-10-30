@@ -205,6 +205,18 @@ export const SettingsCommunityRolesPage = () => {
   // keep applying, and nobody changes them.
   const closed = Boolean(activeCommunity?.closed_surfaces?.includes("custom_roles"));
   const changes = held.writes && !closed;
+  // What the server allows, so nobody fills in a form it must refuse: a role
+  // holding nothing the reader lacks, on the admin rung only for an admin, and
+  // deleting an admin's role (which gives its holders everything back) only for
+  // somebody who holds everything. A settings grant answers for itself.
+  const lent = Boolean(activeCommunity?.grantSettingsLevel);
+  const holdsEvery = ADMIN_SURFACES.every(held.holds);
+  const editable = (role: CustomRoleRead) =>
+    lent ||
+    (role.surfaces.every(held.holds) &&
+      (role.base_rung !== "admin" || Boolean(activeCommunity?.can.administer)));
+  const deletable = (role: CustomRoleRead) =>
+    editable(role) && (lent || role.base_rung !== "admin" || holdsEvery);
 
   if (!held.holds("roles")) {
     return <p className="text-muted-foreground text-sm">{t("communityLayout.permissionDenied")}</p>;
@@ -269,8 +281,17 @@ export const SettingsCommunityRolesPage = () => {
                         {t("customRoles.holdsNothing")}
                       </p>
                     )}
+                    {changes && !editable(role) ? (
+                      <p className="text-muted-foreground text-xs">
+                        {t("customRoles.beyondYours")}
+                      </p>
+                    ) : changes && !deletable(role) ? (
+                      <p className="text-muted-foreground text-xs">
+                        {t("customRoles.widensAnAdmin")}
+                      </p>
+                    ) : null}
                   </div>
-                  {changes ? (
+                  {changes && editable(role) ? (
                     <RowActionsMenu subject={role.name}>
                       <DropdownMenuItem onSelect={() => setEditing(role)}>
                         <Pencil className="h-4 w-4" />
@@ -279,6 +300,7 @@ export const SettingsCommunityRolesPage = () => {
                       <DropdownMenuSeparator />
                       <DropdownMenuItem
                         className="text-destructive"
+                        disabled={!deletable(role)}
                         onSelect={() => setDeleting(role)}
                       >
                         <Trash2 className="h-4 w-4" />

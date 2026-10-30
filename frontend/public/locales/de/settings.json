@@ -2285,6 +2285,8 @@
         "label": "Rollen",
         "description": "Eigene Rollen hinzufügen, ändern und löschen."
       }
-    }
+    },
+    "beyondYours": "Du kannst diese Rolle nicht ändern: Sie enthält etwas, das du selbst nicht hast.",
+    "widensAnAdmin": "Nur ein Admin, der alles darf, kann eine Admin-Rolle löschen: Wer sie hat, darf danach wieder alles."
   }
 }

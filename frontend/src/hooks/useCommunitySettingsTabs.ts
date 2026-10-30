@@ -33,10 +33,16 @@ export const useCommunitySettingsTabs = (): { tabs: SettingsTab[]; isLoading: bo
   const isSuperadmin = Boolean(activeCommunity?.can.seat);
   // Where the deployment has a billing portal, the plan sits with the usage.
   const { billing, guestsEnabled } = useAppConfig();
-  // Guests are invited by whoever hands out invites, and only where the
-  // deployment allows guests and the community takes them.
+  // Guests are invited by whoever hands out invites on the admin rung: a guest
+  // invite can open any initiative, which takes the admin's view of all of
+  // them. And only where the deployment allows guests and the community takes
+  // them.
   const managesGuests =
-    held.writes && holds("invites") && guestsEnabled && activeCommunity?.max_guests !== 0;
+    held.writes &&
+    holds("invites") &&
+    Boolean(activeCommunity?.can.administer) &&
+    guestsEnabled &&
+    activeCommunity?.max_guests !== 0;
   // Where the community has a sign-in of its own to configure, that is. Most
   // never do: the operator grants each half of the surface separately, and
   // with neither there is nothing on the tab to show anybody. A grantee's

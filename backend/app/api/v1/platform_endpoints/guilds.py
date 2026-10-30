@@ -1422,11 +1422,20 @@ async def delete_community(
 )
 async def create_community_invite(
     guild_id: CommunityIdPath,
-    _guild_context: InvitesWriteContext,
+    guild_context: InvitesWriteContext,
     invite_in: CommunityInviteCreate,
     session: SettingsRLSSessionDep,
     current_user: Annotated[User, Depends(get_current_active_user)],
 ) -> CommunityInviteCreated:
+    # A guest invite can open any initiative, so it takes the admin rung's view
+    # of all of them (or a settings grant), beside the invites surface.
+    if invite_in.guest_days is not None and not (
+        guild_context.is_admin or guild_context.settings_rung is not None
+    ):
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail=GuildMessages.COMMUNITY_ADMIN_REQUIRED,
+        )
     invite, code = await guilds_service.create_guild_invite(
         session,
         guild_id=guild_id,

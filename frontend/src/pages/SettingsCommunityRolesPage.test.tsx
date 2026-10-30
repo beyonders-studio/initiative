@@ -104,4 +104,31 @@ describe("SettingsCommunityRolesPage", () => {
       )
     );
   });
+
+  it("offers only the changes the server would make", async () => {
+    // An admin a custom role narrows to the roster and the roles.
+    server.use(
+      communityHttp.get("/custom-roles/held", () =>
+        HttpResponse.json({ surfaces: ["members", "roles"] })
+      ),
+      communityHttp.get("/custom-roles/", () =>
+        HttpResponse.json([
+          { id: 1, name: "Doors", base_rung: "member", surfaces: ["invites"] },
+          { id: 2, name: "Roll", base_rung: "admin", surfaces: ["members"] },
+        ])
+      )
+    );
+    setup();
+
+    expect(
+      await screen.findByText("You can't change this role: it holds something you don't.")
+    ).toBeInTheDocument();
+    expect(
+      screen.getByText(
+        "Only an admin who holds everything can delete an admin role: its holders get everything back."
+      )
+    ).toBeInTheDocument();
+    // Doors holds what the reader lacks, so it has no actions; Roll does.
+    expect(screen.getAllByRole("button", { name: /Roll|Doors/ })).toHaveLength(1);
+  });
 });

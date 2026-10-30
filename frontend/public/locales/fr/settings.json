@@ -2285,6 +2285,8 @@
         "label": "Rôles",
         "description": "Ajouter, modifier et supprimer des rôles personnalisés."
       }
-    }
+    },
+    "beyondYours": "Vous ne pouvez pas modifier ce rôle : il comprend quelque chose que vous n'avez pas.",
+    "widensAnAdmin": "Seul un administrateur qui peut tout faire peut supprimer un rôle d'administrateur : ceux qui l'ont récupèrent tout."
   }
 }

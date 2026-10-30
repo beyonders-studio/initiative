@@ -2285,6 +2285,8 @@
         "label": "Roles",
         "description": "Añadir, cambiar y eliminar roles personalizados."
       }
-    }
+    },
+    "beyondYours": "No puedes cambiar este rol: incluye algo que tú no tienes.",
+    "widensAnAdmin": "Solo un administrador que puede hacerlo todo puede eliminar un rol de administrador: quienes lo tienen lo recuperan todo."
   }
 }

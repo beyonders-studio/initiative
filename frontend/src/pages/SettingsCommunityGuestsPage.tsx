@@ -138,11 +138,16 @@ export const SettingsCommunityGuestsPage = () => {
   const { activeCommunity } = useCommunities();
   const { guestsEnabled } = useAppConfig();
   const communityId = activeCommunity?.id ?? null;
-  // Whoever hands out invites, where the deployment and the community both
-  // take guests. Changing a guest's stay is running the roster.
+  // Whoever hands out invites on the admin rung, where the deployment and the
+  // community both take guests: a guest invite can open any initiative.
+  // Changing a guest's stay is running the roster.
   const held = useHeldSurfaces();
   const managesGuests =
-    held.writes && held.holds("invites") && guestsEnabled && activeCommunity?.max_guests !== 0;
+    held.writes &&
+    held.holds("invites") &&
+    Boolean(activeCommunity?.can.administer) &&
+    guestsEnabled &&
+    activeCommunity?.max_guests !== 0;
   const managesMembers = held.holds("members");
 
   const table = useServerTableState();

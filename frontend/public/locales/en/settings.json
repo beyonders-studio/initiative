@@ -2285,6 +2285,8 @@
         "label": "Roles",
         "description": "Add, change and delete custom roles."
       }
-    }
+    },
+    "beyondYours": "You can't change this role: it holds something you don't.",
+    "widensAnAdmin": "Only an admin who holds everything can delete an admin role: its holders get everything back."
   }
 }

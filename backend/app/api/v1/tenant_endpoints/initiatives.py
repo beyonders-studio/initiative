@@ -284,7 +284,8 @@ async def list_initiatives(
     scope: Annotated[InitiativeListScope, Query()] = InitiativeListScope.member,
 ) -> List[InitiativeRead]:
     """The initiatives the caller belongs to, or — for a guild admin asking for
-    ``scope=community`` — every initiative in the guild.
+    ``scope=community`` — every initiative in the guild, which the admin rung's
+    reach into all content already reads.
 
     The default is the caller's own workspace: what the sidebar and the
     initiative pickers show. A guild admin's authority over their whole guild is
@@ -292,9 +293,7 @@ async def list_initiatives(
     They bring an initiative into it by taking the project manager role from the
     guild-settings initiative table, which is also what ``scope=community`` feeds.
     """
-    if scope is InitiativeListScope.community and not guild_context.holds_surface(
-        AdminSurface.initiatives
-    ):
+    if scope is InitiativeListScope.community and not guild_context.is_admin:
         raise HTTPException(
             status_code=status.HTTP_403_FORBIDDEN,
             detail=GuildMessages.COMMUNITY_ADMIN_REQUIRED,

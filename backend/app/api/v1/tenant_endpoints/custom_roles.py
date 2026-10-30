@@ -23,6 +23,7 @@ from app.api.deps import (
     GuildContext,
     GuildContextDep,
     RLSSessionDep,
+    SettingsContextDep,
     SettingsRLSSessionDep,
     require_surface,
 )
@@ -162,7 +163,7 @@ async def list_custom_roles(
 
 
 @router.get("/held", response_model=HeldSurfacesRead)
-async def read_held_surfaces(context: GuildContextDep) -> HeldSurfacesRead:
+async def read_held_surfaces(context: SettingsContextDep) -> HeldSurfacesRead:
     """The admin surfaces the reader holds here: every one for an admin with
     no custom role, a role's otherwise, none for a member without one. What
     the community's settings pages are shown by."""
