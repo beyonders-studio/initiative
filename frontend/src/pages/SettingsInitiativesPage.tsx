@@ -11,6 +11,7 @@ import { useMemo, useState } from "react";
 import { useTranslation } from "react-i18next";
 
 import type { InitiativeRead } from "@/api/generated/initiativeAPI.schemas";
+import { CommunityInitiativeDefaultsCard } from "@/components/initiatives/CommunityInitiativeDefaultsCard";
 import { DeleteInitiativeDialog } from "@/components/initiatives/DeleteInitiativeDialog";
 import { type MemberLike, useSeenMembers } from "@/components/members/MemberSearchSelect";
 import { Badge } from "@/components/ui/badge";
@@ -405,6 +406,8 @@ export const SettingsInitiativesPage = () => {
           />
         </CardContent>
       </Card>
+
+      {isCommunityAdmin && <CommunityInitiativeDefaultsCard />}
 
       <DeleteInitiativeDialog
         open={deleteTarget !== null}

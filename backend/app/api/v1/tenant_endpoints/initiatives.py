@@ -30,6 +30,7 @@ from app.core.messages import (
 )
 from app.core.tools import Tool
 from app.models.tenant.initiative import (
+    BUILTIN_MEMBER_ROLE,
     Initiative,
     InitiativeJoinRequest,
     InitiativeMember,
@@ -43,6 +44,8 @@ from app.models.platform.user import Presence, User
 from app.models.platform.user_profile_view import MemberProfile
 from app.schemas.tenant.initiative import (
     InitiativeCreate,
+    InitiativeDefaultsRead,
+    InitiativeDefaultsUpdate,
     InitiativeDirectoryEntry,
     InitiativeJoinRequestCreate,
     InitiativeJoinRequestRead,
@@ -351,6 +354,44 @@ async def list_initiative_directory(
         user_id=current_user.id,
         is_guild_admin=guild_context.is_admin,
     )
+
+
+@router.get("/defaults", response_model=InitiativeDefaultsRead)
+async def get_initiative_defaults(
+    session: RLSSessionDep,
+    guild_context: Annotated[GuildContext, Depends(get_guild_membership)],
+) -> InitiativeDefaultsRead:
+    """What the community sets for every initiative in it: each initiative's
+    managers see these as set, and may not change them.
+
+    Declared before ``/{initiative_id}`` so the literal path wins the match.
+    """
+    return await initiatives_service.community_defaults(session)
+
+
+@router.patch("/defaults", response_model=InitiativeDefaultsRead)
+async def update_initiative_defaults(
+    changes: InitiativeDefaultsUpdate,
+    session: RLSSessionDep,
+    current_user: Annotated[User, Depends(get_current_active_user)],
+    guild_context: Annotated[GuildContext, Depends(get_guild_membership)],
+) -> InitiativeDefaultsRead:
+    """Set what every initiative in the community starts from and keeps. The
+    community's admins only. A tool's switch or a member permission set here
+    is written to every initiative at once, archived and trashed ones too."""
+    if not guild_context.is_admin:
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail=InitiativeMessages.DEFAULTS_ADMIN_ONLY,
+        )
+    defaults = await initiatives_service.set_community_defaults(
+        session,
+        guild_id=guild_context.guild_id,
+        changes=changes,
+        actor_user_id=current_user.id,
+    )
+    await session.commit()
+    return defaults
 
 
 @router.post("/{initiative_id}/join", response_model=InitiativeRead)
@@ -828,6 +869,16 @@ async def update_initiative(
     )
 
     update_data = initiative_in.model_dump(exclude_unset=True)
+    if any(tool.view_permission in update_data for tool in Tool):
+        defaults = await initiatives_service.community_defaults(session)
+        if any(
+            update_data.get(tool.view_permission, enabled) != enabled
+            for tool, enabled in defaults.tools.items()
+        ):
+            raise HTTPException(
+                status_code=status.HTTP_409_CONFLICT,
+                detail=InitiativeMessages.SET_BY_COMMUNITY,
+            )
     # Auto-join enrols every future guild member, so it shapes onboarding for
     # the whole guild rather than for one initiative — guild admins only, the
     # same shape as the archive toggle above. join_policy stays with whoever may
@@ -942,7 +993,11 @@ async def list_initiative_roles(
     counts = await initiatives_service.count_members_by_role(
         session, initiative_id=initiative_id
     )
-    return [serialize_role(role, member_count=counts.get(role.id, 0)) for role in roles]
+    defaults = await initiatives_service.community_defaults(session)
+    return [
+        serialize_role(role, member_count=counts.get(role.id, 0), defaults=defaults)
+        for role in roles
+    ]
 
 
 @router.post(
@@ -962,6 +1017,12 @@ async def create_initiative_role(
     await _require_manager_access(
         session, initiative, current_user, guild_context=guild_context
     )
+    defaults = await initiatives_service.community_defaults(session)
+    if not defaults.custom_roles:
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail=InitiativeMessages.CUSTOM_ROLES_OFF,
+        )
 
     # Check for duplicate name
     existing = await initiatives_service.get_role_by_name(
@@ -1082,6 +1143,20 @@ async def update_initiative_role(
         session.add(role)
 
     # Update permissions if provided
+    if (
+        role_in.permissions is not None
+        and role.is_builtin
+        and role.name == BUILTIN_MEMBER_ROLE
+    ):
+        defaults = await initiatives_service.community_defaults(session)
+        if any(
+            role_in.permissions.get(key, enabled) != enabled
+            for key, enabled in defaults.member_permissions.items()
+        ):
+            raise HTTPException(
+                status_code=status.HTTP_409_CONFLICT,
+                detail=InitiativeMessages.SET_BY_COMMUNITY,
+            )
     if role_in.permissions is not None:
         role = await initiatives_service.update_role_permissions(
             session, role=role, permissions=role_in.permissions
@@ -1122,7 +1197,11 @@ async def update_initiative_role(
     member_count = await initiatives_service.count_role_members(
         session, role_id=role.id
     )
-    return serialize_role(role, member_count=member_count)
+    return serialize_role(
+        role,
+        member_count=member_count,
+        defaults=await initiatives_service.community_defaults(session),
+    )
 
 
 @router.delete(

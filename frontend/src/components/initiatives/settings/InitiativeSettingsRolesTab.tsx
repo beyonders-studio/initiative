@@ -16,6 +16,7 @@ import {
   EXTRA_PERMISSION_KEYS,
   PERMISSION_LABEL_KEYS,
   useDeleteRole,
+  useInitiativeDefaults,
   useInitiativeRoles,
   useUpdateRole,
 } from "@/hooks/useInitiativeRoles";
@@ -57,6 +58,8 @@ interface InitiativeSettingsRolesTabProps {
   onRenameRole: (role: InitiativeRoleRead) => void;
 }
 
+const NOTHING_LOCKED: ReadonlySet<string> = new Set();
+
 /**
  * One tool, one row: what this role may see, and what it may make.
  *
@@ -69,6 +72,7 @@ const ToolPermissionRow = ({
   role,
   canManageMembers,
   isPending,
+  locked,
   onToggle,
   t,
 }: {
@@ -76,6 +80,8 @@ const ToolPermissionRow = ({
   role: InitiativeRoleRead;
   canManageMembers: boolean;
   isPending: boolean;
+  /** The permissions the community set for this role: shown, not changed. */
+  locked: ReadonlySet<string>;
   onToggle: (
     role: InitiativeRoleRead,
     tool: Tool,
@@ -112,7 +118,7 @@ const ToolPermissionRow = ({
             </span>
             <Switch
               checked={checked}
-              disabled={disabled}
+              disabled={disabled || locked.has(key)}
               aria-label={t(PERMISSION_LABEL_KEYS[key] as never)}
               onCheckedChange={(next) => onToggle(role, tool, permission, next)}
             />
@@ -204,6 +210,13 @@ export const InitiativeSettingsRolesTab = ({
   const { t } = useTranslation(["initiatives", "common"]);
 
   const rolesQuery = useInitiativeRoles(initiativeId || null);
+  // What the community set for every initiative: the built-in member role's
+  // permissions it set are shown, not changed, and it may keep initiatives to
+  // their built-in roles.
+  const defaults = useInitiativeDefaults().data;
+  const memberLocked = new Set(Object.keys(defaults?.member_permissions ?? {}));
+  const lockedFor = (role: InitiativeRoleRead): ReadonlySet<string> =>
+    role.is_builtin && role.name === "member" ? memberLocked : NOTHING_LOCKED;
   const updateRoleMutation = useUpdateRole(initiativeId);
   const deleteRoleMutation = useDeleteRole(initiativeId);
 
@@ -317,6 +330,9 @@ export const InitiativeSettingsRolesTab = ({
                   )}
                 </CardHeader>
                 <CardContent className="space-y-3">
+                  {lockedFor(role).size > 0 && (
+                    <p className="text-muted-foreground text-xs">{t("settings.setByCommunity")}</p>
+                  )}
                   {/* One list of every tool the initiative uses. Projects and
                       files used to sit above a section headed "Tools",
                       which taught a split the app no longer has — they are
@@ -328,6 +344,7 @@ export const InitiativeSettingsRolesTab = ({
                       role={role}
                       canManageMembers={canManageMembers}
                       isPending={updateRoleMutation.isPending}
+                      locked={lockedFor(role)}
                       onToggle={handleTogglePermission}
                       t={translate}
                     />
@@ -341,7 +358,11 @@ export const InitiativeSettingsRolesTab = ({
                       </span>
                       <Switch
                         checked={role.permissions[key] ?? false}
-                        disabled={!canManageMembers || updateRoleMutation.isPending}
+                        disabled={
+                          !canManageMembers ||
+                          updateRoleMutation.isPending ||
+                          lockedFor(role).has(key)
+                        }
                         aria-label={t(PERMISSION_LABEL_KEYS[key] as never)}
                         onCheckedChange={(on) =>
                           updateRoleMutation.mutate({
@@ -374,6 +395,7 @@ export const InitiativeSettingsRolesTab = ({
                             role={role}
                             canManageMembers={canManageMembers}
                             isPending={updateRoleMutation.isPending}
+                            locked={lockedFor(role)}
                             onToggle={handleTogglePermission}
                             t={translate}
                           />
@@ -388,12 +410,15 @@ export const InitiativeSettingsRolesTab = ({
         </>
       ) : null}
 
-      {canManageMembers && (
-        <Button variant="outline" onClick={onOpenCreateRoleDialog}>
-          <Plus className="h-4 w-4" />
-          {t("settings.addCustomRole")}
-        </Button>
-      )}
+      {canManageMembers &&
+        (defaults?.custom_roles === false ? (
+          <p className="text-muted-foreground text-sm">{t("settings.customRolesOff")}</p>
+        ) : (
+          <Button variant="outline" onClick={onOpenCreateRoleDialog}>
+            <Plus className="h-4 w-4" />
+            {t("settings.addCustomRole")}
+          </Button>
+        ))}
     </div>
   );
 };

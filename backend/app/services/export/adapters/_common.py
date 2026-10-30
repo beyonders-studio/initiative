@@ -45,6 +45,7 @@ from app.services.platform.csv_export import safe_filename_component
 from app.services.tenant.initiatives import keeps_content_in
 from app.services.tenant.tool_listing import initiative_switch_clause
 from app.core.user_input_validators import resolve_zone
+from app.db.session import actor_context
 
 if TYPE_CHECKING:  # pragma: no cover - typing only
     from app.services.storage import StorageBackend
@@ -214,7 +215,7 @@ async def get_for_export(
             guild_id,
         )
     if row.initiative is not None:
-        require_tool_enabled(tool, row.initiative)
+        require_tool_enabled(tool, row.initiative, actor_context(session))
     require_export_access(
         DAC_RESOURCES[tool],
         row,

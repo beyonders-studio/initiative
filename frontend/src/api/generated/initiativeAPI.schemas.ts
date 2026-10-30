@@ -6868,6 +6868,48 @@ export interface InitiativeCreate {
   join_policy?: InitiativeJoinPolicy;
 }
 
+export type PermissionKey = (typeof PermissionKey)[keyof typeof PermissionKey];
+
+export const PermissionKey = {
+  projects_enabled: "projects_enabled",
+  create_projects: "create_projects",
+  files_enabled: "files_enabled",
+  create_files: "create_files",
+  queues_enabled: "queues_enabled",
+  create_queues: "create_queues",
+  counter_groups_enabled: "counter_groups_enabled",
+  create_counter_groups: "create_counter_groups",
+  calendars_enabled: "calendars_enabled",
+  create_calendars: "create_calendars",
+  dashboards_enabled: "dashboards_enabled",
+  create_dashboards: "create_dashboards",
+  posts_enabled: "posts_enabled",
+  create_posts: "create_posts",
+  wikis_enabled: "wikis_enabled",
+  create_wikis: "create_wikis",
+  dashboards_run_as_initiative: "dashboards_run_as_initiative",
+} as const;
+
+/**
+ * What the community sets for every initiative in it. A tool or a member
+ * permission absent here is each initiative's own to set.
+ */
+export interface InitiativeDefaultsRead {
+  tools: Partial<Record<Tool, boolean>>;
+  member_permissions: Partial<Record<PermissionKey, boolean>>;
+  custom_roles: boolean;
+}
+
+/**
+ * The defaults to change. A ``null`` hands that tool or permission back
+ * to each initiative; an omitted one is left as it is.
+ */
+export interface InitiativeDefaultsUpdate {
+  tools?: Partial<Record<Tool, boolean | null>>;
+  member_permissions?: Partial<Record<PermissionKey, boolean | null>>;
+  custom_roles?: boolean | null;
+}
+
 /**
  * One card in a guild's initiative directory.
  *
@@ -7045,28 +7087,6 @@ export interface InitiativeRead {
   member_count: number;
   role_display_name: string | null;
 }
-
-export type PermissionKey = (typeof PermissionKey)[keyof typeof PermissionKey];
-
-export const PermissionKey = {
-  projects_enabled: "projects_enabled",
-  create_projects: "create_projects",
-  files_enabled: "files_enabled",
-  create_files: "create_files",
-  queues_enabled: "queues_enabled",
-  create_queues: "create_queues",
-  counter_groups_enabled: "counter_groups_enabled",
-  create_counter_groups: "create_counter_groups",
-  calendars_enabled: "calendars_enabled",
-  create_calendars: "create_calendars",
-  dashboards_enabled: "dashboards_enabled",
-  create_dashboards: "create_dashboards",
-  posts_enabled: "posts_enabled",
-  create_posts: "create_posts",
-  wikis_enabled: "wikis_enabled",
-  create_wikis: "create_wikis",
-  dashboards_run_as_initiative: "dashboards_run_as_initiative",
-} as const;
 
 /**
  * Create a new custom role.

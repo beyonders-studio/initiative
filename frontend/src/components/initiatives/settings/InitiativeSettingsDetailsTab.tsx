@@ -10,6 +10,7 @@ import { ColorPickerPopover } from "@/components/ui/color-picker-popover";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
+import { useInitiativeDefaults } from "@/hooks/useInitiativeRoles";
 
 interface InitiativeSettingsDetailsTabProps {
   name: string;
@@ -49,6 +50,8 @@ export const InitiativeSettingsDetailsTab = ({
   onManageRoles,
 }: InitiativeSettingsDetailsTabProps) => {
   const { t } = useTranslation(["initiatives", "common"]);
+  // The switches the community set for every initiative are shown, not changed.
+  const defaults = useInitiativeDefaults().data;
 
   return (
     <div className="space-y-6">
@@ -121,6 +124,7 @@ export const InitiativeSettingsDetailsTab = ({
         roles={roles}
         onGrantToEveryone={onGrantToEveryone}
         onManageRoles={onManageRoles}
+        setByCommunity={defaults?.tools}
       />
     </div>
   );

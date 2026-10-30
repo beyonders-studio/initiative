@@ -67,6 +67,7 @@ from app.services.tenant import named_people
 from app.services.tenant import project_grants
 from app.services.tenant import queues as queues_service
 from app.services.tenant import task_queries
+from app.services.tenant.initiative_tools import tool_on
 
 CurrentUserDep = Annotated[User, Depends(get_current_active_user)]
 
@@ -169,7 +170,9 @@ def governing_tool(table: str) -> Tool:
     return path[0]
 
 
-def require_tool_enabled(kind: Tool, initiative: Any) -> None:
+def require_tool_enabled(
+    kind: Tool, initiative: Any, context: Optional[ActorContext]
+) -> None:
     """Raise 403 unless ``initiative`` has ``kind``'s master switch on.
 
     Gate 3's first half at the moment of creation, where there is no row yet for
@@ -181,8 +184,9 @@ def require_tool_enabled(kind: Tool, initiative: Any) -> None:
     ``{plural}_enabled`` leg. This runs first so the answer is a named 403
     rather than a row that silently fails to appear.
     """
-    attr = RESOURCE_ACCESS[kind].feature_attr
-    if attr is not None and not getattr(initiative, attr):
+    if RESOURCE_ACCESS[kind].feature_attr is not None and not tool_on(
+        context, initiative, kind
+    ):
         raise kind.disabled()
 
 
@@ -238,7 +242,7 @@ async def prepare_create(
             status_code=status.HTTP_404_NOT_FOUND,
             detail=InitiativeMessages.NOT_FOUND,
         )
-    require_tool_enabled(kind, initiative)
+    require_tool_enabled(kind, initiative, guild_context)
     await require_create(session, kind, initiative, user, guild_context)
     return initiative
 
@@ -416,7 +420,7 @@ def authorize(
     ``access="write"`` is an edit."""
     cfg = RESOURCE_ACCESS[kind]
     initiative = getattr(row, "initiative", None)
-    if initiative is not None and not getattr(initiative, cfg.feature_attr):
+    if initiative is not None and not tool_on(context, initiative, kind):
         raise kind.disabled()
     permissions_service.require_access(
         permissions_service.DAC_RESOURCES[cfg.dac_kind],
@@ -536,7 +540,7 @@ async def require_may_change(
             status_code=status.HTTP_409_CONFLICT,
             detail=CommonMessages.CONTENT_IS_FROZEN,
         )
-    require_tool_enabled(kind.tool, row.initiative)
+    require_tool_enabled(kind.tool, row.initiative, context)
     await require_create(session, kind.tool, row.initiative, user, context)
 
 

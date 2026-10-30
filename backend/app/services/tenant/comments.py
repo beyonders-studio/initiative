@@ -62,6 +62,8 @@ from app.services.tenant import attachments as attachments_service
 from app.services.tenant import content_references, personal_items
 from app.services import notifications
 from app.services import reachability
+from app.services.tenant.initiative_tools import tool_on, tool_on_sql
+from app.db.session import actor_context
 from app.services.tenant.mention_parser import (
     extract_mentioned_user_ids,
     extract_mentioned_task_ids,
@@ -451,7 +453,9 @@ async def _ensure_parent_access(
         extra = cast(ExtraCommentTarget, ctx.extra)
         tool = KINDS[extra.kind].tool
         initiative = getattr(ctx.extra_row, "initiative", None)
-        if initiative is not None and not getattr(initiative, tool.view_permission):
+        if initiative is not None and not tool_on(
+            actor_context(session), initiative, tool
+        ):
             raise CommentPermissionError(
                 KindMessages.TOOL_NOT_ENABLED, params={"kind": tool.value}
             )
@@ -461,8 +465,8 @@ async def _ensure_parent_access(
     else:
         target = TOOL_COMMENT_TARGETS[ctx.tool]
         initiative = getattr(ctx.resource, "initiative", None)
-        if initiative is not None and not getattr(
-            initiative, target.tool.view_permission
+        if initiative is not None and not tool_on(
+            actor_context(session), initiative, target.tool
         ):
             raise CommentPermissionError(
                 KindMessages.TOOL_NOT_ENABLED, params={"kind": target.tool.value}
@@ -1336,11 +1340,7 @@ async def recent_activity(
         parent_ids = parent_ids.where(
             or_(
                 model.initiative_id.is_(None),
-                model.initiative_id.in_(
-                    select(Initiative.id).where(
-                        getattr(Initiative, tool.view_permission).is_(True)
-                    )
-                ),
+                model.initiative_id.in_(select(Initiative.id).where(tool_on_sql(tool))),
             )
         )
         reachable_by_tool[tool] = parent_ids
@@ -1357,9 +1357,7 @@ async def recent_activity(
             rows = rows.where(
                 extra.model.comments_enabled.is_(True),
                 extra.model.initiative_id.in_(
-                    select(Initiative.id).where(
-                        getattr(Initiative, tool.view_permission).is_(True)
-                    )
+                    select(Initiative.id).where(tool_on_sql(tool))
                 ),
             )
         elif extra.anchor_switch:

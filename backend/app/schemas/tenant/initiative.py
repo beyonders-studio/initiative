@@ -14,6 +14,7 @@ from app.schemas.base import (
 )
 
 from app.models.tenant.initiative import (
+    BUILTIN_MEMBER_ROLE,
     DEFAULT_PERMISSION_VALUES,
     InitiativeJoinPolicy,
     JoinRequestStatus,
@@ -144,6 +145,31 @@ class InitiativeRoleUpdate(SanitizedBaseModel):
     display_name: Optional[str] = Field(default=None, min_length=1, max_length=100)
     is_manager: Optional[bool] = None
     permissions: Optional[Dict[PermissionKey, bool]] = None
+
+
+class InitiativeDefaultsRead(SanitizedBaseModel):
+    """What the community sets for every initiative in it. A tool or a member
+    permission absent here is each initiative's own to set."""
+
+    model_config = ConfigDict(json_schema_serialization_defaults_required=True)
+
+    #: Each tool's switch the community set, by tool.
+    tools: Dict[Tool, bool] = Field(default_factory=dict)
+    #: What the built-in member role may do, by permission, where it set it.
+    member_permissions: Dict[PermissionKey, bool] = Field(default_factory=dict)
+    #: Whether managers may add roles of their own.
+    custom_roles: bool = True
+
+
+class InitiativeDefaultsUpdate(SanitizedBaseModel):
+    """The defaults to change. A ``null`` hands that tool or permission back
+    to each initiative; an omitted one is left as it is."""
+
+    tools: Dict[Tool, Optional[bool]] = Field(default_factory=dict)
+    member_permissions: Dict[PermissionKey, Optional[bool]] = Field(
+        default_factory=dict
+    )
+    custom_roles: Optional[bool] = None
 
 
 class ToolCountsByInitiativeResponse(SanitizedBaseModel):
@@ -336,19 +362,25 @@ class InitiativeJoinRequestRead(SanitizedBaseModel):
 
 
 def serialize_role(
-    role: "InitiativeRoleModel", member_count: int = 0
+    role: "InitiativeRoleModel",
+    member_count: int = 0,
+    *,
+    defaults: InitiativeDefaultsRead | None = None,
 ) -> InitiativeRoleRead:
     """Serialize a role model to a read schema.
 
     Every permission key is answered for, not just the ones with a stored row:
     a role created before a tool shipped has no row for it, and a caller asking
     "who can see Posts" must not have to know that an absent key means the
-    documented default. The stored row wins wherever there is one.
+    documented default. The stored row wins wherever there is one, and for the
+    built-in member role what the community set (``defaults``) wins over it.
     """
     permissions = {
         **DEFAULT_PERMISSION_VALUES,
         **{perm.key: perm.enabled for perm in (role.permissions or [])},
     }
+    if defaults is not None and role.is_builtin and role.name == BUILTIN_MEMBER_ROLE:
+        permissions.update(defaults.member_permissions)
     return InitiativeRoleRead(
         id=role.id,
         name=role.name,
@@ -397,6 +429,10 @@ def serialize_initiative(
     """The initiative as a route answers with it. ``actions``, ``member_count``
     and ``role_display_name`` are deferred on the model, so whoever loads the
     row undefers them."""
+    # Here rather than at the top: the switches read the standing's module,
+    # which reads these schemas.
+    from app.services.tenant.initiative_tools import tool_on
+
     return InitiativeRead(
         id=initiative.id,
         community_id=context.guild_id,
@@ -414,10 +450,7 @@ def serialize_initiative(
         can=initiative_can(initiative),
         member_count=initiative.member_count,
         role_display_name=initiative.role_display_name,
-        **{
-            t.view_permission: getattr(initiative, t.view_permission, False)
-            for t in Tool
-        },
+        **{t.view_permission: tool_on(context, initiative, t) for t in Tool},
     )
 
 

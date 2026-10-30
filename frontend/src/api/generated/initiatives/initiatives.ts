@@ -25,6 +25,8 @@ import type {
   GetInitiativeParams,
   HTTPValidationError,
   InitiativeCreate,
+  InitiativeDefaultsRead,
+  InitiativeDefaultsUpdate,
   InitiativeDirectoryEntry,
   InitiativeJoinRequestCreate,
   InitiativeJoinRequestRead,
@@ -433,6 +435,240 @@ export function useListInitiativeDirectory<
   return withQueryKey(query, queryOptions.queryKey);
 }
 
+/**
+ * What the community sets for every initiative in it: each initiative's
+ * managers see these as set, and may not change them.
+ *
+ * Declared before ``/{initiative_id}`` so the literal path wins the match.
+ * @summary Get Initiative Defaults
+ */
+export const getInitiativeDefaults = (
+  communityId: number,
+  options?: SecondParameter<typeof apiMutator>,
+  signal?: AbortSignal
+) => {
+  return apiMutator<InitiativeDefaultsRead>(
+    { url: `/api/v1/c/${communityId}/initiatives/defaults`, method: "GET", signal },
+    options
+  );
+};
+
+export const getGetInitiativeDefaultsQueryKey = (communityId: number) => {
+  return [`/api/v1/c/${communityId}/initiatives/defaults`] as const;
+};
+
+export const getGetInitiativeDefaultsQueryOptions = <
+  TData = Awaited<ReturnType<typeof getInitiativeDefaults>>,
+  TError = ErrorType<HTTPValidationError>,
+>(
+  communityId: number,
+  options?: {
+    query?: Partial<
+      UseQueryOptions<Awaited<ReturnType<typeof getInitiativeDefaults>>, TError, TData>
+    >;
+    request?: SecondParameter<typeof apiMutator>;
+  }
+) => {
+  const { query: queryOptions, request: requestOptions } = options ?? {};
+
+  const queryKey = queryOptions?.queryKey ?? getGetInitiativeDefaultsQueryKey(communityId);
+
+  const queryFn: QueryFunction<Awaited<ReturnType<typeof getInitiativeDefaults>>> = ({ signal }) =>
+    getInitiativeDefaults(communityId, requestOptions, signal);
+
+  return {
+    queryKey,
+    queryFn,
+    enabled: communityId !== null && communityId !== undefined,
+    ...queryOptions,
+  } as UseQueryOptions<Awaited<ReturnType<typeof getInitiativeDefaults>>, TError, TData> & {
+    queryKey: DataTag<QueryKey, TData, TError>;
+  };
+};
+
+export type GetInitiativeDefaultsQueryResult = NonNullable<
+  Awaited<ReturnType<typeof getInitiativeDefaults>>
+>;
+export type GetInitiativeDefaultsQueryError = ErrorType<HTTPValidationError>;
+
+export function useGetInitiativeDefaults<
+  TData = Awaited<ReturnType<typeof getInitiativeDefaults>>,
+  TError = ErrorType<HTTPValidationError>,
+>(
+  communityId: number,
+  options: {
+    query: Partial<
+      UseQueryOptions<Awaited<ReturnType<typeof getInitiativeDefaults>>, TError, TData>
+    > &
+      Pick<
+        DefinedInitialDataOptions<
+          Awaited<ReturnType<typeof getInitiativeDefaults>>,
+          TError,
+          Awaited<ReturnType<typeof getInitiativeDefaults>>
+        >,
+        "initialData"
+      >;
+    request?: SecondParameter<typeof apiMutator>;
+  },
+  queryClient?: QueryClient
+): DefinedUseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData, TError> };
+export function useGetInitiativeDefaults<
+  TData = Awaited<ReturnType<typeof getInitiativeDefaults>>,
+  TError = ErrorType<HTTPValidationError>,
+>(
+  communityId: number,
+  options?: {
+    query?: Partial<
+      UseQueryOptions<Awaited<ReturnType<typeof getInitiativeDefaults>>, TError, TData>
+    > &
+      Pick<
+        UndefinedInitialDataOptions<
+          Awaited<ReturnType<typeof getInitiativeDefaults>>,
+          TError,
+          Awaited<ReturnType<typeof getInitiativeDefaults>>
+        >,
+        "initialData"
+      >;
+    request?: SecondParameter<typeof apiMutator>;
+  },
+  queryClient?: QueryClient
+): UseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData, TError> };
+export function useGetInitiativeDefaults<
+  TData = Awaited<ReturnType<typeof getInitiativeDefaults>>,
+  TError = ErrorType<HTTPValidationError>,
+>(
+  communityId: number,
+  options?: {
+    query?: Partial<
+      UseQueryOptions<Awaited<ReturnType<typeof getInitiativeDefaults>>, TError, TData>
+    >;
+    request?: SecondParameter<typeof apiMutator>;
+  },
+  queryClient?: QueryClient
+): UseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData, TError> };
+/**
+ * @summary Get Initiative Defaults
+ */
+
+export function useGetInitiativeDefaults<
+  TData = Awaited<ReturnType<typeof getInitiativeDefaults>>,
+  TError = ErrorType<HTTPValidationError>,
+>(
+  communityId: number,
+  options?: {
+    query?: Partial<
+      UseQueryOptions<Awaited<ReturnType<typeof getInitiativeDefaults>>, TError, TData>
+    >;
+    request?: SecondParameter<typeof apiMutator>;
+  },
+  queryClient?: QueryClient
+): UseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData, TError> } {
+  const queryOptions = getGetInitiativeDefaultsQueryOptions(communityId, options);
+
+  const query = useQuery(queryOptions, queryClient) as UseQueryResult<TData, TError> & {
+    queryKey: DataTag<QueryKey, TData, TError>;
+  };
+
+  return withQueryKey(query, queryOptions.queryKey);
+}
+
+/**
+ * Set what every initiative in the community starts from and keeps. The
+ * community's admins only. A tool's switch or a member permission set here
+ * is written to every initiative at once, archived and trashed ones too.
+ * @summary Update Initiative Defaults
+ */
+export const updateInitiativeDefaults = (
+  communityId: number,
+  initiativeDefaultsUpdate: BodyType<InitiativeDefaultsUpdate>,
+  options?: SecondParameter<typeof apiMutator>,
+  signal?: AbortSignal
+) => {
+  return apiMutator<InitiativeDefaultsRead>(
+    {
+      url: `/api/v1/c/${communityId}/initiatives/defaults`,
+      method: "PATCH",
+      headers: { "Content-Type": "application/json" },
+      data: initiativeDefaultsUpdate,
+      signal,
+    },
+    options
+  );
+};
+
+export const getUpdateInitiativeDefaultsMutationKey = () => ["updateInitiativeDefaults"] as const;
+
+export const getUpdateInitiativeDefaultsMutationOptions = <
+  TError = ErrorType<HTTPValidationError>,
+  TContext = unknown,
+>(options?: {
+  mutation?: UseMutationOptions<
+    Awaited<ReturnType<typeof updateInitiativeDefaults>>,
+    TError,
+    UpdateInitiativeDefaultsMutationVariables,
+    TContext
+  >;
+  request?: SecondParameter<typeof apiMutator>;
+}): UseMutationOptions<
+  Awaited<ReturnType<typeof updateInitiativeDefaults>>,
+  TError,
+  UpdateInitiativeDefaultsMutationVariables,
+  TContext
+> => {
+  const mutationKey = getUpdateInitiativeDefaultsMutationKey();
+  const { mutation: mutationOptions, request: requestOptions } = options
+    ? options.mutation && "mutationKey" in options.mutation && options.mutation.mutationKey
+      ? options
+      : { ...options, mutation: { ...options.mutation, mutationKey } }
+    : { mutation: { mutationKey }, request: undefined };
+
+  const mutationFn: MutationFunction<
+    Awaited<ReturnType<typeof updateInitiativeDefaults>>,
+    UpdateInitiativeDefaultsMutationVariables
+  > = (props) => {
+    const { communityId, data } = props ?? {};
+
+    return updateInitiativeDefaults(communityId, data, requestOptions);
+  };
+
+  return { mutationFn, ...mutationOptions };
+};
+
+export type UpdateInitiativeDefaultsMutationResult = NonNullable<
+  Awaited<ReturnType<typeof updateInitiativeDefaults>>
+>;
+export type UpdateInitiativeDefaultsMutationBody = BodyType<InitiativeDefaultsUpdate>;
+export type UpdateInitiativeDefaultsMutationError = ErrorType<HTTPValidationError>;
+export type UpdateInitiativeDefaultsMutationVariables = {
+  communityId: number;
+  data: BodyType<InitiativeDefaultsUpdate>;
+};
+
+/**
+ * @summary Update Initiative Defaults
+ */
+export const useUpdateInitiativeDefaults = <
+  TError = ErrorType<HTTPValidationError>,
+  TContext = unknown,
+>(
+  options?: {
+    mutation?: UseMutationOptions<
+      Awaited<ReturnType<typeof updateInitiativeDefaults>>,
+      TError,
+      UpdateInitiativeDefaultsMutationVariables,
+      TContext
+    >;
+    request?: SecondParameter<typeof apiMutator>;
+  },
+  queryClient?: QueryClient
+): UseMutationResult<
+  Awaited<ReturnType<typeof updateInitiativeDefaults>>,
+  TError,
+  UpdateInitiativeDefaultsMutationVariables,
+  TContext
+> => {
+  return useMutation(getUpdateInitiativeDefaultsMutationOptions(options), queryClient);
+};
 /**
  * Join an ``open`` initiative as yourself, with the built-in member role.
  *

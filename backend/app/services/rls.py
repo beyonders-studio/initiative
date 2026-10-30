@@ -30,6 +30,7 @@ from app.models.platform.user import User
 # Re-export the RLS context helper so callers can import from a single place.
 from app.db.session import require_guild_context, set_rls_context  # noqa: F401
 from app.db.authorization import standing_arg
+from app.services.tenant.initiative_tools import member_permission_sql
 
 
 # ---------------------------------------------------------------------------
@@ -97,7 +98,11 @@ def _role_permits(permission_key: PermissionKey):
     default = DEFAULT_PERMISSION_VALUES.get(permission_key, False)
     return or_(
         InitiativeRoleModel.is_manager,
-        func.coalesce(InitiativeRule.enabled, default),
+        func.coalesce(
+            member_permission_sql(InitiativeRoleModel, permission_key.value),
+            InitiativeRule.enabled,
+            default,
+        ),
     )
 
 

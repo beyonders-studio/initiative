@@ -245,6 +245,9 @@ GUEST_ITEM_INITIATIVES = Guc("app.guest_item_initiatives", Kind.IDS, standing=Tr
 #: The surfaces the deployment has closed for the community: the ``surface.*``
 #: keys of ``app.core.rules`` whose deployment row says off.
 CLOSED_SURFACES = Guc("app.closed_surfaces", Kind.NAMES, standing=True)
+#: ``"<tool>=on"`` / ``"<tool>=off"`` where the community set a tool's switch
+#: for every initiative in it (``app.models.tenant.initiative.INITIATIVE_TOOL_KEYS``).
+COMMUNITY_TOOLS = Guc("app.community_tools", Kind.NAMES, standing=True)
 
 # --- Somebody who filed a case ------------------------------------------------
 #: The tasks of the cases the routed account filed, read by the filer seam

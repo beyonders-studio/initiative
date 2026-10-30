@@ -19,6 +19,9 @@ from app.core.messages import InitiativeMessages
 from app.db.session import routed_context
 from app.models.tenant.resource_grant import ResourceGrant
 from app.models.tenant.initiative import (
+    INITIATIVE_CUSTOM_ROLES,
+    INITIATIVE_MEMBER_PREFIX,
+    INITIATIVE_TOOL_KEYS,
     BUILTIN_ROLES,
     Initiative,
     InitiativeJoinPolicy,
@@ -35,6 +38,8 @@ from app.models.platform.user import User
 from app.models.platform.user_profile_view import MemberProfile
 from app.schemas.platform.user import UserInitiativeRole, UserSummary
 from app.schemas.tenant.initiative import (
+    InitiativeDefaultsRead,
+    InitiativeDefaultsUpdate,
     InitiativeDirectoryEntry,
     InitiativeJoinRequestRead,
 )
@@ -1230,3 +1235,81 @@ async def create_imported_initiative(
     )
     await session.flush()
     return initiative
+
+
+def _member_key(key: PermissionKey) -> str:
+    return f"{INITIATIVE_MEMBER_PREFIX}{key.value}"
+
+
+async def _community_rows(session: AsyncSession) -> dict[str, InitiativeRule]:
+    """The community's own ``initiative_rules`` rows, by key: the ones with no
+    initiative."""
+    rows = await session.exec(
+        select(InitiativeRule).where(
+            InitiativeRule.initiative_id.is_(None)  # type: ignore[union-attr]
+        )
+    )
+    return {row.key: row for row in rows.all()}
+
+
+async def community_defaults(session: AsyncSession) -> InitiativeDefaultsRead:
+    """What the community sets for every initiative in it."""
+    rows = await _community_rows(session)
+    custom_roles = rows.get(INITIATIVE_CUSTOM_ROLES)
+    return InitiativeDefaultsRead(
+        tools={
+            tool: rows[key].enabled
+            for tool, key in INITIATIVE_TOOL_KEYS.items()
+            if key in rows
+        },
+        member_permissions={
+            key: rows[_member_key(key)].enabled
+            for key in PermissionKey
+            if _member_key(key) in rows
+        },
+        custom_roles=custom_roles is None or custom_roles.enabled,
+    )
+
+
+async def set_community_defaults(
+    session: AsyncSession,
+    *,
+    guild_id: int,
+    changes: InitiativeDefaultsUpdate,
+    actor_user_id: int,
+) -> InitiativeDefaultsRead:
+    """Change what the community sets for every initiative. Each initiative
+    keeps its own values beneath, which apply again where the community hands
+    a tool or a permission back. Written on the admin's own session: the
+    community's rows have no initiative, so no manager's policy admits them."""
+    before = await community_defaults(session)
+    stored: dict[str, bool | None] = {
+        **{INITIATIVE_TOOL_KEYS[tool]: on for tool, on in changes.tools.items()},
+        **{_member_key(key): on for key, on in changes.member_permissions.items()},
+    }
+    if changes.custom_roles is not None:
+        # Allowed is the default, so it is no row.
+        stored[INITIATIVE_CUSTOM_ROLES] = None if changes.custom_roles else False
+    rows = await _community_rows(session)
+    for key, value in stored.items():
+        row = rows.get(key)
+        if value is None:
+            if row is not None:
+                await session.delete(row)
+        elif row is None:
+            session.add(InitiativeRule(key=key, enabled=value))
+        else:
+            row.enabled = value
+            session.add(row)
+    await session.flush()
+
+    after = await community_defaults(session)
+    await audit_service.record_settings_change(
+        session,
+        guild_id=guild_id,
+        actor_user_id=actor_user_id,
+        area="initiative_defaults",
+        before=before.model_dump(mode="json"),
+        after=after.model_dump(mode="json"),
+    )
+    return after

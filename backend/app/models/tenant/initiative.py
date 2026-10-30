@@ -129,6 +129,10 @@ class BuiltinRole(NamedTuple):
     permissions: dict["PermissionKey", bool]
 
 
+#: The built-in role an ordinary member holds, whose permissions a community
+#: may set for all its initiatives (``app.core.rules``).
+BUILTIN_MEMBER_ROLE = "member"
+
 # The built-in roles, ordered. Moderator and project manager get every tool
 # permission; members get view-only on the core (always-on) tools.
 BUILTIN_ROLES: tuple[BuiltinRole, ...] = (
@@ -147,7 +151,7 @@ BUILTIN_ROLES: tuple[BuiltinRole, ...] = (
         permissions={key: True for key in PermissionKey},
     ),
     BuiltinRole(
-        name="member",
+        name=BUILTIN_MEMBER_ROLE,
         display_name="Member",
         is_manager=False,
         override_share_restrictions=False,
@@ -207,15 +211,44 @@ class InitiativeRoleModel(CreatedByMixin, table=True):
     members: List["InitiativeMember"] = Relationship(back_populates="role_ref")
 
 
+#: What a community may set for every initiative in it, kept as its
+#: ``initiative_rules`` rows with no initiative: each tool's switch, each
+#: permission of the built-in member role, and whether managers may add roles
+#: of their own. Its value stands over each initiative's own; a key with no row
+#: is each initiative's to set.
+INITIATIVE_TOOL_PREFIX = "initiative_tool."
+INITIATIVE_TOOL_KEYS: dict[Tool, str] = {
+    tool: f"{INITIATIVE_TOOL_PREFIX}{tool.value}" for tool in Tool
+}
+INITIATIVE_MEMBER_PREFIX = f"initiative_role.{BUILTIN_MEMBER_ROLE}."
+INITIATIVE_CUSTOM_ROLES = "initiative_custom_roles"
+COMMUNITY_DEFAULT_KEYS: tuple[str, ...] = (
+    *INITIATIVE_TOOL_KEYS.values(),
+    *(f"{INITIATIVE_MEMBER_PREFIX}{key.value}" for key in PermissionKey),
+    INITIATIVE_CUSTOM_ROLES,
+)
+
+
+def _quoted(keys) -> str:
+    return ", ".join(f"'{key}'" for key in keys)
+
+
 class InitiativeRule(SQLModel, table=True):
     """One of an initiative's rules: what one of its roles may do with a tool
     (``PermissionKey``). Kept in the community's own schema beside the
-    initiative, and gone with it; a role's rules go with the role."""
+    initiative, and gone with it; a role's rules go with the role. A row with
+    no initiative is the community's, for every initiative
+    (``COMMUNITY_DEFAULT_KEYS``)."""
 
     __tablename__ = "initiative_rules"
     __table_args__ = (
         CheckConstraint(
-            "key IN (" + ", ".join(f"'{key.value}'" for key in PermissionKey) + ")",
+            "(initiative_id IS NOT NULL AND key IN ("
+            + _quoted(key.value for key in PermissionKey)
+            + ")) OR (initiative_id IS NULL AND initiative_role_id IS NULL"
+            + " AND key IN ("
+            + _quoted(COMMUNITY_DEFAULT_KEYS)
+            + "))",
             name="ck_initiative_rules_key",
             info={FROM_REGISTRY: True},
         ),
@@ -235,12 +268,14 @@ class InitiativeRule(SQLModel, table=True):
     )
 
     id: Optional[int] = Field(default=None, primary_key=True)
-    initiative_id: int = Field(
+    #: The initiative, or ``None`` for the community's own.
+    initiative_id: Optional[int] = Field(
+        default=None,
         sa_column=Column(
             Integer,
             ForeignKey("initiatives.id", ondelete="CASCADE"),
-            nullable=False,
-        )
+            nullable=True,
+        ),
     )
     #: The role the rule is about.
     initiative_role_id: Optional[int] = Field(

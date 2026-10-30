@@ -12,7 +12,7 @@ from sqlmodel import select
 
 from app.models.platform.guild import CommunityRole
 from app.models.platform.user import UserRole
-from app.models.tenant.initiative import InitiativeMember
+from app.models.tenant.initiative import InitiativeMember, InitiativeRule
 from app.services.tenant import initiatives as initiatives_service
 from app.testing import (
     create_access_grant,
@@ -185,3 +185,34 @@ async def test_the_administrator_adds_a_member_anywhere(
     s = await _writing_as(role_session, user_id=admin.user.id, guild_id=a.guild.id)
     await _add(s, initiative, newcomer.id, role_id)
     assert await _is_member(session, initiative, a.guild.id, newcomer.id)
+
+
+async def test_only_an_admin_writes_the_communitys_initiative_defaults(
+    acting_user, role_session
+):
+    """The community's own ``initiative_rules`` rows, the ones with no
+    initiative, are its admins' to write: a manager of every initiative in it
+    writes none."""
+    admin = await acting_user(guild_role=CommunityRole.admin, initiative=True)
+    pm = await acting_user(
+        guild_role=CommunityRole.member,
+        guild=admin.guild,
+        initiative=admin.initiative,
+        initiative_role="project_manager",
+    )
+
+    async def writes(actor) -> bool:
+        s = await _writing_as(
+            role_session, user_id=actor.user.id, guild_id=admin.guild.id
+        )
+        s.add(InitiativeRule(key="initiative_tool.post", enabled=False))
+        try:
+            await s.commit()
+        except DBAPIError:
+            return False
+        finally:
+            await s.rollback()
+        return True
+
+    assert not await writes(pm)
+    assert await writes(admin)

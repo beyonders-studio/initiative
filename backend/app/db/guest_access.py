@@ -145,7 +145,12 @@ GUEST_ROWS: dict[str, str] = {
         f" OR initiative_members.initiative_id = ANY ({_MEMBER_OF}))"
     ),
     "initiative_roles": f"(initiative_roles.initiative_id IN {_IN_INITIATIVES})",
-    "initiative_rules": f"(initiative_rules.initiative_id IN {_IN_INITIATIVES})",
+    # The community's own rows say what every initiative is held to, which a
+    # guest's standing reads too.
+    "initiative_rules": (
+        f"(initiative_rules.initiative_id IN {_IN_INITIATIVES}"
+        " OR initiative_rules.initiative_id IS NULL)"
+    ),
     # Only the sharing rows that reach them: not who else something is
     # shared with.
     "resource_grants": (
