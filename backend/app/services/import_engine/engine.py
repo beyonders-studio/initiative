@@ -21,7 +21,7 @@ from pathlib import Path
 from typing import Any, AsyncIterator, BinaryIO
 
 from sqlalchemy import func
-from sqlmodel import select
+from sqlmodel import col, select
 from sqlmodel.ext.asyncio.session import AsyncSession
 
 from app.db.advisory_locks import LockNamespace, advisory_lock
@@ -30,7 +30,7 @@ from app.db.session import raise_flag, routed_guild_id
 from app.core.messages import ImportEngineMessages
 from app.models.platform.guild import CommunityRole
 from app.models.platform.user import User
-from app.models.tenant.import_job import ImportJob, ImportJobStatus
+from app.models.tenant.data_job import DataJob, DataJobDirection, DataJobStatus
 from app.models.tenant.initiative import Initiative
 from app.core.legacy_references import rewrite_body, rewrite_ref, rewrite_text
 from app.core.tools import Tool, tool_envelope_type, tool_for_create_permission
@@ -49,12 +49,12 @@ from app.services.import_engine import limits as import_limits
 
 # Statuses that count against the per-user active-job cap.
 _ACTIVE_STATUSES = (
-    ImportJobStatus.staged,
+    DataJobStatus.staged,
     # A fetch is the slowest thing a job does and the one most worth
     # capping — it is somebody else's API being read on our schedule.
-    ImportJobStatus.fetching,
-    ImportJobStatus.queued,
-    ImportJobStatus.running,
+    DataJobStatus.fetching,
+    DataJobStatus.queued,
+    DataJobStatus.running,
 )
 
 
@@ -269,7 +269,7 @@ async def start_envelope_import(
     guild_id: int,
     initiative_id: int,
     envelope: dict[str, Any],
-) -> InlineImport | ImportJob:
+) -> InlineImport | DataJob:
     """The shared create path: validate + authorize under RLS, bound, then
     auto-select delivery.
 
@@ -325,18 +325,19 @@ async def start_envelope_import(
     await count_active_jobs_locked(session, user=user)
 
     payload_ref = await asyncio.to_thread(_stage_envelope, guild_id, envelope)
-    job = ImportJob(
+    job = DataJob(
+        direction=DataJobDirection.import_,
         created_by=user.id,
         source=envelope_type,
         params={"initiative_id": initiative.id},
-        payload_ref=payload_ref,
+        file_ref=payload_ref,
         # A staged job is waiting on a person; a queued one is waiting on the
         # worker. The plan rides along only in the first case, because it is
         # the question being asked.
         plan=EnvelopeImportPlan(people=people).model_dump(mode="json")
         if unplaced
         else None,
-        status=ImportJobStatus.staged if unplaced else ImportJobStatus.queued,
+        status=DataJobStatus.staged if unplaced else DataJobStatus.queued,
         expires_at=datetime.now(timezone.utc)
         + timedelta(hours=import_limits.IMPORT_STAGED_TTL_HOURS),
     )
@@ -411,10 +412,11 @@ async def count_active_jobs_locked(session: AsyncSession, *, user: User) -> None
     active = (
         await session.exec(
             select(func.count())
-            .select_from(ImportJob)
+            .select_from(DataJob)
             .where(
-                ImportJob.created_by == user.id,
-                ImportJob.status.in_(_ACTIVE_STATUSES),
+                DataJob.direction == DataJobDirection.import_,
+                DataJob.created_by == user.id,
+                col(DataJob.status).in_(_ACTIVE_STATUSES),
             )
         )
     ).one()

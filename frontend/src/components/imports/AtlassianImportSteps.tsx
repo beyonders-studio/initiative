@@ -2,17 +2,17 @@ import { AlertTriangle, ExternalLink, FileUp, Loader2 } from "lucide-react";
 import { type FormEvent, useEffect, useRef, useState } from "react";
 import { useTranslation } from "react-i18next";
 
+import { useGetDataJob } from "@/api/generated/data-jobs/data-jobs";
 import {
   useCancelImportJob,
   useConnectAtlassian,
-  useGetImportJob,
   useStartAtlassianImport,
   useStartConfluenceExportImport,
 } from "@/api/generated/imports/imports";
 import type {
   AtlassianConfluenceSpace,
   AtlassianJiraProject,
-  ImportJobRead,
+  DataJobRead,
 } from "@/api/generated/initiativeAPI.schemas";
 import { Button } from "@/components/ui/button";
 import { Checkbox } from "@/components/ui/checkbox";
@@ -102,7 +102,7 @@ export interface AtlassianPlanSummary {
   dropped_macros?: Array<{ name: string; count: number }>;
 }
 
-export function atlassianSummary(job: ImportJobRead | null | undefined): AtlassianPlanSummary {
+export function atlassianSummary(job: DataJobRead | null | undefined): AtlassianPlanSummary {
   const plan = job?.plan as { atlassian?: AtlassianPlanSummary } | null | undefined;
   return plan?.atlassian ?? {};
 }
@@ -228,7 +228,7 @@ export function AtlassianConnectStep({ onConnected, onUseExport }: AtlassianConn
 
 export interface AtlassianExportStepProps {
   initiatives: AtlassianTarget[];
-  onStarted: (job: ImportJobRead) => void;
+  onStarted: (job: DataJobRead) => void;
 }
 
 /** The zip Confluence's space export writes, for a site this server cannot
@@ -380,7 +380,7 @@ export interface AtlassianTarget {
 export interface AtlassianChooseStepProps {
   connection: AtlassianConnection;
   initiatives: AtlassianTarget[];
-  onStarted: (job: ImportJobRead) => void;
+  onStarted: (job: DataJobRead) => void;
 }
 
 function useTicks() {
@@ -606,7 +606,7 @@ export function AtlassianChooseStep({
 export interface AtlassianFetchingStepProps {
   jobId: number;
   /** The site has been read and the job is waiting for review. */
-  onStaged: (job: ImportJobRead) => void;
+  onStaged: (job: DataJobRead) => void;
   /** The fetch is over without a bundle — cancelled, or failed and dismissed. */
   onStopped: () => void;
 }
@@ -618,7 +618,7 @@ export function AtlassianFetchingStep({ jobId, onStaged, onStopped }: AtlassianF
   const { t } = useTranslation("imports");
   const communityId = useActiveCommunityId();
   const cancel = useCancelImportJob();
-  const jobQuery = useGetImportJob(communityId, jobId, {
+  const jobQuery = useGetDataJob(communityId, jobId, {
     query: {
       refetchInterval: (query) =>
         FETCHING.has(query.state.data?.status ?? "queued") ? FETCH_POLL_MS : false,
@@ -685,7 +685,7 @@ export function AtlassianFetchingStep({ jobId, onStaged, onStopped }: AtlassianF
 // ---------------------------------------------------------------------------
 
 export interface JiraReviewSummaryProps {
-  job: ImportJobRead;
+  job: DataJobRead;
   /** Property names unticked so far. */
   excluded: Set<string>;
   onExcludedChange: (next: Set<string>) => void;
@@ -832,7 +832,7 @@ export function JiraReviewSummary({ job, excluded, onExcludedChange }: JiraRevie
 
 /** What reading the spaces found, before anything is written: the pages
  * arriving, and what they held that will not. */
-export function ConfluenceReviewSummary({ job }: { job: ImportJobRead }) {
+export function ConfluenceReviewSummary({ job }: { job: DataJobRead }) {
   const { t } = useTranslation("imports");
   const summary = atlassianSummary(job);
 

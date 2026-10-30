@@ -4,7 +4,7 @@ import { endOfMonth, startOfDay, startOfMonth } from "date-fns";
 import { HttpResponse } from "msw";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 
-import { buildDefaultTaskStatuses } from "@/__tests__/factories";
+import { buildDataJob, buildDefaultTaskStatuses } from "@/__tests__/factories";
 import { communityHttp } from "@/__tests__/helpers/communityHttp";
 import { server } from "@/__tests__/helpers/msw-server";
 import { renderWithProviders } from "@/__tests__/helpers/render";
@@ -52,27 +52,17 @@ function stubJobLifecycle(capture: (url: URL) => void) {
       capture(new URL(request.url));
       return HttpResponse.json({ id: 77, status: "queued" }, { status: 202 });
     }),
-    communityHttp.get("/exports/jobs/:jobId", ({ params }) => {
-      // Fall through for the literal sibling routes (/exports/estimate,
-      // /exports/community, /exports/initiative) — only numeric ids are jobs.
-      if (Number.isNaN(Number(params.jobId))) {
-        return undefined;
-      }
-      return HttpResponse.json({
-        id: 77,
-        community_id: 1,
-        created_by: 1,
-        source: "community",
-        template_id: "data-table",
-        format: "zip",
-        params: {},
-        status: "done",
-        error: null,
-        expires_at: null,
-        created_at: new Date().toISOString(),
-        updated_at: new Date().toISOString(),
-      });
-    }),
+    communityHttp.get("/data-jobs/:jobId", () =>
+      HttpResponse.json(
+        buildDataJob({
+          id: 77,
+          source: "community",
+          template_id: "data-table",
+          format: "zip",
+          status: "done",
+        })
+      )
+    ),
     communityHttp.get("/exports/jobs/:jobId/download", () =>
       HttpResponse.text("PK-zip", {
         headers: {
@@ -182,25 +172,17 @@ describe("ExportWizard", () => {
         HttpResponse.json({ id: 88, status: "queued" }, { status: 202 })
       ),
       // The job never finishes during this test — it stays queued.
-      communityHttp.get("/exports/jobs/:jobId", ({ params }) => {
-        if (Number.isNaN(Number(params.jobId))) {
-          return undefined;
-        }
-        return HttpResponse.json({
-          id: 88,
-          community_id: 1,
-          created_by: 1,
-          source: "community",
-          template_id: "data-table",
-          format: "zip",
-          params: {},
-          status: "queued",
-          error: null,
-          expires_at: null,
-          created_at: new Date().toISOString(),
-          updated_at: new Date().toISOString(),
-        });
-      })
+      communityHttp.get("/data-jobs/:jobId", () =>
+        HttpResponse.json(
+          buildDataJob({
+            id: 88,
+            source: "community",
+            template_id: "data-table",
+            format: "zip",
+            status: "queued",
+          })
+        )
+      )
     );
 
     const { rerender } = renderWithProviders(

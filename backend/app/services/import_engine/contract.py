@@ -37,7 +37,7 @@ class ImportEngineError(CodedError):
 
 class EnvelopeImportResult(SanitizedBaseModel):
     """One envelope's apply outcome — JSON-serializable because it is
-    persisted verbatim into ``import_jobs.result`` and rendered by the UI."""
+    persisted verbatim into ``data_jobs.result`` and rendered by the UI."""
 
     entity_id: int | None = None
     entity_title: str = ""

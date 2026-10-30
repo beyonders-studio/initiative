@@ -189,8 +189,8 @@ async def _guild_import_payloads(conn: AsyncConnection, schema: str) -> frozense
     rows = await conn.execute(
         # schema = guild_schema_name(int), a digits-only identifier.
         text(
-            f'SELECT payload_ref FROM "{schema}".import_jobs '  # noqa: S608
-            "WHERE payload_ref IS NOT NULL"
+            f'SELECT file_ref FROM "{schema}".data_jobs '  # noqa: S608
+            "WHERE direction = 'import' AND file_ref IS NOT NULL"
         )
     )
     return frozenset(rows.scalars().all())

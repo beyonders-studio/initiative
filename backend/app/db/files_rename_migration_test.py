@@ -70,12 +70,14 @@ _PLUGIN_BINDING = {"source": "plugin", "params": {"document_id": 5}}
 
 def _guild_runner(schema: str):
     """Revision 0464 one way or the other, on one guild's schema only. The
-    metadata store (20261027_0550) and the galleries conversion
-    (20261027_0546) come off first and go back last: the checks 0464 restates
-    name the permissions as they were then."""
+    metadata store (20261027_0550), the galleries conversion (20261027_0546)
+    and the data jobs table (20261030_0564) come off first and go back last:
+    the checks 0464 restates name the permissions as they were then, and it
+    respells the exports in the table they had then."""
     files = _load("20261006_0464_documents_are_files.py")
     collections = _load("20261027_0546_galleries_are_collections.py")
     metadata = _load("20261027_0550_metadata_is_one_store.py")
+    data_jobs = _load("20261030_0564_imports_and_exports_are_data_jobs.py")
 
     def run(forward: bool):
         def apply(sync_session) -> None:
@@ -93,7 +95,9 @@ def _guild_runner(schema: str):
                     files._convert(bind, True, in_schema)
                     collections._convert(bind, True, in_schema)
                     in_schema(lambda: metadata._apply(True))
+                    in_schema(data_jobs._upgrade_schema)
                 else:
+                    in_schema(data_jobs._downgrade_schema)
                     in_schema(lambda: metadata._apply(False))
                     collections._convert(bind, False, in_schema)
                     files._convert(bind, False, in_schema)
@@ -157,10 +161,18 @@ async def _guild_values(session, schema: str, ids: dict[str, int]) -> dict:
             f"SELECT definition, config FROM {s}.dashboards WHERE id = :id",
             id=ids["dashboard"],
         ),
+        # The one export, in the table it has on either side; the data jobs
+        # table gives it a new id.
         "export": await _rows(
             session,
-            f"SELECT source, params FROM {s}.export_jobs WHERE id = :id",
-            id=ids["export"],
+            "SELECT source, params FROM "
+            + (
+                await _rows(
+                    session,
+                    f"SELECT COALESCE(to_regclass('{s}.export_jobs'), "
+                    f"to_regclass('{s}.data_jobs'))::text",
+                )
+            )[0][0],
         ),
     }
 
@@ -208,7 +220,7 @@ async def test_guild_values_say_file_and_back(session) -> None:
             }
         },
     )
-    job = await create_export_job(
+    await create_export_job(
         session,
         guild,
         user,
@@ -246,7 +258,6 @@ async def test_guild_values_say_file_and_back(session) -> None:
             "file": file.id,
             "outbox": outbox_id,
             "dashboard": dashboard.id,
-            "export": job.id,
         }
         old = await _guild_values(session, schema, ids)
 

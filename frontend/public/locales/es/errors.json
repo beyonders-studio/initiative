@@ -266,6 +266,7 @@
   "EXPORT_WRITE_REQUIRED": "Esta exportación es demasiado grande para generarla con acceso de solo lectura.",
   "EXPORT_OWNER_REQUIRED": "Solo quien puede eliminar esto puede exportarlo.",
   "EXPORT_JOB_NOT_FOUND": "Exportación no encontrada.",
+  "DATA_JOB_NOT_FOUND": "Importación o exportación no encontrada.",
   "EXPORT_NOT_READY": "Esta exportación aún no está lista para descargar.",
   "EXPORT_EXPIRED": "Esta exportación ha caducado. Inicia una nueva para volver a descargarla.",
   "EXPORT_OUT_OF_REACH": "Ya no tienes acceso a todo lo que contiene esta exportación, así que no se puede descargar.",

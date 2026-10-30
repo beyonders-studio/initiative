@@ -40,7 +40,7 @@ from app.core.messages import ImportEngineMessages
 from app.core.tools import Tool, tool_envelope_type
 from app.core.version import get_version
 from app.models.platform.user import User, UserStatus
-from app.models.tenant.import_job import ImportJob, ImportJobStatus
+from app.models.tenant.data_job import DataJob, DataJobDirection, DataJobStatus
 from app.models.tenant.initiative import Initiative
 from app.core.encryption import (
     SALT_IMPORT_CREDENTIAL,
@@ -69,7 +69,7 @@ from app.services.tenant import attachments as attachments_service
 
 logger = logging.getLogger(__name__)
 
-#: ``import_jobs.source`` for every import read from an Atlassian site.
+#: ``data_jobs.source`` for every import read from an Atlassian site.
 SOURCE = "atlassian"
 
 #: The provider a credential has to have been stored under to start one.
@@ -92,11 +92,11 @@ _FILE_ENVELOPE = tool_envelope_type(Tool.file)
 EXPORT_SUFFIX = "confluence-export.zip"
 
 
-def awaits_fetch(job: ImportJob) -> bool:
+def awaits_fetch(job: DataJob) -> bool:
     """Whether the worker should read the source for this job rather than
     apply it: a site not yet read, or an export not yet converted."""
     return job.source == SOURCE and (
-        not job.payload_ref
+        not job.file_ref
         or (bool((job.params or {}).get("confluence_export")) and job.plan is None)
     )
 
@@ -175,7 +175,7 @@ async def start_import(
     space_keys: list[str],
     include_comments: bool = True,
     include_attachments: bool = True,
-) -> ImportJob:
+) -> DataJob:
     """Queue a job that reads these Jira projects and Confluence spaces into
     ``initiative_id`` — projects as projects, each space as a wiki.
 
@@ -213,7 +213,8 @@ async def start_import(
     assert initiative is not None
     await import_engine.count_active_jobs_locked(session, user=user)
 
-    job = ImportJob(
+    job = DataJob(
+        direction=DataJobDirection.import_,
         created_by=user.id,
         source=SOURCE,
         params={
@@ -228,7 +229,7 @@ async def start_import(
             "include_attachments": include_attachments,
         },
         secret_encrypted=encrypt_field(credential.api_token, SALT_IMPORT_CREDENTIAL),
-        status=ImportJobStatus.queued,
+        status=DataJobStatus.queued,
         expires_at=datetime.now(timezone.utc)
         + timedelta(hours=import_limits.IMPORT_STAGED_TTL_HOURS),
     )
@@ -261,7 +262,7 @@ async def start_export(
     payload: bytes | Path,
     include_attachments: bool = True,
     payload_ref: str | None = None,
-) -> ImportJob:
+) -> DataJob:
     """Queue a job that reads a Confluence space's HTML export into
     ``initiative_id`` as a wiki.
 
@@ -286,7 +287,8 @@ async def start_export(
         payload_ref = await asyncio.to_thread(
             stage, guild_id, payload, suffix=EXPORT_SUFFIX
         )
-    job = ImportJob(
+    job = DataJob(
+        direction=DataJobDirection.import_,
         created_by=user.id,
         source=SOURCE,
         params={
@@ -294,8 +296,8 @@ async def start_export(
             "confluence_export": True,
             "include_attachments": include_attachments,
         },
-        payload_ref=payload_ref,
-        status=ImportJobStatus.queued,
+        file_ref=payload_ref,
+        status=DataJobStatus.queued,
         expires_at=datetime.now(timezone.utc)
         + timedelta(hours=import_limits.IMPORT_STAGED_TTL_HOURS),
     )
@@ -317,14 +319,14 @@ def _check_export(payload: bytes | Path) -> None:
 
 
 async def _fetch_export(
-    job: ImportJob,
+    job: DataJob,
     *,
     guild_id: int,
     open_user_session: Callable[[], AsyncContextManager[AsyncSession]],
     progress: Callable[[AtlassianFetchSummary], Awaitable[None]] | None,
 ) -> StagedFetch:
     """Convert an uploaded HTML export into the bundle a site fetch writes."""
-    raw_ref = job.payload_ref
+    raw_ref = job.file_ref
     if not raw_ref:
         raise ImportEngineError(ImportEngineMessages.IMPORT_INVALID_PARAMS)
     async with import_engine.open_payload(guild_id, raw_ref) as upload:
@@ -339,7 +341,7 @@ async def _fetch_export(
             # starts over from nothing, and says so, rather than finding half
             # of one. The open archive keeps reading the file it opened.
             await asyncio.to_thread(import_engine.delete_payload, guild_id, raw_ref)
-            job.payload_ref = None
+            job.file_ref = None
         if archive is None:
             raise ImportEngineError(ImportEngineMessages.IMPORT_INVALID_PARAMS)
         with archive:
@@ -353,7 +355,7 @@ async def _fetch_export(
 
 
 async def _convert_export(
-    job: ImportJob,
+    job: DataJob,
     archive: zipfile.ZipFile,
     *,
     guild_id: int,
@@ -530,7 +532,7 @@ class FetchCancelled(Exception):
 
 
 async def fetch(
-    job: ImportJob,
+    job: DataJob,
     *,
     guild_id: int,
     open_user_session: Callable[[], AsyncContextManager[AsyncSession]],
@@ -554,7 +556,7 @@ async def fetch(
 
 
 async def _read(
-    job: ImportJob,
+    job: DataJob,
     *,
     guild_id: int,
     open_user_session: Callable[[], AsyncContextManager[AsyncSession]],

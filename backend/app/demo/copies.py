@@ -38,7 +38,7 @@ from app.models.platform.guild import (
 )
 from app.models.platform.guild_image import IMAGE_SPECS, GuildImage, GuildImageVariant
 from app.models.platform.user import User, UserRole, UserStatus
-from app.models.tenant.import_job import ImportJob, ImportJobStatus
+from app.models.tenant.data_job import DataJob, DataJobDirection, DataJobStatus
 from app.services.import_engine import backup as backup_service
 from app.services.import_engine import engine as import_engine
 from app.services.platform import guild_images, guild_purge
@@ -155,7 +155,7 @@ async def redeem(
                 guild_id=guild_id,
                 user=visitor if role is CommunityRole.superadmin else host,
                 payload=bundle,
-                status=ImportJobStatus.queued,
+                status=DataJobStatus.queued,
                 anchor=anchor,
                 people_map=seated,
                 join=[visitor_id] if role is not CommunityRole.superadmin else None,
@@ -313,7 +313,7 @@ async def account_copy(user_id: int) -> AccountCopy | None:
     return None if row is None else AccountCopy(*row)
 
 
-async def copy_import(copy: AccountCopy) -> ImportJobStatus:
+async def copy_import(copy: AccountCopy) -> DataJobStatus:
     """Where the import filling the copy stands; one that is missing counts as
     failed. Read on the system engine routed into the copy: a member visitor
     does not read import jobs."""
@@ -321,10 +321,13 @@ async def copy_import(copy: AccountCopy) -> ImportJobStatus:
         await set_rls_context(session, SystemGuild(copy.guild_id))
         status = (
             await session.exec(
-                select(ImportJob.status).where(ImportJob.id == copy.import_job_id)
+                select(DataJob.status).where(
+                    DataJob.id == copy.import_job_id,
+                    DataJob.direction == DataJobDirection.import_,
+                )
             )
         ).first()
-    return ImportJobStatus.failed if status is None else ImportJobStatus(status)
+    return DataJobStatus.failed if status is None else DataJobStatus(status)
 
 
 # --- the pool loop -----------------------------------------------------------

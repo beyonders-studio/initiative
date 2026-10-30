@@ -15,7 +15,7 @@ from sqlmodel import select
 
 from app.models.platform.guild import CommunityRole
 from app.models.platform.user import UserRole
-from app.models.tenant.export_job import ExportJob
+from app.models.tenant.data_job import DataJob, DataJobDirection
 from app.testing import (
     create_access_grant,
     create_export_job,
@@ -25,7 +25,7 @@ from app.testing import (
 )
 
 
-_FAIL = text("UPDATE export_jobs SET status = 'failed'")
+_FAIL = text("UPDATE data_jobs SET status = 'failed'")
 
 
 async def _seat_session(role_session, *, user_id: int, guild_id: int):
@@ -38,7 +38,7 @@ async def _seat_session(role_session, *, user_id: int, guild_id: int):
 async def _statuses(session, guild_id: int) -> list[str]:
     session.expire_all()
     await route_session_to_guild(session, guild_id)
-    return list((await session.exec(select(ExportJob.status))).all())
+    return list((await session.exec(select(DataJob.status))).all())
 
 
 async def test_a_settings_grant_reads_a_members_row_and_writes_only_beside_read_write(
@@ -58,12 +58,19 @@ async def test_a_settings_grant_reads_a_members_row_and_writes_only_beside_read_
     )
 
     s = await _seat_session(role_session, user_id=support.id, guild_id=guild_id)
-    assert list(await s.exec(select(ExportJob.created_by))) == [member.user.id]
+    assert list(await s.exec(select(DataJob.created_by))) == [member.user.id]
     # The row is read and not written: the update matches nothing.
     result = await s.exec(_FAIL)
     assert result.rowcount == 0
     await s.commit()
-    s.add(ExportJob(created_by=other.id, source="tasks", template_id="task-table"))
+    s.add(
+        DataJob(
+            direction=DataJobDirection.export,
+            created_by=other.id,
+            source="tasks",
+            template_id="task-table",
+        )
+    )
     with pytest.raises(DBAPIError, match="row-level security"):
         await s.commit()
     await s.rollback()

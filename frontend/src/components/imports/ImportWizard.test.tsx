@@ -102,7 +102,7 @@ describe("ImportWizard", () => {
         confirmed = true;
         return HttpResponse.json({ ...STAGED_JOB, status: "queued" });
       }),
-      communityHttp.get("/imports/jobs/:jobId", () => {
+      communityHttp.get("/data-jobs/:jobId", () => {
         pollCount += 1;
         // First poll running, then done.
         if (pollCount < 2) {
@@ -181,7 +181,7 @@ describe("ImportWizard", () => {
     // reopening lands on its review once it has been staged.
     localStorage.setItem("imports:atlassian-job:1", "77");
     server.use(
-      communityHttp.get("/imports/jobs/:jobId", () =>
+      communityHttp.get("/data-jobs/:jobId", () =>
         HttpResponse.json({
           ...STAGED_JOB,
           id: 77,
@@ -216,7 +216,7 @@ describe("ImportWizard", () => {
       },
     };
     server.use(
-      communityHttp.get("/imports/jobs/:jobId", () => HttpResponse.json(staged)),
+      communityHttp.get("/data-jobs/:jobId", () => HttpResponse.json(staged)),
       communityHttp.post("/imports/jobs/:jobId/confirm", async ({ request }) => {
         confirmBody = (await request.json()) as Record<string, unknown>;
         return HttpResponse.json({ ...staged, status: "queued" });
@@ -234,7 +234,7 @@ describe("ImportWizard", () => {
   it("picks a Confluence fetch back up and shows what the spaces hold", async () => {
     localStorage.setItem("imports:atlassian-job:1", "78");
     server.use(
-      communityHttp.get("/imports/jobs/:jobId", () =>
+      communityHttp.get("/data-jobs/:jobId", () =>
         HttpResponse.json({
           ...STAGED_JOB,
           id: 78,

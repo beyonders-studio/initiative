@@ -11,7 +11,8 @@ from app.core.config import settings
 from app.db import cohorts
 from app.db.session import set_rls_context
 from app.models.platform.guild import Guild, CommunityRole, CommunityStatus
-from app.models.tenant.import_job import ImportJob, ImportJobStatus
+from app.models.tenant.data_job import DataJob, DataJobStatus
+from app.services import data_jobs
 from app.services.guild_sweeps import Scope, each_guild
 from app.services.import_engine import worker as import_worker
 from app.services.storage import get_guild_storage
@@ -24,10 +25,10 @@ def _tmp_uploads(monkeypatch, tmp_path):
     monkeypatch.setattr(settings, "UPLOADS_DIR", str(tmp_path))
 
 
-async def _reload(session, guild_id: int, job_id: int) -> ImportJob:
+async def _reload(session, guild_id: int, job_id: int) -> DataJob:
     session.expunge_all()
     await route_session_to_guild(session, guild_id)
-    job = await session.get(ImportJob, job_id)
+    job = await session.get(DataJob, job_id)
     assert job is not None
     return job
 
@@ -42,8 +43,8 @@ async def test_gc_reaches_a_community_that_is_not_active(acting_user, session):
         session,
         a.guild,
         a.user,
-        status=ImportJobStatus.staged,
-        payload_ref=key,
+        status=DataJobStatus.staged,
+        file_ref=key,
         secret_encrypted="sealed",
         expires_at=datetime.now(timezone.utc) - timedelta(hours=1),
     )
@@ -52,11 +53,11 @@ async def test_gc_reaches_a_community_that_is_not_active(acting_user, session):
     session.add(guild)
     await session.commit()
 
-    await each_guild([(Scope.PROVISIONED, import_worker.expire_payloads)], name="t")
+    await each_guild([(Scope.PROVISIONED, data_jobs.expire_files)], name="t")
 
     assert get_guild_storage(a.guild.id).open_readable(key) is None
     expired = await _reload(session, a.guild.id, job.id)
-    assert (expired.status, expired.payload_ref, expired.secret_encrypted) == (
+    assert (expired.status, expired.file_ref, expired.secret_encrypted) == (
         "expired",
         None,
         None,
@@ -66,11 +67,11 @@ async def test_gc_reaches_a_community_that_is_not_active(acting_user, session):
 @pytest.mark.parametrize(
     ("status", "expires_in", "keeps_secret"),
     [
-        (ImportJobStatus.done, None, False),
-        (ImportJobStatus.failed, None, False),
-        (ImportJobStatus.cancelled, None, False),
+        (DataJobStatus.done, None, False),
+        (DataJobStatus.failed, None, False),
+        (DataJobStatus.cancelled, None, False),
         # A queued job before its deadline still needs its secret to start.
-        (ImportJobStatus.queued, timedelta(hours=1), True),
+        (DataJobStatus.queued, timedelta(hours=1), True),
     ],
 )
 async def test_gc_clears_a_secret_only_from_a_job_that_is_over(
@@ -86,7 +87,7 @@ async def test_gc_clears_a_secret_only_from_a_job_that_is_over(
         expires_at=datetime.now(timezone.utc) + expires_in if expires_in else None,
     )
 
-    await each_guild([(Scope.PROVISIONED, import_worker.expire_payloads)], name="t")
+    await each_guild([(Scope.PROVISIONED, data_jobs.expire_files)], name="t")
 
     after = await _reload(session, a.guild.id, job.id)
     assert after.status == status.value
