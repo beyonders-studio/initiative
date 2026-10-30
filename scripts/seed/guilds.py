@@ -21,8 +21,8 @@ from app.models.platform.guild_image import IMAGE_SPECS
 from app.models.platform.user import User
 from app.services.platform import guild_images
 from app.services.platform import guilds as guilds_service
+from app.services.platform import rules
 from app.services.platform.app_settings import (
-    get_app_settings,
     get_or_create_guild_settings,
 )
 
@@ -213,9 +213,7 @@ async def set_images(session: AsyncSession, guild: Guild, name: str) -> None:
 
 async def enable_directory(session: AsyncSession) -> None:
     """Switch the platform's community directory on; it ships off."""
-    settings_row = await get_app_settings(session)
-    settings_row.community_directory_enabled = True
-    session.add(settings_row)
+    await rules.put(session, "community_directory_enabled", True)
     await session.flush()
 
 
