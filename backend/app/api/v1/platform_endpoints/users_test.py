@@ -22,7 +22,7 @@ from app.models.platform.user import Presence, User, UserStatus
 from app.models.platform.user_decoration import UserDecoration
 from app.models.platform.user_dm_settings import DmPolicy
 from app.models.platform.user_passkey import UserPasskey
-from app.models.tenant.task_assignment_digest import TaskAssignmentDigestItem
+from app.models.tenant.batched_notice import BatchedNotice, BatchedNoticeKind
 from app.schemas.platform.user import STATUS_TEXT_MAX_LENGTH
 from app.services.marketplace import catalog as marketplace_catalog
 from app.services.marketplace.builtin import load_builtin_manifests
@@ -279,19 +279,22 @@ async def test_quiet_hours_round_trip(client, acting_user):
 
 
 async def _queue_assignment_item(session: AsyncSession, user, guild) -> None:
-    """Put one pending digest item in ``guild``'s schema for ``user``."""
+    """Put one pending batched line in ``guild``'s schema for ``user``."""
     initiative = await create_initiative(session, guild, user, name="Queue")
     project = await create_project(session, initiative, user, name="Queue Project")
     task = await create_task(session, project, title="Queued")
     await route_as(session, user_id=user.id, guild_id=guild.id)
     session.add(
-        TaskAssignmentDigestItem(
+        BatchedNotice(
             user_id=user.id,
-            task_id=task.id,
+            kind=BatchedNoticeKind.task_assignment,
+            actor_name="Assigner",
+            target_type="task",
+            target_id=task.id,
+            target_path=f"/go/task/{task.id}",
+            title="Queued",
             project_id=project.id,
-            task_title="Queued",
             project_name=project.name,
-            assigned_by_name="Assigner",
         )
     )
     await session.commit()
@@ -302,9 +305,7 @@ async def _pending_assignment_items(session: AsyncSession, user, guild) -> int:
     await route_as(session, user_id=user.id, guild_id=guild.id)
     rows = (
         await session.exec(
-            select(TaskAssignmentDigestItem).where(
-                TaskAssignmentDigestItem.processed_at.is_(None)
-            )
+            select(BatchedNotice).where(BatchedNotice.processed_at.is_(None))
         )
     ).all()
     return len(rows)

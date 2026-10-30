@@ -194,7 +194,6 @@ export function buildUser(overrides: Partial<UserRead> = {}): UserRead {
     count_toward_engagement_ranking: true,
     event_reminder_minutes_before: null,
     last_overdue_notification_at: null,
-    last_task_assignment_digest_at: null,
     color_theme: "kobold",
     task_completion_visual_feedback: "none",
     task_completion_audio_feedback: false,

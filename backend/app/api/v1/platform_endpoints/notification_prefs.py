@@ -23,8 +23,6 @@ from app.core.notification_categories import (
 )
 from app.models.platform.guild import Guild, GuildMembership
 from app.models.platform.user import User
-from app.models.tenant.reaction_digest import ReactionDigestItem
-from app.models.tenant.task_assignment_digest import TaskAssignmentDigestItem
 from app.schemas.platform.notification_prefs import (
     DigestSchedule,
     EmailSchedule,
@@ -42,14 +40,6 @@ from app.services.platform import case_notices, email_outbox
 from app.services.platform import notification_prefs as prefs_service
 
 me_router = APIRouter()
-
-
-#: The digest queues an opt-out can leave nobody wanting, with the categories
-#: that fill each. A queue is emptied once none of them is wanted.
-_DIGEST_QUEUES: tuple[tuple[type, tuple[NotificationCategory, ...]], ...] = (
-    (TaskAssignmentDigestItem, (NotificationCategory.assignments,)),
-    (ReactionDigestItem, (NotificationCategory.mentions,)),
-)
 
 
 def _registry(
@@ -310,18 +300,16 @@ async def update_my_notification_preferences(
         for kind in armed:
             await sweep_timers.arm_in(kind, communities)
 
-    # A queue nobody will ever be sent is discarded, not kept: it is guild
+    # A batch nobody will ever be sent is discarded, not kept: it is guild
     # scoped, so this reaches into each of the account's guild schemas.
     emptied = [
-        model
-        for model, categories in _DIGEST_QUEUES
-        if not any(
-            notifications_service.wants_digest(doc, category) for category in categories
-        )
+        batch.kind
+        for batch in notifications_service.BATCHES
+        if not notifications_service.wants_digest(doc, batch.category)
     ]
     if emptied:
         user_id = current_user.id
-        await notifications_service.clear_digest_queue_across_guilds(
+        await notifications_service.clear_batches_across_guilds(
             session, user_id, emptied
         )
 

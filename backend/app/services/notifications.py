@@ -3,7 +3,7 @@
 :func:`notify` is the one way a notice reaches people — a bell line each, then
 email and push — and it decides who may hear it from what the notice is about.
 Below it: the reaction and assignment notices (their bell line is written at
-once, email and push wait for a digest), the digests themselves, and the
+once, email and push wait for a batch), the batches, the digests, and the
 time-driven sweeps (overdue tasks, hold summaries, event and task reminders), each of
 which starts from what is waiting in each community and claims its work before
 sending it.
@@ -63,14 +63,13 @@ from app.models.tenant.calendar_event import (
     CalendarEventAttendee,
     RSVPStatus,
 )
+from app.models.tenant.batched_notice import BatchedNotice, BatchedNoticeKind
 from app.models.tenant.event_reminder_dispatch import EventReminderDispatch
 from app.models.tenant.guild_plugin import GuildPlugin
 from app.models.tenant.initiative import Initiative
 from app.models.tenant.personal_item import PersonalItem
 from app.models.tenant.project import Project
-from app.models.tenant.reaction_digest import ReactionDigestItem
 from app.models.tenant.task import Task, TaskAssignee, TaskStatus, TaskStatusCategory
-from app.models.tenant.task_assignment_digest import TaskAssignmentDigestItem
 from app.services import email as email_service
 from app.services import permissions as permissions_service
 from app.services.tenant.named_people import (
@@ -813,16 +812,16 @@ async def _roll_up_comment(
     return False, None
 
 
-# ── digests: the task-assignment digest and the machinery ────────────────────
+# ── batches: assignment and reaction email and push, and the machinery ───────
 
-# A task-assignment digest waits for the flurry to end rather than firing on
-# the first item: it ships once nothing new has arrived for QUIET_PERIOD, so a
-# lone assignment still lands promptly while a burst collapses into one
-# notification. MAX_WINDOW bounds how long a steady trickle can hold it back.
-ASSIGNMENT_QUIET_PERIOD = timedelta(minutes=5)
+# A batch waits for the flurry to end rather than firing on the first item: it
+# ships once nothing new has arrived for QUIET_PERIOD, so a lone assignment
+# still lands promptly while a burst collapses into one notification.
+# MAX_WINDOW bounds how long a steady trickle can hold it back.
+BATCH_QUIET_PERIOD = timedelta(minutes=5)
 
 
-ASSIGNMENT_MAX_WINDOW = timedelta(minutes=30)
+BATCH_MAX_WINDOW = timedelta(minutes=30)
 
 
 async def notify_project_added(
@@ -849,11 +848,11 @@ async def notify_project_added(
     )
 
 
-# How long a sent digest's items are kept before the GC sweep drops them. They
+# How long a sent batch's items are kept before the GC sweep drops them. They
 # are only bookkeeping once delivered; the notification itself lives in the
 # bell. Unsent items are dropped at the same age — anything that old is either
 # orphaned or long past being worth sending.
-ASSIGNMENT_ITEM_RETENTION = timedelta(days=7)
+BATCH_RETENTION = timedelta(days=7)
 
 
 async def notify_assigned(
@@ -867,7 +866,7 @@ async def notify_assigned(
     """Tell the people just assigned to ``task``, among those who can open it.
 
     The bell line is written by the notice worker once the caller commits;
-    email and push wait for the assignment digest, which is queued when either
+    email and push wait for the assignment batch, which is queued when either
     channel is on for the community and re-reads both when it sends.
     """
     candidates = [
@@ -906,66 +905,70 @@ async def notify_assigned(
     )
     for user_id in accounts:
         prefs = all_prefs.get(user_id, {})
-        if wants_assignment_digest(prefs, guild_id=guild_id):
+        if wants_assignment_batch(prefs, guild_id=guild_id):
             session.add(
-                TaskAssignmentDigestItem(
+                BatchedNotice(
                     user_id=user_id,
-                    task_id=task.id,
+                    kind=BatchedNoticeKind.task_assignment,
+                    actor_id=assigned_by.id,
+                    actor_name=assigned_by_name,
+                    target_type="task",
+                    target_id=task.id,
+                    target_path=subject.target_path,
+                    title=task.title,
                     project_id=task.project_id,
-                    task_title=task.title,
                     project_name=project_name,
-                    assigned_by_name=assigned_by_name,
-                    assigned_by_id=assigned_by.id,
                 )
             )
 
 
-def wants_assignment_digest(
+def wants_assignment_batch(
     prefs: Mapping[str, Any] | None, *, guild_id: int | None = None
 ) -> bool:
-    """Whether a user still wants the assignment digest on either channel."""
+    """Whether a user still wants the assignment batch on either channel."""
     return wants_digest(prefs, NotificationCategory.assignments, guild_id=guild_id)
 
 
 async def dequeue_task_assignment_events(
     session: AsyncSession, *, task_id: int, user_ids: list[int]
 ) -> None:
-    """Drop pending digest items for users just unassigned from ``task_id``.
+    """Drop pending batched lines for users just unassigned from ``task_id``.
 
-    A digest that has not gone out yet should not announce an assignment that
+    A batch that has not gone out yet should not announce an assignment that
     no longer holds. Operates on the CURRENTLY ROUTED guild schema, which is
     the task's own. Already-sent items are left alone — that mail is gone.
     """
     if not user_ids:
         return
     await session.exec(
-        delete(TaskAssignmentDigestItem).where(
-            TaskAssignmentDigestItem.task_id == task_id,
-            TaskAssignmentDigestItem.user_id.in_(tuple(user_ids)),
-            TaskAssignmentDigestItem.processed_at.is_(None),
+        delete(BatchedNotice).where(
+            col(BatchedNotice.kind) == BatchedNoticeKind.task_assignment,
+            col(BatchedNotice.target_id) == task_id,
+            col(BatchedNotice.user_id).in_(tuple(user_ids)),
+            col(BatchedNotice.processed_at).is_(None),
         )
     )
 
 
-async def clear_digest_queue_for_user(
-    session: AsyncSession, user_id: int, models: Sequence[type]
+async def clear_batches_for_user(
+    session: AsyncSession, user_id: int, kinds: Sequence[BatchedNoticeKind]
 ) -> None:
-    """Clear the user's pending items in the CURRENTLY ROUTED guild schema.
-    Callers on the platform path (no guild route) must use
-    :func:`clear_digest_queue_across_guilds` instead."""
-    for model in models:
-        await session.exec(
-            delete(model).where(
-                model.user_id == user_id,
-                model.processed_at.is_(None),
-            )
+    """Clear the user's pending lines of ``kinds`` in the CURRENTLY ROUTED
+    guild schema. Callers on the platform path (no guild route) must use
+    :func:`clear_batches_across_guilds` instead."""
+    await session.exec(
+        delete(BatchedNotice).where(
+            col(BatchedNotice.user_id) == user_id,
+            col(BatchedNotice.kind).in_(tuple(kinds)),
+            col(BatchedNotice.processed_at).is_(None),
         )
+    )
 
 
-async def clear_digest_queue_across_guilds(
-    session: AsyncSession, user_id: int, models: Sequence[type]
+async def clear_batches_across_guilds(
+    session: AsyncSession, user_id: int, kinds: Sequence[BatchedNoticeKind]
 ) -> None:
-    """Platform-path variant: a digest queue is guild-scoped, so visit each
+    """Platform-path variant: a batch is guild-scoped, so visit each
     of the user's guild schemas. Each community is visited on a session of its
     own (``gather_across_guilds``), and its deletes are committed there, not in
     the caller's transaction."""
@@ -975,9 +978,9 @@ async def clear_digest_queue_across_guilds(
 
     async def _clear(routed: AsyncSession, _gid: int) -> list:
         # A community whose content is on hold takes no writes; its items go
-        # with the digest GC.
+        # with the batch GC.
         if not require_guild_context(routed).content_read_only:
-            await clear_digest_queue_for_user(routed, user_id, models)
+            await clear_batches_for_user(routed, user_id, kinds)
         return []
 
     # Membership-based hygiene, not content access: must reach every guild
@@ -1022,12 +1025,12 @@ def _assignment_push(user: User, assignments: list[dict]) -> push_notifications.
     )
 
 
-def _digest_is_due(
+def _batch_is_due(
     timestamps: list[datetime],
     *,
     now: datetime,
-    quiet_period: timedelta = ASSIGNMENT_QUIET_PERIOD,
-    max_window: timedelta = ASSIGNMENT_MAX_WINDOW,
+    quiet_period: timedelta = BATCH_QUIET_PERIOD,
+    max_window: timedelta = BATCH_MAX_WINDOW,
 ) -> bool:
     """Whether a user's queued items have settled enough to send.
 
@@ -1042,22 +1045,20 @@ def _digest_is_due(
 
 
 @dataclass(frozen=True)
-class DigestSpec:
-    """One digested notification stream, described once.
+class BatchSpec:
+    """One batched notification stream, described once.
 
-    Every digest in the app works the same way — queue a row per (recipient,
-    event) in the guild the event happened in, wait for the flurry to settle,
-    then send email and push together off one drain and mark the batch
-    processed. What differs between two of them is only what is stated here, so
-    the machinery below is written once and a new digest is a spec, not a copy.
+    Every batch works the same way — queue a line per (recipient, event) in the
+    guild the event happened in, wait for the flurry to settle, then send email
+    and push together off one drain and mark the lines processed. What differs
+    between two of them is only what is stated here, so the machinery below is
+    written once and a new batch is a spec, not a copy.
     """
 
-    #: Log label ("task-digest", "reaction-digest").
-    name: str
-    #: The guild-scoped queue table.
-    model: type
+    #: The lines this batch sends.
+    kind: BatchedNoticeKind
     #: The category gating both channels. One queue backs them, so the spec
-    #: names the thing being digested rather than two column names.
+    #: names the thing being batched rather than two column names.
     category: NotificationCategory
     #: What one queued row looks like to the senders, given the guild schema it
     #: was found in (which IS the row's guild).
@@ -1068,11 +1069,13 @@ class DigestSpec:
     pieces: Callable[[User, list[dict]], email_service.EmailPieces]
     #: The batch as a push, for the notice worker to send.
     push: Callable[[User, list[dict]], push_notifications.Push]
-    #: ``User`` column recording when the last one went out, if any. A record,
-    #: never a gate — the send window comes from the queue itself.
-    stamp: str | None = None
-    quiet_period: timedelta = ASSIGNMENT_QUIET_PERIOD
-    max_window: timedelta = ASSIGNMENT_MAX_WINDOW
+    quiet_period: timedelta = BATCH_QUIET_PERIOD
+    max_window: timedelta = BATCH_MAX_WINDOW
+
+    @property
+    def name(self) -> str:
+        """Its sweep's kind, and its label in the log."""
+        return f"{self.kind.value}_batch"
 
 
 def wants_digest(
@@ -1121,27 +1124,31 @@ async def _digest_batch(
     return for_email, for_push
 
 
-def digest_scan(spec: DigestSpec, *, now: datetime) -> Scan:
-    """Send ``spec``'s digest to opted-in users as of ``now``.
+def batch_scan(spec: BatchSpec, *, now: datetime) -> Scan:
+    """Send ``spec``'s batch to opted-in users as of ``now``.
 
     Starts from what is waiting: each live community is asked once which
     accounts have unsent items and when they came, and only accounts whose
-    items have settled go further (see :func:`_digest_is_due`). Their items are
+    items have settled go further (see :func:`_batch_is_due`). Their items are
     then taken in each community under their own membership context — marked
-    processed by the statement that reads them, so a digest goes out once
+    processed by the statement that reads them, so a batch goes out once
     however many processes sweep at the same moment — and email and push ship
     together, so the two channels tell the same story.
     """
-    model = spec.model
     pending: dict[int, dict[int, list[datetime]]] = {}
 
     async def _waiting(routed: AsyncSession, guild_id: int) -> None:
         rows = await routed.exec(
             select(
-                model.user_id, func.min(model.created_at), func.max(model.created_at)
+                BatchedNotice.user_id,
+                func.min(BatchedNotice.created_at),
+                func.max(BatchedNotice.created_at),
             )
-            .where(model.processed_at.is_(None))
-            .group_by(model.user_id)
+            .where(
+                col(BatchedNotice.kind) == spec.kind,
+                col(BatchedNotice.processed_at).is_(None),
+            )
+            .group_by(BatchedNotice.user_id)
         )
         for user_id, first, last in rows.all():
             pending.setdefault(user_id, {})[guild_id] = [first, last]
@@ -1151,38 +1158,41 @@ def digest_scan(spec: DigestSpec, *, now: datetime) -> Scan:
             return {}
         async with cohorts.system_session(None) as session:
             await set_rls_context(session, Unattributed())
-            return await _send_digests(session, spec, pending, now=now)
+            return await _send_batches(session, spec, pending, now=now)
 
     return Scan(Scope.LIVE, _waiting, _finish)
 
 
 async def _waiting_stamps(
-    model: Any, routed: AsyncSession, _guild_id: int
+    kind: BatchedNoticeKind, routed: AsyncSession, _guild_id: int
 ) -> list[tuple[int, datetime]]:
-    """When the reader's oldest and newest unsent items in the routed
-    community came, beside who they are."""
+    """When the reader's oldest and newest unsent lines of ``kind`` in the
+    routed community came, beside who they are."""
     user_id = require_guild_context(routed).user_id
     row = (
         await routed.exec(
-            select(func.min(model.created_at), func.max(model.created_at)).where(
-                model.user_id == user_id, model.processed_at.is_(None)
+            select(
+                func.min(BatchedNotice.created_at), func.max(BatchedNotice.created_at)
+            ).where(
+                col(BatchedNotice.user_id) == user_id,
+                col(BatchedNotice.kind) == kind,
+                col(BatchedNotice.processed_at).is_(None),
             )
         )
     ).one()
     return [(user_id, stamp) for stamp in row if stamp is not None]
 
 
-async def _send_digests(
+async def _send_batches(
     session: AsyncSession,
-    spec: DigestSpec,
+    spec: BatchSpec,
     pending: dict[int, dict[int, list[datetime]]],
     *,
     now: datetime,
 ) -> dict[int, datetime]:
-    """Send the digests of the accounts ``pending`` names, whose items have
+    """Send the batches of the accounts ``pending`` names, whose items have
     settled. Returns when each community holding items not yet due is next
     due."""
-    model = spec.model
     later: dict[int, datetime] = {}
     # Settings are sparse and default to on, so the opted-in set is "everyone
     # who has not said otherwise". Filtered here rather than in the SELECT: the
@@ -1191,7 +1201,7 @@ async def _send_digests(
     # preferences are read again at delivery time.
     all_prefs = await notification_prefs.load_prefs_for(session, list(pending))
     settled = partial(
-        _digest_is_due,
+        _batch_is_due,
         now=now,
         quiet_period=spec.quiet_period,
         max_window=spec.max_window,
@@ -1221,7 +1231,7 @@ async def _send_digests(
             ]
             for user_id, guild_ids in members.items()
         },
-        partial(_waiting_stamps, model),
+        partial(_waiting_stamps, spec.kind),
         on_behalf=True,
     ):
         stamps[user_id].append(stamp)
@@ -1249,19 +1259,23 @@ async def _send_digests(
             return []
         user_id = reader.user_id
         taken = (
-            sa_update(model)
-            .where(model.user_id == user_id, model.processed_at.is_(None))
+            sa_update(BatchedNotice)
+            .where(
+                col(BatchedNotice.user_id) == user_id,
+                col(BatchedNotice.kind) == spec.kind,
+                col(BatchedNotice.processed_at).is_(None),
+            )
             .values(processed_at=now)
         )
         # A community set to say less is filtered here, where the guild is
-        # known — a digest spans guilds, so this cannot be decided once for
+        # known — a batch spans guilds, so this cannot be decided once for
         # the whole batch. Its items are taken all the same, so they stop
         # counting as waiting rather than sitting until the GC drops them.
         if not wants_digest(all_prefs.get(user_id), spec.category, guild_id=gid):
             await routed.exec(taken)
             return []
         items = sorted(
-            (await routed.exec(taken.returning(model))).scalars(),
+            (await routed.exec(taken.returning(BatchedNotice))).scalars(),
             key=lambda item: item.created_at,
         )
         if items:
@@ -1270,7 +1284,7 @@ async def _send_digests(
             )
         return []
 
-    # Digests act on membership (no live session exists here) — the
+    # Batches act on membership (no live session exists here) — the
     # system sentinel clears the guild auth-policy gate.
     try:
         await gather_across_guilds(session, ready, _take, on_behalf=True, writes=True)
@@ -1317,27 +1331,25 @@ async def _send_digests(
                     spec.push(user, push_batch),
                     {item.get("community_id") for item in push_batch},
                 )
-            if spec.stamp is not None:
-                setattr(user, spec.stamp, now)
-                session.add(user)
             await session.commit()
 
     return later
 
 
-async def expire_digest_items(
+async def expire_batched_notices(
     routed: AsyncSession, _guild_id: int, *, now: datetime | None = None
 ) -> None:
-    """Drop one community's digest items older than the retention window.
+    """Drop one community's batched lines older than the retention window.
 
     Sent items are bookkeeping once the mail is gone. Unsent items of the same
     age are dropped too: they are either orphaned (the user turned the channel
     off in a guild an admin could not reach) or so stale that announcing them
     would be noise.
     """
-    cutoff = (now or datetime.now(timezone.utc)) - ASSIGNMENT_ITEM_RETENTION
-    for model in (TaskAssignmentDigestItem, ReactionDigestItem):
-        await routed.exec(delete(model).where(model.created_at < cutoff))
+    cutoff = (now or datetime.now(timezone.utc)) - BATCH_RETENTION
+    await routed.exec(
+        delete(BatchedNotice).where(col(BatchedNotice.created_at) < cutoff)
+    )
 
 
 async def drop_spent_notifications(*, now: datetime) -> None:
@@ -1358,30 +1370,28 @@ async def drop_spent_notifications(*, now: datetime) -> None:
 
 def _assignment_row(item, guild_id: int) -> dict:
     return {
-        "task_title": item.task_title,
+        "task_title": item.title,
         "project_name": item.project_name,
-        "assigned_by_name": item.assigned_by_name,
+        "assigned_by_name": item.actor_name,
         "link": _build_smart_link(
-            target_path=_task_target_path(item.task_id, item.project_id),
+            target_path=item.target_path,
             guild_id=guild_id,  # the item's guild IS the routed schema
         ),
-        # The push carries one deep link rather than a list; these let a digest
+        # The push carries one deep link rather than a list; these let a batch
         # of one point at its task. Ignored by the email, which renders
         # ``link`` per row.
-        "task_id": item.task_id,
+        "task_id": item.target_id,
         "project_id": item.project_id,
         "community_id": guild_id,
     }
 
 
-ASSIGNMENT_DIGEST = DigestSpec(
-    name="task-digest",
-    model=TaskAssignmentDigestItem,
+ASSIGNMENT_BATCH = BatchSpec(
+    kind=BatchedNoticeKind.task_assignment,
     category=NotificationCategory.assignments,
     row=_assignment_row,
-    pieces=email_service.task_assignment_digest_pieces,
+    pieces=email_service.task_assignment_batch_pieces,
     push=_assignment_push,
-    stamp="last_task_assignment_digest_at",
 )
 
 
@@ -1549,16 +1559,17 @@ async def enqueue_reaction_event(
     prefs = await notification_prefs.load_prefs_for_delivery(author.id)
     if wants_digest(prefs, NotificationCategory.mentions, guild_id=guild_id):
         session.add(
-            ReactionDigestItem(
+            BatchedNotice(
                 user_id=author.id,
-                reaction_id=reaction.id,
+                kind=BatchedNoticeKind.reaction,
+                actor_id=reactor.id,
+                actor_name=reactor_name,
                 target_type=reaction.target_type,
                 target_id=reaction.target_id,
-                emoji=reaction.emoji,
                 target_path=target_path,
-                context_title=context_title,
-                reactor_name=reactor_name,
-                reactor_id=reactor.id,
+                title=context_title,
+                reaction_id=reaction.id,
+                emoji=reaction.emoji,
             )
         )
 
@@ -1805,22 +1816,24 @@ def _reaction_push(user: User, reactions: list[dict]) -> push_notifications.Push
 def _reaction_row(item, guild_id: int) -> dict:
     return {
         "emoji": item.emoji,
-        "reactor_name": item.reactor_name,
-        "context_title": item.context_title,
+        "reactor_name": item.actor_name,
+        "context_title": item.title,
         "target_path": item.target_path,
         "link": _build_smart_link(target_path=item.target_path, guild_id=guild_id),
         "community_id": guild_id,
     }
 
 
-REACTION_DIGEST = DigestSpec(
-    name="reaction-digest",
-    model=ReactionDigestItem,
+REACTION_BATCH = BatchSpec(
+    kind=BatchedNoticeKind.reaction,
     category=NotificationCategory.mentions,
     row=_reaction_row,
-    pieces=email_service.reaction_digest_pieces,
+    pieces=email_service.reaction_batch_pieces,
     push=_reaction_push,
 )
+
+#: Every batch, each sending its own kind of line.
+BATCHES: tuple[BatchSpec, ...] = (ASSIGNMENT_BATCH, REACTION_BATCH)
 
 
 # ── time-driven notices: overdue tasks, hold summaries, reminders ────────────

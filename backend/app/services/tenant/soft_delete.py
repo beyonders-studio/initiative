@@ -35,7 +35,7 @@ the doomed files are also removed.
 from datetime import datetime, timedelta
 from typing import Iterable, Optional
 
-from sqlmodel import select
+from sqlmodel import col, delete, select
 from sqlmodel.ext.asyncio.session import AsyncSession
 
 from sqlalchemy.orm import undefer
@@ -46,6 +46,7 @@ from app.db.query import ids_in
 from app.db.session import raise_flag
 from app.db.soft_delete_filter import select_including_deleted
 from app.models.tenant._mixins import SoftDeleteMixin
+from app.models.tenant.batched_notice import BatchedNotice
 from app.models.tenant.comment import Comment
 from app.models.tenant.file import File
 from app.models.tenant.initiative import Initiative
@@ -266,8 +267,8 @@ async def restore_entity(
 
 async def _purge_references(session: AsyncSession, doomed: Level) -> None:
     """Drop every row that names one of these by ``(kind, id)``: edges,
-    reactions, recent views, engagement levels, metadata values (plug-ins'
-    among them) and a tool's views.
+    reactions, recent views, engagement levels, batched notices, metadata
+    values (plug-ins' among them) and a tool's views.
 
     Nothing carries those out with the row they name, and once it is gone
     their policies have nothing to ask, so they go first. Each kind is read
@@ -302,6 +303,13 @@ async def _purge_references(session: AsyncSession, doomed: Level) -> None:
         if (content := content_kinds.get(table)) is not None:
             await personal_items.purge_for_entities(session, content, ids)
             await engagement_levels.purge_for_entities(session, content, ids)
+            # A queued line about it would point at nothing.
+            await session.exec(
+                delete(BatchedNotice).where(
+                    col(BatchedNotice.target_type) == content,
+                    col(BatchedNotice.target_id).in_(ids),
+                )
+            )
         if (spec := metadata.PROPERTY_LINKS_BY_MODEL.get(model)) is not None:
             await metadata.drop_values(session, spec.target, ids)
         if (tool := layout_tools.get(table)) is not None:

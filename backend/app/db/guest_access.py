@@ -61,7 +61,7 @@ _NAMED: dict[str, GuestAccess] = {
     # and bookmarking it.
     "comments": GuestAccess.write,
     "reactions": GuestAccess.write,
-    "reaction_digest_items": GuestAccess.write,
+    "batched_notices": GuestAccess.write,
     # The sweep timers a guest's writes arm (public.arm_timer reads the mark
     # before it writes one).
     "timer_marks": GuestAccess.write,

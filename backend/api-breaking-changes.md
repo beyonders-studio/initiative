@@ -2003,6 +2003,31 @@ notification, a new notification type in the `subscriptions` category.
 - POST /api/v1/notifications/{notification_id}/read added the new `task_reminder` enum value to the `type` response property for the response status `200`
 - POST /api/v1/notifications/{notification_id}/unread added the new `task_reminder` enum value to the `type` response property for the response status `200`
 
+### An account no longer reports when its last assignment email went out
+
+`last_task_assignment_digest_at` left `UserRead`. Nothing read it: it was
+written when a batch of assignment emails went out and read by nothing,
+and the reaction batch beside it never had one.
+
+- DELETE /api/v1/operator/users/{user_id}/age-block removed the required property `last_task_assignment_digest_at` from the response with the `200` status
+- DELETE /api/v1/operator/users/{user_id}/api-keys removed the required property `last_task_assignment_digest_at` from the response with the `200` status
+- DELETE /api/v1/operator/users/{user_id}/profile/{field} removed the required property `last_task_assignment_digest_at` from the response with the `200` status
+- DELETE /api/v1/operator/users/{user_id}/sessions removed the required property `last_task_assignment_digest_at` from the response with the `200` status
+- DELETE /api/v1/operator/users/{user_id}/sign-in-lock removed the required property `last_task_assignment_digest_at` from the response with the `200` status
+- GET /api/v1/me removed the required property `last_task_assignment_digest_at` from the response with the `200` status
+- GET /api/v1/operator/users removed the required property `items/items/last_task_assignment_digest_at` from the response with the `200` status
+- PATCH /api/v1/me removed the required property `last_task_assignment_digest_at` from the response with the `200` status
+- PATCH /api/v1/me/username removed the required property `last_task_assignment_digest_at` from the response with the `200` status
+- PATCH /api/v1/operator/users/{user_id}/platform-role removed the required property `last_task_assignment_digest_at` from the response with the `200` status
+- PATCH /api/v1/operator/users/{user_id}/username removed the required property `last_task_assignment_digest_at` from the response with the `200` status
+- POST /api/v1/auth/register removed the required property `last_task_assignment_digest_at` from the response with the `201` status
+- POST /api/v1/me/age-confirmation removed the required property `last_task_assignment_digest_at` from the response with the `200` status
+- POST /api/v1/me/legal-acceptance removed the required property `last_task_assignment_digest_at` from the response with the `200` status
+- POST /api/v1/operator/users/{user_id}/reactivate removed the required property `last_task_assignment_digest_at` from the response with the `200` status
+- POST /api/v1/operator/users/{user_id}/restore removed the required property `last_task_assignment_digest_at` from the response with the `200` status
+- POST /api/v1/operator/users/{user_id}/suspension removed the required property `last_task_assignment_digest_at` from the response with the `200` status
+- PUT /api/v1/me/avatar removed the required property `last_task_assignment_digest_at` from the response with the `200` status
+
 ## After 0.76.0
 
 ### New values in a response's enums

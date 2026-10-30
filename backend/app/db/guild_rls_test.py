@@ -426,7 +426,7 @@ _NO_SINGLE_PARENT = {
     # is a CASE over the column naming it.
     "comments": "one of eight tools, per row",
     "reactions": "one of eight tools, per row",
-    "reaction_digest_items": "gated exactly like the reaction it describes",
+    "batched_notices": "gated like the task or reaction it describes",
     "personal_items": "any tool or sub-tool, per row",
     "engagement_levels": "any tool or sub-tool, per row",
     "metadata_values": "any tool or sub-tool, per row: read through its own table, written through entity_access, or the install itself",

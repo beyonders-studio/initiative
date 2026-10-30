@@ -20,7 +20,7 @@ from app.models.platform.community_timer import CommunityTimer
 from app.models.tenant.guild_plugin import GuildPlugin
 from app.models.tenant.post import Post
 from app.models.tenant.task import TaskStatus, TaskStatusCategory
-from app.models.tenant.task_assignment_digest import TaskAssignmentDigestItem
+from app.models.tenant.batched_notice import BatchedNotice, BatchedNoticeKind
 from app.models.tenant.personal_item import PersonalItem
 from app.models.tenant.webhook_subscription import WebhookSubscription
 from app.models.platform.user_notification_prefs import DigestCadence
@@ -491,29 +491,32 @@ async def test_a_kept_tab_is_not_work_but_an_old_view_is(session: AsyncSession):
     assert await next_due() == old + personal_items.WINDOW
 
 
-async def test_a_digest_is_armed_for_when_its_items_are_due(session: AsyncSession):
+async def test_a_batch_is_armed_for_when_its_items_are_due(session: AsyncSession):
     """The finish answers each community's next due time: here, the end of
     the quiet period after the one item waiting."""
     author, initiative, community_id = await _community(session)
     project = await create_project(session, initiative, author)
     task = await create_task(session, project)
     await route_session_to_guild(session, community_id)
-    item = TaskAssignmentDigestItem(
+    item = BatchedNotice(
         user_id=author.id,
-        task_id=task.id,
+        kind=BatchedNoticeKind.task_assignment,
+        actor_name="Assigner",
+        target_type="task",
+        target_id=task.id,
+        target_path=f"/go/task/{task.id}",
+        title=task.title,
         project_id=project.id,
-        task_title=task.title,
         project_name=project.name,
-        assigned_by_name="Assigner",
     )
     session.add(item)
     await session.commit()
-    due = item.created_at + notifications.ASSIGNMENT_DIGEST.quiet_period
-    await _due_now(session, community_id, "task_digest")
+    due = item.created_at + notifications.ASSIGNMENT_BATCH.quiet_period
+    await _due_now(session, community_id, notifications.ASSIGNMENT_BATCH.name)
 
     await sweep_timers.process_due_timers()
 
-    [(_c, _k, armed)] = await _timers(session, "task_digest")
+    [(_c, _k, armed)] = await _timers(session, notifications.ASSIGNMENT_BATCH.name)
     assert abs((armed - due).total_seconds()) < 5
 
 

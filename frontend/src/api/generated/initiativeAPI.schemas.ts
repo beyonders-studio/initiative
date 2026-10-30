@@ -8525,7 +8525,6 @@ export interface OperatorUserRead {
   timezone: string;
   event_reminder_minutes_before: number | null;
   last_overdue_notification_at: string | null;
-  last_task_assignment_digest_at: string | null;
   color_theme: string;
   task_completion_visual_feedback: string;
   task_completion_audio_feedback: boolean;
@@ -11745,7 +11744,6 @@ export interface UserRead {
   timezone: string;
   event_reminder_minutes_before: number | null;
   last_overdue_notification_at: string | null;
-  last_task_assignment_digest_at: string | null;
   color_theme: string;
   task_completion_visual_feedback: string;
   task_completion_audio_feedback: boolean;

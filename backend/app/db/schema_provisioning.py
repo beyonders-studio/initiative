@@ -141,7 +141,7 @@ SUPPORT_WRITE_PROTECTED_TABLES: tuple[str, ...] = (
 # identity instead of putting a comments UPDATE, or a scan of the whole change
 # log every five seconds, through initiative_access() one row at a time.
 SYSTEM_GUILD_MAINTENANCE_GRANTS: dict[str, tuple[str, ...]] = {
-    "task_assignment_digest_items": ("SELECT", "UPDATE"),
+    "batched_notices": ("SELECT", "UPDATE"),
     # The frozen-ancestor guard reads each supported parent into a composite
     # record (``SELECT *``) before capture/search triggers resolve identifiers.
     # PostgreSQL therefore requires table-level SELECT for these dependencies.

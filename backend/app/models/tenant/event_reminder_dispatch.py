@@ -10,7 +10,7 @@ class EventReminderDispatch(SQLModel, table=True):
 
     Background-only (written by the event-reminder sweep via the admin
     session, never exposed through the API, so no RLS policy is needed —
-    same stance as ``TaskAssignmentDigestItem``). The unique key includes
+    same stance as ``BatchedNotice``). The unique key includes
     ``event_start_at`` so rescheduling an event to a new time re-arms its
     reminder rather than being suppressed by an earlier dispatch.
     """
