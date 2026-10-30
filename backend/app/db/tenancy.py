@@ -133,7 +133,7 @@ GUILD_LEVEL_TABLES: frozenset[str] = frozenset(
         "initiatives",  # purge-guarded (admin-only DELETE) as well
         "initiative_members",
         "initiative_roles",
-        "initiative_role_permissions",
+        "initiative_rules",
         # Join requests: the requester is by definition NOT yet a member, so an
         # initiative-membership row gate would hide their own request from them
         # — the same reasoning that keeps initiative_members structural. Its
@@ -183,9 +183,7 @@ MANAGED_TABLES: dict[str, str] = {
     "initiatives": "id",
     "initiative_members": "initiative_id",
     "initiative_roles": "initiative_id",
-    "initiative_role_permissions": (
-        "(SELECT r.initiative_id FROM initiative_roles r WHERE r.id = initiative_role_id)"
-    ),
+    "initiative_rules": "initiative_id",
 }
 
 # --- Own-row overlay on guild-level tables -----------------------------------
@@ -318,7 +316,7 @@ CREATED_BY_EXEMPT_TABLES: frozenset[str] = frozenset(
         "calendar_event_attendees",
         "calendar_event_answers",
         "initiative_members",
-        "initiative_role_permissions",
+        "initiative_rules",
         "task_assignees",
         # A knock at a door: ``user_id`` is both the author and the subject (a
         # person asks only for themselves), and ``resolved_by`` already names

@@ -88,7 +88,7 @@ _NAMED: dict[str, GuestAccess] = {
     "initiatives": GuestAccess.read,
     "initiative_members": GuestAccess.read,
     "initiative_roles": GuestAccess.read,
-    "initiative_role_permissions": GuestAccess.read,
+    "initiative_rules": GuestAccess.read,
     "tags": GuestAccess.read,
 }
 
@@ -145,11 +145,7 @@ GUEST_ROWS: dict[str, str] = {
         f" OR initiative_members.initiative_id = ANY ({_MEMBER_OF}))"
     ),
     "initiative_roles": f"(initiative_roles.initiative_id IN {_IN_INITIATIVES})",
-    "initiative_role_permissions": (
-        "EXISTS (SELECT 1 FROM initiative_roles r"
-        " WHERE r.id = initiative_role_permissions.initiative_role_id"
-        f" AND r.initiative_id IN {_IN_INITIATIVES})"
-    ),
+    "initiative_rules": f"(initiative_rules.initiative_id IN {_IN_INITIATIVES})",
     # Only the sharing rows that reach them: not who else something is
     # shared with.
     "resource_grants": (

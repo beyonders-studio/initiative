@@ -133,10 +133,7 @@ _ROLE_AUDIT_FIELDS = ("display_name", "is_manager")
 
 def _role_permissions(role: InitiativeRoleModel) -> dict[str, bool]:
     """A role's permission toggles, by key."""
-    return {
-        getattr(p.permission_key, "value", p.permission_key): p.enabled
-        for p in role.permissions
-    }
+    return {p.key: p.enabled for p in role.permissions}
 
 
 async def _get_initiative_or_404(

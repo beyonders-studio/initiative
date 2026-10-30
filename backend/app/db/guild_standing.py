@@ -193,9 +193,10 @@ my_items AS MATERIALIZED (
     )
 ),
 my_role_permissions AS MATERIALIZED (
-  SELECT mi.initiative_id, rp.permission_key, rp.enabled
+  SELECT rp.initiative_id, rp.key, rp.enabled
   FROM my_initiatives mi
-  JOIN initiative_role_permissions rp ON rp.initiative_role_id = mi.role_id
+  JOIN initiative_rules rp
+    ON rp.initiative_id = mi.initiative_id AND rp.initiative_role_id = mi.role_id
 ),
 my_grants AS MATERIALIZED (
   SELECT g.purpose, g.access_level::text AS access_level
@@ -275,12 +276,12 @@ _PERSON_STANDING: dict[gucs.Guc, str] = {
       WHERE mi.role_id IS NOT NULL
     ), '')""",
     gucs.ROLE_GRANTS: """COALESCE((
-      SELECT string_agg(DISTINCT rp.initiative_id || ':' || rp.permission_key, ',')
+      SELECT string_agg(DISTINCT rp.initiative_id || ':' || rp.key, ',')
       FROM my_role_permissions rp
       WHERE rp.enabled
     ), '')""",
     gucs.ROLE_DENIES: """COALESCE((
-      SELECT string_agg(DISTINCT rp.initiative_id || ':' || rp.permission_key, ',')
+      SELECT string_agg(DISTINCT rp.initiative_id || ':' || rp.key, ',')
       FROM my_role_permissions rp
       WHERE NOT rp.enabled
     ), '')""",
@@ -640,15 +641,15 @@ permitted AS (
   CROSS JOIN (VALUES {_permission_default_values()}) AS k(key, is_default)
   WHERE mr.is_manager
      OR EXISTS (
-       SELECT 1 FROM initiative_role_permissions rp
+       SELECT 1 FROM initiative_rules rp
        WHERE rp.initiative_role_id = mr.role_id
-         AND rp.permission_key = k.key
+         AND rp.key = k.key
          AND rp.enabled
      )
      OR (k.is_default AND NOT EXISTS (
-       SELECT 1 FROM initiative_role_permissions rp
+       SELECT 1 FROM initiative_rules rp
        WHERE rp.initiative_role_id = mr.role_id
-         AND rp.permission_key = k.key
+         AND rp.key = k.key
          AND NOT rp.enabled
      ))
 ),

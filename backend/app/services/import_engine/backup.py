@@ -1073,7 +1073,7 @@ async def _apply_initiative_structure(session, initiative, user: User, payload) 
     from app.models.tenant.initiative import (
         InitiativeMember,
         InitiativeRoleModel,
-        InitiativeRolePermission,
+        InitiativeRule,
         PermissionKey,
     )
 
@@ -1110,9 +1110,10 @@ async def _apply_initiative_structure(session, initiative, user: User, payload) 
             except ValueError:
                 continue  # a permission this build does not have
             session.add(
-                InitiativeRolePermission(
+                InitiativeRule(
+                    initiative_id=role.initiative_id,
                     initiative_role_id=role.id,
-                    permission_key=permission_key,
+                    key=permission_key,
                     enabled=True,
                 )
             )

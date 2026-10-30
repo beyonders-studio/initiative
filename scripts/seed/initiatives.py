@@ -14,7 +14,7 @@ from app.models.tenant.initiative import (
     InitiativeJoinPolicy,
     InitiativeMember,
     InitiativeRoleModel,
-    InitiativeRolePermission,
+    InitiativeRule,
 )
 from app.services.tenant.initiatives import create_builtin_roles, creator_role
 
@@ -273,10 +273,10 @@ async def create_initiative(c: Community, key: str, d: dict) -> Initiative:
     member_tools = d.get("member_tools", tools)
     if member_tools:
         await c.session.exec(
-            update(InitiativeRolePermission)
+            update(InitiativeRule)
             .where(
-                InitiativeRolePermission.initiative_role_id == member_role.id,
-                InitiativeRolePermission.permission_key.in_(
+                InitiativeRule.initiative_role_id == member_role.id,
+                InitiativeRule.key.in_(
                     [tool.view_permission for tool in member_tools]
                 ),
             )

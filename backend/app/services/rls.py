@@ -21,7 +21,7 @@ from sqlmodel import select
 from app.models.tenant.initiative import (
     InitiativeMember,
     InitiativeRoleModel,
-    InitiativeRolePermission,
+    InitiativeRule,
     PermissionKey,
     DEFAULT_PERMISSION_VALUES,
 )
@@ -97,16 +97,16 @@ def _role_permits(permission_key: PermissionKey):
     default = DEFAULT_PERMISSION_VALUES.get(permission_key, False)
     return or_(
         InitiativeRoleModel.is_manager,
-        func.coalesce(InitiativeRolePermission.enabled, default),
+        func.coalesce(InitiativeRule.enabled, default),
     )
 
 
 def _with_permission_row(statement, permission_key: PermissionKey):
     return statement.outerjoin(
-        InitiativeRolePermission,
+        InitiativeRule,
         and_(
-            InitiativeRolePermission.initiative_role_id == InitiativeRoleModel.id,
-            InitiativeRolePermission.permission_key == permission_key,
+            InitiativeRule.initiative_role_id == InitiativeRoleModel.id,
+            InitiativeRule.key == permission_key,
         ),
     )
 

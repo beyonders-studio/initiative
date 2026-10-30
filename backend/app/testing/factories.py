@@ -694,15 +694,13 @@ async def create_initiative(
             from sqlalchemy import update as sa_update
 
             from app.core.tools import Tool as _Tool
-            from app.models.tenant.initiative import InitiativeRolePermission
+            from app.models.tenant.initiative import InitiativeRule
 
             await session.exec(
-                sa_update(InitiativeRolePermission)
+                sa_update(InitiativeRule)
                 .where(
-                    InitiativeRolePermission.initiative_role_id == member_role.id,
-                    InitiativeRolePermission.permission_key.in_(
-                        [tool.view_permission for tool in _Tool]
-                    ),
+                    InitiativeRule.initiative_role_id == member_role.id,
+                    InitiativeRule.key.in_([tool.view_permission for tool in _Tool]),
                 )
                 .values(enabled=True)
             )
@@ -1032,7 +1030,7 @@ async def grant_role_permission(
     """
     from app.models.tenant.initiative import (
         InitiativeRoleModel,
-        InitiativeRolePermission,
+        InitiativeRule,
     )
     from sqlmodel import select
 
@@ -1047,17 +1045,18 @@ async def grant_role_permission(
     ).one()
     existing = (
         await session.exec(
-            select(InitiativeRolePermission).where(
-                InitiativeRolePermission.initiative_role_id == role.id,
-                InitiativeRolePermission.permission_key == permission_key,
+            select(InitiativeRule).where(
+                InitiativeRule.initiative_role_id == role.id,
+                InitiativeRule.key == permission_key,
             )
         )
     ).one_or_none()
     if existing is None:
         session.add(
-            InitiativeRolePermission(
+            InitiativeRule(
+                initiative_id=initiative.id,
                 initiative_role_id=role.id,
-                permission_key=permission_key,
+                key=permission_key,
                 enabled=enabled,
             )
         )

@@ -71,8 +71,8 @@ _PLUGIN_BINDING = {"source": "plugin", "params": {"document_id": 5}}
 def _guild_runner(schema: str):
     """Revision 0464 one way or the other, on one guild's schema only. The
     metadata store (20261027_0550), the galleries conversion (20261027_0546),
-    the batched notices (20261030_0563) and the data jobs table
-    (20261030_0564) come off first and go back last:
+    the batched notices (20261030_0563), the data jobs table (20261030_0564)
+    and the initiative rules (20261030_0567) come off first and go back last:
     the checks 0464 restates name the permissions as they were then, and it
     respells the exports in the table they had then."""
     files = _load("20261006_0464_documents_are_files.py")
@@ -80,6 +80,7 @@ def _guild_runner(schema: str):
     metadata = _load("20261027_0550_metadata_is_one_store.py")
     batched = _load("20261030_0563_assignment_and_reaction_lines_are_one_table.py")
     data_jobs = _load("20261030_0564_imports_and_exports_are_data_jobs.py")
+    rules = _load("20261030_0567_an_initiatives_role_permissions_are_rules.py")
 
     def run(forward: bool):
         def apply(sync_session) -> None:
@@ -99,7 +100,9 @@ def _guild_runner(schema: str):
                     in_schema(lambda: metadata._apply(True))
                     in_schema(lambda: batched._upgrade(bind))
                     in_schema(data_jobs._upgrade_schema)
+                    in_schema(rules._upgrade)
                 else:
+                    in_schema(rules._downgrade)
                     in_schema(data_jobs._downgrade_schema)
                     in_schema(lambda: batched._downgrade(bind))
                     in_schema(lambda: metadata._apply(False))
@@ -143,9 +146,15 @@ async def _guild_values(session, schema: str, ids: dict[str, int]) -> dict:
             "WHERE entity_id = :id AND entity_type IN ('file', 'document')",
             id=ids["file"],
         ),
+        # The permissions' table and key, by the names they have on either side.
         "permissions": await _rows(
             session,
-            f"SELECT DISTINCT permission_key FROM {s}.initiative_role_permissions "
+            f"SELECT DISTINCT key FROM {s}.initiative_rules "
+            "WHERE key ~ '(file|document)' ORDER BY 1"
+            if (await _rows(session, f"SELECT to_regclass('{s}.initiative_rules')"))[0][
+                0
+            ]
+            else f"SELECT DISTINCT permission_key FROM {s}.initiative_role_permissions "
             "WHERE permission_key ~ '(file|document)' ORDER BY 1",
         ),
         "outbox": await _rows(

@@ -321,7 +321,7 @@ SECTION_TABLES: dict[str, str] = {
     "initiatives": "initiatives",
     "initiative_members": "initiatives",
     "initiative_roles": "initiatives",
-    "initiative_role_permissions": "initiatives",
+    "initiative_rules": "initiatives",
 }
 
 # Guild-level tables deliberately NOT exported, and why. A reason is required:

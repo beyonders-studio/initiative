@@ -502,7 +502,7 @@ def _initiative_tool_states(params: dict, initiative) -> dict[str, str]:
 
 def _permission_key(permission) -> str:
     """The permission's name — the enum's value, not its repr."""
-    key = permission.permission_key
+    key = permission.key
     return str(getattr(key, "value", key))
 
 
@@ -1049,7 +1049,7 @@ class _ScopeBuilder:
         from app.models.tenant.initiative import (
             InitiativeMember,
             InitiativeRoleModel,
-            InitiativeRolePermission,
+            InitiativeRule,
         )
 
         roles = list(
@@ -1062,10 +1062,8 @@ class _ScopeBuilder:
         permissions: dict[int, list] = {}
         if roles:
             rows = await self.session.exec(
-                select(InitiativeRolePermission).where(
-                    InitiativeRolePermission.initiative_role_id.in_(
-                        [r.id for r in roles]
-                    )
+                select(InitiativeRule).where(
+                    InitiativeRule.initiative_role_id.in_([r.id for r in roles])
                 )
             )
             for permission in rows:
