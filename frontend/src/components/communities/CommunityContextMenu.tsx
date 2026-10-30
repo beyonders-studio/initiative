@@ -13,7 +13,7 @@ import { type ReactNode, useState } from "react";
 import { useTranslation } from "react-i18next";
 
 import { createCommunityInvite } from "@/api/generated/communities/communities";
-import type { CommunityRead } from "@/api/generated/initiativeAPI.schemas";
+import { AdminSurface, type CommunityRead } from "@/api/generated/initiativeAPI.schemas";
 import { invalidate, q } from "@/api/query-keys";
 import { InitiativeMark } from "@/components/icons/InitiativeMark";
 import {
@@ -178,7 +178,7 @@ export const CommunityContextMenu = ({
                   {creatingInvite ? t("creatingInvite") : inviteLabel}
                 </ContextMenuItem>
               )}
-              {community.can.administer_content && (
+              {held.holds(AdminSurface.initiatives) && (
                 <ContextMenuItem onClick={handleCreateInitiative}>
                   <Plus className="mr-2 h-4 w-4" />
                   {t("createInitiative")}

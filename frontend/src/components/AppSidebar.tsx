@@ -14,7 +14,7 @@ import { useCallback, useEffect, useMemo, useState } from "react";
 import { useTranslation } from "react-i18next";
 
 import type { ProjectRead } from "@/api/generated/initiativeAPI.schemas";
-import { Tool } from "@/api/generated/initiativeAPI.schemas";
+import { AdminSurface, Tool } from "@/api/generated/initiativeAPI.schemas";
 import { CommunitySidebar } from "@/components/communities/CommunitySidebar";
 import { DIRECTORY_SECTION_ID } from "@/components/communityHome/InitiativeDirectory";
 import { InitiativeMark } from "@/components/icons/InitiativeMark";
@@ -85,6 +85,8 @@ export const AppSidebar = () => {
   // role included.
   const heldSurfaces = useHeldSurfaces();
   const showsCommunitySettings = isCommunityAdmin || heldSurfaces.holdsAny;
+  // Making an initiative is part of running the community's initiatives.
+  const createsInitiatives = heldSurfaces.holds(AdminSurface.initiatives);
   // Two separate platform areas: config (Platform settings) vs operational
   // (Operator dashboard). Each surfaced independently per capability.
   const showPlatformSettings = canManagePlatformConfig(user);
@@ -505,7 +507,7 @@ export const AppSidebar = () => {
                                   </SidebarMenuButton>
                                 </SidebarMenuItem>
                               )}
-                              {isCommunityAdmin && (
+                              {createsInitiatives && (
                                 <SidebarMenuItem>
                                   <SidebarMenuButton asChild size="sm">
                                     {/* The create dialog lives on community home
