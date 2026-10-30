@@ -66,7 +66,9 @@ async def list_community_connections(
     return await ai_settings_service.list_guild_connections(session)
 
 
-@router.post("/ai/connections", response_model=AIConnectionResponse, dependencies=[_SURFACE_OPEN])
+@router.post(
+    "/ai/connections", response_model=AIConnectionResponse, dependencies=[_SURFACE_OPEN]
+)
 async def create_community_connection(
     payload: AIConnectionCreate,
     session: SettingsRLSSessionDep,
@@ -78,7 +80,11 @@ async def create_community_connection(
     )
 
 
-@router.put("/ai/connections/{connection_id}", response_model=AIConnectionResponse, dependencies=[_SURFACE_OPEN])
+@router.put(
+    "/ai/connections/{connection_id}",
+    response_model=AIConnectionResponse,
+    dependencies=[_SURFACE_OPEN],
+)
 async def update_community_connection(
     connection_id: int,
     payload: AIConnectionUpdate,
@@ -92,7 +98,10 @@ async def update_community_connection(
 
 
 @router.delete(
-    "/ai/connections/{connection_id}", status_code=status.HTTP_204_NO_CONTENT, dependencies=[_SURFACE_OPEN])
+    "/ai/connections/{connection_id}",
+    status_code=status.HTTP_204_NO_CONTENT,
+    dependencies=[_SURFACE_OPEN],
+)
 async def delete_community_connection(
     connection_id: int,
     session: SettingsRLSSessionDep,

@@ -527,7 +527,11 @@ async def get_community_plugin(
 
 
 @router.post(
-    "/", response_model=CommunityPluginRead, status_code=status.HTTP_201_CREATED, dependencies=[_SURFACE_OPEN])
+    "/",
+    response_model=CommunityPluginRead,
+    status_code=status.HTTP_201_CREATED,
+    dependencies=[_SURFACE_OPEN],
+)
 async def install_community_plugin(
     payload: CommunityPluginInstall,
     session: SeatWriteSessionDep,
@@ -650,7 +654,11 @@ async def install_community_plugin(
     return installed
 
 
-@router.post("/{plugin_id}/upgrade", response_model=CommunityPluginDetail, dependencies=[_SURFACE_OPEN])
+@router.post(
+    "/{plugin_id}/upgrade",
+    response_model=CommunityPluginDetail,
+    dependencies=[_SURFACE_OPEN],
+)
 async def upgrade_community_plugin(
     plugin_id: int,
     session: SeatWriteSessionDep,
@@ -772,7 +780,11 @@ async def upgrade_community_plugin(
     return await _detail(session, plugin, guild_context, current_user.id, viewer)
 
 
-@router.post("/{plugin_id}/upgrade/decline", response_model=CommunityPluginDetail, dependencies=[_SURFACE_OPEN])
+@router.post(
+    "/{plugin_id}/upgrade/decline",
+    response_model=CommunityPluginDetail,
+    dependencies=[_SURFACE_OPEN],
+)
 async def decline_community_plugin_upgrade(
     plugin_id: int,
     payload: CommunityPluginDecline,
@@ -818,7 +830,9 @@ async def decline_community_plugin_upgrade(
     )
 
 
-@router.patch("/{plugin_id}", response_model=CommunityPluginRead, dependencies=[_SURFACE_OPEN])
+@router.patch(
+    "/{plugin_id}", response_model=CommunityPluginRead, dependencies=[_SURFACE_OPEN]
+)
 async def update_community_plugin(
     plugin_id: int,
     payload: CommunityPluginUpdate,
@@ -929,7 +943,9 @@ async def read_uninstall_notice(
     )
 
 
-@router.delete("/{plugin_id}", status_code=status.HTTP_204_NO_CONTENT, dependencies=[_SURFACE_OPEN])
+@router.delete(
+    "/{plugin_id}", status_code=status.HTTP_204_NO_CONTENT, dependencies=[_SURFACE_OPEN]
+)
 async def uninstall_community_plugin(
     plugin_id: int,
     session: SeatWriteSessionDep,
@@ -976,7 +992,11 @@ async def uninstall_community_plugin(
 # ---------------------------------------------------------------------------
 
 
-@router.put("/{plugin_id}/config", response_model=CommunityPluginDetail, dependencies=[_SURFACE_OPEN])
+@router.put(
+    "/{plugin_id}/config",
+    response_model=CommunityPluginDetail,
+    dependencies=[_SURFACE_OPEN],
+)
 async def update_community_plugin_config(
     plugin_id: int,
     payload: CommunityPluginConfigUpdate,
@@ -1007,7 +1027,11 @@ async def update_community_plugin_config(
     return await _detail(session, plugin, guild_context, current_user.id, viewer)
 
 
-@router.put("/{plugin_id}/settings/{key}", response_model=CommunityPluginDetail, dependencies=[_SURFACE_OPEN])
+@router.put(
+    "/{plugin_id}/settings/{key}",
+    response_model=CommunityPluginDetail,
+    dependencies=[_SURFACE_OPEN],
+)
 async def update_community_plugin_setting(
     plugin_id: int,
     key: str,
@@ -1046,7 +1070,10 @@ async def update_community_plugin_setting(
 
 
 @router.put(
-    "/{plugin_id}/placements/{initiative_id}", response_model=PluginPlacementRead, dependencies=[_SURFACE_OPEN])
+    "/{plugin_id}/placements/{initiative_id}",
+    response_model=PluginPlacementRead,
+    dependencies=[_SURFACE_OPEN],
+)
 async def put_community_plugin_placement(
     plugin_id: int,
     initiative_id: int,
@@ -1097,7 +1124,11 @@ async def put_community_plugin_placement(
     return PluginPlacementRead(initiative_id=initiative_id, role_ids=after)
 
 
-@router.put("/{plugin_id}/scopes", response_model=CommunityPluginRead, dependencies=[_SURFACE_OPEN])
+@router.put(
+    "/{plugin_id}/scopes",
+    response_model=CommunityPluginRead,
+    dependencies=[_SURFACE_OPEN],
+)
 async def put_community_plugin_scopes(
     plugin_id: int,
     payload: CommunityPluginScopesUpdate,
@@ -1235,7 +1266,9 @@ def _handoff_response(handoff: handoff_service.PageHandoff) -> CommunityPluginHa
 
 @router.post(
     "/{plugin_id}/connections/{connection_id}/connect",
-    response_model=CommunityPluginConnectStart, dependencies=[_SURFACE_OPEN])
+    response_model=CommunityPluginConnectStart,
+    dependencies=[_SURFACE_OPEN],
+)
 async def connect_community_plugin(
     plugin_id: int,
     connection_id: str,
@@ -1326,7 +1359,10 @@ async def connect_community_plugin(
 
 
 @router.delete(
-    "/{plugin_id}/connections/{connection_id}", status_code=status.HTTP_204_NO_CONTENT, dependencies=[_SURFACE_OPEN])
+    "/{plugin_id}/connections/{connection_id}",
+    status_code=status.HTTP_204_NO_CONTENT,
+    dependencies=[_SURFACE_OPEN],
+)
 async def disconnect_community_plugin(
     plugin_id: int,
     connection_id: str,
