@@ -276,9 +276,7 @@ async def create_initiative(c: Community, key: str, d: dict) -> Initiative:
             update(InitiativeRule)
             .where(
                 InitiativeRule.initiative_role_id == member_role.id,
-                InitiativeRule.key.in_(
-                    [tool.view_permission for tool in member_tools]
-                ),
+                InitiativeRule.key.in_([tool.view_permission for tool in member_tools]),
             )
             .values(enabled=True)
         )
