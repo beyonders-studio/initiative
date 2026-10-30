@@ -58,6 +58,24 @@ async def test_a_member_role_opens_the_surfaces_it_names(client, acting_user):
     )
 
 
+async def test_a_name_another_role_has_is_a_conflict(client, acting_user):
+    admin = await acting_user(guild_role=CommunityRole.admin)
+    await _make(client, admin, name="Doors", base_rung="member", surfaces=[])
+    other = await _make(client, admin, name="Roll", base_rung="member", surfaces=[])
+
+    made = await client.post(
+        admin.g("/custom-roles/"),
+        headers=admin.headers,
+        json={"name": "Doors", "base_rung": "member", "surfaces": []},
+    )
+    renamed = await client.patch(
+        admin.g(f"/custom-roles/{other}"), headers=admin.headers, json={"name": "Doors"}
+    )
+    for response in (made, renamed):
+        assert response.status_code == 409
+        assert response.json()["detail"] == CustomRoleMessages.CUSTOM_ROLE_NAME_TAKEN
+
+
 async def test_a_narrowed_admin_hands_out_no_more_than_it_holds(client, acting_user):
     admin = await acting_user(guild_role=CommunityRole.admin)
     narrowed = await acting_user(guild_role=CommunityRole.admin, guild=admin.guild)

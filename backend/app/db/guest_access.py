@@ -90,6 +90,10 @@ _NAMED: dict[str, GuestAccess] = {
     "initiative_roles": GuestAccess.read,
     "initiative_rules": GuestAccess.read,
     "tags": GuestAccess.read,
+    # Their own custom role, which the standing reads (and never applies on
+    # the guest rung).
+    "custom_role_members": GuestAccess.read,
+    "custom_roles": GuestAccess.read,
 }
 
 
@@ -150,6 +154,12 @@ GUEST_ROWS: dict[str, str] = {
     "initiative_rules": (
         f"(initiative_rules.initiative_id IN {_IN_INITIATIVES}"
         " OR initiative_rules.initiative_id IS NULL)"
+    ),
+    # Their own custom role, if one was given: not who else holds what.
+    "custom_role_members": f"custom_role_members.user_id = {_UID}",
+    "custom_roles": (
+        "custom_roles.id IN (SELECT cm.role_id FROM custom_role_members cm"
+        f" WHERE cm.user_id = {_UID})"
     ),
     # Only the sharing rows that reach them: not who else something is
     # shared with.

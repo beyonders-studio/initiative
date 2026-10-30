@@ -10,7 +10,9 @@ stands on their plain rung. Both tables are the community's own: nothing outside
 it reads them.
 """
 
+from collections.abc import Iterable
 from datetime import datetime, timezone
+from enum import Enum
 from typing import Optional
 
 from sqlalchemy import (
@@ -40,11 +42,11 @@ CUSTOM_ROLE_RUNGS: tuple[CommunityRole, ...] = (
 CUSTOM_ROLE_NAME_MAX_LENGTH = 64
 
 
-def _listed(values) -> str:
+def _listed(values: Iterable[Enum]) -> str:
     return ", ".join(f"'{value.value}'" for value in values)
 
 
-def _surfaces(values) -> str:
+def _surfaces(values: Iterable[AdminSurface]) -> str:
     return f"ARRAY[{_listed(values)}]::text[]"
 
 
