@@ -7,9 +7,21 @@ from sqlmodel import select
 from sqlmodel.ext.asyncio.session import AsyncSession
 
 from app.core.login_methods import LoginMethod, SecondFactorRequirement
-from app.core.rules import PLATFORM_RULES, Slot, choices
+from app.core.rules import (
+    COMMUNITY_RULES,
+    PLATFORM_RULES,
+    SetBy,
+    Slot,
+    choices,
+    writers,
+)
 from app.models.platform.guild import GuildMembership
-from app.models.platform.rule import CommunityRule, PlatformRule, RuleChoice
+from app.models.platform.rule import (
+    CommunityRule,
+    PlatformRule,
+    RuleChoice,
+    RuleKeyWriter,
+)
 from app.services.platform import rules
 from app.testing import create_guild, create_user, guild_administration
 
@@ -31,7 +43,11 @@ async def test_a_rule_without_a_row_is_its_default_and_writing_it_removes_the_ro
     await rules.put(session, "allow_ai", True, guild_id=guild.id)
     await session.commit()
     assert (await session.exec(select(PlatformRule))).all() == []
-    assert (await session.exec(select(CommunityRule))).all() == []
+    assert (
+        await session.exec(
+            select(CommunityRule).where(CommunityRule.set_by == SetBy.community.value)
+        )
+    ).all() == []
 
 
 async def test_a_community_value_applies_while_it_holds_the_option(
@@ -125,3 +141,39 @@ async def test_a_choice_and_the_ways_in_are_rows_like_any_other(
     with pytest.raises(IntegrityError):
         async with session.begin_nested():
             session.add(PlatformRule(key="login_methods_probe", methods=["totp"]))
+
+
+@pytest.mark.always
+async def test_rule_key_writers_are_the_catalogs(session: AsyncSession):
+    """The migrations write ``rule_key_writers``; the catalog says who may
+    write each community rule. A new rule, or a paid one, needs both."""
+    stored = set(
+        (await session.exec(select(RuleKeyWriter.key, RuleKeyWriter.set_by))).all()
+    )
+    assert stored == {
+        (key, writer.value)
+        for key, rule in COMMUNITY_RULES.items()
+        for writer in writers(rule)
+    }
+
+
+async def test_a_deployment_row_wins_and_a_paid_rule_is_the_deployments_alone(
+    session: AsyncSession,
+):
+    """What the deployment sets is owned above: it wins over the community's
+    own row, and a paid rule takes no row from the community at all."""
+    guild = await create_guild(session)
+    await rules.put(session, "guest_max_days", 30, guild_id=guild.id)
+    await rules.put(
+        session, "guest_max_days", 10, guild_id=guild.id, set_by=SetBy.deployment
+    )
+    await rules.put(
+        session, "max_users", 50, guild_id=guild.id, set_by=SetBy.deployment
+    )
+    await session.commit()
+    assert await rules.community_value(session, guild.id, "guest_max_days") == 10
+    assert await rules.community_value(session, guild.id, "max_users") == 50
+
+    with pytest.raises(IntegrityError):
+        async with session.begin_nested():
+            session.add(CommunityRule(guild_id=guild.id, key="max_users", amount=500))

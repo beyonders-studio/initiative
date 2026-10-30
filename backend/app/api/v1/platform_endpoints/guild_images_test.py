@@ -28,6 +28,7 @@ from app.models.platform.guild_image import (
 )
 from app.models.platform.user import UserRole
 from app.services.platform import rules
+from app.testing import guild_administration
 from app.testing.factories import (
     create_access_grant,
     create_user,
@@ -679,19 +680,9 @@ async def test_a_guild_without_the_artwork_entitlement_cannot_upload(
     client: AsyncClient, acting_user, session: AsyncSession
 ):
     """The banner surface stays; the upload half of it does not."""
-    from app.models.platform.guild_administration import GuildAdministration
 
     a = await acting_user(guild_role=CommunityRole.admin)
-    administration = (
-        await session.exec(
-            select(GuildAdministration).where(
-                GuildAdministration.guild_id == a.guild.id
-            )
-        )
-    ).one()
-    administration.banner_image_enabled = False
-    session.add(administration)
-    await session.commit()
+    await guild_administration(session, a.guild, banner_image_enabled=False)
 
     response = await client.put(
         f"/api/v1/communities/{a.guild.id}/banner",
@@ -707,19 +698,9 @@ async def test_the_colour_is_still_available_without_the_entitlement(
     client: AsyncClient, acting_user, session: AsyncSession
 ):
     """Every guild has a banner; not every guild has artwork."""
-    from app.models.platform.guild_administration import GuildAdministration
 
     a = await acting_user(guild_role=CommunityRole.admin)
-    administration = (
-        await session.exec(
-            select(GuildAdministration).where(
-                GuildAdministration.guild_id == a.guild.id
-            )
-        )
-    ).one()
-    administration.banner_image_enabled = False
-    session.add(administration)
-    await session.commit()
+    await guild_administration(session, a.guild, banner_image_enabled=False)
 
     response = await client.patch(
         f"/api/v1/communities/{a.guild.id}",
@@ -733,19 +714,11 @@ async def test_the_colour_is_still_available_without_the_entitlement(
 
 async def test_the_entitlement_is_on_by_default(acting_user, session: AsyncSession):
     """Nothing changes for an existing guild, or for a self-hosted install."""
-    from app.models.platform.guild_administration import GuildAdministration
+    from app.services.platform import rules
 
     a = await acting_user(guild_role=CommunityRole.admin)
 
-    administration = (
-        await session.exec(
-            select(GuildAdministration).where(
-                GuildAdministration.guild_id == a.guild.id
-            )
-        )
-    ).one()
-
-    assert administration.banner_image_enabled is True
+    assert await rules.community_value(session, a.guild.id, "banner_image") is True
 
 
 async def test_a_guild_keeps_serving_artwork_it_already_had(
@@ -753,20 +726,10 @@ async def test_a_guild_keeps_serving_artwork_it_already_had(
 ):
     """Losing the entitlement stops new uploads; it does not take down a
     banner the guild is already showing."""
-    from app.models.platform.guild_administration import GuildAdministration
 
     a = await acting_user(guild_role=CommunityRole.admin)
     payload = await _set_banner(client, a.guild.id, a.headers)
-    administration = (
-        await session.exec(
-            select(GuildAdministration).where(
-                GuildAdministration.guild_id == a.guild.id
-            )
-        )
-    ).one()
-    administration.banner_image_enabled = False
-    session.add(administration)
-    await session.commit()
+    await guild_administration(session, a.guild, banner_image_enabled=False)
 
     response = await client.get(payload["banner"]["image_url"], headers=a.headers)
 
@@ -811,19 +774,9 @@ async def test_the_icon_is_not_gated_by_the_banner_entitlement(
     client: AsyncClient, acting_user, session: AsyncSession
 ):
     """A guild without banner artwork still has a mark in the switcher."""
-    from app.models.platform.guild_administration import GuildAdministration
 
     a = await acting_user(guild_role=CommunityRole.admin)
-    administration = (
-        await session.exec(
-            select(GuildAdministration).where(
-                GuildAdministration.guild_id == a.guild.id
-            )
-        )
-    ).one()
-    administration.banner_image_enabled = False
-    session.add(administration)
-    await session.commit()
+    await guild_administration(session, a.guild, banner_image_enabled=False)
 
     payload = await _set_icon(client, a.guild.id, a.headers)
 
@@ -919,19 +872,9 @@ async def test_a_guild_admin_reads_their_own_entitlements(
 async def test_entitlements_follow_the_operator(
     client: AsyncClient, acting_user, session: AsyncSession
 ):
-    from app.models.platform.guild_administration import GuildAdministration
 
     a = await acting_user(guild_role=CommunityRole.admin)
-    administration = (
-        await session.exec(
-            select(GuildAdministration).where(
-                GuildAdministration.guild_id == a.guild.id
-            )
-        )
-    ).one()
-    administration.banner_image_enabled = False
-    session.add(administration)
-    await session.commit()
+    await guild_administration(session, a.guild, banner_image_enabled=False)
 
     response = await client.get(
         f"/api/v1/communities/{a.guild.id}/entitlements", headers=a.headers
@@ -975,7 +918,6 @@ async def test_dropping_below_the_seat_floor_stops_publishing_artwork(
 ):
     """An operator can take a guild out of the directory without the guild
     doing anything, and what the listing published goes with it."""
-    from app.models.platform.guild_administration import GuildAdministration
 
     a = await acting_user(guild_role=CommunityRole.admin)
     await _set_icon(client, a.guild.id, a.headers)
@@ -987,16 +929,7 @@ async def test_dropping_below_the_seat_floor_stops_publishing_artwork(
     card = await _card_url(session, a.guild.id)
     assert (await client.get(icon, headers=headers)).status_code == 200
 
-    administration = (
-        await session.exec(
-            select(GuildAdministration).where(
-                GuildAdministration.guild_id == a.guild.id
-            )
-        )
-    ).one()
-    administration.max_users = 1
-    session.add(administration)
-    await session.commit()
+    await guild_administration(session, a.guild, max_users=1)
 
     assert (await client.get(icon, headers=headers)).status_code == 404
     assert (await client.get(card, headers=headers)).status_code == 404

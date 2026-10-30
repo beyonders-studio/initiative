@@ -25,6 +25,7 @@ from app.core.config import settings
 from app.core.errors import CodedError
 from app.core.identify import bearer_token
 from app.core.messages import BillingMessages
+from app.core.rules import SetBy
 from app.core.security import PublicKeyBundleError, load_verification_keys
 from app.models.platform.billing import (
     BILLING_SOURCE,
@@ -39,6 +40,7 @@ from app.core.audit_events import AuditEventType
 from app.services import audit as audit_service
 from app.services.marketplace import community_hooks
 from app.services.platform import billing_envelope as envelope
+from app.services.platform import rules
 
 logger = logging.getLogger(__name__)
 
@@ -158,18 +160,13 @@ async def burn_jti(claims: BillingClaims) -> None:
             raise CodedError(BillingMessages.REPLAYED_TOKEN, 403) from exc
 
 
-# The caps and the plan label live on ``guild_administration``; the lifecycle
-# status stays on ``guilds`` (every request reads it). Billing sees exactly
-# these columns of each — nothing else on either table.
+# The plan label and billing's bookkeeping live on ``guild_administration``;
+# the lifecycle status stays on ``guilds`` (every request reads it); what the
+# plan gives is the community's paid rules. Billing sees exactly these columns
+# of the first two — nothing else on either table.
 _GUILD_TIER_COLUMNS = (
     Guild.id,
     GuildAdministration.tier_name,
-    GuildAdministration.max_storage_bytes,
-    GuildAdministration.max_users,
-    GuildAdministration.max_guests,
-    GuildAdministration.banner_image_enabled,
-    GuildAdministration.support_enabled,
-    GuildAdministration.auth_options,
     GuildAdministration.billing_version,
     Guild.status,
 )
@@ -286,12 +283,14 @@ async def apply_community_sync(
     now = datetime.now(timezone.utc)
     administration_values: dict[str, Any] = {
         "tier_name": fields.tier_name,
+        "billing_status": fields.status.value,
+        "billing_version": version,
+    }
+    paid: dict[str, Any] = {
         "max_storage_bytes": fields.max_storage_bytes,
         "max_users": fields.max_users,
         "max_guests": fields.max_guests,
-        "billing_status": fields.status.value,
-        "billing_version": version,
-        **billing_capabilities.administration_values(fields.feature_keys),
+        **billing_capabilities.capability_values(fields.feature_keys),
     }
     guild_values: dict[str, Any] = {"updated_at": now}
     went_on_hold = False
@@ -323,6 +322,8 @@ async def apply_community_sync(
         .where(GuildAdministration.guild_id == guild_id)
         .values(**administration_values)
     )
+    for key, value in paid.items():
+        await rules.put(session, key, value, guild_id=guild_id, set_by=SetBy.deployment)
     # Stamp the guild whichever row moved: "when did this guild last change"
     # stays a fact about the guild.
     await session.exec(update(Guild).where(Guild.id == guild_id).values(**guild_values))

@@ -69,6 +69,25 @@ class StoredRule:
     #: it. Withdrawing the option stops the rule and leaves its row, so it
     #: applies again when the option comes back.
     entitlement: CommunityAuthOption | None = None
+    #: A paid key: what a community's plan gives it. Only the deployment writes
+    #: one — billing's sync, or the operator where billing does not manage
+    #: plans — so a community never raises its own.
+    paid: bool = False
+
+
+class SetBy(str, Enum):
+    """Who wrote a community's rule row. A value set above is owned above: a
+    ``deployment`` row wins over the community's own."""
+
+    #: The community, through its seat.
+    community = "community"
+    #: The deployment: billing's sync, or the operator's per-community route.
+    deployment = "deployment"
+
+
+def writers(rule: StoredRule) -> frozenset[SetBy]:
+    """Who may write a community rule (``rule_key_writers``)."""
+    return frozenset({SetBy.deployment}) if rule.paid else frozenset(SetBy)
 
 
 def choices(rule: StoredRule) -> tuple[str, ...]:
@@ -257,4 +276,27 @@ COMMUNITY_RULES: dict[str, StoredRule] = _catalog(
     # part, so these carry no option of their own.
     StoredRule("auth_policy", Slot.methods, SignInRequirement()),
     StoredRule("guest_auth_policy", Slot.methods, SignInRequirement()),
+    # What the community's plan gives it. The four switches are billing's
+    # capability names; the three caps are its limits, none without a row.
+    # May say which of the deployment's providers it counts as its own, where
+    # the people on them land, and whether members must arrive that way.
+    StoredRule("community_sign_in", _ON, False, paid=True),
+    # May refuse personal API keys and shorten the session limit.
+    StoredRule("security_standards", _ON, False, paid=True),
+    # May upload banner artwork.
+    StoredRule("banner_image", _ON, True, paid=True),
+    # May send a help request to whoever runs the deployment.
+    StoredRule("help_requests", _ON, False, paid=True),
+    # The most members it may hold; guests take no seat.
+    StoredRule("max_users", Slot.amount, None, paid=True),
+    # The most guests it may hold at once; 0 lets no new guest in.
+    StoredRule("max_guests", Slot.amount, None, paid=True),
+    # The most it may store, in bytes.
+    StoredRule("max_storage_bytes", Slot.amount, None, paid=True),
 )
+
+#: The paid key that grants each sign-in option.
+OPTION_RULES: dict[CommunityAuthOption, str] = {
+    CommunityAuthOption.providers: "community_sign_in",
+    CommunityAuthOption.restrictions: "security_standards",
+}

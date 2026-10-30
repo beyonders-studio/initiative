@@ -62,7 +62,7 @@ class RuleChoice(SQLModel, table=True):
     """One value a ``choice`` rule may take (``app.core.rules.choices``).
 
     Written by the migrations, with the rule it belongs to, and held to the
-    catalog by ``rule_choices_test``. Read by nothing but the foreign key that
+    catalog by ``rules_test``. Read by nothing but the foreign key that
     holds each ``choice`` to its own rule's values.
     """
 
@@ -70,6 +70,21 @@ class RuleChoice(SQLModel, table=True):
 
     key: str = Field(sa_column=Column(String(64), primary_key=True))
     value: str = Field(sa_column=Column(String(64), primary_key=True))
+
+
+class RuleKeyWriter(SQLModel, table=True):
+    """Who may write one community rule: the community, the deployment, or
+    both (``app.core.rules.writers``). A paid key has the deployment alone.
+
+    Written by the migrations, with the rule it belongs to, and held to the
+    catalog by ``rules_test``. Read by nothing but the foreign key that holds
+    each community row's ``(key, set_by)`` to them.
+    """
+
+    __tablename__ = "rule_key_writers"
+
+    key: str = Field(sa_column=Column(String(64), primary_key=True))
+    set_by: str = Field(sa_column=Column(String(16), primary_key=True))
 
 
 class PlatformRule(SQLModel, table=True):
@@ -105,7 +120,8 @@ class PlatformRule(SQLModel, table=True):
 
 class CommunityRule(SQLModel, table=True):
     """One of a community's rules that says something other than its default,
-    for the whole community or for one member of it.
+    for the whole community or for one member of it, written by the community
+    or by the deployment (``set_by``). A deployment row wins.
 
     Goes with its community, and a member's with their membership.
     """
@@ -114,16 +130,28 @@ class CommunityRule(SQLModel, table=True):
     __table_args__ = (
         CheckConstraint(_ONE_COMMUNITY_SLOT, name="ck_community_rules_one_slot"),
         CheckConstraint(_REQUIREMENT, name="ck_community_rules_requirement"),
+        # Every figure a community's rule holds is a count, a size or a
+        # length: none is below zero.
+        CheckConstraint(
+            "amount IS NULL OR amount >= 0",
+            name="ck_community_rules_amount_nonnegative",
+        ),
         ForeignKeyConstraint(
             ["guild_id", "user_id"],
             ["guild_memberships.guild_id", "guild_memberships.user_id"],
             ondelete="CASCADE",
             name="fk_community_rules_member",
         ),
+        ForeignKeyConstraint(
+            ["key", "set_by"],
+            ["rule_key_writers.key", "rule_key_writers.set_by"],
+            name="fk_community_rules_writer",
+        ),
         UniqueConstraint(
             "guild_id",
             "key",
             "user_id",
+            "set_by",
             name="uq_community_rules_subject",
             postgresql_nulls_not_distinct=True,
         ),
@@ -142,11 +170,17 @@ class CommunityRule(SQLModel, table=True):
     user_id: Optional[int] = Field(
         default=None, sa_column=Column(Integer, nullable=True)
     )
+    #: Who wrote it (``app.core.rules.SetBy``).
+    set_by: str = Field(
+        default="community",
+        sa_column=Column(String(16), nullable=False, server_default="community"),
+    )
     enabled: Optional[bool] = Field(
         default=None, sa_column=Column(Boolean, nullable=True)
     )
+    #: Wide enough for a storage cap in bytes.
     amount: Optional[int] = Field(
-        default=None, sa_column=Column(Integer, nullable=True)
+        default=None, sa_column=Column(BigInteger, nullable=True)
     )
     methods: Optional[list[str]] = Field(default=None, sa_column=_methods())
     #: RESTRICT: deleting a provider a community requires must surface the

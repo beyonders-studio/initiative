@@ -1871,23 +1871,12 @@ async def test_only_the_seat_may_send_a_backup_in_pieces(client, acting_user):
 async def test_a_backup_on_its_way_needs_no_room_in_the_communitys_storage(
     client, acting_user, session
 ):
-    from sqlmodel import select
 
-    from app.models.platform.guild_administration import GuildAdministration
     from app.services.tenant import attachments
     from app.testing.resumable import send_in_pieces
 
     a = await acting_user(guild_role=CommunityRole.superadmin, initiative=True)
-    administration = (
-        await session.exec(
-            select(GuildAdministration).where(
-                GuildAdministration.guild_id == a.guild.id
-            )
-        )
-    ).one()
-    administration.max_storage_bytes = 0
-    session.add(administration)
-    await session.commit()
+    await guild_administration(session, a.guild, max_storage_bytes=0)
 
     await send_in_pieces(
         client,

@@ -1047,21 +1047,13 @@ async def get_guild_storage_usage(guild_id: int) -> int:
 
 
 async def _storage_limit(guild_id: int) -> int | None:
-    """The guild's ``max_storage_bytes``, ``None`` for no limit. A setting of
-    the community rather than of whoever is writing, so it is read on
-    :func:`guild_wide`, as the usage it is compared with is."""
-    from sqlmodel import select
-
-    from app.models.platform.guild_administration import GuildAdministration
+    """The community's ``max_storage_bytes`` rule, ``None`` for no limit. A
+    setting of the community rather than of whoever is writing, so it is read
+    on :func:`guild_wide`, as the usage it is compared with is."""
+    from app.services.platform import rules
 
     async with guild_wide(guild_id) as session:
-        return (
-            await session.exec(
-                select(GuildAdministration.max_storage_bytes).where(
-                    GuildAdministration.guild_id == guild_id
-                )
-            )
-        ).one_or_none()
+        return await rules.community_value(session, guild_id, "max_storage_bytes")
 
 
 async def storage_left(guild_id: int) -> int | None:

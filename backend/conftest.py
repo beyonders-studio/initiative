@@ -121,9 +121,10 @@ _base_url = (
 )
 
 #: Shared tables the migrations fill with catalog data and no test writes, so
-#: the reset between tests leaves them alone (``rule_choices``: the values each
-#: ``choice`` rule may take).
-_CATALOG_TABLES = frozenset({"rule_choices"})
+#: the reset between tests leaves them alone: ``rule_choices``, the values each
+#: ``choice`` rule may take, and ``rule_key_writers``, who may write each
+#: community rule.
+_CATALOG_TABLES = frozenset({"rule_choices", "rule_key_writers"})
 
 # Per-run database so a worker's TRUNCATE/DROP never clobbers another worker's —
 # or another checkout's — data.

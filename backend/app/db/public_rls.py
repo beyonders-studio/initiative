@@ -186,6 +186,11 @@ def seat_write(col: str = "guild_id") -> str:
     return f"{seat(col)} AND ({GUILD_ADMIN} OR {gucs.PAM_WRITE})"
 
 
+#: Which of a community's rule rows are its own, and which the deployment's.
+COMMUNITY_RULE_SET_BY_COMMUNITY = "set_by = 'community'"
+COMMUNITY_RULE_SET_BY_DEPLOYMENT = "set_by = 'deployment'"
+
+
 # Predicates one table family shares, named once.
 EITHER_END = f"(user_id_low = {gucs.USER_ID}) OR (user_id_high = {gucs.USER_ID})"
 OWN_DEVICE_KEY = (
@@ -671,31 +676,62 @@ SHARED_TABLE_REGISTRY: dict[str, SharedTable] = {
                     ("app_guild_base_ro",),
                     using=routed_admin("guild_id"),
                 ),
+                # The staff list of every community reads each one's plan: the
+                # deployment's rows, never the community's own.
+                Policy(
+                    "community_rules_plan_read",
+                    SELECT,
+                    Capability.COMMUNITIES_READ,
+                    using=COMMUNITY_RULE_SET_BY_DEPLOYMENT,
+                ),
+                # The seat writes the community's own rows, through the floor
+                # its role holds; a deployment row is the deployment's.
                 Policy(
                     "community_rules_seat_delete",
                     DELETE,
-                    ("public",),
-                    using=seat_write("guild_id"),
+                    ("app_superadmin",),
+                    using=f"{seat_write('guild_id')} AND {COMMUNITY_RULE_SET_BY_COMMUNITY}",
                 ),
                 Policy(
                     "community_rules_seat_insert",
                     INSERT,
-                    ("public",),
-                    check=seat_write("guild_id"),
+                    ("app_superadmin",),
+                    check=f"{seat_write('guild_id')} AND {COMMUNITY_RULE_SET_BY_COMMUNITY}",
                 ),
                 Policy(
                     "community_rules_seat_update",
                     UPDATE,
-                    ("public",),
-                    using=seat_write("guild_id"),
+                    ("app_superadmin",),
+                    using=f"{seat_write('guild_id')} AND {COMMUNITY_RULE_SET_BY_COMMUNITY}",
+                ),
+                # Billing's sync writes the deployment's rows of the community
+                # it was routed to: what the plan gives (``rules.put``).
+                *(
+                    Policy(
+                        f"billing_community_rules_{name}",
+                        command,
+                        ("initiative_billing",),
+                        **{
+                            clause: f"{billing_scoped('guild_id')}"
+                            f" AND {COMMUNITY_RULE_SET_BY_DEPLOYMENT}"
+                        },
+                    )
+                    for name, command, clause in (
+                        ("select", SELECT, "using"),
+                        ("insert", INSERT, "check"),
+                        ("update", UPDATE, "using"),
+                        ("delete", DELETE, "using"),
+                    )
                 ),
             ),
         ),
         grants=Grants(
             # A community's stored rules (app.core.rules), written by its seat
-            # and read wherever one is enforced; the system engine reads them
-            # for a notification's send and a sweep, and drops them with the
-            # community.
+            # and, for the deployment's rows, by the operator on the system
+            # engine and billing's sync under its own role (granted in the
+            # migration, like its other tables); read wherever one is
+            # enforced. The system engine reads them for a notification's send
+            # and a sweep, and drops them with the community.
             app_admin=DML,
             # A sign-in reads the rules of every community the account is in.
             app_user=frozenset({SELECT}),
@@ -1649,6 +1685,9 @@ SHARED_TABLE_REGISTRY: dict[str, SharedTable] = {
     # migrations and read by no role: the foreign key that holds a rule's
     # ``choice`` to them checks it as the table's owner.
     "rule_choices": SharedTable(rls=FORCED_NO_POLICY, grants=Grants()),
+    # Who may write each community rule (app.core.rules.writers). Written by
+    # the migrations and read by no role, like ``rule_choices``.
+    "rule_key_writers": SharedTable(rls=FORCED_NO_POLICY, grants=Grants()),
     "platform_rules": SharedTable(
         rls=TableRls(
             policies=(

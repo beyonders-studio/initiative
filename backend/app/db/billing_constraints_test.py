@@ -3,10 +3,10 @@
 ``CHECK (x >= 0)`` passes on NULL, so the CHECK/NULL pairing on each column
 is deliberate and must be pinned exactly (write-boundary plan P-2):
 
-* ``guild_administration.max_storage_bytes`` / ``max_users`` are **nullable by
-  design** (NULL = unlimited) with NULL-aware non-negativity CHECKs;
-  ``tier_name`` nullable (NULL = no paid tier). They moved off ``guilds`` in
-  migration 0178, which carried the CHECKs across with them.
+* The caps are a community's paid rules: no row is unlimited, and a row's
+  ``amount`` has a NULL-aware non-negativity CHECK (migration 0561, which
+  carried the columns' CHECKs across). ``guild_administration.tier_name`` is
+  nullable (NULL = no paid tier).
 * ``billing_event_log``: ``event_id`` PRIMARY KEY; ``guild_id``/``op``/
   ``source`` NOT NULL; ``actor`` nullable; **no FK to guilds** — audit rows
   must survive guild erasure.
@@ -45,23 +45,14 @@ async def _constraints(session, table: str, contype: str) -> dict[str, str]:
     return {name: definition for name, definition in rows}
 
 
-async def test_guild_cap_columns_nullable_with_nonnegative_checks(session):
-    cols = await _nullability(session, "guild_administration")
-    # NULL = unlimited is load-bearing (paid tiers run max_users = NULL);
+async def test_guild_caps_are_never_below_zero(session):
     # NULL = no paid tier for the display label.
-    assert cols["max_storage_bytes"] is True
-    assert cols["max_users"] is True
-    assert cols["max_guests"] is True
-    assert cols["tier_name"] is True
+    assert (await _nullability(session, "guild_administration"))["tier_name"] is True
 
-    checks = await _constraints(session, "guild_administration", "c")
-    storage = checks["ck_guild_administration_max_storage_bytes_nonnegative"]
-    users = checks["ck_guild_administration_max_users_nonnegative"]
-    guests = checks["ck_guild_administration_max_guests_nonnegative"]
+    checks = await _constraints(session, "community_rules", "c")
+    amount = checks["ck_community_rules_amount_nonnegative"]
     # NULL-aware form: the CHECK constrains values without outlawing NULL.
-    assert "max_storage_bytes IS NULL" in storage and ">= 0" in storage
-    assert "max_users IS NULL" in users and ">= 0" in users
-    assert "max_guests IS NULL" in guests and ">= 0" in guests
+    assert "amount IS NULL" in amount and ">= 0" in amount
 
 
 async def test_billing_event_log_shape(session):

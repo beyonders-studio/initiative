@@ -103,7 +103,7 @@ from app.models.platform.auth_provider import AuthProvider, AuthProviderKind
 from app.models.platform.guild_provider_connection import GuildProviderConnection
 from app.models.platform.federated_identity import FederatedIdentity
 from app.core.login_methods import LoginMethod
-from app.core.rules import SignInRequirement
+from app.core.rules import OPTION_RULES, SetBy, SignInRequirement
 from app.models.platform.user import User, UserRole, UserStatus
 from app.services.auth.platform_provider import PLATFORM_OIDC_SLUG
 from app.core import usernames
@@ -256,8 +256,9 @@ async def create_guild(
     a filler account and has no members.
 
     Overrides for the operator-set fields (``max_storage_bytes``, ``max_users``,
-    ``max_guests``, ``tier_name``, ``auth_options``) land on ``guild_administration``; the rest
-    on the guild. Example: ``guild = await create_guild(session, name="Test")``.
+    ``max_guests``, ``tier_name``, ``auth_options``) go through
+    :func:`guild_administration`; the rest land on the guild. Example:
+    ``guild = await create_guild(session, name="Test")``.
     """
     # Test guilds hold every sign-in option by default so the guild-auth
     # surface is exercisable without extra setup; production guilds hold none
@@ -316,14 +317,31 @@ async def create_guild(
     return guild
 
 
+async def community_plan(session: AsyncSession, guild_id: int) -> rules.Values:
+    """What one community's rules say now, its plan among them."""
+    return (await rules.community_values(session, [guild_id]))[guild_id]
+
+
+#: The operator's fields by the names its API uses, and the paid rule each is.
+_PLAN_FIELDS = {
+    "max_storage_bytes": "max_storage_bytes",
+    "max_users": "max_users",
+    "max_guests": "max_guests",
+    "banner_image_enabled": "banner_image",
+    "support_enabled": "help_requests",
+}
+
+
 async def guild_administration(
     session: AsyncSession, guild: Guild, commit: bool = True, **fields: Any
 ) -> GuildAdministration:
-    """Read (and optionally set) a guild's operator-set row.
+    """Read (and optionally set) what the deployment says of one community,
+    by the names the operator's API uses.
 
-    The caps, plan label, and sign-in entitlement live on ``guild_administration``
-    rather than on the guild, so a test that used to poke ``guild.max_users``
-    goes through here instead. Called with no ``fields`` it is a plain read.
+    The caps and entitlements are its paid rules, written as the deployment's
+    rows (``auth_options`` as the two sign-in options); the plan label and
+    billing's bookkeeping are on ``guild_administration``, whose row this
+    returns. Called with no ``fields`` it is a plain read.
     """
     row = (
         await session.exec(
@@ -331,7 +349,26 @@ async def guild_administration(
         )
     ).one()
     for name, value in fields.items():
-        setattr(row, name, value)
+        if name in _PLAN_FIELDS:
+            await rules.put(
+                session,
+                _PLAN_FIELDS[name],
+                value,
+                guild_id=guild.id,
+                set_by=SetBy.deployment,
+            )
+        elif name == "auth_options":
+            held = {CommunityAuthOption(option) for option in value}
+            for option, key in OPTION_RULES.items():
+                await rules.put(
+                    session,
+                    key,
+                    option in held,
+                    guild_id=guild.id,
+                    set_by=SetBy.deployment,
+                )
+        else:
+            setattr(row, name, value)
     if fields:
         session.add(row)
         if commit:

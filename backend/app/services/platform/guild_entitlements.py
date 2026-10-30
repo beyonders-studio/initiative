@@ -1,8 +1,9 @@
-"""What an operator has granted one guild.
+"""Which sign-in options one community's plan gives it.
 
-The single read of ``guild_administration.auth_options``. Both the management
-gates and the just-in-time provisioning check come through here, so "has this
-guild been granted X" is one query with one answer.
+The single read of the two paid switches behind ``CommunityAuthOption``
+(``app.core.rules.OPTION_RULES``), deployment rows of ``community_rules``. The
+management gates come through here, so "has this community been granted X" is
+one query with one answer.
 """
 
 from __future__ import annotations
@@ -14,35 +15,38 @@ from sqlalchemy.sql.elements import ColumnElement
 from sqlmodel import func, select
 from sqlmodel.ext.asyncio.session import AsyncSession
 
-from app.core.guild_auth_options import CommunityAuthOption, effective_options
+from app.core.guild_auth_options import CommunityAuthOption
 from app.core.messages import GuildMessages
-from app.models.platform.guild_administration import GuildAdministration
+from app.core.rules import OPTION_RULES, SetBy
+from app.models.platform.rule import CommunityRule
 
 
 async def auth_options_for(
     session: AsyncSession, guild_id: int
 ) -> frozenset[CommunityAuthOption]:
-    """The sign-in options this guild holds. Empty when it holds none, and
-    empty when it has no administration row at all — a guild nobody has granted
-    anything is the same as a guild with nothing granted.
-
-    What is stored goes through :func:`effective_options`, so an option ticked
-    under a master nobody granted reads here the way it reads everywhere."""
-    administration = (
-        await session.exec(
-            select(GuildAdministration).where(GuildAdministration.guild_id == guild_id)
-        )
-    ).one_or_none()
-    if administration is None:
-        return frozenset()
-    return effective_options(administration.auth_options)
+    """The sign-in options this community holds. Empty when it holds none: a
+    community nobody has granted anything has no row for either."""
+    held = set(
+        (
+            await session.exec(
+                select(CommunityRule.key).where(
+                    CommunityRule.guild_id == guild_id,
+                    CommunityRule.key.in_(OPTION_RULES.values()),  # type: ignore[attr-defined]
+                    CommunityRule.user_id.is_(None),  # type: ignore[union-attr]
+                    CommunityRule.set_by == SetBy.deployment.value,
+                    CommunityRule.enabled.is_(True),  # type: ignore[union-attr]
+                )
+            )
+        ).all()
+    )
+    return frozenset(option for option, key in OPTION_RULES.items() if key in held)
 
 
 def holds_option(guild_id: Any, option: CommunityAuthOption) -> ColumnElement[bool]:
     """Whether a rule that needs ``option`` applies to the community:
-    ``public.guild_holds_option``, the answer the sign-in gate gives. True
-    unless the row the session reads shows the option withdrawn."""
-    return func.public.guild_holds_option(guild_id, option.value)
+    ``public.guild_holds_option``, the answer the sign-in gate gives, over the
+    option's paid key (``app.core.rules.OPTION_RULES``)."""
+    return func.public.guild_holds_option(guild_id, OPTION_RULES[option])
 
 
 async def has_auth_option(

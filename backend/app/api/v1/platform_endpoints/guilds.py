@@ -108,8 +108,8 @@ from app.schemas.platform.guild import (
     MemberDisplayNameUpdate,
 )
 from app.models.platform.auth_provider import AuthProvider
-from app.core.rules import SignInRequirement
-from app.core.guild_auth_options import CommunityAuthOption, effective_options
+from app.core.rules import OPTION_RULES, SignInRequirement
+from app.core.guild_auth_options import CommunityAuthOption
 from app.services.platform import auth_posture
 from app.services.platform import rules
 from app.services.platform import billing_ping
@@ -173,6 +173,7 @@ def _serialize_guild(
     retention_days: int | None = None,
     member_count: int = 0,
     administration: GuildAdministration | None = None,
+    plan: rules.Values | None = None,
     can: CommunityCan,
     images: dict[GuildImageVariant, str] | None = None,
     closed_contact: str | None = None,
@@ -192,9 +193,11 @@ def _serialize_guild(
       the panel's other half), so a regular member's payload leaves them
       ``None``.
 
-    Most of the second group now arrives as ``administration`` — a separate row
-    the caller may read but no request path may write. Callers serving a member
-    pass ``None`` for it and never read the row at all.
+    Most of the second group arrives as ``administration`` — a separate row the
+    caller may read but no request path may write — and ``plan``, the
+    community's rules (``rules.community_values``), whose paid ones hold the caps
+    and the sign-in options. Callers serving a member pass ``None`` for both and
+    never read them at all.
 
     ``membership`` is the caller's own row, where they have one; a grantee
     has no place in the list and no name of their own here.
@@ -209,6 +212,7 @@ def _serialize_guild(
     # serves a member's payload, so this stays the one place the split is made.
     is_admin = role.reaches(CommunityRole.admin)
     admin_row = administration if is_admin else None
+    admin_plan = plan if is_admin else None
     return CommunityRead(
         id=guild.id,
         name=guild.name,
@@ -223,9 +227,9 @@ def _serialize_guild(
         retention_days=retention_days if is_admin else None,
         member_count=member_count,
         # Operator-set caps, shown against usage on the admin settings page.
-        max_storage_bytes=admin_row.max_storage_bytes if admin_row else None,
-        max_users=admin_row.max_users if admin_row else None,
-        max_guests=admin_row.max_guests if admin_row else None,
+        max_storage_bytes=admin_plan["max_storage_bytes"] if admin_plan else None,
+        max_users=admin_plan["max_users"] if admin_plan else None,
+        max_guests=admin_plan["max_guests"] if admin_plan else None,
         # Display-only plan label (never an enforcement input); the SPA shows
         # it only when a billing portal is configured.
         tier_name=admin_row.tier_name if admin_row else None,
@@ -243,10 +247,10 @@ def _serialize_guild(
             else None
         ),
         # Admins only: lets their settings UI show/hide the Authentication tab.
-        # Derived, not stored — an option ticked under a master nobody granted
-        # is not one this guild holds.
-        auth_options=sorted(effective_options(admin_row.auth_options))
-        if admin_row
+        auth_options=sorted(
+            option for option, key in OPTION_RULES.items() if admin_plan[key]
+        )
+        if admin_plan
         else None,
         # Guild identity, not administration: the directory publishes both to
         # strangers, so withholding them from the guild's own members would
@@ -326,6 +330,11 @@ async def _guild_read(
             if is_admin
             else None
         ),
+        plan=(
+            (await rules.community_values(reader, [guild.id]))[guild.id]
+            if is_admin
+            else None
+        ),
         images=await images_service.image_urls_for(
             system_session, guild.id, *GuildImageVariant
         ),
@@ -390,6 +399,14 @@ async def list_communities(
         )
         else None
     )
+    plans = await rules.community_values(
+        session,
+        [
+            guild.id
+            for guild, membership, *_ in memberships
+            if membership.role.reaches(CommunityRole.admin)
+        ],
+    )
     payloads: List[CommunityRead] = []
     for (
         guild,
@@ -410,6 +427,7 @@ async def list_communities(
                 retention_days=retention_days,
                 member_count=member_count,
                 administration=administration,
+                plan=plans.get(guild.id),
                 images=images.get(guild.id),
                 closed_contact=closed_contact,
             )
@@ -841,16 +859,15 @@ async def read_community_entitlements(
     """What an operator has turned on for this guild, for its own admins.
 
     Its own read rather than fields on the guild payload: these are decisions
-    made *about* a guild rather than by it, they live on the separate
-    ``guild_administration`` row, and a member has no use for them. A guild
-    admin does — it is how their settings page knows to offer the banner
-    colour alone rather than an upload that would come back refused.
+    made *about* a guild rather than by it, they are its paid rules, and a
+    member has no use for them. A guild admin does — it is how their settings
+    page knows to offer the banner colour alone rather than an upload that
+    would come back refused.
     """
-    administration = await guilds_service.get_administration(session, guild_id=guild_id)
     return CommunityEntitlementsRead(
         community_id=guild_id,
-        banner_image_enabled=(
-            administration.banner_image_enabled if administration else True
+        banner_image_enabled=await rules.community_value(
+            session, guild_id, "banner_image"
         ),
     )
 
@@ -975,8 +992,7 @@ async def set_community_banner(
     renditions and sends them together, so a guild is never left showing a new
     card over an old front page.
     """
-    administration = await guilds_service.get_administration(session, guild_id=guild_id)
-    if administration is not None and not administration.banner_image_enabled:
+    if not await rules.community_value(session, guild_id, "banner_image"):
         # Only uploading is gated. The banner surface stays, a banner the guild
         # already has keeps being served, and what a guild without artwork sets
         # instead is the colour on ``guilds.banner``, through PATCH.
@@ -1153,17 +1169,14 @@ async def _auth_settings_response(
             status_code=status.HTTP_404_NOT_FOUND,
             detail=GuildMessages.COMMUNITY_NOT_FOUND,
         )
-    administration = await guilds_service.get_administration(
-        seat_session, guild_id=guild_id
-    )
     platform = await rules.platform_values(seat_session)
     community = (await rules.community_values(seat_session, [guild_id], applied=False))[
         guild_id
     ]
     return CommunityAuthSettingsRead(
-        auth_options=sorted(effective_options(administration.auth_options))
-        if administration
-        else [],
+        auth_options=sorted(
+            option for option, key in OPTION_RULES.items() if community[key]
+        ),
         auth_policy=await _auth_policy_response(system_session, guild_id),
         guest_auth_policy=await _auth_policy_response(
             system_session, guild_id, guest=True

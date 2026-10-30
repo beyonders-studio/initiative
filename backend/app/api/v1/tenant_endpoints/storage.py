@@ -1,7 +1,7 @@
 """Guild storage usage for the SPA's usage panel.
 
 The seat's Usage tab shows storage used against the operator-set cap
-(``guilds.max_storage_bytes``). The number is the same
+(the community's ``max_storage_bytes`` rule). The number is the same
 ``SUM(uploads.size_bytes)`` that ``enforce_storage_quota`` enforces against,
 summed over every upload the guild stores; it renders regardless of whether an
 external billing URL is configured.

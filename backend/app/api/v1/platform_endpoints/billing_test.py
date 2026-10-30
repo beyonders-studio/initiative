@@ -24,6 +24,7 @@ from httpx import AsyncClient
 from sqlmodel import select
 from sqlmodel.ext.asyncio.session import AsyncSession
 
+from app.testing import community_plan
 from app.core import config as config_module
 from app.models.platform.billing import BillingJti
 from app.models.platform.guild import CommunityRole, CommunityStatus
@@ -42,7 +43,6 @@ from app.testing import (
     create_upload,
     create_user,
     drain_notices,
-    guild_administration,
 )
 from app.testing.schema_harness import route_session_to_guild
 
@@ -198,14 +198,16 @@ async def test_a_newer_version_lands_and_an_older_one_changes_nothing(
 
     administration = await _administration(session, guild_id)
     assert (administration.tier_name, administration.billing_version) == ("Gold", 5)
-    assert (administration.max_users, administration.max_guests) == (50, 5)
+    plan = await community_plan(session, guild_id)
+    assert (plan["max_users"], plan["max_guests"]) == (50, 5)
 
     newer = await _sync(
         client, (guild_id, 9, _fields(tier_name="Silver", max_users=None))
     )
     assert newer.json()["results"] == [{"community_ref": ref, "version": 9}]
     administration = await _administration(session, guild_id)
-    assert (administration.tier_name, administration.max_users) == ("Silver", None)
+    assert administration.tier_name == "Silver"
+    assert (await community_plan(session, guild_id))["max_users"] is None
 
 
 async def test_each_item_stands_alone(client: AsyncClient, session: AsyncSession):
@@ -245,23 +247,19 @@ async def test_a_capability_package_replaces_rather_than_merges(
     withdrawn by the same write that renamed the tier. A name this build
     can't enforce is ignored, not a reason to drop the caps beside it."""
     guild = await create_guild(session)
-    administration = await guild_administration(session, guild)
     guild_id = guild.id
 
     every = ["banner_image", "help_requests", "community_sign_in", "security_standards"]
     await _sync(client, (guild_id, 1, _fields(feature_keys=every)))
-    await session.refresh(administration)
-    assert administration.banner_image_enabled is True
-    assert administration.support_enabled is True
-    assert sorted(administration.auth_options) == ["providers", "restrictions"]
+    plan = await community_plan(session, guild_id)
+    assert all(plan[key] is True for key in every)
 
     await _sync(
         client, (guild_id, 2, _fields(feature_keys=["banner_image", "teleportation"]))
     )
-    await session.refresh(administration)
-    assert administration.banner_image_enabled is True
-    assert administration.support_enabled is False
-    assert list(administration.auth_options) == []
+    plan = await community_plan(session, guild_id)
+    assert plan["banner_image"] is True
+    assert not any(plan[key] for key in every if key != "banner_image")
 
 
 async def test_the_pushed_ceiling_is_the_one_uploads_are_held_to(
@@ -300,10 +298,8 @@ async def test_a_suspended_community_stays_suspended(
     )
     assert response.status_code == 200, response.text
     administration = await _administration(session, guild_id)
-    assert (administration.billing_status, administration.max_storage_bytes) == (
-        "on_hold",
-        2048,
-    )
+    assert administration.billing_status == "on_hold"
+    assert (await community_plan(session, guild_id))["max_storage_bytes"] == 2048
     read = await billing_boundary.post(
         client,
         "communities/read",

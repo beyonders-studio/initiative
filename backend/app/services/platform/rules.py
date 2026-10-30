@@ -28,6 +28,7 @@ from app.core.login_methods import LoginMethod
 from app.core.rules import (
     COMMUNITY_RULES,
     PLATFORM_RULES,
+    SetBy,
     SignInRequirement,
     Slot,
     StoredRule,
@@ -126,7 +127,9 @@ async def community_values(
             )
         )
     ).all()
-    for row, *held in rows:
+    # The community's own rows first, so a deployment row for the same rule
+    # is the one left standing.
+    for row, *held in sorted(rows, key=lambda r: r[0].set_by == SetBy.deployment):
         rule = COMMUNITY_RULES.get(row.key)
         if rule is None:
             continue
@@ -160,8 +163,11 @@ def community_rule_sql(
     found = (
         sa_select(stored)
         .where(and_(*conditions))
-        # The member's own row first.
-        .order_by(CommunityRule.user_id.is_(None))  # type: ignore[union-attr]
+        # The deployment's row first, then the member's own.
+        .order_by(
+            CommunityRule.set_by != SetBy.deployment.value,
+            CommunityRule.user_id.is_(None),  # type: ignore[union-attr]
+        )
         .limit(1)
         .scalar_subquery()
     )
@@ -196,11 +202,13 @@ async def put(
     *,
     guild_id: int | None = None,
     user_id: int | None = None,
+    set_by: SetBy = SetBy.community,
 ) -> None:
     """Write one rule of the deployment, of ``guild_id``, or of one of its
-    members. A value that is what the row would inherit removes it, so a rule
-    that says nothing holds nothing: the default for the deployment and a
-    community, and the community's own value for a member."""
+    members, as the community or as the deployment (``set_by``). A value that
+    is what the row would inherit removes it, so a rule that says nothing
+    holds nothing: the default for the deployment and a community, and the
+    community's own value for a member."""
     catalog = PLATFORM_RULES if guild_id is None else COMMUNITY_RULES
     rule = catalog[key]
     model = PlatformRule if guild_id is None else CommunityRule
@@ -211,6 +219,7 @@ async def put(
             CommunityRule.user_id.is_(None)  # type: ignore[union-attr]
             if user_id is None
             else CommunityRule.user_id == user_id,
+            CommunityRule.set_by == set_by.value,
         ]
     inherited = rule.default
     if user_id is not None:
@@ -225,7 +234,9 @@ async def put(
         row = (
             PlatformRule(key=key)
             if guild_id is None
-            else CommunityRule(guild_id=guild_id, key=key, user_id=user_id)
+            else CommunityRule(
+                guild_id=guild_id, key=key, user_id=user_id, set_by=set_by.value
+            )
         )
     held = _slots(rule, value)
     for column in ("enabled", "amount", "choice", "methods", "provider_id"):
