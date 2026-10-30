@@ -21,7 +21,7 @@ from app.models.tenant.custom_role import (
     CustomRoleMember,
 )
 from app.models.tenant.initiative import InitiativeMember
-from app.services.oidc_sync import sync_oidc_assignments
+from app.services.oidc_sync import placement_claims, sync_oidc_assignments
 from app.services.tenant import custom_roles as custom_roles_service
 from app.services.tenant import plugin_revocation
 from app.services.tenant.initiatives import get_role_by_name
@@ -813,3 +813,19 @@ async def test_the_first_role_rule_a_sign_in_matches_gives_its_role(
     await custom_roles_service.assign(session, user_id=user_id, role_id=roll.id)
     await session.commit()
     assert await sync({"staff"}) == (roll.id, None)
+
+
+async def test_a_connected_communitys_narrowing_is_asked_for_without_a_rule(
+    session: AsyncSession,
+):
+    """Its custom-role rules live in its own schema, so a community connected
+    to the provider is asked about even with no rule in ``public``: a refresh
+    missing its narrowing claim must not read as leaving it."""
+    owner = await create_user(session)
+    home = await create_guild(session, creator=owner)
+    provider = await create_auth_provider(session, slug="tenant")
+    await create_guild_provider_connection(session, guild=home, provider=provider)
+    await session.commit()
+
+    await set_rls_context(session, Unattributed())
+    assert NARROWED_CLAIM in await placement_claims(session, provider_id=provider.id)

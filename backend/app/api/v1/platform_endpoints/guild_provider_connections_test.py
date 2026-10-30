@@ -375,10 +375,11 @@ async def test_the_seat_orders_the_groups_that_give_custom_roles(
         )
         assert made.status_code == 201, made.text
         ids.append(made.json()["id"])
+    # A sign-in matches a group whatever its capitals, so a rule does too.
     again = await client.post(
         url,
         headers=headers,
-        json={"provider_id": provider.id, "claim_value": "staff", "role_id": doors},
+        json={"provider_id": provider.id, "claim_value": "Staff", "role_id": doors},
     )
     assert again.status_code == 409
 

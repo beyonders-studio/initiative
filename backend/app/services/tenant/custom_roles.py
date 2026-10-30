@@ -9,7 +9,7 @@ from __future__ import annotations
 
 from typing import Optional
 
-from sqlalchemy import and_, delete, func
+from sqlalchemy import and_, delete, func, or_
 from sqlalchemy.dialects.postgresql import insert as pg_insert
 from sqlmodel import col, select
 from sqlmodel.ext.asyncio.session import AsyncSession
@@ -160,24 +160,52 @@ async def apply_claims(
             ):
                 wanted = rule.role_id
                 break
-    held = (
-        await session.exec(
-            select(CustomRoleMember)
-            .join(
-                GuildMembership,
-                and_(
-                    GuildMembership.guild_id == guild_id,
-                    GuildMembership.user_id == CustomRoleMember.user_id,
-                    col(CustomRoleMember.assigned_at) >= GuildMembership.joined_at,
-                ),
-            )
-            .where(CustomRoleMember.user_id == user_id)
+    joined_at = await session.scalar(
+        select(GuildMembership.joined_at).where(
+            GuildMembership.guild_id == guild_id, GuildMembership.user_id == user_id
         )
-    ).one_or_none()
+    )
+    if joined_at is None:
+        return None
+    held = await session.get(CustomRoleMember, user_id)
+    if (
+        held is not None
+        and held.assigned_at is not None
+        and held.assigned_at < joined_at
+    ):
+        held = None
     if held is not None and held.oidc_provider_id != provider_id:
         return None
     previous = held.role_id if held is not None else None
     if previous == wanted:
         return None
-    await assign(session, user_id=user_id, role_id=wanted, provider_id=provider_id)
+    # The write asks again whether the assignment is still this provider's (or
+    # an earlier membership's), so a role given by hand in between stays.
+    if wanted is None:
+        written = await session.exec(
+            delete(CustomRoleMember).where(
+                col(CustomRoleMember.user_id) == user_id,
+                col(CustomRoleMember.oidc_provider_id) == provider_id,
+            )
+        )
+    else:
+        statement = pg_insert(CustomRoleMember).values(
+            user_id=user_id, role_id=wanted, oidc_provider_id=provider_id
+        )
+        written = await session.exec(
+            statement.on_conflict_do_update(
+                index_elements=[CustomRoleMember.user_id],
+                set_={
+                    "role_id": wanted,
+                    "assigned_at": func.now(),
+                    "oidc_provider_id": provider_id,
+                },
+                where=or_(
+                    col(CustomRoleMember.oidc_provider_id) == provider_id,
+                    col(CustomRoleMember.assigned_at) < joined_at,
+                ),
+            )
+        )
+    if not written.rowcount:
+        return None
     return previous, wanted

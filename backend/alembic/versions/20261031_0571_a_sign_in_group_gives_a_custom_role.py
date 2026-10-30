@@ -40,9 +40,12 @@ def _upgrade() -> None:
         sa.Column("created_by", sa.Integer(), nullable=True),
         sa.ForeignKeyConstraint(["role_id"], ["custom_roles.id"], ondelete="CASCADE"),
         sa.PrimaryKeyConstraint("id"),
-        sa.UniqueConstraint(
-            "provider_id", "claim_value", name="uq_custom_role_claim_rules_claim"
-        ),
+    )
+    op.create_index(
+        "uq_custom_role_claim_rules_claim",
+        "custom_role_claim_rules",
+        ["provider_id", sa.text("lower(claim_value)")],
+        unique=True,
     )
     op.create_index(
         "ix_custom_role_claim_rules_role_id", "custom_role_claim_rules", ["role_id"]
