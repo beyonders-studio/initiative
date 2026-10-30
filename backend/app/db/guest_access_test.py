@@ -13,6 +13,7 @@ from app.db.request_context import Member
 from app.db.session import set_rls_context
 from app.models.platform.guild import CommunityRole, CommunityStatus
 from app.models.tenant.comment import Comment
+from app.models.tenant.custom_role import CustomRole, CustomRoleMember
 from app.models.tenant.project import Project
 from app.models.tenant.resource_grant import ResourceAccessLevel
 from app.services.platform import app_settings as app_settings_service
@@ -30,6 +31,7 @@ from app.testing import (
     grant_role_permission,
 )
 from app.testing.routing import route_as
+from app.testing.schema_harness import route_session_to_guild
 
 
 @pytest.fixture(autouse=True)
@@ -309,3 +311,19 @@ async def test_a_guest_row_under_any_other_role_is_no_membership(
 
     assert standing["guest"] == "false"
     assert standing["member_initiatives"] == ""
+
+
+async def test_a_guests_standing_reads_their_own_custom_role_and_holds_nothing(
+    session, acting_user, role_session
+):
+    a = await acting_user(guild_role=CommunityRole.admin)
+    guest = await create_guest(session, a.guild)
+    await route_session_to_guild(session, a.guild.id)
+    role = CustomRole(name="Visitors", base_rung="member", surfaces=["invites"])
+    session.add(role)
+    await session.flush()
+    session.add(CustomRoleMember(user_id=guest.id, role_id=role.id))
+    await session.commit()
+
+    _s, context = await _routed(role_session, guest.id, a.guild.id)
+    assert context.held_surfaces == ()

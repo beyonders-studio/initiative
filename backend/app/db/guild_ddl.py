@@ -26,6 +26,7 @@ from __future__ import annotations
 import json
 
 import re
+from collections.abc import Callable
 
 from sqlalchemy import MetaData, text
 from sqlalchemy.dialects import postgresql
@@ -775,7 +776,7 @@ def _custom_role_writer(surface: AdminSurface, may: str) -> str:
     )
 
 
-def _role_of(may) -> str:
+def _role_of(may: Callable[[str], str]) -> str:
     return (
         "EXISTS (SELECT 1 FROM custom_roles r"
         f" WHERE r.id = custom_role_members.role_id AND {may('r')})"

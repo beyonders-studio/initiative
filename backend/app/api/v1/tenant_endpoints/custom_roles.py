@@ -10,11 +10,13 @@ takes somebody who holds every surface. While the deployment has closed
 keep applying.
 """
 
+from collections.abc import Awaitable, Callable
 from typing import Annotated, List
 
 from fastapi import APIRouter, Depends, HTTPException, Response, status
 from sqlalchemy.exc import IntegrityError
 from sqlmodel import select
+from sqlmodel.ext.asyncio.session import AsyncSession
 
 from app.api.deps import (
     CurrentUser,
@@ -47,7 +49,7 @@ from app.services.tenant import custom_roles as custom_roles_service
 router = APIRouter()
 
 
-def _writes(surface: AdminSurface):
+def _writes(surface: AdminSurface) -> Callable[..., Awaitable[GuildContext]]:
     """A write to the roles, by a holder of ``surface``, while the deployment
     leaves ``surface.custom_roles`` open."""
     guard = require_surface(surface, settings=True, write=True)
@@ -104,7 +106,7 @@ def _read(role: CustomRole) -> CustomRoleRead:
     return CustomRoleRead.model_validate(role, from_attributes=True)
 
 
-async def _role_or_404(session, role_id: int) -> CustomRole:
+async def _role_or_404(session: AsyncSession, role_id: int) -> CustomRole:
     role = await custom_roles_service.get_role(session, role_id)
     if role is None:
         raise HTTPException(
@@ -115,7 +117,11 @@ async def _role_or_404(session, role_id: int) -> CustomRole:
 
 
 async def _record(
-    session, context: GuildContext, actor: int, role: CustomRole, action: str
+    session: AsyncSession,
+    context: GuildContext,
+    actor: int,
+    role: CustomRole,
+    action: str,
 ) -> None:
     await audit_service.record(
         session,
@@ -133,9 +139,10 @@ async def _record(
     )
 
 
-async def _commit_named(session) -> None:
+async def _flush_named(session: AsyncSession) -> None:
+    """Write the role, answering a name another role has with a conflict."""
     try:
-        await session.commit()
+        await session.flush()
     except IntegrityError:
         await session.rollback()
         raise HTTPException(
@@ -168,9 +175,9 @@ async def create_custom_role(
         surfaces=sorted(s.value for s in surfaces),
     )
     session.add(role)
-    await session.flush()
+    await _flush_named(session)
     await _record(session, context, current_user.id, role, "created")
-    await _commit_named(session)
+    await session.commit()
     return _read(role)
 
 
@@ -194,9 +201,9 @@ async def update_custom_role(
         _require_gives(context, rung, surfaces)
         role.surfaces = sorted(s.value for s in surfaces)
     session.add(role)
-    await session.flush()
+    await _flush_named(session)
     await _record(session, context, current_user.id, role, "changed")
-    await _commit_named(session)
+    await session.commit()
     return _read(role)
 
 
