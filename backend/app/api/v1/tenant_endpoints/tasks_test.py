@@ -29,7 +29,7 @@ from app.models.platform.guild import CommunityRole
 from app.models.tenant.task import Task, TaskStatusCategory
 from app.models.tenant.resource_grant import ResourceAccessLevel
 from app.testing.schema_harness import route_session_to_guild
-from app.models.tenant.task_assignment_digest import TaskAssignmentDigestItem
+from app.models.tenant.batched_notice import BatchedNotice
 from app.core.messages import CommonMessages, TaskMessages
 from app.core.relationships import RelationshipType
 from app.core.search import SearchEntityType
@@ -866,9 +866,9 @@ async def test_unassigning_withdraws_the_pending_digest_item(
     await route_as(session, user_id=user.user.id, guild_id=user.guild.id)
     pending = (
         await session.exec(
-            select(TaskAssignmentDigestItem).where(
-                TaskAssignmentDigestItem.user_id == assignee.user.id,
-                TaskAssignmentDigestItem.processed_at.is_(None),
+            select(BatchedNotice).where(
+                BatchedNotice.user_id == assignee.user.id,
+                BatchedNotice.processed_at.is_(None),
             )
         )
     ).all()
@@ -883,9 +883,9 @@ async def test_unassigning_withdraws_the_pending_digest_item(
     await route_as(session, user_id=user.user.id, guild_id=user.guild.id)
     pending = (
         await session.exec(
-            select(TaskAssignmentDigestItem).where(
-                TaskAssignmentDigestItem.user_id == assignee.user.id,
-                TaskAssignmentDigestItem.processed_at.is_(None),
+            select(BatchedNotice).where(
+                BatchedNotice.user_id == assignee.user.id,
+                BatchedNotice.processed_at.is_(None),
             )
         )
     ).all()

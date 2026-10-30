@@ -85,8 +85,9 @@ _SIDE_EFFECTS: frozenset[str] = frozenset(
         "event_outbox",
         # The search index, written by the refresh trigger.
         "search_entries",
-        # Queued when a task is assigned, cleared when it is unassigned.
-        "task_assignment_digest_items",
+        # Queued when a task is assigned, cleared when it is unassigned. A
+        # reaction's line is refused by kind (``guild_ddl._plugin_predicates``).
+        "batched_notices",
         # The sweep timers a write arms, read and written by public.arm_timer.
         "timer_marks",
         # The files content shows, stored, copied and claimed as a step of
@@ -164,13 +165,12 @@ SEARCH_ENTRY_READ_SCOPE: dict[SearchEntityType, PluginScopeResource] = (
 )
 
 #: Tables no plug-in reaches, whose policies refuse an installed plug-in outright
-#: beside the grant it does not hold: a reaction and the line queued about it
-#: are one person's gesture, a recent view one person's history, a bookmark one
-#: person's pick, and an engagement level what many people's history adds up to.
+#: beside the grant it does not hold: a reaction is one person's gesture, a
+#: recent view one person's history, a bookmark one person's pick, and an
+#: engagement level what many people's history adds up to.
 PLUGIN_REFUSED_TABLES: frozenset[str] = frozenset(
     {
         "reactions",
-        "reaction_digest_items",
         "personal_items",
         "engagement_levels",
     }

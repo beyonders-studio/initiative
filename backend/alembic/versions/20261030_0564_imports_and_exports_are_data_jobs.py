@@ -29,8 +29,8 @@ The downgrade moves the export rows back into a new ``export_jobs``, keeping
 their ids, renames the rest back to ``import_jobs``, and gives each
 ``data_job_expiry`` timer back to both old sweeps.
 
-Revision ID: 20261030_0562
-Revises: 20261030_0561
+Revision ID: 20261030_0564
+Revises: 20261030_0563
 Create Date: 2026-10-30
 """
 
@@ -45,8 +45,8 @@ from sqlalchemy.engine import Connection
 
 from app.db.guild_migrations import run_for_each_guild_schema
 
-revision = "20261030_0562"
-down_revision = "20261030_0561"
+revision = "20261030_0564"
+down_revision = "20261030_0563"
 branch_labels = None
 depends_on = None
 

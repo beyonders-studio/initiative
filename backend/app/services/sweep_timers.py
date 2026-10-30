@@ -130,6 +130,7 @@ def sweeps() -> tuple[Sweep, ...]:
     """Every sweep that runs on timers, read once."""
     from app.core.intake import IntakeStream, meta
     from app.db.soft_delete_filter import SOFT_DELETE_MODELS
+    from app.models.tenant.batched_notice import BatchedNotice
     from app.models.tenant.calendar_event import CalendarEvent, CalendarEventAttendee
     from app.models.tenant.content_hold import ContentHold
     from app.models.tenant.engagement_level import EngagementLevel
@@ -145,9 +146,7 @@ def sweeps() -> tuple[Sweep, ...]:
     from app.models.tenant.intake import IntakeCase
     from app.models.tenant.moderation import ModerationReport
     from app.models.tenant.personal_item import PersonalItem
-    from app.models.tenant.reaction_digest import ReactionDigestItem
     from app.models.tenant.task import Task, TaskStatus, TaskStatusCategory
-    from app.models.tenant.task_assignment_digest import TaskAssignmentDigestItem
     from app.models.tenant.upload import Upload
     from app.services import data_jobs, notifications, resumable
     from app.services.export import worker as export_worker
@@ -197,7 +196,6 @@ def sweeps() -> tuple[Sweep, ...]:
         ),
         on_insert("plugin_event_outbox", after=change_log.RETENTION),
     )
-    digest_items = (TaskAssignmentDigestItem, ReactionDigestItem)
     case_keep = {
         stream.value: timedelta(days=meta(stream).retention_days)
         for stream in IntakeStream
@@ -621,47 +619,43 @@ def sweeps() -> tuple[Sweep, ...]:
             ),
         ),
         Sweep(
-            kind="digest_gc",
+            kind="batch_gc",
             scope=Scope.LIVE,
             every=hour,
-            visit=notifications.expire_digest_items,
-            next_due=lambda _now: least(
-                *(
-                    select(
-                        func.min(item.created_at)
-                        + notifications.ASSIGNMENT_ITEM_RETENTION
-                    )
-                    for item in digest_items
-                )
+            visit=notifications.expire_batched_notices,
+            next_due=lambda _now: select(
+                func.min(BatchedNotice.created_at) + notifications.BATCH_RETENTION
             ),
-            sources=tuple(
-                on_insert(
-                    str(item.__tablename__),
-                    after=notifications.ASSIGNMENT_ITEM_RETENTION,
-                )
-                for item in digest_items
+            sources=(
+                on_insert("batched_notices", after=notifications.BATCH_RETENTION),
             ),
         ),
         *(
             Sweep(
-                kind=spec.name.replace("-", "_"),
+                kind=spec.name,
                 scope=Scope.LIVE,
                 every=minute,
-                # A person's digest gathers from every community they are in;
+                # A person's batch gathers from every community they are in;
                 # the finish answers when each community's waiting items are
                 # next due.
-                prepare=partial(_digest, spec),
+                prepare=partial(_batch, spec),
                 next_due=lambda now, spec=spec: select(
-                    func.min(spec.model.created_at) + spec.quiet_period
+                    func.min(BatchedNotice.created_at) + spec.quiet_period
                 ).where(
-                    col(spec.model.processed_at).is_(None),
-                    spec.model.created_at > now - timedelta(days=1),
+                    col(BatchedNotice.kind) == spec.kind,
+                    col(BatchedNotice.processed_at).is_(None),
+                    BatchedNotice.created_at > now - timedelta(days=1),
                 ),
                 sources=(
-                    on_insert(str(spec.model.__tablename__), after=spec.quiet_period),
+                    on_row(
+                        "batched_notices",
+                        "{row}.created_at",
+                        after=spec.quiet_period,
+                        when=f"NEW.kind = '{spec.kind.value}'",
+                    ),
                 ),
             )
-            for spec in (notifications.ASSIGNMENT_DIGEST, notifications.REACTION_DIGEST)
+            for spec in notifications.BATCHES
         ),
         Sweep(
             kind="reminders",
@@ -850,10 +844,10 @@ def sweeps() -> tuple[Sweep, ...]:
     )
 
 
-async def _digest(spec: Any) -> Scan:
+async def _batch(spec: Any) -> Scan:
     from app.services import notifications
 
-    return notifications.digest_scan(spec, now=datetime.now(timezone.utc))
+    return notifications.batch_scan(spec, now=datetime.now(timezone.utc))
 
 
 async def _reminders() -> Scan:

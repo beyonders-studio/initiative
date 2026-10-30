@@ -368,10 +368,6 @@ class User(SQLModel, table=True):
         default=None,
         sa_column=Column(DateTime(timezone=True), nullable=True),
     )
-    last_task_assignment_digest_at: Optional[datetime] = Field(
-        default=None,
-        sa_column=Column(DateTime(timezone=True), nullable=True),
-    )
     last_coming_up_digest_at: Optional[datetime] = Field(
         default=None,
         sa_column=Column(DateTime(timezone=True), nullable=True),

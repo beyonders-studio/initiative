@@ -2160,6 +2160,42 @@ async def authenticate_feed(
     return user
 
 
+def require_surface_open(
+    key: str, session_dependency: Callable[..., Any]
+) -> Callable[..., Awaitable[None]]:
+    """A route that configures a surface the deployment may take away from one
+    community (``app.core.rules``, ``surface.*``), refused while it is closed.
+
+    It reads on the route's own session: ``session_dependency`` is the one the
+    route takes, which FastAPI resolves once a request.
+
+    The surface's tables refuse the seat's writes as well; this is the answer a
+    person can read. Nothing the community set up is deleted, so reopening it
+    has only to stop refusing.
+    """
+
+    async def _open(
+        guild_id: CommunityIdPath,
+        session: Annotated[AsyncSession, Depends(session_dependency)],
+    ) -> None:
+        await refuse_closed_surface(session, guild_id, key)
+
+    return _open
+
+
+async def refuse_closed_surface(session: AsyncSession, guild_id: int, key: str) -> None:
+    """Refuse while the deployment has closed surface ``key`` for the
+    community: :func:`require_surface_open`, for a route that configures the
+    surface on only one of its branches."""
+    from app.services.platform import rules
+
+    if not await rules.community_value(session, guild_id, key):
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail=GuildMessages.COMMUNITY_SURFACE_CLOSED,
+        )
+
+
 async def require_direct_messages_enabled(session: UserSessionDep) -> None:
     """Refuse every direct-message route when the deployment does not offer them.
 

@@ -31,7 +31,12 @@ from app.core.audit_events import AuditEventType
 from app.core.config import DEFAULT_OIDC_SCOPES
 from app.core.config import settings as app_config
 from app.core.intake import IntakeStream
-from app.core.rules import OPTION_RULES, RETENTION_WINDOWS
+from app.core.rules import (
+    OPTION_RULES,
+    RETENTION_WINDOWS,
+    SURFACE_AI_CONNECTIONS,
+    SURFACE_PLUGINS,
+)
 from app.db import cohorts
 from app.db.query import build_paginated_response, paginated_query
 from app.db.request_context import SystemGuild
@@ -959,6 +964,8 @@ def _plan_fields(plan: rules.Values) -> dict[str, Any]:
         ),
         "banner_image_enabled": plan["banner_image"],
         "support_enabled": plan["help_requests"],
+        "ai_connections_open": plan[SURFACE_AI_CONNECTIONS],
+        "plugins_open": plan[SURFACE_PLUGINS],
     }
 
 
@@ -1016,6 +1023,8 @@ def _guild_storage_read(
         auth_options=_plan_fields(plan)["auth_options"],
         banner_image_enabled=plan["banner_image"],
         support_enabled=plan["help_requests"],
+        ai_connections_open=plan[SURFACE_AI_CONNECTIONS],
+        plugins_open=plan[SURFACE_PLUGINS],
     )
 
 
@@ -1172,6 +1181,8 @@ async def update_platform_community_storage(
         or payload.auth_options is not None
         or payload.banner_image_enabled is not None
         or payload.support_enabled is not None
+        or payload.ai_connections_open is not None
+        or payload.plugins_open is not None
     ):
         raise HTTPException(
             status_code=status.HTTP_409_CONFLICT,
@@ -1196,6 +1207,8 @@ async def update_platform_community_storage(
             auth_options=payload.auth_options,
             banner_image_enabled=payload.banner_image_enabled,
             support_enabled=payload.support_enabled,
+            ai_connections_open=payload.ai_connections_open,
+            plugins_open=payload.plugins_open,
         )
         if payload.status is not None and guild.status != payload.status.value:
             recorded = (

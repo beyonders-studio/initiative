@@ -38,6 +38,8 @@ decision.
 
 from __future__ import annotations
 
+from app.core.rules import SURFACE_AI_CONNECTIONS, SURFACE_PLUGINS
+
 from app.db.initiative_rls import INITIATIVE_SCOPED_TABLES
 from app.db.public_rls import SHARED_TABLE_REGISTRY
 
@@ -262,6 +264,19 @@ SEAT_TABLES: frozenset[str] = frozenset(
     }
 )
 
+# --- Seat tables a surface key closes ------------------------------------------
+# The seat tables whose writes a community's surface key governs
+# (``app.core.rules``, ``surface.*``): table -> the key. While the deployment
+# has closed the surface, the seat writes none of them; the system engine
+# still does. Every entry here MUST also be in ``SEAT_TABLES``.
+SEAT_SURFACES: dict[str, str] = {
+    "guild_ai_connections": SURFACE_AI_CONNECTIONS,
+    "guild_ai_connection_keys": SURFACE_AI_CONNECTIONS,
+    "guild_plugins": SURFACE_PLUGINS,
+    "guild_plugin_secrets": SURFACE_PLUGINS,
+    "plugin_placements": SURFACE_PLUGINS,
+}
+
 # --- Seat tables read by the seat alone ---------------------------------------
 # The seat tables whose rows are read by the seat or the system engine rather
 # than within the schema: rendered with the same ``seat_*`` policies, whose
@@ -342,8 +357,7 @@ CREATED_BY_EXEMPT_TABLES: frozenset[str] = frozenset(
         "event_reminder_dispatches",
         "search_entries",
         "engagement_levels",
-        "reaction_digest_items",
-        "task_assignment_digest_items",
+        "batched_notices",
         "webhook_deliveries",
         "subscription_progress",
         "timer_marks",

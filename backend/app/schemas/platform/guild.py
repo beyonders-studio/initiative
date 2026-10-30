@@ -243,6 +243,10 @@ class CommunityRead(CommunityBase):
     # entitlement), so their settings UI knows which surfaces to offer;
     # ``None`` for non-admin members (they never configure auth).
     auth_options: Optional[List[CommunityAuthOption]] = None
+    # ADMIN-ONLY. The settings the deployment has taken away from this
+    # community (``ai_connections``, ``plugins``), so their settings UI says so
+    # instead of offering them; ``None`` for non-admin members.
+    closed_surfaces: Optional[List[str]] = None
     # Community directory opt-in and its subject tags. Guild identity, not
     # administration: every member sees them (they are published to strangers
     # anyway), and the settings page shows the controls to admins.
@@ -518,6 +522,11 @@ class PlatformCommunityStorageRead(SanitizedBaseModel):
     # Off by default: the deployment that receives them is the one that decides
     # it is staffing them.
     support_enabled: bool = False
+    # Whether this guild's seat may set up its own AI connections, and install
+    # and configure plug-ins (operator toggles). Open by default; closed, what
+    # it set up stays and its seat cannot change it.
+    ai_connections_open: bool = True
+    plugins_open: bool = True
     # Where lifting its suspension returns it, while it is suspended. ``deleted``
     # where it was suspended out of deletion.
     lifts_to: Optional[CommunityStatus] = None
@@ -603,6 +612,9 @@ class PlatformCommunityStorageUpdate(SanitizedBaseModel):
     banner_image_enabled: Optional[bool] = None
     # Help-request entitlement. Omit-to-skip, same as the one above.
     support_enabled: Optional[bool] = None
+    # The seat's own AI connections and plug-ins. Omit-to-skip, same as above.
+    ai_connections_open: Optional[bool] = None
+    plugins_open: Optional[bool] = None
 
 
 #: What a community may require, beyond naming one provider. ``sso`` means its

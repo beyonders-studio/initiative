@@ -47,6 +47,7 @@ from app.core.tools import (
     LAYOUT_INSTANCE_TABLES,
     Tool,
 )
+from app.models.tenant.batched_notice import BatchedNoticeKind
 from app.db.presence import present, present_to_member
 from app.db.authorization import (
     IN_POLICY,
@@ -773,40 +774,41 @@ def comments_path() -> InitiativePath:
     )
 
 
-def reactions_path() -> InitiativePath:
-    """A reaction is reached by whoever can reach the thing it is on.
+def _target_path(
+    legs: dict[str, tuple[str, InitiativePath]],
+    share_write: Callable[[str], str] | None = None,
+) -> InitiativePath:
+    """A row reached by whoever can reach the ``(target_type, target_id)`` it
+    names, which is the pair :data:`ENTITY_ACCESS_FN` takes, so the policy is
+    one call and the target's own entry decides inside it. ``legs`` names each
+    target kind's table and path, for the row's initiative and parents.
 
-    Polymorphic over ``(target_type, target_id)``, which is the pair
-    :data:`ENTITY_ACCESS_FN` takes, so the policy is one call and the target's
-    own entry decides inside it: the comment arm walks to the comment's parent,
-    the post arm asks the post. A new reactable kind adds a ``ReactionTarget``
-    member, which puts its table on the function's arms; nothing about the
-    gate is written twice. Sharing rides in the call as read — reacting is
-    responding.
+    Sharing rides in the call as read unless a command asks write of it
+    (``DAC_WRITE_COMMANDS``), and then only for the rows ``share_write`` names.
     """
-    legs: dict[ReactionTarget, InitiativePath] = {
-        ReactionTarget.comment: comments_path(),
-        ReactionTarget.post: direct(),
-    }
 
     def folded(t: str, w: WriteFlag, sw: WriteFlag) -> str:
+        if share_write is not None and sw is True:
+            sw = share_write(t)
+        elif share_write is not None and isinstance(sw, str):
+            sw = f"({sw} AND {share_write(t)})"
         return _entity_call(f"{t}.target_type", f"{t}.target_id", w, sw)
 
     def locate(r: str) -> str:
         arms = " ".join(
-            f"WHEN '{target.value}' THEN "
-            f"(SELECT {path.initiative_expr('rt')} FROM {target.table} rt "  # noqa: S608
+            f"WHEN '{kind}' THEN "
+            f"(SELECT {path.initiative_expr('rt')} FROM {table} rt "  # noqa: S608
             f"WHERE rt.id = {r}.target_id)"
-            for target, path in legs.items()
+            for kind, (table, path) in legs.items()
         )
         return f"(CASE {r}.target_type {arms} END)"
 
     def chain(r: str) -> str:
         arms = " ".join(
-            f"WHEN '{target.value}' THEN "
-            f"(SELECT {path.parents('rt')} FROM {target.table} rt "  # noqa: S608
+            f"WHEN '{kind}' THEN "
+            f"(SELECT {path.parents('rt')} FROM {table} rt "  # noqa: S608
             f"WHERE rt.id = {r}.target_id)"
-            for target, path in legs.items()
+            for kind, (table, path) in legs.items()
         )
         return f"COALESCE((CASE {r}.target_type {arms} END), {NO_PARENTS})"
 
@@ -815,6 +817,37 @@ def reactions_path() -> InitiativePath:
         initiative_expr=locate,
         parents=chain,
         folded=folded,
+    )
+
+
+def _reaction_legs() -> dict[str, tuple[str, InitiativePath]]:
+    paths: dict[ReactionTarget, InitiativePath] = {
+        ReactionTarget.comment: comments_path(),
+        ReactionTarget.post: direct(),
+    }
+    return {target.value: (target.table, path) for target, path in paths.items()}
+
+
+def reactions_path() -> InitiativePath:
+    """A reaction is reached by whoever can reach the thing it is on: the
+    comment arm walks to the comment's parent, the post arm asks the post. A
+    new reactable kind adds a ``ReactionTarget`` member, which puts its table on
+    the function's arms; nothing about the gate is written twice. Sharing rides
+    in the call as read — reacting is responding.
+    """
+    return _target_path(_reaction_legs())
+
+
+def batched_notices_path() -> InitiativePath:
+    """A queued line is reached like what it is about: the task assigned, or
+    what was reacted to. An assignment's line is queued by whoever assigned,
+    who writes to the task, so inserting one asks write of its sharing; taking
+    or clearing it is the recipient's own business, and a reaction's line
+    answers as the reaction did.
+    """
+    return _target_path(
+        {**_reaction_legs(), "task": ("tasks", via("projects", "project_id"))},
+        share_write=lambda t: f"{t}.kind = '{BatchedNoticeKind.task_assignment.value}'",
     )
 
 
@@ -1689,11 +1722,9 @@ INITIATIVE_PATHS: dict[str, InitiativePath] = {
     # Polymorphic over what it is on; gated by that thing's own path.
     "reactions": reactions_path(),
     "relationships": relationships_path(),
-    # Per-user state, scoped via the entity it points at
-    "task_assignment_digest_items": via("projects", "project_id"),
-    # Same polymorphic target columns as the reactions themselves, so the
-    # queued line is gated exactly like the gesture it describes.
-    "reaction_digest_items": reactions_path(),
+    # Per-user state, scoped via the entity it points at: a queued line is
+    # gated like the task or the reacted-to thing it describes.
+    "batched_notices": batched_notices_path(),
     "event_reminder_dispatches": via_event_calendar("event_id"),
     "personal_items": content_kind_path(),
     "engagement_levels": content_kind_path(),
@@ -1782,14 +1813,11 @@ DAC_WRITE_COMMANDS: dict[str, frozenset[str]] = {
     "event_reminder_dispatches": _RESPONDING,
     "comments": _RESPONDING,
     "reactions": _RESPONDING,
-    # The queued line describing a reaction is written in the SAME request as
-    # the reaction, so it answers at the same level. It shares
-    # ``reactions_path``; this is the other half of that sharing.
-    "reaction_digest_items": _RESPONDING,
-    # An assignee's queued line about a task is queued by whoever assigned
-    # them, who writes to the project; taking or clearing it is the assignee's
-    # own business, done as them.
-    "task_assignment_digest_items": frozenset({"INSERT"}),
+    # A queued line is written in the same request as what it describes. An
+    # assignment's asks write of the task's sharing when it is queued
+    # (``batched_notices_path`` narrows this to those rows); taking or clearing
+    # it is the recipient's own business, done as them.
+    "batched_notices": frozenset({"INSERT"}),
 }
 
 #: The default: a command that writes asks at write level.
@@ -2161,8 +2189,7 @@ EVENT_SOURCES: dict[str, Emit | Silent] = {
     "personal_items": Silent(
         "one member's own opens, bookmarks, subscriptions and order"
     ),
-    "task_assignment_digest_items": Silent("internal digest bookkeeping"),
-    "reaction_digest_items": Silent("internal digest bookkeeping"),
+    "batched_notices": Silent("internal batching bookkeeping"),
     "event_reminder_dispatches": Silent("internal reminder bookkeeping"),
     "webhook_subscriptions": Silent(
         "integration config; it reports on content, not on itself"

@@ -590,7 +590,7 @@ class TestReactionNotifications:
         self, client, session, acting_user
     ):
         from app.models.platform.notification import Notification, NotificationType
-        from app.models.tenant.reaction_digest import ReactionDigestItem
+        from app.models.tenant.batched_notice import BatchedNotice
         from sqlmodel import select
 
         a = await acting_user(
@@ -630,9 +630,7 @@ class TestReactionNotifications:
         await route_session_to_guild(session, a.guild.id)
         queued = (
             await session.exec(
-                select(ReactionDigestItem).where(
-                    ReactionDigestItem.user_id == a.user.id
-                )
+                select(BatchedNotice).where(BatchedNotice.user_id == a.user.id)
             )
         ).all()
         assert len(queued) == 1
@@ -914,7 +912,7 @@ class TestReactionNotifications:
     async def test_taking_a_reaction_back_withdraws_the_queued_line(
         self, client, session, acting_user
     ):
-        from app.models.tenant.reaction_digest import ReactionDigestItem
+        from app.models.tenant.batched_notice import BatchedNotice
         from sqlmodel import select
 
         a = await acting_user(
@@ -943,9 +941,7 @@ class TestReactionNotifications:
         await route_session_to_guild(session, a.guild.id)
         queued = (
             await session.exec(
-                select(ReactionDigestItem).where(
-                    ReactionDigestItem.user_id == a.user.id
-                )
+                select(BatchedNotice).where(BatchedNotice.user_id == a.user.id)
             )
         ).all()
         assert queued == []

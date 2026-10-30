@@ -36,24 +36,24 @@ from app.models.tenant.task import (
     TaskStatus,
     TaskStatusCategory,
 )
-from app.models.tenant.task_assignment_digest import TaskAssignmentDigestItem
+from app.models.tenant.batched_notice import BatchedNotice, BatchedNoticeKind
 from app.core.notification_categories import NotificationCategory
 from app.models.platform.user import User
 from app.services.platform import email_outbox
 from app.services.platform import push_config
 from app.services.notifications import (
-    ASSIGNMENT_ITEM_RETENTION,
-    ASSIGNMENT_MAX_WINDOW,
-    ASSIGNMENT_QUIET_PERIOD,
+    BATCH_RETENTION,
+    BATCH_MAX_WINDOW,
+    BATCH_QUIET_PERIOD,
     EVENT_REMINDER_DISPATCH_RETENTION,
     notify,
 )
 from app.services.notifications import (
-    ASSIGNMENT_DIGEST,
-    REACTION_DIGEST,
+    ASSIGNMENT_BATCH,
+    REACTION_BATCH,
     coming_up_scan,
-    expire_digest_items,
-    digest_scan,
+    expire_batched_notices,
+    batch_scan,
     event_when,
     overdue_scan,
     reminder_scan,
@@ -886,13 +886,16 @@ async def _assignment_item_in_new_guild(
     # Queued by whoever assigned it, as the assignment itself is.
     await route_as(session, user_id=assigner.id, guild_id=guild.id)
     session.add(
-        TaskAssignmentDigestItem(
+        BatchedNotice(
             user_id=user.id,
-            task_id=task.id,
+            kind=BatchedNoticeKind.task_assignment,
+            actor_name="Assigner",
+            target_type="task",
+            target_id=task.id,
+            target_path=f"/go/task/{task.id}",
+            title=task.title,
             project_id=project.id,
-            task_title=task.title,
             project_name=project.name,
-            assigned_by_name="Assigner",
         )
     )
     await session.commit()
@@ -966,7 +969,7 @@ async def test_coming_up_digest_lists_what_is_due_and_starting(
     assert {"Later", "Late"}.isdisjoint(_titles(body))
 
 
-async def test_assignment_digest_gathers_items_across_user_guilds(
+async def test_assignment_batch_gathers_items_across_user_guilds(
     session: AsyncSession, monkeypatch
 ):
     """The task-assignment digest must collect a user's pending items from every
@@ -990,8 +993,8 @@ async def test_assignment_digest_gathers_items_across_user_guilds(
     await set_rls_context(session, Unattributed())
     # Past the quiet period, so the items have settled and the digest is due.
     await _sweep(
-        digest_scan(
-            ASSIGNMENT_DIGEST, now=datetime.now(timezone.utc) + ASSIGNMENT_QUIET_PERIOD
+        batch_scan(
+            ASSIGNMENT_BATCH, now=datetime.now(timezone.utc) + BATCH_QUIET_PERIOD
         )
     )
 
@@ -1003,15 +1006,13 @@ async def test_assignment_digest_gathers_items_across_user_guilds(
         await route_as(session, user_id=user.id, guild_id=guild_id)
         pending = (
             await session.exec(
-                select(TaskAssignmentDigestItem).where(
-                    TaskAssignmentDigestItem.processed_at.is_(None)
-                )
+                select(BatchedNotice).where(BatchedNotice.processed_at.is_(None))
             )
         ).all()
         assert pending == [], f"guild {guild_id} items not marked processed"
 
 
-async def test_assignment_digest_takes_only_what_its_reader_reaches(
+async def test_assignment_batch_takes_only_what_its_reader_reaches(
     session: AsyncSession, monkeypatch
 ):
     """The digest is taken as its reader: a line about a project shared with
@@ -1035,8 +1036,8 @@ async def test_assignment_digest_takes_only_what_its_reader_reaches(
 
     await set_rls_context(session, Unattributed())
     await _sweep(
-        digest_scan(
-            ASSIGNMENT_DIGEST, now=datetime.now(timezone.utc) + ASSIGNMENT_QUIET_PERIOD
+        batch_scan(
+            ASSIGNMENT_BATCH, now=datetime.now(timezone.utc) + BATCH_QUIET_PERIOD
         )
     )
 
@@ -1046,15 +1047,13 @@ async def test_assignment_digest_takes_only_what_its_reader_reaches(
         await route_session_to_guild(session, guild.id)
         pending = (
             await session.exec(
-                select(TaskAssignmentDigestItem).where(
-                    TaskAssignmentDigestItem.processed_at.is_(None)
-                )
+                select(BatchedNotice).where(BatchedNotice.processed_at.is_(None))
             )
         ).all()
         assert len(pending) == unsent
 
 
-async def test_assignment_digest_leaves_a_community_on_hold_waiting(
+async def test_assignment_batch_leaves_a_community_on_hold_waiting(
     session: AsyncSession, monkeypatch
 ):
     """Items in a community whose content is on hold wait for the hold to lift;
@@ -1084,21 +1083,19 @@ async def test_assignment_digest_leaves_a_community_on_hold_waiting(
     monkeypatch.setattr(email_outbox, "enqueue", _capture_email)
 
     await _sweep(
-        digest_scan(
-            ASSIGNMENT_DIGEST, now=datetime.now(timezone.utc) + ASSIGNMENT_QUIET_PERIOD
+        batch_scan(
+            ASSIGNMENT_BATCH, now=datetime.now(timezone.utc) + BATCH_QUIET_PERIOD
         )
     )
 
     assert "First task" in sent[first.id]
     assert "Open task" in sent[second.id] and "Held task" not in sent[second.id]
     await route_session_to_guild(session, held.id)
-    assert len((await session.exec(select(TaskAssignmentDigestItem))).all()) == 1
-    assert (
-        await session.exec(select(TaskAssignmentDigestItem.processed_at))
-    ).one() is None
+    assert len((await session.exec(select(BatchedNotice))).all()) == 1
+    assert (await session.exec(select(BatchedNotice.processed_at))).one() is None
 
 
-async def test_assignment_digest_takes_an_opted_out_community_unsent(
+async def test_assignment_batch_takes_an_opted_out_community_unsent(
     session: AsyncSession, monkeypatch
 ):
     """A community switched off after its items were queued leaves them out of
@@ -1129,8 +1126,8 @@ async def test_assignment_digest_takes_an_opted_out_community_unsent(
 
     await set_rls_context(session, Unattributed())
     await _sweep(
-        digest_scan(
-            ASSIGNMENT_DIGEST, now=datetime.now(timezone.utc) + ASSIGNMENT_QUIET_PERIOD
+        batch_scan(
+            ASSIGNMENT_BATCH, now=datetime.now(timezone.utc) + BATCH_QUIET_PERIOD
         )
     )
 
@@ -1139,15 +1136,13 @@ async def test_assignment_digest_takes_an_opted_out_community_unsent(
     await route_as(session, user_id=user.id, guild_id=muted.id)
     pending = (
         await session.exec(
-            select(TaskAssignmentDigestItem).where(
-                TaskAssignmentDigestItem.processed_at.is_(None)
-            )
+            select(BatchedNotice).where(BatchedNotice.processed_at.is_(None))
         )
     ).all()
     assert pending == []
 
 
-async def test_assignment_digest_waits_for_the_flurry_to_end(
+async def test_assignment_batch_waits_for_the_flurry_to_end(
     session: AsyncSession, monkeypatch
 ):
     """The whole point of a digest: it must not fire on the first item while
@@ -1166,7 +1161,7 @@ async def test_assignment_digest_waits_for_the_flurry_to_end(
 
     # Item just landed — still accumulating, nothing goes out.
     await set_rls_context(session, Unattributed())
-    await _sweep(digest_scan(ASSIGNMENT_DIGEST, now=datetime.now(timezone.utc)))
+    await _sweep(batch_scan(ASSIGNMENT_BATCH, now=datetime.now(timezone.utc)))
     assert sent == []
 
     # A second item lands, and the quiet period restarts from it: the run at
@@ -1175,9 +1170,9 @@ async def test_assignment_digest_waits_for_the_flurry_to_end(
     session.expunge_all()
     await set_rls_context(session, Unattributed())
     await _sweep(
-        digest_scan(
-            ASSIGNMENT_DIGEST,
-            now=datetime.now(timezone.utc) + ASSIGNMENT_QUIET_PERIOD / 2,
+        batch_scan(
+            ASSIGNMENT_BATCH,
+            now=datetime.now(timezone.utc) + BATCH_QUIET_PERIOD / 2,
         )
     )
     assert sent == []
@@ -1186,14 +1181,14 @@ async def test_assignment_digest_waits_for_the_flurry_to_end(
     session.expunge_all()
     await set_rls_context(session, Unattributed())
     await _sweep(
-        digest_scan(
-            ASSIGNMENT_DIGEST, now=datetime.now(timezone.utc) + ASSIGNMENT_QUIET_PERIOD
+        batch_scan(
+            ASSIGNMENT_BATCH, now=datetime.now(timezone.utc) + BATCH_QUIET_PERIOD
         )
     )
     assert sent == [2]
 
 
-async def test_assignment_digest_waits_for_a_community_it_did_not_visit(
+async def test_assignment_batch_waits_for_a_community_it_did_not_visit(
     session: AsyncSession, monkeypatch
 ):
     """An item still arriving in a community whose timer has not come due holds
@@ -1204,8 +1199,8 @@ async def test_assignment_digest_waits_for_a_community_it_did_not_visit(
     # Alpha's item has settled; Beta's has just landed.
     await route_as(session, user_id=user.id, guild_id=alpha.id)
     await session.exec(
-        update(TaskAssignmentDigestItem).values(
-            created_at=datetime.now(timezone.utc) - 2 * ASSIGNMENT_QUIET_PERIOD
+        update(BatchedNotice).values(
+            created_at=datetime.now(timezone.utc) - 2 * BATCH_QUIET_PERIOD
         )
     )
     await session.commit()
@@ -1216,14 +1211,14 @@ async def test_assignment_digest_waits_for_a_community_it_did_not_visit(
     await each_guild(
         [],
         name="test",
-        scans=[digest_scan(ASSIGNMENT_DIGEST, now=datetime.now(timezone.utc))],
+        scans=[batch_scan(ASSIGNMENT_BATCH, now=datetime.now(timezone.utc))],
         only=[alpha.id],
     )
 
     sent.assert_not_called()
 
 
-async def test_assignment_digest_caps_a_steady_trickle(
+async def test_assignment_batch_caps_a_steady_trickle(
     session: AsyncSession, monkeypatch
 ):
     """A trickle that never goes quiet must not defer the digest forever —
@@ -1243,14 +1238,12 @@ async def test_assignment_digest_caps_a_steady_trickle(
     # window opened long enough ago that it ships regardless.
     await set_rls_context(session, Unattributed())
     await _sweep(
-        digest_scan(
-            ASSIGNMENT_DIGEST, now=datetime.now(timezone.utc) + ASSIGNMENT_MAX_WINDOW
-        )
+        batch_scan(ASSIGNMENT_BATCH, now=datetime.now(timezone.utc) + BATCH_MAX_WINDOW)
     )
     assert sent == [1]
 
 
-async def test_assignment_digest_sends_both_channels_together(
+async def test_assignment_batch_sends_both_channels_together(
     session: AsyncSession, monkeypatch
 ):
     """Email and push now ship from the same pass on the same trigger, so the
@@ -1270,8 +1263,8 @@ async def test_assignment_digest_sends_both_channels_together(
 
     await set_rls_context(session, Unattributed())
     await _sweep(
-        digest_scan(
-            ASSIGNMENT_DIGEST, now=datetime.now(timezone.utc) + ASSIGNMENT_QUIET_PERIOD
+        batch_scan(
+            ASSIGNMENT_BATCH, now=datetime.now(timezone.utc) + BATCH_QUIET_PERIOD
         )
     )
 
@@ -1285,7 +1278,7 @@ async def test_assignment_digest_sends_both_channels_together(
     }
 
 
-async def test_assignment_digest_of_one_deep_links_to_the_task(
+async def test_assignment_batch_of_one_deep_links_to_the_task(
     session: AsyncSession, monkeypatch
 ):
     """A digest of one has an unambiguous destination, so it keeps the deep
@@ -1301,8 +1294,8 @@ async def test_assignment_digest_of_one_deep_links_to_the_task(
 
     await set_rls_context(session, Unattributed())
     await _sweep(
-        digest_scan(
-            ASSIGNMENT_DIGEST, now=datetime.now(timezone.utc) + ASSIGNMENT_QUIET_PERIOD
+        batch_scan(
+            ASSIGNMENT_BATCH, now=datetime.now(timezone.utc) + BATCH_QUIET_PERIOD
         )
     )
 
@@ -1312,7 +1305,7 @@ async def test_assignment_digest_of_one_deep_links_to_the_task(
     assert push.push_data["target_path"].startswith("/go/task/")
 
 
-async def test_assignment_digest_pushes_when_email_opted_out(
+async def test_assignment_batch_pushes_when_email_opted_out(
     session: AsyncSession, monkeypatch
 ):
     """Queueing is gated on either channel, so a push-only user still gets the
@@ -1334,15 +1327,15 @@ async def test_assignment_digest_pushes_when_email_opted_out(
 
     await set_rls_context(session, Unattributed())
     await _sweep(
-        digest_scan(
-            ASSIGNMENT_DIGEST, now=datetime.now(timezone.utc) + ASSIGNMENT_QUIET_PERIOD
+        batch_scan(
+            ASSIGNMENT_BATCH, now=datetime.now(timezone.utc) + BATCH_QUIET_PERIOD
         )
     )
 
     assert len(await _queued_pushes(session)) == 1
 
 
-async def test_assignment_digest_honours_a_preference_changed_mid_pass(
+async def test_assignment_batch_honours_a_preference_changed_mid_pass(
     session: AsyncSession, monkeypatch
 ):
     """The pass snapshots its candidates, then spends time routing through each
@@ -1369,8 +1362,8 @@ async def test_assignment_digest_honours_a_preference_changed_mid_pass(
     session.expunge_all()
     await set_rls_context(session, Unattributed())
     await _sweep(
-        digest_scan(
-            ASSIGNMENT_DIGEST, now=datetime.now(timezone.utc) + ASSIGNMENT_QUIET_PERIOD
+        batch_scan(
+            ASSIGNMENT_BATCH, now=datetime.now(timezone.utc) + BATCH_QUIET_PERIOD
         )
     )
 
@@ -1388,7 +1381,7 @@ async def test_assignment_gc_drops_items_past_retention(session: AsyncSession):
     async def _row_count() -> int:
         session.expunge_all()
         await route_as(session, user_id=user.id, guild_id=guild.id)
-        rows = (await session.exec(select(TaskAssignmentDigestItem))).all()
+        rows = (await session.exec(select(BatchedNotice))).all()
         return len(rows)
 
     assert await _row_count() == 1
@@ -1396,14 +1389,14 @@ async def test_assignment_gc_drops_items_past_retention(session: AsyncSession):
     # Well inside the window: nothing is touched.
     session.expunge_all()
     await set_rls_context(session, Unattributed())
-    await each_guild([(Scope.LIVE, expire_digest_items)], name="test")
+    await each_guild([(Scope.LIVE, expire_batched_notices)], name="test")
     assert await _row_count() == 1
 
     session.expunge_all()
     await set_rls_context(session, Unattributed())
-    later = datetime.now(timezone.utc) + ASSIGNMENT_ITEM_RETENTION
+    later = datetime.now(timezone.utc) + BATCH_RETENTION
     await each_guild(
-        [(Scope.LIVE, partial(expire_digest_items, now=later))], name="test"
+        [(Scope.LIVE, partial(expire_batched_notices, now=later))], name="test"
     )
     assert await _row_count() == 0
 
@@ -1457,8 +1450,6 @@ async def _reaction_item_in_new_guild(
     session: AsyncSession, user: User, *, label: str, emoji: str = "👍"
 ):
     """Queue a reaction digest item for ``user`` in a brand-new guild."""
-    from app.models.tenant.reaction_digest import ReactionDigestItem
-
     # A prior call left the session in a guild-member context; reset so the new
     # guild INSERT into public.guilds isn't RLS-denied.
     await set_rls_context(session, Unattributed())
@@ -1475,29 +1466,27 @@ async def _reaction_item_in_new_guild(
 
     await route_as(session, user_id=user.id, guild_id=guild.id)
     session.add(
-        ReactionDigestItem(
+        BatchedNotice(
             user_id=user.id,
-            reaction_id=None,
+            kind=BatchedNoticeKind.reaction,
+            actor_name="reactor#0001",
             target_type="comment",
             target_id=comment.id,
-            emoji=emoji,
             target_path=f"/projects/{project.id}/tasks/{task.id}",
-            context_title=f"{label} thread",
-            reactor_name="reactor#0001",
+            title=f"{label} thread",
+            emoji=emoji,
         )
     )
     await session.commit()
     return guild
 
 
-async def test_reaction_digest_gathers_across_guilds_and_marks_processed(
+async def test_reaction_batch_gathers_across_guilds_and_marks_processed(
     session: AsyncSession, monkeypatch
 ):
     """The reaction digest runs on the same engine as the assignment digest,
     so it must show the same cross-guild behaviour: gather from every guild the
     user belongs to, send once, mark processed in each schema."""
-    from app.models.tenant.reaction_digest import ReactionDigestItem
-
     user = await create_user(session, email="reaction-digest@example.com")
     guild_a = await _reaction_item_in_new_guild(session, user, label="Alpha")
     guild_b = await _reaction_item_in_new_guild(session, user, label="Beta", emoji="🎉")
@@ -1513,9 +1502,7 @@ async def test_reaction_digest_gathers_across_guilds_and_marks_processed(
 
     await set_rls_context(session, Unattributed())
     await _sweep(
-        digest_scan(
-            REACTION_DIGEST, now=datetime.now(timezone.utc) + ASSIGNMENT_QUIET_PERIOD
-        )
+        batch_scan(REACTION_BATCH, now=datetime.now(timezone.utc) + BATCH_QUIET_PERIOD)
     )
 
     assert captured.get("user_id") == user.id
@@ -1525,15 +1512,13 @@ async def test_reaction_digest_gathers_across_guilds_and_marks_processed(
         await route_as(session, user_id=user.id, guild_id=guild_id)
         pending = (
             await session.exec(
-                select(ReactionDigestItem).where(
-                    ReactionDigestItem.processed_at.is_(None)
-                )
+                select(BatchedNotice).where(BatchedNotice.processed_at.is_(None))
             )
         ).all()
         assert pending == [], f"guild {guild_id} items not marked processed"
 
 
-async def test_reaction_digest_waits_for_the_flurry_to_end(
+async def test_reaction_batch_waits_for_the_flurry_to_end(
     session: AsyncSession, monkeypatch
 ):
     """Reactions arrive in bursts more than anything else in the app, so the
@@ -1550,16 +1535,16 @@ async def test_reaction_digest_waits_for_the_flurry_to_end(
     monkeypatch.setattr(email_outbox, "enqueue", _capture_email)
 
     await set_rls_context(session, Unattributed())
-    await _sweep(digest_scan(REACTION_DIGEST, now=datetime.now(timezone.utc)))
+    await _sweep(batch_scan(REACTION_BATCH, now=datetime.now(timezone.utc)))
     assert sent == []
 
     await _reaction_item_in_new_guild(session, user, label="Beta", emoji="🚀")
     session.expunge_all()
     await set_rls_context(session, Unattributed())
     await _sweep(
-        digest_scan(
-            REACTION_DIGEST,
-            now=datetime.now(timezone.utc) + ASSIGNMENT_QUIET_PERIOD / 2,
+        batch_scan(
+            REACTION_BATCH,
+            now=datetime.now(timezone.utc) + BATCH_QUIET_PERIOD / 2,
         )
     )
     assert sent == []
@@ -1567,14 +1552,12 @@ async def test_reaction_digest_waits_for_the_flurry_to_end(
     session.expunge_all()
     await set_rls_context(session, Unattributed())
     await _sweep(
-        digest_scan(
-            REACTION_DIGEST, now=datetime.now(timezone.utc) + ASSIGNMENT_QUIET_PERIOD
-        )
+        batch_scan(REACTION_BATCH, now=datetime.now(timezone.utc) + BATCH_QUIET_PERIOD)
     )
     assert sent == [2]
 
 
-async def test_reaction_digest_respects_the_opt_out(session: AsyncSession, monkeypatch):
+async def test_reaction_batch_respects_the_opt_out(session: AsyncSession, monkeypatch):
     """The reaction gate is its own: switching reactions off must not need the
     mention or assignment preferences touched, and must not silence them."""
     user = await create_user(
@@ -1599,9 +1582,7 @@ async def test_reaction_digest_respects_the_opt_out(session: AsyncSession, monke
 
     await set_rls_context(session, Unattributed())
     await _sweep(
-        digest_scan(
-            REACTION_DIGEST, now=datetime.now(timezone.utc) + ASSIGNMENT_QUIET_PERIOD
-        )
+        batch_scan(REACTION_BATCH, now=datetime.now(timezone.utc) + BATCH_QUIET_PERIOD)
     )
     assert sent == []
     assert await _queued_pushes(session) == []
@@ -1820,11 +1801,11 @@ async def test_two_passes_at_once_send_one_digest(session: AsyncSession, monkeyp
         return True
 
     monkeypatch.setattr(email_outbox, "enqueue", _capture_email)
-    now = datetime.now(timezone.utc) + ASSIGNMENT_QUIET_PERIOD
+    now = datetime.now(timezone.utc) + BATCH_QUIET_PERIOD
 
     await asyncio.gather(
-        _sweep(digest_scan(ASSIGNMENT_DIGEST, now=now)),
-        _sweep(digest_scan(ASSIGNMENT_DIGEST, now=now)),
+        _sweep(batch_scan(ASSIGNMENT_BATCH, now=now)),
+        _sweep(batch_scan(ASSIGNMENT_BATCH, now=now)),
     )
 
     assert sent == [user.id]

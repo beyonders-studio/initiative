@@ -9,6 +9,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Added
 
+- **Take AI connections or plug-ins away from one community.** In the operator's community sheet, **Its own AI connections** and **Its own plug-ins** can be switched off for one community. Its AI connections are then kept and not used, and its plug-ins keep running, but its admins can no longer set either up and their settings pages say who manages them.
 - **Required fields.** A task type's page, the calendar's event page, the posts page and a collection's file page can mark a field required in the layout editor. Adding one asks for it up top and waits until it's filled, as does changing a task's type or moving it to another project, and nobody can empty it afterwards; things that already exist keep going and show what's missing.
 - **Remind me about a task.** A task's schedule has a **Remind me** time of your own, which nobody else sees. It reaches you as subscription news, so it follows your **Subscribed** notification settings. On a repeating task, the next one takes the reminder at the same distance from its due date, as it does the start date.
 - **Pick a task's type as you type its title.** Start a new task's title with the type's name and a colon, such as `bug: Login fails` or `milestone: Ship v2`, and it is added as that type. A **?** beside the title lists everything a title can say, with examples.
@@ -57,6 +58,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - **Updating the Android app from Obtainium.** Releases name the Alpine server package `.alpine` rather than `.apk`, so Obtainium downloads the app. **Server operators:** on Alpine, install it with `apk add` as before.
 - **Checklists in descriptions and comments.** A `- [ ]` item shows its box, and ticking it in **Preview** ticks it in the text (#2989). PDF task reports draw checklists with boxes and print comments with their formatting.
 - **Subtasks made from a checklist line with a mention.** The new task's title shows the mention, not its markup.
+- **Reaction emails after an account is deleted.** One still waiting to go out names the person as "Deleted user", as an assignment email already did.
 
 ## [0.77.1] - 2026-10-23
 

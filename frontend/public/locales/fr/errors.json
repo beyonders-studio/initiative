@@ -528,6 +528,7 @@
   "IMAGE_NOT_FOUND": "Cette image n'est plus disponible.",
   "BANNER_COLOR_INVALID": "Choisis une couleur au format #rrggbb.",
   "BANNER_IMAGE_NOT_ENTITLED": "Les images de bannière ne sont pas incluses dans la formule de cette communauté. Choisis plutôt une couleur de bannière.",
+  "COMMUNITY_SURFACE_CLOSED": "La personne qui gère ce serveur s'en occupe pour ta communauté.",
   "USER_AVATAR_INVALID_IMAGE": "Ce fichier n'est pas une image PNG, JPEG ou WebP.",
   "USER_AVATAR_NOT_SQUARE": "Une photo de profil doit être carrée.",
   "USER_AVATAR_TOO_LARGE_DIMENSIONS": "Cette image dépasse la taille autorisée pour une photo de profil.",

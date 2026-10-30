@@ -70,7 +70,7 @@ async def _stored(session, schema: str, job_id: int) -> dict:
 
 def _guild_source(migration: ModuleType, bind, source: dict[str, str]) -> None:
     """The guild half of 0445 on the table that is still there, by the name it
-    has now (20261030_0562). The members' AI key and preference tables it also
+    has now (20261030_0564). The members' AI key and preference tables it also
     respelled went in 20261021_0533."""
     migration._unforced(
         bind,

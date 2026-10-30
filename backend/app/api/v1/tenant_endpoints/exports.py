@@ -667,7 +667,7 @@ async def download_export_artifact(
     # Recover the download name from the artifact key. A named artifact
     # (passthrough / .lexical) is stored as `exports/{job_id}-{filename}`;
     # strip the id prefix back off. The id is the one the job had when it was
-    # rendered, which an export from before 20261030_0562 no longer has. A
+    # rendered, which an export from before 20261030_0564 no longer has. A
     # generic artifact is `exports/{job_id}.{format}` — no such prefix, so use
     # the generic name. build_upload_response escapes the name (RFC 5987) —
     # original filenames are user text and must not break out of the header.

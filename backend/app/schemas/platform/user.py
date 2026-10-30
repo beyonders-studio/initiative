@@ -733,7 +733,6 @@ class UserRead(UserBase):
     timezone: str = "UTC"
     event_reminder_minutes_before: Optional[int] = 15
     last_overdue_notification_at: Optional[datetime] = None
-    last_task_assignment_digest_at: Optional[datetime] = None
     color_theme: str = "kobold"
     task_completion_visual_feedback: str = "none"
     task_completion_audio_feedback: bool = True

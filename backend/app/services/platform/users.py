@@ -56,7 +56,6 @@ from app.models.tenant.share_request import ShareRequest
 from app.models.tenant.task import TaskAssignee
 from app.models.platform.notification import Notification
 from app.models.tenant.personal_item import PersonalItem
-from app.models.tenant.reaction_digest import ReactionDigestItem
 
 if TYPE_CHECKING:  # pragma: no cover - typing only
     from app.models.platform.sign_in_lock import SignInLock
@@ -64,8 +63,8 @@ if TYPE_CHECKING:  # pragma: no cover - typing only
 from app.models.platform.api_key import UserApiKey
 from app.models.platform.account_change_hold import AccountChangeHold
 from app.models.platform.user_token import UserToken
+from app.models.tenant.batched_notice import BatchedNotice
 from app.models.tenant.event_reminder_dispatch import EventReminderDispatch
-from app.models.tenant.task_assignment_digest import TaskAssignmentDigestItem
 from app.db.request_context import SystemGuild, SystemMaintenance
 
 _S = TypeVar("_S", bound=Select)
@@ -249,22 +248,12 @@ async def _erase_in_guild(
         delete(EventReminderDispatch).where(EventReminderDispatch.user_id == user_id)
     )
     await guild_session.exec(
-        delete(TaskAssignmentDigestItem).where(
-            TaskAssignmentDigestItem.user_id == user_id
-        )
+        delete(BatchedNotice).where(col(BatchedNotice.user_id) == user_id)
     )
     await guild_session.exec(
-        update(TaskAssignmentDigestItem)
-        .where(TaskAssignmentDigestItem.assigned_by_id == user_id)
-        .values(assigned_by_id=None)
-    )
-    await guild_session.exec(
-        delete(ReactionDigestItem).where(ReactionDigestItem.user_id == user_id)
-    )
-    await guild_session.exec(
-        update(ReactionDigestItem)
-        .where(ReactionDigestItem.reactor_id == user_id)
-        .values(reactor_id=None)
+        update(BatchedNotice)
+        .where(col(BatchedNotice.actor_id) == user_id)
+        .values(actor_id=None)
     )
     # All per-user DAC grants (project, file, queue, counter group, calendar
     # event) live in the polymorphic resource_grants table; one delete clears

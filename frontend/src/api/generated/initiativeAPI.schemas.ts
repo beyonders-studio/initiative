@@ -4321,6 +4321,7 @@ export interface CommunityRead {
   content_read_only: boolean;
   contact_email: string | null;
   auth_options: CommunityAuthOption[] | null;
+  closed_surfaces: string[] | null;
   is_community: boolean;
   categories: CommunityCategory[];
   has_adult_content: boolean | null;
@@ -8507,7 +8508,6 @@ export interface OperatorUserRead {
   timezone: string;
   event_reminder_minutes_before: number | null;
   last_overdue_notification_at: string | null;
-  last_task_assignment_digest_at: string | null;
   color_theme: string;
   task_completion_visual_feedback: string;
   task_completion_audio_feedback: boolean;
@@ -9023,6 +9023,8 @@ export interface PlatformCommunityStorageRead {
   auth_options: CommunityAuthOption[];
   banner_image_enabled: boolean;
   support_enabled: boolean;
+  ai_connections_open: boolean;
+  plugins_open: boolean;
   lifts_to: CommunityStatus | null;
   allowed_actions: CommunityAction[];
 }
@@ -9057,6 +9059,8 @@ export interface PlatformCommunityStorageUpdate {
   auth_options?: CommunityAuthOption[] | null;
   banner_image_enabled?: boolean | null;
   support_enabled?: boolean | null;
+  ai_connections_open?: boolean | null;
+  plugins_open?: boolean | null;
 }
 
 /**
@@ -11723,7 +11727,6 @@ export interface UserRead {
   timezone: string;
   event_reminder_minutes_before: number | null;
   last_overdue_notification_at: string | null;
-  last_task_assignment_digest_at: string | null;
   color_theme: string;
   task_completion_visual_feedback: string;
   task_completion_audio_feedback: boolean;

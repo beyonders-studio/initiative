@@ -43,6 +43,7 @@ from sqlmodel import select
 from sqlmodel.ext.asyncio.session import AsyncSession
 
 from app.models.platform.guild import CommunityRole
+from app.models.tenant.batched_notice import BatchedNotice, BatchedNoticeKind
 from app.models.tenant.comment import Comment
 from app.models.tenant.event_reminder_dispatch import EventReminderDispatch
 from app.models.tenant.personal_item import PersonalItem
@@ -50,11 +51,10 @@ from app.models.tenant.plugin_member_consent import PluginMemberConsent
 from app.models.tenant.guild_plugin_user_connection import GuildPluginUserConnection
 from app.models.tenant.initiative import InitiativeJoinRequest
 from app.models.tenant.reaction import Reaction
-from app.models.tenant.reaction_digest import ReactionDigestItem
 from app.models.tenant.resource_grant import ResourceGrant
-from app.models.tenant.task_assignment_digest import TaskAssignmentDigestItem
 from app.models.tenant.webhook_subscription import WebhookSubscription
 from app.services.platform import users as user_service
+from app.services.tenant.mention_parser import ANONYMIZED_MENTION_NAME
 from app.testing.factories import (
     create_calendar,
     create_calendar_event,
@@ -175,25 +175,29 @@ async def _seed(session: AsyncSession) -> SimpleNamespace:
             resolved_by=victim.id,
         ),
         # Queued notifications naming them as the one who acted.
-        "reaction_digest": ReactionDigestItem(
+        "reaction_line": BatchedNotice(
             user_id=keeper.id,
-            reaction_id=reaction.id,
+            kind=BatchedNoticeKind.reaction,
+            actor_id=victim.id,
+            actor_name="Leaver",
             target_type="comment",
             target_id=comment.id,
-            emoji="\N{THUMBS UP SIGN}",
             target_path="/x",
-            context_title="a comment",
-            reactor_name="Leaver",
-            reactor_id=victim.id,
+            title="a comment",
+            reaction_id=reaction.id,
+            emoji="\N{THUMBS UP SIGN}",
         ),
-        "assignment_digest": TaskAssignmentDigestItem(
+        "assignment_line": BatchedNotice(
             user_id=keeper.id,
-            task_id=task.id,
+            kind=BatchedNoticeKind.task_assignment,
+            actor_id=victim.id,
+            actor_name="Leaver",
+            target_type="task",
+            target_id=task.id,
+            target_path=f"/go/task/{task.id}",
+            title="A task",
             project_id=project.id,
-            task_title="A task",
             project_name="A project",
-            assigned_by_name="Leaver",
-            assigned_by_id=victim.id,
         ),
         # A live outbound integration they registered.
         "webhook": WebhookSubscription(
@@ -274,28 +278,16 @@ async def test_their_grants_go(session: AsyncSession, role_session):
 # --- the row stays, un-attributed -------------------------------------------
 
 
-async def test_the_reaction_digest_forgets_who_reacted(
-    session: AsyncSession, role_session
-):
-    """Somebody else's queued line survives; the id behind ``reactor_name``
-    does not. The pair matches what the assignment digest already gets."""
+async def test_a_batched_line_forgets_who_acted(session: AsyncSession, role_session):
+    """Somebody else's queued lines survive, a reaction's and an assignment's
+    alike; the id and the name of the one who acted do not."""
     s = await _seed(session)
     await user_service.hard_delete_user(await role_session("app_admin"), s.victim_id)
-    row = await _reread(session, s.guild_id, ReactionDigestItem, s.reaction_digest)
-    assert row is not None
-    assert row.reactor_id is None
-
-
-async def test_the_assignment_digest_forgets_who_assigned(
-    session: AsyncSession, role_session
-):
-    s = await _seed(session)
-    await user_service.hard_delete_user(await role_session("app_admin"), s.victim_id)
-    row = await _reread(
-        session, s.guild_id, TaskAssignmentDigestItem, s.assignment_digest
-    )
-    assert row is not None
-    assert row.assigned_by_id is None
+    for line in (s.reaction_line, s.assignment_line):
+        row = await _reread(session, s.guild_id, BatchedNotice, line)
+        assert row is not None
+        assert row.actor_id is None
+        assert row.actor_name == ANONYMIZED_MENTION_NAME
 
 
 # --- the row stays, still naming them ----------------------------------------

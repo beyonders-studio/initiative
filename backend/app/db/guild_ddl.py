@@ -98,8 +98,10 @@ from app.db.tenancy import (
     PRIVATE_ROW_SHARED_READ,
     PRIVATE_ROW_TABLES,
     SEAT_READ_TABLES,
+    SEAT_SURFACES,
     SEAT_TABLES,
 )
+from app.models.tenant.batched_notice import BatchedNoticeKind
 from app.models.tenant.initiative import InitiativeJoinPolicy
 from app.models.tenant.resource_grant import ResourceAccessLevel
 
@@ -386,7 +388,11 @@ def _table_block(table: str, path: InitiativePath) -> str:
         f"ALTER TABLE {table} FORCE ROW LEVEL SECURITY;",
     ]
     for suffix, command, clause, write in _COMMANDS:
-        pred = path.predicate(table, write)
+        pred = (
+            path.folded(table, write, dac_asks_at_write(table, command))
+            if path.folded is not None
+            else path.predicate(table, write)
+        )
         if path.dac is not None:
             # What the command asks of sharing is per table: changing content
             # takes write on the resource, where responding to it (a comment,
@@ -737,6 +743,19 @@ _SEAT_WRITES = f"({POLICY_SEAT} AND ({IN_POLICY.admin} OR {IN_POLICY.pam_write})
 _SEAT_WRITE_PREDICATE = f"({IN_POLICY.system} OR {_SEAT_WRITES})"
 
 
+def _seat_write_predicate(table: str) -> str:
+    """The seat's write on ``table``: and, where a surface key governs it
+    (``SEAT_SURFACES``), only while the deployment leaves that surface open.
+    The system engine writes either way."""
+    surface = SEAT_SURFACES.get(table)
+    if surface is None:
+        return _SEAT_WRITE_PREDICATE
+    is_open = (
+        f"(SELECT public.community_surface_open({gucs.ROUTED_GUILD_ID}, '{surface}'))"
+    )
+    return f"({IN_POLICY.system} OR ({_SEAT_WRITES} AND {is_open}))"
+
+
 # Seat tables a trigger also writes: table -> the leg OR'd into the INSERT
 # policy beside the seat's. ``plugin_placements`` gains a row for each install that
 # follows new initiatives when an initiative's built-in moderator role is
@@ -784,13 +803,14 @@ def _seat_block(table: str) -> str:
     writing by the seat or the system engine, and inserting by a trigger too
     where ``_SEAT_TRIGGER_WRITTEN_INSERT`` names one."""
     read = _SEAT_READ_PREDICATE if table in SEAT_READ_TABLES else "true"
+    write = _seat_write_predicate(table)
     trigger = _SEAT_TRIGGER_WRITTEN_INSERT.get(table)
-    insert = f"({trigger} OR {_SEAT_WRITE_PREDICATE})" if trigger else None
+    insert = f"({trigger} OR {write})" if trigger else None
     return "\n".join(
         [
             f"ALTER TABLE {table} ENABLE ROW LEVEL SECURITY;",
             f"ALTER TABLE {table} FORCE ROW LEVEL SECURITY;",
-            *_policies(table, "seat", read, _SEAT_WRITE_PREDICATE, insert=insert),
+            *_policies(table, "seat", read, write, insert=insert),
         ]
     )
 
@@ -1110,6 +1130,11 @@ def _plugin_predicates(table: str) -> dict[str, str]:
                 f"{_plugin_placed_initiatives()})"
             )
             return dict.fromkeys(("SELECT", "INSERT", "UPDATE", "DELETE"), placed)
+        if table == "batched_notices":
+            # Queued when a plug-in assigns a task; a reaction's line is one
+            # person's gesture, which no plug-in reaches.
+            own = f"({_IID} IS NULL OR batched_notices.kind <> '{BatchedNoticeKind.reaction.value}')"
+            return dict.fromkeys(("SELECT", "INSERT", "UPDATE", "DELETE"), own)
         # The initiative gate already asks of a side effect it governs; one with
         # no gate of its own (timer_marks) is written by a trigger alone.
         if (

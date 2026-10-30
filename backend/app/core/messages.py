@@ -289,6 +289,8 @@ class GuildMessages:
     BANNER_TEXT_COLOR_INVALID = "BANNER_TEXT_COLOR_INVALID"
     # Banner artwork is not part of what this guild has; the colour is.
     BANNER_IMAGE_NOT_ENTITLED = "BANNER_IMAGE_NOT_ENTITLED"
+    # The deployment has taken this setting away from the community.
+    COMMUNITY_SURFACE_CLOSED = "COMMUNITY_SURFACE_CLOSED"
     CANNOT_CHANGE_OWN_ROLE = "CANNOT_CHANGE_OWN_ROLE"
     # 'support' is synthesized for PAM grantees only; it is never a stored
     # guild-membership role, so it cannot be assigned via the role endpoints.
