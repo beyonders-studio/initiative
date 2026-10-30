@@ -860,6 +860,15 @@ async def change(ctx: RuleContext, changes: dict[str, Any]) -> None:
         before = await rules[key].read(ctx)
         if value != before:
             moved[key] = (before, value)
+    if (
+        ctx.guild_id is not None
+        and moved.keys()
+        & await rules_service.set_by_deployment(ctx.session, ctx.guild_id)
+    ):
+        raise HTTPException(
+            status_code=status.HTTP_409_CONFLICT,
+            detail=GuildMessages.COMMUNITY_RULE_SET_BY_DEPLOYMENT,
+        )
     tightening = {k for k, (b, a) in moved.items() if rules[k].tightens(b, a)}
 
     if ctx.guild_id is not None and tightening:

@@ -697,6 +697,9 @@ class CommunityAuthSettingsRead(SanitizedBaseModel):
     #: which applies when it is ``None`` or longer.
     guest_max_days: Optional[int] = None
     guest_max_days_by_platform: int
+    #: The rules above the deployment sets for this community: shown here, and
+    #: changed only by the deployment.
+    set_by_deployment: List[str] = Field(default_factory=list)
 
 
 class CommunityAuthSettingsUpdate(SanitizedBaseModel):

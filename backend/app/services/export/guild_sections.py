@@ -79,7 +79,7 @@ async def _build_settings(ctx: SectionContext) -> tuple[dict[str, Any], int] | N
     plus the guild-level flags that live on the ``guilds`` row itself."""
     from sqlmodel import select
 
-    from app.core.rules import COMMUNITY_RULES, SignInRequirement
+    from app.core.rules import COMMUNITY_RULES, SetBy, SignInRequirement, writers
     from app.models.platform.guild import Guild
     from app.models.tenant.guild_setting import GuildSetting
     from app.services.platform import rules
@@ -88,9 +88,11 @@ async def _build_settings(ctx: SectionContext) -> tuple[dict[str, Any], int] | N
     if guild is None:
         return None
     setting = (await ctx.session.exec(select(GuildSetting).limit(1))).first()
-    stored = (await rules.community_values(ctx.session, [ctx.guild_id], applied=False))[
-        ctx.guild_id
-    ]
+    stored = (
+        await rules.community_values(
+            ctx.session, [ctx.guild_id], applied=False, own=True
+        )
+    )[ctx.guild_id]
     payload: dict[str, Any] = {
         "type": "guild-settings",
         "schema_version": 1,
@@ -100,9 +102,9 @@ async def _build_settings(ctx: SectionContext) -> tuple[dict[str, Any], int] | N
         "categories": list(guild.categories or []),
         "location": guild.location,
         "has_adult_content": guild.has_adult_content,
-        # Every rule the community keeps, as it wrote them; a sign-in
-        # requirement in the shape the settings page reads it. What its plan
-        # gives it is the deployment's, so it stays behind.
+        # Every rule the community wrote itself; a sign-in requirement in the
+        # shape the settings page reads it. What the deployment sets, its plan
+        # and its surfaces among it, stays behind.
         **{
             key: {
                 "policy": value.policy,
@@ -112,7 +114,7 @@ async def _build_settings(ctx: SectionContext) -> tuple[dict[str, Any], int] | N
             if isinstance(value, SignInRequirement)
             else value
             for key, value in stored.items()
-            if not COMMUNITY_RULES[key].paid
+            if SetBy.community in writers(COMMUNITY_RULES[key])
         },
         "banner": dict(guild.banner or {}),
         "retention_days": setting.retention_days if setting else None,

@@ -1499,6 +1499,7 @@
     }
   },
   "communityAuth": {
+    "setByDeployment": "Quien gestiona este servidor define esto para tu comunidad.",
     "shareUrl": {
       "title": "Enlace de inicio de sesión para miembros",
       "description": "Comparte este enlace con los miembros: ofrece los proveedores de inicio de sesión de esta comunidad y los lleva directamente a la comunidad.",

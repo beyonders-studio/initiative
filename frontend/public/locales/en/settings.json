@@ -1499,6 +1499,7 @@
     }
   },
   "communityAuth": {
+    "setByDeployment": "Whoever runs this server sets this for your community.",
     "shareUrl": {
       "title": "Member sign-in link",
       "description": "Share this link with members — it offers this community's sign-in providers and brings them straight into the community.",

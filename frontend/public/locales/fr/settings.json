@@ -1499,6 +1499,7 @@
     }
   },
   "communityAuth": {
+    "setByDeployment": "La personne qui gère ce serveur définit ce réglage pour ta communauté.",
     "shareUrl": {
       "title": "Lien de connexion des membres",
       "description": "Partagez ce lien avec les membres — il propose les fournisseurs de connexion de cette communauté et les amène directement dans la communauté.",

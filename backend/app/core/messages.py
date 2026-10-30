@@ -291,6 +291,8 @@ class GuildMessages:
     BANNER_IMAGE_NOT_ENTITLED = "BANNER_IMAGE_NOT_ENTITLED"
     # The deployment has taken this setting away from the community.
     COMMUNITY_SURFACE_CLOSED = "COMMUNITY_SURFACE_CLOSED"
+    # The deployment sets this rule for the community.
+    COMMUNITY_RULE_SET_BY_DEPLOYMENT = "COMMUNITY_RULE_SET_BY_DEPLOYMENT"
     CANNOT_CHANGE_OWN_ROLE = "CANNOT_CHANGE_OWN_ROLE"
     # 'support' is synthesized for PAM grantees only; it is never a stored
     # guild-membership role, so it cannot be assigned via the role endpoints.
@@ -1806,6 +1808,12 @@ class BillingMessages:
     INVALID_PAYLOAD = "BILLING_INVALID_PAYLOAD"
     COMMUNITY_NOT_FOUND = "BILLING_COMMUNITY_NOT_FOUND"
     STATUS_NOT_SETTABLE = "BILLING_STATUS_NOT_SETTABLE"
+    #: A sync's rule this deployment knows but does not take over the sync,
+    #: one named twice, or a value its rule does not hold.
+    RULE_NOT_SYNCED = "BILLING_RULE_NOT_SYNCED"
+    #: A sync's rule asks for something this deployment does not offer, such
+    #: as a second factor where no kind of factor is permitted.
+    RULE_NOT_OFFERED = "BILLING_RULE_NOT_OFFERED"
     #: The notice could not be written down. Nothing was recorded, so the same
     #: key may be sent again.
     NOTICE_NOT_DELIVERED = "BILLING_NOTICE_NOT_DELIVERED"

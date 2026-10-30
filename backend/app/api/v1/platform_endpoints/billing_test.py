@@ -26,10 +26,12 @@ from sqlmodel.ext.asyncio.session import AsyncSession
 
 from app.testing import community_plan
 from app.core import config as config_module
+from app.core.login_methods import LoginMethod
 from app.models.platform.billing import BillingJti
 from app.models.platform.guild import CommunityRole, CommunityStatus
 from app.models.platform.guild_administration import GuildAdministration
 from app.services.marketplace import plugin_entitlements
+from app.services.platform import rules
 from app.services.tenant.attachments import (
     StorageQuotaExceededError,
     enforce_storage_quota,
@@ -260,6 +262,69 @@ async def test_a_capability_package_replaces_rather_than_merges(
     plan = await community_plan(session, guild_id)
     assert plan["banner_image"] is True
     assert not any(plan[key] for key in every if key != "banner_image")
+
+
+async def test_the_deployments_rules_stand_over_the_seat_until_withdrawn(
+    client: AsyncClient, session: AsyncSession, acting_user
+):
+    """A rule the sync sets wins over the community's own, is shown to its
+    seat and refused from it; a sync without it gives the community back its
+    own answer. A key this build doesn't know is ignored; one the plan's
+    fields carry, or a value its rule doesn't take, refuses the item."""
+    seat = await acting_user(guild_role=CommunityRole.superadmin)
+    guild_id = seat.guild.id
+    settings_url = f"/api/v1/communities/{guild_id}/auth-settings"
+
+    async def read() -> dict:
+        response = await client.get(settings_url, headers=seat.headers)
+        assert response.status_code == 200, response.text
+        return response.json()
+
+    restricted = _fields(feature_keys=["security_standards"])
+    await _sync(client, (guild_id, 1, restricted))
+    own = await client.patch(
+        settings_url, headers=seat.headers, json={"allow_ai": False}
+    )
+    assert own.status_code == 200, own.text
+
+    control = [{"key": "allow_ai", "value": True}, {"key": "teleport", "value": 1}]
+    synced = await _sync(client, (guild_id, 2, {**restricted, "rules": control}))
+    assert synced.json()["results"] == [
+        {"community_ref": await billing_guild_ref(guild_id), "version": 2}
+    ]
+    held = await read()
+    assert held["allow_ai"] is True
+    assert held["set_by_deployment"] == ["allow_ai"]
+    refused = await client.patch(
+        settings_url, headers=seat.headers, json={"allow_ai": False}
+    )
+    assert refused.status_code == 409
+    assert refused.json()["detail"] == "COMMUNITY_RULE_SET_BY_DEPLOYMENT"
+
+    await _sync(client, (guild_id, 3, restricted))
+    released = await read()
+    assert released["allow_ai"] is False
+    assert released["set_by_deployment"] == []
+
+    for bad in (
+        [{"key": "max_users", "value": 3}],
+        [{"key": "allow_ai", "value": 3}],
+        [{"key": "guest_max_days", "value": True}],
+        [{"key": "allow_ai", "value": True}, {"key": "allow_ai", "value": False}],
+    ):
+        refused_item = await _sync(client, (guild_id, 4, {**restricted, "rules": bad}))
+        assert refused_item.json()["results"][0]["error"] == "BILLING_INVALID_PAYLOAD"
+
+
+async def test_a_rule_the_deployment_offers_nothing_to_meet_refuses_the_item(
+    client: AsyncClient, session: AsyncSession
+):
+    guild = await create_guild(session)
+    await rules.put(session, "login_methods", frozenset({LoginMethod.password}))
+    await session.commit()
+    factor = [{"key": "require_second_factor", "value": True}]
+    response = await _sync(client, (guild.id, 1, _fields(rules=factor)))
+    assert response.json()["results"][0]["error"] == "BILLING_RULE_NOT_OFFERED"
 
 
 async def test_the_pushed_ceiling_is_the_one_uploads_are_held_to(

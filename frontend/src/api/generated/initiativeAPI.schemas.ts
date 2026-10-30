@@ -3184,6 +3184,7 @@ export interface CommunityAuthSettingsRead {
   ai_offered_by_platform: boolean;
   guest_max_days: number | null;
   guest_max_days_by_platform: number;
+  set_by_deployment: string[];
 }
 
 /**

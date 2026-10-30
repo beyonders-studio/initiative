@@ -14,10 +14,11 @@ from dataclasses import dataclass
 from datetime import datetime, timezone
 from typing import Any
 
+from fastapi import HTTPException
 from starlette.datastructures import Headers
 from sqlalchemy import insert, update
 from sqlalchemy.exc import IntegrityError
-from sqlmodel import select
+from sqlmodel import delete, select
 from sqlmodel.ext.asyncio.session import AsyncSession
 
 from app.core import billing_capabilities
@@ -25,7 +26,7 @@ from app.core.config import settings
 from app.core.errors import CodedError
 from app.core.identify import bearer_token
 from app.core.messages import BillingMessages
-from app.core.rules import SetBy
+from app.core.rules import SYNCED_RULES, SetBy
 from app.core.security import PublicKeyBundleError, load_verification_keys
 from app.models.platform.billing import (
     BILLING_SOURCE,
@@ -35,6 +36,7 @@ from app.models.platform.billing import (
 )
 from app.models.platform.guild import Guild, CommunityStatus
 from app.models.platform.guild_administration import GuildAdministration
+from app.models.platform.rule import CommunityRule
 from app.schemas.platform.billing import CommunityFields
 from app.core.audit_events import AuditEventType
 from app.services import audit as audit_service
@@ -261,7 +263,12 @@ class Synced:
 
 
 async def apply_community_sync(
-    session: AsyncSession, *, guild_id: int, version: int, fields: CommunityFields
+    session: AsyncSession,
+    system: AsyncSession,
+    *,
+    guild_id: int,
+    version: int,
+    fields: CommunityFields,
 ) -> Synced:
     """Bring one community to billing's state at ``version``, if that's newer
     than the one it holds; answer with the version held either way.
@@ -270,7 +277,8 @@ async def apply_community_sync(
     written: a capability that drops off a plan is withdrawn by the same
     write that renames the tier. A status write never moves a community out
     of ``suspended`` or ``deleted``; it's recorded, and a suspension that
-    lifts returns the community to it.
+    lifts returns the community to it. A rule the deployment does not offer
+    the means to meet refuses the item; ``system`` reads what it offers.
     """
     # Locked, so two syncs for one community take turns: each reads the
     # version the other wrote, and an older one never lands after a newer.
@@ -279,6 +287,9 @@ async def apply_community_sync(
         raise CodedError(BillingMessages.COMMUNITY_NOT_FOUND, 404)
     if version <= row.billing_version:
         return Synced(version=row.billing_version)
+
+    synced = {rule.key: rule.value for rule in fields.rules if rule.key in SYNCED_RULES}
+    await _refuse_what_is_not_offered(system, guild_id, synced)
 
     now = datetime.now(timezone.utc)
     administration_values: dict[str, Any] = {
@@ -324,10 +335,44 @@ async def apply_community_sync(
     )
     for key, value in paid.items():
         await rules.put(session, key, value, guild_id=guild_id, set_by=SetBy.deployment)
+    # The rest of the deployment's rules, whole: a rule it no longer sends
+    # falls back to the community's own.
+    await session.exec(
+        delete(CommunityRule).where(
+            CommunityRule.guild_id == guild_id,
+            CommunityRule.set_by == SetBy.deployment.value,
+            CommunityRule.user_id.is_(None),  # type: ignore[union-attr]
+            CommunityRule.key.not_in(synced),  # type: ignore[attr-defined]
+            CommunityRule.key.in_(SYNCED_RULES),  # type: ignore[attr-defined]
+        )
+    )
+    for key, value in synced.items():
+        await rules.put(session, key, value, guild_id=guild_id, set_by=SetBy.deployment)
     # Stamp the guild whichever row moved: "when did this guild last change"
     # stays a fact about the guild.
     await session.exec(update(Guild).where(Guild.id == guild_id).values(**guild_values))
     return Synced(version=version, went_on_hold=went_on_hold)
+
+
+async def _refuse_what_is_not_offered(
+    system: AsyncSession, guild_id: int, synced: dict[str, Any]
+) -> None:
+    """Refuse a rule the community's own settings would refuse for want of
+    what the deployment offers: asking for a second factor where no kind is
+    permitted."""
+    # Here rather than at the top: the rules' write path reads the settings
+    # module, which reaches billing.
+    from app.services.platform import auth_posture
+
+    ctx = auth_posture.RuleContext.community(system, system, None, guild_id)
+    for key, value in synced.items():
+        rule = auth_posture.COMMUNITY_RULES.get(key)
+        if rule is None or not rule.tightens(rule.loose, value):
+            continue
+        try:
+            await rule.offered(ctx, value)
+        except HTTPException as exc:
+            raise CodedError(BillingMessages.RULE_NOT_OFFERED, 409) from exc
 
 
 @dataclass(frozen=True)
