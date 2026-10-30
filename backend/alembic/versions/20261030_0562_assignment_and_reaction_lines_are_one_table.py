@@ -226,16 +226,26 @@ def _downgrade(bind: Connection) -> None:
         "CREATE INDEX idx_task_assignment_digest_items_unprocessed "
         "ON task_assignment_digest_items (processed_at) WHERE processed_at IS NULL"
     )
-    # A line whose task has gone has nothing left to name.
-    op.execute(
-        "INSERT INTO task_assignment_digest_items (user_id, task_id, project_id, "
-        "task_title, project_name, assigned_by_name, assigned_by_id, created_at, "
-        "processed_at) "
-        "SELECT n.user_id, n.target_id, n.project_id, n.title, n.project_name, "
-        "n.actor_name, n.actor_id, n.created_at, n.processed_at "
+    # A line whose task has gone has nothing left to name. The tasks are read
+    # with their row security lifted, as the lines are.
+    lines = (
         "FROM batched_notices n JOIN tasks t ON t.id = n.target_id "
         "WHERE n.kind = 'task_assignment'"
     )
+    with _unforced(bind, "tasks"):
+        queued = _count(bind, f"SELECT count(*) {lines}")
+        op.execute(
+            "INSERT INTO task_assignment_digest_items (user_id, task_id, "
+            "project_id, task_title, project_name, assigned_by_name, "
+            "assigned_by_id, created_at, processed_at) "
+            "SELECT n.user_id, n.target_id, n.project_id, n.title, n.project_name, "
+            f"n.actor_name, n.actor_id, n.created_at, n.processed_at {lines}"
+        )
+    moved = _count(bind, "SELECT count(*) FROM task_assignment_digest_items")
+    if moved != queued:
+        raise RuntimeError(
+            f"moved {moved} of {queued} assignment lines out of batched_notices"
+        )
     op.execute("DELETE FROM batched_notices WHERE kind = 'task_assignment'")
 
     op.execute("DROP INDEX ix_batched_notices_user_id_kind")
