@@ -70,8 +70,10 @@ async def test_changing_the_global_mode_is_an_area_of_the_settings_row(
     detail = rows[0]["detail"]
     assert detail["area"] == "ai_mode"
     assert detail["changed"] == ["ai_config_mode"]
-    # The mode is a string, so it is named and not copied.
-    assert detail["values"] == {}
+    # The mode is one of a fixed set, so its values ride along.
+    assert detail["values"] == {
+        "ai_config_mode": {"from": "disabled", "to": "platform"}
+    }
 
 
 async def test_setting_the_mode_it_is_already_on_records_nothing(
