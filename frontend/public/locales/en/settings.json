@@ -2288,5 +2288,24 @@
     },
     "beyondYours": "You can't change this role: it holds something you don't.",
     "widensAnAdmin": "Only an admin who holds everything can delete an admin role: its holders get everything back."
+  },
+  "customRoleRules": {
+    "title": "Custom roles by group",
+    "description": "Give a custom role to whoever signs in carrying a group. A sign-in reads these in order and the first group it carries decides; a role somebody gave by hand stays theirs.",
+    "add": "Add role rule",
+    "empty": "No group gives a custom role yet.",
+    "gives": "Through {{provider}}, gives {{role}}",
+    "moveUp": "Move {{group}} up",
+    "moveDown": "Move {{group}} down",
+    "remove": "Remove rule",
+    "removeTitle": "Remove this rule?",
+    "removeDescription": "People in {{group}} keep the role it gave until they next sign in.",
+    "dialogDescription": "Whoever signs in through this provider carrying the group gets the role, unless an earlier rule matches first.",
+    "roleLabel": "Custom role",
+    "rolePlaceholder": "Choose a role",
+    "added": "Rule added",
+    "addError": "Couldn't add the rule",
+    "orderError": "Couldn't reorder the rules",
+    "removeError": "Couldn't remove the rule"
   }
 }

@@ -137,6 +137,10 @@ vi.mock("@/hooks/useCommunityAuthPolicy", () => ({
   useCreateClaimRule: () => ({ mutate: vi.fn(), isPending: false }),
   useUpdateClaimRule: () => ({ mutate: vi.fn(), isPending: false }),
   useDeleteClaimRule: () => ({ mutate: vi.fn(), isPending: false }),
+  useCustomRoleClaimRules: () => ({ data: [], isLoading: false }),
+  useCreateCustomRoleClaimRule: () => ({ mutate: vi.fn(), isPending: false }),
+  useOrderCustomRoleClaimRules: () => ({ mutate: vi.fn(), isPending: false }),
+  useDeleteCustomRoleClaimRule: () => ({ mutate: vi.fn(), isPending: false }),
 }));
 
 import { SettingsCommunitySecurityPage } from "./SettingsCommunitySecurityPage";

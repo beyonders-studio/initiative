@@ -2288,5 +2288,24 @@
     },
     "beyondYours": "Du kannst diese Rolle nicht ändern: Sie enthält etwas, das du selbst nicht hast.",
     "widensAnAdmin": "Nur ein Admin, der alles darf, kann eine Admin-Rolle löschen: Wer sie hat, darf danach wieder alles."
+  },
+  "customRoleRules": {
+    "title": "Eigene Rollen nach Gruppe",
+    "description": "Gib allen, die sich mit einer Gruppe anmelden, eine eigene Rolle. Eine Anmeldung liest diese Regeln der Reihe nach, und die erste passende Gruppe entscheidet. Eine von Hand vergebene Rolle bleibt bestehen.",
+    "add": "Rollenregel hinzufügen",
+    "empty": "Noch keine Gruppe vergibt eine eigene Rolle.",
+    "gives": "Über {{provider}}: {{role}}",
+    "moveUp": "{{group}} nach oben",
+    "moveDown": "{{group}} nach unten",
+    "remove": "Regel entfernen",
+    "removeTitle": "Diese Regel entfernen?",
+    "removeDescription": "Wer in {{group}} ist, behält die Rolle bis zur nächsten Anmeldung.",
+    "dialogDescription": "Wer sich über diesen Anbieter mit der Gruppe anmeldet, bekommt die Rolle, sofern keine frühere Regel zuerst passt.",
+    "roleLabel": "Eigene Rolle",
+    "rolePlaceholder": "Rolle wählen",
+    "added": "Regel hinzugefügt",
+    "addError": "Die Regel konnte nicht hinzugefügt werden",
+    "orderError": "Die Regeln konnten nicht neu sortiert werden",
+    "removeError": "Die Regel konnte nicht entfernt werden"
   }
 }

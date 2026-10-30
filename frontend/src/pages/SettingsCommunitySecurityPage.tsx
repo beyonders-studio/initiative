@@ -16,6 +16,7 @@ import { CommunityClaimRulesSection } from "@/components/auth/CommunityClaimRule
 import { CommunityEngagementRankingSection } from "@/components/auth/CommunityEngagementRankingSection";
 import { CommunityNotificationPolicySection } from "@/components/auth/CommunityNotificationPolicySection";
 import { ConnectSignInWizard } from "@/components/auth/ConnectSignInWizard";
+import { CustomRoleClaimRulesSection } from "@/components/auth/CustomRoleClaimRulesSection";
 import { Alert, AlertDescription } from "@/components/ui/alert";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
@@ -675,6 +676,8 @@ export const SettingsCommunitySecurityPage = () => {
           />
 
           <CommunityClaimRulesSection communityId={communityId} />
+
+          <CustomRoleClaimRulesSection communityId={communityId} />
 
           <SignInRequirementCard
             communityId={communityId}
