@@ -25,7 +25,7 @@ from app.models.tenant.initiative import (
     InitiativeJoinRequest,
     InitiativeMember,
     InitiativeRoleModel,
-    InitiativeRolePermission,
+    InitiativeRule,
     BUILTIN_ROLE_PERMISSIONS,
     JoinRequestStatus,
     PermissionKey,
@@ -223,9 +223,10 @@ async def create_builtin_roles(
     for spec in BUILTIN_ROLES:
         for perm_key, enabled in spec.permissions.items():
             session.add(
-                InitiativeRolePermission(
+                InitiativeRule(
+                    initiative_id=initiative_id,
                     initiative_role_id=roles[spec.name].id,
-                    permission_key=perm_key,
+                    key=perm_key,
                     enabled=enabled,
                 )
             )
@@ -480,9 +481,10 @@ async def create_custom_role(
     perms = permissions or dict(BUILTIN_ROLE_PERMISSIONS["member"])
     for perm_key, enabled in perms.items():
         session.add(
-            InitiativeRolePermission(
+            InitiativeRule(
+                initiative_id=role.initiative_id,
                 initiative_role_id=role.id,
-                permission_key=perm_key,
+                key=perm_key,
                 enabled=enabled,
             )
         )
@@ -502,7 +504,7 @@ async def update_role_permissions(
     for perm_key, enabled in permissions.items():
         # Find existing permission
         existing = next(
-            (p for p in role.permissions if p.permission_key == perm_key),
+            (p for p in role.permissions if p.key == perm_key),
             None,
         )
         if existing:
@@ -510,9 +512,10 @@ async def update_role_permissions(
             session.add(existing)
         else:
             session.add(
-                InitiativeRolePermission(
+                InitiativeRule(
+                    initiative_id=role.initiative_id,
                     initiative_role_id=role.id,
-                    permission_key=perm_key,
+                    key=perm_key,
                     enabled=enabled,
                 )
             )

@@ -315,7 +315,7 @@ async def test_the_plugin_role_holds_only_what_a_plugin_reaches(engine):
                 "guild_plugins",
                 "guild_plugin_secrets",
                 "plugin_placements",
-                "initiative_role_permissions",
+                "initiative_rules",
             ):
                 for verb in ("SELECT", "INSERT", "UPDATE", "DELETE"):
                     assert await held(conn, table, verb) is False, f"{table} {verb}"
@@ -458,7 +458,7 @@ async def test_support_role_write_capped_on_protected_tables(engine):
                 "guild_settings",
                 "initiative_members",
                 "initiative_roles",
-                "initiative_role_permissions",
+                "initiative_rules",
             ):
                 for verb in ("SELECT", "INSERT", "UPDATE", "DELETE"):
                     assert await priv(table, verb) is True, f"{table} {verb}"

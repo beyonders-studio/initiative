@@ -347,7 +347,7 @@ def serialize_role(
     """
     permissions = {
         **DEFAULT_PERMISSION_VALUES,
-        **{perm.permission_key: perm.enabled for perm in (role.permissions or [])},
+        **{perm.key: perm.enabled for perm in (role.permissions or [])},
     }
     return InitiativeRoleRead(
         id=role.id,

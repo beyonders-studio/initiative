@@ -56,7 +56,7 @@ from app.models.tenant.initiative import (
     Initiative,
     InitiativeMember,
     InitiativeRoleModel,
-    InitiativeRolePermission,
+    InitiativeRule,
 )
 from app.models.tenant.calendar_event import CalendarEvent, CalendarEventAttendee
 from app.models.tenant.metadata import MetadataValue
@@ -199,9 +199,9 @@ def readers_of(governing: Governing, guild_id: int) -> Select:
             return (
                 exists()
                 .where(
-                    InitiativeRolePermission.initiative_role_id == im.role_id,
-                    InitiativeRolePermission.permission_key == tool.view_permission,
-                    InitiativeRolePermission.enabled.is_(enabled),
+                    InitiativeRule.initiative_role_id == im.role_id,
+                    InitiativeRule.key == tool.view_permission,
+                    InitiativeRule.enabled.is_(enabled),
                 )
                 .correlate(im)
             )

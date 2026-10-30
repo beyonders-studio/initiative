@@ -192,7 +192,7 @@ _HEADER = """\
 --
 -- SCOPE: only INITIATIVE-scoped CONTENT tables are here, exactly
 -- app.db.initiative_rls.INITIATIVE_SCOPED_TABLES. The STRUCTURAL initiative tables
--- (initiatives, initiative_members, initiative_roles, initiative_role_permissions)
+-- (initiatives, initiative_members, initiative_roles, initiative_rules)
 -- are read within the schema boundary (co-members read their roster, and the
 -- standing statement reads the membership table before any standing exists) and
 -- written by their managers — the managed_* policies further down, from

@@ -548,7 +548,7 @@ PLUGIN_ROLE_MACHINERY_READS: dict[str, tuple[str, ...]] = {
         "granted_access",
         "revoked_at",
     ),
-    "initiative_role_permissions": ("initiative_role_id", "permission_key", "enabled"),
+    "initiative_rules": ("initiative_id", "initiative_role_id", "key", "enabled"),
     "resource_grants": (),
     "tool_layouts": ("initiative_id", "tool", "tool_id", "kind", "definition"),
 }

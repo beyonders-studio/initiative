@@ -2123,14 +2123,6 @@ def poll_options_report_on_their_post() -> ReportsAs:
     )
 
 
-def _role_initiative(r: str) -> str:
-    """The initiative a row's ``initiative_role_id`` belongs to."""
-    return (
-        f"(SELECT initiative_roles.initiative_id FROM initiative_roles "  # noqa: S608
-        f"WHERE initiative_roles.id = {r}.initiative_role_id)"
-    )
-
-
 @dataclass(frozen=True)
 class Silent:
     """This table gets no capture trigger, and why not."""
@@ -2219,14 +2211,9 @@ EVENT_SOURCES: dict[str, Emit | Silent] = {
         initiative=lambda r: f"{r}.initiative_id",
         reports_as=reports_as("initiatives", "initiative_id", "roles"),
     ),
-    "initiative_role_permissions": Emit(
-        initiative=_role_initiative,
-        # The resource IS the initiative, so its id is the same lookup.
-        reports_as=ReportsAs(
-            resource_types=frozenset({"initiatives"}),
-            id_expr=_role_initiative,
-            facet="roles",
-        ),
+    "initiative_rules": Emit(
+        initiative=lambda r: f"{r}.initiative_id",
+        reports_as=reports_as("initiatives", "initiative_id", "roles"),
     ),
     # -- Guild-wide: no initiative at all -----------------------------------
     # The row carries a NULL initiative_id, which the access function reads as

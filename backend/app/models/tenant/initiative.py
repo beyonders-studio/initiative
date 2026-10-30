@@ -7,8 +7,8 @@ from sqlalchemy import (
     CheckConstraint,
     Column,
     DateTime,
-    Enum as SAEnum,
     ForeignKey,
+    ForeignKeyConstraint,
     Index,
     Integer,
     String,
@@ -77,7 +77,7 @@ class JoinRequestStatus(str, Enum):
 # one `{plural}_enabled` + `create_{plural}` pair per tool (projects_enabled,
 # create_projects, …), plus the few EXTRA_PERMISSION_KEYS that are not a tool of
 # their own. A new Tool member gets its keys automatically, and the CHECK on
-# initiative_role_permissions is rendered from them at boot
+# initiative_rules is rendered from them at boot
 # (``app.db.registry_checks``).
 #: Role keys that are not a tool's pair. Each is a capability inside a tool
 #: rather than the tool itself, defaults to off for an ordinary role, and is
@@ -171,6 +171,9 @@ class InitiativeRoleModel(CreatedByMixin, table=True):
     __tablename__ = "initiative_roles"
     __table_args__ = (
         UniqueConstraint("initiative_id", "name", name="uq_initiative_role_name"),
+        # What an initiative's rule names a role by: the role and the
+        # initiative it belongs to, so a rule never reaches another's role.
+        UniqueConstraint("id", "initiative_id", name="uq_initiative_roles_initiative"),
     )
 
     id: Optional[int] = Field(default=None, primary_key=True)
@@ -197,47 +200,54 @@ class InitiativeRoleModel(CreatedByMixin, table=True):
     position: int = Field(default=0)  # for ordering in UI
 
     initiative: Optional["Initiative"] = Relationship(back_populates="roles")
-    permissions: List["InitiativeRolePermission"] = Relationship(
+    permissions: List["InitiativeRule"] = Relationship(
         back_populates="role",
         sa_relationship_kwargs={"cascade": "all, delete-orphan"},
     )
     members: List["InitiativeMember"] = Relationship(back_populates="role_ref")
 
 
-class InitiativeRolePermission(SQLModel, table=True):
-    """Permission toggles per role."""
+class InitiativeRule(SQLModel, table=True):
+    """One of an initiative's rules: what one of its roles may do with a tool
+    (``PermissionKey``). Kept in the community's own schema beside the
+    initiative, and gone with it; a role's rules go with the role."""
 
-    __tablename__ = "initiative_role_permissions"
+    __tablename__ = "initiative_rules"
     __table_args__ = (
         CheckConstraint(
-            "permission_key IN ("
-            + ", ".join(f"'{key.value}'" for key in PermissionKey)
-            + ")",
-            name="ck_initiative_role_permissions_permission_key",
+            "key IN (" + ", ".join(f"'{key.value}'" for key in PermissionKey) + ")",
+            name="ck_initiative_rules_key",
             info={FROM_REGISTRY: True},
+        ),
+        ForeignKeyConstraint(
+            ["initiative_role_id", "initiative_id"],
+            ["initiative_roles.id", "initiative_roles.initiative_id"],
+            ondelete="CASCADE",
+            name="fk_initiative_rules_role",
+        ),
+        UniqueConstraint(
+            "initiative_id",
+            "key",
+            "initiative_role_id",
+            name="uq_initiative_rules_subject",
+            postgresql_nulls_not_distinct=True,
         ),
     )
 
-    initiative_role_id: int = Field(
+    id: Optional[int] = Field(default=None, primary_key=True)
+    initiative_id: int = Field(
         sa_column=Column(
             Integer,
-            ForeignKey("initiative_roles.id", ondelete="CASCADE"),
-            primary_key=True,
+            ForeignKey("initiatives.id", ondelete="CASCADE"),
+            nullable=False,
         )
     )
-    permission_key: PermissionKey = Field(
-        sa_column=Column(
-            SAEnum(
-                PermissionKey,
-                name="permissionkey",
-                create_constraint=False,
-                native_enum=False,
-                length=50,
-            ),
-            primary_key=True,
-        )
+    #: The role the rule is about.
+    initiative_role_id: Optional[int] = Field(
+        default=None, sa_column=Column(Integer, nullable=True, index=True)
     )
-    enabled: bool = Field(default=True)
+    key: str = Field(sa_column=Column(String(64), nullable=False))
+    enabled: bool = Field(sa_column=Column(Boolean, nullable=False))
 
     role: Optional["InitiativeRoleModel"] = Relationship(back_populates="permissions")
 
