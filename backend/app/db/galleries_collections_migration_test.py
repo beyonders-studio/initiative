@@ -50,9 +50,12 @@ async def _one(session, sql: str, **params: Any) -> Any:
 
 def _runner(schema: str):
     """Revision 0546 one way or the other, on one guild's schema only, with
-    the metadata store (20261027_0550) off first and back on last."""
+    the data jobs table (20261030_0564), the batched notices (20261030_0563)
+    and the metadata store (20261027_0550) off first and back on last."""
     migration = _load("20261027_0546_galleries_are_collections.py")
     metadata = _load("20261027_0550_metadata_is_one_store.py")
+    batched = _load("20261030_0563_assignment_and_reaction_lines_are_one_table.py")
+    data_jobs = _load("20261030_0564_imports_and_exports_are_data_jobs.py")
 
     def run(forward: bool):
         def apply(sync_session) -> None:
@@ -67,10 +70,14 @@ def _runner(schema: str):
 
             with Operations.context(MigrationContext.configure(bind)):
                 if not forward:
+                    in_schema(data_jobs._downgrade_schema)
+                    in_schema(lambda: batched._downgrade(bind))
                     in_schema(lambda: metadata._apply(False))
                 migration._convert(bind, forward, in_schema)
                 if forward:
                     in_schema(lambda: metadata._apply(True))
+                    in_schema(lambda: batched._upgrade(bind))
+                    in_schema(data_jobs._upgrade_schema)
 
         return apply
 
