@@ -106,6 +106,7 @@
   "/c/$communityId/settings/guests",
   "/c/$communityId/settings/initiatives",
   "/c/$communityId/settings/integrations",
+  "/c/$communityId/settings/roles",
   "/c/$communityId/settings/security",
   "/c/$communityId/settings/trash",
   "/c/$communityId/settings/usage",
