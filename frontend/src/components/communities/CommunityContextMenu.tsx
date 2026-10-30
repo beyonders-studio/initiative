@@ -13,7 +13,7 @@ import { type ReactNode, useState } from "react";
 import { useTranslation } from "react-i18next";
 
 import { createCommunityInvite } from "@/api/generated/communities/communities";
-import type { CommunityRead } from "@/api/generated/initiativeAPI.schemas";
+import { AdminSurface, type CommunityRead } from "@/api/generated/initiativeAPI.schemas";
 import { invalidate, q } from "@/api/query-keys";
 import { InitiativeMark } from "@/components/icons/InitiativeMark";
 import {
@@ -26,6 +26,7 @@ import {
 } from "@/components/ui/context-menu";
 import { useBillingPortal } from "@/hooks/useBillingPortal";
 import { useCommunities } from "@/hooks/useCommunities";
+import { useHeldSurfaces } from "@/hooks/useCustomRoles";
 import { holdsBillingSeat } from "@/lib/billingSummary";
 import { getErrorMessage } from "@/lib/errorMessage";
 import { toast } from "@/lib/mascotToast";
@@ -54,10 +55,14 @@ export const CommunityContextMenu = ({
   const { canSell, openPortal } = useBillingPortal();
   const [leaveDialogOpen, setLeaveDialogOpen] = useState(false);
 
-  const isAdmin = community.can.administer;
   // A suspended community offers nothing to open, and its membership cannot
   // change until the platform lifts the suspension.
   const closed = !community.can.enter;
+  // What the reader runs here, a custom role included: asked when the menu
+  // opens, rather than for every community in the list.
+  const [menuOpen, setMenuOpen] = useState(false);
+  const held = useHeldSurfaces(community, { enabled: menuOpen && !closed });
+  const runsAnyPart = community.can.administer || held.holdsAny;
   const [creatingInvite, setCreatingInvite] = useState(false);
   // A community at its seat cap mints no invite (the server refuses), so the item
   // says so rather than handing back an error toast. Both fields are
@@ -140,7 +145,7 @@ export const CommunityContextMenu = ({
 
   return (
     <>
-      <ContextMenu>
+      <ContextMenu onOpenChange={setMenuOpen}>
         <ContextMenuTrigger>{children}</ContextMenuTrigger>
         <ContextMenuContent className="w-48">
           <ContextMenuLabel className="truncate">{community.name}</ContextMenuLabel>
@@ -157,10 +162,10 @@ export const CommunityContextMenu = ({
               </ContextMenuItem>
             </>
           )}
-          {isAdmin && !closed && (
+          {runsAnyPart && !closed && (
             <>
               <ContextMenuSeparator />
-              {community.can.configure && (
+              {held.writes && held.holds("invites") && (
                 <ContextMenuItem
                   onClick={
                     upgradeForSeats
@@ -173,7 +178,7 @@ export const CommunityContextMenu = ({
                   {creatingInvite ? t("creatingInvite") : inviteLabel}
                 </ContextMenuItem>
               )}
-              {community.can.administer_content && (
+              {held.holds(AdminSurface.initiatives) && (
                 <ContextMenuItem onClick={handleCreateInitiative}>
                   <Plus className="mr-2 h-4 w-4" />
                   {t("createInitiative")}

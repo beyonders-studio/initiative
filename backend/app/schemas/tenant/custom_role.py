@@ -49,3 +49,9 @@ class CustomRoleAssignment(SanitizedBaseModel):
 class CustomRoleHolder(SanitizedBaseModel):
     user_id: int
     role_id: int
+
+
+class HeldSurfacesRead(SanitizedBaseModel):
+    #: The admin surfaces the reader holds in the community, as the request's
+    #: standing computed them.
+    surfaces: list[AdminSurface]

@@ -458,6 +458,12 @@ const communityInvites = (communityId: number): Spec => ({
   personalExact: [`/api/v1/communities/${communityId}/invites`],
 });
 
+// ── Custom roles (community) ─────────────────────────────────────────────────────
+// The community's roles, who holds which, and what the reader holds: one prefix,
+// since a change to any of them can change the others.
+
+const customRoles = (): Spec => ({ communityPrefix: ["/api/v1/custom-roles"] });
+
 // ── Calendar Events (community + me) ─────────────────────────────────────────────
 
 // The calendar-entries aggregate unions events + task markers; name it too so
@@ -710,6 +716,7 @@ export const q = {
   contactGrants,
   contacts,
   counterGroup,
+  customRoles,
   currentUser,
   dashboard,
   directMessages,

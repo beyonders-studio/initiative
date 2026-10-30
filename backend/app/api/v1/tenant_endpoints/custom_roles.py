@@ -23,6 +23,7 @@ from app.api.deps import (
     GuildContext,
     GuildContextDep,
     RLSSessionDep,
+    SettingsContextDep,
     SettingsRLSSessionDep,
     require_surface,
 )
@@ -42,6 +43,7 @@ from app.schemas.tenant.custom_role import (
     CustomRoleHolder,
     CustomRoleRead,
     CustomRoleUpdate,
+    HeldSurfacesRead,
 )
 from app.services import audit as audit_service
 from app.services.tenant import custom_roles as custom_roles_service
@@ -158,6 +160,16 @@ async def list_custom_roles(
     """The community's custom roles, for anybody in it: who holds what is
     shown beside each member."""
     return [_read(role) for role in await custom_roles_service.list_roles(session)]
+
+
+@router.get("/held", response_model=HeldSurfacesRead)
+async def read_held_surfaces(context: SettingsContextDep) -> HeldSurfacesRead:
+    """The admin surfaces the reader holds here: every one for an admin with
+    no custom role, a role's otherwise, none for a member without one. What
+    the community's settings pages are shown by."""
+    return HeldSurfacesRead(
+        surfaces=[s for s in AdminSurface if context.holds_surface(s)]
+    )
 
 
 @router.post("/", response_model=CustomRoleRead, status_code=status.HTTP_201_CREATED)

@@ -2,6 +2,7 @@ import { activityHandlers } from "./activity.handlers";
 import { authHandlers } from "./auth.handlers";
 import { commentHandlers } from "./comment.handlers";
 import { communityHandlers } from "./community.handlers";
+import { customRoleHandlers } from "./customRole.handlers";
 import { dmHandlers } from "./dm.handlers";
 import { fileHandlers } from "./file.handlers";
 import { initiativeHandlers } from "./initiative.handlers";
@@ -19,6 +20,7 @@ import { versionHandlers } from "./version.handlers";
 export const handlers = [
   ...authHandlers,
   ...communityHandlers,
+  ...customRoleHandlers,
   ...initiativeHandlers,
   ...projectHandlers,
   ...toolLayoutHandlers,

@@ -66,7 +66,8 @@ const withQueryKey = <T extends object, K>(query: T, queryKey: K): T & { queryKe
 
 /**
  * The initiatives the caller belongs to, or — for a guild admin asking for
- * ``scope=community`` — every initiative in the guild.
+ * ``scope=community`` — every initiative in the guild, which the admin rung's
+ * reach into all content already reads.
  *
  * The default is the caller's own workspace: what the sidebar and the
  * initiative pickers show. A guild admin's authority over their whole guild is

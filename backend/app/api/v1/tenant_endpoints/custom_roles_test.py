@@ -34,6 +34,8 @@ async def test_a_member_role_opens_the_surfaces_it_names(client, acting_user):
         client, admin, name="Doors", base_rung="member", surfaces=["invites"]
     )
     assert (await _give(client, admin, member.user.id, doors)).status_code == 204
+    held = await client.get(member.g("/custom-roles/held"), headers=member.headers)
+    assert held.json() == {"surfaces": ["invites"]}
     holders = await client.get(
         member.g("/custom-roles/holders"), headers=member.headers
     )
@@ -41,6 +43,11 @@ async def test_a_member_role_opens_the_surfaces_it_names(client, acting_user):
 
     issued = await client.post(invites, headers=member.headers, json={})
     assert issued.status_code == 201, issued.text
+    # A guest invite can open any initiative, which a member doesn't see.
+    guest_invite = await client.post(
+        invites, headers=member.headers, json={"guest_days": 7}
+    )
+    assert guest_invite.status_code == 403
     listed = await client.get(invites, headers=member.headers)
     assert listed.status_code == 200 and len(listed.json()) == 1
 

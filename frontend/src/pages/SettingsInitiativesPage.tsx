@@ -31,6 +31,7 @@ import { Skeleton } from "@/components/ui/skeleton";
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip";
 import { useArchiveEntity, useUnarchiveEntity } from "@/hooks/useArchive";
 import { useCommunities } from "@/hooks/useCommunities";
+import { useHeldSurfaces } from "@/hooks/useCustomRoles";
 import { useDebouncedValue } from "@/hooks/useDebouncedValue";
 import { useInitiativeRoles } from "@/hooks/useInitiativeRoles";
 import {
@@ -244,11 +245,14 @@ const InitiativeManagersCell = ({ initiative }: { initiative: InitiativeRead }) 
 export const SettingsInitiativesPage = () => {
   const { t } = useTranslation(["initiatives", "common"]);
   const { activeCommunity } = useCommunities();
+  // Whoever holds the community's initiatives, not only its admins.
+  const managesInitiatives = useHeldSurfaces().holds("initiatives");
+  // What every initiative uses is the admin rung's own to set.
   const isCommunityAdmin = Boolean(activeCommunity?.can.administer);
 
   // The community-wide listing, not the admin's own memberships — this table is
   // where they manage initiatives they have not joined.
-  const initiativesQuery = useCommunityInitiatives({ enabled: isCommunityAdmin });
+  const initiativesQuery = useCommunityInitiatives({ enabled: managesInitiatives });
   const deleteInitiative = useDeleteInitiative();
   const archiveInitiative = useArchiveEntity();
   const unarchiveInitiative = useUnarchiveEntity();
@@ -376,7 +380,7 @@ export const SettingsInitiativesPage = () => {
     },
   ];
 
-  if (!isCommunityAdmin) {
+  if (!managesInitiatives) {
     return <p className="text-muted-foreground text-sm">{t("manage.adminRequired")}</p>;
   }
 

@@ -83,6 +83,7 @@ import { useCalendar, useCalendarsList } from "@/hooks/useCalendars";
 import { useCanonicalInitiativeId } from "@/hooks/useCanonicalInitiativeId";
 import { useCommunities } from "@/hooks/useCommunities";
 import { useCreateFromSearchParam } from "@/hooks/useCreateFromSearchParam";
+import { useHeldSurfaces } from "@/hooks/useCustomRoles";
 import { useExportJob } from "@/hooks/useExportJob";
 import { useToolCreateAccess } from "@/hooks/useInitiativeAccess";
 import { useInitiative } from "@/hooks/useInitiatives";
@@ -476,10 +477,11 @@ export const CalendarsView = ({
     enabled: !communityOnly,
   });
   // At community scope there is no initiative role to consult: the community's
-  // calendars are its admins' to add. The solo deep link is one calendar's
-  // surface, so it offers no list to add to.
+  // calendars are added by whoever holds them. The solo deep link is one
+  // calendar's surface, so it offers no list to add to.
+  const holdsCommunityCalendars = useHeldSurfaces().holds("community_calendars");
   const canCreateCalendars = communityScope
-    ? Boolean(activeCommunity?.can.administer_content)
+    ? holdsCommunityCalendars
     : solo
       ? false
       : (canCreate ?? canCreateCalendarsDerived);

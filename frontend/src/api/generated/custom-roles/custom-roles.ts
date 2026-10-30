@@ -27,6 +27,7 @@ import type {
   CustomRoleRead,
   CustomRoleUpdate,
   HTTPValidationError,
+  HeldSurfacesRead,
 } from "../initiativeAPI.schemas";
 
 import { apiMutator } from "../../mutator";
@@ -263,6 +264,130 @@ export const useCreateCustomRole = <TError = ErrorType<HTTPValidationError>, TCo
 > => {
   return useMutation(getCreateCustomRoleMutationOptions(options), queryClient);
 };
+/**
+ * The admin surfaces the reader holds here: every one for an admin with
+ * no custom role, a role's otherwise, none for a member without one. What
+ * the community's settings pages are shown by.
+ * @summary Read Held Surfaces
+ */
+export const readHeldSurfaces = (
+  communityId: number,
+  options?: SecondParameter<typeof apiMutator>,
+  signal?: AbortSignal
+) => {
+  return apiMutator<HeldSurfacesRead>(
+    { url: `/api/v1/c/${communityId}/custom-roles/held`, method: "GET", signal },
+    options
+  );
+};
+
+export const getReadHeldSurfacesQueryKey = (communityId: number) => {
+  return [`/api/v1/c/${communityId}/custom-roles/held`] as const;
+};
+
+export const getReadHeldSurfacesQueryOptions = <
+  TData = Awaited<ReturnType<typeof readHeldSurfaces>>,
+  TError = ErrorType<HTTPValidationError>,
+>(
+  communityId: number,
+  options?: {
+    query?: Partial<UseQueryOptions<Awaited<ReturnType<typeof readHeldSurfaces>>, TError, TData>>;
+    request?: SecondParameter<typeof apiMutator>;
+  }
+) => {
+  const { query: queryOptions, request: requestOptions } = options ?? {};
+
+  const queryKey = queryOptions?.queryKey ?? getReadHeldSurfacesQueryKey(communityId);
+
+  const queryFn: QueryFunction<Awaited<ReturnType<typeof readHeldSurfaces>>> = ({ signal }) =>
+    readHeldSurfaces(communityId, requestOptions, signal);
+
+  return {
+    queryKey,
+    queryFn,
+    enabled: communityId !== null && communityId !== undefined,
+    ...queryOptions,
+  } as UseQueryOptions<Awaited<ReturnType<typeof readHeldSurfaces>>, TError, TData> & {
+    queryKey: DataTag<QueryKey, TData, TError>;
+  };
+};
+
+export type ReadHeldSurfacesQueryResult = NonNullable<Awaited<ReturnType<typeof readHeldSurfaces>>>;
+export type ReadHeldSurfacesQueryError = ErrorType<HTTPValidationError>;
+
+export function useReadHeldSurfaces<
+  TData = Awaited<ReturnType<typeof readHeldSurfaces>>,
+  TError = ErrorType<HTTPValidationError>,
+>(
+  communityId: number,
+  options: {
+    query: Partial<UseQueryOptions<Awaited<ReturnType<typeof readHeldSurfaces>>, TError, TData>> &
+      Pick<
+        DefinedInitialDataOptions<
+          Awaited<ReturnType<typeof readHeldSurfaces>>,
+          TError,
+          Awaited<ReturnType<typeof readHeldSurfaces>>
+        >,
+        "initialData"
+      >;
+    request?: SecondParameter<typeof apiMutator>;
+  },
+  queryClient?: QueryClient
+): DefinedUseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData, TError> };
+export function useReadHeldSurfaces<
+  TData = Awaited<ReturnType<typeof readHeldSurfaces>>,
+  TError = ErrorType<HTTPValidationError>,
+>(
+  communityId: number,
+  options?: {
+    query?: Partial<UseQueryOptions<Awaited<ReturnType<typeof readHeldSurfaces>>, TError, TData>> &
+      Pick<
+        UndefinedInitialDataOptions<
+          Awaited<ReturnType<typeof readHeldSurfaces>>,
+          TError,
+          Awaited<ReturnType<typeof readHeldSurfaces>>
+        >,
+        "initialData"
+      >;
+    request?: SecondParameter<typeof apiMutator>;
+  },
+  queryClient?: QueryClient
+): UseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData, TError> };
+export function useReadHeldSurfaces<
+  TData = Awaited<ReturnType<typeof readHeldSurfaces>>,
+  TError = ErrorType<HTTPValidationError>,
+>(
+  communityId: number,
+  options?: {
+    query?: Partial<UseQueryOptions<Awaited<ReturnType<typeof readHeldSurfaces>>, TError, TData>>;
+    request?: SecondParameter<typeof apiMutator>;
+  },
+  queryClient?: QueryClient
+): UseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData, TError> };
+/**
+ * @summary Read Held Surfaces
+ */
+
+export function useReadHeldSurfaces<
+  TData = Awaited<ReturnType<typeof readHeldSurfaces>>,
+  TError = ErrorType<HTTPValidationError>,
+>(
+  communityId: number,
+  options?: {
+    query?: Partial<UseQueryOptions<Awaited<ReturnType<typeof readHeldSurfaces>>, TError, TData>>;
+    request?: SecondParameter<typeof apiMutator>;
+  },
+  queryClient?: QueryClient
+): UseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData, TError> } {
+  const queryOptions = getReadHeldSurfacesQueryOptions(communityId, options);
+
+  const query = useQuery(queryOptions, queryClient) as UseQueryResult<TData, TError> & {
+    queryKey: DataTag<QueryKey, TData, TError>;
+  };
+
+  return withQueryKey(query, queryOptions.queryKey);
+}
+
 /**
  * Rename a role, or change what it holds. Its rung stays the one it was
  * made on.
