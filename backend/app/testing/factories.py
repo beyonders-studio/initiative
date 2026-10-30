@@ -318,8 +318,7 @@ async def create_guild(
 
 
 async def community_plan(session: AsyncSession, guild_id: int) -> rules.Values:
-    """What one community's rules say now, its plan among them, read fresh."""
-    session.expire_all()
+    """What one community's rules say now, its plan among them."""
     return (await rules.community_values(session, [guild_id]))[guild_id]
 
 

@@ -337,6 +337,20 @@ $function$
 """
 
 
+#: The ``community_rules`` policies this version's registry renders over
+#: ``set_by`` (``app.db.public_rls``).
+DEPLOYMENT_AWARE_POLICIES = (
+    "community_rules_plan_read",
+    "community_rules_seat_delete",
+    "community_rules_seat_insert",
+    "community_rules_seat_update",
+    "billing_community_rules_select",
+    "billing_community_rules_insert",
+    "billing_community_rules_update",
+    "billing_community_rules_delete",
+)
+
+
 def _billing_role() -> str:
     return f"{settings.PLATFORM_ROLE_PREFIX}initiative_billing"
 
@@ -556,6 +570,13 @@ def downgrade() -> None:
         op.execute(statement)
 
     with _unforced() as bind:
+        # Putting the plan back is not a change billing would refuse, so its
+        # trigger on the row (0364) stands aside for the copy, in this
+        # transaction.
+        bind.exec_driver_sql(
+            "ALTER TABLE public.guild_administration"
+            " DISABLE TRIGGER guild_plan_follows_billing"
+        )
         for column, key in CAPS:
             bind.exec_driver_sql(
                 f"UPDATE public.guild_administration a SET {column} = r.amount"
@@ -587,6 +608,10 @@ def downgrade() -> None:
         bind.exec_driver_sql(
             "DELETE FROM public.community_rules WHERE set_by = 'deployment'"
         )
+        bind.exec_driver_sql(
+            "ALTER TABLE public.guild_administration"
+            " ENABLE TRIGGER guild_plan_follows_billing"
+        )
 
     bind = op.get_bind()
     bind.exec_driver_sql("DROP FUNCTION public.community_rule_follows_billing()")
@@ -609,5 +634,9 @@ def downgrade() -> None:
         existing_type=sa.BigInteger(),
         schema="public",
     )
+    # The policies boot rendered from this version's registry read ``set_by``;
+    # the version being returned to renders its own at its next start.
+    for policy in DEPLOYMENT_AWARE_POLICIES:
+        op.execute(f"DROP POLICY IF EXISTS {policy} ON public.community_rules")
     op.drop_column("community_rules", "set_by", schema="public")
     op.drop_table("rule_key_writers", schema="public")
