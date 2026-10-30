@@ -9,7 +9,8 @@ from httpx import AsyncClient
 from sqlalchemy.orm import undefer
 
 from app.models.platform.guild import CommunityRole
-from app.models.tenant.import_job import ImportJob, ImportJobStatus
+from app.models.tenant.data_job import DataJob, DataJobStatus
+from app.services import data_jobs
 from app.services.guild_sweeps import Scope, each_guild
 from app.services.import_engine import worker as import_worker
 from app.services.storage import get_guild_storage
@@ -636,18 +637,18 @@ async def test_large_envelope_becomes_job_and_worker_applies_it(
     assert resp.status_code == 202, resp.text
     body = resp.json()
     job_id = body["id"]
-    assert body["status"] == ImportJobStatus.queued.value
+    assert body["status"] == DataJobStatus.queued.value
     assert body["params"] == {"initiative_id": a.initiative.id}
     # The row holds options only — the envelope content is staged in storage,
     # and the storage key itself is not exposed through the API.
     assert "items" not in json.dumps(body)
-    assert "payload_ref" not in body
+    assert "file_ref" not in body
 
     await _run_import_worker(monkeypatch, role_session)
 
-    status_resp = await client.get(a.g(f"/imports/jobs/{job_id}"), headers=a.headers)
+    status_resp = await client.get(a.g(f"/data-jobs/{job_id}"), headers=a.headers)
     job = status_resp.json()
-    assert job["status"] == ImportJobStatus.done.value, job.get("error")
+    assert job["status"] == DataJobStatus.done.value, job.get("error")
     assert job["result"]["created"]["queues"] == 1
     assert job["result"]["created"]["items"] == 3
 
@@ -655,8 +656,8 @@ async def test_large_envelope_becomes_job_and_worker_applies_it(
     from app.testing import route_session_to_guild
 
     await route_session_to_guild(session, a.guild.id)
-    row = await session.get(ImportJob, job_id)
-    assert row is not None and row.payload_ref is None
+    row = await session.get(DataJob, job_id)
+    assert row is not None and row.file_ref is None
 
     imported = (
         await session.exec(select(Queue).where(Queue.name == "Big Queue"))
@@ -709,8 +710,8 @@ async def test_worker_fails_closed_on_revoked_permission(
 
     await _run_import_worker(monkeypatch, role_session)
 
-    job = (await client.get(a.g(f"/imports/jobs/{job_id}"), headers=a.headers)).json()
-    assert job["status"] == ImportJobStatus.failed.value
+    job = (await client.get(a.g(f"/data-jobs/{job_id}"), headers=a.headers)).json()
+    assert job["status"] == DataJobStatus.failed.value
     # RLS hides the initiative from a non-member (404-shaped), or the
     # permission check refuses — both fail closed.
     assert job["error"] in ("IMPORT_PERMISSION_REQUIRED", "IMPORT_INVALID_PARAMS")
@@ -737,8 +738,8 @@ async def test_stale_running_import_fails_closed_not_reapplied(
         a.user,
         source="initiative-queue",
         params={"initiative_id": a.initiative.id},
-        payload_ref="imports/gone.json",
-        status=ImportJobStatus.running,
+        file_ref="imports/gone.json",
+        status=DataJobStatus.running,
         created_at=stale_time,
         updated_at=stale_time,
     )
@@ -746,7 +747,7 @@ async def test_stale_running_import_fails_closed_not_reapplied(
     await _run_import_worker(monkeypatch, role_session)
 
     await session.refresh(job)
-    assert job.status == ImportJobStatus.failed
+    assert job.status == DataJobStatus.failed
     assert job.error == "IMPORT_INTERRUPTED"
 
 
@@ -771,7 +772,7 @@ async def test_import_job_cap_and_cancel(client, acting_user, session, monkeypat
     job_id = first.json()["id"]
     cancelled = await client.delete(a.g(f"/imports/jobs/{job_id}"), headers=a.headers)
     assert cancelled.status_code == 200
-    assert cancelled.json()["status"] == ImportJobStatus.cancelled.value
+    assert cancelled.json()["status"] == DataJobStatus.cancelled.value
 
     # Cancelling freed the cap slot.
     third = await _import_envelope(client, a, envelope, a.initiative.id)
@@ -803,10 +804,10 @@ async def test_import_jobs_are_own_row_isolated(
     other = await acting_user(guild_role=CommunityRole.member, guild=a.guild)
     admin = await acting_user(guild_role=CommunityRole.admin, guild=a.guild)
 
-    denied = await client.get(a.g(f"/imports/jobs/{job_id}"), headers=other.headers)
+    denied = await client.get(a.g(f"/data-jobs/{job_id}"), headers=other.headers)
     assert denied.status_code == 404
-    assert (await client.get(a.g("/imports/jobs"), headers=other.headers)).json() == []
-    allowed = await client.get(a.g(f"/imports/jobs/{job_id}"), headers=admin.headers)
+    assert (await client.get(a.g("/data-jobs/"), headers=other.headers)).json() == []
+    allowed = await client.get(a.g(f"/data-jobs/{job_id}"), headers=admin.headers)
     assert allowed.status_code == 200
 
 
@@ -989,7 +990,7 @@ async def _apply_backup(client, actor, zip_bytes, monkeypatch, role_session) -> 
     assert confirmed.status_code == 200, confirmed.text
     await _run_import_worker(monkeypatch, role_session)
     return (
-        await client.get(actor.g(f"/imports/jobs/{job_id}"), headers=actor.headers)
+        await client.get(actor.g(f"/data-jobs/{job_id}"), headers=actor.headers)
     ).json()
 
 
@@ -1059,7 +1060,7 @@ async def test_backup_import_end_to_end_with_assets(
     assert resp.status_code == 201, resp.text
     body = resp.json()
     job_id = body["id"]
-    assert body["status"] == ImportJobStatus.staged.value
+    assert body["status"] == DataJobStatus.staged.value
     plan = body["plan"]
     assert plan["source_community_name"] == "Source Guild"
     assert plan["initiatives"][0]["proposed_name"] == "Restored"
@@ -1071,12 +1072,12 @@ async def test_backup_import_end_to_end_with_assets(
         a.g(f"/imports/jobs/{job_id}/confirm"), headers=a.headers, json={}
     )
     assert confirmed.status_code == 200
-    assert confirmed.json()["status"] == ImportJobStatus.queued.value
+    assert confirmed.json()["status"] == DataJobStatus.queued.value
 
     await _run_import_worker(monkeypatch, role_session)
 
-    job = (await client.get(a.g(f"/imports/jobs/{job_id}"), headers=a.headers)).json()
-    assert job["status"] == ImportJobStatus.done.value, job.get("error")
+    job = (await client.get(a.g(f"/data-jobs/{job_id}"), headers=a.headers)).json()
+    assert job["status"] == DataJobStatus.done.value, job.get("error")
     result = job["result"]
     assert result["per_tool"]["queue"]["created"] == 1
     assert result["per_tool"]["file"]["created"] == 1
@@ -1300,8 +1301,8 @@ async def test_backup_confirm_include_map_skips_tools(
     assert confirmed.status_code == 200
 
     await _run_import_worker(monkeypatch, role_session)
-    job = (await client.get(a.g(f"/imports/jobs/{job_id}"), headers=a.headers)).json()
-    assert job["status"] == ImportJobStatus.done.value, job.get("error")
+    job = (await client.get(a.g(f"/data-jobs/{job_id}"), headers=a.headers)).json()
+    assert job["status"] == DataJobStatus.done.value, job.get("error")
     assert job["result"]["per_tool"]["queue"]["skipped"] == 1
     assert job["result"]["per_tool"]["queue"]["created"] == 0
 
@@ -1351,7 +1352,7 @@ async def test_an_archive_from_before_files_restores_its_documents(
         monkeypatch,
         role_session,
     )
-    assert job["status"] == ImportJobStatus.done.value, job.get("error")
+    assert job["status"] == DataJobStatus.done.value, job.get("error")
     assert job["result"]["per_tool"]["file"]["created"] == 1
 
     await route_session_to_guild(session, a.guild.id)
@@ -1428,7 +1429,7 @@ async def test_an_archive_with_a_gallery_restores_it_as_files_in_a_collection(
         monkeypatch,
         role_session,
     )
-    assert job["status"] == ImportJobStatus.done.value, job.get("error")
+    assert job["status"] == DataJobStatus.done.value, job.get("error")
     assert job["result"]["per_tool"]["file"]["created"] == 1
 
     await route_session_to_guild(session, a.guild.id)
@@ -1687,8 +1688,8 @@ async def test_a_restored_collection_names_only_who_can_open_a_file_in_it(
     )
     assert confirmed.status_code == 200, confirmed.text
     await _run_import_worker(monkeypatch, role_session)
-    job = (await client.get(a.g(f"/imports/jobs/{job_id}"), headers=a.headers)).json()
-    assert job["status"] == ImportJobStatus.done.value, job.get("error")
+    job = (await client.get(a.g(f"/data-jobs/{job_id}"), headers=a.headers)).json()
+    assert job["status"] == DataJobStatus.done.value, job.get("error")
 
     await route_session_to_guild(session, a.guild.id)
     shelf = (
@@ -1738,8 +1739,8 @@ async def test_backup_corrupt_entry_fails_alone(
     assert confirmed.status_code == 200, confirmed.text
     await _run_import_worker(monkeypatch, role_session)
 
-    job = (await client.get(a.g(f"/imports/jobs/{job_id}"), headers=a.headers)).json()
-    assert job["status"] == ImportJobStatus.done.value, job.get("error")
+    job = (await client.get(a.g(f"/data-jobs/{job_id}"), headers=a.headers)).json()
+    assert job["status"] == DataJobStatus.done.value, job.get("error")
     assert job["result"]["per_tool"]["queue"] == {
         "created": 1,
         "failed": 1,
@@ -1772,8 +1773,8 @@ async def test_backup_seat_vacated_before_apply_fails_closed(
     await session.commit()
 
     await _run_import_worker(monkeypatch, role_session)
-    job = (await client.get(a.g(f"/imports/jobs/{job_id}"), headers=a.headers)).json()
-    assert job["status"] == ImportJobStatus.failed.value
+    job = (await client.get(a.g(f"/data-jobs/{job_id}"), headers=a.headers)).json()
+    assert job["status"] == DataJobStatus.failed.value
     assert job["error"] == "IMPORT_SUPERADMIN_REQUIRED"
 
 
@@ -1807,8 +1808,8 @@ async def test_backup_quota_exceeded_fails_job(
     )
     assert confirmed.status_code == 200, confirmed.text
     await _run_import_worker(monkeypatch, role_session)
-    job = (await client.get(a.g(f"/imports/jobs/{job_id}"), headers=a.headers)).json()
-    assert job["status"] == ImportJobStatus.failed.value
+    job = (await client.get(a.g(f"/data-jobs/{job_id}"), headers=a.headers)).json()
+    assert job["status"] == DataJobStatus.failed.value
     assert job["error"] == "IMPORT_QUOTA_EXCEEDED"
 
 
@@ -1838,15 +1839,15 @@ async def test_a_backup_sent_in_pieces_is_restored_from_where_it_arrived(
 
     assert staged.status_code == 201, staged.text
     await route_session_to_guild(session, a.guild.id)
-    job = await session.get(ImportJob, staged.json()["id"])
-    assert job.payload_ref == f"resumable-{upload_id}"
+    job = await session.get(DataJob, staged.json()["id"])
+    assert job.file_ref == f"resumable-{upload_id}"
     assert (await session.exec(select(PendingUpload))).first() is None
     await client.post(
         a.g(f"/imports/jobs/{job.id}/confirm"), headers=a.headers, json={}
     )
     await _run_import_worker(monkeypatch, role_session)
-    done = (await client.get(a.g(f"/imports/jobs/{job.id}"), headers=a.headers)).json()
-    assert done["status"] == ImportJobStatus.done.value, done.get("error")
+    done = (await client.get(a.g(f"/data-jobs/{job.id}"), headers=a.headers)).json()
+    assert done["status"] == DataJobStatus.done.value, done.get("error")
 
 
 async def test_only_the_seat_may_send_a_backup_in_pieces(client, acting_user):
@@ -1908,7 +1909,7 @@ async def test_backup_staged_expiry_and_cancel(
     from app.testing import route_session_to_guild
 
     await route_session_to_guild(session, a.guild.id)
-    row = await session.get(ImportJob, job_id)
+    row = await session.get(DataJob, job_id)
     row.expires_at = datetime.now(timezone.utc) - timedelta(hours=1)
     session.add(row)
     await session.commit()
@@ -1922,13 +1923,13 @@ async def test_backup_staged_expiry_and_cancel(
     assert raced.status_code == 409
     assert raced.json()["detail"] == "IMPORT_NOT_CONFIRMABLE"
     await session.refresh(row)
-    assert row.status == ImportJobStatus.expired
-    assert row.payload_ref is None
+    assert row.status == DataJobStatus.expired
+    assert row.file_ref is None
 
     # GC stays idempotent over the already-expired row.
-    await each_guild([(Scope.PROVISIONED, import_worker.expire_payloads)], name="t")
+    await each_guild([(Scope.PROVISIONED, data_jobs.expire_files)], name="t")
     await session.refresh(row)
-    assert row.status == ImportJobStatus.expired
+    assert row.status == DataJobStatus.expired
 
     late = await client.post(
         a.g(f"/imports/jobs/{job_id}/confirm"), headers=a.headers, json={}
@@ -1942,7 +1943,7 @@ async def test_backup_staged_expiry_and_cancel(
         a.g(f"/imports/jobs/{second_id}"), headers=a.headers
     )
     assert cancelled.status_code == 200
-    assert cancelled.json()["status"] == ImportJobStatus.cancelled.value
+    assert cancelled.json()["status"] == DataJobStatus.cancelled.value
 
 
 async def test_backup_restores_fresh_assets_into_storage(
@@ -1981,8 +1982,8 @@ async def test_backup_restores_fresh_assets_into_storage(
     assert confirmed.status_code == 200, confirmed.text
     await _run_import_worker(monkeypatch, role_session)
 
-    job = (await client.get(a.g(f"/imports/jobs/{job_id}"), headers=a.headers)).json()
-    assert job["status"] == ImportJobStatus.done.value, job.get("error")
+    job = (await client.get(a.g(f"/data-jobs/{job_id}"), headers=a.headers)).json()
+    assert job["status"] == DataJobStatus.done.value, job.get("error")
     assert job["result"]["assets_restored"] == 1
     assert job["result"]["asset_bytes"] == len(payload)
 
@@ -2037,8 +2038,8 @@ async def test_backup_quota_uses_zip_sizes_not_manifest_claims(
     assert confirmed.status_code == 200, confirmed.text
     await _run_import_worker(monkeypatch, role_session)
 
-    job = (await client.get(a.g(f"/imports/jobs/{job_id}"), headers=a.headers)).json()
-    assert job["status"] == ImportJobStatus.failed.value
+    job = (await client.get(a.g(f"/data-jobs/{job_id}"), headers=a.headers)).json()
+    assert job["status"] == DataJobStatus.failed.value
     assert job["error"] == "IMPORT_QUOTA_EXCEEDED"
     # Nothing was written despite the understated claim.
     assert get_guild_storage(a.guild.id).open_readable("liar.bin") is None
@@ -2160,7 +2161,7 @@ async def test_backup_assets_are_stored_as_what_their_bytes_are(
         monkeypatch,
         role_session,
     )
-    assert job["status"] == ImportJobStatus.done.value, job.get("error")
+    assert job["status"] == DataJobStatus.done.value, job.get("error")
     result = job["result"]
     assert result["assets_restored"] == 1
     assert "unsupported_file:typed-tool.exe" in result["warnings"]
@@ -2226,7 +2227,7 @@ async def test_backup_entry_past_the_json_cap_fails_alone(
         monkeypatch,
         role_session,
     )
-    assert job["status"] == ImportJobStatus.done.value, job.get("error")
+    assert job["status"] == DataJobStatus.done.value, job.get("error")
     entries = {entry["title"]: entry for entry in job["result"]["entries"]}
     assert entries["Restored Queue"]["status"] == "created"
     assert (entries["Big Queue"]["status"], entries["Big Queue"]["error"]) == (
@@ -2247,7 +2248,7 @@ async def test_backup_upload_past_the_cap_is_refused_by_the_handler(
     resp = await _upload_backup(client, a, _make_backup_zip(_minimal_manifest()))
     assert resp.status_code == 413
     assert resp.json()["detail"] == "IMPORT_TOO_LARGE"
-    jobs = (await client.get(a.g("/imports/jobs"), headers=a.headers)).json()
+    jobs = (await client.get(a.g("/data-jobs/"), headers=a.headers)).json()
     assert jobs == []
 
 
@@ -2559,8 +2560,8 @@ async def test_backup_attach_to_files_a_file_in_its_wiki(
     assert confirmed.status_code == 200
     await _run_import_worker(monkeypatch, role_session)
 
-    job = (await client.get(a.g(f"/imports/jobs/{job_id}"), headers=a.headers)).json()
-    assert job["status"] == ImportJobStatus.done.value, job.get("error")
+    job = (await client.get(a.g(f"/data-jobs/{job_id}"), headers=a.headers)).json()
+    assert job["status"] == DataJobStatus.done.value, job.get("error")
     assert job["result"]["links_created"] == 1
 
     restored = (
@@ -2630,8 +2631,8 @@ async def test_backup_applies_into_an_existing_initiative(
     )
     await _run_import_worker(monkeypatch, role_session)
 
-    job = (await client.get(a.g(f"/imports/jobs/{job_id}"), headers=a.headers)).json()
-    assert job["status"] == ImportJobStatus.done.value, job.get("error")
+    job = (await client.get(a.g(f"/data-jobs/{job_id}"), headers=a.headers)).json()
+    assert job["status"] == DataJobStatus.done.value, job.get("error")
     assert job["result"]["initiatives"][0]["initiative_id"] == target.id
 
     assert len((await session.exec(select(Initiative.id))).all()) == before
@@ -2669,8 +2670,8 @@ async def test_backup_into_an_unreachable_initiative_fails_the_job(
     )
     await _run_import_worker(monkeypatch, role_session)
 
-    job = (await client.get(a.g(f"/imports/jobs/{job_id}"), headers=a.headers)).json()
-    assert job["status"] == ImportJobStatus.failed.value
+    job = (await client.get(a.g(f"/data-jobs/{job_id}"), headers=a.headers)).json()
+    assert job["status"] == DataJobStatus.failed.value
     assert job["error"] == "IMPORT_INVALID_PARAMS"
 
 
@@ -2702,13 +2703,13 @@ async def test_a_stale_fetch_is_re_claimed_not_failed(
         a.user,
         source="atlassian",
         params={"initiative_id": a.initiative.id},
-        payload_ref="imports/half-written.json",
-        status=ImportJobStatus.fetching,
+        file_ref="imports/half-written.json",
+        status=DataJobStatus.fetching,
     )
     # updated_at is stamped on write, so age it afterwards.
     await session.exec(
-        ImportJob.__table__.update()
-        .where(ImportJob.__table__.c.id == job.id)
+        DataJob.__table__.update()
+        .where(DataJob.__table__.c.id == job.id)
         .values(updated_at=long_ago)
     )
     await session.commit()
@@ -2716,17 +2717,15 @@ async def test_a_stale_fetch_is_re_claimed_not_failed(
     await _run_import_worker(monkeypatch, role_session)
 
     session.expunge_all()
-    reclaimed = (
-        await session.exec(select(ImportJob).where(ImportJob.id == job.id))
-    ).one()
+    reclaimed = (await session.exec(select(DataJob).where(DataJob.id == job.id))).one()
     # It left ``fetching`` and its half-written payload is gone, so the fetch
     # can start clean. It is NOT the apply path's fail-closed outcome, which
     # is the distinction this rule exists to make. (The same pass then picks
     # the queued row up and starts the fetch over, which fails on the spot:
     # this row was never given a credential to read the site with.)
-    assert reclaimed.status is not ImportJobStatus.fetching
+    assert reclaimed.status is not DataJobStatus.fetching
     assert reclaimed.error != "IMPORT_INTERRUPTED"
-    assert reclaimed.payload_ref != "imports/half-written.json"
+    assert reclaimed.file_ref != "imports/half-written.json"
     assert (
         get_guild_storage(a.guild.id).open_readable("imports/half-written.json") is None
     )
@@ -2976,9 +2975,7 @@ async def test_the_people_step_decides_who_an_imported_task_is_assigned_to(
     assert confirmed.status_code == 200, confirmed.text
     await _run_import_worker(monkeypatch, role_session)
 
-    done = (
-        await client.get(a.g(f"/imports/jobs/{job['id']}"), headers=a.headers)
-    ).json()
+    done = (await client.get(a.g(f"/data-jobs/{job['id']}"), headers=a.headers)).json()
     assert done["status"] == "done", done.get("error")
     assert done["result"]["unmatched_handles"] == []
 
@@ -3085,9 +3082,7 @@ async def test_a_user_property_is_placed_by_the_people_step(
         json={"people_map": {"Robin": a.user.id}},
     )
     await _run_import_worker(monkeypatch, role_session)
-    done = (
-        await client.get(a.g(f"/imports/jobs/{job['id']}"), headers=a.headers)
-    ).json()
+    done = (await client.get(a.g(f"/data-jobs/{job['id']}"), headers=a.headers)).json()
     assert done["status"] == "done", done.get("error")
 
     session.expunge_all()
@@ -3203,7 +3198,7 @@ async def _import_with_assignees(client, a, people_map, monkeypatch, role_sessio
     )
     assert confirm.status_code == 200, confirm.text
     await _run_import_worker(monkeypatch, role_session)
-    job = await client.get(a.g(f"/imports/jobs/{job_id}"), headers=a.headers)
+    job = await client.get(a.g(f"/data-jobs/{job_id}"), headers=a.headers)
     return job.json()["result"]
 
 
@@ -3430,8 +3425,8 @@ async def test_the_confirmed_mapping_decides_who_a_comment_belongs_to(
     assert confirmed.status_code == 200, confirmed.text
     await _run_import_worker(monkeypatch, role_session)
 
-    job = (await client.get(a.g(f"/imports/jobs/{job_id}"), headers=a.headers)).json()
-    assert job["status"] == ImportJobStatus.done.value, job.get("error")
+    job = (await client.get(a.g(f"/data-jobs/{job_id}"), headers=a.headers)).json()
+    assert job["status"] == DataJobStatus.done.value, job.get("error")
 
     comment = (
         await session.exec(
@@ -3550,8 +3545,8 @@ async def test_a_restored_mention_links_to_whoever_its_handle_is_here(
     )
     assert confirmed.status_code == 200, confirmed.text
     await _run_import_worker(monkeypatch, role_session)
-    job = (await client.get(a.g(f"/imports/jobs/{job_id}"), headers=a.headers)).json()
-    assert job["status"] == ImportJobStatus.done.value, job.get("error")
+    job = (await client.get(a.g(f"/data-jobs/{job_id}"), headers=a.headers)).json()
+    assert job["status"] == DataJobStatus.done.value, job.get("error")
     restored = job["result"]["initiatives"][0]["initiative_id"]
 
     project = (
@@ -3859,7 +3854,7 @@ async def _restore_referencing_backup(
                 data = json.dumps(manifest).encode()
             rezipped.writestr(name, data)
     job = await _apply_backup(client, a, buffer.getvalue(), monkeypatch, role_session)
-    assert job["status"] == ImportJobStatus.done.value, job.get("error")
+    assert job["status"] == DataJobStatus.done.value, job.get("error")
     return job["result"]["initiatives"][0]["initiative_id"]
 
 
@@ -4393,7 +4388,7 @@ async def test_backup_restores_property_definitions_in_full(
     )
 
     job = await _apply_backup(client, a, zip_bytes, monkeypatch, role_session)
-    assert job["status"] == ImportJobStatus.done.value, job.get("error")
+    assert job["status"] == DataJobStatus.done.value, job.get("error")
 
     from app.models.tenant.metadata import MetadataDefinition
 
@@ -4448,7 +4443,7 @@ async def test_backup_restores_roles_and_places_members(
     )
 
     job = await _apply_backup(client, a, zip_bytes, monkeypatch, role_session)
-    assert job["status"] == ImportJobStatus.done.value, job.get("error")
+    assert job["status"] == DataJobStatus.done.value, job.get("error")
 
     from app.models.tenant.initiative import (
         Initiative,
@@ -4516,7 +4511,7 @@ async def test_backup_structure_never_overwrites_what_is_already_there(
     )
 
     job = await _apply_backup(client, a, zip_bytes, monkeypatch, role_session)
-    assert job["status"] == ImportJobStatus.done.value, job.get("error")
+    assert job["status"] == DataJobStatus.done.value, job.get("error")
 
     from app.models.tenant.initiative import InitiativeRoleModel
 
@@ -4739,7 +4734,7 @@ async def _job_secret(session, guild_id, job_id):
 
     session.expunge_all()
     await set_rls_context(session, SystemGuild(guild_id))
-    job = await session.get(ImportJob, job_id)
+    job = await session.get(DataJob, job_id)
     return None if job is None else job.secret_encrypted
 
 
@@ -4773,7 +4768,7 @@ async def test_a_jira_import_fetches_then_waits_for_review_then_applies(
     resp = await _start_jira(client, a, initiative_id=a.initiative.id)
     assert resp.status_code == 202, resp.text
     job = resp.json()
-    assert job["status"] == ImportJobStatus.queued.value
+    assert job["status"] == DataJobStatus.queued.value
     assert job["source"] == "atlassian"
     assert job["params"]["jira_projects"] == ["ACME"]
     assert job["params"]["site_url"] == "https://acme.atlassian.net"
@@ -4781,9 +4776,9 @@ async def test_a_jira_import_fetches_then_waits_for_review_then_applies(
 
     await _run_import_worker(monkeypatch, role_session)
     staged = (
-        await client.get(a.g(f"/imports/jobs/{job['id']}"), headers=a.headers)
+        await client.get(a.g(f"/data-jobs/{job['id']}"), headers=a.headers)
     ).json()
-    assert staged["status"] == ImportJobStatus.staged.value, staged.get("error")
+    assert staged["status"] == DataJobStatus.staged.value, staged.get("error")
     plan = staged["plan"]
     assert plan["atlassian"]["projects"] == 1
     assert plan["atlassian"]["tasks"] == 2
@@ -4803,10 +4798,8 @@ async def test_a_jira_import_fetches_then_waits_for_review_then_applies(
     assert confirmed.status_code == 200, confirmed.text
     await _run_import_worker(monkeypatch, role_session)
 
-    done = (
-        await client.get(a.g(f"/imports/jobs/{job['id']}"), headers=a.headers)
-    ).json()
-    assert done["status"] == ImportJobStatus.done.value, done.get("error")
+    done = (await client.get(a.g(f"/data-jobs/{job['id']}"), headers=a.headers)).json()
+    assert done["status"] == DataJobStatus.done.value, done.get("error")
     assert done["result"]["initiatives"][0]["initiative_id"] == a.initiative.id
 
     session.expunge_all()
@@ -4871,10 +4864,8 @@ async def test_a_jira_import_brings_its_links_across(
     job_id = (await _start_jira(client, a, initiative_id=a.initiative.id)).json()["id"]
 
     await _run_import_worker(monkeypatch, role_session)
-    staged = (
-        await client.get(a.g(f"/imports/jobs/{job_id}"), headers=a.headers)
-    ).json()
-    assert staged["status"] == ImportJobStatus.staged.value, staged.get("error")
+    staged = (await client.get(a.g(f"/data-jobs/{job_id}"), headers=a.headers)).json()
+    assert staged["status"] == DataJobStatus.staged.value, staged.get("error")
     assert staged["plan"]["atlassian"]["links"] == 2
     assert staged["plan"]["atlassian"]["links_outside_selection"] == 1
 
@@ -4882,8 +4873,8 @@ async def test_a_jira_import_brings_its_links_across(
         a.g(f"/imports/jobs/{job_id}/confirm"), headers=a.headers, json={}
     )
     await _run_import_worker(monkeypatch, role_session)
-    done = (await client.get(a.g(f"/imports/jobs/{job_id}"), headers=a.headers)).json()
-    assert done["status"] == ImportJobStatus.done.value, done.get("error")
+    done = (await client.get(a.g(f"/data-jobs/{job_id}"), headers=a.headers)).json()
+    assert done["status"] == DataJobStatus.done.value, done.get("error")
     assert done["result"]["links_created"] == 2
     assert done["result"]["links_unresolved"] == 1
 
@@ -4933,10 +4924,8 @@ async def test_a_jira_import_brings_its_fields_as_properties(
     job_id = (await _start_jira(client, a, initiative_id=a.initiative.id)).json()["id"]
 
     await _run_import_worker(monkeypatch, role_session)
-    staged = (
-        await client.get(a.g(f"/imports/jobs/{job_id}"), headers=a.headers)
-    ).json()
-    assert staged["status"] == ImportJobStatus.staged.value, staged.get("error")
+    staged = (await client.get(a.g(f"/data-jobs/{job_id}"), headers=a.headers)).json()
+    assert staged["status"] == DataJobStatus.staged.value, staged.get("error")
     listed = {p["name"]: p for p in staged["plan"]["atlassian"]["properties"]}
     assert listed["Priority"] == {
         "name": "Priority",
@@ -4952,8 +4941,8 @@ async def test_a_jira_import_brings_its_fields_as_properties(
         json={"people_map": {"Robin": a.user.id}},
     )
     await _run_import_worker(monkeypatch, role_session)
-    done = (await client.get(a.g(f"/imports/jobs/{job_id}"), headers=a.headers)).json()
-    assert done["status"] == ImportJobStatus.done.value, done.get("error")
+    done = (await client.get(a.g(f"/data-jobs/{job_id}"), headers=a.headers)).json()
+    assert done["status"] == DataJobStatus.done.value, done.get("error")
 
     session.expunge_all()
     task = (await session.exec(select(Task).where(Task.title == "Fit the frame"))).one()
@@ -5041,10 +5030,8 @@ async def test_a_jira_sprint_becomes_an_event_its_tasks_are_related_to(
 
     job_id = (await _start_jira(client, a, initiative_id=a.initiative.id)).json()["id"]
     await _run_import_worker(monkeypatch, role_session)
-    staged = (
-        await client.get(a.g(f"/imports/jobs/{job_id}"), headers=a.headers)
-    ).json()
-    assert staged["status"] == ImportJobStatus.staged.value, staged.get("error")
+    staged = (await client.get(a.g(f"/data-jobs/{job_id}"), headers=a.headers)).json()
+    assert staged["status"] == DataJobStatus.staged.value, staged.get("error")
     summary = staged["plan"]["atlassian"]
     assert (summary["sprints"], summary["sprint_calendars"]) == (1, 1)
     assert summary["sprints_skipped"] is None
@@ -5053,8 +5040,8 @@ async def test_a_jira_sprint_becomes_an_event_its_tasks_are_related_to(
         a.g(f"/imports/jobs/{job_id}/confirm"), headers=a.headers, json={}
     )
     await _run_import_worker(monkeypatch, role_session)
-    done = (await client.get(a.g(f"/imports/jobs/{job_id}"), headers=a.headers)).json()
-    assert done["status"] == ImportJobStatus.done.value, done.get("error")
+    done = (await client.get(a.g(f"/data-jobs/{job_id}"), headers=a.headers)).json()
+    assert done["status"] == DataJobStatus.done.value, done.get("error")
 
     session.expunge_all()
     calendar = (
@@ -5120,9 +5107,7 @@ async def test_sprints_are_left_behind_and_said_so_when_calendars_are_off(
 
     job_id = (await _start_jira(client, a, initiative_id=a.initiative.id)).json()["id"]
     await _run_import_worker(monkeypatch, role_session)
-    staged = (
-        await client.get(a.g(f"/imports/jobs/{job_id}"), headers=a.headers)
-    ).json()
+    staged = (await client.get(a.g(f"/data-jobs/{job_id}"), headers=a.headers)).json()
     summary = staged["plan"]["atlassian"]
     assert summary["sprints"] == 1
     assert summary["sprint_calendars"] == 0
@@ -5132,8 +5117,8 @@ async def test_sprints_are_left_behind_and_said_so_when_calendars_are_off(
         a.g(f"/imports/jobs/{job_id}/confirm"), headers=a.headers, json={}
     )
     await _run_import_worker(monkeypatch, role_session)
-    done = (await client.get(a.g(f"/imports/jobs/{job_id}"), headers=a.headers)).json()
-    assert done["status"] == ImportJobStatus.done.value, done.get("error")
+    done = (await client.get(a.g(f"/data-jobs/{job_id}"), headers=a.headers)).json()
+    assert done["status"] == DataJobStatus.done.value, done.get("error")
     assert done["result"]["links_unresolved"] == 0
 
     session.expunge_all()
@@ -5192,10 +5177,8 @@ async def test_a_jira_import_brings_its_comments_to_whoever_wrote_them(
     job_id = (await _start_jira(client, a, initiative_id=a.initiative.id)).json()["id"]
 
     await _run_import_worker(monkeypatch, role_session)
-    staged = (
-        await client.get(a.g(f"/imports/jobs/{job_id}"), headers=a.headers)
-    ).json()
-    assert staged["status"] == ImportJobStatus.staged.value, staged.get("error")
+    staged = (await client.get(a.g(f"/data-jobs/{job_id}"), headers=a.headers)).json()
+    assert staged["status"] == DataJobStatus.staged.value, staged.get("error")
     summary = staged["plan"]["atlassian"]
     assert (summary["comments"], summary["comments_restricted"]) == (2, 1)
     people = {p["handle"]: p["comment_count"] for p in staged["plan"]["people"]}
@@ -5207,8 +5190,8 @@ async def test_a_jira_import_brings_its_comments_to_whoever_wrote_them(
         json={"people_map": {"Robin": a.user.id}},
     )
     await _run_import_worker(monkeypatch, role_session)
-    done = (await client.get(a.g(f"/imports/jobs/{job_id}"), headers=a.headers)).json()
-    assert done["status"] == ImportJobStatus.done.value, done.get("error")
+    done = (await client.get(a.g(f"/data-jobs/{job_id}"), headers=a.headers)).json()
+    assert done["status"] == DataJobStatus.done.value, done.get("error")
 
     session.expunge_all()
     task = (await session.exec(select(Task).where(Task.title == "Fit the frame"))).one()
@@ -5271,10 +5254,8 @@ async def test_a_jira_import_brings_its_images_as_uploads(
     job_id = (await _start_jira(client, a, initiative_id=a.initiative.id)).json()["id"]
 
     await _run_import_worker(monkeypatch, role_session)
-    staged = (
-        await client.get(a.g(f"/imports/jobs/{job_id}"), headers=a.headers)
-    ).json()
-    assert staged["status"] == ImportJobStatus.staged.value, staged.get("error")
+    staged = (await client.get(a.g(f"/data-jobs/{job_id}"), headers=a.headers)).json()
+    assert staged["status"] == DataJobStatus.staged.value, staged.get("error")
     summary = staged["plan"]["atlassian"]
     assert (summary["images"], summary["files"], summary["other_attachments"]) == (
         1,
@@ -5288,8 +5269,8 @@ async def test_a_jira_import_brings_its_images_as_uploads(
         a.g(f"/imports/jobs/{job_id}/confirm"), headers=a.headers, json={}
     )
     await _run_import_worker(monkeypatch, role_session)
-    done = (await client.get(a.g(f"/imports/jobs/{job_id}"), headers=a.headers)).json()
-    assert done["status"] == ImportJobStatus.done.value, done.get("error")
+    done = (await client.get(a.g(f"/data-jobs/{job_id}"), headers=a.headers)).json()
+    assert done["status"] == DataJobStatus.done.value, done.get("error")
     assert done["result"]["assets_restored"] == 2
 
     session.expunge_all()
@@ -5345,10 +5326,8 @@ async def test_a_jira_file_stays_behind_when_the_initiative_has_no_files(
     job_id = (await _start_jira(client, a, initiative_id=a.initiative.id)).json()["id"]
 
     await _run_import_worker(monkeypatch, role_session)
-    staged = (
-        await client.get(a.g(f"/imports/jobs/{job_id}"), headers=a.headers)
-    ).json()
-    assert staged["status"] == ImportJobStatus.staged.value, staged.get("error")
+    staged = (await client.get(a.g(f"/data-jobs/{job_id}"), headers=a.headers)).json()
+    assert staged["status"] == DataJobStatus.staged.value, staged.get("error")
     summary = staged["plan"]["atlassian"]
     assert (summary["images"], summary["files"], summary["other_attachments"]) == (
         1,
@@ -5389,8 +5368,8 @@ async def test_a_property_unticked_on_the_review_is_not_created(
     assert confirmed.status_code == 200, confirmed.text
     assert confirmed.json()["params"]["exclude_properties"] == ["Priority"]
     await _run_import_worker(monkeypatch, role_session)
-    done = (await client.get(a.g(f"/imports/jobs/{job_id}"), headers=a.headers)).json()
-    assert done["status"] == ImportJobStatus.done.value, done.get("error")
+    done = (await client.get(a.g(f"/data-jobs/{job_id}"), headers=a.headers)).json()
+    assert done["status"] == DataJobStatus.done.value, done.get("error")
 
     session.expunge_all()
     names = {
@@ -5444,8 +5423,8 @@ async def test_confirm_refuses_a_malformed_list_of_unticked_properties(
         a.user,
         source="atlassian",
         params={},
-        status=ImportJobStatus.staged,
-        payload_ref="imports/x.zip",
+        status=DataJobStatus.staged,
+        file_ref="imports/x.zip",
     )
 
     resp = await client.post(
@@ -5518,8 +5497,8 @@ async def test_a_site_that_refuses_every_project_fails_the_job_and_drops_the_tok
 
     await _run_import_worker(monkeypatch, role_session)
 
-    job = (await client.get(a.g(f"/imports/jobs/{job_id}"), headers=a.headers)).json()
-    assert job["status"] == ImportJobStatus.failed.value
+    job = (await client.get(a.g(f"/data-jobs/{job_id}"), headers=a.headers)).json()
+    assert job["status"] == DataJobStatus.failed.value
     assert job["error"] == "IMPORT_SOURCE_UNREACHABLE"
     await drain_notices()
     failed = [
@@ -5575,8 +5554,8 @@ async def test_cancelling_a_fetch_stops_it_at_the_next_project(
 
     await _run_import_worker(monkeypatch, role_session)
 
-    job = (await client.get(a.g(f"/imports/jobs/{job_id}"), headers=a.headers)).json()
-    assert job["status"] == ImportJobStatus.cancelled.value
+    job = (await client.get(a.g(f"/data-jobs/{job_id}"), headers=a.headers)).json()
+    assert job["status"] == DataJobStatus.cancelled.value
     assert not any("/project/BETA" in url for url in site.requested)
     assert await _job_secret(session, a.guild.id, job["id"]) is None
 
@@ -5906,9 +5885,9 @@ async def test_a_confluence_space_becomes_a_wiki_with_its_tree_and_its_people(
 
     await _run_import_worker(monkeypatch, role_session)
     staged = (
-        await client.get(a.g(f"/imports/jobs/{job['id']}"), headers=a.headers)
+        await client.get(a.g(f"/data-jobs/{job['id']}"), headers=a.headers)
     ).json()
-    assert staged["status"] == ImportJobStatus.staged.value, staged.get("error")
+    assert staged["status"] == DataJobStatus.staged.value, staged.get("error")
     summary = staged["plan"]["atlassian"]
     assert (summary["spaces"], summary["pages"], summary["labels"]) == (1, 2, 1)
     assert {p["handle"] for p in staged["plan"]["people"]} == {"Robin Ade", "Sam Bee"}
@@ -5921,10 +5900,8 @@ async def test_a_confluence_space_becomes_a_wiki_with_its_tree_and_its_people(
     )
     assert confirmed.status_code == 200, confirmed.text
     await _run_import_worker(monkeypatch, role_session)
-    done = (
-        await client.get(a.g(f"/imports/jobs/{job['id']}"), headers=a.headers)
-    ).json()
-    assert done["status"] == ImportJobStatus.done.value, done.get("error")
+    done = (await client.get(a.g(f"/data-jobs/{job['id']}"), headers=a.headers)).json()
+    assert done["status"] == DataJobStatus.done.value, done.get("error")
 
     session.expunge_all()
     wiki = (await session.exec(select(Wiki).where(Wiki.name == "Docs"))).one()
@@ -6023,10 +6000,8 @@ async def test_a_confluence_pages_attachments_arrive_as_uploads_and_files(
         "id"
     ]
     await _run_import_worker(monkeypatch, role_session)
-    staged = (
-        await client.get(a.g(f"/imports/jobs/{job_id}"), headers=a.headers)
-    ).json()
-    assert staged["status"] == ImportJobStatus.staged.value, staged.get("error")
+    staged = (await client.get(a.g(f"/data-jobs/{job_id}"), headers=a.headers)).json()
+    assert staged["status"] == DataJobStatus.staged.value, staged.get("error")
     summary = staged["plan"]["atlassian"]
     assert (summary["page_images"], summary["page_files"]) == (1, 2)
     assert summary["page_attachment_bytes"] == 2 * len(png) + len(pdf)
@@ -6035,8 +6010,8 @@ async def test_a_confluence_pages_attachments_arrive_as_uploads_and_files(
         a.g(f"/imports/jobs/{job_id}/confirm"), headers=a.headers, json={}
     )
     await _run_import_worker(monkeypatch, role_session)
-    done = (await client.get(a.g(f"/imports/jobs/{job_id}"), headers=a.headers)).json()
-    assert done["status"] == ImportJobStatus.done.value, done.get("error")
+    done = (await client.get(a.g(f"/data-jobs/{job_id}"), headers=a.headers)).json()
+    assert done["status"] == DataJobStatus.done.value, done.get("error")
     assert done["result"]["assets_restored"] == 3
 
     session.expunge_all()
@@ -6100,10 +6075,8 @@ async def test_an_initiative_without_files_takes_only_the_pictures(
         "id"
     ]
     await _run_import_worker(monkeypatch, role_session)
-    staged = (
-        await client.get(a.g(f"/imports/jobs/{job_id}"), headers=a.headers)
-    ).json()
-    assert staged["status"] == ImportJobStatus.staged.value, staged.get("error")
+    staged = (await client.get(a.g(f"/data-jobs/{job_id}"), headers=a.headers)).json()
+    assert staged["status"] == DataJobStatus.staged.value, staged.get("error")
     summary = staged["plan"]["atlassian"]
     assert (summary["page_images"], summary["page_files"]) == (1, 0)
     assert summary["page_files_blocked"] == 2
@@ -6112,8 +6085,8 @@ async def test_an_initiative_without_files_takes_only_the_pictures(
         a.g(f"/imports/jobs/{job_id}/confirm"), headers=a.headers, json={}
     )
     await _run_import_worker(monkeypatch, role_session)
-    done = (await client.get(a.g(f"/imports/jobs/{job_id}"), headers=a.headers)).json()
-    assert done["status"] == ImportJobStatus.done.value, done.get("error")
+    done = (await client.get(a.g(f"/data-jobs/{job_id}"), headers=a.headers)).json()
+    assert done["status"] == DataJobStatus.done.value, done.get("error")
     session.expunge_all()
     assert (await session.exec(select(File))).all() == []
 
@@ -6169,10 +6142,8 @@ async def test_a_confluence_pages_comments_arrive_on_its_wiki_page(
         "id"
     ]
     await _run_import_worker(monkeypatch, role_session)
-    staged = (
-        await client.get(a.g(f"/imports/jobs/{job_id}"), headers=a.headers)
-    ).json()
-    assert staged["status"] == ImportJobStatus.staged.value, staged.get("error")
+    staged = (await client.get(a.g(f"/data-jobs/{job_id}"), headers=a.headers)).json()
+    assert staged["status"] == DataJobStatus.staged.value, staged.get("error")
     assert staged["plan"]["atlassian"]["page_comments"] == 3
 
     # Robin is placed; Sam is left as a name.
@@ -6182,8 +6153,8 @@ async def test_a_confluence_pages_comments_arrive_on_its_wiki_page(
         json={"people_map": {"Robin Ade": b.user.id}},
     )
     await _run_import_worker(monkeypatch, role_session)
-    done = (await client.get(a.g(f"/imports/jobs/{job_id}"), headers=a.headers)).json()
-    assert done["status"] == ImportJobStatus.done.value, done.get("error")
+    done = (await client.get(a.g(f"/data-jobs/{job_id}"), headers=a.headers)).json()
+    assert done["status"] == DataJobStatus.done.value, done.get("error")
 
     session.expunge_all()
     wiki = (await session.exec(select(Wiki).where(Wiki.name == "Docs"))).one()
@@ -6241,10 +6212,8 @@ async def test_a_confluence_html_export_becomes_a_wiki(
     job_id = resp.json()["id"]
 
     await _run_import_worker(monkeypatch, role_session)
-    staged = (
-        await client.get(a.g(f"/imports/jobs/{job_id}"), headers=a.headers)
-    ).json()
-    assert staged["status"] == ImportJobStatus.staged.value, staged.get("error")
+    staged = (await client.get(a.g(f"/data-jobs/{job_id}"), headers=a.headers)).json()
+    assert staged["status"] == DataJobStatus.staged.value, staged.get("error")
     summary = staged["plan"]["atlassian"]
     assert (summary["spaces"], summary["pages"]) == (1, 4)
     assert (summary["page_images"], summary["page_files"]) == (1, 1)
@@ -6256,8 +6225,8 @@ async def test_a_confluence_html_export_becomes_a_wiki(
         json={"people_map": {"Robin Ade": b.user.id}},
     )
     await _run_import_worker(monkeypatch, role_session)
-    done = (await client.get(a.g(f"/imports/jobs/{job_id}"), headers=a.headers)).json()
-    assert done["status"] == ImportJobStatus.done.value, done.get("error")
+    done = (await client.get(a.g(f"/data-jobs/{job_id}"), headers=a.headers)).json()
+    assert done["status"] == DataJobStatus.done.value, done.get("error")
 
     session.expunge_all()
     wiki = (await session.exec(select(Wiki).where(Wiki.name == "Team Docs"))).one()
@@ -6303,9 +6272,9 @@ async def test_a_confluence_export_can_arrive_in_pieces(
     assert resp.status_code == 202, resp.text
     await _run_import_worker(monkeypatch, role_session)
     staged = (
-        await client.get(a.g(f"/imports/jobs/{resp.json()['id']}"), headers=a.headers)
+        await client.get(a.g(f"/data-jobs/{resp.json()['id']}"), headers=a.headers)
     ).json()
-    assert staged["status"] == ImportJobStatus.staged.value, staged.get("error")
+    assert staged["status"] == DataJobStatus.staged.value, staged.get("error")
     assert staged["plan"]["atlassian"]["pages"] == 4
 
 
@@ -6399,8 +6368,8 @@ async def test_a_confluence_page_points_its_jira_issues_at_the_tasks_they_became
     )
     assert confirmed.status_code == 200, confirmed.text
     await _run_import_worker(monkeypatch, role_session)
-    done = (await client.get(a.g(f"/imports/jobs/{job_id}"), headers=a.headers)).json()
-    assert done["status"] == ImportJobStatus.done.value, done.get("error")
+    done = (await client.get(a.g(f"/data-jobs/{job_id}"), headers=a.headers)).json()
+    assert done["status"] == DataJobStatus.done.value, done.get("error")
 
     session.expunge_all()
     wiki = (await session.exec(select(Wiki).where(Wiki.name == "Docs"))).one()
@@ -6529,10 +6498,8 @@ async def test_one_atlassian_import_joins_its_issues_and_pages_both_ways(
     assert resp.status_code == 202, resp.text
     job_id = resp.json()["id"]
     await _run_import_worker(monkeypatch, role_session)
-    staged = (
-        await client.get(a.g(f"/imports/jobs/{job_id}"), headers=a.headers)
-    ).json()
-    assert staged["status"] == ImportJobStatus.staged.value, staged.get("error")
+    staged = (await client.get(a.g(f"/data-jobs/{job_id}"), headers=a.headers)).json()
+    assert staged["status"] == DataJobStatus.staged.value, staged.get("error")
     summary = staged["plan"]["atlassian"]
     assert (summary["projects"], summary["tasks"]) == (1, 1)
     assert (summary["spaces"], summary["pages"]) == (1, 1)
@@ -6546,8 +6513,8 @@ async def test_one_atlassian_import_joins_its_issues_and_pages_both_ways(
     )
     assert confirmed.status_code == 200, confirmed.text
     await _run_import_worker(monkeypatch, role_session)
-    done = (await client.get(a.g(f"/imports/jobs/{job_id}"), headers=a.headers)).json()
-    assert done["status"] == ImportJobStatus.done.value, done.get("error")
+    done = (await client.get(a.g(f"/data-jobs/{job_id}"), headers=a.headers)).json()
+    assert done["status"] == DataJobStatus.done.value, done.get("error")
 
     session.expunge_all()
     task = (
@@ -6599,7 +6566,7 @@ async def test_an_apply_touches_its_row_as_it_goes(
 
     job = await _apply_backup(client, a, zip_bytes, monkeypatch, role_session)
 
-    assert job["status"] == ImportJobStatus.done.value, job.get("error")
+    assert job["status"] == DataJobStatus.done.value, job.get("error")
     assert beats
 
 
@@ -6624,7 +6591,7 @@ async def _queued(client, actor) -> int:
 
 async def _status(client, actor, job_id) -> str:
     job = (
-        await client.get(actor.g(f"/imports/jobs/{job_id}"), headers=actor.headers)
+        await client.get(actor.g(f"/data-jobs/{job_id}"), headers=actor.headers)
     ).json()
     return job["status"]
 
@@ -6657,8 +6624,8 @@ async def test_two_communities_import_side_by_side(
 
     assert len(started) == 2
     await asyncio.gather(*started)
-    assert await _status(client, a, first) == ImportJobStatus.done.value
-    assert await _status(client, b, second) == ImportJobStatus.done.value
+    assert await _status(client, a, first) == DataJobStatus.done.value
+    assert await _status(client, b, second) == DataJobStatus.done.value
 
 
 async def test_a_community_runs_one_import_at_a_time(
@@ -6677,11 +6644,11 @@ async def test_a_community_runs_one_import_at_a_time(
 
     assert len(started) == 1
     await asyncio.gather(*started)
-    assert await _status(client, a, first) == ImportJobStatus.done.value
-    assert await _status(client, a, second) == ImportJobStatus.queued.value
+    assert await _status(client, a, first) == DataJobStatus.done.value
+    assert await _status(client, a, second) == DataJobStatus.queued.value
 
     await import_worker.process_import_jobs()
-    assert await _status(client, a, second) == ImportJobStatus.done.value
+    assert await _status(client, a, second) == DataJobStatus.done.value
 
 
 async def test_a_process_starts_no_more_than_its_slots(
@@ -6726,8 +6693,8 @@ async def test_the_sweep_leaves_a_job_this_process_is_running(
         a.user,
         source="initiative-queue",
         params={"initiative_id": a.initiative.id},
-        payload_ref="imports/elsewhere.json",
-        status=ImportJobStatus.running,
+        file_ref="imports/elsewhere.json",
+        status=DataJobStatus.running,
         created_at=stale_time,
         updated_at=stale_time,
     )
@@ -6742,4 +6709,4 @@ async def test_the_sweep_leaves_a_job_this_process_is_running(
         alive.cancel()
 
     await session.refresh(job)
-    assert job.status == ImportJobStatus.running
+    assert job.status == DataJobStatus.running

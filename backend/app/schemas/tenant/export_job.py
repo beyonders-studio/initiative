@@ -1,79 +1,12 @@
-"""API payloads for export jobs. ``params`` is the caller's own filter
-selector (echoed back so a client can re-run the export); the row never
-carries exported content — the artifact is fetched via the download route."""
+"""API payloads about exports beyond the job itself (``DataJobRead``)."""
 
-from datetime import datetime, timezone
-from typing import Any, Optional
+from datetime import datetime
+from typing import Optional
 
-from pydantic import AliasChoices, ConfigDict, Field, computed_field
+from pydantic import ConfigDict
 
-from app.models.tenant.export_job import ExportJob, ExportJobStatus
 from app.schemas.base import SanitizedBaseModel
-
-
-class ExportJobRead(SanitizedBaseModel):
-    model_config = ConfigDict(
-        from_attributes=True, json_schema_serialization_defaults_required=True
-    )
-
-    id: int
-    community_id: int = Field(validation_alias=AliasChoices("community_id", "guild_id"))
-    created_by: int
-    source: str
-    template_id: str
-    format: str
-    params: dict[str, Any]
-    status: ExportJobStatus
-    error: Optional[str] = None
-    expires_at: Optional[datetime] = None
-    # Read from the row so ``delivered`` can be computed, and excluded from
-    # the payload: the destination is a path on the server, which the operator
-    # configured and already knows. A community administrator needs to know
-    # that an archive was delivered rather than where this deployment keeps
-    # its files.
-    destination_ref: Optional[str] = Field(default=None, exclude=True)
-
-    @computed_field  # type: ignore[prop-decorator]
-    @property
-    def delivered(self) -> bool:
-        """The archive went to the operator's destination; there is nothing
-        here to download."""
-        return self.destination_ref is not None
-
-    created_at: datetime
-    updated_at: datetime
-
-
-def artifact_expired(job: ExportJob, now: Optional[datetime] = None) -> bool:
-    """Whether the job's artifact is past its expiry: swept already, or
-    finished with an ``expires_at`` that has passed and waiting for the next
-    GC pass to delete it."""
-    if job.status == ExportJobStatus.expired:
-        return True
-    if job.status != ExportJobStatus.done or job.expires_at is None:
-        return False
-    expires_at = job.expires_at
-    if expires_at.tzinfo is None:
-        expires_at = expires_at.replace(tzinfo=timezone.utc)
-    return expires_at <= (now or datetime.now(timezone.utc))
-
-
-def serialize_export_job(job: ExportJob, *, guild_id: int) -> ExportJobRead:
-    """The wire shape of one job row.
-
-    The row lives in its guild's schema and carries no guild column of its
-    own, so the guild is handed in by whoever routed the session. A finished
-    job whose artifact is past its expiry reads as ``expired`` before GC has
-    swept it, as the download route treats it.
-    """
-    fields = {
-        name: getattr(job, name)
-        for name in ExportJobRead.model_fields
-        if name != "community_id"
-    }
-    if artifact_expired(job):
-        fields["status"] = ExportJobStatus.expired
-    return ExportJobRead(community_id=guild_id, **fields)
+from app.schemas.tenant.data_job import DataJobRead
 
 
 class CommunityExportStatus(SanitizedBaseModel):
@@ -94,7 +27,7 @@ class CommunityExportStatus(SanitizedBaseModel):
     next_available_at: Optional[datetime] = None
     #: The newest whole-community export, whatever became of it — a failed or
     #: expired one is still what somebody needs to know about.
-    latest: Optional[ExportJobRead] = None
+    latest: Optional[DataJobRead] = None
     #: Who started ``latest``, as this community names people. ``None`` where
     #: that account is gone.
     latest_started_by: Optional[str] = None

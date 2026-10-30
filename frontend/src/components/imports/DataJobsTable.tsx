@@ -1,14 +1,10 @@
 import { Download, FileText, X } from "lucide-react";
-import { useMemo, useState } from "react";
+import { useState } from "react";
 import { useTranslation } from "react-i18next";
 
-import { useListExportJobs } from "@/api/generated/exports/exports";
-import {
-  getListImportJobsQueryKey,
-  useCancelImportJob,
-  useListImportJobs,
-} from "@/api/generated/imports/imports";
-import type { ExportJobRead, ImportJobRead } from "@/api/generated/initiativeAPI.schemas";
+import { getListDataJobsQueryKey, useListDataJobs } from "@/api/generated/data-jobs/data-jobs";
+import { useCancelImportJob } from "@/api/generated/imports/imports";
+import type { DataJobRead } from "@/api/generated/initiativeAPI.schemas";
 import { ImportReport } from "@/components/imports/ImportReport";
 import { SkeletonRegion, TableSkeleton } from "@/components/skeletons/PageSkeletons";
 import { Badge } from "@/components/ui/badge";
@@ -43,15 +39,12 @@ const STATUS_VARIANT: Record<string, "default" | "secondary" | "destructive" | "
   expired: "outline",
 };
 
-type Row =
-  | { direction: "export"; job: ExportJobRead }
-  | { direction: "import"; job: ImportJobRead };
-
 /** Effective status at render time for export rows: polling stops once every
  * job is terminal, so a tab left open can hold a stale "done" row whose
  * artifact has since expired. Clamp it client-side. */
-function exportDisplayStatus(job: ExportJobRead): string {
+function displayStatus(job: DataJobRead): string {
   if (
+    job.direction === "export" &&
     job.status === "done" &&
     job.expires_at != null &&
     new Date(job.expires_at).getTime() <= Date.now()
@@ -62,54 +55,39 @@ function exportDisplayStatus(job: ExportJobRead): string {
 }
 
 /** One table for both directions of the Data tab: export and import jobs
- * interleaved newest-first (RLS scopes rows — members their own, community
+ * newest-first in one list (RLS scopes rows — members their own, community
  * admins everyone's). Per-row actions stay direction-specific: Download for
  * finished exports, Cancel for staged/queued imports, a report view for
  * terminal imports. Polls while any job of either direction is active. */
 export function DataJobsTable() {
   const { t } = useTranslation(["imports", "exports"]);
   const communityId = useActiveCommunityId();
-  const [reportJob, setReportJob] = useState<ImportJobRead | null>(null);
+  const [reportJob, setReportJob] = useState<DataJobRead | null>(null);
 
-  const exportsQuery = useListExportJobs(communityId, {
-    query: {
-      refetchInterval: (query) =>
-        (query.state.data ?? []).some((job) => ACTIVE.has(job.status)) ? POLL_MS : false,
-    },
-  });
-  const importsQuery = useListImportJobs(communityId, {
+  const jobsQuery = useListDataJobs(communityId, {
     query: {
       refetchInterval: (query) =>
         (query.state.data ?? []).some((job) => ACTIVE.has(job.status)) ? POLL_MS : false,
     },
   });
   const cancelMutation = useCancelImportJob();
+  const jobs = jobsQuery.data ?? [];
 
-  const rows: Row[] = useMemo(() => {
-    const merged: Row[] = [
-      ...(exportsQuery.data ?? []).map((job) => ({ direction: "export" as const, job })),
-      ...(importsQuery.data ?? []).map((job) => ({ direction: "import" as const, job })),
-    ];
-    return merged.sort(
-      (a, b) => new Date(b.job.created_at).getTime() - new Date(a.job.created_at).getTime()
-    );
-  }, [exportsQuery.data, importsQuery.data]);
-
-  if (exportsQuery.isLoading || importsQuery.isLoading) {
+  if (jobsQuery.isLoading) {
     return (
       <SkeletonRegion>
         <TableSkeleton rows={3} columns={5} toolbar={false} />
       </SkeletonRegion>
     );
   }
-  if (exportsQuery.isError || importsQuery.isError) {
+  if (jobsQuery.isError) {
     return <p className="py-4 text-destructive text-sm">{t("exports:table.loadFailed")}</p>;
   }
-  if (rows.length === 0) {
+  if (jobs.length === 0) {
     return <p className="py-4 text-muted-foreground text-sm">{t("exports:table.empty")}</p>;
   }
 
-  const handleCancel = async (job: ImportJobRead) => {
+  const handleCancel = async (job: DataJobRead) => {
     try {
       await cancelMutation.mutateAsync({ communityId: communityId, jobId: job.id });
     } catch (err) {
@@ -118,24 +96,15 @@ export function DataJobsTable() {
       toast.error(getErrorMessage(err, "imports:job.failed"));
     } finally {
       void queryClient.invalidateQueries({
-        queryKey: getListImportJobsQueryKey(communityId),
+        queryKey: getListDataJobsQueryKey(communityId),
       });
     }
   };
 
-  const rowLabel = (row: Row): string => {
-    if (row.direction === "export") {
-      return t(`exports:table.source.${row.job.source}` as never, {
-        defaultValue: row.job.source,
-      });
-    }
-    return t(`imports:table.source.${row.job.source}` as never, {
-      defaultValue: row.job.source,
+  const rowLabel = (job: DataJobRead): string =>
+    t(`${job.direction === "export" ? "exports" : "imports"}:table.source.${job.source}` as never, {
+      defaultValue: job.source,
     });
-  };
-
-  const rowStatus = (row: Row): string =>
-    row.direction === "export" ? exportDisplayStatus(row.job) : row.job.status;
 
   return (
     <div className="overflow-x-auto">
@@ -153,33 +122,33 @@ export function DataJobsTable() {
           </TableRow>
         </TableHeader>
         <TableBody>
-          {rows.map((row) => {
-            const status = rowStatus(row);
+          {jobs.map((job) => {
+            const status = displayStatus(job);
             return (
-              <TableRow key={`${row.direction}-${row.job.id}`}>
+              <TableRow key={job.id}>
                 <TableCell className="font-medium">
                   <Badge variant="outline" className="mr-2">
-                    {t(`imports:table.direction.${row.direction}`)}
+                    {t(`imports:table.direction.${job.direction}`)}
                   </Badge>
-                  {rowLabel(row)}
-                  {row.direction === "export" && (
+                  {rowLabel(job)}
+                  {job.direction === "export" && (
                     <span className="ml-1 text-muted-foreground text-xs uppercase">
-                      {row.job.format}
+                      {job.format}
                     </span>
                   )}
                 </TableCell>
                 <TableCell>
                   <Badge variant={STATUS_VARIANT[status] ?? "secondary"}>
-                    {row.direction === "export"
+                    {job.direction === "export"
                       ? t(`exports:table.status.${status}` as never, { defaultValue: status })
                       : t(`imports:table.status.${status}` as never, { defaultValue: status })}
                   </Badge>
                 </TableCell>
                 <TableCell className="hidden text-muted-foreground text-sm sm:table-cell">
-                  <RelativeTime date={row.job.created_at} />
+                  <RelativeTime date={job.created_at} />
                 </TableCell>
                 <TableCell className="text-right">
-                  {row.direction === "export" && status === "done" && (
+                  {job.direction === "export" && status === "done" && (
                     <Button
                       variant="outline"
                       size="sm"
@@ -187,10 +156,10 @@ export function DataJobsTable() {
                       onClick={() =>
                         void downloadExportArtifact(
                           communityId,
-                          row.job.id,
+                          job.id,
                           t as (key: string, options?: Record<string, unknown>) => string,
-                          row.job.source,
-                          (row.job as ExportJobRead).format
+                          job.source,
+                          job.format
                         )
                       }
                     >
@@ -198,25 +167,25 @@ export function DataJobsTable() {
                       <span className="hidden sm:inline">{t("exports:table.download")}</span>
                     </Button>
                   )}
-                  {row.direction === "import" && ACTIVE.has(row.job.status) && (
+                  {job.direction === "import" && ACTIVE.has(job.status) && (
                     <Button
                       variant="outline"
                       size="sm"
-                      disabled={row.job.status === "running"}
+                      disabled={job.status === "running"}
                       aria-label={t("imports:table.cancel")}
-                      onClick={() => void handleCancel(row.job as ImportJobRead)}
+                      onClick={() => void handleCancel(job)}
                     >
                       <X className="h-4 w-4" />
                       <span className="hidden sm:inline">{t("imports:table.cancel")}</span>
                     </Button>
                   )}
-                  {row.direction === "import" &&
-                    (row.job.status === "done" || row.job.status === "failed") && (
+                  {job.direction === "import" &&
+                    (job.status === "done" || job.status === "failed") && (
                       <Button
                         variant="outline"
                         size="sm"
                         aria-label={t("imports:table.viewReport")}
-                        onClick={() => setReportJob(row.job as ImportJobRead)}
+                        onClick={() => setReportJob(job)}
                       >
                         <FileText className="h-4 w-4" />
                         <span className="hidden sm:inline">{t("imports:table.viewReport")}</span>

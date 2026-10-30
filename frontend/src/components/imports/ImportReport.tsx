@@ -1,6 +1,6 @@
 import { useTranslation } from "react-i18next";
 
-import type { ImportJobRead } from "@/api/generated/initiativeAPI.schemas";
+import type { DataJobRead } from "@/api/generated/initiativeAPI.schemas";
 import { getErrorMessage } from "@/lib/errorMessage";
 
 interface BackupResult {
@@ -21,7 +21,7 @@ interface EnvelopeResult {
 /** Render a terminal import job's persisted report — backup jobs get the
  * per-initiative / per-tool breakdown, envelope jobs the created counts.
  * Shared by the wizard's final step and the Data tab's report view. */
-export function ImportReport({ job }: { job: ImportJobRead }) {
+export function ImportReport({ job }: { job: DataJobRead }) {
   const { t } = useTranslation("imports");
 
   if (job.status !== "done" && job.status !== "failed") {

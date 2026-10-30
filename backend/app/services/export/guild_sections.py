@@ -335,8 +335,7 @@ EXEMPT: dict[str, str] = {
     "plugin_member_consents": "credentials",
     # Operational ledgers about the app's own work. Restoring them would
     # describe a history that did not happen in the instance reading them.
-    "export_jobs": "operational",
-    "import_jobs": "operational",
+    "data_jobs": "operational",
     "webhook_deliveries": "operational",
     "plugin_hook_deliveries": "operational",
     "plugin_schedule_runs": "operational",

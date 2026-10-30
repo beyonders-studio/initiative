@@ -271,6 +271,7 @@
   "EXPORT_WRITE_REQUIRED": "Dieser Export ist zu groß, um ihn mit Lesezugriff zu erstellen.",
   "EXPORT_OWNER_REQUIRED": "Exportieren kann nur, wer dies auch löschen darf.",
   "EXPORT_JOB_NOT_FOUND": "Export nicht gefunden.",
+  "DATA_JOB_NOT_FOUND": "Import oder Export nicht gefunden.",
   "EXPORT_NOT_READY": "Dieser Export ist noch nicht zum Herunterladen bereit.",
   "EXPORT_EXPIRED": "Dieser Export ist abgelaufen. Starte einen neuen, um ihn erneut herunterzuladen.",
   "EXPORT_OUT_OF_REACH": "Du hast keinen Zugriff mehr auf alles in diesem Export, daher kann er nicht heruntergeladen werden.",

@@ -3,10 +3,11 @@ import userEvent from "@testing-library/user-event";
 import { HttpResponse } from "msw";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 
+import { buildDataJob } from "@/__tests__/factories";
 import { communityHttp } from "@/__tests__/helpers/communityHttp";
 import { server } from "@/__tests__/helpers/msw-server";
 import { renderWithProviders } from "@/__tests__/helpers/render";
-import type { ImportJobRead } from "@/api/generated/initiativeAPI.schemas";
+import type { DataJobRead } from "@/api/generated/initiativeAPI.schemas";
 
 import {
   AtlassianChooseStep,
@@ -21,22 +22,15 @@ vi.mock("@/lib/mascotToast", () => ({
   toast: { success: vi.fn(), error: vi.fn(), warning: vi.fn() },
 }));
 
-function job(overrides: Partial<ImportJobRead> = {}): ImportJobRead {
-  return {
+function job(overrides: Partial<DataJobRead> = {}): DataJobRead {
+  return buildDataJob({
     id: 77,
-    community_id: 1,
-    created_by: 1,
+    direction: "import",
     source: "atlassian",
-    params: {},
-    status: "queued",
-    plan: null,
-    result: null,
-    error: null,
-    expires_at: null,
-    created_at: new Date().toISOString(),
-    updated_at: new Date().toISOString(),
+    template_id: null,
+    format: null,
     ...overrides,
-  };
+  });
 }
 
 const CONNECTION = {
@@ -257,7 +251,7 @@ describe("AtlassianFetchingStep", () => {
   it("shows the fetch climbing, then hands over the staged job", async () => {
     let polls = 0;
     server.use(
-      communityHttp.get("/imports/jobs/:jobId", () => {
+      communityHttp.get("/data-jobs/:jobId", () => {
         polls += 1;
         return polls < 2
           ? HttpResponse.json(
@@ -285,7 +279,7 @@ describe("AtlassianFetchingStep", () => {
 
   it("explains a failed fetch in words, and lets somebody start over", async () => {
     server.use(
-      communityHttp.get("/imports/jobs/:jobId", () =>
+      communityHttp.get("/data-jobs/:jobId", () =>
         HttpResponse.json(job({ status: "failed", error: "IMPORT_SOURCE_RATE_LIMITED" }))
       )
     );

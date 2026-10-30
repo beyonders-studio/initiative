@@ -47,7 +47,7 @@ from app.core.search import SearchEntityType
 from app.core.tools import BULK_EXPORT_TOOLS, Tool, tool_envelope_type
 from app.core.messages import ImportEngineMessages
 from app.models.platform.user import User
-from app.models.tenant.import_job import ImportJob, ImportJobStatus
+from app.models.tenant.data_job import DataJob, DataJobDirection, DataJobStatus
 from app.models.tenant.initiative import Initiative
 from app.models.tenant.resource_grant import ResourceAccessLevel, ResourceGrant
 from app.schemas.base import SanitizedBaseModel
@@ -299,12 +299,12 @@ async def stage_backup_job(
     guild_id: int,
     user: User,
     payload: Path,
-    status: ImportJobStatus,
+    status: DataJobStatus,
     anchor: datetime | None = None,
     people_map: dict[str, int] | None = None,
     join: list[int] | None = None,
     payload_ref: str | None = None,
-) -> ImportJob:
+) -> DataJob:
     """Plan the backup zip at ``payload``, stage it in the community's storage
     and add its job, created by ``user``, to ``session`` without committing.
     ``payload_ref`` names it where it is already there (a resumable upload).
@@ -335,11 +335,12 @@ async def stage_backup_job(
         params["people_map"] = people_map
     if join:
         params["join"] = join
-    job = ImportJob(
+    job = DataJob(
+        direction=DataJobDirection.import_,
         created_by=user.id,
         source="backup",
         params=params,
-        payload_ref=payload_ref,
+        file_ref=payload_ref,
         plan=plan.model_dump(mode="json"),
         status=status,
         expires_at=datetime.now(timezone.utc)

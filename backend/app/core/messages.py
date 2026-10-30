@@ -979,6 +979,11 @@ class ProjectExportMessages:
     NO_TASK_STATUSES = "PROJECT_EXPORT_NO_TASK_STATUSES"
 
 
+class DataJobMessages:
+    #: An import or export job the caller cannot see, or none at all.
+    DATA_JOB_NOT_FOUND = "DATA_JOB_NOT_FOUND"
+
+
 class ExportMessages:
     EXPORT_UNKNOWN_SOURCE = "EXPORT_UNKNOWN_SOURCE"
     EXPORT_INVALID_FORMAT = "EXPORT_INVALID_FORMAT"

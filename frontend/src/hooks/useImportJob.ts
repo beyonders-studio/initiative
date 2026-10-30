@@ -1,8 +1,8 @@
 import { useEffect, useRef, useState } from "react";
 import { useTranslation } from "react-i18next";
 
-import { useGetImportJob } from "@/api/generated/imports/imports";
-import type { ImportJobRead } from "@/api/generated/initiativeAPI.schemas";
+import { useGetDataJob } from "@/api/generated/data-jobs/data-jobs";
+import type { DataJobRead } from "@/api/generated/initiativeAPI.schemas";
 import { useActiveCommunityId } from "@/hooks/useActiveCommunityId";
 import { toast } from "@/lib/mascotToast";
 import { getItem, removeItem, setItem } from "@/lib/storage";
@@ -41,12 +41,12 @@ export function useImportJob({ resumePending = false }: UseImportJobOptions = {}
   });
   // The last terminal row, until the next watch()/reset() — what lets a
   // wizard render a report screen after the poll ends.
-  const [terminal, setTerminal] = useState<ImportJobRead | null>(null);
+  const [terminal, setTerminal] = useState<DataJobRead | null>(null);
   // Job ids already handled — a terminal status must fire exactly once even
   // though polling re-renders keep delivering it.
   const handledJobs = useRef(new Set<number>());
 
-  const jobQuery = useGetImportJob(communityId, jobId ?? 0, {
+  const jobQuery = useGetDataJob(communityId, jobId ?? 0, {
     query: {
       enabled: jobId != null,
       refetchInterval: (query) => (TERMINAL.has(query.state.data?.status ?? "") ? false : POLL_MS),
@@ -55,7 +55,17 @@ export function useImportJob({ resumePending = false }: UseImportJobOptions = {}
 
   const job = jobQuery.data;
   useEffect(() => {
-    if (!jobId || !job || job.id !== jobId || !TERMINAL.has(job.status)) {
+    if (!jobId || !job || job.id !== jobId) {
+      return;
+    }
+    // A pending id saved before imports and exports shared their ids can now
+    // name a job going the other way: it is not this one, so let it go.
+    if (job.direction !== "import") {
+      setJobId(null);
+      removeItem(pendingKey(communityId));
+      return;
+    }
+    if (!TERMINAL.has(job.status)) {
       return;
     }
     if (handledJobs.current.has(jobId)) {

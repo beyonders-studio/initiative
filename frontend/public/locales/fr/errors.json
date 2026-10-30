@@ -266,6 +266,7 @@
   "EXPORT_WRITE_REQUIRED": "Cet export est trop volumineux pour être généré avec un accès en lecture seule.",
   "EXPORT_OWNER_REQUIRED": "Seule la personne qui peut supprimer ceci peut l’exporter.",
   "EXPORT_JOB_NOT_FOUND": "Export introuvable.",
+  "DATA_JOB_NOT_FOUND": "Import ou export introuvable.",
   "EXPORT_NOT_READY": "Cet export n’est pas encore prêt à être téléchargé.",
   "EXPORT_EXPIRED": "Cet export a expiré. Lancez-en un nouveau pour le télécharger à nouveau.",
   "EXPORT_OUT_OF_REACH": "Vous n’avez plus accès à tout le contenu de cet export, il ne peut donc pas être téléchargé.",

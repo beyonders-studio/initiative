@@ -3,9 +3,7 @@
 Every route here writes, so every route re-checks that the community is
 writable. The engine behind them is shared: whatever file or site the work
 arrived from, it becomes an envelope, and one apply path puts the rows in.
-
-NOTE: the job routes use literal paths plus a parametric ``/{job_id}``; every
-literal route MUST stay declared before the parametric ones.
+Reading an import job is ``data_jobs``'s.
 """
 
 import asyncio
@@ -28,7 +26,6 @@ from fastapi import (
     status,
 )
 from fastapi.responses import JSONResponse
-from sqlmodel import select
 from sqlmodel.ext.asyncio.session import AsyncSession
 
 from app.api.deps import (
@@ -42,7 +39,7 @@ from app.core.body_limit import MULTIPART_SLACK_BYTES, max_body
 from app.core.messages import ImportEngineMessages, ResumableMessages
 from app.core.version import get_version
 from app.models.platform.user import User
-from app.models.tenant.import_job import ImportJob, ImportJobStatus
+from app.models.tenant.data_job import DataJobDirection, DataJobStatus
 from app.schemas.tenant.atlassian import (
     AtlassianConnectRequest,
     AtlassianConnectResponse,
@@ -54,10 +51,9 @@ from app.schemas.tenant.import_job import (
     ForeignImportRequest,
     ForeignPreview,
     ForeignSourceOption,
-    ImportJobRead,
-    serialize_import_job,
 )
-from app.services import resumable
+from app.schemas.tenant.data_job import DataJobRead, serialize_data_job
+from app.services import data_jobs, resumable
 from app.services.import_engine import atlassian as atlassian_service
 from app.services.import_engine import atlassian_job
 from app.services.import_engine import backup as backup_service
@@ -76,8 +72,6 @@ logger = logging.getLogger(__name__)
 
 router = APIRouter()
 
-
-_LIST_LIMIT = 50
 
 #: The most property names one confirm may untick.
 _MAX_EXCLUDED_PROPERTIES = 500
@@ -138,9 +132,9 @@ async def import_envelope(
         )
     return JSONResponse(
         status_code=status.HTTP_202_ACCEPTED,
-        content=serialize_import_job(
-            outcome, guild_id=guild_context.guild_id
-        ).model_dump(mode="json"),
+        content=serialize_data_job(outcome, guild_id=guild_context.guild_id).model_dump(
+            mode="json"
+        ),
     )
 
 
@@ -187,9 +181,9 @@ async def import_envelope_archive(
         )
     return JSONResponse(
         status_code=status.HTTP_202_ACCEPTED,
-        content=serialize_import_job(
-            outcome, guild_id=guild_context.guild_id
-        ).model_dump(mode="json"),
+        content=serialize_data_job(outcome, guild_id=guild_context.guild_id).model_dump(
+            mode="json"
+        ),
     )
 
 
@@ -278,9 +272,9 @@ async def import_foreign(
         )
     return JSONResponse(
         status_code=status.HTTP_202_ACCEPTED,
-        content=serialize_import_job(
-            started, guild_id=guild_context.guild_id
-        ).model_dump(mode="json"),
+        content=serialize_data_job(started, guild_id=guild_context.guild_id).model_dump(
+            mode="json"
+        ),
     )
 
 
@@ -337,7 +331,7 @@ async def connect_atlassian(
 
 @router.post(
     "/atlassian/import",
-    response_model=ImportJobRead,
+    response_model=DataJobRead,
     status_code=status.HTTP_202_ACCEPTED,
 )
 @max_body(lambda: ATLASSIAN_MAX_REQUEST_BYTES, ImportEngineMessages.IMPORT_TOO_LARGE)
@@ -346,7 +340,7 @@ async def start_atlassian_import(
     session: RLSSessionDep,
     current_user: Annotated[User, Depends(get_current_active_user)],
     guild_context: GuildContextDep,
-) -> ImportJobRead:
+) -> DataJobRead:
     """Start reading Jira projects and Confluence spaces into an initiative.
 
     One job for both: projects arrive as projects, each space as a wiki, and
@@ -384,12 +378,12 @@ async def start_atlassian_import(
         include_comments=payload.include_comments,
         include_attachments=payload.include_attachments,
     )
-    return serialize_import_job(job, guild_id=guild_context.guild_id)
+    return serialize_data_job(job, guild_id=guild_context.guild_id)
 
 
 @router.post(
     "/atlassian/export",
-    response_model=ImportJobRead,
+    response_model=DataJobRead,
     status_code=status.HTTP_202_ACCEPTED,
 )
 @max_body(_upload_bytes, ImportEngineMessages.IMPORT_TOO_LARGE)
@@ -401,7 +395,7 @@ async def start_confluence_export_import(
     include_attachments: bool = Form(True),
     file: UploadFile | None = File(None),
     upload_id: str | None = Form(None),
-) -> ImportJobRead:
+) -> DataJobRead:
     """Start reading a Confluence space's HTML export into an initiative,
     sent as ``file`` or as a resumable upload named by ``upload_id``.
 
@@ -429,46 +423,16 @@ async def start_confluence_export_import(
             include_attachments=include_attachments,
             payload_ref=payload_ref,
         )
-    return serialize_import_job(job, guild_id=guild_context.guild_id)
+    return serialize_data_job(job, guild_id=guild_context.guild_id)
 
 
-@router.get("/jobs", response_model=list[ImportJobRead])
-async def list_import_jobs(
-    session: RLSSessionDep,
-    current_user: Annotated[User, Depends(get_current_active_user)],
-    guild_context: GuildContextDep,
-) -> list[ImportJobRead]:
-    """The caller's import jobs, newest first (RLS scopes the rows: own rows,
-    or the whole guild for a guild admin)."""
-    jobs = await session.exec(
-        select(ImportJob).order_by(ImportJob.created_at.desc()).limit(_LIST_LIMIT)
-    )
-    return [serialize_import_job(job, guild_id=guild_context.guild_id) for job in jobs]
-
-
-@router.get("/jobs/{job_id}", response_model=ImportJobRead)
-async def get_import_job(
-    job_id: int,
-    session: RLSSessionDep,
-    current_user: Annotated[User, Depends(get_current_active_user)],
-    guild_context: GuildContextDep,
-) -> ImportJobRead:
-    job = await session.get(ImportJob, job_id)
-    if job is None:  # includes rows RLS hides — 404, never 403
-        raise HTTPException(
-            status_code=status.HTTP_404_NOT_FOUND,
-            detail=ImportEngineMessages.IMPORT_JOB_NOT_FOUND,
-        )
-    return serialize_import_job(job, guild_id=guild_context.guild_id)
-
-
-@router.delete("/jobs/{job_id}", response_model=ImportJobRead)
+@router.delete("/jobs/{job_id}", response_model=DataJobRead)
 async def cancel_import_job(
     job_id: int,
     session: RLSSessionDep,
     current_user: Annotated[User, Depends(get_current_active_user)],
     guild_context: GuildContextDep,
-) -> ImportJobRead:
+) -> DataJobRead:
     """Cancel a job that hasn't started applying (staged, queued, or still
     fetching from its source); its staged payload is deleted. A fetch writes
     nothing but that payload, so stopping one mid-read is safe — the worker
@@ -476,33 +440,35 @@ async def cancel_import_job(
     terminal job is not cancellable — 409 (an interrupted apply would leave
     half-committed content). The row is locked, as the worker locks it to
     claim, so the status read here is the one the cancel replaces."""
-    job = await session.get(ImportJob, job_id, with_for_update=True)
+    job = await data_jobs.find(
+        session, job_id, DataJobDirection.import_, for_update=True
+    )
     if job is None:
         raise HTTPException(
             status_code=status.HTTP_404_NOT_FOUND,
             detail=ImportEngineMessages.IMPORT_JOB_NOT_FOUND,
         )
     if job.status not in (
-        ImportJobStatus.staged,
-        ImportJobStatus.queued,
-        ImportJobStatus.fetching,
+        DataJobStatus.staged,
+        DataJobStatus.queued,
+        DataJobStatus.fetching,
     ):
         raise HTTPException(
             status_code=status.HTTP_409_CONFLICT,
             detail=ImportEngineMessages.IMPORT_NOT_CANCELLABLE,
         )
     await asyncio.to_thread(
-        import_engine.delete_payload, guild_context.guild_id, job.payload_ref
+        import_engine.delete_payload, guild_context.guild_id, job.file_ref
     )
     # Everything the job was lent goes back with the payload — a cancelled
     # import has no further use for the secret it was given.
     job.secret_encrypted = None
-    job.status = ImportJobStatus.cancelled
-    job.payload_ref = None
+    job.status = DataJobStatus.cancelled
+    job.file_ref = None
     session.add(job)
     await session.commit()
     await session.refresh(job)
-    return serialize_import_job(job, guild_id=guild_context.guild_id)
+    return serialize_data_job(job, guild_id=guild_context.guild_id)
 
 
 @asynccontextmanager
@@ -556,9 +522,7 @@ async def _payload(
 # ---------------------------------------------------------------------------
 
 
-@router.post(
-    "/backup", response_model=ImportJobRead, status_code=status.HTTP_201_CREATED
-)
+@router.post("/backup", response_model=DataJobRead, status_code=status.HTTP_201_CREATED)
 @max_body(_upload_bytes, ImportEngineMessages.IMPORT_TOO_LARGE)
 async def upload_backup(
     session: RLSSessionDep,
@@ -566,7 +530,7 @@ async def upload_backup(
     guild_context: GuildContextDep,
     file: UploadFile | None = File(None),
     upload_id: str | None = Form(None),
-) -> ImportJobRead:
+) -> DataJobRead:
     """Upload a backup zip, as ``file`` or as a resumable upload named by
     ``upload_id``, and get its pre-flight plan. The zip is staged in
     guild storage and the job parked as ``staged`` (nothing is imported yet);
@@ -585,22 +549,22 @@ async def upload_backup(
             guild_id=guild_id,
             user=current_user,
             payload=payload,
-            status=ImportJobStatus.staged,
+            status=DataJobStatus.staged,
             payload_ref=payload_ref,
         )
     await session.commit()
     await session.refresh(job)
-    return serialize_import_job(job, guild_id=guild_context.guild_id)
+    return serialize_data_job(job, guild_id=guild_context.guild_id)
 
 
-@router.post("/jobs/{job_id}/confirm", response_model=ImportJobRead)
+@router.post("/jobs/{job_id}/confirm", response_model=DataJobRead)
 async def confirm_import(
     job_id: int,
     session: RLSSessionDep,
     current_user: Annotated[User, Depends(get_current_active_user)],
     guild_context: GuildContextDep,
     body: Optional[dict] = None,
-) -> ImportJobRead:
+) -> DataJobRead:
     """Confirm a staged import: flips it to ``queued`` for the worker.
 
     Optional body ``{"include": {tool: bool}}`` narrows which tools apply
@@ -620,7 +584,7 @@ async def confirm_import(
     are, so that creator is the one who answers, and nobody else confirms on
     their behalf."""
     import_engine.require_writable(guild_context)
-    job = await session.get(ImportJob, job_id)
+    job = await data_jobs.find(session, job_id, DataJobDirection.import_)
     if job is None:
         raise HTTPException(
             status_code=status.HTTP_404_NOT_FOUND,
@@ -637,7 +601,7 @@ async def confirm_import(
             status_code=status.HTTP_403_FORBIDDEN,
             detail=ImportEngineMessages.IMPORT_NOT_CONFIRMABLE,
         )
-    if job.status != ImportJobStatus.staged:
+    if job.status != DataJobStatus.staged:
         raise HTTPException(
             status_code=status.HTTP_409_CONFLICT,
             detail=ImportEngineMessages.IMPORT_NOT_CONFIRMABLE,
@@ -648,11 +612,11 @@ async def confirm_import(
     now = datetime.now(timezone.utc)
     if job.expires_at is not None and job.expires_at <= now:
         await asyncio.to_thread(
-            import_engine.delete_payload, guild_context.guild_id, job.payload_ref
+            import_engine.delete_payload, guild_context.guild_id, job.file_ref
         )
         job.secret_encrypted = None
-        job.status = ImportJobStatus.expired
-        job.payload_ref = None
+        job.status = DataJobStatus.expired
+        job.file_ref = None
         session.add(job)
         await session.commit()
         raise HTTPException(
@@ -700,11 +664,11 @@ async def confirm_import(
                 detail=ImportEngineMessages.IMPORT_INVALID_PARAMS,
             )
         job.params = {**(job.params or {}), "exclude_properties": exclude_properties}
-    job.status = ImportJobStatus.queued
+    job.status = DataJobStatus.queued
     # Fresh TTL window: the confirmed job now waits on the worker, and a
     # nearly-elapsed staging TTL must not let GC sweep it out of the queue.
     job.expires_at = now + timedelta(hours=import_limits.IMPORT_STAGED_TTL_HOURS)
     session.add(job)
     await session.commit()
     await session.refresh(job)
-    return serialize_import_job(job, guild_id=guild_context.guild_id)
+    return serialize_data_job(job, guild_id=guild_context.guild_id)

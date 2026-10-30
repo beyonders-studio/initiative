@@ -1,7 +1,7 @@
 """The export engine's bounds."""
 
 #: Inline-vs-job auto-select: at or under this many rows the PDF renders
-#: in-request; above it the request becomes a persisted ExportJob.
+#: in-request; above it the request becomes a persisted export job.
 EXPORT_INLINE_MAX_ROWS = 200
 #: Hard ceiling on rows in one export snapshot (the list-endpoint pagination
 #: caps do not apply to exports).

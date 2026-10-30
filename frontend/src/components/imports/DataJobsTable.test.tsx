@@ -3,9 +3,11 @@ import userEvent from "@testing-library/user-event";
 import { HttpResponse } from "msw";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 
+import { buildDataJob } from "@/__tests__/factories";
 import { communityHttp } from "@/__tests__/helpers/communityHttp";
 import { server } from "@/__tests__/helpers/msw-server";
 import { renderWithProviders } from "@/__tests__/helpers/render";
+import type { DataJobRead } from "@/api/generated/initiativeAPI.schemas";
 
 import { DataJobsTable } from "./DataJobsTable";
 
@@ -21,50 +23,37 @@ import { downloadExportArtifact } from "@/lib/exportDownload";
 const now = new Date();
 const iso = (offsetMs: number) => new Date(now.getTime() + offsetMs).toISOString();
 
-const exportJob = (o: Record<string, unknown>) => ({
-  id: 1,
-  community_id: 1,
-  created_by: 1,
-  source: "community",
-  template_id: "data-table",
-  format: "zip",
-  params: {},
-  status: "done",
-  error: null,
-  expires_at: iso(86_400_000),
-  created_at: iso(-1000),
-  updated_at: iso(-1000),
-  ...o,
-});
-const importJob = (o: Record<string, unknown>) => ({
-  id: 1,
-  community_id: 1,
-  created_by: 1,
-  source: "backup",
-  params: {},
-  plan: null,
-  result: null,
-  status: "queued",
-  error: null,
-  expires_at: null,
-  created_at: iso(-500),
-  updated_at: iso(-500),
-  ...o,
-});
+const exportJob = (overrides: Partial<DataJobRead>) =>
+  buildDataJob({
+    source: "community",
+    template_id: "data-table",
+    format: "zip",
+    status: "done",
+    expires_at: iso(86_400_000),
+    created_at: iso(-1000),
+    ...overrides,
+  });
+const importJob = (overrides: Partial<DataJobRead>) =>
+  buildDataJob({
+    direction: "import",
+    source: "backup",
+    template_id: null,
+    format: null,
+    created_at: iso(-500),
+    ...overrides,
+  });
 
 describe("DataJobsTable", () => {
   beforeEach(() => {
     vi.clearAllMocks();
   });
 
-  it("interleaves both directions with direction-specific actions", async () => {
+  it("lists both directions with direction-specific actions", async () => {
     server.use(
-      communityHttp.get("/exports/jobs", () =>
-        HttpResponse.json([exportJob({ id: 10, status: "done" })])
-      ),
-      communityHttp.get("/imports/jobs", () =>
+      communityHttp.get("/data-jobs/", () =>
         HttpResponse.json([
           importJob({ id: 20, status: "queued", created_at: iso(0) }),
+          exportJob({ id: 10, status: "done" }),
           importJob({ id: 21, status: "done", created_at: iso(-2000) }),
         ])
       )
@@ -74,7 +63,6 @@ describe("DataJobsTable", () => {
 
     // The placeholder table has rows of its own, so wait for the data proper.
     await screen.findByRole("button", { name: /download/i });
-    // Newest first: the queued import (created now) leads.
     const rows = screen.getAllByRole("row");
     // header + 3 data rows
     expect(rows).toHaveLength(4);
@@ -90,10 +78,9 @@ describe("DataJobsTable", () => {
 
   it("re-downloads a finished export via the download helper", async () => {
     server.use(
-      communityHttp.get("/exports/jobs", () =>
+      communityHttp.get("/data-jobs/", () =>
         HttpResponse.json([exportJob({ id: 10, status: "done" })])
-      ),
-      communityHttp.get("/imports/jobs", () => HttpResponse.json([]))
+      )
     );
     renderWithProviders(<DataJobsTable />);
     await userEvent.click(await screen.findByRole("button", { name: /download/i }));
@@ -103,8 +90,7 @@ describe("DataJobsTable", () => {
   it("cancels a staged/queued import", async () => {
     let cancelled = false;
     server.use(
-      communityHttp.get("/exports/jobs", () => HttpResponse.json([])),
-      communityHttp.get("/imports/jobs", () =>
+      communityHttp.get("/data-jobs/", () =>
         HttpResponse.json([importJob({ id: 20, status: "staged" })])
       ),
       communityHttp.delete("/imports/jobs/:jobId", () => {
@@ -119,10 +105,9 @@ describe("DataJobsTable", () => {
 
   it("clamps a stale done export whose artifact has expired", async () => {
     server.use(
-      communityHttp.get("/exports/jobs", () =>
+      communityHttp.get("/data-jobs/", () =>
         HttpResponse.json([exportJob({ id: 10, status: "done", expires_at: iso(-60_000) })])
-      ),
-      communityHttp.get("/imports/jobs", () => HttpResponse.json([]))
+      )
     );
     renderWithProviders(<DataJobsTable />);
     expect(await screen.findByText("Expired")).toBeInTheDocument();

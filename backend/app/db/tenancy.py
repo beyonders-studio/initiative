@@ -142,12 +142,10 @@ GUILD_LEVEL_TABLES: frozenset[str] = frozenset(
         "initiative_join_requests",
         # Own-row tables (also listed in OWN_ROW_TABLES below): guild-level
         # placement, but rows belong to ONE user and carry own_row_* policies.
-        "export_jobs",  # a job may span initiatives ("export all my tasks"), so
-        # it can't use initiative_access; the row holds selector text and gates
-        # the artifact download, so it must not be guild-wide-readable either.
-        "import_jobs",  # same shape as export_jobs: a backup import spans
-        # initiatives, and the row's options/plan/report text plus the staged
-        # payload it gates must not be guild-wide-readable.
+        "data_jobs",  # an import or export may span initiatives ("export all
+        # my tasks", a backup), so it can't use initiative_access; the row holds
+        # selector, plan and report text and gates its stored file, so it must
+        # not be guild-wide-readable either.
         "pending_uploads",  # a file arriving in pieces is its uploader's until
         # an endpoint takes it; a backup being uploaded spans initiatives.
         # A member's own credentials: their connection to an installed plug-in's
@@ -198,8 +196,7 @@ MANAGED_TABLES: dict[str, str] = {
 # MUST also be in ``GUILD_LEVEL_TABLES`` (that's the schema-placement decision;
 # this is the policy overlay) — enforced in ``tenancy_test.py``.
 OWN_ROW_TABLES: dict[str, str] = {
-    "export_jobs": "created_by",
-    "import_jobs": "created_by",
+    "data_jobs": "created_by",
     "pending_uploads": "created_by",
     "plugin_member_consents": "user_id",
 }
