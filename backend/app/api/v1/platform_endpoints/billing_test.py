@@ -26,10 +26,12 @@ from sqlmodel.ext.asyncio.session import AsyncSession
 
 from app.testing import community_plan
 from app.core import config as config_module
+from app.core.login_methods import LoginMethod
 from app.models.platform.billing import BillingJti
 from app.models.platform.guild import CommunityRole, CommunityStatus
 from app.models.platform.guild_administration import GuildAdministration
 from app.services.marketplace import plugin_entitlements
+from app.services.platform import rules
 from app.services.tenant.attachments import (
     StorageQuotaExceededError,
     enforce_storage_quota,
@@ -312,6 +314,17 @@ async def test_the_deployments_rules_stand_over_the_seat_until_withdrawn(
     ):
         refused_item = await _sync(client, (guild_id, 4, {**restricted, "rules": bad}))
         assert refused_item.json()["results"][0]["error"] == "BILLING_INVALID_PAYLOAD"
+
+
+async def test_a_rule_the_deployment_offers_nothing_to_meet_refuses_the_item(
+    client: AsyncClient, session: AsyncSession
+):
+    guild = await create_guild(session)
+    await rules.put(session, "login_methods", frozenset({LoginMethod.password}))
+    await session.commit()
+    factor = [{"key": "require_second_factor", "value": True}]
+    response = await _sync(client, (guild.id, 1, _fields(rules=factor)))
+    assert response.json()["results"][0]["error"] == "BILLING_RULE_NOT_OFFERED"
 
 
 async def test_the_pushed_ceiling_is_the_one_uploads_are_held_to(

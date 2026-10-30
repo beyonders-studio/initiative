@@ -1811,6 +1811,9 @@ class BillingMessages:
     #: A sync's rule this deployment knows but does not take over the sync,
     #: one named twice, or a value its rule does not hold.
     RULE_NOT_SYNCED = "BILLING_RULE_NOT_SYNCED"
+    #: A sync's rule asks for something this deployment does not offer, such
+    #: as a second factor where no kind of factor is permitted.
+    RULE_NOT_OFFERED = "BILLING_RULE_NOT_OFFERED"
     #: The notice could not be written down. Nothing was recorded, so the same
     #: key may be sent again.
     NOTICE_NOT_DELIVERED = "BILLING_NOTICE_NOT_DELIVERED"

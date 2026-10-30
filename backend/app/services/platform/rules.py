@@ -97,12 +97,17 @@ def platform_rule_sql(key: str) -> ColumnElement[Any]:
 
 
 async def community_values(
-    session: AsyncSession, guild_ids: Iterable[int], *, applied: bool = True
+    session: AsyncSession,
+    guild_ids: Iterable[int],
+    *,
+    applied: bool = True,
+    own: bool = False,
 ) -> dict[int, Values]:
     """Every rule each community keeps, in one read.
 
     ``applied``: a value counts only while the community holds the option its
-    rule needs, and is its default otherwise.
+    rule needs, and is its default otherwise. ``own``: only what the community
+    wrote itself, without the deployment's rows over it.
     """
     wanted = set(guild_ids)
     values = {
@@ -125,6 +130,7 @@ async def community_values(
             sa_select(CommunityRule, *held_columns).where(
                 CommunityRule.guild_id.in_(wanted),  # type: ignore[attr-defined]
                 CommunityRule.user_id.is_(None),  # type: ignore[union-attr]
+                *([CommunityRule.set_by == SetBy.community.value] if own else []),
             )
         )
     ).all()

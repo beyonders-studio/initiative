@@ -391,13 +391,19 @@ AS $function$
             -- requirement, because a community that asks nothing about arrival
             -- holds no requirement and still asks this, while it holds
             -- ``restrictions``. Unsatisfied is what this finds, like the leg
-            -- above it.
+            -- above it. The deployment's row, where it set one, stands over
+            -- the community's own.
             SELECT 1
-            FROM public.community_rules r
-            WHERE r.guild_id = {gucs.ROUTED_GUILD_ID}
-              AND r.user_id IS NULL
-              AND r.key = 'require_second_factor'
-              AND r.enabled
+            FROM (
+                SELECT r.guild_id, r.enabled
+                FROM public.community_rules r
+                WHERE r.guild_id = {gucs.ROUTED_GUILD_ID}
+                  AND r.user_id IS NULL
+                  AND r.key = 'require_second_factor'
+                ORDER BY r.set_by = 'deployment' DESC
+                LIMIT 1
+            ) r
+            WHERE r.enabled
               AND NOT ('mfa' = ANY(public.session_amr()))
               AND public.guild_holds_option(r.guild_id, 'security_standards')
         ))

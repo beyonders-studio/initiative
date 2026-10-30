@@ -88,9 +88,11 @@ async def _build_settings(ctx: SectionContext) -> tuple[dict[str, Any], int] | N
     if guild is None:
         return None
     setting = (await ctx.session.exec(select(GuildSetting).limit(1))).first()
-    stored = (await rules.community_values(ctx.session, [ctx.guild_id], applied=False))[
-        ctx.guild_id
-    ]
+    stored = (
+        await rules.community_values(
+            ctx.session, [ctx.guild_id], applied=False, own=True
+        )
+    )[ctx.guild_id]
     payload: dict[str, Any] = {
         "type": "guild-settings",
         "schema_version": 1,
@@ -100,9 +102,9 @@ async def _build_settings(ctx: SectionContext) -> tuple[dict[str, Any], int] | N
         "categories": list(guild.categories or []),
         "location": guild.location,
         "has_adult_content": guild.has_adult_content,
-        # Every rule the community keeps; a sign-in requirement in the shape
-        # the settings page reads it. What only the deployment writes, its
-        # plan and its surfaces, stays behind.
+        # Every rule the community wrote itself; a sign-in requirement in the
+        # shape the settings page reads it. What the deployment sets, its plan
+        # and its surfaces among it, stays behind.
         **{
             key: {
                 "policy": value.policy,

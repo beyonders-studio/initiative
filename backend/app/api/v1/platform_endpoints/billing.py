@@ -35,7 +35,7 @@ from fastapi import APIRouter, HTTPException, Request, status
 from pydantic import BaseModel, ValidationError
 from sqlmodel import select
 
-from app.api.deps import SessionDep
+from app.api.deps import SessionDep, SystemSessionDep
 from app.core.errors import CodedError
 from app.core.messages import BillingMessages
 from app.db import cohorts, post_commit
@@ -93,7 +93,9 @@ def _refs(items: list[Any]) -> list[str]:
 
 
 @router.post("/communities/sync")
-async def sync_communities(request: Request, session: SessionDep) -> dict:
+async def sync_communities(
+    request: Request, session: SessionDep, system: SystemSessionDep
+) -> dict:
     payload = await _verified(request, CommunitySyncRequest)
     guild_ids = await identity_refs.resolve_billing_refs(
         _refs(payload.communities), IdentityEntity.guild
@@ -122,7 +124,11 @@ async def sync_communities(request: Request, session: SessionDep) -> dict:
         try:
             async with session.begin_nested():
                 synced = await billing_service.apply_community_sync(
-                    session, guild_id=guild_id, version=item.version, fields=item.fields
+                    session,
+                    system,
+                    guild_id=guild_id,
+                    version=item.version,
+                    fields=item.fields,
                 )
         except CodedError as exc:
             results.append({"community_ref": item.community_ref, "error": exc.code})

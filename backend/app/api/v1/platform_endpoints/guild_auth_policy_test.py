@@ -22,7 +22,7 @@ from app.db.schema_provisioning import GuildRoleKind, guild_role_name
 from app.db.session import set_rls_context
 from app.models.platform.guild import Guild, CommunityRole
 from app.core.login_methods import LoginMethod
-from app.core.rules import SignInRequirement
+from app.core.rules import SetBy, SignInRequirement
 from app.models.platform.rule import CommunityRule
 from app.models.platform.user import User, UserRole
 from app.models.tenant.project import Project
@@ -870,6 +870,34 @@ async def _app_admits(
     finally:
         auth_context.reset()
     return True
+
+
+async def test_the_deployments_factor_rule_stands_over_the_communitys(
+    session: AsyncSession, acting_user
+):
+    """Where the deployment sets the community's second-factor rule, the
+    database gate reads its row rather than the community's own beneath it."""
+    member = await acting_user(guild_role=CommunityRole.member)
+    guild_id = member.guild.id
+    await guild_administration(session, member.guild, auth_options=["restrictions"])
+    await rules.put(session, "require_second_factor", True, guild_id=guild_id)
+    await session.commit()
+
+    async def admits() -> bool:
+        return await _database_admits(
+            session, guild_id=guild_id, user_id=member.user.id, satisfied=[]
+        )
+
+    assert not await admits()
+    await rules.put(
+        session,
+        "require_second_factor",
+        False,
+        guild_id=guild_id,
+        set_by=SetBy.deployment,
+    )
+    await session.commit()
+    assert await admits()
 
 
 @pytest.mark.parametrize("guest", [False, True], ids=["members", "guests"])
