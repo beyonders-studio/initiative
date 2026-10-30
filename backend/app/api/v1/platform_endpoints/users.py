@@ -33,8 +33,9 @@ from app.api.deps import (
     holds_guild_role,
     require_first_party_session,
     SystemSessionDep,
-    GuildAdminContext,
+    GuildContext,
     GuildContextDep,
+    require_surface,
 )
 from app.api.v1.platform_endpoints.password_recheck import (
     require_password_or_recent_proof,
@@ -65,6 +66,7 @@ from app.core.user_input_validators import (
 )
 from sqlmodel.ext.asyncio.session import AsyncSession
 from app.models.platform.guild import (
+    AdminSurface,
     GUILD_ADMIN_ROLES,
     GuildMembership,
     CommunityRole,
@@ -190,6 +192,9 @@ TASK_COMPLETION_VISUAL_FEEDBACK_VALUES: frozenset[str] = frozenset(
 logger = logging.getLogger(__name__)
 
 # Other people's public profiles. Mounted under /api/v1/users.
+#: A route that administers the community's roster.
+MembersContext = Annotated[GuildContext, Depends(require_surface(AdminSurface.members))]
+
 router = APIRouter()
 # The signed-in account: its profile, settings and stats. Mounted under
 # /api/v1/me; user-scoped (no guild context).
@@ -1000,7 +1005,7 @@ _GUILD_CSV_HEADERS = [
 @guild_router.get("/export.csv")
 async def export_users_csv(
     session: RLSSessionDep,
-    guild_context: GuildAdminContext,
+    guild_context: MembersContext,
     user_id: Annotated[list[int] | None, Query()] = None,
 ) -> Response:
     """Export guild members as a CSV file. Pass `user_id` one or more times to
@@ -1890,7 +1895,7 @@ def _transfer_payload(counts: dict) -> OwnershipTransferResponse:
 async def list_unowned_content(
     session: SessionDep,
     current_admin: Annotated[User, Depends(get_current_active_user)],
-    guild_context: GuildAdminContext,
+    guild_context: MembersContext,
 ) -> OwnedContentResponse:
     """Everything in this guild that no current member or live plug-in owns, and
     the plug-ins that may own all of it.
@@ -1911,7 +1916,7 @@ async def claim_unowned_content(
     payload: OwnershipTransferRequest,
     session: SessionDep,
     current_admin: Annotated[User, Depends(get_current_active_user)],
-    guild_context: GuildAdminContext,
+    guild_context: MembersContext,
 ) -> OwnershipTransferResponse:
     """Give everything nobody owns to one guild admin, or to a plug-in that may
     own all of it (422 ``OWNER_PLUGIN_NOT_ELIGIBLE`` otherwise)."""
@@ -1933,7 +1938,7 @@ async def list_owned_content(
     user_id: int,
     session: SessionDep,
     current_admin: Annotated[User, Depends(get_current_active_user)],
-    guild_context: GuildAdminContext,
+    guild_context: MembersContext,
 ) -> OwnedContentResponse:
     """What this user owns in this guild, for the transfer dialog to list,
     and the plug-ins that may own all of it.
@@ -1955,7 +1960,7 @@ async def transfer_ownership(
     payload: OwnershipTransferRequest,
     session: SessionDep,
     current_admin: Annotated[User, Depends(get_current_active_user)],
-    guild_context: GuildAdminContext,
+    guild_context: MembersContext,
 ) -> OwnershipTransferResponse:
     """Move everything ``user_id`` owns in this guild to a guild admin, or to
     a plug-in that may own all of it (422 ``OWNER_PLUGIN_NOT_ELIGIBLE`` otherwise).
@@ -1987,7 +1992,7 @@ async def remove_member(
     session: SessionDep,
     system_session: SystemSessionDep,
     current_admin: Annotated[User, Depends(get_current_active_user)],
-    guild_context: GuildAdminContext,
+    guild_context: MembersContext,
 ) -> None:
     """Remove a member from this guild.
 

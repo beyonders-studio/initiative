@@ -67,6 +67,7 @@ from app.models.platform.plugin_service_registration import (
 )
 from app.models.platform.guild import (
     GUILD_LADDER,
+    AdminSurface,
     LIVE_STATUS_VALUES,
     CommunityRole,
     CommunityStatus,
@@ -115,6 +116,8 @@ _ADMIN_RUNGS: tuple[CommunityRole, ...] = tuple(
     rung for rung in GUILD_LADDER if rung.reaches(CommunityRole.admin)
 )
 _ADMIN_RUNGS_SQL = sql_values(rung.value for rung in _ADMIN_RUNGS)
+#: ``app.held_surfaces`` for the admin rung: every surface.
+_EVERY_SURFACE = ",".join(surface.value for surface in AdminSurface)
 #: The highest rung held wins, so the ladder is walked from the top.
 _SETTINGS_RUNG_CASE = "\n".join(
     f"               WHEN bool_or(rung = '{rung.value}') THEN '{rung.value}'"
@@ -254,6 +257,10 @@ _PERSON_STANDING: dict[gucs.Guc, str] = {
     gucs.GUILD_ADMIN: f"""COALESCE((
       SELECT (m.role IN ({_ADMIN_RUNGS_SQL}))::text FROM my_membership m
     ), 'false')""",
+    gucs.HELD_SURFACES: f"""COALESCE((
+      SELECT '{_EVERY_SURFACE}' FROM my_membership m
+      WHERE m.role IN ({_ADMIN_RUNGS_SQL})
+    ), '')""",
     # The seat as ``guild_superadmin()`` answers it, lent by a grant only while
     # the grant is still held.
     gucs.GUILD_SEAT: f"""COALESCE((
@@ -272,11 +279,7 @@ _PERSON_STANDING: dict[gucs.Guc, str] = {
 {_SETTINGS_RUNG_CASE}
              END
       FROM (
-        SELECT m.role::text AS rung
-        FROM my_membership m
-        WHERE m.role IN ({_ADMIN_RUNGS_SQL})
-        UNION ALL
-        SELECT g.access_level FROM my_grants g
+        SELECT g.access_level AS rung FROM my_grants g
         WHERE g.purpose = '{AccessGrantPurpose.settings.value}'
       ) AS rungs
     ), '')""",
@@ -459,6 +462,9 @@ _INSTALL_STANDING: dict[gucs.Guc, str] = {
     gucs.GUILD_ADMIN: """COALESCE((
       SELECT lv.administers::text FROM standing_level lv
     ), 'false')""",
+    gucs.HELD_SURFACES: f"""COALESCE((
+      SELECT '{_EVERY_SURFACE}' FROM standing_level lv WHERE lv.administers
+    ), '')""",
     gucs.GUILD_SEAT: """'false'""",
     gucs.SETTINGS_RUNG: """''""",
     gucs.PAM_GUILD_ID: """''""",
@@ -825,7 +831,7 @@ class GuildContext:
     #: ``public.guild_superadmin(guild, user)`` — the membership row's seat, or
     #: a live ``superadmin`` settings grant.
     guild_seat: bool = False
-    #: The rung this request administers the community at, or ``None``.
+    #: The rung a live settings grant lends here, or ``None``.
     settings_rung: Optional[str] = None
     #: A live content grant covers this request, at read / read_write.
     pam_read: bool = False
@@ -850,6 +856,8 @@ class GuildContext:
     #: ``"<tool>=on"`` / ``"<tool>=off"`` where the community set a tool's
     #: switch for every initiative (:meth:`community_tool`).
     community_tools: tuple[str, ...] = ()
+    #: The admin surfaces the reader holds (:meth:`holds_surface`).
+    held_surfaces: tuple[str, ...] = ()
     #: Initiatives where the reader's role holds "Full access".
     override_initiatives: tuple[int, ...] = ()
     #: The community's sign-in policy is satisfied by this session.
@@ -882,6 +890,12 @@ class GuildContext:
         never answers yes here: what a grant reaches is its own two axes.
         """
         return self.guild_admin
+
+    def holds_surface(self, surface: AdminSurface) -> bool:
+        """Whether the reader holds ``surface``, as the database computed it:
+        what an admin route asks, where :attr:`is_admin` is the reach into
+        the community's content. A grant holds none."""
+        return surface.value in self.held_surfaces
 
     @property
     def rung(self) -> "CommunityRole":
@@ -1085,6 +1099,8 @@ class InstallContext:
     manager_initiatives: tuple[int, ...] = ()
     #: Its token holds the guild admin standing. Never for a member token.
     guild_admin: bool = False
+    #: Every admin surface with that standing, none without it.
+    held_surfaces: tuple[str, ...] = ()
     #: The resources its scopes let it read, and write.
     install_read: tuple[str, ...] = ()
     install_write: tuple[str, ...] = ()
@@ -1125,6 +1141,9 @@ class InstallContext:
     @property
     def is_admin(self) -> bool:
         return self.guild_admin
+
+    def holds_surface(self, surface: AdminSurface) -> bool:
+        return surface.value in self.held_surfaces
 
     @property
     def content_read_only(self) -> bool:

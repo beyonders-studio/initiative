@@ -50,7 +50,7 @@ const withQueryKey = <T extends object, K>(query: T, queryKey: K): T & { queryKe
 };
 
 /**
- * The active guild's trash, newest first (guild-admin only).
+ * The active guild's trash, newest first, for whoever holds the trash.
  *
  * This is the guild settings trash view. Members use the user-scoped
  * ``GET /me/trash`` for their own deletions; they never reach this endpoint.
@@ -286,7 +286,8 @@ export const useRestoreTrashEntity = <TError = ErrorType<HTTPValidationError>, T
  * ``app_admin`` connection. The guild-schema content tables carry PERMISSIVE
  * ``initiative_member_delete`` policies that defer to ``initiative_access``,
  * whose community-admin leg (``app.guild_admin = 'true'``) admits the routed
- * admin for the hard delete, so the guild role itself does it.
+ * admin for the hard delete, beside the RESTRICTIVE purge guard, which asks
+ * for the community's trash, so the guild role itself does it.
  * ``_load_trash_entity`` 404s unless the entity is in THIS guild's trash (and
  * still soft-deleted) — that is the authorization boundary — and
  * ``for_update=True`` locks the row so a concurrent restore can't slip in

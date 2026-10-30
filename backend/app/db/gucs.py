@@ -212,7 +212,7 @@ TOKEN_PURPOSE = Guc("app.token_purpose", Kind.TEXT)
 STANDING_GUILD_ID = Guc("app.standing_guild_id", Kind.INT, standing=True)
 GUILD_ADMIN = Guc("app.guild_admin", Kind.BOOL, standing=True)
 GUILD_SEAT = Guc("app.guild_seat", Kind.BOOL, standing=True, read_once=True)
-#: The rung a membership or a live settings grant administers at, or ``''``.
+#: The rung a live settings grant lends, or ``''``.
 SETTINGS_RUNG = Guc("app.settings_rung", Kind.TEXT, standing=True, read_once=True)
 #: A live content grant covers the request, at read / read_write.
 PAM_READ = Guc("app.pam_read", Kind.BOOL, standing=True)
@@ -248,6 +248,10 @@ CLOSED_SURFACES = Guc("app.closed_surfaces", Kind.NAMES, standing=True)
 #: ``"<tool>=on"`` / ``"<tool>=off"`` where the community set a tool's switch
 #: for every initiative in it (``app.models.tenant.initiative.INITIATIVE_TOOL_KEYS``).
 COMMUNITY_TOOLS = Guc("app.community_tools", Kind.NAMES, standing=True)
+#: The admin surfaces the reader holds here
+#: (``app.models.platform.guild.AdminSurface``): every one for the admin
+#: rung, none below it.
+HELD_SURFACES = Guc("app.held_surfaces", Kind.NAMES, standing=True)
 
 # --- Somebody who filed a case ------------------------------------------------
 #: The tasks of the cases the routed account filed, read by the filer seam

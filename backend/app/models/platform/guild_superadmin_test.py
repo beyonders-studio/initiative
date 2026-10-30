@@ -16,6 +16,7 @@ from app.models.platform.guild import (
     GUILD_ADMIN_ROLES,
     GUILD_ASSIGNABLE_ROLES,
     GUILD_STORED_ROLES,
+    AdminSurface,
     Guild,
     GuildMembership,
     CommunityRole,
@@ -87,6 +88,9 @@ def _context(role: CommunityRole) -> GuildContext:
         guild_role=role.value,
         standing_guild_id=1,
         guild_admin=role in GUILD_ADMIN_ROLES,
+        held_surfaces=(
+            tuple(s.value for s in AdminSurface) if role in GUILD_ADMIN_ROLES else ()
+        ),
         guild_seat=role is CommunityRole.superadmin,
     )
 
@@ -97,22 +101,26 @@ def test_the_context_answers_admin_or_above():
     assert not _context(CommunityRole.member).is_admin
 
 
-async def test_a_guard_asking_for_admin_admits_the_seat_above_it():
-    """The dependency every guild-admin endpoint is written against.
-
-    Each of those endpoints names ``admin``; this is the one place that reads
-    that as admin-or-above, so the seat reaches all of them at once.
-    """
-    guard = deps.require_guild_roles(CommunityRole.admin)
-    for role in (CommunityRole.admin, CommunityRole.superadmin):
-        assert (await guard(_context(role))).role == role
+async def test_a_surface_guard_admits_the_admin_rung_and_the_seat_above_it():
+    """The dependency every admin endpoint is written against: each names the
+    surface it guards, and the admin rung holds every one."""
+    for surface in AdminSurface:
+        guard = deps.require_surface(surface)
+        for role in (CommunityRole.admin, CommunityRole.superadmin):
+            assert (await guard(_context(role))).role == role
 
 
 async def test_that_guard_still_turns_a_member_away():
-    guard = deps.require_guild_roles(CommunityRole.admin)
+    guard = deps.require_surface(AdminSurface.invites)
     with pytest.raises(HTTPException) as caught:
         await guard(_context(CommunityRole.member))
     assert caught.value.status_code == 403
+
+
+def test_no_guard_asks_for_the_admin_rung_alone():
+    """An admin route names its surface, so the rung guard refuses ``admin``."""
+    with pytest.raises(ValueError):
+        deps.require_guild_roles(CommunityRole.admin)
 
 
 async def test_a_guard_naming_a_rung_admits_the_rungs_above_it():

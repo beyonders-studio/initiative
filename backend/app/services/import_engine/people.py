@@ -31,6 +31,7 @@ from sqlmodel import select
 from sqlmodel.ext.asyncio.session import AsyncSession
 
 from app.db.session import require_guild_context
+from app.models.platform.guild import AdminSurface
 from app.models.tenant.initiative import InitiativeMember
 from app.models.tenant.resource_grant import ResourceAccessLevel, ResourceGrant
 from app.services.import_engine.common import handle_key
@@ -181,7 +182,10 @@ async def bring_in_named(
         ).all()
     )
     context = require_guild_context(session)
-    if context.is_admin or initiative_id in context.manager_initiatives:
+    if (
+        context.holds_surface(AdminSurface.initiatives)
+        or initiative_id in context.manager_initiatives
+    ):
         role = await initiatives_service.get_member_role(
             session, initiative_id=initiative_id
         )

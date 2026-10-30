@@ -37,6 +37,7 @@ from app.core.rate_limit import limiter
 from app.core.messages import CalendarMessages, GuildMessages
 from app.core.tools import Tool
 from app.core.user_input_validators import resolve_zone
+from app.models.platform.guild import AdminSurface
 from app.models.tenant.calendar import Calendar
 from app.models.tenant.guild_plugin import GuildPlugin
 from app.models.platform.user import User
@@ -189,7 +190,7 @@ async def create_calendar(
             detail=CalendarMessages.PLUGIN_INITIATIVE_REQUIRED,
         )
     if initiative_id is None:
-        if not guild_context.is_admin:
+        if not guild_context.holds_surface(AdminSurface.community_calendars):
             raise HTTPException(
                 status_code=status.HTTP_403_FORBIDDEN,
                 detail=GuildMessages.COMMUNITY_ADMIN_REQUIRED,

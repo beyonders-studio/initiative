@@ -18,8 +18,7 @@ from app.api.deps import (
     get_current_active_user,
     get_guild_membership,
     GuildContext,
-    require_guild_roles,
-    GuildAdminContext,
+    require_surface,
 )
 from app.core.audit_events import AuditEventType
 from app.core.messages import (
@@ -37,7 +36,7 @@ from app.models.tenant.initiative import (
     JoinRequestStatus,
     LOCKED_PERMISSION_ROLE_NAMES,
 )
-from app.models.platform.guild import CommunityRole
+from app.models.platform.guild import AdminSurface
 from app.models.platform.notification import NotificationType
 from app.models.platform.user import Presence, User
 from app.models.platform.user_profile_view import MemberProfile
@@ -82,6 +81,11 @@ from app.services.content_sockets import sockets as content_sockets
 from app.services import rls as rls_service
 from app.services.membership import initiative_scope_clause
 
+
+#: A route that administers the community's initiatives.
+InitiativesContext = Annotated[
+    GuildContext, Depends(require_surface(AdminSurface.initiatives))
+]
 
 router = APIRouter(route_class=ActorRoute)
 
@@ -186,8 +190,11 @@ async def _require_manager_access(
     *,
     guild_context: GuildContext | None = None,
 ) -> None:
-    """Require that the user has manager-level access to the initiative."""
-    if guild_context is not None and guild_context.is_admin:
+    """Require that the user has manager-level access to the initiative:
+    a manager of it, or a holder of the community's initiatives."""
+    if guild_context is not None and guild_context.holds_surface(
+        AdminSurface.initiatives
+    ):
         return
     is_manager = (
         initiative.id in guild_context.manager_initiatives
@@ -285,7 +292,9 @@ async def list_initiatives(
     They bring an initiative into it by taking the project manager role from the
     guild-settings initiative table, which is also what ``scope=community`` feeds.
     """
-    if scope is InitiativeListScope.community and not guild_context.is_admin:
+    if scope is InitiativeListScope.community and not guild_context.holds_surface(
+        AdminSurface.initiatives
+    ):
         raise HTTPException(
             status_code=status.HTTP_403_FORBIDDEN,
             detail=GuildMessages.COMMUNITY_ADMIN_REQUIRED,
@@ -379,7 +388,7 @@ async def update_initiative_defaults(
     """Set what every initiative in the community starts from and keeps. The
     community's admins only. A tool's switch or a member permission set here
     is written to every initiative at once, archived and trashed ones too."""
-    if not guild_context.is_admin:
+    if not guild_context.holds_surface(AdminSurface.initiatives):
         raise HTTPException(
             status_code=status.HTTP_403_FORBIDDEN,
             detail=InitiativeMessages.DEFAULTS_ADMIN_ONLY,
@@ -802,9 +811,7 @@ async def create_initiative(
     initiative_in: InitiativeCreate,
     session: RLSSessionDep,
     current_user: Annotated[User, Depends(get_current_active_user)],
-    guild_context: Annotated[
-        GuildContext, Depends(require_guild_roles(CommunityRole.admin))
-    ],
+    guild_context: InitiativesContext,
 ) -> InitiativeRead:
     guild_id = guild_context.guild_id
     await ensure_name_free(
@@ -895,7 +902,7 @@ async def update_initiative(
     if (
         update_data.get("auto_join") is not None
         and update_data["auto_join"] != initiative.auto_join
-        and not guild_context.is_admin
+        and not guild_context.holds_surface(AdminSurface.initiatives)
     ):
         raise HTTPException(
             status_code=status.HTTP_403_FORBIDDEN,
@@ -943,7 +950,7 @@ async def update_initiative(
 async def delete_initiative(
     initiative_id: int,
     session: RLSSessionDep,
-    guild_context: GuildAdminContext,
+    guild_context: InitiativesContext,
     current_user: Annotated[User, Depends(get_current_active_user)],
 ) -> None:
     """Soft-delete an initiative. Cascades the same deleted_at to its

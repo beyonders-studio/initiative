@@ -47,6 +47,7 @@ from app.core.tools import (
     LAYOUT_INSTANCE_TABLES,
     Tool,
 )
+from app.models.platform.guild import AdminSurface
 from app.models.tenant.batched_notice import BatchedNoticeKind
 from app.db.presence import present, present_to_member
 from app.db.authorization import (
@@ -1167,29 +1168,33 @@ def metadata_values_path() -> InitiativePath:
     )
 
 
-#: The community's administration: its admin, a settings rung writing beside
-#: a read_write grant, or the system engine.
-_ADMINISTRATION = (
-    f"({_P.system} OR {_P.admin} OR ({POLICY_SETTINGS_ADMIN} AND {_P.pam_write}))"
-)
+def _administration(surface: AdminSurface) -> str:
+    """Who administers ``surface``: its holder, a settings rung writing beside
+    a read_write grant, or the system engine."""
+    return (
+        f"({_P.system} OR {_P.holds(surface)}"
+        f" OR ({POLICY_SETTINGS_ADMIN} AND {_P.pam_write}))"
+    )
 
 
 def managed_write(initiative_expr: str) -> str:
     """Who changes what an initiative is set up with: its managers by the
-    standing, or the community's administration. The structural initiative
-    tables' ``managed_*`` policies, and a shared page's views."""
+    standing, or the community's administration of its initiatives. The
+    structural initiative tables' ``managed_*`` policies, and a shared page's
+    views."""
     return (
-        f"({_ADMINISTRATION} OR ({_P.this_guild}"
+        f"({_administration(AdminSurface.initiatives)} OR ({_P.this_guild}"
         f" AND ({initiative_expr}) = ANY ({_P.field('manager_initiatives')})))"
     )
 
 
 def administration_path() -> InitiativePath:
-    """A row the community's administration alone reads and writes, whatever
-    initiative it names: what a guest invite gives, which the invites
-    themselves answer to."""
+    """A row the community's administration of its invites alone reads and
+    writes, whatever initiative it names: what a guest invite gives, which the
+    invites themselves answer to."""
+    predicate = _administration(AdminSurface.invites)
     return InitiativePath(
-        predicate=lambda t, w: _ADMINISTRATION,
+        predicate=lambda t, w: predicate,
         initiative_expr=lambda r: f"{r}.initiative_id",
     )
 
@@ -1319,16 +1324,17 @@ def webhook_subscription_path() -> InitiativePath:
     Naming NO initiative is the guild-wide case, and there the ordinary
     ``initiative_access`` answer is wrong: a NULL means "the initiative gate has
     nothing to decide", which admits any member. A guild-wide subscription
-    reports across every initiative, so reaching it is guild-admin authority —
-    the one role that already spans them — or an installed plug-in's whose token is
-    not narrowed to one initiative. A plug-in sees and changes only the
+    reports across every initiative, so reaching it is the holder of
+    ``AdminSurface.webhooks``'s — the admin rung, which already spans them — or
+    an installed plug-in's whose token is not narrowed to one initiative. A plug-in sees and changes only the
     subscriptions it registered (the ``plugin_scope_*`` policies), and what one
     delivers is capped by where the plug-in is placed and the scopes it holds.
     """
     return InitiativePath(
         predicate=lambda t, w: (
             f"(CASE WHEN {t}.initiative_id IS NULL "
-            f"THEN ({_GUILD_ADMIN} OR {_UNNARROWED_INSTALL}) "
+            f"THEN ({_P.system} OR {_P.holds(AdminSurface.webhooks)}"
+            f" OR {_UNNARROWED_INSTALL}) "
             f"ELSE {_access(f'{t}.initiative_id', w)} END)"
         ),
         initiative_expr=lambda r: f"{r}.initiative_id",

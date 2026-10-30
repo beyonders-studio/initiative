@@ -428,6 +428,37 @@ GUILD_ADMIN_ROLES: frozenset[CommunityRole] = frozenset(
     role for role in CommunityRole if role.reaches(CommunityRole.admin)
 )
 
+
+class AdminSurface(str, Enum):
+    """A part of administering a community, held as a whole.
+
+    The admin rung holds every one. What the rung holds beyond them, the reach
+    into all of the community's content (``initiative_access``, "Full access",
+    the trash's reads), is not one of these: it is the rung's own. Each admin
+    route names the surface it guards, and so does each policy leg that guards
+    one, reading the request's ``held_surfaces``.
+    """
+
+    #: The community's name, pictures, listing and retention.
+    profile = "profile"
+    #: Invites to the community, and what a guest invite gives.
+    invites = "invites"
+    #: The roster: rungs, guests, display names, removal, a departing
+    #: member's content, and how people sign in to join.
+    members = "members"
+    #: Creating, archiving and deleting initiatives, every initiative's setup,
+    #: and what every initiative uses.
+    initiatives = "initiatives"
+    #: Calendars that belong to the whole community.
+    community_calendars = "community_calendars"
+    #: Webhook subscriptions that report on the whole community.
+    webhooks = "webhooks"
+    #: Restoring anybody's deletions, and purging.
+    trash = "trash"
+    #: Storage used, and what installed plug-ins report.
+    usage = "usage"
+
+
 #: What an ordinary guild admin may hand out. ``support`` is never persisted at
 #: all, and ``superadmin`` is passed on only by somebody already holding it.
 GUILD_ASSIGNABLE_ROLES: frozenset[CommunityRole] = frozenset(

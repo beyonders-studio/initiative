@@ -38,6 +38,7 @@ from app.core.tools import (
 from app.db.base import MODELS_BY_TABLE
 from app.models.tenant._mixins import tool_models
 
+from app.models.platform.guild import AdminSurface
 from app.models.platform.user import User
 from app.models.tenant.initiative import Initiative
 from app.schemas.tenant.tool_layout import (
@@ -110,7 +111,8 @@ async def _resolve(
         raise invalid
     await _require_initiative(session, context, initiative_id)
     can_configure = not context.content_read_only and (
-        context.is_admin or initiative_id in context.manager_initiatives
+        context.holds_surface(AdminSurface.initiatives)
+        or initiative_id in context.manager_initiatives
     )
     return _Resolved(Target(tool, None, initiative_id), can_configure, None)
 
