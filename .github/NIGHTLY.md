@@ -2,8 +2,8 @@
 
 The `fix/skip-fork-nightlies` change keeps scheduled Nightly workloads in
 `beyonders-studio/initiative`, while retaining intentional test runs in forks.
-It changes only `.github/workflows/nightly.yml`; the shared Browser Journeys
-workflow keeps its existing behavior for its other callers.
+The workflow change is confined to `.github/workflows/nightly.yml`; the shared
+Browser Journeys workflow keeps its existing behavior for its other callers.
 
 ## Execution policy
 
@@ -54,3 +54,22 @@ has no executed workloads or report, and that upstream's next scheduled run
 retains its matrix, frontend, journeys, and reporting. PR checks exercise the
 PR event, not the scheduled event. No repository Actions settings, release
 pipelines, or Security/Trivy policy are changed by this fix.
+
+## CI follow-up for PR #3085
+
+Backend CI exposed an inherited policy-dependency assertion that predated
+upstream PR #3081 and migration 0562. Those intentionally let the seat's write
+policies consult `public.community_surface_open(integer, text)`, which reads
+platform rules. The assertion still required every policy function to be local.
+
+The test now requires exactly that shared function signature on each
+surface-gated table's `seat_insert`, `seat_update`, and `seat_delete` policies.
+Unexpected shared functions, policies, tables, or overloads still fail, as do
+missing expected bindings. The local function inventory and legacy-function
+absence checks remain. Production policies and authorization code are unchanged.
+
+The original failure reproduced on disposable Postgres 17. The repaired test
+and neighboring guild RLS, community-surface behavior, and tenancy checks passed
+(26 tests). Local fault injection also verified rejection of an added shared
+read gate, a missing write gate, and the wrong function overload. Python lint,
+formatting, type checks, workflow lint, and whitespace checks passed.
