@@ -313,6 +313,17 @@ COMMUNITY_RULES: dict[str, StoredRule] = _catalog(
     StoredRule(SURFACE_PLUGINS, _ON, True, surface=True),
 )
 
+#: The community rules the deployment sets beside a plan, through billing's
+#: sync (its ``rules`` field): each on/off or figure rule it may write that the
+#: plan's own fields do not carry.
+SYNCED_RULES: frozenset[str] = frozenset(
+    key
+    for key, rule in COMMUNITY_RULES.items()
+    if not rule.paid
+    and SetBy.deployment in writers(rule)
+    and rule.slot in (Slot.enabled, Slot.amount)
+)
+
 #: The paid key that grants each sign-in option.
 OPTION_RULES: dict[CommunityAuthOption, str] = {
     CommunityAuthOption.providers: "community_sign_in",

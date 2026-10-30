@@ -58,7 +58,7 @@ const SEAT_ROLE_OPTIONS: CommunityRole[] = ["superadmin", "admin", "member"];
 
 export const SettingsUsersPage = () => {
   const { user } = useAuth();
-  const { t } = useTranslation("communities");
+  const { t } = useTranslation(["communities", "settings"]);
 
   const { activeCommunity } = useCommunities();
   const { canSell, openPortal } = useBillingPortal();
@@ -81,6 +81,8 @@ export const SettingsUsersPage = () => {
     enabled: isSeat && activeCommunityId != null,
   }).data;
   const showsApiAccess = isSeat && (authSettings?.auth_options ?? []).includes("restrictions");
+  // Whoever runs the server may set it for the whole community instead.
+  const apiAccessFixed = (authSettings?.set_by_deployment ?? []).includes("api_keys");
 
   // Seat cap, admin-only on the payload and null when uncapped. A full community
   // mints no invite (the server refuses), so the form says so up front instead
@@ -265,7 +267,7 @@ export const SettingsUsersPage = () => {
                   aria-label={t("users.apiAccessLabel", {
                     name: getUserDisplayName(communityMember),
                   })}
-                  disabled={setMemberApiAccess.isPending}
+                  disabled={setMemberApiAccess.isPending || apiAccessFixed}
                   onCheckedChange={(allowed) =>
                     setMemberApiAccess.mutate({
                       communityId: activeCommunityId!,
@@ -414,7 +416,11 @@ export const SettingsUsersPage = () => {
               {showsApiAccess ? (
                 <div className="flex gap-1.5">
                   <dt className="font-medium text-foreground">{t("users.apiAccessColumn")}</dt>
-                  <dd>{t("users.apiAccessHelp")}</dd>
+                  <dd>
+                    {apiAccessFixed
+                      ? t("settings:communityAuth.setByDeployment")
+                      : t("users.apiAccessHelp")}
+                  </dd>
                 </div>
               ) : null}
             </dl>

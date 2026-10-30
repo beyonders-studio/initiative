@@ -1499,6 +1499,7 @@
     }
   },
   "communityAuth": {
+    "setByDeployment": "Wer diesen Server betreibt, legt das für deine Community fest.",
     "shareUrl": {
       "title": "Anmeldelink für Mitglieder",
       "description": "Teile diesen Link mit Mitgliedern — er bietet die Anmeldeanbieter dieser Community an und führt sie direkt in die Community.",

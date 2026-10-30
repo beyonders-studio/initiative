@@ -24,12 +24,16 @@ import jwt
 from pydantic import (
     ConfigDict,
     Field,
+    StrictBool,
+    StrictInt,
     StringConstraints,
     ValidationError,
     field_validator,
+    model_validator,
 )
 
 from app.core.messages import BillingMessages
+from app.core.rules import COMMUNITY_RULES, SYNCED_RULES, Slot
 from app.core.security import PUBLIC_KEY_JWT_ALGORITHM
 from app.models.platform.identity_ref import REF_MAX_LENGTH
 from app.models.platform.marketplace import UID_LENGTH
@@ -61,6 +65,30 @@ class CommunitySyncRequest(BillingBatch):
     communities: list[Any] = Field(min_length=1, max_length=BATCH_MAX)
 
 
+class SyncedRule(SanitizedBaseModel):
+    """One of the deployment's rules for a community, beside its plan. A key
+    this build does not know is ignored, as a capability name is."""
+
+    model_config = ConfigDict(extra="forbid")
+
+    key: str = Field(min_length=1, max_length=64)
+    value: StrictBool | StrictInt
+
+    @model_validator(mode="after")
+    def _fits_its_rule(self) -> SyncedRule:
+        rule = COMMUNITY_RULES.get(self.key)
+        if rule is None:
+            return self
+        on_off = rule.slot is Slot.enabled
+        if (
+            self.key not in SYNCED_RULES
+            or on_off != isinstance(self.value, bool)
+            or not 0 <= self.value <= MAX_VERSION
+        ):
+            raise ValueError(BillingMessages.RULE_NOT_SYNCED)
+        return self
+
+
 class CommunityFields(SanitizedBaseModel):
     """What billing holds a community to, whole, at one version. Every field
     is sent every time: billing sends its desired state, never a patch, so a
@@ -76,6 +104,17 @@ class CommunityFields(SanitizedBaseModel):
     max_guests: Optional[int] = Field(ge=0)
     feature_keys: list[str] = Field(max_length=64)
     status: CommunityStatus
+    #: The deployment's other rules for the community, whole: a rule left out
+    #: falls back to the community's own. A sender that predates the field
+    #: sets none.
+    rules: list[SyncedRule] = Field(default_factory=list, max_length=64)
+
+    @field_validator("rules")
+    @classmethod
+    def _once_each(cls, value: list[SyncedRule]) -> list[SyncedRule]:
+        if len({rule.key for rule in value}) != len(value):
+            raise ValueError(BillingMessages.RULE_NOT_SYNCED)
+        return value
 
     @field_validator("status")
     @classmethod

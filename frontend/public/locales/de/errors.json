@@ -528,6 +528,7 @@
   "BANNER_COLOR_INVALID": "Wähle eine Farbe im Format #rrggbb.",
   "BANNER_IMAGE_NOT_ENTITLED": "Bannerbilder sind im Tarif dieser Community nicht enthalten. Wähle stattdessen eine Bannerfarbe.",
   "COMMUNITY_SURFACE_CLOSED": "Wer diesen Server betreibt, verwaltet das für deine Community.",
+  "COMMUNITY_RULE_SET_BY_DEPLOYMENT": "Wer diesen Server betreibt, legt das für deine Community fest.",
   "USER_AVATAR_INVALID_IMAGE": "Diese Datei ist kein PNG-, JPEG- oder WebP-Bild.",
   "USER_AVATAR_NOT_SQUARE": "Ein Profilbild muss quadratisch sein.",
   "USER_AVATAR_TOO_LARGE_DIMENSIONS": "Dieses Bild ist größer, als ein Profilbild erlaubt.",

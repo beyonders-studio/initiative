@@ -1202,6 +1202,7 @@ async def _auth_settings_response(
         engagement_ranking_allowed_by_platform=platform["engagement_ranking_enabled"],
         ai_offered_by_platform=platform["ai_config_mode"] is not AIConfigMode.disabled,
         guest_max_days_by_platform=platform["max_guest_days"],
+        set_by_deployment=sorted(await rules.set_by_deployment(seat_session, guild_id)),
     )
 
 
@@ -1710,6 +1711,11 @@ async def set_member_api_access(
 
     On the system engine, as a role change is: the guild role writes only the
     caller's own membership row."""
+    if "api_keys" in await rules.set_by_deployment(session, guild_id):
+        raise HTTPException(
+            status_code=status.HTTP_409_CONFLICT,
+            detail=GuildMessages.COMMUNITY_RULE_SET_BY_DEPLOYMENT,
+        )
     if not payload.api_keys_allowed:
         await guild_entitlements.require_auth_option(
             session, guild_id, CommunityAuthOption.restrictions

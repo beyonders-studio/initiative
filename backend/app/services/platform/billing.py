@@ -17,7 +17,7 @@ from typing import Any
 from starlette.datastructures import Headers
 from sqlalchemy import insert, update
 from sqlalchemy.exc import IntegrityError
-from sqlmodel import select
+from sqlmodel import delete, select
 from sqlmodel.ext.asyncio.session import AsyncSession
 
 from app.core import billing_capabilities
@@ -25,7 +25,7 @@ from app.core.config import settings
 from app.core.errors import CodedError
 from app.core.identify import bearer_token
 from app.core.messages import BillingMessages
-from app.core.rules import SetBy
+from app.core.rules import SYNCED_RULES, SetBy
 from app.core.security import PublicKeyBundleError, load_verification_keys
 from app.models.platform.billing import (
     BILLING_SOURCE,
@@ -35,6 +35,7 @@ from app.models.platform.billing import (
 )
 from app.models.platform.guild import Guild, CommunityStatus
 from app.models.platform.guild_administration import GuildAdministration
+from app.models.platform.rule import CommunityRule
 from app.schemas.platform.billing import CommunityFields
 from app.core.audit_events import AuditEventType
 from app.services import audit as audit_service
@@ -323,6 +324,20 @@ async def apply_community_sync(
         .values(**administration_values)
     )
     for key, value in paid.items():
+        await rules.put(session, key, value, guild_id=guild_id, set_by=SetBy.deployment)
+    # The rest of the deployment's rules, whole: a rule it no longer sends
+    # falls back to the community's own.
+    synced = {rule.key: rule.value for rule in fields.rules if rule.key in SYNCED_RULES}
+    await session.exec(
+        delete(CommunityRule).where(
+            CommunityRule.guild_id == guild_id,
+            CommunityRule.set_by == SetBy.deployment.value,
+            CommunityRule.user_id.is_(None),  # type: ignore[union-attr]
+            CommunityRule.key.not_in(synced),  # type: ignore[attr-defined]
+            CommunityRule.key.in_(SYNCED_RULES),  # type: ignore[attr-defined]
+        )
+    )
+    for key, value in synced.items():
         await rules.put(session, key, value, guild_id=guild_id, set_by=SetBy.deployment)
     # Stamp the guild whichever row moved: "when did this guild last change"
     # stays a fact about the guild.

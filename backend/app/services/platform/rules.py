@@ -32,6 +32,7 @@ from app.core.rules import (
     SignInRequirement,
     Slot,
     StoredRule,
+    writers,
 )
 from app.models.platform.rule import CommunityRule, PlatformRule
 from app.services.platform import guild_entitlements
@@ -195,6 +196,25 @@ async def member_value(
     )
 
 
+async def set_by_deployment(session: AsyncSession, guild_id: int) -> frozenset[str]:
+    """The community's rules the deployment sets for the whole community that
+    its seat could otherwise set: shown to the seat, not changed by it."""
+    keys = (
+        await session.exec(
+            select(CommunityRule.key).where(
+                CommunityRule.guild_id == guild_id,
+                CommunityRule.set_by == SetBy.deployment.value,
+                CommunityRule.user_id.is_(None),  # type: ignore[union-attr]
+            )
+        )
+    ).all()
+    return frozenset(
+        key
+        for key in keys
+        if key in COMMUNITY_RULES and SetBy.community in writers(COMMUNITY_RULES[key])
+    )
+
+
 async def put(
     session: AsyncSession,
     key: str,
@@ -208,7 +228,9 @@ async def put(
     members, as the community or as the deployment (``set_by``). A value that
     is what the row would inherit removes it, so a rule that says nothing
     holds nothing: the default for the deployment and a community, and the
-    community's own value for a member."""
+    community's own value for a member. The deployment's row of a rule the
+    community also writes is kept at the default, which it holds the
+    community to."""
     catalog = PLATFORM_RULES if guild_id is None else COMMUNITY_RULES
     rule = catalog[key]
     model = PlatformRule if guild_id is None else CommunityRule
@@ -226,7 +248,8 @@ async def put(
         # What the community says, this session's own writes included.
         await session.flush()
         inherited = await community_value(session, guild_id, key, applied=False)
-    if value == inherited:
+    holds_the_default = set_by is SetBy.deployment and SetBy.community in writers(rule)
+    if value == inherited and not holds_the_default:
         await session.exec(delete(model).where(*where))  # type: ignore[arg-type]
         return
     row = (await session.exec(select(model).where(*where))).one_or_none()

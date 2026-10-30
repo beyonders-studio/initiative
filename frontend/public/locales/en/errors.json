@@ -528,6 +528,7 @@
   "BANNER_COLOR_INVALID": "Pick a color in #rrggbb form.",
   "BANNER_IMAGE_NOT_ENTITLED": "Banner images aren't included on this community's plan. Pick a banner color instead.",
   "COMMUNITY_SURFACE_CLOSED": "Whoever runs this server manages this for your community.",
+  "COMMUNITY_RULE_SET_BY_DEPLOYMENT": "Whoever runs this server sets this for your community.",
   "USER_AVATAR_INVALID_IMAGE": "That file is not a PNG, JPEG or WebP image.",
   "USER_AVATAR_NOT_SQUARE": "A profile picture has to be square.",
   "USER_AVATAR_TOO_LARGE_DIMENSIONS": "That picture is bigger than a profile picture allows.",
