@@ -54,6 +54,7 @@ from app.schemas.tenant.export_job import (
     serialize_export_job,
 )
 from app.services import audit as audit_service
+from app.services.platform import rules
 from app.services.export.adapters import ADAPTERS
 from app.services.export.adapters.backup import (
     GuildExportAdapter,
@@ -317,7 +318,7 @@ async def _guild_export_available_at(session) -> Optional[datetime]:
 
     A whole community's content is not a thing to re-read on a loop. The bound
     that actually matters for what this costs a deployment: one community-wide
-    export per ``EXPORT_GUILD_COOLDOWN_HOURS``, counted across the community
+    export per the deployment's ``community_export_cooldown_hours``, counted across the community
     rather than per person, so a second admin does not reset it. Failed and
     expired jobs do not hold the door — only work that was really done counts.
 
@@ -325,9 +326,10 @@ async def _guild_export_available_at(session) -> Optional[datetime]:
     endpoint reports it, so what the settings page says and what the door
     does cannot come apart.
     """
-    if settings.EXPORT_GUILD_COOLDOWN_HOURS <= 0:
+    hours = (await rules.platform_values(session))["community_export_cooldown_hours"]
+    if hours <= 0:
         return None
-    window = timedelta(hours=settings.EXPORT_GUILD_COOLDOWN_HOURS)
+    window = timedelta(hours=hours)
     started_at = (
         await session.exec(
             select(ExportJob.created_at)
@@ -562,7 +564,9 @@ async def read_community_export_status(
     if latest is not None:
         started_by = display_name(await session.get(MemberProfile, latest.created_by))
     return CommunityExportStatus(
-        cooldown_hours=settings.EXPORT_GUILD_COOLDOWN_HOURS,
+        cooldown_hours=(await rules.platform_values(session))[
+            "community_export_cooldown_hours"
+        ],
         next_available_at=await _guild_export_available_at(session),
         latest=serialize_export_job(latest, guild_id=guild_context.guild_id)
         if latest is not None

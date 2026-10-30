@@ -609,16 +609,20 @@ def handoff_signing_key(monkeypatch) -> str:
 
 @pytest.fixture(autouse=True)
 def _disable_hibp_check(monkeypatch):
-    """Disable the HaveIBeenPwned breach lookup for all tests by default.
+    """Answer the HaveIBeenPwned breach lookup "not breached" for all tests.
 
     Without this, every registration / password change test would make
-    a real outbound HTTPS call to the HIBP API — flaky and slow.
-    Tests that explicitly exercise the breach path opt back in via
-    their own monkeypatch + ``hibp.is_password_breached`` stub.
+    a real outbound HTTPS call to the HIBP API — flaky and slow. The
+    deployment's rule asks for the check by default, so the lookup itself is
+    stubbed. Tests that exercise the breach path put their own stub in its
+    place; the client's own tests put the real one back.
     """
-    from app.core.config import settings as app_settings
+    from app.services import hibp
 
-    monkeypatch.setattr(app_settings, "HIBP_CHECK_ENABLED", False)
+    async def _not_breached(_password: str) -> bool:
+        return False
+
+    monkeypatch.setattr(hibp, "is_password_breached", _not_breached)
 
 
 @pytest.fixture(scope="function")

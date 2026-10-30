@@ -100,6 +100,13 @@ CASES: dict[tuple[str, str], Case] = {
         False, True, PLATFORM_SETTINGS
     ),
     ("platform", "marketplace_registry_enabled"): Case(True, False, PLATFORM_SETTINGS),
+    ("platform", "public_registration_enabled"): Case(True, False, PLATFORM_SETTINGS),
+    ("platform", "community_creation_enabled"): Case(True, False, PLATFORM_SETTINGS),
+    ("platform", "community_creation_daily_limit"): Case(5, 1, PLATFORM_SETTINGS),
+    ("platform", "community_export_cooldown_hours"): Case(48, 0, PLATFORM_SETTINGS),
+    ("platform", "breached_password_check_enabled"): Case(
+        True, False, PLATFORM_SETTINGS
+    ),
     ("community", "auth_policy"): Case(
         SignInRequirement(),
         FACTOR_REQUIREMENT,

@@ -686,6 +686,15 @@ async def update_interface_settings(
         settings_row.dark_accent_color = dark_accent_color.strip() or "#60a5fa"
 
 
+async def registration_open(session: AsyncSession) -> bool:
+    """Whether somebody may register without an invite: public registration
+    is on, and so is community creation."""
+    stored = await rules.platform_values(session)
+    return (
+        stored["public_registration_enabled"] and stored["community_creation_enabled"]
+    )
+
+
 async def community_directory_enabled(session: AsyncSession) -> bool:
     """Whether the platform owner has the community directory switched on.
 

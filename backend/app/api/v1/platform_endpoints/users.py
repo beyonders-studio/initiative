@@ -1491,7 +1491,7 @@ async def update_me(
             current_user,
             update_data.get("current_password"),
         )
-        await validate_new_password(password)
+        await validate_new_password(session, password)
         # A request of its own (``UserSelfUpdate`` holds it to that), committed
         # with the session that keeps this device signed in. Its commit is the
         # request's only write; the account is read back for the answer.

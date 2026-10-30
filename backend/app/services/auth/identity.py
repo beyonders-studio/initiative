@@ -35,7 +35,6 @@ from sqlmodel import func, select
 from sqlmodel.ext.asyncio.session import AsyncSession
 
 from app.core.audit_events import AuditEventType
-from app.core.config import settings
 from app.core.encryption import encrypt_token, normalize_email
 from app.core.login_methods import LoginMethod
 from app.services.auth import addresses
@@ -497,7 +496,9 @@ async def any_account_exists(session: AsyncSession) -> bool:
 async def _registration_open(session: AsyncSession) -> bool:
     """Mirrors the existing OIDC flow's gate: a closed instance still admits
     the very first user (fresh-install bootstrap)."""
-    if settings.registration_open:
+    from app.services.platform import app_settings as app_settings_service
+
+    if await app_settings_service.registration_open(session):
         return True
     return not await any_account_exists(session)
 

@@ -161,6 +161,23 @@ PLATFORM_RULES: dict[str, StoredRule] = _catalog(
     # Who owns AI configuration: the operator for every community, each
     # community for itself, or nobody.
     StoredRule("ai_config_mode", Slot.choice, AIConfigMode.disabled),
+    # Whether somebody may register without an invite. Seeded from
+    # ``ENABLE_PUBLIC_REGISTRATION`` when the rule arrived; registration also
+    # closes while community creation is off.
+    StoredRule("public_registration_enabled", _ON, True),
+    # Whether an account may create a community. Off, only an account that
+    # manages communities may. Seeded from ``DISABLE_GUILD_CREATION``.
+    StoredRule("community_creation_enabled", _ON, True),
+    # How many communities one account may create in a day; 0 is no limit.
+    # Accounts that manage communities are not held to it. Seeded from
+    # ``GUILD_CREATION_DAILY_LIMIT``.
+    StoredRule("community_creation_daily_limit", Slot.amount, 5),
+    # Whether a new password is checked against the breach corpus. Seeded from
+    # ``HIBP_CHECK_ENABLED``.
+    StoredRule("breached_password_check_enabled", _ON, True),
+    # How long a community waits between whole-community exports, in hours;
+    # 0 is no wait. Seeded from ``EXPORT_GUILD_COOLDOWN_HOURS``.
+    StoredRule("community_export_cooldown_hours", Slot.amount, 48),
     # Whether an arriving visitor is asked what this deployment may keep in
     # their browser. Most deployments are a group's own server, reached by
     # people who were sent a link; an owner running a public front door turns

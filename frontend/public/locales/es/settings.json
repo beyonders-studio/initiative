@@ -762,6 +762,16 @@
       "idlePlaceholder": "Sin límite",
       "idleHint": "Cuánto puede estar una sesión sin tocarse antes de terminar. Déjalo en blanco para conservar la ventana fijada al desplegar el servidor. Usar la aplicación cuenta como tocarla, así que solo corre cuando alguien para. Una comunidad sujeta al estándar de cumplimiento lo acorta aún más para sus miembros."
     },
+    "breachedPasswordCheck": {
+      "title": "Contraseñas filtradas",
+      "description": "Rechazar una contraseña nueva que ya haya aparecido en una filtración de datos.",
+      "label": "Comprobar las contraseñas nuevas con filtraciones conocidas",
+      "onHelp": "Solo los cinco primeros caracteres del hash de la contraseña salen de este servidor. La contraseña en sí, nunca.",
+      "offHelp": "Las contraseñas nuevas no se comprueban. Desactívalo solo si este servidor no puede acceder a internet.",
+      "enabledToast": "Las contraseñas nuevas se comprueban con filtraciones conocidas.",
+      "disabledToast": "Las contraseñas nuevas ya no se comprueban con filtraciones conocidas.",
+      "error": "No hemos podido cambiar la comprobación de contraseñas filtradas."
+    },
     "secondFactorRequirement": {
       "title": "Autenticación en dos pasos",
       "description": "Si quienes están aquí deben tener un segundo factor — una aplicación de autenticación o una clave de acceso — además de una forma de iniciar sesión.",
@@ -1886,7 +1896,28 @@
     "maxGuestDaysHelpText": "Ningún invitado se queda más que esto, configure lo que configure una comunidad.",
     "maxGuestDaysSave": "Guardar la estancia máxima de invitados",
     "maxGuestDaysSaved_one": "Los invitados se quedan {{count}} día como máximo.",
-    "maxGuestDaysSaved_other": "Los invitados se quedan {{count}} días como máximo."
+    "maxGuestDaysSaved_other": "Los invitados se quedan {{count}} días como máximo.",
+    "joinAndCreateTitle": "Quién puede unirse y crear",
+    "publicRegistrationLabel": "Permitir que cualquiera se registre",
+    "publicRegistrationHelpText": "Las personas pueden crear una cuenta sin invitación. Mientras la creación de comunidades esté desactivada, solo pueden registrarse las personas invitadas.",
+    "publicRegistrationEnabledToast": "Cualquiera puede registrarse.",
+    "publicRegistrationDisabledToast": "Solo las personas invitadas pueden registrarse.",
+    "communityCreationLabel": "Permitir que cualquiera cree una comunidad",
+    "communityCreationHelpText": "Si está desactivado, solo quienes gestionan comunidades en este servidor pueden crear una, y solo las personas invitadas pueden registrarse.",
+    "communityCreationEnabledToast": "Cualquiera puede crear una comunidad.",
+    "communityCreationDisabledToast": "Solo quienes gestionan comunidades pueden crear una.",
+    "creationDailyLimitLabel": "Comunidades que una cuenta puede crear al día",
+    "creationDailyLimitHelpText": "0 significa sin límite. No se aplica a quienes gestionan comunidades.",
+    "creationDailyLimitSave": "Guardar el límite diario de comunidades",
+    "creationDailyLimitSaved_one": "Cada cuenta puede crear {{count}} comunidad al día.",
+    "creationDailyLimitSaved_other": "Cada cuenta puede crear {{count}} comunidades al día.",
+    "creationDailyLimitSavedNone": "No hay límite diario de comunidades nuevas.",
+    "exportCooldownLabel": "Horas entre exportaciones de una comunidad",
+    "exportCooldownHelpText": "Cuánto espera una comunidad antes de poder exportarlo todo de nuevo. 0 significa sin espera.",
+    "exportCooldownSave": "Guardar el tiempo entre exportaciones de comunidades",
+    "exportCooldownSaved_one": "Las comunidades esperan {{count}} hora entre exportaciones.",
+    "exportCooldownSaved_other": "Las comunidades esperan {{count}} horas entre exportaciones.",
+    "exportCooldownSavedNone": "Las comunidades pueden exportar sin esperar."
   },
   "account": {
     "passwordTitle": "Contraseña",

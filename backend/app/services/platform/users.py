@@ -12,7 +12,11 @@ from sqlmodel.ext.asyncio.session import AsyncSession
 from app.core.errors import CodedError
 from app.core.messages import AuthMessages, GuildMessages, UserMessages
 from app.core.audit_events import AuditEventType
-from app.core.capabilities import Capability, roles_with_capability
+from app.core.capabilities import (
+    Capability,
+    roles_with_capability,
+    standing_capabilities,
+)
 from app.core.config import settings
 from app.core import usernames
 from app.core.security import has_usable_password
@@ -1179,6 +1183,15 @@ async def to_self_read(session: AsyncSession, user: User) -> "UserRead":
         if copy is not None:
             payload.demo_community_id = copy.guild_id
             payload.demo_expires_at = copy.expires_at
+    payload.can_create_communities = (
+        user.status != UserStatus.suspended
+        and payload.demo_expires_at is None
+        and (
+            (await rules.platform_values(session))["community_creation_enabled"]
+            or Capability.COMMUNITIES_MANAGE
+            in standing_capabilities(user.role, user.status)
+        )
+    )
     return payload
 
 

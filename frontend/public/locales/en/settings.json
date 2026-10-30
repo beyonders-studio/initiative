@@ -762,6 +762,16 @@
       "idlePlaceholder": "No limit",
       "idleHint": "How long a session may sit untouched before it ends. Leave blank to keep the window set when the server was deployed. Using the app counts as touching it, so this only runs down once somebody has stopped. A community held to the compliance standard shortens it further for its own members."
     },
+    "breachedPasswordCheck": {
+      "title": "Breached passwords",
+      "description": "Turn away a new password that has already turned up in a data breach.",
+      "label": "Check new passwords against known breaches",
+      "onHelp": "Only the first five characters of the password's hash leave this server. The password itself never does.",
+      "offHelp": "New passwords are not checked. Turn this off only where this server cannot reach the internet.",
+      "enabledToast": "New passwords are checked against known breaches.",
+      "disabledToast": "New passwords are no longer checked against known breaches.",
+      "error": "We couldn't change the breached password check."
+    },
     "secondFactorRequirement": {
       "title": "Two-factor authentication",
       "description": "Whether people here have to hold a second factor — an authenticator app or a passkey — as well as a way to sign in.",
@@ -1886,7 +1896,28 @@
     "maxGuestDaysHelpText": "No guest stays longer than this, whatever a community sets.",
     "maxGuestDaysSave": "Save the longest guest stay",
     "maxGuestDaysSaved_one": "Guests stay {{count}} day at most.",
-    "maxGuestDaysSaved_other": "Guests stay {{count}} days at most."
+    "maxGuestDaysSaved_other": "Guests stay {{count}} days at most.",
+    "joinAndCreateTitle": "Who may join and create",
+    "publicRegistrationLabel": "Let anyone sign up",
+    "publicRegistrationHelpText": "People can make an account without an invite. While community creation is off, only invited people can sign up.",
+    "publicRegistrationEnabledToast": "Anyone can sign up.",
+    "publicRegistrationDisabledToast": "Only invited people can sign up.",
+    "communityCreationLabel": "Let anyone create a community",
+    "communityCreationHelpText": "When off, only people who manage communities on this server can create one, and only invited people can sign up.",
+    "communityCreationEnabledToast": "Anyone can create a community.",
+    "communityCreationDisabledToast": "Only people who manage communities can create one.",
+    "creationDailyLimitLabel": "Communities one account may create per day",
+    "creationDailyLimitHelpText": "0 means no limit. People who manage communities are not held to it.",
+    "creationDailyLimitSave": "Save the daily community limit",
+    "creationDailyLimitSaved_one": "Each account may create {{count}} community a day.",
+    "creationDailyLimitSaved_other": "Each account may create {{count}} communities a day.",
+    "creationDailyLimitSavedNone": "There is no daily limit on new communities.",
+    "exportCooldownLabel": "Hours between community exports",
+    "exportCooldownHelpText": "How long a community waits before it can export everything again. 0 means no wait.",
+    "exportCooldownSave": "Save the time between community exports",
+    "exportCooldownSaved_one": "Communities wait {{count}} hour between exports.",
+    "exportCooldownSaved_other": "Communities wait {{count}} hours between exports.",
+    "exportCooldownSavedNone": "Communities can export without waiting."
   },
   "account": {
     "passwordTitle": "Password",

@@ -285,6 +285,14 @@ RUNTIME_SEEDED_SETTINGS = frozenset(
         "SMTP_PASSWORD",
         "SMTP_FROM_ADDRESS",
         "SMTP_TEST_RECIPIENT",
+        # Who may join and create, and the password breach check: seeded into
+        # their platform rules (app/core/rules.py) by the revision that moved
+        # them, and set in Settings → Platform from then on.
+        "ENABLE_PUBLIC_REGISTRATION",
+        "DISABLE_GUILD_CREATION",
+        "GUILD_CREATION_DAILY_LIMIT",
+        "HIBP_CHECK_ENABLED",
+        "EXPORT_GUILD_COOLDOWN_HOURS",
         # Object storage.
         "STORAGE_BACKEND",
         "S3_BUCKET",
@@ -634,11 +642,6 @@ class Settings(BaseSettings):
         can be rotated without touching encrypted-at-rest data; falls back to
         SECRET_KEY for deployments that haven't set one."""
         return self.JWT_SIGNING_KEY or self.SECRET_KEY
-
-    @property
-    def registration_open(self) -> bool:
-        """Whether somebody may register without an invite."""
-        return self.ENABLE_PUBLIC_REGISTRATION and not self.DISABLE_GUILD_CREATION
 
     @property
     def app_url_is_https(self) -> bool:

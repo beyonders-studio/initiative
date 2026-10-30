@@ -625,9 +625,9 @@ async def create_community(
     and name an ``owner_user_id``, which hands the guild to that account
     instead and leaves the caller holding nothing in it.
     """
-    if settings.DISABLE_GUILD_CREATION and not user_has_capability(
-        current_user, Capability.COMMUNITIES_MANAGE
-    ):
+    if not (await rules.platform_values(session))[
+        "community_creation_enabled"
+    ] and not user_has_capability(current_user, Capability.COMMUNITIES_MANAGE):
         raise HTTPException(
             status_code=status.HTTP_403_FORBIDDEN,
             detail=GuildMessages.COMMUNITY_CREATION_DISABLED,

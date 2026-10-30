@@ -91,7 +91,8 @@ async def test_bootstrap_status_with_users(
         "demo": False,
     }
 
-    monkeypatch.setattr(settings, "DISABLE_GUILD_CREATION", True)
+    await rules.put(session, "community_creation_enabled", False)
+    await session.commit()
     monkeypatch.setattr(settings, "DEMO_MODE", True)
     response = await client.get("/api/v1/auth/bootstrap")
     assert response.json()["public_registration_enabled"] is False
@@ -411,9 +412,9 @@ async def test_closed_registration_says_nothing_about_the_address(
     """Where registration needs an invite, a held address and a free one are
     refused the same way: whether one is held is only told to somebody the
     deployment would register."""
-    from app.core import config as cfg
 
-    monkeypatch.setattr(cfg.settings, "ENABLE_PUBLIC_REGISTRATION", False)
+    await rules.put(session, "public_registration_enabled", False)
+    await session.commit()
     await create_user(session, email="held-closed@example.com")
 
     answers = []
@@ -2106,12 +2107,11 @@ async def test_oidc_callback_blocks_new_user_when_registration_disabled(
     guild_creation_disabled: bool,
 ):
     """OIDC callback must honor the same no-invite registration gate as /register."""
-    from app.core import config as cfg
 
-    monkeypatch.setattr(
-        cfg.settings, "ENABLE_PUBLIC_REGISTRATION", public_registration_enabled
-    )
-    monkeypatch.setattr(cfg.settings, "DISABLE_GUILD_CREATION", guild_creation_disabled)
+    await rules.put(session, "public_registration_enabled", public_registration_enabled)
+    await session.commit()
+    await rules.put(session, "community_creation_enabled", not guild_creation_disabled)
+    await session.commit()
     # Must have at least one existing user so the bootstrap exception is off.
     await create_user(session)
     await _enable_platform_oidc(session)

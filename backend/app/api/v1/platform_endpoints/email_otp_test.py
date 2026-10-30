@@ -3,6 +3,7 @@
 from httpx import AsyncClient
 from sqlmodel.ext.asyncio.session import AsyncSession
 
+from app.services.platform import rules
 from app.core.security import decode_session_token
 from app.testing import captcha_switched_on, create_user
 
@@ -15,7 +16,6 @@ async def _permit(session: AsyncSession, *, mail: bool = True) -> None:
     """A deployment offering the emailed code, able to send."""
     from app.core.login_methods import LoginMethod
     from app.services.platform import app_settings as app_settings_service
-    from app.services.platform import rules
 
     row = await app_settings_service.get_app_settings(session)
     if mail:
@@ -507,7 +507,6 @@ async def test_a_closed_deployment_sends_no_sign_up_code(
 ):
     """And says so no differently than it says anything else about an
     address: the answer is the same, and no letter goes."""
-    from app.core.config import settings as app_config
 
     await _permit(session)
     _catch_codes(monkeypatch)
@@ -515,7 +514,8 @@ async def test_a_closed_deployment_sends_no_sign_up_code(
     # Somebody is already here: the first account bootstraps the deployment
     # and is taken whatever the registration setting says.
     await create_user(session, email="resident@example.com")
-    monkeypatch.setattr(app_config, "ENABLE_PUBLIC_REGISTRATION", False)
+    await rules.put(session, "public_registration_enabled", False)
+    await session.commit()
 
     response = await client.post(SEND_URL, json={"email": "shutout@example.com"})
 
@@ -530,13 +530,13 @@ async def test_a_code_for_an_address_no_sign_up_follows_opens_nothing(
 ):
     """The challenge stands so the answer reads the same, and answers to it
     are refused like any other pair that names nothing."""
-    from app.core.config import settings as app_config
 
     await _permit(session)
     _catch_codes(monkeypatch)
     _catch_sign_ups(monkeypatch)
     await create_user(session, email="resident@example.com")
-    monkeypatch.setattr(app_config, "ENABLE_PUBLIC_REGISTRATION", False)
+    await rules.put(session, "public_registration_enabled", False)
+    await session.commit()
 
     handle = await _ask(client, "shutout@example.com")
     refused = await client.post(
@@ -552,7 +552,6 @@ async def test_asking_reads_the_same_whether_or_not_the_address_is_known(
 ):
     """The whole point of the door: the response to the three cases is one
     response."""
-    from app.core.config import settings as app_config
     from app.models.platform.user import UserStatus
 
     await _permit(session)
@@ -564,7 +563,8 @@ async def test_asking_reads_the_same_whether_or_not_the_address_is_known(
     known = await client.post(SEND_URL, json={"email": "known@example.com"})
     halted = await client.post(SEND_URL, json={"email": "halted@example.com"})
     fresh = await client.post(SEND_URL, json={"email": "fresh@example.com"})
-    monkeypatch.setattr(app_config, "ENABLE_PUBLIC_REGISTRATION", False)
+    await rules.put(session, "public_registration_enabled", False)
+    await session.commit()
     closed = await client.post(SEND_URL, json={"email": "closed@example.com"})
 
     bodies = [r.json() for r in (known, halted, fresh, closed)]

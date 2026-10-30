@@ -222,3 +222,26 @@ async def test_deleting_a_guild_tells_the_people_who_were_in_it(
     await settle()
 
     assert [frame["resource"] for frame in tab.sent] == ["account"]
+
+
+async def test_letting_anyone_create_a_community_pokes_every_tab(
+    session, account_socket
+) -> None:
+    """Whether an account may create a community is part of ``/me``, so the
+    deployment's switch reaches every open tab, not only its writer's."""
+    from app.models.platform.user import UserRole
+    from app.services.platform import auth_posture
+
+    owner = await create_user(session, role=UserRole.owner)
+    member = await create_user(session)
+    tab = account_socket(member.id)
+    await rules.put(session, "community_creation_enabled", False)
+    await session.commit()
+
+    await auth_posture.change(
+        auth_posture.RuleContext.platform(session, owner),
+        {"community_creation_enabled": True},
+    )
+    await settle()
+
+    assert [frame["resource"] for frame in tab.sent] == ["account"]
