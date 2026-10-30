@@ -91,6 +91,11 @@ GUILD_LEVEL_TABLES: frozenset[str] = frozenset(
         # soft_delete_admin_purge), never a membership scope. See the rendered RLS DDL.
         # Guild-wide config / data (no initiative scope)
         "guild_settings",
+        # The community's custom roles and who holds them: read within the
+        # schema, written under the no-escalation policies
+        # (app.db.guild_ddl._custom_roles_block).
+        "custom_roles",
+        "custom_role_members",
         # Installed plug-ins: guild-wide by definition, and readable by any member —
         # the sidebar has to know a plug-in is there. Installing, configuring and
         # removing are the seat's (SEAT_TABLES below); what a member may do
@@ -315,6 +320,7 @@ CREATED_BY_EXEMPT_TABLES: frozenset[str] = frozenset(
         # whose it is.
         "calendar_event_attendees",
         "calendar_event_answers",
+        "custom_role_members",
         "initiative_members",
         "initiative_rules",
         "task_assignees",

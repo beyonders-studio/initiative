@@ -553,6 +553,29 @@ export interface ActivityFeedPage {
 }
 
 /**
+ * A part of administering a community, held as a whole.
+ *
+ * The admin rung holds every one. What the rung holds beyond them, the reach
+ * into all of the community's content (``initiative_access``, "Full access",
+ * the trash's reads), is not one of these: it is the rung's own. Each admin
+ * route names the surface it guards, and so does each policy leg that guards
+ * one, reading the request's ``held_surfaces``.
+ */
+export type AdminSurface = (typeof AdminSurface)[keyof typeof AdminSurface];
+
+export const AdminSurface = {
+  profile: "profile",
+  invites: "invites",
+  members: "members",
+  initiatives: "initiatives",
+  community_calendars: "community_calendars",
+  webhooks: "webhooks",
+  trash: "trash",
+  usage: "usage",
+  roles: "roles",
+} as const;
+
+/**
  * Someone saying when they were born, once.
  *
  * The date answers one question — are they old enough — and is then gone. It
@@ -4932,6 +4955,37 @@ export interface CounterUpdate {
   position?: number | string | null;
 }
 
+export interface CustomRoleAssignment {
+  role_id?: number | null;
+}
+
+export interface CustomRoleCreate {
+  /**
+   * @minLength 1
+   * @maxLength 64
+   */
+  name: string;
+  base_rung: CommunityRole;
+  surfaces?: AdminSurface[];
+}
+
+export interface CustomRoleHolder {
+  user_id: number;
+  role_id: number;
+}
+
+export interface CustomRoleRead {
+  id: number;
+  name: string;
+  base_rung: CommunityRole;
+  surfaces: AdminSurface[];
+}
+
+export interface CustomRoleUpdate {
+  name?: string | null;
+  surfaces?: AdminSurface[] | null;
+}
+
 /**
  * What a person is up to, in their own words.
  *
@@ -9046,6 +9100,7 @@ export interface PlatformCommunityStorageRead {
   support_enabled: boolean;
   ai_connections_open: boolean;
   plugins_open: boolean;
+  custom_roles_open: boolean;
   lifts_to: CommunityStatus | null;
   allowed_actions: CommunityAction[];
 }
@@ -9082,6 +9137,7 @@ export interface PlatformCommunityStorageUpdate {
   support_enabled?: boolean | null;
   ai_connections_open?: boolean | null;
   plugins_open?: boolean | null;
+  custom_roles_open?: boolean | null;
 }
 
 /**

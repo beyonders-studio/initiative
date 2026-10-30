@@ -827,5 +827,11 @@
     "dates": "Fechas de inicio y vencimiento",
     "location": "Ubicación",
     "attendees": "Asistentes"
-  }
+  },
+  "CUSTOM_ROLE_NOT_FOUND": "Ese rol ya no existe.",
+  "CUSTOM_ROLE_NAME_TAKEN": "Otro rol ya tiene ese nombre.",
+  "CUSTOM_ROLE_BEYOND_YOURS": "Solo puedes crear o asignar un rol con lo que tú mismo puedes hacer.",
+  "CUSTOM_ROLE_WIDENS_AN_ADMIN": "Quitar este rol le devuelve todo a un administrador, así que solo puede hacerlo un administrador que pueda hacerlo todo.",
+  "CUSTOM_ROLE_SURFACE_NOT_FOR_MEMBERS": "Un rol para miembros no puede incluir eso. Dáselo a un rol de administrador.",
+  "CUSTOM_ROLE_HOLDER_NOT_MEMBER": "Esa persona no es miembro de esta comunidad."
 }

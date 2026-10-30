@@ -523,10 +523,12 @@ class PlatformCommunityStorageRead(SanitizedBaseModel):
     # it is staffing them.
     support_enabled: bool = False
     # Whether this guild's seat may set up its own AI connections, and install
-    # and configure plug-ins (operator toggles). Open by default; closed, what
-    # it set up stays and its seat cannot change it.
+    # and configure plug-ins, and whether its admins may define and give custom
+    # roles (operator toggles). Open by default; closed, what it set up stays
+    # and nobody in it can change it.
     ai_connections_open: bool = True
     plugins_open: bool = True
+    custom_roles_open: bool = True
     # Where lifting its suspension returns it, while it is suspended. ``deleted``
     # where it was suspended out of deletion.
     lifts_to: Optional[CommunityStatus] = None
@@ -612,9 +614,11 @@ class PlatformCommunityStorageUpdate(SanitizedBaseModel):
     banner_image_enabled: Optional[bool] = None
     # Help-request entitlement. Omit-to-skip, same as the one above.
     support_enabled: Optional[bool] = None
-    # The seat's own AI connections and plug-ins. Omit-to-skip, same as above.
+    # The seat's own AI connections and plug-ins, and the community's custom
+    # roles. Omit-to-skip, same as above.
     ai_connections_open: Optional[bool] = None
     plugins_open: Optional[bool] = None
+    custom_roles_open: Optional[bool] = None
 
 
 #: What a community may require, beyond naming one provider. ``sso`` means its

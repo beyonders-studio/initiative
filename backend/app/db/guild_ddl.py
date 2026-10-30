@@ -33,6 +33,7 @@ from sqlalchemy.ext.asyncio import AsyncEngine
 from sqlalchemy.schema import CheckConstraint, CreateTable
 
 from app.core.plugin_scopes import PluginScopeResource, tool_resource
+from app.core.rules import SURFACE_CUSTOM_ROLES
 from app.core.tools import (
     INSTALL_METADATA_KIND,
     KINDS,
@@ -101,7 +102,7 @@ from app.db.tenancy import (
     SEAT_SURFACES,
     SEAT_TABLES,
 )
-from app.models.platform.guild import AdminSurface
+from app.models.platform.guild import AdminSurface, CommunityRole
 from app.models.tenant.batched_notice import BatchedNoticeKind
 from app.models.tenant.initiative import InitiativeJoinPolicy
 from app.models.tenant.resource_grant import ResourceAccessLevel
@@ -721,6 +722,113 @@ PLUGIN_CONNECTION_SECRET_FIELDS_TRIGGER = (
     " AFTER INSERT OR UPDATE OR DELETE ON plugin_connection_secrets FOR EACH ROW"
     " EXECUTE FUNCTION public.fn_plugin_connection_secret_fields();"
 )
+
+
+_CUSTOM_ROLES_SECTION = """\
+-- ===========================================================================
+-- Custom roles (custom_roles, custom_role_members): read within the schema.
+-- Written while the deployment leaves surface.custom_roles open, by a holder
+-- of the surface the write is part of (defining a role is roles, giving one
+-- is members), by a settings rung beside a read_write grant, or by the system
+-- engine. Nobody writes or gives a role holding a surface they do not hold,
+-- and a role on the admin rung takes an admin writer. Taking one off its
+-- holders, by deleting it or the assignment, widens an admin back to every
+-- surface, so that takes a writer who holds every surface.
+--
+-- tr_custom_roles_rung_fixed: a role keeps the rung it was made on.
+-- ==========================================================================="""
+
+_HELD_SURFACES = IN_POLICY.field("held_surfaces")
+
+
+def _gives(role: str) -> str:
+    """The writer may give ``role``: it holds nothing they do not, and a role
+    on the admin rung takes an admin."""
+    return (
+        f"({role}.surfaces <@ {_HELD_SURFACES}"
+        f" AND ({role}.base_rung = '{CommunityRole.member.value}'"
+        f" OR {IN_POLICY.admin}))"
+    )
+
+
+def _takes_off(role: str) -> str:
+    """The writer may take ``role`` off its holders: it holds nothing they do
+    not, and an admin's widens them to every surface, so it takes a writer
+    who holds every one."""
+    return (
+        f"({role}.surfaces <@ {_HELD_SURFACES}"
+        f" AND ({role}.base_rung = '{CommunityRole.member.value}'"
+        f" OR {IN_POLICY.holds_every_surface}))"
+    )
+
+
+def _custom_role_writer(surface: AdminSurface, may: str) -> str:
+    """The system engine, or, while the surface key is open, a settings rung
+    beside a read_write grant or a holder of ``surface`` for whom ``may``."""
+    is_open = (
+        f"NOT ('{SURFACE_CUSTOM_ROLES}' = ANY ({IN_POLICY.field('closed_surfaces')}))"
+    )
+    return (
+        f"({IN_POLICY.system} OR ({is_open} AND ("
+        f"({POLICY_SETTINGS_ADMIN} AND {IN_POLICY.pam_write})"
+        f" OR ({IN_POLICY.holds(surface)} AND {may}))))"
+    )
+
+
+def _role_of(may) -> str:
+    return (
+        "EXISTS (SELECT 1 FROM custom_roles r"
+        f" WHERE r.id = custom_role_members.role_id AND {may('r')})"
+    )
+
+
+CUSTOM_ROLE_RUNG_FIXED_FN = """
+CREATE OR REPLACE FUNCTION public.fn_custom_role_rung_fixed() RETURNS trigger
+    LANGUAGE plpgsql AS $rung_fixed$
+BEGIN
+    IF NEW.base_rung IS DISTINCT FROM OLD.base_rung THEN
+        RAISE EXCEPTION 'a custom role keeps its rung' USING ERRCODE = '42501';
+    END IF;
+    RETURN NEW;
+END;
+$rung_fixed$;
+"""
+
+
+def _custom_roles_block() -> str:
+    gives = _custom_role_writer(AdminSurface.roles, _gives("custom_roles"))
+    takes_off = _custom_role_writer(AdminSurface.roles, _takes_off("custom_roles"))
+    assigns = _custom_role_writer(AdminSurface.members, _role_of(_gives))
+    unassigns = _custom_role_writer(AdminSurface.members, _role_of(_takes_off))
+    lines: list[str] = []
+    for table, write, remove in (
+        ("custom_roles", gives, takes_off),
+        ("custom_role_members", assigns, unassigns),
+    ):
+        lines += [
+            f"ALTER TABLE {table} ENABLE ROW LEVEL SECURITY;",
+            f"ALTER TABLE {table} FORCE ROW LEVEL SECURITY;",
+            *(
+                f"DROP POLICY IF EXISTS custom_role_{c} ON {table};"
+                for c in ("select", "insert", "update", "delete")
+            ),
+            f"CREATE POLICY custom_role_select ON {table} AS PERMISSIVE FOR SELECT"
+            "  USING (true);",
+            f"CREATE POLICY custom_role_insert ON {table} AS PERMISSIVE FOR INSERT"
+            f"  WITH CHECK ({write});",
+            f"CREATE POLICY custom_role_update ON {table} AS PERMISSIVE FOR UPDATE"
+            f"  USING ({remove if table == 'custom_role_members' else write})"
+            f" WITH CHECK ({write});",
+            f"CREATE POLICY custom_role_delete ON {table} AS PERMISSIVE FOR DELETE"
+            f"  USING ({remove});",
+        ]
+    lines += [
+        CUSTOM_ROLE_RUNG_FIXED_FN,
+        "CREATE OR REPLACE TRIGGER tr_custom_roles_rung_fixed"
+        " BEFORE UPDATE OF base_rung ON custom_roles FOR EACH ROW"
+        " EXECUTE FUNCTION public.fn_custom_role_rung_fixed();",
+    ]
+    return "\n".join(lines)
 
 
 _SEAT_SECTION = """\
@@ -1605,6 +1713,7 @@ def render_guild_rls_ddl() -> str:
     )
     seats = [_seat_block(t) for t in sorted(SEAT_TABLES)]
     out += "\n\n" + _SEAT_SECTION + "\n\n" + "\n\n".join(seats)
+    out += "\n\n" + _CUSTOM_ROLES_SECTION + "\n\n" + _custom_roles_block()
     out += "\n" + PLUGIN_SECRET_FIELDS_FN + "\n" + PLUGIN_SECRET_FIELDS_TRIGGER
     out += "\n" + AI_KEY_PRESENT_FN + "\n" + AI_KEY_PRESENT_TRIGGER
     ledgers = [_ledger_block(t, p) for t, p in sorted(LEDGER_TABLES.items())]

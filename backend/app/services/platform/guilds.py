@@ -46,6 +46,7 @@ from app.models.platform.access_grant import AccessGrant, AccessGrantPurpose
 from app.core.rules import (
     OPTION_RULES,
     SURFACE_AI_CONNECTIONS,
+    SURFACE_CUSTOM_ROLES,
     SURFACE_PLUGINS,
     SetBy,
 )
@@ -1295,6 +1296,7 @@ async def update_guild(
     support_enabled: bool | None = None,
     ai_connections_open: bool | None = None,
     plugins_open: bool | None = None,
+    custom_roles_open: bool | None = None,
 ) -> Guild:
     guild = await get_guild(session, guild_id=guild_id)
     updated = False
@@ -1375,6 +1377,7 @@ async def update_guild(
         or support_enabled is not None
         or ai_connections_open is not None
         or plugins_open is not None
+        or custom_roles_open is not None
     ):
         plan = await rules.community_values(session, [guild_id])
         changes: dict[str, Any] = {}
@@ -1420,6 +1423,8 @@ async def update_guild(
             changes[SURFACE_AI_CONNECTIONS] = ai_connections_open
         if plugins_open is not None:
             changes[SURFACE_PLUGINS] = plugins_open
+        if custom_roles_open is not None:
+            changes[SURFACE_CUSTOM_ROLES] = custom_roles_open
         # The deployment's rows: a community's own seat never writes these.
         for key, value in changes.items():
             await rules.put(

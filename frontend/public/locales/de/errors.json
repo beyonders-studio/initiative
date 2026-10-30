@@ -827,5 +827,11 @@
     "dates": "Start- und Fälligkeitsdatum",
     "location": "Ort",
     "attendees": "Teilnehmer"
-  }
+  },
+  "CUSTOM_ROLE_NOT_FOUND": "Diese Rolle gibt es nicht mehr.",
+  "CUSTOM_ROLE_NAME_TAKEN": "Eine andere Rolle hat bereits diesen Namen.",
+  "CUSTOM_ROLE_BEYOND_YOURS": "Du kannst nur Rollen erstellen oder vergeben, die nicht mehr können als du selbst.",
+  "CUSTOM_ROLE_WIDENS_AN_ADMIN": "Wird diese Rolle entfernt, darf ein Admin wieder alles. Das kann nur ein Admin, der selbst alles darf.",
+  "CUSTOM_ROLE_SURFACE_NOT_FOR_MEMBERS": "Eine Rolle für Mitglieder kann das nicht enthalten. Gib es stattdessen einer Admin-Rolle.",
+  "CUSTOM_ROLE_HOLDER_NOT_MEMBER": "Diese Person ist kein Mitglied dieser Community."
 }

@@ -1933,3 +1933,21 @@ class DemoMessages:
     DEMO_PERSONA_TAKEN = "DEMO_PERSONA_TAKEN"
     #: A link's end is in the past.
     DEMO_LINK_EXPIRY_INVALID = "DEMO_LINK_EXPIRY_INVALID"
+
+
+class CustomRoleMessages:
+    """A community's custom roles."""
+
+    CUSTOM_ROLE_NOT_FOUND = "CUSTOM_ROLE_NOT_FOUND"
+    #: Another role already has the name.
+    CUSTOM_ROLE_NAME_TAKEN = "CUSTOM_ROLE_NAME_TAKEN"
+    #: The role holds a surface the writer does not, or sits on the admin rung
+    #: and the writer is not an admin.
+    CUSTOM_ROLE_BEYOND_YOURS = "CUSTOM_ROLE_BEYOND_YOURS"
+    #: Taking a role off an admin gives them every surface back, which takes
+    #: somebody who holds every one.
+    CUSTOM_ROLE_WIDENS_AN_ADMIN = "CUSTOM_ROLE_WIDENS_AN_ADMIN"
+    #: A role on the member rung holds a surface that is for admins.
+    CUSTOM_ROLE_SURFACE_NOT_FOR_MEMBERS = "CUSTOM_ROLE_SURFACE_NOT_FOR_MEMBERS"
+    #: The person given a role is not a member of the community.
+    CUSTOM_ROLE_HOLDER_NOT_MEMBER = "CUSTOM_ROLE_HOLDER_NOT_MEMBER"

@@ -223,6 +223,7 @@ async def _erase_in_guild(
     ``guild_session`` is a system session routed into ``guild_id``.
     """
     from app.models.tenant.calendar_event import CalendarEventAttendee
+    from app.models.tenant.custom_role import CustomRoleMember
     from app.models.tenant.metadata import MetadataValue
     from app.models.tenant.queue import QueueItem
     from app.services.tenant.mention_parser import anonymize_user_mentions
@@ -241,6 +242,9 @@ async def _erase_in_guild(
 
     await guild_session.exec(
         delete(PersonalItem).where(col(PersonalItem.user_id) == user_id)
+    )
+    await guild_session.exec(
+        delete(CustomRoleMember).where(col(CustomRoleMember.user_id) == user_id)
     )
     # The ledger that stops an event reminder being sent twice: one row per
     # (event, person), of no use to anyone once the person is gone.

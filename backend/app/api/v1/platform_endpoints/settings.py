@@ -35,6 +35,7 @@ from app.core.rules import (
     OPTION_RULES,
     RETENTION_WINDOWS,
     SURFACE_AI_CONNECTIONS,
+    SURFACE_CUSTOM_ROLES,
     SURFACE_PLUGINS,
 )
 from app.db import cohorts
@@ -966,6 +967,7 @@ def _plan_fields(plan: rules.Values) -> dict[str, Any]:
         "support_enabled": plan["help_requests"],
         "ai_connections_open": plan[SURFACE_AI_CONNECTIONS],
         "plugins_open": plan[SURFACE_PLUGINS],
+        "custom_roles_open": plan[SURFACE_CUSTOM_ROLES],
     }
 
 
@@ -1025,6 +1027,7 @@ def _guild_storage_read(
         support_enabled=plan["help_requests"],
         ai_connections_open=plan[SURFACE_AI_CONNECTIONS],
         plugins_open=plan[SURFACE_PLUGINS],
+        custom_roles_open=plan[SURFACE_CUSTOM_ROLES],
     )
 
 
@@ -1183,6 +1186,7 @@ async def update_platform_community_storage(
         or payload.support_enabled is not None
         or payload.ai_connections_open is not None
         or payload.plugins_open is not None
+        or payload.custom_roles_open is not None
     ):
         raise HTTPException(
             status_code=status.HTTP_409_CONFLICT,
@@ -1209,6 +1213,7 @@ async def update_platform_community_storage(
             support_enabled=payload.support_enabled,
             ai_connections_open=payload.ai_connections_open,
             plugins_open=payload.plugins_open,
+            custom_roles_open=payload.custom_roles_open,
         )
         if payload.status is not None and guild.status != payload.status.value:
             recorded = (

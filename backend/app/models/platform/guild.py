@@ -457,6 +457,24 @@ class AdminSurface(str, Enum):
     trash = "trash"
     #: Storage used, and what installed plug-ins report.
     usage = "usage"
+    #: The community's custom roles: defining them. Assigning one is
+    #: ``members``.
+    roles = "roles"
+
+
+#: What a custom role on the member rung may hold. The rest reach the
+#: community's content (``initiatives`` writes every roster, ``webhooks``
+#: report across initiatives, ``trash`` reads the trash) or define roles, so
+#: they are for a role on the admin rung.
+MEMBER_ROLE_SURFACES: frozenset[AdminSurface] = frozenset(
+    {
+        AdminSurface.profile,
+        AdminSurface.invites,
+        AdminSurface.members,
+        AdminSurface.community_calendars,
+        AdminSurface.usage,
+    }
+)
 
 
 #: What an ordinary guild admin may hand out. ``support`` is never persisted at
