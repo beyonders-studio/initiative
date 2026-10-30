@@ -38,7 +38,11 @@ decision.
 
 from __future__ import annotations
 
-from app.core.rules import SURFACE_AI_CONNECTIONS, SURFACE_PLUGINS
+from app.core.rules import (
+    SURFACE_AI_CONNECTIONS,
+    SURFACE_CUSTOM_ROLES,
+    SURFACE_PLUGINS,
+)
 
 from app.db.initiative_rls import INITIATIVE_SCOPED_TABLES
 from app.db.public_rls import SHARED_TABLE_REGISTRY
@@ -96,6 +100,9 @@ GUILD_LEVEL_TABLES: frozenset[str] = frozenset(
         # (app.db.guild_ddl._custom_roles_block).
         "custom_roles",
         "custom_role_members",
+        # Which custom role a provider's group gives: sign-in configuration,
+        # the seat's (SEAT_TABLES).
+        "custom_role_claim_rules",
         # Installed plug-ins: guild-wide by definition, and readable by any member —
         # the sidebar has to know a plug-in is there. Installing, configuring and
         # removing are the seat's (SEAT_TABLES below); what a member may do
@@ -259,6 +266,7 @@ MEMBER_SECRET_TABLES: dict[str, tuple[str, str]] = {
 # ``GUILD_LEVEL_TABLES`` — enforced in ``tenancy_test.py``.
 SEAT_TABLES: frozenset[str] = frozenset(
     {
+        "custom_role_claim_rules",
         "plugin_placements",
         "guild_ai_connection_keys",
         "guild_ai_connections",
@@ -273,6 +281,7 @@ SEAT_TABLES: frozenset[str] = frozenset(
 # has closed the surface, the seat writes none of them; the system engine
 # still does. Every entry here MUST also be in ``SEAT_TABLES``.
 SEAT_SURFACES: dict[str, str] = {
+    "custom_role_claim_rules": SURFACE_CUSTOM_ROLES,
     "guild_ai_connections": SURFACE_AI_CONNECTIONS,
     "guild_ai_connection_keys": SURFACE_AI_CONNECTIONS,
     "guild_plugins": SURFACE_PLUGINS,
@@ -286,7 +295,7 @@ SEAT_SURFACES: dict[str, str] = {
 # read predicate is the seat's. Every entry here MUST also be in
 # ``SEAT_TABLES`` — enforced in ``tenancy_test.py``.
 SEAT_READ_TABLES: frozenset[str] = frozenset(
-    {"guild_ai_connection_keys", "guild_plugin_secrets"}
+    {"custom_role_claim_rules", "guild_ai_connection_keys", "guild_plugin_secrets"}
 )
 
 # --- Ledger overlay on guild-level tables -------------------------------------

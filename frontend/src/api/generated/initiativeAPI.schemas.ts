@@ -4959,6 +4959,28 @@ export interface CustomRoleAssignment {
   role_id?: number | null;
 }
 
+export interface CustomRoleClaimRuleCreate {
+  provider_id: number;
+  /**
+   * @minLength 1
+   * @maxLength 500
+   */
+  claim_value: string;
+  role_id: number;
+}
+
+export interface CustomRoleClaimRuleOrder {
+  rule_ids: number[];
+}
+
+export interface CustomRoleClaimRuleRead {
+  id: number;
+  provider_id: number;
+  claim_value: string;
+  role_id: number;
+  position: number;
+}
+
 export interface CustomRoleCreate {
   /**
    * @minLength 1
