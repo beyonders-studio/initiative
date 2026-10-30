@@ -36,6 +36,7 @@ from app.services.tenant import tags as tags_service
 from app.services.tenant.archive import archive_filter_clause
 from app.services.tenant.names import ensure_name_free
 from app.services.tenant.soft_delete import trash
+from app.services.tenant.initiative_tools import tool_on_sql
 from app.schemas.tenant.tag import (
     TagBulkEditRequest,
     TagBulkEditResponse,
@@ -317,11 +318,7 @@ async def _tagged_conditions(
         return [
             model.id.in_(tags_service.tagged_entity_ids(spec, [tag_id])),
             archive_filter_clause(model, None),
-            model.initiative_id.in_(
-                select(Initiative.id).where(
-                    getattr(Initiative, tool.view_permission).is_(True)
-                )
-            ),
+            model.initiative_id.in_(select(Initiative.id).where(tool_on_sql(tool))),
         ]
     tool, chain = _governing(spec)
     tool_list = TOOL_LISTS[tool]

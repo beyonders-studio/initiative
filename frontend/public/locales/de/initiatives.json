@@ -174,6 +174,8 @@
     "rolesDescription": "Was jede Rolle sehen und was sie erstellen darf. Manager haben alles.",
     "loadingRoles": "Rollen werden geladen...",
     "addCustomRole": "Benutzerdefinierte Rolle hinzufügen",
+    "setByCommunity": "Deine Community legt das für jede Initiative fest.",
+    "customRolesOff": "Deine Community beschränkt Initiativen auf ihre eingebauten Rollen.",
     "builtIn": "Integriert",
     "manager": "Manager",
     "fullAccess": "Vollzugriff",
@@ -323,5 +325,21 @@
     "firstIntroLink": "Hier mehr lesen"
   },
   "wikisFeature": "Wikis",
-  "wikisFeatureDescription": "Seiten, die aufeinander verweisen. Handbücher, Nachschlagewerke, das eine Thema, nach dem alle immer fragen."
+  "wikisFeatureDescription": "Seiten, die aufeinander verweisen. Handbücher, Nachschlagewerke, das eine Thema, nach dem alle immer fragen.",
+  "communityDefaults": {
+    "title": "Jede Initiative",
+    "description": "Ein Tool oder eine Mitgliederberechtigung, die du hier festlegst, gilt in jeder Initiative dieser Community; deren Manager sehen sie als festgelegt. Bleibt es jeder Initiative überlassen, entscheidet sie selbst.",
+    "toolsHeading": "Tools",
+    "memberHeading": "Was Mitglieder tun können",
+    "memberHelp": "Für die eingebaute Rolle „Mitglied“ in jeder Initiative.",
+    "choice": {
+      "initiative": "Jede Initiative entscheidet",
+      "on": "Überall an",
+      "off": "Überall aus"
+    },
+    "customRolesLabel": "Manager können Rollen hinzufügen",
+    "customRolesHelp": "Aus, können Initiativen keine Rollen hinzufügen, und ihre vorhandenen eigenen Rollen dürfen nicht mehr als Mitglieder.",
+    "saved": "Für jede Initiative gespeichert",
+    "error": "Speichern fehlgeschlagen"
+  }
 }

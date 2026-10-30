@@ -31,7 +31,7 @@ from dataclasses import dataclass
 from typing import Any, Optional
 
 from fastapi import HTTPException, status
-from sqlalchemy import and_, exists, false, or_, true, tuple_
+from sqlalchemy import and_, exists, false, func, or_, true, tuple_
 from sqlalchemy import Select
 from sqlalchemy import delete as sa_delete
 from sqlalchemy import update as sa_update
@@ -66,6 +66,7 @@ from app.models.tenant.task import Task, TaskAssignee
 from app.services.membership import live_membership_clause
 from app.services.platform.users import visible_to_other_people
 from app.db.request_context import SystemGuild
+from app.services.tenant.initiative_tools import member_permission_sql, tool_on_sql
 
 _ADMIN_RUNGS = [rung for rung in GUILD_LADDER if rung.reaches(CommunityRole.admin)]
 
@@ -214,11 +215,13 @@ def readers_of(governing: Governing, guild_id: int) -> Select:
             .where(
                 im.initiative_id == governing.initiative_id,
                 im.user_id == gm.user_id,
-                getattr(Initiative, f"{tool.plural}_enabled").is_(True),
+                tool_on_sql(tool),
                 or_(
                     role.is_manager.is_(True),
-                    role_says(True),
-                    and_(default, ~role_says(False)),
+                    func.coalesce(
+                        member_permission_sql(role, tool.view_permission),
+                        or_(role_says(True), and_(default, ~role_says(False))),
+                    ),
                 ),
                 or_(
                     role.override_share_restrictions.is_(True),
@@ -239,7 +242,7 @@ def readers_of(governing: Governing, guild_id: int) -> Select:
         )
         enabled = exists().where(
             Initiative.id == governing.initiative_id,
-            getattr(Initiative, f"{tool.plural}_enabled").is_(True),
+            tool_on_sql(tool),
         )
         reached = or_(reached, and_(guest, given, enabled))
     return sa_select(gm.user_id).where(

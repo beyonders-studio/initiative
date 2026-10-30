@@ -46,6 +46,7 @@ from app.services.import_engine.contract import (
     InlineImport,
 )
 from app.services.import_engine import limits as import_limits
+from app.services.tenant.initiative_tools import tool_on_in
 
 # Statuses that count against the per-user active-job cap.
 _ACTIVE_STATUSES = (
@@ -210,7 +211,7 @@ async def load_target_initiative(
     # (importers/__init__.py), so a miss here is impossible, not "default on".
     permission = PermissionKey(importer.permission)
     tool = tool_for_create_permission(permission.value)
-    if not getattr(initiative, tool.view_permission):
+    if not await tool_on_in(session, initiative, tool):
         raise ImportEngineError(
             ImportEngineMessages.IMPORT_TOOL_DISABLED, status_code=400
         )

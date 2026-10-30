@@ -57,6 +57,7 @@ from app.services.tenant import required_fields
 from app.services.tenant import share_requests as share_requests_service
 from app.services.tenant import tags as tags_service
 from app.services.tenant.soft_delete import trash
+from app.services.tenant.initiative_tools import tool_on_sql
 
 router = APIRouter(route_class=ActorRoute)
 
@@ -171,7 +172,7 @@ async def list_collections(
                 .where(
                     Collection.initiative_id == initiative_id,
                     archive_service.archive_filter_clause(Collection, archived),
-                    col(Initiative.files_enabled).is_(True),
+                    tool_on_sql(Tool.file),
                 )
                 .options(selectinload(Collection.initiative))
                 .order_by(col(Collection.updated_at).desc(), col(Collection.id).desc())

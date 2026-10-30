@@ -359,6 +359,12 @@ class InitiativeMessages:
     # Auto-join shapes onboarding for the whole guild, so only a guild admin sets
     # it — unlike join_policy, which any initiative manager may change.
     AUTO_JOIN_ADMIN_ONLY = "INITIATIVE_AUTO_JOIN_ADMIN_ONLY"
+    # The community sets this for every initiative in it.
+    SET_BY_COMMUNITY = "INITIATIVE_SET_BY_COMMUNITY"
+    # The community keeps its initiatives to their built-in roles.
+    CUSTOM_ROLES_OFF = "INITIATIVE_CUSTOM_ROLES_OFF"
+    # Only the community's admins set what every initiative starts from.
+    DEFAULTS_ADMIN_ONLY = "INITIATIVE_DEFAULTS_ADMIN_ONLY"
     # A PAM grant confers content read/write for a window; a membership row
     # would outlast it, so joining is for real guild members.
     GRANT_CANNOT_MANAGE_MEMBERS = "INITIATIVE_GRANT_CANNOT_MANAGE_MEMBERS"

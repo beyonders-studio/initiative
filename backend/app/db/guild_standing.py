@@ -80,7 +80,14 @@ from app.models.platform.identity_ref import (
 )
 from app.models.platform.user import UserRole, UserStatus
 from app.models.tenant.plugin_member_consent import ConsentAccess
-from app.models.tenant.initiative import DEFAULT_PERMISSION_VALUES, PermissionKey
+from app.models.tenant.initiative import (
+    BUILTIN_MEMBER_ROLE,
+    INITIATIVE_CUSTOM_ROLES,
+    INITIATIVE_MEMBER_PREFIX,
+    INITIATIVE_TOOL_PREFIX,
+    DEFAULT_PERMISSION_VALUES,
+    PermissionKey,
+)
 
 if TYPE_CHECKING:  # pragma: no cover
     from sqlalchemy.ext.asyncio import AsyncSession
@@ -159,6 +166,33 @@ _GRANT_HELD = f"""COALESCE(CASE
 #: other role it is no membership and its holder is in no initiative.
 _ROUTED_AS_GUEST = "pg_has_role(current_user, 'guest_base', 'USAGE')"
 
+#: What the community sets for every initiative in it: its own
+#: ``initiative_rules`` rows, the ones with no initiative
+#: (``app.models.tenant.initiative.COMMUNITY_DEFAULT_KEYS``), read once. Each
+#: statement's ``WITH`` names it.
+_COMMUNITY_DEFAULTS_CTE = """community_defaults AS MATERIALIZED (
+  SELECT r.key, r.enabled
+  FROM initiative_rules r
+  WHERE r.initiative_id IS NULL
+)"""
+
+#: The roles what the community set for members holds for: the built-in
+#: member role, and while the community keeps initiatives to their built-in
+#: roles every custom role that is not a manager's. Over a row ``m`` carrying
+#: ``member_role`` and ``custom_role``.
+_HELD_FOR_MEMBERS = (
+    "(m.member_role OR (m.custom_role AND EXISTS ("
+    "SELECT 1 FROM community_defaults off"
+    f" WHERE off.key = '{INITIATIVE_CUSTOM_ROLES}' AND NOT off.enabled)))"
+)
+
+#: Whether a tool's switch is on in the initiative ``t`` names: the
+#: community's where it set one, the initiative's own otherwise.
+_TOOL_ON = (
+    "COALESCE((SELECT cd.enabled FROM community_defaults cd"
+    f" WHERE cd.key = '{INITIATIVE_TOOL_PREFIX}' || t.tool), t.enabled)"
+)
+
 #: The reader's own rows the person statement reads, each table once. Every
 #: key below is an aggregate over one of these, so a new key picks a row set
 #: rather than reading its table again. ``my_items`` is a guest's: the
@@ -178,7 +212,10 @@ my_membership AS MATERIALIZED (
 my_initiatives AS MATERIALIZED (
   SELECT im.initiative_id, im.role_id,
          COALESCE(r.is_manager, false) AS is_manager,
-         COALESCE(r.override_share_restrictions, false) AS overrides
+         COALESCE(r.override_share_restrictions, false) AS overrides,
+         COALESCE(r.is_builtin AND r.name = '{BUILTIN_MEMBER_ROLE}', false)
+           AS member_role,
+         COALESCE(NOT r.is_builtin AND NOT r.is_manager, false) AS custom_role
   FROM initiative_members im
   LEFT JOIN initiative_roles r ON r.id = im.role_id
   WHERE im.user_id = {gucs.USER_ID}
@@ -192,11 +229,15 @@ my_items AS MATERIALIZED (
       SELECT 1 FROM my_membership m WHERE m.role = '{CommunityRole.guest.value}'
     )
 ),
+{_COMMUNITY_DEFAULTS_CTE},
+-- What the community set for members holds where it reaches the role.
 my_role_permissions AS MATERIALIZED (
-  SELECT rp.initiative_id, rp.key, rp.enabled
-  FROM my_initiatives mi
+  SELECT rp.initiative_id, rp.key, COALESCE(cd.enabled, rp.enabled) AS enabled
+  FROM my_initiatives m
   JOIN initiative_rules rp
-    ON rp.initiative_id = mi.initiative_id AND rp.initiative_role_id = mi.role_id
+    ON rp.initiative_id = m.initiative_id AND rp.initiative_role_id = m.role_id
+  LEFT JOIN community_defaults cd
+    ON {_HELD_FOR_MEMBERS} AND cd.key = '{INITIATIVE_MEMBER_PREFIX}' || rp.key
 ),
 my_grants AS MATERIALIZED (
   SELECT g.purpose, g.access_level::text AS access_level
@@ -285,11 +326,19 @@ _PERSON_STANDING: dict[gucs.Guc, str] = {
       FROM my_role_permissions rp
       WHERE NOT rp.enabled
     ), '')""",
+    gucs.COMMUNITY_TOOLS: f"""COALESCE((
+      SELECT string_agg(
+        substr(cd.key, {len(INITIATIVE_TOOL_PREFIX) + 1})
+          || CASE WHEN cd.enabled THEN '=on' ELSE '=off' END,
+        ',' ORDER BY cd.key)
+      FROM community_defaults cd
+      WHERE cd.key LIKE 'initiative\\_tool.%'
+    ), '')""",
     gucs.ENABLED_TOOLS: f"""COALESCE((
       SELECT string_agg(DISTINCT i.id || ':' || t.tool, ',')
       FROM initiatives i
       CROSS JOIN LATERAL (VALUES {_tool_switch_values()}) AS t(tool, enabled)
-      WHERE t.enabled
+      WHERE {_TOOL_ON}
         AND i.id IN (
           SELECT mi.initiative_id FROM my_initiatives mi
           UNION ALL
@@ -440,12 +489,20 @@ _INSTALL_STANDING: dict[gucs.Guc, str] = {
     gucs.ROLE_DENIES: """COALESCE((
       SELECT string_agg(d.pair, ',' ORDER BY d.pair) FROM denied d
     ), '')""",
+    gucs.COMMUNITY_TOOLS: f"""COALESCE((
+      SELECT string_agg(
+        substr(cd.key, {len(INITIATIVE_TOOL_PREFIX) + 1})
+          || CASE WHEN cd.enabled THEN '=on' ELSE '=off' END,
+        ',' ORDER BY cd.key)
+      FROM community_defaults cd
+      WHERE cd.key LIKE 'initiative\\_tool.%'
+    ), '')""",
     gucs.ENABLED_TOOLS: f"""COALESCE((
       SELECT string_agg(DISTINCT i.id || ':' || t.tool, ',')
       FROM initiatives i
       JOIN placed p ON p.initiative_id = i.id
       CROSS JOIN LATERAL (VALUES {_tool_switch_values()}) AS t(tool, enabled)
-      WHERE t.enabled
+      WHERE {_TOOL_ON}
     ), '')""",
     gucs.OVERRIDE_INITIATIVES: """COALESCE((
       SELECT string_agg(DISTINCT o.initiative_id::text, ',')
@@ -532,7 +589,8 @@ _INSTALL_STANDING: dict[gucs.Guc, str] = {
 #: resolves for its grace window, as ``identity_refs.resolve_ref`` has it. The
 #: array chooses which rows are looked up; the sector is the routing's.
 INSTALL_STANDING_SQL = f"""
-WITH consent AS (
+WITH {_COMMUNITY_DEFAULTS_CTE},
+consent AS (
   SELECT c.initiative_id,
          c.granted_access = '{ConsentAccess.read_write.value}' AS writes
   FROM plugin_member_consents c
@@ -617,7 +675,10 @@ held AS (
 member_role AS (
   SELECT im.initiative_id, im.role_id,
          COALESCE(r.is_manager, false) AS is_manager,
-         COALESCE(r.override_share_restrictions, false) AS overrides
+         COALESCE(r.override_share_restrictions, false) AS overrides,
+         COALESCE(r.is_builtin AND r.name = '{BUILTIN_MEMBER_ROLE}', false)
+           AS member_role,
+         COALESCE(NOT r.is_builtin AND NOT r.is_manager, false) AS custom_role
   FROM initiative_members im
   LEFT JOIN initiative_roles r ON r.id = im.role_id
   WHERE {gucs.USER_ID} IS NOT NULL AND im.user_id = {gucs.USER_ID}
@@ -639,19 +700,21 @@ permitted AS (
   FROM placed p
   JOIN member_role mr ON mr.initiative_id = p.initiative_id
   CROSS JOIN (VALUES {_permission_default_values()}) AS k(key, is_default)
+  LEFT JOIN community_defaults cd
+    ON {_HELD_FOR_MEMBERS.replace("m.", "mr.")}
+   AND cd.key = '{INITIATIVE_MEMBER_PREFIX}' || k.key
   WHERE mr.is_manager
-     OR EXISTS (
+     OR COALESCE(cd.enabled, EXISTS (
        SELECT 1 FROM initiative_rules rp
        WHERE rp.initiative_role_id = mr.role_id
          AND rp.key = k.key
          AND rp.enabled
-     )
-     OR (k.is_default AND NOT EXISTS (
+     ) OR (k.is_default AND NOT EXISTS (
        SELECT 1 FROM initiative_rules rp
        WHERE rp.initiative_role_id = mr.role_id
          AND rp.key = k.key
          AND NOT rp.enabled
-     ))
+     )))
 ),
 granted AS (
   SELECT DISTINCT p.initiative_id || ':' || k.key AS pair
@@ -784,6 +847,9 @@ class GuildContext:
     role_denies: tuple[str, ...] = ()
     #: ``"<initiative_id>:<tool>"`` where the initiative's switch is on.
     enabled_tools: tuple[str, ...] = ()
+    #: ``"<tool>=on"`` / ``"<tool>=off"`` where the community set a tool's
+    #: switch for every initiative (:meth:`community_tool`).
+    community_tools: tuple[str, ...] = ()
     #: Initiatives where the reader's role holds "Full access".
     override_initiatives: tuple[int, ...] = ()
     #: The community's sign-in policy is satisfied by this session.
@@ -1005,6 +1071,9 @@ class InstallContext:
     role_denies: tuple[str, ...] = ()
     #: ``"<initiative_id>:<tool>"`` where the initiative's switch is on.
     enabled_tools: tuple[str, ...] = ()
+    #: ``"<tool>=on"`` / ``"<tool>=off"`` where the community set a tool's
+    #: switch for every initiative (:meth:`community_tool`).
+    community_tools: tuple[str, ...] = ()
     #: For a member token, the member's initiative roles, and the initiatives
     #: where their role holds "Full access", within ``member_initiatives``.
     #: For the install itself, no roles, and "Full access" exactly where its

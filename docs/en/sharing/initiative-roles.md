@@ -66,6 +66,18 @@ Name roles for *people*, not for permissions. "Volunteer" is friendlier and clea
 
 When you [add a member](../guides/initiatives.md#adding-members), you pick their role. Change it later from the same **Members** settings — changes take effect immediately, no re-login, no waiting.
 
+## When the community sets it
+
+Some communities want every initiative to work the same way: posts on everywhere, say, or members never making dashboards. A community admin sets that once, under **Settings → Initiatives → Every initiative**:
+
+| They can set | For every initiative |
+|---|---|
+| Each tool | On everywhere, off everywhere, or left to each initiative |
+| What the built-in **Member** role can see and make | The same three choices, one per permission |
+| **Managers can add roles** | Off, nobody adds a role, and any custom role an initiative already has can do no more than members, so what the community said holds |
+
+Anything the community set shows up switched the way it said, with a note, and the initiative's managers can't change it. Pick **Each initiative decides** and it's theirs again, exactly as they left it.
+
 ## Related
 
 - [Sharing projects & files](sharing-projects-and-files.md) — the final, per-item layer.

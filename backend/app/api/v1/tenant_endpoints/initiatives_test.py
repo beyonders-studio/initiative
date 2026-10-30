@@ -24,7 +24,13 @@ from app.models.platform.email_outbox import EmailOutboxItem
 from app.models.platform.guild import CommunityRole
 from app.models.platform.notification import Notification, NotificationType
 from app.models.platform.user import Presence, UserStatus
-from app.models.tenant.initiative import InitiativeJoinRequest, InitiativeMember
+from app.models.tenant.initiative import (
+    Initiative,
+    InitiativeJoinRequest,
+    InitiativeMember,
+)
+from app.services.tenant.initiative_tools import tool_on_sql
+from app.testing.schema_harness import route_session_to_guild
 from app.models.tenant.resource_grant import ResourceGrant
 from app.services import email as email_service
 from app.services.platform import email_outbox
@@ -2436,3 +2442,144 @@ async def test_changing_what_an_initiative_allows_rechecks_its_members(
     )
     assert changed.status_code == 200, changed.text
     assert rechecked.pop() == {member.user.id}
+
+
+async def test_a_communitys_defaults_stand_over_every_initiative(
+    client: AsyncClient, acting_user, session: AsyncSession
+):
+    """What a community's admins set for every initiative wins over each
+    initiative's own, reaches its members' standing, is refused to its
+    managers, and hands back the initiative's own value when cleared."""
+    admin = await acting_user(guild_role=CommunityRole.admin, initiative=True)
+    initiative_id = admin.initiative.id
+    pm = await acting_user(
+        guild_role=CommunityRole.member,
+        guild=admin.guild,
+        initiative=admin.initiative,
+        initiative_role="project_manager",
+    )
+    member = await acting_user(
+        guild_role=CommunityRole.member,
+        guild=admin.guild,
+        initiative=admin.initiative,
+        initiative_role="member",
+    )
+    defaults_url = admin.g("/initiatives/defaults")
+    initiative_url = pm.g(f"/initiatives/{initiative_id}")
+    own = await client.patch(
+        initiative_url, headers=pm.headers, json={"posts_enabled": False}
+    )
+    assert own.status_code == 200, own.text
+    # A custom role that predates the community keeping initiatives to their
+    # built-in roles.
+    editors = await client.post(
+        f"{initiative_url}/roles",
+        headers=pm.headers,
+        json={"name": "editors", "display_name": "Editors"},
+    )
+    assert editors.status_code == 201, editors.text
+    roles = (await client.get(f"{initiative_url}/roles", headers=pm.headers)).json()
+    member_role = next(r for r in roles if r["name"] == "member")
+    hidden = await client.patch(
+        f"{initiative_url}/roles/{member_role['id']}",
+        headers=pm.headers,
+        json={"permissions": {"posts_enabled": False}},
+    )
+    assert hidden.status_code == 200, hidden.text
+
+    async def members_view() -> dict:
+        seen = await client.get(
+            member.g(f"/initiatives/{initiative_id}"), headers=member.headers
+        )
+        assert seen.status_code == 200, seen.text
+        return seen.json()
+
+    refused = await client.patch(
+        defaults_url, headers=pm.headers, json={"tools": {"post": True}}
+    )
+    assert refused.status_code == 403
+    assert refused.json()["detail"] == InitiativeMessages.DEFAULTS_ADMIN_ONLY
+
+    set_ = {
+        "tools": {"post": True},
+        "member_permissions": {"posts_enabled": True},
+        "custom_roles": False,
+    }
+    made = await client.patch(defaults_url, headers=admin.headers, json=set_)
+    assert made.status_code == 200, made.text
+    assert made.json() == set_
+    read = await client.get(member.g("/initiatives/defaults"), headers=member.headers)
+    assert read.json() == set_
+    seen = await members_view()
+    assert seen["posts_enabled"] is True
+    assert Tool.post.value in seen["can"]["view"]
+
+    switch = await client.patch(
+        initiative_url, headers=pm.headers, json={"posts_enabled": False}
+    )
+    assert switch.status_code == 409
+    assert switch.json()["detail"] == InitiativeMessages.SET_BY_COMMUNITY
+    roles = (await client.get(f"{initiative_url}/roles", headers=pm.headers)).json()
+    member_role = next(r for r in roles if r["name"] == "member")
+    assert member_role["permissions"]["posts_enabled"] is True
+    # Held to the members' answer while custom roles are off.
+    assert (
+        next(r for r in roles if r["name"] == "editors")["permissions"]["posts_enabled"]
+        is True
+    )
+    permission = await client.patch(
+        f"{initiative_url}/roles/{member_role['id']}",
+        headers=pm.headers,
+        json={"permissions": {"posts_enabled": False}},
+    )
+    assert permission.status_code == 409
+    # The grid sends the whole map; the community's keys in it are not kept
+    # as the role's own.
+    other = await client.patch(
+        f"{initiative_url}/roles/{member_role['id']}",
+        headers=pm.headers,
+        json={"permissions": {**member_role["permissions"], "create_files": True}},
+    )
+    assert other.status_code == 200, other.text
+    added = await client.post(
+        f"{initiative_url}/roles",
+        headers=pm.headers,
+        json={"name": "editors", "display_name": "Editors"},
+    )
+    assert added.status_code == 403
+    assert added.json()["detail"] == InitiativeMessages.CUSTOM_ROLES_OFF
+
+    cleared = await client.patch(
+        defaults_url,
+        headers=admin.headers,
+        json={
+            "tools": {"post": None},
+            "member_permissions": {"posts_enabled": None},
+            "custom_roles": True,
+        },
+    )
+    assert cleared.json() == {
+        "tools": {},
+        "member_permissions": {},
+        "custom_roles": True,
+    }
+    seen = await members_view()
+    assert seen["posts_enabled"] is False
+    assert Tool.post.value not in seen["can"]["view"]
+    roles = (await client.get(f"{initiative_url}/roles", headers=pm.headers)).json()
+    member_role = next(r for r in roles if r["name"] == "member")
+    assert member_role["permissions"]["posts_enabled"] is False
+    assert member_role["permissions"]["create_files"] is True
+
+    # A read with no standing (the system's own) takes the community's
+    # switch from its row.
+    await client.patch(
+        defaults_url, headers=admin.headers, json={"tools": {"post": True}}
+    )
+    await route_session_to_guild(session, admin.guild.id)
+    on = await session.scalar(
+        select(Initiative.id).where(
+            Initiative.id == initiative_id, tool_on_sql(Tool.post)
+        )
+    )
+    assert on == initiative_id

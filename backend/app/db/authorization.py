@@ -547,9 +547,11 @@ STANDING_FIELDS: tuple[tuple[str, str, str], ...] = (
     # at a time.
     _read(gucs.GUEST),
     _read(gucs.GUEST_ITEM_INITIATIVES),
-    # The surfaces the deployment has closed for the community. Last, as
-    # ``ALTER TYPE`` appends.
+    # The surfaces the deployment has closed for the community.
     _read(gucs.CLOSED_SURFACES),
+    # The tool switches the community set for every initiative. Last, as
+    # ``ALTER TYPE`` appends.
+    _read(gucs.COMMUNITY_TOOLS),
 )
 _STANDING_NAMES = frozenset(name for name, _type, _expr in STANDING_FIELDS)
 
@@ -1257,8 +1259,14 @@ def _initiative_tool_actions() -> str:
     read-only, and the reader is not here through an access grant (those can
     edit existing things but not create new ones)."""
     arms = []
+    community = _B.field("community_tools")
     for tool in Tool:
-        switch = f"v_initiative.{tool.view_permission}"
+        # The community's switch where it set one, the initiative's otherwise.
+        switch = (
+            f"(CASE WHEN '{tool.value}=on' = ANY ({community}) THEN true"
+            f" WHEN '{tool.value}=off' = ANY ({community}) THEN false"
+            f" ELSE v_initiative.{tool.view_permission} END)"
+        )
         view_default = str(
             DEFAULT_PERMISSION_VALUES[PermissionKey(tool.view_permission)]
         ).lower()

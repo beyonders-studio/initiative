@@ -9,6 +9,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Added
 
+- **Set what every initiative uses.** Community admins can set each tool, what the built-in Member role can see and make, and whether managers can add roles (off also holds existing custom roles to the member settings), for every initiative at once (**Settings → Initiatives → Every initiative**). Each initiative shows what the community set and its managers can't change it; **Each initiative decides** hands it back.
 - **Take AI connections or plug-ins away from one community.** In the operator's community sheet, **Its own AI connections** and **Its own plug-ins** can be switched off for one community. Its AI connections are then kept and not used, and its plug-ins keep running, but its admins can no longer set either up and their settings pages say who manages them.
 - **Settings your server sets show as such.** Where whoever runs the server sets one of a community's security, notification, AI, guest-stay or API-key settings for it, the community's settings pages show that setting and say who sets it, without offering to change it.
 - **Required fields.** A task type's page, the calendar's event page, the posts page and a collection's file page can mark a field required in the layout editor. Adding one asks for it up top and waits until it's filled, as does changing a task's type or moving it to another project, and nobody can empty it afterwards; things that already exist keep going and show what's missing.
