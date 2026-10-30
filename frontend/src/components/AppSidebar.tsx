@@ -48,6 +48,7 @@ import { useAuth } from "@/hooks/useAuth";
 import { useAutoCloseSidebar } from "@/hooks/useAutoCloseSidebar";
 import { useCommunities } from "@/hooks/useCommunities";
 import { useCommunityPlugins } from "@/hooks/useCommunityPlugins";
+import { useHeldSurfaces } from "@/hooks/useCustomRoles";
 import { liveInitiatives } from "@/hooks/useInitiativeAccess";
 import { useInitiativeDirectory, useInitiatives } from "@/hooks/useInitiatives";
 import { compareVersions, useLatestVersion } from "@/hooks/useLatestVersion";
@@ -80,6 +81,10 @@ export const AppSidebar = () => {
   // The gear opens the community's own configuration, which a settings
   // grant reaches as well as its admin does.
   const isCommunityAdmin = Boolean(activeCommunity?.can.administer);
+  // The gear shows for anybody who runs any part of the community, a custom
+  // role included.
+  const heldSurfaces = useHeldSurfaces();
+  const showsCommunitySettings = isCommunityAdmin || heldSurfaces.holdsAny;
   // Two separate platform areas: config (Platform settings) vs operational
   // (Operator dashboard). Each surfaced independently per capability.
   const showPlatformSettings = canManagePlatformConfig(user);
@@ -337,7 +342,7 @@ export const AppSidebar = () => {
                       <h2 className="min-w-0 flex-1 truncate font-semibold text-lg">
                         {activeCommunity?.name ?? t("selectCommunity")}
                       </h2>
-                      {activeCommunity && isCommunityAdmin && (
+                      {activeCommunity && showsCommunitySettings && (
                         <Button variant="ghost" size="icon" className="h-8 w-8 shrink-0" asChild>
                           <Link to={gp("/settings")} aria-label={t("communitySettings")}>
                             <Settings className="h-4 w-4" />

@@ -33,7 +33,8 @@
       "integrations": "Integraciones",
       "usage": "Uso",
       "planAndUsage": "Plan y uso",
-      "guests": "Invitados"
+      "guests": "Invitados",
+      "roles": "Roles"
     },
     "tabBadge": {
       "paymentFailed": "Pago fallido",
@@ -1384,6 +1385,8 @@
       "aiConnectionsHelp": "Permite que la comunidad configure sus propios proveedores de IA. Desactivado, las que tiene se conservan y no se usan.",
       "pluginsLabel": "Sus propios complementos",
       "pluginsHelp": "Permite que la comunidad instale y configure complementos. Desactivado, los que tiene siguen funcionando como están.",
+      "customRolesLabel": "Roles personalizados",
+      "customRolesHelp": "Sus administradores pueden definir roles que dan a otras personas parte de la gestión de la comunidad. Desactivado, los roles que tiene siguen aplicándose.",
       "authOption": {
         "restrictions": {
           "label": "Su propio estándar de seguridad",
@@ -2204,5 +2207,84 @@
     "noCommunity": "No abre ninguna comunidad ni necesita un acceso.",
     "open": "Abrir Control",
     "openError": "No se pudo abrir Control."
+  },
+  "customRoles": {
+    "title": "Roles",
+    "description": "Un rol personalizado da a un miembro parte de la gestión de la comunidad, o limita a un administrador a una parte de ella. Cada persona tiene uno como máximo.",
+    "add": "Añadir rol",
+    "addTitle": "Añadir un rol",
+    "editTitle": "Editar {{name}}",
+    "dialogDescription": "Ponle nombre, elige para quién es y marca lo que incluye.",
+    "nameLabel": "Nombre",
+    "rungLabel": "Para",
+    "rung": {
+      "member": "Miembros",
+      "admin": "Administradores"
+    },
+    "rungHelp": {
+      "member": "Da a un miembro lo que incluye, además de lo que ya hace.",
+      "admin": "Limita a un administrador a lo que incluye."
+    },
+    "rungFixed": "Para quién es un rol no se puede cambiar una vez creado.",
+    "surfacesLabel": "Qué incluye",
+    "notYours": "No tienes esto tú mismo, así que no puedes darlo.",
+    "holdsNothing": "Aún no incluye nada.",
+    "empty": "Esta comunidad no tiene roles personalizados.",
+    "loading": "Cargando roles",
+    "loadError": "No se pudieron cargar los roles.",
+    "closed": "Quien administra este servidor ha desactivado los roles personalizados para esta comunidad. Los roles que tiene siguen aplicándose.",
+    "deleteTitle": "¿Eliminar {{name}}?",
+    "deleteDescription": "Quienes lo tienen vuelven a su rol normal.",
+    "created": "Rol añadido",
+    "updated": "Rol guardado",
+    "deleted": "Rol eliminado",
+    "assigned": "Rol cambiado",
+    "createError": "No se pudo añadir el rol.",
+    "updateError": "No se pudo guardar el rol.",
+    "deleteError": "No se pudo eliminar el rol.",
+    "assignError": "No se pudo cambiar su rol.",
+    "column": "Rol personalizado",
+    "none": "Ninguno",
+    "pickerLabel": "Rol personalizado de {{name}}",
+    "appliesWhileMember": "Se aplica mientras sea miembro",
+    "appliesWhileAdmin": "Se aplica mientras sea administrador",
+    "surfaces": {
+      "profile": {
+        "label": "Perfil",
+        "description": "Cambiar el nombre, la imagen, el banner y la descripción de la comunidad."
+      },
+      "invites": {
+        "label": "Invitaciones",
+        "description": "Crear y eliminar enlaces de invitación, incluidas las invitaciones de invitado."
+      },
+      "members": {
+        "label": "Miembros",
+        "description": "Cambiar los roles y nombres de las personas, eliminarlas y dar roles personalizados."
+      },
+      "initiatives": {
+        "label": "Iniciativas",
+        "description": "Crear, archivar y eliminar cualquier iniciativa, y gestionar aquellas en las que no se está."
+      },
+      "community_calendars": {
+        "label": "Calendarios de la comunidad",
+        "description": "Añadir y cambiar los calendarios propios de la comunidad."
+      },
+      "webhooks": {
+        "label": "Webhooks",
+        "description": "Configurar los webhooks de la comunidad."
+      },
+      "trash": {
+        "label": "Papelera",
+        "description": "Restaurar o eliminar definitivamente cualquier cosa de la papelera de la comunidad."
+      },
+      "usage": {
+        "label": "Uso",
+        "description": "Ver lo que usa la comunidad frente a sus límites."
+      },
+      "roles": {
+        "label": "Roles",
+        "description": "Añadir, cambiar y eliminar roles personalizados."
+      }
+    }
   }
 }

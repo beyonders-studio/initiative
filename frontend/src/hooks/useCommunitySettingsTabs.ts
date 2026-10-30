@@ -5,6 +5,7 @@ import { useTranslation } from "react-i18next";
 import type { SettingsTab } from "@/components/settings/SettingsTabsNav";
 import { useAppConfig } from "@/hooks/useAppConfig";
 import { useCommunities } from "@/hooks/useCommunities";
+import { useHeldSurfaces } from "@/hooks/useCustomRoles";
 import { communityPath } from "@/lib/communityUrl";
 
 /**
@@ -13,15 +14,19 @@ import { communityPath } from "@/lib/communityUrl";
  *
  * One list for the tab bar and for where `/settings` itself sends you: the
  * first tab here is the landing page, so nobody is sent to a tab they would be
- * refused.
+ * refused. The seat's tabs follow the seat; the rest follow the parts of
+ * running the community the reader holds. `isLoading` is true until the
+ * server has said which those are.
  */
-export const useCommunitySettingsTabs = (): SettingsTab[] => {
+export const useCommunitySettingsTabs = (): { tabs: SettingsTab[]; isLoading: boolean } => {
   const { t } = useTranslation(["settings"]);
   const { activeCommunity, activeCommunityId } = useCommunities();
   // Reaching the work inside the community, which a settings grant does not —
   // the tabs built on content are dropped below rather than rendered into
   // refusals.
   const reachesContent = Boolean(activeCommunity?.can.content);
+  const held = useHeldSurfaces();
+  const { holds } = held;
   // The seat above admin, which holds this community's sign-in and its
   // integrations — held outright, or lent for a window by a settings grant.
   const onTheGrantedSeat = activeCommunity?.grantSettingsLevel === "superadmin";
@@ -31,7 +36,7 @@ export const useCommunitySettingsTabs = (): SettingsTab[] => {
   // Guests are invited by whoever hands out invites, and only where the
   // deployment allows guests and the community takes them.
   const managesGuests =
-    Boolean(activeCommunity?.can.configure) && guestsEnabled && activeCommunity?.max_guests !== 0;
+    held.writes && holds("invites") && guestsEnabled && activeCommunity?.max_guests !== 0;
   // Where the community has a sign-in of its own to configure, that is. Most
   // never do: the operator grants each half of the surface separately, and
   // with neither there is nothing on the tab to show anybody. A grantee's
@@ -45,7 +50,7 @@ export const useCommunitySettingsTabs = (): SettingsTab[] => {
   // Get community ID from URL params or active community
   const urlCommunityId = params.communityId ? Number(params.communityId) : activeCommunityId;
 
-  return useMemo(() => {
+  const tabs = useMemo(() => {
     const tabs: SettingsTab[] = [
       // First, so the seat lands on it: what the community uses against its
       // caps, and — where there is a portal — the plan those caps come with.
@@ -64,18 +69,39 @@ export const useCommunitySettingsTabs = (): SettingsTab[] => {
             },
           ]
         : []),
-      {
-        value: "community",
-        label: t("communityLayout.tabs.community"),
-        path: urlCommunityId
-          ? communityPath(urlCommunityId, "/settings/community")
-          : "/settings/community",
-      },
-      {
-        value: "users",
-        label: t("communityLayout.tabs.users"),
-        path: urlCommunityId ? communityPath(urlCommunityId, "/settings/users") : "/settings/users",
-      },
+      ...(holds("profile")
+        ? [
+            {
+              value: "community",
+              label: t("communityLayout.tabs.community"),
+              path: urlCommunityId
+                ? communityPath(urlCommunityId, "/settings/community")
+                : "/settings/community",
+            },
+          ]
+        : []),
+      ...(holds("members") || holds("invites")
+        ? [
+            {
+              value: "users",
+              label: t("communityLayout.tabs.users"),
+              path: urlCommunityId
+                ? communityPath(urlCommunityId, "/settings/users")
+                : "/settings/users",
+            },
+          ]
+        : []),
+      ...(holds("roles")
+        ? [
+            {
+              value: "roles",
+              label: t("communityLayout.tabs.roles"),
+              path: urlCommunityId
+                ? communityPath(urlCommunityId, "/settings/roles")
+                : "/settings/roles",
+            },
+          ]
+        : []),
       ...(managesGuests
         ? [
             {
@@ -100,7 +126,7 @@ export const useCommunitySettingsTabs = (): SettingsTab[] => {
             },
           ]
         : []),
-      ...(reachesContent
+      ...(reachesContent && holds("initiatives")
         ? [
             {
               value: "initiatives",
@@ -125,7 +151,7 @@ export const useCommunitySettingsTabs = (): SettingsTab[] => {
             },
           ]
         : []),
-      ...(reachesContent
+      ...(reachesContent && holds("trash")
         ? [
             {
               value: "trash",
@@ -174,5 +200,7 @@ export const useCommunitySettingsTabs = (): SettingsTab[] => {
     reachesContent,
     billing,
     managesGuests,
+    holds,
   ]);
+  return { tabs, isLoading: held.isLoading };
 };

@@ -33,7 +33,8 @@
       "integrations": "Integrationen",
       "usage": "Nutzung",
       "planAndUsage": "Tarif & Nutzung",
-      "guests": "Gäste"
+      "guests": "Gäste",
+      "roles": "Rollen"
     },
     "tabBadge": {
       "paymentFailed": "Zahlung fehlgeschlagen",
@@ -1384,6 +1385,8 @@
       "aiConnectionsHelp": "Erlaubt der Community, eigene KI-Anbieter einzurichten. Aus bleiben die vorhandenen erhalten und werden nicht genutzt.",
       "pluginsLabel": "Eigene Plug-ins",
       "pluginsHelp": "Erlaubt der Community, Plug-ins zu installieren und einzurichten. Aus laufen die vorhandenen unverändert weiter.",
+      "customRolesLabel": "Eigene Rollen",
+      "customRolesHelp": "Ihre Administratoren können Rollen festlegen, die Leuten einen Teil der Community-Verwaltung geben. Geschlossen gelten die vorhandenen Rollen weiter.",
       "authOption": {
         "restrictions": {
           "label": "Eigener Sicherheitsstandard",
@@ -2204,5 +2207,84 @@
     "noCommunity": "Es öffnet keine Community und braucht keine Zugriffsfreigabe.",
     "open": "Control öffnen",
     "openError": "Control konnte nicht geöffnet werden."
+  },
+  "customRoles": {
+    "title": "Rollen",
+    "description": "Eine eigene Rolle gibt einem Mitglied einen Teil der Community-Verwaltung oder beschränkt einen Administrator auf einen Teil davon. Jede Person hat höchstens eine.",
+    "add": "Rolle hinzufügen",
+    "addTitle": "Rolle hinzufügen",
+    "editTitle": "{{name}} bearbeiten",
+    "dialogDescription": "Gib ihr einen Namen, wähle, für wen sie ist, und kreuze an, was sie umfasst.",
+    "nameLabel": "Name",
+    "rungLabel": "Für",
+    "rung": {
+      "member": "Mitglieder",
+      "admin": "Administratoren"
+    },
+    "rungHelp": {
+      "member": "Gibt einem Mitglied, was sie umfasst, zusätzlich zu dem, was es schon tut.",
+      "admin": "Beschränkt einen Administrator auf das, was sie umfasst."
+    },
+    "rungFixed": "Für wen eine Rolle ist, lässt sich nach dem Anlegen nicht mehr ändern.",
+    "surfacesLabel": "Was sie umfasst",
+    "notYours": "Das hast du selbst nicht, also kannst du es nicht vergeben.",
+    "holdsNothing": "Umfasst noch nichts.",
+    "empty": "Diese Community hat keine eigenen Rollen.",
+    "loading": "Rollen werden geladen",
+    "loadError": "Die Rollen konnten nicht geladen werden.",
+    "closed": "Wer diesen Server betreibt, hat eigene Rollen für diese Community geschlossen. Die vorhandenen Rollen gelten weiter.",
+    "deleteTitle": "{{name}} löschen?",
+    "deleteDescription": "Wer sie hat, kehrt zu seiner einfachen Rolle zurück.",
+    "created": "Rolle hinzugefügt",
+    "updated": "Rolle gespeichert",
+    "deleted": "Rolle gelöscht",
+    "assigned": "Rolle geändert",
+    "createError": "Die Rolle konnte nicht hinzugefügt werden.",
+    "updateError": "Die Rolle konnte nicht gespeichert werden.",
+    "deleteError": "Die Rolle konnte nicht gelöscht werden.",
+    "assignError": "Die Rolle konnte nicht geändert werden.",
+    "column": "Eigene Rolle",
+    "none": "Keine",
+    "pickerLabel": "Eigene Rolle für {{name}}",
+    "appliesWhileMember": "Gilt, solange die Person Mitglied ist",
+    "appliesWhileAdmin": "Gilt, solange die Person Administrator ist",
+    "surfaces": {
+      "profile": {
+        "label": "Profil",
+        "description": "Name, Bild, Banner und Beschreibung der Community ändern."
+      },
+      "invites": {
+        "label": "Einladungen",
+        "description": "Einladungslinks erstellen und löschen, Gasteinladungen eingeschlossen."
+      },
+      "members": {
+        "label": "Mitglieder",
+        "description": "Rollen und Namen von Leuten ändern, sie entfernen und eigene Rollen vergeben."
+      },
+      "initiatives": {
+        "label": "Initiativen",
+        "description": "Jede Initiative erstellen, archivieren und löschen und auch solche verwalten, in denen man nicht ist."
+      },
+      "community_calendars": {
+        "label": "Community-Kalender",
+        "description": "Die eigenen Kalender der Community hinzufügen und ändern."
+      },
+      "webhooks": {
+        "label": "Webhooks",
+        "description": "Die Webhooks der Community einrichten."
+      },
+      "trash": {
+        "label": "Papierkorb",
+        "description": "Alles im Papierkorb der Community wiederherstellen oder endgültig löschen."
+      },
+      "usage": {
+        "label": "Nutzung",
+        "description": "Sehen, was die Community gemessen an ihren Grenzen nutzt."
+      },
+      "roles": {
+        "label": "Rollen",
+        "description": "Eigene Rollen hinzufügen, ändern und löschen."
+      }
+    }
   }
 }

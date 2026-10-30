@@ -407,6 +407,19 @@ export const CommunityOperatorSettingsSheet = ({
                 />
               }
             />
+            <SettingRow
+              label={t("communities.sheet.customRolesLabel")}
+              help={t("communities.sheet.customRolesHelp")}
+              htmlFor="community-custom-roles"
+              control={
+                <Switch
+                  id="community-custom-roles"
+                  checked={community.custom_roles_open}
+                  onCheckedChange={(checked) => patch({ custom_roles_open: Boolean(checked) })}
+                  disabled={update.isPending || planLocked}
+                />
+              }
+            />
           </Section>
         </div>
       </SheetContent>

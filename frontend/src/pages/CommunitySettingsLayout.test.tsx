@@ -1,12 +1,16 @@
 import { cleanup, screen, within } from "@testing-library/react";
+import { HttpResponse } from "msw";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 
 import { buildCommunity, buildUser, communityCan } from "@/__tests__/factories";
+import { communityHttp } from "@/__tests__/helpers/communityHttp";
+import { server } from "@/__tests__/helpers/msw-server";
 import { renderPage } from "@/__tests__/helpers/render";
-import type {
-  CommunityAuthOption,
-  CommunityBillingSummaryRead,
-  CommunityRole,
+import {
+  AdminSurface,
+  type CommunityAuthOption,
+  type CommunityBillingSummaryRead,
+  type CommunityRole,
 } from "@/api/generated/initiativeAPI.schemas";
 import type { useAppConfig as useAppConfigType } from "@/hooks/useAppConfig";
 import type { CommunityEntry } from "@/hooks/useCommunities";
@@ -29,6 +33,9 @@ let maxGuests: number | null = null;
 
 // What the billing service said of the plan; undefined is "not asked".
 let summary: CommunityBillingSummaryRead | undefined;
+// What the server says this member holds; null leaves it unanswered, so the
+// rung answers.
+let held: AdminSurface[] | null = null;
 
 vi.mock(import("@/hooks/useAppConfig"), async (importOriginal) => ({
   ...(await importOriginal()),
@@ -91,6 +98,53 @@ describe("CommunitySettingsLayout", () => {
     guestsEnabled = true;
     maxGuests = null;
     summary = undefined;
+    held = null;
+    server.use(
+      communityHttp.get("/custom-roles/held", () =>
+        held === null
+          ? HttpResponse.json({ detail: "NOT_FOUND" }, { status: 404 })
+          : HttpResponse.json({ surfaces: held })
+      )
+    );
+  });
+
+  it("gives an admin the tabs an admin has always had, and Roles after Users", async () => {
+    communityRole = "admin";
+    held = Object.values(AdminSurface);
+    render();
+
+    await screen.findByRole("tab", { name: "Community" });
+    expect(screen.getAllByRole("tab").map((tab) => tab.textContent)).toEqual([
+      "Community",
+      "Users",
+      "Roles",
+      "Guests",
+      "Initiatives",
+      "Trash",
+    ]);
+  });
+
+  it("gives a member holding invites the Users and Guests tabs, and nothing else", async () => {
+    communityRole = "member";
+    held = ["invites"];
+    render();
+
+    await screen.findByRole("tab", { name: "Users" });
+    expect(screen.getAllByRole("tab").map((tab) => tab.textContent)).toEqual(["Users", "Guests"]);
+    // What they hold, they may change.
+    expect(screen.getByRole("group")).toBeEnabled();
+  });
+
+  it("narrows an admin to what their custom role holds", async () => {
+    communityRole = "admin";
+    held = ["profile", "trash"];
+    render();
+
+    await screen.findByRole("tab", { name: "Community" });
+    expect(screen.getAllByRole("tab").map((tab) => tab.textContent)).toEqual([
+      "Community",
+      "Trash",
+    ]);
   });
 
   it("offers Guests where the server allows guests and the community takes them", async () => {
@@ -291,6 +345,7 @@ describe("CommunitySettingsLayout", () => {
 
   it("turns a member with nothing away", async () => {
     communityRole = "member";
+    held = [];
     render();
 
     expect(await screen.findByText(/permission/i)).toBeInTheDocument();

@@ -33,7 +33,8 @@
       "integrations": "Integrations",
       "usage": "Usage",
       "planAndUsage": "Plan & usage",
-      "guests": "Guests"
+      "guests": "Guests",
+      "roles": "Roles"
     },
     "tabBadge": {
       "paymentFailed": "Payment failed",
@@ -1305,6 +1306,8 @@
       "aiConnectionsHelp": "Lets the community set up AI providers of its own. Off, the ones it has are kept and not used.",
       "pluginsLabel": "Its own plug-ins",
       "pluginsHelp": "Lets the community install and configure plug-ins. Off, the ones it has keep running as they are.",
+      "customRolesLabel": "Custom roles",
+      "customRolesHelp": "Its admins can define roles that give people part of running the community. Closed, the roles it has keep applying.",
       "authOption": {
         "restrictions": {
           "label": "Its own security standard",
@@ -2204,5 +2207,84 @@
     "noCommunity": "It opens no community and needs no access grant.",
     "open": "Open Control",
     "openError": "Control could not be opened."
+  },
+  "customRoles": {
+    "title": "Roles",
+    "description": "A custom role gives a member part of running the community, or narrows an admin to part of it. Each person holds one at most.",
+    "add": "Add role",
+    "addTitle": "Add a role",
+    "editTitle": "Edit {{name}}",
+    "dialogDescription": "Name it, choose who it is for, and tick what it holds.",
+    "nameLabel": "Name",
+    "rungLabel": "For",
+    "rung": {
+      "member": "Members",
+      "admin": "Admins"
+    },
+    "rungHelp": {
+      "member": "Gives a member what it holds, on top of what they already do.",
+      "admin": "Narrows an admin to what it holds."
+    },
+    "rungFixed": "Who a role is for can't change once it is made.",
+    "surfacesLabel": "What it holds",
+    "notYours": "You don't hold this yourself, so you can't give it.",
+    "holdsNothing": "Holds nothing yet.",
+    "empty": "This community has no custom roles.",
+    "loading": "Loading roles",
+    "loadError": "Couldn't load the roles.",
+    "closed": "Whoever runs this server has closed custom roles for this community. The roles it has keep applying.",
+    "deleteTitle": "Delete {{name}}?",
+    "deleteDescription": "People holding it go back to their plain role.",
+    "created": "Role added",
+    "updated": "Role saved",
+    "deleted": "Role deleted",
+    "assigned": "Role changed",
+    "createError": "Couldn't add the role.",
+    "updateError": "Couldn't save the role.",
+    "deleteError": "Couldn't delete the role.",
+    "assignError": "Couldn't change their role.",
+    "column": "Custom role",
+    "none": "None",
+    "pickerLabel": "Custom role for {{name}}",
+    "appliesWhileMember": "Applies while they are a member",
+    "appliesWhileAdmin": "Applies while they are an admin",
+    "surfaces": {
+      "profile": {
+        "label": "Profile",
+        "description": "Change the community's name, picture, banner and description."
+      },
+      "invites": {
+        "label": "Invites",
+        "description": "Make and delete invite links, guest invites included."
+      },
+      "members": {
+        "label": "Members",
+        "description": "Change people's roles and names, remove them, and give custom roles."
+      },
+      "initiatives": {
+        "label": "Initiatives",
+        "description": "Create, archive and delete any initiative, and run ones they are not in."
+      },
+      "community_calendars": {
+        "label": "Community calendars",
+        "description": "Add and change the community's own calendars."
+      },
+      "webhooks": {
+        "label": "Webhooks",
+        "description": "Set up the community's webhooks."
+      },
+      "trash": {
+        "label": "Trash",
+        "description": "Restore or delete for good anything in the community's trash."
+      },
+      "usage": {
+        "label": "Usage",
+        "description": "See what the community uses against its limits."
+      },
+      "roles": {
+        "label": "Roles",
+        "description": "Add, change and delete custom roles."
+      }
+    }
   }
 }

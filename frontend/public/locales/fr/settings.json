@@ -33,7 +33,8 @@
       "integrations": "Intégrations",
       "usage": "Utilisation",
       "planAndUsage": "Forfait et utilisation",
-      "guests": "Invités"
+      "guests": "Invités",
+      "roles": "Rôles"
     },
     "tabBadge": {
       "paymentFailed": "Échec du paiement",
@@ -1384,6 +1385,8 @@
       "aiConnectionsHelp": "Permet à la communauté de configurer ses propres fournisseurs d'IA. Désactivé, celles qu'elle a sont conservées et ne servent plus.",
       "pluginsLabel": "Ses propres plug-ins",
       "pluginsHelp": "Permet à la communauté d'installer et de configurer des plug-ins. Désactivé, ceux qu'elle a continuent de fonctionner tels quels.",
+      "customRolesLabel": "Rôles personnalisés",
+      "customRolesHelp": "Ses administrateurs peuvent définir des rôles qui confient à des personnes une partie de la gestion de la communauté. Désactivé, les rôles qu'elle a continuent de s'appliquer.",
       "authOption": {
         "restrictions": {
           "label": "Son propre standard de sécurité",
@@ -2204,5 +2207,84 @@
     "noCommunity": "Il n'ouvre aucune communauté et ne demande aucun accès.",
     "open": "Ouvrir Control",
     "openError": "Impossible d'ouvrir Control."
+  },
+  "customRoles": {
+    "title": "Rôles",
+    "description": "Un rôle personnalisé confie à un membre une partie de la gestion de la communauté, ou limite un administrateur à une partie de celle-ci. Chaque personne en a un au plus.",
+    "add": "Ajouter un rôle",
+    "addTitle": "Ajouter un rôle",
+    "editTitle": "Modifier {{name}}",
+    "dialogDescription": "Nommez-le, choisissez à qui il s'adresse et cochez ce qu'il comprend.",
+    "nameLabel": "Nom",
+    "rungLabel": "Pour",
+    "rung": {
+      "member": "Membres",
+      "admin": "Administrateurs"
+    },
+    "rungHelp": {
+      "member": "Donne à un membre ce qu'il comprend, en plus de ce qu'il fait déjà.",
+      "admin": "Limite un administrateur à ce qu'il comprend."
+    },
+    "rungFixed": "À qui s'adresse un rôle ne peut plus changer une fois qu'il est créé.",
+    "surfacesLabel": "Ce qu'il comprend",
+    "notYours": "Vous ne l'avez pas vous-même, vous ne pouvez donc pas le donner.",
+    "holdsNothing": "Ne comprend encore rien.",
+    "empty": "Cette communauté n'a aucun rôle personnalisé.",
+    "loading": "Chargement des rôles",
+    "loadError": "Impossible de charger les rôles.",
+    "closed": "La personne qui gère ce serveur a désactivé les rôles personnalisés pour cette communauté. Les rôles qu'elle a continuent de s'appliquer.",
+    "deleteTitle": "Supprimer {{name}} ?",
+    "deleteDescription": "Les personnes qui l'ont reviennent à leur rôle de base.",
+    "created": "Rôle ajouté",
+    "updated": "Rôle enregistré",
+    "deleted": "Rôle supprimé",
+    "assigned": "Rôle modifié",
+    "createError": "Impossible d'ajouter le rôle.",
+    "updateError": "Impossible d'enregistrer le rôle.",
+    "deleteError": "Impossible de supprimer le rôle.",
+    "assignError": "Impossible de modifier son rôle.",
+    "column": "Rôle personnalisé",
+    "none": "Aucun",
+    "pickerLabel": "Rôle personnalisé de {{name}}",
+    "appliesWhileMember": "S'applique tant que la personne est membre",
+    "appliesWhileAdmin": "S'applique tant que la personne est administrateur",
+    "surfaces": {
+      "profile": {
+        "label": "Profil",
+        "description": "Modifier le nom, l'image, la bannière et la description de la communauté."
+      },
+      "invites": {
+        "label": "Invitations",
+        "description": "Créer et supprimer des liens d'invitation, invitations d'invités comprises."
+      },
+      "members": {
+        "label": "Membres",
+        "description": "Modifier les rôles et les noms des personnes, les retirer et attribuer des rôles personnalisés."
+      },
+      "initiatives": {
+        "label": "Initiatives",
+        "description": "Créer, archiver et supprimer n'importe quelle initiative, et gérer celles dont on ne fait pas partie."
+      },
+      "community_calendars": {
+        "label": "Calendriers de la communauté",
+        "description": "Ajouter et modifier les calendriers propres à la communauté."
+      },
+      "webhooks": {
+        "label": "Webhooks",
+        "description": "Configurer les webhooks de la communauté."
+      },
+      "trash": {
+        "label": "Corbeille",
+        "description": "Restaurer ou supprimer définitivement tout ce qui se trouve dans la corbeille de la communauté."
+      },
+      "usage": {
+        "label": "Utilisation",
+        "description": "Voir ce que la communauté utilise par rapport à ses limites."
+      },
+      "roles": {
+        "label": "Rôles",
+        "description": "Ajouter, modifier et supprimer des rôles personnalisés."
+      }
+    }
   }
 }
