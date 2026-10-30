@@ -280,17 +280,12 @@ class TestTakingItDown:
 
 @pytest.fixture(autouse=True)
 async def _reset_publish_directly(session):
-    """The switch lives on the deployment's one settings row; leave it off."""
+    """The switch is one of the deployment's rules; leave it off."""
     yield
-    from sqlmodel import select
+    from app.services.platform import rules
 
-    from app.models.platform.app_setting import AppSetting
-
-    row = (await session.exec(select(AppSetting))).first()
-    if row is not None and row.marketplace_members_publish_directly:
-        row.marketplace_members_publish_directly = False
-        session.add(row)
-        await session.commit()
+    await rules.put(session, "marketplace_members_publish_directly", False)
+    await session.commit()
 
 
 class TestPictures:

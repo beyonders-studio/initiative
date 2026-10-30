@@ -40,6 +40,7 @@ from app.services.guild_sweeps import Scope, each_guild
 from app.services.import_engine import engine as import_engine
 from app.services.import_engine import worker as import_worker
 from app.services.platform import app_settings as app_settings_service
+from app.services.platform import rules
 from app.services.platform import users as users_service
 from app.services.platform.app_settings import get_app_settings
 from app.testing import (
@@ -66,8 +67,9 @@ async def demo(session, monkeypatch):
     """The demo deployment, as boot records it."""
     monkeypatch.setattr(settings, "DEMO_MODE", True)
     row = await app_settings_service.ensure_settings_row(session)
-    row.demo_mode = row.guests_enabled = True
+    row.demo_mode = True
     session.add(row)
+    await rules.put(session, "guests_enabled", True)
     await session.commit()
 
 
@@ -790,7 +792,7 @@ async def test_a_listed_pitch_from_the_api_and_its_deletion(
     created_at = listed.created_at
     assert listed.is_community and listed.categories == ["education"]
     assert listed.has_adult_content is False
-    assert (await get_app_settings(session)).community_directory_enabled
+    assert (await rules.platform_values(session))["community_directory_enabled"]
     await route_session_to_guild(session, pitch_id)
     assert set((await session.exec(select(Initiative.join_policy))).all()) == {
         "request"

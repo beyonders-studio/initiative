@@ -319,7 +319,7 @@ class User(SQLModel, table=True):
     #: flag because the record of *when* is the point: it is what a deployment
     #: running a community directory keeps for the accounts that joined one.
     #: Whether it is asked for at all is the platform owner's switch
-    #: (``AppSetting.community_age_gate_enabled``).
+    #: (the rule ``community_age_gate_enabled``).
     age_confirmed_at: Optional[datetime] = Field(
         default=None,
         sa_column=Column(DateTime(timezone=True), nullable=True),

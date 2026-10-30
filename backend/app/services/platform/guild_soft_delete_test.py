@@ -19,7 +19,7 @@ from app.db import cohorts, post_commit
 from app.db.holds import HoldsInForce
 from app.db.request_context import SystemGuild
 from app.db.session import set_rls_context
-from app.models.platform.app_setting import (
+from app.core.rules import (
     DEFAULT_GUILD_RETENTION_DAYS,
     DEFAULT_HOLD_DELETION_DAYS,
 )

@@ -9,7 +9,9 @@ A community's row says something of the whole community, or of one member
 (``user_id``). For a member, their own row wins over the community's.
 
 :func:`community_rule_sql` is the same answer as a SQL expression, for a query
-that has to ask it of many communities or members at once.
+that has to ask it of many communities or members at once, and
+:func:`platform_rule_sql` the deployment's, for a query that already reads
+something else.
 """
 
 from __future__ import annotations
@@ -64,6 +66,20 @@ async def platform_values(session: AsyncSession) -> Values:
         if rule is not None:
             values[row.key] = _value(rule, row)
     return values
+
+
+def platform_rule_sql(key: str) -> ColumnElement[Any]:
+    """One of the deployment's rules as an expression, for a query that
+    already reads something else."""
+    rule = PLATFORM_RULES[key]
+    found = (
+        sa_select(getattr(PlatformRule, rule.slot.value))
+        .where(PlatformRule.key == key)
+        .scalar_subquery()
+    )
+    if rule.default is None:
+        return found
+    return func.coalesce(found, rule.default)
 
 
 async def community_values(

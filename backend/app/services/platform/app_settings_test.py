@@ -55,7 +55,6 @@ async def test_reading_settings_before_the_seed_stores_nothing(session: AsyncSes
     """Configuration read on a database that has no row yet answers from the env."""
     row = await get_app_settings(session)
     assert row.id == GLOBAL_SETTINGS_ID
-    assert row.community_directory_enabled is False
     assert await _stored_ids(session) == []
 
 

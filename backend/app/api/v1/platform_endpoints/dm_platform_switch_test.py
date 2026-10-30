@@ -18,7 +18,7 @@ from app.models.platform.contact_grant import (
 )
 from app.models.platform.guild import CommunityRole
 from app.models.platform.user import UserRole
-from app.services.platform import app_settings as app_settings_service
+from app.services.platform import rules
 from app.testing import create_guild_membership, create_user, get_auth_headers
 
 
@@ -40,11 +40,9 @@ async def _reachable_from_their_communities(session, *user_ids: int) -> None:
 
 async def _set_switch(session, *, enabled: bool) -> None:
     """Write the switch straight to the row, as an owner's PUT would."""
-    await app_settings_service.update_community_settings(
-        session,
-        community_directory_enabled=False,
-        direct_messages_enabled=enabled,
-    )
+    await rules.put(session, "community_directory_enabled", False)
+    await rules.put(session, "direct_messages_enabled", enabled)
+    await session.commit()
 
 
 # ------------------------------------------------------------------ config ---

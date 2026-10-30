@@ -1191,7 +1191,7 @@ async def _auth_settings_response(
         redacted_by_platform=platform["redact_notification_content"],
         engagement_ranking_allowed_by_platform=platform["engagement_ranking_enabled"],
         ai_offered_by_platform=settings_row.ai_config_mode != "disabled",
-        guest_max_days_by_platform=settings_row.max_guest_days,
+        guest_max_days_by_platform=platform["max_guest_days"],
     )
 
 

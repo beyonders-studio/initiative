@@ -47,8 +47,7 @@ from app.schemas.tenant.import_job import BackupPlanPerson
 from app.services.import_engine import backup as backup_service
 from app.services.import_engine import worker as import_worker
 from app.services.import_engine.common import handle_key
-from app.services.platform import app_settings as app_settings_service
-from app.services.platform import guild_images, guild_purge
+from app.services.platform import guild_images, guild_purge, rules
 from app.services.platform import guilds as guilds_service
 
 #: How long a link lasts unless it is made for longer, or for good.
@@ -271,9 +270,7 @@ async def _seat_in_initiatives(guild_id: int, placed: Mapping[int, PitchSeat]) -
 async def _list(session: AsyncSession, guild: Guild, card: DemoDirectoryCard) -> None:
     """Put the community in the directory with ``card``, and the directory
     on. Staged."""
-    row = await app_settings_service.get_app_settings(session)
-    row.community_directory_enabled = True
-    session.add(row)
+    await rules.put(session, "community_directory_enabled", True)
     guild.is_community = True
     guild.categories = guilds_service.normalize_categories(
         [category.value for category in card.categories]

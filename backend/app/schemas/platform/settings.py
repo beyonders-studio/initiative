@@ -6,7 +6,7 @@ from pydantic import AliasChoices, ConfigDict, EmailStr, Field, field_validator
 from app.core.config import CaptchaProvider, StorageBackendKind
 from app.core.login_methods import LoginMethod, SecondFactorRequirement
 from app.core.user_input_validators import validate_provider_slug
-from app.models.platform.app_setting import (
+from app.core.rules import (
     MAX_GUILD_RETENTION_DAYS,
     MIN_GUILD_RETENTION_DAYS,
 )

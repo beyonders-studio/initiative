@@ -43,6 +43,7 @@ from app.models.platform.user_dm_settings import DmPolicy
 from app.models.tenant.guild_setting import GuildSetting
 from app.services.marketplace import context_jwt
 from app.services.platform import guilds as guilds_service
+from app.services.platform import rules
 from app.db.request_context import SystemGuild
 
 GLOBAL_SETTINGS_ID = 1
@@ -477,17 +478,20 @@ async def record_running_version(
     started = {
         name: now for name in transitions if name not in settings_row.transitions
     }
+    # The demo's visitors are guests of their copies.
+    guests_off = (
+        demo_mode and not (await rules.platform_values(session))["guests_enabled"]
+    )
     if (
         settings_row.last_seen_version == version
         and not started
         and settings_row.demo_mode == demo_mode
-        and (settings_row.guests_enabled or not demo_mode)
+        and not guests_off
     ):
         return settings_row.previous_version
     settings_row.demo_mode = demo_mode
-    # The demo's visitors are guests of their copies.
-    if demo_mode:
-        settings_row.guests_enabled = True
+    if guests_off:
+        await rules.put(session, "guests_enabled", True)
     if started:
         settings_row.transitions = {**settings_row.transitions, **started}
     if settings_row.last_seen_version != version:
@@ -532,24 +536,8 @@ async def get_app_settings(session: AsyncSession) -> AppSetting:
 # Which columns of the settings singleton each area of the owner's settings
 # page can move. A record names the ones that actually moved; a value rides
 # along only where its type rules out a secret.
-INTERFACE_FIELDS: tuple[str, ...] = (
-    "light_accent_color",
-    "dark_accent_color",
-    "cookie_consent_enabled",
-)
-COMMUNITY_FIELDS: tuple[str, ...] = (
-    "community_directory_enabled",
-    "community_age_gate_enabled",
-    "default_dm_policy",
-    "direct_messages_enabled",
-    "guests_enabled",
-    "max_guest_days",
-    "deleted_community_retention_days",
-    "deleted_account_retention_days",
-    "on_hold_community_deletion_days",
-)
-MARKETPLACE_FIELDS: tuple[str, ...] = ("marketplace_members_publish_directly",)
-MARKETPLACE_REGISTRY_FIELDS: tuple[str, ...] = ("marketplace_registry_enabled",)
+INTERFACE_FIELDS: tuple[str, ...] = ("light_accent_color", "dark_accent_color")
+COMMUNITY_FIELDS: tuple[str, ...] = ("default_dm_policy",)
 EMAIL_FIELDS: tuple[str, ...] = (
     "smtp_host",
     "smtp_port",
@@ -626,11 +614,13 @@ async def _settings_area(
     fields: tuple[str, ...],
     actor_user_id: int | None,
     secret: _SecretChange | None = None,
+    commit: bool = True,
 ) -> AsyncIterator[AppSetting]:
     """Save one area of the settings row with its record, in one commit.
 
     Yields the stored row for the caller to change. On leaving, the fields
-    that moved are recorded and the row is committed. ``secret`` is the
+    that moved are recorded and the row is committed, or with ``commit``
+    off staged for the caller's own commit. ``secret`` is the
     area's credential: named in the record when it moves, never valued, and
     stored afterwards by :func:`_store_secret`, once the row it hangs off is
     committed.
@@ -654,6 +644,9 @@ async def _settings_area(
         after=after,
         extras=extras,
     )
+    if not commit:
+        await session.flush()
+        return
     await session.commit()
     await session.refresh(row)
 
@@ -677,22 +670,19 @@ async def update_interface_settings(
     *,
     light_accent_color: str,
     dark_accent_color: str,
-    cookie_consent_enabled: bool | None = None,
     actor_user_id: int | None = None,
-) -> AppSetting:
-    """The two accent colours, and whether arriving visitors are asked about cookies.
-
-    ``cookie_consent_enabled`` is an independent decision and is left alone when
-    omitted, so saving a colour does not silently answer it.
-    """
+) -> None:
+    """The two accent colours, staged for the caller's commit: the page saves
+    them with its rule in one change (``auth_posture.change``)."""
     async with _settings_area(
-        session, area="interface", fields=INTERFACE_FIELDS, actor_user_id=actor_user_id
+        session,
+        area="interface",
+        fields=INTERFACE_FIELDS,
+        actor_user_id=actor_user_id,
+        commit=False,
     ) as settings_row:
         settings_row.light_accent_color = light_accent_color.strip() or "#2563eb"
         settings_row.dark_accent_color = dark_accent_color.strip() or "#60a5fa"
-        if cookie_consent_enabled is not None:
-            settings_row.cookie_consent_enabled = bool(cookie_consent_enabled)
-    return settings_row
 
 
 async def community_directory_enabled(session: AsyncSession) -> bool:
@@ -702,8 +692,7 @@ async def community_directory_enabled(session: AsyncSession) -> bool:
     it, joining from it, and a guild listing itself in it — asks this first, so
     turning it off closes all three at once.
     """
-    settings_row = await get_app_settings(session)
-    return bool(settings_row.community_directory_enabled)
+    return (await rules.platform_values(session))["community_directory_enabled"]
 
 
 async def community_age_gate_enabled(session: AsyncSession) -> bool:
@@ -714,10 +703,9 @@ async def community_age_gate_enabled(session: AsyncSession) -> bool:
     the directory's join, the standing check at a listed guild's door, a
     plug-in's minimum age and the direct-message policy — must agree at every
     moment. The direct-message rule in the database (``dm_reachable``) reads
-    the same column.
+    the same rule.
     """
-    settings_row = await get_app_settings(session)
-    return bool(settings_row.community_age_gate_enabled)
+    return (await rules.platform_values(session))["community_age_gate_enabled"]
 
 
 async def direct_messages_enabled(session: AsyncSession) -> bool:
@@ -727,8 +715,7 @@ async def direct_messages_enabled(session: AsyncSession) -> bool:
     and so is the roster of people My Contacts says you could reach, so turning
     it off closes the feature and everything that advertises it at once.
     """
-    settings_row = await get_app_settings(session)
-    return bool(settings_row.direct_messages_enabled)
+    return (await rules.platform_values(session))["direct_messages_enabled"]
 
 
 async def marketplace_members_publish_directly(session: AsyncSession) -> bool:
@@ -737,27 +724,9 @@ async def marketplace_members_publish_directly(session: AsyncSession) -> bool:
     The one read of the switch, taken when a share is submitted: a version
     submitted while it was off keeps waiting after it is turned on.
     """
-    settings_row = await get_app_settings(session)
-    return bool(settings_row.marketplace_members_publish_directly)
-
-
-async def update_marketplace_settings(
-    session: AsyncSession,
-    *,
-    members_publish_directly: bool,
-    actor_user_id: int,
-) -> AppSetting:
-    """Set whether members' shares go on the shelf without review."""
-    async with _settings_area(
-        session,
-        area="marketplace",
-        fields=MARKETPLACE_FIELDS,
-        actor_user_id=actor_user_id,
-    ) as settings_row:
-        settings_row.marketplace_members_publish_directly = bool(
-            members_publish_directly
-        )
-    return settings_row
+    return (await rules.platform_values(session))[
+        "marketplace_members_publish_directly"
+    ]
 
 
 async def marketplace_registry_enabled(session: AsyncSession) -> bool:
@@ -766,107 +735,30 @@ async def marketplace_registry_enabled(session: AsyncSession) -> bool:
     The one read of the switch: the background refresh and the "refresh now"
     button both ask it before fetching anything.
     """
-    settings_row = await get_app_settings(session)
-    return bool(settings_row.marketplace_registry_enabled)
-
-
-async def update_marketplace_registry_settings(
-    session: AsyncSession,
-    *,
-    enabled: bool,
-    actor_user_id: int,
-) -> AppSetting:
-    """Follow the marketplace registry, or stop. What already arrived stays."""
-    async with _settings_area(
-        session,
-        area="marketplace_registry",
-        fields=MARKETPLACE_REGISTRY_FIELDS,
-        actor_user_id=actor_user_id,
-    ) as settings_row:
-        settings_row.marketplace_registry_enabled = bool(enabled)
-    return settings_row
+    return (await rules.platform_values(session))["marketplace_registry_enabled"]
 
 
 async def update_community_settings(
     session: AsyncSession,
     *,
-    community_directory_enabled: bool,
-    community_age_gate_enabled: bool | None = None,
-    default_dm_policy: "DmPolicy | None" = None,
-    direct_messages_enabled: bool | None = None,
-    guests_enabled: bool | None = None,
-    max_guest_days: int | None = None,
-    deleted_community_retention_days: int | None = None,
-    retention_provided: bool = False,
-    deleted_account_retention_days: int | None = None,
-    account_retention_provided: bool = False,
-    on_hold_community_deletion_days: int | None = None,
-    hold_deletion_provided: bool = False,
+    default_dm_policy: "DmPolicy",
     actor_user_id: int | None = None,
-) -> AppSetting:
-    """Turn the community directory on or off for the whole deployment.
+) -> None:
+    """The direct-message policy a newly created account starts on, staged
+    for the caller's commit: the page saves it with its rules in one change.
 
-    Switching it off leaves every guild's own opt-in exactly as it was: the
-    listings simply have nowhere to appear until it is switched back on, so an
-    operator flipping this twice does not silently unpublish anybody.
-
-    ``default_dm_policy`` is a third, and the same rule applies: it is the
-    policy a newly created account starts on, read once when the account is
-    made. Changing it moves no existing account — raising it would open
-    accounts that never chose to be open, and lowering it would revoke channels
-    people are using.
-
-    ``community_age_gate_enabled`` is a second, independent decision and is
-    left alone when omitted: an owner who has asserted that every account here
-    belongs to an adult has not un-asserted it by toggling the directory.
-
-    ``direct_messages_enabled`` is a fourth, and independent of all three: a
-    deployment can run a directory without messaging and vice versa. Omitted,
-    it is left alone. Switching it off keeps every channel, policy and queued
-    message as it is, so switching it back on restores them.
-
-    ``guests_enabled`` and ``max_guest_days`` are left alone when omitted.
-    Off, no guest reaches anything; the ceiling bounds guests made or
-    extended after it changes.
-
-    ``deleted_community_retention_days`` and
-    ``deleted_account_retention_days`` are the fifth and sixth, and the only
-    ones where ``None`` is an answer rather than an omission — it means deleted
-    communities are never destroyed — so the caller says which it meant with
-    ``retention_provided``. Changing it changes when everything already deleted
-    is destroyed, because the date is counted from each deletion rather than
-    stamped at the time.
-
-    ``on_hold_community_deletion_days`` is the seventh and reads the same way:
-    ``None`` means a held community is never deleted on a timer. It too is
-    counted from each hold, so changing it moves the date for every community
-    already on hold.
+    Read once, when an account is made. Changing it moves no existing account:
+    raising it would open accounts that never chose to be open, and lowering
+    it would revoke channels people are using.
     """
     async with _settings_area(
-        session, area="community", fields=COMMUNITY_FIELDS, actor_user_id=actor_user_id
+        session,
+        area="community",
+        fields=COMMUNITY_FIELDS,
+        actor_user_id=actor_user_id,
+        commit=False,
     ) as settings_row:
-        settings_row.community_directory_enabled = bool(community_directory_enabled)
-        if community_age_gate_enabled is not None:
-            settings_row.community_age_gate_enabled = bool(community_age_gate_enabled)
-        if default_dm_policy is not None:
-            settings_row.default_dm_policy = default_dm_policy
-        if direct_messages_enabled is not None:
-            settings_row.direct_messages_enabled = bool(direct_messages_enabled)
-        if guests_enabled is not None:
-            settings_row.guests_enabled = guests_enabled
-        if max_guest_days is not None:
-            settings_row.max_guest_days = max_guest_days
-        if retention_provided:
-            settings_row.deleted_community_retention_days = (
-                deleted_community_retention_days
-            )
-        if account_retention_provided:
-            settings_row.deleted_account_retention_days = deleted_account_retention_days
-        if hold_deletion_provided:
-            settings_row.on_hold_community_deletion_days = (
-                on_hold_community_deletion_days
-            )
-    return settings_row
+        settings_row.default_dm_policy = default_dm_policy
 
 
 async def update_email_settings(

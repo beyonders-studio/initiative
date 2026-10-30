@@ -187,6 +187,7 @@ async def get_app_config(session: SessionDep) -> AppConfig:
     )
 
     app_settings = await app_settings_service.get_app_settings(session)
+    stored = await rules.platform_values(session)
 
     return AppConfig(
         captcha=captcha,
@@ -194,14 +195,12 @@ async def get_app_config(session: SessionDep) -> AppConfig:
         faro_collector_url=settings.FARO_COLLECTOR_URL,
         count_page_views=settings.METRICS_TOKEN is not None,
         max_upload_bytes=MAX_FILE_SIZE,
-        community_directory_enabled=app_settings.community_directory_enabled,
-        community_age_gate_enabled=app_settings.community_age_gate_enabled,
-        direct_messages_enabled=app_settings.direct_messages_enabled,
-        guests_enabled=app_settings.guests_enabled,
-        engagement_ranking_enabled=(await rules.platform_values(session))[
-            "engagement_ranking_enabled"
-        ],
-        cookie_consent_enabled=app_settings.cookie_consent_enabled,
+        community_directory_enabled=stored["community_directory_enabled"],
+        community_age_gate_enabled=stored["community_age_gate_enabled"],
+        direct_messages_enabled=stored["direct_messages_enabled"],
+        guests_enabled=stored["guests_enabled"],
+        engagement_ranking_enabled=stored["engagement_ranking_enabled"],
+        cookie_consent_enabled=stored["cookie_consent_enabled"],
         light_accent_color=app_settings.light_accent_color,
         dark_accent_color=app_settings.dark_accent_color,
         cookie_categories=[c.value for c in active_cookie_categories(settings)],

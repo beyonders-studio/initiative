@@ -30,7 +30,6 @@ from app.models.platform.user import (
     UserRole,
     UserStatus,
 )
-from app.models.platform.app_setting import AppSetting
 from app.models.platform.user_birthdate import UserBirthdate
 from app.models.platform.user_notification_prefs import UserNotificationPrefs
 from app.models.platform.user_profile_view import MemberProfile
@@ -44,7 +43,8 @@ from app.services.auth import sessions as session_service
 from app.services.auth import challenges as challenge_service
 from app.services.auth import totp as totp_service
 from app.services.platform import api_keys as api_keys_service
-from app.services.platform import identity_refs
+from app.services.platform import identity_refs, rules
+from app.services.platform.rules import Values
 from app.services.platform.retention import ACCOUNT_DELETION
 from app.services.platform import user_avatars as user_avatars_service
 from app.models.tenant.resource_grant import ResourceGrant
@@ -1220,7 +1220,7 @@ async def to_operator_read(users: List[User]) -> List["OperatorUserRead"]:
     # Only asked when somebody on this page is actually waiting out a window,
     # which on an ordinary roster is nobody.
     deployment = (
-        await _app_settings()
+        await _deployment_rules()
         if any(u.status == UserStatus.deleted for u in users)
         else None
     )
@@ -1242,17 +1242,16 @@ async def to_operator_read(users: List[User]) -> List["OperatorUserRead"]:
     return out
 
 
-async def _app_settings() -> AppSetting:
-    """The deployment's settings, on its own session.
+async def _deployment_rules() -> Values:
+    """The deployment's rules, on their own session.
 
     Same reason as :func:`_reach`: this shape is built outside any particular
-    request's session, and the setting is one row read once for the whole page.
+    request's session, and the rules are read once for the whole page.
     """
     from app.db.session import SystemSessionLocal
-    from app.services.platform import app_settings as app_settings_service
 
     async with SystemSessionLocal() as system_session:
-        return await app_settings_service.get_app_settings(system_session)
+        return await rules.platform_values(system_session)
 
 
 async def to_operator_read_one(user: User) -> "OperatorUserRead":

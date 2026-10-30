@@ -41,6 +41,7 @@ from app.models.platform.user_email import UserEmail
 from app.services.auth import addresses
 from app.services.platform import email_outbox
 from app.services.platform import app_settings as app_settings_service
+from app.services.platform import rules
 from app.models.platform.federated_identity_secret import FederatedIdentitySecret
 from app.models.platform.user import User, UserStatus
 from app.services.auth.oidc.flow_state import s256
@@ -231,9 +232,9 @@ async def test_register_refuses_anyone_under_the_minimum_where_they_are(
 async def test_register_asks_no_age_where_the_deployment_does_not_check(
     client: AsyncClient, session: AsyncSession
 ):
-    await app_settings_service.update_community_settings(
-        session, community_directory_enabled=False, community_age_gate_enabled=False
-    )
+    await rules.put(session, "community_directory_enabled", False)
+    await rules.put(session, "community_age_gate_enabled", False)
+    await session.commit()
     today = date.today()
 
     response = await _register_born(client, "young", date(today.year - 10, 1, 1))

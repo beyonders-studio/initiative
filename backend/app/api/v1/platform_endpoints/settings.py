@@ -31,6 +31,7 @@ from app.core.audit_events import AuditEventType
 from app.core.config import DEFAULT_OIDC_SCOPES
 from app.core.config import settings as app_config
 from app.core.intake import IntakeStream
+from app.core.rules import RETENTION_WINDOWS
 from app.db import cohorts
 from app.db.query import build_paginated_response, paginated_query
 from app.db.request_context import SystemGuild
@@ -125,7 +126,11 @@ from app.services.platform import push_config, push_relay
 from app.services import captcha as captcha_service
 from app.services.captcha_config import ResolvedCaptchaConfig
 from app.services.platform import billing as billing_service
-from app.services.platform.retention import COMMUNITY_DELETION
+from app.services.platform.retention import (
+    ACCOUNT_DELETION,
+    COMMUNITY_DELETION,
+    COMMUNITY_HOLD,
+)
 from app.services.platform import guilds as guilds_service
 from app.services.platform import case_activity, grant_cases
 from app.core.user_display import handle_of
@@ -346,17 +351,57 @@ async def update_interface_settings(
     session: UserSessionDep,
     owner: ConfigManageDep,
 ) -> InterfaceSettingsResponse:
-    settings_obj = await app_settings_service.update_interface_settings(
+    """The accent colours, and whether arriving visitors are asked about
+    cookies. ``cookie_consent_enabled`` is left alone when omitted, so saving a
+    colour does not silently answer it."""
+    await app_settings_service.update_interface_settings(
         session,
         light_accent_color=payload.light_accent_color,
         dark_accent_color=payload.dark_accent_color,
-        cookie_consent_enabled=payload.cookie_consent_enabled,
         actor_user_id=owner.id,
     )
+    changes: dict[str, object] = {}
+    if payload.cookie_consent_enabled is not None:
+        changes["cookie_consent_enabled"] = payload.cookie_consent_enabled
+    # Commits the colours with the rule.
+    await auth_posture.change(
+        auth_posture.RuleContext.platform(session, owner), changes
+    )
+    settings_obj = await app_settings_service.get_app_settings(session)
     return InterfaceSettingsResponse(
         light_accent_color=settings_obj.light_accent_color,
         dark_accent_color=settings_obj.dark_accent_color,
-        cookie_consent_enabled=settings_obj.cookie_consent_enabled,
+        cookie_consent_enabled=(await rules.platform_values(session))[
+            "cookie_consent_enabled"
+        ],
+    )
+
+
+#: The community page's switches and limits that are left alone when omitted,
+#: by field and the rule each writes.
+_COMMUNITY_RULE_FIELDS = (
+    ("age_gate_enabled", "community_age_gate_enabled"),
+    ("direct_messages_enabled", "direct_messages_enabled"),
+    ("engagement_ranking_enabled", "engagement_ranking_enabled"),
+    ("guests_enabled", "guests_enabled"),
+    ("max_guest_days", "max_guest_days"),
+)
+
+
+async def _community_payload(session: AsyncSession) -> CommunitySettingsResponse:
+    stored = await rules.platform_values(session)
+    settings_obj = await app_settings_service.get_app_settings(session)
+    return CommunitySettingsResponse(
+        community_directory_enabled=stored["community_directory_enabled"],
+        age_gate_enabled=stored["community_age_gate_enabled"],
+        default_dm_policy=settings_obj.default_dm_policy,
+        direct_messages_enabled=stored["direct_messages_enabled"],
+        deleted_community_retention_days=COMMUNITY_DELETION.days(stored),
+        deleted_account_retention_days=ACCOUNT_DELETION.days(stored),
+        on_hold_community_deletion_days=COMMUNITY_HOLD.days(stored),
+        engagement_ranking_enabled=stored["engagement_ranking_enabled"],
+        guests_enabled=stored["guests_enabled"],
+        max_guest_days=stored["max_guest_days"],
     )
 
 
@@ -373,21 +418,7 @@ async def read_community_settings(
     behind the capability that writes it, rather than added to everyone's boot
     payload.
     """
-    settings_obj = await app_settings_service.get_app_settings(session)
-    return CommunitySettingsResponse(
-        community_directory_enabled=settings_obj.community_directory_enabled,
-        age_gate_enabled=settings_obj.community_age_gate_enabled,
-        default_dm_policy=settings_obj.default_dm_policy,
-        direct_messages_enabled=settings_obj.direct_messages_enabled,
-        deleted_community_retention_days=settings_obj.deleted_community_retention_days,
-        deleted_account_retention_days=settings_obj.deleted_account_retention_days,
-        on_hold_community_deletion_days=settings_obj.on_hold_community_deletion_days,
-        engagement_ranking_enabled=(await rules.platform_values(session))[
-            "engagement_ranking_enabled"
-        ],
-        guests_enabled=settings_obj.guests_enabled,
-        max_guest_days=settings_obj.max_guest_days,
-    )
+    return await _community_payload(session)
 
 
 @router.put("/community", response_model=CommunitySettingsResponse)
@@ -441,44 +472,28 @@ async def update_community_settings(
     the longest one may stay. Off, no guest reaches anything until it is back
     on. Omitted, each is left alone.
     """
-    settings_obj = await app_settings_service.update_community_settings(
-        session,
-        community_directory_enabled=payload.community_directory_enabled,
-        community_age_gate_enabled=payload.age_gate_enabled,
-        default_dm_policy=payload.default_dm_policy,
-        direct_messages_enabled=payload.direct_messages_enabled,
-        guests_enabled=payload.guests_enabled,
-        max_guest_days=payload.max_guest_days,
-        deleted_community_retention_days=payload.deleted_community_retention_days,
-        retention_provided="deleted_community_retention_days"
-        in payload.model_fields_set,
-        deleted_account_retention_days=payload.deleted_account_retention_days,
-        account_retention_provided="deleted_account_retention_days"
-        in payload.model_fields_set,
-        on_hold_community_deletion_days=payload.on_hold_community_deletion_days,
-        hold_deletion_provided="on_hold_community_deletion_days"
-        in payload.model_fields_set,
-        actor_user_id=owner.id,
-    )
-    if payload.engagement_ranking_enabled is not None:
-        await auth_posture.change(
-            auth_posture.RuleContext.platform(session, owner),
-            {"engagement_ranking_enabled": payload.engagement_ranking_enabled},
+    changes: dict[str, object] = {
+        "community_directory_enabled": payload.community_directory_enabled
+    }
+    for field, key in _COMMUNITY_RULE_FIELDS:
+        value = getattr(payload, field)
+        if value is not None:
+            changes[key] = value
+    for key, switch in RETENTION_WINDOWS.items():
+        if key in payload.model_fields_set:
+            days = getattr(payload, key)
+            changes[switch] = days is not None
+            if days is not None:
+                changes[key] = days
+    if payload.default_dm_policy is not None:
+        await app_settings_service.update_community_settings(
+            session, default_dm_policy=payload.default_dm_policy, actor_user_id=owner.id
         )
-    return CommunitySettingsResponse(
-        community_directory_enabled=settings_obj.community_directory_enabled,
-        age_gate_enabled=settings_obj.community_age_gate_enabled,
-        default_dm_policy=settings_obj.default_dm_policy,
-        direct_messages_enabled=settings_obj.direct_messages_enabled,
-        deleted_community_retention_days=settings_obj.deleted_community_retention_days,
-        deleted_account_retention_days=settings_obj.deleted_account_retention_days,
-        on_hold_community_deletion_days=settings_obj.on_hold_community_deletion_days,
-        engagement_ranking_enabled=(await rules.platform_values(session))[
-            "engagement_ranking_enabled"
-        ],
-        guests_enabled=settings_obj.guests_enabled,
-        max_guest_days=settings_obj.max_guest_days,
+    # Commits the direct-message default with the rules.
+    await auth_posture.change(
+        auth_posture.RuleContext.platform(session, owner), changes
     )
+    return await _community_payload(session)
 
 
 @router.get("/email", response_model=EmailSettingsResponse)
@@ -941,7 +956,7 @@ def _guild_storage_read(
     *,
     member_count: int,
     has_seat: bool,
-    deployment: AppSetting,
+    deployment: rules.Values,
     actor: User,
     moderating: bool = False,
 ) -> PlatformCommunityStorageRead:
@@ -1085,7 +1100,7 @@ async def list_platform_community_storage(
         page=page,
         page_size=page_size,
     )
-    deployment = await app_settings_service.get_app_settings(session)
+    deployment = await rules.platform_values(session)
     counts, seated = await _member_tallies([g.id for g, _ in rows])
     # The reader's own grants, under the requester's own-row policy.
     moderating = await _moderating(
@@ -1250,7 +1265,7 @@ async def update_platform_community_storage(
         administration,
         member_count=await guilds_service.count_members(session, guild_id=guild_id),
         has_seat=await guilds_service.guild_has_seat(session, guild_id=guild.id),
-        deployment=await app_settings_service.get_app_settings(session),
+        deployment=await rules.platform_values(session),
         actor=operator,
         moderating=guild.id
         in await _moderating(session, user_id=operator.id, guild_ids=[guild.id]),
@@ -1358,7 +1373,7 @@ async def set_platform_community_suspension(
         administration,
         member_count=await guilds_service.count_members(session, guild_id=guild_id),
         has_seat=await guilds_service.guild_has_seat(session, guild_id=guild_id),
-        deployment=await app_settings_service.get_app_settings(session),
+        deployment=await rules.platform_values(session),
         actor=moderator,
         moderating=True,
     )
@@ -1527,7 +1542,7 @@ async def restore_platform_community(
         administration,
         member_count=await guilds_service.count_members(session, guild_id=guild_id),
         has_seat=await guilds_service.guild_has_seat(session, guild_id=guild_id),
-        deployment=await app_settings_service.get_app_settings(session),
+        deployment=await rules.platform_values(session),
         actor=operator,
         moderating=guild_id
         in await _moderating(session, user_id=operator.id, guild_ids=[guild_id]),
