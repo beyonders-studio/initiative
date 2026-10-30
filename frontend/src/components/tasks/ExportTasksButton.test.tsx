@@ -3,10 +3,10 @@ import userEvent from "@testing-library/user-event";
 import { HttpResponse } from "msw";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 
+import { buildDataJob } from "@/__tests__/factories";
 import { communityHttp } from "@/__tests__/helpers/communityHttp";
 import { server } from "@/__tests__/helpers/msw-server";
 import { renderWithProviders } from "@/__tests__/helpers/render";
-import type { ExportJobRead } from "@/api/generated/initiativeAPI.schemas";
 
 import { ExportTasksButton } from "./ExportTasksButton";
 
@@ -20,23 +20,6 @@ import { toast } from "@/lib/mascotToast";
 import { getItem, setItem } from "@/lib/storage";
 
 const PDF = new Uint8Array([0x25, 0x50, 0x44, 0x46]); // "%PDF"
-
-const buildJob = (overrides: Partial<ExportJobRead> = {}): ExportJobRead => ({
-  id: 7,
-  community_id: 1,
-  created_by: 1,
-  source: "tasks",
-  template_id: "task-table",
-  format: "pdf",
-  params: {},
-  status: "queued",
-  error: null,
-  expires_at: null,
-  created_at: "2026-07-12T00:00:00Z",
-  updated_at: "2026-07-12T00:00:00Z",
-  delivered: false,
-  ...overrides,
-});
 
 const pdfResponse = () =>
   new HttpResponse(PDF, { status: 200, headers: { "Content-Type": "application/pdf" } });
@@ -62,9 +45,11 @@ describe("ExportTasksButton", () => {
 
   it("polls a queued (202) job and downloads when it finishes", async () => {
     server.use(
-      communityHttp.get("/exports/tasks", () => HttpResponse.json(buildJob(), { status: 202 })),
-      communityHttp.get("/exports/jobs/:jobId", () =>
-        HttpResponse.json(buildJob({ status: "done" }))
+      communityHttp.get("/exports/tasks", () =>
+        HttpResponse.json(buildDataJob({ id: 7 }), { status: 202 })
+      ),
+      communityHttp.get("/data-jobs/:jobId", () =>
+        HttpResponse.json(buildDataJob({ id: 7, status: "done" }))
       ),
       communityHttp.get("/exports/jobs/:jobId/download", () => pdfResponse())
     );
@@ -79,9 +64,11 @@ describe("ExportTasksButton", () => {
 
   it("surfaces a failed job as an error toast, without downloading", async () => {
     server.use(
-      communityHttp.get("/exports/tasks", () => HttpResponse.json(buildJob(), { status: 202 })),
-      communityHttp.get("/exports/jobs/:jobId", () =>
-        HttpResponse.json(buildJob({ status: "failed", error: "EXPORT_RENDER_FAILED" }))
+      communityHttp.get("/exports/tasks", () =>
+        HttpResponse.json(buildDataJob({ id: 7 }), { status: 202 })
+      ),
+      communityHttp.get("/data-jobs/:jobId", () =>
+        HttpResponse.json(buildDataJob({ id: 7, status: "failed", error: "EXPORT_RENDER_FAILED" }))
       )
     );
     renderWithProviders(<ExportTasksButton params={{ conditions: [] }} />);
@@ -168,8 +155,8 @@ describe("ExportTasksButton", () => {
   it("resumes a pending job from storage on mount and downloads it", async () => {
     setItem("exports:pending:1", "9");
     server.use(
-      communityHttp.get("/exports/jobs/:jobId", () =>
-        HttpResponse.json(buildJob({ id: 9, status: "done" }))
+      communityHttp.get("/data-jobs/:jobId", () =>
+        HttpResponse.json(buildDataJob({ id: 9, status: "done" }))
       ),
       communityHttp.get("/exports/jobs/:jobId/download", () => pdfResponse())
     );
@@ -186,8 +173,8 @@ describe("ExportTasksButton", () => {
     // Selected); only the designated adopter may resume, or a job in flight
     // when the second instance mounts would download twice.
     setItem("exports:pending:1", "9");
-    const jobPoll = vi.fn(() => HttpResponse.json(buildJob({ id: 9, status: "done" })));
-    server.use(communityHttp.get("/exports/jobs/:jobId", jobPoll));
+    const jobPoll = vi.fn(() => HttpResponse.json(buildDataJob({ id: 9, status: "done" })));
+    server.use(communityHttp.get("/data-jobs/:jobId", jobPoll));
     renderWithProviders(<ExportTasksButton params={{ conditions: [] }} />);
 
     await new Promise((resolve) => setTimeout(resolve, 50));

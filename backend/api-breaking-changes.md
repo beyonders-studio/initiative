@@ -2003,6 +2003,18 @@ notification, a new notification type in the `subscriptions` category.
 - POST /api/v1/notifications/{notification_id}/read added the new `task_reminder` enum value to the `type` response property for the response status `200`
 - POST /api/v1/notifications/{notification_id}/unread added the new `task_reminder` enum value to the `type` response property for the response status `200`
 
+### Imports and exports are one record
+
+An import job and an export job are one record, `DataJobRead`, with a
+`direction`. Reading them is `GET /c/{community_id}/data-jobs/` and
+`GET /c/{community_id}/data-jobs/{job_id}`; starting, cancelling, confirming
+and downloading stay on their direction's routes.
+
+- GET /api/v1/c/{community_id}/exports/jobs api path removed without deprecation
+- GET /api/v1/c/{community_id}/exports/jobs/{job_id} api path removed without deprecation
+- GET /api/v1/c/{community_id}/imports/jobs api path removed without deprecation
+- GET /api/v1/c/{community_id}/imports/jobs/{job_id} api removed without deprecation
+
 ## After 0.76.0
 
 ### New values in a response's enums

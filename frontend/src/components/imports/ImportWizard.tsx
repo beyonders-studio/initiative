@@ -18,7 +18,7 @@ import {
   usePreviewForeignImport,
   useUploadBackup,
 } from "@/api/generated/imports/imports";
-import type { ForeignPreview, ImportJobRead } from "@/api/generated/initiativeAPI.schemas";
+import type { DataJobRead, ForeignPreview } from "@/api/generated/initiativeAPI.schemas";
 import { Tool } from "@/api/generated/initiativeAPI.schemas";
 import {
   AtlassianChooseStep,
@@ -167,7 +167,7 @@ export function ImportWizard({ open, onOpenChange }: ImportWizardProps) {
   const [excludedProperties, setExcludedProperties] = useState<Set<string>>(new Set());
 
   const [pickError, setPickError] = useState<string | null>(null);
-  const [stagedJob, setStagedJob] = useState<ImportJobRead | null>(null);
+  const [stagedJob, setStagedJob] = useState<DataJobRead | null>(null);
   // How much of the backup has arrived, and how to stop it.
   const [sent, setSent] = useState(0);
   const sending = useRef<AbortController | null>(null);
@@ -271,7 +271,7 @@ export function ImportWizard({ open, onOpenChange }: ImportWizardProps) {
 
   const forgetJiraJob = () => removeItem(atlassianJobKey(communityId));
 
-  const handleJiraStarted = (job: ImportJobRead) => {
+  const handleJiraStarted = (job: DataJobRead) => {
     setItem(atlassianJobKey(communityId), String(job.id));
     setJiraJobId(job.id);
     // Past this point the site is being read; the way out is Cancel.
@@ -279,7 +279,7 @@ export function ImportWizard({ open, onOpenChange }: ImportWizardProps) {
   };
 
   const handleJiraStaged = useCallback(
-    (job: ImportJobRead) => {
+    (job: DataJobRead) => {
       setStagedJob(job);
       commit("review");
     },
@@ -404,7 +404,7 @@ export function ImportWizard({ open, onOpenChange }: ImportWizardProps) {
           selection,
           content: foreignText,
         },
-      })) as { result: { entity_title: string; unmatched_handles: string[] } } | ImportJobRead;
+      })) as { result: { entity_title: string; unmatched_handles: string[] } } | DataJobRead;
       // `id` rather than `result`, which a job row also carries (its report):
       // only a job has an id, so that is what tells the two apart.
       if (!("id" in response)) {

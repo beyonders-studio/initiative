@@ -20,7 +20,7 @@ from pathlib import Path
 from typing import Any, cast
 
 from sqlalchemy import exists, func, or_, tuple_, update
-from sqlmodel import select
+from sqlmodel import col, select
 from sqlmodel.sql.expression import SelectOfScalar
 from sqlmodel.ext.asyncio.session import AsyncSession
 
@@ -35,8 +35,7 @@ from app.models.platform.demo import DemoSandbox, LinkState
 from app.models.platform.guild import CommunityRole, CommunityStatus, Guild, GuildInvite
 from app.models.platform.guild_image import IMAGE_SPECS, GuildImageVariant
 from app.models.platform.user import User
-from app.models.tenant.export_job import ExportJob, ExportJobStatus
-from app.models.tenant.import_job import ImportJob, ImportJobStatus
+from app.models.tenant.data_job import DataJob, DataJobDirection, DataJobStatus
 from app.models.tenant.initiative import (
     Initiative,
     InitiativeMember,
@@ -194,7 +193,7 @@ async def make_pitch(
                 guild_id=guild_id,
                 user=host,
                 payload=bundle,
-                status=ImportJobStatus.queued,
+                status=DataJobStatus.queued,
                 anchor=datetime.fromisoformat(plan.exported_at)
                 if plan.exported_at
                 else None,
@@ -311,10 +310,10 @@ async def _wait_for_import(guild_id: int, job_id: int) -> None:
     while True:
         async with cohorts.system_session(guild_id) as session:
             await set_rls_context(session, SystemGuild(guild_id))
-            job = await session.get(ImportJob, job_id)
+            job = await session.get(DataJob, job_id)
             if job is None or job.status not in (
-                ImportJobStatus.queued,
-                ImportJobStatus.running,
+                DataJobStatus.queued,
+                DataJobStatus.running,
             ):
                 break
             task = await import_worker.jobs.claim(session, guild_id)
@@ -324,7 +323,7 @@ async def _wait_for_import(guild_id: int, job_id: int) -> None:
             raise TimeoutError(f"the import into community {guild_id} timed out")
         else:
             await asyncio.sleep(IMPORT_POLL_SECONDS)
-    if job is None or job.status != ImportJobStatus.done:
+    if job is None or job.status != DataJobStatus.done:
         raise RuntimeError(
             f"the import into community {guild_id} ended "
             f"{job.status if job else 'missing'}: {job.error if job else ''}"
@@ -366,12 +365,13 @@ def _published(column: Any) -> SelectOfScalar[Any]:
     return (
         select(column)
         .where(
-            ExportJob.source == "community",
-            ExportJob.status == ExportJobStatus.done,
-            ExportJob.artifact_ref.is_not(None),
-            func.coalesce(ExportJob.params.op("->>")("mode"), "backup") == "backup",
+            DataJob.direction == DataJobDirection.export,
+            DataJob.source == "community",
+            DataJob.status == DataJobStatus.done,
+            col(DataJob.file_ref).is_not(None),
+            func.coalesce(DataJob.params.op("->>")("mode"), "backup") == "backup",
         )
-        .order_by(ExportJob.created_at.desc())
+        .order_by(DataJob.created_at.desc())
         .limit(1)
     )
 
@@ -381,10 +381,8 @@ async def newest_export(guild_id: int) -> tuple[str, datetime] | None:
     it was taken, or ``None`` when it has none."""
     async with cohorts.system_session(guild_id) as session:
         await set_rls_context(session, SystemGuild(guild_id))
-        newest = (await session.exec(_published(ExportJob))).first()
-    return (
-        None if newest is None else (cast(str, newest.artifact_ref), newest.created_at)
-    )
+        newest = (await session.exec(_published(DataJob))).first()
+    return None if newest is None else (cast(str, newest.file_ref), newest.created_at)
 
 
 async def published_export_id(session: AsyncSession, guild_id: int) -> int | None:
@@ -395,7 +393,7 @@ async def published_export_id(session: AsyncSession, guild_id: int) -> int | Non
         await set_rls_context(platform, Unattributed())
         if not await is_pitch(platform, guild_id):
             return None
-    return (await session.exec(_published(ExportJob.id))).first()
+    return (await session.exec(_published(DataJob.id))).first()
 
 
 async def is_pitch(session: AsyncSession, guild_id: int) -> bool:

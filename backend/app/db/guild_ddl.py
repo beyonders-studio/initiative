@@ -240,13 +240,13 @@ _GUILD_LEVEL_SECTION = """\
 -- allow-all — it adds no row gate, it just lets the RESTRICTIVE delete policy bind.
 -- ==========================================================================="""
 
-# Header for the own-row section (export_jobs, …).
+# Header for the own-row section (data_jobs, …).
 _OWN_ROW_SECTION = """\
 -- ===========================================================================
 -- Own-row guild-level tables (app.db.tenancy.OWN_ROW_TABLES): rows belong to
 -- ONE user. Unlike guild_level_open, this IS a row gate — a member must not
--- see another member's rows (an export_jobs row leaks the selector and gates
--- the artifact download). Owner OR the community's administrator OR trusted
+-- see another member's rows (a data_jobs row leaks the selector and gates
+-- the file download). Owner OR the community's administrator OR trusted
 -- system maintenance; the last two legs match initiative_access and the purge
 -- guard exactly. A settings rung reads them, and writes them only beside a
 -- read_write grant. A read-only PAM grantee is routed to guild_<id>_ro with

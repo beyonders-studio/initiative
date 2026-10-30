@@ -39,11 +39,12 @@ from app.models.platform.guild import Guild, CommunityRole, CommunityStatus
 from app.models.platform.guild_image import GuildImage, GuildImageVariant
 from app.models.platform.notification import Notification, NotificationType
 from app.core.file_types import FileType
-from app.models.tenant.export_job import ExportJob, ExportJobStatus
+from app.models.tenant.data_job import DataJob, DataJobStatus
 from app.models.tenant.initiative import Initiative, InitiativeMember
 from app.models.tenant.metadata import MetadataType
 from app.models.tenant.resource_grant import ResourceAccessLevel, ResourceGrant
 from app.models.tenant.task import TaskPriority, TaskStatusCategory
+from app.services import data_jobs
 from app.services import storage as storage_module
 from app.services.export import worker as export_worker
 from app.services.guild_sweeps import Scope, each_guild
@@ -107,7 +108,7 @@ async def _export(
 
 async def _job(client: AsyncClient, a, job_id: int) -> dict:
     """The job row as its own creator reads it back."""
-    resp = await client.get(a.g(f"/exports/jobs/{job_id}"), headers=a.headers)
+    resp = await client.get(a.g(f"/data-jobs/{job_id}"), headers=a.headers)
     assert resp.status_code == 200
     return resp.json()
 
@@ -133,7 +134,7 @@ async def _rendered_zip(client, a, monkeypatch, role_session, resp) -> zipfile.Z
     job_id = resp.json()["id"]
     await _run_worker()
     body = await _job(client, a, job_id)
-    assert body["status"] == ExportJobStatus.done.value, body.get("error")
+    assert body["status"] == DataJobStatus.done.value, body.get("error")
     dl = await _download(client, a, job_id)
     assert dl.headers["content-type"] == "application/zip"
     return _zip(dl)
@@ -681,12 +682,12 @@ async def test_large_export_becomes_job(
     resp = await _export(client, a, "tasks")
     assert resp.status_code == 202
     body = resp.json()
-    assert body["status"] == ExportJobStatus.queued.value
+    assert body["status"] == DataJobStatus.queued.value
     assert body["source"] == "tasks"
     assert body["created_by"] == a.user.id
-    # The row persists the SELECTOR only — no artifact_ref field is exposed,
+    # The row persists the SELECTOR only — no file_ref field is exposed,
     # and params echo the caller's own filter input.
-    assert "artifact_ref" not in body
+    assert "file_ref" not in body
     assert body["params"]["include_archived"] is False
 
     # Not rendered yet: download must refuse, not serve a partial artifact.
@@ -724,18 +725,18 @@ async def test_jobs_are_own_row_isolated(
     admin = await acting_user(guild_role=CommunityRole.admin, guild=a.guild)
 
     assert (await _job(client, a, job_id))["id"] == job_id
-    for path in (f"/exports/jobs/{job_id}", f"/exports/jobs/{job_id}/download"):
+    for path in (f"/data-jobs/{job_id}", f"/exports/jobs/{job_id}/download"):
         denied = await client.get(a.g(path), headers=other.headers)
         assert denied.status_code == 404, path
     assert (
-        await client.get(a.g(f"/exports/jobs/{job_id}"), headers=admin.headers)
+        await client.get(a.g(f"/data-jobs/{job_id}"), headers=admin.headers)
     ).status_code == 200
 
     # List views scope the same way.
-    assert (await client.get(a.g("/exports/jobs"), headers=other.headers)).json() == []
+    assert (await client.get(a.g("/data-jobs/"), headers=other.headers)).json() == []
     assert [
         j["id"]
-        for j in (await client.get(a.g("/exports/jobs"), headers=a.headers)).json()
+        for j in (await client.get(a.g("/data-jobs/"), headers=a.headers)).json()
     ] == [job_id]
 
 
@@ -752,7 +753,7 @@ async def test_an_export_is_served_while_its_initiatives_are_reached(
     await _run_worker()
 
     await route_session_to_guild(session, guild_id)
-    job = await session.get(ExportJob, job_id)
+    job = await session.get(DataJob, job_id)
     assert job.initiative_ids == [initiative_id]
     job.initiative_ids = [initiative_id, initiative_id + 1000]
     session.add(job)
@@ -807,7 +808,7 @@ async def test_worker_renders_job_and_download_succeeds(
     await _run_worker()
 
     body = await _job(client, a, job_id)
-    assert body["status"] == ExportJobStatus.done.value, body.get("error")
+    assert body["status"] == DataJobStatus.done.value, body.get("error")
     assert body["expires_at"] is not None
     _assert_export(await _download(client, a, job_id), "pdf")
 
@@ -1292,8 +1293,8 @@ async def test_file_export_file_passthrough(
     # The stored object carries the job id in its basename, so it can't
     # collide with another job exporting a same-named file (both backends
     # flatten a key to its basename, dropping any directory).
-    job = await session.get(ExportJob, job_id)
-    assert job.artifact_ref == f"exports/{job_id}-Q3 Report Final.pdf"
+    job = await session.get(DataJob, job_id)
+    assert job.file_ref == f"exports/{job_id}-Q3 Report Final.pdf"
 
 
 async def test_passthrough_exports_do_not_collide_by_filename(
@@ -1324,9 +1325,9 @@ async def test_passthrough_exports_do_not_collide_by_filename(
 
     await _run_worker()
 
-    row_a = await session.get(ExportJob, job_a)
-    row_b = await session.get(ExportJob, job_b)
-    assert row_a.artifact_ref != row_b.artifact_ref
+    row_a = await session.get(DataJob, job_a)
+    row_b = await session.get(DataJob, job_b)
+    assert row_a.file_ref != row_b.file_ref
 
     dl_a = await _download(client, a, job_a)
     dl_b = await _download(client, a, job_b)
@@ -1372,7 +1373,7 @@ async def test_gc_expires_the_job_row_and_releases_its_artifact(
     acting_user, session, monkeypatch, storage_fails
 ):
     """Past its expiry, GC drops the artifact and moves the row to ``expired``
-    with no artifact_ref, in a community that is not active as in any other.
+    with no file_ref, in a community that is not active as in any other.
     A storage backend that raises on delete reaches the same row state, with
     the failure logged, so the pass still completes."""
     a = await acting_user(
@@ -1385,8 +1386,8 @@ async def test_gc_expires_the_job_row_and_releases_its_artifact(
         session,
         a.guild,
         a.user,
-        status=ExportJobStatus.done,
-        artifact_ref=key,
+        status=DataJobStatus.done,
+        file_ref=key,
         expires_at=datetime.now(timezone.utc) - timedelta(hours=1),
     )
     guild = await session.get(Guild, a.guild.id)
@@ -1399,16 +1400,16 @@ async def test_gc_expires_the_job_row_and_releases_its_artifact(
             storage_module, "get_guild_storage", lambda gid: _BrokenStorage()
         )
 
-    await each_guild([(Scope.PROVISIONED, export_worker.expire_artifacts)], name="t")
+    await each_guild([(Scope.PROVISIONED, data_jobs.expire_files)], name="t")
 
     if not storage_fails:
         assert storage.open_readable(key) is None
 
     session.expunge_all()
     await route_session_to_guild(session, a.guild.id)
-    refreshed = await session.get(ExportJob, job.id)
-    assert refreshed.status == ExportJobStatus.expired.value
-    assert refreshed.artifact_ref is None
+    refreshed = await session.get(DataJob, job.id)
+    assert refreshed.status == DataJobStatus.expired.value
+    assert refreshed.file_ref is None
 
 
 async def test_an_artifact_past_its_expiry_is_not_served(
@@ -1428,23 +1429,23 @@ async def test_an_artifact_past_its_expiry_is_not_served(
         session,
         a.guild,
         a.user,
-        status=ExportJobStatus.done,
-        artifact_ref=key,
+        status=DataJobStatus.done,
+        file_ref=key,
         expires_at=now - timedelta(minutes=1),
     )
     swept = await create_export_job(
         session,
         a.guild,
         a.user,
-        status=ExportJobStatus.expired,
+        status=DataJobStatus.expired,
         expires_at=now - timedelta(days=1),
     )
     unrecorded = await create_export_job(
         session,
         a.guild,
         a.user,
-        status=ExportJobStatus.done,
-        artifact_ref=key,
+        status=DataJobStatus.done,
+        file_ref=key,
         expires_at=now + timedelta(days=1),
     )
 
@@ -1456,7 +1457,7 @@ async def test_an_artifact_past_its_expiry_is_not_served(
         assert dl.json()["detail"] == "EXPORT_EXPIRED"
     for job in (due, swept):
         assert (await _job(client, a, job.id))["status"] == (
-            ExportJobStatus.expired.value
+            DataJobStatus.expired.value
         )
 
 
@@ -1557,7 +1558,7 @@ async def test_a_queue_envelope_records_the_initiatives_of_its_attachments(
 
     await route_session_to_guild(session, guild_id)
     recorded = {
-        fmt: (await session.get(ExportJob, job_id)).initiative_ids
+        fmt: (await session.get(DataJob, job_id)).initiative_ids
         for fmt, job_id in jobs.items()
     }
     assert recorded == {"json": sorted([own, other]), "csv": [own]}
@@ -1768,7 +1769,7 @@ async def test_exporting_a_tool_takes_the_rung_that_may_delete_it(
     backup = await _export(client, a, "initiative", initiative_id=a.initiative.id)
     await _run_worker()
     done = await _job(client, a, backup.json()["id"])
-    assert done["status"] == ExportJobStatus.done.value, done.get("error")
+    assert done["status"] == DataJobStatus.done.value, done.get("error")
 
 
 def _page_body(text: str) -> dict:
@@ -3054,7 +3055,7 @@ async def test_backup_embedded_image_bytes_hit_cap_at_build(
     await _run_worker()
 
     body = await _job(client, a, job_id)
-    assert body["status"] == ExportJobStatus.failed.value
+    assert body["status"] == DataJobStatus.failed.value
     assert body["error"] == "EXPORT_TOO_LARGE"
 
 
@@ -3418,7 +3419,7 @@ async def test_guild_export_seat_vacated_fails_closed(
     await _run_worker()
 
     body = await _job(client, a, job_id)
-    assert body["status"] == ExportJobStatus.failed.value
+    assert body["status"] == DataJobStatus.failed.value
     assert body["error"] == "EXPORT_SUPERADMIN_REQUIRED"
     dl = await client.get(a.g(f"/exports/jobs/{job_id}/download"), headers=a.headers)
     assert dl.status_code == 409
@@ -3768,7 +3769,7 @@ async def test_guild_export_status_says_who_took_the_last_one_and_when(
         await client.get(a.g("/exports/community/status"), headers=a.headers)
     ).json()
     assert body["latest"]["id"] == job_id
-    assert body["latest"]["status"] == ExportJobStatus.queued.value
+    assert body["latest"]["status"] == DataJobStatus.queued.value
     assert body["latest_started_by"] == f"{a.user.username}#{a.user.discriminator:04d}"
 
     # The countdown the page shows and the door the create route shuts are the
@@ -3816,7 +3817,7 @@ async def test_a_failed_export_is_reported_but_holds_no_door(
         await client.get(a.g("/exports/community/status"), headers=a.headers)
     ).json()
     assert body["latest"]["id"] == job_id
-    assert body["latest"]["status"] == ExportJobStatus.failed.value
+    assert body["latest"]["status"] == DataJobStatus.failed.value
     assert body["next_available_at"] is None
     assert (await _export(client, a, "community")).status_code == 202
 
@@ -3838,7 +3839,7 @@ async def test_an_archive_over_the_download_bound_is_delivered(
     await _run_worker()
 
     body = await _job(client, a, job_id)
-    assert body["status"] == ExportJobStatus.done.value, body.get("error")
+    assert body["status"] == DataJobStatus.done.value, body.get("error")
     assert body["delivered"] is True
     # The path stays server-side; the client is told that it was delivered.
     assert "destination_ref" not in body
@@ -3887,7 +3888,7 @@ async def test_over_the_bound_with_no_destination_fails_the_job_clearly(
     await _run_worker()
 
     body = await _job(client, a, job_id)
-    assert body["status"] == ExportJobStatus.failed.value
+    assert body["status"] == DataJobStatus.failed.value
     assert body["error"] == "EXPORT_DESTINATION_REQUIRED"
 
 
@@ -3927,7 +3928,7 @@ async def test_download_redirects_when_storage_can_sign_a_url(
     assert resp.status_code == 202, resp.text
     job_id = resp.json()["id"]
     await _run_worker()
-    assert (await _job(client, a, job_id))["status"] == ExportJobStatus.done.value
+    assert (await _job(client, a, job_id))["status"] == DataJobStatus.done.value
 
     import app.api.v1.tenant_endpoints.exports as exports_module
 

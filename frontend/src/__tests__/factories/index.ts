@@ -20,6 +20,7 @@ export {
   communityCan,
   resetCounter as resetCommunityCounter,
 } from "./community.factory";
+export { buildDataJob, resetCounter as resetDataJobCounter } from "./dataJob.factory";
 export {
   buildContactGrant,
   buildIgnoredAccount,
@@ -119,6 +120,7 @@ import { resetCounter as resetCalendarEventCounter } from "./calendarEvent.facto
 import { resetCounter as resetCollectionCounter } from "./collection.factory";
 import { resetCounter as resetCommentCounter } from "./comment.factory";
 import { resetCounter as resetCommunityCounter } from "./community.factory";
+import { resetCounter as resetDataJobCounter } from "./dataJob.factory";
 import { resetCounter as resetDmCounter } from "./dm.factory";
 import { resetCounter as resetFileCounter } from "./file.factory";
 import { resetCounter as resetInitiativeCounter } from "./initiative.factory";
@@ -150,6 +152,7 @@ export function resetFactories(): void {
   resetTaskTypeCounter();
   resetTagCounter();
   resetFileCounter();
+  resetDataJobCounter();
   resetCommentCounter();
   resetNotificationCounter();
   resetQueueCounter();

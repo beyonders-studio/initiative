@@ -2,7 +2,7 @@ import { useEffect, useRef, useState } from "react";
 import { useTranslation } from "react-i18next";
 
 import { apiClient } from "@/api/client";
-import { useGetExportJob } from "@/api/generated/exports/exports";
+import { useGetDataJob } from "@/api/generated/data-jobs/data-jobs";
 import { useActiveCommunityId } from "@/hooks/useActiveCommunityId";
 import { downloadBlob } from "@/lib/csv";
 import { getErrorMessage } from "@/lib/errorMessage";
@@ -68,7 +68,7 @@ export function useExportJob({ resumePending = false }: UseExportJobOptions = {}
   // though polling re-renders keep delivering it.
   const handledJobs = useRef(new Set<number>());
 
-  const jobQuery = useGetExportJob(communityId, jobId ?? 0, {
+  const jobQuery = useGetDataJob(communityId, jobId ?? 0, {
     query: {
       enabled: jobId != null,
       refetchInterval: (query) => (TERMINAL.has(query.state.data?.status ?? "") ? false : POLL_MS),

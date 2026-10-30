@@ -32,6 +32,7 @@ from app.api.v1.tenant_endpoints import (
     calendar_events,
     calendars,
     dashboards,
+    data_jobs,
     guild_plugins,
     collaboration,
     comments,
@@ -320,6 +321,7 @@ guild_router.include_router(
 guild_router.include_router(
     share_requests.router, prefix="/share-requests", tags=["sharing"]
 )
+guild_router.include_router(data_jobs.router, prefix="/data-jobs", tags=["data-jobs"])
 guild_router.include_router(exports.router, prefix="/exports", tags=["exports"])
 guild_router.include_router(demo.community_router, prefix="/demo", tags=["demo"])
 guild_router.include_router(demo.sales_router, prefix="/demo", tags=["demo"])

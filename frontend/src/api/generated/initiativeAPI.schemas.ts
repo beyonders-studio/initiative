@@ -3463,34 +3463,51 @@ export interface CommunityEntitlementsRead {
   banner_image_enabled: boolean;
 }
 
-export type ExportJobStatus = (typeof ExportJobStatus)[keyof typeof ExportJobStatus];
+export type DataJobDirection = (typeof DataJobDirection)[keyof typeof DataJobDirection];
 
-export const ExportJobStatus = {
+export const DataJobDirection = {
+  import: "import",
+  export: "export",
+} as const;
+
+export type DataJobStatus = (typeof DataJobStatus)[keyof typeof DataJobStatus];
+
+export const DataJobStatus = {
+  staged: "staged",
+  fetching: "fetching",
   queued: "queued",
   running: "running",
   done: "done",
   failed: "failed",
+  cancelled: "cancelled",
   expired: "expired",
 } as const;
 
-export type ExportJobReadParams = { [key: string]: unknown };
+export type DataJobReadParams = { [key: string]: unknown };
 
-export interface ExportJobRead {
+export type DataJobReadPlan = { [key: string]: unknown } | null;
+
+export type DataJobReadResult = { [key: string]: unknown } | null;
+
+export interface DataJobRead {
   id: number;
   community_id: number;
+  direction: DataJobDirection;
   created_by: number;
   source: string;
-  template_id: string;
-  format: string;
-  params: ExportJobReadParams;
-  status: ExportJobStatus;
+  params: DataJobReadParams;
+  status: DataJobStatus;
   error: string | null;
   expires_at: string | null;
   created_at: string;
   updated_at: string;
+  plan: DataJobReadPlan;
+  result: DataJobReadResult;
+  template_id: string | null;
+  format: string | null;
   /**
-   * The archive went to the operator's destination; there is nothing
-   * here to download.
+   * The export's archive went to the operator's destination; there is
+   * nothing here to download.
    */
   readonly delivered: boolean;
 }
@@ -3506,7 +3523,7 @@ export interface ExportJobRead {
 export interface CommunityExportStatus {
   cooldown_hours: number;
   next_available_at: string | null;
-  latest: ExportJobRead | null;
+  latest: DataJobRead | null;
   latest_started_by: string | null;
 }
 
@@ -6167,7 +6184,7 @@ export type EnvelopeImportResultFailed = { [key: string]: number };
 
 /**
  * One envelope's apply outcome — JSON-serializable because it is
- * persisted verbatim into ``import_jobs.result`` and rendered by the UI.
+ * persisted verbatim into ``data_jobs.result`` and rendered by the UI.
  */
 export interface EnvelopeImportResult {
   entity_id?: number | null;
@@ -6796,40 +6813,6 @@ export interface IgnoredAccountsResponse {
   has_next: boolean;
   has_prev: boolean;
   items: IgnoredAccountRead[];
-}
-
-export type ImportJobReadParams = { [key: string]: unknown };
-
-export type ImportJobReadPlan = { [key: string]: unknown } | null;
-
-export type ImportJobReadResult = { [key: string]: unknown } | null;
-
-export type ImportJobStatus = (typeof ImportJobStatus)[keyof typeof ImportJobStatus];
-
-export const ImportJobStatus = {
-  staged: "staged",
-  fetching: "fetching",
-  queued: "queued",
-  running: "running",
-  done: "done",
-  failed: "failed",
-  cancelled: "cancelled",
-  expired: "expired",
-} as const;
-
-export interface ImportJobRead {
-  id: number;
-  community_id: number;
-  created_by: number;
-  source: string;
-  params: ImportJobReadParams;
-  plan: ImportJobReadPlan;
-  result: ImportJobReadResult;
-  status: ImportJobStatus;
-  error: string | null;
-  expires_at: string | null;
-  created_at: string;
-  updated_at: string;
 }
 
 /**

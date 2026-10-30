@@ -135,9 +135,13 @@ def sweeps() -> tuple[Sweep, ...]:
     from app.models.tenant.engagement_level import EngagementLevel
     from app.models.tenant.event_outbox import EventOutbox
     from app.models.tenant.evidence import Evidence
-    from app.models.tenant.export_job import ExportJob, ExportJobStatus
+    from app.models.tenant.data_job import (
+        HOLDS_FILE,
+        DataJob,
+        DataJobDirection,
+        DataJobStatus,
+    )
     from app.models.tenant.guild_plugin import GuildPlugin
-    from app.models.tenant.import_job import ImportJob, ImportJobStatus
     from app.models.tenant.intake import IntakeCase
     from app.models.tenant.moderation import ModerationReport
     from app.models.tenant.personal_item import PersonalItem
@@ -145,7 +149,7 @@ def sweeps() -> tuple[Sweep, ...]:
     from app.models.tenant.task import Task, TaskStatus, TaskStatusCategory
     from app.models.tenant.task_assignment_digest import TaskAssignmentDigestItem
     from app.models.tenant.upload import Upload
-    from app.services import notifications, resumable
+    from app.services import data_jobs, notifications, resumable
     from app.services.export import worker as export_worker
     from app.services.import_engine import worker as import_worker
     from app.services.marketplace import community_hooks, plugin_installs
@@ -178,16 +182,14 @@ def sweeps() -> tuple[Sweep, ...]:
         return select(func.now()).where(condition)
 
     hour, minute = timedelta(hours=1), timedelta(minutes=1)
-    imports_pending = (
-        ImportJobStatus.staged.value,
-        ImportJobStatus.fetching.value,
-        ImportJobStatus.queued.value,
-    )
-    imports_finished = tuple(
-        status.value
-        for status in ImportJobStatus
-        if status.value not in (*imports_pending, ImportJobStatus.running.value)
-    )
+    dispatchers = (export_worker.jobs, import_worker.jobs)
+
+    def job_is(direction: DataJobDirection, statuses: Iterable[DataJobStatus]) -> str:
+        """A trigger's ``when``: the written data job goes that way and holds
+        one of the statuses."""
+        listed = ", ".join(f"'{status.value}'" for status in statuses)
+        return f"(NEW.direction = '{direction.value}' AND NEW.status IN ({listed}))"
+
     change_log_sources = (
         on_insert(
             "event_outbox",
@@ -318,25 +320,22 @@ def sweeps() -> tuple[Sweep, ...]:
             visit=claim_jobs,
             # Armed at once by a job queued or ended, so it is claimed now.
             next_due=lambda _now: least(
-                when_exists(
-                    exists().where(ExportJob.status == ExportJobStatus.queued.value)
-                    & ~exists().where(ExportJob.status == ExportJobStatus.running.value)
-                ),
-                when_exists(
-                    exists().where(ImportJob.status == ImportJobStatus.queued.value)
-                    & ~exists().where(
-                        col(ImportJob.status).in_(
-                            (
-                                ImportJobStatus.fetching.value,
-                                ImportJobStatus.running.value,
-                            )
+                *(
+                    when_exists(
+                        exists().where(
+                            DataJob.direction == jobs.direction,
+                            DataJob.status == DataJobStatus.queued,
+                        )
+                        & ~exists().where(
+                            DataJob.direction == jobs.direction,
+                            col(DataJob.status).in_(jobs.active),
                         )
                     )
-                ),
+                    for jobs in dispatchers
+                )
             ),
-            sources=tuple(
-                on_row(table, "now()", events="INSERT OR UPDATE OF status")
-                for table in ("export_jobs", "import_jobs")
+            sources=(
+                on_row("data_jobs", "now()", events="INSERT OR UPDATE OF status"),
             ),
         ),
         Sweep(
@@ -367,33 +366,42 @@ def sweeps() -> tuple[Sweep, ...]:
             # Heartbeats only push these later, so they arm nothing.
             next_due=lambda _now: least(
                 select(
-                    func.min(ExportJob.updated_at) + export_worker.STALE_RUNNING
-                ).where(ExportJob.status == ExportJobStatus.running.value),
+                    func.min(DataJob.updated_at) + export_worker.STALE_RUNNING
+                ).where(
+                    DataJob.direction == DataJobDirection.export,
+                    DataJob.status == DataJobStatus.running,
+                ),
                 select(
-                    func.min(ImportJob.updated_at) + import_worker.STALE_RUNNING
-                ).where(ImportJob.status == ImportJobStatus.running.value),
+                    func.min(DataJob.updated_at) + import_worker.STALE_RUNNING
+                ).where(
+                    DataJob.direction == DataJobDirection.import_,
+                    DataJob.status == DataJobStatus.running,
+                ),
                 select(
-                    func.min(ImportJob.updated_at) + import_worker.STALE_FETCHING
-                ).where(ImportJob.status == ImportJobStatus.fetching.value),
+                    func.min(DataJob.updated_at) + import_worker.STALE_FETCHING
+                ).where(
+                    DataJob.direction == DataJobDirection.import_,
+                    DataJob.status == DataJobStatus.fetching,
+                ),
             ),
             sources=(
                 on_row(
-                    "export_jobs",
+                    "data_jobs",
                     "now()",
                     after=export_worker.STALE_RUNNING,
                     events="INSERT OR UPDATE OF status",
-                    when=f"NEW.status = '{ExportJobStatus.running.value}'",
+                    when=job_is(DataJobDirection.export, (DataJobStatus.running,)),
                 ),
                 on_row(
-                    "import_jobs",
+                    "data_jobs",
                     "now()",
                     after=min(
                         import_worker.STALE_RUNNING, import_worker.STALE_FETCHING
                     ),
                     events="INSERT OR UPDATE OF status",
-                    when=(
-                        f"NEW.status IN ('{ImportJobStatus.running.value}',"
-                        f" '{ImportJobStatus.fetching.value}')"
+                    when=job_is(
+                        DataJobDirection.import_,
+                        (DataJobStatus.running, DataJobStatus.fetching),
                     ),
                 ),
             ),
@@ -461,57 +469,43 @@ def sweeps() -> tuple[Sweep, ...]:
             ),
         ),
         Sweep(
-            kind="export_expiry",
+            kind="data_job_expiry",
             scope=Scope.PROVISIONED,
             every=hour,
-            visit=export_worker.expire_artifacts,
-            next_due=lambda _now: select(func.min(ExportJob.expires_at)).where(
-                ExportJob.status == ExportJobStatus.done.value,
-                col(ExportJob.expires_at).is_not(None),
-            ),
-            sources=(
-                on_row(
-                    "export_jobs",
-                    "{row}.expires_at",
-                    events="INSERT OR UPDATE OF expires_at, status",
-                    when=(
-                        f"NEW.status = '{ExportJobStatus.done.value}'"
-                        " AND NEW.expires_at IS NOT NULL"
-                    ),
-                ),
-            ),
-        ),
-        Sweep(
-            kind="import_expiry",
-            scope=Scope.PROVISIONED,
-            every=hour,
-            visit=import_worker.expire_payloads,
+            visit=data_jobs.expire_files,
             next_due=lambda _now: least(
-                select(func.min(ImportJob.expires_at)).where(
-                    col(ImportJob.status).in_(imports_pending),
-                    col(ImportJob.expires_at).is_not(None),
+                select(func.min(DataJob.expires_at)).where(
+                    data_jobs.holds_file(), col(DataJob.expires_at).is_not(None)
                 ),
                 when_exists(
                     exists().where(
-                        col(ImportJob.status).in_(imports_finished),
-                        col(ImportJob.secret_encrypted).is_not(None),
+                        DataJob.direction == DataJobDirection.import_,
+                        col(DataJob.status).in_(data_jobs.IMPORT_OVER),
+                        col(DataJob.secret_encrypted).is_not(None),
                     )
                 ),
             ),
             sources=(
                 on_row(
-                    "import_jobs",
+                    "data_jobs",
                     "{row}.expires_at",
-                    events="INSERT OR UPDATE OF expires_at",
-                    when="NEW.expires_at IS NOT NULL",
+                    events="INSERT OR UPDATE OF expires_at, status",
+                    when=(
+                        "NEW.expires_at IS NOT NULL AND ("
+                        + " OR ".join(
+                            job_is(direction, statuses)
+                            for direction, statuses in HOLDS_FILE.items()
+                        )
+                        + ")"
+                    ),
                 ),
                 on_row(
-                    "import_jobs",
+                    "data_jobs",
                     "now()",
                     events="UPDATE OF status",
                     when=(
-                        f"NEW.status IN ({', '.join(repr(s) for s in imports_finished)})"
-                        " AND NEW.secret_encrypted IS NOT NULL"
+                        job_is(DataJobDirection.import_, data_jobs.IMPORT_OVER)
+                        + " AND NEW.secret_encrypted IS NOT NULL"
                     ),
                 ),
             ),

@@ -1,7 +1,8 @@
-"""Export endpoints: create (auto inline-vs-job), poll, and download.
+"""Export endpoints: create (auto inline-vs-job) and download; a job is polled
+through ``data_jobs``.
 
 The artifact is content, so its download is a gated read: the download route
-loads the ExportJob row under RLS (own-row + guild-admin policies), asks again
+loads the DataJob row under RLS (own-row + guild-admin policies), asks again
 that the caller reaches every initiative the artifact holds, and only then
 streams the file from the guild's storage backend. Artifacts are deliberately
 never registered in ``uploads``, so the guild-wide ``/uploads/{community_id}/…``
@@ -22,7 +23,7 @@ from pydantic import Field
 from fastapi import APIRouter, Depends, HTTPException, Query, Response, status
 from fastapi.responses import JSONResponse, RedirectResponse
 from sqlalchemy import func, not_
-from sqlmodel import select
+from sqlmodel import col, select
 
 from app.api.deps import (
     GuildContext,
@@ -38,7 +39,7 @@ from app.core.tools import Tool, tool_export_source
 from app.core.user_display import display_name
 from app.models.platform.user import User
 from app.models.platform.user_profile_view import MemberProfile
-from app.models.tenant.export_job import ExportJob, ExportJobStatus
+from app.models.tenant.data_job import DataJob, DataJobDirection, DataJobStatus
 from app.models.tenant.initiative import Initiative
 from app.schemas.query import DateBucket
 from app.schemas.tenant.backup_export import BackupEstimate
@@ -47,13 +48,10 @@ from app.schemas.tenant.tool_layout import (
     MAX_HIDDEN_GROUPS,
     MAX_NODES,
 )
-from app.schemas.tenant.export_job import (
-    ExportJobRead,
-    CommunityExportStatus,
-    artifact_expired,
-    serialize_export_job,
-)
+from app.schemas.tenant.data_job import file_expired, serialize_data_job
+from app.schemas.tenant.export_job import CommunityExportStatus
 from app.services import audit as audit_service
+from app.services import data_jobs
 from app.services.platform import rules
 from app.services.export.adapters import ADAPTERS
 from app.services.export.adapters.backup import (
@@ -73,8 +71,6 @@ from app.services.tenant.initiatives import keeps_content_in
 router = APIRouter()
 
 CurrentUserDep = Annotated[User, Depends(get_current_active_user)]
-
-_LIST_LIMIT = 50
 
 
 def _inline_response(result: InlineExport) -> Response:
@@ -101,11 +97,11 @@ def _allow_job(guild_context: GuildContext) -> bool:
 
 
 def _job_response(
-    job: ExportJob, *, guild_id: int, status_code: int = status.HTTP_200_OK
+    job: DataJob, *, guild_id: int, status_code: int = status.HTTP_200_OK
 ) -> JSONResponse:
     return JSONResponse(
         status_code=status_code,
-        content=serialize_export_job(job, guild_id=guild_id).model_dump(mode="json"),
+        content=serialize_data_job(job, guild_id=guild_id).model_dump(mode="json"),
     )
 
 
@@ -117,7 +113,7 @@ async def _start_export(
     source: str,
     format: str,
     params: dict[str, Any],
-) -> Union[InlineExport, ExportJob]:
+) -> Union[InlineExport, DataJob]:
     """Start an export through the engine: rendered here when it is small, or
     queued as a job the caller polls."""
     return await start_export(
@@ -132,7 +128,7 @@ async def _start_export(
 
 
 def _export_response(
-    result: Union[InlineExport, ExportJob], guild_context: GuildContext
+    result: Union[InlineExport, DataJob], guild_context: GuildContext
 ) -> Response:
     """The file itself for an inline export; ``202`` and the job for a queued
     one."""
@@ -332,19 +328,20 @@ async def _guild_export_available_at(session) -> Optional[datetime]:
     window = timedelta(hours=hours)
     started_at = (
         await session.exec(
-            select(ExportJob.created_at)
+            select(DataJob.created_at)
             .where(
-                ExportJob.source == "community",
-                ExportJob.status.in_(
+                DataJob.direction == DataJobDirection.export,
+                DataJob.source == "community",
+                DataJob.status.in_(
                     (
-                        ExportJobStatus.queued,
-                        ExportJobStatus.running,
-                        ExportJobStatus.done,
+                        DataJobStatus.queued,
+                        DataJobStatus.running,
+                        DataJobStatus.done,
                     )
                 ),
-                ExportJob.created_at >= datetime.now(timezone.utc) - window,
+                DataJob.created_at >= datetime.now(timezone.utc) - window,
             )
-            .order_by(ExportJob.created_at.desc())
+            .order_by(col(DataJob.created_at).desc())
             .limit(1)
         )
     ).first()
@@ -551,9 +548,12 @@ async def read_community_export_status(
     require_seat(guild_context, detail=ExportMessages.EXPORT_SUPERADMIN_REQUIRED)
     latest = (
         await session.exec(
-            select(ExportJob)
-            .where(ExportJob.source == "community")
-            .order_by(ExportJob.created_at.desc())
+            select(DataJob)
+            .where(
+                DataJob.direction == DataJobDirection.export,
+                DataJob.source == "community",
+            )
+            .order_by(col(DataJob.created_at).desc())
             .limit(1)
         )
     ).first()
@@ -568,41 +568,11 @@ async def read_community_export_status(
             "community_export_cooldown_hours"
         ],
         next_available_at=await _guild_export_available_at(session),
-        latest=serialize_export_job(latest, guild_id=guild_context.guild_id)
+        latest=serialize_data_job(latest, guild_id=guild_context.guild_id)
         if latest is not None
         else None,
         latest_started_by=started_by or None,
     )
-
-
-@router.get("/jobs", response_model=list[ExportJobRead])
-async def list_export_jobs(
-    session: RLSSessionDep,
-    current_user: CurrentUserDep,
-    guild_context: GuildContextDep,
-) -> list[ExportJobRead]:
-    """The caller's export jobs, newest first (RLS scopes the rows: own rows,
-    or the whole guild for a guild admin)."""
-    jobs = await session.exec(
-        select(ExportJob).order_by(ExportJob.created_at.desc()).limit(_LIST_LIMIT)
-    )
-    return [serialize_export_job(job, guild_id=guild_context.guild_id) for job in jobs]
-
-
-@router.get("/jobs/{job_id}", response_model=ExportJobRead)
-async def get_export_job(
-    job_id: int,
-    session: RLSSessionDep,
-    current_user: CurrentUserDep,
-    guild_context: GuildContextDep,
-) -> ExportJobRead:
-    job = await session.get(ExportJob, job_id)
-    if job is None:  # includes rows RLS hides — 404, never 403
-        raise HTTPException(
-            status_code=status.HTTP_404_NOT_FOUND,
-            detail=ExportMessages.EXPORT_JOB_NOT_FOUND,
-        )
-    return serialize_export_job(job, guild_id=guild_context.guild_id)
 
 
 async def _require_reach(
@@ -641,19 +611,19 @@ async def download_export_artifact(
     """Stream a finished export's artifact. The RLS-gated job lookup and the
     initiatives the artifact holds are the authorization, asked now rather
     than when it was rendered; storage is touched only after both pass."""
-    job = await session.get(ExportJob, job_id)
+    job = await data_jobs.find(session, job_id, DataJobDirection.export)
     if job is None:
         raise HTTPException(
             status_code=status.HTTP_404_NOT_FOUND,
             detail=ExportMessages.EXPORT_JOB_NOT_FOUND,
         )
-    if artifact_expired(job):
+    if file_expired(job):
         # Past its expiry the artifact is gone or about to be: the next GC
         # pass deletes it, and until then it is no longer served.
         raise HTTPException(
             status_code=status.HTTP_410_GONE, detail=ExportMessages.EXPORT_EXPIRED
         )
-    if job.status != ExportJobStatus.done or not job.artifact_ref:
+    if job.status != DataJobStatus.done or not job.file_ref:
         # A delivered job is finished and has nothing to download — it was
         # written to the operator's destination, which the job row names.
         raise HTTPException(
@@ -700,7 +670,7 @@ async def download_export_artifact(
     # `exports/{job_id}.{format}` — no such prefix, so use the generic name.
     # build_upload_response escapes the name (RFC 5987) — original filenames
     # are user text and must not break out of the header.
-    basename = job.artifact_ref.rsplit("/", 1)[-1]
+    basename = job.file_ref.rsplit("/", 1)[-1]
     named_prefix = f"{job.id}-"
     if basename.startswith(named_prefix):
         filename = basename[len(named_prefix) :]
@@ -716,7 +686,7 @@ async def download_export_artifact(
     # whatever the setting says.
     signed = (
         storage.presign_get(
-            job.artifact_ref,
+            job.file_ref,
             ttl=export_limits.EXPORT_DOWNLOAD_URL_TTL_SECONDS,
             filename=filename,
         )
@@ -728,7 +698,7 @@ async def download_export_artifact(
             url=signed, status_code=status.HTTP_307_TEMPORARY_REDIRECT
         )
 
-    blob = storage.open_readable(job.artifact_ref)
+    blob = storage.open_readable(job.file_ref)
     if blob is None:  # GC'd or missing — fail closed
         raise HTTPException(
             status_code=status.HTTP_404_NOT_FOUND,

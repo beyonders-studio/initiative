@@ -9,7 +9,7 @@ backend-agnostic data payload the ``task-table`` template reads.
 accepts: ``{"conditions", "sorting", "tz", "include_archived"}``, the field
 their view of the list is grouped by (``group_by``), the layout fields its
 table shows (``columns``) and, for the detailed report, the parts of the task
-page in its order (``detail``). It is what an ExportJob row persists, and what
+page in its order (``detail``). It is what an export job row persists, and what
 the worker replays here at render time.
 
 Rows are the task list's own (``TaskListRead``), and a column is a field of

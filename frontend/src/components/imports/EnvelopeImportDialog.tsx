@@ -7,7 +7,7 @@ import {
   useImportEnvelope,
   useImportEnvelopeArchive,
 } from "@/api/generated/imports/imports";
-import type { ImportJobRead, Tool } from "@/api/generated/initiativeAPI.schemas";
+import type { DataJobRead, Tool } from "@/api/generated/initiativeAPI.schemas";
 import { invalidate, q } from "@/api/query-keys";
 import { ImportPeopleStep, type PlanPerson } from "@/components/imports/ImportPeopleStep";
 import { Button } from "@/components/ui/button";
@@ -108,7 +108,7 @@ export function EnvelopeImportDialog({
   const [fileName, setFileName] = useState("");
   // The job the server parked to ask about its people, if it did. Null is the
   // ordinary case: the import already happened.
-  const [stagedJob, setStagedJob] = useState<ImportJobRead | null>(null);
+  const [stagedJob, setStagedJob] = useState<DataJobRead | null>(null);
   // Source handle → the account picked for it, seeded from the plan's exact
   // matches. A handle left out stays unmapped on purpose.
   const [peopleMap, setPeopleMap] = useState<Record<string, number | null>>({});
@@ -256,7 +256,7 @@ export function EnvelopeImportDialog({
                 initiative_id: Number(initiativeId),
               },
             })
-      ) as { result: { entity_title: string; unmatched_handles: string[] } } | ImportJobRead;
+      ) as { result: { entity_title: string; unmatched_handles: string[] } } | DataJobRead;
       // `id` rather than `result`, which a job row also carries (its report):
       // only a job has an id, so that is what tells the two apart.
       if (!("id" in response)) {

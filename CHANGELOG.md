@@ -46,6 +46,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - **Marketplace projects bring their own properties.** A ready-made project's fields, such as a grant's funder or a deal's value, are the project's properties, shown in its table, cards and task page, rather than added to the initiative's metadata. Money fields hold an amount in US dollars.
 - **Delete a task type from a project's layouts.** Each type's page under **Settings › Layouts** has a delete button that asks where its tasks go.
 - **Smaller pages and lists to download.** The app's JSON, text and SVG are sent compressed to browsers that accept it.
+- **Imports and exports are one list in the API.** `GET /c/{id}/data-jobs/` and `GET /c/{id}/data-jobs/{job_id}` replace reading jobs from `/imports/jobs` and `/exports/jobs`; each job says its `direction`. Starting, cancelling, confirming and downloading are where they were. A notification about an export made before the upgrade no longer opens it.
 
 ### Removed
 

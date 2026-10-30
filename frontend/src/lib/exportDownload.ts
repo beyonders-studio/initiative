@@ -60,14 +60,14 @@ export async function downloadExportArtifact(
   jobId: number,
   t: (key: string, options?: Record<string, unknown>) => string,
   source = "tasks",
-  format = "pdf"
+  format: string | null = "pdf"
 ): Promise<void> {
   try {
     const res = await apiClient.get<Blob>(`/c/${communityId}/exports/jobs/${jobId}/download`, {
       responseType: "blob",
     });
     const serverName = filenameFromDisposition(res.headers["content-disposition"]);
-    downloadBlob(res.data, serverName ?? `${source}-${jobId}.${format}`);
+    downloadBlob(res.data, serverName ?? `${source}-${jobId}.${format ?? "pdf"}`);
     toast.success(t("exports:export.success"));
   } catch (err) {
     toast.error(getErrorMessage(await normalizeBlobError(err), "exports:export.error"));

@@ -6,7 +6,7 @@ import {
   getReadCommunityExportStatusQueryKey,
   useReadCommunityExportStatus,
 } from "@/api/generated/exports/exports";
-import type { ExportJobRead } from "@/api/generated/initiativeAPI.schemas";
+import type { DataJobRead } from "@/api/generated/initiativeAPI.schemas";
 import { ExportWizard } from "@/components/exports/ExportWizard";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
@@ -31,7 +31,7 @@ const STATUS_VARIANT: Record<string, "default" | "secondary" | "destructive" | "
 /** Effective status at render time: polling stops once the job is terminal,
  * so a page left open can hold a stale "done" whose artifact has since been
  * cleaned up. Mirrors the clamp the jobs table makes. */
-function displayStatus(job: ExportJobRead): string {
+function displayStatus(job: DataJobRead): string {
   if (
     job.status === "done" &&
     job.expires_at != null &&
