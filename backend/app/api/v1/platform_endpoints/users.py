@@ -48,6 +48,7 @@ from app.api.v1.platform_endpoints.held_changes import (
 )
 from app.api.v1.platform_endpoints.session_opening import set_password
 from app.core.capabilities import Capability
+from app.core.image_headers import image_response
 from app.core.password_policy import validate_new_password
 from app.core.identity_boundary import PersonId
 from app.core.user_display import handle_of
@@ -2064,14 +2065,7 @@ async def _avatar_response(
     avatar = await user_avatars_service.get_avatar(session, user_id=user_id)
     if avatar is None or avatar.sha256 != digest:
         raise _image_not_found()
-    return Response(
-        content=avatar.data,
-        media_type=avatar.content_type,
-        headers={
-            "Cache-Control": "public, max-age=31536000, immutable",
-            "X-Content-Type-Options": "nosniff",
-        },
-    )
+    return image_response(avatar.data, avatar.content_type, shared=True)
 
 
 @router.get("/{user_id}/avatar/{digest}", include_in_schema=False)

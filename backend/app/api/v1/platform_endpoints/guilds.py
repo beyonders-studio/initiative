@@ -47,7 +47,7 @@ from app.core.capabilities import Capability, user_has_capability
 from app.core.config import settings
 from app.core.login_methods import SecondFactorRequirement
 from app.schemas.ai_settings import AIConfigMode
-from app.core.image_headers import validate_image
+from app.core.image_headers import image_response, validate_image
 from app.core.messages import BillingMessages, GuildMessages, ImageMessages
 from app.core.rate_limit import limiter
 from app.core.security import (
@@ -885,17 +885,8 @@ async def read_community_image(
             status_code=status.HTTP_404_NOT_FOUND,
             detail=ImageMessages.IMAGE_NOT_FOUND,
         )
-    return Response(
-        content=image.data,
-        media_type=image.content_type,
-        headers={
-            # The digest is in the path, so these bytes are these bytes
-            # forever. ``private`` because who may have them is decided per
-            # caller: a shared cache must never hand one viewer's copy on.
-            "Cache-Control": "private, max-age=31536000, immutable",
-            "X-Content-Type-Options": "nosniff",
-        },
-    )
+    # Who may have these is decided per caller, so no shared cache keeps them.
+    return image_response(image.data, image.content_type, shared=False)
 
 
 async def _store_guild_images(

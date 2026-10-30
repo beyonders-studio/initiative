@@ -37,6 +37,7 @@ from sqlmodel.ext.asyncio.session import AsyncSession
 from app.api.deps import SessionDep, UserSessionDep, SystemSessionDep, CurrentUser
 from app.api.v1.platform_endpoints.operator import ConfigManageDep
 from app.core.audit_events import AuditEventType
+from app.core.image_headers import image_response
 from app.core.messages import MarketplaceMessages
 from app.core.messages import MarketplaceRegistryMessages as RegistryCodes
 from app.models.platform.marketplace_registry import MarketplaceMedia
@@ -159,14 +160,7 @@ async def read_marketplace_media(digest: str, session: SessionDep) -> Response:
             status_code=status.HTTP_404_NOT_FOUND,
             detail=MarketplaceMessages.MEDIA_NOT_FOUND,
         )
-    return Response(
-        content=media.data,
-        media_type=media.content_type,
-        headers={
-            "Cache-Control": "public, max-age=31536000, immutable",
-            "X-Content-Type-Options": "nosniff",
-        },
-    )
+    return image_response(media.data, media.content_type, shared=True)
 
 
 # --- the registry (operator) --------------------------------------------------
