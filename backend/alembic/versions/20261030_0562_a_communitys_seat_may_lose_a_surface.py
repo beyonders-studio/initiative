@@ -15,6 +15,10 @@ Revises: 20261030_0561
 Create Date: 2026-10-30
 """
 
+from collections.abc import Iterator
+from contextlib import contextmanager
+
+import sqlalchemy as sa
 from alembic import op
 
 revision = "20261030_0562"
@@ -46,33 +50,40 @@ $function$
 """
 
 
+@contextmanager
+def _unforced(table: str) -> Iterator[sa.engine.Connection]:
+    """``table`` unforced for this revision's role, forced again after."""
+    bind = op.get_bind()
+    bind.exec_driver_sql(f"ALTER TABLE public.{table} NO FORCE ROW LEVEL SECURITY")
+    try:
+        yield bind
+    finally:
+        bind.exec_driver_sql(f"ALTER TABLE public.{table} FORCE ROW LEVEL SECURITY")
+
+
 def upgrade() -> None:
-    for key in SURFACES:
-        op.execute(
-            "INSERT INTO public.rule_key_writers (key, set_by)"
-            f" VALUES ('{key}', 'deployment')"
-        )
+    with _unforced("rule_key_writers") as bind:
+        for key in SURFACES:
+            bind.exec_driver_sql(
+                "INSERT INTO public.rule_key_writers (key, set_by)"
+                f" VALUES ('{key}', 'deployment')"
+            )
     op.get_bind().exec_driver_sql(COMMUNITY_SURFACE_OPEN)
 
 
 def downgrade() -> None:
-    bind = op.get_bind()
-    bind.exec_driver_sql(
-        "ALTER TABLE public.community_rules NO FORCE ROW LEVEL SECURITY"
-    )
-    try:
+    with _unforced("community_rules") as bind:
         bind.exec_driver_sql(
             "DELETE FROM public.community_rules"
             " WHERE key IN ('surface.ai_connections', 'surface.plugins')"
         )
-    finally:
-        bind.exec_driver_sql(
-            "ALTER TABLE public.community_rules FORCE ROW LEVEL SECURITY"
-        )
     # The policies that ask it are rendered again, without it, by the version
     # being returned to.
-    bind.exec_driver_sql(
+    op.get_bind().exec_driver_sql(
         "DROP FUNCTION public.community_surface_open(integer, text) CASCADE"
     )
-    for key in SURFACES:
-        op.execute(f"DELETE FROM public.rule_key_writers WHERE key = '{key}'")
+    with _unforced("rule_key_writers") as bind:
+        for key in SURFACES:
+            bind.exec_driver_sql(
+                f"DELETE FROM public.rule_key_writers WHERE key = '{key}'"
+            )

@@ -48,7 +48,11 @@ from sqlalchemy.exc import IntegrityError
 from sqlmodel import select
 from sqlmodel.ext.asyncio.session import AsyncSession
 
-from app.api.deps import refuse_closed_surface, require_surface_open
+from app.api.deps import (
+    get_guild_seat_write_session,
+    refuse_closed_surface,
+    require_surface_open,
+)
 from app.core.rules import SURFACE_PLUGINS
 from app.api.deps import (
     AgeViewerDep,
@@ -142,7 +146,9 @@ logger = logging.getLogger(__name__)
 router = APIRouter()
 
 #: Configuring this surface, which the deployment may close for one community.
-_SURFACE_OPEN = Depends(require_surface_open(SURFACE_PLUGINS))
+_SURFACE_OPEN = Depends(
+    require_surface_open(SURFACE_PLUGINS, get_guild_seat_write_session)
+)
 
 #: The same installs, reached from inside one initiative. Mounted at the guild
 #: root rather than under ``/plugins`` because the initiative comes first in the

@@ -15,7 +15,7 @@ from typing import Annotated
 
 from fastapi import APIRouter, Depends, status
 
-from app.api.deps import require_surface_open
+from app.api.deps import get_guild_settings_session, require_surface_open
 from app.core.rules import SURFACE_AI_CONNECTIONS
 from app.api.deps import (
     GuildContext,
@@ -39,7 +39,9 @@ from app.services import ai_settings as ai_settings_service
 router = APIRouter()
 
 #: Configuring this surface, which the deployment may close for one community.
-_SURFACE_OPEN = Depends(require_surface_open(SURFACE_AI_CONNECTIONS))
+_SURFACE_OPEN = Depends(
+    require_surface_open(SURFACE_AI_CONNECTIONS, get_guild_settings_session)
+)
 
 # Connecting a community to an AI provider decides what leaves it, and for
 # whom — the same kind of question as who may sign in, so it answers to the
@@ -114,7 +116,9 @@ async def delete_community_connection(
 
 
 @router.post(
-    "/ai/connections/{connection_id}/test", response_model=AIConnectionTestResponse
+    "/ai/connections/{connection_id}/test",
+    response_model=AIConnectionTestResponse,
+    dependencies=[_SURFACE_OPEN],
 )
 async def test_community_connection(
     connection_id: int,
@@ -124,7 +128,11 @@ async def test_community_connection(
     return await ai_settings_service.test_guild_connection(session, connection_id)
 
 
-@router.post("/ai/connections/{connection_id}/models", response_model=AIModelsResponse)
+@router.post(
+    "/ai/connections/{connection_id}/models",
+    response_model=AIModelsResponse,
+    dependencies=[_SURFACE_OPEN],
+)
 async def fetch_community_connection_models(
     connection_id: int,
     session: SettingsRLSSessionDep,

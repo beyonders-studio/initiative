@@ -2160,16 +2160,24 @@ async def authenticate_feed(
     return user
 
 
-def require_surface_open(key: str) -> Callable[..., Awaitable[None]]:
+def require_surface_open(
+    key: str, session_dependency: Callable[..., Any]
+) -> Callable[..., Awaitable[None]]:
     """A route that configures a surface the deployment may take away from one
     community (``app.core.rules``, ``surface.*``), refused while it is closed.
+
+    It reads on the route's own session: ``session_dependency`` is the one the
+    route takes, which FastAPI resolves once a request.
 
     The surface's tables refuse the seat's writes as well; this is the answer a
     person can read. Nothing the community set up is deleted, so reopening it
     has only to stop refusing.
     """
 
-    async def _open(guild_id: CommunityIdPath, session: SystemSessionDep) -> None:
+    async def _open(
+        guild_id: CommunityIdPath,
+        session: Annotated[AsyncSession, Depends(session_dependency)],
+    ) -> None:
         await refuse_closed_surface(session, guild_id, key)
 
     return _open
