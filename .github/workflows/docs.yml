@@ -28,6 +28,8 @@ concurrency:
 
 jobs:
   build-and-deploy:
+    # The help center is this repository's Pages site; a fork publishes none.
+    if: ${{ github.repository == 'beyonders-studio/initiative' }}
     environment:
       name: github-pages
       url: ${{ steps.deployment.outputs.page_url }}
