@@ -21,11 +21,17 @@ import { TaskBulkEditDialog } from "./TaskBulkEditDialog";
 const TASK_TYPE = buildTaskType({ id: 1, name: "Task", project_id: 1, is_default: true });
 const IDEA = buildTaskType({ id: 9, name: "Idea", project_id: 1, position: 1 });
 
-/** The dialog for `tasks`, in a project whose Idea page requires tags. */
-const open = (tasks: TaskListRead[], types = [TASK_TYPE, IDEA]) => {
+/** The dialog for `tasks`, in a project whose Idea page requires tags, or
+ *  whose type pages can't be read (`unreadable`). */
+const open = (tasks: TaskListRead[], types = [TASK_TYPE, IDEA], { unreadable = false } = {}) => {
+  const layoutReads = { failed: 0 };
   server.use(
-    communityHttp.get("/layouts/", () =>
-      HttpResponse.json(
+    communityHttp.get("/layouts/", () => {
+      if (unreadable) {
+        layoutReads.failed += 1;
+        return new HttpResponse(null, { status: 500 });
+      }
+      return HttpResponse.json(
         buildToolLayoutSet({
           layouts: [
             {
@@ -39,8 +45,8 @@ const open = (tasks: TaskListRead[], types = [TASK_TYPE, IDEA]) => {
             },
           ],
         })
-      )
-    )
+      );
+    })
   );
   const onApply = vi.fn();
   renderWithProviders(
@@ -57,7 +63,15 @@ const open = (tasks: TaskListRead[], types = [TASK_TYPE, IDEA]) => {
       />
     </Dialog>
   );
-  return { onApply, user: userEvent.setup() };
+  return { onApply, layoutReads, user: userEvent.setup() };
+};
+
+/** Opens Details and the type picker, once the type pages are read. */
+const openTypes = async (user: ReturnType<typeof userEvent.setup>) => {
+  await user.click(screen.getByRole("button", { name: "Details" }));
+  const picker = screen.getByRole("combobox", { name: "Type" });
+  await waitFor(() => expect(picker).toBeEnabled());
+  await user.click(picker);
 };
 
 const tagged = () =>
@@ -67,8 +81,7 @@ describe("TaskBulkEditDialog's type", () => {
   it("gives every selected task the type picked", async () => {
     const { onApply, user } = open([tagged(), tagged()]);
 
-    await user.click(screen.getByRole("button", { name: "Details" }));
-    await user.click(screen.getByRole("combobox", { name: "Type" }));
+    await openTypes(user);
     await user.click(await screen.findByRole("option", { name: "Idea" }));
     await user.click(screen.getByRole("button", { name: "Apply changes" }));
 
@@ -81,8 +94,7 @@ describe("TaskBulkEditDialog's type", () => {
     const idea = buildTask({ project_id: 1, task_type_id: IDEA.id, tags: [] });
     const { user } = open([tagged(), bare, idea]);
 
-    await user.click(screen.getByRole("button", { name: "Details" }));
-    await user.click(screen.getByRole("combobox", { name: "Type" }));
+    await openTypes(user);
 
     await waitFor(() =>
       expect(
@@ -93,6 +105,30 @@ describe("TaskBulkEditDialog's type", () => {
       "aria-disabled",
       "true"
     );
+  });
+
+  it("can be left unchanged again once picked", async () => {
+    const { onApply, user } = open([tagged()]);
+
+    await openTypes(user);
+    await user.click(await screen.findByRole("option", { name: "Idea" }));
+    await user.click(screen.getByRole("combobox", { name: "Type" }));
+    await user.click(await screen.findByRole("option", { name: "Leave unchanged" }));
+
+    expect(screen.getByRole("combobox", { name: "Type" })).toHaveTextContent("Select type");
+    expect(screen.getByRole("button", { name: "Apply changes" })).toBeDisabled();
+    expect(onApply).not.toHaveBeenCalled();
+  });
+
+  it("can't be picked while the type pages can't be read", async () => {
+    const { layoutReads, user } = open([tagged()], undefined, { unreadable: true });
+
+    await user.click(screen.getByRole("button", { name: "Details" }));
+    await waitFor(() => expect(layoutReads.failed).toBeGreaterThan(0));
+
+    expect(screen.getByRole("combobox", { name: "Type" })).toBeDisabled();
+    // Everything else can still be changed.
+    expect(screen.getByRole("combobox", { name: "Status" })).toBeEnabled();
   });
 
   it("isn't asked in a project of one type", async () => {

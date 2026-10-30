@@ -354,21 +354,25 @@ export const taskChanges = ({ fields, properties }: Written<TaskRead, TaskUpdate
  *  project's layouts and fields are read, when the server still holds it to
  *  them. */
 export const useMissingAsType = (projectId: number, initiativeId: number | null) => {
-  const missing = useMissingByType(projectId, initiativeId);
+  const { missing } = useMissingByType(projectId, initiativeId);
   return (task: TaskRead, typeId: number, patch: Partial<TaskUpdate> = {}): string[] =>
     missing(typeId, (key) => TASK_DETAIL.filled?.(task, key, patch) ?? true);
 };
 
 /** The same, of a task as a list reads it: what a change of type made to many
- *  tasks at once checks, without reading each one. */
+ *  tasks at once checks, without reading each one. Until `ready`, it can't
+ *  tell, and many tasks have nobody to ask for what each leaves empty. */
 export const useListedMissingAsType = (projectId: number, initiativeId: number | null) => {
-  const missing = useMissingByType(projectId, initiativeId);
-  return (task: TaskListRead, typeId: number, patch: Partial<TaskUpdate> = {}): string[] =>
-    missing(typeId, (key) => filledInList(task, key, patch));
+  const { ready, missing } = useMissingByType(projectId, initiativeId);
+  return {
+    ready,
+    missing: (task: TaskListRead, typeId: number, patch: Partial<TaskUpdate> = {}): string[] =>
+      missing(typeId, (key) => filledInList(task, key, patch)),
+  };
 };
 
 /** What a type's page requires that `filled` says is empty, once the
- *  project's layouts and fields are read. */
+ *  project's layouts and fields are read (`ready`). */
 const useMissingByType = (projectId: number, initiativeId: number | null) => {
   const layouts = useToolLayouts(instanceTarget(Tool.project, projectId)).data;
   const definitions = useOwnedDefinitions({
@@ -376,14 +380,17 @@ const useMissingByType = (projectId: number, initiativeId: number | null) => {
     owner: { kind: "project", id: projectId },
     enabled: initiativeId !== null,
   }).data;
-  return (typeId: number, filled: (key: string) => boolean): string[] =>
-    layouts && definitions
-      ? missingRequired(
-          requiredKeys(detailLayoutOf(layouts, "task", typeId) as StoredRegions | null),
-          filled,
-          definitions
-        )
-      : [];
+  return {
+    ready: Boolean(layouts && definitions),
+    missing: (typeId: number, filled: (key: string) => boolean): string[] =>
+      layouts && definitions
+        ? missingRequired(
+            requiredKeys(detailLayoutOf(layouts, "task", typeId) as StoredRegions | null),
+            filled,
+            definitions
+          )
+        : [],
+  };
 };
 
 /** How a listed task reads as filled, as `TASK_DETAIL.filled` reads a whole

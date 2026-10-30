@@ -219,6 +219,7 @@
     "selectStatus": "Sélectionner un statut",
     "typeLabel": "Type",
     "selectType": "Sélectionner un type",
+    "keepType": "Laisser inchangé",
     "typeLeavesEmpty_one": "{{name}} exige des champs que {{count}} tâche laisse vides",
     "typeLeavesEmpty_other": "{{name}} exige des champs que {{count}} tâches laissent vides",
     "priorityLabel": "Priorité",

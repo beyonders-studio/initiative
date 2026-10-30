@@ -47,6 +47,9 @@ import {
 } from "@/lib/recurrence";
 import { PRIORITY_ORDER } from "@/lib/sorting";
 
+/** The type option that takes a picked type back: the tasks keep theirs. */
+const KEEP_TYPE = "keep";
+
 export type TaskBulkUpdate = {
   start_date: string | null;
   due_date: string | null;
@@ -101,7 +104,7 @@ export const TaskBulkEditDialog = ({
   });
   const { rule: recurrence, strategy: recurrenceStrategy, limit } = repeat;
   const hasDueDate = Boolean(dueDate) || selectedTasks.every((task) => Boolean(task.due_date));
-  const missingAs = useListedMissingAsType(projectId, initiativeId);
+  const typeCheck = useListedMissingAsType(projectId, initiativeId);
   // What else this edit fills counts toward what the new type's page requires.
   const filling = {
     ...(startDate ? { start_date: startDate } : {}),
@@ -113,9 +116,10 @@ export const TaskBulkEditDialog = ({
    *  leave empty: the server refuses each, so the type isn't offered. */
   const leavingEmpty = (id: number) =>
     selectedTasks.filter(
-      (task) => task.task_type_id !== id && missingAs(task, id, filling).length > 0
+      (task) => task.task_type_id !== id && typeCheck.missing(task, id, filling).length > 0
     ).length;
-  const typeBlocked = typeId !== "" && leavingEmpty(Number(typeId)) > 0;
+  // Until the type's page is read, the server may take some tasks and not others.
+  const typeBlocked = typeId !== "" && (!typeCheck.ready || leavingEmpty(Number(typeId)) > 0);
 
   const handleSubmit = (event: FormEvent<HTMLFormElement>) => {
     event.preventDefault();
@@ -216,11 +220,16 @@ export const TaskBulkEditDialog = ({
               {taskTypes.length > 1 ? (
                 <div className="space-y-2">
                   <Label htmlFor="bulk-type">{t("bulkEdit.typeLabel")}</Label>
-                  <Select value={typeId} onValueChange={setTypeId}>
+                  <Select
+                    value={typeId}
+                    onValueChange={(value) => setTypeId(value === KEEP_TYPE ? "" : value)}
+                    disabled={!typeCheck.ready}
+                  >
                     <SelectTrigger id="bulk-type">
                       <SelectValue placeholder={t("bulkEdit.selectType")} />
                     </SelectTrigger>
                     <SelectContent>
+                      <SelectItem value={KEEP_TYPE}>{t("bulkEdit.keepType")}</SelectItem>
                       {taskTypes.map((type) => {
                         const count = leavingEmpty(type.id);
                         return (

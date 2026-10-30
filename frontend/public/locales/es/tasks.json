@@ -219,6 +219,7 @@
     "selectStatus": "Seleccionar estado",
     "typeLabel": "Tipo",
     "selectType": "Seleccionar tipo",
+    "keepType": "Dejar sin cambios",
     "typeLeavesEmpty_one": "{{name}} requiere campos que {{count}} tarea deja vacíos",
     "typeLeavesEmpty_other": "{{name}} requiere campos que {{count}} tareas dejan vacíos",
     "priorityLabel": "Prioridad",

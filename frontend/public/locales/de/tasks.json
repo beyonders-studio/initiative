@@ -219,6 +219,7 @@
     "selectStatus": "Status auswählen",
     "typeLabel": "Typ",
     "selectType": "Typ auswählen",
+    "keepType": "Unverändert lassen",
     "typeLeavesEmpty_one": "{{name}} verlangt Felder, die {{count}} Aufgabe leer lässt",
     "typeLeavesEmpty_other": "{{name}} verlangt Felder, die {{count}} Aufgaben leer lassen",
     "priorityLabel": "Priorität",
