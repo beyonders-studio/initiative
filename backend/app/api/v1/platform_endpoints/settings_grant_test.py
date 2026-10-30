@@ -229,6 +229,7 @@ async def test_the_superadmin_grantee_reads_the_auth_controls(
         "guest_max_days_by_platform": 90,
         "allow_ai": True,
         "ai_offered_by_platform": False,
+        "set_by_deployment": [],
     }
 
 
