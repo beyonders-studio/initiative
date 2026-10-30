@@ -242,6 +242,9 @@ GUEST = Guc("app.guest", Kind.BOOL, standing=True)
 #: A guest's initiatives of the items shared with them one at a time. Empty
 #: for everyone else.
 GUEST_ITEM_INITIATIVES = Guc("app.guest_item_initiatives", Kind.IDS, standing=True)
+#: The surfaces the deployment has closed for the community: the ``surface.*``
+#: keys of ``app.core.rules`` whose deployment row says off.
+CLOSED_SURFACES = Guc("app.closed_surfaces", Kind.NAMES, standing=True)
 
 # --- Somebody who filed a case ------------------------------------------------
 #: The tasks of the cases the routed account filed, read by the filer seam

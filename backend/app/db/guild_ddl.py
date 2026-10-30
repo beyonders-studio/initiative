@@ -750,9 +750,7 @@ def _seat_write_predicate(table: str) -> str:
     surface = SEAT_SURFACES.get(table)
     if surface is None:
         return _SEAT_WRITE_PREDICATE
-    is_open = (
-        f"(SELECT public.community_surface_open({gucs.ROUTED_GUILD_ID}, '{surface}'))"
-    )
+    is_open = f"NOT ('{surface}' = ANY ({IN_POLICY.field('closed_surfaces')}))"
     return f"({IN_POLICY.system} OR ({_SEAT_WRITES} AND {is_open}))"
 
 
