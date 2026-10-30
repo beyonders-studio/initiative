@@ -11,7 +11,8 @@ foreign key to name, so a rule never points at another initiative's role.
 
 The rows move one for one and are counted against their source. Both source
 tables are policy-bound for this revision's role, so each is unforced for the
-copy and put back as it was.
+copy and put back as it was. A table is dropped only once the policies a start
+rendered on it are gone and its row security is off.
 
 Revision ID: 20261030_0567
 Revises: 20261030_0566
@@ -76,6 +77,19 @@ def _unforced(*tables: str) -> Iterator[sa.engine.Connection]:
         op.execute(f"ALTER TABLE {table} FORCE ROW LEVEL SECURITY")
 
 
+def _drop(table: str) -> None:
+    """Drop ``table``: its rendered policies first, then its row security,
+    then the table."""
+    bind = op.get_bind()
+    for (name,) in bind.execute(
+        sa.text("SELECT polname FROM pg_policy WHERE polrelid = to_regclass(:t)"),
+        {"t": table},
+    ).all():
+        op.execute(f'DROP POLICY IF EXISTS "{name}" ON {table}')
+    op.execute(f"ALTER TABLE {table} DISABLE ROW LEVEL SECURITY")
+    op.drop_table(table)
+
+
 def _check(copied: int, source: int) -> None:
     if copied != source:
         raise RuntimeError(f"initiative rules: copied {copied} of {source} rows")
@@ -138,7 +152,7 @@ def _upgrade() -> None:
             sa.text("SELECT count(*) FROM initiative_rules")
         ).scalar_one()
         _check(copied, source)
-    op.drop_table("initiative_role_permissions")
+    _drop("initiative_role_permissions")
 
 
 def downgrade() -> None:
@@ -179,7 +193,7 @@ def _downgrade() -> None:
             sa.text("SELECT count(*) FROM initiative_role_permissions")
         ).scalar_one()
         _check(copied, source)
-    op.drop_table("initiative_rules")
+    _drop("initiative_rules")
     op.drop_constraint(
         "uq_initiative_roles_initiative", "initiative_roles", type_="unique"
     )
