@@ -52,6 +52,7 @@ from app.core.plugin_scopes import (
     STANDING_SCOPES,
     InstallLevel,
 )
+from app.core.rules import SetBy
 from app.core.tools import Tool
 from app.db import gucs
 from app.db.authorization import LIVE_GRANT, live_membership, sql_values
@@ -305,6 +306,15 @@ _PERSON_STANDING: dict[gucs.Guc, str] = {
     gucs.GUEST_ITEM_INITIATIVES: """COALESCE((
       SELECT string_agg(it.initiative_id::text, ',') FROM my_items it
     ), '')""",
+    gucs.CLOSED_SURFACES: f"""COALESCE((
+      SELECT string_agg(r.key, ',' ORDER BY r.key)
+      FROM public.community_rules r
+      WHERE r.guild_id = {gucs.ROUTED_GUILD_ID}
+        AND r.user_id IS NULL
+        AND r.set_by = '{SetBy.deployment.value}'
+        AND r.key LIKE 'surface.%'
+        AND NOT r.enabled
+    ), '')""",
     gucs.GUILD_AUTH_OK: """   (SELECT public.guild_auth_satisfied()::text)""",
     gucs.CONTENT_HOLD: f"""COALESCE((
       SELECT (g.status = '{CommunityStatus.read_only.value}')::text
@@ -407,6 +417,7 @@ _INSTALL_STANDING: dict[gucs.Guc, str] = {
     gucs.PAM_MODERATE: """'false'""",
     gucs.GUEST: """'false'""",
     gucs.GUEST_ITEM_INITIATIVES: """''""",
+    gucs.CLOSED_SURFACES: """''""",
     gucs.MEMBER_INITIATIVES: """COALESCE((
       SELECT string_agg(p.initiative_id::text, ',' ORDER BY p.initiative_id)
       FROM placed p
@@ -761,6 +772,8 @@ class GuildContext:
     guest: bool = False
     #: A guest's initiatives of the items shared with them one at a time.
     guest_item_initiatives: tuple[int, ...] = ()
+    #: The ``surface.*`` keys the deployment has closed for the community.
+    closed_surfaces: tuple[str, ...] = ()
     member_initiatives: tuple[int, ...] = ()
     manager_initiatives: tuple[int, ...] = ()
     member_role_ids: tuple[int, ...] = ()

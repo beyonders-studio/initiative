@@ -40,7 +40,6 @@ from app.db.tenancy import (
     PRIVATE_ROW_SHARED_READ,
     PRIVATE_ROW_TABLES,
     SEAT_TABLES,
-    SEAT_SURFACES,
 )
 
 pytestmark = pytest.mark.always
@@ -79,8 +78,8 @@ _MANAGED_POLICIES = frozenset(
 
 
 async def test_a_provisioned_schema_holds_its_own_authorization_functions(engine):
-    """Guild authorization stays local; only surface-gated seat writes call
-    the shared platform surface rule (migration 0562). The legacy
+    """The functions a schema's policies call live in that schema, and no
+    policy in it binds a function anywhere else. The legacy
     ``is_initiative_member`` rule stays gone (dropped in migration 0111)."""
     from app.db.authorization import GUILD_FUNCTION_SIGNATURES
 
@@ -100,24 +99,26 @@ async def test_a_provisioned_schema_holds_its_own_authorization_functions(engine
                 )
             }
             outside = (
-                await conn.execute(
-                    text(
-                        "SELECT DISTINCT c.relname, p.polname, "
-                        "n.nspname || '.' || f.proname || '(' || "
-                        "oidvectortypes(f.proargtypes) || ')' "
-                        "FROM pg_policy p "
-                        "JOIN pg_class c ON c.oid = p.polrelid "
-                        "JOIN pg_depend d ON d.classid = 'pg_policy'::regclass "
-                        "AND d.objid = p.oid "
-                        "JOIN pg_proc f ON d.refclassid = 'pg_proc'::regclass "
-                        "AND f.oid = d.refobjid "
-                        "JOIN pg_namespace n ON n.oid = f.pronamespace "
-                        "WHERE c.relnamespace = CAST(:s AS regnamespace) "
-                        "AND n.nspname <> CAST(:name AS text) ORDER BY 1, 2, 3"
-                    ),
-                    {"s": schema, "name": schema},
+                (
+                    await conn.execute(
+                        text(
+                            "SELECT DISTINCT n.nspname || '.' || f.proname "
+                            "FROM pg_policy p "
+                            "JOIN pg_class c ON c.oid = p.polrelid "
+                            "JOIN pg_depend d ON d.classid = 'pg_policy'::regclass "
+                            "AND d.objid = p.oid "
+                            "JOIN pg_proc f ON d.refclassid = 'pg_proc'::regclass "
+                            "AND f.oid = d.refobjid "
+                            "JOIN pg_namespace n ON n.oid = f.pronamespace "
+                            "WHERE c.relnamespace = CAST(:s AS regnamespace) "
+                            "AND n.nspname <> CAST(:name AS text) ORDER BY 1"
+                        ),
+                        {"s": schema, "name": schema},
+                    )
                 )
-            ).all()
+                .scalars()
+                .all()
+            )
             legacy = (
                 await conn.execute(
                     text(
@@ -132,15 +133,7 @@ async def test_a_provisioned_schema_holds_its_own_authorization_functions(engine
         f"{schema} holds {sorted(local)}; expected exactly "
         f"{sorted(GUILD_FUNCTION_SIGNATURES)}"
     )
-    expected_shared = {
-        (table, f"seat_{command}", "public.community_surface_open(integer, text)")
-        for table in SEAT_SURFACES
-        for command in ("insert", "update", "delete")
-    }
-    assert set(outside) == expected_shared, (
-        f"policies in {schema} must bind exactly the shared surface gate on "
-        f"surface-gated seat writes: {outside}"
-    )
+    assert outside == [], f"policies in {schema} bind functions outside it: {outside}"
     assert legacy == 0, "is_initiative_member still exists (see migration 0111)"
 
 

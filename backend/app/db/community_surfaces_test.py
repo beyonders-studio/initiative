@@ -65,6 +65,10 @@ async def test_a_closed_ai_surface_refuses_its_seat_and_goes_unused(
     await route_as(s, user_id=seat.user.id, guild_id=seat.guild.id, seat=True)
     changed = await s.exec(text("UPDATE guild_ai_connections SET label = 'Renamed'"))
     assert changed.rowcount == 0
+    # Still closed once the standing is replayed on the next transaction.
+    await s.rollback()
+    changed = await s.exec(text("UPDATE guild_ai_connections SET label = 'Renamed'"))
+    assert changed.rowcount == 0
     await s.rollback()
 
     await _set(session, seat.guild.id, SURFACE_AI_CONNECTIONS, True)

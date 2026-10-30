@@ -287,31 +287,6 @@ $function$
 """
 
 
-#: Whether a community's seat may configure a surface (``app.core.rules``,
-#: the ``surface.*`` keys): open unless the deployment's row for it says
-#: closed. The write policies on that surface's tables ask it.
-COMMUNITY_SURFACE_OPEN = """\
-CREATE OR REPLACE FUNCTION public.community_surface_open(p_guild_id integer, p_surface text)
- RETURNS boolean
- LANGUAGE plpgsql
- STABLE
-AS $function$
-BEGIN
-    RETURN NOT EXISTS (
-        SELECT 1
-        FROM public.community_rules r
-        WHERE r.guild_id = p_guild_id
-          AND r.key = p_surface
-          AND r.user_id IS NULL
-          AND r.set_by = 'deployment'
-          AND NOT r.enabled
-    );
-END
-$function$
-
-"""
-
-
 #: Gate 0: the guild's sign-in policy, satisfied by this session.
 GUILD_AUTH_SATISFIED = f"""\
 CREATE OR REPLACE FUNCTION public.guild_auth_satisfied()
@@ -569,9 +544,12 @@ STANDING_FIELDS: tuple[tuple[str, str, str], ...] = (
     # readable (``app.db.holds``).
     _read(gucs.PAM_MODERATE),
     # A guest's request, and the initiatives of the items shared with them one
-    # at a time. Last, as ``ALTER TYPE`` appends.
+    # at a time.
     _read(gucs.GUEST),
     _read(gucs.GUEST_ITEM_INITIATIVES),
+    # The surfaces the deployment has closed for the community. Last, as
+    # ``ALTER TYPE`` appends.
+    _read(gucs.CLOSED_SURFACES),
 )
 _STANDING_NAMES = frozenset(name for name, _type, _expr in STANDING_FIELDS)
 
@@ -1403,7 +1381,6 @@ $function$
 #: sees a dangling call.
 AUTHORIZATION_FUNCTIONS: tuple[tuple[str, str], ...] = (
     ("guild_holds_option", GUILD_HOLDS_OPTION),
-    ("community_surface_open", COMMUNITY_SURFACE_OPEN),
     ("guild_connection_admits", GUILD_CONNECTION_ADMITS),
     ("guild_connection_satisfied", GUILD_CONNECTION_SATISFIED),
     ("session_amr", SESSION_AMR),
