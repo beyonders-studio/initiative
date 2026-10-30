@@ -23,8 +23,6 @@ from app.api.deps import (
     SeatPaymentSessionDep,
     SeatSessionDep,
     SeatWriteSessionDep,
-    SettingsAdminContextDep,
-    SettingsAdminWriteContextDep,
     SettingsContextDep,
     SettingsRLSSessionDep,
     SettingsSeatWriteContextDep,
@@ -34,6 +32,7 @@ from app.api.deps import (
     establish_guild_access,
     holds_guild_role,
     raise_for_guild_access,
+    require_surface,
     get_current_active_user,
     SystemSessionDep,
 )
@@ -62,6 +61,7 @@ from app.core.audit_events import AuditEventType
 from app.services import audit as audit_service
 from app.services import email as email_service
 from app.models.platform.guild import (
+    AdminSurface,
     assignable_roles,
     Guild,
     CommunityCategory,
@@ -123,6 +123,24 @@ from app.services.tenant import plugin_connections as plugin_connections_service
 from sqlmodel import select
 from sqlmodel.ext.asyncio.session import AsyncSession
 
+
+#: The configuration surface's guards, by the part of administering the
+#: community each route is (``require_surface``).
+ProfileContext = Annotated[
+    GuildContext, Depends(require_surface(AdminSurface.profile, settings=True))
+]
+ProfileWriteContext = Annotated[
+    GuildContext,
+    Depends(require_surface(AdminSurface.profile, settings=True, write=True)),
+]
+InvitesWriteContext = Annotated[
+    GuildContext,
+    Depends(require_surface(AdminSurface.invites, settings=True, write=True)),
+]
+MembersWriteContext = Annotated[
+    GuildContext,
+    Depends(require_surface(AdminSurface.members, settings=True, write=True)),
+]
 
 router = APIRouter()
 logger = logging.getLogger(__name__)
@@ -722,7 +740,7 @@ async def create_community(
 @router.get("/{community_id}/invites", response_model=List[CommunityInviteRead])
 async def list_community_invites(
     guild_id: CommunityIdPath,
-    _guild_context: SettingsAdminWriteContextDep,
+    _guild_context: InvitesWriteContext,
     session: SettingsRLSSessionDep,
 ) -> List[CommunityInviteRead]:
     invites = await guilds_service.list_guild_invites(session, guild_id=guild_id)
@@ -745,7 +763,7 @@ async def list_community_invites(
 @router.get("/{community_id}", response_model=CommunityRead)
 async def read_community(
     guild_id: CommunityIdPath,
-    guild_context: SettingsAdminContextDep,
+    guild_context: ProfileContext,
     session: SettingsRLSSessionDep,
     system_session: SystemSessionDep,
 ) -> CommunityRead:
@@ -762,7 +780,7 @@ async def read_community(
 @router.patch("/{community_id}", response_model=CommunityRead)
 async def update_community(
     guild_id: CommunityIdPath,
-    guild_context: SettingsAdminWriteContextDep,
+    guild_context: ProfileWriteContext,
     updates: CommunityUpdate,
     session: SettingsRLSSessionDep,
     system_session: SystemSessionDep,
@@ -860,7 +878,7 @@ async def update_community(
 @router.get("/{community_id}/entitlements", response_model=CommunityEntitlementsRead)
 async def read_community_entitlements(
     guild_id: CommunityIdPath,
-    _guild_context: SettingsAdminContextDep,
+    _guild_context: ProfileContext,
     session: SettingsRLSSessionDep,
 ) -> CommunityEntitlementsRead:
     """What an operator has turned on for this guild, for its own admins.
@@ -945,7 +963,7 @@ async def _store_guild_images(
 @router.put("/{community_id}/icon", response_model=CommunityRead)
 async def set_community_icon(
     guild_id: CommunityIdPath,
-    guild_context: SettingsAdminWriteContextDep,
+    guild_context: ProfileWriteContext,
     session: SystemSessionDep,
     settings_session: SettingsRLSSessionDep,
     current_user: Annotated[User, Depends(get_current_active_user)],
@@ -967,7 +985,7 @@ async def set_community_icon(
 @router.delete("/{community_id}/icon", response_model=CommunityRead)
 async def clear_community_icon(
     guild_id: CommunityIdPath,
-    guild_context: SettingsAdminWriteContextDep,
+    guild_context: ProfileWriteContext,
     session: SystemSessionDep,
     settings_session: SettingsRLSSessionDep,
     current_user: Annotated[User, Depends(get_current_active_user)],
@@ -986,7 +1004,7 @@ async def clear_community_icon(
 @router.put("/{community_id}/banner", response_model=CommunityRead)
 async def set_community_banner(
     guild_id: CommunityIdPath,
-    guild_context: SettingsAdminWriteContextDep,
+    guild_context: ProfileWriteContext,
     session: SystemSessionDep,
     settings_session: SettingsRLSSessionDep,
     current_user: Annotated[User, Depends(get_current_active_user)],
@@ -1022,7 +1040,7 @@ async def set_community_banner(
 @router.delete("/{community_id}/banner", response_model=CommunityRead)
 async def clear_community_banner(
     guild_id: CommunityIdPath,
-    guild_context: SettingsAdminWriteContextDep,
+    guild_context: ProfileWriteContext,
     session: SystemSessionDep,
     settings_session: SettingsRLSSessionDep,
     current_user: Annotated[User, Depends(get_current_active_user)],
@@ -1403,7 +1421,7 @@ async def delete_community(
 )
 async def create_community_invite(
     guild_id: CommunityIdPath,
-    _guild_context: SettingsAdminWriteContextDep,
+    _guild_context: InvitesWriteContext,
     invite_in: CommunityInviteCreate,
     session: SettingsRLSSessionDep,
     current_user: Annotated[User, Depends(get_current_active_user)],
@@ -1436,7 +1454,7 @@ async def create_community_invite(
 )
 async def delete_community_invite(
     guild_id: CommunityIdPath,
-    _guild_context: SettingsAdminWriteContextDep,
+    _guild_context: InvitesWriteContext,
     invite_id: int,
     session: SettingsRLSSessionDep,
     current_user: Annotated[User, Depends(get_current_active_user)],
@@ -1482,7 +1500,7 @@ async def accept_invite(
 )
 async def update_community_membership(
     guild_id: CommunityIdPath,
-    guild_context: SettingsAdminWriteContextDep,
+    guild_context: MembersWriteContext,
     user_id: int,
     payload: CommunityMembershipUpdate,
     session: SystemSessionDep,
@@ -1613,7 +1631,7 @@ async def update_community_membership(
 )
 async def extend_community_guest(
     guild_id: CommunityIdPath,
-    _guild_context: SettingsAdminWriteContextDep,
+    _guild_context: MembersWriteContext,
     user_id: int,
     payload: CommunityGuestExtend,
     session: SystemSessionDep,
@@ -1639,7 +1657,7 @@ async def extend_community_guest(
 )
 async def make_community_guest_a_member(
     guild_id: CommunityIdPath,
-    _guild_context: SettingsAdminWriteContextDep,
+    _guild_context: MembersWriteContext,
     user_id: int,
     session: SystemSessionDep,
     current_user: Annotated[User, Depends(get_current_active_user)],
@@ -1663,7 +1681,7 @@ async def make_community_guest_a_member(
 )
 async def set_member_display_name(
     guild_id: CommunityIdPath,
-    _guild_context: SettingsAdminWriteContextDep,
+    _guild_context: MembersWriteContext,
     user_id: int,
     payload: MemberDisplayNameUpdate,
     session: SystemSessionDep,

@@ -53,8 +53,10 @@ from app.db.authorization import (
     GUILD_ADMIN,
     SETTINGS_ADMIN,
     SYSTEM_SESSION,
+    holds,
     live_membership,
 )
+from app.models.platform.guild import AdminSurface
 from app.models.platform.user import UserRole
 
 logger = logging.getLogger(__name__)
@@ -89,17 +91,6 @@ __all__ = [
 # what it reaches is the community's work, not its settings, so the two are kept
 # apart here rather than in each policy.
 CONFIGURED_GID = f"COALESCE({gucs.GUILD_ID}, {gucs.SETTINGS_GUILD_ID})"
-#: The reader administers the routed community. A lookup on the membership
-#: row, made by the standing statement and written where a policy can read it
-#: — the same leg the guild schemas' gates carry, from one definition — beside
-#: the rung a live settings grant confers, which is its own axis.
-ROUTED_ADMIN = f"({SYSTEM_SESSION} OR {GUILD_ADMIN} OR {SETTINGS_ADMIN})"
-#: The reader changes what they administer. The membership row's admin does;
-#: a settings rung reads, and writes only beside a live read_write content
-#: grant — the two asks together.
-ROUTED_ADMIN_WRITE = (
-    f"({SYSTEM_SESSION} OR {GUILD_ADMIN} OR ({SETTINGS_ADMIN} AND {gucs.PAM_WRITE}))"
-)
 
 # --- Predicate builders -------------------------------------------------------
 # Each returns the SQL of a policy predicate. ``{table}`` is replaced with the
@@ -120,17 +111,28 @@ def guild_scoped(col: str = "guild_id") -> str:
     return f"{col} = {CONFIGURED_GID}"
 
 
-def routed_admin(col: str = "guild_id") -> str:
+def routed_admin(col: str = "guild_id", surface: AdminSurface | None = None) -> str:
     """The row belongs to this request's community and the reader administers
-    it — as its admin, or at the rung a live settings grant confers."""
-    return f"{col} = {CONFIGURED_GID} AND {ROUTED_ADMIN}"
+    it — holding ``surface`` where the row is part of one, as its admin
+    otherwise: lookups the standing statement made, the same legs the guild
+    schemas' gates carry — or holds the rung a live settings grant confers,
+    which is its own axis."""
+    administers = GUILD_ADMIN if surface is None else holds(surface)
+    return (
+        f"{col} = {CONFIGURED_GID} AND ({SYSTEM_SESSION}"
+        f" OR {administers} OR {SETTINGS_ADMIN})"
+    )
 
 
-def routed_admin_write(col: str = "guild_id") -> str:
-    """The row belongs to this request's community and the reader changes what
-    they administer — as its admin, or on a settings grant beside a read_write
-    content grant."""
-    return f"{col} = {CONFIGURED_GID} AND {ROUTED_ADMIN_WRITE}"
+def routed_admin_write(col: str, surface: AdminSurface) -> str:
+    """The row belongs to this request's community and the reader changes the
+    ``surface`` it is part of: holding it, or on a settings grant, which
+    reads, and writes only beside a live read_write content grant — the two
+    asks together."""
+    return (
+        f"{col} = {CONFIGURED_GID} AND ({SYSTEM_SESSION} OR {holds(surface)}"
+        f" OR ({SETTINGS_ADMIN} AND {gucs.PAM_WRITE}))"
+    )
 
 
 def routed_or_own(guild_col: str, user_col: str) -> str:
@@ -1170,13 +1172,13 @@ SHARED_TABLE_REGISTRY: dict[str, SharedTable] = {
                     "guild_delete",
                     DELETE,
                     ("app_guild_base",),
-                    using=routed_admin_write("guild_id"),
+                    using=routed_admin_write("guild_id", AdminSurface.invites),
                 ),
                 Policy(
                     "guild_insert",
                     INSERT,
                     ("app_guild_base",),
-                    check=routed_admin_write("guild_id"),
+                    check=routed_admin_write("guild_id", AdminSurface.invites),
                 ),
                 Policy(
                     "guild_select",
@@ -1185,7 +1187,7 @@ SHARED_TABLE_REGISTRY: dict[str, SharedTable] = {
                         "app_guild_base",
                         "app_guild_base_ro",
                     ),
-                    using=routed_admin("guild_id"),
+                    using=routed_admin("guild_id", AdminSurface.invites),
                 ),
             ),
         ),
@@ -1237,7 +1239,7 @@ SHARED_TABLE_REGISTRY: dict[str, SharedTable] = {
                     "guild_memberships_admin_delete",
                     DELETE,
                     ("app_guild_base",),
-                    using=routed_admin_write("guild_id"),
+                    using=routed_admin_write("guild_id", AdminSurface.members),
                 ),
                 # The reader's own rows and the routed community's, for the bare
                 # login, the platform floor, and the roles that own the member
@@ -1402,7 +1404,10 @@ SHARED_TABLE_REGISTRY: dict[str, SharedTable] = {
                     using=routed_or_pam("id"),
                 ),
                 Policy(
-                    "guild_update", UPDATE, ("public",), using=routed_admin_write("id")
+                    "guild_update",
+                    UPDATE,
+                    ("public",),
+                    using=routed_admin_write("id", AdminSurface.profile),
                 ),
                 # The staff list of every community.
                 Policy(

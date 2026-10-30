@@ -98,6 +98,7 @@ from app.models.platform.access_grant import (
 )
 from app.models.platform.guild import (
     LIVE_STATUS_VALUES,
+    AdminSurface,
     Guild,
     GuildMembership,
     CommunityRole,
@@ -1024,12 +1025,10 @@ def require_seat(
 
 def _rung_refusal(roles: tuple[CommunityRole, ...]) -> str:
     """The code a guard answers with, from the rung it names: a guard for
-    the seat says so, one for an administrator says so, and one naming
-    anything else says a permission is missing."""
+    the seat says so, and one naming anything else says a permission is
+    missing."""
     if roles == (CommunityRole.superadmin,):
         return GuildMessages.COMMUNITY_SUPERADMIN_REQUIRED
-    if roles == (CommunityRole.admin,):
-        return GuildMessages.COMMUNITY_ADMIN_REQUIRED
     return GuildMessages.COMMUNITY_PERMISSION_REQUIRED
 
 
@@ -1045,7 +1044,12 @@ def require_guild_roles(
     that changes something: a grantee is then also asked for the
     ``read_write`` grant beside the rung (:func:`require_grant_writes`).
     The refusal's code comes from the rung named (:func:`_rung_refusal`).
+
+    An admin route names the part of administering the community it guards
+    instead (:func:`require_surface`), so this refuses the admin rung.
     """
+    if CommunityRole.admin in roles:
+        raise ValueError("an admin route guards a surface: use require_surface")
     establish = get_guild_settings_context if settings else get_guild_membership
     detail = _rung_refusal(roles)
 
@@ -1061,9 +1065,32 @@ def require_guild_roles(
     return dependency
 
 
-GuildAdminContext = Annotated[
-    GuildContext, Depends(require_guild_roles(CommunityRole.admin))
-]
+def require_surface(
+    surface: AdminSurface, *, settings: bool = False, write: bool = False
+) -> Callable:
+    """Guard an admin route on the part of administering the community it is
+    (:class:`AdminSurface`), by the standing: the reader holds it, or, on the
+    configuration surface (``settings``), a settings grant answers at the
+    rung it lends, as :func:`require_guild_roles` reads it. ``write`` asks a
+    grantee for the ``read_write`` grant beside it."""
+    establish = get_guild_settings_context if settings else get_guild_membership
+
+    async def dependency(
+        context: Annotated[GuildContext, Depends(establish)],
+    ) -> GuildContext:
+        if not (
+            context.holds_surface(surface)
+            or (settings and context.settings_rung is not None)
+        ):
+            raise HTTPException(
+                status_code=status.HTTP_403_FORBIDDEN,
+                detail=GuildMessages.COMMUNITY_ADMIN_REQUIRED,
+            )
+        if write:
+            require_grant_writes(context)
+        return context
+
+    return dependency
 
 
 def _note_privileged_request(current_user: User, guild_context: GuildContext) -> None:
@@ -1954,17 +1981,9 @@ async def get_guild_seat_payment_session(
 # Dependency for routes that need RLS-aware database access
 RLSSessionDep = Annotated[AsyncSession, Depends(get_guild_session)]
 SettingsContextDep = Annotated[GuildContext, Depends(get_guild_settings_context)]
-# The configuration surface, by rung: what an administrator keeps while the
-# content is closed and what a settings grant may serve, and — for a route
-# that changes something — asking a grantee for the read_write grant beside
-# the rung.
-SettingsAdminContextDep = Annotated[
-    GuildContext, Depends(require_guild_roles(CommunityRole.admin, settings=True))
-]
-SettingsAdminWriteContextDep = Annotated[
-    GuildContext,
-    Depends(require_guild_roles(CommunityRole.admin, settings=True, write=True)),
-]
+# The configuration surface at the seat's rung: what the seat keeps while the
+# content is closed and what a settings grant at that rung may serve, asking a
+# grantee for the read_write grant beside it.
 SettingsSeatWriteContextDep = Annotated[
     GuildContext,
     Depends(require_guild_roles(CommunityRole.superadmin, settings=True, write=True)),

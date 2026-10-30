@@ -29,11 +29,13 @@ from sqlmodel.ext.asyncio.session import AsyncSession
 from app.api.deps import (
     CommunityIdPath,
     SeatWriteSessionDep,
-    SettingsAdminContextDep,
+    GuildContext,
+    require_surface,
     get_current_active_user,
     SystemSessionDep,
 )
 from app.core.guild_auth_options import CommunityAuthOption
+from app.models.platform.guild import AdminSurface
 from app.models.platform.user import User
 from app.schemas.platform.settings import (
     ConnectableProviderRead,
@@ -48,6 +50,12 @@ from app.services.auth import guild_claim_rules as claim_rules
 from app.services.auth import guild_provider_connections as connections
 from app.services.platform import guild_entitlements
 from app.services.platform import guilds as guilds_service
+
+#: How people sign in to join is read by whoever administers the roster;
+#: changing it is the seat's.
+MembersContext = Annotated[
+    GuildContext, Depends(require_surface(AdminSurface.members, settings=True))
+]
 
 router = APIRouter()
 CurrentUserDep = Annotated[User, Depends(get_current_active_user)]
@@ -70,7 +78,7 @@ async def _require_connection_option(
 )
 async def list_community_provider_connections(
     guild_id: CommunityIdPath,
-    _guild_context: SettingsAdminContextDep,
+    _guild_context: MembersContext,
     system_session: SystemSessionDep,
 ) -> List[CommunityProviderConnectionRead]:
     await guild_entitlements.require_auth_option(
@@ -85,7 +93,7 @@ async def list_community_provider_connections(
 )
 async def list_connectable_providers(
     guild_id: CommunityIdPath,
-    _guild_context: SettingsAdminContextDep,
+    _guild_context: MembersContext,
     system_session: SystemSessionDep,
 ) -> List[ConnectableProviderRead]:
     """The providers this community may choose from: the ones on offer, plus
@@ -169,7 +177,7 @@ async def delete_community_provider_connection(
 @router.get("/{community_id}/auth/rules", response_model=CommunityClaimRulesResponse)
 async def list_community_claim_rules(
     guild_id: CommunityIdPath,
-    _guild_context: SettingsAdminContextDep,
+    _guild_context: MembersContext,
     system_session: SystemSessionDep,
 ) -> CommunityClaimRulesResponse:
     """Where this community places the people its providers vouch for."""

@@ -37,6 +37,7 @@ from app.core.plugin_scopes import PluginScopeAccess, scope_name, tool_resource
 from app.core.messages import GuildMessages, InitiativeMessages
 from app.core.tools import ARCHIVE_TARGETS, KINDS, Tool, plural_of
 from app.db.base import MODELS_BY_TABLE
+from app.models.platform.guild import AdminSurface
 from app.models.platform.user import User
 from app.models.tenant._mixins import archive_models
 from app.schemas.tenant.archive import ArchivableType, ArchiveResponse
@@ -146,7 +147,7 @@ async def _authorize(
     will accept here either way.
     """
     if entity_type == "initiative":
-        if not guild_context.is_admin:
+        if not guild_context.holds_surface(AdminSurface.initiatives):
             raise HTTPException(
                 status_code=status.HTTP_403_FORBIDDEN,
                 detail=GuildMessages.COMMUNITY_ADMIN_REQUIRED,

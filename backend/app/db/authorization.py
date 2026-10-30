@@ -57,7 +57,7 @@ from app.models.platform.access_grant import (
     AccessGrantStatus,
     SettingsLevel,
 )
-from app.models.platform.guild import CommunityRole
+from app.models.platform.guild import AdminSurface, CommunityRole
 from app.models.platform.user import UserRole
 from app.models.tenant.initiative import DEFAULT_PERMISSION_VALUES, PermissionKey
 from app.models.tenant.resource_grant import (
@@ -431,6 +431,21 @@ STANDING_IS_THIS_GUILD = (
 #: the standing statement read it, written where a policy can read it.
 GUILD_ADMIN = f"({STANDING_IS_THIS_GUILD} AND {gucs.GUILD_ADMIN})"
 
+#: The admin surfaces the reader holds in this community, as the standing
+#: statement read them: none outside the community the standing is for.
+HELD_SURFACES = (
+    f"(CASE WHEN {STANDING_IS_THIS_GUILD} THEN {gucs.HELD_SURFACES.sql}"
+    " ELSE ARRAY[]::text[] END)"
+)
+
+
+def holds(surface: AdminSurface) -> str:
+    """The reader holds ``surface`` here: :data:`GUILD_ADMIN`'s counterpart for
+    a leg that guards one part of administering the community rather than
+    its content."""
+    return f"('{surface.value}' = ANY ({HELD_SURFACES}))"
+
+
 #: This request administers the community's configuration: a live settings
 #: grant, at either rung, as the standing statement read it from the rows.
 #: Its own axis — what a grant reaches of the community's settings — beside
@@ -549,9 +564,10 @@ STANDING_FIELDS: tuple[tuple[str, str, str], ...] = (
     _read(gucs.GUEST_ITEM_INITIATIVES),
     # The surfaces the deployment has closed for the community.
     _read(gucs.CLOSED_SURFACES),
-    # The tool switches the community set for every initiative. Last, as
-    # ``ALTER TYPE`` appends.
+    # The tool switches the community set for every initiative.
     _read(gucs.COMMUNITY_TOOLS),
+    # The admin surfaces the reader holds. Last, as ``ALTER TYPE`` appends.
+    ("held_surfaces", "text[]", HELD_SURFACES),
 )
 _STANDING_NAMES = frozenset(name for name, _type, _expr in STANDING_FIELDS)
 
@@ -644,6 +660,11 @@ class Legs:
     def admin(self) -> str:
         return self.field("guild_admin")
 
+    def holds(self, surface: AdminSurface) -> str:
+        """The reader holds ``surface``: the leg for one part of administering
+        the community, where :attr:`admin` is the reach into its content."""
+        return f"('{surface.value}' = ANY ({self.field('held_surfaces')}))"
+
     @property
     def auth_ok(self) -> str:
         return self.field("guild_auth_ok")
@@ -706,10 +727,12 @@ class Legs:
     @property
     def guild_row_writer(self) -> str:
         """Who changes a row that belongs to the whole community rather than
-        one initiative: the guild admin or the system, a live write grant, or
-        an installed plug-in on a token not narrowed to one initiative."""
+        one initiative, which only a calendar can be: the system, a holder of
+        ``AdminSurface.community_calendars``, a live write grant, or an
+        installed plug-in on a token not narrowed to one initiative."""
         return (
-            f"({self.system_or_admin} OR {self.pam_write} OR {self.unnarrowed_install})"
+            f"({self.system} OR {self.holds(AdminSurface.community_calendars)}"
+            f" OR {self.pam_write} OR {self.unnarrowed_install})"
         )
 
 
@@ -1311,7 +1334,7 @@ BEGIN
     IF NOT FOUND THEN
         RETURN v_actions;
     END IF;
-    IF {_B.system} OR {_B.admin}
+    IF {_B.system} OR {_B.holds(AdminSurface.initiatives)}
        OR ({_B.this_guild} AND NOT {_B.guest}
            AND p_initiative_id = ANY ({_B.field("manager_initiatives")})) THEN
         v_actions := v_actions || 'manage'::text;

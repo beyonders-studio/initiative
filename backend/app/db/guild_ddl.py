@@ -101,6 +101,7 @@ from app.db.tenancy import (
     SEAT_SURFACES,
     SEAT_TABLES,
 )
+from app.models.platform.guild import AdminSurface
 from app.models.tenant.batched_notice import BatchedNoticeKind
 from app.models.tenant.initiative import InitiativeJoinPolicy
 from app.models.tenant.resource_grant import ResourceAccessLevel
@@ -127,22 +128,26 @@ _GUILD_LEVEL_PURGE_TABLES: frozenset[str] = (
     frozenset(SOFT_DELETE_TABLES) - INITIATIVE_SCOPED_TABLES
 )
 
-# Admit only a community's administrator, or trusted system maintenance.
-# Matches the same two legs of initiative_access exactly: the admin fact the
-# standing statement computed from the membership row, and the connection's own
-# login for a sweep.
-_PURGE_GUARD_PREDICATE = f"({IN_POLICY.system} OR {IN_POLICY.admin})"
+#: The reader holds the community's trash: restores anybody's deletions and
+#: purges.
+_HOLDS_TRASH = IN_POLICY.holds(AdminSurface.trash)
+
+# Admit only the holder of the community's trash, or trusted system
+# maintenance: the surface the standing statement computed from the membership
+# row, and the connection's own login for a sweep.
+_PURGE_GUARD_PREDICATE = f"({IN_POLICY.system} OR {_HOLDS_TRASH})"
 
 # Who may READ a row that is in the trash. Deleting something takes it out of
 # sight, so the ordinary answer is nobody: the trash is a place to recover from,
 # not a second copy of the guild's content that outlives the decision to remove
-# it. Two legs open it — the guild admin, who manages the trash for everyone,
-# and whoever deleted the row, who gets their own deletions back from /me/trash.
+# it. Two legs open it — the guild admin, whose reach into all of the
+# community's content takes in its trash, and whoever deleted the row, who gets
+# their own deletions back from /me/trash.
 # RESTRICTIVE, so it AND-combines with the membership gate rather than widening
 # it: a trashed row is still only visible to someone who could see it alive.
 _TRASH_READ_PREDICATE = (
     "deleted_at IS NULL"
-    f" OR {_PURGE_GUARD_PREDICATE}"
+    f" OR {IN_POLICY.system_or_admin}"
     f" OR deleted_by = {gucs.USER_ID.once}"
 )
 
@@ -540,14 +545,14 @@ CREATE OR REPLACE FUNCTION public.fn_comment_author_guard() RETURNS trigger
 DECLARE
     lifecycle text[] := ARRAY[{", ".join(f"'{c}'" for c in LIFECYCLE_COLUMNS)}];
 BEGIN
-    IF {IN_POLICY.system} OR ({IN_POLICY.admin} AND {gucs.PURGING})
+    IF {IN_POLICY.system} OR ({_HOLDS_TRASH} AND {gucs.PURGING})
        OR OLD.created_by = {gucs.USER_ID.once} THEN
         RETURN NEW;
     END IF;
     IF (to_jsonb(NEW) - lifecycle) IS NOT DISTINCT FROM (to_jsonb(OLD) - lifecycle) AND (
         (OLD.deleted_at IS NULL AND NEW.deleted_by = {gucs.USER_ID.once})
         OR (NEW.deleted_at IS NULL
-            AND ({IN_POLICY.admin} OR OLD.deleted_by = {gucs.USER_ID.once}))
+            AND ({_HOLDS_TRASH} OR OLD.deleted_by = {gucs.USER_ID.once}))
     ) THEN
         RETURN NEW;
     END IF;

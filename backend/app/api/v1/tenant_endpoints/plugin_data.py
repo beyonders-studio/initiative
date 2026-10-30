@@ -44,7 +44,7 @@ declaration, and it is fetched on the caller's own credentials.
 
 from typing import Annotated, Any, Optional
 
-from fastapi import APIRouter, HTTPException, Query, status
+from fastapi import APIRouter, Depends, HTTPException, Query, status
 from sqlmodel import select
 
 from app.core.errors import CodedError
@@ -54,13 +54,15 @@ from app.api.deps import (
     RLSSessionDep,
     GuildContextDep,
     CurrentUser,
-    SettingsAdminContextDep,
+    GuildContext,
     SettingsRLSSessionDep,
+    require_surface,
 )
 from app.core.audit_events import AuditEventType
 from app.core.messages import GuildPluginMessages, PluginDataMessages
 from app.core.rate_limit import PLUGIN_ACTIONS_PER_MEMBER, take_allowance
 from app.core.tools import Tool
+from app.models.platform.guild import AdminSurface
 from app.models.tenant.guild_plugin import GuildPlugin
 from app.schemas.sql_query import QueryColumnDescription
 from app.services.query import rows as rows_query
@@ -103,6 +105,12 @@ def _projected_sample(raw: Any, endpoints: dict[str, dict[str, Any]]) -> dict[st
         projected[endpoint_id] = {"rows": rows, "values": values}
     return projected
 
+
+#: The community's usage page, where its admins read what each plug-in
+#: reports.
+UsageContext = Annotated[
+    GuildContext, Depends(require_surface(AdminSurface.usage, settings=True))
+]
 
 router = APIRouter()
 
@@ -359,7 +367,7 @@ def _transformed(
 @router.get("/summaries", response_model=PluginSummaryListResponse)
 async def list_plugin_summaries(
     session: SettingsRLSSessionDep,
-    _guild_context: SettingsAdminContextDep,
+    _guild_context: UsageContext,
 ) -> PluginSummaryListResponse:
     """The installs whose pinned definition names a community summary, with
     what each declares it returns."""
@@ -371,7 +379,7 @@ async def read_plugin_summary(
     plugin_id: int,
     session: SettingsRLSSessionDep,
     current_user: CurrentUser,
-    _guild_context: SettingsAdminContextDep,
+    _guild_context: UsageContext,
 ) -> PluginDataResponse:
     """Where the community stands with one installed plug-in.
 

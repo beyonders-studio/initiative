@@ -26,7 +26,7 @@ from app.api.deps import (
     GuildContext,
     RLSSessionDep,
     get_current_active_user,
-    require_guild_roles,
+    require_surface,
     GuildContextDep,
 )
 from app.core.audit_events import AuditEventType
@@ -37,7 +37,7 @@ from app.db.query import build_paginated_response
 from app.db.soft_delete_filter import SOFT_DELETE_MODELS, select_including_deleted
 from app.models.tenant.comment import Comment
 from app.models.tenant.task import Task
-from app.models.platform.guild import CommunityRole
+from app.models.platform.guild import AdminSurface
 from app.models.platform.user import User, UserStatus
 from app.models.platform.user_profile_view import MemberProfile
 from app.schemas.tenant.trash import (
@@ -212,12 +212,12 @@ async def trash_page(
 async def list_community_trash(
     session: RLSSessionDep,
     guild_context: Annotated[
-        GuildContext, Depends(require_guild_roles(CommunityRole.admin))
+        GuildContext, Depends(require_surface(AdminSurface.trash))
     ],
     page: TrashPage = 1,
     page_size: TrashPageSize = 50,
 ) -> TrashListResponse:
-    """The active guild's trash, newest first (guild-admin only).
+    """The active guild's trash, newest first, for whoever holds the trash.
 
     This is the guild settings trash view. Members use the user-scoped
     ``GET /me/trash`` for their own deletions; they never reach this endpoint.
@@ -295,7 +295,7 @@ async def restore_trash_entity(
 
     # Permission: regular users can only restore their own deletions.
     if (
-        not guild_context.is_admin
+        not guild_context.holds_surface(AdminSurface.trash)
         and getattr(entity, "deleted_by", None) != current_user.id
     ):
         raise HTTPException(
@@ -345,14 +345,15 @@ async def purge_trash_entity(
     ``app_admin`` connection. The guild-schema content tables carry PERMISSIVE
     ``initiative_member_delete`` policies that defer to ``initiative_access``,
     whose community-admin leg (``app.guild_admin = 'true'``) admits the routed
-    admin for the hard delete, so the guild role itself does it.
+    admin for the hard delete, beside the RESTRICTIVE purge guard, which asks
+    for the community's trash, so the guild role itself does it.
     ``_load_trash_entity`` 404s unless the entity is in THIS guild's trash (and
     still soft-deleted) — that is the authorization boundary — and
     ``for_update=True`` locks the row so a concurrent restore can't slip in
     between the ``deleted_at`` check and the delete (which would otherwise
     permanently remove a just-restored live row).
     """
-    if not guild_context.is_admin:
+    if not guild_context.holds_surface(AdminSurface.trash):
         raise HTTPException(
             status_code=status.HTTP_403_FORBIDDEN,
             detail=TrashMessages.PURGE_REQUIRES_ADMIN,
