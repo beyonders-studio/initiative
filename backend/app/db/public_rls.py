@@ -51,12 +51,13 @@ from app.core.config import settings
 from app.db import gucs
 from app.db.authorization import (
     GUILD_ADMIN,
+    HOLDS_EVERY_SURFACE,
     SETTINGS_ADMIN,
     SYSTEM_SESSION,
     holds,
     live_membership,
 )
-from app.models.platform.guild import AdminSurface
+from app.models.platform.guild import GUILD_ADMIN_ROLES, AdminSurface
 from app.models.platform.user import UserRole
 
 logger = logging.getLogger(__name__)
@@ -91,6 +92,12 @@ __all__ = [
 # what it reaches is the community's work, not its settings, so the two are kept
 # apart here rather than in each policy.
 CONFIGURED_GID = f"COALESCE({gucs.GUILD_ID}, {gucs.SETTINGS_GUILD_ID})"
+
+#: The rungs that administer a community, as a policy lists them.
+_ADMIN_RUNGS = ", ".join(f"'{rung.value}'" for rung in sorted(GUILD_ADMIN_ROLES))
+#: Who may take a membership off the admin rung: a holder of every surface,
+#: a settings rung, or the system engine — the same answer the routes ask.
+_UNMAKES_AN_ADMIN = f"({SYSTEM_SESSION} OR {HOLDS_EVERY_SURFACE} OR {SETTINGS_ADMIN})"
 
 # --- Predicate builders -------------------------------------------------------
 # Each returns the SQL of a policy predicate. ``{table}`` is replaced with the
@@ -1234,12 +1241,17 @@ SHARED_TABLE_REGISTRY: dict[str, SharedTable] = {
                     ("public",),
                     using=routed_and_own("guild_id", "user_id"),
                 ),
-                # The routed community's admin removes one of its members.
+                # The routed community's roster holder removes one of its
+                # members; an admin only while holding every surface, as the
+                # admin rung does.
                 Policy(
                     "guild_memberships_admin_delete",
                     DELETE,
                     ("app_guild_base",),
-                    using=routed_admin_write("guild_id", AdminSurface.members),
+                    using=(
+                        f"{routed_admin_write('guild_id', AdminSurface.members)}"
+                        f" AND ({_UNMAKES_AN_ADMIN} OR role::text NOT IN ({_ADMIN_RUNGS}))"
+                    ),
                 ),
                 # The reader's own rows and the routed community's, for the bare
                 # login, the platform floor, and the roles that own the member

@@ -2019,11 +2019,13 @@ async def remove_member(
         )
 
     # Removing the seat-holder ends the seat exactly as demoting them does, so
-    # it answers to the same authority: only the seat passes the seat on.
+    # it answers to the same authority: only the seat passes the seat on. And
+    # removing an admin, as demoting one does, takes somebody who holds every
+    # surface.
     if (
         membership.role == CommunityRole.superadmin
         and guild_context.role != CommunityRole.superadmin
-    ):
+    ) or (membership.role in GUILD_ADMIN_ROLES and not guild_context.manages_admins):
         raise HTTPException(
             status_code=status.HTTP_403_FORBIDDEN,
             detail=GuildMessages.COMMUNITY_ROLE_NOT_ASSIGNABLE,

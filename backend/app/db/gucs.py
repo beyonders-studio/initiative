@@ -249,8 +249,8 @@ CLOSED_SURFACES = Guc("app.closed_surfaces", Kind.NAMES, standing=True)
 #: for every initiative in it (``app.models.tenant.initiative.INITIATIVE_TOOL_KEYS``).
 COMMUNITY_TOOLS = Guc("app.community_tools", Kind.NAMES, standing=True)
 #: The admin surfaces the reader holds here
-#: (``app.models.platform.guild.AdminSurface``): every one for the admin
-#: rung, none below it.
+#: (``app.models.platform.guild.AdminSurface``): a custom role's, or else
+#: every one for the admin rung and none below it.
 HELD_SURFACES = Guc("app.held_surfaces", Kind.NAMES, standing=True)
 
 # --- Somebody who filed a case ------------------------------------------------

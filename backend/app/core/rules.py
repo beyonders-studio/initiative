@@ -259,6 +259,7 @@ PLATFORM_RULES: dict[str, StoredRule] = _catalog(
 #: surface is closed.
 SURFACE_AI_CONNECTIONS = "surface.ai_connections"
 SURFACE_PLUGINS = "surface.plugins"
+SURFACE_CUSTOM_ROLES = "surface.custom_roles"
 
 #: A community's rules. Each is set by its seat and applies while the community
 #: holds the option it needs.
@@ -311,6 +312,9 @@ COMMUNITY_RULES: dict[str, StoredRule] = _catalog(
     # Whether its seat may install, configure and remove plug-ins. Closed, the
     # plug-ins it has keep running as they are.
     StoredRule(SURFACE_PLUGINS, _ON, True, surface=True),
+    # Whether its admins may define and assign custom roles. Closed, the roles
+    # it has keep applying as they are.
+    StoredRule(SURFACE_CUSTOM_ROLES, _ON, True, surface=True),
 )
 
 #: The community rules the deployment sets beside a plan, through billing's

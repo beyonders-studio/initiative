@@ -61,6 +61,7 @@ from app.core.audit_events import AuditEventType
 from app.services import audit as audit_service
 from app.services import email as email_service
 from app.models.platform.guild import (
+    GUILD_ADMIN_ROLES,
     AdminSurface,
     assignable_roles,
     Guild,
@@ -1562,6 +1563,17 @@ async def update_community_membership(
     if (
         target_membership.role == CommunityRole.superadmin
         and guild_context.rung != CommunityRole.superadmin
+    ):
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail=GuildMessages.COMMUNITY_ROLE_NOT_ASSIGNABLE,
+        )
+    # The admin rung holds every surface, so making or unmaking an admin takes
+    # somebody who holds every one: a custom role leaves nobody able to hand
+    # out more than they hold.
+    if (
+        GUILD_ADMIN_ROLES & {target_membership.role, payload.role}
+        and not guild_context.manages_admins
     ):
         raise HTTPException(
             status_code=status.HTTP_403_FORBIDDEN,

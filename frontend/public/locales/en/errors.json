@@ -827,5 +827,11 @@
     "dates": "Start and due dates",
     "location": "Location",
     "attendees": "Attendees"
-  }
+  },
+  "CUSTOM_ROLE_NOT_FOUND": "That role doesn't exist any more.",
+  "CUSTOM_ROLE_NAME_TAKEN": "Another role already has that name.",
+  "CUSTOM_ROLE_BEYOND_YOURS": "You can only make or give a role with what you can do yourself.",
+  "CUSTOM_ROLE_WIDENS_AN_ADMIN": "Taking this role off gives an admin everything back, so only an admin who can do everything can do it.",
+  "CUSTOM_ROLE_SURFACE_NOT_FOR_MEMBERS": "A role for members can't include that. Give it to an admin role instead.",
+  "CUSTOM_ROLE_HOLDER_NOT_MEMBER": "That person isn't a member of this community."
 }

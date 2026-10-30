@@ -827,5 +827,11 @@
     "dates": "Dates de début et d’échéance",
     "location": "Lieu",
     "attendees": "Participants"
-  }
+  },
+  "CUSTOM_ROLE_NOT_FOUND": "Ce rôle n'existe plus.",
+  "CUSTOM_ROLE_NAME_TAKEN": "Un autre rôle porte déjà ce nom.",
+  "CUSTOM_ROLE_BEYOND_YOURS": "Vous ne pouvez créer ou attribuer un rôle qu'avec ce que vous pouvez faire vous-même.",
+  "CUSTOM_ROLE_WIDENS_AN_ADMIN": "Retirer ce rôle rend tout à un administrateur : seul un administrateur qui peut tout faire peut le retirer.",
+  "CUSTOM_ROLE_SURFACE_NOT_FOR_MEMBERS": "Un rôle pour les membres ne peut pas inclure cela. Donnez-le plutôt à un rôle d'administrateur.",
+  "CUSTOM_ROLE_HOLDER_NOT_MEMBER": "Cette personne n'est pas membre de cette communauté."
 }

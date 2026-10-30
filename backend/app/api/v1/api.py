@@ -57,6 +57,7 @@ from app.api.v1.tenant_endpoints import (
     relationships,
     resource_grants,
     storage,
+    custom_roles,
     tags,
     task_statuses,
     task_types,
@@ -368,6 +369,9 @@ guild_router.include_router(
     resource_grants.router, prefix="/resource-grants", tags=["resource-grants"]
 )
 guild_router.include_router(storage.router, prefix="/storage", tags=["storage"])
+guild_router.include_router(
+    custom_roles.router, prefix="/custom-roles", tags=["custom-roles"]
+)
 guild_router.include_router(
     relationships.router, prefix="/relationships", tags=["relationships"]
 )

@@ -203,14 +203,14 @@ _TOOL_ON = (
 #: membership row is a guest's.
 _PERSON_ROWS = f"""
 WITH my_row AS MATERIALIZED (
-  SELECT m.role,
+  SELECT m.role, m.joined_at,
          (m.role <> '{CommunityRole.guest.value}' OR {_ROUTED_AS_GUEST}) AS routed
   FROM public.guild_memberships m
   WHERE m.guild_id = {gucs.GUILD_ID} AND m.user_id = {gucs.USER_ID}
     AND {live_membership("m")}
 ),
 my_membership AS MATERIALIZED (
-  SELECT r.role FROM my_row r WHERE r.routed
+  SELECT r.role, r.joined_at FROM my_row r WHERE r.routed
 ),
 my_initiatives AS MATERIALIZED (
   SELECT im.initiative_id, im.role_id,
@@ -257,9 +257,19 @@ _PERSON_STANDING: dict[gucs.Guc, str] = {
     gucs.GUILD_ADMIN: f"""COALESCE((
       SELECT (m.role IN ({_ADMIN_RUNGS_SQL}))::text FROM my_membership m
     ), 'false')""",
+    # A custom role given during this membership, on the rung the membership
+    # holds, decides; otherwise the rung does.
     gucs.HELD_SURFACES: f"""COALESCE((
-      SELECT '{_EVERY_SURFACE}' FROM my_membership m
-      WHERE m.role IN ({_ADMIN_RUNGS_SQL})
+      SELECT CASE
+               WHEN r.id IS NOT NULL THEN array_to_string(r.surfaces, ',')
+               WHEN m.role IN ({_ADMIN_RUNGS_SQL}) THEN '{_EVERY_SURFACE}'
+               ELSE ''
+             END
+      FROM my_membership m
+      LEFT JOIN custom_role_members cm
+        ON cm.user_id = {gucs.USER_ID} AND cm.assigned_at >= m.joined_at
+      LEFT JOIN custom_roles r
+        ON r.id = cm.role_id AND r.base_rung = m.role::text
     ), '')""",
     # The seat as ``guild_superadmin()`` answers it, lent by a grant only while
     # the grant is still held.
@@ -896,6 +906,20 @@ class GuildContext:
         what an admin route asks, where :attr:`is_admin` is the reach into
         the community's content. A grant holds none."""
         return surface.value in self.held_surfaces
+
+    @property
+    def holds_every_surface(self) -> bool:
+        """Whether the reader holds the whole catalog: an admin with no custom
+        role, or one whose role keeps every surface. What making or unmaking
+        an admin asks, since the admin rung holds every one."""
+        return all(self.holds_surface(surface) for surface in AdminSurface)
+
+    @property
+    def manages_admins(self) -> bool:
+        """Whether this request may make or unmake an admin: holding every
+        surface, as the admin rung does, or on a settings grant — the answer
+        the membership policy gives too."""
+        return self.holds_every_surface or self.settings_rung is not None
 
     @property
     def rung(self) -> "CommunityRole":

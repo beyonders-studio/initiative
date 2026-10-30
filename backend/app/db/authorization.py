@@ -446,6 +446,16 @@ def holds(surface: AdminSurface) -> str:
     return f"('{surface.value}' = ANY ({HELD_SURFACES}))"
 
 
+#: The whole catalog, as a policy compares a held list with it.
+EVERY_SURFACE = (
+    f"ARRAY[{', '.join(f"'{surface.value}'" for surface in AdminSurface)}]::text[]"
+)
+
+#: The reader holds every surface here: an admin with no custom role, or one
+#: whose role keeps every one. What making or unmaking an admin asks.
+HOLDS_EVERY_SURFACE = f"({HELD_SURFACES} @> {EVERY_SURFACE})"
+
+
 #: This request administers the community's configuration: a live settings
 #: grant, at either rung, as the standing statement read it from the rows.
 #: Its own axis — what a grant reaches of the community's settings — beside
@@ -664,6 +674,11 @@ class Legs:
         """The reader holds ``surface``: the leg for one part of administering
         the community, where :attr:`admin` is the reach into its content."""
         return f"('{surface.value}' = ANY ({self.field('held_surfaces')}))"
+
+    @property
+    def holds_every_surface(self) -> str:
+        """The reader holds the whole catalog (:data:`HOLDS_EVERY_SURFACE`)."""
+        return f"({self.field('held_surfaces')} @> {EVERY_SURFACE})"
 
     @property
     def auth_ok(self) -> str:
