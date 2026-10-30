@@ -20,8 +20,8 @@ every ``guild_<id>``:
 In ``public``, ``community_timers`` takes the sweeps' new names, and
 ``users.last_task_assignment_digest_at``, which nothing read, is dropped.
 
-Revision ID: 20261030_0562
-Revises: 20261030_0561
+Revision ID: 20261030_0563
+Revises: 20261030_0562
 Create Date: 2026-10-30
 """
 
@@ -36,8 +36,8 @@ from sqlalchemy.engine import Connection
 
 from app.db.guild_migrations import run_for_each_guild_schema
 
-revision = "20261030_0562"
-down_revision = "20261030_0561"
+revision = "20261030_0563"
+down_revision = "20261030_0562"
 branch_labels = None
 depends_on = None
 
