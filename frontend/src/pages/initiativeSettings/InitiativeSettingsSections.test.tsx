@@ -231,6 +231,39 @@ describe("initiative settings sections", () => {
     });
   });
 
+  it("holds a switch whose partner the community set", async () => {
+    stubInitiative();
+    server.use(
+      communityHttp.get("/initiatives/:id/roles", () =>
+        HttpResponse.json([
+          buildInitiativeRole({
+            id: 2,
+            name: "member",
+            display_name: "Member",
+            is_builtin: true,
+            permissions: { projects_enabled: true, create_projects: true },
+          }),
+        ])
+      ),
+      communityHttp.get("/initiatives/defaults", () =>
+        HttpResponse.json({
+          tools: {},
+          member_permissions: { create_projects: true },
+          custom_roles: true,
+        })
+      )
+    );
+
+    renderSection(InitiativeSettingsRolesPage, "roles");
+
+    // Turning view off would take create with it, and create is the
+    // community's.
+    const create = await screen.findByRole("switch", { name: "Create Projects" });
+    await waitFor(() => expect(create).toBeDisabled());
+    expect(screen.getByRole("switch", { name: "View Projects" })).toBeDisabled();
+    expect(screen.getByText(/sets this for every initiative/)).toBeInTheDocument();
+  });
+
   /**
    * A permission for a tool the initiative has switched off grants nothing —
    * the mirror of the details screen never mentioning roles. The roles screen

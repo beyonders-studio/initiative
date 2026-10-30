@@ -96,6 +96,12 @@ const ToolPermissionRow = ({
   const canView = role.permissions[viewKey] ?? false;
   const canCreate = role.permissions[createKey] ?? false;
   const disabled = !canManageMembers || isPending;
+  // The pair moves together (see handleTogglePermission), so a switch whose
+  // change would move a partner the community set is held too.
+  const held = {
+    view: locked.has(viewKey) || (canView && canCreate && locked.has(createKey)),
+    create: locked.has(createKey) || (!canCreate && !canView && locked.has(viewKey)),
+  };
 
   return (
     <div className="flex flex-wrap items-center gap-x-2 gap-y-1">
@@ -118,7 +124,7 @@ const ToolPermissionRow = ({
             </span>
             <Switch
               checked={checked}
-              disabled={disabled || locked.has(key)}
+              disabled={disabled || held[permission]}
               aria-label={t(PERMISSION_LABEL_KEYS[key] as never)}
               onCheckedChange={(next) => onToggle(role, tool, permission, next)}
             />
