@@ -7,7 +7,10 @@ on:
 
 jobs:
   tag:
-    if: github.event.pull_request.merged == true && startsWith(github.event.pull_request.head.ref, 'release/v')
+    if: >-
+      github.repository == 'beyonders-studio/initiative'
+      && github.event.pull_request.merged == true
+      && startsWith(github.event.pull_request.head.ref, 'release/v')
     runs-on: ubuntu-24.04
     timeout-minutes: 10
     # Everything that writes goes through the release app's token below, so
@@ -99,7 +102,8 @@ jobs:
   # candidate still building from it is cancelled, and the branch deleted.
   discard:
     if: >-
-      github.event.pull_request.merged == false
+      github.repository == 'beyonders-studio/initiative'
+      && github.event.pull_request.merged == false
       && startsWith(github.event.pull_request.head.ref, 'release/v')
       && github.event.pull_request.head.repo.full_name == github.repository
     runs-on: ubuntu-24.04
