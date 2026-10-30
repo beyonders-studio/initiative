@@ -2010,6 +2010,7 @@ An import job and an export job are one record, `DataJobRead`, with a
 `GET /c/{community_id}/data-jobs/{job_id}`; starting, cancelling, confirming
 and downloading stay on their direction's routes.
 
+- GET /api/v1/c/{community_id}/exports/community/status added `#/components/schemas/DataJobRead` to the `latest` response property `anyOf` list for the response status `200`
 - GET /api/v1/c/{community_id}/exports/jobs api path removed without deprecation
 - GET /api/v1/c/{community_id}/exports/jobs/{job_id} api path removed without deprecation
 - GET /api/v1/c/{community_id}/imports/jobs api path removed without deprecation

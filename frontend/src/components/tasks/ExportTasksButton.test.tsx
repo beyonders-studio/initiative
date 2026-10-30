@@ -168,6 +168,22 @@ describe("ExportTasksButton", () => {
     expect(getItem("exports:pending:1")).toBeNull();
   });
 
+  it("lets go of a stored pending id that names an import", async () => {
+    setItem("exports:pending:1", "9");
+    server.use(
+      communityHttp.get("/data-jobs/:jobId", () =>
+        HttpResponse.json(
+          buildDataJob({ id: 9, direction: "import", source: "backup", status: "cancelled" })
+        )
+      )
+    );
+    renderWithProviders(<ExportTasksButton params={{ conditions: [] }} resumePending />);
+
+    await waitFor(() => expect(getItem("exports:pending:1")).toBeNull());
+    expect(downloadBlob).not.toHaveBeenCalled();
+    expect(toast.error).not.toHaveBeenCalled();
+  });
+
   it("does not adopt a stored pending job without resumePending", async () => {
     // Two instances share the community's pending key (toolbar + Export
     // Selected); only the designated adopter may resume, or a job in flight

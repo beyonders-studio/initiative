@@ -55,7 +55,17 @@ export function useImportJob({ resumePending = false }: UseImportJobOptions = {}
 
   const job = jobQuery.data;
   useEffect(() => {
-    if (!jobId || !job || job.id !== jobId || !TERMINAL.has(job.status)) {
+    if (!jobId || !job || job.id !== jobId) {
+      return;
+    }
+    // A pending id saved before imports and exports shared their ids can now
+    // name a job going the other way: it is not this one, so let it go.
+    if (job.direction !== "import") {
+      setJobId(null);
+      removeItem(pendingKey(communityId));
+      return;
+    }
+    if (!TERMINAL.has(job.status)) {
       return;
     }
     if (handledJobs.current.has(jobId)) {
