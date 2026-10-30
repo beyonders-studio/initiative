@@ -9,6 +9,9 @@ name: Nightly
 #
 # A schedule runs the workflow as the default branch holds it, and that is
 # dev, so the night runs dev's steps against dev's code.
+# Scheduled workloads run only in the upstream repository. Forks can still
+# run them by hand or on pull requests; only upstream manages nightly issues.
+# GitHub may still create a scheduled run on a fork, with every job skipped.
 
 on:
   schedule:
@@ -34,6 +37,7 @@ concurrency:
 jobs:
   backend:
     name: Backend (${{ matrix.name }})
+    if: ${{ github.event_name != 'schedule' || github.repository == 'beyonders-studio/initiative' }}
     runs-on: ubuntu-24.04
     timeout-minutes: 60
     strategy:
@@ -143,6 +147,7 @@ jobs:
 
   frontend:
     name: Frontend (Auckland, shuffled)
+    if: ${{ github.event_name != 'schedule' || github.repository == 'beyonders-studio/initiative' }}
     runs-on: ubuntu-24.04
     timeout-minutes: 20
     # The tests pin their own locale (vitest.config.ts), so only the timezone
@@ -171,14 +176,17 @@ jobs:
 
   journeys:
     name: Journeys
+    if: ${{ github.event_name != 'schedule' || github.repository == 'beyonders-studio/initiative' }}
     uses: ./.github/workflows/journeys.yml
 
   report:
     name: Report
     needs: [backend, frontend, journeys]
-    # The night on dev, scheduled or started by hand; a branch's run reports
-    # on its own page only.
-    if: ${{ !cancelled() && github.event_name != 'pull_request' && github.ref_name == 'dev' }}
+    # Only upstream's night on dev, scheduled or started by hand. Keep the
+    # repository guard here too: !cancelled() can run after skipped needs.
+    if: >-
+      ${{ !cancelled() && github.repository == 'beyonders-studio/initiative'
+      && github.event_name != 'pull_request' && github.ref_name == 'dev' }}
     runs-on: ubuntu-24.04
     timeout-minutes: 5
     permissions:
