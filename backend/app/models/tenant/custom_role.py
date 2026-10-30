@@ -23,8 +23,8 @@ from sqlalchemy import (
     ForeignKey,
     Integer,
     String,
+    Index,
     Text,
-    UniqueConstraint,
     text,
 )
 from sqlmodel import Field, SQLModel
@@ -128,8 +128,12 @@ class CustomRoleClaimRule(CreatedByMixin, table=True):
 
     __tablename__ = "custom_role_claim_rules"
     __table_args__ = (
-        UniqueConstraint(
-            "provider_id", "claim_value", name="uq_custom_role_claim_rules_claim"
+        # One rule per group as a sign-in matches it: capitals aside.
+        Index(
+            "uq_custom_role_claim_rules_claim",
+            "provider_id",
+            text("lower(claim_value)"),
+            unique=True,
         ),
     )
 

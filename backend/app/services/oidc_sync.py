@@ -10,6 +10,7 @@ from sqlmodel.ext.asyncio.session import AsyncSession
 from app.core.audit_events import AuditEventType
 from app.db import post_commit
 from app.models.platform.guild import GUILD_ADMIN_ROLES, GuildMembership, CommunityRole
+from app.models.platform.guild_provider_connection import GuildProviderConnection
 from app.services import audit as audit_service
 from app.services.auth import guild_provider_connections as guild_connections
 from app.services.guild_sweeps import Scope, each_guild
@@ -112,7 +113,11 @@ async def placement_claims(session: AsyncSession, *, provider_id: int) -> set[st
     """The verified claims this provider's rules are decided by: the narrowing
     each community that wrote a rule has for the provider, and the directory a
     provider rule names. What :func:`sync_oidc_assignments` reads from
-    ``claims`` besides the groups."""
+    ``claims`` besides the groups.
+
+    A community's custom-role rules live in its own schema, so which of them
+    have any is not read here: every community connected to the provider may,
+    and its narrowing is asked for too."""
     rules = (
         await session.exec(
             select(OIDCClaimMapping).where(OIDCClaimMapping.provider_id == provider_id)
@@ -130,7 +135,16 @@ async def placement_claims(session: AsyncSession, *, provider_id: int) -> set[st
         provider_id=provider_id,
         guild_ids={
             rule.guild_id for rule in rules if rule.author == ClaimRuleAuthor.community
-        },
+        }
+        | set(
+            (
+                await session.exec(
+                    select(GuildProviderConnection.guild_id).where(
+                        GuildProviderConnection.provider_id == provider_id
+                    )
+                )
+            ).all()
+        ),
     )
 
 
