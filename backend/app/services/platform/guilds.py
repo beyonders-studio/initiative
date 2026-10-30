@@ -43,6 +43,7 @@ from app.models.platform.guild import (
     restore_status_choices,
 )
 from app.models.platform.access_grant import AccessGrant, AccessGrantPurpose
+from app.core.rules import OPTION_RULES, SetBy
 from app.models.platform.guild_administration import GuildAdministration
 from app.models.platform.notification import NotificationType
 from app.models.tenant.guest_invite_grant import GuestInviteGrant
@@ -541,12 +542,12 @@ async def _assert_member_capacity(
     point-in-time reading either way, so serializing joins against it would buy
     nothing. The join path stays the authoritative gate.
     """
-    administration = await get_administration(session, guild_id=guild_id)
-    if administration.max_users is None:
+    cap = await rules.community_value(session, guild_id, "max_users")
+    if cap is None:
         return
     if claiming_seat:
         await advisory_lock(session, LockNamespace.MEMBER_CAP, guild_id)
-    if await count_members(session, guild_id=guild_id) >= administration.max_users:
+    if await count_members(session, guild_id=guild_id) >= cap:
         raise GuildCapacityError(GuildMessages.COMMUNITY_USER_LIMIT_REACHED)
 
 
@@ -560,12 +561,12 @@ async def _assert_guest_capacity(
     namespace so guests and members do not queue behind each other. A cap of 0
     takes no new guests.
     """
-    administration = await get_administration(session, guild_id=guild_id)
-    if administration.max_guests is None:
+    cap = await rules.community_value(session, guild_id, "max_guests")
+    if cap is None:
         return
     if claiming_seat:
         await advisory_lock(session, LockNamespace.GUEST_CAP, guild_id)
-    if await count_guests(session, guild_id=guild_id) >= administration.max_guests:
+    if await count_guests(session, guild_id=guild_id) >= cap:
         raise GuildCapacityError(GuildMessages.COMMUNITY_GUEST_LIMIT_REACHED)
 
 
@@ -1353,10 +1354,11 @@ async def update_guild(
         session.add(guild)
         await session.flush()
 
-    # The operator-set fields live on their own row and are writable only on the
-    # system engine, so they are applied separately from the identity edits
-    # above — a guild admin's PATCH carries none of them, and skipping the whole
-    # block spares that path a query it would never use.
+    # The operator-set fields are the community's paid rules, written as the
+    # deployment's rows on the system engine, so they are applied separately
+    # from the identity edits above — a guild admin's PATCH carries none of
+    # them, and skipping the whole block spares that path a query it would
+    # never use.
     if (
         max_storage_bytes_provided
         or max_users_provided
@@ -1365,20 +1367,14 @@ async def update_guild(
         or banner_image_enabled is not None
         or support_enabled is not None
     ):
-        administration_updated = False
-        administration = await get_administration(session, guild_id=guild_id)
-        if (
-            max_storage_bytes_provided
-            and administration.max_storage_bytes != max_storage_bytes
-        ):
-            administration.max_storage_bytes = max_storage_bytes
-            administration_updated = True
-        if max_users_provided and administration.max_users != max_users:
-            administration.max_users = max_users
-            administration_updated = True
-        if max_guests_provided and administration.max_guests != max_guests:
-            administration.max_guests = max_guests
-            administration_updated = True
+        plan = await rules.community_values(session, [guild_id])
+        changes: dict[str, Any] = {}
+        if max_storage_bytes_provided:
+            changes["max_storage_bytes"] = max_storage_bytes
+        if max_users_provided:
+            changes["max_users"] = max_users
+        if max_guests_provided:
+            changes["max_guests"] = max_guests
         # An explicit ``null`` is meaningless for an entitlement (unlike the
         # caps, where null resets to unlimited), so guard on ``is not None`` and
         # treat null/omitted alike as a no-op — mirroring how the operator
@@ -1389,20 +1385,11 @@ async def update_guild(
         # A sent list replaces the set outright: these are grants, and the
         # operator is stating which ones the guild holds now.
         if auth_options is not None:
-            requested = sorted({option.value for option in auth_options})
-            if sorted(administration.auth_options or []) != requested:
-                administration.auth_options = requested
-                administration_updated = True
-        if (
-            banner_image_enabled is not None
-            and administration.banner_image_enabled != banner_image_enabled
-        ):
-            administration.banner_image_enabled = banner_image_enabled
-            administration_updated = True
-        if (
-            support_enabled is not None
-            and administration.support_enabled != support_enabled
-        ):
+            for option, key in OPTION_RULES.items():
+                changes[key] = option in auth_options
+        if banner_image_enabled is not None:
+            changes["banner_image"] = banner_image_enabled
+        if support_enabled is not None:
             # Switching it on offers the community's members a form. Where the
             # deployment has bound no support stream, that form has nowhere to
             # send what somebody writes in it, so the entitlement is refused
@@ -1411,15 +1398,21 @@ async def update_guild(
             # help stops offering it.
             from app.services.platform.intake import stream_is_bound
 
-            if support_enabled and not await stream_is_bound(IntakeStream.support):
+            if (
+                support_enabled
+                and not plan[guild_id]["help_requests"]
+                and not await stream_is_bound(IntakeStream.support)
+            ):
                 raise SupportIntakeMissingError(
                     GuildMessages.SUPPORT_INTAKE_NOT_CONFIGURED
                 )
-            administration.support_enabled = support_enabled
-            administration_updated = True
-        if administration_updated:
-            session.add(administration)
-            await session.flush()
+            changes["help_requests"] = support_enabled
+        # The deployment's rows: a community's own seat never writes these.
+        for key, value in changes.items():
+            await rules.put(
+                session, key, value, guild_id=guild_id, set_by=SetBy.deployment
+            )
+        await session.flush()
     if retention_days_provided:
         from app.services.platform.app_settings import get_or_create_guild_settings
 
@@ -2487,11 +2480,8 @@ async def _assert_listable(session: AsyncSession, guild: Guild) -> None:
         )
     if guild.has_adult_content:
         raise CommunityListingError(GuildMessages.COMMUNITY_COMMUNITY_ADULT_CONTENT)
-    administration = await get_administration(session, guild_id=guild.id)
-    if (
-        administration.max_users is not None
-        and administration.max_users < MIN_COMMUNITY_SEATS
-    ):
+    cap = await rules.community_value(session, guild.id, "max_users")
+    if cap is not None and cap < MIN_COMMUNITY_SEATS:
         raise CommunityListingError(GuildMessages.COMMUNITY_COMMUNITY_REQUIRES_CAPACITY)
 
 
@@ -2506,17 +2496,15 @@ def community_listing_filters() -> list:
     Two of the three are CHECK constraints on ``guilds`` as well (a listed
     guild is on a shelf and has declared itself free of adult content), so a
     row that reaches this query already satisfies them. The seat cap is not: it
-    lives on ``guild_administration``, only an operator sets it, and it can be
-    lowered long after the listing was made.
+    is a paid rule, only the deployment sets it, and it can be lowered long
+    after the listing was made.
     """
+    cap = rules.community_rule_sql(Guild.id, "max_users")
     return [
         Guild.is_community.is_(True),
         Guild.status == CommunityStatus.active.value,
-        # NULL is unlimited, hence the explicit null leg.
-        or_(
-            GuildAdministration.max_users.is_(None),
-            GuildAdministration.max_users >= MIN_COMMUNITY_SEATS,
-        ),
+        # No cap is unlimited, hence the explicit null leg.
+        or_(cap.is_(None), cap >= MIN_COMMUNITY_SEATS),
     ]
 
 
@@ -2531,12 +2519,7 @@ async def is_listed_in_directory(session: AsyncSession, *, guild_id: int) -> boo
 
     if not await app_settings_service.community_directory_enabled(session):
         return False
-    statement = (
-        select(func.count())
-        .select_from(Guild)
-        .join(GuildAdministration, GuildAdministration.guild_id == Guild.id)
-        .where(Guild.id == guild_id)
-    )
+    statement = select(func.count()).select_from(Guild).where(Guild.id == guild_id)
     for condition in community_listing_filters():
         statement = statement.where(condition)
     return bool((await session.exec(statement)).one())
@@ -2652,9 +2635,6 @@ async def list_profile_communities(
     stmt = (
         select(Guild)
         .join(GuildMembership, GuildMembership.guild_id == Guild.id)
-        .join(
-            GuildAdministration, GuildAdministration.guild_id == Guild.id, isouter=True
-        )
         .where(GuildMembership.user_id == user_id, *community_listing_filters())
         .order_by(Guild.name.asc())
     )
@@ -2732,16 +2712,8 @@ async def list_community_guilds(
             matches.append(location["country"].astext.in_(query_countries))
         filters.append(or_(*matches))
 
-    # Every guild has exactly one administration row, created with it, so this
-    # is an inner join by construction.
-    administration_join = (
-        GuildAdministration,
-        GuildAdministration.guild_id == Guild.id,
-    )
-    count_statement = select(func.count()).select_from(Guild).join(*administration_join)
-    statement = select(Guild, member_count, already_member > 0).join(
-        *administration_join
-    )
+    count_statement = select(func.count()).select_from(Guild)
+    statement = select(Guild, member_count, already_member > 0)
     for condition in filters:
         statement = statement.where(condition)
         count_statement = count_statement.where(condition)

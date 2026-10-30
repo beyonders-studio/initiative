@@ -21,6 +21,7 @@ import pytest
 from httpx import AsyncClient
 from sqlmodel.ext.asyncio.session import AsyncSession
 
+from app.testing import community_plan
 from app.core.messages import GuildMessages
 from app.core.tools import Tool
 from app.models.platform.access_grant import AccessGrant
@@ -30,7 +31,6 @@ from app.models.platform.user import UserRole
 from app.services.platform import guilds as guild_service
 from app.services.tenant import task_statuses as task_statuses_service
 from app.testing import (
-    guild_administration,
     create_guild,
     create_initiative,
     create_task,
@@ -731,7 +731,7 @@ async def test_guild_admin_patch_cannot_touch_enforcement_fields(
     assert body["tier_name"] is None
 
     await session.refresh(a.guild)
-    assert (await guild_administration(session, a.guild)).max_storage_bytes is None
+    assert (await community_plan(session, a.guild.id))["max_storage_bytes"] is None
     assert a.guild.status == CommunityStatus.active.value
 
 
@@ -762,14 +762,6 @@ async def test_guild_role_lacks_update_on_enforcement_columns(
         ("public.guilds", "id", "status", "'suspended'"),
         ("public.guilds", "id", "status_changed_at", "now()"),
         ("public.guild_administration", "guild_id", "tier_name", "'Enterprise'"),
-        ("public.guild_administration", "guild_id", "max_storage_bytes", "5"),
-        ("public.guild_administration", "guild_id", "max_users", "1"),
-        (
-            "public.guild_administration",
-            "guild_id",
-            "auth_options",
-            "ARRAY['providers']::guild_auth_option[]",
-        ),
     ]:
         await route_as(s, user_id=a.user.id, guild_id=a.guild.id)
         with pytest.raises(sqlalchemy.exc.ProgrammingError, match="permission denied"):
@@ -778,6 +770,19 @@ async def test_guild_role_lacks_update_on_enforcement_columns(
                 params={"gid": a.guild.id},
             )
         await s.rollback()
+
+    # Nor does it write its plan, which is the deployment's rows of its rules.
+    await route_as(s, user_id=a.user.id, guild_id=a.guild.id)
+    with pytest.raises(sqlalchemy.exc.ProgrammingError, match="permission denied"):
+        await s.exec(
+            sa_text(
+                "INSERT INTO public.community_rules"
+                " (guild_id, key, set_by, amount, updated_at)"
+                " VALUES (:gid, 'max_users', 'deployment', 1, now())"
+            ),
+            params={"gid": a.guild.id},
+        )
+    await s.rollback()
 
     # Reading its own caps is allowed — the settings page shows usage against them.
     await route_as(s, user_id=a.user.id, guild_id=a.guild.id)

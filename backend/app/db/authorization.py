@@ -260,9 +260,10 @@ $function$
 """
 
 
-#: Whether a rule that needs an operator-granted option applies to the
-#: community: true unless its row shows the option withdrawn. A role that
-#: reads no settings sees no row, and is asked the rule as it stands. The
+#: Whether a rule that needs a paid sign-in option applies to the community:
+#: the deployment's row for the option's key (``app.core.rules.OPTION_RULES``)
+#: grants it. The rule and the option are rows of the same table, read under
+#: the same policies, so a session that sees the one sees the other. The
 #: sign-in gate asks it here, and the app's queries ask the same function.
 GUILD_HOLDS_OPTION = """\
 CREATE OR REPLACE FUNCTION public.guild_holds_option(p_guild_id integer, p_option text)
@@ -271,11 +272,14 @@ CREATE OR REPLACE FUNCTION public.guild_holds_option(p_guild_id integer, p_optio
  STABLE
 AS $function$
 BEGIN
-    RETURN NOT EXISTS (
+    RETURN EXISTS (
         SELECT 1
-        FROM public.guild_administration a
-        WHERE a.guild_id = p_guild_id
-          AND NOT p_option::public.guild_auth_option = ANY(a.auth_options)
+        FROM public.community_rules r
+        WHERE r.guild_id = p_guild_id
+          AND r.key = p_option
+          AND r.user_id IS NULL
+          AND r.set_by = 'deployment'
+          AND r.enabled
     );
 END
 $function$
@@ -336,7 +340,7 @@ AS $function$
                   OR (
                       'totp' = ANY(p.methods)
                       AND NOT ('mfa' = ANY(public.session_amr()))
-                      AND public.guild_holds_option(p.guild_id, 'providers')
+                      AND public.guild_holds_option(p.guild_id, 'community_sign_in')
                   )
                   -- Or a passkey, where the community asks for one. Its own
                   -- leg rather than the factor's: an assertion records the
@@ -345,7 +349,7 @@ AS $function$
                   OR (
                       'passkey' = ANY(p.methods)
                       AND NOT (public.session_amr() && ARRAY['hwk', 'swk'])
-                      AND public.guild_holds_option(p.guild_id, 'providers')
+                      AND public.guild_holds_option(p.guild_id, 'community_sign_in')
                   )
                   -- Or any of its own, whichever provider served it. Named
                   -- rather than counted, so a list holding some other method
@@ -370,7 +374,7 @@ AS $function$
               AND r.key = 'require_second_factor'
               AND r.enabled
               AND NOT ('mfa' = ANY(public.session_amr()))
-              AND public.guild_holds_option(r.guild_id, 'restrictions')
+              AND public.guild_holds_option(r.guild_id, 'security_standards')
         ))
 $function$
 

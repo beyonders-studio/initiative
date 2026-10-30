@@ -17,6 +17,7 @@ from httpx import AsyncClient
 from sqlalchemy import text
 from sqlmodel.ext.asyncio.session import AsyncSession
 
+from app.testing import community_plan
 from app.core.intake import IntakeStream
 from app.core.messages import GuildMessages
 from app.db.session import set_rls_context
@@ -344,7 +345,8 @@ async def test_guild_auth_options_are_operator_only(
     assert resp.status_code == 200, resp.text
     session.expire_all()
     guild = await session.get(Guild, guild_id)
-    assert (await guild_administration(session, guild)).auth_options == []
+    plan = await community_plan(session, guild.id)
+    assert not (plan["community_sign_in"] or plan["security_standards"])
 
 
 async def test_lowering_the_cap_below_the_headcount_keeps_the_members(
@@ -1299,7 +1301,7 @@ async def test_help_requests_need_somewhere_to_go(client, session, owner):
 
     assert response.status_code == 400, response.text
     assert response.json()["detail"] == GuildMessages.SUPPORT_INTAKE_NOT_CONFIGURED
-    assert (await guild_administration(session, guild)).support_enabled is False
+    assert (await community_plan(session, guild.id))["help_requests"] is False
 
 
 async def test_help_requests_switch_on_once_a_stream_is_bound(client, session, owner):
@@ -1314,7 +1316,7 @@ async def test_help_requests_switch_on_once_a_stream_is_bound(client, session, o
     )
 
     assert response.status_code == 200, response.text
-    assert (await guild_administration(session, guild)).support_enabled is True
+    assert (await community_plan(session, guild.id))["help_requests"] is True
 
 
 async def test_the_community_list_says_whether_help_has_somewhere_to_go(
@@ -1347,7 +1349,7 @@ async def test_help_requests_can_always_be_switched_off(client, session, owner):
     )
 
     assert response.status_code == 200, response.text
-    assert (await guild_administration(session, guild)).support_enabled is False
+    assert (await community_plan(session, guild.id))["help_requests"] is False
 
 
 INTERFACE = "/api/v1/settings/interface"

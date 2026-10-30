@@ -70,8 +70,8 @@ async def test_billing_role_is_confined_to_its_column_and_guild_surface(
     caps = (
         await s.exec(
             text(
-                "SELECT guild_id, tier_name, max_storage_bytes, max_users, max_guests "
-                "FROM guild_administration WHERE guild_id = :gid"
+                "SELECT guild_id, tier_name FROM guild_administration"
+                " WHERE guild_id = :gid"
             ),
             params={"gid": guild_a.id},
         )
@@ -122,30 +122,38 @@ async def test_billing_role_is_confined_to_its_column_and_guild_surface(
     await _denied(s, f"SELECT description FROM guilds WHERE id = {guild_a.id}")
     await _denied(s, f"SELECT created_by FROM guilds WHERE id = {guild_a.id}")
     await _denied(s, f"UPDATE guilds SET name = 'pwned' WHERE id = {guild_a.id}")
-    # The administration row is billing's where the caps and the capability
-    # switches are concerned — a plan decides what is included, and migration
-    # 0324 is what lets it say so (see ``app.core.billing_capabilities``).
-    capabilities = (
-        await s.exec(
-            text(
-                "SELECT banner_image_enabled, support_enabled, auth_options "
-                "FROM guild_administration WHERE guild_id = :gid"
-            ),
-            params={"gid": guild_a.id},
-        )
-    ).one()
-    assert capabilities.banner_image_enabled in (True, False)
-
+    # What the plan gives is billing's: the deployment's rows of the
+    # community's rules, the caps and the capability switches (migration
+    # 0561, see ``app.core.billing_capabilities``).
     package_written = await s.exec(
         text(
-            "UPDATE guild_administration SET banner_image_enabled = false, "
-            "support_enabled = true, "
-            "auth_options = ARRAY['providers']::guild_auth_option[] "
-            "WHERE guild_id = :gid"
+            "INSERT INTO community_rules (guild_id, key, set_by, enabled, updated_at)"
+            " VALUES (:gid, 'help_requests', 'deployment', true, now())"
         ),
         params={"gid": guild_a.id},
     )
     assert package_written.rowcount == 1
+    capped = await s.exec(
+        text(
+            "UPDATE community_rules SET enabled = false"
+            " WHERE guild_id = :gid AND key = 'help_requests'"
+        ),
+        params={"gid": guild_a.id},
+    )
+    assert capped.rowcount == 1
+    # Never the community's own rows, nor another community's.
+    await _denied(
+        s,
+        "INSERT INTO community_rules (guild_id, key, set_by, enabled, updated_at)"
+        f" VALUES ({guild_a.id}, 'allow_ai', 'community', false, now())",
+    )
+    await set_rls_context(s, Billing(guild_a.id))
+    await _denied(
+        s,
+        "INSERT INTO community_rules (guild_id, key, set_by, enabled, updated_at)"
+        f" VALUES ({guild_b.id}, 'help_requests', 'deployment', true, now())",
+    )
+    await set_rls_context(s, Billing(guild_a.id))
 
     # What stays out of reach: the row's own identity, and its existence.
     await _denied(

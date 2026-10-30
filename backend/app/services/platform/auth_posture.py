@@ -25,7 +25,7 @@ community, and what leaves a community on its behalf, is a :class:`Rule` in
 5. Follow up and commit: switching push off drops the tokens it was sent to.
 
 A community's rule applies only while it holds the option the rule needs
-(``guild_administration.auth_options``), and every point that enforces
+(its paid key, ``app.core.rules.OPTION_RULES``), and every point that enforces
 one asks. Taking an option away stops the rule applying and
 leaves it set, so it applies again when the option comes back.
 """

@@ -31,7 +31,7 @@ from app.core.audit_events import AuditEventType
 from app.core.config import DEFAULT_OIDC_SCOPES
 from app.core.config import settings as app_config
 from app.core.intake import IntakeStream
-from app.core.rules import RETENTION_WINDOWS
+from app.core.rules import OPTION_RULES, RETENTION_WINDOWS
 from app.db import cohorts
 from app.db.query import build_paginated_response, paginated_query
 from app.db.request_context import SystemGuild
@@ -143,16 +143,6 @@ logger = logging.getLogger(__name__)
 
 # Reason stamped on a grant self-issued by the Guilds tab's billing button.
 BILLING_PORTAL_GRANT_REASON = "Opened the billing portal from the Guilds tab"
-
-#: What the operator's caps and entitlements for one community consist of.
-_GUILD_ADMINISTRATION_FIELDS: tuple[str, ...] = (
-    "max_storage_bytes",
-    "max_users",
-    "max_guests",
-    "auth_options",
-    "banner_image_enabled",
-    "support_enabled",
-)
 
 
 router = APIRouter()
@@ -957,10 +947,26 @@ async def _moderating(session: Any, *, user_id: int, guild_ids: list[int]) -> se
     return {int(guild_id) for guild_id in rows.all()}
 
 
+def _plan_fields(plan: rules.Values) -> dict[str, Any]:
+    """What the operator's caps and entitlements for one community consist of:
+    its paid rules, under the names the operator's page and its records use."""
+    return {
+        "max_storage_bytes": plan["max_storage_bytes"],
+        "max_users": plan["max_users"],
+        "max_guests": plan["max_guests"],
+        "auth_options": sorted(
+            option.value for option, key in OPTION_RULES.items() if plan[key]
+        ),
+        "banner_image_enabled": plan["banner_image"],
+        "support_enabled": plan["help_requests"],
+    }
+
+
 def _guild_storage_read(
     guild: Guild,
     administration: GuildAdministration | None,
     *,
+    plan: rules.Values,
     member_count: int,
     has_seat: bool,
     deployment: rules.Values,
@@ -970,8 +976,9 @@ def _guild_storage_read(
     """One row of the Guilds tab, as ``actor`` may act on it.
 
     ``administration`` is None only for a guild missing its companion row,
-    which is listed with blank caps rather than dropped. The status choices
-    are offered only to whoever sets them.
+    which is listed with a blank plan label rather than dropped. ``plan`` is
+    its rules (``rules.community_values``). The status choices are offered
+    only to whoever sets them.
     """
     current = CommunityStatus(guild.status)
     recorded = administration.billing_status if administration else None
@@ -984,11 +991,9 @@ def _guild_storage_read(
         purge_at=COMMUNITY_DELETION.ends_at(guild, deployment),
         has_seat=has_seat,
         tier_name=administration.tier_name if administration else None,
-        max_storage_bytes=(
-            administration.max_storage_bytes if administration else None
-        ),
-        max_users=administration.max_users if administration else None,
-        max_guests=administration.max_guests if administration else None,
+        max_storage_bytes=plan["max_storage_bytes"],
+        max_users=plan["max_users"],
+        max_guests=plan["max_guests"],
         status=current,
         status_changed_at=guild.status_changed_at,
         status_choices=(
@@ -1008,11 +1013,9 @@ def _guild_storage_read(
             else None
         ),
         allowed_actions=actions,
-        auth_options=sorted(administration.auth_options) if administration else [],
-        banner_image_enabled=(
-            administration.banner_image_enabled if administration else True
-        ),
-        support_enabled=administration.support_enabled if administration else False,
+        auth_options=_plan_fields(plan)["auth_options"],
+        banner_image_enabled=plan["banner_image"],
+        support_enabled=plan["help_requests"],
     )
 
 
@@ -1108,6 +1111,7 @@ async def list_platform_community_storage(
         page_size=page_size,
     )
     deployment = await rules.platform_values(session)
+    plans = await rules.community_values(session, [g.id for g, _ in rows])
     counts, seated = await _member_tallies([g.id for g, _ in rows])
     # The reader's own grants, under the requester's own-row policy.
     moderating = await _moderating(
@@ -1117,6 +1121,7 @@ async def list_platform_community_storage(
         _guild_storage_read(
             g,
             administration,
+            plan=plans[g.id],
             member_count=counts.get(g.id, 0),
             has_seat=g.id in seated,
             deployment=deployment,
@@ -1176,9 +1181,8 @@ async def update_platform_community_storage(
     status_before: str | None = None
     status_after: str | None = None
     try:
-        before = audit_service.snapshot(
-            await guilds_service.get_administration(session, guild_id=guild_id),
-            _GUILD_ADMINISTRATION_FIELDS,
+        before = _plan_fields(
+            (await rules.community_values(session, [guild_id]))[guild_id]
         )
         guild = await guilds_service.update_guild(
             session,
@@ -1240,7 +1244,8 @@ async def update_platform_community_storage(
         raise
     administration = await guilds_service.get_administration(session, guild_id=guild_id)
     changed = audit_service.changed_fields(
-        before, audit_service.snapshot(administration, _GUILD_ADMINISTRATION_FIELDS)
+        before,
+        _plan_fields((await rules.community_values(session, [guild_id]))[guild_id]),
     )
     if changed["changed"]:
         await audit_service.record(
@@ -1270,6 +1275,7 @@ async def update_platform_community_storage(
     return _guild_storage_read(
         guild,
         administration,
+        plan=(await rules.community_values(session, [guild.id]))[guild.id],
         member_count=await guilds_service.count_members(session, guild_id=guild_id),
         has_seat=await guilds_service.guild_has_seat(session, guild_id=guild.id),
         deployment=await rules.platform_values(session),
@@ -1378,6 +1384,7 @@ async def set_platform_community_suspension(
     return _guild_storage_read(
         guild,
         administration,
+        plan=(await rules.community_values(session, [guild.id]))[guild.id],
         member_count=await guilds_service.count_members(session, guild_id=guild_id),
         has_seat=await guilds_service.guild_has_seat(session, guild_id=guild_id),
         deployment=await rules.platform_values(session),
@@ -1547,6 +1554,7 @@ async def restore_platform_community(
     return _guild_storage_read(
         guild,
         administration,
+        plan=(await rules.community_values(session, [guild.id]))[guild.id],
         member_count=await guilds_service.count_members(session, guild_id=guild_id),
         has_seat=await guilds_service.guild_has_seat(session, guild_id=guild_id),
         deployment=await rules.platform_values(session),

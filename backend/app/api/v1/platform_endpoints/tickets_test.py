@@ -11,12 +11,13 @@ import json
 import pytest
 from sqlmodel import select
 
+from app.core.rules import SetBy
+from app.services.platform import rules
 from app.core.intake import IntakeStream, meta
 from app.core.messages import SupportMessages, TicketMessages
 from app.db.session import set_rls_context
 from app.models.platform.app_setting import AppSetting
 from app.models.platform.guild import CommunityRole
-from app.models.platform.guild_administration import GuildAdministration
 from app.models.tenant.comment import Comment, CommentAudience
 from app.models.tenant.intake import IntakeBinding, IntakeCase
 from app.models.tenant.task import Task, TaskStatus, TaskStatusCategory
@@ -78,13 +79,9 @@ async def _set_contacts(session, *, general=None, **streams) -> None:
 async def _set_support(session, guild_id: int, enabled: bool) -> None:
     """Grant the entitlement, the way the operator's Guilds tab does."""
     await set_rls_context(session, Unattributed())
-    row = (
-        await session.exec(
-            select(GuildAdministration).where(GuildAdministration.guild_id == guild_id)
-        )
-    ).one()
-    row.support_enabled = enabled
-    session.add(row)
+    await rules.put(
+        session, "help_requests", enabled, guild_id=guild_id, set_by=SetBy.deployment
+    )
     await session.commit()
 
 
