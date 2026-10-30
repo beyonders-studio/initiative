@@ -19,7 +19,7 @@ from typing import Optional, Set
 from pycrdt import Doc, Text, XmlElement, XmlText
 from pycrdt._base import base_types
 from sqlalchemy import Text as SqlText, cast
-from sqlmodel import select, update
+from sqlmodel import col, select, update
 from sqlmodel.ext.asyncio.session import AsyncSession
 
 from app.core.identity_boundary import STORED_MENTION
@@ -27,7 +27,7 @@ from app.core.references import references_in_text
 from app.core.search import SearchEntityType
 from app.db import gucs
 from app.db.session import raise_flag
-from app.models.tenant.task_assignment_digest import TaskAssignmentDigestItem
+from app.models.tenant.batched_notice import BatchedNotice
 from app.db.session import routed_guild_id
 
 # Placeholder written over an anonymized user's name in a digest row.
@@ -150,11 +150,11 @@ async def anonymize_user_mentions(session: AsyncSession, *, user_id: int) -> Non
             )
             rooms.append((kind, row_id))
 
-    # Digest rows snapshot the assigner's name for the email body.
+    # Batched lines snapshot the assigner's or reactor's name for the email.
     await session.exec(
-        update(TaskAssignmentDigestItem)
-        .where(TaskAssignmentDigestItem.assigned_by_id == user_id)
-        .values(assigned_by_name=ANONYMIZED_MENTION_NAME)
+        update(BatchedNotice)
+        .where(col(BatchedNotice.actor_id) == user_id)
+        .values(actor_name=ANONYMIZED_MENTION_NAME)
         .execution_options(synchronize_session=False)
     )
 

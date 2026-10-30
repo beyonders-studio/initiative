@@ -56,6 +56,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - **Updating the Android app from Obtainium.** Releases name the Alpine server package `.alpine` rather than `.apk`, so Obtainium downloads the app. **Server operators:** on Alpine, install it with `apk add` as before.
 - **Checklists in descriptions and comments.** A `- [ ]` item shows its box, and ticking it in **Preview** ticks it in the text (#2989). PDF task reports draw checklists with boxes and print comments with their formatting.
 - **Subtasks made from a checklist line with a mention.** The new task's title shows the mention, not its markup.
+- **Reaction emails after an account is deleted.** One still waiting to go out names the person as "Deleted user", as an assignment email already did.
 
 ## [0.77.1] - 2026-10-23
 

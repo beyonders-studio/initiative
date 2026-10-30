@@ -1452,7 +1452,7 @@ def _redacted_item(text: str, link: str | None) -> str:
     return f'<li><a href="{link}">{text}</a></li>' if link else f"<li>{text}</li>"
 
 
-def task_assignment_digest_pieces(
+def task_assignment_batch_pieces(
     user: User, assignments: Sequence[dict]
 ) -> EmailPieces:
     """The "these landed on you" summary, as one list."""
@@ -1490,10 +1490,10 @@ def task_assignment_digest_pieces(
     )
 
 
-def reaction_digest_pieces(user: User, reactions: Sequence[dict]) -> EmailPieces:
+def reaction_batch_pieces(user: User, reactions: Sequence[dict]) -> EmailPieces:
     """The "people reacted to your posts" summary.
 
-    Same shape as the assignment digest: one list, one line per reaction,
+    Same shape as the assignment batch: one list, one line per reaction,
     linking back to what was reacted to.
     """
     locale = _user_locale(user)
