@@ -21,6 +21,9 @@ name: Security
 # Running on pull_request means base-image CVEs are caught BEFORE merge, not just
 # after a push — hence living here rather than in docker-publish.yml.
 #
+# A fork scans its pull requests and runs by hand; its pushes and the cron are
+# this repository's to run.
+#
 # Secret scanning is deliberately left ON for env files: they are gitignored and
 # never reach this checkout, so a hit means someone force-added one.
 
@@ -44,6 +47,9 @@ concurrency:
 jobs:
   trivy-fs:
     name: Trivy (deps, config, secrets)
+    if: >-
+      ${{ (github.event_name != 'push' && github.event_name != 'schedule')
+      || github.repository == 'beyonders-studio/initiative' }}
     runs-on: ubuntu-24.04
     timeout-minutes: 15
     steps:
@@ -66,6 +72,9 @@ jobs:
 
   trivy-image:
     name: Trivy (image / base OS)
+    if: >-
+      ${{ (github.event_name != 'push' && github.event_name != 'schedule')
+      || github.repository == 'beyonders-studio/initiative' }}
     runs-on: ubuntu-24.04
     timeout-minutes: 30
     steps:

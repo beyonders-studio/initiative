@@ -92,6 +92,8 @@ jobs:
           # Whether the pull request's branch is in this repository, where
           # Release Candidate runs, rather than in a fork.
           SAME_REPO: ${{ github.event.pull_request.head.repo.full_name == github.repository }}
+          # Whether this run is in a fork of this repository.
+          FORK: ${{ github.repository != 'beyonders-studio/initiative' }}
           BEFORE: ${{ github.event.before }}
           TESTED: ${{ steps.tested.outputs.tested }}
         run: |
@@ -274,12 +276,19 @@ jobs:
             fi
           }
 
-          backend
-          seam
-          upgrade
-          frontend
-          codegen
-          tooling
+          # A fork's main and dev follow this repository's, where every push
+          # is tested; a fork's own work is tested on its pull requests.
+          if [[ "$EVENT" != "pull_request" && "$FORK" == "true" ]]; then
+            for area in backend seam upgrade frontend codegen tooling; do out "$area" false; done
+            echo "A push to a fork — checking nothing"
+          else
+            backend
+            seam
+            upgrade
+            frontend
+            codegen
+            tooling
+          fi
 
           {
             echo "### What this run checks"

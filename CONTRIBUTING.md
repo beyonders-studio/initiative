@@ -172,6 +172,8 @@ Commit the updated generated files alongside your schema changes. CI will fail i
 5. Open a pull request **targeting `dev`** describing what changed and why
 6. Include screenshots or GIFs for UI changes
 
+**Actions in your fork.** With Actions turned on in a fork, nothing there runs on its own: pushes to the fork's `main` and `dev` and the scheduled runs check nothing, and the workflows that publish images, apps, docs or releases skip. A pull request inside your fork runs CI as it would here, and you can start the nightly (browser journeys included) or the security scan by hand. Your pull request to this repository runs every check it needs here. The checks live in the workflows, so they reach your fork when you sync it; scheduled runs read them from its default branch, so sync that one too if it isn't `dev`.
+
 **Important:** Do not open PRs against `main`. The `main` branch is restricted to project maintainers (@jordandrako, @LeeJMorel) who promote changes from `dev` using the release tooling below. PRs targeting `main` from non-maintainers will be closed.
 
 ## Releases (Maintainers)
