@@ -381,6 +381,32 @@ export const CommunityOperatorSettingsSheet = ({
                 />
               }
             />
+            <SettingRow
+              label={t("communities.sheet.aiConnectionsLabel")}
+              help={t("communities.sheet.aiConnectionsHelp")}
+              htmlFor="community-ai-connections"
+              control={
+                <Switch
+                  id="community-ai-connections"
+                  checked={community.ai_connections_open}
+                  onCheckedChange={(checked) => patch({ ai_connections_open: Boolean(checked) })}
+                  disabled={update.isPending || planLocked}
+                />
+              }
+            />
+            <SettingRow
+              label={t("communities.sheet.pluginsLabel")}
+              help={t("communities.sheet.pluginsHelp")}
+              htmlFor="community-plugins"
+              control={
+                <Switch
+                  id="community-plugins"
+                  checked={community.plugins_open}
+                  onCheckedChange={(checked) => patch({ plugins_open: Boolean(checked) })}
+                  disabled={update.isPending || planLocked}
+                />
+              }
+            />
           </Section>
         </div>
       </SheetContent>

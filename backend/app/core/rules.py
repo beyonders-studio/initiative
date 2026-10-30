@@ -73,6 +73,10 @@ class StoredRule:
     #: one — billing's sync, or the operator where billing does not manage
     #: plans — so a community never raises its own.
     paid: bool = False
+    #: A surface key: whether the community may configure that thing at all.
+    #: On, as a deployment has it, until the deployment takes it away for one
+    #: community; only the deployment writes one.
+    surface: bool = False
 
 
 class SetBy(str, Enum):
@@ -87,7 +91,9 @@ class SetBy(str, Enum):
 
 def writers(rule: StoredRule) -> frozenset[SetBy]:
     """Who may write a community rule (``rule_key_writers``)."""
-    return frozenset({SetBy.deployment}) if rule.paid else frozenset(SetBy)
+    if rule.paid or rule.surface:
+        return frozenset({SetBy.deployment})
+    return frozenset(SetBy)
 
 
 def choices(rule: StoredRule) -> tuple[str, ...]:
@@ -248,6 +254,12 @@ PLATFORM_RULES: dict[str, StoredRule] = _catalog(
     ),
 )
 
+#: The surface keys: what a community's seat may configure, each on until the
+#: deployment takes it away. What it configured stays, unused while the
+#: surface is closed.
+SURFACE_AI_CONNECTIONS = "surface.ai_connections"
+SURFACE_PLUGINS = "surface.plugins"
+
 #: A community's rules. Each is set by its seat and applies while the community
 #: holds the option it needs.
 COMMUNITY_RULES: dict[str, StoredRule] = _catalog(
@@ -293,6 +305,12 @@ COMMUNITY_RULES: dict[str, StoredRule] = _catalog(
     StoredRule("max_guests", Slot.amount, None, paid=True),
     # The most it may store, in bytes.
     StoredRule("max_storage_bytes", Slot.amount, None, paid=True),
+    # Whether its seat may set up its own AI connections. Closed, those it has
+    # are not used.
+    StoredRule(SURFACE_AI_CONNECTIONS, _ON, True, surface=True),
+    # Whether its seat may install, configure and remove plug-ins. Closed, the
+    # plug-ins it has keep running as they are.
+    StoredRule(SURFACE_PLUGINS, _ON, True, surface=True),
 )
 
 #: The paid key that grants each sign-in option.

@@ -108,7 +108,7 @@ from app.schemas.platform.guild import (
     MemberDisplayNameUpdate,
 )
 from app.models.platform.auth_provider import AuthProvider
-from app.core.rules import OPTION_RULES, SignInRequirement
+from app.core.rules import COMMUNITY_RULES, OPTION_RULES, SignInRequirement
 from app.core.guild_auth_options import CommunityAuthOption
 from app.services.platform import auth_posture
 from app.services.platform import rules
@@ -249,6 +249,13 @@ def _serialize_guild(
         # Admins only: lets their settings UI show/hide the Authentication tab.
         auth_options=sorted(
             option for option, key in OPTION_RULES.items() if admin_plan[key]
+        )
+        if admin_plan
+        else None,
+        closed_surfaces=sorted(
+            key.removeprefix("surface.")
+            for key, rule in COMMUNITY_RULES.items()
+            if rule.surface and not admin_plan[key]
         )
         if admin_plan
         else None,

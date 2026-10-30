@@ -98,6 +98,7 @@ from app.db.tenancy import (
     PRIVATE_ROW_SHARED_READ,
     PRIVATE_ROW_TABLES,
     SEAT_READ_TABLES,
+    SEAT_SURFACES,
     SEAT_TABLES,
 )
 from app.models.tenant.initiative import InitiativeJoinPolicy
@@ -737,6 +738,19 @@ _SEAT_WRITES = f"({POLICY_SEAT} AND ({IN_POLICY.admin} OR {IN_POLICY.pam_write})
 _SEAT_WRITE_PREDICATE = f"({IN_POLICY.system} OR {_SEAT_WRITES})"
 
 
+def _seat_write_predicate(table: str) -> str:
+    """The seat's write on ``table``: and, where a surface key governs it
+    (``SEAT_SURFACES``), only while the deployment leaves that surface open.
+    The system engine writes either way."""
+    surface = SEAT_SURFACES.get(table)
+    if surface is None:
+        return _SEAT_WRITE_PREDICATE
+    is_open = (
+        f"(SELECT public.community_surface_open({gucs.ROUTED_GUILD_ID}, '{surface}'))"
+    )
+    return f"({IN_POLICY.system} OR ({_SEAT_WRITES} AND {is_open}))"
+
+
 # Seat tables a trigger also writes: table -> the leg OR'd into the INSERT
 # policy beside the seat's. ``plugin_placements`` gains a row for each install that
 # follows new initiatives when an initiative's built-in moderator role is
@@ -784,13 +798,14 @@ def _seat_block(table: str) -> str:
     writing by the seat or the system engine, and inserting by a trigger too
     where ``_SEAT_TRIGGER_WRITTEN_INSERT`` names one."""
     read = _SEAT_READ_PREDICATE if table in SEAT_READ_TABLES else "true"
+    write = _seat_write_predicate(table)
     trigger = _SEAT_TRIGGER_WRITTEN_INSERT.get(table)
-    insert = f"({trigger} OR {_SEAT_WRITE_PREDICATE})" if trigger else None
+    insert = f"({trigger} OR {write})" if trigger else None
     return "\n".join(
         [
             f"ALTER TABLE {table} ENABLE ROW LEVEL SECURITY;",
             f"ALTER TABLE {table} FORCE ROW LEVEL SECURITY;",
-            *_policies(table, "seat", read, _SEAT_WRITE_PREDICATE, insert=insert),
+            *_policies(table, "seat", read, write, insert=insert),
         ]
     )
 

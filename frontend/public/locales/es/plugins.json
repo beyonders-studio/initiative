@@ -35,7 +35,8 @@
     "upToDate": "Actualizada",
     "upgraded": "Actualizada a {{version}}.",
     "removeManagedNeutral": "Los cargos de este complemento los gestiona tu proveedor.",
-    "removeManagedAction": "Gestionar"
+    "removeManagedAction": "Gestionar",
+    "closed": "Quien gestiona este servidor administra los complementos de esta comunidad."
   },
   "updates": {
     "wants": "La versión {{version}} quiere:",

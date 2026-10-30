@@ -35,7 +35,8 @@
     "upToDate": "Aktuell",
     "upgraded": "Auf {{version}} aktualisiert.",
     "removeManagedNeutral": "Die Kosten für dieses Plug-in verwaltet euer Anbieter.",
-    "removeManagedAction": "Verwalten"
+    "removeManagedAction": "Verwalten",
+    "closed": "Die Betreiber dieses Servers verwalten die Plug-ins für diese Community."
   },
   "updates": {
     "wants": "Version {{version}} möchte:",

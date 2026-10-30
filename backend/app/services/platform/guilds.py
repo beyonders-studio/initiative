@@ -43,7 +43,12 @@ from app.models.platform.guild import (
     restore_status_choices,
 )
 from app.models.platform.access_grant import AccessGrant, AccessGrantPurpose
-from app.core.rules import OPTION_RULES, SetBy
+from app.core.rules import (
+    OPTION_RULES,
+    SURFACE_AI_CONNECTIONS,
+    SURFACE_PLUGINS,
+    SetBy,
+)
 from app.models.platform.guild_administration import GuildAdministration
 from app.models.platform.notification import NotificationType
 from app.models.tenant.guest_invite_grant import GuestInviteGrant
@@ -1288,6 +1293,8 @@ async def update_guild(
     auth_options: list[CommunityAuthOption] | None = None,
     banner_image_enabled: bool | None = None,
     support_enabled: bool | None = None,
+    ai_connections_open: bool | None = None,
+    plugins_open: bool | None = None,
 ) -> Guild:
     guild = await get_guild(session, guild_id=guild_id)
     updated = False
@@ -1366,6 +1373,8 @@ async def update_guild(
         or auth_options is not None
         or banner_image_enabled is not None
         or support_enabled is not None
+        or ai_connections_open is not None
+        or plugins_open is not None
     ):
         plan = await rules.community_values(session, [guild_id])
         changes: dict[str, Any] = {}
@@ -1407,6 +1416,10 @@ async def update_guild(
                     GuildMessages.SUPPORT_INTAKE_NOT_CONFIGURED
                 )
             changes["help_requests"] = support_enabled
+        if ai_connections_open is not None:
+            changes[SURFACE_AI_CONNECTIONS] = ai_connections_open
+        if plugins_open is not None:
+            changes[SURFACE_PLUGINS] = plugins_open
         # The deployment's rows: a community's own seat never writes these.
         for key, value in changes.items():
             await rules.put(

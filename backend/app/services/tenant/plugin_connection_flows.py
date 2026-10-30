@@ -56,6 +56,8 @@ from sqlalchemy import func, text
 from sqlmodel import select
 from sqlmodel.ext.asyncio.session import AsyncSession
 
+from app.core.rules import SURFACE_PLUGINS
+from app.services.platform import rules
 from app.core.config import settings
 from app.core.encryption import SALT_PLUGIN_CONFIG, decrypt_field, encrypt_field
 from app.core.errors import CodedError
@@ -1192,6 +1194,13 @@ async def complete_callback(
                     values=values,
                     label=label,
                 )
+            elif not await rules.community_value(
+                session, state.guild_id, SURFACE_PLUGINS
+            ):
+                # The deployment closed the community's plug-ins while the
+                # vendor's page was open: its own credential is no longer its
+                # seat's to set.
+                return landing_url(state.return_path, "refused")
             else:
                 outcome = await _store_community(
                     session,

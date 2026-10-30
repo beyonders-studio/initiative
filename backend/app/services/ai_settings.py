@@ -29,6 +29,7 @@ from sqlalchemy import func, text, update
 from sqlmodel import col, delete, select
 from sqlmodel.ext.asyncio.session import AsyncSession
 
+from app.core.rules import SURFACE_AI_CONNECTIONS
 from app.db import cohorts
 from app.db.session import routed_guild_id, set_rls_context
 from app.core.audit_events import AuditEventType
@@ -363,13 +364,17 @@ async def resolve_ai_settings(
             for c in given or [c for c in cfg.connections if not c.community_ids]
             if c.enabled
         ]
-    else:
+    elif await rules.community_value(session, guild_id, SURFACE_AI_CONNECTIONS):
         rows = (
             await session.exec(
                 select(GuildAIConnection).where(GuildAIConnection.enabled.is_(True))
             )
         ).all()
         conns = [_conn_from_guild(r) for r in rows]
+    else:
+        # The deployment has taken the community's own connections away: they
+        # are kept, and not used.
+        conns = []
     # A connection that names no model yet is not one a request can use.
     conns = [c for c in conns if c.model and _provider_or_none(c.provider) is not None]
     if not conns:

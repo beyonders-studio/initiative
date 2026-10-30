@@ -214,6 +214,7 @@
     "connectionsDescription": "Define las conexiones de IA que pueden usar los miembros de esta comunidad.",
     "disabledDescription": "Las funciones de IA están desactivadas para la plataforma.",
     "managedByPlatform": "Las conexiones de IA se gestionan a nivel de plataforma. Los miembros configuran su propia clave en la configuración de su perfil.",
+    "managedByServer": "Quien gestiona este servidor administra la IA de esta comunidad.",
     "switchTitle": "IA en esta comunidad",
     "switchLabel": "Permitir funciones de IA",
     "switchHelp": "Desactivada, nada de esta comunidad se envía a un proveedor de IA, sea cual sea la conexión que configuren el servidor o la comunidad.",
@@ -1379,6 +1380,10 @@
       "supportLabel": "Solicitudes de ayuda",
       "supportHelp": "Permite que sus miembros envíen una solicitud de ayuda. Desactivado, el control Pedir ayuda abre las preguntas frecuentes.",
       "supportNeedsIntake": "Todavía no hay dónde enviar una solicitud de ayuda. Vincule el flujo de soporte a un proyecto en Configuración de la plataforma › Entradas y esto podrá activarse.",
+      "aiConnectionsLabel": "Sus propias conexiones de IA",
+      "aiConnectionsHelp": "Permite que la comunidad configure sus propios proveedores de IA. Desactivado, las que tiene se conservan y no se usan.",
+      "pluginsLabel": "Sus propios complementos",
+      "pluginsHelp": "Permite que la comunidad instale y configure complementos. Desactivado, los que tiene siguen funcionando como están.",
       "authOption": {
         "restrictions": {
           "label": "Su propio estándar de seguridad",

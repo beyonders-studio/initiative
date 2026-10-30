@@ -214,6 +214,7 @@
     "connectionsDescription": "Define the AI connections members of this community can use.",
     "disabledDescription": "AI features are turned off for the platform.",
     "managedByPlatform": "AI connections are managed at the platform level. Members set their own key in their profile settings.",
+    "managedByServer": "Whoever runs this server manages AI for this community.",
     "switchTitle": "AI in this community",
     "switchLabel": "Allow AI features",
     "switchHelp": "Off, nothing in this community is sent to an AI provider, whichever connection the server or the community sets up.",
@@ -1300,6 +1301,10 @@
       "supportLabel": "Help requests",
       "supportHelp": "Let their members send a help request. Off, the Ask for help control opens the FAQ instead.",
       "supportNeedsIntake": "Nowhere to send a help request yet. Bind the support stream to a project under Platform settings › Intake, and this can be switched on.",
+      "aiConnectionsLabel": "Its own AI connections",
+      "aiConnectionsHelp": "Lets the community set up AI providers of its own. Off, the ones it has are kept and not used.",
+      "pluginsLabel": "Its own plug-ins",
+      "pluginsHelp": "Lets the community install and configure plug-ins. Off, the ones it has keep running as they are.",
       "authOption": {
         "restrictions": {
           "label": "Its own security standard",
