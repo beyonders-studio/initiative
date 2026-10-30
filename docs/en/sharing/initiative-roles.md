@@ -74,7 +74,7 @@ Some communities want every initiative to work the same way: posts on everywhere
 |---|---|
 | Each tool | On everywhere, off everywhere, or left to each initiative |
 | What the built-in **Member** role can see and make | The same three choices, one per permission |
-| **Managers can add roles** | Off keeps every initiative to its built-in roles, so what members can do stays what the community said |
+| **Managers can add roles** | Off, nobody adds a role, and any custom role an initiative already has can do no more than members, so what the community said holds |
 
 Anything the community set shows up switched the way it said, with a note, and the initiative's managers can't change it. Pick **Each initiative decides** and it's theirs again, exactly as they left it.
 

@@ -338,7 +338,7 @@
       "off": "Desactivado en todas"
     },
     "customRolesLabel": "Los responsables pueden añadir roles",
-    "customRolesHelp": "Si está desactivado, las iniciativas se limitan a sus roles integrados, así se mantiene lo que defines para los miembros.",
+    "customRolesHelp": "Si está desactivado, las iniciativas no pueden añadir roles, y los roles propios que ya tengan no pueden hacer más que los miembros.",
     "saved": "Guardado para todas las iniciativas",
     "error": "No se pudo guardar"
   }

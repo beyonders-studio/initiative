@@ -6,6 +6,7 @@ import logging
 from typing import Iterable
 
 from sqlalchemy import case, desc, func, or_
+from sqlalchemy.dialects.postgresql import insert as pg_insert
 from sqlalchemy.exc import IntegrityError
 from sqlalchemy.orm import aliased, selectinload
 from sqlmodel import select, delete, update
@@ -1290,18 +1291,23 @@ async def set_community_defaults(
     if changes.custom_roles is not None:
         # Allowed is the default, so it is no row.
         stored[INITIATIVE_CUSTOM_ROLES] = None if changes.custom_roles else False
-    rows = await _community_rows(session)
     for key, value in stored.items():
-        row = rows.get(key)
         if value is None:
-            if row is not None:
-                await session.delete(row)
-        elif row is None:
-            session.add(InitiativeRule(key=key, enabled=value))
+            await session.exec(
+                delete(InitiativeRule).where(
+                    InitiativeRule.initiative_id.is_(None),  # type: ignore[union-attr]
+                    InitiativeRule.key == key,
+                )
+            )
         else:
-            row.enabled = value
-            session.add(row)
-    await session.flush()
+            # Two admins saving the same key at once: the later one wins.
+            await session.exec(
+                pg_insert(InitiativeRule)
+                .values(key=key, enabled=value)
+                .on_conflict_do_update(
+                    constraint="uq_initiative_rules_subject", set_={"enabled": value}
+                )
+            )
 
     after = await community_defaults(session)
     await audit_service.record_settings_change(

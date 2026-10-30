@@ -82,6 +82,7 @@ from app.models.platform.user import UserRole, UserStatus
 from app.models.tenant.plugin_member_consent import ConsentAccess
 from app.models.tenant.initiative import (
     BUILTIN_MEMBER_ROLE,
+    INITIATIVE_CUSTOM_ROLES,
     INITIATIVE_MEMBER_PREFIX,
     INITIATIVE_TOOL_PREFIX,
     DEFAULT_PERMISSION_VALUES,
@@ -175,6 +176,16 @@ _COMMUNITY_DEFAULTS_CTE = """community_defaults AS MATERIALIZED (
   WHERE r.initiative_id IS NULL
 )"""
 
+#: The roles what the community set for members holds for: the built-in
+#: member role, and while the community keeps initiatives to their built-in
+#: roles every custom role that is not a manager's. Over a row ``m`` carrying
+#: ``member_role`` and ``custom_role``.
+_HELD_FOR_MEMBERS = (
+    "(m.member_role OR (m.custom_role AND EXISTS ("
+    "SELECT 1 FROM community_defaults off"
+    f" WHERE off.key = '{INITIATIVE_CUSTOM_ROLES}' AND NOT off.enabled)))"
+)
+
 #: Whether a tool's switch is on in the initiative ``t`` names: the
 #: community's where it set one, the initiative's own otherwise.
 _TOOL_ON = (
@@ -203,7 +214,8 @@ my_initiatives AS MATERIALIZED (
          COALESCE(r.is_manager, false) AS is_manager,
          COALESCE(r.override_share_restrictions, false) AS overrides,
          COALESCE(r.is_builtin AND r.name = '{BUILTIN_MEMBER_ROLE}', false)
-           AS member_role
+           AS member_role,
+         COALESCE(NOT r.is_builtin AND NOT r.is_manager, false) AS custom_role
   FROM initiative_members im
   LEFT JOIN initiative_roles r ON r.id = im.role_id
   WHERE im.user_id = {gucs.USER_ID}
@@ -218,14 +230,14 @@ my_items AS MATERIALIZED (
     )
 ),
 {_COMMUNITY_DEFAULTS_CTE},
--- The built-in member role holds what the community set for it, where it did.
+-- What the community set for members holds where it reaches the role.
 my_role_permissions AS MATERIALIZED (
   SELECT rp.initiative_id, rp.key, COALESCE(cd.enabled, rp.enabled) AS enabled
-  FROM my_initiatives mi
+  FROM my_initiatives m
   JOIN initiative_rules rp
-    ON rp.initiative_id = mi.initiative_id AND rp.initiative_role_id = mi.role_id
+    ON rp.initiative_id = m.initiative_id AND rp.initiative_role_id = m.role_id
   LEFT JOIN community_defaults cd
-    ON mi.member_role AND cd.key = '{INITIATIVE_MEMBER_PREFIX}' || rp.key
+    ON {_HELD_FOR_MEMBERS} AND cd.key = '{INITIATIVE_MEMBER_PREFIX}' || rp.key
 ),
 my_grants AS MATERIALIZED (
   SELECT g.purpose, g.access_level::text AS access_level
@@ -665,7 +677,8 @@ member_role AS (
          COALESCE(r.is_manager, false) AS is_manager,
          COALESCE(r.override_share_restrictions, false) AS overrides,
          COALESCE(r.is_builtin AND r.name = '{BUILTIN_MEMBER_ROLE}', false)
-           AS member_role
+           AS member_role,
+         COALESCE(NOT r.is_builtin AND NOT r.is_manager, false) AS custom_role
   FROM initiative_members im
   LEFT JOIN initiative_roles r ON r.id = im.role_id
   WHERE {gucs.USER_ID} IS NOT NULL AND im.user_id = {gucs.USER_ID}
@@ -688,7 +701,8 @@ permitted AS (
   JOIN member_role mr ON mr.initiative_id = p.initiative_id
   CROSS JOIN (VALUES {_permission_default_values()}) AS k(key, is_default)
   LEFT JOIN community_defaults cd
-    ON mr.member_role AND cd.key = '{INITIATIVE_MEMBER_PREFIX}' || k.key
+    ON {_HELD_FOR_MEMBERS.replace("m.", "mr.")}
+   AND cd.key = '{INITIATIVE_MEMBER_PREFIX}' || k.key
   WHERE mr.is_manager
      OR COALESCE(cd.enabled, EXISTS (
        SELECT 1 FROM initiative_rules rp

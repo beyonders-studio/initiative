@@ -30,7 +30,6 @@ from app.core.messages import (
 )
 from app.core.tools import Tool
 from app.models.tenant.initiative import (
-    BUILTIN_MEMBER_ROLE,
     Initiative,
     InitiativeJoinRequest,
     InitiativeMember,
@@ -60,6 +59,7 @@ from app.schemas.tenant.initiative import (
     InitiativeUpdate,
     serialize_initiative,
     serialize_initiative_member,
+    community_holds_role,
     serialize_role,
 )
 from app.schemas.platform.user import UserSummaryListResponse
@@ -391,6 +391,11 @@ async def update_initiative_defaults(
         actor_user_id=current_user.id,
     )
     await session.commit()
+    # What each open connection may see and edit has moved with the switches.
+    guild_id = guild_context.guild_id
+    await content_sockets.refresh_users(
+        guild_id, content_sockets.users_in_guild(guild_id)
+    )
     return defaults
 
 
@@ -879,6 +884,10 @@ async def update_initiative(
                 status_code=status.HTTP_409_CONFLICT,
                 detail=InitiativeMessages.SET_BY_COMMUNITY,
             )
+        # The community's switch is shown back as the initiative's; the
+        # initiative's own value under it is left as it was.
+        for tool in defaults.tools:
+            update_data.pop(tool.view_permission, None)
     # Auto-join enrols every future guild member, so it shapes onboarding for
     # the whole guild rather than for one initiative — guild admins only, the
     # same shape as the archive toggle above. join_policy stays with whoever may
@@ -1143,23 +1152,27 @@ async def update_initiative_role(
         session.add(role)
 
     # Update permissions if provided
-    if (
-        role_in.permissions is not None
-        and role.is_builtin
-        and role.name == BUILTIN_MEMBER_ROLE
-    ):
+    permissions = role_in.permissions
+    if permissions is not None:
         defaults = await initiatives_service.community_defaults(session)
-        if any(
-            role_in.permissions.get(key, enabled) != enabled
-            for key, enabled in defaults.member_permissions.items()
-        ):
-            raise HTTPException(
-                status_code=status.HTTP_409_CONFLICT,
-                detail=InitiativeMessages.SET_BY_COMMUNITY,
-            )
-    if role_in.permissions is not None:
+        if community_holds_role(role, defaults):
+            if any(
+                permissions.get(key, enabled) != enabled
+                for key, enabled in defaults.member_permissions.items()
+            ):
+                raise HTTPException(
+                    status_code=status.HTTP_409_CONFLICT,
+                    detail=InitiativeMessages.SET_BY_COMMUNITY,
+                )
+            # Shown back as the role's own; the role's own values under them
+            # are left as they were.
+            permissions = {
+                key: on
+                for key, on in permissions.items()
+                if key not in defaults.member_permissions
+            }
         role = await initiatives_service.update_role_permissions(
-            session, role=role, permissions=role_in.permissions
+            session, role=role, permissions=permissions
         )
 
     changed = audit_service.changed_fields(

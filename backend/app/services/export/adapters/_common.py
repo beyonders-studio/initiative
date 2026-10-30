@@ -45,7 +45,7 @@ from app.services.platform.csv_export import safe_filename_component
 from app.services.tenant.initiatives import keeps_content_in
 from app.services.tenant.tool_listing import initiative_switch_clause
 from app.core.user_input_validators import resolve_zone
-from app.db.session import actor_context
+from app.services.tenant.initiative_tools import tool_on_in
 
 if TYPE_CHECKING:  # pragma: no cover - typing only
     from app.services.storage import StorageBackend
@@ -203,7 +203,6 @@ async def get_for_export(
     there, its tool switched on in its initiative, and ``access`` held on it —
     the owner rung for an export of the entity itself, ``"read"`` from an
     initiative or community backup (``permissions.require_export_access``)."""
-    from app.api.resource_access import require_tool_enabled
     from app.services import reachability
 
     row = await load(session, entity_id)
@@ -214,8 +213,10 @@ async def get_for_export(
             user.id,
             guild_id,
         )
-    if row.initiative is not None:
-        require_tool_enabled(tool, row.initiative, actor_context(session))
+    if row.initiative is not None and not await tool_on_in(
+        session, row.initiative, tool
+    ):
+        raise tool.disabled()
     require_export_access(
         DAC_RESOURCES[tool],
         row,

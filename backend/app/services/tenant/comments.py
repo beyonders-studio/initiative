@@ -62,8 +62,7 @@ from app.services.tenant import attachments as attachments_service
 from app.services.tenant import content_references, personal_items
 from app.services import notifications
 from app.services import reachability
-from app.services.tenant.initiative_tools import tool_on, tool_on_sql
-from app.db.session import actor_context
+from app.services.tenant.initiative_tools import tool_on_in, tool_on_sql
 from app.services.tenant.mention_parser import (
     extract_mentioned_user_ids,
     extract_mentioned_task_ids,
@@ -453,9 +452,7 @@ async def _ensure_parent_access(
         extra = cast(ExtraCommentTarget, ctx.extra)
         tool = KINDS[extra.kind].tool
         initiative = getattr(ctx.extra_row, "initiative", None)
-        if initiative is not None and not tool_on(
-            actor_context(session), initiative, tool
-        ):
+        if initiative is not None and not await tool_on_in(session, initiative, tool):
             raise CommentPermissionError(
                 KindMessages.TOOL_NOT_ENABLED, params={"kind": tool.value}
             )
@@ -465,8 +462,8 @@ async def _ensure_parent_access(
     else:
         target = TOOL_COMMENT_TARGETS[ctx.tool]
         initiative = getattr(ctx.resource, "initiative", None)
-        if initiative is not None and not tool_on(
-            actor_context(session), initiative, target.tool
+        if initiative is not None and not await tool_on_in(
+            session, initiative, target.tool
         ):
             raise CommentPermissionError(
                 KindMessages.TOOL_NOT_ENABLED, params={"kind": target.tool.value}

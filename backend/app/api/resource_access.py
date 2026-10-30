@@ -170,9 +170,7 @@ def governing_tool(table: str) -> Tool:
     return path[0]
 
 
-def require_tool_enabled(
-    kind: Tool, initiative: Any, context: Optional[ActorContext]
-) -> None:
+def require_tool_enabled(kind: Tool, initiative: Any, context: ActorContext) -> None:
     """Raise 403 unless ``initiative`` has ``kind``'s master switch on.
 
     Gate 3's first half at the moment of creation, where there is no row yet for

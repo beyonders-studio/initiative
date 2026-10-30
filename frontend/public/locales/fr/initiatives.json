@@ -338,7 +338,7 @@
       "off": "Désactivé partout"
     },
     "customRolesLabel": "Les responsables peuvent ajouter des rôles",
-    "customRolesHelp": "Désactivé, les initiatives s'en tiennent à leurs rôles intégrés, et ce que tu définis pour les membres tient.",
+    "customRolesHelp": "Désactivé, les initiatives ne peuvent pas ajouter de rôles, et leurs rôles personnalisés existants ne peuvent pas faire plus que les membres.",
     "saved": "Enregistré pour toutes les initiatives",
     "error": "Enregistrement impossible"
   }

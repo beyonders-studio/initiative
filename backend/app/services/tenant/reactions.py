@@ -37,8 +37,7 @@ from app.models.tenant.reaction import Reaction
 from app.models.platform.user import User
 from app.services.platform import accounts as accounts_service
 from app.schemas.tenant.reaction import ReactionGroup, ReactionSummary, ReactionUser
-from app.services.tenant.initiative_tools import tool_on
-from app.db.session import actor_context
+from app.services.tenant.initiative_tools import tool_on_in
 
 logger = logging.getLogger(__name__)
 
@@ -155,8 +154,8 @@ async def _resolve_post(
     post = await posts_service.get_post(session, target_id)
     if post is None:
         raise ReactionNotFoundError(ReactionMessages.TARGET_NOT_FOUND)
-    if post.initiative is not None and not tool_on(
-        actor_context(session), post.initiative, Tool.post
+    if post.initiative is not None and not await tool_on_in(
+        session, post.initiative, Tool.post
     ):
         raise ReactionNotFoundError(ReactionMessages.TARGET_NOT_FOUND)
     # The notice's own switch, the counterpart to a thread's. Off means it

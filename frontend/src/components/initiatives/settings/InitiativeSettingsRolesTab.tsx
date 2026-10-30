@@ -215,8 +215,14 @@ export const InitiativeSettingsRolesTab = ({
   // their built-in roles.
   const defaults = useInitiativeDefaults().data;
   const memberLocked = new Set(Object.keys(defaults?.member_permissions ?? {}));
+  // What the community set for members holds for the built-in Member role,
+  // and for every custom role that is not a manager's while it keeps
+  // initiatives to their built-in roles.
   const lockedFor = (role: InitiativeRoleRead): ReadonlySet<string> =>
-    role.is_builtin && role.name === "member" ? memberLocked : NOTHING_LOCKED;
+    (role.is_builtin && role.name === "member") ||
+    (!role.is_builtin && !role.is_manager && defaults?.custom_roles === false)
+      ? memberLocked
+      : NOTHING_LOCKED;
   const updateRoleMutation = useUpdateRole(initiativeId);
   const deleteRoleMutation = useDeleteRole(initiativeId);
 

@@ -361,6 +361,17 @@ class InitiativeJoinRequestRead(SanitizedBaseModel):
     prior_denials: int = 0
 
 
+def community_holds_role(
+    role: "InitiativeRoleModel", defaults: InitiativeDefaultsRead
+) -> bool:
+    """Whether what the community set for members holds for ``role``: the
+    built-in member role, and while the community keeps initiatives to their
+    built-in roles every custom role that is not a manager's."""
+    if role.is_builtin:
+        return role.name == BUILTIN_MEMBER_ROLE
+    return not role.is_manager and not defaults.custom_roles
+
+
 def serialize_role(
     role: "InitiativeRoleModel",
     member_count: int = 0,
@@ -379,7 +390,7 @@ def serialize_role(
         **DEFAULT_PERMISSION_VALUES,
         **{perm.key: perm.enabled for perm in (role.permissions or [])},
     }
-    if defaults is not None and role.is_builtin and role.name == BUILTIN_MEMBER_ROLE:
+    if defaults is not None and community_holds_role(role, defaults):
         permissions.update(defaults.member_permissions)
     return InitiativeRoleRead(
         id=role.id,

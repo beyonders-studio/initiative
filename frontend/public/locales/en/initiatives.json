@@ -338,7 +338,7 @@
       "off": "Off everywhere"
     },
     "customRolesLabel": "Managers can add roles",
-    "customRolesHelp": "Off, initiatives keep to their built-in roles, so what you set for members holds.",
+    "customRolesHelp": "Off, initiatives can't add roles, and any custom roles they already have can do no more than members.",
     "saved": "Saved for every initiative",
     "error": "Could not save"
   }

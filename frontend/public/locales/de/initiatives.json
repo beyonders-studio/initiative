@@ -338,7 +338,7 @@
       "off": "Überall aus"
     },
     "customRolesLabel": "Manager können Rollen hinzufügen",
-    "customRolesHelp": "Aus, bleiben Initiativen bei ihren eingebauten Rollen, damit gilt, was du für Mitglieder festlegst.",
+    "customRolesHelp": "Aus, können Initiativen keine Rollen hinzufügen, und ihre vorhandenen eigenen Rollen dürfen nicht mehr als Mitglieder.",
     "saved": "Für jede Initiative gespeichert",
     "error": "Speichern fehlgeschlagen"
   }
