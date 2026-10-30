@@ -302,14 +302,14 @@ async def test_a_suspended_account_appeals_without_the_factor_it_cannot_enrol(
     factor, and a suspended account cannot enrol one, so its appeal is too.
     An active account is still asked."""
     from app.core.login_methods import SecondFactorRequirement
-    from app.services.platform import app_settings as app_settings_service
+    from app.services.platform import rules
 
     account = await create_user(session)
     await _suspend(client, session, account)
     await set_rls_context(session, Unattributed())
-    row = await app_settings_service.get_app_settings(session)
-    row.second_factor_requirement = SecondFactorRequirement.everyone
-    session.add(row)
+    await rules.put(
+        session, "second_factor_requirement", SecondFactorRequirement.everyone
+    )
     await session.commit()
     headers = get_auth_headers(account)
 

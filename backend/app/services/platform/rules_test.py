@@ -1,11 +1,15 @@
 """The stored rules: no row is the default, and a community's value applies
 while it holds the option its rule needs."""
 
+import pytest
+from sqlalchemy.exc import IntegrityError
 from sqlmodel import select
 from sqlmodel.ext.asyncio.session import AsyncSession
 
+from app.core.login_methods import LoginMethod, SecondFactorRequirement
+from app.core.rules import PLATFORM_RULES, Slot, choices
 from app.models.platform.guild import GuildMembership
-from app.models.platform.rule import CommunityRule, PlatformRule
+from app.models.platform.rule import CommunityRule, PlatformRule, RuleChoice
 from app.services.platform import rules
 from app.testing import create_guild, create_user, guild_administration
 
@@ -88,3 +92,36 @@ async def test_a_member_keeps_a_value_that_differs_from_the_community(
         )
     ).all()
     assert members == []
+
+
+@pytest.mark.always
+async def test_rule_choices_are_the_catalogs(session: AsyncSession):
+    """The migrations write ``rule_choices``; the catalog says what they
+    should hold. A new choice rule, or a new value on one, needs both."""
+    stored = set((await session.exec(select(RuleChoice.key, RuleChoice.value))).all())
+    assert stored == {
+        (key, value)
+        for key, rule in PLATFORM_RULES.items()
+        if rule.slot is Slot.choice
+        for value in choices(rule)
+    }
+
+
+async def test_a_choice_and_the_ways_in_are_rows_like_any_other(
+    session: AsyncSession,
+):
+    """A value its rule does not have is refused by the database, and the
+    ways in must include one that can begin a session."""
+    await rules.put(session, "second_factor_requirement", "everyone")
+    await rules.put(session, "login_methods", frozenset({LoginMethod.sso}))
+    await session.commit()
+    stored = await rules.platform_values(session)
+    assert stored["second_factor_requirement"] is SecondFactorRequirement.everyone
+    assert stored["login_methods"] == {LoginMethod.sso}
+
+    with pytest.raises(IntegrityError):
+        async with session.begin_nested():
+            session.add(PlatformRule(key="default_dm_policy", choice="everyone"))
+    with pytest.raises(IntegrityError):
+        async with session.begin_nested():
+            session.add(PlatformRule(key="login_methods_probe", methods=["totp"]))

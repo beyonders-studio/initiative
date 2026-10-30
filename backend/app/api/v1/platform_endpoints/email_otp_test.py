@@ -13,14 +13,16 @@ VERIFY_URL = "/api/v1/auth/email-otp/verify"
 
 async def _permit(session: AsyncSession, *, mail: bool = True) -> None:
     """A deployment offering the emailed code, able to send."""
+    from app.core.login_methods import LoginMethod
     from app.services.platform import app_settings as app_settings_service
+    from app.services.platform import rules
 
     row = await app_settings_service.get_app_settings(session)
     if mail:
         row.smtp_host = "smtp.example.com"
         row.smtp_from_address = "noreply@example.com"
-    row.login_methods = ["password", "sso", "totp", "passkey", "email_otp"]
     session.add(row)
+    await rules.put(session, "login_methods", frozenset(LoginMethod))
     await session.commit()
 
 

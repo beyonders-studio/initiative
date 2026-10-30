@@ -18,12 +18,12 @@ from app.core.encryption import (
     SALT_SMTP_PASSWORD,
     decrypt_field,
 )
-from app.core.login_methods import DEFAULT_LOGIN_METHODS
+from app.core.login_methods import DEFAULT_LOGIN_METHODS, LoginMethod
 from app.models.platform.app_setting import AppSetting
 from app.services.marketplace import context_jwt
 from app.services.platform.app_settings import (
     GLOBAL_SETTINGS_ID,
-    _build_default_app_settings,
+    _seeded_login_methods,
     ensure_settings_row,
     get_app_setting_secrets,
     get_app_settings,
@@ -31,6 +31,7 @@ from app.services.platform.app_settings import (
     load_plugin_platform_signing_key,
     seed_app_settings,
 )
+from app.services.platform import rules
 from app.testing import create_guild, route_session_to_guild
 
 
@@ -112,7 +113,8 @@ async def test_guild_settings_gap_fill_joins_the_transaction(session: AsyncSessi
 
 # --- The sign-in posture the env seeds ------------------------------------
 
-DEFAULT_METHODS = [m.value for m in DEFAULT_LOGIN_METHODS]
+DEFAULT_METHODS = frozenset(DEFAULT_LOGIN_METHODS)
+M = LoginMethod
 
 
 def _seed_env(monkeypatch, methods, *, mail: bool = True) -> None:
@@ -124,34 +126,29 @@ def _seed_env(monkeypatch, methods, *, mail: bool = True) -> None:
 
 
 def test_env_decides_the_ways_in_of_a_fresh_row(monkeypatch):
-    """AUTH_LOGIN_METHODS is stored the way the settings page stores it."""
+    """AUTH_LOGIN_METHODS is what a fresh deployment permits."""
     _seed_env(monkeypatch, ["sso", "passkey", "totp", "email_otp"])
-    assert _build_default_app_settings().login_methods == [
-        "email_otp",
-        "passkey",
-        "sso",
-        "totp",
-    ]
+    assert _seeded_login_methods() == {M.email_otp, M.passkey, M.sso, M.totp}
 
 
 def test_env_unset_keeps_the_default(monkeypatch):
     _seed_env(monkeypatch, [])
-    assert _build_default_app_settings().login_methods == DEFAULT_METHODS
+    assert _seeded_login_methods() == DEFAULT_METHODS
 
 
 def test_env_value_this_version_does_not_know_is_dropped_and_said(monkeypatch, caplog):
     _seed_env(monkeypatch, ["sso", "magic_link"])
     with caplog.at_level(logging.WARNING):
-        assert _build_default_app_settings().login_methods == ["sso"]
+        assert _seeded_login_methods() == {M.sso}
     assert "magic_link" in caplog.text
 
 
 def test_env_with_no_way_to_begin_keeps_the_default(monkeypatch, caplog):
-    """The column's CHECK would refuse the row; falling back keeps the
-    deployment one somebody can still configure."""
+    """The rule's CHECK would refuse it; falling back keeps the deployment one
+    somebody can still configure."""
     _seed_env(monkeypatch, ["totp"])
     with caplog.at_level(logging.WARNING):
-        assert _build_default_app_settings().login_methods == DEFAULT_METHODS
+        assert _seeded_login_methods() == DEFAULT_METHODS
     assert "begin a session" in caplog.text
 
 
@@ -159,18 +156,20 @@ def test_env_emailed_code_needs_a_mail_server(monkeypatch, caplog):
     """The rule the settings page enforces on the way up, applied to the seed."""
     _seed_env(monkeypatch, ["sso", "email_otp"], mail=False)
     with caplog.at_level(logging.WARNING):
-        assert _build_default_app_settings().login_methods == ["sso"]
+        assert _seeded_login_methods() == {M.sso}
     assert "mail server" in caplog.text
 
 
-async def test_env_seeds_the_row_once(session: AsyncSession, monkeypatch):
-    """The env decides a row it creates, and never one that already exists."""
+async def test_env_seeds_the_ways_in_once(session: AsyncSession, monkeypatch):
+    """The env decides the first boot's ways in, and never a later boot's."""
+    seeded = {M.passkey, M.sso}
     _seed_env(monkeypatch, ["sso", "passkey"])
-    assert (await seed_app_settings(session)).login_methods == ["passkey", "sso"]
+    await seed_app_settings(session)
+    assert (await rules.platform_values(session))["login_methods"] == seeded
 
     _seed_env(monkeypatch, ["password"])
-    assert (await seed_app_settings(session)).login_methods == ["passkey", "sso"]
-    assert (await get_app_settings(session)).login_methods == ["passkey", "sso"]
+    await seed_app_settings(session)
+    assert (await rules.platform_values(session))["login_methods"] == seeded
 
 
 async def test_first_boot_stores_every_env_credential(

@@ -22,7 +22,11 @@ from sqlmodel import Field, SQLModel
 from app.core.login_methods import LoginMethod
 
 #: A row holds its value in exactly one slot; ``app.core.rules`` says which.
-_ONE_SLOT = "num_nonnulls(enabled, amount) = 1"
+_ONE_SLOT = "num_nonnulls(enabled, amount, choice, methods) = 1"
+#: The deployment's ways in include one that can begin a session.
+_BEGINS_A_SESSION = (
+    "methods IS NULL OR methods && '{password,sso,passkey}'::login_method[]"
+)
 #: A community's may also hold a sign-in requirement: its methods, and beside
 #: them, only there, the provider it names.
 _ONE_COMMUNITY_SLOT = (
@@ -47,12 +51,41 @@ def _updated_at() -> Column:
     )
 
 
+def _methods() -> Column:
+    return Column(
+        ARRAY(PGEnum(LoginMethod, name="login_method", create_type=False)),
+        nullable=True,
+    )
+
+
+class RuleChoice(SQLModel, table=True):
+    """One value a ``choice`` rule may take (``app.core.rules.choices``).
+
+    Written by the migrations, with the rule it belongs to, and held to the
+    catalog by ``rule_choices_test``. Read by nothing but the foreign key that
+    holds each ``choice`` to its own rule's values.
+    """
+
+    __tablename__ = "rule_choices"
+
+    key: str = Field(sa_column=Column(String(64), primary_key=True))
+    value: str = Field(sa_column=Column(String(64), primary_key=True))
+
+
 class PlatformRule(SQLModel, table=True):
     """One of the deployment's rules that says something other than its
     default."""
 
     __tablename__ = "platform_rules"
-    __table_args__ = (CheckConstraint(_ONE_SLOT, name="ck_platform_rules_one_slot"),)
+    __table_args__ = (
+        CheckConstraint(_ONE_SLOT, name="ck_platform_rules_one_slot"),
+        CheckConstraint(_BEGINS_A_SESSION, name="ck_platform_rules_begins_a_session"),
+        ForeignKeyConstraint(
+            ["key", "choice"],
+            ["rule_choices.key", "rule_choices.value"],
+            name="fk_platform_rules_choice",
+        ),
+    )
 
     key: str = Field(sa_column=Column(String(64), primary_key=True))
     enabled: Optional[bool] = Field(
@@ -61,6 +94,10 @@ class PlatformRule(SQLModel, table=True):
     amount: Optional[int] = Field(
         default=None, sa_column=Column(Integer, nullable=True)
     )
+    choice: Optional[str] = Field(
+        default=None, sa_column=Column(String(64), nullable=True)
+    )
+    methods: Optional[list[str]] = Field(default=None, sa_column=_methods())
     updated_at: datetime = Field(
         default_factory=lambda: datetime.now(timezone.utc), sa_column=_updated_at()
     )
@@ -111,13 +148,7 @@ class CommunityRule(SQLModel, table=True):
     amount: Optional[int] = Field(
         default=None, sa_column=Column(Integer, nullable=True)
     )
-    methods: Optional[list[str]] = Field(
-        default=None,
-        sa_column=Column(
-            ARRAY(PGEnum(LoginMethod, name="login_method", create_type=False)),
-            nullable=True,
-        ),
-    )
+    methods: Optional[list[str]] = Field(default=None, sa_column=_methods())
     #: RESTRICT: deleting a provider a community requires must surface the
     #: conflict, never silently reopen the community.
     provider_id: Optional[int] = Field(

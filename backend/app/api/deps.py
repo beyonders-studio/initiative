@@ -43,11 +43,9 @@ from app.services.auth.assurance import (
     carries_passkey,
 )
 from app.core.login_methods import SecondFactorRequirement
-from app.models.platform.app_setting import AppSetting
 from app.core.guild_auth_options import CommunityAuthOption
 from app.services.platform import auth_posture
 from app.services.platform import guild_entitlements, rules
-from app.services.platform.app_settings import GLOBAL_SETTINGS_ID
 from app.core import audit_context
 from app.core.messages import (
     AccessGrantMessages,
@@ -690,14 +688,14 @@ async def _enforce_guild_api_access(
 async def _read_membership_gate(
     session: AsyncSession, guild_id: int, user_id: int
 ) -> tuple[GuildMembership, Guild, SecondFactorRequirement, bool] | None:
-    """The three rows the gate needs about a member, in one query.
+    """The two rows the gate needs about a member, in one query.
 
     ``guild_memberships`` and ``guilds`` both live in ``public`` and are both
     keyed on the guild this request addresses, so asking for them separately
-    was two trips for one answer. The settings singleton rides along for the
-    same reason — what the deployment asks of an account is
-    decided in the same breath as what the community asks of the session, and a
-    read of its own would be a round trip on every guild request there is.
+    was two trips for one answer. Two of the deployment's rules ride along for
+    the same reason — what it asks of an account is decided in the same breath
+    as what the community asks of the session, and a read of its own would be a
+    round trip on every guild request there is.
 
     Each row still comes back under its own policies — an outer join to a row
     the session may not read yields NULL, exactly as its own SELECT would have.
@@ -709,12 +707,11 @@ async def _read_membership_gate(
             select(
                 GuildMembership,
                 Guild,
-                AppSetting,
+                rules.platform_rule_sql("second_factor_requirement"),
                 rules.platform_rule_sql("community_age_gate_enabled"),
             )
             .select_from(GuildMembership)
             .outerjoin(Guild, Guild.id == GuildMembership.guild_id)
-            .outerjoin(AppSetting, AppSetting.id == GLOBAL_SETTINGS_ID)
             .where(
                 GuildMembership.guild_id == guild_id,
                 GuildMembership.user_id == user_id,
@@ -724,13 +721,10 @@ async def _read_membership_gate(
     ).one_or_none()
     if row is None:
         return None
-    membership, guild, settings_row, age_gate_on = row
+    membership, guild, asked, age_gate_on = row
     if guild is None:
         raise ValueError(GuildMessages.COMMUNITY_NOT_FOUND)
-    # The age rule rides along for the same reason the factor requirement
-    # does: reading it separately would be a round trip on every guild
-    # request there is.
-    return membership, guild, asked_of_an_account(settings_row), bool(age_gate_on)
+    return membership, guild, asked_of_an_account(asked), bool(age_gate_on)
 
 
 async def _read_grant_gate(
@@ -741,9 +735,8 @@ async def _read_grant_gate(
     read cannot be folded into the membership one above."""
     row = (
         await session.exec(
-            select(Guild, AppSetting)
+            select(Guild, rules.platform_rule_sql("second_factor_requirement"))
             .select_from(Guild)
-            .outerjoin(AppSetting, AppSetting.id == GLOBAL_SETTINGS_ID)
             .where(Guild.id == guild_id)
         )
     ).one_or_none()

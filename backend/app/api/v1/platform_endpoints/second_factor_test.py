@@ -6,6 +6,7 @@ import pyotp
 from httpx import AsyncClient, Response
 from sqlmodel.ext.asyncio.session import AsyncSession
 
+from app.core.login_methods import LoginMethod
 from app.core.security import get_password_hash
 from app.models.platform.user import User, UserStatus
 from app.services.auth import totp as totp_service
@@ -599,11 +600,11 @@ async def test_a_hash_no_scheme_verifies_asks_for_no_password(
 
 async def _withdraw_totp(session: AsyncSession) -> None:
     """Leave the deployment permitting the two that can begin a session."""
-    from app.services.platform import app_settings as app_settings_service
+    from app.services.platform import rules
 
-    row = await app_settings_service.get_app_settings(session)
-    row.login_methods = ["password", "sso"]
-    session.add(row)
+    await rules.put(
+        session, "login_methods", frozenset({LoginMethod.password, LoginMethod.sso})
+    )
     await session.commit()
 
 

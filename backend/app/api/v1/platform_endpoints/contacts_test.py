@@ -4,14 +4,11 @@ from __future__ import annotations
 
 import pytest
 from httpx import AsyncClient
-from sqlmodel import select
 from sqlmodel.ext.asyncio.session import AsyncSession
 
-from app.models.platform.app_setting import AppSetting
 from app.models.platform.guild import Guild, CommunityRole
 from app.models.platform.user import User, UserStatus
 from app.models.platform.user_dm_settings import DmPolicy
-from app.services.platform.app_settings import GLOBAL_SETTINGS_ID
 from app.testing.factories import (
     create_guild,
     create_guild_membership,
@@ -35,15 +32,9 @@ async def community_by_default(session: AsyncSession):
     Set before any account is made: the default is copied into the account when
     it is created, and moving it afterwards moves nobody.
     """
-    settings = (
-        await session.exec(
-            select(AppSetting).where(AppSetting.id == GLOBAL_SETTINGS_ID)
-        )
-    ).one_or_none()
-    if settings is None:
-        settings = AppSetting(id=GLOBAL_SETTINGS_ID)
-        session.add(settings)
-    settings.default_dm_policy = DmPolicy.community
+    from app.services.platform import rules
+
+    await rules.put(session, "default_dm_policy", DmPolicy.community)
     await session.commit()
 
 
