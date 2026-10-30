@@ -12,6 +12,8 @@ permissions:
 
 jobs:
   sha:
+    # :dev is this repository's, signed with its dev key; a fork builds none.
+    if: ${{ github.repository == 'beyonders-studio/initiative' }}
     runs-on: ubuntu-24.04
     timeout-minutes: 5
     outputs:

@@ -25,6 +25,8 @@ permissions:
 jobs:
   report:
     name: Report
+    # This repository's month; a fork reports one only by hand.
+    if: ${{ github.event_name != 'schedule' || github.repository == 'beyonders-studio/initiative' }}
     runs-on: ubuntu-24.04
     timeout-minutes: 15
     steps:
