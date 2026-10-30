@@ -6715,6 +6715,10 @@ export interface HeldChangeOutcome {
   held: HeldChangeRead | null;
 }
 
+export interface HeldSurfacesRead {
+  surfaces: AdminSurface[];
+}
+
 /**
  * Hold something for the platform.
  */
