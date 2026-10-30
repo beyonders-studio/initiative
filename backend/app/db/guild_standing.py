@@ -772,6 +772,8 @@ class GuildContext:
     guest: bool = False
     #: A guest's initiatives of the items shared with them one at a time.
     guest_item_initiatives: tuple[int, ...] = ()
+    #: The ``surface.*`` keys the deployment has closed for the community.
+    closed_surfaces: tuple[str, ...] = ()
     member_initiatives: tuple[int, ...] = ()
     manager_initiatives: tuple[int, ...] = ()
     member_role_ids: tuple[int, ...] = ()
