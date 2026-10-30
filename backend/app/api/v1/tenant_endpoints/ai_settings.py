@@ -15,6 +15,8 @@ from typing import Annotated
 
 from fastapi import APIRouter, Depends, status
 
+from app.api.deps import require_surface_open
+from app.core.rules import SURFACE_AI_CONNECTIONS
 from app.api.deps import (
     GuildContext,
     RLSSessionDep,
@@ -35,6 +37,9 @@ from app.schemas.ai_settings import (
 from app.services import ai_settings as ai_settings_service
 
 router = APIRouter()
+
+#: Configuring this surface, which the deployment may close for one community.
+_SURFACE_OPEN = Depends(require_surface_open(SURFACE_AI_CONNECTIONS))
 
 # Connecting a community to an AI provider decides what leaves it, and for
 # whom — the same kind of question as who may sign in, so it answers to the
@@ -61,7 +66,7 @@ async def list_community_connections(
     return await ai_settings_service.list_guild_connections(session)
 
 
-@router.post("/ai/connections", response_model=AIConnectionResponse)
+@router.post("/ai/connections", response_model=AIConnectionResponse, dependencies=[_SURFACE_OPEN])
 async def create_community_connection(
     payload: AIConnectionCreate,
     session: SettingsRLSSessionDep,
@@ -73,7 +78,7 @@ async def create_community_connection(
     )
 
 
-@router.put("/ai/connections/{connection_id}", response_model=AIConnectionResponse)
+@router.put("/ai/connections/{connection_id}", response_model=AIConnectionResponse, dependencies=[_SURFACE_OPEN])
 async def update_community_connection(
     connection_id: int,
     payload: AIConnectionUpdate,
@@ -87,8 +92,7 @@ async def update_community_connection(
 
 
 @router.delete(
-    "/ai/connections/{connection_id}", status_code=status.HTTP_204_NO_CONTENT
-)
+    "/ai/connections/{connection_id}", status_code=status.HTTP_204_NO_CONTENT, dependencies=[_SURFACE_OPEN])
 async def delete_community_connection(
     connection_id: int,
     session: SettingsRLSSessionDep,

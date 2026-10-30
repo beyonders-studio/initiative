@@ -243,6 +243,10 @@ class CommunityRead(CommunityBase):
     # entitlement), so their settings UI knows which surfaces to offer;
     # ``None`` for non-admin members (they never configure auth).
     auth_options: Optional[List[CommunityAuthOption]] = None
+    # ADMIN-ONLY. The settings the deployment has taken away from this
+    # community (``ai_connections``, ``plugins``), so their settings UI says so
+    # instead of offering them; ``None`` for non-admin members.
+    closed_surfaces: Optional[List[str]] = None
     # Community directory opt-in and its subject tags. Guild identity, not
     # administration: every member sees them (they are published to strangers
     # anyway), and the settings page shows the controls to admins.
