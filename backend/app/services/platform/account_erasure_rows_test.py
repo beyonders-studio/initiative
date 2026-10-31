@@ -52,6 +52,7 @@ from app.models.tenant.guild_plugin_user_connection import GuildPluginUserConnec
 from app.models.tenant.initiative import InitiativeJoinRequest
 from app.models.tenant.reaction import Reaction
 from app.models.tenant.resource_grant import ResourceGrant
+from app.models.tenant.view_preference import ViewPreference
 from app.models.tenant.webhook_subscription import WebhookSubscription
 from app.services.platform import users as user_service
 from app.services.tenant.mention_parser import ANONYMIZED_MENTION_NAME
@@ -239,8 +240,8 @@ async def _reread(session: AsyncSession, guild_id: int, model, row_id: int):
 
 
 async def test_what_they_kept_goes(session: AsyncSession, role_session):
-    """Opens, bookmarks, subscriptions and orders are one person's own: theirs go, and
-    someone else's stay."""
+    """Opens, bookmarks, subscriptions, orders and list views are one person's
+    own: theirs go, and someone else's stay."""
     s = await _seed(session)
     await route_session_to_guild(session, s.guild_id)
     for person in (s.victim_id, s.keeper_id):
@@ -252,6 +253,9 @@ async def test_what_they_kept_goes(session: AsyncSession, role_session):
                 bookmarked_at=datetime.now(timezone.utc),
             )
         )
+        session.add(
+            ViewPreference(user_id=person, scope_key="view:project:1", value={})
+        )
     await session.commit()
 
     await user_service.hard_delete_user(await role_session("app_admin"), s.victim_id)
@@ -259,6 +263,8 @@ async def test_what_they_kept_goes(session: AsyncSession, role_session):
     await route_session_to_guild(session, s.guild_id)
     left = (await session.exec(select(PersonalItem.user_id))).all()
     assert left == [s.keeper_id]
+    views = (await session.exec(select(ViewPreference.user_id))).all()
+    assert views == [s.keeper_id]
 
 
 async def test_their_grants_go(session: AsyncSession, role_session):

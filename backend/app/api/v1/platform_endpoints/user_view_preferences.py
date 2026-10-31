@@ -4,6 +4,9 @@ A generic key/value/JSON store keyed by ``(user_id, scope_key)``. The
 frontend uses one of these per "view" (e.g. ``my-tasks``,
 ``project:42:tasks``, ``files``) and the server keeps the blob
 verbatim. RLS confines every read/write to ``current_user_id``.
+
+These are the account's own views, which name no community. A community's
+lists keep theirs in that community (``/c/{community_id}/view-preferences``).
 """
 
 from __future__ import annotations

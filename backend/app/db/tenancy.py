@@ -177,6 +177,11 @@ GUILD_LEVEL_TABLES: frozenset[str] = frozenset(
         # own_row_* policies. A member token's standing reads the member's own
         # row for its install.
         "plugin_member_consents",
+        # How a member shows the community's lists: their filters, order and
+        # layout for a project, a tool list, a queue, the roster. One owner per
+        # row; no initiative of its own, since a key may name the community's
+        # roster or its calendars together.
+        "view_preferences",
         # The platform's record of what it holds in the community: why, by
         # whom, under which case. Read by the system engine and a ``moderate``
         # grantee alone, never by the community — its policies are rendered
@@ -212,6 +217,7 @@ OWN_ROW_TABLES: dict[str, str] = {
     "data_jobs": "created_by",
     "pending_uploads": "created_by",
     "plugin_member_consents": "user_id",
+    "view_preferences": "user_id",
 }
 
 # --- Private-row overlay on initiative-scoped tables --------------------------
@@ -352,6 +358,7 @@ CREATED_BY_EXEMPT_TABLES: frozenset[str] = frozenset(
         "guild_plugin_user_connections",
         "plugin_member_consents",
         "post_reads",
+        "view_preferences",
         # A fact about an install: where it appears. The rows a new initiative's
         # trigger writes have no person placing them.
         "plugin_placements",

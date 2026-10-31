@@ -69,6 +69,7 @@ from app.api.v1.tenant_endpoints import (
     tools,
     trash,
     share_requests,
+    view_preferences,
     wikis,
 )
 from app.api.v1.platform_endpoints import (
@@ -406,6 +407,13 @@ guild_router.include_router(users.guild_router, prefix="/users", tags=["users"])
 guild_router.include_router(users.members_router, prefix="/members", tags=["users"])
 guild_router.include_router(
     personal_items.guild_router, prefix="/personal-items", tags=["personal-items"]
+)
+# A person's views of this community's lists. The account's own views are the
+# top-level /user-view-preferences; both answer under one tag.
+guild_router.include_router(
+    view_preferences.router,
+    prefix="/view-preferences",
+    tags=["user-view-preferences"],
 )
 # WebSockets (guild-scoped). Mounting under /c fixes the URL shape now; the
 # handlers are rewired to read the path guild in a follow-up step.

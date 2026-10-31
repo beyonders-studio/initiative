@@ -226,6 +226,7 @@ async def _erase_in_guild(
     from app.models.tenant.custom_role import CustomRoleMember
     from app.models.tenant.metadata import MetadataValue
     from app.models.tenant.queue import QueueItem
+    from app.models.tenant.view_preference import ViewPreference
     from app.services.tenant.mention_parser import anonymize_user_mentions
 
     # Releases their owner grants (content is left unowned) and drops their
@@ -242,6 +243,9 @@ async def _erase_in_guild(
 
     await guild_session.exec(
         delete(PersonalItem).where(col(PersonalItem.user_id) == user_id)
+    )
+    await guild_session.exec(
+        delete(ViewPreference).where(col(ViewPreference.user_id) == user_id)
     )
     await guild_session.exec(
         delete(CustomRoleMember).where(col(CustomRoleMember.user_id) == user_id)
