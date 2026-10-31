@@ -10,7 +10,7 @@ The downgrade drops the column, and a role the deployment set stays as one the
 community has.
 
 Revision ID: 20261031_0575
-Revises: 20261031_0573
+Revises: 20261031_0574
 Create Date: 2026-10-31
 """
 
@@ -20,7 +20,7 @@ from alembic import op
 from app.db.guild_migrations import run_for_each_guild_schema
 
 revision = "20261031_0575"
-down_revision = "20261031_0573"
+down_revision = "20261031_0574"
 branch_labels = None
 depends_on = None
 
