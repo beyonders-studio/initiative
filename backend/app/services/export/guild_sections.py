@@ -204,6 +204,45 @@ async def _build_members(ctx: SectionContext) -> tuple[dict[str, Any], int] | No
     return payload, len(members)
 
 
+async def _build_roles(ctx: SectionContext) -> tuple[dict[str, Any], int] | None:
+    """The community's custom roles, each with what it holds and who holds it
+    now, by handle as the members section names people."""
+    from sqlmodel import col, select
+
+    from app.core.user_display import handle_of
+    from app.models.platform.user_profile_view import GuildMember
+    from app.models.tenant.custom_role import CustomRole
+    from app.services.tenant import custom_roles
+
+    roles = list(
+        await ctx.session.exec(select(CustomRole).order_by(col(CustomRole.name)))
+    )
+    if not roles:
+        return None
+    holders = await custom_roles.holders(ctx.session, ctx.guild_id)
+    profiles = {
+        profile.id: profile for profile in await ctx.session.exec(select(GuildMember))
+    }
+    payload = {
+        "type": "guild-roles",
+        "schema_version": 1,
+        "roles": [
+            {
+                "name": role.name,
+                "base_rung": role.base_rung,
+                "surfaces": list(role.surfaces),
+                "holders": [
+                    handle_of(profiles[user_id])
+                    for user_id, role_id in holders
+                    if role_id == role.id and user_id in profiles
+                ],
+            }
+            for role in roles
+        ],
+    }
+    return payload, len(roles)
+
+
 async def _build_plugins(ctx: SectionContext) -> tuple[dict[str, Any], int] | None:
     """Plug-ins the community installed — built-in ones only.
 
@@ -298,6 +337,7 @@ GUILD_SECTIONS: tuple[GuildSection, ...] = (
         scopes=frozenset({"guild", "initiative"}),
     ),
     GuildSection("members", "guild/members.json", _build_members),
+    GuildSection("roles", "guild/roles.json", _build_roles),
     GuildSection("plugins", "guild/plugins.json", _build_plugins),
 )
 
@@ -322,6 +362,8 @@ SECTION_TABLES: dict[str, str] = {
     "initiative_members": "initiatives",
     "initiative_roles": "initiatives",
     "initiative_rules": "initiatives",
+    "custom_roles": "roles",
+    "custom_role_members": "roles",
 }
 
 # Guild-level tables deliberately NOT exported, and why. A reason is required:
@@ -351,6 +393,9 @@ EXEMPT: dict[str, str] = {
     # The platform's record of what it holds here. Not the community's to
     # read, so not the community's to carry out.
     "content_holds": "platform",
+    # Sign-in configuration: it names the deployment's providers, which mean
+    # nothing to the instance reading the archive.
+    "custom_role_claim_rules": "sign_in",
 }
 
 __all__ = [

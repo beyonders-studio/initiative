@@ -17,6 +17,7 @@ from alembic.operations import Operations
 from pycrdt import Doc, Map, Text
 from sqlalchemy import text
 
+from app.testing.later_revisions import step_later_revisions
 from app.services import editor_engine
 from app.testing import (
     create_file,
@@ -50,15 +51,10 @@ async def _one(session, sql: str, **params: Any) -> Any:
 
 def _runner(schema: str):
     """Revision 0546 one way or the other, on one guild's schema only, with
-    the initiative rules (20261030_0567, 20261030_0568), the data jobs table
-    (20261030_0564), the batched notices (20261030_0563) and the metadata
+    the later revisions (``app.testing.later_revisions``) and the metadata
     store (20261027_0550) off first and back on last."""
     migration = _load("20261027_0546_galleries_are_collections.py")
     metadata = _load("20261027_0550_metadata_is_one_store.py")
-    batched = _load("20261030_0563_assignment_and_reaction_lines_are_one_table.py")
-    data_jobs = _load("20261030_0564_imports_and_exports_are_data_jobs.py")
-    rules = _load("20261030_0567_an_initiatives_role_permissions_are_rules.py")
-    defaults = _load("20261030_0568_a_community_sets_its_initiatives_defaults.py")
 
     def run(forward: bool):
         def apply(sync_session) -> None:
@@ -73,18 +69,12 @@ def _runner(schema: str):
 
             with Operations.context(MigrationContext.configure(bind)):
                 if not forward:
-                    in_schema(defaults._downgrade)
-                    in_schema(rules._downgrade)
-                    in_schema(data_jobs._downgrade_schema)
-                    in_schema(lambda: batched._downgrade(bind))
+                    step_later_revisions(bind, schema, forward=False)
                     in_schema(lambda: metadata._apply(False))
                 migration._convert(bind, forward, in_schema)
                 if forward:
                     in_schema(lambda: metadata._apply(True))
-                    in_schema(lambda: batched._upgrade(bind))
-                    in_schema(data_jobs._upgrade_schema)
-                    in_schema(rules._upgrade)
-                    in_schema(defaults._upgrade)
+                    step_later_revisions(bind, schema, forward=True)
 
         return apply
 

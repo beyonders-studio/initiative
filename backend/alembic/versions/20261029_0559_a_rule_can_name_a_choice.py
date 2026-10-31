@@ -59,7 +59,7 @@ COLUMN_TYPES = {
 DEFAULT_METHODS = "'{password,sso,totp,passkey}'::login_method[]"
 #: One of the ways in can begin a session.
 BEGINS_A_SESSION = (
-    "methods IS NULL OR methods && '{password,sso,passkey}'::login_method[]"
+    "methods IS NULL OR methods && '{password,sso,passkey,email_otp}'::login_method[]"
 )
 ONE_SLOT_BEFORE = "num_nonnulls(enabled, amount) = 1"
 ONE_SLOT = "num_nonnulls(enabled, amount, choice, methods) = 1"

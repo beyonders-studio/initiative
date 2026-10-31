@@ -14,6 +14,7 @@ from alembic.migration import MigrationContext
 from alembic.operations import Operations
 from sqlalchemy import text
 
+from app.testing.later_revisions import later_revisions
 from app.testing import (
     create_file,
     create_guild,
@@ -111,6 +112,7 @@ async def test_old_files_get_versions_types_and_pointers(
 
         return apply
 
+    await session.run_sync(later_revisions(schema, forward=False))
     await session.run_sync(run(lambda: _load(_METADATA)._apply(False)))
     await session.run_sync(run(lambda: collections._apply(False)))
     picture = await _picture(session, schema, initiative.id, user.id)
@@ -187,3 +189,4 @@ async def test_old_files_get_versions_types_and_pointers(
     await session.run_sync(run(lambda: files._apply(True)))
     await session.run_sync(run(lambda: collections._apply(True)))
     await session.run_sync(run(lambda: _load(_METADATA)._apply(True)))
+    await session.run_sync(later_revisions(schema, forward=True))
