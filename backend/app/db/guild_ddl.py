@@ -34,7 +34,7 @@ from sqlalchemy.ext.asyncio import AsyncEngine
 from sqlalchemy.schema import CheckConstraint, CreateTable
 
 from app.core.plugin_scopes import PluginScopeResource, tool_resource
-from app.core.rules import SURFACE_CUSTOM_ROLES
+from app.core.rules import SURFACE_CUSTOM_ROLES, SetBy
 from app.core.tools import (
     INSTALL_METADATA_KIND,
     KINDS,
@@ -784,7 +784,9 @@ _CUSTOM_ROLES_SECTION = """\
 -- engine. Nobody writes or gives a role holding a surface they do not hold,
 -- and a role on the admin rung takes an admin writer. Taking one off its
 -- holders, by deleting it or the assignment, widens an admin back to every
--- surface, so that takes a writer who holds every surface.
+-- surface, so that takes a writer who holds every surface. A role the
+-- deployment defined (set_by) is the system engine's to write; the community
+-- gives it as it gives its own (custom_role_set_by_*, RESTRICTIVE).
 --
 -- tr_custom_roles_rung_fixed: a role keeps the rung it was made on.
 -- ==========================================================================="""
@@ -873,7 +875,18 @@ def _custom_roles_block() -> str:
             f"CREATE POLICY custom_role_delete ON {table} AS PERMISSIVE FOR DELETE"
             f"  USING ({remove});",
         ]
+    communitys = f"({IN_POLICY.system} OR set_by = '{SetBy.community.value}')"
     lines += [
+        *(
+            f"DROP POLICY IF EXISTS custom_role_set_by_{c} ON custom_roles;"
+            for c in ("insert", "update", "delete")
+        ),
+        "CREATE POLICY custom_role_set_by_insert ON custom_roles AS RESTRICTIVE"
+        f" FOR INSERT WITH CHECK ({communitys});",
+        "CREATE POLICY custom_role_set_by_update ON custom_roles AS RESTRICTIVE"
+        f" FOR UPDATE USING ({communitys}) WITH CHECK ({communitys});",
+        "CREATE POLICY custom_role_set_by_delete ON custom_roles AS RESTRICTIVE"
+        f" FOR DELETE USING ({communitys});",
         CUSTOM_ROLE_RUNG_FIXED_FN,
         "CREATE OR REPLACE TRIGGER tr_custom_roles_rung_fixed"
         " BEFORE UPDATE OF base_rung ON custom_roles FOR EACH ROW"

@@ -833,5 +833,7 @@
   "CUSTOM_ROLE_BEYOND_YOURS": "Vous ne pouvez créer ou attribuer un rôle qu'avec ce que vous pouvez faire vous-même.",
   "CUSTOM_ROLE_WIDENS_AN_ADMIN": "Retirer ce rôle rend tout à un administrateur : seul un administrateur qui peut tout faire peut le retirer.",
   "CUSTOM_ROLE_SURFACE_NOT_FOR_MEMBERS": "Un rôle pour les membres ne peut pas inclure cela. Donnez-le plutôt à un rôle d'administrateur.",
-  "CUSTOM_ROLE_HOLDER_NOT_MEMBER": "Cette personne n'est pas membre de cette communauté."
+  "CUSTOM_ROLE_HOLDER_NOT_MEMBER": "Cette personne n'est pas membre de cette communauté.",
+  "CUSTOM_ROLE_SET_BY_DEPLOYMENT": "Ce rôle est défini par la personne qui gère ce serveur : il ne peut pas être modifié ni supprimé ici.",
+  "CUSTOM_ROLE_NAME_RESERVED": "La personne qui gère ce serveur a déjà un rôle portant ce nom. Choisissez-en un autre."
 }

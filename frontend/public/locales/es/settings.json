@@ -2287,7 +2287,8 @@
       }
     },
     "beyondYours": "No puedes cambiar este rol: incluye algo que tú no tienes.",
-    "widensAnAdmin": "Solo un administrador que puede hacerlo todo puede eliminar un rol de administrador: quienes lo tienen lo recuperan todo."
+    "widensAnAdmin": "Solo un administrador que puede hacerlo todo puede eliminar un rol de administrador: quienes lo tienen lo recuperan todo.",
+    "setByDeployment": "Quien gestiona este servidor define este rol. Puedes asignarlo aquí, pero no cambiarlo ni eliminarlo."
   },
   "customRoleRules": {
     "title": "Roles personalizados por grupo",

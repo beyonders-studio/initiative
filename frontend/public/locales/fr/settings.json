@@ -2287,7 +2287,8 @@
       }
     },
     "beyondYours": "Vous ne pouvez pas modifier ce rôle : il comprend quelque chose que vous n'avez pas.",
-    "widensAnAdmin": "Seul un administrateur qui peut tout faire peut supprimer un rôle d'administrateur : ceux qui l'ont récupèrent tout."
+    "widensAnAdmin": "Seul un administrateur qui peut tout faire peut supprimer un rôle d'administrateur : ceux qui l'ont récupèrent tout.",
+    "setByDeployment": "Ce rôle est défini par la personne qui gère ce serveur. Vous pouvez l'attribuer ici, mais pas le modifier ni le supprimer."
   },
   "customRoleRules": {
     "title": "Rôles personnalisés par groupe",

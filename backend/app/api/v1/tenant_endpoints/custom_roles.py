@@ -7,7 +7,8 @@ Each write is refused here with the reason, and by the policies on
 not hold, a role on the admin rung takes an admin, and taking one off an admin
 takes somebody who holds every surface. While the deployment has closed
 ``surface.custom_roles`` nothing here changes, and the roles the community has
-keep applying.
+keep applying. A role the deployment defined is given here and changed only by
+billing's sync, and its name is the deployment's.
 """
 
 from collections.abc import Awaitable, Callable
@@ -29,7 +30,7 @@ from app.api.deps import (
 )
 from app.core.audit_events import AuditEventType
 from app.core.messages import CustomRoleMessages, GuildMessages
-from app.core.rules import SURFACE_CUSTOM_ROLES
+from app.core.rules import SURFACE_CUSTOM_ROLES, SetBy
 from app.models.platform.guild import (
     MEMBER_ROLE_SURFACES,
     AdminSurface,
@@ -118,6 +119,26 @@ async def _role_or_404(session: AsyncSession, role_id: int) -> CustomRole:
     return role
 
 
+async def _communitys_role(session: AsyncSession, role_id: int) -> CustomRole:
+    """A role the community defined, which it may change or delete."""
+    role = await _role_or_404(session, role_id)
+    if role.set_by == SetBy.deployment.value:
+        raise HTTPException(
+            status_code=status.HTTP_409_CONFLICT,
+            detail=CustomRoleMessages.CUSTOM_ROLE_SET_BY_DEPLOYMENT,
+        )
+    return role
+
+
+async def _require_free(session: AsyncSession, name: str) -> None:
+    """``name`` is not one the deployment's roles have."""
+    if await custom_roles_service.reserved(session, name):
+        raise HTTPException(
+            status_code=status.HTTP_409_CONFLICT,
+            detail=CustomRoleMessages.CUSTOM_ROLE_NAME_RESERVED,
+        )
+
+
 async def _record(
     session: AsyncSession,
     context: GuildContext,
@@ -181,6 +202,7 @@ async def create_custom_role(
 ) -> CustomRoleRead:
     surfaces = set(payload.surfaces)
     _require_gives(context, payload.base_rung, surfaces)
+    await _require_free(session, payload.name)
     role = CustomRole(
         name=payload.name,
         base_rung=payload.base_rung.value,
@@ -203,10 +225,11 @@ async def update_custom_role(
 ) -> CustomRoleRead:
     """Rename a role, or change what it holds. Its rung stays the one it was
     made on."""
-    role = await _role_or_404(session, role_id)
+    role = await _communitys_role(session, role_id)
     rung = CommunityRole(role.base_rung)
     _require_gives(context, rung, {AdminSurface(s) for s in role.surfaces})
     if payload.name is not None:
+        await _require_free(session, payload.name)
         role.name = payload.name
     if payload.surfaces is not None:
         surfaces = set(payload.surfaces)
@@ -227,7 +250,7 @@ async def delete_custom_role(
     current_user: CurrentUser,
 ) -> Response:
     """Delete a role. Its holders stand on their plain rung again."""
-    role = await _role_or_404(session, role_id)
+    role = await _communitys_role(session, role_id)
     _require_takes_off(context, role)
     await _record(session, context, current_user.id, role, "deleted")
     await session.delete(role)
