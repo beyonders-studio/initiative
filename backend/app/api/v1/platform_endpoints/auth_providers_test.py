@@ -270,7 +270,7 @@ async def test_delete_cascades_identity_links(
     ).one()
     assert released is None
     # Its rules go with it, and so does the initiative one placed people in.
-    assert await session.get(ClaimRuleInitiative, rule_id) is None
+    assert await session.get(ClaimRuleInitiative, (rule_id, 0)) is None
 
 
 async def test_delete_refused_when_provider_is_a_sole_credential(

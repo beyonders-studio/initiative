@@ -21,16 +21,17 @@ naming a directory and no group places everybody arriving from it.
 Initiatives and their roles are read from the community's own schema, one
 community at a time and only for a community the rule may place into, by
 :func:`_initiatives_in`. The initiative a rule of either kind places into is
-kept there too, under the rule's id (``claim_rule_initiatives``), written by
-:func:`set_rule_initiative` and read by :func:`rule_initiatives`.
+kept there too, under the rule's id and the version the rule names
+(``claim_rule_initiatives``), written by :func:`set_rule_initiative` and read
+by :func:`rule_initiatives`.
 """
 
 import logging
-from collections.abc import Collection
+from collections.abc import Collection, Iterable
 from dataclasses import asdict, dataclass
 
 from fastapi import HTTPException, status
-from sqlalchemy import ColumnElement, exists, func, or_
+from sqlalchemy import ColumnElement, exists, func, or_, tuple_
 from sqlmodel import delete, select
 from sqlmodel.ext.asyncio.session import AsyncSession
 
@@ -362,20 +363,31 @@ def destination_type(
     return OIDCMappingTargetType.initiative
 
 
+def placed(rules: Iterable[OIDCClaimMapping]) -> list[tuple[int, int]]:
+    """The ``claim_rule_initiatives`` key of each of these rules that places
+    people in an initiative: its id and the version it names."""
+    return [
+        (rule.id, rule.placement_version)
+        for rule in rules
+        if rule.target_type == OIDCMappingTargetType.initiative and rule.id is not None
+    ]
+
+
 async def rule_initiatives(
-    guild_id: int, rule_ids: Collection[int], *, named: bool = True
+    guild_id: int, rules: Iterable[OIDCClaimMapping], *, named: bool = True
 ) -> dict[int, RuleInitiative]:
     """The initiative each of these rules places people in, by rule id, read
     in the community's schema; a rule placing into none is left out. Unnamed
     where ``named`` is false: the platform reads no initiative's name in a
     community its rules do not apply in."""
-    if not rule_ids:
+    keys = placed(rules)
+    if not keys:
         return {}
     stmt = select(
         ClaimRuleInitiative.rule_id,
         ClaimRuleInitiative.initiative_id,
         ClaimRuleInitiative.initiative_role_id,
-    ).where(ClaimRuleInitiative.rule_id.in_(rule_ids))
+    ).where(tuple_(ClaimRuleInitiative.rule_id, ClaimRuleInitiative.version).in_(keys))
     if named:
         stmt = (
             stmt.add_columns(Initiative.name, InitiativeRoleModel.display_name)
@@ -395,14 +407,15 @@ async def set_rule_initiative(
     guild_id: int,
     rule_id: int,
     *,
+    version: int,
     initiative_id: int,
     initiative_role_id: int,
-    alike: Collection[int],
+    alike: Collection[tuple[int, int]],
 ) -> RuleInitiative:
     """Place a rule's people in one of the community's initiatives, at one of
-    that initiative's roles, written and committed in the community's schema.
-    ``alike`` are the rules none of which may place the same people in the same
-    initiative already."""
+    that initiative's roles, written and committed in the community's schema
+    under the rule's ``version``. ``alike`` are the rules, by id and version,
+    none of which may place the same people in the same initiative already."""
     async with cohorts.system_session(guild_id) as session:
         await set_rls_context(session, SystemGuild(guild_id))
         names = (
@@ -428,7 +441,9 @@ async def set_rule_initiative(
                 await session.exec(
                     select(ClaimRuleInitiative.rule_id)
                     .where(
-                        ClaimRuleInitiative.rule_id.in_(alike),
+                        tuple_(
+                            ClaimRuleInitiative.rule_id, ClaimRuleInitiative.version
+                        ).in_(alike),
                         ClaimRuleInitiative.initiative_id == initiative_id,
                     )
                     .limit(1)
@@ -439,10 +454,11 @@ async def set_rule_initiative(
                     status_code=status.HTTP_409_CONFLICT,
                     detail=AuthProviderMessages.RULE_EXISTS,
                 )
-        row = await session.get(ClaimRuleInitiative, rule_id)
+        row = await session.get(ClaimRuleInitiative, (rule_id, version))
         if row is None:
             row = ClaimRuleInitiative(
                 rule_id=rule_id,
+                version=version,
                 initiative_id=initiative_id,
                 initiative_role_id=initiative_role_id,
             )
@@ -453,14 +469,17 @@ async def set_rule_initiative(
     return RuleInitiative(initiative_id, initiative_role_id, *names)
 
 
-async def drop_rule_initiative(guild_id: int, rule_id: int) -> None:
-    """Stop a rule placing people in an initiative, in the community's
-    schema."""
+async def drop_rule_initiative(
+    guild_id: int, rule_id: int, *, before: int | None = None
+) -> None:
+    """Drop a rule's rows in the community's schema: every one, or those of
+    the versions ``before`` the one given."""
+    stmt = delete(ClaimRuleInitiative).where(ClaimRuleInitiative.rule_id == rule_id)
+    if before is not None:
+        stmt = stmt.where(ClaimRuleInitiative.version < before)
     async with cohorts.system_session(guild_id) as session:
         await set_rls_context(session, SystemGuild(guild_id))
-        await session.exec(
-            delete(ClaimRuleInitiative).where(ClaimRuleInitiative.rule_id == rule_id)
-        )
+        await session.exec(stmt)
         await session.commit()
 
 
@@ -476,14 +495,14 @@ async def place_rule(
     author already gives the same arrivals in the same community, and write
     the initiative it names.
 
-    ``row`` carries its :func:`destination_type`. It is flushed here for the
-    id its initiative is kept under, which is committed in the community
-    before the caller commits ``row``: a rule that is then not committed
-    leaves a row under an id no rule will have. A rule that names no
-    initiative keeps whatever one it had until the caller drops it
-    (:func:`drop_rule_initiative`), once ``row`` is committed.
+    ``row`` carries its :func:`destination_type` and the version to write
+    under. It is flushed here for the id its initiative is kept under, which
+    is committed in the community before the caller commits ``row``: a rule
+    that is then not committed leaves a row under a version no rule names. A
+    rule that names no initiative keeps whatever one it had until the caller
+    drops it (:func:`drop_rule_initiative`), once ``row`` is committed.
     """
-    stmt = select(OIDCClaimMapping.id).where(
+    stmt = select(OIDCClaimMapping.id, OIDCClaimMapping.placement_version).where(
         OIDCClaimMapping.author == row.author,
         OIDCClaimMapping.provider_id == row.provider_id,
         OIDCClaimMapping.guild_id == row.guild_id,
@@ -511,9 +530,10 @@ async def place_rule(
     return await set_rule_initiative(
         row.guild_id,
         row.id,
+        version=row.placement_version,
         initiative_id=initiative_id,
         initiative_role_id=initiative_role_id,
-        alike=list(alike),
+        alike=[(rule_id, version) for rule_id, version in alike],
     )
 
 
@@ -600,14 +620,14 @@ async def list_rules(session: AsyncSession) -> ProviderPlacementResponse:
             guild_ids={row.guild_id for row in rows if row.provider_id == provider_id},
         ):
             placeable.add((provider_id, gid))
-    placing: dict[tuple[int, int], list[int]] = {}
+    placing: dict[tuple[int, int], list[OIDCClaimMapping]] = {}
     for row in rows:
-        if row.target_type == OIDCMappingTargetType.initiative and row.id is not None:
-            placing.setdefault((row.provider_id, row.guild_id), []).append(row.id)
+        if row.target_type == OIDCMappingTargetType.initiative:
+            placing.setdefault((row.provider_id, row.guild_id), []).append(row)
     initiatives: dict[int, RuleInitiative] = {}
-    for (provider_id, gid), rule_ids in sorted(placing.items()):
+    for (provider_id, gid), placing_rows in sorted(placing.items()):
         initiatives |= await rule_initiatives(
-            gid, rule_ids, named=(provider_id, gid) in placeable
+            gid, placing_rows, named=(provider_id, gid) in placeable
         )
     return ProviderPlacementResponse(
         placement_everywhere=await placement_everywhere(session),
@@ -713,11 +733,7 @@ async def update_rule(
         session, provider_id=row.provider_id, guild_id=row.guild_id
     )
     assert row.id is not None
-    was = (
-        (await rule_initiatives(row.guild_id, [row.id], named=False)).get(row.id)
-        if row.target_type == OIDCMappingTargetType.initiative
-        else None
-    )
+    was = (await rule_initiatives(row.guild_id, [row], named=False)).get(row.id)
     before = audited(row, AUDITED_FIELDS, was)
     data = payload.model_dump(exclude_unset=True)
 
@@ -740,6 +756,11 @@ async def update_rule(
         else (was.initiative_role_id if was else None)
     )
     row.target_type = destination_type(initiative_id, initiative_role_id)
+    # Moving the rule writes its next version, which it names once committed
+    # with its claims, so a sign-in reads the place that goes with them.
+    moved = (was.initiative_id, was.initiative_role_id) if was else None
+    if initiative_id is not None and moved != (initiative_id, initiative_role_id):
+        row.placement_version += 1
     initiative = await place_rule(
         session,
         row,
@@ -766,8 +787,15 @@ async def update_rule(
             },
         )
     await session.commit()
-    if was is not None and initiative is None:
-        await drop_rule_initiative(row.guild_id, row.id)
+    if initiative is None:
+        if was is not None:
+            await drop_rule_initiative(row.guild_id, row.id)
+    else:
+        # The version before stays for a sign-in that read the rule just
+        # before this change.
+        await drop_rule_initiative(
+            row.guild_id, row.id, before=row.placement_version - 1
+        )
     await session.refresh(row)
     return await _read_one(session, row, initiative)
 

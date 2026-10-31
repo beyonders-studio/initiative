@@ -924,7 +924,7 @@ async def test_a_rule_whose_initiative_is_deleted_places_in_the_community_alone(
     await route_session_to_guild(session, guild_id)
     await session.exec(delete(Initiative).where(Initiative.id == initiative_id))
     await session.commit()
-    assert await session.get(ClaimRuleInitiative, rule_id) is None
+    assert await session.get(ClaimRuleInitiative, (rule_id, 0)) is None
 
     result = await _sync(
         session, user_id=user_id, provider_id=provider.id, claims=_ADMITTED

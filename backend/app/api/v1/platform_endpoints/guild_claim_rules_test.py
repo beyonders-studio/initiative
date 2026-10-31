@@ -173,7 +173,7 @@ async def test_a_rule_can_place_somebody_in_an_initiative(
     removed = await client.delete(f"{_base(guild_id)}/{body['id']}", headers=headers)
     assert removed.status_code == 204, removed.text
     await route_session_to_guild(session, guild_id)
-    assert await session.get(ClaimRuleInitiative, body["id"]) is None
+    assert await session.get(ClaimRuleInitiative, (body["id"], 0)) is None
 
 
 async def test_an_initiative_rule_names_both_halves_or_neither(

@@ -161,15 +161,7 @@ async def list_rules(
             .order_by(OIDCClaimMapping.id)
         )
     ).all()
-    initiatives = await provider_placement.rule_initiatives(
-        guild_id,
-        [
-            row.id
-            for row in rows
-            if row.target_type == OIDCMappingTargetType.initiative
-            and row.id is not None
-        ],
-    )
+    initiatives = await provider_placement.rule_initiatives(guild_id, rows)
     return CommunityClaimRulesResponse(
         rules=[
             _rule_read(
