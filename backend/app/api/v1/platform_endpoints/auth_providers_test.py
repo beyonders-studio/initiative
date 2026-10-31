@@ -11,10 +11,12 @@ from app.models.platform.auth_provider import AuthProvider
 from app.models.platform.auth_provider_secret import AuthProviderSecret
 from app.models.platform.federated_identity import FederatedIdentity
 from app.models.platform.user import UserRole
+from app.models.tenant.claim_rule_initiative import ClaimRuleInitiative
 from app.models.tenant.initiative import InitiativeMember
 from app.testing import route_session_to_guild
 from app.testing.factories import (
     create_auth_provider,
+    create_claim_rule,
     create_federated_identity,
     create_guild,
     create_initiative,
@@ -223,17 +225,24 @@ async def test_delete_cascades_identity_links(
     user = await create_user(session)
     await create_federated_identity(session, user, provider=provider)
     guild = await create_guild(session, creator=user)
+    initiative = await create_initiative(session, guild, user)
     member = await create_initiative_member(
-        session,
-        await create_initiative(session, guild, user),
-        await create_user(session),
+        session, initiative, await create_user(session)
     )
     member.oidc_provider_id = provider.id
     session.add(member)
     await session.commit()
+    rule = await create_claim_rule(
+        session,
+        provider=provider,
+        guild=guild,
+        initiative=initiative,
+        initiative_role_id=member.role_id,
+    )
     await set_rls_context(session, Unattributed())
     provider_id, user_id, guild_id = provider.id, user.id, guild.id
     managed = (member.initiative_id, member.user_id)
+    rule_id = rule.id
 
     response = await client.delete(f"{BASE}{provider_id}", headers=headers)
     assert response.status_code == 204
@@ -260,6 +269,8 @@ async def test_delete_cascades_identity_links(
         )
     ).one()
     assert released is None
+    # Its rules go with it, and so does the initiative one placed people in.
+    assert await session.get(ClaimRuleInitiative, rule_id) is None
 
 
 async def test_delete_refused_when_provider_is_a_sole_credential(

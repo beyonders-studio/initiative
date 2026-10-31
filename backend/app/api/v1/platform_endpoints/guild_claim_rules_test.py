@@ -11,6 +11,8 @@ from sqlmodel.ext.asyncio.session import AsyncSession
 from app.testing import guild_of
 from app.core.messages import AuthProviderMessages, SettingsMessages
 from app.models.platform.guild import CommunityRole
+from app.models.tenant.claim_rule_initiative import ClaimRuleInitiative
+from app.testing.schema_harness import route_session_to_guild
 from app.testing.factories import (
     create_auth_provider,
     create_guild,
@@ -49,7 +51,6 @@ async def _a_role(session: AsyncSession, initiative) -> tuple[int, str]:
     from sqlmodel import select
 
     from app.models.tenant.initiative import InitiativeRoleModel
-    from app.testing.schema_harness import route_session_to_guild
 
     await route_session_to_guild(session, guild_of(initiative))
     row = (
@@ -135,24 +136,44 @@ async def test_a_rule_can_place_somebody_in_an_initiative(
     initiative = await create_initiative(session, guild=guild, creator=admin)
     initiative_id, initiative_name = initiative.id, initiative.name
     role_id, role_name = await _a_role(session, initiative)
+    guild_id = guild.id
     headers = get_auth_headers(admin)
+    rule = {
+        "provider_id": provider.id,
+        "claim_value": "design",
+        "community_role": "member",
+        "initiative_id": initiative_id,
+        "initiative_role_id": role_id,
+    }
 
-    created = await client.post(
-        _base(guild.id),
-        headers=headers,
-        json={
-            "provider_id": provider.id,
-            "claim_value": "design",
-            "community_role": "member",
-            "initiative_id": initiative_id,
-            "initiative_role_id": role_id,
-        },
-    )
+    created = await client.post(_base(guild_id), headers=headers, json=rule)
     assert created.status_code == 201, created.text
     body = created.json()
     assert body["initiative_id"] == initiative_id
     assert body["initiative_name"] == initiative_name
     assert body["initiative_role_name"] == role_name
+    listed = (await client.get(_base(guild_id), headers=headers)).json()["rules"]
+    assert [(r["initiative_id"], r["initiative_role_id"]) for r in listed] == [
+        (initiative_id, role_id)
+    ]
+
+    # The same group into the same initiative is the same rule; into the
+    # community alone it is another.
+    again = await client.post(_base(guild_id), headers=headers, json=rule)
+    assert again.status_code == 409, again.text
+    assert again.json()["detail"] == AuthProviderMessages.RULE_EXISTS
+    community_only = {
+        key: rule[key] for key in ("provider_id", "claim_value", "community_role")
+    }
+    assert (
+        await client.post(_base(guild_id), headers=headers, json=community_only)
+    ).status_code == 201
+
+    # Its initiative is kept in the community's schema and goes with it.
+    removed = await client.delete(f"{_base(guild_id)}/{body['id']}", headers=headers)
+    assert removed.status_code == 204, removed.text
+    await route_session_to_guild(session, guild_id)
+    assert await session.get(ClaimRuleInitiative, body["id"]) is None
 
 
 async def test_an_initiative_rule_names_both_halves_or_neither(

@@ -14,7 +14,7 @@ import logging
 
 from fastapi import HTTPException, status
 from sqlalchemy.exc import IntegrityError
-from sqlmodel import select, update
+from sqlmodel import delete, select, update
 from sqlmodel.ext.asyncio.session import AsyncSession
 
 from app.core.audit_events import AuditEventType
@@ -28,6 +28,10 @@ from app.db.errors import (
 )
 from app.models.platform.auth_provider import AuthProvider
 from app.models.platform.auth_provider_secret import AuthProviderSecret
+from app.models.platform.oidc_claim_mapping import (
+    OIDCClaimMapping,
+    OIDCMappingTargetType,
+)
 from app.schemas.platform.settings import (
     AuthProviderOwnerRead,
     AuthProviderCreate,
@@ -245,21 +249,31 @@ async def update_provider(
     return owner_read(row, secret_set=await secret_is_set(session, row.id))
 
 
-async def _release_initiative_memberships(provider_id: int) -> None:
-    """Clear a deleted provider from every guild's ``initiative_members``.
+async def _release_in_each_guild(
+    provider_id: int, rule_ids: dict[int, list[int]]
+) -> None:
+    """Clear a deleted provider from every guild's ``initiative_members``, and
+    drop the initiatives its rules placed people in: ``rule_ids``, by guild.
 
-    Guild by guild, because the table exists once per schema. Provider
+    Guild by guild, because the tables exist once per schema. Provider
     deletion is rare, so the walk is not on any hot path.
     """
+    from app.models.tenant.claim_rule_initiative import ClaimRuleInitiative
     from app.models.tenant.initiative import InitiativeMember
     from app.services.guild_sweeps import Scope, each_guild
 
-    async def release(guild_session: AsyncSession, _guild_id: int) -> None:
+    async def release(guild_session: AsyncSession, guild_id: int) -> None:
         await guild_session.exec(
             update(InitiativeMember)
             .where(InitiativeMember.oidc_provider_id == provider_id)
             .values(oidc_provider_id=None)
         )
+        if guild_id in rule_ids:
+            await guild_session.exec(
+                delete(ClaimRuleInitiative).where(
+                    ClaimRuleInitiative.rule_id.in_(rule_ids[guild_id])
+                )
+            )
 
     await each_guild(
         [(Scope.PROVISIONED, release)], name="auth-provider-initiative-release"
@@ -304,6 +318,19 @@ async def delete_provider(
             detail=AuthProviderMessages.SOLE_CREDENTIAL,
         )
     kind = row.kind
+    # Its rules go with it (``ON DELETE CASCADE``); the initiatives they place
+    # people in are kept in each community's schema, under their ids.
+    rule_ids: dict[int, list[int]] = {}
+    for guild_id, rule_id in (
+        await session.exec(
+            select(OIDCClaimMapping.guild_id, OIDCClaimMapping.id).where(
+                OIDCClaimMapping.provider_id == row.id,
+                OIDCClaimMapping.target_type == OIDCMappingTargetType.initiative,
+            )
+        )
+    ).all():
+        if rule_id is not None:
+            rule_ids.setdefault(guild_id, []).append(rule_id)
     secret = await session.get(AuthProviderSecret, row.id)
     if secret is not None:
         await session.delete(secret)
@@ -331,5 +358,5 @@ async def delete_provider(
     # NULL``); ``initiative_members`` lives in a guild schema and carries no
     # key across that line, so the same clearing is written by hand. The row is
     # then unmanaged, which is what it is: no provider answers for it.
-    await _release_initiative_memberships(provider_id)
+    await _release_in_each_guild(provider_id, rule_ids)
     logger.info("auth provider %s (%s) deleted", row.slug, provider_id)

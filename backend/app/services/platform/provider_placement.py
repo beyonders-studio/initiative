@@ -20,14 +20,18 @@ naming a directory and no group places everybody arriving from it.
 
 Initiatives and their roles are read from the community's own schema, one
 community at a time and only for a community the rule may place into, by
-:func:`_initiatives_in`.
+:func:`_initiatives_in`. The initiative a rule of either kind places into is
+kept there too, under the rule's id (``claim_rule_initiatives``), written by
+:func:`set_rule_initiative` and read by :func:`rule_initiatives`.
 """
 
 import logging
+from collections.abc import Collection
+from dataclasses import asdict, dataclass
 
 from fastapi import HTTPException, status
 from sqlalchemy import ColumnElement, exists, func, or_
-from sqlmodel import select
+from sqlmodel import delete, select
 from sqlmodel.ext.asyncio.session import AsyncSession
 
 from app.core.audit_events import AuditEventType
@@ -45,6 +49,7 @@ from app.models.platform.oidc_claim_mapping import (
     OIDCClaimMapping,
     OIDCMappingTargetType,
 )
+from app.models.tenant.claim_rule_initiative import ClaimRuleInitiative
 from app.models.tenant.initiative import Initiative, InitiativeRoleModel
 from app.schemas.platform.settings import (
     PlacementCommunityRead,
@@ -62,7 +67,8 @@ from app.db.request_context import SystemGuild
 
 logger = logging.getLogger(__name__)
 
-#: What a provider rule places somebody by, for the record.
+#: What a provider rule places somebody by, for the record, besides its
+#: initiative (:func:`audited`).
 AUDITED_FIELDS: tuple[str, ...] = (
     "provider_id",
     "claim_value",
@@ -70,8 +76,6 @@ AUDITED_FIELDS: tuple[str, ...] = (
     "scope_value",
     "guild_id",
     "guild_role",
-    "initiative_id",
-    "initiative_role_id",
 )
 
 #: The standings a provider rule may hand out: the ones a community's own
@@ -319,13 +323,35 @@ def _require_mappable_role(guild_role: str) -> None:
         )
 
 
-async def _resolve_destination(
-    *,
-    guild_id: int,
-    initiative_id: int | None,
-    initiative_role_id: int | None,
+@dataclass(frozen=True)
+class RuleInitiative:
+    """The initiative a rule places people in, and the role they hold there,
+    spelled as both rule reads spell them. The names are ``None`` where they
+    were not read."""
+
+    initiative_id: int
+    initiative_role_id: int
+    initiative_name: str | None = None
+    initiative_role_name: str | None = None
+
+
+def audited(
+    row: OIDCClaimMapping, fields: Collection[str], initiative: RuleInitiative | None
+) -> dict[str, object]:
+    """What a rule places somebody by, for the record: ``fields`` of the rule,
+    and the initiative and role it places them in."""
+    return {
+        **audit_service.snapshot(row, fields),
+        "initiative_id": initiative.initiative_id if initiative else None,
+        "initiative_role_id": initiative.initiative_role_id if initiative else None,
+    }
+
+
+def destination_type(
+    initiative_id: int | None, initiative_role_id: int | None
 ) -> OIDCMappingTargetType:
-    """Check an initiative destination and say which kind of rule results."""
+    """Which kind of rule a destination makes: naming neither lands somebody
+    in the community alone, and an initiative needs the role to go with it."""
     if initiative_id is None and initiative_role_id is None:
         return OIDCMappingTargetType.guild
     if initiative_id is None or initiative_role_id is None:
@@ -333,40 +359,162 @@ async def _resolve_destination(
             status_code=status.HTTP_400_BAD_REQUEST,
             detail=SettingsMessages.INITIATIVE_FIELDS_REQUIRED,
         )
-    initiatives = await _initiatives_in(guild_id)
-    for initiative in initiatives:
-        if initiative.id == initiative_id and any(
-            role.id == initiative_role_id for role in initiative.roles
-        ):
-            return OIDCMappingTargetType.initiative
-    raise HTTPException(
-        status_code=status.HTTP_400_BAD_REQUEST,
-        detail=SettingsMessages.INITIATIVE_WRONG_GUILD,
-    )
+    return OIDCMappingTargetType.initiative
 
 
-async def _require_unique(
-    session: AsyncSession, row: OIDCClaimMapping, *, excluding: int | None = None
-) -> None:
+async def rule_initiatives(
+    guild_id: int, rule_ids: Collection[int], *, named: bool = True
+) -> dict[int, RuleInitiative]:
+    """The initiative each of these rules places people in, by rule id, read
+    in the community's schema; a rule placing into none is left out. Unnamed
+    where ``named`` is false: the platform reads no initiative's name in a
+    community its rules do not apply in."""
+    if not rule_ids:
+        return {}
+    stmt = select(
+        ClaimRuleInitiative.rule_id,
+        ClaimRuleInitiative.initiative_id,
+        ClaimRuleInitiative.initiative_role_id,
+    ).where(ClaimRuleInitiative.rule_id.in_(rule_ids))
+    if named:
+        stmt = (
+            stmt.add_columns(Initiative.name, InitiativeRoleModel.display_name)
+            .join(Initiative, Initiative.id == ClaimRuleInitiative.initiative_id)
+            .join(
+                InitiativeRoleModel,
+                InitiativeRoleModel.id == ClaimRuleInitiative.initiative_role_id,
+            )
+        )
+    async with cohorts.system_session(guild_id) as session:
+        await set_rls_context(session, SystemGuild(guild_id))
+        rows = (await session.exec(stmt)).all()
+    return {row[0]: RuleInitiative(*row[1:]) for row in rows}
+
+
+async def set_rule_initiative(
+    guild_id: int,
+    rule_id: int,
+    *,
+    initiative_id: int,
+    initiative_role_id: int,
+    alike: Collection[int],
+) -> RuleInitiative:
+    """Place a rule's people in one of the community's initiatives, at one of
+    that initiative's roles, written and committed in the community's schema.
+    ``alike`` are the rules none of which may place the same people in the same
+    initiative already."""
+    async with cohorts.system_session(guild_id) as session:
+        await set_rls_context(session, SystemGuild(guild_id))
+        names = (
+            await session.exec(
+                select(Initiative.name, InitiativeRoleModel.display_name)
+                .join(
+                    InitiativeRoleModel,
+                    InitiativeRoleModel.initiative_id == Initiative.id,
+                )
+                .where(
+                    Initiative.id == initiative_id,
+                    InitiativeRoleModel.id == initiative_role_id,
+                )
+            )
+        ).one_or_none()
+        if names is None:
+            raise HTTPException(
+                status_code=status.HTTP_400_BAD_REQUEST,
+                detail=SettingsMessages.INITIATIVE_WRONG_GUILD,
+            )
+        if alike:
+            taken = (
+                await session.exec(
+                    select(ClaimRuleInitiative.rule_id)
+                    .where(
+                        ClaimRuleInitiative.rule_id.in_(alike),
+                        ClaimRuleInitiative.initiative_id == initiative_id,
+                    )
+                    .limit(1)
+                )
+            ).first()
+            if taken is not None:
+                raise HTTPException(
+                    status_code=status.HTTP_409_CONFLICT,
+                    detail=AuthProviderMessages.RULE_EXISTS,
+                )
+        row = await session.get(ClaimRuleInitiative, rule_id)
+        if row is None:
+            row = ClaimRuleInitiative(
+                rule_id=rule_id,
+                initiative_id=initiative_id,
+                initiative_role_id=initiative_role_id,
+            )
+        row.initiative_id = initiative_id
+        row.initiative_role_id = initiative_role_id
+        session.add(row)
+        await session.commit()
+    return RuleInitiative(initiative_id, initiative_role_id, *names)
+
+
+async def drop_rule_initiative(guild_id: int, rule_id: int) -> None:
+    """Stop a rule placing people in an initiative, in the community's
+    schema."""
+    async with cohorts.system_session(guild_id) as session:
+        await set_rls_context(session, SystemGuild(guild_id))
+        await session.exec(
+            delete(ClaimRuleInitiative).where(ClaimRuleInitiative.rule_id == rule_id)
+        )
+        await session.commit()
+
+
+async def place_rule(
+    session: AsyncSession,
+    row: OIDCClaimMapping,
+    *,
+    initiative_id: int | None,
+    initiative_role_id: int | None,
+    excluding: int | None = None,
+) -> RuleInitiative | None:
+    """Check where ``row`` places people, refusing a place another rule by its
+    author already gives the same arrivals in the same community, and write
+    the initiative it names.
+
+    ``row`` carries its :func:`destination_type`. It is flushed here for the
+    id its initiative is kept under, which is committed in the community
+    before the caller commits ``row``: a rule that is then not committed
+    leaves a row under an id no rule will have. A rule that names no
+    initiative keeps whatever one it had until the caller drops it
+    (:func:`drop_rule_initiative`), once ``row`` is committed.
+    """
     stmt = select(OIDCClaimMapping.id).where(
-        OIDCClaimMapping.author == ClaimRuleAuthor.provider,
+        OIDCClaimMapping.author == row.author,
         OIDCClaimMapping.provider_id == row.provider_id,
         OIDCClaimMapping.guild_id == row.guild_id,
+        OIDCClaimMapping.target_type == row.target_type,
     )
     for column, value in (
         (OIDCClaimMapping.claim_value, row.claim_value),
         (OIDCClaimMapping.scope_claim, row.scope_claim),
         (OIDCClaimMapping.scope_value, row.scope_value),
-        (OIDCClaimMapping.initiative_id, row.initiative_id),
     ):
         stmt = stmt.where(column.is_(None) if value is None else column == value)
     if excluding is not None:
         stmt = stmt.where(OIDCClaimMapping.id != excluding)
-    if (await session.exec(stmt.limit(1))).first() is not None:
-        raise HTTPException(
-            status_code=status.HTTP_409_CONFLICT,
-            detail=AuthProviderMessages.RULE_EXISTS,
-        )
+    alike = (await session.exec(stmt)).all()
+    if initiative_id is None or initiative_role_id is None:
+        if alike:
+            raise HTTPException(
+                status_code=status.HTTP_409_CONFLICT,
+                detail=AuthProviderMessages.RULE_EXISTS,
+            )
+        return None
+    session.add(row)
+    await session.flush()
+    assert row.id is not None
+    return await set_rule_initiative(
+        row.guild_id,
+        row.id,
+        initiative_id=initiative_id,
+        initiative_role_id=initiative_role_id,
+        alike=list(alike),
+    )
 
 
 async def _provider_rule(session: AsyncSession, rule_id: int) -> OIDCClaimMapping:
@@ -392,19 +540,10 @@ def rule_read(
     provider: AuthProvider | None,
     guild_name: str,
     applies: bool,
-    initiatives: list[PlacementInitiativeRead],
+    initiative: RuleInitiative | None,
 ) -> ProviderPlacementRuleRead:
-    """One rule as either surface shows it. ``initiatives`` is the community's
-    list where it was read, for naming the initiative and role; empty
-    otherwise."""
-    initiative_name = None
-    initiative_role_name = None
-    for initiative in initiatives:
-        if initiative.id == row.initiative_id:
-            initiative_name = initiative.name
-            for role in initiative.roles:
-                if role.id == row.initiative_role_id:
-                    initiative_role_name = role.name
+    """One rule as either surface shows it, with the initiative it places
+    people in where it names one."""
     assert row.id is not None
     return ProviderPlacementRuleRead(
         id=row.id,
@@ -417,11 +556,8 @@ def rule_read(
         community_id=row.guild_id,
         community_name=guild_name,
         community_role=row.guild_role,
-        initiative_id=row.initiative_id,
-        initiative_name=initiative_name,
-        initiative_role_id=row.initiative_role_id,
-        initiative_role_name=initiative_role_name,
         applies=applies,
+        **(asdict(initiative) if initiative else {}),
     )
 
 
@@ -464,12 +600,15 @@ async def list_rules(session: AsyncSession) -> ProviderPlacementResponse:
             guild_ids={row.guild_id for row in rows if row.provider_id == provider_id},
         ):
             placeable.add((provider_id, gid))
-    initiatives: dict[int, list[PlacementInitiativeRead]] = {}
-    for provider_id, gid in sorted(placeable):
-        if gid in initiatives:
-            continue
-        if any(row.guild_id == gid and row.initiative_id is not None for row in rows):
-            initiatives[gid] = await _initiatives_in(gid)
+    placing: dict[tuple[int, int], list[int]] = {}
+    for row in rows:
+        if row.target_type == OIDCMappingTargetType.initiative and row.id is not None:
+            placing.setdefault((row.provider_id, row.guild_id), []).append(row.id)
+    initiatives: dict[int, RuleInitiative] = {}
+    for (provider_id, gid), rule_ids in sorted(placing.items()):
+        initiatives |= await rule_initiatives(
+            gid, rule_ids, named=(provider_id, gid) in placeable
+        )
     return ProviderPlacementResponse(
         placement_everywhere=await placement_everywhere(session),
         providers=[
@@ -487,7 +626,7 @@ async def list_rules(session: AsyncSession) -> ProviderPlacementResponse:
                 provider=providers.get(row.provider_id),
                 guild_name=names.get(row.guild_id, ""),
                 applies=(row.provider_id, row.guild_id) in placeable,
-                initiatives=initiatives.get(row.guild_id, []),
+                initiative=initiatives.get(row.id) if row.id is not None else None,
             )
             for row in rows
         ],
@@ -495,24 +634,17 @@ async def list_rules(session: AsyncSession) -> ProviderPlacementResponse:
 
 
 async def _read_one(
-    session: AsyncSession, row: OIDCClaimMapping
+    session: AsyncSession, row: OIDCClaimMapping, initiative: RuleInitiative | None
 ) -> ProviderPlacementRuleRead:
+    """A rule just written, which applies: its community accepted it."""
     provider = await session.get(AuthProvider, row.provider_id)
     guild = await session.get(Guild, row.guild_id)
-    applies = row.guild_id in await placeable_communities(
-        session, provider_id=row.provider_id, guild_ids={row.guild_id}
-    )
-    initiatives = (
-        await _initiatives_in(row.guild_id)
-        if applies and row.initiative_id is not None
-        else []
-    )
     return rule_read(
         row,
         provider=provider,
         guild_name=guild.name if guild else "",
-        applies=applies,
-        initiatives=initiatives,
+        applies=True,
+        initiative=initiative,
     )
 
 
@@ -531,24 +663,22 @@ async def create_rule(
     await _require_placeable(
         session, provider_id=payload.provider_id, guild_id=payload.community_id
     )
-    target_type = await _resolve_destination(
-        guild_id=payload.community_id,
-        initiative_id=payload.initiative_id,
-        initiative_role_id=payload.initiative_role_id,
-    )
     row = OIDCClaimMapping(
         author=ClaimRuleAuthor.provider,
         provider_id=payload.provider_id,
         claim_value=claim_value,
         scope_claim=scope_claim,
         scope_value=scope_value,
-        target_type=target_type,
+        target_type=destination_type(payload.initiative_id, payload.initiative_role_id),
         guild_id=payload.community_id,
         guild_role=payload.community_role,
+    )
+    initiative = await place_rule(
+        session,
+        row,
         initiative_id=payload.initiative_id,
         initiative_role_id=payload.initiative_role_id,
     )
-    await _require_unique(session, row)
     session.add(row)
     await session.flush()
     await audit_service.record(
@@ -562,13 +692,13 @@ async def create_rule(
             "via": "platform",
             "author": ClaimRuleAuthor.provider.value,
             **audit_service.changed_fields(
-                {}, audit_service.snapshot(row, AUDITED_FIELDS)
+                {}, audited(row, AUDITED_FIELDS, initiative)
             ),
         },
     )
     await session.commit()
     await session.refresh(row)
-    return await _read_one(session, row)
+    return await _read_one(session, row, initiative)
 
 
 async def update_rule(
@@ -582,7 +712,13 @@ async def update_rule(
     await _require_placeable(
         session, provider_id=row.provider_id, guild_id=row.guild_id
     )
-    before = audit_service.snapshot(row, AUDITED_FIELDS)
+    assert row.id is not None
+    was = (
+        (await rule_initiatives(row.guild_id, [row.id], named=False)).get(row.id)
+        if row.target_type == OIDCMappingTargetType.initiative
+        else None
+    )
+    before = audited(row, AUDITED_FIELDS, was)
     data = payload.model_dump(exclude_unset=True)
 
     row.claim_value, row.scope_claim, row.scope_value = _clean_match(
@@ -593,19 +729,27 @@ async def update_rule(
     if data.get("community_role") is not None:
         _require_mappable_role(data["community_role"])
         row.guild_role = data["community_role"]
-    if "initiative_id" in data:
-        row.initiative_id = data["initiative_id"]
-    if "initiative_role_id" in data:
-        row.initiative_role_id = data["initiative_role_id"]
-    row.target_type = await _resolve_destination(
-        guild_id=row.guild_id,
-        initiative_id=row.initiative_id,
-        initiative_role_id=row.initiative_role_id,
+    initiative_id = (
+        data["initiative_id"]
+        if "initiative_id" in data
+        else (was.initiative_id if was else None)
     )
-    await _require_unique(session, row, excluding=row.id)
+    initiative_role_id = (
+        data["initiative_role_id"]
+        if "initiative_role_id" in data
+        else (was.initiative_role_id if was else None)
+    )
+    row.target_type = destination_type(initiative_id, initiative_role_id)
+    initiative = await place_rule(
+        session,
+        row,
+        initiative_id=initiative_id,
+        initiative_role_id=initiative_role_id,
+        excluding=row.id,
+    )
     session.add(row)
     changed = audit_service.changed_fields(
-        before, audit_service.snapshot(row, AUDITED_FIELDS)
+        before, audited(row, AUDITED_FIELDS, initiative)
     )
     if changed["changed"]:
         await audit_service.record(
@@ -622,8 +766,10 @@ async def update_rule(
             },
         )
     await session.commit()
+    if was is not None and initiative is None:
+        await drop_rule_initiative(row.guild_id, row.id)
     await session.refresh(row)
-    return await _read_one(session, row)
+    return await _read_one(session, row, initiative)
 
 
 async def delete_rule(
@@ -633,6 +779,7 @@ async def delete_rule(
     the next sign-in through the provider, as a community's own rule is."""
     row = await _provider_rule(session, rule_id)
     guild_id = row.guild_id
+    placed = row.target_type == OIDCMappingTargetType.initiative
     await session.delete(row)
     await audit_service.record(
         session,
@@ -644,3 +791,5 @@ async def delete_rule(
         detail={"via": "platform", "author": ClaimRuleAuthor.provider.value},
     )
     await session.commit()
+    if placed:
+        await drop_rule_initiative(guild_id, rule_id)

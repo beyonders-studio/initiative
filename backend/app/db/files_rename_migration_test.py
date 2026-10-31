@@ -71,10 +71,11 @@ _PLUGIN_BINDING = {"source": "plugin", "params": {"document_id": 5}}
 def _guild_runner(schema: str):
     """Revision 0464 one way or the other, on one guild's schema only. The
     metadata store (20261027_0550), the galleries conversion (20261027_0546),
-    the batched notices (20261030_0563), the data jobs table (20261030_0564)
-    and the initiative rules (20261030_0567, 20261030_0568) come off first and go back last:
-    the checks 0464 restates name the permissions as they were then, and it
-    respells the exports in the table they had then."""
+    the batched notices (20261030_0563), the data jobs table (20261030_0564),
+    the initiative rules (20261030_0567, 20261030_0568) and the sign-in rules'
+    initiatives (20261031_0573), which key on the rules' role key, come off
+    first and go back last: the checks 0464 restates name the permissions as
+    they were then, and it respells the exports in the table they had then."""
     files = _load("20261006_0464_documents_are_files.py")
     collections = _load("20261027_0546_galleries_are_collections.py")
     metadata = _load("20261027_0550_metadata_is_one_store.py")
@@ -82,6 +83,7 @@ def _guild_runner(schema: str):
     data_jobs = _load("20261030_0564_imports_and_exports_are_data_jobs.py")
     rules = _load("20261030_0567_an_initiatives_role_permissions_are_rules.py")
     defaults = _load("20261030_0568_a_community_sets_its_initiatives_defaults.py")
+    claims = _load("20261031_0573_a_rules_initiative_is_the_communitys.py")
 
     def run(forward: bool):
         def apply(sync_session) -> None:
@@ -103,7 +105,9 @@ def _guild_runner(schema: str):
                     in_schema(data_jobs._upgrade_schema)
                     in_schema(rules._upgrade)
                     in_schema(defaults._upgrade)
+                    in_schema(claims._create)
                 else:
+                    in_schema(claims._drop)
                     in_schema(defaults._downgrade)
                     in_schema(rules._downgrade)
                     in_schema(data_jobs._downgrade_schema)

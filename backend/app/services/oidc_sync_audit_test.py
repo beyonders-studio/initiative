@@ -13,11 +13,7 @@ from sqlmodel.ext.asyncio.session import AsyncSession
 
 from app.core.audit_events import AuditEventType
 from app.db.session import set_rls_context
-from app.models.platform.guild import CommunityRole
-from app.models.platform.oidc_claim_mapping import (
-    OIDCClaimMapping,
-    OIDCMappingTargetType,
-)
+from app.models.tenant.claim_rule_initiative import ClaimRuleInitiative
 from app.models.tenant.initiative import InitiativeRoleModel
 from app.services.oidc_sync import sync_oidc_assignments
 from app.services.tenant.initiatives import get_role_by_name
@@ -26,6 +22,7 @@ from app.testing.factories import (
     NARROWED_CLAIM,
     NARROWED_VALUE,
     create_auth_provider,
+    create_claim_rule,
     create_guild_provider_connection,
     create_guild,
     create_initiative,
@@ -78,18 +75,14 @@ async def test_a_first_arrival_records_the_guild_and_the_initiative(
 
     newcomer = await create_user(session)
     newcomer_id = newcomer.id
-    session.add(
-        OIDCClaimMapping(
-            provider_id=provider_id,
-            claim_value="engineering",
-            target_type=OIDCMappingTargetType.initiative,
-            guild_id=guild_id,
-            guild_role=CommunityRole.member.value,
-            initiative_id=initiative_id,
-            initiative_role_id=pm_role_id,
-        )
+    await create_claim_rule(
+        session,
+        provider=provider,
+        guild=guild,
+        claim_value="engineering",
+        initiative=initiative,
+        initiative_role_id=pm_role_id,
     )
-    await session.commit()
     capfd.readouterr()
 
     await _sync(
@@ -157,36 +150,31 @@ async def test_a_moved_role_and_a_withdrawn_claim_are_both_recorded(
             .order_by(InitiativeRoleModel.position)
         )
     ).first()
-    assert other_role is not None
+    assert other_role is not None and other_role.id is not None
     other_role_id, other_role_name = other_role.id, other_role.name
 
     newcomer = await create_user(session)
     newcomer_id = newcomer.id
-    session.add(
-        OIDCClaimMapping(
-            provider_id=provider_id,
-            claim_value="engineering",
-            target_type=OIDCMappingTargetType.initiative,
-            guild_id=guild_id,
-            guild_role=CommunityRole.member.value,
-            initiative_id=initiative_id,
-            initiative_role_id=pm_role_id,
-        )
+    rule = await create_claim_rule(
+        session,
+        provider=provider,
+        guild=guild,
+        claim_value="engineering",
+        initiative=initiative,
+        initiative_role_id=pm_role_id,
     )
-    await session.commit()
+    rule_id = rule.id
 
     await _sync(
         session, user_id=newcomer_id, provider_id=provider_id, claims={"engineering"}
     )
 
     # The rule now names a different role for the same claim.
-    mapping = (
-        await session.exec(
-            select(OIDCClaimMapping).where(OIDCClaimMapping.provider_id == provider_id)
-        )
-    ).one()
-    mapping.initiative_role_id = other_role_id
-    session.add(mapping)
+    await route_session_to_guild(session, guild_id)
+    placed = await session.get(ClaimRuleInitiative, rule_id)
+    assert placed is not None
+    placed.initiative_role_id = other_role_id
+    session.add(placed)
     await session.commit()
     capfd.readouterr()
 

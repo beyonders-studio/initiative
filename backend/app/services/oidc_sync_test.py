@@ -2,7 +2,7 @@
 and leaving a tenant whose rules no longer grant a membership."""
 
 import pytest
-from sqlmodel import select
+from sqlmodel import delete, select
 from sqlmodel.ext.asyncio.session import AsyncSession
 
 from app.core.rules import SetBy
@@ -21,13 +21,15 @@ from app.models.tenant.custom_role import (
     CustomRoleClaimRule,
     CustomRoleMember,
 )
-from app.models.tenant.initiative import InitiativeMember
+from app.models.tenant.claim_rule_initiative import ClaimRuleInitiative
+from app.models.tenant.initiative import Initiative, InitiativeMember
 from app.services.oidc_sync import sync_oidc_assignments
 from app.services.platform import rules
 from app.services.tenant import custom_roles as custom_roles_service
 from app.services.tenant import plugin_revocation
 from app.services.tenant.initiatives import get_role_by_name
 from app.testing.factories import (
+    create_claim_rule,
     create_guild_membership,
     NARROWED_CLAIM,
     NARROWED_VALUE,
@@ -82,18 +84,14 @@ async def test_claim_mapped_role_survives_auto_join(session: AsyncSession):
     await create_guild_provider_connection(session, guild=guild, provider=provider)
 
     newcomer = await create_user(session)
-    session.add(
-        OIDCClaimMapping(
-            provider_id=provider.id,
-            claim_value="engineering",
-            target_type=OIDCMappingTargetType.initiative,
-            guild_id=guild.id,
-            guild_role=CommunityRole.member.value,
-            initiative_id=initiative.id,
-            initiative_role_id=pm_role.id,
-        )
+    await create_claim_rule(
+        session,
+        provider=provider,
+        guild=guild,
+        claim_value="engineering",
+        initiative=initiative,
+        initiative_role_id=pm_role.id,
     )
-    await session.commit()
 
     await set_rls_context(session, Unattributed())
     await sync_oidc_assignments(
@@ -295,18 +293,14 @@ async def test_auto_join_still_covers_what_the_claims_do_not(session: AsyncSessi
     await create_guild_provider_connection(session, guild=guild, provider=provider)
 
     newcomer = await create_user(session)
-    session.add(
-        OIDCClaimMapping(
-            provider_id=provider.id,
-            claim_value="engineering",
-            target_type=OIDCMappingTargetType.initiative,
-            guild_id=guild.id,
-            guild_role=CommunityRole.member.value,
-            initiative_id=mapped.id,
-            initiative_role_id=mapped_pm.id,
-        )
+    await create_claim_rule(
+        session,
+        provider=provider,
+        guild=guild,
+        claim_value="engineering",
+        initiative=mapped,
+        initiative_role_id=mapped_pm.id,
     )
-    await session.commit()
 
     await set_rls_context(session, Unattributed())
     await sync_oidc_assignments(
@@ -870,17 +864,17 @@ async def test_a_full_community_takes_nobody_new_from_its_rules(
     owner = await create_user(session)
     full = await create_guild(session, creator=owner)
     initiative = await create_initiative(session, full, owner)
+    member_role = await get_role_by_name(
+        session, initiative_id=initiative.id, role_name="member"
+    )
     provider = await create_auth_provider(session, slug="tenant")
     await create_guild_provider_connection(session, guild=full, provider=provider)
-    session.add(
-        OIDCClaimMapping(
-            provider_id=provider.id,
-            claim_value="staff",
-            target_type=OIDCMappingTargetType.initiative,
-            guild_id=full.id,
-            guild_role=CommunityRole.member.value,
-            initiative_id=initiative.id,
-        )
+    await create_claim_rule(
+        session,
+        provider=provider,
+        guild=full,
+        initiative=initiative,
+        initiative_role_id=member_role.id,
     )
     await rules.put(session, "max_users", 1, guild_id=full.id, set_by=SetBy.deployment)
     newcomer = await create_user(session)
@@ -900,3 +894,42 @@ async def test_a_full_community_takes_nobody_new_from_its_rules(
         )
         is None
     )
+
+
+async def test_a_rule_whose_initiative_is_deleted_places_in_the_community_alone(
+    session: AsyncSession,
+):
+    """A rule's initiative is kept beside the initiative, in the community's
+    schema, and goes when the initiative does: the rule then places people in
+    the community and in no initiative."""
+    provider = await create_auth_provider(session)
+    owner = await create_user(session)
+    guild = await create_guild(session, creator=owner)
+    initiative = await create_initiative(session, guild, owner, name="Gone")
+    member_role = await get_role_by_name(
+        session, initiative_id=initiative.id, role_name="member"
+    )
+    await create_guild_provider_connection(session, guild=guild, provider=provider)
+    rule = await create_claim_rule(
+        session,
+        provider=provider,
+        guild=guild,
+        initiative=initiative,
+        initiative_role_id=member_role.id,
+    )
+    newcomer = await create_user(session)
+    guild_id, initiative_id = guild.id, initiative.id
+    rule_id, user_id = rule.id, newcomer.id
+
+    await route_session_to_guild(session, guild_id)
+    await session.exec(delete(Initiative).where(Initiative.id == initiative_id))
+    await session.commit()
+    assert await session.get(ClaimRuleInitiative, rule_id) is None
+
+    result = await _sync(
+        session, user_id=user_id, provider_id=provider.id, claims=_ADMITTED
+    )
+
+    assert result.guilds_added == [guild_id]
+    assert result.initiatives_added == []
+    assert await _joined(session, user_id) == {guild_id}

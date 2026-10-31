@@ -78,6 +78,7 @@ from app.services.tenant.plugin_config import mint_connection_ref
 from app.services.tenant.dashboard_definition import (
     normalize_dashboard_definition,
 )
+from app.models.tenant.claim_rule_initiative import ClaimRuleInitiative
 from app.models.tenant.initiative import Initiative, InitiativeMember
 from app.models.tenant.project import Project
 from app.models.tenant.resource_grant import ResourceGrant, ResourceAccessLevel
@@ -100,6 +101,10 @@ from app.models.tenant.upload import Upload
 from app.models.tenant.data_job import DataJob, DataJobDirection
 from app.models.platform.auth_provider import AuthProvider, AuthProviderKind
 from app.models.platform.guild_provider_connection import GuildProviderConnection
+from app.models.platform.oidc_claim_mapping import (
+    OIDCClaimMapping,
+    OIDCMappingTargetType,
+)
 from app.models.platform.federated_identity import FederatedIdentity
 from app.core.login_methods import LoginMethod
 from app.core.rules import OPTION_RULES, SetBy, SignInRequirement
@@ -2444,6 +2449,49 @@ async def create_guild_provider_connection(
         await session.commit()
         await session.refresh(connection)
     return connection
+
+
+async def create_claim_rule(
+    session: AsyncSession,
+    *,
+    provider: AuthProvider,
+    guild: "Guild",
+    initiative: Initiative | None = None,
+    initiative_role_id: int | None = None,
+    **overrides: Any,
+) -> OIDCClaimMapping:
+    """A community's sign-in rule placing whoever carries ``staff`` in
+    ``guild`` as a member, and in ``initiative`` at ``initiative_role_id`` too
+    where one is given: that half is kept in the community's schema
+    (``claim_rule_initiatives``), under the rule's id."""
+    rule = OIDCClaimMapping(
+        **{
+            "provider_id": provider.id,
+            "claim_value": "staff",
+            "target_type": OIDCMappingTargetType.initiative
+            if initiative is not None
+            else OIDCMappingTargetType.guild,
+            "guild_id": guild.id,
+            "guild_role": CommunityRole.member.value,
+            **overrides,
+        }
+    )
+    session.add(rule)
+    await session.flush()
+    if initiative is not None:
+        assert rule.id is not None and initiative.id is not None
+        assert initiative_role_id is not None
+        await route_session_to_guild(session, guild.id)
+        session.add(
+            ClaimRuleInitiative(
+                rule_id=rule.id,
+                initiative_id=initiative.id,
+                initiative_role_id=initiative_role_id,
+            )
+        )
+    await session.commit()
+    await session.refresh(rule)
+    return rule
 
 
 async def create_guild_auth_policy(

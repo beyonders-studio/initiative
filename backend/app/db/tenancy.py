@@ -103,6 +103,9 @@ GUILD_LEVEL_TABLES: frozenset[str] = frozenset(
         # Which custom role a provider's group gives: sign-in configuration,
         # the seat's (SEAT_TABLES).
         "custom_role_claim_rules",
+        # Which initiative a sign-in rule (public.oidc_claim_mappings) places
+        # people in: sign-in configuration, the seat's (SEAT_TABLES).
+        "claim_rule_initiatives",
         # Installed plug-ins: guild-wide by definition, and readable by any member —
         # the sidebar has to know a plug-in is there. Installing, configuring and
         # removing are the seat's (SEAT_TABLES below); what a member may do
@@ -266,6 +269,7 @@ MEMBER_SECRET_TABLES: dict[str, tuple[str, str]] = {
 # ``GUILD_LEVEL_TABLES`` — enforced in ``tenancy_test.py``.
 SEAT_TABLES: frozenset[str] = frozenset(
     {
+        "claim_rule_initiatives",
         "custom_role_claim_rules",
         "plugin_placements",
         "guild_ai_connection_keys",
@@ -295,7 +299,12 @@ SEAT_SURFACES: dict[str, str] = {
 # read predicate is the seat's. Every entry here MUST also be in
 # ``SEAT_TABLES`` — enforced in ``tenancy_test.py``.
 SEAT_READ_TABLES: frozenset[str] = frozenset(
-    {"custom_role_claim_rules", "guild_ai_connection_keys", "guild_plugin_secrets"}
+    {
+        "claim_rule_initiatives",
+        "custom_role_claim_rules",
+        "guild_ai_connection_keys",
+        "guild_plugin_secrets",
+    }
 )
 
 # --- Ledger overlay on guild-level tables -------------------------------------
@@ -354,6 +363,9 @@ CREATED_BY_EXEMPT_TABLES: frozenset[str] = frozenset(
         "plugin_connection_secrets",
         # A connection's shared key. The connection row names who made it.
         "guild_ai_connection_keys",
+        # Where a sign-in rule places people, under the rule's id. The rule's
+        # record names who wrote it.
+        "claim_rule_initiatives",
         # A ballot: ``user_id`` is the voter, which is both the author of the
         # row and its whole content.
         "post_poll_votes",

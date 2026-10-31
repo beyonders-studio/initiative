@@ -351,6 +351,9 @@ EXEMPT: dict[str, str] = {
     # The platform's record of what it holds here. Not the community's to
     # read, so not the community's to carry out.
     "content_holds": "platform",
+    # Half of a sign-in rule, whose other half (public.oidc_claim_mappings)
+    # names this instance's providers and no archive carries.
+    "claim_rule_initiatives": "sign_in",
 }
 
 __all__ = [

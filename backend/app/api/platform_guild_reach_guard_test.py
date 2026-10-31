@@ -103,8 +103,17 @@ _WRAPPERS: dict[tuple[str, str], str] = {
     (f"{_SERVICES}/provider_placement.py", "_initiatives_in"): (
         "reads one community's initiatives and roles for a provider placement rule"
     ),
-    (f"{_SERVICES}/provider_placement.py", "_resolve_destination"): (
-        "checks a provider placement rule's initiative is the named community's"
+    (f"{_SERVICES}/provider_placement.py", "rule_initiatives"): (
+        "reads the initiatives sign-in rules place people in, in the "
+        "community's schema where they are kept"
+    ),
+    (f"{_SERVICES}/provider_placement.py", "set_rule_initiative"): (
+        "checks and writes the initiative a sign-in rule places people in, in "
+        "the community the rule names"
+    ),
+    (f"{_SERVICES}/provider_placement.py", "drop_rule_initiative"): (
+        "drops the initiative a sign-in rule placed people in, in the "
+        "community the rule named"
     ),
     (f"{_SERVICES}/provider_placement.py", "list_targets"): (
         "lists a placeable community's initiatives for a provider placement rule"
@@ -265,14 +274,16 @@ _ALLOWED: dict[tuple[str, str], str] = {
         "names the initiatives provider placement rules place into, in the "
         "communities they apply to"
     ),
-    (f"{_SERVICES}/provider_placement.py", "_read_one"): (
-        "names the initiative a provider placement rule places into"
-    ),
-    (f"{_SERVICES}/provider_placement.py", "create_rule"): (
-        "checks a new provider placement rule's initiative"
+    (f"{_SERVICES}/provider_placement.py", "place_rule"): (
+        "checks and writes the initiative a new or changed sign-in rule "
+        "places people in, in the community it names"
     ),
     (f"{_SERVICES}/provider_placement.py", "update_rule"): (
-        "checks a changed provider placement rule's initiative"
+        "reads a provider placement rule's initiative before a change, and "
+        "drops it when the rule no longer names one"
+    ),
+    (f"{_SERVICES}/provider_placement.py", "delete_rule"): (
+        "drops the initiative a deleted provider placement rule placed people in"
     ),
 }
 
