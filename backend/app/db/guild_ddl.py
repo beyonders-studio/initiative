@@ -277,7 +277,28 @@ _MANAGED_SECTION = """\
 -- community's admin, a settings rung beside a read_write grant, or the system
 -- engine. A member's own row into an initiative whose join policy is open is
 -- the one further way in. initiatives keeps its purge guard and trash reads.
+--
+-- tr_initiatives_community_columns: whether new members of the community join
+-- an initiative (auto_join) and whether it is archived are the community's to
+-- say, not the initiative's managers': only a holder of the initiatives
+-- surface, or the system engine, changes them.
 -- ==========================================================================="""
+
+#: The columns of an initiative the community decides rather than its managers.
+INITIATIVE_COMMUNITY_COLUMNS: tuple[str, ...] = ("auto_join", "archived_at")
+
+_INITIATIVE_COMMUNITY_COLUMNS_FN = f"""
+CREATE OR REPLACE FUNCTION public.fn_initiative_community_columns() RETURNS trigger
+    LANGUAGE plpgsql AS $community_columns$
+BEGIN
+    IF ({" OR ".join(f"NEW.{c} IS DISTINCT FROM OLD.{c}" for c in INITIATIVE_COMMUNITY_COLUMNS)})
+       AND NOT ({IN_POLICY.system} OR {IN_POLICY.holds(AdminSurface.initiatives)}) THEN
+        RAISE EXCEPTION 'the community decides this' USING ERRCODE = '42501';
+    END IF;
+    RETURN NEW;
+END;
+$community_columns$;
+"""
 
 
 #: A member's own row into an initiative that is open to join — the self-join
@@ -324,6 +345,14 @@ def _managed_block(table: str, initiative_expr: str) -> str:
             f"  USING ({_PURGE_GUARD_PREDICATE});",
             *_trash_read_policy(table),
             *_query_trash_policy(table),
+        ]
+    if table == "initiatives":
+        lines += [
+            _INITIATIVE_COMMUNITY_COLUMNS_FN,
+            "CREATE OR REPLACE TRIGGER tr_initiatives_community_columns"
+            f" BEFORE UPDATE OF {', '.join(INITIATIVE_COMMUNITY_COLUMNS)}"
+            " ON initiatives FOR EACH ROW"
+            " EXECUTE FUNCTION public.fn_initiative_community_columns();",
         ]
     return "\n".join(lines)
 
