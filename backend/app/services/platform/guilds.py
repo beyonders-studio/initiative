@@ -388,10 +388,10 @@ async def ensure_membership(
         return membership
     # New member: enforce the per-guild cap. Only reached on a genuine insert
     # (re-joins / role updates return above), so an existing member is never
-    # blocked. SSO/OIDC provisioning uses a separate insert path
-    # (oidc_sync._create_guild_membership) and is intentionally exempt.
+    # blocked. Sign-in sync inserts on a path of its own
+    # (oidc_sync._create_guild_membership) and asks the same cap first.
     if guest_until is None:
-        await _assert_member_capacity(session, guild_id=guild_id)
+        await assert_member_capacity(session, guild_id=guild_id)
     else:
         await _assert_guest_capacity(session, guild_id=guild_id)
     # A listed community never gains somebody who has answered the age question
@@ -525,7 +525,7 @@ def align_admin_initiative_roles(
     post_commit.after_commit(session, align_guild_admin_membership_roles)
 
 
-async def _assert_member_capacity(
+async def assert_member_capacity(
     session: AsyncSession, *, guild_id: int, claiming_seat: bool = True
 ) -> None:
     """Raise ``GuildCapacityError`` if the guild is at its ``max_users`` cap.
@@ -562,7 +562,7 @@ async def _assert_guest_capacity(
 ) -> None:
     """Raise ``GuildCapacityError`` if the guild is at its ``max_guests`` cap.
 
-    The guest half of :func:`_assert_member_capacity`: the same session
+    The guest half of :func:`assert_member_capacity`: the same session
     requirement and the same ``claiming_seat``, with the lock under its own
     namespace so guests and members do not queue behind each other. A cap of 0
     takes no new guests.
@@ -659,7 +659,7 @@ async def make_guest_a_member(
     )
     if membership is None or membership.guest_until is None:
         raise NotAGuestError(GuildMessages.NOT_A_GUEST)
-    await _assert_member_capacity(session, guild_id=guild_id)
+    await assert_member_capacity(session, guild_id=guild_id)
     membership.guest_until = None
     if membership.role == CommunityRole.guest:
         membership.role = CommunityRole.member
@@ -1571,7 +1571,7 @@ async def create_guild_invite(
     # A full guild mints no new invites: every seat is taken, so any code handed
     # out now could only fail at redemption. Raises ``GuildCapacityError``.
     if guest_days is None:
-        await _assert_member_capacity(session, guild_id=guild_id, claiming_seat=False)
+        await assert_member_capacity(session, guild_id=guild_id, claiming_seat=False)
     else:
         guest_days = await _guest_days(session, guild_id=guild_id, days=guest_days)
         await _assert_guest_capacity(session, guild_id=guild_id, claiming_seat=False)
