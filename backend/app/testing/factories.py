@@ -98,6 +98,7 @@ from app.models.tenant.task import (
     TaskStatusCategory,
 )
 from app.models.tenant.upload import Upload
+from app.models.tenant.webhook_subscription import WebhookSubscription
 from app.models.tenant.data_job import DataJob, DataJobDirection
 from app.models.platform.auth_provider import AuthProvider, AuthProviderKind
 from app.models.platform.guild_provider_connection import GuildProviderConnection
@@ -1366,6 +1367,30 @@ async def create_plugin_user_connection(
         await session.commit()
     await session.refresh(row)
     return row
+
+
+async def create_webhook_subscription(
+    session: AsyncSession, guild: Guild, creator: User | None = None, **overrides: Any
+) -> WebhookSubscription:
+    """A subscription to ``tasks.created`` against a URL of the creator's own,
+    for the whole community unless ``initiative_id`` says otherwise."""
+    await route_session_to_guild(session, guild.id)
+    now = datetime.now(timezone.utc)
+    subscription = WebhookSubscription(
+        **{
+            "created_by": None if creator is None else creator.id,
+            "target_url": "https://example.test/hook",
+            "hmac_secret": uuid.uuid4().hex,
+            "event_types": ["tasks.created"],
+            "created_at": now,
+            "updated_at": now,
+            **overrides,
+        }
+    )
+    session.add(subscription)
+    await session.commit()
+    await session.refresh(subscription)
+    return subscription
 
 
 _TEST_PLUGIN_KEY = ed25519.Ed25519PrivateKey.generate()

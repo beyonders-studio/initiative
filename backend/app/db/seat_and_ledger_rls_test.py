@@ -7,7 +7,8 @@ the seat. ``guild_plugin_secrets`` and ``guild_ai_connection_keys`` are read and
 written by the seat and the system engine alone, and the trigger on the first
 keeps ``guild_plugins.secret_fields`` in step.
 ``webhook_deliveries`` is read through its subscription and written by the
-system engine. Each test acts on the real request login, routed through the
+system engine; ``webhook_refs`` is read and written by the system engine
+alone. Each test acts on the real request login, routed through the
 seam, and carries no guard of its own: what the database accepts is what the
 policies allow.
 """
@@ -30,11 +31,13 @@ from app.models.tenant.plugin_placement import PluginPlacement
 from app.models.tenant.guild_plugin import GuildPlugin
 from app.models.tenant.webhook_subscription import WebhookSubscription
 from app.services.tenant import guild_plugins as guild_plugins_service
+from app.services.tenant import webhook_refs
 from app.testing import (
     create_access_grant,
     create_guild_plugin,
     create_initiative,
     create_user,
+    create_webhook_subscription,
     route_as,
     route_session_to_guild,
 )
@@ -425,3 +428,38 @@ async def test_only_the_system_engine_writes_a_delivery(
     )
     assert list(updated) == [(424242,)]
     await system.commit()
+
+
+# ---------------------------------------------------------------------------
+# webhook_refs
+# ---------------------------------------------------------------------------
+
+
+async def test_a_subscriptions_names_are_the_system_engines_alone(
+    session, acting_user, role_session
+):
+    """The administrator sees the subscription and the names on it, which the
+    system engine reads out; the table itself is closed to them."""
+    a = await acting_user(guild_role=CommunityRole.admin)
+    subscription = await create_webhook_subscription(session, a.guild, a.user)
+    guild_ref, _ = await webhook_refs.name_for_subscriber(
+        guild_id=a.guild.id, plugin=None, subscription_id=subscription.id
+    )
+
+    s = await _as(role_session, user_id=a.user.id, guild_id=a.guild.id)
+    assert list(await s.exec(text("SELECT ref FROM webhook_refs"))) == []
+    with pytest.raises(DBAPIError, match="row-level security"):
+        await s.exec(
+            text(
+                "INSERT INTO webhook_refs"
+                " (subscription_id, entity_type, entity_id, ref, created_at)"
+                " VALUES (:sid, 'user', :uid, 'uweb_chosen', now())"
+            ).bindparams(sid=subscription.id, uid=a.user.id)
+        )
+    await s.rollback()
+
+    system = await role_session("app_admin")
+    await set_rls_context(system, SystemGuild(a.guild.id))
+    assert list(await system.exec(text("SELECT ref FROM webhook_refs"))) == [
+        (guild_ref,)
+    ]
