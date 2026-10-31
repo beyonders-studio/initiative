@@ -331,6 +331,13 @@ async def test_a_member_defines_a_field_and_only_a_manager_reshapes_it(
         "UPDATE metadata_definitions SET options = options"
         f' || \'[{{"value": "b"}}]\'::jsonb WHERE {field}',
     )
+    # An option already there keeps its label: a second one with its value is
+    # not an addition.
+    assert not await runs(
+        member,
+        "UPDATE metadata_definitions SET options = options"
+        f' || \'[{{"value": "a", "label": "Changed"}}]\'::jsonb WHERE {field}',
+    )
     assert not await runs(
         member, f"UPDATE metadata_definitions SET name = 'Phase' WHERE {field}"
     )
