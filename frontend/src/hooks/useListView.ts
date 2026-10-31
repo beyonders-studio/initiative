@@ -2,7 +2,9 @@
  * One person's view of one list: how they show it, and what they narrow it
  * to, order it by and group it by. A list's layouts are the initiative's; a
  * view is the person's own, kept for them on that list as a view preference
- * (so it follows them from one device to the next), under {@link viewKey}.
+ * (so it follows them from one device to the next), under {@link viewKey}: in
+ * the community's map for a list inside a community, in the account's for
+ * their own lists across communities.
  *
  * Every list keeps its view here, in one shape:
  *
@@ -25,10 +27,10 @@ import type { ColumnVisibilityState, GroupingState, SortingState } from "@tansta
 import { useCallback, useEffect, useMemo, useRef } from "react";
 
 import type { UserViewPreferencesMap } from "@/api/generated/initiativeAPI.schemas";
-import { useViewPreference } from "@/hooks/useViewPreference";
+import { useViewPreference, useViewPreferenceMap } from "@/hooks/useViewPreference";
 import type { Preset } from "@/lib/layouts/presets";
 import { getItem } from "@/lib/storage";
-import { VIEW_PREFERENCES_QUERY_KEY } from "@/lib/viewPreferences";
+import { VIEW_PREFERENCES_QUERY_KEY, viewPreferencesQueryKey } from "@/lib/viewPreferences";
 
 /** What this device kept under `key` before views followed a person, read
  *  for a carry-over; null where nothing, or nothing readable, is kept. */
@@ -43,9 +45,14 @@ export const deviceJSON = (key: string): unknown => {
 /** The one part of a list that has no layouts to choose between. */
 export const LIST = "list";
 
-/** Where a person's view of a list is kept: `view`, then what names the list,
- *  its community first where it has one (ids restart in each community). */
+/** Where a person's view of a list is kept: `view`, then what names the list.
+ *  A list inside a community is kept in that community's map, so its key
+ *  names no community (`view:project:12`); a person's own lists across
+ *  communities say so (`view:me:tasks`). */
 export const viewKey = (...names: (string | number)[]) => ["view", ...names].join(":");
+
+/** A preference map, by key. */
+type ViewMap = Readonly<Record<string, unknown>>;
 
 /** One part's view, whole. */
 export type PartView<F> = {
@@ -67,13 +74,18 @@ export type StoredListView = {
 export type ListViewSpec<F> = {
   /** Where it is kept, from {@link viewKey}. */
   key: string;
+  /** The community the list is inside, whose map keeps it; none for a
+   *  person's own lists across communities, which the account's keeps. */
+  communityId?: number;
   /** Their filters as kept, read into the list's shape. */
   read: (raw: unknown) => F;
   /** What someone who has changed nothing sees, for each part. */
   defaults: PartView<F>;
-  /** What an older release kept for this list, from the preference map or
-   *  the device, read where nothing is kept under `key` yet. */
-  carryOver?: (items: Readonly<Record<string, unknown>>) => StoredListView | null;
+  /** What an older release kept for this list, read where nothing is kept
+   *  under `key` yet: from the map that keeps it (`items`), the account's
+   *  (`account`, the same map for a list that is the account's own), or the
+   *  device. */
+  carryOver?: (items: ViewMap, account: ViewMap) => StoredListView | null;
 };
 
 const strings = (raw: unknown): string[] | undefined =>
@@ -132,31 +144,36 @@ export const partOf = <F>(
   };
 };
 
-/** The view kept under `spec.key` in `items`, or what an older release kept
- *  where nothing is. Shared with route loaders, which read the map before the
- *  list mounts. */
+/** The view kept under `spec.key` in `items`, the map that keeps it, or what
+ *  an older release kept where nothing is; `account` is the account's map,
+ *  for a carry-over from it (`items`, where the list is the account's own).
+ *  Shared with route loaders, which read the maps before the list mounts. */
 export const keptView = <F>(
-  items: Readonly<Record<string, unknown>> | undefined,
-  spec: Pick<ListViewSpec<F>, "key" | "carryOver">
+  items: ViewMap | undefined,
+  spec: Pick<ListViewSpec<F>, "key" | "carryOver">,
+  account: ViewMap | undefined = items
 ): { view: StoredListView } => {
   const raw = items?.[spec.key];
   if (raw != null) return { view: sanitizeListView(raw) };
   // Device carry-overs read with or without a map to read from.
-  return { view: sanitizeListView(spec.carryOver?.(items ?? {}) ?? null) };
+  return { view: sanitizeListView(spec.carryOver?.(items ?? {}, account ?? {}) ?? null) };
 };
 
-/** A list whose view is only which way it is shown (a queue's list or
- *  on-deck, a counter group's rows or grid): its spec, carrying over what
- *  `older` reads where an older release kept it. */
+/** A list inside `communityId` whose view is only which way it is shown (a
+ *  queue's list or on-deck, a counter group's rows or grid): its spec,
+ *  carrying over what `older` reads where an older release kept it, on the
+ *  account or the device. */
 export const layoutViewSpec = (
+  communityId: number,
   key: string,
-  older: (items: Readonly<Record<string, unknown>>) => unknown
+  older: (account: ViewMap) => unknown
 ): ListViewSpec<null> => ({
   key,
+  communityId,
   read: () => null,
   defaults: { filters: null, ...NO_PART_VIEW },
-  carryOver: (items) => {
-    const layout = older(items);
+  carryOver: (_items, account) => {
+    const layout = older(account);
     return typeof layout === "string" ? { layout } : null;
   },
 });
@@ -180,7 +197,14 @@ export function useListView<F>(
   pick: string | ((view: StoredListView) => string) = LIST
 ) {
   const queryClient = useQueryClient();
-  const [, setRaw, { isLoaded: loaded, items }] = useViewPreference<unknown>(spec.key, null);
+  const [, setRaw, { isLoaded, items }] = useViewPreference<unknown>(
+    spec.key,
+    null,
+    spec.communityId
+  );
+  // The account's map, for what an older release kept there.
+  const account = useViewPreferenceMap();
+  const loaded = isLoaded && account.isLoaded;
   const specRef = useRef(spec);
   specRef.current = spec;
   const { read, defaults } = spec;
@@ -195,9 +219,10 @@ export function useListView<F>(
   const view = useMemo(
     () =>
       loaded
-        ? keptView(items, { key: spec.key, carryOver: specRef.current.carryOver }).view
+        ? keptView(items, { key: spec.key, carryOver: specRef.current.carryOver }, account.items)
+            .view
         : ({} as StoredListView),
-    [loaded, items, spec.key]
+    [loaded, items, account.items, spec.key]
   );
 
   const part = typeof pick === "function" ? pick(view) : pick;
@@ -213,8 +238,11 @@ export function useListView<F>(
   const write = useCallback(
     (patches: ((kept: StoredListView) => StoredListView)[]) => {
       const kept = keptView(
-        queryClient.getQueryData<UserViewPreferencesMap>(VIEW_PREFERENCES_QUERY_KEY)?.items,
-        specRef.current
+        queryClient.getQueryData<UserViewPreferencesMap>(
+          viewPreferencesQueryKey(specRef.current.communityId)
+        )?.items,
+        specRef.current,
+        queryClient.getQueryData<UserViewPreferencesMap>(VIEW_PREFERENCES_QUERY_KEY)?.items
       ).view;
       const next = patches.reduce((view, patch) => patch(view), kept);
       if (JSON.stringify(next) !== JSON.stringify(kept)) setRaw(next);

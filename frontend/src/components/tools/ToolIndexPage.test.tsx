@@ -32,6 +32,7 @@ import { VIEW_PREFERENCES_QUERY_KEY } from "@/hooks/useViewPreference";
 import { queryClient } from "@/lib/queryClient";
 import { setItem } from "@/lib/storage";
 import { TOOLS, toolCamelPlural, toolRouteSegment, toolViews } from "@/lib/tools";
+import { viewPreferencesQueryKey } from "@/lib/viewPreferences";
 import type { TranslateFn } from "@/types/i18n";
 
 const INITIATIVE_ID = 1;
@@ -470,7 +471,8 @@ describe("the tool index page's bulk actions", () => {
 describe("the file index page", () => {
   const files = (key: string) => translate(key, { ns: "files" });
 
-  /** Rendered in the layout a reader left the list in. */
+  /** Rendered in the layout a reader left every files list in, as an older
+   *  release kept it on the account, with what community 1 keeps. */
   const renderIn = (
     layout: "grid" | "list" | "tags",
     canCreate = true,
@@ -478,8 +480,9 @@ describe("the file index page", () => {
   ) => {
     const queryClient = createTestQueryClient();
     queryClient.setQueryData(VIEW_PREFERENCES_QUERY_KEY, {
-      items: { [`${Tool.file}:view-mode`]: layout, ...kept },
+      items: { [`${Tool.file}:view-mode`]: layout },
     });
+    queryClient.setQueryData(viewPreferencesQueryKey(1), { items: { ...kept } });
     return renderPage(
       () => (
         <ToolIndexPage tool={Tool.file} fixedInitiativeId={INITIATIVE_ID} canCreate={canCreate} />
@@ -519,7 +522,7 @@ describe("the file index page", () => {
 
   it("opens its table newest first, and remembers another order for the next visit", async () => {
     const requests = stubList(Tool.file, [row(Tool.file, { id: 1, name: "Brief" })]);
-    const kept = keepViewPreferences();
+    const kept = keepViewPreferences(1);
 
     const first = renderIn("list");
     await screen.findByText("Brief");
