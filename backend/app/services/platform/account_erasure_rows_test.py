@@ -53,8 +53,10 @@ from app.models.tenant.initiative import InitiativeJoinRequest
 from app.models.tenant.reaction import Reaction
 from app.models.tenant.resource_grant import ResourceGrant
 from app.models.tenant.view_preference import ViewPreference
+from app.models.tenant.webhook_ref import WebhookRef
 from app.models.tenant.webhook_subscription import WebhookSubscription
 from app.services.platform import users as user_service
+from app.services.tenant import webhook_refs
 from app.services.tenant.mention_parser import ANONYMIZED_MENTION_NAME
 from app.testing.factories import (
     create_calendar,
@@ -279,6 +281,27 @@ async def test_their_grants_go(session: AsyncSession, role_session):
         )
     ).all()
     assert remaining == []
+
+
+async def test_what_a_webhook_calls_them_goes(session: AsyncSession, role_session):
+    """A subscription's receiver holds a name for each person it was told
+    about. Theirs goes, as every other outside party's does; the community's
+    and somebody else's stay."""
+    s = await _seed(session)
+    await webhook_refs.name_for_subscriber(
+        guild_id=s.guild_id,
+        plugin=None,
+        subscription_id=s.webhook,
+        actor_ids=(s.victim_id, s.keeper_id),
+    )
+
+    await user_service.soft_delete_user(await role_session("app_admin"), s.victim_id)
+    session.expunge_all()
+    await route_session_to_guild(session, s.guild_id)
+    left = (
+        await session.exec(select(WebhookRef.entity_type, WebhookRef.entity_id))
+    ).all()
+    assert sorted(left) == [("guild", s.guild_id), ("user", s.keeper_id)]
 
 
 # --- the row stays, un-attributed -------------------------------------------

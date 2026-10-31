@@ -130,7 +130,7 @@ minted AS (
   SELECT w.ref, w.entity_type, w.entity_id, '{_PURPOSE.value}', {gucs.GUILD_ID}, {gucs.TOKEN_CLIENT_ID}, now()
   FROM wanted w
   WHERE {gucs.GUILD_ID} IS NOT NULL AND {gucs.TOKEN_CLIENT_ID} IS NOT NULL
-  ON CONFLICT (entity_type, entity_id, purpose, sector_guild_id, sector_id, sector_plugin)
+  ON CONFLICT (entity_type, entity_id, purpose, sector_guild_id, sector_plugin)
     WHERE retired_at IS NULL
     DO NOTHING
   RETURNING entity_type, entity_id, ref
@@ -538,7 +538,6 @@ async def drop_plugin_refs(*, guild_id: int, public_id: str) -> int:
             session,
             sector_guild_id=guild_id,
             sector_plugin=public_id,
-            purpose=_PURPOSE,
         )
         await session.commit()
     return dropped

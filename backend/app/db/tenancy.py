@@ -132,6 +132,8 @@ GUILD_LEVEL_TABLES: frozenset[str] = frozenset(
         "guild_ai_connection_keys",
         "webhook_deliveries",  # per-subscription delivery ledger, no initiative of
         # its own; read through its subscription (LEDGER_TABLES below).
+        "webhook_refs",  # what each subscription calls the community and its
+        # people; the system engine's alone (LEDGER_TABLES below).
         "subscription_progress",  # how far through the change log subscribers
         # were told; the system engine's alone (LEDGER_TABLES below).
         "plugin_hook_deliveries",  # vendor webhook deliveries an install accepted;
@@ -317,12 +319,13 @@ SEAT_READ_TABLES: frozenset[str] = frozenset(
 # Guild-level bookkeeping a system job keeps about a parent row: table ->
 # (parent table, FK column). Read through the parent, so a row is visible to
 # whoever the parent's own policy shows the parent to; written by the system
-# engine alone. ``None`` for bookkeeping about no row, read and written by the
-# system engine alone. Rendered as ``ledger_*`` policies by
+# engine alone. ``None`` for bookkeeping nobody but the system engine reads,
+# whatever row it is about. Rendered as ``ledger_*`` policies by
 # ``app.db.guild_ddl.render_guild_rls_ddl``. Every entry here MUST also be in
 # ``GUILD_LEVEL_TABLES`` — enforced in ``tenancy_test.py``.
 LEDGER_TABLES: dict[str, tuple[str, str] | None] = {
     "webhook_deliveries": ("webhook_subscriptions", "subscription_id"),
+    "webhook_refs": None,
     "subscription_progress": None,
     "plugin_hook_deliveries": ("guild_plugins", "install_id"),
     "plugin_schedule_runs": ("guild_plugins", "install_id"),
@@ -391,6 +394,7 @@ CREATED_BY_EXEMPT_TABLES: frozenset[str] = frozenset(
         "engagement_levels",
         "batched_notices",
         "webhook_deliveries",
+        "webhook_refs",
         "subscription_progress",
         "timer_marks",
         # The key -> task map the intake writer reads. The case it points at

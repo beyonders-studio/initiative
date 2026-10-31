@@ -222,11 +222,13 @@ async def _erase_in_guild(
 
     ``guild_session`` is a system session routed into ``guild_id``.
     """
+    from app.models.platform.identity_ref import IdentityEntity
     from app.models.tenant.calendar_event import CalendarEventAttendee
     from app.models.tenant.custom_role import CustomRoleMember
     from app.models.tenant.metadata import MetadataValue
     from app.models.tenant.queue import QueueItem
     from app.models.tenant.view_preference import ViewPreference
+    from app.models.tenant.webhook_ref import WebhookRef
     from app.services.tenant.mention_parser import anonymize_user_mentions
 
     # Releases their owner grants (content is left unowned) and drops their
@@ -254,6 +256,14 @@ async def _erase_in_guild(
     # (event, person), of no use to anyone once the person is gone.
     await guild_session.exec(
         delete(EventReminderDispatch).where(EventReminderDispatch.user_id == user_id)
+    )
+    # What each webhook subscription's receiver calls them, as
+    # identity_refs.forget_user drops every other party's name for them.
+    await guild_session.exec(
+        delete(WebhookRef).where(
+            col(WebhookRef.entity_type) == IdentityEntity.user,
+            col(WebhookRef.entity_id) == user_id,
+        )
     )
     await guild_session.exec(
         delete(BatchedNotice).where(col(BatchedNotice.user_id) == user_id)

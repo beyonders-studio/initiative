@@ -44,11 +44,9 @@ subscriptions it registered.
 
 from __future__ import annotations
 
-import logging
 from typing import Annotated
 
 from fastapi import APIRouter, Depends, HTTPException, status
-from sqlalchemy.exc import SQLAlchemyError
 from sqlmodel import select
 from sqlmodel.ext.asyncio.session import AsyncSession
 
@@ -81,8 +79,6 @@ from app.services.webhook_target_url import (
     WebhookTargetUrlPrivateError,
     assert_target_url_is_public_async,
 )
-
-logger = logging.getLogger(__name__)
 
 router = APIRouter(route_class=ActorRoute)
 
@@ -345,36 +341,14 @@ async def delete_subscription(
     """Hard-delete a subscription. Who may is the DELETE policy, the same gates
     that govern the content it watches; a cross-guild lookup is a 404. An
     installed plug-in reaches only the subscriptions it registered, and any other
-    is a 404."""
-    by_install = isinstance(guild_context, InstallContext)
+    is a 404.
+
+    The names it minted for itself go with it. One a plug-in registered is
+    named in that plug-in's sector, which outlives any single subscription."""
     await subscriptions_service.delete_subscription(
         session,
         subscription_id=subscription_id,
         guild_id=guild_context.guild_id,
         actor_user_id=guild_context.user_id,
-        by_install=by_install,
+        by_install=isinstance(guild_context, InstallContext),
     )
-    if by_install:
-        # An install's subscriptions are named in the install's own sector,
-        # which outlives any one of them; there is nothing of this one's to
-        # remove.
-        return
-
-    # The names this subscription minted for itself. Only its own sector: one an
-    # plug-in registered is named in that plug-in's, which belongs to the install and
-    # outlives any single subscription.
-    #
-    # Reported rather than raised, like the same step on plug-in uninstall: the row
-    # is already gone and committed, so failing the request here would answer
-    # "no" to something that happened, and the retry it invites answers 404.
-    try:
-        await webhook_refs.drop_subscription_refs(
-            guild_id=guild_context.guild_id, subscription_id=subscription_id
-        )
-    except SQLAlchemyError:
-        logger.warning(
-            "webhook refs: references for subscription %s in guild %s were not "
-            "removed; they name a subscription that no longer exists",
-            subscription_id,
-            guild_context.guild_id,
-        )

@@ -10,32 +10,38 @@ Which reference depends on who is receiving, because a reference is pairwise:
   and for each member, minted for it in this guild and used on every other
   exchange it has with us. A delivery arrives under those, so the plug-in can match an
   envelope to what it has stored without learning a second set of names for the
-  same people.
+  same people. They are kept in ``public.identity_refs``, beside the plug-in's
+  other names.
 * **A member registered it against a URL of their own.** There is no plug-in to
   borrow a sector from, so the subscription is the sector. The names are stable
-  for that subscription and unrelated to every other subscriber's.
+  for that subscription and unrelated to every other subscriber's. They are the
+  guild's own, kept in its schema under the subscription
+  (``models.tenant.webhook_ref``), and go when it does.
 
-Either way the sector is ``(guild_id, <thing>)``: the plug-in by its
-``public_id``, or the subscription by its per-guild row id.
-
-Reached only on the system engine, like every other minting path, so each call
-opens a session of its own: the callers are a background poller routed into a
-guild role and a request handler doing the same.
+Minted on the system engine, like every other name, so each call opens a session
+of its own from the guild's cohort: the callers are a background poller routed
+into a guild role and a request handler doing the same.
 """
 
 from __future__ import annotations
 
-from collections.abc import Awaitable, Callable, Collection, Sequence
+from collections.abc import Collection, Iterable, Sequence
+from datetime import datetime, timezone
 
+from sqlalchemy import tuple_
+from sqlalchemy.dialects.postgresql import insert as pg_insert
+from sqlmodel import select
 from sqlmodel.ext.asyncio.session import AsyncSession
 
-from app.db import session as db_session
+from app.db import cohorts
+from app.db.request_context import SystemGuild
+from app.db.session import set_rls_context
 from app.models.platform.identity_ref import IdentityEntity, IdentityPurpose
+from app.models.tenant.webhook_ref import WebhookRef
 from app.services.marketplace import plugin_refs
 from app.services.platform import identity_refs
 
 __all__ = [
-    "drop_subscription_refs",
     "name_for_subscriber",
     "names_for_subscribers",
 ]
@@ -46,6 +52,13 @@ __all__ = [
 #: own), and the people it will be told about.
 Subscriber = tuple[str | None, int, Collection[int]]
 
+#: ``(guild_ref, {user_id: ref})`` — what one subscriber calls the guild and
+#: each person.
+Names = tuple[str, dict[int, str]]
+
+#: ``(subscription_id, entity_type, entity_id)`` — one name a subscription holds.
+_Key = tuple[int, IdentityEntity, int]
+
 
 async def name_for_subscriber(
     *,
@@ -53,7 +66,7 @@ async def name_for_subscriber(
     plugin: str | None,
     subscription_id: int,
     actor_ids: Collection[int] = (),
-) -> tuple[str, dict[int, str]]:
+) -> Names:
     """This subscriber's names for the guild and for each actor it will be told about.
 
     Returns ``(guild_ref, {user_id: ref})``. Minted on first use, in one
@@ -68,25 +81,19 @@ async def name_for_subscriber(
 
 async def names_for_subscribers(
     *, guild_id: int, subscribers: Sequence[Subscriber]
-) -> list[tuple[str, dict[int, str]]]:
+) -> list[Names]:
     """:func:`name_for_subscriber` for each of many subscribers, in order — one
     session and one commit for the lot, for a page listing them."""
     if not subscribers:
         return []
-    names = []
-    async with db_session.SystemSessionLocal() as session:
-        for plugin, subscription_id, actor_ids in subscribers:
+    names: dict[int, Names] = {}
+    own: dict[int, tuple[int, Collection[int]]] = {}
+    async with cohorts.system_session(guild_id) as session:
+        for index, (plugin, subscription_id, actor_ids) in enumerate(subscribers):
             if plugin is not None:
                 try:
-                    names.append(
-                        await _named_in(
-                            session,
-                            guild_id=guild_id,
-                            purpose=IdentityPurpose.plugin,
-                            sector_plugin=plugin,
-                            actor_ids=actor_ids,
-                            before_mint=plugin_refs.mint_guard(guild_id, plugin),
-                        )
+                    names[index] = await _named_by_plugin(
+                        session, guild_id=guild_id, plugin=plugin, actor_ids=actor_ids
                     )
                     continue
                 except plugin_refs.PluginNameRefused:
@@ -95,38 +102,47 @@ async def names_for_subscribers(
                     # Only a subscription switched off with its install comes
                     # here; the delivery roster needs a live install.
                     pass
-            names.append(
-                await _named_in(
-                    session,
-                    guild_id=guild_id,
-                    purpose=IdentityPurpose.webhook,
-                    sector_id=subscription_id,
-                    actor_ids=actor_ids,
-                )
+            own[index] = (subscription_id, actor_ids)
+        if own:
+            # A subscription's own names are in the guild's schema and the
+            # plug-ins' above are not, so this routes after them.
+            await set_rls_context(session, SystemGuild(guild_id))
+            held = await _subscription_refs(
+                session, guild_id=guild_id, wanted=own.values()
             )
+            for index, (subscription_id, actor_ids) in own.items():
+                names[index] = (
+                    held[subscription_id, IdentityEntity.guild, guild_id],
+                    {
+                        actor_id: held[subscription_id, IdentityEntity.user, actor_id]
+                        for actor_id in _people(actor_ids)
+                    },
+                )
         await session.commit()
-    return names
+    return [names[index] for index in range(len(subscribers))]
 
 
-async def _named_in(
+def _people(actor_ids: Collection[int]) -> list[int]:
+    return sorted({actor_id for actor_id in actor_ids if actor_id is not None})
+
+
+async def _named_by_plugin(
     session: AsyncSession,
     *,
     guild_id: int,
-    purpose: IdentityPurpose,
+    plugin: str,
     actor_ids: Collection[int],
-    sector_id: int | None = None,
-    sector_plugin: str | None = None,
-    before_mint: Callable[[], Awaitable[None]] | None = None,
-) -> tuple[str, dict[int, str]]:
-    """The guild's and each actor's names in one sector, minted on first use."""
+) -> Names:
+    """The guild's and each actor's names in one plug-in's sector, minted on
+    first use."""
+    before_mint = plugin_refs.mint_guard(guild_id, plugin)
     guild_ref = await identity_refs.ensure_ref(
         session,
         entity_type=IdentityEntity.guild,
         entity_id=guild_id,
-        purpose=purpose,
+        purpose=IdentityPurpose.plugin,
         sector_guild_id=guild_id,
-        sector_id=sector_id,
-        sector_plugin=sector_plugin,
+        sector_plugin=plugin,
         before_mint=before_mint,
     )
     actor_refs = {
@@ -134,31 +150,90 @@ async def _named_in(
             session,
             entity_type=IdentityEntity.user,
             entity_id=actor_id,
-            purpose=purpose,
+            purpose=IdentityPurpose.plugin,
             sector_guild_id=guild_id,
-            sector_id=sector_id,
-            sector_plugin=sector_plugin,
+            sector_plugin=plugin,
             before_mint=before_mint,
         )
-        for actor_id in sorted(
-            {actor_id for actor_id in actor_ids if actor_id is not None}
-        )
+        for actor_id in _people(actor_ids)
     }
     return guild_ref, actor_refs
 
 
-async def drop_subscription_refs(*, guild_id: int, subscription_id: int) -> int:
-    """Remove the references minted for one subscription's own sector.
+async def _subscription_refs(
+    session: AsyncSession,
+    *,
+    guild_id: int,
+    wanted: Iterable[tuple[int, Collection[int]]],
+) -> dict[_Key, str]:
+    """What each subscription calls the guild and each of its people, minting
+    the names it does not hold yet: one read when it holds them all.
 
-    Only the sector this module owns: a subscription a plug-in registered is named
-    in that plug-in's, which outlives it.
+    ``session`` is routed into the guild as the platform, which alone writes
+    these.
     """
-    async with db_session.SystemSessionLocal() as session:
-        dropped = await identity_refs.drop_sector_refs(
-            session,
-            sector_guild_id=guild_id,
-            sector_id=subscription_id,
-            purpose=IdentityPurpose.webhook,
+    keys = {
+        key
+        for subscription_id, actor_ids in wanted
+        for key in (
+            (subscription_id, IdentityEntity.guild, guild_id),
+            *(
+                (subscription_id, IdentityEntity.user, actor_id)
+                for actor_id in _people(actor_ids)
+            ),
         )
-        await session.commit()
-    return dropped
+    }
+    held = await _held(session, keys)
+    missing = sorted(keys - held.keys())
+    if missing:
+        now = datetime.now(timezone.utc)
+        await session.exec(
+            pg_insert(WebhookRef.__table__)
+            .values(
+                [
+                    {
+                        "subscription_id": subscription_id,
+                        "entity_type": entity_type.value,
+                        "entity_id": entity_id,
+                        "ref": identity_refs.mint_ref(
+                            entity_type, IdentityPurpose.webhook
+                        ),
+                        "created_at": now,
+                    }
+                    for subscription_id, entity_type, entity_id in missing
+                ]
+            )
+            # Two callers racing the same first mint both insert and one loses
+            # here; both read back the winner's value below.
+            .on_conflict_do_nothing(
+                index_elements=["subscription_id", "entity_type", "entity_id"]
+            )
+        )
+        held |= await _held(session, missing)
+    return held
+
+
+async def _held(session: AsyncSession, keys: Collection[_Key]) -> dict[_Key, str]:
+    rows = await session.exec(
+        select(
+            WebhookRef.subscription_id,
+            WebhookRef.entity_type,
+            WebhookRef.entity_id,
+            WebhookRef.ref,
+        ).where(
+            tuple_(
+                WebhookRef.subscription_id,
+                WebhookRef.entity_type,
+                WebhookRef.entity_id,
+            ).in_(
+                [
+                    (subscription_id, entity_type.value, entity_id)
+                    for subscription_id, entity_type, entity_id in keys
+                ]
+            )
+        )
+    )
+    return {
+        (subscription_id, IdentityEntity(entity_type), entity_id): ref
+        for subscription_id, entity_type, entity_id, ref in rows
+    }

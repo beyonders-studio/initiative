@@ -123,7 +123,6 @@ class TestTheGuildPredicate:
         assert row is not None
         assert row.entity_id == user.id
         assert row.sector_plugin == "acme.tracker"
-        assert row.sector_id is None
 
     async def test_it_does_not_resolve_for_another_guild(self, session):
         user = await create_user(session)
