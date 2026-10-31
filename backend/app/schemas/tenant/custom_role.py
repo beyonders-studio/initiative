@@ -55,3 +55,26 @@ class HeldSurfacesRead(SanitizedBaseModel):
     #: The admin surfaces the reader holds in the community, as the request's
     #: standing computed them.
     surfaces: list[AdminSurface]
+
+
+class CustomRoleClaimRuleCreate(SanitizedBaseModel):
+    #: One of the community's connected sign-in providers.
+    provider_id: int
+    #: The group the provider asserts, as the community's other claim rules
+    #: name it.
+    claim_value: str = Field(min_length=1, max_length=500)
+    role_id: int
+
+
+class CustomRoleClaimRuleRead(SanitizedBaseModel):
+    id: int
+    provider_id: int
+    claim_value: str
+    role_id: int
+    #: Earlier first; the first matching rule decides the role.
+    position: int
+
+
+class CustomRoleClaimRuleOrder(SanitizedBaseModel):
+    #: Every rule's id, once, in the order a sign-in should read them.
+    rule_ids: list[int]

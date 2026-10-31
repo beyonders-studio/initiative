@@ -28,6 +28,9 @@ import type {
   CommunityProviderConnectionRead,
   CommunityProviderConnectionUpdate,
   ConnectableProviderRead,
+  CustomRoleClaimRuleCreate,
+  CustomRoleClaimRuleOrder,
+  CustomRoleClaimRuleRead,
   HTTPValidationError,
 } from "../initiativeAPI.schemas";
 
@@ -937,4 +940,423 @@ export const useDeleteCommunityClaimRule = <
   TContext
 > => {
   return useMutation(getDeleteCommunityClaimRuleMutationOptions(options), queryClient);
+};
+/**
+ * Which custom role each group gives, in the order a sign-in reads them:
+ * the first rule whose group it carries decides. Kept in the community's own
+ * schema, beside the roles they name.
+ * @summary List Custom Role Claim Rules
+ */
+export const listCustomRoleClaimRules = (
+  communityId: number,
+  options?: SecondParameter<typeof apiMutator>,
+  signal?: AbortSignal
+) => {
+  return apiMutator<CustomRoleClaimRuleRead[]>(
+    { url: `/api/v1/communities/${communityId}/auth/role-rules`, method: "GET", signal },
+    options
+  );
+};
+
+export const getListCustomRoleClaimRulesQueryKey = (communityId: number) => {
+  return [`/api/v1/communities/${communityId}/auth/role-rules`] as const;
+};
+
+export const getListCustomRoleClaimRulesQueryOptions = <
+  TData = Awaited<ReturnType<typeof listCustomRoleClaimRules>>,
+  TError = ErrorType<HTTPValidationError>,
+>(
+  communityId: number,
+  options?: {
+    query?: Partial<
+      UseQueryOptions<Awaited<ReturnType<typeof listCustomRoleClaimRules>>, TError, TData>
+    >;
+    request?: SecondParameter<typeof apiMutator>;
+  }
+) => {
+  const { query: queryOptions, request: requestOptions } = options ?? {};
+
+  const queryKey = queryOptions?.queryKey ?? getListCustomRoleClaimRulesQueryKey(communityId);
+
+  const queryFn: QueryFunction<Awaited<ReturnType<typeof listCustomRoleClaimRules>>> = ({
+    signal,
+  }) => listCustomRoleClaimRules(communityId, requestOptions, signal);
+
+  return {
+    queryKey,
+    queryFn,
+    enabled: communityId !== null && communityId !== undefined,
+    ...queryOptions,
+  } as UseQueryOptions<Awaited<ReturnType<typeof listCustomRoleClaimRules>>, TError, TData> & {
+    queryKey: DataTag<QueryKey, TData, TError>;
+  };
+};
+
+export type ListCustomRoleClaimRulesQueryResult = NonNullable<
+  Awaited<ReturnType<typeof listCustomRoleClaimRules>>
+>;
+export type ListCustomRoleClaimRulesQueryError = ErrorType<HTTPValidationError>;
+
+export function useListCustomRoleClaimRules<
+  TData = Awaited<ReturnType<typeof listCustomRoleClaimRules>>,
+  TError = ErrorType<HTTPValidationError>,
+>(
+  communityId: number,
+  options: {
+    query: Partial<
+      UseQueryOptions<Awaited<ReturnType<typeof listCustomRoleClaimRules>>, TError, TData>
+    > &
+      Pick<
+        DefinedInitialDataOptions<
+          Awaited<ReturnType<typeof listCustomRoleClaimRules>>,
+          TError,
+          Awaited<ReturnType<typeof listCustomRoleClaimRules>>
+        >,
+        "initialData"
+      >;
+    request?: SecondParameter<typeof apiMutator>;
+  },
+  queryClient?: QueryClient
+): DefinedUseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData, TError> };
+export function useListCustomRoleClaimRules<
+  TData = Awaited<ReturnType<typeof listCustomRoleClaimRules>>,
+  TError = ErrorType<HTTPValidationError>,
+>(
+  communityId: number,
+  options?: {
+    query?: Partial<
+      UseQueryOptions<Awaited<ReturnType<typeof listCustomRoleClaimRules>>, TError, TData>
+    > &
+      Pick<
+        UndefinedInitialDataOptions<
+          Awaited<ReturnType<typeof listCustomRoleClaimRules>>,
+          TError,
+          Awaited<ReturnType<typeof listCustomRoleClaimRules>>
+        >,
+        "initialData"
+      >;
+    request?: SecondParameter<typeof apiMutator>;
+  },
+  queryClient?: QueryClient
+): UseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData, TError> };
+export function useListCustomRoleClaimRules<
+  TData = Awaited<ReturnType<typeof listCustomRoleClaimRules>>,
+  TError = ErrorType<HTTPValidationError>,
+>(
+  communityId: number,
+  options?: {
+    query?: Partial<
+      UseQueryOptions<Awaited<ReturnType<typeof listCustomRoleClaimRules>>, TError, TData>
+    >;
+    request?: SecondParameter<typeof apiMutator>;
+  },
+  queryClient?: QueryClient
+): UseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData, TError> };
+/**
+ * @summary List Custom Role Claim Rules
+ */
+
+export function useListCustomRoleClaimRules<
+  TData = Awaited<ReturnType<typeof listCustomRoleClaimRules>>,
+  TError = ErrorType<HTTPValidationError>,
+>(
+  communityId: number,
+  options?: {
+    query?: Partial<
+      UseQueryOptions<Awaited<ReturnType<typeof listCustomRoleClaimRules>>, TError, TData>
+    >;
+    request?: SecondParameter<typeof apiMutator>;
+  },
+  queryClient?: QueryClient
+): UseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData, TError> } {
+  const queryOptions = getListCustomRoleClaimRulesQueryOptions(communityId, options);
+
+  const query = useQuery(queryOptions, queryClient) as UseQueryResult<TData, TError> & {
+    queryKey: DataTag<QueryKey, TData, TError>;
+  };
+
+  return withQueryKey(query, queryOptions.queryKey);
+}
+
+/**
+ * Give a custom role to whoever signs in through one of the community's
+ * providers carrying a group, after every rule already there.
+ * @summary Create Custom Role Claim Rule
+ */
+export const createCustomRoleClaimRule = (
+  communityId: number,
+  customRoleClaimRuleCreate: BodyType<CustomRoleClaimRuleCreate>,
+  options?: SecondParameter<typeof apiMutator>,
+  signal?: AbortSignal
+) => {
+  return apiMutator<CustomRoleClaimRuleRead>(
+    {
+      url: `/api/v1/communities/${communityId}/auth/role-rules`,
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      data: customRoleClaimRuleCreate,
+      signal,
+    },
+    options
+  );
+};
+
+export const getCreateCustomRoleClaimRuleMutationKey = () => ["createCustomRoleClaimRule"] as const;
+
+export const getCreateCustomRoleClaimRuleMutationOptions = <
+  TError = ErrorType<HTTPValidationError>,
+  TContext = unknown,
+>(options?: {
+  mutation?: UseMutationOptions<
+    Awaited<ReturnType<typeof createCustomRoleClaimRule>>,
+    TError,
+    CreateCustomRoleClaimRuleMutationVariables,
+    TContext
+  >;
+  request?: SecondParameter<typeof apiMutator>;
+}): UseMutationOptions<
+  Awaited<ReturnType<typeof createCustomRoleClaimRule>>,
+  TError,
+  CreateCustomRoleClaimRuleMutationVariables,
+  TContext
+> => {
+  const mutationKey = getCreateCustomRoleClaimRuleMutationKey();
+  const { mutation: mutationOptions, request: requestOptions } = options
+    ? options.mutation && "mutationKey" in options.mutation && options.mutation.mutationKey
+      ? options
+      : { ...options, mutation: { ...options.mutation, mutationKey } }
+    : { mutation: { mutationKey }, request: undefined };
+
+  const mutationFn: MutationFunction<
+    Awaited<ReturnType<typeof createCustomRoleClaimRule>>,
+    CreateCustomRoleClaimRuleMutationVariables
+  > = (props) => {
+    const { communityId, data } = props ?? {};
+
+    return createCustomRoleClaimRule(communityId, data, requestOptions);
+  };
+
+  return { mutationFn, ...mutationOptions };
+};
+
+export type CreateCustomRoleClaimRuleMutationResult = NonNullable<
+  Awaited<ReturnType<typeof createCustomRoleClaimRule>>
+>;
+export type CreateCustomRoleClaimRuleMutationBody = BodyType<CustomRoleClaimRuleCreate>;
+export type CreateCustomRoleClaimRuleMutationError = ErrorType<HTTPValidationError>;
+export type CreateCustomRoleClaimRuleMutationVariables = {
+  communityId: number;
+  data: BodyType<CustomRoleClaimRuleCreate>;
+};
+
+/**
+ * @summary Create Custom Role Claim Rule
+ */
+export const useCreateCustomRoleClaimRule = <
+  TError = ErrorType<HTTPValidationError>,
+  TContext = unknown,
+>(
+  options?: {
+    mutation?: UseMutationOptions<
+      Awaited<ReturnType<typeof createCustomRoleClaimRule>>,
+      TError,
+      CreateCustomRoleClaimRuleMutationVariables,
+      TContext
+    >;
+    request?: SecondParameter<typeof apiMutator>;
+  },
+  queryClient?: QueryClient
+): UseMutationResult<
+  Awaited<ReturnType<typeof createCustomRoleClaimRule>>,
+  TError,
+  CreateCustomRoleClaimRuleMutationVariables,
+  TContext
+> => {
+  return useMutation(getCreateCustomRoleClaimRuleMutationOptions(options), queryClient);
+};
+/**
+ * Put the rules in a new order; it names every rule once.
+ * @summary Order Custom Role Claim Rules
+ */
+export const orderCustomRoleClaimRules = (
+  communityId: number,
+  customRoleClaimRuleOrder: BodyType<CustomRoleClaimRuleOrder>,
+  options?: SecondParameter<typeof apiMutator>,
+  signal?: AbortSignal
+) => {
+  return apiMutator<CustomRoleClaimRuleRead[]>(
+    {
+      url: `/api/v1/communities/${communityId}/auth/role-rules/order`,
+      method: "PUT",
+      headers: { "Content-Type": "application/json" },
+      data: customRoleClaimRuleOrder,
+      signal,
+    },
+    options
+  );
+};
+
+export const getOrderCustomRoleClaimRulesMutationKey = () => ["orderCustomRoleClaimRules"] as const;
+
+export const getOrderCustomRoleClaimRulesMutationOptions = <
+  TError = ErrorType<HTTPValidationError>,
+  TContext = unknown,
+>(options?: {
+  mutation?: UseMutationOptions<
+    Awaited<ReturnType<typeof orderCustomRoleClaimRules>>,
+    TError,
+    OrderCustomRoleClaimRulesMutationVariables,
+    TContext
+  >;
+  request?: SecondParameter<typeof apiMutator>;
+}): UseMutationOptions<
+  Awaited<ReturnType<typeof orderCustomRoleClaimRules>>,
+  TError,
+  OrderCustomRoleClaimRulesMutationVariables,
+  TContext
+> => {
+  const mutationKey = getOrderCustomRoleClaimRulesMutationKey();
+  const { mutation: mutationOptions, request: requestOptions } = options
+    ? options.mutation && "mutationKey" in options.mutation && options.mutation.mutationKey
+      ? options
+      : { ...options, mutation: { ...options.mutation, mutationKey } }
+    : { mutation: { mutationKey }, request: undefined };
+
+  const mutationFn: MutationFunction<
+    Awaited<ReturnType<typeof orderCustomRoleClaimRules>>,
+    OrderCustomRoleClaimRulesMutationVariables
+  > = (props) => {
+    const { communityId, data } = props ?? {};
+
+    return orderCustomRoleClaimRules(communityId, data, requestOptions);
+  };
+
+  return { mutationFn, ...mutationOptions };
+};
+
+export type OrderCustomRoleClaimRulesMutationResult = NonNullable<
+  Awaited<ReturnType<typeof orderCustomRoleClaimRules>>
+>;
+export type OrderCustomRoleClaimRulesMutationBody = BodyType<CustomRoleClaimRuleOrder>;
+export type OrderCustomRoleClaimRulesMutationError = ErrorType<HTTPValidationError>;
+export type OrderCustomRoleClaimRulesMutationVariables = {
+  communityId: number;
+  data: BodyType<CustomRoleClaimRuleOrder>;
+};
+
+/**
+ * @summary Order Custom Role Claim Rules
+ */
+export const useOrderCustomRoleClaimRules = <
+  TError = ErrorType<HTTPValidationError>,
+  TContext = unknown,
+>(
+  options?: {
+    mutation?: UseMutationOptions<
+      Awaited<ReturnType<typeof orderCustomRoleClaimRules>>,
+      TError,
+      OrderCustomRoleClaimRulesMutationVariables,
+      TContext
+    >;
+    request?: SecondParameter<typeof apiMutator>;
+  },
+  queryClient?: QueryClient
+): UseMutationResult<
+  Awaited<ReturnType<typeof orderCustomRoleClaimRules>>,
+  TError,
+  OrderCustomRoleClaimRulesMutationVariables,
+  TContext
+> => {
+  return useMutation(getOrderCustomRoleClaimRulesMutationOptions(options), queryClient);
+};
+/**
+ * Stop giving a role for a group. Whoever holds it by this rule keeps it
+ * until their next sign-in through that provider.
+ * @summary Delete Custom Role Claim Rule
+ */
+export const deleteCustomRoleClaimRule = (
+  communityId: number,
+  ruleId: number,
+  options?: SecondParameter<typeof apiMutator>,
+  signal?: AbortSignal
+) => {
+  return apiMutator<void>(
+    {
+      url: `/api/v1/communities/${communityId}/auth/role-rules/${ruleId}`,
+      method: "DELETE",
+      signal,
+    },
+    options
+  );
+};
+
+export const getDeleteCustomRoleClaimRuleMutationKey = () => ["deleteCustomRoleClaimRule"] as const;
+
+export const getDeleteCustomRoleClaimRuleMutationOptions = <
+  TError = ErrorType<HTTPValidationError>,
+  TContext = unknown,
+>(options?: {
+  mutation?: UseMutationOptions<
+    Awaited<ReturnType<typeof deleteCustomRoleClaimRule>>,
+    TError,
+    DeleteCustomRoleClaimRuleMutationVariables,
+    TContext
+  >;
+  request?: SecondParameter<typeof apiMutator>;
+}): UseMutationOptions<
+  Awaited<ReturnType<typeof deleteCustomRoleClaimRule>>,
+  TError,
+  DeleteCustomRoleClaimRuleMutationVariables,
+  TContext
+> => {
+  const mutationKey = getDeleteCustomRoleClaimRuleMutationKey();
+  const { mutation: mutationOptions, request: requestOptions } = options
+    ? options.mutation && "mutationKey" in options.mutation && options.mutation.mutationKey
+      ? options
+      : { ...options, mutation: { ...options.mutation, mutationKey } }
+    : { mutation: { mutationKey }, request: undefined };
+
+  const mutationFn: MutationFunction<
+    Awaited<ReturnType<typeof deleteCustomRoleClaimRule>>,
+    DeleteCustomRoleClaimRuleMutationVariables
+  > = (props) => {
+    const { communityId, ruleId } = props ?? {};
+
+    return deleteCustomRoleClaimRule(communityId, ruleId, requestOptions);
+  };
+
+  return { mutationFn, ...mutationOptions };
+};
+
+export type DeleteCustomRoleClaimRuleMutationResult = NonNullable<
+  Awaited<ReturnType<typeof deleteCustomRoleClaimRule>>
+>;
+
+export type DeleteCustomRoleClaimRuleMutationError = ErrorType<HTTPValidationError>;
+export type DeleteCustomRoleClaimRuleMutationVariables = { communityId: number; ruleId: number };
+
+/**
+ * @summary Delete Custom Role Claim Rule
+ */
+export const useDeleteCustomRoleClaimRule = <
+  TError = ErrorType<HTTPValidationError>,
+  TContext = unknown,
+>(
+  options?: {
+    mutation?: UseMutationOptions<
+      Awaited<ReturnType<typeof deleteCustomRoleClaimRule>>,
+      TError,
+      DeleteCustomRoleClaimRuleMutationVariables,
+      TContext
+    >;
+    request?: SecondParameter<typeof apiMutator>;
+  },
+  queryClient?: QueryClient
+): UseMutationResult<
+  Awaited<ReturnType<typeof deleteCustomRoleClaimRule>>,
+  TError,
+  DeleteCustomRoleClaimRuleMutationVariables,
+  TContext
+> => {
+  return useMutation(getDeleteCustomRoleClaimRuleMutationOptions(options), queryClient);
 };

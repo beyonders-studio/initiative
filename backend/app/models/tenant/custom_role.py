@@ -23,6 +23,7 @@ from sqlalchemy import (
     ForeignKey,
     Integer,
     String,
+    Index,
     Text,
     text,
 )
@@ -110,4 +111,47 @@ class CustomRoleMember(SQLModel, table=True):
         sa_column=Column(
             DateTime(timezone=True), nullable=False, server_default=text("now()")
         ),
+    )
+    #: The sign-in provider whose claims gave the role
+    #: (:class:`CustomRoleClaimRule`), which a later sign-in through it may
+    #: change or take back. ``None`` for a role somebody gave by hand, which the
+    #: claims leave alone. A ``public.auth_providers`` id.
+    oidc_provider_id: Optional[int] = Field(
+        default=None, sa_column=Column(Integer, nullable=True)
+    )
+
+
+class CustomRoleClaimRule(CreatedByMixin, table=True):
+    """A custom role the community gives whoever signs in through one of its
+    providers carrying a group. The seat writes them, in order: the first rule
+    whose group a sign-in carries decides the person's role."""
+
+    __tablename__ = "custom_role_claim_rules"
+    __table_args__ = (
+        # One rule per group as a sign-in matches it: capitals aside.
+        Index(
+            "uq_custom_role_claim_rules_claim",
+            "provider_id",
+            text("lower(claim_value)"),
+            unique=True,
+        ),
+    )
+
+    id: Optional[int] = Field(default=None, primary_key=True)
+    #: A ``public.auth_providers`` id the community connects to.
+    provider_id: int = Field(sa_column=Column(Integer, nullable=False))
+    claim_value: str = Field(sa_column=Column(String(length=500), nullable=False))
+    role_id: int = Field(
+        sa_column=Column(
+            Integer,
+            ForeignKey("custom_roles.id", ondelete="CASCADE"),
+            nullable=False,
+            index=True,
+        )
+    )
+    #: Earlier first; the first matching rule wins.
+    position: int = Field(default=0, sa_column=Column(Integer, nullable=False))
+    created_at: datetime = Field(
+        default_factory=lambda: datetime.now(timezone.utc),
+        sa_column=Column(DateTime(timezone=True), nullable=False),
     )

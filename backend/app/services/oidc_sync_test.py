@@ -15,11 +15,18 @@ from app.models.platform.oidc_claim_mapping import (
     OIDCMappingTargetType,
 )
 from app.models.tenant.guild_plugin_user_connection import GuildPluginUserConnection
+from app.models.tenant.custom_role import (
+    CustomRole,
+    CustomRoleClaimRule,
+    CustomRoleMember,
+)
 from app.models.tenant.initiative import InitiativeMember
 from app.services.oidc_sync import sync_oidc_assignments
+from app.services.tenant import custom_roles as custom_roles_service
 from app.services.tenant import plugin_revocation
 from app.services.tenant.initiatives import get_role_by_name
 from app.testing.factories import (
+    create_guild_membership,
     NARROWED_CLAIM,
     NARROWED_VALUE,
     create_guild_provider_connection,
@@ -31,6 +38,7 @@ from app.testing.factories import (
     create_user,
 )
 from app.db.request_context import SystemGuild, Unattributed
+from app.testing.schema_harness import route_session_to_guild
 
 
 #: What an arrival from the tenant the factory's connections narrow to carries.
@@ -749,3 +757,103 @@ async def test_a_provider_rule_places_whatever_the_communitys_own_narrowing_says
     )
 
     assert await _joined(session, out_of_tenant.id) == {accepting.id}
+
+
+async def test_the_first_role_rule_a_sign_in_matches_gives_its_role(
+    session: AsyncSession,
+):
+    """A community's custom-role rules, in its own schema, are read in order:
+    the first whose group the sign-in carries decides. A role somebody gave
+    by hand is the claims' to leave alone."""
+    owner = await create_user(session)
+    home = await create_guild(session, creator=owner)
+    provider = await create_auth_provider(session, slug="tenant")
+    await create_guild_provider_connection(session, guild=home, provider=provider)
+    await _guild_rule(session, provider_id=provider.id, guild_id=home.id)
+    newcomer = await create_user(session)
+    await route_session_to_guild(session, home.id)
+    doors = CustomRole(name="Doors", base_rung="member", surfaces=["invites"])
+    roll = CustomRole(name="Roll", base_rung="member", surfaces=["members"])
+    session.add_all([doors, roll])
+    await session.flush()
+    session.add_all(
+        [
+            CustomRoleClaimRule(
+                provider_id=provider.id, claim_value="crew", role_id=roll.id, position=1
+            ),
+            CustomRoleClaimRule(
+                provider_id=provider.id,
+                claim_value="staff",
+                role_id=doors.id,
+                position=2,
+            ),
+        ]
+    )
+    await session.commit()
+    home_id, provider_id, user_id = home.id, provider.id, newcomer.id
+
+    async def sync(groups: set[str]) -> tuple[int, int | None]:
+        await set_rls_context(session, Unattributed())
+        await sync_oidc_assignments(
+            session,
+            user_id=user_id,
+            provider_id=provider_id,
+            claim_values=groups,
+            claims=_ADMITTED,
+        )
+        await session.commit()
+        session.expunge_all()
+        await set_rls_context(session, SystemGuild(home_id))
+        held = await session.get(CustomRoleMember, user_id)
+        assert held is not None
+        return held.role_id, held.oidc_provider_id
+
+    assert await sync({"staff", "crew"}) == (roll.id, provider_id)
+    assert await sync({"staff"}) == (doors.id, provider_id)
+
+    await custom_roles_service.assign(session, user_id=user_id, role_id=roll.id)
+    await session.commit()
+    assert await sync({"staff"}) == (roll.id, None)
+
+
+async def test_a_role_stays_until_a_sign_in_says_the_claim(session: AsyncSession):
+    """A refresh can come back without the claim a community narrows by. Its
+    custom-role rules live in its schema, out of the refresh guard's sight, so
+    there the role is left as it is; a sign-in that carries the claim but not
+    the group takes it back."""
+    owner = await create_user(session)
+    home = await create_guild(session, creator=owner)
+    provider = await create_auth_provider(session, slug="tenant")
+    await create_guild_provider_connection(session, guild=home, provider=provider)
+    member = await create_user(session)
+    await create_guild_membership(session, user=member, guild=home)
+    await route_session_to_guild(session, home.id)
+    doors = CustomRole(name="Doors", base_rung="member", surfaces=["invites"])
+    session.add(doors)
+    await session.flush()
+    session.add(
+        CustomRoleClaimRule(
+            provider_id=provider.id, claim_value="staff", role_id=doors.id, position=1
+        )
+    )
+    await session.commit()
+    home_id, provider_id, user_id, doors_id = home.id, provider.id, member.id, doors.id
+
+    async def sync(groups: set[str], claims: dict) -> int | None:
+        await set_rls_context(session, Unattributed())
+        await sync_oidc_assignments(
+            session,
+            user_id=user_id,
+            provider_id=provider_id,
+            claim_values=groups,
+            claims=claims,
+        )
+        await session.commit()
+        session.expunge_all()
+        await set_rls_context(session, SystemGuild(home_id))
+        held = await session.get(CustomRoleMember, user_id)
+        return held.role_id if held is not None else None
+
+    assert await sync({"staff"}, _ADMITTED) == doors_id
+    assert await sync(set(), {}) == doors_id
+    assert await sync(set(), _ADMITTED) is None

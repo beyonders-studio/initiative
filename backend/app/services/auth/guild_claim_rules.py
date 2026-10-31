@@ -112,7 +112,7 @@ async def lookup_guild_initiative(
         await reset_to_system_baseline(session)
 
 
-async def _connected_provider(
+async def connected_provider(
     session: AsyncSession, *, guild_id: int, provider_id: int
 ) -> AuthProvider:
     """The provider behind one of this community's connections.
@@ -345,7 +345,7 @@ async def create_rule(
     payload: CommunityClaimRuleCreate,
     actor_user_id: int | None = None,
 ) -> CommunityClaimRuleRead:
-    provider = await _connected_provider(
+    provider = await connected_provider(
         session, guild_id=guild_id, provider_id=payload.provider_id
     )
     _require_mappable_role(payload.community_role)

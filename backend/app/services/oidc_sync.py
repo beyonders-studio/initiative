@@ -16,6 +16,7 @@ from app.services.guild_sweeps import Scope, each_guild
 from app.services.platform import provider_placement
 from app.services.platform import account_stream
 from app.services.platform import guilds as guilds_service
+from app.services.tenant import custom_roles as custom_roles_service
 from app.models.tenant.initiative import (
     Initiative,
     InitiativeMember,
@@ -394,6 +395,26 @@ async def sync_oidc_assignments(
     relevant_guilds = (
         existing_guild_ids | set(initiative_guild.values()) | set(guild_roles)
     )
+    # Where the community's own custom-role rules (in its schema) may speak for
+    # this arrival: the communities that count it as one of their own, as for
+    # the rules above.
+    role_admitted = await guild_connections.communities_admitting(
+        session, provider_id=provider_id, claims=claims, guild_ids=relevant_guilds
+    )
+    # A refresh can arrive without the claim a community narrows by. Its
+    # custom-role rules are in its schema, which the refresh guard does not
+    # read, so there "not admitted" may only mean "not said": its roles are
+    # left as they are until a sign-in carries the claim.
+    role_unsaid = {
+        gid
+        for gid in relevant_guilds
+        if not (
+            await guild_connections.narrowing_claims(
+                session, provider_id=provider_id, guild_ids={gid}
+            )
+        )
+        <= claims.keys()
+    }
     await session.commit()
 
     # --- Initiative resolution + membership (each guild's half) ---
@@ -485,6 +506,34 @@ async def sync_oidc_assignments(
         if gid in newly_admitted_guilds:
             await enroll_in_auto_join_initiatives(
                 guild_session, guild_id=gid, user_id=user_id
+            )
+
+        # The custom role the community's rules give for these groups.
+        changed = (
+            None
+            if gid in role_unsaid
+            else await custom_roles_service.apply_claims(
+                guild_session,
+                guild_id=gid,
+                user_id=user_id,
+                provider_id=provider_id,
+                claim_values=claim_values,
+                admitted=gid in role_admitted,
+            )
+        )
+        if changed is not None:
+            await _record(
+                guild_session,
+                event_type=AuditEventType.GUILD_CUSTOM_ROLE_ASSIGNED,
+                target_user_id=user_id,
+                guild_id=gid,
+                target_type="custom_role",
+                target_id=changed[1],
+                detail={
+                    "from_role_id": changed[0],
+                    "to_role_id": changed[1],
+                    "via": _VIA,
+                },
             )
 
     if relevant_guilds:
