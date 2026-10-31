@@ -585,12 +585,12 @@ async def count_members_by_role(
 # ============================================================================
 
 #: The policies that put an initiative on the guild's directory for everyone.
-#: ``private`` is deliberately absent: RLS *would* permit listing it (the
-#: ``initiatives`` table is structural, so any guild member's session can read
-#: the row), so keeping private initiatives off the directory is an app-layer
-#: promise this constant makes in one place. The one exception is the caller's
-#: own membership — a private initiative is listed to its own members, which
-#: reveals nothing they don't already see in their sidebar.
+#: ``private`` is absent: the database hides a private initiative's row from
+#: anybody not in it (``private_initiative_read``), and this keeps it off the
+#: directory for the community's admin too, who reads every row. The one
+#: exception is the caller's own membership — a private initiative is listed to
+#: its own members, which reveals nothing they don't already see in their
+#: sidebar.
 LISTED_JOIN_POLICIES: tuple[str, ...] = (
     InitiativeJoinPolicy.request.value,
     InitiativeJoinPolicy.open.value,

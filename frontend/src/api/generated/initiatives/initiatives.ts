@@ -2417,7 +2417,8 @@ export function useSearchInitiativeMembers<
 }
 
 /**
- * Remove a member from an initiative.
+ * Remove a member from an initiative. Nothing comes back: a manager who
+ * leaves a private initiative no longer reads it.
  * @summary Remove Initiative Member
  */
 export const removeInitiativeMember = (
@@ -2427,7 +2428,7 @@ export const removeInitiativeMember = (
   options?: SecondParameter<typeof apiMutator>,
   signal?: AbortSignal
 ) => {
-  return apiMutator<InitiativeRead>(
+  return apiMutator<void>(
     {
       url: `/api/v1/c/${communityId}/initiatives/${initiativeId}/members/${userId}`,
       method: "DELETE",

@@ -268,7 +268,7 @@ async def test_guild_scope_lists_the_whole_guild_for_admins_only(
 
 @pytest.mark.parametrize(
     ("caller", "status_code"),
-    [("grantee", 200), ("outsider", 403)],
+    [("grantee", 200), ("outsider", 404)],
     ids=["a live read grant", "a guild member outside it"],
 )
 async def test_reading_an_initiative_by_id_answers_each_caller(
@@ -279,8 +279,9 @@ async def test_reading_an_initiative_by_id_answers_each_caller(
     status_code: int,
 ):
     """The initiative and its roles are addressable by id for a grantee — the
-    pages that open one resolve it that way rather than from a roster. The
-    grantee leg widened nothing for an ordinary member of the guild.
+    pages that open one resolve it that way rather than from a roster. To an
+    ordinary member of the guild outside it, a private initiative reads as
+    absent.
     """
     owner = await acting_user(guild_role=CommunityRole.admin)
     initiative = await create_initiative(
@@ -303,7 +304,7 @@ async def test_reading_an_initiative_by_id_answers_each_caller(
 
     assert detail.status_code == status_code, detail.text
     if status_code != 200:
-        assert detail.json()["detail"] == InitiativeMessages.NOT_A_MEMBER
+        assert detail.json()["detail"] == InitiativeMessages.NOT_FOUND
         return
 
     assert detail.json()["name"] == "Apollo"
@@ -680,10 +681,10 @@ async def test_search_initiative_members_filters_by_user_id(
     [
         ("/members", "insider", 200),
         ("/members", "admin", 200),
-        ("/members", "outsider", 403),
+        ("/members", "outsider", 404),
         ("/members/search", "insider", 200),
         ("/members/search", "admin", 200),
-        ("/members/search", "outsider", 403),
+        ("/members/search", "outsider", 404),
     ],
 )
 async def test_the_roster_answers_its_members_and_a_guild_admin(
@@ -698,9 +699,9 @@ async def test_the_roster_answers_its_members_and_a_guild_admin(
 
     A guild admin reads it too, without ever having joined — the same
     guild-admin override every other initiative read honors, and what the
-    assignee and linked-member pickers run on. A plain guild member outside the
-    initiative stays out. The slim search answers exactly as the full roster
-    does.
+    assignee and linked-member pickers run on. To a plain guild member outside
+    the (private) initiative it reads as absent. The slim search answers
+    exactly as the full roster does.
     """
     owner, initiative = await _initiative_with_owner(session, acting_user)
     insider = await _caller(acting_user, "member", owner, initiative)
@@ -717,7 +718,7 @@ async def test_the_roster_answers_its_members_and_a_guild_admin(
 
     assert response.status_code == status_code, response.text
     if status_code != 200:
-        assert response.json()["detail"] == InitiativeMessages.NOT_A_MEMBER
+        assert response.json()["detail"] == InitiativeMessages.NOT_FOUND
         return
 
     # The roster nests each person beside their role; the search is people.
@@ -1037,8 +1038,18 @@ async def test_removing_a_membership_ends_it(
         headers=owner.headers,
     )
 
-    assert response.status_code == 200, response.text
-    assert response.json()["member_count"] == (0 if who == "the last manager" else 1)
+    # Nothing to answer with: whoever left a private initiative no longer reads
+    # it.
+    assert response.status_code == 204, response.text
+    await route_session_to_guild(session, owner.guild.id)
+    remaining = (
+        await session.exec(
+            select(InitiativeMember.user_id).where(
+                InitiativeMember.initiative_id == initiative.id
+            )
+        )
+    ).all()
+    assert len(remaining) == (0 if who == "the last manager" else 1)
     levels = (
         await session.exec(
             select(ResourceGrant.level).where(ResourceGrant.user_id == target.user.id)
@@ -1135,9 +1146,8 @@ async def test_directory_lists_only_joinable_initiatives(
     guild is unchanged, the directory just stops standing in for it, and
     ``scope=community`` is where the whole guild is.
 
-    RLS *would* permit listing a private initiative to any guild member (the
-    `initiatives` table is structural), so this exclusion is an app-layer
-    promise — pinned here rather than assumed.
+    The database hides a private initiative's row from anybody not in it; the
+    directory leaves it off for the guild admin too, who reads every row.
     """
     admin = await acting_user(guild_role=CommunityRole.admin)
 
@@ -1260,7 +1270,7 @@ async def _joiner(acting_user, session: AsyncSession, kind: str, owner, initiati
     ("policy", "caller", "status_code", "outcome"),
     [
         ("open", "guild member", 200, ("member", False)),
-        ("private", "guild member", 403, InitiativeMessages.NOT_JOINABLE),
+        ("private", "guild member", 404, InitiativeMessages.NOT_FOUND),
         ("request", "guild member", 403, InitiativeMessages.NOT_JOINABLE),
         ("private", "guild admin", 200, ("moderator", True)),
         ("request", "guild admin", 200, ("moderator", True)),
@@ -1280,9 +1290,9 @@ async def test_self_join_answers_each_policy_and_caller(
     """Who walks in, and on which role.
 
     Self-join hands out the floor — the built-in member role, not managed by
-    OIDC — and joining twice is a success rather than a second row. ``private``
-    and ``request`` answer identically ("not by this route"), so the refusal
-    says no more about one than the other. A guild admin's sidebar is their
+    OIDC — and joining twice is a success rather than a second row. A
+    ``private`` initiative reads as absent to anybody not in it; ``request``
+    answers "not by this route". A guild admin's sidebar is their
     memberships, so walking in is how they put an initiative in it, and they
     land on the moderator role their standing already carries. A grant reaches
     the guild for a window; the membership row a join writes has no end date.
@@ -1502,7 +1512,7 @@ async def test_join_request_created_on_request_policy(
 @pytest.mark.parametrize(
     ("policy", "caller", "knocked_first", "status_code", "detail"),
     [
-        ("private", "guild member", False, 403, InitiativeMessages.NOT_REQUESTABLE),
+        ("private", "guild member", False, 404, InitiativeMessages.NOT_FOUND),
         ("open", "guild member", False, 403, InitiativeMessages.NOT_REQUESTABLE),
         (
             "request",
@@ -1540,8 +1550,8 @@ async def test_knocking_answers_each_policy_and_caller(
 ):
     """Who may leave a request at the door, and who has nothing to ask for.
 
-    `private` and `open` answer identically — "not by this route" — so the
-    refusal reveals no more about a private initiative than it did before.
+    A `private` initiative reads as absent to anybody not in it; `open`
+    answers "not by this route".
     There is one live request per door. A guild admin already reaches every
     initiative in their guild and may only ever hold a manager role in one, so
     there is nothing for them to ask and no request to approve later. A grant
