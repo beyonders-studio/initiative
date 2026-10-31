@@ -2288,5 +2288,28 @@
     },
     "beyondYours": "No puedes cambiar este rol: incluye algo que tú no tienes.",
     "widensAnAdmin": "Solo un administrador que puede hacerlo todo puede eliminar un rol de administrador: quienes lo tienen lo recuperan todo."
+  },
+  "customRoleRules": {
+    "title": "Roles personalizados por grupo",
+    "description": "Da un rol personalizado a quien inicie sesión con un grupo. Un inicio de sesión lee estas reglas en orden y decide el primer grupo que coincida; un rol asignado a mano se mantiene.",
+    "add": "Añadir regla de rol",
+    "empty": "Ningún grupo da todavía un rol personalizado.",
+    "gives": "Con {{provider}}, da {{role}}",
+    "moveUp": "Subir {{group}}",
+    "moveDown": "Bajar {{group}}",
+    "remove": "Quitar regla",
+    "removeTitle": "¿Quitar esta regla?",
+    "removeDescription": "Quienes están en {{group}} conservan el rol hasta su próximo inicio de sesión.",
+    "dialogDescription": "Quien inicie sesión con este proveedor y tenga el grupo recibe el rol, salvo que antes coincida otra regla.",
+    "roleLabel": "Rol personalizado",
+    "rolePlaceholder": "Elige un rol",
+    "added": "Regla añadida",
+    "addError": "No se pudo añadir la regla",
+    "orderError": "No se pudieron reordenar las reglas",
+    "removeError": "No se pudo quitar la regla",
+    "closed": "Tu servidor ha desactivado los roles personalizados en esta comunidad. Estas reglas siguen aplicándose; nadie aquí puede cambiarlas.",
+    "loading": "Cargando reglas…",
+    "loadError": "No se pudieron cargar las reglas.",
+    "retry": "Reintentar"
   }
 }

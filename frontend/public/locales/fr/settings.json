@@ -2288,5 +2288,28 @@
     },
     "beyondYours": "Vous ne pouvez pas modifier ce rôle : il comprend quelque chose que vous n'avez pas.",
     "widensAnAdmin": "Seul un administrateur qui peut tout faire peut supprimer un rôle d'administrateur : ceux qui l'ont récupèrent tout."
+  },
+  "customRoleRules": {
+    "title": "Rôles personnalisés par groupe",
+    "description": "Donnez un rôle personnalisé à quiconque se connecte avec un groupe. Une connexion lit ces règles dans l'ordre et le premier groupe correspondant décide ; un rôle donné à la main est conservé.",
+    "add": "Ajouter une règle de rôle",
+    "empty": "Aucun groupe ne donne encore de rôle personnalisé.",
+    "gives": "Via {{provider}}, donne {{role}}",
+    "moveUp": "Monter {{group}}",
+    "moveDown": "Descendre {{group}}",
+    "remove": "Supprimer la règle",
+    "removeTitle": "Supprimer cette règle ?",
+    "removeDescription": "Les personnes de {{group}} gardent le rôle jusqu'à leur prochaine connexion.",
+    "dialogDescription": "Quiconque se connecte via ce fournisseur avec ce groupe reçoit le rôle, sauf si une règle précédente correspond d'abord.",
+    "roleLabel": "Rôle personnalisé",
+    "rolePlaceholder": "Choisir un rôle",
+    "added": "Règle ajoutée",
+    "addError": "Impossible d'ajouter la règle",
+    "orderError": "Impossible de réordonner les règles",
+    "removeError": "Impossible de supprimer la règle",
+    "closed": "Votre serveur a désactivé les rôles personnalisés pour cette communauté. Ces règles continuent de s'appliquer ; personne ici ne peut les modifier.",
+    "loading": "Chargement des règles…",
+    "loadError": "Impossible de charger les règles.",
+    "retry": "Réessayer"
   }
 }
