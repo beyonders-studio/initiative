@@ -340,7 +340,9 @@ async def sync_oidc_assignments(
                 kept_out.add(guild_id)
                 continue
             # A seat is a seat however somebody arrives: a full community
-            # takes nobody new from its rules either.
+            # takes nobody new from its rules either. The cap's lock is held
+            # to the commit, taken in ascending order as ``join_on_arrival``
+            # takes it.
             try:
                 await guilds_service.assert_member_capacity(session, guild_id=guild_id)
             except guilds_service.GuildCapacityError:

@@ -1561,10 +1561,11 @@ _DEFINITIONS_SECTION = """\
 -- community's admin's.
 --
 -- definition_removal: RESTRICTIVE on DELETE.
--- tr_metadata_definitions_reshape: an UPDATE by anybody else may only add
---   options with values the field doesn't have yet, leaving every other column
---   (its update time aside) and every option already there as it is. A policy
---   cannot compare the old row with the new one.
+-- tr_metadata_definitions_reshape: an UPDATE by anybody else may only append
+--   options with values the field doesn't have yet: the options already there
+--   come first, exactly as they were, and every other column (its update time
+--   aside) is left as it is. A policy cannot compare the old row with the new
+--   one.
 -- ==========================================================================="""
 
 #: An initiative's own field, as against a project's, a collection's or a
@@ -1583,18 +1584,37 @@ def _sets_up(initiative: str) -> str:
     )
 
 
+def _options(row: str) -> str:
+    """A definition's options as an array: none, SQL or JSON null, reads as
+    empty."""
+    return (
+        f"(CASE WHEN jsonb_typeof({row}.options) = 'array'"
+        f" THEN {row}.options ELSE '[]'::jsonb END)"
+    )
+
+
 _DEFINITION_RESHAPE_FN = f"""
 CREATE OR REPLACE FUNCTION public.fn_metadata_definition_reshape() RETURNS trigger
     LANGUAGE plpgsql AS $reshape$
+DECLARE
+    v_old jsonb;
+    v_new jsonb;
 BEGIN
-    IF OLD.project_id IS NULL AND OLD.collection_id IS NULL AND OLD.install_id IS NULL
-       AND NOT {_sets_up("OLD.initiative_id")}
-       AND NOT ((to_jsonb(NEW) - 'options' - 'updated_at')
-                = (to_jsonb(OLD) - 'options' - 'updated_at')
-                AND COALESCE(NEW.options, '[]'::jsonb)
-                    @> COALESCE(OLD.options, '[]'::jsonb)
-                AND (SELECT count(DISTINCT o ->> 'value') = count(*)
-                     FROM jsonb_array_elements(COALESCE(NEW.options, '[]'::jsonb)) o)) THEN
+    IF OLD.project_id IS NOT NULL OR OLD.collection_id IS NOT NULL
+       OR OLD.install_id IS NOT NULL OR {_sets_up("OLD.initiative_id")} THEN
+        RETURN NEW;
+    END IF;
+    v_old := {_options("OLD")};
+    v_new := {_options("NEW")};
+    IF (to_jsonb(NEW) - 'options' - 'updated_at')
+           IS DISTINCT FROM (to_jsonb(OLD) - 'options' - 'updated_at')
+       OR v_old IS DISTINCT FROM COALESCE((
+              SELECT jsonb_agg(t.o ORDER BY t.n)
+              FROM jsonb_array_elements(v_new) WITH ORDINALITY AS t(o, n)
+              WHERE t.n <= jsonb_array_length(v_old)
+          ), '[]'::jsonb)
+       OR (SELECT count(DISTINCT o ->> 'value') <> count(*)
+           FROM jsonb_array_elements(v_new) o) THEN
         RAISE EXCEPTION 'only a manager reshapes this field' USING ERRCODE = '42501';
     END IF;
     RETURN NEW;
