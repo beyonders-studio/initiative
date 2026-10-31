@@ -1562,9 +1562,9 @@ _DEFINITIONS_SECTION = """\
 --
 -- definition_removal: RESTRICTIVE on DELETE.
 -- tr_metadata_definitions_reshape: an UPDATE by anybody else may only add
---   options, leaving every other column (its update time aside) and every
---   option already there as it is. A policy cannot compare the old row with
---   the new one.
+--   options with values the field doesn't have yet, leaving every other column
+--   (its update time aside) and every option already there as it is. A policy
+--   cannot compare the old row with the new one.
 -- ==========================================================================="""
 
 #: An initiative's own field, as against a project's, a collection's or a
@@ -1592,7 +1592,9 @@ BEGIN
        AND NOT ((to_jsonb(NEW) - 'options' - 'updated_at')
                 = (to_jsonb(OLD) - 'options' - 'updated_at')
                 AND COALESCE(NEW.options, '[]'::jsonb)
-                    @> COALESCE(OLD.options, '[]'::jsonb)) THEN
+                    @> COALESCE(OLD.options, '[]'::jsonb)
+                AND (SELECT count(DISTINCT o ->> 'value') = count(*)
+                     FROM jsonb_array_elements(COALESCE(NEW.options, '[]'::jsonb)) o)) THEN
         RAISE EXCEPTION 'only a manager reshapes this field' USING ERRCODE = '42501';
     END IF;
     RETURN NEW;
