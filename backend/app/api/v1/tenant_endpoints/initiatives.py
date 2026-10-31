@@ -1,6 +1,6 @@
 from typing import Annotated, List, Optional, TypeVar
 
-from fastapi import APIRouter, Depends, HTTPException, Query, status
+from fastapi import APIRouter, Depends, HTTPException, Query, Response, status
 from sqlalchemy import ColumnElement, Select, func
 from sqlalchemy.orm import contains_eager, selectinload, undefer
 from sqlmodel import select
@@ -1617,15 +1617,18 @@ async def add_initiative_member(
     return read
 
 
-@router.delete("/{initiative_id}/members/{user_id}", response_model=InitiativeRead)
+@router.delete(
+    "/{initiative_id}/members/{user_id}", status_code=status.HTTP_204_NO_CONTENT
+)
 async def remove_initiative_member(
     initiative_id: int,
     user_id: int,
     session: RLSSessionDep,
     current_user: Annotated[User, Depends(get_current_active_user)],
     guild_context: Annotated[GuildContext, Depends(get_guild_membership)],
-) -> InitiativeRead:
-    """Remove a member from an initiative."""
+) -> Response:
+    """Remove a member from an initiative. Nothing comes back: a manager who
+    leaves a private initiative no longer reads it."""
     initiative = await _get_initiative_or_404(initiative_id, session)
     await _require_manager_access(
         session,
@@ -1675,7 +1678,7 @@ async def remove_initiative_member(
         # the guild immediately (initiative-level access change).
         await content_sockets.revoke_user(guild_context.guild_id, user_id)
 
-    return await _read_initiative(initiative_id, session, guild_context)
+    return Response(status_code=status.HTTP_204_NO_CONTENT)
 
 
 @router.patch("/{initiative_id}/members/{user_id}", response_model=InitiativeRead)

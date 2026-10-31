@@ -9,6 +9,15 @@ matter and can be deleted.
 
 ## After 0.77.1
 
+### Removing someone from an initiative answers with nothing
+
+A private initiative now reads as absent, in the database, to anybody not in
+it, so a manager who removes their own membership can no longer read the
+initiative to answer with. The route answers `204` for everyone; the app never
+read the body.
+
+- DELETE /api/v1/c/{community_id}/initiatives/{initiative_id}/members/{user_id} removed the success response with the status `200`
+
 ### The community list stops carrying two admin-only rules
 
 `enforce_compliance_session` and `require_second_factor` left `CommunityRead`.
