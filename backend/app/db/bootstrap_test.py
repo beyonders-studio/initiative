@@ -642,3 +642,39 @@ async def test_the_handover_leaves_alone_what_the_target_already_owns(session):
         assert f"table guild_template.{table}" not in labels
     finally:
         await session.exec(text(f"DROP TABLE IF EXISTS guild_template.{table}"))
+
+
+async def test_a_shared_role_the_provisioner_administers_is_left_alone():
+    """Granting the provisioner ADMIN again would lock the role, which a
+    community being provisioned elsewhere may hold: one the provisioner
+    already administers is skipped, so the start never waits on it."""
+    from sqlalchemy import text
+    from sqlalchemy.ext.asyncio import create_async_engine
+    from sqlalchemy.pool import NullPool
+
+    from app.db.bootstrap import _administer_existing_roles
+    from app.db.public_rls import role_name
+    from conftest import RUN_ID, TEST_DATABASE_URL
+
+    shared = role_name("app_billing_log")
+    holder = f"test_{RUN_ID}_lock_holder"
+    provisioner = login_roles()[0].name
+    engine = create_async_engine(TEST_DATABASE_URL, poolclass=NullPool)
+    try:
+        async with engine.connect() as other:
+            # A grant of the shared role, left open, holds its lock.
+            held = await other.begin()
+            await other.execute(text(f'CREATE ROLE "{holder}"'))
+            await other.execute(text(f'GRANT "{shared}" TO "{holder}"'))
+            try:
+                async with engine.begin() as conn:
+                    await conn.execute(text("SET LOCAL lock_timeout = '2s'"))
+                    await conn.execute(
+                        text("SELECT set_config('app._bootstrap_role', :p, true)"),
+                        {"p": provisioner},
+                    )
+                    await conn.execute(text(_administer_existing_roles()))
+            finally:
+                await held.rollback()
+    finally:
+        await engine.dispose()
