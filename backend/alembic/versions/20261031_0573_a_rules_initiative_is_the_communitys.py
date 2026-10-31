@@ -5,9 +5,11 @@ an initiative and a role in a community's own schema, which no key from
 ``public`` reaches. The sign-in reads a rule's community across communities,
 and its initiative only once it is inside that community. In
 ``guild_template`` and every ``guild_<id>``, ``claim_rule_initiatives`` keeps
-them under the rule's id, with keys holding the row to an initiative and a role
-of that initiative: deleting either deletes the row, and the rule goes on
-placing people in the community alone.
+them under the rule's id and a version, with keys holding the row to an
+initiative and a role of that initiative: deleting either deletes the row, and
+the rule goes on placing people in the community alone. The rule names its
+version in ``placement_version``, so moving it switches the claims and the
+place together.
 
 Each community's rows are copied from the rules naming it whose initiative and
 role are still there. A rule whose initiative or role has since been deleted
@@ -72,6 +74,7 @@ def _create() -> None:
     op.create_table(
         TABLE,
         sa.Column("rule_id", sa.Integer(), autoincrement=False, nullable=False),
+        sa.Column("version", sa.Integer(), autoincrement=False, nullable=False),
         sa.Column("initiative_id", sa.Integer(), nullable=False),
         sa.Column("initiative_role_id", sa.Integer(), nullable=False),
         sa.ForeignKeyConstraint(
@@ -83,7 +86,7 @@ def _create() -> None:
             ondelete="CASCADE",
             name="fk_claim_rule_initiatives_role",
         ),
-        sa.PrimaryKeyConstraint("rule_id"),
+        sa.PrimaryKeyConstraint("rule_id", "version"),
     )
     op.create_index(f"ix_{TABLE}_initiative_id", TABLE, ["initiative_id"])
     op.create_index(f"ix_{TABLE}_initiative_role_id", TABLE, ["initiative_role_id"])
@@ -107,8 +110,9 @@ def _upgrade_schema() -> None:
     with _unforced("initiative_roles") as bind:
         bind.execute(
             sa.text(
-                f"INSERT INTO {TABLE} (rule_id, initiative_id, initiative_role_id)"
-                " SELECT m.id, m.initiative_id, m.initiative_role_id"
+                f"INSERT INTO {TABLE}"
+                " (rule_id, version, initiative_id, initiative_role_id)"
+                " SELECT m.id, 0, m.initiative_id, m.initiative_role_id"
                 f" FROM {RULES} m"
                 " JOIN initiative_roles r"
                 " ON r.id = m.initiative_role_id AND r.initiative_id = m.initiative_id"
@@ -125,7 +129,8 @@ def _downgrade_schema() -> None:
             " SET initiative_id = c.initiative_id,"
             " initiative_role_id = c.initiative_role_id"
             f" FROM {TABLE} c"
-            f" WHERE c.rule_id = m.id AND m.guild_id = {_GUILD_ID}"
+            f" WHERE c.rule_id = m.id AND c.version = m.placement_version"
+            f" AND m.guild_id = {_GUILD_ID}"
         )
     )
     _drop()
@@ -136,6 +141,13 @@ def upgrade() -> None:
         run_for_each_guild_schema(bind, _upgrade_schema)
     op.drop_column("oidc_claim_mappings", "initiative_role_id", schema="public")
     op.drop_column("oidc_claim_mappings", "initiative_id", schema="public")
+    op.add_column(
+        "oidc_claim_mappings",
+        sa.Column(
+            "placement_version", sa.Integer(), nullable=False, server_default="0"
+        ),
+        schema="public",
+    )
 
 
 def downgrade() -> None:
@@ -147,3 +159,4 @@ def downgrade() -> None:
         )
     with _unforced(RULES) as bind:
         run_for_each_guild_schema(bind, _downgrade_schema)
+    op.drop_column("oidc_claim_mappings", "placement_version", schema="public")

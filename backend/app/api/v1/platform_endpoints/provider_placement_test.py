@@ -24,6 +24,20 @@ from app.testing.schema_harness import route_session_to_guild
 BASE = "/api/v1/settings/placement"
 
 
+async def _versions(session: AsyncSession, rule_id: int) -> list[int]:
+    """The versions a rule has rows for in the community's schema."""
+    session.expunge_all()
+    return list(
+        (
+            await session.exec(
+                select(ClaimRuleInitiative.version)
+                .where(ClaimRuleInitiative.rule_id == rule_id)
+                .order_by(ClaimRuleInitiative.version)
+            )
+        ).all()
+    )
+
+
 async def _headers(session: AsyncSession, role: UserRole) -> dict[str, str]:
     return get_auth_headers(await create_user(session, role=role))
 
@@ -227,21 +241,43 @@ async def test_the_initiative_picker_reads_a_placeable_community_only(
     assert moved.status_code == 200, moved.text
     assert moved.json()["initiative_id"] is None
     await route_session_to_guild(session, guild.id)
-    assert await session.get(ClaimRuleInitiative, rule_id) is None
+    assert await _versions(session, rule_id) == []
 
-    # And deleting a rule that places in one drops it too.
+    # Placing it again writes its next version, which the rule names once
+    # committed with its claims; changing only what it matches writes none.
     again = await client.patch(
         f"{BASE}/rules/{rule_id}",
         headers=headers,
         json={"initiative_id": initiative.id, "initiative_role_id": pm_role.id},
     )
     assert again.json()["initiative_role_id"] == pm_role.id
-    session.expunge_all()
-    assert await session.get(ClaimRuleInitiative, rule_id) is not None
+    assert await _versions(session, rule_id) == [1]
+    renamed = await client.patch(
+        f"{BASE}/rules/{rule_id}", headers=headers, json={"claim_value": "chiefs"}
+    )
+    assert renamed.json()["initiative_role_id"] == pm_role.id
+    assert await _versions(session, rule_id) == [1]
+
+    # Moving it keeps the version before, for a sign-in that read the rule
+    # just before, and drops the older ones.
+    member_role = await get_role_by_name(
+        session, initiative_id=initiative.id, role_name="member"
+    )
+    for role in (member_role, pm_role):
+        moved = await client.patch(
+            f"{BASE}/rules/{rule_id}",
+            headers=headers,
+            json={"initiative_role_id": role.id},
+        )
+        assert moved.json()["initiative_role_id"] == role.id
+    assert await _versions(session, rule_id) == [2, 3]
+    rule = await session.get(OIDCClaimMapping, rule_id)
+    assert rule is not None and rule.placement_version == 3
+
+    # And deleting a rule that places in one drops it too.
     removed = await client.delete(f"{BASE}/rules/{rule_id}", headers=headers)
     assert removed.status_code == 204, removed.text
-    session.expunge_all()
-    assert await session.get(ClaimRuleInitiative, rule_id) is None
+    assert await _versions(session, rule_id) == []
 
 
 async def test_the_community_search_says_which_communities_accept(

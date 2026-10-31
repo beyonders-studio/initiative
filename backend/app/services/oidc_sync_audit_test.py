@@ -171,7 +171,7 @@ async def test_a_moved_role_and_a_withdrawn_claim_are_both_recorded(
 
     # The rule now names a different role for the same claim.
     await route_session_to_guild(session, guild_id)
-    placed = await session.get(ClaimRuleInitiative, rule_id)
+    placed = await session.get(ClaimRuleInitiative, (rule_id, 0))
     assert placed is not None
     placed.initiative_role_id = other_role_id
     session.add(placed)

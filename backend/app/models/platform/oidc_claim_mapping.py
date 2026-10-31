@@ -71,6 +71,12 @@ class OIDCClaimMapping(SQLModel, table=True):
     target_type: OIDCMappingTargetType = Field(
         sa_column=Column(String(20), nullable=False),
     )
+    #: Which of the rule's rows in ``claim_rule_initiatives`` is its own: the
+    #: one written for the claims it matches now.
+    placement_version: int = Field(
+        default=0,
+        sa_column=Column(Integer, nullable=False, server_default="0"),
+    )
     guild_id: int = Field(
         sa_column=Column(
             Integer,

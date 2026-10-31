@@ -5,6 +5,7 @@ from collections.abc import Collection
 from dataclasses import dataclass, field
 from functools import partial
 
+from sqlalchemy import tuple_
 from sqlmodel import select
 from sqlmodel.ext.asyncio.session import AsyncSession
 
@@ -193,8 +194,9 @@ async def sync_oidc_assignments(
     # naming no group places everybody its directory matched.
     guild_roles: dict[int, str] = {}
     # Per guild, the matched rules that place people in one of its
-    # initiatives too. Which initiative is the guild's own, read in its half.
-    initiative_rules: dict[int, set[int]] = {}
+    # initiatives too, by id and the version each names. Which initiative is
+    # the guild's own, read in its half.
+    initiative_rules: dict[int, list[OIDCClaimMapping]] = {}
     for mapping in mappings:
         if mapping.claim_value is not None and (
             mapping.claim_value.lower() not in claim_values
@@ -208,11 +210,8 @@ async def sync_oidc_assignments(
             guild_roles[gid], 0
         ):
             guild_roles[gid] = role
-        if (
-            mapping.target_type == OIDCMappingTargetType.initiative
-            and mapping.id is not None
-        ):
-            initiative_rules.setdefault(gid, set()).add(mapping.id)
+        if mapping.target_type == OIDCMappingTargetType.initiative:
+            initiative_rules.setdefault(gid, []).append(mapping)
 
     # ``oidc_claim_mappings`` and guild memberships are shared; initiatives,
     # their roles and members, and which initiative a rule places people in,
@@ -404,9 +403,9 @@ async def sync_oidc_assignments(
     async def sync_initiatives(guild_session: AsyncSession, gid: int) -> None:
         # Each initiative the matched rules place people in, at the strongest
         # role they name there: a manager role first, then the lowest position.
-        rule_ids = initiative_rules.get(gid)
+        keys = provider_placement.placed(initiative_rules.get(gid, ()))
         guild_init_roles: dict[int, int] = {}
-        if rule_ids:
+        if keys:
             for iid, role_id in (
                 await guild_session.exec(
                     select(
@@ -418,7 +417,11 @@ async def sync_oidc_assignments(
                         InitiativeRoleModel.id
                         == ClaimRuleInitiative.initiative_role_id,
                     )
-                    .where(ClaimRuleInitiative.rule_id.in_(rule_ids))
+                    .where(
+                        tuple_(
+                            ClaimRuleInitiative.rule_id, ClaimRuleInitiative.version
+                        ).in_(keys)
+                    )
                     .order_by(
                         InitiativeRoleModel.is_manager.desc(),
                         InitiativeRoleModel.position,
