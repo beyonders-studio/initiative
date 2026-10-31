@@ -71,8 +71,6 @@ class DemoSandbox(SQLModel, table=True):
     claimed_at: Optional[datetime] = Field(
         default=None, sa_column=Column(DateTime(timezone=True), nullable=True)
     )
-    #: The import filling the copy, in the copy's own schema.
-    import_job_id: Optional[int] = Field(default=None)
     #: The account made for the visitor, deleted with the copy.
     visitor_id: Optional[int] = Field(
         default=None,
