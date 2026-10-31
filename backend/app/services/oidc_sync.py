@@ -10,7 +10,6 @@ from sqlmodel.ext.asyncio.session import AsyncSession
 from app.core.audit_events import AuditEventType
 from app.db import post_commit
 from app.models.platform.guild import GUILD_ADMIN_ROLES, GuildMembership, CommunityRole
-from app.models.platform.guild_provider_connection import GuildProviderConnection
 from app.services import audit as audit_service
 from app.services.auth import guild_provider_connections as guild_connections
 from app.services.guild_sweeps import Scope, each_guild
@@ -113,11 +112,7 @@ async def placement_claims(session: AsyncSession, *, provider_id: int) -> set[st
     """The verified claims this provider's rules are decided by: the narrowing
     each community that wrote a rule has for the provider, and the directory a
     provider rule names. What :func:`sync_oidc_assignments` reads from
-    ``claims`` besides the groups.
-
-    A community's custom-role rules live in its own schema, so which of them
-    have any is not read here: every community connected to the provider may,
-    and its narrowing is asked for too."""
+    ``claims`` besides the groups."""
     rules = (
         await session.exec(
             select(OIDCClaimMapping).where(OIDCClaimMapping.provider_id == provider_id)
@@ -135,16 +130,7 @@ async def placement_claims(session: AsyncSession, *, provider_id: int) -> set[st
         provider_id=provider_id,
         guild_ids={
             rule.guild_id for rule in rules if rule.author == ClaimRuleAuthor.community
-        }
-        | set(
-            (
-                await session.exec(
-                    select(GuildProviderConnection.guild_id).where(
-                        GuildProviderConnection.provider_id == provider_id
-                    )
-                )
-            ).all()
-        ),
+        },
     )
 
 
@@ -415,6 +401,20 @@ async def sync_oidc_assignments(
     role_admitted = await guild_connections.communities_admitting(
         session, provider_id=provider_id, claims=claims, guild_ids=relevant_guilds
     )
+    # A refresh can arrive without the claim a community narrows by. Its
+    # custom-role rules are in its schema, which the refresh guard does not
+    # read, so there "not admitted" may only mean "not said": its roles are
+    # left as they are until a sign-in carries the claim.
+    role_unsaid = {
+        gid
+        for gid in relevant_guilds
+        if not (
+            await guild_connections.narrowing_claims(
+                session, provider_id=provider_id, guild_ids={gid}
+            )
+        )
+        <= claims.keys()
+    }
     await session.commit()
 
     # --- Initiative resolution + membership (each guild's half) ---
@@ -509,13 +509,17 @@ async def sync_oidc_assignments(
             )
 
         # The custom role the community's rules give for these groups.
-        changed = await custom_roles_service.apply_claims(
-            guild_session,
-            guild_id=gid,
-            user_id=user_id,
-            provider_id=provider_id,
-            claim_values=claim_values,
-            admitted=gid in role_admitted,
+        changed = (
+            None
+            if gid in role_unsaid
+            else await custom_roles_service.apply_claims(
+                guild_session,
+                guild_id=gid,
+                user_id=user_id,
+                provider_id=provider_id,
+                claim_values=claim_values,
+                admitted=gid in role_admitted,
+            )
         )
         if changed is not None:
             await _record(
