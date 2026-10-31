@@ -4997,8 +4997,8 @@ export interface CustomRoleHolder {
 }
 
 /**
- * Who wrote a community's rule row. A value set above is owned above: a
- * ``deployment`` row wins over the community's own.
+ * Who wrote a community's rule row or custom role. A value set above is
+ * owned above: a ``deployment`` row wins over the community's own.
  */
 export type SetBy = (typeof SetBy)[keyof typeof SetBy];
 
