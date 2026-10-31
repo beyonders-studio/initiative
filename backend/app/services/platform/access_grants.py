@@ -54,7 +54,7 @@ from app.schemas.platform.access_grant import (
     BreakGlassCreate,
 )
 from app.services import email as email_service
-from app.services.platform import auth_posture
+from app.services.platform import auth_posture, grant_cases
 from app.services.platform import guilds as guilds_service
 from app.services.platform import notice_outbox
 from app.core.user_display import handle_of
@@ -299,7 +299,6 @@ async def request_grants(
             reason=payload.reason,
             requested_duration_minutes=duration,
             requested_by_id=requester.id,
-            case_task_id=payload.case_task_id,
             community_notice=community_notice.value,
         )
         session.add(grant)
@@ -471,7 +470,6 @@ async def break_glass(
         approved_by_id=actor.id,
         decided_at=now,
         expires_at=now + timedelta(minutes=duration),
-        case_task_id=getattr(payload, "case_task_id", None),
         community_notice=community_notice.value,
     )
     session.add(grant)
@@ -800,8 +798,6 @@ async def process_grant_expiry() -> None:
     """Background sweep: mark the grants whose window has closed."""
     from app.db.session import SystemSessionLocal
 
-    from app.services.platform import grant_cases
-
     async with SystemSessionLocal() as session:
         expired = await expire_due(session)
         await session.commit()
@@ -830,13 +826,15 @@ async def _enrichment(
 async def to_read(
     grants: list[AccessGrant], *, system_session: Optional[AsyncSession] = None
 ) -> list[AccessGrantRead]:
-    """Serialize grants, batch-loading display enrichment (user/guild names).
+    """Serialize grants, batch-loading display enrichment (user/guild names)
+    and the case each serves.
 
     The enrichment is read on the system engine: the people a grant names are
     named by handle whoever reads it, and the community it names is one its
     holder is not a member of. A route already on the system engine passes its session;
     a route on the caller's platform tier passes none and a short system
-    session is opened for the lookup.
+    session is opened for the lookup. The cases are read in the operations
+    community, once for the page.
     """
     if not grants:
         return []
@@ -861,9 +859,12 @@ async def to_read(
                 own_session, user_ids=user_ids, guild_ids=guild_ids
             )
 
+    cases = await grant_cases.cases_of([int(g.id) for g in grants])
+
     out: list[AccessGrantRead] = []
     for g in grants:
         read = AccessGrantRead.model_validate(g)
+        read.case_task_id = cases.get(int(g.id))
         grantee = users.get(g.user_id)
         if grantee is not None:
             read.user = UserIdentity.model_validate(grantee)

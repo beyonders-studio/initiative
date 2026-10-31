@@ -591,22 +591,35 @@ async def take_task_case(
 async def _case_grants(guild_id: int, task_id: int) -> list[AccessGrantRead]:
     """The access grants asked for case ``task_id``, where this community is
     the operations community the grants' cases are in. Read on the system
-    engine: grants are shared rows, and the reader of a case is not the
-    approver of its grants."""
-    from sqlmodel import select
+    engine: the case's links are the platform's, grants are shared rows, and
+    the reader of a case is not the approver of its grants."""
+    from sqlmodel import col, select
 
-    from app.db.session import SystemSessionLocal
+    from app.db import cohorts
+    from app.db.request_context import SystemGuild
+    from app.db.session import SystemSessionLocal, set_rls_context
     from app.models.platform.access_grant import AccessGrant
+    from app.models.tenant.case_grant import CaseGrant
     from app.services.platform import access_grants as access_grants_service
     from app.services.platform.intake import configured_operations_guild_id
 
     if await configured_operations_guild_id() != guild_id:
         return []
+    async with cohorts.system_session(guild_id) as linked:
+        await set_rls_context(linked, SystemGuild(guild_id, read_only=True))
+        grant_ids = (
+            await linked.exec(
+                select(CaseGrant.grant_id).where(CaseGrant.task_id == task_id)
+            )
+        ).all()
+        await linked.rollback()
+    if not grant_ids:
+        return []
     async with SystemSessionLocal() as system:
         grants = (
             await system.exec(
                 select(AccessGrant)
-                .where(AccessGrant.case_task_id == task_id)
+                .where(col(AccessGrant.id).in_(grant_ids))
                 .order_by(AccessGrant.requested_at.desc(), AccessGrant.id.desc())
             )
         ).all()
