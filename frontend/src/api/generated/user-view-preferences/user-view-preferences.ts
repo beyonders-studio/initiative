@@ -169,6 +169,8 @@ export function useListViewPreferences<
 
 /**
  * Upsert the preference for the given ``scope_key`` (last write wins).
+ * A view of a community's list (``view:<community id>:…``) is refused: it
+ * is kept in that community.
  * @summary Put View Preference
  */
 export const putViewPreference = (

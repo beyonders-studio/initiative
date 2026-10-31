@@ -14,10 +14,11 @@ from __future__ import annotations
 from datetime import datetime, timezone
 from typing import Annotated
 
-from fastapi import APIRouter, Depends, Path, Response, status
+from fastapi import APIRouter, Depends, HTTPException, Path, Response, status
 from sqlmodel import select
 
 from app.api.deps import UserSessionDep, get_current_active_user
+from app.core.messages import ViewPreferenceMessages
 from app.models.platform.user import User
 from app.models.platform.user_view_preference import UserViewPreference
 from app.schemas.platform.user_view_preference import (
@@ -65,7 +66,15 @@ async def put_view_preference(
     session: UserSessionDep,
     current_user: Annotated[User, Depends(get_current_active_user)],
 ) -> Response:
-    """Upsert the preference for the given ``scope_key`` (last write wins)."""
+    """Upsert the preference for the given ``scope_key`` (last write wins).
+    A view of a community's list (``view:<community id>:…``) is refused: it
+    is kept in that community."""
+    names = scope_key.split(":")
+    if len(names) > 2 and names[0] == "view" and names[1].isdigit():
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail=ViewPreferenceMessages.VIEW_KEPT_IN_THE_COMMUNITY,
+        )
     stmt = select(UserViewPreference).where(
         UserViewPreference.user_id == current_user.id,
         UserViewPreference.scope_key == scope_key,
