@@ -283,3 +283,72 @@ async def test_a_private_initiative_reads_as_absent_to_anybody_not_in_it(
     assert await reads(admin) == set(ids)
     assert await reads(insider) == set(ids)
     assert await reads(outsider) == {open_one.id}
+
+
+async def test_a_member_defines_a_field_and_only_a_manager_reshapes_it(
+    acting_user, role_session
+):
+    """Any member defines an initiative's field and adds options to it as they
+    pick a value nobody offered; renaming or removing it is its managers'."""
+    admin = await acting_user(guild_role=CommunityRole.admin, initiative=True)
+    manager = await acting_user(
+        guild_role=CommunityRole.member,
+        guild=admin.guild,
+        initiative=admin.initiative,
+        initiative_role="project_manager",
+    )
+    member = await acting_user(
+        guild_role=CommunityRole.member,
+        guild=admin.guild,
+        initiative=admin.initiative,
+        initiative_role="member",
+    )
+    iid = admin.initiative.id
+
+    async def runs(actor, sql: str) -> bool:
+        s = await _writing_as(
+            role_session, user_id=actor.user.id, guild_id=admin.guild.id
+        )
+        try:
+            changed = (await s.exec(text(sql))).rowcount
+            await s.commit()
+        except DBAPIError:
+            return False
+        finally:
+            await s.rollback()
+        return changed > 0
+
+    assert await runs(
+        member,
+        "INSERT INTO metadata_definitions"
+        " (initiative_id, name, type, position, options, created_at, updated_at)"
+        f" VALUES ({iid}, 'Stage', 'select', 0, '[{{\"value\": \"a\"}}]'::jsonb,"
+        " now(), now())",
+    )
+    field = f"name = 'Stage' AND initiative_id = {iid}"
+    assert await runs(
+        member,
+        "UPDATE metadata_definitions SET options = options"
+        f' || \'[{{"value": "b"}}]\'::jsonb WHERE {field}',
+    )
+    # An option already there keeps its label: a second one with its value is
+    # not an addition.
+    assert not await runs(
+        member,
+        "UPDATE metadata_definitions SET options = options"
+        f' || \'[{{"value": "a", "label": "Changed"}}]\'::jsonb WHERE {field}',
+    )
+    assert not await runs(
+        member, f"UPDATE metadata_definitions SET name = 'Phase' WHERE {field}"
+    )
+    assert not await runs(
+        member, f"UPDATE metadata_definitions SET options = '[]'::jsonb WHERE {field}"
+    )
+    assert not await runs(member, f"DELETE FROM metadata_definitions WHERE {field}")
+    assert await runs(
+        manager, f"UPDATE metadata_definitions SET name = 'Phase' WHERE {field}"
+    )
+    assert await runs(
+        manager,
+        f"DELETE FROM metadata_definitions WHERE name = 'Phase' AND initiative_id = {iid}",
+    )

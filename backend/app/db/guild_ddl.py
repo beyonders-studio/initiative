@@ -1552,6 +1552,72 @@ def _draft_block() -> str:
     )
 
 
+_DEFINITIONS_SECTION = """\
+-- ===========================================================================
+-- An initiative's own metadata (metadata_definitions naming no project,
+-- collection or plug-in): any member defines a field, and adds options to a
+-- choice field as they pick a value nobody has offered; reshaping or removing
+-- one is setting the initiative up, which is its managers' and the
+-- community's admin's.
+--
+-- definition_removal: RESTRICTIVE on DELETE.
+-- tr_metadata_definitions_reshape: an UPDATE by anybody else may only add
+--   options with values the field doesn't have yet, leaving every other column
+--   (its update time aside) and every option already there as it is. A policy
+--   cannot compare the old row with the new one.
+-- ==========================================================================="""
+
+#: An initiative's own field, as against a project's, a collection's or a
+#: plug-in's, which their owners' policies govern.
+_INITIATIVE_FIELD = (
+    "project_id IS NULL AND collection_id IS NULL AND install_id IS NULL"
+)
+
+
+def _sets_up(initiative: str) -> str:
+    """Who sets ``initiative`` up: its managers, the community's admin, or the
+    system engine (``property_definitions._manages``)."""
+    return (
+        f"({IN_POLICY.system} OR {IN_POLICY.admin} OR ({IN_POLICY.this_guild}"
+        f" AND {initiative} = ANY ({IN_POLICY.field('manager_initiatives')})))"
+    )
+
+
+_DEFINITION_RESHAPE_FN = f"""
+CREATE OR REPLACE FUNCTION public.fn_metadata_definition_reshape() RETURNS trigger
+    LANGUAGE plpgsql AS $reshape$
+BEGIN
+    IF OLD.project_id IS NULL AND OLD.collection_id IS NULL AND OLD.install_id IS NULL
+       AND NOT {_sets_up("OLD.initiative_id")}
+       AND NOT ((to_jsonb(NEW) - 'options' - 'updated_at')
+                = (to_jsonb(OLD) - 'options' - 'updated_at')
+                AND COALESCE(NEW.options, '[]'::jsonb)
+                    @> COALESCE(OLD.options, '[]'::jsonb)
+                AND (SELECT count(DISTINCT o ->> 'value') = count(*)
+                     FROM jsonb_array_elements(COALESCE(NEW.options, '[]'::jsonb)) o)) THEN
+        RAISE EXCEPTION 'only a manager reshapes this field' USING ERRCODE = '42501';
+    END IF;
+    RETURN NEW;
+END;
+$reshape$;
+"""
+
+
+def _definitions_block() -> str:
+    return "\n".join(
+        [
+            "DROP POLICY IF EXISTS definition_removal ON metadata_definitions;",
+            "CREATE POLICY definition_removal ON metadata_definitions AS RESTRICTIVE"
+            f" FOR DELETE USING (NOT ({_INITIATIVE_FIELD})"
+            f" OR {_sets_up('initiative_id')});",
+            _DEFINITION_RESHAPE_FN,
+            "CREATE OR REPLACE TRIGGER tr_metadata_definitions_reshape"
+            " BEFORE UPDATE ON metadata_definitions FOR EACH ROW"
+            " EXECUTE FUNCTION public.fn_metadata_definition_reshape();",
+        ]
+    )
+
+
 _DEPARTURE_SECTION = """\
 -- ===========================================================================
 -- Leaving: when someone's initiative membership row is deleted, every grant
@@ -1781,6 +1847,7 @@ def render_guild_rls_ddl() -> str:
     out += "\n\n" + _SHARING_SECTION + "\n\n" + _sharing_block()
     out += "\n\n" + _SHARE_REQUESTS_SECTION + "\n\n" + _share_requests_block()
     out += "\n\n" + _DRAFT_SECTION + "\n\n" + _draft_block()
+    out += "\n\n" + _DEFINITIONS_SECTION + "\n\n" + _definitions_block()
     out += "\n\n" + render_holds_ddl()
     out += "\n\n" + render_moderation_log_ddl()
     out += (
