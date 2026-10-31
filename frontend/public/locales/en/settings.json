@@ -2306,6 +2306,10 @@
     "added": "Rule added",
     "addError": "Couldn't add the rule",
     "orderError": "Couldn't reorder the rules",
-    "removeError": "Couldn't remove the rule"
+    "removeError": "Couldn't remove the rule",
+    "closed": "Your server has switched custom roles off for this community. These rules keep applying; nobody here can change them.",
+    "loading": "Loading rules…",
+    "loadError": "Couldn't load the rules.",
+    "retry": "Try again"
   }
 }

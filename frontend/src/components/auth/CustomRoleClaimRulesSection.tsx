@@ -35,6 +35,7 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
+import { useCommunities } from "@/hooks/useCommunities";
 import {
   useCommunityProviderConnections,
   useCreateCustomRoleClaimRule,
@@ -48,6 +49,7 @@ import { toast } from "@/lib/mascotToast";
 
 export const CustomRoleClaimRulesSection = ({ communityId }: { communityId: number }) => {
   const { t } = useTranslation("settings");
+  const { activeCommunity } = useCommunities();
   const rolesQuery = useCustomRoles();
   const rulesQuery = useCustomRoleClaimRules(communityId);
   const connectionsQuery = useCommunityProviderConnections(communityId);
@@ -66,6 +68,10 @@ export const CustomRoleClaimRulesSection = ({ communityId }: { communityId: numb
 
   const rules = rulesQuery.data ?? [];
   const connections = connectionsQuery.data ?? [];
+  // The deployment may close custom roles for the community: the rules keep
+  // applying and stay readable, and nobody changes them.
+  const closed = Boolean(activeCommunity?.closed_surfaces?.includes("custom_roles"));
+  const busy = orderRules.isPending;
   const roleName = (id: number) => roles.find((role) => role.id === id)?.name ?? "";
   const providerName = (id: number) =>
     connections.find((row) => row.provider_id === id)?.provider_display_name ?? "";
@@ -113,17 +119,31 @@ export const CustomRoleClaimRulesSection = ({ communityId }: { communityId: numb
           <CardTitle>{t("customRoleRules.title")}</CardTitle>
           <CardDescription>{t("customRoleRules.description")}</CardDescription>
         </div>
-        <Button
-          type="button"
-          onClick={() => setDialogOpen(true)}
-          disabled={connections.length === 0}
-        >
-          <Plus className="h-4 w-4" />
-          {t("customRoleRules.add")}
-        </Button>
+        {closed ? null : (
+          <Button
+            type="button"
+            onClick={() => setDialogOpen(true)}
+            disabled={connections.length === 0}
+          >
+            <Plus className="h-4 w-4" />
+            {t("customRoleRules.add")}
+          </Button>
+        )}
       </CardHeader>
-      <CardContent>
-        {rules.length === 0 ? (
+      <CardContent className="space-y-4">
+        {closed ? (
+          <p className="text-muted-foreground text-sm">{t("customRoleRules.closed")}</p>
+        ) : null}
+        {rulesQuery.isLoading ? (
+          <p className="text-muted-foreground text-sm">{t("customRoleRules.loading")}</p>
+        ) : rulesQuery.isError ? (
+          <div className="flex flex-wrap items-center gap-3">
+            <p className="text-destructive text-sm">{t("customRoleRules.loadError")}</p>
+            <Button type="button" variant="outline" size="sm" onClick={() => rulesQuery.refetch()}>
+              {t("customRoleRules.retry")}
+            </Button>
+          </div>
+        ) : rules.length === 0 ? (
           <p className="text-muted-foreground text-sm">{t("customRoleRules.empty")}</p>
         ) : (
           <ol className="divide-y rounded-md border">
@@ -138,38 +158,40 @@ export const CustomRoleClaimRulesSection = ({ communityId }: { communityId: numb
                     })}
                   </p>
                 </div>
-                <div className="flex shrink-0 items-center gap-1">
-                  <Button
-                    type="button"
-                    variant="ghost"
-                    size="sm"
-                    aria-label={t("customRoleRules.moveUp", { group: rule.claim_value })}
-                    disabled={index === 0 || orderRules.isPending}
-                    onClick={() => move(index, -1)}
-                  >
-                    <ArrowUp className="h-4 w-4" />
-                  </Button>
-                  <Button
-                    type="button"
-                    variant="ghost"
-                    size="sm"
-                    aria-label={t("customRoleRules.moveDown", { group: rule.claim_value })}
-                    disabled={index === rules.length - 1 || orderRules.isPending}
-                    onClick={() => move(index, 1)}
-                  >
-                    <ArrowDown className="h-4 w-4" />
-                  </Button>
-                  <Button
-                    type="button"
-                    variant="ghost"
-                    size="sm"
-                    className="text-destructive"
-                    aria-label={t("customRoleRules.remove")}
-                    onClick={() => setRemoving(rule)}
-                  >
-                    <Trash2 className="h-4 w-4" />
-                  </Button>
-                </div>
+                {closed ? null : (
+                  <div className="flex shrink-0 items-center gap-1">
+                    <Button
+                      type="button"
+                      variant="ghost"
+                      size="sm"
+                      aria-label={t("customRoleRules.moveUp", { group: rule.claim_value })}
+                      disabled={index === 0 || busy}
+                      onClick={() => move(index, -1)}
+                    >
+                      <ArrowUp className="h-4 w-4" />
+                    </Button>
+                    <Button
+                      type="button"
+                      variant="ghost"
+                      size="sm"
+                      aria-label={t("customRoleRules.moveDown", { group: rule.claim_value })}
+                      disabled={index === rules.length - 1 || busy}
+                      onClick={() => move(index, 1)}
+                    >
+                      <ArrowDown className="h-4 w-4" />
+                    </Button>
+                    <Button
+                      type="button"
+                      variant="ghost"
+                      size="sm"
+                      className="text-destructive"
+                      aria-label={t("customRoleRules.remove")}
+                      onClick={() => setRemoving(rule)}
+                    >
+                      <Trash2 className="h-4 w-4" />
+                    </Button>
+                  </div>
+                )}
               </li>
             ))}
           </ol>

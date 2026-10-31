@@ -241,13 +241,14 @@ export const useCustomRoleClaimRules = (
   });
 };
 
+/** Refetch the rules. Returned, so a mutation stays pending until the new
+ *  order is in and the next move is built from it. */
 const useInvalidateCustomRoleClaimRules = (communityId: number) => {
   const queryClient = useQueryClient();
-  return () => {
-    void queryClient.invalidateQueries({
+  return () =>
+    queryClient.invalidateQueries({
       queryKey: getListCustomRoleClaimRulesQueryKey(communityId),
     });
-  };
 };
 
 export const useCreateCustomRoleClaimRule = (communityId: number) => {

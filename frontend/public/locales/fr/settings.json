@@ -2306,6 +2306,10 @@
     "added": "Règle ajoutée",
     "addError": "Impossible d'ajouter la règle",
     "orderError": "Impossible de réordonner les règles",
-    "removeError": "Impossible de supprimer la règle"
+    "removeError": "Impossible de supprimer la règle",
+    "closed": "Votre serveur a désactivé les rôles personnalisés pour cette communauté. Ces règles continuent de s'appliquer ; personne ici ne peut les modifier.",
+    "loading": "Chargement des règles…",
+    "loadError": "Impossible de charger les règles.",
+    "retry": "Réessayer"
   }
 }

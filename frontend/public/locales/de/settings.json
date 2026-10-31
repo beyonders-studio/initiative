@@ -2306,6 +2306,10 @@
     "added": "Regel hinzugefügt",
     "addError": "Die Regel konnte nicht hinzugefügt werden",
     "orderError": "Die Regeln konnten nicht neu sortiert werden",
-    "removeError": "Die Regel konnte nicht entfernt werden"
+    "removeError": "Die Regel konnte nicht entfernt werden",
+    "closed": "Dein Server hat eigene Rollen für diese Community abgeschaltet. Diese Regeln gelten weiter; hier kann sie niemand ändern.",
+    "loading": "Regeln werden geladen …",
+    "loadError": "Die Regeln konnten nicht geladen werden.",
+    "retry": "Erneut versuchen"
   }
 }

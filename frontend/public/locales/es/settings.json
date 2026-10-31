@@ -2306,6 +2306,10 @@
     "added": "Regla añadida",
     "addError": "No se pudo añadir la regla",
     "orderError": "No se pudieron reordenar las reglas",
-    "removeError": "No se pudo quitar la regla"
+    "removeError": "No se pudo quitar la regla",
+    "closed": "Tu servidor ha desactivado los roles personalizados en esta comunidad. Estas reglas siguen aplicándose; nadie aquí puede cambiarlas.",
+    "loading": "Cargando reglas…",
+    "loadError": "No se pudieron cargar las reglas.",
+    "retry": "Reintentar"
   }
 }
