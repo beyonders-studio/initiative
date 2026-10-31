@@ -322,6 +322,9 @@ async def sync_oidc_assignments(
     # half). Admins are left out for the same reason the invite path leaves
     # them out — standing access already, and no member role to hold.
     newly_admitted_guilds: set[int] = set()
+    # Communities the rules matched that took nobody new: their initiatives do
+    # not take the account either.
+    kept_out: set[int] = set()
     for guild_id in sorted(ensure_member_guilds):
         desired = guild_roles.get(guild_id)
         membership = await _get_guild_membership(
@@ -361,6 +364,15 @@ async def sync_oidc_assignments(
                     "account out of it",
                     guild_id,
                 )
+                kept_out.add(guild_id)
+                continue
+            # A seat is a seat however somebody arrives: a full community
+            # takes nobody new from its rules either.
+            try:
+                await guilds_service.assert_member_capacity(session, guild_id=guild_id)
+            except guilds_service.GuildCapacityError:
+                logger.info("guild %s is full; its rules place nobody new", guild_id)
+                kept_out.add(guild_id)
                 continue
             role = (
                 CommunityRole(desired) if desired is not None else CommunityRole.member
@@ -392,9 +404,12 @@ async def sync_oidc_assignments(
             )
         ).all()
     )
+    initiative_guild = {
+        iid: gid for iid, gid in initiative_guild.items() if gid not in kept_out
+    }
     relevant_guilds = (
         existing_guild_ids | set(initiative_guild.values()) | set(guild_roles)
-    )
+    ) - kept_out
     # Where the community's own custom-role rules (in its schema) may speak for
     # this arrival: the communities that count it as one of their own, as for
     # the rules above.
