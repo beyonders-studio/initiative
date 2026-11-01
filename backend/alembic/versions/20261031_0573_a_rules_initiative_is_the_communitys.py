@@ -65,9 +65,11 @@ def _unforced(*tables: str) -> Iterator[sa.engine.Connection]:
     ]
     for table in forced:
         op.execute(f"ALTER TABLE {table} NO FORCE ROW LEVEL SECURITY")
-    yield bind
-    for table in forced:
-        op.execute(f"ALTER TABLE {table} FORCE ROW LEVEL SECURITY")
+    try:
+        yield bind
+    finally:
+        for table in forced:
+            op.execute(f"ALTER TABLE {table} FORCE ROW LEVEL SECURITY")
 
 
 def _create() -> None:
