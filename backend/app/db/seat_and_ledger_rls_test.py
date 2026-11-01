@@ -442,9 +442,11 @@ async def test_a_subscriptions_names_are_the_system_engines_alone(
     system engine reads out; the table itself is closed to them."""
     a = await acting_user(guild_role=CommunityRole.admin)
     subscription = await create_webhook_subscription(session, a.guild, a.user)
-    guild_ref, _ = await webhook_refs.name_for_subscriber(
+    named = await webhook_refs.name_for_subscriber(
         guild_id=a.guild.id, plugin=None, subscription_id=subscription.id
     )
+    assert named is not None
+    guild_ref, _ = named
 
     s = await _as(role_session, user_id=a.user.id, guild_id=a.guild.id)
     assert list(await s.exec(text("SELECT ref FROM webhook_refs"))) == []
