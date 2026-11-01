@@ -38,6 +38,7 @@ from app.db.request_context import SystemGuild
 from app.db.session import set_rls_context
 from app.models.platform.identity_ref import IdentityEntity, IdentityPurpose
 from app.models.tenant.webhook_ref import WebhookRef
+from app.models.tenant.webhook_subscription import WebhookSubscription
 from app.services.marketplace import plugin_refs
 from app.services.platform import identity_refs
 
@@ -66,12 +67,13 @@ async def name_for_subscriber(
     plugin: str | None,
     subscription_id: int,
     actor_ids: Collection[int] = (),
-) -> Names:
+) -> Names | None:
     """This subscriber's names for the guild and for each actor it will be told about.
 
-    Returns ``(guild_ref, {user_id: ref})``. Minted on first use, in one
-    session for the whole batch, because a delivery names as many people as the
-    transaction it describes touched.
+    Returns ``(guild_ref, {user_id: ref})``, or ``None`` for a subscription
+    deleted meanwhile. Minted on first use, in one session for the whole
+    batch, because a delivery names as many people as the transaction it
+    describes touched.
     """
     (names,) = await names_for_subscribers(
         guild_id=guild_id, subscribers=[(plugin, subscription_id, actor_ids)]
@@ -81,12 +83,12 @@ async def name_for_subscriber(
 
 async def names_for_subscribers(
     *, guild_id: int, subscribers: Sequence[Subscriber]
-) -> list[Names]:
+) -> list[Names | None]:
     """:func:`name_for_subscriber` for each of many subscribers, in order — one
     session and one commit for the lot, for a page listing them."""
     if not subscribers:
         return []
-    names: dict[int, Names] = {}
+    names: dict[int, Names | None] = {}
     own: dict[int, tuple[int, Collection[int]]] = {}
     async with cohorts.system_session(guild_id) as session:
         for index, (plugin, subscription_id, actor_ids) in enumerate(subscribers):
@@ -111,12 +113,19 @@ async def names_for_subscribers(
                 session, guild_id=guild_id, wanted=own.values()
             )
             for index, (subscription_id, actor_ids) in own.items():
+                guild_ref = held.get((subscription_id, IdentityEntity.guild, guild_id))
                 names[index] = (
-                    held[subscription_id, IdentityEntity.guild, guild_id],
-                    {
-                        actor_id: held[subscription_id, IdentityEntity.user, actor_id]
-                        for actor_id in _people(actor_ids)
-                    },
+                    None
+                    if guild_ref is None
+                    else (
+                        guild_ref,
+                        {
+                            actor_id: held[
+                                subscription_id, IdentityEntity.user, actor_id
+                            ]
+                            for actor_id in _people(actor_ids)
+                        },
+                    )
                 )
         await session.commit()
     return [names[index] for index in range(len(subscribers))]
@@ -167,14 +176,32 @@ async def _subscription_refs(
     wanted: Iterable[tuple[int, Collection[int]]],
 ) -> dict[_Key, str]:
     """What each subscription calls the guild and each of its people, minting
-    the names it does not hold yet: one read when it holds them all.
+    the names it does not hold yet: one read when it holds them all. A
+    subscription deleted meanwhile has none.
 
     ``session`` is routed into the guild as the platform, which alone writes
     these.
     """
+    wanted = list(wanted)
+    # Held while they are named, as the names' key would hold them: one
+    # deleted first is left out, and none is deleted until this commits.
+    standing = set(
+        (
+            await session.exec(
+                select(WebhookSubscription.id)
+                .where(
+                    WebhookSubscription.id.in_(  # type: ignore[union-attr]
+                        {subscription_id for subscription_id, _ in wanted}
+                    )
+                )
+                .with_for_update(key_share=True)
+            )
+        ).all()
+    )
     keys = {
         key
         for subscription_id, actor_ids in wanted
+        if subscription_id in standing
         for key in (
             (subscription_id, IdentityEntity.guild, guild_id),
             *(

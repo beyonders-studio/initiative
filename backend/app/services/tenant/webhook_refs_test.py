@@ -176,6 +176,33 @@ async def test_a_subscriptions_names_go_with_it(session):
     )
 
 
+async def test_a_subscription_deleted_before_it_is_named_has_no_names(session):
+    """A page lists its subscriptions, then names them: one deleted in between
+    is named nothing, and the rest as ever."""
+    user = await create_user(session)
+    guild = await create_guild(session, creator=user)
+    kept = await create_webhook_subscription(session, guild, user)
+    gone = await create_webhook_subscription(session, guild, user)
+    gone_id = gone.id
+    await session.exec(
+        text(f'DELETE FROM "guild_{guild.id}".webhook_subscriptions WHERE id = :id'),
+        params={"id": gone_id},
+    )
+    await session.commit()
+
+    named, deleted = await webhook_refs.names_for_subscribers(
+        guild_id=guild.id,
+        subscribers=[(None, kept.id, (user.id,)), (None, gone_id, (user.id,))],
+    )
+
+    assert named is not None and set(named[1]) == {user.id}
+    assert deleted is None
+    assert {row[3] for row in await _held(session, guild.id)} == {
+        named[0],
+        named[1][user.id],
+    }
+
+
 async def test_an_initiatives_subscriptions_take_their_names_with_them(session):
     """A subscription to one initiative goes when the initiative does, and its
     names with it."""

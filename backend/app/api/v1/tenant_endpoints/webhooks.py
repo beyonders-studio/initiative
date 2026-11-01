@@ -192,7 +192,11 @@ async def _named(
         if own_ref is not None and row.id in own:
             guild_ref, actor_refs = own_ref, {}
         else:
-            guild_ref, actor_refs = next(minted)
+            named = next(minted)
+            if named is None:
+                # Deleted while the page was read.
+                continue
+            guild_ref, actor_refs = named
         reads.append(
             WebhookSubscriptionRead(
                 id=row.id,
