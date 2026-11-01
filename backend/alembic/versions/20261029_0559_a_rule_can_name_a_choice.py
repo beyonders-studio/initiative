@@ -241,7 +241,7 @@ def downgrade() -> None:
         "ck_app_settings_login_methods_has_primary",
         "app_settings",
         "'password' = ANY(login_methods) OR 'sso' = ANY(login_methods)"
-        " OR 'passkey' = ANY(login_methods)",
+        " OR 'passkey' = ANY(login_methods) OR 'email_otp' = ANY(login_methods)",
         schema="public",
     )
     op.add_column(
