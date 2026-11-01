@@ -6,8 +6,8 @@ defines its roles once for every community through billing's sync. Only the
 system engine changes or deletes a deployment's role; its CHECK and policies
 are rendered at start, as always.
 
-The downgrade drops the column, and a role the deployment set stays as one the
-community has.
+The downgrade drops the column and the policies that read it, and a role the
+deployment set stays as one the community has.
 
 Revision ID: 20261031_0575
 Revises: 20261031_0574
@@ -38,6 +38,10 @@ def _upgrade() -> None:
 
 
 def _downgrade() -> None:
+    for command in ("insert", "update", "delete"):
+        op.execute(
+            f"DROP POLICY IF EXISTS custom_role_set_by_{command} ON custom_roles"
+        )
     op.execute(
         "ALTER TABLE custom_roles DROP CONSTRAINT IF EXISTS ck_custom_roles_set_by"
     )

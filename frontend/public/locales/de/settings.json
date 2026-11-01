@@ -2288,7 +2288,7 @@
     },
     "beyondYours": "Du kannst diese Rolle nicht ändern: Sie enthält etwas, das du selbst nicht hast.",
     "widensAnAdmin": "Nur ein Admin, der alles darf, kann eine Admin-Rolle löschen: Wer sie hat, darf danach wieder alles.",
-    "setByDeployment": "Diese Rolle legt fest, wer diesen Server betreibt. Du kannst sie hier vergeben, aber nicht ändern oder löschen."
+    "setByDeployment": "Diese Rolle wird von den Serverbetreibenden festgelegt. Du kannst sie hier vergeben, aber nicht ändern oder löschen."
   },
   "customRoleRules": {
     "title": "Eigene Rollen nach Gruppe",
