@@ -721,11 +721,13 @@ async def test_suspending_a_suspended_account_tells_its_case_nothing(
 
 
 async def test_a_grant_whose_case_is_gone_is_closed_out_untold(
-    session: AsyncSession, desk
+    session: AsyncSession, desk, mail_on
 ):
     """Purging a case takes its links with it. A grant that owes its
-    community a letter once it ends is still closed out, with nothing told."""
-    target = await create_guild(session)
+    community a letter once it ends is still closed out, with nothing told
+    on the case, and the community still gets its letter."""
+    seat_id = (await create_user(session)).id
+    target = await create_guild(session, creator=await session.get(User, seat_id))
     task_id = await _case()
     grant = await _live_grant(
         session,
@@ -762,6 +764,7 @@ async def test_a_grant_whose_case_is_gone_is_closed_out_untold(
         await session.exec(select(AccessGrant).where(AccessGrant.id == grant_id))
     ).one()
     assert closed.closed_out_at is not None
+    assert len(await _letters(session, seat_id)) == 1
 
 
 # ── Telling the community ────────────────────────────────────────────────────
