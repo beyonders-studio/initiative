@@ -216,6 +216,16 @@ describe("query-keys community scoping", () => {
       expect(departing()).toBe(false);
     });
 
+    it("keeps a person's own views of the departing community's lists", async () => {
+      const views = survives(["/api/v1/c/4/view-preferences"]);
+      const lists = survives(["/api/v1/c/4/projects/"]);
+
+      await resetCommunityScopedQueries(5);
+
+      expect(views()).toBe(true);
+      expect(lists()).toBe(false);
+    });
+
     it("still drops everything community-scoped when no arriving community is named", async () => {
       const five = survives(["/api/v1/c/5/projects/"]);
 

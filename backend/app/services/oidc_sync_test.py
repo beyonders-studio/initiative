@@ -2,11 +2,11 @@
 and leaving a tenant whose rules no longer grant a membership."""
 
 import pytest
-from sqlmodel import delete, select
+from sqlmodel import delete, select, update
 from sqlmodel.ext.asyncio.session import AsyncSession
 
 from app.core.rules import SetBy
-from app.db import post_commit
+from app.db import cohorts, post_commit
 from app.db.session import set_rls_context
 from app.models.platform.guild import GuildMembership, CommunityRole
 from app.models.platform.platform_provider_default import PlatformProviderDefault
@@ -23,8 +23,9 @@ from app.models.tenant.custom_role import (
 )
 from app.models.tenant.claim_rule_initiative import ClaimRuleInitiative
 from app.models.tenant.initiative import Initiative, InitiativeMember
+from app.services import oidc_sync
 from app.services.oidc_sync import sync_oidc_assignments
-from app.services.platform import rules
+from app.services.platform import provider_placement, rules
 from app.services.tenant import custom_roles as custom_roles_service
 from app.services.tenant import plugin_revocation
 from app.services.tenant.initiatives import get_role_by_name
@@ -933,3 +934,68 @@ async def test_a_rule_whose_initiative_is_deleted_places_in_the_community_alone(
     assert result.guilds_added == [guild_id]
     assert result.initiatives_added == []
     assert await _joined(session, user_id) == {guild_id}
+
+
+async def test_a_rule_moved_during_a_sign_in_takes_nothing_away(
+    session: AsyncSession, monkeypatch
+):
+    """A sign-in reads its rules, then each community's half reads where they
+    place people. A rule moved twice in between has no row at the version the
+    sign-in read: the person keeps their place, and the next sign-in decides."""
+    provider = await create_auth_provider(session)
+    owner = await create_user(session)
+    guild = await create_guild(session, creator=owner)
+    initiative = await create_initiative(session, guild, owner)
+    member_role = await get_role_by_name(
+        session, initiative_id=initiative.id, role_name="member"
+    )
+    manager_role = await get_role_by_name(
+        session, initiative_id=initiative.id, role_name="project_manager"
+    )
+    await create_guild_provider_connection(session, guild=guild, provider=provider)
+    rule = await create_claim_rule(
+        session,
+        provider=provider,
+        guild=guild,
+        initiative=initiative,
+        initiative_role_id=member_role.id,
+    )
+    newcomer = await create_user(session)
+    guild_id, initiative_id, manager_role_id = guild.id, initiative.id, manager_role.id
+    rule_id, user_id, provider_id = rule.id, newcomer.id, provider.id
+    await _sync(session, user_id=user_id, provider_id=provider_id, claims=_ADMITTED)
+    assert await _membership(
+        session, guild_id=guild_id, initiative_id=initiative_id, user_id=user_id
+    )
+
+    each_guild = oidc_sync.each_guild
+
+    async def moved_meanwhile(visits, **kwargs):
+        if kwargs["name"] == "oidc-sync":
+            await provider_placement.set_rule_initiative(
+                guild_id,
+                rule_id,
+                version=2,
+                initiative_id=initiative_id,
+                initiative_role_id=manager_role_id,
+                alike=[],
+            )
+            async with cohorts.system_session(None) as system:
+                await system.exec(
+                    update(OIDCClaimMapping)
+                    .where(OIDCClaimMapping.id == rule_id)
+                    .values(placement_version=2)
+                )
+                await system.commit()
+            await provider_placement.drop_rule_initiative(guild_id, rule_id, before=1)
+        return await each_guild(visits, **kwargs)
+
+    monkeypatch.setattr(oidc_sync, "each_guild", moved_meanwhile)
+    result = await _sync(
+        session, user_id=user_id, provider_id=provider_id, claims=_ADMITTED
+    )
+
+    assert result.initiatives_removed == []
+    assert await _membership(
+        session, guild_id=guild_id, initiative_id=initiative_id, user_id=user_id
+    )

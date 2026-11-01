@@ -786,7 +786,9 @@ export const q = {
  * Everything else survives. A platform or personal path (`/me/*`, `/users`,
  * `/communities`, `/me/personal-items`) answers the same in every community, and a
  * hand-written key that holds community data (`["query", communityId, …]`) carries the
- * community's id, so another community's entry is never the one read.
+ * community's id, so another community's entry is never the one read. A person's own
+ * views of a community's lists (`/c/{communityId}/view-preferences`) survive too, so
+ * coming back without a connection still shows a list the way they left it.
  */
 export const resetCommunityScopedQueries = (arrivingCommunityId?: number | null) =>
   queryClient.resetQueries({
@@ -794,7 +796,11 @@ export const resetCommunityScopedQueries = (arrivingCommunityId?: number | null)
       const first = query.queryKey[0];
       if (typeof first !== "string") return false;
       const match = COMMUNITY_SEGMENT.exec(first);
-      return match !== null && Number(match[1]) !== arrivingCommunityId;
+      return (
+        match !== null &&
+        Number(match[1]) !== arrivingCommunityId &&
+        match[2] !== "/view-preferences"
+      );
     },
   });
 
