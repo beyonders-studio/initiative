@@ -27,7 +27,7 @@ by :func:`rule_initiatives`.
 """
 
 import logging
-from collections.abc import Collection, Iterable
+from collections.abc import Collection, Iterable, Mapping
 from dataclasses import asdict, dataclass
 
 from fastapi import HTTPException, status
@@ -401,6 +401,26 @@ async def rule_initiatives(
         await set_rls_context(session, SystemGuild(guild_id))
         rows = (await session.exec(stmt)).all()
     return {row[0]: RuleInitiative(*row[1:]) for row in rows}
+
+
+async def placements_stand(versions: Mapping[int, int]) -> bool:
+    """Whether each of these rules, by id, still names the version given:
+    False where one has moved or gone since it was read."""
+    if not versions:
+        return True
+    async with cohorts.system_session(None) as session:
+        now = dict(
+            (
+                await session.exec(
+                    select(
+                        OIDCClaimMapping.id, OIDCClaimMapping.placement_version
+                    ).where(
+                        OIDCClaimMapping.id.in_(versions)  # type: ignore[union-attr]
+                    )
+                )
+            ).all()
+        )
+    return all(now.get(rule_id) == version for rule_id, version in versions.items())
 
 
 async def set_rule_initiative(

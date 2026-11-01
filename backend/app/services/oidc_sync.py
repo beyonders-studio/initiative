@@ -405,10 +405,13 @@ async def sync_oidc_assignments(
         # role they name there: a manager role first, then the lowest position.
         keys = provider_placement.placed(initiative_rules.get(gid, ()))
         guild_init_roles: dict[int, int] = {}
+        settled = True
         if keys:
-            for iid, role_id in (
+            found: set[int] = set()
+            for rule_id, iid, role_id in (
                 await guild_session.exec(
                     select(
+                        ClaimRuleInitiative.rule_id,
                         ClaimRuleInitiative.initiative_id,
                         ClaimRuleInitiative.initiative_role_id,
                     )
@@ -429,7 +432,15 @@ async def sync_oidc_assignments(
                     )
                 )
             ).all():
+                found.add(rule_id)
                 guild_init_roles.setdefault(iid, role_id)
+            # A rule whose row is gone either went with its initiative or role,
+            # and places in the community alone, or moved since it was read:
+            # then the next sign-in says what it places, and nothing is taken
+            # away now.
+            settled = await provider_placement.placements_stand(
+                {rule_id: version for rule_id, version in keys if rule_id not in found}
+            )
 
         for iid, role_id in guild_init_roles.items():
             im = await _get_initiative_membership(
@@ -468,7 +479,8 @@ async def sync_oidc_assignments(
                 )
                 result.initiatives_added.append(iid)
 
-        await drop_stale_initiatives(guild_session, gid, granted=guild_init_roles)
+        if settled:
+            await drop_stale_initiatives(guild_session, gid, granted=guild_init_roles)
 
         # Onboarding for a first-time arrival, once the claims have had their
         # say. It runs last because the claims are authoritative about role:
