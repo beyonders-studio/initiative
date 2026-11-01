@@ -64,12 +64,14 @@ async def test_a_plugin_hears_the_names_it_already_holds(session):
     guild = await _with_plugin(session, user)
     plugin = "acme.tracker"
 
-    guild_ref, actor_refs = await webhook_refs.name_for_subscriber(
+    named = await webhook_refs.name_for_subscriber(
         guild_id=guild.id,
         plugin=plugin,
         subscription_id=1,
         actor_ids=(user.id,),
     )
+    assert named is not None
+    guild_ref, actor_refs = named
 
     assert guild_ref == await ensure_plugin_guild_ref(
         guild_id=guild.id, public_id=plugin
@@ -87,12 +89,14 @@ async def test_a_member_registered_target_is_named_by_its_subscription(session):
     guild = await _with_plugin(session, user)
     subscription = await create_webhook_subscription(session, guild, user)
 
-    guild_ref, actor_refs = await webhook_refs.name_for_subscriber(
+    named = await webhook_refs.name_for_subscriber(
         guild_id=guild.id,
         plugin=None,
         subscription_id=subscription.id,
         actor_ids=(user.id,),
     )
+    assert named is not None
+    guild_ref, actor_refs = named
 
     assert guild_ref.startswith("g" + IdentityPurpose.webhook.code + "_")
     assert actor_refs[user.id].startswith("u" + IdentityPurpose.webhook.code + "_")
@@ -112,13 +116,12 @@ async def test_two_subscriptions_in_one_guild_are_unrelated(session):
     one = await create_webhook_subscription(session, guild, user)
     other = await create_webhook_subscription(session, guild, user)
 
-    (
-        (first, first_actors),
-        (second, second_actors),
-    ) = await webhook_refs.names_for_subscribers(
+    named_one, named_other = await webhook_refs.names_for_subscribers(
         guild_id=guild.id,
         subscribers=[(None, one.id, (user.id,)), (None, other.id, (user.id,))],
     )
+    assert named_one is not None and named_other is not None
+    (first, first_actors), (second, second_actors) = named_one, named_other
 
     assert first != second
     assert first_actors[user.id] != second_actors[user.id]
@@ -237,9 +240,11 @@ async def test_an_erased_plugins_subscription_is_named_as_its_own(session):
     guild = await create_guild(session, creator=user)
     subscription = await create_webhook_subscription(session, guild)
 
-    guild_ref, _ = await webhook_refs.name_for_subscriber(
+    named = await webhook_refs.name_for_subscriber(
         guild_id=guild.id, plugin="acme.tracker", subscription_id=subscription.id
     )
+    assert named is not None
+    guild_ref, _ = named
 
     assert guild_ref.startswith("g" + IdentityPurpose.webhook.code + "_")
     assert await _held(session, guild.id) == {
