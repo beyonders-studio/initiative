@@ -240,6 +240,44 @@ async def test_a_guild_admin_may_rewrite_any_of_them(client, acting_user):
     assert response.json()["active"] is False
 
 
+async def test_a_subscription_deleted_as_it_is_rewritten_is_not_found(
+    client, acting_user, session, monkeypatch
+):
+    """Rewritten, then deleted by somebody else before it is named: the
+    rewrite answers that it is not there rather than failing."""
+    from sqlalchemy import text
+
+    from app.services.tenant import webhook_refs
+
+    admin = await acting_user(guild_role=CommunityRole.admin)
+    with _mock_public_dns():
+        created = await client.post(
+            _url(admin.guild.id), json=_body(), headers=admin.headers
+        )
+    subscription_id, guild_id = created.json()["id"], admin.guild.id
+    names_for_subscribers = webhook_refs.names_for_subscribers
+
+    async def deleted_first(**kwargs):
+        await session.exec(
+            text(
+                f'DELETE FROM "guild_{guild_id}".webhook_subscriptions WHERE id = :id'
+            ),
+            params={"id": subscription_id},
+        )
+        await session.commit()
+        return await names_for_subscribers(**kwargs)
+
+    monkeypatch.setattr(webhook_refs, "names_for_subscribers", deleted_first)
+    response = await client.patch(
+        _url(guild_id, f"/{subscription_id}"),
+        json={"active": False},
+        headers=admin.headers,
+    )
+
+    assert response.status_code == 404
+    assert response.json()["detail"] == "WEBHOOK_SUBSCRIPTION_NOT_FOUND"
+
+
 async def test_a_subscription_in_another_guild_is_not_found(client, acting_user):
     a = await acting_user(guild_role=CommunityRole.admin, initiative=True)
     with _mock_public_dns():
