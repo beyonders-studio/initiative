@@ -60,6 +60,7 @@ from app.api.deps import (
     GuildContextDep,
 )
 from app.core import webhook_events
+from app.core.errors import CodedError
 from app.core.messages import WebhookSubscriptionMessages
 from app.db.guild_standing import InstallContext
 from app.models.platform.user import User
@@ -265,16 +266,38 @@ async def create_subscription(
     return WebhookSubscriptionCreated(
         # A subscription that was just created has no delivery history yet.
         **(
-            await _named(
+            await _named_one(
                 session,
-                [subscription],
+                subscription,
                 guild_id=guild_context.guild_id,
                 dead_letter_counts={},
                 actor=guild_context,
             )
-        )[0].model_dump(),
+        ).model_dump(),
         hmac_secret=secret,
     )
+
+
+async def _named_one(
+    session: AsyncSession,
+    row: WebhookSubscription,
+    *,
+    guild_id: int,
+    dead_letter_counts: dict[int, int],
+    actor: ActorContext | None = None,
+) -> WebhookSubscriptionRead:
+    """One subscription, named as :func:`_named` names it; not found once it
+    has been deleted meanwhile."""
+    named = await _named(
+        session,
+        [row],
+        guild_id=guild_id,
+        dead_letter_counts=dead_letter_counts,
+        actor=actor,
+    )
+    if not named:
+        raise CodedError(WebhookSubscriptionMessages.NOT_FOUND, 404)
+    return named[0]
 
 
 @router.get("/subscriptions", response_model=list[WebhookSubscriptionRead])
@@ -326,10 +349,9 @@ async def update_subscription(
     counts = await subscriptions_service.dead_letter_counts(
         session, subscription_ids=[row.id]
     )
-    (read,) = await _named(
-        session, [row], guild_id=guild_context.guild_id, dead_letter_counts=counts
+    return await _named_one(
+        session, row, guild_id=guild_context.guild_id, dead_letter_counts=counts
     )
-    return read
 
 
 @router.delete(
