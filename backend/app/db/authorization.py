@@ -1456,10 +1456,35 @@ $function$
 
 """
 
+#: The initiatives the reader is in, or holds something shared with them in,
+#: read from the roster and their own sharing rows rather than the standing:
+#: the standing statement reads ``initiatives`` while it is still computing it.
+#: A function, so the policy on ``initiatives`` that asks it does not name
+#: ``initiative_members``, whose own policies read ``initiatives``.
+READER_INITIATIVES = f"""\
+CREATE OR REPLACE FUNCTION reader_initiatives()
+ RETURNS integer[]
+ LANGUAGE plpgsql
+ STABLE
+AS $function$
+BEGIN
+    RETURN ARRAY(
+        SELECT im.initiative_id FROM initiative_members im
+        WHERE im.user_id = {gucs.USER_ID}
+        UNION
+        SELECT g.initiative_id FROM resource_grants g
+        WHERE g.user_id = {gucs.USER_ID} AND g.initiative_id IS NOT NULL
+    );
+END
+$function$
+
+"""
+
 GUILD_AUTHORIZATION_FUNCTIONS: tuple[tuple[str, str], ...] = (
     *READ_FUNCTIONS,
     ("current_standing", CURRENT_STANDING),
     ("reads_held", READS_HELD),
+    ("reader_initiatives", READER_INITIATIVES),
     ("initiative_access", INITIATIVE_ACCESS),
     ("initiative_full_access", INITIATIVE_FULL_ACCESS),
     ("initiative_role_permits", INITIATIVE_ROLE_PERMITS),
@@ -1480,6 +1505,7 @@ GUILD_FUNCTION_SIGNATURES: dict[str, str] = {
     **{name: "()" for name, _sql in READ_FUNCTIONS},
     "current_standing": "()",
     "reads_held": "()",
+    "reader_initiatives": "()",
     "initiative_access": "(integer, integer, boolean, public.standing)",
     "initiative_full_access": "(integer, boolean, public.standing)",
     "initiative_role_permits": "(integer, integer, text, boolean, public.standing)",

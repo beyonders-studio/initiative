@@ -251,3 +251,35 @@ async def test_whether_an_initiative_auto_joins_or_is_archived_is_the_communitys
     assert not await changes(manager, "archived_at = now()")
     assert await changes(admin, "join_policy = 'open', auto_join = true")
     assert await changes(admin, "archived_at = now()")
+
+
+async def test_a_private_initiative_reads_as_absent_to_anybody_not_in_it(
+    session, acting_user, role_session
+):
+    """Its row, not only its content: its members, the community's admin and
+    the system engine read it; another member of the community reads none,
+    while an initiative on offer stays readable to them."""
+    admin = await acting_user(guild_role=CommunityRole.admin)
+    private_one = await create_initiative(session, admin.guild, admin.user)
+    open_one = await create_initiative(
+        session, admin.guild, admin.user, join_policy="open"
+    )
+    insider = await acting_user(
+        guild_role=CommunityRole.member,
+        guild=admin.guild,
+        initiative=private_one,
+        initiative_role="member",
+    )
+    outsider = await acting_user(guild_role=CommunityRole.member, guild=admin.guild)
+    ids = (private_one.id, open_one.id)
+
+    async def reads(actor) -> set[int]:
+        s = await _writing_as(
+            role_session, user_id=actor.user.id, guild_id=admin.guild.id
+        )
+        rows = await s.exec(text(f"SELECT id FROM initiatives WHERE id IN {ids}"))
+        return set(rows.scalars().all())
+
+    assert await reads(admin) == set(ids)
+    assert await reads(insider) == set(ids)
+    assert await reads(outsider) == {open_one.id}

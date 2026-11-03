@@ -278,11 +278,29 @@ _MANAGED_SECTION = """\
 -- engine. A member's own row into an initiative whose join policy is open is
 -- the one further way in. initiatives keeps its purge guard and trash reads.
 --
+-- private_initiative_read: a private initiative's row reads as absent to
+-- anybody in the community who is not in it. RESTRICTIVE, beside the open
+-- read: its members (read from the roster itself, since the standing
+-- statement reads initiatives before any standing exists), whoever holds an
+-- item shared with them there, the community's admin, a grant, an installed
+-- plug-in (held to its own placements by its policies), a trigger, or the
+-- system engine.
 -- tr_initiatives_community_columns: whether new members of the community join
 -- an initiative (auto_join) and whether it is archived are the community's to
 -- say, not the initiative's managers': only a holder of the initiatives
 -- surface, or the system engine, changes them.
 -- ==========================================================================="""
+
+#: Who reads a private initiative's row. Its members and sharees come from
+#: ``reader_initiatives()``, read from the rows rather than the standing, which
+#: the standing statement is still computing when it reads initiatives.
+_PRIVATE_INITIATIVE_READ = (
+    f"(initiatives.join_policy <> '{InitiativeJoinPolicy.private.value}'"
+    f" OR {IN_POLICY.system} OR {IN_POLICY.admin} OR {IN_POLICY.pam_any}"
+    f" OR {POLICY_SETTINGS_ADMIN} OR {IN_POLICY.install_id} IS NOT NULL"
+    " OR pg_trigger_depth() > 0"
+    " OR initiatives.id = ANY ((SELECT reader_initiatives())::integer[]))"
+)
 
 #: The columns of an initiative the community decides rather than its managers.
 INITIATIVE_COMMUNITY_COLUMNS: tuple[str, ...] = ("auto_join", "archived_at")
@@ -348,6 +366,9 @@ def _managed_block(table: str, initiative_expr: str) -> str:
         ]
     if table == "initiatives":
         lines += [
+            "DROP POLICY IF EXISTS private_initiative_read ON initiatives;",
+            "CREATE POLICY private_initiative_read ON initiatives AS RESTRICTIVE"
+            f" FOR SELECT USING ({_PRIVATE_INITIATIVE_READ});",
             _INITIATIVE_COMMUNITY_COLUMNS_FN,
             "CREATE OR REPLACE TRIGGER tr_initiatives_community_columns"
             f" BEFORE UPDATE OF {', '.join(INITIATIVE_COMMUNITY_COLUMNS)}"
