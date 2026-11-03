@@ -1576,8 +1576,8 @@ _DEFINITIONS_SECTION = """\
 -- definition_removal: RESTRICTIVE on DELETE.
 -- tr_metadata_definitions_reshape: an UPDATE by anybody else may only append
 --   options with values the field doesn't have yet: the options already there
---   come first, exactly as they were, and every other column (its update time
---   aside) is left as it is. A policy cannot compare the old row with the new
+--   come first, exactly as they were, the options stay a list, and every other
+--   column (its update time aside) is left as it is. A policy cannot compare the old row with the new
 --   one.
 -- ==========================================================================="""
 
@@ -1626,6 +1626,7 @@ BEGIN
               FROM jsonb_array_elements(v_new) WITH ORDINALITY AS t(o, n)
               WHERE t.n <= jsonb_array_length(v_old)
           ), '[]'::jsonb)
+       OR jsonb_typeof(NEW.options) NOT IN ('array', 'null')
        OR (SELECT count(DISTINCT o ->> 'value') <> count(*)
            FROM jsonb_array_elements(v_new) o) THEN
         RAISE EXCEPTION 'only a manager reshapes this field' USING ERRCODE = '42501';

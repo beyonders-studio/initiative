@@ -74,6 +74,11 @@ TOOL_DESCRIPTIONS: dict[str, str] = {
         "with what each publishes about itself. None of their content."
     ),
     "get_initiative": "Read one initiative by id: its settings and which tools it has on.",
+    "get_initiative_defaults": (
+        "What a community sets for every initiative in it: each tool's switch, "
+        "what the built-in member role may do, and whether managers may add "
+        "roles. A value set here stands over each initiative's own."
+    ),
     "list_initiative_roles": "An initiative's roles and what each may do.",
     "get_initiative_members": (
         "One page of an initiative's members, each with their role. Narrow with "

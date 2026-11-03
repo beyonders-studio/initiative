@@ -301,7 +301,10 @@ def _administer_existing_roles() -> str:
     cluster-global role is created once, by whichever login got there first,
     and a ``CREATEROLE`` login holds ADMIN only on the roles it created itself
     (implicitly, PG16+), so the ones that already exist are granted here.
-    Rendered at call time, under the configured role prefixes.
+    A role it already administers is left alone: a grant locks the role, and
+    a community being provisioned at the same moment locks the same shared
+    roles in its own order. Rendered at call time, under the configured role
+    prefixes.
     """
     from app.db.schema_provisioning import guild_role_regex
 
@@ -316,8 +319,13 @@ DECLARE
     provisioner text := current_setting('app._bootstrap_role');
     r record;
 BEGIN
-    FOR r IN SELECT rolname FROM pg_roles
-              WHERE rolname IN ({listed}) OR rolname ~ '{guild_role_regex()}'
+    FOR r IN SELECT g.rolname FROM pg_roles g
+              WHERE (g.rolname IN ({listed}) OR g.rolname ~ '{guild_role_regex()}')
+                AND NOT EXISTS (
+                    SELECT 1 FROM pg_auth_members m
+                    JOIN pg_roles p ON p.oid = m.member
+                    WHERE m.roleid = g.oid AND p.rolname = provisioner
+                      AND m.admin_option)
     LOOP
         EXECUTE format('GRANT %I TO %I WITH ADMIN OPTION', r.rolname, provisioner);
     END LOOP;

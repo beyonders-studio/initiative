@@ -351,6 +351,18 @@ async def test_a_member_defines_a_field_and_only_a_manager_reshapes_it(
         member, f"UPDATE metadata_definitions SET options = '[]'::jsonb WHERE {field}"
     )
     assert not await runs(member, f"DELETE FROM metadata_definitions WHERE {field}")
+    # A field with no options takes a list of them or nothing.
+    assert await runs(
+        member,
+        "INSERT INTO metadata_definitions"
+        " (initiative_id, name, type, position, created_at, updated_at)"
+        f" VALUES ({iid}, 'Done', 'checkbox', 1, now(), now())",
+    )
+    assert not await runs(
+        member,
+        "UPDATE metadata_definitions SET options = '{\"x\": 1}'::jsonb"
+        f" WHERE name = 'Done' AND initiative_id = {iid}",
+    )
     assert await runs(
         manager, f"UPDATE metadata_definitions SET name = 'Phase' WHERE {field}"
     )
