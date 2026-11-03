@@ -916,10 +916,9 @@ class TestInstallingAToolListing:
             headers=outsider.headers,
         )
 
-        # The importer's own answer: a guild member may see the initiative,
-        # and holds no role in it that creates anything.
-        assert response.status_code == 403
-        assert response.json()["detail"] == "IMPORT_PERMISSION_REQUIRED"
+        # A private initiative reads as absent to a member outside it.
+        assert response.status_code == 404
+        assert response.json()["detail"] == "IMPORT_INVALID_PARAMS"
 
     async def test_a_plugin_is_not_installed_here(self, client, acting_user, session):
         actor = await acting_user(guild_role=CommunityRole.admin, initiative=True)

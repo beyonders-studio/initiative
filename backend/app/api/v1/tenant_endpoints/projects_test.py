@@ -954,7 +954,8 @@ async def test_create_project_not_in_initiative_forbidden(
         outsider.g("/projects/"), headers=outsider.headers, json=payload
     )
 
-    assert response.status_code == 403
+    assert response.status_code == 404
+    assert response.json()["detail"] == "INITIATIVE_NOT_FOUND"
 
 
 async def test_get_project_by_id(
