@@ -5,6 +5,7 @@ import pytest
 from sqlmodel import select
 from sqlmodel.ext.asyncio.session import AsyncSession
 
+from app.core.rules import SetBy
 from app.db import post_commit
 from app.db.session import set_rls_context
 from app.models.platform.guild import GuildMembership, CommunityRole
@@ -22,6 +23,7 @@ from app.models.tenant.custom_role import (
 )
 from app.models.tenant.initiative import InitiativeMember
 from app.services.oidc_sync import sync_oidc_assignments
+from app.services.platform import rules
 from app.services.tenant import custom_roles as custom_roles_service
 from app.services.tenant import plugin_revocation
 from app.services.tenant.initiatives import get_role_by_name
@@ -857,3 +859,44 @@ async def test_a_role_stays_until_a_sign_in_says_the_claim(session: AsyncSession
     assert await sync({"staff"}, _ADMITTED) == doors_id
     assert await sync(set(), {}) == doors_id
     assert await sync(set(), _ADMITTED) is None
+
+
+async def test_a_full_community_takes_nobody_new_from_its_rules(
+    session: AsyncSession,
+):
+    """A seat is a seat however somebody arrives: at its cap, a community's
+    rules place nobody new in it, nor in its initiatives, and the rest of the
+    sign-in goes on."""
+    owner = await create_user(session)
+    full = await create_guild(session, creator=owner)
+    initiative = await create_initiative(session, full, owner)
+    provider = await create_auth_provider(session, slug="tenant")
+    await create_guild_provider_connection(session, guild=full, provider=provider)
+    session.add(
+        OIDCClaimMapping(
+            provider_id=provider.id,
+            claim_value="staff",
+            target_type=OIDCMappingTargetType.initiative,
+            guild_id=full.id,
+            guild_role=CommunityRole.member.value,
+            initiative_id=initiative.id,
+        )
+    )
+    await rules.put(session, "max_users", 1, guild_id=full.id, set_by=SetBy.deployment)
+    newcomer = await create_user(session)
+    await session.commit()
+    full_id, initiative_id, user_id = full.id, initiative.id, newcomer.id
+
+    result = await _sync(
+        session, user_id=user_id, provider_id=provider.id, claims=_ADMITTED
+    )
+
+    assert result.guilds_added == []
+    assert result.initiatives_added == []
+    assert await _joined(session, user_id) == set()
+    assert (
+        await _membership(
+            session, guild_id=full_id, initiative_id=initiative_id, user_id=user_id
+        )
+        is None
+    )

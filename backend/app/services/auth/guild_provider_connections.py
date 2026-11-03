@@ -667,8 +667,10 @@ async def join_on_arrival(
     from app.services.platform import guilds as guilds_service
 
     # Plain values up front: the commit below expires the rows, and reading
-    # an expired attribute mid-loop would need an await of its own.
-    wanted = [
+    # an expired attribute mid-loop would need an await of its own. In
+    # ascending order, the order the sign-in sync takes the same communities'
+    # member-cap locks in, so the two never wait on each other.
+    wanted = sorted(
         connection.guild_id
         for connection in await admitting_connections(
             session, provider_id=provider_id, claims=claims
@@ -677,7 +679,7 @@ async def join_on_arrival(
         # community names them itself, and joining somebody to a community is
         # not something it gets to do on its own word alone.
         if connection.auto_join and connection.narrowing_approved_at is not None
-    ]
+    )
 
     joined: list[int] = []
     for guild_id in wanted:
