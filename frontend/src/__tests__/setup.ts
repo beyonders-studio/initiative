@@ -274,7 +274,7 @@ if (typeof Blob.prototype.stream !== "function") {
 // ---------------------------------------------------------------------------
 
 beforeAll(() => {
-  server.listen({ onUnhandledRequest: "warn" });
+  server.listen({ onUnhandledFrame: "warn" });
 });
 
 afterEach(() => {
