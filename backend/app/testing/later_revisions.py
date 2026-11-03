@@ -24,6 +24,7 @@ LATER: tuple[str, ...] = (
     "20261030_0564_imports_and_exports_are_data_jobs.py",
     "20261030_0567_an_initiatives_role_permissions_are_rules.py",
     "20261030_0568_a_community_sets_its_initiatives_defaults.py",
+    "20261031_0573_a_rules_initiative_is_the_communitys.py",
 )
 
 
@@ -37,15 +38,17 @@ def _load(name: str) -> ModuleType:
 
 
 def _steps(bind: Any, *, forward: bool) -> list[Callable[[], None]]:
-    batched, data_jobs, rules, defaults = (_load(name) for name in LATER)
+    batched, data_jobs, rules, defaults, claims = (_load(name) for name in LATER)
     if forward:
         return [
             lambda: batched._upgrade(bind),
             data_jobs._upgrade_schema,
             rules._upgrade,
             defaults._upgrade,
+            claims._create,
         ]
     return [
+        claims._drop,
         defaults._downgrade,
         rules._downgrade,
         data_jobs._downgrade_schema,

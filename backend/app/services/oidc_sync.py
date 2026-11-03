@@ -1,9 +1,11 @@
 from __future__ import annotations
 
 import logging
+from collections.abc import Collection
 from dataclasses import dataclass, field
 from functools import partial
 
+from sqlalchemy import tuple_
 from sqlmodel import select
 from sqlmodel.ext.asyncio.session import AsyncSession
 
@@ -17,11 +19,8 @@ from app.services.platform import provider_placement
 from app.services.platform import account_stream
 from app.services.platform import guilds as guilds_service
 from app.services.tenant import custom_roles as custom_roles_service
-from app.models.tenant.initiative import (
-    Initiative,
-    InitiativeMember,
-    InitiativeRoleModel,
-)
+from app.models.tenant.claim_rule_initiative import ClaimRuleInitiative
+from app.models.tenant.initiative import InitiativeMember, InitiativeRoleModel
 from app.models.platform.oidc_claim_mapping import (
     ClaimRuleAuthor,
     OIDCClaimMapping,
@@ -191,25 +190,18 @@ async def sync_oidc_assignments(
     # grants nothing, which is not the same as having nothing to take back —
     # the sweeps below are what hand those memberships over.
 
-    # Partition into matched and unmatched
-    matched: list[OIDCClaimMapping] = []
-    matched_guild_ids: set[int] = set()
-    matched_initiative_ids: set[int] = set()
-
-    for mapping in mappings:
-        # A rule naming no group places everybody its directory matched.
-        if mapping.claim_value is None or mapping.claim_value.lower() in claim_values:
-            matched.append(mapping)
-            if mapping.target_type == OIDCMappingTargetType.guild:
-                matched_guild_ids.add(mapping.guild_id)
-            elif mapping.target_type == OIDCMappingTargetType.initiative:
-                matched_guild_ids.add(mapping.guild_id)
-                if mapping.initiative_id is not None:
-                    matched_initiative_ids.add(mapping.initiative_id)
-
-    # Resolve guild role conflicts: highest role wins per guild
+    # The matched rules' standing in each guild: the highest role wins. A rule
+    # naming no group places everybody its directory matched.
     guild_roles: dict[int, str] = {}
-    for mapping in matched:
+    # Per guild, the matched rules that place people in one of its
+    # initiatives too, by id and the version each names. Which initiative is
+    # the guild's own, read in its half.
+    initiative_rules: dict[int, list[OIDCClaimMapping]] = {}
+    for mapping in mappings:
+        if mapping.claim_value is not None and (
+            mapping.claim_value.lower() not in claim_values
+        ):
+            continue
         gid = mapping.guild_id
         role = mapping.guild_role
         if gid not in guild_roles:
@@ -218,29 +210,13 @@ async def sync_oidc_assignments(
             guild_roles[gid], 0
         ):
             guild_roles[gid] = role
-
-    # Resolve initiative mappings: collect candidate role_ids per initiative,
-    # then pick the highest-privilege role (is_manager wins, then lowest position).
-    # Also track which guild each initiative mapping belongs to.
-    initiative_guild: dict[int, int] = {}  # initiative_id -> guild_id
-    initiative_role_candidates: dict[int, list[int]] = {}  # initiative_id -> role_ids
-    for mapping in matched:
-        if (
-            mapping.target_type == OIDCMappingTargetType.initiative
-            and mapping.initiative_id is not None
-        ):
-            initiative_guild[mapping.initiative_id] = mapping.guild_id
-            if mapping.initiative_role_id is not None:
-                initiative_role_candidates.setdefault(mapping.initiative_id, []).append(
-                    mapping.initiative_role_id
-                )
-            else:
-                initiative_role_candidates.setdefault(mapping.initiative_id, [])
+        if mapping.target_type == OIDCMappingTargetType.initiative:
+            initiative_rules.setdefault(gid, []).append(mapping)
 
     # ``oidc_claim_mappings`` and guild memberships are shared; initiatives,
-    # their roles and members live in each guild's schema. The shared half runs
-    # on ``session``, and each guild's half on a system session from that
-    # guild's cohort.
+    # their roles and members, and which initiative a rule places people in,
+    # live in each guild's schema. The shared half runs on ``session``, and
+    # each guild's half on a system session from that guild's cohort.
 
     # --- Stale guild memberships ---
     # An oidc-managed membership the claims no longer grant, removed in each
@@ -249,7 +225,9 @@ async def sync_oidc_assignments(
     from app.services.content_sockets import sockets as content_sockets
     from app.services.tenant.initiatives import enroll_in_auto_join_initiatives
 
-    async def drop_stale_initiatives(guild_session: AsyncSession, gid: int) -> None:
+    async def drop_stale_initiatives(
+        guild_session: AsyncSession, gid: int, *, granted: Collection[int] = ()
+    ) -> None:
         """Remove the oidc-managed initiative memberships in this guild that
         the claims no longer grant, recording each."""
         stale_inits = (
@@ -261,7 +239,7 @@ async def sync_oidc_assignments(
             )
         ).all()
         for im in stale_inits:
-            if im.initiative_id not in matched_initiative_ids:
+            if im.initiative_id not in granted:
                 await _record(
                     guild_session,
                     event_type=AuditEventType.INITIATIVE_MEMBER_REMOVED,
@@ -274,20 +252,17 @@ async def sync_oidc_assignments(
                 await guild_session.delete(im)
                 result.initiatives_removed.append(im.initiative_id)
 
-    stale_guild_ids = (
-        set(
-            (
-                await session.exec(
-                    select(GuildMembership.guild_id).where(
-                        GuildMembership.user_id == user_id,
-                        GuildMembership.oidc_provider_id == provider_id,
-                        GuildMembership.role != CommunityRole.superadmin,
-                    )
+    stale_guild_ids = set(
+        (
+            await session.exec(
+                select(GuildMembership.guild_id).where(
+                    GuildMembership.user_id == user_id,
+                    GuildMembership.oidc_provider_id == provider_id,
+                    GuildMembership.role != CommunityRole.superadmin,
                 )
-            ).all()
-        )
-        - matched_guild_ids
-    )
+            )
+        ).all()
+    ) - set(guild_roles)
     left: set[int] = set()
 
     async def leave(guild_session: AsyncSession, gid: int) -> None:
@@ -313,9 +288,8 @@ async def sync_oidc_assignments(
     result.guilds_removed.extend(sorted(left))
 
     # --- Guild memberships (shared) ---
-    # Apply matched guild roles, and ensure a membership exists for every guild
-    # that has a matched initiative so the initiative member can be added below.
-    ensure_member_guilds = set(guild_roles) | set(initiative_guild.values())
+    # Apply matched guild roles, and ensure a membership exists for every
+    # matched guild, so an initiative member can be added below.
     # Guilds this sync admits the user to for the first time, as a plain member.
     # They are as new to the guild as an invite redeemer, so the guild's
     # auto-join initiatives take them in the same way (below, in each guild's
@@ -325,8 +299,7 @@ async def sync_oidc_assignments(
     # Communities the rules matched that took nobody new: their initiatives do
     # not take the account either.
     kept_out: set[int] = set()
-    for guild_id in sorted(ensure_member_guilds):
-        desired = guild_roles.get(guild_id)
+    for guild_id, desired in sorted(guild_roles.items()):
         membership = await _get_guild_membership(
             session, user_id=user_id, guild_id=guild_id
         )
@@ -336,8 +309,7 @@ async def sync_oidc_assignments(
             # neither is a superadmin: that seat is passed on by somebody
             # holding it, never by a rule matching a claim value.
             if (
-                desired is not None
-                and membership.oidc_provider_id == provider_id
+                membership.oidc_provider_id == provider_id
                 and membership.role != CommunityRole.superadmin
             ):
                 role = CommunityRole(desired)
@@ -376,9 +348,7 @@ async def sync_oidc_assignments(
                 logger.info("guild %s is full; its rules place nobody new", guild_id)
                 kept_out.add(guild_id)
                 continue
-            role = (
-                CommunityRole(desired) if desired is not None else CommunityRole.member
-            )
+            role = CommunityRole(desired)
             await _create_guild_membership(
                 session,
                 user_id=user_id,
@@ -406,12 +376,7 @@ async def sync_oidc_assignments(
             )
         ).all()
     )
-    initiative_guild = {
-        iid: gid for iid, gid in initiative_guild.items() if gid not in kept_out
-    }
-    relevant_guilds = (
-        existing_guild_ids | set(initiative_guild.values()) | set(guild_roles)
-    ) - kept_out
+    relevant_guilds = (existing_guild_ids | set(guild_roles)) - kept_out
     # Where the community's own custom-role rules (in its schema) may speak for
     # this arrival: the communities that count it as one of their own, as for
     # the rules above.
@@ -436,40 +401,46 @@ async def sync_oidc_assignments(
 
     # --- Initiative resolution + membership (each guild's half) ---
     async def sync_initiatives(guild_session: AsyncSession, gid: int) -> None:
-        guild_inits = {iid for iid, g in initiative_guild.items() if g == gid}
-        # Drop references to initiatives that no longer exist in this schema
-        # (oidc_claim_mappings has no cross-schema FK, so a purged initiative can
-        # leave a dangling mapping).
-        if guild_inits:
-            present = set(
-                (
-                    await guild_session.exec(
-                        select(Initiative.id).where(Initiative.id.in_(guild_inits))
+        # Each initiative the matched rules place people in, at the strongest
+        # role they name there: a manager role first, then the lowest position.
+        keys = provider_placement.placed(initiative_rules.get(gid, ()))
+        guild_init_roles: dict[int, int] = {}
+        settled = True
+        if keys:
+            found: set[int] = set()
+            for rule_id, iid, role_id in (
+                await guild_session.exec(
+                    select(
+                        ClaimRuleInitiative.rule_id,
+                        ClaimRuleInitiative.initiative_id,
+                        ClaimRuleInitiative.initiative_role_id,
                     )
-                ).all()
-            )
-            guild_inits &= present
-
-        # Resolve each initiative to a single role_id (manager first, then lowest
-        # position), validating the role still exists in this schema.
-        guild_init_roles: dict[int, int | None] = {}
-        for iid in guild_inits:
-            unique_ids = list(
-                {c for c in initiative_role_candidates.get(iid, []) if c is not None}
-            )
-            role_id: int | None = None
-            if unique_ids:
-                roles = (
-                    await guild_session.exec(
-                        select(InitiativeRoleModel).where(
-                            InitiativeRoleModel.id.in_(unique_ids)
-                        )
+                    .join(
+                        InitiativeRoleModel,
+                        InitiativeRoleModel.id
+                        == ClaimRuleInitiative.initiative_role_id,
                     )
-                ).all()
-                if roles:
-                    roles.sort(key=lambda r: (not r.is_manager, r.position))
-                    role_id = roles[0].id
-            guild_init_roles[iid] = role_id
+                    .where(
+                        tuple_(
+                            ClaimRuleInitiative.rule_id, ClaimRuleInitiative.version
+                        ).in_(keys)
+                    )
+                    .order_by(
+                        InitiativeRoleModel.is_manager.desc(),
+                        InitiativeRoleModel.position,
+                        InitiativeRoleModel.id,
+                    )
+                )
+            ).all():
+                found.add(rule_id)
+                guild_init_roles.setdefault(iid, role_id)
+            # A rule whose row is gone either went with its initiative or role,
+            # and places in the community alone, or moved since it was read:
+            # then the next sign-in says what it places, and nothing is taken
+            # away now.
+            settled = await provider_placement.placements_stand(
+                {rule_id: version for rule_id, version in keys if rule_id not in found}
+            )
 
         for iid, role_id in guild_init_roles.items():
             im = await _get_initiative_membership(
@@ -478,7 +449,7 @@ async def sync_oidc_assignments(
             if im:
                 if im.oidc_provider_id != provider_id:
                     continue
-                if role_id is not None and im.role_id != role_id:
+                if im.role_id != role_id:
                     previous_role_id = im.role_id
                     im.role_id = role_id
                     guild_session.add(im)
@@ -508,7 +479,8 @@ async def sync_oidc_assignments(
                 )
                 result.initiatives_added.append(iid)
 
-        await drop_stale_initiatives(guild_session, gid)
+        if settled:
+            await drop_stale_initiatives(guild_session, gid, granted=guild_init_roles)
 
         # Onboarding for a first-time arrival, once the claims have had their
         # say. It runs last because the claims are authoritative about role:

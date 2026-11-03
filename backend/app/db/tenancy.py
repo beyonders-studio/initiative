@@ -103,6 +103,9 @@ GUILD_LEVEL_TABLES: frozenset[str] = frozenset(
         # Which custom role a provider's group gives: sign-in configuration,
         # the seat's (SEAT_TABLES).
         "custom_role_claim_rules",
+        # Which initiative a sign-in rule (public.oidc_claim_mappings) places
+        # people in: sign-in configuration, the seat's (SEAT_TABLES).
+        "claim_rule_initiatives",
         # Installed plug-ins: guild-wide by definition, and readable by any member —
         # the sidebar has to know a plug-in is there. Installing, configuring and
         # removing are the seat's (SEAT_TABLES below); what a member may do
@@ -129,6 +132,8 @@ GUILD_LEVEL_TABLES: frozenset[str] = frozenset(
         "guild_ai_connection_keys",
         "webhook_deliveries",  # per-subscription delivery ledger, no initiative of
         # its own; read through its subscription (LEDGER_TABLES below).
+        "webhook_refs",  # what each subscription calls the community and its
+        # people; the system engine's alone (LEDGER_TABLES below).
         "subscription_progress",  # how far through the change log subscribers
         # were told; the system engine's alone (LEDGER_TABLES below).
         "plugin_hook_deliveries",  # vendor webhook deliveries an install accepted;
@@ -266,6 +271,7 @@ MEMBER_SECRET_TABLES: dict[str, tuple[str, str]] = {
 # ``GUILD_LEVEL_TABLES`` — enforced in ``tenancy_test.py``.
 SEAT_TABLES: frozenset[str] = frozenset(
     {
+        "claim_rule_initiatives",
         "custom_role_claim_rules",
         "plugin_placements",
         "guild_ai_connection_keys",
@@ -295,19 +301,25 @@ SEAT_SURFACES: dict[str, str] = {
 # read predicate is the seat's. Every entry here MUST also be in
 # ``SEAT_TABLES`` — enforced in ``tenancy_test.py``.
 SEAT_READ_TABLES: frozenset[str] = frozenset(
-    {"custom_role_claim_rules", "guild_ai_connection_keys", "guild_plugin_secrets"}
+    {
+        "claim_rule_initiatives",
+        "custom_role_claim_rules",
+        "guild_ai_connection_keys",
+        "guild_plugin_secrets",
+    }
 )
 
 # --- Ledger overlay on guild-level tables -------------------------------------
 # Guild-level bookkeeping a system job keeps about a parent row: table ->
 # (parent table, FK column). Read through the parent, so a row is visible to
 # whoever the parent's own policy shows the parent to; written by the system
-# engine alone. ``None`` for bookkeeping about no row, read and written by the
-# system engine alone. Rendered as ``ledger_*`` policies by
+# engine alone. ``None`` for bookkeeping nobody but the system engine reads,
+# whatever row it is about. Rendered as ``ledger_*`` policies by
 # ``app.db.guild_ddl.render_guild_rls_ddl``. Every entry here MUST also be in
 # ``GUILD_LEVEL_TABLES`` — enforced in ``tenancy_test.py``.
 LEDGER_TABLES: dict[str, tuple[str, str] | None] = {
     "webhook_deliveries": ("webhook_subscriptions", "subscription_id"),
+    "webhook_refs": None,
     "subscription_progress": None,
     "plugin_hook_deliveries": ("guild_plugins", "install_id"),
     "plugin_schedule_runs": ("guild_plugins", "install_id"),
@@ -354,6 +366,9 @@ CREATED_BY_EXEMPT_TABLES: frozenset[str] = frozenset(
         "plugin_connection_secrets",
         # A connection's shared key. The connection row names who made it.
         "guild_ai_connection_keys",
+        # Where a sign-in rule places people, under the rule's id. The rule's
+        # record names who wrote it.
+        "claim_rule_initiatives",
         # A ballot: ``user_id`` is the voter, which is both the author of the
         # row and its whole content.
         "post_poll_votes",
@@ -372,6 +387,7 @@ CREATED_BY_EXEMPT_TABLES: frozenset[str] = frozenset(
         "engagement_levels",
         "batched_notices",
         "webhook_deliveries",
+        "webhook_refs",
         "subscription_progress",
         "timer_marks",
         # The key -> task map the intake writer reads. The case it points at

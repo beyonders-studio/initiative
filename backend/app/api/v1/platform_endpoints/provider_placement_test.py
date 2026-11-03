@@ -6,6 +6,7 @@ from sqlmodel import select
 from sqlmodel.ext.asyncio.session import AsyncSession
 
 from app.models.platform.oidc_claim_mapping import ClaimRuleAuthor, OIDCClaimMapping
+from app.models.tenant.claim_rule_initiative import ClaimRuleInitiative
 from app.models.platform.user import UserRole
 from app.services.platform import rules
 from app.services.tenant.initiatives import get_role_by_name
@@ -17,9 +18,24 @@ from app.testing.factories import (
     create_user,
     get_auth_headers,
 )
+from app.testing.schema_harness import route_session_to_guild
 
 
 BASE = "/api/v1/settings/placement"
+
+
+async def _versions(session: AsyncSession, rule_id: int) -> list[int]:
+    """The versions a rule has rows for in the community's schema."""
+    session.expunge_all()
+    return list(
+        (
+            await session.exec(
+                select(ClaimRuleInitiative.version)
+                .where(ClaimRuleInitiative.rule_id == rule_id)
+                .order_by(ClaimRuleInitiative.version)
+            )
+        ).all()
+    )
 
 
 async def _headers(session: AsyncSession, role: UserRole) -> dict[str, str]:
@@ -210,6 +226,58 @@ async def test_the_initiative_picker_reads_a_placeable_community_only(
     )
     assert placed.status_code == 201, placed.text
     assert placed.json()["initiative_name"] == "Roadmap"
+    rule_id = placed.json()["id"]
+    listed = (await client.get(f"{BASE}/", headers=headers)).json()["rules"]
+    assert [(r["initiative_id"], r["initiative_role_id"]) for r in listed] == [
+        (initiative.id, pm_role.id)
+    ]
+
+    # Placing in the community alone drops the initiative from its schema.
+    moved = await client.patch(
+        f"{BASE}/rules/{rule_id}",
+        headers=headers,
+        json={"initiative_id": None, "initiative_role_id": None},
+    )
+    assert moved.status_code == 200, moved.text
+    assert moved.json()["initiative_id"] is None
+    await route_session_to_guild(session, guild.id)
+    assert await _versions(session, rule_id) == []
+
+    # Placing it again writes its next version, which the rule names once
+    # committed with its claims; changing only what it matches writes none.
+    again = await client.patch(
+        f"{BASE}/rules/{rule_id}",
+        headers=headers,
+        json={"initiative_id": initiative.id, "initiative_role_id": pm_role.id},
+    )
+    assert again.json()["initiative_role_id"] == pm_role.id
+    assert await _versions(session, rule_id) == [1]
+    renamed = await client.patch(
+        f"{BASE}/rules/{rule_id}", headers=headers, json={"claim_value": "chiefs"}
+    )
+    assert renamed.json()["initiative_role_id"] == pm_role.id
+    assert await _versions(session, rule_id) == [1]
+
+    # Moving it keeps the version before, for a sign-in that read the rule
+    # just before, and drops the older ones.
+    member_role = await get_role_by_name(
+        session, initiative_id=initiative.id, role_name="member"
+    )
+    for role in (member_role, pm_role):
+        moved = await client.patch(
+            f"{BASE}/rules/{rule_id}",
+            headers=headers,
+            json={"initiative_role_id": role.id},
+        )
+        assert moved.json()["initiative_role_id"] == role.id
+    assert await _versions(session, rule_id) == [2, 3]
+    rule = await session.get(OIDCClaimMapping, rule_id)
+    assert rule is not None and rule.placement_version == 3
+
+    # And deleting a rule that places in one drops it too.
+    removed = await client.delete(f"{BASE}/rules/{rule_id}", headers=headers)
+    assert removed.status_code == 204, removed.text
+    assert await _versions(session, rule_id) == []
 
 
 async def test_the_community_search_says_which_communities_accept(

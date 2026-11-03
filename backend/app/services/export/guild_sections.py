@@ -381,6 +381,9 @@ EXEMPT: dict[str, str] = {
     # describe a history that did not happen in the instance reading them.
     "data_jobs": "operational",
     "webhook_deliveries": "operational",
+    # What each subscription calls the community and its people, for a
+    # receiver of this instance's alone.
+    "webhook_refs": "operational",
     "plugin_hook_deliveries": "operational",
     "plugin_schedule_runs": "operational",
     "timer_marks": "operational",
@@ -393,6 +396,9 @@ EXEMPT: dict[str, str] = {
     # The platform's record of what it holds here. Not the community's to
     # read, so not the community's to carry out.
     "content_holds": "platform",
+    # Half of a sign-in rule, whose other half (public.oidc_claim_mappings)
+    # names this instance's providers and no archive carries.
+    "claim_rule_initiatives": "sign_in",
     # Sign-in configuration: it names the deployment's providers, which mean
     # nothing to the instance reading the archive.
     "custom_role_claim_rules": "sign_in",
