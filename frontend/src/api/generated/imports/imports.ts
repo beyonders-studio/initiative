@@ -4,20 +4,12 @@
  * Initiative API
  * OpenAPI spec version: 0.77.1
  */
-import { useMutation, useQuery } from "@tanstack/react-query";
+import { useMutation } from "@tanstack/react-query";
 import type {
-  DataTag,
-  DefinedInitialDataOptions,
-  DefinedUseQueryResult,
   MutationFunction,
   QueryClient,
-  QueryFunction,
-  QueryKey,
-  UndefinedInitialDataOptions,
   UseMutationOptions,
   UseMutationResult,
-  UseQueryOptions,
-  UseQueryResult,
 } from "@tanstack/react-query";
 
 import type {
@@ -28,11 +20,11 @@ import type {
   BodyStartConfluenceExportImport,
   BodyUploadBackup,
   ConfirmImportBody,
+  DataJobRead,
   EnvelopeImportRequest,
   ForeignImportRequest,
   ForeignPreview,
   HTTPValidationError,
-  ImportJobRead,
 } from "../initiativeAPI.schemas";
 
 import { apiMutator } from "../../mutator";
@@ -40,21 +32,6 @@ import type { ErrorType, BodyType } from "../../mutator";
 import { toFormData } from "../../formData";
 
 type SecondParameter<T extends (...args: never) => unknown> = Parameters<T>[1];
-
-const withQueryKey = <T extends object, K>(query: T, queryKey: K): T & { queryKey: K } => {
-  const result = { queryKey } as T & { queryKey: K };
-  for (const key of Object.keys(query)) {
-    // The explicit queryKey always wins, matching the previous
-    // `{ ...query, queryKey }` spread where it was set last.
-    if (key === "queryKey") continue;
-    Object.defineProperty(result, key, {
-      enumerable: true,
-      configurable: true,
-      get: () => (query as Record<string, unknown>)[key],
-    });
-  }
-  return result;
-};
 
 /**
  * Import a previously-exported JSON envelope (any tool — the envelope's
@@ -155,7 +132,7 @@ export const useImportEnvelope = <TError = ErrorType<HTTPValidationError>, TCont
   return useMutation(getImportEnvelopeMutationOptions(options), queryClient);
 };
 /**
- * Import an export that travels as a zip — a catalog with its pictures —
+ * Import an export that travels as a zip — a wiki with its files —
  * into the chosen initiative. The zip holds one envelope at its top level and
  * the files it names under ``assets/``; the files are stored first, then the
  * envelope imports exactly as ``POST /imports/envelope`` imports one, with
@@ -589,7 +566,7 @@ export const startAtlassianImport = (
   options?: SecondParameter<typeof apiMutator>,
   signal?: AbortSignal
 ) => {
-  return apiMutator<ImportJobRead>(
+  return apiMutator<DataJobRead>(
     {
       url: `/api/v1/c/${communityId}/imports/atlassian/import`,
       method: "POST",
@@ -675,7 +652,8 @@ export const useStartAtlassianImport = <
   return useMutation(getStartAtlassianImportMutationOptions(options), queryClient);
 };
 /**
- * Start reading a Confluence space's HTML export into an initiative.
+ * Start reading a Confluence space's HTML export into an initiative,
+ * sent as ``file`` or as a resumable upload named by ``upload_id``.
  *
  * The zip Confluence's "Export space → HTML" writes, for a site this server
  * cannot reach or somebody would rather not hand a token to. It is staged
@@ -692,7 +670,7 @@ export const startConfluenceExportImport = (
   signal?: AbortSignal
 ) => {
   const formData = toFormData(bodyStartConfluenceExportImport);
-  return apiMutator<ImportJobRead>(
+  return apiMutator<DataJobRead>(
     {
       url: `/api/v1/c/${communityId}/imports/atlassian/export`,
       method: "POST",
@@ -779,257 +757,6 @@ export const useStartConfluenceExportImport = <
   return useMutation(getStartConfluenceExportImportMutationOptions(options), queryClient);
 };
 /**
- * The caller's import jobs, newest first (RLS scopes the rows: own rows,
- * or the whole guild for a guild admin).
- * @summary List Import Jobs
- */
-export const listImportJobs = (
-  communityId: number,
-  options?: SecondParameter<typeof apiMutator>,
-  signal?: AbortSignal
-) => {
-  return apiMutator<ImportJobRead[]>(
-    { url: `/api/v1/c/${communityId}/imports/jobs`, method: "GET", signal },
-    options
-  );
-};
-
-export const getListImportJobsQueryKey = (communityId: number) => {
-  return [`/api/v1/c/${communityId}/imports/jobs`] as const;
-};
-
-export const getListImportJobsQueryOptions = <
-  TData = Awaited<ReturnType<typeof listImportJobs>>,
-  TError = ErrorType<HTTPValidationError>,
->(
-  communityId: number,
-  options?: {
-    query?: Partial<UseQueryOptions<Awaited<ReturnType<typeof listImportJobs>>, TError, TData>>;
-    request?: SecondParameter<typeof apiMutator>;
-  }
-) => {
-  const { query: queryOptions, request: requestOptions } = options ?? {};
-
-  const queryKey = queryOptions?.queryKey ?? getListImportJobsQueryKey(communityId);
-
-  const queryFn: QueryFunction<Awaited<ReturnType<typeof listImportJobs>>> = ({ signal }) =>
-    listImportJobs(communityId, requestOptions, signal);
-
-  return {
-    queryKey,
-    queryFn,
-    enabled: communityId !== null && communityId !== undefined,
-    ...queryOptions,
-  } as UseQueryOptions<Awaited<ReturnType<typeof listImportJobs>>, TError, TData> & {
-    queryKey: DataTag<QueryKey, TData, TError>;
-  };
-};
-
-export type ListImportJobsQueryResult = NonNullable<Awaited<ReturnType<typeof listImportJobs>>>;
-export type ListImportJobsQueryError = ErrorType<HTTPValidationError>;
-
-export function useListImportJobs<
-  TData = Awaited<ReturnType<typeof listImportJobs>>,
-  TError = ErrorType<HTTPValidationError>,
->(
-  communityId: number,
-  options: {
-    query: Partial<UseQueryOptions<Awaited<ReturnType<typeof listImportJobs>>, TError, TData>> &
-      Pick<
-        DefinedInitialDataOptions<
-          Awaited<ReturnType<typeof listImportJobs>>,
-          TError,
-          Awaited<ReturnType<typeof listImportJobs>>
-        >,
-        "initialData"
-      >;
-    request?: SecondParameter<typeof apiMutator>;
-  },
-  queryClient?: QueryClient
-): DefinedUseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData, TError> };
-export function useListImportJobs<
-  TData = Awaited<ReturnType<typeof listImportJobs>>,
-  TError = ErrorType<HTTPValidationError>,
->(
-  communityId: number,
-  options?: {
-    query?: Partial<UseQueryOptions<Awaited<ReturnType<typeof listImportJobs>>, TError, TData>> &
-      Pick<
-        UndefinedInitialDataOptions<
-          Awaited<ReturnType<typeof listImportJobs>>,
-          TError,
-          Awaited<ReturnType<typeof listImportJobs>>
-        >,
-        "initialData"
-      >;
-    request?: SecondParameter<typeof apiMutator>;
-  },
-  queryClient?: QueryClient
-): UseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData, TError> };
-export function useListImportJobs<
-  TData = Awaited<ReturnType<typeof listImportJobs>>,
-  TError = ErrorType<HTTPValidationError>,
->(
-  communityId: number,
-  options?: {
-    query?: Partial<UseQueryOptions<Awaited<ReturnType<typeof listImportJobs>>, TError, TData>>;
-    request?: SecondParameter<typeof apiMutator>;
-  },
-  queryClient?: QueryClient
-): UseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData, TError> };
-/**
- * @summary List Import Jobs
- */
-
-export function useListImportJobs<
-  TData = Awaited<ReturnType<typeof listImportJobs>>,
-  TError = ErrorType<HTTPValidationError>,
->(
-  communityId: number,
-  options?: {
-    query?: Partial<UseQueryOptions<Awaited<ReturnType<typeof listImportJobs>>, TError, TData>>;
-    request?: SecondParameter<typeof apiMutator>;
-  },
-  queryClient?: QueryClient
-): UseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData, TError> } {
-  const queryOptions = getListImportJobsQueryOptions(communityId, options);
-
-  const query = useQuery(queryOptions, queryClient) as UseQueryResult<TData, TError> & {
-    queryKey: DataTag<QueryKey, TData, TError>;
-  };
-
-  return withQueryKey(query, queryOptions.queryKey);
-}
-
-/**
- * @summary Get Import Job
- */
-export const getImportJob = (
-  communityId: number,
-  jobId: number,
-  options?: SecondParameter<typeof apiMutator>,
-  signal?: AbortSignal
-) => {
-  return apiMutator<ImportJobRead>(
-    { url: `/api/v1/c/${communityId}/imports/jobs/${jobId}`, method: "GET", signal },
-    options
-  );
-};
-
-export const getGetImportJobQueryKey = (communityId: number, jobId: number) => {
-  return [`/api/v1/c/${communityId}/imports/jobs/${jobId}`] as const;
-};
-
-export const getGetImportJobQueryOptions = <
-  TData = Awaited<ReturnType<typeof getImportJob>>,
-  TError = ErrorType<HTTPValidationError>,
->(
-  communityId: number,
-  jobId: number,
-  options?: {
-    query?: Partial<UseQueryOptions<Awaited<ReturnType<typeof getImportJob>>, TError, TData>>;
-    request?: SecondParameter<typeof apiMutator>;
-  }
-) => {
-  const { query: queryOptions, request: requestOptions } = options ?? {};
-
-  const queryKey = queryOptions?.queryKey ?? getGetImportJobQueryKey(communityId, jobId);
-
-  const queryFn: QueryFunction<Awaited<ReturnType<typeof getImportJob>>> = ({ signal }) =>
-    getImportJob(communityId, jobId, requestOptions, signal);
-
-  return {
-    queryKey,
-    queryFn,
-    enabled:
-      communityId !== null && communityId !== undefined && jobId !== null && jobId !== undefined,
-    ...queryOptions,
-  } as UseQueryOptions<Awaited<ReturnType<typeof getImportJob>>, TError, TData> & {
-    queryKey: DataTag<QueryKey, TData, TError>;
-  };
-};
-
-export type GetImportJobQueryResult = NonNullable<Awaited<ReturnType<typeof getImportJob>>>;
-export type GetImportJobQueryError = ErrorType<HTTPValidationError>;
-
-export function useGetImportJob<
-  TData = Awaited<ReturnType<typeof getImportJob>>,
-  TError = ErrorType<HTTPValidationError>,
->(
-  communityId: number,
-  jobId: number,
-  options: {
-    query: Partial<UseQueryOptions<Awaited<ReturnType<typeof getImportJob>>, TError, TData>> &
-      Pick<
-        DefinedInitialDataOptions<
-          Awaited<ReturnType<typeof getImportJob>>,
-          TError,
-          Awaited<ReturnType<typeof getImportJob>>
-        >,
-        "initialData"
-      >;
-    request?: SecondParameter<typeof apiMutator>;
-  },
-  queryClient?: QueryClient
-): DefinedUseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData, TError> };
-export function useGetImportJob<
-  TData = Awaited<ReturnType<typeof getImportJob>>,
-  TError = ErrorType<HTTPValidationError>,
->(
-  communityId: number,
-  jobId: number,
-  options?: {
-    query?: Partial<UseQueryOptions<Awaited<ReturnType<typeof getImportJob>>, TError, TData>> &
-      Pick<
-        UndefinedInitialDataOptions<
-          Awaited<ReturnType<typeof getImportJob>>,
-          TError,
-          Awaited<ReturnType<typeof getImportJob>>
-        >,
-        "initialData"
-      >;
-    request?: SecondParameter<typeof apiMutator>;
-  },
-  queryClient?: QueryClient
-): UseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData, TError> };
-export function useGetImportJob<
-  TData = Awaited<ReturnType<typeof getImportJob>>,
-  TError = ErrorType<HTTPValidationError>,
->(
-  communityId: number,
-  jobId: number,
-  options?: {
-    query?: Partial<UseQueryOptions<Awaited<ReturnType<typeof getImportJob>>, TError, TData>>;
-    request?: SecondParameter<typeof apiMutator>;
-  },
-  queryClient?: QueryClient
-): UseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData, TError> };
-/**
- * @summary Get Import Job
- */
-
-export function useGetImportJob<
-  TData = Awaited<ReturnType<typeof getImportJob>>,
-  TError = ErrorType<HTTPValidationError>,
->(
-  communityId: number,
-  jobId: number,
-  options?: {
-    query?: Partial<UseQueryOptions<Awaited<ReturnType<typeof getImportJob>>, TError, TData>>;
-    request?: SecondParameter<typeof apiMutator>;
-  },
-  queryClient?: QueryClient
-): UseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData, TError> } {
-  const queryOptions = getGetImportJobQueryOptions(communityId, jobId, options);
-
-  const query = useQuery(queryOptions, queryClient) as UseQueryResult<TData, TError> & {
-    queryKey: DataTag<QueryKey, TData, TError>;
-  };
-
-  return withQueryKey(query, queryOptions.queryKey);
-}
-
-/**
  * Cancel a job that hasn't started applying (staged, queued, or still
  * fetching from its source); its staged payload is deleted. A fetch writes
  * nothing but that payload, so stopping one mid-read is safe — the worker
@@ -1045,7 +772,7 @@ export const cancelImportJob = (
   options?: SecondParameter<typeof apiMutator>,
   signal?: AbortSignal
 ) => {
-  return apiMutator<ImportJobRead>(
+  return apiMutator<DataJobRead>(
     { url: `/api/v1/c/${communityId}/imports/jobs/${jobId}`, method: "DELETE", signal },
     options
   );
@@ -1119,7 +846,8 @@ export const useCancelImportJob = <TError = ErrorType<HTTPValidationError>, TCon
   return useMutation(getCancelImportJobMutationOptions(options), queryClient);
 };
 /**
- * Upload a backup zip and get its pre-flight plan. The zip is staged in
+ * Upload a backup zip, as ``file`` or as a resumable upload named by
+ * ``upload_id``, and get its pre-flight plan. The zip is staged in
  * guild storage and the job parked as ``staged`` (nothing is imported yet);
  * ``POST /imports/jobs/{id}/confirm`` starts the apply. Unconfirmed staged
  * backups expire after IMPORT_STAGED_TTL_HOURS. The community's seat only.
@@ -1127,12 +855,12 @@ export const useCancelImportJob = <TError = ErrorType<HTTPValidationError>, TCon
  */
 export const uploadBackup = (
   communityId: number,
-  bodyUploadBackup: BodyType<BodyUploadBackup>,
+  bodyUploadBackup?: BodyType<BodyUploadBackup>,
   options?: SecondParameter<typeof apiMutator>,
   signal?: AbortSignal
 ) => {
   const formData = toFormData(bodyUploadBackup);
-  return apiMutator<ImportJobRead>(
+  return apiMutator<DataJobRead>(
     {
       url: `/api/v1/c/${communityId}/imports/backup`,
       method: "POST",
@@ -1183,11 +911,11 @@ export const getUploadBackupMutationOptions = <
 };
 
 export type UploadBackupMutationResult = NonNullable<Awaited<ReturnType<typeof uploadBackup>>>;
-export type UploadBackupMutationBody = BodyType<BodyUploadBackup>;
+export type UploadBackupMutationBody = BodyType<BodyUploadBackup> | undefined;
 export type UploadBackupMutationError = ErrorType<HTTPValidationError>;
 export type UploadBackupMutationVariables = {
   communityId: number;
-  data: BodyType<BodyUploadBackup>;
+  data?: BodyType<BodyUploadBackup>;
 };
 
 /**
@@ -1240,7 +968,7 @@ export const confirmImport = (
   options?: SecondParameter<typeof apiMutator>,
   signal?: AbortSignal
 ) => {
-  return apiMutator<ImportJobRead>(
+  return apiMutator<DataJobRead>(
     {
       url: `/api/v1/c/${communityId}/imports/jobs/${jobId}/confirm`,
       method: "POST",

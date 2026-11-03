@@ -1,0 +1,317 @@
+"""A community's custom roles: defining them, and who holds which.
+
+The routes in front of these say why a write is refused; the policies on
+``custom_roles`` and ``custom_role_members`` refuse it either way
+(``app.db.guild_ddl``). The deployment's roles are written by
+:func:`apply_deployment_roles`, from billing's sync.
+"""
+
+from __future__ import annotations
+
+from collections.abc import Collection, Sequence
+from itertools import count
+from typing import TYPE_CHECKING, Optional
+
+from sqlalchemy import and_, delete, func, or_
+from sqlalchemy.dialects.postgresql import insert as pg_insert
+from sqlmodel import col, select
+from sqlmodel.ext.asyncio.session import AsyncSession
+
+from app.core.audit_events import AuditEventType
+from app.core.rules import SetBy
+from app.models.platform.guild import GuildMembership
+from app.models.tenant.custom_role import (
+    CUSTOM_ROLE_NAME_MAX_LENGTH,
+    CustomRole,
+    CustomRoleClaimRule,
+    CustomRoleMember,
+)
+from app.services import audit as audit_service
+
+if TYPE_CHECKING:
+    from app.schemas.platform.billing import SyncedCustomRole
+
+
+async def list_roles(session: AsyncSession) -> list[CustomRole]:
+    return list(
+        (await session.exec(select(CustomRole).order_by(col(CustomRole.name)))).all()
+    )
+
+
+async def get_role(session: AsyncSession, role_id: int) -> Optional[CustomRole]:
+    return await session.get(CustomRole, role_id)
+
+
+async def reserved(session: AsyncSession, name: str) -> bool:
+    """Whether a role the deployment defined has ``name``, capitals aside."""
+    return (
+        await session.scalar(
+            select(func.count())
+            .select_from(CustomRole)
+            .where(
+                CustomRole.set_by == SetBy.deployment.value,
+                func.lower(CustomRole.name) == name.lower(),
+            )
+        )
+    ) > 0
+
+
+def _communitys(name: str, taken: Collection[str]) -> str:
+    """``name`` marked as the community's own, and free."""
+    for n in count(1):
+        suffix = " (community)" if n == 1 else f" (community {n})"
+        renamed = name[: CUSTOM_ROLE_NAME_MAX_LENGTH - len(suffix)] + suffix
+        if renamed.lower() not in taken:
+            return renamed
+    raise AssertionError  # pragma: no cover
+
+
+async def apply_deployment_roles(
+    session: AsyncSession, guild_id: int, roles: Sequence[SyncedCustomRole]
+) -> None:
+    """Bring the deployment's roles in the community to ``roles``, on a
+    session routed into it as the system engine, writing only what differs.
+
+    A role is matched by its name, capitals aside. One ``roles`` no longer
+    names is deleted, and its assignments and claim rules with it, so its
+    holders stand on their rung; one whose rung moved is made anew, since a
+    role keeps its rung. A role of the community's own with a name the
+    deployment takes is renamed as the community's, once: from then on the
+    name is reserved.
+    """
+    existing = await list_roles(session)
+    wanted = {role.name.lower(): role for role in roles}
+    ours = {
+        role.name.lower(): role
+        for role in existing
+        if role.set_by == SetBy.deployment.value
+    }
+    changes: list[tuple[str, CustomRole]] = []
+    for key, row in list(ours.items()):
+        role = wanted.get(key)
+        if role is None or row.base_rung != role.base_rung.value:
+            changes.append(("deleted", row))
+            await session.delete(row)
+            del ours[key]
+    await session.flush()
+    taken = {role.name.lower() for role in existing} | set(wanted)
+    for key, role in wanted.items():
+        surfaces = sorted(surface.value for surface in role.surfaces)
+        row = ours.get(key)
+        if row is not None:
+            if row.name != role.name or sorted(row.surfaces) != surfaces:
+                row.name, row.surfaces = role.name, surfaces
+                session.add(row)
+                changes.append(("updated", row))
+            continue
+        for theirs in existing:
+            if theirs.set_by == SetBy.community.value and theirs.name.lower() == key:
+                theirs.name = _communitys(theirs.name, taken)
+                taken.add(theirs.name.lower())
+                session.add(theirs)
+                changes.append(("renamed", theirs))
+                await session.flush()
+        row = CustomRole(
+            name=role.name,
+            base_rung=role.base_rung.value,
+            surfaces=surfaces,
+            set_by=SetBy.deployment.value,
+        )
+        session.add(row)
+        changes.append(("created", row))
+    await session.flush()
+    for action, row in changes:
+        await audit_service.record(
+            session,
+            event_type=AuditEventType.GUILD_CUSTOM_ROLE_CHANGED,
+            actor_user_id=None,
+            guild_id=guild_id,
+            target_type="custom_role",
+            target_id=row.id,
+            detail={
+                "action": action,
+                "via": "deployment",
+                "name": row.name,
+                "base_rung": row.base_rung,
+                "surfaces": sorted(row.surfaces),
+            },
+        )
+
+
+async def holders(session: AsyncSession, guild_id: int) -> list[tuple[int, int]]:
+    """``(user_id, role_id)`` for each member holding a role given during the
+    membership they have now: what the standing applies, rung aside."""
+    rows = await session.exec(
+        select(CustomRoleMember.user_id, CustomRoleMember.role_id)
+        .join(
+            GuildMembership,
+            and_(
+                GuildMembership.guild_id == guild_id,
+                GuildMembership.user_id == CustomRoleMember.user_id,
+                col(CustomRoleMember.assigned_at) >= GuildMembership.joined_at,
+            ),
+        )
+        .order_by(col(CustomRoleMember.user_id))
+    )
+    return [(user_id, role_id) for user_id, role_id in rows.all()]
+
+
+async def assign(
+    session: AsyncSession,
+    *,
+    user_id: int,
+    role_id: Optional[int],
+    provider_id: Optional[int] = None,
+) -> None:
+    """Give ``user_id`` the role ``role_id``, from now, or take theirs off.
+    ``provider_id`` is the sign-in provider whose claims gave it; a role given
+    by hand names none, and the claims leave it alone from then on."""
+    if role_id is None:
+        await session.exec(
+            delete(CustomRoleMember).where(CustomRoleMember.user_id == user_id)
+        )
+        return
+    statement = pg_insert(CustomRoleMember).values(
+        user_id=user_id, role_id=role_id, oidc_provider_id=provider_id
+    )
+    await session.exec(
+        statement.on_conflict_do_update(
+            index_elements=[CustomRoleMember.user_id],
+            set_={
+                "role_id": role_id,
+                "assigned_at": func.now(),
+                "oidc_provider_id": provider_id,
+            },
+        )
+    )
+
+
+async def held_role(session: AsyncSession, user_id: int) -> Optional[CustomRole]:
+    """The role ``user_id``'s assignment names, whatever membership it was
+    given in: what taking it off would take off."""
+    return (
+        await session.exec(
+            select(CustomRole)
+            .join(CustomRoleMember, CustomRoleMember.role_id == CustomRole.id)
+            .where(CustomRoleMember.user_id == user_id)
+        )
+    ).one_or_none()
+
+
+async def claim_rules(session: AsyncSession) -> list[CustomRoleClaimRule]:
+    """The community's claim rules, in the order a sign-in reads them."""
+    return list(
+        (
+            await session.exec(
+                select(CustomRoleClaimRule).order_by(
+                    col(CustomRoleClaimRule.position), col(CustomRoleClaimRule.id)
+                )
+            )
+        ).all()
+    )
+
+
+async def add_claim_rule(
+    session: AsyncSession, *, provider_id: int, claim_value: str, role_id: int
+) -> CustomRoleClaimRule:
+    """A rule after every other: the first matching rule wins."""
+    last = await session.scalar(select(func.max(CustomRoleClaimRule.position)))
+    rule = CustomRoleClaimRule(
+        provider_id=provider_id,
+        claim_value=claim_value,
+        role_id=role_id,
+        position=(last or 0) + 1,
+    )
+    session.add(rule)
+    await session.flush()
+    return rule
+
+
+async def order_claim_rules(session: AsyncSession, rule_ids: list[int]) -> bool:
+    """Put the rules in the order ``rule_ids`` lists, which names each once.
+    ``False`` where it names other rules than the community has."""
+    rules = {rule.id: rule for rule in await claim_rules(session)}
+    if sorted(rule_ids) != sorted(rules):
+        return False
+    for position, rule_id in enumerate(rule_ids, start=1):
+        rules[rule_id].position = position
+        session.add(rules[rule_id])
+    await session.flush()
+    return True
+
+
+async def apply_claims(
+    session: AsyncSession,
+    *,
+    guild_id: int,
+    user_id: int,
+    provider_id: int,
+    claim_values: set[str],
+    admitted: bool,
+) -> Optional[tuple[Optional[int], Optional[int]]]:
+    """A sign-in through ``provider_id``'s say over ``user_id``'s custom role:
+    the role of the first rule for the provider whose group the claims carry,
+    while the community counts the arrival as its own, or none.
+
+    Only a role this provider gave is changed or taken back; one given by hand
+    or by another provider is left as it is. A role from an earlier membership
+    counts as none. Returns ``(from, to)`` role ids when it changed anything.
+    """
+    wanted: Optional[int] = None
+    if admitted:
+        for rule in await claim_rules(session):
+            if (
+                rule.provider_id == provider_id
+                and rule.claim_value.lower() in claim_values
+            ):
+                wanted = rule.role_id
+                break
+    joined_at = await session.scalar(
+        select(GuildMembership.joined_at).where(
+            GuildMembership.guild_id == guild_id, GuildMembership.user_id == user_id
+        )
+    )
+    if joined_at is None:
+        return None
+    held = await session.get(CustomRoleMember, user_id)
+    if (
+        held is not None
+        and held.assigned_at is not None
+        and held.assigned_at < joined_at
+    ):
+        held = None
+    if held is not None and held.oidc_provider_id != provider_id:
+        return None
+    previous = held.role_id if held is not None else None
+    if previous == wanted:
+        return None
+    # The write asks again whether the assignment is still this provider's (or
+    # an earlier membership's), so a role given by hand in between stays.
+    if wanted is None:
+        written = await session.exec(
+            delete(CustomRoleMember).where(
+                col(CustomRoleMember.user_id) == user_id,
+                col(CustomRoleMember.oidc_provider_id) == provider_id,
+            )
+        )
+    else:
+        statement = pg_insert(CustomRoleMember).values(
+            user_id=user_id, role_id=wanted, oidc_provider_id=provider_id
+        )
+        written = await session.exec(
+            statement.on_conflict_do_update(
+                index_elements=[CustomRoleMember.user_id],
+                set_={
+                    "role_id": wanted,
+                    "assigned_at": func.now(),
+                    "oidc_provider_id": provider_id,
+                },
+                where=or_(
+                    col(CustomRoleMember.oidc_provider_id) == provider_id,
+                    col(CustomRoleMember.assigned_at) < joined_at,
+                ),
+            )
+        )
+    if not written.rowcount:
+        return None
+    return previous, wanted

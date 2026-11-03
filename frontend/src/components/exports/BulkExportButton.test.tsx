@@ -67,8 +67,8 @@ describe("BulkExportButton for files", () => {
       })
     );
     const docs = [
-      buildFileSummary({ id: 11, file_type: "native" }),
-      buildFileSummary({ id: 12, file_type: "native" }),
+      buildFileSummary({ id: 11, file_type: "lexical" }),
+      buildFileSummary({ id: 12, file_type: "lexical" }),
     ];
     renderWithProviders(<BulkExportButton tool={Tool.file} items={docs} />);
 
@@ -84,8 +84,8 @@ describe("BulkExportButton for files", () => {
 
   it("offers only the formats every selected type shares", async () => {
     const docs = [
-      buildFileSummary({ id: 1, file_type: "native" }),
-      buildFileSummary({ id: 2, file_type: "spreadsheet" }),
+      buildFileSummary({ id: 1, file_type: "lexical" }),
+      buildFileSummary({ id: 2, file_type: "sheet" }),
     ];
     renderWithProviders(<BulkExportButton tool={Tool.file} items={docs} />);
 
@@ -98,8 +98,8 @@ describe("BulkExportButton for files", () => {
 
   it("says why when the selected types share no format", () => {
     const docs = [
-      buildFileSummary({ id: 1, file_type: "native" }),
-      buildFileSummary({ id: 2, file_type: "file" }),
+      buildFileSummary({ id: 1, file_type: "lexical" }),
+      buildFileSummary({ id: 2, file_type: "pdf" }),
     ];
     renderWithProviders(<BulkExportButton tool={Tool.file} items={docs} />);
 

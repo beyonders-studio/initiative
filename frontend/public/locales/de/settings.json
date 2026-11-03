@@ -33,7 +33,8 @@
       "integrations": "Integrationen",
       "usage": "Nutzung",
       "planAndUsage": "Tarif & Nutzung",
-      "guests": "Gäste"
+      "guests": "Gäste",
+      "roles": "Rollen"
     },
     "tabBadge": {
       "paymentFailed": "Zahlung fehlgeschlagen",
@@ -214,6 +215,7 @@
     "connectionsDescription": "Definiere die KI-Verbindungen, die Mitglieder dieser Community verwenden können.",
     "disabledDescription": "KI-Funktionen sind für die Plattform deaktiviert.",
     "managedByPlatform": "KI-Verbindungen werden auf Plattformebene verwaltet. Mitglieder legen ihren eigenen Schlüssel in ihren Profileinstellungen fest.",
+    "managedByServer": "Die Betreiber dieses Servers verwalten die KI für diese Community.",
     "switchTitle": "KI in dieser Community",
     "switchLabel": "KI-Funktionen erlauben",
     "switchHelp": "Ausgeschaltet wird nichts aus dieser Community an einen KI-Anbieter gesendet, egal welche Verbindung der Server oder die Community einrichtet.",
@@ -375,7 +377,9 @@
       "cases": "Fälle",
       "direct_messages": "Nachrichten und Kontakte",
       "jobs": "Exporte und Importe",
-      "account": "Dein Konto"
+      "account": "Dein Konto",
+      "overdue": "Überfällige Aufgaben",
+      "coming_up": "Demnächst"
     },
     "reminderLeadTime": {
       "label": "Erinnere mich",
@@ -399,11 +403,12 @@
     "groups": {
       "your_communities": "In deinen Communities",
       "community": "Braucht dich",
-      "account": "Nur du"
+      "account": "Nur du",
+      "digests": "Zusammenfassungen"
     },
     "categoryDescriptions": {
       "mentions": "Jemand hat dich genannt, dir geantwortet oder auf deinen Kommentar reagiert.",
-      "assignments": "Du hast eine Aufgabe bekommen oder wurdest zu etwas eingeladen, oder woran du beteiligt bist, ist fällig, hat sich geändert, wurde abgesagt oder beginnt gleich.",
+      "assignments": "Du hast eine Aufgabe bekommen oder wurdest zu etwas eingeladen, oder woran du beteiligt bist, hat sich geändert, wurde abgesagt oder beginnt gleich.",
       "subscriptions": "Änderungen, Kommentare und Reaktionen an dem, was du verfolgst, auch an dem, was du erstellt hast. Die Glocke an jedem Eintrag stellt es ab.",
       "news": "Ein Beitrag wurde veröffentlicht, du wurdest zu einer Initiative oder einem Projekt hinzugefügt, oder deine Beitrittsanfrage wurde beantwortet.",
       "approvals": "Jemand wartet auf deine Entscheidung. Erscheint immer in der Glocke.",
@@ -411,7 +416,9 @@
       "cases": "Ein Fall wurde dort eröffnet, wo du Fälle bearbeitest, oder seine anfragende Person hat geantwortet und niemand hat ihn übernommen.",
       "direct_messages": "Jemand hat dir geschrieben, möchte sich vernetzen oder hat angenommen. Wer und wie viele, nie der Inhalt einer Nachricht.",
       "jobs": "Ein Export oder Import, den du angefordert hast, ist fertig.",
-      "account": "An deinem Konto wurde etwas geändert. Erscheint immer in der Glocke."
+      "account": "An deinem Konto wurde etwas geändert. Erscheint immer in der Glocke.",
+      "overdue": "Alle dir zugewiesenen Aufgaben, deren Fälligkeit verstrichen ist, in einer Nachricht.",
+      "coming_up": "Fällige Aufgaben und beginnende Termine bis zur nächsten Zusammenfassung, in einer Nachricht."
     },
     "quietHours": {
       "title": "Ruhezeiten",
@@ -431,19 +438,15 @@
       "offHere": "Hier aus: {{rows}}"
     },
     "timing": {
-      "title": "Wann du davon erfährst",
-      "description": "E-Mails können sofort oder gesammelt ankommen. Zurückgehalten wird nur, worum du gebeten hast.",
       "cadence": {
         "label": "E-Mail kommt",
         "instant": "Sofort",
         "hourly": "Einmal pro Stunde",
         "daily": "Einmal pro Tag",
-        "weekly": "Einmal pro Woche",
-        "help": "Alles Zurückgehaltene kommt in einer Nachricht."
+        "weekly": "Einmal pro Woche"
       },
       "day": "Am",
       "time": "Um",
-      "timeHelp": "Deine geplante E-Mail und die Erinnerung an überfällige Aufgaben gehen zu dieser Zeit raus.",
       "personalInstant": "An mich gerichtetes sofort senden",
       "personalInstantHelp": "Erwähnungen, Antworten, dir zugewiesene Aufgaben, Einladungen und Direktnachrichten überspringen die Warteschlange.",
       "respectPresence": "Nicht stören, während ich Initiative nutze",
@@ -468,6 +471,16 @@
       "saveError": "Einstellung konnte nicht gespeichert werden",
       "zone": "Zeiten gelten für {{timezone}}.",
       "changeZone": "Zeitzone ändern"
+    },
+    "digests": {
+      "title": "Zusammenfassungen",
+      "description": "Zusammenfassungen nach Zeitplan. Alles darin steht schon in deiner Glocke.",
+      "frequency": "Wie oft",
+      "daily": "Jeden Tag",
+      "weekly": "Jede Woche",
+      "gatheredEmail": "Gesammelte E-Mails",
+      "gatheredEmailHelp": "E-Mails zu den Zeilen oben kommen sofort oder gesammelt in einer Nachricht.",
+      "afterPause": "Endet eine Pause oder die Ruhezeit, bekommst du außerdem eine Zusammenfassung dessen, was eingegangen ist."
     },
     "weekdays": {
       "1": "Montag",
@@ -750,6 +763,16 @@
       "idleLabel": "Leerlauf (Minuten)",
       "idlePlaceholder": "Kein Limit",
       "idleHint": "Wie lange eine Sitzung unberührt bleiben darf, bevor sie endet. Leer lassen, um das beim Deployment gesetzte Fenster zu behalten. Die App zu benutzen zählt als Berührung, die Zeit läuft also erst, wenn jemand aufhört. Eine Community, die dem Compliance-Standard folgt, verkürzt es für ihre Mitglieder weiter."
+    },
+    "breachedPasswordCheck": {
+      "title": "Kompromittierte Passwörter",
+      "description": "Ein neues Passwort ablehnen, das bereits in einem Datenleck aufgetaucht ist.",
+      "label": "Neue Passwörter mit bekannten Datenlecks abgleichen",
+      "onHelp": "Nur die ersten fünf Zeichen des Passwort-Hashes verlassen diesen Server. Das Passwort selbst nie.",
+      "offHelp": "Neue Passwörter werden nicht geprüft. Schalte dies nur aus, wenn dieser Server das Internet nicht erreichen kann.",
+      "enabledToast": "Neue Passwörter werden mit bekannten Datenlecks abgeglichen.",
+      "disabledToast": "Neue Passwörter werden nicht mehr mit bekannten Datenlecks abgeglichen.",
+      "error": "Die Prüfung auf kompromittierte Passwörter konnte nicht geändert werden."
     },
     "secondFactorRequirement": {
       "title": "Zwei-Faktor-Authentifizierung",
@@ -1067,7 +1090,19 @@
     "caseRequiredNoneOpen": "Zugriff wird hier für einen Fall beantragt, und es gibt keinen offenen Fall, den du angeben kannst. Eröffne zuerst einen.",
     "caseOptionalHint": "Optional. Ohne Fall hältst du danach von Hand im Fall fest, was du getan hast.",
     "caseOtherCommunity": "Dieser Fall betrifft Community #{{community}}, nicht die ausgewählte.",
-    "caseMark": "Fall #{{id}}"
+    "caseMark": "Fall #{{id}}",
+    "notice": {
+      "label": "Community benachrichtigen",
+      "none": "Nicht benachrichtigen",
+      "when_granted": "Wenn der Zugriff beginnt",
+      "when_ended": "Wenn der Zugriff beendet ist",
+      "help": "Ihre Superadmins erhalten per E-Mail die Stufe und die Art des Falls, nie die Begründung.",
+      "always": "Über Zugriff für einen Support-Fall werden die Superadmins der Community immer per E-Mail informiert, sobald er beginnt.",
+      "mark": {
+        "when_granted": "Community wird bei Beginn informiert",
+        "when_ended": "Community wird nach dem Ende informiert"
+      }
+    }
   },
   "platformLayout": {
     "title": "Plattformeinstellungen",
@@ -1346,6 +1381,12 @@
       "supportLabel": "Hilfeanfragen",
       "supportHelp": "Erlaubt den Mitgliedern, eine Hilfeanfrage zu senden. Aus öffnet „Hilfe anfordern“ stattdessen die FAQ.",
       "supportNeedsIntake": "Hilfeanfragen können derzeit nirgendwohin gesendet werden. Verknüpfen Sie den Support-Stream unter Plattformeinstellungen › Eingang mit einem Projekt, dann lässt sich dies einschalten.",
+      "aiConnectionsLabel": "Eigene KI-Verbindungen",
+      "aiConnectionsHelp": "Erlaubt der Community, eigene KI-Anbieter einzurichten. Aus bleiben die vorhandenen erhalten und werden nicht genutzt.",
+      "pluginsLabel": "Eigene Plug-ins",
+      "pluginsHelp": "Erlaubt der Community, Plug-ins zu installieren und einzurichten. Aus laufen die vorhandenen unverändert weiter.",
+      "customRolesLabel": "Eigene Rollen",
+      "customRolesHelp": "Ihre Administratoren können Rollen festlegen, die Leuten einen Teil der Community-Verwaltung geben. Geschlossen gelten die vorhandenen Rollen weiter.",
       "authOption": {
         "restrictions": {
           "label": "Eigener Sicherheitsstandard",
@@ -1461,6 +1502,7 @@
     }
   },
   "communityAuth": {
+    "setByDeployment": "Wer diesen Server betreibt, legt das für deine Community fest.",
     "shareUrl": {
       "title": "Anmeldelink für Mitglieder",
       "description": "Teile diesen Link mit Mitgliedern — er bietet die Anmeldeanbieter dieser Community an und führt sie direkt in die Community.",
@@ -1863,7 +1905,28 @@
     "maxGuestDaysHelpText": "Kein Gast bleibt länger als das, egal was eine Community einstellt.",
     "maxGuestDaysSave": "Längsten Gastaufenthalt speichern",
     "maxGuestDaysSaved_one": "Gäste bleiben höchstens {{count}} Tag.",
-    "maxGuestDaysSaved_other": "Gäste bleiben höchstens {{count}} Tage."
+    "maxGuestDaysSaved_other": "Gäste bleiben höchstens {{count}} Tage.",
+    "joinAndCreateTitle": "Wer beitreten und erstellen darf",
+    "publicRegistrationLabel": "Jedem die Registrierung erlauben",
+    "publicRegistrationHelpText": "Personen können ohne Einladung ein Konto anlegen. Solange das Erstellen von Communities aus ist, können sich nur Eingeladene registrieren.",
+    "publicRegistrationEnabledToast": "Jeder kann sich registrieren.",
+    "publicRegistrationDisabledToast": "Nur Eingeladene können sich registrieren.",
+    "communityCreationLabel": "Jedem das Erstellen von Communities erlauben",
+    "communityCreationHelpText": "Wenn aus, können nur Personen, die auf diesem Server Communities verwalten, eine erstellen, und nur Eingeladene können sich registrieren.",
+    "communityCreationEnabledToast": "Jeder kann eine Community erstellen.",
+    "communityCreationDisabledToast": "Nur Personen, die Communities verwalten, können eine erstellen.",
+    "creationDailyLimitLabel": "Communities pro Konto und Tag",
+    "creationDailyLimitHelpText": "0 bedeutet kein Limit. Für Personen, die Communities verwalten, gilt es nicht.",
+    "creationDailyLimitSave": "Tageslimit für Communities speichern",
+    "creationDailyLimitSaved_one": "Jedes Konto kann {{count}} Community pro Tag erstellen.",
+    "creationDailyLimitSaved_other": "Jedes Konto kann {{count}} Communities pro Tag erstellen.",
+    "creationDailyLimitSavedNone": "Für neue Communities gibt es kein Tageslimit.",
+    "exportCooldownLabel": "Stunden zwischen Community-Exporten",
+    "exportCooldownHelpText": "Wie lange eine Community wartet, bevor sie wieder alles exportieren kann. 0 bedeutet keine Wartezeit.",
+    "exportCooldownSave": "Zeit zwischen Community-Exporten speichern",
+    "exportCooldownSaved_one": "Communities warten {{count}} Stunde zwischen Exporten.",
+    "exportCooldownSaved_other": "Communities warten {{count}} Stunden zwischen Exporten.",
+    "exportCooldownSavedNone": "Communities können ohne Wartezeit exportieren."
   },
   "account": {
     "passwordTitle": "Passwort",
@@ -2144,5 +2207,110 @@
     "noCommunity": "Es öffnet keine Community und braucht keine Zugriffsfreigabe.",
     "open": "Control öffnen",
     "openError": "Control konnte nicht geöffnet werden."
+  },
+  "customRoles": {
+    "title": "Rollen",
+    "description": "Eine eigene Rolle gibt einem Mitglied einen Teil der Community-Verwaltung oder beschränkt einen Administrator auf einen Teil davon. Jede Person hat höchstens eine.",
+    "add": "Rolle hinzufügen",
+    "addTitle": "Rolle hinzufügen",
+    "editTitle": "{{name}} bearbeiten",
+    "dialogDescription": "Gib ihr einen Namen, wähle, für wen sie ist, und kreuze an, was sie umfasst.",
+    "nameLabel": "Name",
+    "rungLabel": "Für",
+    "rung": {
+      "member": "Mitglieder",
+      "admin": "Administratoren"
+    },
+    "rungHelp": {
+      "member": "Gibt einem Mitglied, was sie umfasst, zusätzlich zu dem, was es schon tut.",
+      "admin": "Beschränkt einen Administrator auf das, was sie umfasst."
+    },
+    "rungFixed": "Für wen eine Rolle ist, lässt sich nach dem Anlegen nicht mehr ändern.",
+    "surfacesLabel": "Was sie umfasst",
+    "notYours": "Das hast du selbst nicht, also kannst du es nicht vergeben.",
+    "holdsNothing": "Umfasst noch nichts.",
+    "empty": "Diese Community hat keine eigenen Rollen.",
+    "loading": "Rollen werden geladen",
+    "loadError": "Die Rollen konnten nicht geladen werden.",
+    "closed": "Wer diesen Server betreibt, hat eigene Rollen für diese Community geschlossen. Die vorhandenen Rollen gelten weiter.",
+    "deleteTitle": "{{name}} löschen?",
+    "deleteDescription": "Wer sie hat, kehrt zu seiner einfachen Rolle zurück.",
+    "created": "Rolle hinzugefügt",
+    "updated": "Rolle gespeichert",
+    "deleted": "Rolle gelöscht",
+    "assigned": "Rolle geändert",
+    "createError": "Die Rolle konnte nicht hinzugefügt werden.",
+    "updateError": "Die Rolle konnte nicht gespeichert werden.",
+    "deleteError": "Die Rolle konnte nicht gelöscht werden.",
+    "assignError": "Die Rolle konnte nicht geändert werden.",
+    "column": "Eigene Rolle",
+    "none": "Keine",
+    "pickerLabel": "Eigene Rolle für {{name}}",
+    "appliesWhileMember": "Gilt, solange die Person Mitglied ist",
+    "appliesWhileAdmin": "Gilt, solange die Person Administrator ist",
+    "surfaces": {
+      "profile": {
+        "label": "Profil",
+        "description": "Name, Bild, Banner und Beschreibung der Community ändern."
+      },
+      "invites": {
+        "label": "Einladungen",
+        "description": "Einladungslinks erstellen und löschen, Gasteinladungen eingeschlossen."
+      },
+      "members": {
+        "label": "Mitglieder",
+        "description": "Rollen und Namen von Leuten ändern, sie entfernen und eigene Rollen vergeben."
+      },
+      "initiatives": {
+        "label": "Initiativen",
+        "description": "Jede Initiative erstellen, archivieren und löschen und auch solche verwalten, in denen man nicht ist."
+      },
+      "community_calendars": {
+        "label": "Community-Kalender",
+        "description": "Die eigenen Kalender der Community hinzufügen und ändern."
+      },
+      "webhooks": {
+        "label": "Webhooks",
+        "description": "Die Webhooks der Community einrichten."
+      },
+      "trash": {
+        "label": "Papierkorb",
+        "description": "Alles im Papierkorb der Community wiederherstellen oder endgültig löschen."
+      },
+      "usage": {
+        "label": "Nutzung",
+        "description": "Sehen, was die Community gemessen an ihren Grenzen nutzt."
+      },
+      "roles": {
+        "label": "Rollen",
+        "description": "Eigene Rollen hinzufügen, ändern und löschen."
+      }
+    },
+    "beyondYours": "Du kannst diese Rolle nicht ändern: Sie enthält etwas, das du selbst nicht hast.",
+    "widensAnAdmin": "Nur ein Admin, der alles darf, kann eine Admin-Rolle löschen: Wer sie hat, darf danach wieder alles.",
+    "setByDeployment": "Diese Rolle wird von den Serverbetreibenden festgelegt. Du kannst sie hier vergeben, aber nicht ändern oder löschen."
+  },
+  "customRoleRules": {
+    "title": "Eigene Rollen nach Gruppe",
+    "description": "Gib allen, die sich mit einer Gruppe anmelden, eine eigene Rolle. Eine Anmeldung liest diese Regeln der Reihe nach, und die erste passende Gruppe entscheidet. Eine von Hand vergebene Rolle bleibt bestehen.",
+    "add": "Rollenregel hinzufügen",
+    "empty": "Noch keine Gruppe vergibt eine eigene Rolle.",
+    "gives": "Über {{provider}}: {{role}}",
+    "moveUp": "{{group}} nach oben",
+    "moveDown": "{{group}} nach unten",
+    "remove": "Regel entfernen",
+    "removeTitle": "Diese Regel entfernen?",
+    "removeDescription": "Wer in {{group}} ist, behält die Rolle bis zur nächsten Anmeldung.",
+    "dialogDescription": "Wer sich über diesen Anbieter mit der Gruppe anmeldet, bekommt die Rolle, sofern keine frühere Regel zuerst passt.",
+    "roleLabel": "Eigene Rolle",
+    "rolePlaceholder": "Rolle wählen",
+    "added": "Regel hinzugefügt",
+    "addError": "Die Regel konnte nicht hinzugefügt werden",
+    "orderError": "Die Regeln konnten nicht neu sortiert werden",
+    "removeError": "Die Regel konnte nicht entfernt werden",
+    "closed": "Dein Server hat eigene Rollen für diese Community abgeschaltet. Diese Regeln gelten weiter; hier kann sie niemand ändern.",
+    "loading": "Regeln werden geladen …",
+    "loadError": "Die Regeln konnten nicht geladen werden.",
+    "retry": "Erneut versuchen"
   }
 }

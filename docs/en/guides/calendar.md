@@ -24,6 +24,8 @@ On an initiative's **Calendar**, click a slot and **Create Event** opens. On a p
 
 ![The initiative calendar with events](../images/tools/calendar.png)
 
+The calendar's event page can [require fields](layouts.md#required-fields), a location say, for every event in the initiative. **Create Event** waits until they're filled, and an older event without one shows the gap.
+
 To make another one like an event you already have, open it and use **Duplicate** under its title. The copy invites the same people afresh. On a repeating event opened at one of its dates, Initiative asks whether you mean that date, which becomes an event of its own, or the whole series, which brings the dates you changed on their own with it.
 
 ## Repeating events

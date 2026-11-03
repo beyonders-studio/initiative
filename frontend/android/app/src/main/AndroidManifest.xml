@@ -95,7 +95,7 @@
             android:value="default"
         />
         <!-- Backported Android photo picker for devices below API 30, delivered
-             through Google Play services. Used by the camera plugin's catalog
+             through Google Play services. Used by the camera plugin's library
              picker; without it those devices fall back to the older chooser. -->
         <service
             android:name="com.google.android.gms.metadata.ModuleDependencies"

@@ -85,8 +85,6 @@ export const TOOL_PALETTE: Record<Tool, ToolPaletteSource> = {
       return (query.data?.items ?? []).map((doc) => {
         const { Icon: DocIcon, colorClass } = fileIcon({
           file_type: doc.file_type,
-          mime_type: doc.file_content_type,
-          original_filename: doc.original_filename,
           smart_link_url: doc.smart_link_url,
         });
         return {
@@ -166,19 +164,6 @@ export const TOOL_PALETTE: Record<Tool, ToolPaletteSource> = {
         keywords: [post.excerpt.replace(USER_MENTION_PATTERN, " ")],
         icon: null,
         path: toolDetailRoute(Tool.post, post.initiative_id, post.id),
-      }));
-    },
-  },
-  [Tool.catalog]: {
-    useHeading: () => useGroupHeading(Tool.catalog),
-    useItems: (ctx) => {
-      const query = useToolPaletteList(TOOL_HOOKS[Tool.catalog].listQuery, BROWSE_PAGE, ctx);
-      return (query.data?.items ?? []).map((catalog) => ({
-        id: catalog.id,
-        label: catalog.name,
-        keywords: [catalog.description ?? ""],
-        icon: null,
-        path: toolDetailRoute(Tool.catalog, catalog.initiative_id, catalog.id),
       }));
     },
   },

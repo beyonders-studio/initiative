@@ -366,11 +366,7 @@ function SharedFileThumb({ file, className }: { file: SharedFile; className?: st
       />
     );
   }
-  const { Icon, colorClass } = fileIcon({
-    file_type: "file",
-    mime_type: file.mimeType,
-    original_filename: file.name,
-  });
+  const { Icon, colorClass } = fileIcon({ mime_type: file.mimeType, original_filename: file.name });
   return (
     <div
       className={cn(

@@ -13,6 +13,8 @@ on:
 
 jobs:
   decide:
+    # Releases are this repository's; in a fork every job below skips with it.
+    if: ${{ github.repository == 'beyonders-studio/initiative' }}
     runs-on: ubuntu-24.04
     timeout-minutes: 5
     permissions:

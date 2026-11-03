@@ -79,8 +79,9 @@ export function QueueDetailPage() {
   const viewSpec = useMemo(
     () =>
       layoutViewSpec(
-        viewKey(communityId, "queue", parsedId),
-        (items) => items[`queue-${parsedId}-view`] ?? getItem(`queues.view.${parsedId}`)
+        communityId,
+        viewKey("queue", parsedId),
+        (account) => account[`queue-${parsedId}-view`] ?? getItem(`queues.view.${parsedId}`)
       ),
     [communityId, parsedId]
   );
@@ -172,6 +173,7 @@ export function QueueDetailPage() {
         keys="queues:"
         backTo={gp(toolListRoute(Tool.queue, initiativeId))}
         backLabel={t("backToQueues")}
+        entity={{ kind: "queue", id: parsedId }}
       />
     );
   }

@@ -27,7 +27,7 @@ import pytest
 
 from app.services.marketplace import contract, service_plugins
 from app.services.marketplace.definitions import normalize_listing_definition
-from app.services.tenant import plugin_metadata
+from app.services.tenant import metadata as metadata_service
 
 pytestmark = pytest.mark.always
 
@@ -278,7 +278,23 @@ def maximal_manifest() -> dict:
                     }
                 },
                 "requires": {"all_of": ["vendor"]},
-            }
+            },
+            {
+                "key": "demo.stage",
+                "name": {"en": "Stage"},
+                "kind": "select",
+                "on": ["task"],
+                "options": [
+                    {"value": "won", "label": {"en": "Won"}, "color": "#22aa55"}
+                ],
+            },
+            {
+                "key": "demo.price",
+                "name": {"en": "Price"},
+                "kind": "currency",
+                "on": ["task"],
+                "currency": "EUR",
+            },
         ],
         "actions": [
             {
@@ -732,7 +748,17 @@ def _nodes(published: dict, declarative: dict) -> list[tuple[str, dict]]:
         ("webhookEvent", hooks["events"][0]),
         ("webhookStatus", hooks["status"][0]),
         # Only a declarative plug-in's list field offers its elements actions.
-        ("field", {**published["fields"][0], **declarative["fields"][0]}),
+        # A select's options and money's currency are terms of those kinds.
+        (
+            "field",
+            {
+                **published["fields"][0],
+                **declarative["fields"][0],
+                **published["fields"][1],
+                **published["fields"][2],
+            },
+        ),
+        ("fieldOption", published["fields"][1]["options"][0]),
         ("stateFacet", published["fields"][0]["states"]["status"]),
         ("stateValue", published["fields"][0]["states"]["status"]["values"]["open"]),
         ("setting", published["settings"][0]),
@@ -803,11 +829,11 @@ def test_the_maximal_manifests_really_are_maximal(nodes):
     contract defines with fields is one these manifests reach. A change, and
     a list's element, is what a ``write`` answers rather than a term a
     manifest stores, and the changes engine holds an answer to it
-    (``plugin_metadata.apply_changes``), an element's every term."""
+    (``metadata.apply_changes``), an element's every term."""
     reached = {owner for owner, _ in nodes} - {"other"}
     with_fields = {name for name in contract.objects() if contract.fields(name)}
     assert with_fields - reached == {"change", "targetedChange", "listElement"}
-    assert set(plugin_metadata._ELEMENT_TERMS) == set(contract.fields("listElement"))
+    assert set(metadata_service._ELEMENT_TERMS) == set(contract.fields("listElement"))
 
 
 def test_an_emitting_endpoint_keeps_what_describes_it(published):
@@ -847,8 +873,8 @@ def test_the_uid_shape_matches_the_contract():
 
 
 def test_the_metadata_columns_match_the_contract():
-    """A plug-in's metadata key and look-up text are column widths, and the
-    items it keeps values on are the table's CHECK, so each is checked against
+    """A plug-in's metadata key and an element's ref are column widths, and
+    the items it keeps values on are the table's CHECK, so each is checked against
     the contract rather than read from it, as the uid is. So are a setting's
     key and a unique setting's value, which an install claims."""
     from app.core.tools import ITEM_KINDS
@@ -856,12 +882,12 @@ def test_the_metadata_columns_match_the_contract():
         SETTING_KEY_LENGTH,
         SETTING_VALUE_LENGTH,
     )
-    from app.models.tenant.plugin_metadata import LOOKUP_LENGTH, PluginMetadata
+    from app.models.tenant.metadata import REF_LENGTH, MetadataDefinition
 
-    assert PluginMetadata.__table__.c.key.type.length == contract.cap(
+    assert MetadataDefinition.__table__.c.key.type.length == contract.cap(
         "metadataKeyLength"
     )
-    assert LOOKUP_LENGTH == contract.cap("metadataLookupLength")
+    assert REF_LENGTH == contract.cap("metadataLookupLength")
     assert frozenset(ITEM_KINDS) == contract.enum("itemKind")
     assert SETTING_KEY_LENGTH == contract.cap("identifierLength")
     assert SETTING_VALUE_LENGTH == contract.cap("uniqueSettingValueLength")

@@ -31,7 +31,8 @@ from app.models.platform.guild import CommunityRole
 from app.models.tenant.calendar import Calendar
 from app.models.tenant.calendar_event import CalendarEvent
 from app.models.tenant.comment import Comment
-from app.models.tenant.file import File, FileType
+from app.core.file_types import FileType
+from app.models.tenant.file import File
 from app.models.tenant.initiative import InitiativeMember
 from app.models.tenant.project import Project
 from app.models.tenant.resource_grant import ResourceAccessLevel, ResourceGrant
@@ -236,7 +237,7 @@ async def test_creating_asks_the_scope_of_what_is_created(
     made = File(
         initiative_id=install.a.id,
         name="Made by the plug-in",
-        file_type=FileType.native,
+        file_type=FileType.lexical,
     )
     s.add(made)
     await s.flush()
@@ -268,7 +269,7 @@ async def test_a_person_creating_a_file_gets_no_install_grant(
     made = File(
         initiative_id=install.a.id,
         name="Made by a person",
-        file_type=FileType.native,
+        file_type=FileType.lexical,
     )
     person.add(made)
     await person.flush()
@@ -323,7 +324,7 @@ async def test_an_install_writes_no_grant_itself(
         made = File(
             initiative_id=install.a.id,
             name="Made by the plug-in",
-            file_type=FileType.native,
+            file_type=FileType.lexical,
         )
         s.add(made)
         await s.flush()

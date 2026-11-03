@@ -23,6 +23,7 @@ from app.db.tenancy import (
     PRIVATE_ROW_SHARED_READ,
     PRIVATE_ROW_TABLES,
     SEAT_READ_TABLES,
+    SEAT_SURFACES,
     SEAT_TABLES,
     SHARED_TABLES,
     is_guild_scoped,
@@ -146,6 +147,7 @@ def test_seat_and_ledger_tables_are_guild_level():
     ledger's parent key is a real column pointing at a real parent."""
     assert SEAT_TABLES <= GUILD_LEVEL_TABLES
     assert SEAT_READ_TABLES <= SEAT_TABLES
+    assert set(SEAT_SURFACES) <= SEAT_TABLES
     assert set(LEDGER_TABLES) <= GUILD_LEVEL_TABLES
     for table, parent_key in LEDGER_TABLES.items():
         if parent_key is None:

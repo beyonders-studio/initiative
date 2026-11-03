@@ -384,6 +384,9 @@ export const useUpdateSubscription = <TError = ErrorType<HTTPValidationError>, T
  * that govern the content it watches; a cross-guild lookup is a 404. An
  * installed plug-in reaches only the subscriptions it registered, and any other
  * is a 404.
+ *
+ * The names it minted for itself go with it. One a plug-in registered is
+ * named in that plug-in's sector, which outlives any single subscription.
  * @summary Delete Subscription
  */
 export const deleteSubscription = (

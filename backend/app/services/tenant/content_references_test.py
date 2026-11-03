@@ -25,10 +25,6 @@ def _doc(*nodes: dict[str, Any]) -> dict[str, Any]:
     return {"root": {"children": [{"type": "paragraph", "children": list(nodes)}]}}
 
 
-def _wikilink(file_id: int) -> dict[str, Any]:
-    return {"type": "wikilink", "documentId": file_id, "documentTitle": "Some page"}
-
-
 def _reference(entity_type: str, entity_id: int) -> dict[str, Any]:
     return {"type": "entity-mention", "entityType": entity_type, "entityId": entity_id}
 
@@ -44,17 +40,6 @@ TASK = SearchEntityType.task
 
 def test_a_hash_reference_is_a_reference():
     assert references_in_body(_doc(_reference("file", 7))) == {(FILE, 7)}
-
-
-def test_a_wikilink_still_counts():
-    """Written before references were one thing, and still sitting in stored
-    files."""
-    assert references_in_body(_doc(_wikilink(3))) == {(FILE, 3)}
-
-
-def test_both_triggers_land_in_one_graph():
-    content = _doc(_wikilink(3), _reference("file", 7))
-    assert references_in_body(content) == {(FILE, 3), (FILE, 7)}
 
 
 def test_a_reference_to_something_that_is_not_a_file_counts_too():
@@ -100,22 +85,16 @@ def test_content_that_is_not_a_body_yields_nothing():
     assert references_in_body({}) == set()
 
 
-def test_an_unresolved_reference_is_not_a_reference():
-    """A wikilink whose target was deleted is left pointing at nothing rather
-    than at a file that no longer exists."""
-    assert references_in_body(_doc({"type": "wikilink", "documentId": None})) == set()
-
-
 def test_a_hash_in_running_text_is_a_reference():
     """What a comment is written in."""
     assert references_in_text("see #task[Fix the bug](12) first") == {(TASK, 12)}
 
 
 def test_a_hash_reads_every_spelling_the_composer_writes():
-    """The composer kebabs a kind after ``#`` and once wrote ``#doc``; both
-    name the same things the kind's own spelling does."""
+    """The composer kebabs a kind after ``#``, which names the same things the
+    kind's own spelling does."""
     assert references_in_text(
-        "#wiki-page[Start](3) #counter-group[Tally](4) #doc[Spec](5) #wiki_page[A](6)"
+        "#wiki-page[Start](3) #counter-group[Tally](4) #file[Spec](5) #wiki_page[A](6)"
     ) == {
         (SearchEntityType.wiki_page, 3),
         (SearchEntityType.counter_group, 4),
@@ -161,7 +140,7 @@ async def test_a_file_does_not_reference_itself(session, acting_user):
     await content_references.sync_for_entity(
         session,
         anchor,
-        body=_doc(_wikilink(doc.id), _wikilink(other.id)),
+        body=_doc(_reference("file", doc.id), _reference("file", other.id)),
         author_id=a.user.id,
     )
 
@@ -213,7 +192,7 @@ async def test_a_reference_to_something_that_is_not_there_is_not_recorded(
     anchor = Endpoint(FILE, doc.id)
 
     await content_references.sync_for_entity(
-        session, anchor, body=_doc(_wikilink(999_999)), author_id=a.user.id
+        session, anchor, body=_doc(_reference("file", 999_999)), author_id=a.user.id
     )
 
     assert await _references(session, anchor) == set()
@@ -226,7 +205,7 @@ async def test_editing_the_sentence_out_takes_the_edge_with_it(session, acting_u
     anchor = Endpoint(FILE, doc.id)
 
     await content_references.sync_for_entity(
-        session, anchor, body=_doc(_wikilink(other.id)), author_id=a.user.id
+        session, anchor, body=_doc(_reference("file", other.id)), author_id=a.user.id
     )
     await content_references.sync_for_entity(
         session, anchor, body=_doc(), author_id=a.user.id
@@ -243,24 +222,6 @@ async def test_editing_the_sentence_out_takes_the_edge_with_it(session, acting_u
         "a link that went away because somebody rewrote a sentence asserts "
         "nothing, so it is deleted rather than kept as a tombstone"
     )
-
-
-async def test_fixing_content_unresolves_a_link_to_itself(session, acting_user):
-    """Asked to repair the content too, it leaves the words and drops the
-    pointer — the same treatment a link to a deleted file gets."""
-    a = await acting_user(guild_role=CommunityRole.admin, initiative=True)
-    doc = await create_file(session, a.initiative, a.user)
-
-    fixed = await content_references.sync_for_entity(
-        session,
-        Endpoint(FILE, doc.id),
-        body=_doc(_wikilink(doc.id)),
-        author_id=a.user.id,
-        fix_content=True,
-    )
-
-    assert fixed is not None
-    assert references_in_body(fixed) == set()
 
 
 # ---------------------------------------------------------------------------
@@ -321,7 +282,7 @@ async def test_the_body_and_the_comments_are_read_together(session, acting_user)
     await content_references.sync_for_entity(
         session,
         Endpoint(FILE, doc.id),
-        body=_doc(_wikilink(other.id)),
+        body=_doc(_reference("file", other.id)),
         author_id=a.user.id,
     )
 
@@ -341,7 +302,7 @@ async def test_an_edge_a_body_makes_is_marked_as_nobody_s_assertion(
     await content_references.sync_for_entity(
         session,
         Endpoint(FILE, doc.id),
-        body=_doc(_wikilink(other.id)),
+        body=_doc(_reference("file", other.id)),
         author_id=a.user.id,
     )
 
@@ -368,7 +329,7 @@ async def test_saving_the_same_body_twice_changes_nothing(session, acting_user):
     doc = await create_file(session, a.initiative, a.user)
     other = await create_file(session, a.initiative, a.user)
     anchor = Endpoint(FILE, doc.id)
-    body = _doc(_wikilink(other.id))
+    body = _doc(_reference("file", other.id))
 
     await content_references.sync_for_entity(
         session, anchor, body=body, author_id=a.user.id
@@ -433,11 +394,11 @@ async def test_a_task_description_is_read_as_the_task_s_body(session, acting_use
     a = await acting_user(guild_role=CommunityRole.admin, initiative=True, project=True)
     doc = await create_file(session, a.initiative, a.user)
     task = await create_task(
-        session, a.project, description=f"see #doc[Spec]({doc.id})"
+        session, a.project, description=f"see #file[Spec]({doc.id})"
     )
 
     assert await content_references.own_body(session, Endpoint(TASK, task.id)) == (
-        f"see #doc[Spec]({doc.id})"
+        f"see #file[Spec]({doc.id})"
     )
     await content_references.sync_for_entity(
         session,
@@ -457,7 +418,7 @@ async def test_a_comment_on_a_task_keeps_what_its_description_says(
     a = await acting_user(guild_role=CommunityRole.admin, initiative=True, project=True)
     doc = await create_file(session, a.initiative, a.user)
     other = await create_task(session, a.project)
-    task = await create_task(session, a.project, description=f"#doc[Spec]({doc.id})")
+    task = await create_task(session, a.project, description=f"#file[Spec]({doc.id})")
 
     comment = await create_comment(
         session, a.user, task=task, content=f"and #task[That]({other.id})"

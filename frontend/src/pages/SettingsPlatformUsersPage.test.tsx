@@ -301,6 +301,7 @@ describe("SettingsPlatformUsersPage manage sheet", () => {
         stream: "moderation",
         subject_community_id: null,
         mine: true,
+        community_notice: "optional",
       },
     ];
     const rows = masked(["sign_out_everywhere"]);
@@ -399,6 +400,7 @@ describe("SettingsPlatformUsersPage manage sheet", () => {
         stream: "support",
         subject_community_id: null,
         mine: true,
+        community_notice: "always",
       },
     ];
     renderRoster(masked(["reset_password", "delete"]), buildUser({ role: "operator" }));

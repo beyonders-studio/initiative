@@ -27,11 +27,12 @@ from __future__ import annotations
 
 from datetime import datetime
 from enum import Enum
-from typing import Annotated, Any, List, Literal, Optional, Union, get_args
+from typing import Annotated, Any, Dict, List, Literal, Optional, Union, get_args
 
 from pydantic import AfterValidator, ConfigDict, Field, field_validator, model_validator
 
-from app.core.tools import Tool
+from app.core.collection_shapes import ScaleDisplay
+from app.core.tools import LAYOUT_KIND_TARGETS, Tool
 from app.models.tenant.task import TaskPriority, TaskStatusCategory
 from app.schemas.base import SanitizedBaseModel
 from app.schemas.query import DateBucket, FilterOp, SortDir
@@ -42,7 +43,7 @@ from app.services.marketplace.manifest_values import (
     MAX_METADATA_KEY_LENGTH,
     is_metadata_key,
 )
-from app.services.tenant.properties import MAX_PROPERTY_FILTERS
+from app.schemas.tenant.property import MAX_PROPERTY_FILTERS
 
 #: What one layout may hold. Every part of a tree counts as a
 #: node, as does every column.
@@ -190,6 +191,19 @@ class TaskFieldId(str, Enum):
     tags = "tags"
 
 
+class FileFieldId(str, Enum):
+    """A file's own fields, as a collection's lists and its file detail show
+    them."""
+
+    name = "name"
+    #: What kind of file it is.
+    type = "type"
+    size = "size"
+    #: When it was added to the collection.
+    added = "added"
+    created = "created"
+
+
 class EventDetailFieldId(str, Enum):
     """What an event's detail edits as a field. Its dates, its properties and
     your answer are parts of their own."""
@@ -212,16 +226,6 @@ class QueueItemDetailFieldId(str, Enum):
     color = "color"
     visible = "visible"
     person = "person"
-    tags = "tags"
-
-
-class CatalogItemDetailFieldId(str, Enum):
-    """What a picture's detail edits as a field. The picture itself, where it
-    came from, its versions, what is linked to it and what can be done with it
-    are parts of their own."""
-
-    title = "title"
-    caption = "caption"
     tags = "tags"
 
 
@@ -282,8 +286,18 @@ def _named_field(value: str) -> str:
     )
 
 
+def _property_field(value: str) -> str:
+    """``property:<definition id>``."""
+    if value.startswith(PROPERTY_FIELD_PREFIX) and _is_row_id(
+        value.removeprefix(PROPERTY_FIELD_PREFIX)
+    ):
+        return value
+    raise ValueError("a property's field is 'property:<id>'")
+
+
 NamedFieldId = Annotated[str, AfterValidator(_named_field)]
-CardFieldId = Union[TaskFieldId, NamedFieldId]
+PropertyFieldId = Annotated[str, AfterValidator(_property_field)]
+CardFieldId = Union[TaskFieldId, FileFieldId, NamedFieldId]
 
 
 #: The characters a built-in field's name is written in.
@@ -343,14 +357,14 @@ TaskDetailFieldId = Enum(
     {f.name: f.value for f in TaskFieldId if f.value in _PAGE},
     type=str,
 )
-ColumnFieldId = Union[TaskColumnFieldId, NamedFieldId]
+ColumnFieldId = Union[TaskColumnFieldId, FileFieldId, NamedFieldId]
 DetailFieldId = Union[
     TaskDetailFieldId,
     EventDetailFieldId,
     QueueItemDetailFieldId,
-    CatalogItemDetailFieldId,
     CounterDetailFieldId,
     PostDetailFieldId,
+    FileFieldId,
     NamedFieldId,
 ]
 
@@ -425,8 +439,17 @@ CardPart.model_rebuild()
 StackPart.model_rebuild()
 
 
+def _unset(value: Any) -> bool:
+    return value is None
+
+
 class DetailFieldProps(_Strict):
     field: DetailFieldId
+    #: A person must fill it in to add the item, and cannot empty it once it
+    #: is filled. Only a field a person fills in can be required
+    #: (``app.services.tenant.tool_layouts.REQUIREABLE``); a title always is.
+    #: Left out of a read where it is not set, as it was before it existed.
+    required: Optional[bool] = Field(default=None, exclude_if=_unset)
 
 
 class DetailFieldPart(_Strict):
@@ -471,9 +494,6 @@ OwnPartType = Literal[
     "case",
     "comments",
     "rsvp",
-    "picture",
-    "about",
-    "versions",
     "count",
     "body",
     "schedule",
@@ -482,10 +502,17 @@ OwnPartType = Literal[
 ]
 
 
+class OwnPartProps(_Strict):
+    #: As a field's: a part that edits a value a person fills in (a task's
+    #: dates) can be required.
+    required: Optional[bool] = Field(default=None, exclude_if=_unset)
+
+
 class OwnPart(_Strict):
     """One of a detail's own parts."""
 
     type: OwnPartType
+    props: Optional[OwnPartProps] = Field(default=None, exclude_if=_unset)
 
 
 DetailPart = Annotated[
@@ -508,11 +535,13 @@ DetailStackPart.model_rebuild()
 
 #: Every way a layout can list a tool's items; which of them a tool draws is
 #: ``app.core.tools.LIST_LAYOUTS``.
-ListLayoutKind = Literal["table", "board", "gantt", "calendar"]
+ListLayoutKind = Literal[
+    "table", "board", "gantt", "calendar", "masonry", "grid", "timeline"
+]
 #: Every kind of thing a detail layout shows one of; which a tool holds is
 #: ``app.core.tools.DETAIL_LAYOUTS``.
 DetailLayoutKind = Literal[
-    "task", "calendar_event", "queue_item", "catalog_item", "counter", "post"
+    "task", "calendar_event", "queue_item", "counter", "post", "file"
 ]
 
 
@@ -594,6 +623,11 @@ class ListLayoutDefinition(_Strict):
     )
     #: Left out of the list's menu; none keeps what its tool ships.
     hidden: Optional[bool] = None
+    #: How each scale it shows is drawn, by the field's ``property:<id>``. A
+    #: scale with none is drawn as a number.
+    displays: Optional[Dict[PropertyFieldId, ScaleDisplay]] = Field(
+        default=None, max_length=MAX_NODES
+    )
 
     @model_validator(mode="after")
     def _offers_what_it_starts_on(self) -> "ListLayoutDefinition":
@@ -699,6 +733,17 @@ class DetailLayoutRead(SanitizedBaseModel):
 ToolLayoutRead = Annotated[
     Union[ListLayoutRead, DetailLayoutRead], Field(discriminator="kind")
 ]
+
+
+#: What a request names a set of layouts by: any tool, or a kind inside one
+#: that lays out what it holds. Which of them have layouts is
+#: ``app.core.tools.LAYOUT_TARGETS``; the others are refused by name.
+LayoutTarget = Enum(
+    "LayoutTarget",
+    {value: value for value in (*(t.value for t in Tool), *LAYOUT_KIND_TARGETS)},
+    type=str,
+)
+LayoutTarget.__doc__ = "What a set of layouts is for."
 
 
 class ToolLayoutSetRead(SanitizedBaseModel):

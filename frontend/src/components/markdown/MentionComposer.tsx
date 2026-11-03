@@ -304,6 +304,7 @@ export const MentionComposer = ({
     <>
       <MarkdownComposer
         {...composerProps}
+        chooseImagesFrom={initiativeId > 0 ? initiativeId : undefined}
         textareaRef={textareaRef}
         value={text}
         onChange={handleChange}

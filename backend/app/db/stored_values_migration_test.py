@@ -58,7 +58,7 @@ async def _stored(session, schema: str, job_id: int) -> dict:
     ).one()
     source = await _scalar(
         session,
-        text(f'SELECT source FROM "{schema}".export_jobs WHERE id = :id'),
+        text(f'SELECT source FROM "{schema}".data_jobs WHERE id = :id'),
         {"id": job_id},
     )
     return {
@@ -68,13 +68,39 @@ async def _stored(session, schema: str, job_id: int) -> dict:
     }
 
 
+def _public_values(
+    migration: ModuleType,
+    bind,
+    types: dict[str, str],
+    keys: dict[str, str],
+    source: tuple[str, str],
+) -> None:
+    """The public half of 0445 on the tables that still hold those values: the
+    notifications and their outbox. ``ai_config_mode`` it also respelled left
+    ``app_settings`` for ``platform_rules`` in 20261029_0559."""
+    notifications = "public.notifications"
+    outbox = "public.notice_outbox"
+
+    def write() -> None:
+        migration._set_value(bind, notifications, "type", types)
+        migration._rename_keys(bind, notifications, "data", keys, "::json")
+        migration._export_source(bind, notifications, "data", source, "::json")
+        migration._set_value(bind, outbox, "type", types)
+        migration._rename_keys(bind, outbox, "data", keys, "")
+        migration._rename_keys(bind, outbox, "push_data", keys, "")
+        migration._export_source(bind, outbox, "data", source, "")
+
+    migration._unforced(bind, (notifications, outbox), write)
+
+
 def _guild_source(migration: ModuleType, bind, source: dict[str, str]) -> None:
-    """The guild half of 0445 on the table that is still there. The members' AI
-    key and preference tables it also respelled went in 20261021_0533."""
+    """The guild half of 0445 on the table that is still there, by the name it
+    has now (20261030_0564). The members' AI key and preference tables it also
+    respelled went in 20261021_0533."""
     migration._unforced(
         bind,
-        ("export_jobs",),
-        lambda: migration._set_value(bind, "export_jobs", "source", source),
+        ("data_jobs",),
+        lambda: migration._set_value(bind, "data_jobs", "source", source),
     )
 
 
@@ -114,12 +140,12 @@ async def test_stored_values_say_community_and_back(session) -> None:
 
     def upgrade(sync_session) -> None:
         bind = sync_session.connection()
-        migration._public(
+        _public_values(
+            migration,
             bind,
             migration.NOTIFICATION_TYPES,
             migration.PAYLOAD_KEYS,
             ("guild", "community"),
-            {"guild": "community"},
         )
         bind.execute(
             text("SELECT set_config('search_path', :sp, true)"),
@@ -149,12 +175,12 @@ async def test_stored_values_say_community_and_back(session) -> None:
             {"sp": f"{schema}, public"},
         )
         _guild_source(migration, bind, {"community": "guild"})
-        migration._public(
+        _public_values(
+            migration,
             bind,
             {new: o for o, new in migration.NOTIFICATION_TYPES.items()},
             {new: o for o, new in migration.PAYLOAD_KEYS.items()},
             ("community", "guild"),
-            {"community": "guild"},
         )
 
     await session.run_sync(downgrade)

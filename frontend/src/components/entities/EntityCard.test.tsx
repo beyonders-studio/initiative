@@ -27,7 +27,7 @@ const end = (overrides: Partial<RelatedEnd> = {}): RelatedEnd => ({
   image_urls: [],
   icon: null,
   color: null,
-  file_type: "native",
+  file_type: "lexical",
   mime_type: null,
   original_filename: null,
   smart_link_url: null,
@@ -63,12 +63,12 @@ describe("EntityCard", () => {
   });
 
   it("draws every picture a thing offers, not just the first", async () => {
-    // A catalog nobody picked a cover for stands for itself with its newest
-    // few, the way it does everywhere else in the app.
+    // A collection nobody picked a cover for stands for itself with its
+    // newest few.
     const { container } = renderCard({
       end: end({
-        type: SearchEntityType.catalog,
-        tool: Tool.catalog,
+        type: SearchEntityType.collection,
+        tool: Tool.file,
         image_urls: ["/uploads/3/a.webp", "/uploads/3/b.webp", "/uploads/3/c.webp"],
       }),
     });
@@ -79,8 +79,8 @@ describe("EntityCard", () => {
   it("draws the one picture a thing chose on its own", async () => {
     const { container } = renderCard({
       end: end({
-        type: SearchEntityType.catalog,
-        tool: Tool.catalog,
+        type: SearchEntityType.collection,
+        tool: Tool.file,
         image_urls: ["/uploads/3/cover.webp"],
       }),
     });

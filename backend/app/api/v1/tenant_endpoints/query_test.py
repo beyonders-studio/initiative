@@ -19,7 +19,6 @@ from app.services.fields.spec import FieldType
 from app.services.marketplace import builtin
 from app.services.tenant import relationships as relationships_service
 from app.services.tenant.dashboard_definition import WIDGET_SPECS
-from app.models.tenant.file import FileType
 from app.testing import (
     create_file,
     create_initiative_member,
@@ -651,7 +650,6 @@ class TestAskingAboutTheReader:
             session,
             actor.initiative,
             actor.user,
-            file_type=FileType.file,
             file_url="/uploads/1/brief.pdf",
             file_size=2048,
         )

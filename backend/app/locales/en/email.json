@@ -69,10 +69,10 @@
       "title": "Your task was mentioned",
       "body": "<strong>{{actor}}</strong> mentioned <strong>{{task}}</strong> in <strong>{{context}}</strong>"
     },
-    "taskDescription": {
-      "subject": "You were mentioned in {{task}}",
+    "description": {
+      "subject": "You were mentioned in {{title}}",
       "title": "You were mentioned",
-      "body": "<strong>{{actor}}</strong> mentioned you in the description of <strong>{{task}}</strong>"
+      "body": "<strong>{{actor}}</strong> mentioned you in the description of <strong>{{title}}</strong>"
     },
     "greeting": "Hi <strong>{{name}}</strong>,",
     "buttonLabel": "View"
@@ -169,6 +169,15 @@
     "textBody_one": "You have {{count}} overdue task:",
     "textBody_other": "You have {{count}} overdue tasks:",
     "redactedItem": "A task is overdue"
+  },
+  "comingUp": {
+    "subject": "Coming up",
+    "title": "Coming up",
+    "body_one": "You have <strong>{{count}}</strong> thing coming up:",
+    "body_other": "You have <strong>{{count}}</strong> things coming up:",
+    "taskDetail": "due <strong>{{when}}</strong>, in <strong>{{projectName}}</strong>",
+    "eventDetail": "starts <strong>{{when}}</strong>",
+    "redactedItem": "Something is coming up"
   },
   "accessGrant": {
     "buttonLabel": "Open Access dashboard",
@@ -388,7 +397,9 @@
       "cases": "Cases",
       "direct_messages": "Messages and connections",
       "jobs": "Exports and imports",
-      "account": "Your account"
+      "account": "Your account",
+      "overdue": "Overdue",
+      "coming_up": "Coming up"
     }
   },
   "signInCode": {
@@ -436,6 +447,26 @@
     "contact": "Contact <strong>{{contact}}</strong> to sort it out.",
     "contactNobody": "Contact whoever runs this server to sort it out.",
     "buttonLabel": "Restore the plan"
+  },
+  "communityAccess": {
+    "granted": {
+      "subject": "Platform staff have access to {{community}}",
+      "title": "Platform staff have access to {{community}}",
+      "body": "Staff of this server were given <strong>{{level}}</strong> access to <strong>{{community}}</strong> on {{start}}, until {{end}}."
+    },
+    "ended": {
+      "subject": "Platform staff had access to {{community}}",
+      "title": "Platform staff had access to {{community}}",
+      "body": "Staff of this server had <strong>{{level}}</strong> access to <strong>{{community}}</strong> from {{start}} until {{end}}. That access has ended."
+    },
+    "case": {
+      "security": "It was for a security case.",
+      "moderation": "It was for a moderation case.",
+      "support": "It was for a support case."
+    },
+    "recorded": "Every request made with it is recorded.",
+    "contact": "Questions about it can go to <strong>{{contact}}</strong>.",
+    "moment": "{{date}}, {{time}} UTC"
   },
   "communityTrialEnding": {
     "subject": "{{community}}'s trial ends on {{date}}",
@@ -522,6 +553,49 @@
       "subject": "A new way to sign in to your account",
       "title": "A new way to sign in to your account",
       "body": "Your account can now be signed in to through <strong>{{provider}}</strong>, because it proved an address of yours."
+    }
+  },
+  "share": {
+    "requested": {
+      "read": {
+        "subject": "Asked to view",
+        "title": "Asked to view",
+        "body_one": "<strong>{{requester}}</strong> asks to view <strong>{{title}}</strong>",
+        "body_other": "<strong>{{requester}}</strong> asks to view {{count}} files"
+      },
+      "write": {
+        "subject": "Asked to edit",
+        "title": "Asked to edit",
+        "body_one": "<strong>{{requester}}</strong> asks to edit <strong>{{title}}</strong>",
+        "body_other": "<strong>{{requester}}</strong> asks to edit {{count}} files"
+      }
+    },
+    "granted": {
+      "read": {
+        "subject": "You can view it now",
+        "title": "You can view it now",
+        "body_one": "<strong>{{answerer}}</strong> let you view <strong>{{title}}</strong>",
+        "body_other": "<strong>{{answerer}}</strong> let you view {{count}} files"
+      },
+      "write": {
+        "subject": "You can edit it now",
+        "title": "You can edit it now",
+        "body_one": "<strong>{{answerer}}</strong> let you edit <strong>{{title}}</strong>",
+        "body_other": "<strong>{{answerer}}</strong> let you edit {{count}} files"
+      }
+    },
+    "declined": {
+      "subject": "Request declined",
+      "title": "Request declined",
+      "body_one": "<strong>{{answerer}}</strong> declined your request",
+      "body_other": "<strong>{{answerer}}</strong> declined your request for {{count}} files"
+    }
+  },
+  "task": {
+    "reminder": {
+      "subject": "Reminder: {{task}}",
+      "title": "Reminder",
+      "body": "You asked to be reminded of <strong>{{task}}</strong>."
     }
   }
 }

@@ -85,8 +85,8 @@ async def test_postgres_refuses_the_write_to_anyone_but_the_seat(
     await session.commit()
 
     insert = text(
-        "INSERT INTO public.guild_auth_policies (guild_id, policy, updated_at) "
-        "VALUES (:g, 'open', now())"
+        "INSERT INTO public.community_rules (guild_id, key, enabled, updated_at) "
+        "VALUES (:g, 'allow_ai', false, now())"
     )
     # The request path's own login role, not the superuser the setup above
     # runs as — this is the boundary under test.

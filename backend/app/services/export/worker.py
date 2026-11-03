@@ -1,4 +1,4 @@
-"""Export worker: claims queued ExportJobs, re-runs their query, renders.
+"""Export worker: claims queued export jobs, re-runs their query, renders.
 
 The job row persists only the filter *selector*, so the worker re-executes
 the source adapter's query at render time — under a session routed as the
@@ -31,17 +31,16 @@ from collections.abc import Awaitable
 from contextlib import AbstractAsyncContextManager
 from datetime import datetime, timedelta, timezone
 
-from sqlmodel import select
+from sqlmodel import col, select
 from sqlmodel.ext.asyncio.session import AsyncSession
 
-from app.core.config import settings
 from app.core.messages import ExportMessages
 from app.core.user_display import name_here
 from app.db import cohorts
 from app.db.advisory_locks import LockNamespace
 from app.models.platform.notification import NotificationType
 from app.models.platform.user import UserStatus
-from app.models.tenant.export_job import ExportJob, ExportJobStatus
+from app.models.tenant.data_job import DataJob, DataJobDirection, DataJobStatus
 from app.services import data_jobs
 from app.services.data_jobs import JobOutcome
 from app.services.export import engine as export_engine
@@ -84,11 +83,12 @@ async def _sweep(
     the sweep waits for it is read again and no longer matches."""
     abandoned = list(
         await session.exec(
-            select(ExportJob)
+            select(DataJob)
             .where(
-                ExportJob.status == ExportJobStatus.running,
-                ExportJob.updated_at < now - STALE_RUNNING,
-                ExportJob.id.not_in(own),  # type: ignore[union-attr]
+                DataJob.direction == DataJobDirection.export,
+                DataJob.status == DataJobStatus.running,
+                DataJob.updated_at < now - STALE_RUNNING,
+                col(DataJob.id).not_in(own),
             )
             .with_for_update()
         )
@@ -102,7 +102,7 @@ async def _sweep(
                 guild_id,
                 job.source,
             )
-            job.status = ExportJobStatus.failed
+            job.status = DataJobStatus.failed
             job.error = ExportMessages.EXPORT_RENDER_FAILED
             _forget_filters(job)
             outcomes.append(_outcome(job, guild_id))
@@ -113,7 +113,7 @@ async def _sweep(
                 guild_id,
                 job.source,
             )
-            job.status = ExportJobStatus.queued
+            job.status = DataJobStatus.queued
             job.restarts += 1
         job.updated_at = now
         session.add(job)
@@ -123,7 +123,7 @@ async def _sweep(
 
 
 async def _render(
-    session: AsyncSession, job: ExportJob, *, guild_id: int, kind: str
+    session: AsyncSession, job: DataJob, *, guild_id: int, kind: str
 ) -> JobOutcome | None:
     """Render a claimed job and record how it ended."""
     # The last ``updated_at`` this render wrote, starting with the claim's.
@@ -132,7 +132,7 @@ async def _render(
 
     async def still_ours() -> bool:
         await session.refresh(job, with_for_update=True)
-        return job.status == ExportJobStatus.running and job.updated_at == touched
+        return job.status == DataJobStatus.running and job.updated_at == touched
 
     async def touch() -> None:
         nonlocal touched
@@ -163,15 +163,15 @@ async def _render(
         if not await still_ours():
             await session.commit()
             return None
-        job.status = ExportJobStatus.failed
+        job.status = DataJobStatus.failed
         job.error = _error_code(exc)
     else:
         if not await still_ours():
             await session.commit()
             logger.info("export render superseded id=%s guild=%s", job.id, guild_id)
             return None
-        job.status = ExportJobStatus.done
-        job.artifact_ref = location.artifact_ref
+        job.status = DataJobStatus.done
+        job.file_ref = location.artifact_ref
         job.destination_ref = location.destination_ref
         job.initiative_ids = sorted(reach)
         job.error = None
@@ -191,14 +191,14 @@ async def _render(
     return _outcome(job, guild_id)
 
 
-def _forget_filters(job: ExportJob) -> None:
+def _forget_filters(job: DataJob) -> None:
     """Filters are one person's instruction for one render. Once it has ended,
     the row keeps none of them."""
     if job.params and "filters" in job.params:
         job.params = {k: v for k, v in job.params.items() if k != "filters"}
 
 
-def _outcome(job: ExportJob, guild_id: int) -> JobOutcome:
+def _outcome(job: DataJob, guild_id: int) -> JobOutcome:
     """What the creator is told. They may have navigated away while the render
     ran — an inbox entry is how they reach the artifact afterwards. Data
     mirrors the other notification payloads: ids only plus what the bell
@@ -206,7 +206,7 @@ def _outcome(job: ExportJob, guild_id: int) -> JobOutcome:
     return (
         job.created_by,
         NotificationType.export_ready
-        if job.status == ExportJobStatus.done
+        if job.status == DataJobStatus.done
         else NotificationType.export_failed,
         {
             "community_id": guild_id,
@@ -217,15 +217,14 @@ def _outcome(job: ExportJob, guild_id: int) -> JobOutcome:
     )
 
 
-jobs: data_jobs.Dispatcher[ExportJob] = data_jobs.Dispatcher(
+jobs = data_jobs.Dispatcher(
     name="export",
-    model=ExportJob,
+    direction=DataJobDirection.export,
     lock_namespace=LockNamespace.EXPORT_CLAIM,
-    queued=ExportJobStatus.queued,
-    active=(ExportJobStatus.running,),
+    active=(DataJobStatus.running,),
     kinds=(_RENDER,),
     kind_of=lambda _job: _RENDER,
-    start_status=lambda _kind: ExportJobStatus.running,
+    start_status=lambda _kind: DataJobStatus.running,
     slots=lambda _kind: export_limits.EXPORT_RENDER_SLOTS,
     sweep=_sweep,
     run=_render,
@@ -240,7 +239,7 @@ async def process_export_jobs() -> None:
 
 async def _execute(
     session: AsyncSession,
-    job: ExportJob,
+    job: DataJob,
     *,
     guild_id: int,
     heartbeat: data_jobs.Heartbeat,
@@ -328,51 +327,3 @@ def _error_code(exc: Exception) -> str:
     if isinstance(exc, GuildAccessError):
         return ExportMessages.EXPORT_ACCESS_REVOKED
     return ExportMessages.EXPORT_RENDER_FAILED
-
-
-async def expire_artifacts(session: AsyncSession, guild_id: int) -> None:
-    """Delete the community's artifacts past ``expires_at`` (via the storage
-    backend, so local FS and S3 behave identically) and mark their jobs
-    expired.
-
-    Visited in every community whose schema exists, whatever its status: a
-    read-only or suspended community's artifacts expire like anyone's. On a
-    demo deployment a pitch's newest backup is kept: it is what its links
-    copy."""
-    from app.services.storage import get_guild_storage
-
-    now = datetime.now(timezone.utc)
-    jobs = list(
-        await session.exec(
-            select(ExportJob).where(
-                ExportJob.status == ExportJobStatus.done,
-                ExportJob.expires_at.is_not(None),
-                ExportJob.expires_at < now,
-            )
-        )
-    )
-    if jobs and settings.DEMO_MODE:
-        from app.demo import pitches
-
-        published = await pitches.published_export_id(session, guild_id)
-        jobs = [job for job in jobs if job.id != published]
-    storage = get_guild_storage(guild_id) if jobs else None
-    for job in jobs:
-        if job.artifact_ref and storage is not None:
-            try:
-                await asyncio.to_thread(storage.delete, job.artifact_ref)
-            except Exception:
-                # Expire the row anyway: a permanently failing delete
-                # (key already gone, bucket misconfig) must not pin the
-                # job in ``done`` and re-fail every pass.
-                logger.exception(
-                    "export gc: artifact delete failed job=%s ref=%s guild=%s",
-                    job.id,
-                    job.artifact_ref,
-                    guild_id,
-                )
-        job.status = ExportJobStatus.expired
-        job.artifact_ref = None
-        job.updated_at = now
-        session.add(job)
-    await session.commit()

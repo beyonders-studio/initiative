@@ -699,13 +699,13 @@ async def test_soft_delete_takes_their_name_out_of_collaboration(
     name, and takes the names out of the collaboration state of every file
     and wiki page that mentions them, archived ones included: an editor from
     before names were left out can have written one into it. A state that
-    cannot be read is left as it is. Digest rows lose
+    cannot be read is left as it is. Batched lines lose
     the assigner's name snapshot and id (issue #794)."""
     from sqlalchemy import text
 
     from app.db.session import set_rls_context
     from app.models.tenant.file import File
-    from app.models.tenant.task_assignment_digest import TaskAssignmentDigestItem
+    from app.models.tenant.batched_notice import BatchedNotice, BatchedNoticeKind
     from app.models.tenant.wiki import WikiPage
     from app.services.tenant.mention_parser import (
         ANONYMIZED_MENTION_NAME,
@@ -763,18 +763,21 @@ async def test_soft_delete_takes_their_name_out_of_collaboration(
         content=mentioning,
         yjs_state=MENTIONING_YJS_STATE,
     )
-    digest = TaskAssignmentDigestItem(
+    line = BatchedNotice(
         user_id=author.id,
-        task_id=task.id,
+        kind=BatchedNoticeKind.task_assignment,
+        actor_id=victim.id,
+        actor_name="Vic Tim",
+        target_type="task",
+        target_id=task.id,
+        target_path=f"/go/task/{task.id}",
+        title=task.title,
         project_id=project.id,
-        task_title=task.title,
         project_name=project.name,
-        assigned_by_name="Vic Tim",
-        assigned_by_id=victim.id,
     )
-    session.add(digest)
+    session.add(line)
     await session.commit()
-    digest_id = digest.id
+    line_id = line.id
     victim_id = victim.id
 
     # Account erasure is trusted system work and must not be narrowed by an
@@ -821,16 +824,15 @@ async def test_soft_delete_takes_their_name_out_of_collaboration(
     for state in (*states.values(), refreshed_page.yjs_state):
         assert state != MENTIONING_YJS_STATE and nameless_state(state) is None
 
-    digest_name, digest_by = (
+    line_name, line_by = (
         await session.exec(
-            select(
-                TaskAssignmentDigestItem.assigned_by_name,
-                TaskAssignmentDigestItem.assigned_by_id,
-            ).where(TaskAssignmentDigestItem.id == digest_id)
+            select(BatchedNotice.actor_name, BatchedNotice.actor_id).where(
+                BatchedNotice.id == line_id
+            )
         )
     ).one()
-    assert digest_name == ANONYMIZED_MENTION_NAME
-    assert digest_by is None
+    assert line_name == ANONYMIZED_MENTION_NAME
+    assert line_by is None
 
 
 async def test_hard_delete_anonymized_user_cleans_guild_data(

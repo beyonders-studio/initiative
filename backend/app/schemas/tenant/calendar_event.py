@@ -1,7 +1,7 @@
 from __future__ import annotations
 
 from datetime import datetime
-from typing import Any, List, Mapping, Optional, Sequence, TYPE_CHECKING
+from typing import Any, List, Mapping, Optional, TYPE_CHECKING
 
 from pydantic import (
     AliasChoices,
@@ -31,7 +31,6 @@ from app.schemas.tenant.property import (
     annotated_properties,
 )
 from app.schemas.tenant.archive import ContentCan
-from app.schemas.tenant.plugin_data import PluginValueSummary
 from app.schemas.tenant.tag import TagSummary, annotated_tags
 from app.schemas.tenant.tool import from_row
 from app.schemas.platform.user import PluginPerson, PersonShape, UserPublic
@@ -224,9 +223,6 @@ class CalendarEventRead(CalendarEventFields):
     #: A series' skipped starts and extra starts.
     skipped_starts: List[datetime] = Field(default_factory=list)
     extra_starts: List[datetime] = Field(default_factory=list)
-    #: The values installed plug-ins show on the event, from the installs on
-    #: and placed in its initiative.
-    plugin_values: List[PluginValueSummary] = Field(default_factory=list)
 
 
 # ---------------------------------------------------------------------------
@@ -281,11 +277,9 @@ def serialize_calendar_event(
     context: ActorContext,
     user_id: Optional[int] = None,
     answers: Mapping[int, RSVPStatus],
-    plugin_values: Sequence[PluginValueSummary] = (),
 ) -> CalendarEventRead:
     """``answers`` are what was answered to the event, or to the one
-    occurrence shown; someone with none is still to answer. ``plugin_values``
-    are what the reader is drawn of the plug-ins' values on it."""
+    occurrence shown; someone with none is still to answer."""
     skipped, extra = (
         recurrence.exception_starts(
             event.recurrence, event.start_at, event.recurrence_shift
@@ -309,5 +303,4 @@ def serialize_calendar_event(
         overridden_fields=list(event.overridden_fields or []),
         skipped_starts=skipped,
         extra_starts=extra,
-        plugin_values=list(plugin_values),
     )

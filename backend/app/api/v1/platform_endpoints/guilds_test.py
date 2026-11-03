@@ -18,6 +18,7 @@ from sqlmodel.ext.asyncio.session import AsyncSession
 
 from sqlmodel import select
 
+from app.services.platform import rules
 from app.testing.schema_harness import route_session_to_guild
 from app.models.platform.guild import Guild, GuildMembership, CommunityRole
 from app.models.platform.notification import Notification, NotificationType
@@ -268,10 +269,10 @@ async def test_an_account_creates_only_its_daily_allowance_of_guilds(
     """Past the allowance the request is refused before anything is made, and
     deleting a community does not give the allowance back; the staff who stand
     communities up for others are not counted."""
-    from app.core.config import settings
     from app.services.platform import guilds as guilds_service
 
-    monkeypatch.setattr(settings, "GUILD_CREATION_DAILY_LIMIT", 1)
+    await rules.put(session, "community_creation_daily_limit", 1)
+    await session.commit()
     a = await acting_user("member")
     first = await client.post(
         "/api/v1/communities/", headers=a.headers, json={"name": "First"}

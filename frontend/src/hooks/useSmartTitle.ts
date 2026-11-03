@@ -4,6 +4,7 @@ import { useTranslation } from "react-i18next";
 
 import { type TaskPriority, Tool } from "@/api/generated/initiativeAPI.schemas";
 import { getListTagsQueryKey, listTags } from "@/api/generated/tags/tags";
+import { getListTaskTypesQueryOptions } from "@/api/generated/task-types/task-types";
 import { getSearchUsersQueryOptions } from "@/api/generated/users/users";
 import { useAuth } from "@/hooks/useAuth";
 import { useDebouncedValue } from "@/hooks/useDebouncedValue";
@@ -57,8 +58,8 @@ export interface SmartTitle {
 
 /**
  * Reads a new task's `text` for its details: the community's tags for `#`,
- * and for `@` the people who can open the project, looked up as their handles
- * are typed.
+ * the project's task types for a leading "bug:", and for `@` the people who
+ * can open the project, looked up as their handles are typed.
  */
 export const useSmartTitle = ({
   text,
@@ -82,6 +83,12 @@ export const useSmartTitle = ({
     queryFn: () => listTags(communityId ?? 0),
     staleTime: 60 * 1000,
     enabled: enabled && hasCommunity && text.includes("#"),
+  });
+
+  const types = useQuery({
+    ...getListTaskTypesQueryOptions(communityId ?? 0, projectId),
+    staleTime: 60 * 1000,
+    enabled: enabled && hasCommunity && text.includes(":"),
   });
 
   // Looked up once typing pauses, rather than for every letter of a name.
@@ -136,11 +143,12 @@ export const useSmartTitle = ({
       words,
       weekStartsOn: user?.week_starts_on ?? 0,
       tags: tags.data ?? [],
+      types: types.data ?? [],
       people,
       me,
       kept,
     }),
-    [words, user?.week_starts_on, tags.data, people, me, kept]
+    [words, user?.week_starts_on, tags.data, types.data, people, me, kept]
   );
   const read = useCallback(
     (typed: string) => readTitle(typed, { ...context, now: new Date() }),

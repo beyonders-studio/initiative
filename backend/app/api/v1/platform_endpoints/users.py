@@ -33,8 +33,9 @@ from app.api.deps import (
     holds_guild_role,
     require_first_party_session,
     SystemSessionDep,
-    GuildAdminContext,
+    GuildContext,
     GuildContextDep,
+    require_surface,
 )
 from app.api.v1.platform_endpoints.password_recheck import (
     require_password_or_recent_proof,
@@ -48,6 +49,7 @@ from app.api.v1.platform_endpoints.held_changes import (
 )
 from app.api.v1.platform_endpoints.session_opening import set_password
 from app.core.capabilities import Capability
+from app.core.image_headers import image_response
 from app.core.password_policy import validate_new_password
 from app.core.identity_boundary import PersonId
 from app.core.user_display import handle_of
@@ -64,6 +66,7 @@ from app.core.user_input_validators import (
 )
 from sqlmodel.ext.asyncio.session import AsyncSession
 from app.models.platform.guild import (
+    AdminSurface,
     GUILD_ADMIN_ROLES,
     GuildMembership,
     CommunityRole,
@@ -143,7 +146,7 @@ from app.services.tenant import initiatives as initiatives_service
 from app.services.tenant import named_people
 from app.services.tenant import ownership as ownership_service
 from app.services.platform import cookie_consent as cookie_consent_service
-from app.services.platform import guild_entitlements
+from app.services.platform import rules
 from app.services.platform import guilds as guilds_service
 from app.services.platform import guild_images as images_service
 from app.services.platform import legal as legal_service
@@ -189,6 +192,9 @@ TASK_COMPLETION_VISUAL_FEEDBACK_VALUES: frozenset[str] = frozenset(
 logger = logging.getLogger(__name__)
 
 # Other people's public profiles. Mounted under /api/v1/users.
+#: A route that administers the community's roster.
+MembersContext = Annotated[GuildContext, Depends(require_surface(AdminSurface.members))]
+
 router = APIRouter()
 # The signed-in account: its profile, settings and stats. Mounted under
 # /api/v1/me; user-scoped (no guild context).
@@ -332,7 +338,12 @@ async def list_users(
             GuildMembership.role,
             GuildMembership.oidc_provider_id,
             GuildMembership.display_name,
-            GuildMembership.api_keys_allowed,
+            rules.community_rule_sql(
+                GuildMembership.guild_id,
+                "api_keys",
+                user_id=GuildMembership.user_id,
+                applied=False,
+            ),
             GuildMembership.guest_until,
         ),
         guild_id=guild_context.guild_id,
@@ -994,7 +1005,7 @@ _GUILD_CSV_HEADERS = [
 @guild_router.get("/export.csv")
 async def export_users_csv(
     session: RLSSessionDep,
-    guild_context: GuildAdminContext,
+    guild_context: MembersContext,
     user_id: Annotated[list[int] | None, Query()] = None,
 ) -> Response:
     """Export guild members as a CSV file. Pass `user_id` one or more times to
@@ -1486,7 +1497,7 @@ async def update_me(
             current_user,
             update_data.get("current_password"),
         )
-        await validate_new_password(password)
+        await validate_new_password(session, password)
         # A request of its own (``UserSelfUpdate`` holds it to that), committed
         # with the session that keeps this device signed in. Its commit is the
         # request's only write; the account is read back for the answer.
@@ -1536,8 +1547,8 @@ async def update_me(
         normalized_timezone = normalize_timezone(update_data["timezone"])
         if normalized_timezone:
             if normalized_timezone != current_user.timezone:
-                # The overdue digest goes out at a time of their day.
-                sooner.append("overdue")
+                # The digests go out at a time of their day.
+                sooner += ["overdue", "coming_up"]
             current_user.timezone = normalized_timezone
     if "event_reminder_minutes_before" in update_data:
         # ``None`` is a valid value here (reminders off), so assign directly.
@@ -1768,7 +1779,9 @@ async def create_my_api_key(
         # And the guild has to accept this member's keys at all. Asked here as
         # well as at the gate so a key that could never be used is never handed
         # over.
-        if await guild_entitlements.refuses_api_keys(session, membership):
+        if not await rules.member_value(
+            session, membership.guild_id, membership.user_id, "api_keys"
+        ):
             raise HTTPException(
                 status_code=status.HTTP_403_FORBIDDEN,
                 detail=GuildMessages.COMMUNITY_API_KEYS_REFUSED,
@@ -1882,7 +1895,7 @@ def _transfer_payload(counts: dict) -> OwnershipTransferResponse:
 async def list_unowned_content(
     session: SessionDep,
     current_admin: Annotated[User, Depends(get_current_active_user)],
-    guild_context: GuildAdminContext,
+    guild_context: MembersContext,
 ) -> OwnedContentResponse:
     """Everything in this guild that no current member or live plug-in owns, and
     the plug-ins that may own all of it.
@@ -1903,7 +1916,7 @@ async def claim_unowned_content(
     payload: OwnershipTransferRequest,
     session: SessionDep,
     current_admin: Annotated[User, Depends(get_current_active_user)],
-    guild_context: GuildAdminContext,
+    guild_context: MembersContext,
 ) -> OwnershipTransferResponse:
     """Give everything nobody owns to one guild admin, or to a plug-in that may
     own all of it (422 ``OWNER_PLUGIN_NOT_ELIGIBLE`` otherwise)."""
@@ -1925,7 +1938,7 @@ async def list_owned_content(
     user_id: int,
     session: SessionDep,
     current_admin: Annotated[User, Depends(get_current_active_user)],
-    guild_context: GuildAdminContext,
+    guild_context: MembersContext,
 ) -> OwnedContentResponse:
     """What this user owns in this guild, for the transfer dialog to list,
     and the plug-ins that may own all of it.
@@ -1947,7 +1960,7 @@ async def transfer_ownership(
     payload: OwnershipTransferRequest,
     session: SessionDep,
     current_admin: Annotated[User, Depends(get_current_active_user)],
-    guild_context: GuildAdminContext,
+    guild_context: MembersContext,
 ) -> OwnershipTransferResponse:
     """Move everything ``user_id`` owns in this guild to a guild admin, or to
     a plug-in that may own all of it (422 ``OWNER_PLUGIN_NOT_ELIGIBLE`` otherwise).
@@ -1979,7 +1992,7 @@ async def remove_member(
     session: SessionDep,
     system_session: SystemSessionDep,
     current_admin: Annotated[User, Depends(get_current_active_user)],
-    guild_context: GuildAdminContext,
+    guild_context: MembersContext,
 ) -> None:
     """Remove a member from this guild.
 
@@ -2006,11 +2019,13 @@ async def remove_member(
         )
 
     # Removing the seat-holder ends the seat exactly as demoting them does, so
-    # it answers to the same authority: only the seat passes the seat on.
+    # it answers to the same authority: only the seat passes the seat on. And
+    # removing an admin, as demoting one does, takes somebody who holds every
+    # surface.
     if (
         membership.role == CommunityRole.superadmin
         and guild_context.role != CommunityRole.superadmin
-    ):
+    ) or (membership.role in GUILD_ADMIN_ROLES and not guild_context.manages_admins):
         raise HTTPException(
             status_code=status.HTTP_403_FORBIDDEN,
             detail=GuildMessages.COMMUNITY_ROLE_NOT_ASSIGNABLE,
@@ -2057,14 +2072,7 @@ async def _avatar_response(
     avatar = await user_avatars_service.get_avatar(session, user_id=user_id)
     if avatar is None or avatar.sha256 != digest:
         raise _image_not_found()
-    return Response(
-        content=avatar.data,
-        media_type=avatar.content_type,
-        headers={
-            "Cache-Control": "public, max-age=31536000, immutable",
-            "X-Content-Type-Options": "nosniff",
-        },
-    )
+    return image_response(avatar.data, avatar.content_type, shared=True)
 
 
 @router.get("/{user_id}/avatar/{digest}", include_in_schema=False)

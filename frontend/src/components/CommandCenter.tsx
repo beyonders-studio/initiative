@@ -38,6 +38,7 @@ import {
 import { MentionText } from "@/components/user/MentionText";
 import { useAuth } from "@/hooks/useAuth";
 import { useCommunities } from "@/hooks/useCommunities";
+import { useHeldSurfaces } from "@/hooks/useCustomRoles";
 import { useDebouncedValue } from "@/hooks/useDebouncedValue";
 import { useDirectMessagesEnabled } from "@/hooks/useDirectMessages";
 import { useGlobalCreateAccess } from "@/hooks/useInitiativeAccess";
@@ -250,7 +251,9 @@ export function CommandCenter() {
     scopeQuery.isSuccess &&
     !scopeQuery.isPlaceholderData;
 
-  const isCommunityAdmin = Boolean(activeCommunity?.can.administer);
+  // Anybody who runs any part of the community, a custom role included.
+  const heldSurfaces = useHeldSurfaces();
+  const showsCommunitySettings = Boolean(activeCommunity?.can.administer) || heldSurfaces.holdsAny;
   const dmEnabled = useDirectMessagesEnabled();
   const hasTickets = useHasFiledTickets();
   const securityReporting = useSecurityReporting();
@@ -279,7 +282,7 @@ export function CommandCenter() {
       },
     ];
 
-    if (isCommunityAdmin) {
+    if (showsCommunitySettings) {
       items.push({
         label: t("pages.communitySettings"),
         path: getCommunityPath("/settings"),
@@ -309,7 +312,7 @@ export function CommandCenter() {
     getCommunityPath,
     dmEnabled,
     hasTickets,
-    isCommunityAdmin,
+    showsCommunitySettings,
     showOperatorDashboard,
     showPlatformSettings,
   ]);

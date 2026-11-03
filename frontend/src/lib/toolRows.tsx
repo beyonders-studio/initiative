@@ -15,7 +15,6 @@ import type { ReactNode } from "react";
 
 import type {
   CalendarListResponse,
-  CatalogListResponse,
   CounterGroupListResponse,
   DashboardListResponse,
   FileListResponse,
@@ -63,7 +62,6 @@ export const TOOL_HAS_DETAIL: Record<Tool, boolean> = {
   [Tool.calendar]: true,
   [Tool.dashboard]: true,
   [Tool.post]: true,
-  [Tool.catalog]: false,
   [Tool.wiki]: false,
 };
 
@@ -86,7 +84,6 @@ export type ToolResponses = {
   [Tool.calendar]: CalendarListResponse | undefined;
   [Tool.dashboard]: DashboardListResponse | undefined;
   [Tool.post]: PostListResponse | undefined;
-  [Tool.catalog]: CatalogListResponse | undefined;
   [Tool.wiki]: WikiListResponse | undefined;
 };
 
@@ -164,7 +161,7 @@ export function buildToolRows(
         initiativeId: file.initiative_id,
         tags: file.tags,
         updatedAt: file.updated_at,
-        detail: <Badge variant="secondary">{t(`detail.fileType.${file.file_type}`)}</Badge>,
+        detail: <Badge variant="secondary">{t(`detail.fileKind.${file.kind}`)}</Badge>,
       }));
     case Tool.queue:
       return (data[Tool.queue]?.items ?? []).map((queue) => ({
@@ -231,17 +228,6 @@ export function buildToolRows(
         // of them — the server derives this from the body for exactly here,
         // with the people it mentions left in for the table to name.
         detail: post.excerpt,
-      }));
-    case Tool.catalog:
-      return (data[Tool.catalog]?.items ?? []).map((catalog) => ({
-        id: catalog.id,
-        communityId: catalog.community_id ?? fallbackCommunityId,
-        name: catalog.name,
-        href: href(catalog.id, catalog.initiative_id),
-        glyph: null,
-        initiativeId: catalog.initiative_id,
-        tags: catalog.tags,
-        updatedAt: catalog.updated_at,
       }));
     case Tool.wiki:
       return (data[Tool.wiki]?.items ?? []).map((wiki) => ({

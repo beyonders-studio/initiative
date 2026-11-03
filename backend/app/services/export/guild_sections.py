@@ -79,13 +79,20 @@ async def _build_settings(ctx: SectionContext) -> tuple[dict[str, Any], int] | N
     plus the guild-level flags that live on the ``guilds`` row itself."""
     from sqlmodel import select
 
+    from app.core.rules import COMMUNITY_RULES, SetBy, SignInRequirement, writers
     from app.models.platform.guild import Guild
     from app.models.tenant.guild_setting import GuildSetting
+    from app.services.platform import rules
 
     guild = await ctx.session.get(Guild, ctx.guild_id)
     if guild is None:
         return None
     setting = (await ctx.session.exec(select(GuildSetting).limit(1))).first()
+    stored = (
+        await rules.community_values(
+            ctx.session, [ctx.guild_id], applied=False, own=True
+        )
+    )[ctx.guild_id]
     payload: dict[str, Any] = {
         "type": "guild-settings",
         "schema_version": 1,
@@ -95,12 +102,20 @@ async def _build_settings(ctx: SectionContext) -> tuple[dict[str, Any], int] | N
         "categories": list(guild.categories or []),
         "location": guild.location,
         "has_adult_content": guild.has_adult_content,
-        "enforce_compliance_session": guild.enforce_compliance_session,
-        "allow_push_notifications": guild.allow_push_notifications,
-        "allow_email_notifications": guild.allow_email_notifications,
-        "redact_notification_content": guild.redact_notification_content,
-        "allow_engagement_ranking": guild.allow_engagement_ranking,
-        "allow_ai": guild.allow_ai,
+        # Every rule the community wrote itself; a sign-in requirement in the
+        # shape the settings page reads it. What the deployment sets, its plan
+        # and its surfaces among it, stays behind.
+        **{
+            key: {
+                "policy": value.policy,
+                "provider_id": value.provider_id,
+                "require_methods": sorted(m.value for m in value.methods),
+            }
+            if isinstance(value, SignInRequirement)
+            else value
+            for key, value in stored.items()
+            if SetBy.community in writers(COMMUNITY_RULES[key])
+        },
         "banner": dict(guild.banner or {}),
         "retention_days": setting.retention_days if setting else None,
     }
@@ -146,6 +161,7 @@ async def _build_members(ctx: SectionContext) -> tuple[dict[str, Any], int] | No
 
     from app.core.user_display import handle_of
     from app.models.platform.guild import GuildMembership
+    from app.models.platform.rule import CommunityRule
     from app.models.platform.user_profile_view import GuildMember
 
     memberships = list(
@@ -160,6 +176,17 @@ async def _build_members(ctx: SectionContext) -> tuple[dict[str, Any], int] | No
     profiles = {
         profile.id: profile for profile in await ctx.session.exec(select(GuildMember))
     }
+    # The members whose keys the seat turned off; everybody else's reach it.
+    keys_off = set(
+        await ctx.session.exec(
+            select(CommunityRule.user_id).where(
+                CommunityRule.guild_id == ctx.guild_id,
+                CommunityRule.key == "api_keys",
+                CommunityRule.user_id.is_not(None),  # type: ignore[union-attr]
+                CommunityRule.enabled.is_(False),  # type: ignore[union-attr]
+            )
+        )
+    )
     members = []
     for membership in memberships:
         profile = profiles.get(membership.user_id)
@@ -169,12 +196,51 @@ async def _build_members(ctx: SectionContext) -> tuple[dict[str, Any], int] | No
                 "handle": handle_of(profile) if profile else None,
                 "name": membership.display_name,
                 "role": _enum_value(membership.role),
-                "api_keys_allowed": membership.api_keys_allowed,
+                "api_keys_allowed": membership.user_id not in keys_off,
                 "joined_at": _iso(getattr(membership, "created_at", None)),
             }
         )
     payload = {"type": "guild-members", "schema_version": 1, "members": members}
     return payload, len(members)
+
+
+async def _build_roles(ctx: SectionContext) -> tuple[dict[str, Any], int] | None:
+    """The community's custom roles, each with what it holds and who holds it
+    now, by handle as the members section names people."""
+    from sqlmodel import col, select
+
+    from app.core.user_display import handle_of
+    from app.models.platform.user_profile_view import GuildMember
+    from app.models.tenant.custom_role import CustomRole
+    from app.services.tenant import custom_roles
+
+    roles = list(
+        await ctx.session.exec(select(CustomRole).order_by(col(CustomRole.name)))
+    )
+    if not roles:
+        return None
+    holders = await custom_roles.holders(ctx.session, ctx.guild_id)
+    profiles = {
+        profile.id: profile for profile in await ctx.session.exec(select(GuildMember))
+    }
+    payload = {
+        "type": "guild-roles",
+        "schema_version": 1,
+        "roles": [
+            {
+                "name": role.name,
+                "base_rung": role.base_rung,
+                "surfaces": list(role.surfaces),
+                "holders": [
+                    handle_of(profiles[user_id])
+                    for user_id, role_id in holders
+                    if role_id == role.id and user_id in profiles
+                ],
+            }
+            for role in roles
+        ],
+    }
+    return payload, len(roles)
 
 
 async def _build_plugins(ctx: SectionContext) -> tuple[dict[str, Any], int] | None:
@@ -271,6 +337,7 @@ GUILD_SECTIONS: tuple[GuildSection, ...] = (
         scopes=frozenset({"guild", "initiative"}),
     ),
     GuildSection("members", "guild/members.json", _build_members),
+    GuildSection("roles", "guild/roles.json", _build_roles),
     GuildSection("plugins", "guild/plugins.json", _build_plugins),
 )
 
@@ -294,7 +361,9 @@ SECTION_TABLES: dict[str, str] = {
     "initiatives": "initiatives",
     "initiative_members": "initiatives",
     "initiative_roles": "initiatives",
-    "initiative_role_permissions": "initiatives",
+    "initiative_rules": "initiatives",
+    "custom_roles": "roles",
+    "custom_role_members": "roles",
 }
 
 # Guild-level tables deliberately NOT exported, and why. A reason is required:
@@ -310,9 +379,11 @@ EXEMPT: dict[str, str] = {
     "plugin_member_consents": "credentials",
     # Operational ledgers about the app's own work. Restoring them would
     # describe a history that did not happen in the instance reading them.
-    "export_jobs": "operational",
-    "import_jobs": "operational",
+    "data_jobs": "operational",
     "webhook_deliveries": "operational",
+    # What each subscription calls the community and its people, for a
+    # receiver of this instance's alone.
+    "webhook_refs": "operational",
     "plugin_hook_deliveries": "operational",
     "plugin_schedule_runs": "operational",
     "timer_marks": "operational",
@@ -320,9 +391,23 @@ EXEMPT: dict[str, str] = {
     # In-flight workflow rather than owned content: a request to join is a
     # question waiting on somebody in THIS instance.
     "initiative_join_requests": "in_flight",
+    # A file still arriving, which only this instance's storage holds.
+    "pending_uploads": "in_flight",
     # The platform's record of what it holds here. Not the community's to
     # read, so not the community's to carry out.
     "content_holds": "platform",
+    # Which of the platform's access grants serves which case: grants only
+    # this instance holds, and not the community's to read either.
+    "case_grants": "platform",
+    # Half of a sign-in rule, whose other half (public.oidc_claim_mappings)
+    # names this instance's providers and no archive carries.
+    "claim_rule_initiatives": "sign_in",
+    # How each member shows the community's lists: theirs rather than the
+    # community's, and keyed to ids this instance gave.
+    "view_preferences": "personal",
+    # Sign-in configuration: it names the deployment's providers, which mean
+    # nothing to the instance reading the archive.
+    "custom_role_claim_rules": "sign_in",
 }
 
 __all__ = [

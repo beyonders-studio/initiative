@@ -17,7 +17,7 @@ from fastapi import (
 )
 from fastapi.responses import Response
 from sqlalchemy import text
-from sqlmodel import select
+from sqlmodel import col, select
 from sqlmodel.ext.asyncio.session import AsyncSession
 
 from app.core.search import SearchEntityType
@@ -39,7 +39,6 @@ from app.api.deps import (
     establish_guild_access,
     get_current_active_user,
     GuildAccessError,
-    GuildContext,
     GuildContextDep,
 )
 from app.core.messages import (
@@ -48,10 +47,19 @@ from app.core.messages import (
 )
 from app.core.rate_limit import limiter
 from app.db.session import require_actor_context
+from app.core.image_headers import read_image_header
+from app.core.file_types import (
+    FileKind,
+    FileType,
+    is_stored,
+    spec_of,
+    type_of_media,
+    types_of_kind,
+)
+from app.models.tenant.collection import CollectionFile
 from app.models.tenant.file import (
     File,
     FileVersion,
-    FileType,
 )
 from app.models.platform.notification import NotificationType
 from app.models.platform.user import User
@@ -62,22 +70,30 @@ from app.schemas.tenant.file import (
     FileSummary,
     FileUpdate,
     serialize_file,
-    serialize_file_summary,
     SpreadsheetImportRead,
 )
+from app.schemas.tenant.tool import serialize_tool
 from app.schemas.tenant.resource_grant import initiative_readable
 from app.schemas.ai_generation import AIStreamEvent
+from app.services import resumable
 from app.services.tenant import attachments as attachments_service
-from app.services.tenant import file_versions
+from app.services.tenant import thumbnails
+from app.services.tenant import file_conversion, file_versions
 from app.services import storage_config
-from app.services.storage import build_upload_response, get_guild_storage
+from app.services.storage import (
+    INLINE_UPLOAD_TYPES,
+    USER_CONTENT_CSP,
+    build_upload_response,
+    get_guild_storage,
+    requested_range,
+)
 from app.api import resource_access
 from app.core.tools import Tool
 from app.services.tenant import body_states
 from app.services.tenant import comments as comments_service
 from app.services.tenant import files as files_service
 from app.services.tenant import ownership as ownership_service
-from app.services.tenant import properties as properties_service
+from app.services.tenant import metadata as metadata_service
 from app.services.tenant import tags as tags_service
 from app.services.tenant.names import ensure_name_free
 from app.services.tenant import tool_listing
@@ -103,45 +119,50 @@ FilesRead = Annotated[ActorContext, Depends(plugin_scope("files:read"))]
 FilesWrite = Annotated[ActorContext, Depends(plugin_scope("files:write"))]
 
 
+def _shown_as_is(content_type: str | None) -> bool:
+    """Whether the browser draws a file of this type itself, with nothing in
+    it acting as a page: a picture, a PDF in its own viewer, audio, video."""
+    media = (content_type or "").lower()
+    return (
+        media in INLINE_UPLOAD_TYPES
+        or media == "application/pdf"
+        or media.startswith(("audio/", "video/"))
+    )
+
+
 def _file_download_response(
-    *, guild_id: int, version: FileVersion, inline: bool
+    *, guild_id: int, version: FileVersion, inline: bool, request: Request
 ) -> Response:
     """Build a hardened download response for one version's stored file.
 
-    Shared by the current-file download and the per-version download so
-    the filename checks and SVG/HTML response hardening can't drift
-    between the two endpoints. Serves through the guild's storage backend
-    (local FileResponse or S3 streaming proxy) via :func:`build_upload_response`.
+    Shared by the current-file download and the per-version download so the
+    response hardening can't drift between the two endpoints. A type the
+    browser would render as a page is sandboxed (:data:`USER_CONTENT_CSP`),
+    framed only by the in-app viewer, and downloaded rather than opened when
+    its link is followed as a page (``Sec-Fetch-Dest: document``). Serves
+    through the guild's storage backend via :func:`build_upload_response`, the
+    range of bytes the request asks for where it asks for one.
     """
+    fetch_dest = request.headers.get("sec-fetch-dest")
     content_type = version.file_content_type
     original_filename = version.original_filename
     filename = version.file_url.split("/")[-1]
-    blob = get_guild_storage(guild_id).open_readable(filename)
+    blob = get_guild_storage(guild_id).open_readable(
+        filename, byte_range=requested_range(request.headers.get("range"))
+    )
     if blob is None:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND)
 
     headers: dict[str, str] = {"X-Content-Type-Options": "nosniff"}
-    ext = (original_filename or filename).rsplit(".", 1)[-1].lower()
-    normalized_type = (content_type or "").lower()
-    if (
-        ext in ("svg", "html", "htm")
-        or "svg" in normalized_type
-        or "html" in normalized_type
-    ):
+    if not _shown_as_is(content_type):
+        inline = inline and fetch_dest != "document"
+        headers["Content-Security-Policy"] = USER_CONTENT_CSP
         if inline:
-            # Shown as a static page: sandboxed, with no scripts and no forms,
-            # and framed only by the in-app file viewer on this origin.
             # X-Frame-Options set here overrides the SecurityHeadersMiddleware
-            # global DENY (it uses setdefault); frame-ancestors 'self' is the
-            # CSP equivalent.
-            headers["Content-Security-Policy"] = (
-                "sandbox; script-src 'none'; form-action 'none'; frame-ancestors 'self'"
-            )
+            # global DENY (it uses setdefault); frame-ancestors is the CSP
+            # equivalent.
+            headers["Content-Security-Policy"] += "; frame-ancestors 'self'"
             headers["X-Frame-Options"] = "SAMEORIGIN"
-        else:
-            # Non-inline downloads are sent as attachments; keep the strict
-            # script-src and let the global X-Frame-Options: DENY stand.
-            headers["Content-Security-Policy"] = "script-src 'none'"
 
     if inline:
         return build_upload_response(blob, media_type=content_type, headers=headers)
@@ -160,6 +181,8 @@ def visible_file_conditions(
     untagged: Optional[bool] = None,
     is_template: Optional[bool] = None,
     file_type: Optional[FileType] = None,
+    kind: Optional[FileKind] = None,
+    collection_id: Optional[int] = None,
 ):
     """WHERE conditions for visible-file queries — the list and the tag
     counts beside it, so the sidebar's numbers match the rows under them.
@@ -185,6 +208,9 @@ def visible_file_conditions(
     if file_type is not None:
         conditions.append(File.file_type == file_type)
 
+    if kind is not None:
+        conditions.append(File.file_type.in_([t.value for t in types_of_kind(kind)]))
+
     if untagged:
         conditions.append(
             tags_service.untagged_clause(
@@ -192,11 +218,23 @@ def visible_file_conditions(
             )
         )
 
+    if collection_id is not None:
+        conditions.append(
+            col(File.id).in_(
+                select(CollectionFile.file_id).where(
+                    CollectionFile.collection_id == collection_id
+                )
+            )
+        )
+
     return conditions
 
 
 async def serialize_file_page(
-    session: AsyncSession, user_id: int | None, files: list[File]
+    session: AsyncSession,
+    user_id: int | None,
+    files: list[File],
+    schema: type[FileSummary] = FileSummary,
 ) -> list[FileSummary]:
     """Serialize one page of files — the rows a file list answers with.
 
@@ -207,15 +245,15 @@ async def serialize_file_page(
 
     Both file lists run this: the guild-wide one through
     ``tool_lists.TOOL_LISTS``, and the cross-guild ``/me/files`` through
-    ``me_tools.MY_TOOL_LISTS``.
+    ``me_tools.MY_TOOL_LISTS``; a collection's, in its own ``schema``.
     """
     await tags_service.annotate_tags(session, files)
-    await properties_service.annotate_properties(session, files)
+    await metadata_service.annotate_properties(session, files)
     await comments_service.annotate_comment_counts(session, files, column="file_id")
     await ownership_service.annotate_owner_plugins(session, files)
     context = require_actor_context(session)
     return [
-        serialize_file_summary(file, context=context, user_id=user_id) for file in files
+        serialize_tool(schema, file, context=context, user_id=user_id) for file in files
     ]
 
 
@@ -283,21 +321,23 @@ async def create_file(
     )
     await attachments_service.claim_uploads(session, file)
 
-    await properties_service.write_on_create(session, file, file_in.properties)
+    await metadata_service.write_on_create(session, file, file_in.properties)
     await session.commit()
     return await read_after_write(session, file.id, current_user, guild_context)
 
 
 @router.post("/upload", response_model=FileRead, status_code=status.HTTP_201_CREATED)
 async def upload_file(
-    session: RLSSessionDep,
-    current_user: Annotated[User, Depends(get_current_active_user)],
-    guild_context: GuildContextDep,
+    session: ActorSessionDep,
+    current_user: ActorUserDep,
+    guild_context: FilesWrite,
     name: str = Form(...),
     initiative_id: int = Form(...),
-    upload: UploadFile = FormFile(..., alias="file"),
+    upload: UploadFile | None = FormFile(None, alias="file"),
+    upload_id: str | None = Form(None),
 ) -> FileRead:
-    """Upload a file (PDF, DOCX, etc.)."""
+    """Upload a file: sent with the request as ``file``, or sent in pieces
+    before it as a resumable upload, named by ``upload_id``."""
     initiative = await resource_access.prepare_create(
         session, Tool.file, initiative_id, current_user, guild_context
     )
@@ -315,19 +355,15 @@ async def upload_file(
         detail=FileMessages.NAME_ALREADY_EXISTS,
     )
     stored = await _store_file(
-        session, guild_context, upload, initiative_id=initiative.id
+        session, guild_context, upload, upload_id, initiative_id=initiative.id
     )
 
-    # Create file record. A picture is its own featured image, set here so
-    # it is written with the row: the uploader's owner grant is only added
-    # below, so a later UPDATE in this transaction is not theirs to make yet.
     file = File(
         name=name,
         initiative_id=initiative.id,
         content={},  # An uploaded file has no content of its own
-        created_by=current_user.id,
-        file_type=FileType.file,
-        featured_image_url=_featured(stored["file_url"], stored["file_content_type"]),
+        created_by=guild_context.user_id,
+        file_type=type_of_media(stored["file_content_type"]),
     )
     session.add(file)
     await session.flush()
@@ -348,84 +384,114 @@ async def upload_file(
     await session.flush()
 
     version = await file_versions.add_version(
-        session, file, created_by=current_user.id, **stored
+        session, file, created_by=guild_context.user_id, **stored
     )
     await file_versions.commit_version(session, guild_context.guild_id, version)
     return await read_after_write(session, file.id, current_user, guild_context)
 
 
-def _normalize_mime(mime: str | None) -> str:
-    """Normalize a MIME type for version type-match comparison."""
-    normalized = (mime or "").lower().strip()
-    if normalized == "image/jpg":
-        return "image/jpeg"
-    return normalized
-
-
-def _featured(file_url: str, content_type: str | None) -> str | None:
-    """A picture is its own featured image; any other file shows none."""
-    return file_url if (content_type or "").startswith("image/") else None
-
-
 async def _store_file(
     session: AsyncSession,
-    guild_context: GuildContext,
-    upload: UploadFile,
+    guild_context: ActorContext,
+    upload: UploadFile | None,
+    upload_id: str | None,
     *,
     initiative_id: int,
-    keep_type: str | None = None,
+    keep_kind: FileKind | None = None,
 ) -> dict[str, Any]:
-    """Read an uploaded file, check it and store it, and return the version
-    columns it was stored as. ``keep_type`` refuses a file of another type."""
+    """Store the file sent with the request, or take the one sent in pieces
+    before it (``upload_id``, ``app.services.resumable``); check it, and
+    return the version columns it was stored as. ``keep_kind`` refuses a file
+    of another kind."""
+    if (upload is None) == (upload_id is None):
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail=FileMessages.INVALID_FILE,
+        )
     guild_id = guild_context.guild_id
     # Pick up a backend/credential change saved in another worker before writing.
     await storage_config.ensure_storage_config_fresh(session)
-    # Read the body with a hard cap so an over-limit upload is rejected before
-    # the whole payload is buffered into memory.
+    contents = b""
     try:
-        contents = await attachments_service.read_upload_bounded(
-            upload, attachments_service.MAX_FILE_SIZE
-        )
+        if upload_id is not None:
+            staged = await resumable.take(
+                session,
+                guild_id,
+                upload_id,
+                purpose="file",
+                user_id=guild_context.user_id,
+                initiative_id=initiative_id,
+            )
+            mime_type = await asyncio.to_thread(
+                attachments_service.validate_stored,
+                guild_id,
+                staged.staging_key,
+                staged.length,
+                staged.filename,
+            )
+            original_filename, size = staged.filename, staged.length
+        else:
+            assert upload is not None
+            # Read the body with a hard cap so an over-limit upload is
+            # rejected before the whole payload is buffered into memory.
+            contents = await attachments_service.read_upload_bounded(
+                upload, attachments_service.MAX_FILE_SIZE
+            )
+            mime_type, extension = attachments_service.validate_file(
+                content=contents, filename=upload.filename
+            )
+            original_filename, size = upload.filename, len(contents)
     except attachments_service.FileTooLargeError:
         raise HTTPException(
             status_code=status.HTTP_413_CONTENT_TOO_LARGE,
             detail=FileMessages.FILE_TOO_LARGE,
         )
-    try:
-        mime_type, extension = attachments_service.validate_file(
-            content=contents,
-            filename=upload.filename,
-            content_type=upload.content_type,
+    except attachments_service.RefusedFileTypeError:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail=FileMessages.TYPE_NOT_ALLOWED,
         )
     except ValueError:
         raise HTTPException(
             status_code=status.HTTP_400_BAD_REQUEST,
             detail=FileMessages.INVALID_FILE,
         )
-    if keep_type is not None and _normalize_mime(mime_type) != _normalize_mime(
-        keep_type
-    ):
+    if keep_kind is not None and spec_of(type_of_media(mime_type)).kind != keep_kind:
         raise HTTPException(
             status_code=status.HTTP_400_BAD_REQUEST,
             detail=FileMessages.VERSION_TYPE_MISMATCH,
         )
-    await attachments_service.enforce_storage_quota(
-        session, guild_id=guild_id, incoming_bytes=len(contents)
-    )
-    file_url = await attachments_service.store_upload(
-        session,
-        guild_id=guild_id,
-        filename=attachments_service.new_upload_filename(extension),
-        data=contents,
-        content_type=mime_type,
-        created_by=guild_context.user_id,
-        initiative_id=initiative_id,
-    )
+    if upload_id is not None:
+        # Kept where it was staged; its room was held from the moment the
+        # upload was created.
+        file_url = attachments_service.record_upload(
+            session,
+            guild_id=guild_id,
+            filename=staged.staging_key,
+            size=size,
+            content_type=mime_type,
+            content_hash=None,
+            created_by=guild_context.user_id,
+            initiative_id=initiative_id,
+        )
+    else:
+        await attachments_service.enforce_storage_quota(
+            session, guild_id=guild_id, incoming_bytes=size
+        )
+        file_url = await attachments_service.store_upload(
+            session,
+            guild_id=guild_id,
+            filename=attachments_service.new_upload_filename(extension),
+            data=contents,
+            content_type=mime_type,
+            created_by=guild_context.user_id,
+            initiative_id=initiative_id,
+        )
     return {
         "file_url": file_url,
         "file_content_type": mime_type,
-        "file_size": len(contents),
-        "original_filename": upload.filename,
+        "file_size": size,
+        "original_filename": original_filename,
     }
 
 
@@ -435,36 +501,45 @@ async def _store_file(
     status_code=status.HTTP_201_CREATED,
 )
 async def upload_file_version(
-    session: RLSSessionDep,
-    current_user: Annotated[User, Depends(get_current_active_user)],
-    guild_context: GuildContextDep,
+    session: ActorSessionDep,
+    current_user: ActorUserDep,
+    guild_context: FilesWrite,
     file_id: int,
-    upload: UploadFile = FormFile(..., alias="file"),
+    upload: UploadFile | None = FormFile(None, alias="file"),
+    upload_id: str | None = Form(None),
 ) -> FileVersionRead:
-    """Upload a new version of an uploaded file. Requires write access."""
+    """Upload a new version of an uploaded file, sent as ``file`` or as a
+    resumable upload named by ``upload_id``. Requires write access."""
     file = await resource_access.load_authorized(
         session, Tool.file, file_id, current_user, guild_context, access="write"
     )
-    if file.file_type != FileType.file:
+    # Held until the version commits and read fresh once held, so a file
+    # converted meanwhile takes no version, and a conversion that starts now
+    # waits and converts this one.
+    await session.exec(
+        select(File)
+        .where(File.id == file.id)
+        .with_for_update()
+        .execution_options(populate_existing=True)
+    )
+    if not is_stored(file.file_type):
         raise HTTPException(
             status_code=status.HTTP_400_BAD_REQUEST,
             detail=FileMessages.NOT_AN_UPLOADED_FILE,
         )
-    # A new version keeps the type of the one it replaces.
-    current = file.current_version
+    # A new version keeps the kind of the one it replaces: a picture stays a
+    # picture, though a PNG may become a JPEG.
     stored = await _store_file(
         session,
         guild_context,
         upload,
+        upload_id,
         initiative_id=file.initiative_id,
-        keep_type=current.file_content_type if current is not None else None,
+        keep_kind=spec_of(file.file_type).kind,
     )
     version = await file_versions.add_version(
-        session, file, created_by=current_user.id, **stored
+        session, file, created_by=guild_context.user_id, **stored
     )
-    featured = _featured(version.file_url, version.file_content_type)
-    if featured is not None:
-        file.featured_image_url = featured
     await file_versions.commit_version(
         session,
         guild_context.guild_id,
@@ -472,6 +547,109 @@ async def upload_file_version(
         conflict=True,
     )
     return file_versions.read(FileVersionRead, version, file)
+
+
+@router.post("/{file_id}/convert", response_model=FileRead)
+async def convert_file(
+    session: RLSSessionDep,
+    current_user: Annotated[User, Depends(get_current_active_user)],
+    guild_context: GuildContextDep,
+    file_id: int,
+) -> FileRead:
+    """Convert an uploaded file to edit it: it becomes the editor's own type
+    its type converts to (``converts_to``), keeping its id, name, sharing,
+    tags, comments and links, and its uploaded versions go. Requires write
+    access."""
+    file = await resource_access.load_authorized(
+        session, Tool.file, file_id, current_user, guild_context, access="write"
+    )
+    gone, pictures = await file_conversion.convert(
+        session, guild_context.guild_id, file, user_id=current_user.id
+    )
+    try:
+        await session.commit()
+    except Exception as failed:
+        await session.rollback()
+        file_versions.discard_orphans(guild_context.guild_id, pictures, failed)
+        raise
+    for version in gone:
+        await file_versions.release_files(guild_context.guild_id, version)
+    return await read_after_write(session, file.id, current_user, guild_context)
+
+
+#: The largest frame a browser may send as a video's thumbnail.
+MAX_FRAME_BYTES = 2 * 1024 * 1024
+#: The formats a frame may come in.
+_FRAME_TYPES = frozenset({"image/png", "image/jpeg", "image/webp"})
+
+
+@router.put(
+    "/{file_id}/versions/{version_id}/thumbnail",
+    status_code=status.HTTP_204_NO_CONTENT,
+)
+async def put_video_thumbnail(
+    session: RLSSessionDep,
+    current_user: Annotated[User, Depends(get_current_active_user)],
+    guild_context: GuildContextDep,
+    file_id: int,
+    version_id: int,
+    upload: UploadFile = FormFile(..., alias="file"),
+) -> None:
+    """Give a video version its thumbnail: a frame the browser drew from it.
+    Requires write access. Taken once, for a video version that has none,
+    and drawn again on the server like any picture."""
+    file = await resource_access.load_authorized(
+        session, Tool.file, file_id, current_user, guild_context, access="write"
+    )
+    version = (
+        await session.exec(
+            select(FileVersion)
+            .where(FileVersion.id == version_id, FileVersion.file_id == file.id)
+            .with_for_update()
+            # Read as it stands once the lock is held: a frame another editor
+            # sent first counts.
+            .execution_options(populate_existing=True)
+        )
+    ).first()
+    if version is None:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail=CommonMessages.VERSION_NOT_FOUND,
+        )
+    if (
+        spec_of(type_of_media(version.file_content_type)).kind is not FileKind.video
+        or version.thumbnail_url is not None
+    ):
+        raise HTTPException(
+            status_code=status.HTTP_409_CONFLICT,
+            detail=FileMessages.THUMBNAIL_NOT_WANTED,
+        )
+    try:
+        frame = await attachments_service.read_upload_bounded(upload, MAX_FRAME_BYTES)
+    except attachments_service.FileTooLargeError:
+        raise HTTPException(
+            status_code=status.HTTP_413_CONTENT_TOO_LARGE,
+            detail=FileMessages.FILE_TOO_LARGE,
+        )
+    header = read_image_header(frame)
+    picture_format = (
+        spec_of(type_of_media(header.content_type)).picture_format
+        if header is not None and header.content_type in _FRAME_TYPES
+        else None
+    )
+    if picture_format is None or not await thumbnails.take_frame(
+        session,
+        guild_context.guild_id,
+        version,
+        file.initiative_id,
+        frame,
+        picture_format,
+    ):
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail=FileMessages.INVALID_FILE,
+        )
+    await session.commit()
 
 
 @router.get("/{file_id}/versions", response_model=List[FileVersionRead])
@@ -485,7 +663,7 @@ async def list_file_versions(
     file = await resource_access.load_authorized(
         session, Tool.file, file_id, current_user, guild_context
     )
-    if file.file_type != FileType.file:
+    if not is_stored(file.file_type):
         raise HTTPException(
             status_code=status.HTTP_400_BAD_REQUEST,
             detail=FileMessages.NOT_AN_UPLOADED_FILE,
@@ -518,16 +696,12 @@ async def delete_file_version(
         guild_context,
         action=Action.delete,
     )
-    if file.file_type != FileType.file:
+    if not is_stored(file.file_type):
         raise HTTPException(
             status_code=status.HTTP_400_BAD_REQUEST,
             detail=FileMessages.NOT_AN_UPLOADED_FILE,
         )
     deleted = await file_versions.delete_version(session, file, version_id)
-    # A featured image that was the deleted file follows the current one.
-    current = file.current_version
-    if current is not None and file.featured_image_url == deleted.file_url:
-        file.featured_image_url = _featured(current.file_url, current.file_content_type)
     await session.commit()
     await file_versions.release_files(guild_context.guild_id, deleted)
 
@@ -757,13 +931,13 @@ async def generate_summary(
 ) -> ai_generation.AIStreamResponse:
     """A summary of a file, streamed as it is written.
 
-    Requires read access to the file. Only works for native (editor)
-    files.
+    Requires read access to the file. Only works for files the editor
+    writes (``lexical``).
     """
     file = await resource_access.load_authorized(
         session, Tool.file, file_id, current_user, guild_context
     )
-    if file.file_type != FileType.native:
+    if file.file_type != FileType.lexical:
         raise HTTPException(
             status_code=status.HTTP_400_BAD_REQUEST,
             detail=FileMessages.AI_NATIVE_ONLY,
@@ -890,7 +1064,7 @@ async def download_file(
             int(guild_id),
         )
     version = file.current_version
-    if file.file_type != FileType.file or version is None:
+    if not is_stored(file.file_type) or version is None:
         raise Tool.file.not_found()
 
     resource_access.authorize(
@@ -903,7 +1077,12 @@ async def download_file(
         current_user.id,
         inline,
     )
-    return _file_download_response(guild_id=guild_id, version=version, inline=inline)
+    return _file_download_response(
+        guild_id=guild_id,
+        version=version,
+        inline=inline,
+        request=request,
+    )
 
 
 @router.get("/{file_id}/versions/{version_id}/download", include_in_schema=False)
@@ -928,7 +1107,7 @@ async def download_file_version(
             int(current_user.id),
             int(guild_id),
         )
-    if file.file_type != FileType.file:
+    if not is_stored(file.file_type):
         raise Tool.file.not_found()
 
     resource_access.authorize(
@@ -955,7 +1134,12 @@ async def download_file_version(
         current_user.id,
         inline,
     )
-    return _file_download_response(guild_id=guild_id, version=version, inline=inline)
+    return _file_download_response(
+        guild_id=guild_id,
+        version=version,
+        inline=inline,
+        request=request,
+    )
 
 
 @router.post(
@@ -984,7 +1168,7 @@ async def import_spreadsheet_file(
     file = await resource_access.load_authorized(
         session, Tool.file, file_id, current_user, guild_context, access="write"
     )
-    if file.file_type != FileType.spreadsheet:
+    if file.file_type != FileType.sheet:
         raise HTTPException(
             status_code=status.HTTP_400_BAD_REQUEST,
             detail=FileMessages.SPREADSHEET_INVALID_PAYLOAD,

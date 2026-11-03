@@ -23,8 +23,6 @@ from app.api.deps import (
     SeatPaymentSessionDep,
     SeatSessionDep,
     SeatWriteSessionDep,
-    SettingsAdminContextDep,
-    SettingsAdminWriteContextDep,
     SettingsContextDep,
     SettingsRLSSessionDep,
     SettingsSeatWriteContextDep,
@@ -34,6 +32,7 @@ from app.api.deps import (
     establish_guild_access,
     holds_guild_role,
     raise_for_guild_access,
+    require_surface,
     get_current_active_user,
     SystemSessionDep,
 )
@@ -46,7 +45,8 @@ from app.db.query import build_paginated_response
 from app.core.capabilities import Capability, user_has_capability
 from app.core.config import settings
 from app.core.login_methods import SecondFactorRequirement
-from app.core.image_headers import validate_image
+from app.schemas.ai_settings import AIConfigMode
+from app.core.image_headers import image_response, validate_image
 from app.core.messages import BillingMessages, GuildMessages, ImageMessages
 from app.core.rate_limit import limiter
 from app.core.security import (
@@ -61,6 +61,8 @@ from app.core.audit_events import AuditEventType
 from app.services import audit as audit_service
 from app.services import email as email_service
 from app.models.platform.guild import (
+    GUILD_ADMIN_ROLES,
+    AdminSurface,
     assignable_roles,
     Guild,
     CommunityCategory,
@@ -107,11 +109,10 @@ from app.schemas.platform.guild import (
     MemberDisplayNameUpdate,
 )
 from app.models.platform.auth_provider import AuthProvider
-from app.models.platform.guild_auth_policy import GuildAuthPolicy, SignInHalf
-from app.core.guild_auth_options import CommunityAuthOption, effective_options
-from app.services.platform import app_settings as app_settings_service
+from app.core.rules import COMMUNITY_RULES, OPTION_RULES, SignInRequirement
+from app.core.guild_auth_options import CommunityAuthOption
 from app.services.platform import auth_posture
-from app.services.platform import notification_policy
+from app.services.platform import rules
 from app.services.platform import billing_ping
 from app.services.platform import guild_images as images_service
 from app.services.tenant.attachments import FileTooLargeError, read_upload_bounded
@@ -124,6 +125,24 @@ from sqlmodel import select
 from sqlmodel.ext.asyncio.session import AsyncSession
 
 
+#: The configuration surface's guards, by the part of administering the
+#: community each route is (``require_surface``).
+ProfileContext = Annotated[
+    GuildContext, Depends(require_surface(AdminSurface.profile, settings=True))
+]
+ProfileWriteContext = Annotated[
+    GuildContext,
+    Depends(require_surface(AdminSurface.profile, settings=True, write=True)),
+]
+InvitesWriteContext = Annotated[
+    GuildContext,
+    Depends(require_surface(AdminSurface.invites, settings=True, write=True)),
+]
+MembersWriteContext = Annotated[
+    GuildContext,
+    Depends(require_surface(AdminSurface.members, settings=True, write=True)),
+]
+
 router = APIRouter()
 logger = logging.getLogger(__name__)
 
@@ -131,7 +150,7 @@ logger = logging.getLogger(__name__)
 def _can_of(guild_context: GuildContext, *, use_api: bool) -> CommunityCan:
     """What the caller may do in the community, by the standing: each flag is
     what the guard on the routes that do the thing asks. ``use_api`` is
-    :func:`guild_entitlements.accepts_api_keys` for the caller's membership."""
+    the member's ``api_keys`` rule for the caller's membership."""
     return CommunityCan(
         # The seam admitted the request, which a community in time out refuses.
         enter=True,
@@ -173,6 +192,7 @@ def _serialize_guild(
     retention_days: int | None = None,
     member_count: int = 0,
     administration: GuildAdministration | None = None,
+    plan: rules.Values | None = None,
     can: CommunityCan,
     images: dict[GuildImageVariant, str] | None = None,
     closed_contact: str | None = None,
@@ -192,9 +212,11 @@ def _serialize_guild(
       the panel's other half), so a regular member's payload leaves them
       ``None``.
 
-    Most of the second group now arrives as ``administration`` — a separate row
-    the caller may read but no request path may write. Callers serving a member
-    pass ``None`` for it and never read the row at all.
+    Most of the second group arrives as ``administration`` — a separate row the
+    caller may read but no request path may write — and ``plan``, the
+    community's rules (``rules.community_values``), whose paid ones hold the caps
+    and the sign-in options. Callers serving a member pass ``None`` for both and
+    never read them at all.
 
     ``membership`` is the caller's own row, where they have one; a grantee
     has no place in the list and no name of their own here.
@@ -209,6 +231,7 @@ def _serialize_guild(
     # serves a member's payload, so this stays the one place the split is made.
     is_admin = role.reaches(CommunityRole.admin)
     admin_row = administration if is_admin else None
+    admin_plan = plan if is_admin else None
     return CommunityRead(
         id=guild.id,
         name=guild.name,
@@ -223,9 +246,9 @@ def _serialize_guild(
         retention_days=retention_days if is_admin else None,
         member_count=member_count,
         # Operator-set caps, shown against usage on the admin settings page.
-        max_storage_bytes=admin_row.max_storage_bytes if admin_row else None,
-        max_users=admin_row.max_users if admin_row else None,
-        max_guests=admin_row.max_guests if admin_row else None,
+        max_storage_bytes=admin_plan["max_storage_bytes"] if admin_plan else None,
+        max_users=admin_plan["max_users"] if admin_plan else None,
+        max_guests=admin_plan["max_guests"] if admin_plan else None,
         # Display-only plan label (never an enforcement input); the SPA shows
         # it only when a billing portal is configured.
         tier_name=admin_row.tier_name if admin_row else None,
@@ -243,18 +266,18 @@ def _serialize_guild(
             else None
         ),
         # Admins only: lets their settings UI show/hide the Authentication tab.
-        # Derived, not stored — an option ticked under a master nobody granted
-        # is not one this guild holds.
-        auth_options=sorted(effective_options(admin_row.auth_options))
-        if admin_row
+        auth_options=sorted(
+            option for option, key in OPTION_RULES.items() if admin_plan[key]
+        )
+        if admin_plan
         else None,
-        # Admins only: the state of the API-access control on that tab.
-        # Admins only: and of the session-limit control beside it.
-        enforce_compliance_session=(
-            guild.enforce_compliance_session if is_admin else None
-        ),
-        # Admins only: and of the second-factor control beside that.
-        require_second_factor=(guild.require_second_factor if is_admin else None),
+        closed_surfaces=sorted(
+            key.removeprefix("surface.")
+            for key, rule in COMMUNITY_RULES.items()
+            if rule.surface and not admin_plan[key]
+        )
+        if admin_plan
+        else None,
         # Guild identity, not administration: the directory publishes both to
         # strangers, so withholding them from the guild's own members would
         # only mean the settings page could not render its own state.
@@ -306,8 +329,8 @@ async def _guild_read(
     elif membership is None:
         raise TypeError("_guild_read needs a standing or a membership")
     # A grantee holds no membership, and a grant is never reached with a key.
-    use_api = membership is not None and not (
-        await guild_entitlements.refuses_api_keys(system_session, membership)
+    use_api = membership is not None and await rules.member_value(
+        system_session, membership.guild_id, membership.user_id, "api_keys"
     )
     if standing is not None:
         role = standing.rung
@@ -330,6 +353,11 @@ async def _guild_read(
         member_count=await guilds_service.count_members(reader, guild_id=guild.id),
         administration=(
             await guilds_service.get_administration(reader, guild_id=guild.id)
+            if is_admin
+            else None
+        ),
+        plan=(
+            (await rules.community_values(reader, [guild.id]))[guild.id]
             if is_admin
             else None
         ),
@@ -397,6 +425,14 @@ async def list_communities(
         )
         else None
     )
+    plans = await rules.community_values(
+        session,
+        [
+            guild.id
+            for guild, membership, *_ in memberships
+            if membership.role.reaches(CommunityRole.admin)
+        ],
+    )
     payloads: List[CommunityRead] = []
     for (
         guild,
@@ -417,6 +453,7 @@ async def list_communities(
                 retention_days=retention_days,
                 member_count=member_count,
                 administration=administration,
+                plan=plans.get(guild.id),
                 images=images.get(guild.id),
                 closed_contact=closed_contact,
             )
@@ -632,9 +669,9 @@ async def create_community(
     and name an ``owner_user_id``, which hands the guild to that account
     instead and leaves the caller holding nothing in it.
     """
-    if settings.DISABLE_GUILD_CREATION and not user_has_capability(
-        current_user, Capability.COMMUNITIES_MANAGE
-    ):
+    if not (await rules.platform_values(session))[
+        "community_creation_enabled"
+    ] and not user_has_capability(current_user, Capability.COMMUNITIES_MANAGE):
         raise HTTPException(
             status_code=status.HTTP_403_FORBIDDEN,
             detail=GuildMessages.COMMUNITY_CREATION_DISABLED,
@@ -704,7 +741,7 @@ async def create_community(
 @router.get("/{community_id}/invites", response_model=List[CommunityInviteRead])
 async def list_community_invites(
     guild_id: CommunityIdPath,
-    _guild_context: SettingsAdminWriteContextDep,
+    _guild_context: InvitesWriteContext,
     session: SettingsRLSSessionDep,
 ) -> List[CommunityInviteRead]:
     invites = await guilds_service.list_guild_invites(session, guild_id=guild_id)
@@ -727,7 +764,7 @@ async def list_community_invites(
 @router.get("/{community_id}", response_model=CommunityRead)
 async def read_community(
     guild_id: CommunityIdPath,
-    guild_context: SettingsAdminContextDep,
+    guild_context: ProfileContext,
     session: SettingsRLSSessionDep,
     system_session: SystemSessionDep,
 ) -> CommunityRead:
@@ -744,7 +781,7 @@ async def read_community(
 @router.patch("/{community_id}", response_model=CommunityRead)
 async def update_community(
     guild_id: CommunityIdPath,
-    guild_context: SettingsAdminWriteContextDep,
+    guild_context: ProfileWriteContext,
     updates: CommunityUpdate,
     session: SettingsRLSSessionDep,
     system_session: SystemSessionDep,
@@ -842,22 +879,21 @@ async def update_community(
 @router.get("/{community_id}/entitlements", response_model=CommunityEntitlementsRead)
 async def read_community_entitlements(
     guild_id: CommunityIdPath,
-    _guild_context: SettingsAdminContextDep,
+    _guild_context: ProfileContext,
     session: SettingsRLSSessionDep,
 ) -> CommunityEntitlementsRead:
     """What an operator has turned on for this guild, for its own admins.
 
     Its own read rather than fields on the guild payload: these are decisions
-    made *about* a guild rather than by it, they live on the separate
-    ``guild_administration`` row, and a member has no use for them. A guild
-    admin does — it is how their settings page knows to offer the banner
-    colour alone rather than an upload that would come back refused.
+    made *about* a guild rather than by it, they are its paid rules, and a
+    member has no use for them. A guild admin does — it is how their settings
+    page knows to offer the banner colour alone rather than an upload that
+    would come back refused.
     """
-    administration = await guilds_service.get_administration(session, guild_id=guild_id)
     return CommunityEntitlementsRead(
         community_id=guild_id,
-        banner_image_enabled=(
-            administration.banner_image_enabled if administration else True
+        banner_image_enabled=await rules.community_value(
+            session, guild_id, "banner_image"
         ),
     )
 
@@ -892,17 +928,8 @@ async def read_community_image(
             status_code=status.HTTP_404_NOT_FOUND,
             detail=ImageMessages.IMAGE_NOT_FOUND,
         )
-    return Response(
-        content=image.data,
-        media_type=image.content_type,
-        headers={
-            # The digest is in the path, so these bytes are these bytes
-            # forever. ``private`` because who may have them is decided per
-            # caller: a shared cache must never hand one viewer's copy on.
-            "Cache-Control": "private, max-age=31536000, immutable",
-            "X-Content-Type-Options": "nosniff",
-        },
-    )
+    # Who may have these is decided per caller, so no shared cache keeps them.
+    return image_response(image.data, image.content_type, shared=False)
 
 
 async def _store_guild_images(
@@ -937,7 +964,7 @@ async def _store_guild_images(
 @router.put("/{community_id}/icon", response_model=CommunityRead)
 async def set_community_icon(
     guild_id: CommunityIdPath,
-    guild_context: SettingsAdminWriteContextDep,
+    guild_context: ProfileWriteContext,
     session: SystemSessionDep,
     settings_session: SettingsRLSSessionDep,
     current_user: Annotated[User, Depends(get_current_active_user)],
@@ -959,7 +986,7 @@ async def set_community_icon(
 @router.delete("/{community_id}/icon", response_model=CommunityRead)
 async def clear_community_icon(
     guild_id: CommunityIdPath,
-    guild_context: SettingsAdminWriteContextDep,
+    guild_context: ProfileWriteContext,
     session: SystemSessionDep,
     settings_session: SettingsRLSSessionDep,
     current_user: Annotated[User, Depends(get_current_active_user)],
@@ -978,7 +1005,7 @@ async def clear_community_icon(
 @router.put("/{community_id}/banner", response_model=CommunityRead)
 async def set_community_banner(
     guild_id: CommunityIdPath,
-    guild_context: SettingsAdminWriteContextDep,
+    guild_context: ProfileWriteContext,
     session: SystemSessionDep,
     settings_session: SettingsRLSSessionDep,
     current_user: Annotated[User, Depends(get_current_active_user)],
@@ -991,8 +1018,7 @@ async def set_community_banner(
     renditions and sends them together, so a guild is never left showing a new
     card over an old front page.
     """
-    administration = await guilds_service.get_administration(session, guild_id=guild_id)
-    if administration is not None and not administration.banner_image_enabled:
+    if not await rules.community_value(session, guild_id, "banner_image"):
         # Only uploading is gated. The banner surface stays, a banner the guild
         # already has keeps being served, and what a guild without artwork sets
         # instead is the colour on ``guilds.banner``, through PATCH.
@@ -1015,7 +1041,7 @@ async def set_community_banner(
 @router.delete("/{community_id}/banner", response_model=CommunityRead)
 async def clear_community_banner(
     guild_id: CommunityIdPath,
-    guild_context: SettingsAdminWriteContextDep,
+    guild_context: ProfileWriteContext,
     session: SystemSessionDep,
     settings_session: SettingsRLSSessionDep,
     current_user: Annotated[User, Depends(get_current_active_user)],
@@ -1131,21 +1157,21 @@ async def read_community_billing_summary(
 
 
 def _auth_policy_read(
-    half: SignInHalf | None,
-    provider_display_name: str | None = None,
+    requirement: SignInRequirement,
+    provider: AuthProvider | None = None,
     *,
     factor_required_by_platform: bool = False,
 ) -> CommunityAuthPolicyRead:
-    if half is None or half.policy == "open":
+    if requirement.policy == "open":
         return CommunityAuthPolicyRead(
             policy="open", factor_required_by_platform=factor_required_by_platform
         )
     return CommunityAuthPolicyRead(
         policy="required",
-        provider_id=half.provider_id,
-        provider_slug=half.provider_slug,
-        provider_display_name=provider_display_name,
-        require_methods=list(half.require_methods),
+        provider_id=requirement.provider_id,
+        provider_slug=provider.slug if provider else None,
+        provider_display_name=provider.display_name if provider else None,
+        require_methods=sorted(m.value for m in requirement.methods),
         factor_required_by_platform=factor_required_by_platform,
     )
 
@@ -1169,33 +1195,33 @@ async def _auth_settings_response(
             status_code=status.HTTP_404_NOT_FOUND,
             detail=GuildMessages.COMMUNITY_NOT_FOUND,
         )
-    administration = await guilds_service.get_administration(
-        seat_session, guild_id=guild_id
-    )
-    platform = await notification_policy.resolve(seat_session, None)
-    settings_row = await app_settings_service.get_app_settings(seat_session)
+    platform = await rules.platform_values(seat_session)
+    community = (await rules.community_values(seat_session, [guild_id], applied=False))[
+        guild_id
+    ]
     return CommunityAuthSettingsRead(
-        auth_options=sorted(effective_options(administration.auth_options))
-        if administration
-        else [],
+        auth_options=sorted(
+            option for option, key in OPTION_RULES.items() if community[key]
+        ),
         auth_policy=await _auth_policy_response(system_session, guild_id),
         guest_auth_policy=await _auth_policy_response(
             system_session, guild_id, guest=True
         ),
-        enforce_compliance_session=guild.enforce_compliance_session,
-        require_second_factor=guild.require_second_factor,
-        allow_push_notifications=guild.allow_push_notifications,
-        allow_email_notifications=guild.allow_email_notifications,
-        redact_notification_content=guild.redact_notification_content,
-        push_allowed_by_platform=platform.push,
-        email_allowed_by_platform=platform.email,
-        redacted_by_platform=platform.redact,
-        allow_engagement_ranking=guild.allow_engagement_ranking,
-        engagement_ranking_allowed_by_platform=settings_row.engagement_ranking_enabled,
-        allow_ai=guild.allow_ai,
-        ai_offered_by_platform=settings_row.ai_config_mode != "disabled",
-        guest_max_days=guild.guest_max_days,
-        guest_max_days_by_platform=settings_row.max_guest_days,
+        # The seat's switches and limits, as it wrote them. Its sign-in
+        # requirements are read above, with the providers they name.
+        **{
+            key: value
+            for key, value in community.items()
+            if key in CommunityAuthSettingsRead.model_fields
+            and key not in ("auth_policy", "guest_auth_policy")
+        },
+        push_allowed_by_platform=platform["push_notifications_enabled"],
+        email_allowed_by_platform=platform["email_notifications_enabled"],
+        redacted_by_platform=platform["redact_notification_content"],
+        engagement_ranking_allowed_by_platform=platform["engagement_ranking_enabled"],
+        ai_offered_by_platform=platform["ai_config_mode"] is not AIConfigMode.disabled,
+        guest_max_days_by_platform=platform["max_guest_days"],
+        set_by_deployment=sorted(await rules.set_by_deployment(seat_session, guild_id)),
     )
 
 
@@ -1212,15 +1238,20 @@ async def get_community_auth_settings(
 async def _auth_policy_response(
     system_session: AsyncSession, guild_id: int, *, guest: bool = False
 ) -> CommunityAuthPolicyRead:
-    policy_row = await system_session.get(GuildAuthPolicy, guild_id)
-    half = policy_row.half(guest) if policy_row is not None else None
-    display_name = None
-    if half is not None and half.provider_id is not None:
-        provider = await system_session.get(AuthProvider, half.provider_id)
-        display_name = provider.display_name if provider else None
+    requirement = await rules.community_value(
+        system_session,
+        guild_id,
+        "guest_auth_policy" if guest else "auth_policy",
+        applied=False,
+    )
+    provider = (
+        await system_session.get(AuthProvider, requirement.provider_id)
+        if requirement.provider_id is not None
+        else None
+    )
     return _auth_policy_read(
-        half,
-        display_name,
+        requirement,
+        provider,
         factor_required_by_platform=await _platform_asks_everyone(system_session),
     )
 
@@ -1391,11 +1422,20 @@ async def delete_community(
 )
 async def create_community_invite(
     guild_id: CommunityIdPath,
-    _guild_context: SettingsAdminWriteContextDep,
+    guild_context: InvitesWriteContext,
     invite_in: CommunityInviteCreate,
     session: SettingsRLSSessionDep,
     current_user: Annotated[User, Depends(get_current_active_user)],
 ) -> CommunityInviteCreated:
+    # A guest invite can open any initiative, so it takes the admin rung's view
+    # of all of them (or a settings grant), beside the invites surface.
+    if invite_in.guest_days is not None and not (
+        guild_context.is_admin or guild_context.settings_rung is not None
+    ):
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail=GuildMessages.COMMUNITY_ADMIN_REQUIRED,
+        )
     invite, code = await guilds_service.create_guild_invite(
         session,
         guild_id=guild_id,
@@ -1424,7 +1464,7 @@ async def create_community_invite(
 )
 async def delete_community_invite(
     guild_id: CommunityIdPath,
-    _guild_context: SettingsAdminWriteContextDep,
+    _guild_context: InvitesWriteContext,
     invite_id: int,
     session: SettingsRLSSessionDep,
     current_user: Annotated[User, Depends(get_current_active_user)],
@@ -1470,7 +1510,7 @@ async def accept_invite(
 )
 async def update_community_membership(
     guild_id: CommunityIdPath,
-    guild_context: SettingsAdminWriteContextDep,
+    guild_context: MembersWriteContext,
     user_id: int,
     payload: CommunityMembershipUpdate,
     session: SystemSessionDep,
@@ -1532,6 +1572,17 @@ async def update_community_membership(
     if (
         target_membership.role == CommunityRole.superadmin
         and guild_context.rung != CommunityRole.superadmin
+    ):
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail=GuildMessages.COMMUNITY_ROLE_NOT_ASSIGNABLE,
+        )
+    # The admin rung holds every surface, so making or unmaking an admin takes
+    # somebody who holds every one: a custom role leaves nobody able to hand
+    # out more than they hold.
+    if (
+        GUILD_ADMIN_ROLES & {target_membership.role, payload.role}
+        and not guild_context.manages_admins
     ):
         raise HTTPException(
             status_code=status.HTTP_403_FORBIDDEN,
@@ -1601,7 +1652,7 @@ async def update_community_membership(
 )
 async def extend_community_guest(
     guild_id: CommunityIdPath,
-    _guild_context: SettingsAdminWriteContextDep,
+    _guild_context: MembersWriteContext,
     user_id: int,
     payload: CommunityGuestExtend,
     session: SystemSessionDep,
@@ -1627,7 +1678,7 @@ async def extend_community_guest(
 )
 async def make_community_guest_a_member(
     guild_id: CommunityIdPath,
-    _guild_context: SettingsAdminWriteContextDep,
+    _guild_context: MembersWriteContext,
     user_id: int,
     session: SystemSessionDep,
     current_user: Annotated[User, Depends(get_current_active_user)],
@@ -1651,7 +1702,7 @@ async def make_community_guest_a_member(
 )
 async def set_member_display_name(
     guild_id: CommunityIdPath,
-    _guild_context: SettingsAdminWriteContextDep,
+    _guild_context: MembersWriteContext,
     user_id: int,
     payload: MemberDisplayNameUpdate,
     session: SystemSessionDep,
@@ -1699,6 +1750,11 @@ async def set_member_api_access(
 
     On the system engine, as a role change is: the guild role writes only the
     caller's own membership row."""
+    if "api_keys" in await rules.set_by_deployment(session, guild_id):
+        raise HTTPException(
+            status_code=status.HTTP_409_CONFLICT,
+            detail=GuildMessages.COMMUNITY_RULE_SET_BY_DEPLOYMENT,
+        )
     if not payload.api_keys_allowed:
         await guild_entitlements.require_auth_option(
             session, guild_id, CommunityAuthOption.restrictions
@@ -1711,10 +1767,18 @@ async def set_member_api_access(
             status_code=status.HTTP_404_NOT_FOUND,
             detail=GuildMessages.USER_NOT_FOUND_IN_COMMUNITY,
         )
-    if membership.api_keys_allowed == payload.api_keys_allowed:
+    stored = await rules.member_value(
+        session, guild_id, user_id, "api_keys", applied=False
+    )
+    if stored == payload.api_keys_allowed:
         return Response(status_code=status.HTTP_204_NO_CONTENT)
-    membership.api_keys_allowed = payload.api_keys_allowed
-    session.add(membership)
+    await rules.put(
+        session,
+        "api_keys",
+        payload.api_keys_allowed,
+        guild_id=guild_id,
+        user_id=user_id,
+    )
     await audit_service.record(
         session,
         event_type=AuditEventType.GUILD_MEMBER_API_ACCESS_CHANGED,

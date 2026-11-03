@@ -187,7 +187,7 @@ def test_images_are_found_by_filename_and_the_rest_listed_at_the_foot():
 
 async def test_other_files_come_over_as_files_when_asked_for():
     """A file of a type an uploaded file can hold comes over, a table of text included (it
-    becomes a spreadsheet); a type no file holds is left behind."""
+    becomes a spreadsheet); a program is left behind."""
     download = _downloader()
     store = _sink()
     report = await ja.download_images(
@@ -198,7 +198,7 @@ async def test_other_files_come_over_as_files_when_asked_for():
                 _att("11", "spec.pdf", mime="application/pdf"),
                 _att("12", "logo.svg", mime="image/svg+xml"),
                 _att("13", "counts.csv", mime="text/csv"),
-                _att("14", "build.zip", mime="application/zip"),
+                _att("14", "setup.exe", mime="application/x-msdownload"),
             )
         ],
         download=download,

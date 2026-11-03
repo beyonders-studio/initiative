@@ -19,6 +19,7 @@ import {
   type DetailLayoutRead,
   type DetailLayoutWrite,
   type GetLayoutsParams,
+  type LayoutTarget,
   type ListLayoutRead,
   type ListLayoutReadKind,
   type ListLayoutWrite,
@@ -45,11 +46,11 @@ export const INSTANCE_LAYOUT_TOOLS: ReadonlySet<Tool> = new Set([
   Tool.project,
   Tool.queue,
   Tool.counter_group,
-  Tool.catalog,
 ]);
 
-/** The layouts one instance of a tool keeps as its own: a project's, a queue's. */
-export const instanceTarget = (tool: Tool, id: number): GetLayoutsParams => ({
+/** The layouts one instance of a tool keeps as its own: a project's, a
+ *  queue's, or a collection's, which lays out its files as an instance does. */
+export const instanceTarget = (tool: LayoutTarget, id: number): GetLayoutsParams => ({
   tool,
   tool_id: id,
 });
@@ -81,8 +82,18 @@ export const useToolLayouts = (target: GetLayoutsParams | null) => {
 };
 
 /** One instance's own layouts, or nothing while `id` is not one. */
-export const useInstanceLayouts = (tool: Tool, id: number | null) =>
+export const useInstanceLayouts = (tool: LayoutTarget, id: number | null) =>
   useToolLayouts(id !== null && Number.isFinite(id) ? instanceTarget(tool, id) : null);
+
+/** Reads a target's layouts when asked, from the cache where they are held:
+ *  for a decision made on a click, such as what a collection requires of the
+ *  files going in. */
+export const useReadToolLayouts = () => {
+  const communityId = useActiveCommunityId();
+  const queryClient = useQueryClient();
+  return (target: GetLayoutsParams) =>
+    queryClient.fetchQuery(toolLayoutsQuery(communityId, target));
+};
 
 /** Every project's layouts in an initiative the reader can open, for its
  *  settings, with whether the reader may change each. */

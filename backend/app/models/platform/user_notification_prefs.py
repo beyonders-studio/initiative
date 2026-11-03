@@ -22,7 +22,8 @@ Shape::
                 "personal_instant": true},
       "pause": {"since": "2026-09-19T17:00:00+00:00",
                 "until": "2026-10-03T07:00:00+00:00"},
-      "away": {"respect": true}
+      "away": {"respect": true},
+      "digests": {"overdue": {"cadence": "daily", "at": "18:00", "weekday": 1}}
     }
 
 A document rather than a row per setting: fifteen categories times three
@@ -64,6 +65,15 @@ class EmailCadence(str, Enum):
     #: One message a day, at a chosen time in the account's own timezone.
     daily = "daily"
     #: One message a week, on a chosen day and time.
+    weekly = "weekly"
+
+
+class DigestCadence(str, Enum):
+    """How often one digest goes out. Each digest keeps its own, apart from
+    the email's: a summary is read at a time of day, which is not when the
+    rest of the mail arrives."""
+
+    daily = "daily"
     weekly = "weekly"
 
 

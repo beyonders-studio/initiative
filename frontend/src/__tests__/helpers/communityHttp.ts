@@ -20,6 +20,8 @@ type GetArgs = Parameters<typeof http.get>;
 export const communityHttp = {
   get: (path: string, resolver: GetArgs[1], options?: GetArgs[2]) =>
     http.get(`${COMMUNITY_BASE}${path}`, resolver, options),
+  head: (path: string, resolver: GetArgs[1], options?: GetArgs[2]) =>
+    http.head(`${COMMUNITY_BASE}${path}`, resolver, options),
   post: (path: string, resolver: GetArgs[1], options?: GetArgs[2]) =>
     http.post(`${COMMUNITY_BASE}${path}`, resolver, options),
   put: (path: string, resolver: GetArgs[1], options?: GetArgs[2]) =>

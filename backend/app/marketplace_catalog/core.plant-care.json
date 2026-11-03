@@ -101,7 +101,8 @@
         "type": "text",
         "position": 0.0,
         "color": null,
-        "options": null
+        "options": null,
+        "project": true
       },
       {
         "name": "Room",
@@ -139,7 +140,8 @@
             "label": "Outside",
             "color": "#84CC16"
           }
-        ]
+        ],
+        "project": true
       },
       {
         "name": "Light",
@@ -162,21 +164,24 @@
             "label": "Low light",
             "color": "#64748B"
           }
-        ]
+        ],
+        "project": true
       },
       {
         "name": "Fertilizer",
         "type": "text",
         "position": 3.0,
         "color": null,
-        "options": null
+        "options": null,
+        "project": true
       },
       {
         "name": "Pot size",
         "type": "text",
         "position": 4.0,
         "color": null,
-        "options": null
+        "options": null,
+        "project": true
       }
     ],
     "tasks": [],
@@ -314,6 +319,7 @@
             "title",
             "property:1",
             "property:2",
+            "property:3",
             "dueDate",
             "assignees",
             "comments"
@@ -674,7 +680,8 @@
         "type": "text",
         "position": 0.0,
         "color": null,
-        "options": null
+        "options": null,
+        "project": true
       },
       {
         "name": "Room",
@@ -712,7 +719,8 @@
             "label": "Outside",
             "color": "#84CC16"
           }
-        ]
+        ],
+        "project": true
       },
       {
         "name": "Light",
@@ -735,21 +743,24 @@
             "label": "Low light",
             "color": "#64748B"
           }
-        ]
+        ],
+        "project": true
       },
       {
         "name": "Fertilizer",
         "type": "text",
         "position": 3.0,
         "color": null,
-        "options": null
+        "options": null,
+        "project": true
       },
       {
         "name": "Pot size",
         "type": "text",
         "position": 4.0,
         "color": null,
-        "options": null
+        "options": null,
+        "project": true
       }
     ],
     "tasks": [
@@ -769,17 +780,20 @@
           {
             "property_name": "Plant",
             "property_type": "text",
-            "value_text": "Basil, parsley and mint"
+            "value_text": "Basil, parsley and mint",
+            "project": true
           },
           {
             "property_name": "Room",
             "property_type": "select",
-            "value_text": "kitchen"
+            "value_text": "kitchen",
+            "project": true
           },
           {
             "property_name": "Light",
             "property_type": "select",
-            "value_text": "bright"
+            "value_text": "bright",
+            "project": true
           }
         ],
         "type_name": "Watering",
@@ -801,17 +815,20 @@
           {
             "property_name": "Plant",
             "property_type": "text",
-            "value_text": "Boston fern"
+            "value_text": "Boston fern",
+            "project": true
           },
           {
             "property_name": "Room",
             "property_type": "select",
-            "value_text": "bathroom"
+            "value_text": "bathroom",
+            "project": true
           },
           {
             "property_name": "Light",
             "property_type": "select",
-            "value_text": "indirect"
+            "value_text": "indirect",
+            "project": true
           }
         ],
         "type_name": "Watering",
@@ -833,17 +850,20 @@
           {
             "property_name": "Plant",
             "property_type": "text",
-            "value_text": "Monstera"
+            "value_text": "Monstera",
+            "project": true
           },
           {
             "property_name": "Room",
             "property_type": "select",
-            "value_text": "living-room"
+            "value_text": "living-room",
+            "project": true
           },
           {
             "property_name": "Light",
             "property_type": "select",
-            "value_text": "indirect"
+            "value_text": "indirect",
+            "project": true
           }
         ],
         "type_name": "Watering",
@@ -865,17 +885,20 @@
           {
             "property_name": "Plant",
             "property_type": "text",
-            "value_text": "Moth orchid"
+            "value_text": "Moth orchid",
+            "project": true
           },
           {
             "property_name": "Room",
             "property_type": "select",
-            "value_text": "office"
+            "value_text": "office",
+            "project": true
           },
           {
             "property_name": "Light",
             "property_type": "select",
-            "value_text": "indirect"
+            "value_text": "indirect",
+            "project": true
           }
         ],
         "type_name": "Watering",
@@ -897,17 +920,20 @@
           {
             "property_name": "Plant",
             "property_type": "text",
-            "value_text": "Snake plant"
+            "value_text": "Snake plant",
+            "project": true
           },
           {
             "property_name": "Room",
             "property_type": "select",
-            "value_text": "bedroom"
+            "value_text": "bedroom",
+            "project": true
           },
           {
             "property_name": "Light",
             "property_type": "select",
-            "value_text": "low"
+            "value_text": "low",
+            "project": true
           }
         ],
         "type_name": "Watering",
@@ -929,17 +955,20 @@
           {
             "property_name": "Plant",
             "property_type": "text",
-            "value_text": "Basil, parsley and mint"
+            "value_text": "Basil, parsley and mint",
+            "project": true
           },
           {
             "property_name": "Room",
             "property_type": "select",
-            "value_text": "kitchen"
+            "value_text": "kitchen",
+            "project": true
           },
           {
             "property_name": "Fertilizer",
             "property_type": "text",
-            "value_text": "Liquid seaweed"
+            "value_text": "Liquid seaweed",
+            "project": true
           }
         ],
         "type_name": "Fertilizing",
@@ -961,17 +990,20 @@
           {
             "property_name": "Plant",
             "property_type": "text",
-            "value_text": "Monstera"
+            "value_text": "Monstera",
+            "project": true
           },
           {
             "property_name": "Room",
             "property_type": "select",
-            "value_text": "living-room"
+            "value_text": "living-room",
+            "project": true
           },
           {
             "property_name": "Fertilizer",
             "property_type": "text",
-            "value_text": "Balanced houseplant feed"
+            "value_text": "Balanced houseplant feed",
+            "project": true
           }
         ],
         "type_name": "Fertilizing",
@@ -993,17 +1025,20 @@
           {
             "property_name": "Plant",
             "property_type": "text",
-            "value_text": "Moth orchid"
+            "value_text": "Moth orchid",
+            "project": true
           },
           {
             "property_name": "Room",
             "property_type": "select",
-            "value_text": "office"
+            "value_text": "office",
+            "project": true
           },
           {
             "property_name": "Fertilizer",
             "property_type": "text",
-            "value_text": "Orchid feed"
+            "value_text": "Orchid feed",
+            "project": true
           }
         ],
         "type_name": "Fertilizing",
@@ -1046,17 +1081,20 @@
           {
             "property_name": "Plant",
             "property_type": "text",
-            "value_text": "Monstera"
+            "value_text": "Monstera",
+            "project": true
           },
           {
             "property_name": "Pot size",
             "property_type": "text",
-            "value_text": "30 cm"
+            "value_text": "30 cm",
+            "project": true
           },
           {
             "property_name": "Room",
             "property_type": "select",
-            "value_text": "living-room"
+            "value_text": "living-room",
+            "project": true
           }
         ],
         "type_name": "Repotting"
@@ -1098,17 +1136,20 @@
           {
             "property_name": "Plant",
             "property_type": "text",
-            "value_text": "Snake plant"
+            "value_text": "Snake plant",
+            "project": true
           },
           {
             "property_name": "Pot size",
             "property_type": "text",
-            "value_text": "20 cm"
+            "value_text": "20 cm",
+            "project": true
           },
           {
             "property_name": "Room",
             "property_type": "select",
-            "value_text": "bedroom"
+            "value_text": "bedroom",
+            "project": true
           }
         ],
         "type_name": "Repotting",
@@ -1249,6 +1290,7 @@
             "title",
             "property:1",
             "property:2",
+            "property:3",
             "dueDate",
             "assignees",
             "comments"

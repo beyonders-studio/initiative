@@ -1,8 +1,12 @@
 import { useMutation, useQuery } from "@tanstack/react-query";
+import { useMemo } from "react";
 import { useTranslation } from "react-i18next";
 
 import type {
+  PropertyDefinitionBulkDelete,
   PropertyDefinitionCreate,
+  PropertyDefinitionGroups,
+  PropertyDefinitionPromote,
   PropertyDefinitionRead,
   PropertyDefinitionUpdate,
   PropertyDefinitionUpdateResponse,
@@ -13,8 +17,12 @@ import { PropertyTarget } from "@/api/generated/initiativeAPI.schemas";
 import {
   createPropertyDefinition,
   deletePropertyDefinition,
+  deletePropertyDefinitions,
+  getListPropertyDefinitionsByOwnerQueryKey,
   getListPropertyDefinitionsQueryKey,
   listPropertyDefinitions,
+  listPropertyDefinitionsByOwner,
+  promotePropertyDefinitions,
   updatePropertyDefinition,
 } from "@/api/generated/property-definitions/property-definitions";
 import { invalidate, q } from "@/api/query-keys";
@@ -27,6 +35,20 @@ import type { MutationOpts } from "@/types/mutation";
 
 // ── Queries ──────────────────────────────────────────────────────────────────
 
+/** Who a definition belongs to where it is not the initiative's: a project
+ *  (its metadata, on its tasks) or a collection (its metadata, on its files). */
+export type MetadataOwner = { kind: "project" | "collection"; id: number };
+
+/** The owner columns a definition is created and listed with. */
+export const ownerColumns = (
+  owner: MetadataOwner | undefined
+): { project_id?: number; collection_id?: number } =>
+  owner === undefined
+    ? {}
+    : owner.kind === "project"
+      ? { project_id: owner.id }
+      : { collection_id: owner.id };
+
 /**
  * List property definitions.
  *
@@ -35,11 +57,19 @@ import type { MutationOpts } from "@/types/mutation";
  * - ``initiativeId`` omitted: returns the union across every initiative the
  *   caller is a member of — used by global views (My Tasks, Files list,
  *   events list) so property columns and filters aggregate across initiatives.
+ * - ``owner`` bound: that project's or collection's metadata instead, which
+ *   are never among an initiative's properties.
  */
-export const useProperties = (options?: { initiativeId?: number; enabled?: boolean }) => {
+export const useProperties = (options?: {
+  initiativeId?: number;
+  owner?: MetadataOwner;
+  enabled?: boolean;
+}) => {
   const communityId = useActiveCommunityId();
   const initiativeId = options?.initiativeId;
-  const params: { initiative_id?: number } = {};
+  const params: { initiative_id?: number; project_id?: number; collection_id?: number } = {
+    ...ownerColumns(options?.owner),
+  };
   if (initiativeId !== undefined) params.initiative_id = initiativeId;
   const hasParams = Object.keys(params).length > 0;
   return useQuery<PropertyDefinitionRead[]>({
@@ -50,6 +80,56 @@ export const useProperties = (options?: { initiativeId?: number; enabled?: boole
   });
 };
 
+/**
+ * An initiative's metadata, then the properties of each of its projects and
+ * collections the reader may edit, each under its owner: what the server
+ * lists, and only that.
+ */
+export const usePropertyGroups = (initiativeId: number) => {
+  const communityId = useActiveCommunityId();
+  const params = { initiative_id: initiativeId };
+  return useQuery<PropertyDefinitionGroups>({
+    queryKey: getListPropertyDefinitionsByOwnerQueryKey(communityId, params),
+    queryFn: () => listPropertyDefinitionsByOwner(communityId, params),
+    staleTime: 60 * 1000,
+  });
+};
+
+/** No definitions, as one list, for a read not yet answered. */
+export const NO_DEFINITIONS: PropertyDefinitionRead[] = [];
+
+/**
+ * What can be placed on an item where an owner keeps metadata beside the
+ * initiative's properties: the owner's metadata first, then the properties.
+ * Without an owner, the properties alone.
+ */
+export const useOwnedDefinitions = (options: {
+  initiativeId?: number;
+  owner?: MetadataOwner;
+  enabled?: boolean;
+}) => {
+  const enabled = options.enabled ?? true;
+  const owned = options.owner !== undefined;
+  const properties = useProperties({ initiativeId: options.initiativeId, enabled });
+  const metadata = useProperties({
+    owner: options.owner,
+    enabled: enabled && owned,
+  });
+  const data = useMemo(
+    () =>
+      properties.data && (!owned || metadata.data)
+        ? [...(owned ? (metadata.data ?? []) : []), ...properties.data]
+        : undefined,
+    [properties.data, metadata.data, owned]
+  );
+  return {
+    data,
+    isLoading: properties.isLoading || (owned && metadata.isLoading),
+    isError: properties.isError || (owned && metadata.isError),
+    refetch: () => Promise.all([properties.refetch(), metadata.refetch()]),
+  };
+};
+
 // ── Mutations ────────────────────────────────────────────────────────────────
 
 export const useCreateProperty = (
@@ -58,7 +138,9 @@ export const useCreateProperty = (
   useCommunityMutation<PropertyDefinitionRead, PropertyDefinitionCreate>(
     {
       mutationFn: (communityId, data) => createPropertyDefinition(communityId, data),
-      invalidate: () => invalidate(q.allProperties()),
+      // A collection's metadata is listed with the collection, and its lists.
+      invalidate: (created) =>
+        invalidate(q.allProperties(), ...(created.collection_id ? [q.allCollections()] : [])),
       errorKey: "properties:manager.createError",
     },
     options
@@ -78,8 +160,8 @@ export const useUpdateProperty = (
       mutationFn: (communityId, { propertyId, data }) =>
         updatePropertyDefinition(communityId, propertyId, data),
       // Every row's embedded summaries carry the definition's name, options
-      // and color.
-      invalidate: () => invalidate(q.allProperties(), q.allPropertyHolders()),
+      // and color, as a collection's files carry its metadata's.
+      invalidate: () => invalidate(q.allProperties(), q.allPropertyHolders(), q.allCollections()),
       errorKey: "properties:manager.updateError",
     },
     options
@@ -89,8 +171,34 @@ export const useDeleteProperty = (options?: MutationOpts<void, number>) =>
   useCommunityMutation<void, number>(
     {
       mutationFn: (communityId, propertyId) => deletePropertyDefinition(communityId, propertyId),
-      invalidate: () => invalidate(q.allProperties(), q.allPropertyHolders()),
+      invalidate: () => invalidate(q.allProperties(), q.allPropertyHolders(), q.allCollections()),
       errorKey: "properties:manager.deleteError",
+    },
+    options
+  );
+
+/** Delete several definitions of one initiative at once, or none. */
+export const useDeleteProperties = (options?: MutationOpts<void, PropertyDefinitionBulkDelete>) =>
+  useCommunityMutation<void, PropertyDefinitionBulkDelete>(
+    {
+      mutationFn: (communityId, data) => deletePropertyDefinitions(communityId, data),
+      invalidate: () => invalidate(q.allProperties(), q.allPropertyHolders(), q.allCollections()),
+      errorKey: "properties:manager.bulkDeleteError",
+    },
+    options
+  );
+
+/** Merge properties of one type into one of the initiative's metadata. Their
+ *  values and the layouts that show them move with them. */
+export const usePromoteProperties = (
+  options?: MutationOpts<PropertyDefinitionRead, PropertyDefinitionPromote>
+) =>
+  useCommunityMutation<PropertyDefinitionRead, PropertyDefinitionPromote>(
+    {
+      mutationFn: (communityId, data) => promotePropertyDefinitions(communityId, data),
+      invalidate: () =>
+        invalidate(q.allProperties(), q.allPropertyHolders(), q.allCollections(), q.layouts()),
+      errorKey: "properties:manager.promoteError",
     },
     options
   );

@@ -1,7 +1,7 @@
 /**
- * The details the layout editor lays out: a project's task, and the initiative
- * calendar's event; and the presets each tool's lists offer, with its own
- * filter controls. Each says what kind of detail it is, what the editor calls
+ * The details the layout editor lays out: a project's task, the initiative
+ * calendar's event and a collection's file; and the presets each tool's lists
+ * offer, with its own filter controls. Each says what kind of detail it is, what the editor calls
  * it and its parts, what its fields are, whether plug-ins draw on it, and
  * draws itself with one of its own while it is laid out.
  */
@@ -12,6 +12,9 @@ import { useTranslation } from "react-i18next";
 
 import { useReadCounter } from "@/api/generated/counters/counters";
 import {
+  type CollectionFileSummary,
+  type CollectionRead,
+  FileKind,
   type PropertyDefinitionRead,
   type PropertySummary,
   type TaskTypeRead,
@@ -26,25 +29,26 @@ import { useActiveCommunityId } from "@/hooks/useActiveCommunityId";
 import { useAuth } from "@/hooks/useAuth";
 import { useCalendarEntries } from "@/hooks/useCalendarEntries";
 import { useCalendarEvent } from "@/hooks/useCalendarEvents";
-import { useCatalogItemsFeed } from "@/hooks/useCatalogs";
 import { useCounterGroup } from "@/hooks/useCounters";
 import { usePost, usePostsFeed } from "@/hooks/usePosts";
 import { useQueue } from "@/hooks/useQueues";
 import { useTask, useTasks } from "@/hooks/useTasks";
 import { type CalendarFilters, EMPTY_CALENDAR_FILTERS } from "@/lib/filters/calendarFilters";
 import { buildTaskListParams, EMPTY_TASK_FILTERS } from "@/lib/filters/taskFilters";
-import { CATALOG_ITEM_DETAIL } from "@/lib/layouts/catalogItemLayout";
 import { COUNTER_DETAIL } from "@/lib/layouts/counterLayout";
 import { type DetailKind, DetailLayoutView } from "@/lib/layouts/DetailLayoutView";
 import type { DetailLayoutSpec, StoredRegions } from "@/lib/layouts/detailLayout";
 import { EVENT_DETAIL } from "@/lib/layouts/eventLayout";
 import type { FieldDef } from "@/lib/layouts/fields";
+import { FILE_DETAIL } from "@/lib/layouts/fileLayout";
+import { collectionFileFields } from "@/lib/layouts/files";
 import { POST_DETAIL } from "@/lib/layouts/postLayout";
 import { CALENDAR_PRESETS, TASK_PRESETS } from "@/lib/layouts/presets";
 import { QUEUE_ITEM_DETAIL } from "@/lib/layouts/queueItemLayout";
 import { TASK_DETAIL } from "@/lib/layouts/taskLayout";
 import { taskLayoutFor } from "@/lib/layouts/tasks";
 import type { LayoutNode } from "@/lib/layouts/tree";
+import { resolveUploadUrl } from "@/lib/uploadUrl";
 import type { TranslateFn } from "@/types/i18n";
 
 import { editablePresets } from "./LayoutPresets";
@@ -273,37 +277,6 @@ const QueueItemPreview = ({
   );
 };
 
-/** The catalog's picture detail drawn with its first picture. */
-const CatalogItemPreview = ({
-  catalogId,
-  initiativeId,
-  tree,
-}: {
-  catalogId: number;
-  initiativeId: number;
-  tree: LayoutNode;
-}) => {
-  const pictures = useCatalogItemsFeed(catalogId);
-  return (
-    <ItemPreview
-      detail={CATALOG_ITEM_DETAIL}
-      tree={tree}
-      item={pictures.data?.pages[0]?.items[0]}
-      none={pictures.isSuccess}
-      empty="catalogItemDetail.noItems"
-      context={() => ({
-        readOnly: false,
-        catalogId,
-        initiativeId,
-        canDeleteVersions: false,
-        leaving: LEFT,
-        actions: <ActionsPreview />,
-        preview: true,
-      })}
-    />
-  );
-};
-
 /** The group's counter detail drawn with its first counter. */
 const CounterPreview = ({
   groupId,
@@ -391,22 +364,65 @@ export const queueItemDetail = (queueId: number, initiativeId: number): Editable
   preview: (tree) => <QueueItemPreview queueId={queueId} initiativeId={initiativeId} tree={tree} />,
 });
 
-/** A catalog's picture detail. */
-export const catalogItemDetail = (catalogId: number, initiativeId: number): EditableDetail => ({
-  spec: CATALOG_ITEM_DETAIL.spec,
-  words: wordsOf("catalogItemDetail"),
-  fields: CATALOG_ITEM_DETAIL.fields,
-  preview: (tree) => (
-    <CatalogItemPreview catalogId={catalogId} initiativeId={initiativeId} tree={tree} />
-  ),
-});
-
 /** A counter group's counter detail. */
 export const counterDetail = (groupId: number, initiativeId: number): EditableDetail => ({
   spec: COUNTER_DETAIL.spec,
   words: wordsOf("counterDetail"),
   fields: COUNTER_DETAIL.fields,
   preview: (tree) => <CounterPreview groupId={groupId} initiativeId={initiativeId} tree={tree} />,
+});
+
+/** A file's page in a collection drawn where the collection opens it: a
+ *  picture's in the panel beside it, as the lightbox has it, and any other
+ *  file's in the sheet beside the wall. */
+const FilePreview = ({
+  collection,
+  file,
+  loaded,
+  tree,
+}: {
+  collection: CollectionRead;
+  file: CollectionFileSummary | undefined;
+  loaded: boolean;
+  tree: LayoutNode;
+}) => {
+  const page = (
+    <div className="@container">
+      <ItemPreview
+        detail={FILE_DETAIL}
+        tree={tree}
+        item={file}
+        none={loaded}
+        empty="fileDetail.noItems"
+        context={() => ({ collection })}
+      />
+    </div>
+  );
+  const picture = file?.kind === FileKind.image ? resolveUploadUrl(file.file_url) : null;
+  if (!picture) return <div className="max-w-md">{page}</div>;
+  return (
+    <div className="flex canvas-md:flex-row flex-col overflow-hidden rounded-md">
+      <div className="flex min-h-64 flex-1 items-center justify-center bg-black p-4">
+        <img src={picture} alt={file?.name} className="max-h-96 max-w-full object-contain" />
+      </div>
+      <div className="canvas-md:w-80 shrink-0 border bg-background p-4">{page}</div>
+    </div>
+  );
+};
+
+/** A file opened from a collection, drawn with `first`, the first of its
+ *  files, once they are `loaded`. Its fields are the collection's lists'. */
+export const fileDetail = (
+  collection: CollectionRead,
+  first: CollectionFileSummary | undefined,
+  loaded: boolean
+): EditableDetail => ({
+  spec: FILE_DETAIL.spec,
+  words: wordsOf("fileDetail"),
+  fields: (definitions) => collectionFileFields(collection.metadata, definitions),
+  preview: (tree) => (
+    <FilePreview collection={collection} file={first} loaded={loaded} tree={tree} />
+  ),
 });
 
 /** The initiative's notice detail, which every notice in it shares. */
@@ -423,7 +439,6 @@ export const ITEM_DETAILS: Partial<
   Record<Tool, (id: number, initiativeId: number) => EditableDetail>
 > = {
   [Tool.queue]: queueItemDetail,
-  [Tool.catalog]: catalogItemDetail,
   [Tool.counter_group]: counterDetail,
 };
 
@@ -440,6 +455,7 @@ export const taskPresets = (project: LayoutProject) =>
           statuses: project.statuses,
           types: project.types,
           initiativeId: project.initiativeId,
+          projectId: project.id,
         }}
         value={value}
         onChange={onChange}

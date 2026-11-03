@@ -10,6 +10,18 @@ export const parseLocalCalendarDate = (value: string): Date | null => {
   return format(date, "yyyy-MM-dd") === value ? date : null;
 };
 
+/** A stored instant as the date-time pickers hold it: local, to the minute
+ *  (`yyyy-MM-dd'T'HH:mm`), or empty for none. */
+export const toPickerValue = (value: string | null | undefined): string => {
+  const date = value ? new Date(value) : null;
+  if (!date || Number.isNaN(date.getTime())) return "";
+  return format(date, "yyyy-MM-dd'T'HH:mm");
+};
+
+/** A picker's value as the instant it is stored as, or null for none. */
+export const fromPickerValue = (value: string): string | null =>
+  value ? new Date(value).toISOString() : null;
+
 /**
  * Resolve wall-clock input only when it names one instant. A retained original
  * disambiguates an unchanged fold time and preserves its seconds/milliseconds.

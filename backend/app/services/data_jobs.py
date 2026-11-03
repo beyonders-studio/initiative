@@ -1,7 +1,7 @@
 """The dispatcher imports and exports share.
 
-A data job is a row in its community's own schema (an ``ImportJob`` or an
-``ExportJob``) that a background visit claims and runs. The claim is visited
+A data job is a ``DataJob`` row in its community's own schema, an import or
+an export, that a background visit claims and runs. The claim is visited
 by the ``data_jobs`` timer that queuing or ending a job arms at once, and again
 once the job's slot is free. Every API process does this, so the claim is
 decided in the database: under a transaction-scoped
@@ -19,6 +19,9 @@ which nobody is running any more. What happens to one depends on the job type, s
 the sweep is the worker's. Jobs this process is running are left out of it:
 they are known to be alive.
 
+The ``data_job_expiry`` timer deletes a job's file at its deadline, whichever
+way the job runs (:func:`expire_files`).
+
 Bookkeeping runs on the system engine, routed into the community with
 ``guild_id`` alone; the policies' system leg names that login. Notifications
 are written from the unrouted system context, since the shared notifications
@@ -34,17 +37,24 @@ from collections.abc import Awaitable, Callable
 from contextlib import suppress
 from dataclasses import dataclass, field
 from datetime import datetime, timezone
-from typing import Any, Generic, TypeVar
+from typing import Any
 
-from sqlalchemy import func
-from sqlmodel import SQLModel, select
+from sqlalchemy import and_, func, or_
+from sqlmodel import col, select
 from sqlmodel.ext.asyncio.session import AsyncSession
 
 from app.core import audit_context
 from app.db import cohorts
 from app.db.advisory_locks import LockNamespace, advisory_lock
+from app.core.config import settings
 from app.db.session import set_rls_context
 from app.models.platform.notification import NotificationType
+from app.models.tenant.data_job import (
+    HOLDS_FILE,
+    DataJob,
+    DataJobDirection,
+    DataJobStatus,
+)
 from app.services import sweep_timers
 from app.services.guild_sweeps import Scope, each_guild
 from app.services.platform import notice_outbox
@@ -55,7 +65,6 @@ logger = logging.getLogger(__name__)
 #: Who to tell, what to tell them, and the notification's data.
 JobOutcome = tuple[int, NotificationType, dict[str, Any]]
 
-JobT = TypeVar("JobT", bound=SQLModel)
 Heartbeat = Callable[[], Awaitable[None]]
 
 #: ``(session, *, guild_id, now, own)``: deal with one community's quiet rows,
@@ -68,13 +77,22 @@ Sweep = Callable[..., Awaitable[list[JobOutcome]]]
 Runner = Callable[..., Awaitable[JobOutcome | None]]
 
 
+#: The statuses of an import that is over, which needs no secret however it
+#: ended.
+IMPORT_OVER = (
+    DataJobStatus.done,
+    DataJobStatus.failed,
+    DataJobStatus.cancelled,
+    DataJobStatus.expired,
+)
+
 #: Every dispatcher, for :func:`cancel_running_jobs`.
-_dispatchers: weakref.WeakSet[Dispatcher[Any]] = weakref.WeakSet()
+_dispatchers: weakref.WeakSet[Dispatcher] = weakref.WeakSet()
 
 
 @dataclass(eq=False)
-class Dispatcher(Generic[JobT]):
-    """Claims and runs one type of data job.
+class Dispatcher:
+    """Claims and runs the data jobs of one direction.
 
     ``kind_of`` says which kind of slot a queued job needs, ``start_status``
     what a claimed job of that kind moves to, and ``slots`` how many jobs of a
@@ -85,14 +103,13 @@ class Dispatcher(Generic[JobT]):
 
     #: Names the job type in task names and log lines.
     name: str
-    model: type[JobT]
+    direction: DataJobDirection
     #: The advisory-lock namespace this job type claims under.
     lock_namespace: LockNamespace
-    queued: str
-    active: tuple[str, ...]
+    active: tuple[DataJobStatus, ...]
     kinds: tuple[str, ...]
-    kind_of: Callable[[JobT], str]
-    start_status: Callable[[str], str]
+    kind_of: Callable[[DataJob], str]
+    start_status: Callable[[str], DataJobStatus]
     slots: Callable[[str], int]
     sweep: Sweep
     run: Runner
@@ -192,23 +209,28 @@ class Dispatcher(Generic[JobT]):
         job starts, so a crash leaves a quiet row for the sweep rather than a
         queued one that looks untouched.
         """
-        model: Any = self.model
         await advisory_lock(session, self.lock_namespace, guild_id)
         active = (
             await session.exec(
                 select(func.count())
-                .select_from(model)
-                .where(model.status.in_(self.active))
+                .select_from(DataJob)
+                .where(
+                    DataJob.direction == self.direction,
+                    col(DataJob.status).in_(self.active),
+                )
             )
         ).one()
-        job: Any = (
+        job = (
             None
             if active
             else (
                 await session.exec(
-                    select(model)
-                    .where(model.status == self.queued)
-                    .order_by(model.created_at.asc())
+                    select(DataJob)
+                    .where(
+                        DataJob.direction == self.direction,
+                        DataJob.status == DataJobStatus.queued,
+                    )
+                    .order_by(col(DataJob.created_at).asc())
                     .limit(1)
                     .with_for_update()
                 )
@@ -223,6 +245,7 @@ class Dispatcher(Generic[JobT]):
             return None
         # The slot is held from here, so a claim in another cohort's visit
         # running alongside this one finds it taken.
+        assert job.id is not None
         key = (guild_id, job.id)
         self.running[key] = (kind, None)
         try:
@@ -233,18 +256,22 @@ class Dispatcher(Generic[JobT]):
         except BaseException:
             self.running.pop(key, None)
             raise
-        return job.id, kind
+        return key[1], kind
 
     async def _run(self, guild_id: int, job_id: int, kind: str) -> None:
         """One claimed job, start to finish, on a session of its own. Once it
         ends, the community's next queued job may start."""
-        model: Any = self.model
         with audit_context.job(self.name, guild_id=guild_id):
             try:
                 async with cohorts.system_session(guild_id) as session:
                     await set_rls_context(session, SystemGuild(guild_id))
                     job = (
-                        await session.exec(select(model).where(model.id == job_id))
+                        await session.exec(
+                            select(DataJob).where(
+                                DataJob.id == job_id,
+                                DataJob.direction == self.direction,
+                            )
+                        )
                     ).one_or_none()
                     if job is None:
                         return
@@ -286,4 +313,91 @@ async def notify(session: AsyncSession, outcomes: list[JobOutcome]) -> None:
             for user_id, notification_type, data in outcomes
         ],
     )
+    await session.commit()
+
+
+async def find(
+    session: AsyncSession,
+    job_id: int,
+    direction: DataJobDirection,
+    *,
+    for_update: bool = False,
+) -> DataJob | None:
+    """The job ``job_id`` when it goes ``direction``; ``None`` for one the
+    caller cannot see, or one going the other way."""
+    query = select(DataJob).where(DataJob.id == job_id, DataJob.direction == direction)
+    if for_update:
+        query = query.with_for_update()
+    return (await session.exec(query)).first()
+
+
+def holds_file() -> Any:
+    """Rows whose job still holds its file (:data:`HOLDS_FILE`)."""
+    return or_(
+        *(
+            and_(DataJob.direction == direction, col(DataJob.status).in_(statuses))
+            for direction, statuses in HOLDS_FILE.items()
+        )
+    )
+
+
+async def expire_files(session: AsyncSession, guild_id: int) -> None:
+    """Delete the community's job files past ``expires_at`` (through the
+    storage backend, so local FS and S3 behave identically) and mark their
+    jobs expired: an export's artifact, an import's payload left unconfirmed.
+    Terminal imports keep their (small) result reports, and any secret an
+    import that is over still holds is cleared.
+
+    Visited in every community whose schema exists, whatever its status: a
+    read-only or suspended community's files expire like anyone's. On a demo
+    deployment a pitch's newest backup is kept: it is what its links copy."""
+    from app.services.storage import get_guild_storage
+
+    now = datetime.now(timezone.utc)
+    jobs = list(
+        await session.exec(
+            select(DataJob).where(
+                holds_file(),
+                col(DataJob.expires_at).is_not(None),
+                col(DataJob.expires_at) < now,
+            )
+        )
+    )
+    if jobs and settings.DEMO_MODE:
+        from app.demo import pitches
+
+        published = await pitches.published_export_id(session, guild_id)
+        jobs = [job for job in jobs if job.id != published]
+    storage = get_guild_storage(guild_id) if jobs else None
+    for job in jobs:
+        if job.file_ref and storage is not None:
+            try:
+                await asyncio.to_thread(storage.delete, job.file_ref)
+            except Exception:
+                # Expire the row anyway: a permanently failing delete (key
+                # already gone, bucket misconfig) must not pin the job and
+                # re-fail every pass.
+                logger.exception(
+                    "data job gc: file delete failed job=%s ref=%s guild=%s",
+                    job.id,
+                    job.file_ref,
+                    guild_id,
+                )
+        job.status = DataJobStatus.expired
+        job.file_ref = None
+        job.secret_encrypted = None
+        job.updated_at = now
+        session.add(job)
+    lent = list(
+        await session.exec(
+            select(DataJob).where(
+                DataJob.direction == DataJobDirection.import_,
+                col(DataJob.status).in_(IMPORT_OVER),
+                col(DataJob.secret_encrypted).is_not(None),
+            )
+        )
+    )
+    for job in lent:
+        job.secret_encrypted = None
+        session.add(job)
     await session.commit()

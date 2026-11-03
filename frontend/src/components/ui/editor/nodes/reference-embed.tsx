@@ -7,6 +7,7 @@ import { createContext, lazy, Suspense, useContext } from "react";
 import { useTranslation } from "react-i18next";
 
 import type { SearchEntityType } from "@/api/generated/initiativeAPI.schemas";
+import { AskWhereUnavailable } from "@/components/access/RequestAccess";
 import { TaskDescription } from "@/components/tasks/TaskDescription";
 import { Button } from "@/components/ui/button";
 import { EmbedCallout, useEmbedFold } from "@/components/ui/editor/nodes/embed-callout";
@@ -99,7 +100,8 @@ export function ReferenceEmbed(props: ReferenceEmbedProps) {
  *
  * A thing that cannot be read — deleted, or never shared with this reader —
  * keeps the name it had, dimmed, and says so; the two look the same on
- * purpose, as they do for a link.
+ * purpose, as they do for a link. One the reader knows is there, inside an
+ * initiative of theirs, offers to ask for access instead.
  *
  * Shown as `fields`, it holds a smart chip for each fact chosen for this page —
  * its status, who has it, when it is due — under its name.
@@ -186,7 +188,9 @@ function ItemEmbed({
       ) : showDescription && embed?.description ? (
         <TaskDescription content={embed.description} />
       ) : isFetched && !embed ? (
-        <p className="text-muted-foreground text-sm">{t("references.unavailable")}</p>
+        <AskWhereUnavailable kind={entityType} entityId={entityId}>
+          <p className="text-muted-foreground text-sm">{t("references.unavailable")}</p>
+        </AskWhereUnavailable>
       ) : null}
     </EmbedCallout>
   );

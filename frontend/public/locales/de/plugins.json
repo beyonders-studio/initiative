@@ -35,7 +35,8 @@
     "upToDate": "Aktuell",
     "upgraded": "Auf {{version}} aktualisiert.",
     "removeManagedNeutral": "Die Kosten für dieses Plug-in verwaltet euer Anbieter.",
-    "removeManagedAction": "Verwalten"
+    "removeManagedAction": "Verwalten",
+    "closed": "Die Betreiber dieses Servers verwalten die Plug-ins für diese Community."
   },
   "updates": {
     "wants": "Version {{version}} möchte:",
@@ -250,7 +251,7 @@
       "comments": "Kommentare",
       "relationships": "Verknüpfungen",
       "tags": "Tags",
-      "properties": "Eigenschaften",
+      "properties": "Metadaten",
       "sharing": "Freigaben",
       "members": "Mitglieder",
       "initiatives": "Initiativen",
@@ -285,10 +286,6 @@
         "read": "Beiträge lesen",
         "write": "Beiträge lesen und ändern"
       },
-      "catalogs": {
-        "read": "Kataloge lesen",
-        "write": "Kataloge lesen und ändern"
-      },
       "wikis": {
         "read": "Wikis lesen",
         "write": "Wikis lesen und ändern"
@@ -306,8 +303,8 @@
         "write": "Tags lesen und ändern"
       },
       "properties": {
-        "read": "Eigene Eigenschaften und ihre Optionen lesen",
-        "write": "Eigene Eigenschaften lesen, anlegen und ändern"
+        "read": "Metadaten der Initiative und ihre Optionen lesen",
+        "write": "Metadaten der Initiative lesen, anlegen und ändern"
       },
       "sharing": {
         "read": "Sehen, wer worauf Zugriff hat",

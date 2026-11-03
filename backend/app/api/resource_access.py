@@ -7,7 +7,8 @@ registry: one entry per `Tool`, carrying only how a row is loaded and addressed.
 Everything it answers with is derived from the tool itself.
 
 `load_child` does the same for a row inside a tool (`SUB_TOOLS`), which its
-tool's sharing reaches.
+tool's sharing reaches — or, for a kind in no one instance of its tool (a
+collection), its own rule.
 """
 
 # NOT `from __future__ import annotations`: resource_dependency builds a signature
@@ -26,16 +27,20 @@ from app.api.deps import (
 )
 from app.core.plugin_scopes import PluginScopeAccess, scope_name, tool_resource
 from app.core.messages import (
+    CommonMessages,
+    KindMessages,
     PluginMessages,
     InitiativeMessages,
 )
-from app.core.tools import KIND_BY_TABLE, KINDS, Tool
+from app.core.errors import CodedError
+from app.core.tools import KIND_BY_TABLE, KINDS, Tool, kind_refusal
+from app.db.frozen import ancestor_is_frozen, row_is_frozen
 from app.db.guild_standing import InstallContext
 from app.db.initiative_rls import governing_path
 from app.db.session import require_actor_context
 from app.models.tenant.calendar_event import CalendarEvent
 from app.models.tenant.counter import Counter
-from app.models.tenant.catalog import CatalogItem
+from app.models.tenant.collection import Collection
 from app.models.tenant.initiative import Initiative, PermissionKey
 from app.models.tenant.queue import QueueItem
 from app.models.tenant.wiki import WikiPage
@@ -54,7 +59,7 @@ from app.services.tenant import calendars as calendars_service
 from app.services.tenant import counters as counters_service
 from app.services.tenant import dashboards as dashboards_service
 from app.services.tenant import files as files_service
-from app.services.tenant import catalogs as catalogs_service
+from app.services.tenant import collections as collections_service
 from app.services.tenant import initiatives as initiatives_service
 from app.services.tenant import wikis as wikis_service
 from app.services.tenant import posts as posts_service
@@ -62,6 +67,7 @@ from app.services.tenant import named_people
 from app.services.tenant import project_grants
 from app.services.tenant import queues as queues_service
 from app.services.tenant import task_queries
+from app.services.tenant.initiative_tools import tool_on
 
 CurrentUserDep = Annotated[User, Depends(get_current_active_user)]
 
@@ -132,11 +138,6 @@ RESOURCE_ACCESS: dict[Tool, ResourceAccessConfig] = {
         hydrated_loader=dashboards_service.get_dashboard_hydrated,
     ),
     Tool.post: ResourceAccessConfig(Tool.post, posts_service.get_post),
-    Tool.catalog: ResourceAccessConfig(
-        Tool.catalog,
-        catalogs_service.get_catalog,
-        hydrated_loader=catalogs_service.get_catalog_hydrated,
-    ),
     Tool.wiki: ResourceAccessConfig(
         Tool.wiki,
         wikis_service.get_wiki,
@@ -169,7 +170,7 @@ def governing_tool(table: str) -> Tool:
     return path[0]
 
 
-def require_tool_enabled(kind: Tool, initiative: Any) -> None:
+def require_tool_enabled(kind: Tool, initiative: Any, context: ActorContext) -> None:
     """Raise 403 unless ``initiative`` has ``kind``'s master switch on.
 
     Gate 3's first half at the moment of creation, where there is no row yet for
@@ -181,8 +182,9 @@ def require_tool_enabled(kind: Tool, initiative: Any) -> None:
     ``{plural}_enabled`` leg. This runs first so the answer is a named 403
     rather than a row that silently fails to appear.
     """
-    attr = RESOURCE_ACCESS[kind].feature_attr
-    if attr is not None and not getattr(initiative, attr):
+    if RESOURCE_ACCESS[kind].feature_attr is not None and not tool_on(
+        context, initiative, kind
+    ):
         raise kind.disabled()
 
 
@@ -238,7 +240,7 @@ async def prepare_create(
             status_code=status.HTTP_404_NOT_FOUND,
             detail=InitiativeMessages.NOT_FOUND,
         )
-    require_tool_enabled(kind, initiative)
+    require_tool_enabled(kind, initiative, guild_context)
     await require_create(session, kind, initiative, user, guild_context)
     return initiative
 
@@ -337,7 +339,7 @@ async def apply_plugin_initial_sharing(
     """
     if not isinstance(actor, InstallContext):
         return
-    if "grants" not in payload.model_fields_set:
+    if payload is None or "grants" not in payload.model_fields_set:
         return
     require_install_may_share(actor, kind)
     refuse_install_community_share(actor, initiative_id)
@@ -416,7 +418,7 @@ def authorize(
     ``access="write"`` is an edit."""
     cfg = RESOURCE_ACCESS[kind]
     initiative = getattr(row, "initiative", None)
-    if initiative is not None and not getattr(initiative, cfg.feature_attr):
+    if initiative is not None and not tool_on(context, initiative, kind):
         raise kind.disabled()
     permissions_service.require_access(
         permissions_service.DAC_RESOURCES[cfg.dac_kind],
@@ -494,8 +496,13 @@ SUB_TOOLS: dict[type, SubTool] = {
         wikis_service.get_page,
         copy_resets={"yjs_state": None, "yjs_updated_at": None},
     ),
-    CatalogItem: SubTool(catalogs_service.get_item),
+    Collection: SubTool(collections_service.get_collection, name="name"),
 }
+
+
+def _standalone(model: type) -> bool:
+    """Whether ``model`` sits in its tool but in no one instance of it."""
+    return KIND_BY_TABLE[model.__tablename__].standalone
 
 
 def parent_column(model: type) -> str:
@@ -504,6 +511,51 @@ def parent_column(model: type) -> str:
     assert path is not None, model
     ((column, _table),) = path[1]
     return column
+
+
+async def require_may_change(
+    session: Any,
+    row: Any,
+    user: Optional[User],
+    context: ActorContext,
+    *,
+    action: Optional[Action] = None,
+) -> None:
+    """Raise unless the request may change ``row``, a kind in no one instance
+    of its tool: its tool switched on in the row's initiative, a role there
+    that creates the tool, and the row neither archived nor in the trash —
+    or, to take it back out of the archive (``Action.unarchive``), nothing
+    above it. A collection, which a file maker changes whoever's files are in
+    it."""
+    kind = KIND_BY_TABLE[type(row).__tablename__]
+    if context.content_read_only:
+        raise kind_refusal(kind.value, KindMessages.WRITE_ACCESS_REQUIRED, 403)
+    frozen = (
+        ancestor_is_frozen(row) if action is Action.unarchive else row_is_frozen(row)
+    )
+    if frozen:
+        raise HTTPException(
+            status_code=status.HTTP_409_CONFLICT,
+            detail=CommonMessages.CONTENT_IS_FROZEN,
+        )
+    require_tool_enabled(kind.tool, row.initiative, context)
+    await require_create(session, kind.tool, row.initiative, user, context)
+
+
+async def may_change(
+    session: Any,
+    row: Any,
+    context: ActorContext,
+    *,
+    action: Optional[Action] = None,
+) -> bool:
+    """Whether :func:`require_may_change` would let the request change ``row``,
+    for a read that reports it."""
+    try:
+        await require_may_change(session, row, None, context, action=action)
+    except (HTTPException, CodedError):
+        return False
+    return True
 
 
 Child = TypeVar("Child")
@@ -523,6 +575,13 @@ async def load_child(
     ``parent_id`` is the tool a route addresses it under, whose own refusal
     comes first when the row is out of reach."""
     context = require_actor_context(session)
+    if _standalone(model):
+        row = await SUB_TOOLS[model].load(session, child_id)
+        if row is None:
+            raise _missing(model)
+        if access != "read" or action is not None:
+            await require_may_change(session, row, None, context, action=action)
+        return row
     kind = governing_tool(model.__tablename__)
     column = parent_column(model)
     row = await SUB_TOOLS[model].load(session, child_id)
@@ -555,8 +614,11 @@ async def load_kind(
 
 
 def parent_of(row: Any) -> Any:
-    """The tool a row inside a tool sits in."""
+    """The tool a row inside a tool sits in. A kind in no one instance of its
+    tool answers for itself."""
     model = type(row)
+    if _standalone(model):
+        return row
     column = parent_column(model)
     return next(
         getattr(row, r.key)
@@ -636,6 +698,9 @@ async def set_resource_grants(
     )
     refuse_install_community_share(guild_context, row.initiative_id)
     settled = named_people.Governing.of(kind, row)
+    if kind is Tool.file:
+        # Who a collection may name is whoever can open a file in it.
+        collections_service.settle_after_commit(session, left_files=[row.id])
     await permissions_service.replace_resource_grants(
         session,
         resource_type=kind,

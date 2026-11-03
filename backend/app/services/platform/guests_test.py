@@ -22,6 +22,7 @@ from app.models.tenant.resource_grant import ResourceAccessLevel, ResourceGrant
 from app.services import cross_guild
 from app.services import permissions as permissions_service
 from app.services.platform import app_settings as app_settings_service
+from app.services.platform import rules
 from app.services.platform import contacts as contacts_service
 from app.services.platform import guests
 from app.services.platform import guilds as guilds_service
@@ -48,9 +49,9 @@ HOUR = timedelta(hours=1)
 
 async def _platform(session, *, guests_enabled: bool = True, demo_mode: bool = False):
     row = await app_settings_service.ensure_settings_row(session)
-    row.guests_enabled = guests_enabled
     row.demo_mode = demo_mode
     session.add(row)
+    await rules.put(session, "guests_enabled", guests_enabled)
     await session.commit()
 
 

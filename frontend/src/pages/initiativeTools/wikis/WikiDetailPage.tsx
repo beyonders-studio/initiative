@@ -54,6 +54,7 @@ export const WikiDetailPage = () => {
         keys="wikis:"
         backTo={gp(toolListRoute(Tool.wiki, initiativeId))}
         backLabel={t("backToWikis")}
+        entity={validIds ? { kind: "wiki", id: wikiId } : undefined}
       />
     );
   }

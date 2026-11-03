@@ -36,8 +36,7 @@
     "tag": "Tag",
     "comment": "Comment",
     "post": "Post",
-    "catalog": "Catalog",
-    "catalog_item": "Picture"
+    "collection": "Collection"
   },
   "switchHint": "Tab to switch",
   "closeMatches": "Nothing matches “{{query}}” exactly. These are the closest.",

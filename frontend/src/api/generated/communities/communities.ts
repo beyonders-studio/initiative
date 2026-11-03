@@ -1260,10 +1260,10 @@ export const useDeleteCommunity = <TError = ErrorType<HTTPValidationError>, TCon
  * What an operator has turned on for this guild, for its own admins.
  *
  * Its own read rather than fields on the guild payload: these are decisions
- * made *about* a guild rather than by it, they live on the separate
- * ``guild_administration`` row, and a member has no use for them. A guild
- * admin does — it is how their settings page knows to offer the banner
- * colour alone rather than an upload that would come back refused.
+ * made *about* a guild rather than by it, they are its paid rules, and a
+ * member has no use for them. A guild admin does — it is how their settings
+ * page knows to offer the banner colour alone rather than an upload that
+ * would come back refused.
  * @summary Read Community Entitlements
  */
 export const readCommunityEntitlements = (

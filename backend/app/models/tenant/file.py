@@ -1,5 +1,4 @@
 from datetime import datetime, timezone
-from enum import Enum
 from typing import List, Optional, TYPE_CHECKING
 
 from sqlalchemy import (
@@ -9,16 +8,19 @@ from sqlalchemy import (
     Column,
     DateTime,
     ForeignKey,
+    Index,
     Integer,
     LargeBinary,
     String,
+    Text,
     UniqueConstraint,
     text,
 )
 from sqlalchemy.dialects.postgresql import JSONB
 from sqlalchemy.orm import column_property, deferred
-from sqlmodel import Enum as SQLEnum, Field, Relationship
+from sqlmodel import Field, Relationship
 
+from app.core.file_types import FileType
 from app.core.tools import Tool
 from app.models.tenant._mixins import (
     ArchiveMixin,
@@ -34,16 +36,6 @@ from app.models.tenant._mixins import (
 if TYPE_CHECKING:  # pragma: no cover
     from app.models.tenant.initiative import Initiative
     from app.models.tenant.resource_grant import ResourceGrant
-
-
-class FileType(str, Enum):
-    """Discriminator for file type."""
-
-    native = "native"  # Lexical editor file
-    file = "file"  # Uploaded file (PDF, DOCX, etc.)
-    whiteboard = "whiteboard"  # Excalidraw scene stored in content JSONB
-    smart_link = "smart_link"  # URL-backed iframe embed (Figma, YouTube, …)
-    spreadsheet = "spreadsheet"  # Sparse cell map; collaborative via yjs
 
 
 #: The body, in its two views. Both are deferred so a list or an access check
@@ -67,7 +59,11 @@ class File(
     # A tool row is written before anything has been shared, so it is read
     # back by no RETURNING clause: the id comes from the sequence first and
     # the INSERT stands alone. See app/db/initiative_rls.py.
-    __table_args__ = {"implicit_returning": False}
+    __table_args__ = (
+        # What a collection's entries name a file by, with its initiative.
+        UniqueConstraint("id", "initiative_id", name="uq_files_id_initiative"),
+        {"implicit_returning": False},
+    )
     __mapper_args__ = {
         "properties": {
             "content": deferred(_CONTENT, raiseload=True),
@@ -102,18 +98,11 @@ class File(
         default=None,
         sa_column=Column(DateTime(timezone=True), nullable=True),
     )
-    # Uploaded file fields
+    #: The file's format (:mod:`app.core.file_types`); an uploaded file's is
+    #: its current version's.
     file_type: FileType = Field(
-        default=FileType.native,
-        sa_column=Column(
-            SQLEnum(
-                FileType,
-                name="file_type",
-                create_type=False,
-            ),
-            nullable=False,
-            server_default=text("'native'"),
-        ),
+        default=FileType.lexical,
+        sa_column=Column(Text, nullable=False, server_default=text("'lexical'")),
     )
     #: An uploaded file's current version; ``NULL`` for every other type. The
     #: two tables point at each other, so the key is added once both exist
@@ -167,12 +156,19 @@ class FileVersion(CreatedByMixin, table=True):
     """A single uploaded version of an uploaded file.
 
     Every uploaded file has at least one row here, and the ``files`` row
-    names the current one (``current_version_id``).
+    names the current one (``current_version_id``). ``created_by`` is null
+    for a version a plug-in acting as its community uploaded.
     """
 
     __tablename__ = "file_versions"
     __table_args__ = (
         UniqueConstraint("file_id", "version_number", name="uq_fv_file_version"),
+        # The thumbnails sweep's queue.
+        Index(
+            "ix_file_versions_thumbnail_pending",
+            "id",
+            postgresql_where=text("thumbnail_state = 'pending'"),
+        ),
     )
 
     id: Optional[int] = Field(default=None, primary_key=True)
@@ -186,8 +182,8 @@ class FileVersion(CreatedByMixin, table=True):
     )
     version_number: int = Field(nullable=False)
     file_url: str = Field(sa_column=Column(String(length=512), nullable=False))
-    #: One of ``attachments.ALLOWED_FILE_MIME_TYPES``: it decides how the
-    #: file is shown.
+    #: What its bytes were read as (``attachments.validate_file``): it
+    #: decides the file's type.
     file_content_type: str = Field(
         sa_column=Column(String(length=128), nullable=False),
     )
@@ -199,7 +195,27 @@ class FileVersion(CreatedByMixin, table=True):
         default=None,
         sa_column=Column(String(length=255), nullable=True),
     )
-    created_by: int = Field(foreign_key="users.id", nullable=False)
+    #: A smaller picture of it, for a type the app makes one of
+    #: (``FileTypeSpec.picture_format``); its own ``file_url`` when it is
+    #: already small enough.
+    thumbnail_url: Optional[str] = Field(
+        default=None,
+        sa_column=Column(String(length=512), nullable=True),
+    )
+    #: ``pending`` until the ``thumbnails`` sweep has made it, then ``ready``,
+    #: or ``failed`` for bytes it could not draw; ``NULL`` for a type that has
+    #: no thumbnail.
+    thumbnail_state: Optional[str] = Field(
+        default=None,
+        sa_column=Column(Text, nullable=True),
+    )
+    #: A picture's size in pixels, as it is shown (turned upright), which a
+    #: wall reserves its space by. Measured by the ``thumbnails`` sweep when it
+    #: draws one; ``NULL`` until then, and for every other type.
+    width: Optional[int] = Field(default=None, sa_column=Column(Integer, nullable=True))
+    height: Optional[int] = Field(
+        default=None, sa_column=Column(Integer, nullable=True)
+    )
     created_at: datetime = Field(
         default_factory=lambda: datetime.now(timezone.utc),
         sa_column=Column(DateTime(timezone=True), nullable=False),
@@ -221,7 +237,7 @@ File.__mapper__.add_property(  # type: ignore[attr-defined]
     column_property(
         case(
             (
-                File.__table__.c.file_type == FileType.smart_link,
+                File.__table__.c.file_type == FileType.url.value,
                 _CONTENT["url"].astext,
             )
         ),

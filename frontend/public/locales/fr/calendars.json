@@ -42,7 +42,7 @@
   "selectInitiative": "Sélectionner une initiative",
   "deleteEventConfirm": "L'événement sera envoyé à la corbeille. Vous pouvez le restaurer depuis Paramètres → Corbeille avant la fin de la période de rétention.",
   "dangerZoneDescription": "Actions destructrices. Les événements supprimés vont à la corbeille et peuvent être restaurés avant la fin de la période de rétention.",
-  "properties": "Propriétés",
+  "properties": "Métadonnées",
   "import": {
     "title": "Importer des événements",
     "importIcs": "Importer .ics",

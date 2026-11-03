@@ -181,6 +181,23 @@ describe("InitiativeSettingsDetailsPage", () => {
       expect(within(postsRow as HTMLElement).getByText(/Visible to Member/)).toBeInTheDocument();
     });
 
+    it("shows a switch the community set as set, and offers no change", async () => {
+      stubInitiative({ posts_enabled: true } as Partial<InitiativeRead>);
+      stubRoles([managerRole(), memberRole({ posts_enabled: true })]);
+      server.use(
+        communityHttp.get("/initiatives/defaults", () =>
+          HttpResponse.json({ tools: { post: true }, member_permissions: {}, custom_roles: true })
+        )
+      );
+
+      renderDetails();
+
+      const posts = await screen.findByRole("switch", { name: /Posts/ });
+      await waitFor(() => expect(posts).toBeDisabled());
+      const postsRow = posts.closest("[data-slot='tool-card']") as HTMLElement;
+      expect(within(postsRow).getByText(/sets this for every initiative/)).toBeInTheDocument();
+    });
+
     it("warns when a tool is on but no ordinary role has been given it", async () => {
       stubInitiative({ posts_enabled: true } as Partial<InitiativeRead>);
       stubRoles([managerRole(), memberRole()]);

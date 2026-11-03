@@ -107,7 +107,7 @@
     "pluginParamPlaceholder": "Choisir…",
     "pluginParamNeedsSibling": "Choisissez d'abord la valeur ci-dessus.",
     "pluginParamListHint": "Séparez les valeurs par des virgules.",
-    "all_property": "Aucune propriété",
+    "all_property": "Aucune métadonnée ni propriété",
     "sqlHelp": "Un SELECT en lecture seule sur les données de cette communauté. Il s'exécute en votre nom et ne renvoie donc que ce que vous pouvez déjà voir."
   },
   "picker": {
@@ -169,8 +169,8 @@
     "description": "Description",
     "updated_at": "Mis à jour",
     "created_by": "Créé par",
-    "property": "Propriété",
-    "property_id": "Propriété",
+    "property": "Métadonnée ou propriété",
+    "property_id": "Métadonnée ou propriété",
     "value_text": "Texte",
     "value_number": "Nombre",
     "value_boolean": "Case à cocher",
@@ -307,8 +307,8 @@
     "counters": "Compteurs",
     "counter_groups": "Groupes de compteurs",
     "task_statuses": "Statuts de tâche",
-    "property_values": "Valeurs des propriétés",
-    "property_definitions": "Propriétés",
+    "metadata_values": "Valeurs des métadonnées et propriétés",
+    "metadata_definitions": "Métadonnées et propriétés",
     "relationships": "Liens"
   },
   "viewMode": {

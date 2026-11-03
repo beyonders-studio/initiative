@@ -130,7 +130,7 @@ describe("landShare", () => {
     });
 
     expect(uploaded).toEqual(["cat.png"]);
-    expect(created).toMatchObject({ name: "Moodboard", initiative_id: 4, file_type: "native" });
+    expect(created).toMatchObject({ name: "Moodboard", initiative_id: 4, file_type: "lexical" });
     expect(JSON.stringify(created)).toContain('"src":"/uploads/3/cat.png"');
     expect(path).toBe("/c/3/i/4/files/12");
   });

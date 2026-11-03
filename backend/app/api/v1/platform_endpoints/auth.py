@@ -262,7 +262,7 @@ async def register_user(
     await require_login_method(session, LoginMethod.password)
     # Enforce password policy (NIST 800-63B: length + HIBP breach check) before
     # we hash. Raises 422 PASSWORD_TOO_SHORT / PASSWORD_BREACHED on failure.
-    await validate_new_password(user_in.password)
+    await validate_new_password(session, user_in.password)
     registered = await _register_account(
         request,
         session,
@@ -330,7 +330,11 @@ async def _registration_gate(
     # Registration is closed without an invite when public registration or
     # guild creation is off. The very first account bootstraps the deployment
     # and is always allowed.
-    if not settings.registration_open and not invite and not is_first_user:
+    if (
+        not invite
+        and not is_first_user
+        and not await app_settings_service.registration_open(session)
+    ):
         raise HTTPException(
             status_code=status.HTTP_403_FORBIDDEN,
             detail=AuthMessages.REGISTRATION_REQUIRES_INVITE,
@@ -734,7 +738,9 @@ async def finish_passkey_sign_up(
 async def bootstrap_status(session: SessionDep) -> dict[str, bool]:
     return {
         "has_users": await any_account_exists(session),
-        "public_registration_enabled": settings.registration_open,
+        "public_registration_enabled": await app_settings_service.registration_open(
+            session
+        ),
         "demo": settings.DEMO_MODE,
     }
 
@@ -2039,7 +2045,7 @@ async def reset_password(
     await require_login_method(session, LoginMethod.password)
     # Run the policy first so an invalid candidate doesn't burn the
     # reset token; ``consume_token`` is one-shot.
-    await validate_new_password(payload.password)
+    await validate_new_password(session, payload.password)
     record = await user_tokens.consume_token(
         system_session,
         token=payload.token,

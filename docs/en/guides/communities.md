@@ -151,6 +151,21 @@ So the top seat is its own rung, and it's narrow on purpose: the [Security and I
 
 **A community always keeps one.** The last superadmin can't be demoted or removed, and can't leave or close their account while anybody else is still there. Promote somebody first. The one exception is the obvious one: if you're the only person left, there's nobody to strand and nobody to promote, so you're free to go.
 
+### Custom roles
+
+The person who should be sending out invites is not always the person who should be able to delete the summer fete. A **custom role** is a named handful of the jobs of running the community, given to one person at a time. Make them under **Community settings → Roles**, and give one to somebody from **Users**.
+
+| A role on… | Does |
+|---|---|
+| **Member** | Gives a member a few jobs: the community's profile, invites, the member list, community-wide calendars, or the usage page. "Door person" is a member role with invites. Guest invites stay with admins, since a guest can be let into any initiative. |
+| **Admin** | Narrows an admin to the jobs it lists. They still see everything in the community; they just can't run the parts left out. |
+
+- **One role each.** A role only counts while the person is still on its rung, so demoting an admin quietly retires their admin role. Somebody who leaves and comes back starts with none.
+- **Nobody hands out more than they hold.** You can't make or give a role that can do something you can't. Taking a role off an admin gives them every job back, so only an admin who can do everything can do that, and the same goes for promoting, demoting or removing an admin.
+- **Your server can switch custom roles off** for a community. The roles you have keep working; you just can't change them.
+
+Most communities never need one. If yours doesn't, the Roles tab stays empty and nothing else changes.
+
 ### What the member list shows
 
 The things a community actually manages: **handle**, **name** (the [display name](#your-name-in-a-community), where there is one), **community role**, whether the membership came from a group login sync, the member's standing, and when they joined. **Export all as CSV** gives you the same columns.
@@ -169,6 +184,7 @@ Open **Community settings** from the sidebar or the rail:
 | **Usage** | Storage and members against the community's limits, and anything an installed plug-in counts for you. On a hosted server the tab is **Plan & usage** and also shows the plan: a running trial, the next renewal and its amount, a scheduled cancellation, or a failed payment. Every change to the plan, cancelling included, is made in the billing portal the tab links to. Superadmin only, and where community settings opens for them. |
 | **Community** | Name, description, [location](#saying-where-your-community-is-admins), icon and banner (square, up to 512 KB), and the directory listing. |
 | **Users** | Members, roles, invite links. A superadmin also sees whose personal API keys reach the community, where the server grants it the security standard. |
+| **Roles** | [Custom roles](#custom-roles): what each holds, and on which rung. |
 | **Initiatives** | Create and manage the community's initiatives. |
 | **Guests** | Guest invites, and the guests here now. Only where the server allows guests and the community takes them. See [Guests](../sharing/guests.md). |
 | **Security** | Who gets in and on what terms: the community's own single sign-on, where its people land, how long a session lasts, and how much a notification says once it leaves the app. Superadmin only, and only where your server has granted it — most communities never see this tab. See [Your community's sign-in and security](../security/community-security.md). |
@@ -200,7 +216,7 @@ Jira and Confluence have no file to drop in. Pick **Jira & Confluence** in the s
 1. **Connect** with your site's address, your Atlassian email and an [API token](https://id.atlassian.com/manage-profile/security/api-tokens). The token reads only what you pick, and it's deleted as soon as it's been read.
 2. **Tick the projects and spaces**, choose the initiative they all land in, and decide whether comments and attachments come along.
 3. **Wait while it reads.** A big project takes a few minutes. You can close the window and make a cup of tea — opening the import again picks up exactly where it was.
-4. **Check what it found.** Nothing is written yet. You get the count of everything coming across, the Jira fields that become properties (untick any you don't want), and — just as plainly — anything that won't make it.
+4. **Check what it found.** Nothing is written yet. You get the count of everything coming across, the Jira fields that become metadata (untick any you don't want), and — just as plainly — anything that won't make it.
 5. **Say who its people are**, then start it. Somebody who's in both products is asked about once.
 
 No token to hand, or a Confluence this server can't reach — one on the office network, say? Export the space instead: in Confluence, **Space settings → Export space → HTML**. Pick **Jira & Confluence** here, choose **Upload it** under the connect form, and drop in the zip. It's read the same way and you get the same review; only the comments stay behind.

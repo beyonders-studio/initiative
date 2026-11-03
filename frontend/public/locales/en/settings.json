@@ -33,7 +33,8 @@
       "integrations": "Integrations",
       "usage": "Usage",
       "planAndUsage": "Plan & usage",
-      "guests": "Guests"
+      "guests": "Guests",
+      "roles": "Roles"
     },
     "tabBadge": {
       "paymentFailed": "Payment failed",
@@ -214,6 +215,7 @@
     "connectionsDescription": "Define the AI connections members of this community can use.",
     "disabledDescription": "AI features are turned off for the platform.",
     "managedByPlatform": "AI connections are managed at the platform level. Members set their own key in their profile settings.",
+    "managedByServer": "Whoever runs this server manages AI for this community.",
     "switchTitle": "AI in this community",
     "switchLabel": "Allow AI features",
     "switchHelp": "Off, nothing in this community is sent to an AI provider, whichever connection the server or the community sets up.",
@@ -375,7 +377,9 @@
       "cases": "Cases",
       "direct_messages": "Messages and connections",
       "jobs": "Exports and imports",
-      "account": "Your account"
+      "account": "Your account",
+      "overdue": "Overdue tasks",
+      "coming_up": "Coming up"
     },
     "reminderLeadTime": {
       "label": "Remind me",
@@ -399,19 +403,22 @@
     "groups": {
       "your_communities": "In your communities",
       "community": "Needs you",
-      "account": "Just you"
+      "account": "Just you",
+      "digests": "Digests"
     },
     "categoryDescriptions": {
       "mentions": "Somebody named you, replied to you or reacted to your comment.",
-      "assignments": "You were given a task or invited to something, or what you're on is due, changed, cancelled or about to start.",
-      "subscriptions": "Changes, comments and reactions on what you follow, which includes what you made. The bell on anything stops it.",
+      "assignments": "You were given a task or invited to something, or what you're on changed, was cancelled or is about to start.",
+      "subscriptions": "Changes, comments and reactions on what you follow, which includes what you made, and the reminders you set on tasks. The bell on anything stops its changes.",
       "news": "A post went up, you were added to an initiative or a project, or your request to join was answered.",
       "approvals": "Somebody is waiting on your decision. Always shows in the bell.",
       "moderation": "A community's moderators took down or warned you about something you wrote. Always shows in the bell.",
       "cases": "A case opened where you work cases, or its requester answered and nobody has taken it.",
       "direct_messages": "Somebody messaged you, asked to connect, or accepted. Who and how many, never what a message says.",
       "jobs": "An export or import you asked for has finished.",
-      "account": "Something was done to your account. Always shows in the bell."
+      "account": "Something was done to your account. Always shows in the bell.",
+      "overdue": "Every task assigned to you that is past its due date, in one message.",
+      "coming_up": "Tasks due and events starting before the next one, in one message."
     },
     "quietHours": {
       "title": "Quiet hours",
@@ -431,19 +438,15 @@
       "offHere": "Off here: {{rows}}"
     },
     "timing": {
-      "title": "When you hear about it",
-      "description": "Email can arrive as it happens or gathered up. Nothing is held back that you have not asked us to hold.",
       "cadence": {
         "label": "Email arrives",
         "instant": "Right away",
         "hourly": "Once an hour",
         "daily": "Once a day",
-        "weekly": "Once a week",
-        "help": "Anything held is gathered into one message."
+        "weekly": "Once a week"
       },
       "day": "On",
       "time": "At",
-      "timeHelp": "Your scheduled email, and the overdue reminder, go out at this time.",
       "personalInstant": "Send things addressed to me right away",
       "personalInstantHelp": "Mentions, replies, tasks assigned to you, invitations and direct messages skip the queue.",
       "respectPresence": "Don't interrupt me while I'm using Initiative",
@@ -468,6 +471,16 @@
       "saveError": "Unable to update when you hear about things",
       "zone": "Times are in {{timezone}}.",
       "changeZone": "Change time zone"
+    },
+    "digests": {
+      "title": "Digests",
+      "description": "Summaries on a schedule. Everything in them is already in your bell.",
+      "frequency": "How often",
+      "daily": "Every day",
+      "weekly": "Every week",
+      "gatheredEmail": "Gathered email",
+      "gatheredEmailHelp": "Email from the rows above arrives right away, or gathered into one message.",
+      "afterPause": "When a pause or quiet hours end, you also get one summary of what came in."
     },
     "weekdays": {
       "1": "Monday",
@@ -750,6 +763,16 @@
       "idleLabel": "Idle minutes",
       "idlePlaceholder": "No limit",
       "idleHint": "How long a session may sit untouched before it ends. Leave blank to keep the window set when the server was deployed. Using the app counts as touching it, so this only runs down once somebody has stopped. A community held to the compliance standard shortens it further for its own members."
+    },
+    "breachedPasswordCheck": {
+      "title": "Breached passwords",
+      "description": "Turn away a new password that has already turned up in a data breach.",
+      "label": "Check new passwords against known breaches",
+      "onHelp": "Only the first five characters of the password's hash leave this server. The password itself never does.",
+      "offHelp": "New passwords are not checked. Turn this off only where this server cannot reach the internet.",
+      "enabledToast": "New passwords are checked against known breaches.",
+      "disabledToast": "New passwords are no longer checked against known breaches.",
+      "error": "We couldn't change the breached password check."
     },
     "secondFactorRequirement": {
       "title": "Two-factor authentication",
@@ -1067,7 +1090,19 @@
     "caseRequiredNoneOpen": "Access is asked for on a case here, and there is no open case you can name. Open one first.",
     "caseOptionalHint": "Optional. Without one, record what you did on the case by hand afterwards.",
     "caseOtherCommunity": "This case is about community #{{community}}, not the one chosen.",
-    "caseMark": "Case #{{id}}"
+    "caseMark": "Case #{{id}}",
+    "notice": {
+      "label": "Tell the community",
+      "none": "Don't tell it",
+      "when_granted": "When access starts",
+      "when_ended": "Once access has ended",
+      "help": "Its superadmins are emailed the level and the kind of case, never the reason.",
+      "always": "Access for a support case is always emailed to the community's superadmins when it starts.",
+      "mark": {
+        "when_granted": "community told when it starts",
+        "when_ended": "community told once it ends"
+      }
+    }
   },
   "platformLayout": {
     "title": "Platform settings",
@@ -1267,6 +1302,12 @@
       "supportLabel": "Help requests",
       "supportHelp": "Let their members send a help request. Off, the Ask for help control opens the FAQ instead.",
       "supportNeedsIntake": "Nowhere to send a help request yet. Bind the support stream to a project under Platform settings › Intake, and this can be switched on.",
+      "aiConnectionsLabel": "Its own AI connections",
+      "aiConnectionsHelp": "Lets the community set up AI providers of its own. Off, the ones it has are kept and not used.",
+      "pluginsLabel": "Its own plug-ins",
+      "pluginsHelp": "Lets the community install and configure plug-ins. Off, the ones it has keep running as they are.",
+      "customRolesLabel": "Custom roles",
+      "customRolesHelp": "Its admins can define roles that give people part of running the community. Closed, the roles it has keep applying.",
       "authOption": {
         "restrictions": {
           "label": "Its own security standard",
@@ -1461,6 +1502,7 @@
     }
   },
   "communityAuth": {
+    "setByDeployment": "Whoever runs this server sets this for your community.",
     "shareUrl": {
       "title": "Member sign-in link",
       "description": "Share this link with members — it offers this community's sign-in providers and brings them straight into the community.",
@@ -1863,7 +1905,28 @@
     "maxGuestDaysHelpText": "No guest stays longer than this, whatever a community sets.",
     "maxGuestDaysSave": "Save the longest guest stay",
     "maxGuestDaysSaved_one": "Guests stay {{count}} day at most.",
-    "maxGuestDaysSaved_other": "Guests stay {{count}} days at most."
+    "maxGuestDaysSaved_other": "Guests stay {{count}} days at most.",
+    "joinAndCreateTitle": "Who may join and create",
+    "publicRegistrationLabel": "Let anyone sign up",
+    "publicRegistrationHelpText": "People can make an account without an invite. While community creation is off, only invited people can sign up.",
+    "publicRegistrationEnabledToast": "Anyone can sign up.",
+    "publicRegistrationDisabledToast": "Only invited people can sign up.",
+    "communityCreationLabel": "Let anyone create a community",
+    "communityCreationHelpText": "When off, only people who manage communities on this server can create one, and only invited people can sign up.",
+    "communityCreationEnabledToast": "Anyone can create a community.",
+    "communityCreationDisabledToast": "Only people who manage communities can create one.",
+    "creationDailyLimitLabel": "Communities one account may create per day",
+    "creationDailyLimitHelpText": "0 means no limit. People who manage communities are not held to it.",
+    "creationDailyLimitSave": "Save the daily community limit",
+    "creationDailyLimitSaved_one": "Each account may create {{count}} community a day.",
+    "creationDailyLimitSaved_other": "Each account may create {{count}} communities a day.",
+    "creationDailyLimitSavedNone": "There is no daily limit on new communities.",
+    "exportCooldownLabel": "Hours between community exports",
+    "exportCooldownHelpText": "How long a community waits before it can export everything again. 0 means no wait.",
+    "exportCooldownSave": "Save the time between community exports",
+    "exportCooldownSaved_one": "Communities wait {{count}} hour between exports.",
+    "exportCooldownSaved_other": "Communities wait {{count}} hours between exports.",
+    "exportCooldownSavedNone": "Communities can export without waiting."
   },
   "account": {
     "passwordTitle": "Password",
@@ -2144,5 +2207,110 @@
     "noCommunity": "It opens no community and needs no access grant.",
     "open": "Open Control",
     "openError": "Control could not be opened."
+  },
+  "customRoles": {
+    "title": "Roles",
+    "description": "A custom role gives a member part of running the community, or narrows an admin to part of it. Each person holds one at most.",
+    "add": "Add role",
+    "addTitle": "Add a role",
+    "editTitle": "Edit {{name}}",
+    "dialogDescription": "Name it, choose who it is for, and tick what it holds.",
+    "nameLabel": "Name",
+    "rungLabel": "For",
+    "rung": {
+      "member": "Members",
+      "admin": "Admins"
+    },
+    "rungHelp": {
+      "member": "Gives a member what it holds, on top of what they already do.",
+      "admin": "Narrows an admin to what it holds."
+    },
+    "rungFixed": "Who a role is for can't change once it is made.",
+    "surfacesLabel": "What it holds",
+    "notYours": "You don't hold this yourself, so you can't give it.",
+    "holdsNothing": "Holds nothing yet.",
+    "empty": "This community has no custom roles.",
+    "loading": "Loading roles",
+    "loadError": "Couldn't load the roles.",
+    "closed": "Whoever runs this server has closed custom roles for this community. The roles it has keep applying.",
+    "deleteTitle": "Delete {{name}}?",
+    "deleteDescription": "People holding it go back to their plain role.",
+    "created": "Role added",
+    "updated": "Role saved",
+    "deleted": "Role deleted",
+    "assigned": "Role changed",
+    "createError": "Couldn't add the role.",
+    "updateError": "Couldn't save the role.",
+    "deleteError": "Couldn't delete the role.",
+    "assignError": "Couldn't change their role.",
+    "column": "Custom role",
+    "none": "None",
+    "pickerLabel": "Custom role for {{name}}",
+    "appliesWhileMember": "Applies while they are a member",
+    "appliesWhileAdmin": "Applies while they are an admin",
+    "surfaces": {
+      "profile": {
+        "label": "Profile",
+        "description": "Change the community's name, picture, banner and description."
+      },
+      "invites": {
+        "label": "Invites",
+        "description": "Make and delete invite links, guest invites included."
+      },
+      "members": {
+        "label": "Members",
+        "description": "Change people's roles and names, remove them, and give custom roles."
+      },
+      "initiatives": {
+        "label": "Initiatives",
+        "description": "Create, archive and delete any initiative, and run ones they are not in."
+      },
+      "community_calendars": {
+        "label": "Community calendars",
+        "description": "Add and change the community's own calendars."
+      },
+      "webhooks": {
+        "label": "Webhooks",
+        "description": "Set up the community's webhooks."
+      },
+      "trash": {
+        "label": "Trash",
+        "description": "Restore or delete for good anything in the community's trash."
+      },
+      "usage": {
+        "label": "Usage",
+        "description": "See what the community uses against its limits."
+      },
+      "roles": {
+        "label": "Roles",
+        "description": "Add, change and delete custom roles."
+      }
+    },
+    "beyondYours": "You can't change this role: it holds something you don't.",
+    "widensAnAdmin": "Only an admin who holds everything can delete an admin role: its holders get everything back.",
+    "setByDeployment": "Whoever runs this server defines this role. You can give it to people here, but not change or delete it."
+  },
+  "customRoleRules": {
+    "title": "Custom roles by group",
+    "description": "Give a custom role to whoever signs in carrying a group. A sign-in reads these in order and the first group it carries decides; a role somebody gave by hand stays theirs.",
+    "add": "Add role rule",
+    "empty": "No group gives a custom role yet.",
+    "gives": "Through {{provider}}, gives {{role}}",
+    "moveUp": "Move {{group}} up",
+    "moveDown": "Move {{group}} down",
+    "remove": "Remove rule",
+    "removeTitle": "Remove this rule?",
+    "removeDescription": "People in {{group}} keep the role it gave until they next sign in.",
+    "dialogDescription": "Whoever signs in through this provider carrying the group gets the role, unless an earlier rule matches first.",
+    "roleLabel": "Custom role",
+    "rolePlaceholder": "Choose a role",
+    "added": "Rule added",
+    "addError": "Couldn't add the rule",
+    "orderError": "Couldn't reorder the rules",
+    "removeError": "Couldn't remove the rule",
+    "closed": "Your server has switched custom roles off for this community. These rules keep applying; nobody here can change them.",
+    "loading": "Loading rules…",
+    "loadError": "Couldn't load the rules.",
+    "retry": "Try again"
   }
 }

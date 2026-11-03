@@ -9,7 +9,7 @@
  */
 import { screen, waitFor, within } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
-import { HttpResponse, http } from "msw";
+import { HttpResponse } from "msw";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 
 import {
@@ -108,8 +108,8 @@ const rememberView = ({
     ])
   );
   server.use(
-    http.get("/api/v1/user-view-preferences", () =>
-      HttpResponse.json({ items: { "view:1:project:1": { layout, mode: null, parts } } })
+    communityHttp.get("/view-preferences", () =>
+      HttpResponse.json({ items: { "view:project:1": { layout, mode: null, parts } } })
     )
   );
 };
@@ -118,7 +118,7 @@ const rememberView = ({
 const captureViewWrites = () => {
   const writes: unknown[] = [];
   server.use(
-    http.put("/api/v1/user-view-preferences/:scopeKey", async ({ request }) => {
+    communityHttp.put("/view-preferences/:scopeKey", async ({ request }) => {
       writes.push(((await request.json()) as { value: unknown }).value);
       return HttpResponse.json({});
     })

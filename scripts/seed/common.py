@@ -3,11 +3,13 @@ seeded, and the helpers each tool's rows are built with."""
 
 from __future__ import annotations
 
-import zlib
+import io
 from collections.abc import Iterable
 from dataclasses import dataclass, field
 from datetime import datetime, timedelta, timezone
+from pathlib import Path
 
+from PIL import Image, ImageEnhance
 from sqlmodel import SQLModel
 from sqlmodel.ext.asyncio.session import AsyncSession
 
@@ -27,6 +29,9 @@ from app.services.tenant import tags as tags_service
 
 #: One "now" for the whole run, so every relative date in it agrees.
 NOW = datetime.now(timezone.utc)
+
+#: The photos every seeded picture is cut from: the front page's own.
+PHOTOS = Path(__file__).resolve().parents[2] / "frontend" / "public" / "homepage"
 
 
 def days_ago(days: int) -> datetime:
@@ -149,40 +154,27 @@ def chip(entity_type: str, entity_id: int, text: str) -> dict:
     }
 
 
-def gradient_png(
-    width: int, height: int, top: tuple[int, int, int], bottom: tuple[int, int, int]
+def photo(
+    name: str, width: int, height: int, *, shade: int = 0, max_bytes: int | None = None
 ) -> bytes:
-    """A vertical-gradient PNG, written by hand so seeding needs no image library.
-
-    Every row is one flat colour, which is what keeps the result a few KB
-    instead of the megabytes its raw pixels would be — well inside the caps in
-    ``IMAGE_SPECS``.
-    """
-    raw = bytearray()
-    for y in range(height):
-        ratio = y / max(height - 1, 1)
-        pixel = bytes(
-            round(start + (end - start) * ratio) for start, end in zip(top, bottom)
-        )
-        raw.append(0)  # per-scanline filter: none
-        raw.extend(pixel * width)
-
-    def chunk(kind: bytes, payload: bytes) -> bytes:
-        return (
-            len(payload).to_bytes(4, "big")
-            + kind
-            + payload
-            + zlib.crc32(kind + payload).to_bytes(4, "big")
-        )
-
-    header = (
-        width.to_bytes(4, "big")
-        + height.to_bytes(4, "big")
-        + bytes((8, 2, 0, 0, 0))  # 8-bit truecolour, no interlace
-    )
-    return (
-        b"\x89PNG\r\n\x1a\n"
-        + chunk(b"IHDR", header)
-        + chunk(b"IDAT", zlib.compress(bytes(raw), 9))
-        + chunk(b"IEND", b"")
-    )
+    """One of the front page's photos as a WebP, cut from its middle to
+    ``width``:``height`` and no larger than that, so a picture keeps its
+    proportions without being made bigger than the photo is. Each ``shade``
+    darkens it a step, for an earlier rendition of the same picture. Given
+    ``max_bytes``, it is saved at whatever quality fits."""
+    image = Image.open(PHOTOS / f"{name}.webp").convert("RGB")
+    scale = min(image.width / width, image.height / height)
+    cut_width, cut_height = round(width * scale), round(height * scale)
+    left = (image.width - cut_width) // 2
+    top = (image.height - cut_height) // 2
+    image = image.crop((left, top, left + cut_width, top + cut_height))
+    if cut_width > width:
+        image = image.resize((width, height), Image.Resampling.LANCZOS)
+    if shade:
+        image = ImageEnhance.Brightness(image).enhance(1 - 0.15 * shade)
+    for quality in range(80, 0, -10):
+        out = io.BytesIO()
+        image.save(out, "WEBP", quality=quality)
+        if max_bytes is None or out.tell() <= max_bytes:
+            break
+    return out.getvalue()

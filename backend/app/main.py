@@ -33,6 +33,7 @@ from app.api.deps import (
 from app.api.plugin_openapi import build_plugin_openapi, mark_plugin_scopes
 from app.api.embed_csp import content_security_policy, plugin_frame_policy
 from app.core.body_limit import BodySizeLimitMiddleware
+from app.core.compression import TextCompressionMiddleware
 from app.core.csrf import CsrfOriginMiddleware
 from app.api.v1.api import api_router
 from app.api.well_known import router as well_known_router
@@ -71,22 +72,6 @@ configure_logging()
 
 logger = logging.getLogger(__name__)
 
-#: Stored types a served upload is rendered inline as. Raster pictures only:
-#: an ``<img>`` draws these and nothing about them is markup. Anything else —
-#: an SVG, an uploaded file, a type nothing recognizes — is handed over as a
-#: download with scripts disabled.
-INLINE_UPLOAD_TYPES = frozenset(
-    {
-        "image/png",
-        "image/jpeg",
-        "image/gif",
-        "image/webp",
-        "image/tiff",
-        "image/x-icon",
-        "image/vnd.microsoft.icon",
-    }
-)
-
 #: The same question for a row written before the type column existed: its
 #: stored name is the only thing that describes it.
 NAMED_AS_MARKUP = (".svg", ".html", ".htm")
@@ -95,7 +80,7 @@ NAMED_AS_MARKUP = (".svg", ".html", ".htm")
 #:
 #: A stored blob is immutable, so this is not about staleness — it is how
 #: often access is re-checked. Five minutes: long enough that scrolling a
-#: catalog up and down is not a request per picture per pass, short enough to
+#: collection up and down is not a request per picture per pass, short enough to
 #: stay close to the current answer.
 UPLOAD_CACHE_SECONDS = 300
 
@@ -164,6 +149,11 @@ async def lifespan(app: FastAPI):
         from app.services import storage_config
 
         await storage_config.refresh_storage_config(session)
+        # Whether objects stored encrypted are left to read with
+        # STORAGE_ENCRYPTION unset; nothing to do where it is set or never was.
+        from app.services import storage_keys
+
+        await storage_keys.prime(session)
         # The same for the captcha secret and the FCM service account: both are
         # read from paths that hold no usable session (a synchronous predicate,
         # a background dispatch), so each keeps a process-wide snapshot, and it
@@ -244,13 +234,16 @@ async def lifespan(app: FastAPI):
         from app.db import post_commit
 
         await post_commit.settle_all()
-        # The expression evaluators of declarative plug-ins and the document
-        # editor, if either started.
+        # The expression evaluators of declarative plug-ins, the document
+        # editor and the image worker, if any started.
         from app.services import editor_engine
         from app.services.marketplace import expressions
+        from app.services.tenant import spreadsheet_import, thumbnails
 
         expressions.shutdown()
         editor_engine.shutdown()
+        thumbnails.shutdown()
+        spreadsheet_import.shutdown()
 
 
 # docs_url is left None: the default route would inherit the app-wide CSP and
@@ -518,6 +511,10 @@ class SecurityHeadersMiddleware(BaseHTTPMiddleware):
 
 app.add_middleware(SecurityHeadersMiddleware)
 
+# Text-like responses gzipped, outside the headers above; see
+# app/core/compression.py.
+app.add_middleware(TextCompressionMiddleware, minimum_size=1024, compresslevel=6)
+
 # Body-size bounds for every request — a route's own where it has one, a
 # default otherwise — enforced at the ASGI seam so an oversized (or chunked,
 # length-less) request is refused before its body is buffered, not after
@@ -544,7 +541,17 @@ app.add_middleware(
     # Export downloads name the file server-side (Content-Disposition); the
     # SPA reads it to name the blob it saves — expose it for the native
     # (cross-origin) app, web is same-origin and sees it regardless.
-    expose_headers=["Content-Disposition"],
+    # A resumable upload's client reads where the upload is and how far it got.
+    expose_headers=[
+        "Content-Disposition",
+        "Location",
+        "Upload-Offset",
+        "Upload-Length",
+        "Upload-Expires",
+        "Tus-Resumable",
+        "Tus-Version",
+        "Tus-Extension",
+    ],
 )
 
 # Added last, so it sits outside the rest: every request gets its id here,
@@ -568,7 +575,13 @@ async def serve_upload_file(
 
     from sqlalchemy import text
 
-    from app.services.storage import build_upload_response, get_guild_storage
+    from app.services.storage import (
+        INLINE_UPLOAD_TYPES,
+        USER_CONTENT_CSP,
+        build_upload_response,
+        get_guild_storage,
+        requested_range,
+    )
 
     # Media is referenced by pages inside a guild, and ``<img>``/iframe can't
     # send headers, so the guild rides in the URL (and a cookie is per-browser,
@@ -594,7 +607,9 @@ async def serve_upload_file(
 
     # Storage is touched only after authorization passes. open_readable returns
     # None for a missing/traversal key -> 404 (same fail-closed shape as before).
-    blob = get_guild_storage(guild_id).open_readable(filename)
+    blob = get_guild_storage(guild_id).open_readable(
+        filename, byte_range=requested_range(request.headers.get("range"))
+    )
     if blob is None:
         raise HTTPException(status_code=404)
 
@@ -602,7 +617,7 @@ async def serve_upload_file(
     # new version of a picture, gets a fresh UUID — so the bytes behind a URL
     # are safe to reuse. The decision above them is re-made per request, so
     # the window is short rather than a year: long enough for the repeat
-    # requests one session of scrolling a catalog makes, and short enough that
+    # requests one session of scrolling a collection makes, and short enough that
     # access is re-checked while somebody is still reading. ``private`` keeps
     # shared caches out of it, and ``must-revalidate`` bounds the entry to
     # that window.
@@ -623,7 +638,7 @@ async def serve_upload_file(
     )
     if not inline:
         headers["Content-Disposition"] = "attachment"
-        headers["Content-Security-Policy"] = "script-src 'none'"
+        headers["Content-Security-Policy"] = USER_CONTENT_CSP
     logger.info("upload_served filename=%s user=%d", filename, current_user.id)
     return build_upload_response(blob, media_type=stored_type, headers=headers)
 

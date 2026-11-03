@@ -32,6 +32,7 @@ from app.api.v1.tenant_endpoints import (
     calendar_events,
     calendars,
     dashboards,
+    data_jobs,
     guild_plugins,
     collaboration,
     comments,
@@ -40,10 +41,11 @@ from app.api.v1.tenant_endpoints import (
     events,
     exports,
     imports,
+    resumable_uploads,
     initiatives,
     marketplace as guild_marketplace,
     me_tools,
-    catalogs,
+    collections,
     me_trash,
     posts,
     projects,
@@ -55,6 +57,7 @@ from app.api.v1.tenant_endpoints import (
     relationships,
     resource_grants,
     storage,
+    custom_roles,
     tags,
     task_statuses,
     task_types,
@@ -65,6 +68,8 @@ from app.api.v1.tenant_endpoints import (
     tool_lists,
     tools,
     trash,
+    share_requests,
+    view_preferences,
     wikis,
 )
 from app.api.v1.platform_endpoints import (
@@ -306,13 +311,24 @@ guild_router.include_router(
     initiatives.router, prefix="/initiatives", tags=["initiatives"]
 )
 guild_router.include_router(files.router, **_tool_mount(Tool.file))
+# A collection is part of Files, and answers under its tag.
+guild_router.include_router(
+    collections.router, prefix="/collections", tags=_tool_mount(Tool.file)["tags"]
+)
 guild_router.include_router(
     attachments.router, prefix="/attachments", tags=["attachments"]
 )
+# Asking for something you can't open or edit, and the answer. Every tool's
+# resources, so mounted once at the community's root rather than per tool.
+guild_router.include_router(
+    share_requests.router, prefix="/share-requests", tags=["sharing"]
+)
+guild_router.include_router(data_jobs.router, prefix="/data-jobs", tags=["data-jobs"])
 guild_router.include_router(exports.router, prefix="/exports", tags=["exports"])
 guild_router.include_router(demo.community_router, prefix="/demo", tags=["demo"])
 guild_router.include_router(demo.sales_router, prefix="/demo", tags=["demo"])
 guild_router.include_router(imports.router, prefix="/imports", tags=["imports"])
+guild_router.include_router(resumable_uploads.router, prefix="/resumable-uploads")
 guild_router.include_router(queues.router, **_tool_mount(Tool.queue))
 # Flat read-back routes, at the guild root: an event envelope names a
 # resource by its own id, so every evented resource must resolve from one.
@@ -323,10 +339,6 @@ guild_router.include_router(counters.counters_router, tags=["counters"])
 guild_router.include_router(calendars.router, **_tool_mount(Tool.calendar))
 guild_router.include_router(dashboards.router, **_tool_mount(Tool.dashboard))
 guild_router.include_router(posts.router, **_tool_mount(Tool.post))
-guild_router.include_router(catalogs.router, **_tool_mount(Tool.catalog))
-guild_router.include_router(
-    catalogs.items_router, tags=_tool_mount(Tool.catalog)["tags"]
-)
 guild_router.include_router(wikis.router, **_tool_mount(Tool.wiki))
 guild_router.include_router(wikis.pages_router, tags=_tool_mount(Tool.wiki)["tags"])
 # Plug-ins installed at guild scope. Every member reads them (the sidebar needs to
@@ -358,6 +370,9 @@ guild_router.include_router(
     resource_grants.router, prefix="/resource-grants", tags=["resource-grants"]
 )
 guild_router.include_router(storage.router, prefix="/storage", tags=["storage"])
+guild_router.include_router(
+    custom_roles.router, prefix="/custom-roles", tags=["custom-roles"]
+)
 guild_router.include_router(
     relationships.router, prefix="/relationships", tags=["relationships"]
 )
@@ -392,6 +407,13 @@ guild_router.include_router(users.guild_router, prefix="/users", tags=["users"])
 guild_router.include_router(users.members_router, prefix="/members", tags=["users"])
 guild_router.include_router(
     personal_items.guild_router, prefix="/personal-items", tags=["personal-items"]
+)
+# A person's views of this community's lists. The account's own views are the
+# top-level /user-view-preferences; both answer under one tag.
+guild_router.include_router(
+    view_preferences.router,
+    prefix="/view-preferences",
+    tags=["user-view-preferences"],
 )
 # WebSockets (guild-scoped). Mounting under /c fixes the URL shape now; the
 # handlers are rewired to read the path guild in a follow-up step.

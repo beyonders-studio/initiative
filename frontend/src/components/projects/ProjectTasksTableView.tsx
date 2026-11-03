@@ -18,6 +18,7 @@ import { Trans, useTranslation } from "react-i18next";
 
 import type {
   LayoutGrouping,
+  ListLayoutDefinitionInputDisplays,
   ListTasksParams,
   TaskListRead,
   TaskStatusRead,
@@ -34,12 +35,13 @@ import { TableRow } from "@/components/ui/table";
 import { type ColumnLimits, NO_COLUMN_LIMITS } from "@/hooks/useColumnLimits";
 import { useProjectTaskTypes } from "@/hooks/useProjects";
 import type { useProjectTaskTableState } from "@/hooks/useProjectTaskView";
-import { useProperties } from "@/hooks/useProperties";
+import { NO_DEFINITIONS, useOwnedDefinitions } from "@/hooks/useProperties";
 import { useTaskGroupings } from "@/hooks/useTaskGroupings";
 import { useMoveTaskToGroup } from "@/hooks/useTasks";
+import { useTaskTypeChange } from "@/hooks/useTaskTypeChange";
 import { fieldColumnId } from "@/lib/layouts/columns";
 import { columnsOf } from "@/lib/layouts/draft";
-import { useProjectLayoutEnv } from "@/lib/layouts/fields";
+import { useProjectLayoutEnv, withDisplays } from "@/lib/layouts/fields";
 import { groupRowId, groupRows, NO_GROUP, uniqueTasksFromRows } from "@/lib/layouts/grouping";
 import { pluginFields, usePluginsOnItems } from "@/lib/layouts/plugins";
 import { taskFields } from "@/lib/layouts/tasks";
@@ -76,6 +78,8 @@ type ProjectTasksListViewProps = {
   tableState: ReturnType<typeof useProjectTaskTableState>;
   /** The fields the view shows as columns, in order, where it names them. */
   viewColumns?: string[] | null;
+  /** How its columns draw each rating, as the layout says. */
+  displays?: ListLayoutDefinitionInputDisplays;
   /** The groupings the view offers, in order, where it names them. */
   viewGroupings?: LayoutGrouping[] | null;
   /** How full the board's limited columns are. */
@@ -345,6 +349,7 @@ const ProjectTasksTableViewComponent = ({
   onExitSelection,
   tableState: [tableState, { setGrouping, setSorting }],
   viewColumns,
+  displays,
   viewGroupings,
   columnLimits = NO_COLUMN_LIMITS,
   editing = false,
@@ -352,16 +357,26 @@ const ProjectTasksTableViewComponent = ({
   const { t, i18n } = useTranslation(["projects", "comments", "tasks"]);
   const statusDisabled = !canEditTaskDetails || taskActionsDisabled;
   const env = useProjectLayoutEnv(taskHref);
-  const { mutate: moveTask } = useMoveTaskToGroup();
+  const { mutate: moveTask, mutateAsync: moveTaskNow } = useMoveTaskToGroup();
+  // A drop into another type asks first for what that type's page requires.
+  const typeChange = useTaskTypeChange(projectId, initiativeId);
 
-  // Scoped to the project's initiative so the column list stays focused.
-  const { data: propertyDefinitions = [] } = useProperties({ initiativeId });
+  // The project's metadata and its initiative's properties, so the column
+  // list stays focused.
+  const { data: propertyDefinitions = NO_DEFINITIONS } = useOwnedDefinitions({
+    initiativeId,
+    owner: { kind: "project", id: projectId },
+  });
   const plugins = usePluginsOnItems(initiativeId);
   // A project with one type shows none: it tells no task apart.
   const typed = (useProjectTaskTypes(projectId).data?.length ?? 0) > 1;
   const fields = useMemo(
-    () => taskFields(propertyDefinitions, pluginFields(plugins, i18n.language), { typed }),
-    [propertyDefinitions, plugins, i18n.language, typed]
+    () =>
+      withDisplays(
+        taskFields(propertyDefinitions, pluginFields(plugins, i18n.language), { typed }),
+        displays
+      ),
+    [propertyDefinitions, plugins, i18n.language, typed, displays]
   );
   const { grouping, sorting } = tableState;
   // What the view offers to group by, the groups each leaves out, and the
@@ -688,11 +703,15 @@ const ProjectTasksTableViewComponent = ({
       const move = grouped.move(from, to);
       if ("status" in move) {
         onStatusChange(task.id, move.status);
+      } else if ("patch" in move && typeof move.patch.task_type_id === "number") {
+        void typeChange.change(task.id, move.patch.task_type_id, (changes) =>
+          moveTaskNow({ taskId: task.id, move: { patch: { ...move.patch, ...changes } } })
+        );
       } else {
         moveTask({ taskId: task.id, move });
       }
     },
-    [grouped, tasksById, onStatusChange, moveTask]
+    [grouped, tasksById, onStatusChange, moveTask, moveTaskNow, typeChange]
   );
 
   return (
@@ -762,6 +781,7 @@ const ProjectTasksTableViewComponent = ({
           onExitSelection={onExitSelection}
         />
       </SortableContext>
+      {typeChange.dialog}
     </DndContext>
   );
 };
@@ -782,6 +802,7 @@ export const ProjectTasksTableView = memo(
       prevProps.initiativeId === nextProps.initiativeId &&
       prevProps.tableState[0] === nextProps.tableState[0] &&
       prevProps.viewColumns === nextProps.viewColumns &&
+      prevProps.displays === nextProps.displays &&
       prevProps.viewGroupings === nextProps.viewGroupings &&
       prevProps.columnLimits === nextProps.columnLimits &&
       prevProps.editing === nextProps.editing

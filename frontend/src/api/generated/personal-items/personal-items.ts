@@ -28,11 +28,12 @@ import type {
   PersonalItemRead,
   PersonalItemState,
   RecordViewParams,
+  ReminderSet,
   Tool,
 } from "../initiativeAPI.schemas";
 
 import { apiMutator } from "../../mutator";
-import type { ErrorType } from "../../mutator";
+import type { ErrorType, BodyType } from "../../mutator";
 
 type SecondParameter<T extends (...args: never) => unknown> = Parameters<T>[1];
 
@@ -872,6 +873,189 @@ export const useUnsubscribeItem = <TError = ErrorType<HTTPValidationError>, TCon
   TContext
 > => {
   return useMutation(getUnsubscribeItemMutationOptions(options), queryClient);
+};
+/**
+ * Remind the reader of a task at a time of their choosing. Setting it again
+ * moves it, and arms one already sent. A platform grantee is not a member, so
+ * nothing is kept for them.
+ * @summary Set Task Reminder
+ */
+export const setTaskReminder = (
+  communityId: number,
+  taskId: number,
+  reminderSet: BodyType<ReminderSet>,
+  options?: SecondParameter<typeof apiMutator>,
+  signal?: AbortSignal
+) => {
+  return apiMutator<PersonalItemState>(
+    {
+      url: `/api/v1/c/${communityId}/personal-items/reminder/task/${taskId}`,
+      method: "PUT",
+      headers: { "Content-Type": "application/json" },
+      data: reminderSet,
+      signal,
+    },
+    options
+  );
+};
+
+export const getSetTaskReminderMutationKey = () => ["setTaskReminder"] as const;
+
+export const getSetTaskReminderMutationOptions = <
+  TError = ErrorType<HTTPValidationError>,
+  TContext = unknown,
+>(options?: {
+  mutation?: UseMutationOptions<
+    Awaited<ReturnType<typeof setTaskReminder>>,
+    TError,
+    SetTaskReminderMutationVariables,
+    TContext
+  >;
+  request?: SecondParameter<typeof apiMutator>;
+}): UseMutationOptions<
+  Awaited<ReturnType<typeof setTaskReminder>>,
+  TError,
+  SetTaskReminderMutationVariables,
+  TContext
+> => {
+  const mutationKey = getSetTaskReminderMutationKey();
+  const { mutation: mutationOptions, request: requestOptions } = options
+    ? options.mutation && "mutationKey" in options.mutation && options.mutation.mutationKey
+      ? options
+      : { ...options, mutation: { ...options.mutation, mutationKey } }
+    : { mutation: { mutationKey }, request: undefined };
+
+  const mutationFn: MutationFunction<
+    Awaited<ReturnType<typeof setTaskReminder>>,
+    SetTaskReminderMutationVariables
+  > = (props) => {
+    const { communityId, taskId, data } = props ?? {};
+
+    return setTaskReminder(communityId, taskId, data, requestOptions);
+  };
+
+  return { mutationFn, ...mutationOptions };
+};
+
+export type SetTaskReminderMutationResult = NonNullable<
+  Awaited<ReturnType<typeof setTaskReminder>>
+>;
+export type SetTaskReminderMutationBody = BodyType<ReminderSet>;
+export type SetTaskReminderMutationError = ErrorType<HTTPValidationError>;
+export type SetTaskReminderMutationVariables = {
+  communityId: number;
+  taskId: number;
+  data: BodyType<ReminderSet>;
+};
+
+/**
+ * @summary Set Task Reminder
+ */
+export const useSetTaskReminder = <TError = ErrorType<HTTPValidationError>, TContext = unknown>(
+  options?: {
+    mutation?: UseMutationOptions<
+      Awaited<ReturnType<typeof setTaskReminder>>,
+      TError,
+      SetTaskReminderMutationVariables,
+      TContext
+    >;
+    request?: SecondParameter<typeof apiMutator>;
+  },
+  queryClient?: QueryClient
+): UseMutationResult<
+  Awaited<ReturnType<typeof setTaskReminder>>,
+  TError,
+  SetTaskReminderMutationVariables,
+  TContext
+> => {
+  return useMutation(getSetTaskReminderMutationOptions(options), queryClient);
+};
+/**
+ * Take the reader's reminder of a task off. Idempotent.
+ * @summary Clear Task Reminder
+ */
+export const clearTaskReminder = (
+  communityId: number,
+  taskId: number,
+  options?: SecondParameter<typeof apiMutator>,
+  signal?: AbortSignal
+) => {
+  return apiMutator<void>(
+    {
+      url: `/api/v1/c/${communityId}/personal-items/reminder/task/${taskId}`,
+      method: "DELETE",
+      signal,
+    },
+    options
+  );
+};
+
+export const getClearTaskReminderMutationKey = () => ["clearTaskReminder"] as const;
+
+export const getClearTaskReminderMutationOptions = <
+  TError = ErrorType<HTTPValidationError>,
+  TContext = unknown,
+>(options?: {
+  mutation?: UseMutationOptions<
+    Awaited<ReturnType<typeof clearTaskReminder>>,
+    TError,
+    ClearTaskReminderMutationVariables,
+    TContext
+  >;
+  request?: SecondParameter<typeof apiMutator>;
+}): UseMutationOptions<
+  Awaited<ReturnType<typeof clearTaskReminder>>,
+  TError,
+  ClearTaskReminderMutationVariables,
+  TContext
+> => {
+  const mutationKey = getClearTaskReminderMutationKey();
+  const { mutation: mutationOptions, request: requestOptions } = options
+    ? options.mutation && "mutationKey" in options.mutation && options.mutation.mutationKey
+      ? options
+      : { ...options, mutation: { ...options.mutation, mutationKey } }
+    : { mutation: { mutationKey }, request: undefined };
+
+  const mutationFn: MutationFunction<
+    Awaited<ReturnType<typeof clearTaskReminder>>,
+    ClearTaskReminderMutationVariables
+  > = (props) => {
+    const { communityId, taskId } = props ?? {};
+
+    return clearTaskReminder(communityId, taskId, requestOptions);
+  };
+
+  return { mutationFn, ...mutationOptions };
+};
+
+export type ClearTaskReminderMutationResult = NonNullable<
+  Awaited<ReturnType<typeof clearTaskReminder>>
+>;
+
+export type ClearTaskReminderMutationError = ErrorType<HTTPValidationError>;
+export type ClearTaskReminderMutationVariables = { communityId: number; taskId: number };
+
+/**
+ * @summary Clear Task Reminder
+ */
+export const useClearTaskReminder = <TError = ErrorType<HTTPValidationError>, TContext = unknown>(
+  options?: {
+    mutation?: UseMutationOptions<
+      Awaited<ReturnType<typeof clearTaskReminder>>,
+      TError,
+      ClearTaskReminderMutationVariables,
+      TContext
+    >;
+    request?: SecondParameter<typeof apiMutator>;
+  },
+  queryClient?: QueryClient
+): UseMutationResult<
+  Awaited<ReturnType<typeof clearTaskReminder>>,
+  TError,
+  ClearTaskReminderMutationVariables,
+  TContext
+> => {
+  return useMutation(getClearTaskReminderMutationOptions(options), queryClient);
 };
 /**
  * The tools the reader opened or bookmarked in every community they are in,

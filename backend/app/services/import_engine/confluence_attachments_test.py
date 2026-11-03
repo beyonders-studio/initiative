@@ -74,11 +74,11 @@ async def test_pictures_render_from_their_upload_and_other_files_wait_to_be_file
             attachment("1", "chart.png", "image/png"),
             attachment("2", "spec.pdf", "application/pdf"),
             attachment("3", "counts.csv", "text/csv"),
-            attachment("4", "build.zip", "application/zip"),
+            attachment("4", "setup.exe", "application/x-msdownload"),
         ]
     )
-    # A table of text comes over to become a spreadsheet; a type no file
-    # holds does not come at all.
+    # A table of text comes over to become a spreadsheet; a program does not
+    # come at all.
     assert set(media.files) == {"spec.pdf", "counts.csv"}
     assert report.refused == 1
     stored = media.stored_images["chart.png"]

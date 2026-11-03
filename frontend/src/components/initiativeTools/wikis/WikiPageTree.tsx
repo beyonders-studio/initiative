@@ -213,8 +213,6 @@ const WikiPageRow = ({
   // spreadsheet, a link to a design tool — the same mark it has everywhere.
   const { Icon: FileIcon, colorClass: fileColor } = fileIcon({
     file_type: page.file_type,
-    mime_type: page.file_content_type,
-    original_filename: page.original_filename,
     smart_link_url: page.smart_link_url,
   });
 

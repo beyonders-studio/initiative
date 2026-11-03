@@ -1,4 +1,4 @@
-import { Camera, ImagePlus, Images } from "lucide-react";
+import { Camera, FolderOpen, ImagePlus, Images, Upload } from "lucide-react";
 import {
   type ChangeEvent,
   type ClipboardEvent,
@@ -14,6 +14,7 @@ import {
 } from "react";
 import { useTranslation } from "react-i18next";
 
+import { type ChosenImage, ImageChooserDialog } from "@/components/files/ImageChooser";
 import { Markdown } from "@/components/Markdown";
 import { usePhotoCapture } from "@/components/ui/image-picker";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
@@ -30,7 +31,12 @@ import { toast } from "@/lib/mascotToast";
 import { canCapturePhoto } from "@/lib/nativeCamera";
 import { cn } from "@/lib/utils";
 
-import { MARKDOWN_SHORTCUTS, MarkdownToolbar, type ToolbarItem } from "./MarkdownToolbar";
+import {
+  MARKDOWN_SHORTCUTS,
+  MarkdownToolbar,
+  type ToolbarChoice,
+  type ToolbarItem,
+} from "./MarkdownToolbar";
 
 type ComposerMode = "write" | "preview";
 
@@ -62,6 +68,9 @@ interface MarkdownComposerProps {
   /** Stores a pasted, dropped or chosen picture and answers with its address.
    *  Without it, the field takes text only. */
   onUploadImage?: (file: File) => Promise<string>;
+  /** The initiative whose pictures in Files the image button also offers,
+   *  opening there. Without it, a picture is only ever uploaded. */
+  chooseImagesFrom?: number;
   /** Shrinks the chrome for a reply box or an inline edit. */
   compact?: boolean;
   /** Which tab the field opens on. A surface whose text is usually read
@@ -97,6 +106,7 @@ export const MarkdownComposer = ({
   actions,
   tools,
   onUploadImage,
+  chooseImagesFrom,
   compact = false,
   defaultMode = "write",
   className,
@@ -166,6 +176,28 @@ export const MarkdownComposer = ({
   latestValue.current = value;
   const uploadCount = useRef(0);
   const fileInput = useRef<HTMLInputElement>(null);
+  const [choosingImage, setChoosingImage] = useState(false);
+
+  /** Write a block where the caret is, on a fresh line of its own. */
+  const writeBlock = useCallback(
+    (field: HTMLTextAreaElement, block: string) => {
+      const start = field.selectionStart;
+      const before = value.slice(0, start);
+      const written = (before === "" || before.endsWith("\n") ? "" : "\n") + block;
+      const caret = start + written.length;
+      const next = before + written + value.slice(field.selectionEnd);
+      // Known now rather than at the next render: an upload that finishes
+      // first has to find its placeholder in this text, not the one before it.
+      latestValue.current = next;
+      commit({ value: next, start: caret, end: caret });
+    },
+    [commit, value]
+  );
+
+  const insertChosen = (image: ChosenImage) => {
+    const field = innerRef.current;
+    if (field && !disabled) writeBlock(field, imageMarkdown(image.name, image.src));
+  };
 
   /** Put a picture where the caret is: a placeholder at once, the picture
    *  when it has been stored, and nothing at all if it could not be. */
@@ -182,18 +214,7 @@ export const MarkdownComposer = ({
           })}](uploading:${uploadCount.current})`,
         };
       });
-      const start = field.selectionStart;
-      const end = field.selectionEnd;
-      const before = value.slice(0, start);
-      // A picture is a block of its own, so it starts on a fresh line.
-      const lead = before === "" || before.endsWith("\n") ? "" : "\n";
-      const written = lead + placeholders.map((p) => p.text).join("\n");
-      const caret = start + written.length;
-      const withPlaceholders = before + written + value.slice(end);
-      // Known now rather than at the next render: an upload that finishes
-      // first has to find its placeholder in this text, not the one before it.
-      latestValue.current = withPlaceholders;
-      commit({ value: withPlaceholders, start: caret, end: caret });
+      writeBlock(field, placeholders.map((p) => p.text).join("\n"));
 
       const settle = (text: string, replacement: string) => {
         const next = latestValue.current.replace(text, replacement);
@@ -210,7 +231,7 @@ export const MarkdownComposer = ({
         );
       }
     },
-    [commit, disabled, onChange, onUploadImage, t, value]
+    [disabled, onChange, onUploadImage, t, writeBlock]
   );
 
   const handlePaste = (event: ClipboardEvent<HTMLTextAreaElement>) => {
@@ -244,6 +265,38 @@ export const MarkdownComposer = ({
   const allTools = useMemo<ToolbarItem[] | undefined>(() => {
     if (!onUploadImage) return tools;
     const chooseFile = () => fileInput.current?.click();
+    const fromDevice: ToolbarChoice[] = canCapturePhoto()
+      ? [
+          {
+            id: "camera",
+            label: t("imagePicker.takePhoto"),
+            icon: Camera,
+            onSelect: () => void capture("camera"),
+          },
+          {
+            id: "library",
+            label: t("imagePicker.chooseFromLibrary"),
+            icon: Images,
+            onSelect: () => void capture("library"),
+          },
+        ]
+      : [];
+    const fromFiles: ToolbarChoice[] = chooseImagesFrom
+      ? [
+          {
+            id: "files",
+            label: t("markdownEditor.imageFromFiles"),
+            icon: FolderOpen,
+            onSelect: () => setChoosingImage(true),
+          },
+        ]
+      : [];
+    const upload: ToolbarChoice = {
+      id: "upload",
+      label: t("markdownEditor.uploadImage"),
+      icon: Upload,
+      onSelect: chooseFile,
+    };
     return [
       ...(tools ?? []),
       {
@@ -251,25 +304,13 @@ export const MarkdownComposer = ({
         label: t("markdownEditor.image"),
         icon: ImagePlus,
         onClick: chooseFile,
-        choices: canCapturePhoto()
-          ? [
-              {
-                id: "camera",
-                label: t("imagePicker.takePhoto"),
-                icon: Camera,
-                onSelect: () => void capture("camera"),
-              },
-              {
-                id: "library",
-                label: t("imagePicker.chooseFromLibrary"),
-                icon: Images,
-                onSelect: () => void capture("library"),
-              },
-            ]
-          : undefined,
+        choices:
+          fromDevice.length || fromFiles.length
+            ? [...(fromDevice.length ? fromDevice : [upload]), ...fromFiles]
+            : undefined,
       },
     ];
-  }, [capture, onUploadImage, t, tools]);
+  }, [capture, chooseImagesFrom, onUploadImage, t, tools]);
 
   const handleKeyDown = (event: KeyboardEvent<HTMLTextAreaElement>) => {
     onKeyDown?.(event);
@@ -371,6 +412,14 @@ export const MarkdownComposer = ({
             className="resize-y rounded-none rounded-b-md border-0 shadow-none focus-visible:ring-0"
           />
           {overlay}
+          {chooseImagesFrom ? (
+            <ImageChooserDialog
+              open={choosingImage}
+              onOpenChange={setChoosingImage}
+              initiativeId={chooseImagesFrom}
+              onPick={insertChosen}
+            />
+          ) : null}
           {onUploadImage && (
             <input
               ref={fileInput}

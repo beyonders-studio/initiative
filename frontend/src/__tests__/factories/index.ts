@@ -6,7 +6,7 @@ export {
   resetCounter as resetCalendarEventCounter,
 } from "./calendarEvent.factory";
 export { ownerCan, readerCan, writerCan } from "./can";
-export { buildCatalog, buildCatalogItem } from "./catalog.factory";
+export { buildCollection, buildCollectionFile } from "./collection.factory";
 export {
   buildComment,
   buildReactionGroup,
@@ -20,6 +20,7 @@ export {
   communityCan,
   resetCounter as resetCommunityCounter,
 } from "./community.factory";
+export { buildDataJob, resetCounter as resetDataJobCounter } from "./dataJob.factory";
 export {
   buildContactGrant,
   buildIgnoredAccount,
@@ -57,6 +58,7 @@ export {
 } from "./project.factory";
 export {
   buildPropertyDefinition,
+  buildPropertyGroup,
   buildPropertyOption,
   buildPropertySummary,
   resetCounter as resetPropertyCounter,
@@ -83,6 +85,11 @@ export {
   buildTaggedEntity,
   resetCounter as resetSearchCounter,
 } from "./search.factory";
+export {
+  buildShareRequest,
+  buildShareStanding,
+  resetCounter as resetShareRequestCounter,
+} from "./shareRequest.factory";
 export { buildTag, buildTagSummary, resetCounter as resetTagCounter } from "./tag.factory";
 export {
   buildTask,
@@ -110,9 +117,10 @@ export {
 export { buildWiki, buildWikiPage } from "./wiki.factory";
 
 import { resetCounter as resetCalendarEventCounter } from "./calendarEvent.factory";
-import { resetCounter as resetCatalogCounter } from "./catalog.factory";
+import { resetCounter as resetCollectionCounter } from "./collection.factory";
 import { resetCounter as resetCommentCounter } from "./comment.factory";
 import { resetCounter as resetCommunityCounter } from "./community.factory";
+import { resetCounter as resetDataJobCounter } from "./dataJob.factory";
 import { resetCounter as resetDmCounter } from "./dm.factory";
 import { resetCounter as resetFileCounter } from "./file.factory";
 import { resetCounter as resetInitiativeCounter } from "./initiative.factory";
@@ -124,6 +132,7 @@ import { resetCounter as resetPropertyCounter } from "./properties";
 import { resetCounter as resetQueueCounter } from "./queue.factory";
 import { resetRecentCounter } from "./recent.factory";
 import { resetCounter as resetSearchCounter } from "./search.factory";
+import { resetCounter as resetShareRequestCounter } from "./shareRequest.factory";
 import { resetCounter as resetTagCounter } from "./tag.factory";
 import { resetCounter as resetTaskCounter } from "./task.factory";
 import { resetCounter as resetTaskTypeCounter } from "./taskType.factory";
@@ -143,6 +152,7 @@ export function resetFactories(): void {
   resetTaskTypeCounter();
   resetTagCounter();
   resetFileCounter();
+  resetDataJobCounter();
   resetCommentCounter();
   resetNotificationCounter();
   resetQueueCounter();
@@ -152,7 +162,8 @@ export function resetFactories(): void {
   resetSearchCounter();
   resetDmCounter();
   resetPostCounter();
-  resetCatalogCounter();
+  resetCollectionCounter();
   resetWikiCounter();
   resetCalendarEventCounter();
+  resetShareRequestCounter();
 }

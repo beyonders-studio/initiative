@@ -41,7 +41,8 @@ from sqlmodel.ext.asyncio.session import AsyncSession
 from app.core.messages import ExportMessages
 from app.core.tools import Tool, tool_envelope_type
 from app.models.platform.user import User
-from app.models.tenant.file import File, FileType
+from app.core.file_types import FileType, export_formats, is_stored
+from app.models.tenant.file import File
 from app.services.export.adapters._common import (
     BuildContext,
     ToolExportAdapter,
@@ -51,14 +52,6 @@ from app.services.export.adapters._common import (
 from app.services.export.contract import RenderItem
 from app.services.export.engine import ExportError
 
-# Ordered, so the union the route publishes reads in one stable order.
-_TYPE_FORMATS: dict[str, tuple[str, ...]] = {
-    FileType.native.value: ("json", "md", "pdf", "docx"),
-    FileType.whiteboard.value: ("json",),
-    FileType.spreadsheet.value: ("csv", "xlsx", "json"),
-    FileType.file.value: ("file",),
-    FileType.smart_link.value: ("md", "json"),
-}
 
 # The size proxy divisor for file passthroughs: one "row" per MiB, so the
 # inline threshold (rows) doubles as an inline size cap in MiB.
@@ -68,8 +61,11 @@ _FILE_SIZE_ROW_BYTES = 1_048_576
 class FileAdapter(ToolExportAdapter):
     tool = Tool.file
     template_id = "document"  # the Lexical PDF template
+    # Ordered, so the union the route publishes reads in one stable order.
     formats = tuple(
-        dict.fromkeys(fmt for fmts in _TYPE_FORMATS.values() for fmt in fmts)
+        dict.fromkeys(
+            fmt for file_type in FileType for fmt in export_formats(file_type)
+        )
     )
 
     async def load(
@@ -85,7 +81,7 @@ class FileAdapter(ToolExportAdapter):
         is only exportable in a format every file in it supports."""
         files = await super().load(session, user, guild_id, params, format)
         for file in files:
-            if format not in _TYPE_FORMATS.get(doc_type_of(file), ()):
+            if format not in export_formats(file_type_of(file)):
                 raise ExportError(ExportMessages.EXPORT_INVALID_FORMAT)
         return files
 
@@ -105,14 +101,14 @@ class FileAdapter(ToolExportAdapter):
 
 
 def _file_count(file: File) -> int:
-    doc_type = doc_type_of(file)
-    if doc_type == FileType.spreadsheet.value:
+    file_type = file_type_of(file)
+    if file_type == FileType.sheet.value:
         from app.services.export.spreadsheet import sheets_of
 
         return sum(
             len(sheet.get("cells") or {}) for sheet in sheets_of(file.content or {})
         )
-    if doc_type == FileType.file.value:
+    if is_stored(file_type):
         return int(file.current_version.file_size or 0) // _FILE_SIZE_ROW_BYTES
     return 1
 
@@ -124,10 +120,10 @@ def build_file_item(
     these (the engine zips a batch of N into a single download)."""
     from app.services.export.i18n import et
 
-    doc_type = doc_type_of(file)
+    file_type = file_type_of(file)
     stem = export_stem(file.name, date)
 
-    if doc_type == FileType.native.value and format != "json":
+    if file_type == FileType.lexical.value and format != "json":
         from app.services.export.lexical import blocks_from_editor_state
 
         blocks, assets = blocks_from_editor_state(file.content or {}, guild_id=guild_id)
@@ -141,7 +137,7 @@ def build_file_item(
             "assets": assets,
         }
         return RenderItem(key=stem, data=data)
-    if doc_type == FileType.whiteboard.value:
+    if file_type == FileType.excalidraw.value:
         # Importable backup: the scene wrapped as the standard Excalidraw
         # file shape INSIDE the generic envelope — a future import
         # discriminates by type like every other file type, and
@@ -158,12 +154,12 @@ def build_file_item(
                 "files": content.get("files") or {},
             },
         )
-    elif doc_type == FileType.native.value:
+    elif file_type == FileType.lexical.value:
         # Importable backup: the raw editor state inside the generic
         # file envelope. The editor toolbar's import unwraps the
         # envelope, so round-trip through the editor survives.
         data = _envelope(file, content=file.content or {})
-    elif doc_type == FileType.spreadsheet.value:
+    elif file_type == FileType.sheet.value:
         if format == "json":
             # Importable backup: the canonical (already-versioned) snapshot
             # in the generic file envelope, so a future import can
@@ -171,7 +167,7 @@ def build_file_item(
             data = _envelope(file, content=file.content or {})
         else:
             data = {"title": file.name, "grid": file.content or {}}
-    elif doc_type == FileType.file.value:
+    elif is_stored(file_type):
         version = file.current_version
         storage_key = storage_key_of(version.file_url)
         data = {
@@ -179,7 +175,7 @@ def build_file_item(
             "filename": version.original_filename or storage_key,
             "content_type": version.file_content_type,
         }
-    else:  # smart_link
+    else:  # url
         if format == "json":
             data = _envelope(
                 file,
@@ -205,7 +201,7 @@ def _envelope(file: File, *, content: dict) -> dict:
     return {
         "type": tool_envelope_type(Tool.file),
         "schema_version": 1,
-        "file_type": doc_type_of(file),
+        "file_type": file_type_of(file),
         "name": file.name,
         "content": content,
         "tags": sorted(tag.name for tag in file.tags or []),
@@ -213,7 +209,7 @@ def _envelope(file: File, *, content: dict) -> dict:
     }
 
 
-def doc_type_of(file: File) -> str:
+def file_type_of(file: File) -> str:
     """The file's type as its string value."""
-    doc_type = file.file_type
-    return doc_type.value if hasattr(doc_type, "value") else str(doc_type)
+    file_type = file.file_type
+    return file_type.value if hasattr(file_type, "value") else str(file_type)

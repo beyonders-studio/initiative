@@ -38,13 +38,14 @@ concurrency:
 jobs:
   cla:
     name: CLA signed
-    # A pull request event, or a comment on a pull request (not an issue)
-    # that signs or asks for a recheck.
+    # In this repository, not a fork: a pull request event, or a comment on a
+    # pull request (not an issue) that signs or asks for a recheck.
     if: >-
-      github.event_name == 'pull_request_target' ||
-      (github.event.issue.pull_request &&
-        (github.event.comment.body == 'recheck' ||
-         github.event.comment.body == 'I have read the CLA Document and I hereby sign the CLA'))
+      github.repository == 'beyonders-studio/initiative' &&
+      (github.event_name == 'pull_request_target' ||
+        (github.event.issue.pull_request &&
+          (github.event.comment.body == 'recheck' ||
+           github.event.comment.body == 'I have read the CLA Document and I hereby sign the CLA')))
     runs-on: ubuntu-24.04
     timeout-minutes: 5
     # What the action calls: contents to read and commit the signatures file,

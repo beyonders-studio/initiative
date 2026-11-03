@@ -7,6 +7,7 @@ import {
   buildInitiative,
   buildPost,
   buildPropertySummary,
+  buildShareRequest,
   buildTagSummary,
   initiativeCan,
   ownerCan,
@@ -131,7 +132,7 @@ describe("ToolSettingsDetailsPage properties", () => {
     );
 
     expect(await screen.findByText("Budget")).toBeInTheDocument();
-    expect(screen.getByRole("group", { name: "Properties" })).toBeInTheDocument();
+    expect(screen.getByRole("group", { name: "Metadata" })).toBeInTheDocument();
   });
 
   it("offers none on a community-level tool, which has no definitions to add", async () => {
@@ -139,7 +140,7 @@ describe("ToolSettingsDetailsPage properties", () => {
     renderSection(ToolSettingsDetailsPage, buildEntity({ initiative_id: null }));
 
     await screen.findByRole("switch", { name: "Enable comments" });
-    expect(screen.queryByText("Properties")).not.toBeInTheDocument();
+    expect(screen.queryByText("Metadata")).not.toBeInTheDocument();
   });
 });
 
@@ -419,5 +420,32 @@ describe("ToolSettingsAccessPage", () => {
     renderSection(ToolSettingsAccessPage, buildEntity({ can: readerCan() }));
 
     expect(await screen.findByText("Permission required")).toBeInTheDocument();
+  });
+
+  it.each([
+    ["shares at the level asked for", "Share", { approve: true, level: "write", tell: false }],
+    [
+      "declines, telling them when asked to",
+      "Decline",
+      { approve: false, level: null, tell: true },
+    ],
+  ])("answers a request: %s", async (_, button, expected) => {
+    resetFactories();
+    const request = buildShareRequest({ level: "write", message: "For the launch" });
+    let body: unknown = null;
+    server.use(
+      communityHttp.get("/share-requests/", () => HttpResponse.json([request])),
+      communityHttp.post("/share-requests/answer", async ({ request: sent }) => {
+        body = await sent.json();
+        return new HttpResponse(null, { status: 204 });
+      })
+    );
+    renderSection(ToolSettingsAccessPage, buildEntity());
+
+    expect(await screen.findByText("For the launch")).toBeInTheDocument();
+    if (expected.tell) await userEvent.click(screen.getByRole("checkbox", { name: "Tell them" }));
+    await userEvent.click(screen.getByRole("button", { name: button }));
+
+    await waitFor(() => expect(body).toEqual({ ids: [request.id], scope: "user", ...expected }));
   });
 });

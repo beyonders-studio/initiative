@@ -57,7 +57,7 @@ from app.models.platform.access_grant import (
     AccessGrantStatus,
     SettingsLevel,
 )
-from app.models.platform.guild import CommunityRole
+from app.models.platform.guild import AdminSurface, CommunityRole
 from app.models.platform.user import UserRole
 from app.models.tenant.initiative import DEFAULT_PERMISSION_VALUES, PermissionKey
 from app.models.tenant.resource_grant import (
@@ -227,9 +227,10 @@ $function$
 
 #: Gate 0, first half: the deployment's own second-factor rule.
 #:
-#: The level is read from the settings row rather than from a GUC — what the
-#: deployment asks is a fact it holds, and the singleton is readable under
-#: every routed role, the SELECT-only guild floor included. Which rung the
+#: The level is read from the rule ``second_factor_requirement`` rather than
+#: from a GUC — what the deployment asks is a fact it holds, and
+#: ``platform_rules`` is readable under every routed role, the SELECT-only
+#: guild floor included. No row asks nobody. Which rung the
 #: session holds arrives as ``app.platform_role``, because ``public.users`` is
 #: not on a guild request's path, and whether the account answers the rule
 #: arrives as ``app.platform_factor`` — the second factor it holds, or one
@@ -245,11 +246,11 @@ CREATE OR REPLACE FUNCTION public.platform_factor_satisfied()
  STABLE
 AS $function$
     SELECT NOT EXISTS (
-        SELECT 1 FROM public.app_settings s
-        WHERE s.id = 1
-          AND s.second_factor_requirement <> 'nobody'
+        SELECT 1 FROM public.platform_rules r
+        WHERE r.key = 'second_factor_requirement'
+          AND r.choice <> 'nobody'
           AND (
-              s.second_factor_requirement = 'everyone'
+              r.choice = 'everyone'
               OR {gucs.PLATFORM_ROLE} IS DISTINCT FROM '{UserRole.member.value}'
           )
           AND ({gucs.PLATFORM_FACTOR}) IS NOT TRUE
@@ -259,9 +260,10 @@ $function$
 """
 
 
-#: Whether a rule that needs an operator-granted option applies to the
-#: community: true unless its row shows the option withdrawn. A role that
-#: reads no settings sees no row, and is asked the rule as it stands. The
+#: Whether a rule that needs a paid sign-in option applies to the community:
+#: the deployment's row for the option's key (``app.core.rules.OPTION_RULES``)
+#: grants it. The rule and the option are rows of the same table, read under
+#: the same policies, so a session that sees the one sees the other. The
 #: sign-in gate asks it here, and the app's queries ask the same function.
 GUILD_HOLDS_OPTION = """\
 CREATE OR REPLACE FUNCTION public.guild_holds_option(p_guild_id integer, p_option text)
@@ -270,11 +272,14 @@ CREATE OR REPLACE FUNCTION public.guild_holds_option(p_guild_id integer, p_optio
  STABLE
 AS $function$
 BEGIN
-    RETURN NOT EXISTS (
+    RETURN EXISTS (
         SELECT 1
-        FROM public.guild_administration a
-        WHERE a.guild_id = p_guild_id
-          AND NOT p_option::public.guild_auth_option = ANY(a.auth_options)
+        FROM public.community_rules r
+        WHERE r.guild_id = p_guild_id
+          AND r.key = p_option
+          AND r.user_id IS NULL
+          AND r.set_by = 'deployment'
+          AND r.enabled
     );
 END
 $function$
@@ -300,8 +305,8 @@ AS $function$
         public.platform_factor_satisfied()
         AND NOT EXISTS (
             SELECT 1
-            FROM public.guild_auth_policies r
-            -- The half that applies: a request routed into one of the
+            FROM public.community_rules p
+            -- The requirement that applies: a request routed into one of the
             -- community's guest roles, each granted the guest floor, is asked
             -- what the community asks of its guests.
             CROSS JOIN LATERAL (
@@ -311,19 +316,12 @@ AS $function$
                       AND m.roleid = to_regrole('guest_base')
                 ) AS guest
             ) routed
-            CROSS JOIN LATERAL (
-                SELECT
-                    r.guild_id,
-                    CASE WHEN routed.guest THEN r.guest_policy ELSE r.policy END
-                        AS policy,
-                    CASE WHEN routed.guest THEN r.guest_provider_id ELSE r.provider_id END
-                        AS provider_id,
-                    CASE WHEN routed.guest THEN r.guest_require_methods
-                        ELSE r.require_methods END
-                        AS require_methods
-            ) p
-            WHERE r.guild_id = {gucs.ROUTED_GUILD_ID}
-              AND p.policy <> 'open'
+            -- A requirement is a row, so there is one only where it asks
+            -- something.
+            WHERE p.guild_id = {gucs.ROUTED_GUILD_ID}
+              AND p.user_id IS NULL
+              AND p.key = CASE WHEN routed.guest
+                  THEN 'guest_auth_policy' ELSE 'auth_policy' END
               AND (
                   -- The provider this guild names, if it names one: the
                   -- session came through it, and this community counts the
@@ -340,41 +338,49 @@ AS $function$
                   -- Both factor legs apply while the community holds
                   -- ``providers``; the arrival legs apply whatever it holds.
                   OR (
-                      'totp' = ANY(p.require_methods)
+                      'totp' = ANY(p.methods)
                       AND NOT ('mfa' = ANY(public.session_amr()))
-                      AND public.guild_holds_option(p.guild_id, 'providers')
+                      AND public.guild_holds_option(p.guild_id, 'community_sign_in')
                   )
                   -- Or a passkey, where the community asks for one. Its own
                   -- leg rather than the factor's: an assertion records the
                   -- second factor too, so the two are asked for separately.
                   -- Either kind of key answers, which is what the overlap says.
                   OR (
-                      'passkey' = ANY(p.require_methods)
+                      'passkey' = ANY(p.methods)
                       AND NOT (public.session_amr() && ARRAY['hwk', 'swk'])
-                      AND public.guild_holds_option(p.guild_id, 'providers')
+                      AND public.guild_holds_option(p.guild_id, 'community_sign_in')
                   )
                   -- Or any of its own, whichever provider served it. Named
                   -- rather than counted, so a list holding some other method
                   -- is not read as this one.
                   OR (
-                      'sso' = ANY(p.require_methods)
+                      'sso' = ANY(p.methods)
                       AND NOT public.guild_connection_satisfied(p.guild_id)
                   )
               )
         )
         AND NOT EXISTS (
             -- Asked of everybody reaching this community, whatever it says
-            -- about how they arrive. Its own row rather than the policy's,
-            -- because a community that asks nothing about arrival holds no
-            -- policy row and still asks this, while it holds
+            -- about how they arrive. A rule of its own rather than part of the
+            -- requirement, because a community that asks nothing about arrival
+            -- holds no requirement and still asks this, while it holds
             -- ``restrictions``. Unsatisfied is what this finds, like the leg
-            -- above it.
+            -- above it. The deployment's row, where it set one, stands over
+            -- the community's own.
             SELECT 1
-            FROM public.guilds g
-            WHERE g.id = {gucs.ROUTED_GUILD_ID}
-              AND g.require_second_factor
+            FROM (
+                SELECT r.guild_id, r.enabled
+                FROM public.community_rules r
+                WHERE r.guild_id = {gucs.ROUTED_GUILD_ID}
+                  AND r.user_id IS NULL
+                  AND r.key = 'require_second_factor'
+                ORDER BY r.set_by = 'deployment' DESC
+                LIMIT 1
+            ) r
+            WHERE r.enabled
               AND NOT ('mfa' = ANY(public.session_amr()))
-              AND public.guild_holds_option(g.id, 'restrictions')
+              AND public.guild_holds_option(r.guild_id, 'security_standards')
         ))
 $function$
 
@@ -425,6 +431,31 @@ STANDING_IS_THIS_GUILD = (
 #: the standing statement read it, written where a policy can read it.
 GUILD_ADMIN = f"({STANDING_IS_THIS_GUILD} AND {gucs.GUILD_ADMIN})"
 
+#: The admin surfaces the reader holds in this community, as the standing
+#: statement read them: none outside the community the standing is for.
+HELD_SURFACES = (
+    f"(CASE WHEN {STANDING_IS_THIS_GUILD} THEN {gucs.HELD_SURFACES.sql}"
+    " ELSE ARRAY[]::text[] END)"
+)
+
+
+def holds(surface: AdminSurface) -> str:
+    """The reader holds ``surface`` here: :data:`GUILD_ADMIN`'s counterpart for
+    a leg that guards one part of administering the community rather than
+    its content."""
+    return f"('{surface.value}' = ANY ({HELD_SURFACES}))"
+
+
+#: The whole catalog, as a policy compares a held list with it.
+EVERY_SURFACE = (
+    f"ARRAY[{', '.join(f"'{surface.value}'" for surface in AdminSurface)}]::text[]"
+)
+
+#: The reader holds every surface here: an admin with no custom role, or one
+#: whose role keeps every one. What making or unmaking an admin asks.
+HOLDS_EVERY_SURFACE = f"({HELD_SURFACES} @> {EVERY_SURFACE})"
+
+
 #: This request administers the community's configuration: a live settings
 #: grant, at either rung, as the standing statement read it from the rows.
 #: Its own axis — what a grant reaches of the community's settings — beside
@@ -443,8 +474,9 @@ LIVE_GRANT = f"g.status = '{AccessGrantStatus.approved.value}' AND g.expires_at 
 
 
 #: Whether a guest's membership admits them now: before its end, while the
-#: platform allows guests, and above the ``guest`` rung only on the demo
-#: deployment. ``app_settings`` is one row (``GLOBAL_SETTINGS_ID``).
+#: platform allows guests (the rule ``guests_enabled``, off without a row),
+#: and above the ``guest`` rung only on the demo deployment. ``app_settings``
+#: is one row (``GLOBAL_SETTINGS_ID``).
 GUEST_MEMBERSHIP_LIVE = f"""\
 CREATE OR REPLACE FUNCTION public.guest_membership_live(p_until timestamp with time zone, p_role guild_role)
  RETURNS boolean
@@ -456,7 +488,11 @@ BEGIN
         SELECT 1
         FROM public.app_settings s
         WHERE s.id = 1
-          AND s.guests_enabled
+          AND COALESCE(
+              (SELECT r.enabled FROM public.platform_rules r
+                WHERE r.key = 'guests_enabled'),
+              false
+          )
           AND (p_role = '{CommunityRole.guest.value}' OR s.demo_mode)
     );
 END
@@ -533,9 +569,15 @@ STANDING_FIELDS: tuple[tuple[str, str, str], ...] = (
     # readable (``app.db.holds``).
     _read(gucs.PAM_MODERATE),
     # A guest's request, and the initiatives of the items shared with them one
-    # at a time. Last, as ``ALTER TYPE`` appends.
+    # at a time.
     _read(gucs.GUEST),
     _read(gucs.GUEST_ITEM_INITIATIVES),
+    # The surfaces the deployment has closed for the community.
+    _read(gucs.CLOSED_SURFACES),
+    # The tool switches the community set for every initiative.
+    _read(gucs.COMMUNITY_TOOLS),
+    # The admin surfaces the reader holds. Last, as ``ALTER TYPE`` appends.
+    ("held_surfaces", "text[]", HELD_SURFACES),
 )
 _STANDING_NAMES = frozenset(name for name, _type, _expr in STANDING_FIELDS)
 
@@ -628,6 +670,16 @@ class Legs:
     def admin(self) -> str:
         return self.field("guild_admin")
 
+    def holds(self, surface: AdminSurface) -> str:
+        """The reader holds ``surface``: the leg for one part of administering
+        the community, where :attr:`admin` is the reach into its content."""
+        return f"('{surface.value}' = ANY ({self.field('held_surfaces')}))"
+
+    @property
+    def holds_every_surface(self) -> str:
+        """The reader holds the whole catalog (:data:`HOLDS_EVERY_SURFACE`)."""
+        return f"({self.field('held_surfaces')} @> {EVERY_SURFACE})"
+
     @property
     def auth_ok(self) -> str:
         return self.field("guild_auth_ok")
@@ -690,10 +742,12 @@ class Legs:
     @property
     def guild_row_writer(self) -> str:
         """Who changes a row that belongs to the whole community rather than
-        one initiative: the guild admin or the system, a live write grant, or
-        an installed plug-in on a token not narrowed to one initiative."""
+        one initiative, which only a calendar can be: the system, a holder of
+        ``AdminSurface.community_calendars``, a live write grant, or an
+        installed plug-in on a token not narrowed to one initiative."""
         return (
-            f"({self.system_or_admin} OR {self.pam_write} OR {self.unnarrowed_install})"
+            f"({self.system} OR {self.holds(AdminSurface.community_calendars)}"
+            f" OR {self.pam_write} OR {self.unnarrowed_install})"
         )
 
 
@@ -1243,8 +1297,14 @@ def _initiative_tool_actions() -> str:
     read-only, and the reader is not here through an access grant (those can
     edit existing things but not create new ones)."""
     arms = []
+    community = _B.field("community_tools")
     for tool in Tool:
-        switch = f"v_initiative.{tool.view_permission}"
+        # The community's switch where it set one, the initiative's otherwise.
+        switch = (
+            f"(CASE WHEN '{tool.value}=on' = ANY ({community}) THEN true"
+            f" WHEN '{tool.value}=off' = ANY ({community}) THEN false"
+            f" ELSE v_initiative.{tool.view_permission} END)"
+        )
         view_default = str(
             DEFAULT_PERMISSION_VALUES[PermissionKey(tool.view_permission)]
         ).lower()
@@ -1289,7 +1349,7 @@ BEGIN
     IF NOT FOUND THEN
         RETURN v_actions;
     END IF;
-    IF {_B.system} OR {_B.admin}
+    IF {_B.system} OR {_B.holds(AdminSurface.initiatives)}
        OR ({_B.this_guild} AND NOT {_B.guest}
            AND p_initiative_id = ANY ({_B.field("manager_initiatives")})) THEN
         v_actions := v_actions || 'manage'::text;
@@ -1324,7 +1384,7 @@ $function$
 #: A live ``superadmin`` settings grant satisfies the same predicate for the
 #: duration of its grant.
 #:
-#: The one definition of the rule. The policies on ``guild_auth_policies`` call
+#: The one definition of the rule. The seat's policies on ``community_rules`` call
 #: it, and so does the app — ``func.guild_superadmin(...)`` where an endpoint
 #: has to decide before it writes, the way ``initiative_scope_clause`` already
 #: defers to ``initiative_access`` rather than restating it in Python.
@@ -1396,10 +1456,35 @@ $function$
 
 """
 
+#: The initiatives the reader is in, or holds something shared with them in,
+#: read from the roster and their own sharing rows rather than the standing:
+#: the standing statement reads ``initiatives`` while it is still computing it.
+#: A function, so the policy on ``initiatives`` that asks it does not name
+#: ``initiative_members``, whose own policies read ``initiatives``.
+READER_INITIATIVES = f"""\
+CREATE OR REPLACE FUNCTION reader_initiatives()
+ RETURNS integer[]
+ LANGUAGE plpgsql
+ STABLE
+AS $function$
+BEGIN
+    RETURN ARRAY(
+        SELECT im.initiative_id FROM initiative_members im
+        WHERE im.user_id = {gucs.USER_ID}
+        UNION
+        SELECT g.initiative_id FROM resource_grants g
+        WHERE g.user_id = {gucs.USER_ID} AND g.initiative_id IS NOT NULL
+    );
+END
+$function$
+
+"""
+
 GUILD_AUTHORIZATION_FUNCTIONS: tuple[tuple[str, str], ...] = (
     *READ_FUNCTIONS,
     ("current_standing", CURRENT_STANDING),
     ("reads_held", READS_HELD),
+    ("reader_initiatives", READER_INITIATIVES),
     ("initiative_access", INITIATIVE_ACCESS),
     ("initiative_full_access", INITIATIVE_FULL_ACCESS),
     ("initiative_role_permits", INITIATIVE_ROLE_PERMITS),
@@ -1420,6 +1505,7 @@ GUILD_FUNCTION_SIGNATURES: dict[str, str] = {
     **{name: "()" for name, _sql in READ_FUNCTIONS},
     "current_standing": "()",
     "reads_held": "()",
+    "reader_initiatives": "()",
     "initiative_access": "(integer, integer, boolean, public.standing)",
     "initiative_full_access": "(integer, boolean, public.standing)",
     "initiative_role_permits": "(integer, integer, text, boolean, public.standing)",

@@ -8,6 +8,7 @@ import {
   WikiPageKind,
   WikiReadingWidth,
 } from "@/api/generated/initiativeAPI.schemas";
+import { NeedAccessOr } from "@/components/access/RequestAccess";
 import { ToolCommentsPanel } from "@/components/comments/ToolCommentsPanel";
 import { WikiChrome } from "@/components/initiativeTools/wikis/WikiChrome";
 import { isWideFile, WikiFileBody } from "@/components/initiativeTools/wikis/WikiFileBody";
@@ -89,11 +90,16 @@ export const WikiFileView = () => {
 
   if (!validIds || fileQuery.isError) {
     return (
-      <Card className="mx-auto mt-10 max-w-md">
-        <CardHeader>
-          <CardTitle>{t("pages.notFound")}</CardTitle>
-        </CardHeader>
-      </Card>
+      <NeedAccessOr
+        error={fileQuery.error}
+        entity={validIds ? { kind: "file", id: fileId } : undefined}
+      >
+        <Card className="mx-auto mt-10 max-w-md">
+          <CardHeader>
+            <CardTitle>{t("pages.notFound")}</CardTitle>
+          </CardHeader>
+        </Card>
+      </NeedAccessOr>
     );
   }
 

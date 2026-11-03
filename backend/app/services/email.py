@@ -1296,6 +1296,64 @@ def project_added_pieces(
     )
 
 
+def community_access_pieces(
+    *,
+    community: str,
+    levels: Sequence[str],
+    stream: str | None,
+    started_at: datetime,
+    ends_at: datetime | None,
+    ended: bool,
+    contact: str | None,
+    locale: str,
+) -> EmailPieces:
+    """Platform staff's access to a community, as a letter to its seat
+    holders in ``locale``: the levels, the kind of case it serves, and when —
+    until when, while it is ``ended=False``; from when to when once it is
+    over. Queued as account mail."""
+    level_label = ", ".join(
+        email_t(LEVEL_LABEL_KEYS[level], locale=locale)
+        for level in levels
+        if level in LEVEL_LABEL_KEYS
+    )
+
+    def moment(value: datetime) -> str:
+        return email_t(
+            "communityAccess.moment",
+            locale=locale,
+            date=email_date(value, locale),
+            time=value.strftime("%H:%M"),
+        )
+
+    event = "ended" if ended else "granted"
+    body = email_t(
+        f"communityAccess.{event}.body",
+        locale=locale,
+        community=community,
+        level=level_label,
+        start=moment(started_at),
+        end=moment(ends_at) if ends_at is not None else "",
+    )
+    parts = [body]
+    if stream is not None:
+        parts.append(email_t(f"communityAccess.case.{stream}", locale=locale))
+    parts.append(email_t("communityAccess.recorded", locale=locale))
+    if contact:
+        parts.append(email_t("communityAccess.contact", locale=locale, contact=contact))
+    return EmailPieces(
+        subject=email_t(
+            f"communityAccess.{event}.subject",
+            locale=locale,
+            community=community,
+            escape=False,
+        ),
+        headline=email_t(
+            f"communityAccess.{event}.title", locale=locale, community=community
+        ),
+        body=" ".join(parts),
+    )
+
+
 def access_grant_pieces(
     user: User,
     *,
@@ -1394,7 +1452,7 @@ def _redacted_item(text: str, link: str | None) -> str:
     return f'<li><a href="{link}">{text}</a></li>' if link else f"<li>{text}</li>"
 
 
-def task_assignment_digest_pieces(
+def task_assignment_batch_pieces(
     user: User, assignments: Sequence[dict]
 ) -> EmailPieces:
     """The "these landed on you" summary, as one list."""
@@ -1432,10 +1490,10 @@ def task_assignment_digest_pieces(
     )
 
 
-def reaction_digest_pieces(user: User, reactions: Sequence[dict]) -> EmailPieces:
+def reaction_batch_pieces(user: User, reactions: Sequence[dict]) -> EmailPieces:
     """The "people reacted to your posts" summary.
 
-    Same shape as the assignment digest: one list, one line per reaction,
+    Same shape as the assignment batch: one list, one line per reaction,
     linking back to what was reacted to.
     """
     locale = _user_locale(user)
@@ -1483,6 +1541,49 @@ def direct_message_pieces(user: User, *, sender_name: str, link: str) -> EmailPi
         body=email_t("directMessage.body", locale=locale, sender=sender_name),
         link=link,
         link_label=email_t("directMessage.buttonLabel", locale=locale),
+    )
+
+
+def coming_up_pieces(user: User, items: Sequence[dict]) -> EmailPieces:
+    """What is due and what starts before the next one, soonest first."""
+    locale = _user_locale(user)
+
+    def item_html(item: dict) -> str:
+        if item.get("redacted"):
+            return _redacted_item(
+                email_t("comingUp.redactedItem", locale=locale), item.get("link")
+            )
+        # ``title`` is user-controlled and spliced into markup directly (not via
+        # email_t), so escape it here.
+        title = _html.escape(item.get("title") or "")
+        link = item.get("link")
+        title_markup = (
+            f'<a href="{link}"><strong>{title}</strong></a>'
+            if link
+            else f"<strong>{title}</strong>"
+        )
+        detail = (
+            email_t(
+                "comingUp.taskDetail",
+                locale=locale,
+                when=item.get("when") or "",
+                projectName=item.get("project_name") or "",
+            )
+            if item.get("kind") == "task"
+            else email_t(
+                "comingUp.eventDetail", locale=locale, when=item.get("when") or ""
+            )
+        )
+        return f"<li>{title_markup} ({detail})</li>"
+
+    items_html = "".join(item_html(item) for item in items)
+    return EmailPieces(
+        subject=email_t("comingUp.subject", locale=locale, escape=False),
+        headline=email_t("comingUp.title", locale=locale),
+        body=(
+            f"{email_t('comingUp.body', locale=locale, count=len(items))}"
+            f"<ul>{items_html}</ul>"
+        ),
     )
 
 

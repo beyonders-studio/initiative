@@ -24,18 +24,13 @@ already reads provenance to decide that, so it is stated once, there.
 
 from __future__ import annotations
 
-from copy import deepcopy
 from typing import Any, Awaitable, Callable, Sequence
 
 from sqlalchemy.orm import undefer
 from sqlmodel import select
 from sqlmodel.ext.asyncio.session import AsyncSession
 
-from app.core.references import (
-    references_in_body,
-    references_in_text,
-    unresolve_missing_wikilinks,
-)
+from app.core.references import references_in_body, references_in_text
 from app.core.relationships import Provenance, RelationshipType
 from app.core.search import SearchEntityType
 from app.db import reference_targets
@@ -76,18 +71,12 @@ async def sync_for_entity(
     *,
     body: Any = None,
     author_id: int | None = None,
-    fix_content: bool = False,
-) -> dict[str, Any] | None:
+) -> None:
     """Make this thing's ``references`` edges match what is written about it.
 
     ``body`` is the entity's own content as it now stands — the caller passes it
     because the caller is mid-save and holds the new version, which is not yet
     what a query would return.
-
-    ``fix_content`` additionally blanks any ``[[ ]]`` whose target is gone and
-    returns the repaired body, which is the one thing a save wants done to the
-    content itself. It returns None when nothing needed repairing, so a caller
-    can write back ``fixed or original``.
     """
     wanted = references_in(body)
     for text in await _comment_bodies(session, entity):
@@ -99,16 +88,6 @@ async def sync_for_entity(
     live = await _live_targets(session, wanted)
     if relationships_service.records_edges(session):
         await _reconcile(session, entity, live, author_id=author_id)
-
-    if not fix_content or not isinstance(body, dict):
-        return None
-    live_files = {
-        entity_id for kind, entity_id in live if kind is SearchEntityType.file
-    }
-    repaired = deepcopy(body)
-    if not unresolve_missing_wikilinks(repaired, live_files):
-        return None
-    return repaired
 
 
 def references_in(body: Any) -> set[tuple[SearchEntityType, int]]:
@@ -141,9 +120,9 @@ async def sync_for_comment(
 async def referencing_files(session: AsyncSession, file_id: int) -> list[File]:
     """Files whose content points at this one, trashed ones included.
 
-    The purge path asks this: a ``[[ ]]`` in a file that is only in the
-    trash still has to be blanked, or restoring it later brings a dangling link
-    back with it.
+    The purge path asks this: a reference in a file that is only in the
+    trash still has to be unlinked, or restoring it later brings a dangling
+    link back with it.
     """
     from app.db.soft_delete_filter import select_including_deleted
 

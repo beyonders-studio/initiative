@@ -170,7 +170,7 @@
     "tags": "Étiquettes",
     "tagsDescription": "Ajoutez des étiquettes pour organiser et filtrer.",
     "tagsNoAccess": "Vous avez besoin d'un accès en écriture pour gérer les étiquettes.",
-    "propertiesDescription": "Valeurs des propriétés personnalisées définies par cette initiative.",
+    "propertiesDescription": "Valeurs des métadonnées définies par cette initiative.",
     "comments": "Commentaires",
     "commentsDescription": "Autorisez les commentaires sur cet élément. Si vous les désactivez, tout ce qui a déjà été publié est conservé et réapparaît lorsque vous les réactivez.",
     "commentsToggle": "Activer les commentaires",
@@ -292,8 +292,7 @@
   },
   "fileDrop": {
     "release": "Dépose-le ici",
-    "unsupported": "Ce type de fichier ne peut pas être envoyé ici.",
-    "tooLarge": "Ce fichier dépasse la taille acceptée par ce serveur."
+    "unsupported": "Ce type de fichier ne peut pas être envoyé ici."
   },
   "archiveError": "Impossible d'archiver cet élément. Veuillez réessayer.",
   "unarchiveError": "Impossible de désarchiver cet élément. Veuillez réessayer.",
@@ -314,6 +313,8 @@
     "taskList": "Liste de tâches",
     "more": "Plus de mise en forme",
     "image": "Image",
+    "uploadImage": "Téléverser une image",
+    "imageFromFiles": "Depuis Fichiers",
     "uploadingImage": "Envoi de {{name}}…",
     "imageUploadFailed": "Impossible d'ajouter cette image."
   },
@@ -422,11 +423,6 @@
       "this": "cette publication",
       "plural": "publications"
     },
-    "catalog": {
-      "name": "Catalogue",
-      "this": "ce catalogue",
-      "plural": "catalogues"
-    },
     "wiki": {
       "name": "Wiki",
       "this": "ce wiki",
@@ -452,11 +448,6 @@
       "this": "ce compteur",
       "plural": "compteurs"
     },
-    "catalog_item": {
-      "name": "Image",
-      "this": "cette image",
-      "plural": "images"
-    },
     "wiki_page": {
       "name": "Page",
       "this": "cette page",
@@ -466,6 +457,11 @@
       "name": "Étiquette",
       "this": "cette étiquette",
       "plural": "étiquettes"
+    },
+    "collection": {
+      "name": "Collection",
+      "this": "cette collection",
+      "plural": "collections"
     }
   }
 }

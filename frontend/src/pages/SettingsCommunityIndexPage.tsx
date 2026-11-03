@@ -12,6 +12,7 @@ import { Navigate } from "@tanstack/react-router";
 import { useCommunitySettingsTabs } from "@/hooks/useCommunitySettingsTabs";
 
 export function SettingsCommunityIndexPage() {
-  const [first] = useCommunitySettingsTabs();
-  return first ? <Navigate to={first.path} replace /> : null;
+  const { tabs, isLoading } = useCommunitySettingsTabs();
+  const [first] = tabs;
+  return !isLoading && first ? <Navigate to={first.path} replace /> : null;
 }

@@ -1,11 +1,14 @@
 {
-  "title": "Propriétés",
-  "addProperty": "Ajouter une propriété",
-  "noProperties": "Aucune propriété",
+  "title": "Métadonnées",
+  "titleWithMetadata": "Propriétés et métadonnées",
+  "addMetadata": "Ajouter des métadonnées",
+  "addPropertyOrMetadata": "Ajouter une propriété ou des métadonnées",
+  "noMetadata": "Aucune métadonnée",
+  "noPropertiesOrMetadata": "Aucune propriété ni métadonnée",
   "saving": "Enregistrement…",
   "saved": "Enregistré",
-  "remove": "Supprimer la propriété",
-  "loadError": "Impossible de charger cette propriété.",
+  "remove": "Retirer",
+  "loadError": "Impossible de charger cette valeur.",
   "types": {
     "text": "Texte",
     "number": "Nombre",
@@ -15,13 +18,25 @@
     "url": "URL",
     "select": "Sélection",
     "multi_select": "Sélection multiple",
-    "user_reference": "Personne"
+    "user_reference": "Personne",
+    "currency": "Montant",
+    "scale": "Échelle",
+    "link": "Lien",
+    "badge": "Badge",
+    "json": "Données"
   },
   "picker": {
-    "placeholder": "Rechercher des propriétés…",
-    "empty": "Aucune propriété ne correspond",
-    "createHeading": "Créer une nouvelle propriété",
-    "namePlaceholder": "Nom de la propriété",
+    "placeholder": "Rechercher…",
+    "empty": "Aucun résultat",
+    "createHeading": "Nouvelles métadonnées",
+    "createPropertyHeading": "Nouvelle propriété",
+    "ownerLabel": "Appartient à",
+    "owner": {
+      "project": "Propriétés de ce projet",
+      "collection": "Propriétés de cette collection",
+      "initiative": "Métadonnées de l'initiative"
+    },
+    "namePlaceholder": "Nom",
     "typeLabel": "Type",
     "createButton": "Créer",
     "optionLabelPlaceholder": "Libellé",
@@ -41,17 +56,20 @@
     "searchOptions": "Rechercher ou créer une option…",
     "createOption": "Créer « {{label}} »",
     "optionAdded": "Option ajoutée",
-    "optionAddFailed": "Impossible d'ajouter l'option"
+    "optionAddFailed": "Impossible d'ajouter l'option",
+    "scalePlaceholder": "0–100",
+    "stars_one": "{{count}} étoile",
+    "stars_other": "{{count}} étoiles"
   },
   "cell": {
     "emptyValue": "—",
     "none": "Aucun"
   },
   "manager": {
-    "title": "Propriétés personnalisées",
-    "description": "Définissez des métadonnées réutilisables pour tout élément de cette initiative.",
-    "newDefinition": "Nouvelle propriété",
-    "editDefinition": "Modifier la propriété",
+    "title": "Métadonnées",
+    "description": "Les métadonnées portent des valeurs sur tout ce que contient cette initiative : ses tâches, fichiers, événements et le reste.",
+    "newDefinition": "Nouvelles métadonnées",
+    "editDefinition": "Modifier les métadonnées",
     "nameLabel": "Nom",
     "typeLabel": "Type",
     "optionsLabel": "Options",
@@ -59,20 +77,46 @@
     "removeOption": "Supprimer l'option",
     "optionLabelPlaceholder": "Libellé",
     "colorLabel": "Couleur",
-    "delete": "Supprimer la propriété",
-    "deleteConfirmTitle": "Supprimer cette propriété ?",
-    "deleteConfirmBody": "Cela supprimera la propriété et toutes ses valeurs dans cette initiative.",
+    "delete": "Supprimer les métadonnées",
+    "deleteConfirmTitle": "Supprimer ces métadonnées ?",
+    "deleteConfirmBody": "Elles seront supprimées, avec toutes les valeurs saisies dans cette initiative.",
     "orphanedWarning": "{{count}} valeurs existantes font référence à des options supprimées. Elles s'afficheront comme « Option inconnue » jusqu'à leur mise à jour.",
-    "createError": "Échec de la création de la propriété",
-    "updateError": "Échec de la mise à jour de la propriété",
-    "deleteError": "Échec de la suppression de la propriété",
-    "setValuesError": "Échec de l'enregistrement de la valeur de la propriété"
+    "createError": "Impossible de le créer",
+    "updateError": "Impossible d'enregistrer la modification",
+    "deleteError": "Impossible de le supprimer",
+    "setValuesError": "Impossible d'enregistrer la valeur",
+    "moveUp": "Monter {{name}}",
+    "moveDown": "Descendre {{name}}",
+    "toolsTitle": "Propriétés des projets et des collections",
+    "toolsDescription": "Les propriétés propres à chaque projet et collection que vous pouvez modifier. Elles se créent, se modifient et se suppriment aussi dans leur éditeur de mise en page.",
+    "noTools": "Aucune propriété que vous pouvez modifier",
+    "owner": {
+      "project": "Projet",
+      "collection": "Collection"
+    },
+    "select": "Sélectionner {{name}}",
+    "selected_one": "{{count}} sélectionné",
+    "selected_other": "{{count}} sélectionnés",
+    "promote": "Transformer en métadonnée",
+    "promoteBody_one": "Elle devient une métadonnée de cette initiative, sur tout ce qu'elle contient. Ses valeurs sont reprises, chaque mise en page qui l'affiche affiche la métadonnée à sa place, et elle est supprimée.",
+    "promoteBody_other": "Elles deviennent une seule métadonnée de cette initiative, sur tout ce qu'elle contient. Leurs valeurs sont reprises, chaque mise en page qui en affiche une affiche la métadonnée à sa place, et elles sont supprimées. Si un élément a des valeurs de plusieurs, la plus récemment modifiée est conservée.",
+    "promoteInto": "Fusionne avec la métadonnée « {{name}} », qui est du même type.",
+    "promoteTaken": "Cette initiative a déjà une métadonnée de ce nom, d'un autre type.",
+    "promoteHint": "Sélectionnez des propriétés d'un même type pour les transformer en métadonnée.",
+    "promoted": "Transformé en « {{name}} »",
+    "promoteError": "Impossible de les transformer",
+    "bulkDeleteTitle_one": "Supprimer {{count}} champ ?",
+    "bulkDeleteTitle_other": "Supprimer {{count}} champs ?",
+    "bulkDeleteBody": "Chacun est supprimé avec toutes ses valeurs.",
+    "bulkDeleted_one": "{{count}} champ supprimé",
+    "bulkDeleted_other": "{{count}} champs supprimés",
+    "bulkDeleteError": "Impossible de les supprimer"
   },
   "filter": {
-    "addFilter": "Ajouter un filtre de propriété",
-    "property": "Propriété",
+    "addFilter": "Ajouter un filtre",
+    "property": "Filtrer par",
     "operator": "Op",
-    "remove": "Supprimer le filtre de propriété",
+    "remove": "Retirer le filtre",
     "ops": {
       "eq": "est",
       "lt": "<",
@@ -83,5 +127,10 @@
       "ilike": "contient",
       "is_null": "est vide"
     }
+  },
+  "currency": {
+    "label": "Devise",
+    "none": "Aucune devise ne correspond",
+    "default": "EUR"
   }
 }

@@ -1,11 +1,15 @@
 import { useNavigate } from "@tanstack/react-router";
-import { ArrowUpRight } from "lucide-react";
+import { ArrowUpRight, Lock } from "lucide-react";
+import { useState } from "react";
 import { useTranslation } from "react-i18next";
 
 import { SmartChipAspect, type SmartChipKind } from "@/api/generated/initiativeAPI.schemas";
+import { RequestAccessDialog, Requested, standingTarget } from "@/components/access/RequestAccess";
+import { Button } from "@/components/ui/button";
 import { ChecklistChip } from "@/components/ui/editor/nodes/checklist-chip";
 import { HoverCard, HoverCardContent, HoverCardTrigger } from "@/components/ui/hover-card";
 import { useActiveCommunityId } from "@/hooks/useActiveCommunityId";
+import { useShareStanding } from "@/hooks/useShareRequests";
 import { useChipState } from "@/hooks/useSmartChips";
 import { communityPath } from "@/lib/communityUrl";
 import { entityRefTypeFor } from "@/lib/entityResolver";
@@ -43,7 +47,7 @@ export function SmartChip(props: SmartChipProps) {
 }
 
 function ReadingChip({ chipKind, entityId, fallback }: SmartChipProps) {
-  const { t, i18n } = useTranslation(["editor", "search"]);
+  const { t, i18n } = useTranslation(["editor", "search", "access"]);
   const navigate = useNavigate();
   const communityId = useActiveCommunityId();
   const state = useChipState(chipRef(chipKind, entityId));
@@ -73,58 +77,94 @@ function ReadingChip({ chipKind, entityId, fallback }: SmartChipProps) {
 
   const Icon = entityIcon(entityType);
 
+  // Whether the reader may ask for it is read when they look at the card, so
+  // a page of chips asks nothing until one is hovered.
+  const [looking, setLooking] = useState(false);
+  const [asking, setAsking] = useState(false);
+  const { data: standing } = useShareStanding(entityType, entityId, looking && !reachable);
+  const askable = !reachable && standing != null && standing.level == null;
+
   return (
-    <HoverCard openDelay={200} closeDelay={100}>
-      <HoverCardTrigger asChild>
-        <button
-          type="button"
-          onClick={open}
-          // `aria-disabled` rather than `disabled`: a disabled button takes no
-          // pointer events, and the card is what explains why this one is dim.
-          aria-disabled={!reachable}
-          className={cn(
-            // Sized in `em`, not a fixed step. A chip is a word in somebody's
-            // sentence, so it belongs to whatever that sentence is set in —
-            // dropped into a heading, a `text-xs` chip reads as a footnote
-            // stuck to the title. 0.85em is what `text-xs` came to inside body
-            // text, so ordinary prose looks exactly as it did and everything
-            // else now scales with what it sits in — padding and margin
-            // included, or the box tightens around the text as it grows.
-            "mx-[0.15em] inline-flex items-center rounded-[0.25em] px-[0.4em] py-[0.15em] align-baseline font-medium text-[0.85em]",
-            display.className,
-            reachable ? "cursor-pointer hover:brightness-95" : "cursor-default"
-          )}
-          // A status carries a colour its project chose, which beats any tone.
-          style={
-            display.color
-              ? { backgroundColor: `${display.color}26`, color: display.color }
-              : undefined
-          }
-        >
-          {display.text}
-        </button>
-      </HoverCardTrigger>
-      <HoverCardContent align="start" className="w-auto max-w-72 p-3">
-        <div className="flex items-start gap-2">
-          <Icon className="mt-0.5 size-4 shrink-0 text-muted-foreground" />
-          <div className="min-w-0 space-y-1">
-            <p className="truncate font-medium text-sm leading-tight">{liveTitle ?? fallback}</p>
-            <p className="text-muted-foreground text-xs">
-              {t(`search:types.${entityType}` as never)}
-              {" · "}
-              {t(`smartChips.aspects.${chipAspect(chipKind)}` as never)}
-            </p>
-            {reachable ? (
-              <p className="flex items-center gap-1 text-primary text-xs">
-                <ArrowUpRight className="size-3 shrink-0" />
-                {t("smartChips.openHint")}
-              </p>
-            ) : (
-              <p className="text-muted-foreground text-xs">{t("references.unavailable")}</p>
+    <>
+      <HoverCard openDelay={200} closeDelay={100} onOpenChange={setLooking}>
+        <HoverCardTrigger asChild>
+          <button
+            type="button"
+            onClick={open}
+            // `aria-disabled` rather than `disabled`: a disabled button takes no
+            // pointer events, and the card is what explains why this one is dim.
+            aria-disabled={!reachable}
+            className={cn(
+              // Sized in `em`, not a fixed step. A chip is a word in somebody's
+              // sentence, so it belongs to whatever that sentence is set in —
+              // dropped into a heading, a `text-xs` chip reads as a footnote
+              // stuck to the title. 0.85em is what `text-xs` came to inside body
+              // text, so ordinary prose looks exactly as it did and everything
+              // else now scales with what it sits in — padding and margin
+              // included, or the box tightens around the text as it grows.
+              "mx-[0.15em] inline-flex items-center rounded-[0.25em] px-[0.4em] py-[0.15em] align-baseline font-medium text-[0.85em]",
+              display.className,
+              reachable ? "cursor-pointer hover:brightness-95" : "cursor-default"
             )}
+            // A status carries a colour its project chose, which beats any tone.
+            style={
+              display.color
+                ? { backgroundColor: `${display.color}26`, color: display.color }
+                : undefined
+            }
+          >
+            {display.text}
+          </button>
+        </HoverCardTrigger>
+        <HoverCardContent align="start" className="w-auto max-w-72 p-3">
+          <div className="flex items-start gap-2">
+            <Icon className="mt-0.5 size-4 shrink-0 text-muted-foreground" />
+            <div className="min-w-0 space-y-1">
+              <p className="truncate font-medium text-sm leading-tight">{liveTitle ?? fallback}</p>
+              <p className="text-muted-foreground text-xs">
+                {t(`search:types.${entityType}` as never)}
+                {" · "}
+                {t(`smartChips.aspects.${chipAspect(chipKind)}` as never)}
+              </p>
+              {reachable ? (
+                <p className="flex items-center gap-1 text-primary text-xs">
+                  <ArrowUpRight className="size-3 shrink-0" />
+                  {t("smartChips.openHint")}
+                </p>
+              ) : askable ? (
+                <>
+                  <p className="text-muted-foreground text-xs">{t("access:request.cantSee")}</p>
+                  {standing.pending ? (
+                    <Requested level={standing.pending} className="text-xs" />
+                  ) : (
+                    <Button
+                      type="button"
+                      variant="outline"
+                      size="sm"
+                      className="mt-1 h-7"
+                      onClick={() => setAsking(true)}
+                    >
+                      <Lock />
+                      {t("access:request.submit")}
+                    </Button>
+                  )}
+                </>
+              ) : (
+                <p className="text-muted-foreground text-xs">{t("references.unavailable")}</p>
+              )}
+            </div>
           </div>
-        </div>
-      </HoverCardContent>
-    </HoverCard>
+        </HoverCardContent>
+      </HoverCard>
+      {/* Beside the card rather than in it: the card closes as the pointer
+        leaves for the dialog. */}
+      {askable ? (
+        <RequestAccessDialog
+          open={asking}
+          onOpenChange={setAsking}
+          target={standingTarget(standing)}
+        />
+      ) : null}
+    </>
   );
 }

@@ -18,7 +18,7 @@ from typing import Any, Literal, Optional
 
 from pydantic import ConfigDict, Field, model_validator
 
-from app.models.tenant.property import PropertyType
+from app.models.tenant.metadata import MetadataType
 from app.models.tenant.wiki import WikiPageOrder, WikiReadingWidth
 from app.schemas.base import SanitizedBaseModel
 
@@ -45,18 +45,23 @@ class EnvelopePropertyValue(SanitizedBaseModel):
     model_config = ConfigDict(extra="ignore")
 
     property_name: str
-    property_type: PropertyType
+    property_type: MetadataType
     value_text: Optional[str] = None
     value_number: Optional[float] = None
     value_boolean: Optional[bool] = None
     value_json: Any = None
     value_handle: Optional[str] = None
     value_name: Optional[str] = None
+    #: A money value's currency, which is its property's.
+    currency: Optional[str] = None
+    #: A value of its project's metadata, not of one of the initiative's
+    #: properties.
+    project: bool = False
 
 
 class FileEnvelope(_EnvelopeBase):
     type: Literal["initiative-file"]
-    file_type: str  # native | spreadsheet | smart_link | whiteboard
+    file_type: str  # one of the editor's types: lexical | excalidraw | sheet | url
     name: str
     content: dict[str, Any] = {}
     tags: list[str] = []
@@ -190,49 +195,6 @@ class WikiEnvelope(_EnvelopeBase):
     pages: list[WikiPageEnvelope] = []
     #: The files filed in the wiki, when its export carried them.
     files: list[WikiFiledFile] = []
-
-
-class CatalogItemEnvelope(SanitizedBaseModel):
-    """One picture: what the row says about it, and the key naming its bytes.
-
-    ``storage_key`` is the blob's name under ``assets/`` in the backup zip. A
-    picture whose bytes did not travel is skipped on apply and counted — a
-    catalog row pointing at a file that is not there would render as a broken
-    tile forever.
-    """
-
-    model_config = ConfigDict(extra="ignore")
-
-    storage_key: str
-    title: Optional[str] = None
-    caption: Optional[str] = None
-    content_type: Optional[str] = None
-    size_bytes: Optional[int] = None
-    original_filename: Optional[str] = None
-    width: Optional[int] = None
-    height: Optional[int] = None
-    tags: list[str] = []
-    properties: list[EnvelopePropertyValue] = []
-    #: What this picture was called where it came from — a thing a reference
-    #: elsewhere in the same import can name. Refs live for one job.
-    external_ref: Optional[str] = None
-
-
-class CatalogEnvelope(_EnvelopeBase):
-    """A catalog and its pictures.
-
-    Only meaningful inside a backup: the bytes ride under ``assets/`` and the
-    items name them by key. Thumbnails are not carried — the app makes those
-    from the picture.
-    """
-
-    type: Literal["initiative-catalog"]
-    name: str
-    description: Optional[str] = None
-    cover: Optional[str] = None
-    tags: list[str] = []
-    properties: list[EnvelopePropertyValue] = []
-    items: list[CatalogItemEnvelope] = []
 
 
 class QueueEnvelopeItem(SanitizedBaseModel):

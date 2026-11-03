@@ -29,7 +29,7 @@ class GalleryField:
 
     #: Its name's key (``taskTypes.gallery.fields.<key>``).
     key: str
-    #: A ``PropertyType`` value.
+    #: A ``MetadataType`` value.
     type: str
 
 

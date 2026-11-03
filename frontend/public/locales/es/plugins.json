@@ -35,7 +35,8 @@
     "upToDate": "Actualizada",
     "upgraded": "Actualizada a {{version}}.",
     "removeManagedNeutral": "Los cargos de este complemento los gestiona tu proveedor.",
-    "removeManagedAction": "Gestionar"
+    "removeManagedAction": "Gestionar",
+    "closed": "Quien gestiona este servidor administra los complementos de esta comunidad."
   },
   "updates": {
     "wants": "La versión {{version}} quiere:",
@@ -250,7 +251,7 @@
       "comments": "Comentarios",
       "relationships": "Vínculos",
       "tags": "Etiquetas",
-      "properties": "Propiedades",
+      "properties": "Metadatos",
       "sharing": "Uso compartido",
       "members": "Miembros",
       "initiatives": "Iniciativas",
@@ -285,10 +286,6 @@
         "read": "Leer publicaciones",
         "write": "Leer y cambiar publicaciones"
       },
-      "catalogs": {
-        "read": "Leer catálogos",
-        "write": "Leer y cambiar catálogos"
-      },
       "wikis": {
         "read": "Leer wikis",
         "write": "Leer y cambiar wikis"
@@ -306,8 +303,8 @@
         "write": "Leer y cambiar etiquetas"
       },
       "properties": {
-        "read": "Leer propiedades personalizadas y sus opciones",
-        "write": "Leer, crear y cambiar propiedades personalizadas"
+        "read": "Leer los metadatos de la iniciativa y sus opciones",
+        "write": "Leer, crear y cambiar los metadatos de la iniciativa"
       },
       "sharing": {
         "read": "Ver quién tiene acceso a qué",

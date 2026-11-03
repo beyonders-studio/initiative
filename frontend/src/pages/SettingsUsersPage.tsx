@@ -38,6 +38,12 @@ import { useBillingPortal } from "@/hooks/useBillingPortal";
 import { useCommunities } from "@/hooks/useCommunities";
 import { useCommunityAuthSettings } from "@/hooks/useCommunityAuthPolicy";
 import { useCommunityInvites } from "@/hooks/useCommunityInvites";
+import {
+  useAssignCustomRole,
+  useCustomRoleHolders,
+  useCustomRoles,
+  useHeldSurfaces,
+} from "@/hooks/useCustomRoles";
 import { useServerTableState } from "@/hooks/useServerTableState";
 import {
   useExportCommunityUsersCsv,
@@ -47,6 +53,7 @@ import {
 } from "@/hooks/useUsers";
 import { getErrorMessage } from "@/lib/errorMessage";
 import { toast } from "@/lib/mascotToast";
+import { isAdminRole } from "@/lib/permissions";
 import type { AppColumnDef } from "@/lib/table";
 import { getUrlHandle, getUserDisplayName, getUserHandle } from "@/lib/userDisplay";
 
@@ -55,20 +62,24 @@ import { getUrlHandle, getUserDisplayName, getUserHandle } from "@/lib/userDispl
 //: neither appoint nor demote one, and the server says so too.
 const COMMUNITY_ROLE_OPTIONS: CommunityRole[] = ["admin", "member"];
 const SEAT_ROLE_OPTIONS: CommunityRole[] = ["superadmin", "admin", "member"];
+//: The custom role picker's "none", since a select's value is a string.
+const NO_CUSTOM_ROLE = "none";
 
 export const SettingsUsersPage = () => {
   const { user } = useAuth();
-  const { t } = useTranslation("communities");
+  const { t } = useTranslation(["communities", "settings"]);
 
   const { activeCommunity } = useCommunities();
   const { canSell, openPortal } = useBillingPortal();
   // Running the community, not reaching its work: the roster and its
-  // invites answer to the community's own ladder, and to a settings grant
-  // standing in on it. Platform role has nothing to do with it.
-  const isCommunityAdmin = Boolean(activeCommunity?.can.administer);
-  // Invites are handed out by whoever may change the roster, so a rung that
-  // only reads it does not list them.
-  const managesInvites = Boolean(activeCommunity?.can.configure);
+  // invites are parts of running it, held by its admins, by a custom role, or
+  // by a settings grant standing in. Platform role has nothing to do with it.
+  const held = useHeldSurfaces();
+  const managesMembers = held.holds("members");
+  // Invites are handed out by whoever holds them and may change what they
+  // hold, so a grant that only reads does not list them.
+  const managesInvites = held.writes && held.holds("invites");
+  const opensPage = managesMembers || held.holds("invites");
   const roleOptions = activeCommunity?.can.seat ? SEAT_ROLE_OPTIONS : COMMUNITY_ROLE_OPTIONS;
 
   const activeCommunityId = activeCommunity?.id ?? null;
@@ -81,6 +92,8 @@ export const SettingsUsersPage = () => {
     enabled: isSeat && activeCommunityId != null,
   }).data;
   const showsApiAccess = isSeat && (authSettings?.auth_options ?? []).includes("restrictions");
+  // Whoever runs the server may set it for the whole community instead.
+  const apiAccessFixed = (authSettings?.set_by_deployment ?? []).includes("api_keys");
 
   // Seat cap, admin-only on the payload and null when uncapped. A full community
   // mints no invite (the server refuses), so the form says so up front instead
@@ -109,9 +122,17 @@ export const SettingsUsersPage = () => {
   // Searched and paged on the server: the table only ever holds the page on
   // screen.
   const table = useServerTableState();
-  const usersQuery = useUsers(table.params, { enabled: isCommunityAdmin });
+  const usersQuery = useUsers(table.params, { enabled: opensPage });
   const rows = usersQuery.data?.items ?? [];
   const totalCount = usersQuery.data?.total_count ?? 0;
+
+  // The custom role beside each member, where the community has any; given
+  // here by whoever holds the members.
+  const customRoles = useCustomRoles({ enabled: opensPage }).data ?? [];
+  const customRoleHolders = useCustomRoleHolders({ enabled: customRoles.length > 0 }).data ?? [];
+  const heldRoleIds = new Map(customRoleHolders.map((holder) => [holder.user_id, holder.role_id]));
+  const assignCustomRole = useAssignCustomRole();
+  const customRolesClosed = Boolean(activeCommunity?.closed_surfaces?.includes("custom_roles"));
 
   const updateCommunityMembership = useUpdateCommunityMembership({
     onError: (error: unknown) => {
@@ -163,7 +184,7 @@ export const SettingsUsersPage = () => {
     });
   };
 
-  if (!isCommunityAdmin) {
+  if (!opensPage) {
     return <p className="text-muted-foreground text-sm">{t("users.adminRequired")}</p>;
   }
 
@@ -228,6 +249,13 @@ export const SettingsUsersPage = () => {
         const communityMember = row.original;
         const isSelf = communityMember.id === user?.id;
         const currentCommunityRole = communityMember.community_role ?? "member";
+        if (!managesMembers) {
+          return (
+            <span className="text-sm">
+              {t(`users.communityRole.${currentCommunityRole}` as never)}
+            </span>
+          );
+        }
         return (
           <div className="flex flex-col gap-1">
             <Select
@@ -252,6 +280,62 @@ export const SettingsUsersPage = () => {
         );
       },
     },
+    ...(customRoles.length > 0
+      ? [
+          {
+            id: "custom_role",
+            header: t("settings:customRoles.column"),
+            cell: ({ row }) => {
+              const communityMember = row.original;
+              const roleId = heldRoleIds.get(communityMember.id) ?? null;
+              if (!managesMembers || customRolesClosed) {
+                const name = customRoles.find((role) => role.id === roleId)?.name;
+                return name ? <span className="text-sm">{name}</span> : null;
+              }
+              // A role applies while its holder stands on its rung.
+              const rung = isAdminRole(communityMember.community_role) ? "admin" : "member";
+              return (
+                <Select
+                  value={roleId === null ? NO_CUSTOM_ROLE : String(roleId)}
+                  onValueChange={(value) =>
+                    assignCustomRole.mutate({
+                      userId: communityMember.id,
+                      roleId: value === NO_CUSTOM_ROLE ? null : Number(value),
+                    })
+                  }
+                  disabled={assignCustomRole.isPending}
+                >
+                  <SelectTrigger
+                    className="min-w-40"
+                    aria-label={t("settings:customRoles.pickerLabel", {
+                      name: getUserDisplayName(communityMember),
+                    })}
+                  >
+                    <SelectValue />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value={NO_CUSTOM_ROLE}>{t("settings:customRoles.none")}</SelectItem>
+                    {customRoles.map((role) => (
+                      <SelectItem key={role.id} value={String(role.id)}>
+                        <span className="flex flex-col">
+                          <span>{role.name}</span>
+                          {role.base_rung === rung ? null : (
+                            <span className="text-muted-foreground text-xs">
+                              {role.base_rung === "admin"
+                                ? t("settings:customRoles.appliesWhileAdmin")
+                                : t("settings:customRoles.appliesWhileMember")}
+                            </span>
+                          )}
+                        </span>
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              );
+            },
+          } satisfies AppColumnDef<UserCommunityMember>,
+        ]
+      : []),
     ...(showsApiAccess
       ? [
           {
@@ -265,7 +349,7 @@ export const SettingsUsersPage = () => {
                   aria-label={t("users.apiAccessLabel", {
                     name: getUserDisplayName(communityMember),
                   })}
-                  disabled={setMemberApiAccess.isPending}
+                  disabled={setMemberApiAccess.isPending || apiAccessFixed}
                   onCheckedChange={(allowed) =>
                     setMemberApiAccess.mutate({
                       communityId: activeCommunityId!,
@@ -292,43 +376,47 @@ export const SettingsUsersPage = () => {
         );
       },
     },
-    {
-      id: "actions",
-      header: t("users.actionsColumn"),
-      cell: ({ row }) => {
-        const communityMember = row.original;
-        const isSelf = communityMember.id === user?.id;
-        return (
-          <RowActionsMenu subject={getUserDisplayName(communityMember)}>
-            <DropdownMenuItem onSelect={() => exportUserCsv(communityMember)}>
-              <Download className="h-4 w-4" />
-              {t("users.exportUser")}
-            </DropdownMenuItem>
-            <DropdownMenuItem onSelect={() => setNamingMember(communityMember)}>
-              <IdCard className="h-4 w-4" />
-              {t("displayName.adminAction")}
-            </DropdownMenuItem>
-            <DropdownMenuItem onSelect={() => setTransferTarget({ member: communityMember })}>
-              <HandCoins className="h-4 w-4" />
-              {t("transferOwnership.action")}
-            </DropdownMenuItem>
-            {/* Removing somebody from the community is the destructive one, and
+    ...(managesMembers
+      ? [
+          {
+            id: "actions",
+            header: t("users.actionsColumn"),
+            cell: ({ row }) => {
+              const communityMember = row.original;
+              const isSelf = communityMember.id === user?.id;
+              return (
+                <RowActionsMenu subject={getUserDisplayName(communityMember)}>
+                  <DropdownMenuItem onSelect={() => exportUserCsv(communityMember)}>
+                    <Download className="h-4 w-4" />
+                    {t("users.exportUser")}
+                  </DropdownMenuItem>
+                  <DropdownMenuItem onSelect={() => setNamingMember(communityMember)}>
+                    <IdCard className="h-4 w-4" />
+                    {t("displayName.adminAction")}
+                  </DropdownMenuItem>
+                  <DropdownMenuItem onSelect={() => setTransferTarget({ member: communityMember })}>
+                    <HandCoins className="h-4 w-4" />
+                    {t("transferOwnership.action")}
+                  </DropdownMenuItem>
+                  {/* Removing somebody from the community is the destructive one, and
                 the only one you cannot aim at yourself. */}
-            <DropdownMenuSeparator />
-            <DropdownMenuItem
-              className="text-destructive"
-              onSelect={() =>
-                handleDeleteUser(communityMember.id, getUserDisplayName(communityMember))
-              }
-              disabled={isSelf}
-            >
-              <UserMinus className="h-4 w-4" />
-              {t("users.removeFromCommunity")}
-            </DropdownMenuItem>
-          </RowActionsMenu>
-        );
-      },
-    },
+                  <DropdownMenuSeparator />
+                  <DropdownMenuItem
+                    className="text-destructive"
+                    onSelect={() =>
+                      handleDeleteUser(communityMember.id, getUserDisplayName(communityMember))
+                    }
+                    disabled={isSelf}
+                  >
+                    <UserMinus className="h-4 w-4" />
+                    {t("users.removeFromCommunity")}
+                  </DropdownMenuItem>
+                </RowActionsMenu>
+              );
+            },
+          } satisfies AppColumnDef<UserCommunityMember>,
+        ]
+      : []),
   ];
 
   const createInvite = (event: FormEvent<HTMLFormElement>) => {
@@ -414,21 +502,27 @@ export const SettingsUsersPage = () => {
               {showsApiAccess ? (
                 <div className="flex gap-1.5">
                   <dt className="font-medium text-foreground">{t("users.apiAccessColumn")}</dt>
-                  <dd>{t("users.apiAccessHelp")}</dd>
+                  <dd>
+                    {apiAccessFixed
+                      ? t("settings:communityAuth.setByDeployment")
+                      : t("users.apiAccessHelp")}
+                  </dd>
                 </div>
               ) : null}
             </dl>
           </div>
-          <Button
-            type="button"
-            variant="outline"
-            size="sm"
-            onClick={exportAllUsersCsv}
-            disabled={totalCount === 0 && !table.params.search}
-          >
-            <Download className="h-4 w-4" />
-            {t("users.exportAll")}
-          </Button>
+          {managesMembers ? (
+            <Button
+              type="button"
+              variant="outline"
+              size="sm"
+              onClick={exportAllUsersCsv}
+              disabled={totalCount === 0 && !table.params.search}
+            >
+              <Download className="h-4 w-4" />
+              {t("users.exportAll")}
+            </Button>
+          ) : null}
         </CardHeader>
         <CardContent className="space-y-4">
           <DataTable
@@ -443,7 +537,9 @@ export const SettingsUsersPage = () => {
         </CardContent>
       </Card>
 
-      <UnownedContentCard onClaim={() => setTransferTarget({ member: null })} />
+      {managesMembers ? (
+        <UnownedContentCard onClaim={() => setTransferTarget({ member: null })} />
+      ) : null}
 
       <RemoveCommunityMemberDialog
         open={deleteUserConfirm !== null}

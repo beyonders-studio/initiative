@@ -49,8 +49,8 @@ _BUILDERS: dict[str, Callable[[], Dataset]] = {
     "task_types": task_types_dataset.build,
     "task_assignees": task_assignees_dataset.build,
     "members": members_dataset.build,
-    "property_definitions": property_datasets.build_property_definitions,
-    "property_values": property_datasets.build_property_values,
+    "metadata_definitions": property_datasets.build_metadata_definitions,
+    "metadata_values": property_datasets.build_metadata_values,
     "relationships": relationships_dataset.build,
     # The datasets that are simply a tool. Declared together because there is
     # nothing to say about any of them individually (app.services.fields.tools).
@@ -61,9 +61,7 @@ _BUILDERS: dict[str, Callable[[], Dataset]] = {
     "calendars": tool_datasets.build_calendars,
     "dashboards": tool_datasets.build_dashboards,
     "posts": tool_datasets.build_posts,
-    "catalogs": tool_datasets.build_catalogs,
-    "catalog_items": tool_datasets.build_catalog_items,
-    "catalog_item_versions": tool_datasets.build_catalog_item_versions,
+    "collections": tool_datasets.build_collections,
     "wikis": tool_datasets.build_wikis,
     "wiki_pages": tool_datasets.build_wiki_pages,
 }

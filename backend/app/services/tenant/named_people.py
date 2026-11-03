@@ -31,7 +31,7 @@ from dataclasses import dataclass
 from typing import Any, Optional
 
 from fastapi import HTTPException, status
-from sqlalchemy import and_, exists, false, or_, true
+from sqlalchemy import and_, exists, false, func, or_, true, tuple_
 from sqlalchemy import Select
 from sqlalchemy import delete as sa_delete
 from sqlalchemy import update as sa_update
@@ -56,16 +56,17 @@ from app.models.tenant.initiative import (
     Initiative,
     InitiativeMember,
     InitiativeRoleModel,
-    InitiativeRolePermission,
+    InitiativeRule,
 )
 from app.models.tenant.calendar_event import CalendarEvent, CalendarEventAttendee
-from app.models.tenant.property import PropertyValue
+from app.models.tenant.metadata import MetadataValue
 from app.models.tenant.queue import QueueItem
 from app.models.tenant.resource_grant import ResourceGrant
 from app.models.tenant.task import Task, TaskAssignee
 from app.services.membership import live_membership_clause
 from app.services.platform.users import visible_to_other_people
 from app.db.request_context import SystemGuild
+from app.services.tenant.initiative_tools import member_permission_sql, tool_on_sql
 
 _ADMIN_RUNGS = [rung for rung in GUILD_LADDER if rung.reaches(CommunityRole.admin)]
 
@@ -73,15 +74,41 @@ _ADMIN_RUNGS = [rung for rung in GUILD_LADDER if rung.reaches(CommunityRole.admi
 @dataclass(frozen=True)
 class Governing:
     """The tool row whose sharing decides who may be named on content inside
-    it: a task's project, an event's calendar, a file itself."""
+    it: a task's project, an event's calendar, a file itself.
+
+    Content no sharing governs, a collection, is opened by whoever can open
+    one of its files: ``resource_id`` is None and ``resource_ids`` selects
+    those files."""
 
     tool: Tool
-    resource_id: int
+    resource_id: Optional[int]
     initiative_id: Optional[int]
+    resource_ids: Any = None
 
     @classmethod
     def of(cls, tool: Tool, row: Any) -> "Governing":
         return cls(tool, row.id, row.initiative_id)
+
+    @classmethod
+    def of_collection(cls, row: Any) -> "Governing":
+        """Whoever can open a file in the collection that is not in the
+        trash."""
+        from app.models.tenant.collection import CollectionFile
+        from app.models.tenant.file import File
+
+        files = (
+            select(CollectionFile.file_id)
+            .join(File, File.id == CollectionFile.file_id)
+            .where(CollectionFile.collection_id == row.id, File.deleted_at.is_(None))
+        )
+        return cls(Tool.file, None, row.initiative_id, resource_ids=files)
+
+    def governs(self, column: Any) -> ColumnElement[bool]:
+        """Whether a resource id column names the governing row, or one of
+        them."""
+        if self.resource_ids is not None:
+            return column.in_(self.resource_ids)
+        return column == self.resource_id
 
 
 async def governing_of(
@@ -132,7 +159,7 @@ def _grant_reaches(
         exists()
         .where(
             ResourceGrant.resource_type == governing.tool.value,
-            ResourceGrant.resource_id == governing.resource_id,
+            governing.governs(ResourceGrant.resource_id),
             or_(
                 ResourceGrant.user_id == user_id,
                 ResourceGrant.role_id.in_(held),
@@ -173,9 +200,9 @@ def readers_of(governing: Governing, guild_id: int) -> Select:
             return (
                 exists()
                 .where(
-                    InitiativeRolePermission.initiative_role_id == im.role_id,
-                    InitiativeRolePermission.permission_key == tool.view_permission,
-                    InitiativeRolePermission.enabled.is_(enabled),
+                    InitiativeRule.initiative_role_id == im.role_id,
+                    InitiativeRule.key == tool.view_permission,
+                    InitiativeRule.enabled.is_(enabled),
                 )
                 .correlate(im)
             )
@@ -188,11 +215,13 @@ def readers_of(governing: Governing, guild_id: int) -> Select:
             .where(
                 im.initiative_id == governing.initiative_id,
                 im.user_id == gm.user_id,
-                getattr(Initiative, f"{tool.plural}_enabled").is_(True),
+                tool_on_sql(tool),
                 or_(
                     role.is_manager.is_(True),
-                    role_says(True),
-                    and_(default, ~role_says(False)),
+                    func.coalesce(
+                        member_permission_sql(role, tool.view_permission),
+                        or_(role_says(True), and_(default, ~role_says(False))),
+                    ),
                 ),
                 or_(
                     role.override_share_restrictions.is_(True),
@@ -206,14 +235,14 @@ def readers_of(governing: Governing, guild_id: int) -> Select:
             exists()
             .where(
                 ResourceGrant.resource_type == tool.value,
-                ResourceGrant.resource_id == governing.resource_id,
+                governing.governs(ResourceGrant.resource_id),
                 ResourceGrant.user_id == gm.user_id,
             )
             .correlate(gm)
         )
         enabled = exists().where(
             Initiative.id == governing.initiative_id,
-            getattr(Initiative, f"{tool.plural}_enabled").is_(True),
+            tool_on_sql(tool),
         )
         reached = or_(reached, and_(guest, given, enabled))
     return sa_select(gm.user_id).where(
@@ -328,10 +357,13 @@ PERSON_REFS: dict[Tool, tuple[PersonRef, ...]] = {
 
 def _property_ref(tool: Tool) -> PersonRef | None:
     """A person-valued property on anything ``tool`` governs: the tool row
-    itself and every sub-tool row inside it, read from the properties seam."""
-    from app.services.tenant.properties import PROPERTY_LINKS
+    itself and every sub-tool row inside it, read from the properties seam. A
+    collection is governed by no one row, so it is not among them."""
+    from app.services.tenant.metadata import PROPERTY_LINKS
 
-    specs = [spec for spec in PROPERTY_LINKS.values() if spec.tool is tool]
+    specs = [
+        spec for spec in PROPERTY_LINKS.values() if spec.tool is tool and spec.shared
+    ]
     if not specs:
         return None
 
@@ -339,10 +371,10 @@ def _property_ref(tool: Tool) -> PersonRef | None:
         return or_(
             *(
                 and_(
-                    PropertyValue.entity_type == spec.target,
-                    PropertyValue.entity_id == gid
+                    MetadataValue.entity_type == spec.target,
+                    MetadataValue.entity_id == gid
                     if spec.via is None
-                    else PropertyValue.entity_id.in_(
+                    else MetadataValue.entity_id.in_(
                         sa_select(spec.model.id).where(
                             getattr(spec.model, spec.via) == gid
                         )
@@ -352,7 +384,7 @@ def _property_ref(tool: Tool) -> PersonRef | None:
             )
         )
 
-    return PersonRef(PropertyValue.value_user_id, within, clears=True)
+    return PersonRef(MetadataValue.value_user_id, within, clears=True)
 
 
 def person_refs(tool: Tool) -> tuple[PersonRef, ...]:
@@ -375,6 +407,53 @@ async def named_on(session: AsyncSession, governing: Governing) -> set[int]:
             ).all()
         )
     return named
+
+
+async def sweep_collections(
+    session: AsyncSession, collections: Iterable[Any]
+) -> set[int]:
+    """Take everyone who can open no file in a collection off its values, and
+    answer who that was. A collection is governed by its files rather than one
+    row (:meth:`Governing.of_collection`), so the whole set is read at once."""
+    from app.models.tenant.collection import Collection
+    from app.services.tenant.metadata import link_for
+
+    rows = list(collections)
+    if not rows:
+        return set()
+    guild_id = routed_guild_id(session)
+    if guild_id is None:
+        raise RuntimeError("people are named on content inside a community")
+    on = MetadataValue.entity_type == link_for(Collection).target
+    unreadable = or_(
+        *(
+            and_(
+                MetadataValue.entity_id == row.id,
+                MetadataValue.value_user_id.not_in(
+                    readers_of(Governing.of_collection(row), guild_id)
+                ),
+            )
+            for row in rows
+        )
+    )
+    async with roster_session(session) as reader:
+        gone = (
+            await reader.exec(
+                select(MetadataValue.entity_id, MetadataValue.value_user_id).where(
+                    on, MetadataValue.value_user_id.is_not(None), unreadable
+                )
+            )
+        ).all()
+    if gone:
+        await session.exec(
+            sa_update(MetadataValue)
+            .where(
+                on,
+                tuple_(MetadataValue.entity_id, MetadataValue.value_user_id).in_(gone),
+            )
+            .values(value_user_id=None)
+        )
+    return {user_id for _, user_id in gone}
 
 
 async def sweep(session: AsyncSession, governing: Governing) -> set[int]:

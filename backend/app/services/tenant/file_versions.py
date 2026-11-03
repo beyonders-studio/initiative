@@ -1,11 +1,11 @@
-"""A file kept as numbered versions: an uploaded file's, a catalog picture's.
+"""An uploaded file kept as numbered versions.
 
-The parent row names the version it shows (``current_version_id``) and the
-version rows are its history. Both tools take the same steps through here:
-number a new version and make it current, copy one for a duplicate, delete
-one and point back at the newest left, and take back the stored files a
-failed or finished write leaves behind. Every version a row is given has a
-type its tool accepts, since that type decides how the file is shown.
+The file names the version it shows (``current_version_id``) and the version
+rows are its history. Every step on them goes through here: number a new
+version and make it current, copy one for a duplicate, delete one and point
+back at the newest left, and take back the stored files a failed or finished
+write leaves behind. Every version a file is given has a type a file may be,
+since that type decides how the file is shown.
 
 A parent's versions are read off its ``versions`` relationship, so the steps
 work for any model that keeps one.
@@ -13,7 +13,6 @@ work for any model that keeps one.
 
 import asyncio
 import logging
-from collections.abc import Collection
 from datetime import datetime, timezone
 from typing import Any, TypeVar
 
@@ -25,6 +24,7 @@ from sqlalchemy.exc import DataError, IntegrityError
 from sqlmodel import select
 from sqlmodel.ext.asyncio.session import AsyncSession
 
+from app.core.file_types import is_refused, spec_of, type_of_media
 from app.core.messages import CommonMessages
 from app.schemas.tenant.tool import from_row
 from app.services.tenant import attachments as attachments_service
@@ -52,48 +52,30 @@ def _history(parent: Any) -> tuple[type, Column]:
 
 
 def _stored(version: Any) -> list[str | None]:
-    """The stored files a version names: its file, and a picture's thumbnail."""
-    return [version.file_url, getattr(version, "thumbnail_url", None)]
+    """The stored files a version names: its file, and its thumbnail."""
+    return [version.file_url, version.thumbnail_url]
 
 
-def _allowed(model: type) -> Collection[str]:
-    """The types a ``model`` row's file may be: what an upload of one accepts,
-    which is what decides how the file is shown."""
-    from app.models.tenant.file import File
-    from app.models.tenant.catalog import CatalogItem
-    from app.services.tenant.catalogs import PICTURE_EXTENSIONS
-
-    return {
-        File: attachments_service.ALLOWED_FILE_MIME_TYPES,
-        CatalogItem: PICTURE_EXTENSIONS,
-    }[model]
+def _may_hold(content_type: str | None) -> bool:
+    """Whether a file may be of ``content_type``: anything but a program."""
+    return content_type is not None and not is_refused(content_type, None)
 
 
-def file_type(
-    model: type, data: bytes, *, filename: str | None, hint: str | None
-) -> str | None:
-    """The type ``data`` takes as a ``model`` row's file, read from its bytes
-    by the rule an upload of one follows (``filename`` and ``hint`` are what
-    that rule falls back on), or ``None`` where it is not a file the row may
-    hold."""
-    from app.models.tenant.catalog import CatalogItem
-    from app.services.tenant import catalogs
-
+def file_type(data: bytes, *, filename: str | None) -> str | None:
+    """The type ``data`` takes as a file, read from its bytes by the rule an
+    upload of one follows (``filename`` narrows it), or ``None`` where it is
+    not a file one may hold."""
     try:
-        if model is CatalogItem:
-            return catalogs.validate_image(data)[0].content_type
-        return attachments_service.validate_file(data, filename, hint)[0]
+        return attachments_service.validate_file(data, filename)[0]
     except ValueError:
         return None
 
 
 async def stored_file_type(
-    model: type,
     guild_id: int,
     key: str,
     *,
     filename: str | None = None,
-    hint: str | None = None,
 ) -> str | None:
     """:func:`file_type` for a file already stored in the community under
     ``key``, or ``None`` where nothing is stored there."""
@@ -102,21 +84,40 @@ async def stored_file_type(
     data = await asyncio.to_thread(read_payload, guild_id, key)
     if data is None:
         return None
-    return file_type(model, data, filename=filename, hint=hint)
+    return file_type(data, filename=filename)
 
 
 def _make_current(parent: Any, version: Any) -> None:
+    """Make ``version`` the one ``parent`` shows. An uploaded file's type is
+    its current version's."""
+    from app.models.tenant.file import File
+
     parent.current_version = version
     parent.updated_at = datetime.now(timezone.utc)
+    if isinstance(parent, File):
+        parent.file_type = type_of_media(version.file_content_type)
 
 
 def _new_version(session: AsyncSession, parent: Any, fields: dict[str, Any]) -> Any:
     """Add a version of ``parent``'s file and make it current. Its type is one
-    ``parent`` may show; anything else raises ``ValueError``."""
+    ``parent`` may show; anything else raises ``ValueError``. A picture's
+    version waits for the ``thumbnails`` sweep to draw it smaller."""
+    from app.models.tenant.file import File
+
     content_type = fields.get("file_content_type")
-    if content_type not in _allowed(type(parent)):
+    if not _may_hold(content_type):
         raise ValueError(f"Unsupported file type: {content_type}")
+    if (
+        isinstance(parent, File)
+        and fields.get("thumbnail_url") is None
+        and spec_of(type_of_media(content_type)).picture_format
+    ):
+        fields["thumbnail_state"] = "pending"
     model, _ = _history(parent)
+    if "original_filename" in fields:
+        fields["original_filename"] = attachments_service.display_filename(
+            fields["original_filename"]
+        )
     version = model(**fields)
     session.add(version)
     _make_current(parent, version)
@@ -147,13 +148,18 @@ async def add_version(session: AsyncSession, parent: Any, **fields: Any) -> Any:
 
 def copy_version(session: AsyncSession, version: Any, copy: Any, **values: Any) -> Any:
     """Version 1 of ``copy``, carrying ``version``'s file, made current.
-    ``values`` set what differs from it: the copy's author, a copied file."""
+    ``values`` set what differs from it: the copy's author, a copied file. A
+    file version's thumbnail is its own, so the copy's is drawn again."""
+    from app.models.tenant.file import FileVersion
+
     model, column = _history(copy)
+    left = {"version_number", "created_at"}
+    if model is FileVersion:
+        left |= {"thumbnail_url", "thumbnail_state"}
     carried = {
         c.name: getattr(version, c.name)
         for c in model.__table__.columns
-        if not (c.primary_key or c.foreign_keys)
-        and c.name not in ("version_number", "created_at")
+        if not (c.primary_key or c.foreign_keys) and c.name not in left
     }
     return _new_version(
         session,

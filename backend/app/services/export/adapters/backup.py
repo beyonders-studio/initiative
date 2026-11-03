@@ -23,10 +23,10 @@ with one ``initiatives/`` entry, so ONE import path serves both)::
     initiatives/{id}-{slug}/calendars/{id}-{slug}.initiative-calendar.json
     initiatives/{id}-{slug}/posts/{id}-{slug}.initiative-post.json
     initiatives/{id}-{slug}/wikis/{id}-{slug}.initiative-wiki.json
-    initiatives/{id}-{slug}/catalogs/{id}-{slug}.initiative-catalog.json
     initiatives/{id}-{slug}/dashboards/{id}-{slug}.initiative-dashboard.json
     initiatives/{id}-{slug}/structure.json          (backup mode)
     initiatives/{id}-{slug}/properties.json         (backup mode)
+    initiatives/{id}-{slug}/collections.json        (backup mode)
     assets/{storage_key}                            (include_uploads only)
 
 Authorization: the initiative source requires the creator to manage the
@@ -55,7 +55,7 @@ from __future__ import annotations
 from collections.abc import Awaitable, Callable, Mapping
 from dataclasses import dataclass, field, replace
 from datetime import datetime, timezone
-from typing import Any, cast
+from typing import Any, Optional, cast
 
 from sqlmodel.ext.asyncio.session import AsyncSession
 
@@ -63,13 +63,13 @@ from app.core.user_display import handle_of
 from app.core.config import settings
 from app.core.messages import ExportMessages, InitiativeMessages
 from app.models.platform.user import User
-from app.models.tenant.file import FileType
+from app.core.file_types import FileType, is_stored
 from app.services.export.adapters._common import (
     BuildContext,
     ToolExportAdapter,
     storage_key_of,
 )
-from app.services.export.adapters.file import doc_type_of
+from app.services.export.adapters.file import file_type_of
 from app.services.export.contract import RenderItem, RenderRequest
 from app.core.tools import (
     BULK_EXPORT_TOOLS,
@@ -229,8 +229,8 @@ def _validate_params(params: dict, *, scope_kind: str) -> None:
             if section is not None and section.type_report_formats:
                 allowed = section.type_report_formats
                 if not isinstance(fmt, dict) or not all(
-                    doc_type in allowed and value in allowed[doc_type]
-                    for doc_type, value in fmt.items()
+                    file_type in allowed and value in allowed[file_type]
+                    for file_type, value in fmt.items()
                 ):
                     raise ExportError(ExportMessages.EXPORT_INVALID_FORMAT)
             elif (
@@ -487,10 +487,9 @@ async def _build_scope(
 def _initiative_tool_states(params: dict, initiative) -> dict[str, str]:
     states: dict[str, str] = {}
     for tool in _TOOLS:
-        # The switch column via the enum, not `tool + "s"`: the naive spelling
-        # is wrong for `catalog`, and every tool now carries a column, so a
-        # missing-attribute default would hide a real mismatch rather than
-        # cover for the two that used to have none.
+        # The switch column via the enum, not `tool + "s"`: every tool now
+        # carries a column, so a missing-attribute default would hide a real
+        # mismatch rather than cover for the two that used to have none.
         flag = getattr(initiative, Tool(tool).view_permission)
         if not flag:
             states[tool] = "disabled"
@@ -503,7 +502,7 @@ def _initiative_tool_states(params: dict, initiative) -> dict[str, str]:
 
 def _permission_key(permission) -> str:
     """The permission's name — the enum's value, not its repr."""
-    key = permission.permission_key
+    key = permission.key
     return str(getattr(key, "value", key))
 
 
@@ -571,6 +570,7 @@ class _ScopeBuilder:
             await self._add_section(section, initiative, folder)
         await self._add_initiative_structure(initiative, folder)
         await self._add_initiative_properties(initiative, folder)
+        await self._add_initiative_collections(initiative, folder)
         await self._link_wiki_files(initiative)
 
     # -- per-tool sections ---------------------------------------------------
@@ -704,16 +704,16 @@ class _ScopeBuilder:
         """Report mode offers per-type choices for native/spreadsheet;
         everything else (whiteboards, smart links) rides as its canonical json
         envelope in both modes."""
-        doc_type = doc_type_of(file)
+        file_type = file_type_of(file)
         doc_formats = self._file_formats()
-        if self.mode == "backup" or doc_type not in doc_formats:
+        if self.mode == "backup" or file_type not in doc_formats:
             return "json"
-        return doc_formats[doc_type]
+        return doc_formats[file_type]
 
     def _write_uploaded_file(self, file, initiative, path_stem: str) -> bool:
         """An uploaded file is its blob, registered as an asset — or, with
         uploads left out, a skipped entry."""
-        if doc_type_of(file) != FileType.file.value:
+        if not is_stored(file_type_of(file)):
             return False
         if not _include_uploads(self.params):
             self._skip(
@@ -766,7 +766,7 @@ class _ScopeBuilder:
 
         keys: list[str] = []
         for file in files:
-            if doc_type_of(file) != FileType.native.value:
+            if file_type_of(file) != FileType.lexical.value:
                 continue
             if self._file_format(file) != "json":
                 continue
@@ -793,40 +793,6 @@ class _ScopeBuilder:
                 content_type=content_type,
                 size_bytes=size_bytes,
                 referenced_by=entry_path,
-            )
-
-    # -- section hooks: catalogs ----------------------------------------------
-
-    def _skip_catalog_without_uploads(self, loaded, initiative, path_stem: str) -> bool:
-        """A catalog is mostly blobs, so it obeys the uploads toggle the way a
-        uploaded file does — excluded uploads means the pictures do not
-        travel, and a catalog of captions without them is not worth writing,
-        so the whole catalog is recorded as skipped instead."""
-        if _include_uploads(self.params):
-            return False
-        catalog, _images = loaded
-        self._skip(
-            Tool.catalog, catalog.id, catalog.name, initiative, "uploads_excluded"
-        )
-        return True
-
-    async def _register_catalog_pictures(self, loaded, path: str) -> None:
-        """Each picture's bytes, registered as an asset of the catalog's
-        entry."""
-        _catalog, images = loaded
-        for image in images:
-            version = image.current_version
-            key = storage_key_of(version.file_url)
-            if not key:
-                continue
-            # The picture only; a thumbnail is a rendition the app makes
-            # again from it.
-            self._register_asset(
-                key,
-                original_filename=version.original_filename,
-                content_type=version.file_content_type,
-                size_bytes=int(version.file_size or 0),
-                referenced_by=path,
             )
 
     # -- section hooks: dashboards ---------------------------------------------
@@ -1083,7 +1049,7 @@ class _ScopeBuilder:
         from app.models.tenant.initiative import (
             InitiativeMember,
             InitiativeRoleModel,
-            InitiativeRolePermission,
+            InitiativeRule,
         )
 
         roles = list(
@@ -1096,10 +1062,8 @@ class _ScopeBuilder:
         permissions: dict[int, list] = {}
         if roles:
             rows = await self.session.exec(
-                select(InitiativeRolePermission).where(
-                    InitiativeRolePermission.initiative_role_id.in_(
-                        [r.id for r in roles]
-                    )
+                select(InitiativeRule).where(
+                    InitiativeRule.initiative_role_id.in_([r.id for r in roles])
                 )
             )
             for permission in rows:
@@ -1184,13 +1148,13 @@ class _ScopeBuilder:
             return
         from sqlmodel import select
 
-        from app.models.tenant.property import PropertyDefinition
+        from app.models.tenant.metadata import MetadataDefinition
 
         rows = list(
             await self.session.exec(
-                select(PropertyDefinition)
-                .where(PropertyDefinition.initiative_id == initiative.id)
-                .order_by(PropertyDefinition.position.asc())
+                select(MetadataDefinition)
+                .where(MetadataDefinition.of_initiative(initiative.id))
+                .order_by(MetadataDefinition.position.asc())
             )
         )
         if not rows:
@@ -1199,16 +1163,7 @@ class _ScopeBuilder:
             "type": "initiative-properties",
             "schema_version": 1,
             "initiative_id": initiative.id,
-            "properties": [
-                {
-                    "name": row.name,
-                    "type": row.type.value,
-                    "position": float(row.position),
-                    "color": row.color,
-                    "options": list(row.options or []),
-                }
-                for row in rows
-            ],
+            "properties": [_definition_record(row) for row in rows],
         }
         path = f"{folder}/properties.json"
         await self._append_backup(
@@ -1216,6 +1171,147 @@ class _ScopeBuilder:
             path=path,
             tool=_STRUCTURAL_TOOL,
             type="initiative-properties",
+            schema_version=1,
+            entity_id=initiative.id,
+            title=initiative.name,
+            initiative_id=initiative.id,
+        )
+
+    async def _add_initiative_collections(self, initiative, folder: str) -> None:
+        """The initiative's collections the creator can see, each under the id
+        it has here, holding its files by theirs, with its metadata, each
+        file's values of it and its layouts, which name its metadata by place:
+        an import puts each one together from the files it made of them."""
+        if self.mode != "backup" or not _included(self.params, Tool.file.value):
+            return
+        from sqlmodel import col, select
+
+        from app.db.query import ids_in
+        from app.models.tenant.collection import Collection, CollectionFile
+        from app.models.tenant.file import File
+        from app.models.tenant.metadata import MetadataType
+        from app.services.export.property_values import property_export_dict
+        from app.services.import_engine.common import load_initiative_properties
+        from app.services.tenant import collections as collections_service
+        from app.services.tenant import metadata as metadata_service
+        from app.services.tenant import tags as tags_service
+        from app.services.tenant import tool_layouts as tool_layouts_service
+
+        rows = list(
+            await self.session.exec(
+                select(Collection)
+                .where(Collection.initiative_id == initiative.id)
+                .order_by(col(Collection.id))
+            )
+        )
+        if not rows:
+            return
+        held: dict[int, list[int]] = {}
+        for collection_id, file_id in await self.session.exec(
+            select(CollectionFile.collection_id, CollectionFile.file_id)
+            .join(File, col(File.id) == CollectionFile.file_id)
+            .where(ids_in(CollectionFile.collection_id, [row.id for row in rows]))
+            .order_by(col(CollectionFile.added_at), col(CollectionFile.file_id))
+        ):
+            held.setdefault(collection_id, []).append(file_id)
+        await tags_service.annotate_tags(self.session, rows)
+        await metadata_service.annotate_properties(self.session, rows)
+        fields = await collections_service.metadata_of(
+            self.session, [row.id for row in rows]
+        )
+        values = {
+            row.id: await metadata_service.summaries_by_id(
+                self.session,
+                Tool.file.value,
+                held.get(row.id, []),
+                collection_id=row.id,
+            )
+            for row in rows
+        }
+
+        properties = {
+            definition.id: definition
+            for definition in (
+                await load_initiative_properties(
+                    self.session, initiative_id=initiative.id
+                )
+            ).values()
+        }
+
+        async def layouts(row) -> dict:
+            """The collection's layouts, naming its metadata by place, and
+            the initiative's properties they name at the places after it
+            (``layout_properties``)."""
+            own = fields.get(row.id, [])
+            places = {field.id: place for place, field in enumerate(own, start=1)}
+            named: list = []
+
+            def place(property_id: int) -> Optional[int]:
+                if property_id not in places and property_id in properties:
+                    named.append(properties[property_id])
+                    places[property_id] = len(places) + 1
+                return places.get(property_id)
+
+            remap = tool_layouts_service.Remap(
+                statuses=lambda _: None,
+                properties=place,
+                community=False,
+                people=frozenset(
+                    defn.id
+                    for defn in (*own, *properties.values())
+                    if defn.type == MetadataType.user_reference
+                ),
+            )
+            stored = [
+                {
+                    "kind": layout.kind,
+                    "definition": tool_layouts_service.remapped_definition(
+                        layout.definition, remap
+                    ),
+                }
+                for layout in await tool_layouts_service.list_rows(
+                    self.session,
+                    tool_layouts_service.Target("collection", row.id, initiative.id),
+                )
+            ]
+            return {
+                "layouts": stored,
+                "layout_properties": [_definition_record(defn) for defn in named],
+            }
+
+        payload = {
+            "type": "initiative-collections",
+            "schema_version": 1,
+            "initiative_id": initiative.id,
+            "collections": [
+                {
+                    "id": row.id,
+                    "name": row.name,
+                    "description": row.description,
+                    "cover_file_id": row.cover_file_id
+                    if row.cover_file_id in held.get(row.id, [])
+                    else None,
+                    "file_ids": held.get(row.id, []),
+                    **_file_metadata(row),
+                    "fields": [
+                        _definition_record(field) for field in fields.get(row.id, [])
+                    ],
+                    "values": {
+                        str(file_id): [property_export_dict(v) for v in summaries]
+                        for file_id, summaries in values[row.id].items()
+                    },
+                    **await layouts(row),
+                }
+                for row in rows
+            ],
+        }
+        self._record_property_people(payload)
+        path = f"{folder}/collections.json"
+        await self._append_backup(
+            RenderItem(key=path, data=payload, filename=path, format="json"),
+            path=path,
+            tool=_STRUCTURAL_TOOL,
+            type="initiative-collections",
             schema_version=1,
             entity_id=initiative.id,
             title=initiative.name,
@@ -1274,17 +1370,18 @@ class _ScopeBuilder:
         """
         if self.mode != "backup" or not _include_uploads(self.params):
             return
-        from sqlmodel import select
+        from sqlmodel import col, select
 
         from app.models.tenant.upload import Upload
-        from app.services.tenant.attachments import guild_wide
+        from app.services.tenant.attachments import THUMBNAIL_PREFIX, guild_wide
 
         async with guild_wide(self.guild_id) as session:
             rows = (
                 await session.exec(
-                    select(
-                        Upload.filename, Upload.size_bytes, Upload.content_type
-                    ).order_by(Upload.id.asc())
+                    select(Upload.filename, Upload.size_bytes, Upload.content_type)
+                    # A thumbnail is made again from its picture.
+                    .where(~col(Upload.filename).startswith(THUMBNAIL_PREFIX))
+                    .order_by(Upload.id.asc())
                 )
             ).all()
         for storage_key, size_bytes, content_type in rows:
@@ -1385,6 +1482,19 @@ class _ScopeBuilder:
             )
         )
         return path
+
+
+def _definition_record(definition) -> dict:
+    """A definition as a backup carries it, by name
+    (``ProjectExportPropertyDefinition``)."""
+    return {
+        "name": definition.name,
+        "type": definition.type.value,
+        "position": float(definition.position),
+        "color": definition.color,
+        "options": list(definition.options or []),
+        "currency": definition.currency,
+    }
 
 
 def _file_metadata(file) -> dict:
@@ -1491,8 +1601,8 @@ _SECTIONS: tuple[BackupSection, ...] = (
     BackupSection(
         Tool.file,
         type_report_formats={
-            FileType.native.value: frozenset({"pdf", "md", "docx"}),
-            FileType.spreadsheet.value: frozenset({"csv", "xlsx"}),
+            FileType.lexical.value: frozenset({"pdf", "md", "docx"}),
+            FileType.sheet.value: frozenset({"csv", "xlsx"}),
         },
         type_in_filename=False,
         preload=_ScopeBuilder._preload_embedded_assets,
@@ -1507,12 +1617,6 @@ _SECTIONS: tuple[BackupSection, ...] = (
     BackupSection(Tool.calendar, report_formats=frozenset({"ics", "json"})),
     BackupSection(Tool.post, in_reports=False),
     BackupSection(Tool.wiki, in_reports=False, fetch=_fetch_wiki_pages),
-    BackupSection(
-        Tool.catalog,
-        in_reports=False,
-        write_apart=_ScopeBuilder._skip_catalog_without_uploads,
-        before_envelope=_ScopeBuilder._register_catalog_pictures,
-    ),
     # A dashboard is a live canvas, not a document, so a report carries its
     # envelope too.
     BackupSection(Tool.dashboard, finish=_ScopeBuilder._record_foreign_dashboards),
@@ -1544,7 +1648,7 @@ async def estimate_backup(
     from sqlalchemy import func
     from sqlmodel import select
 
-    from app.models.tenant.file import File, FileType
+    from app.models.tenant.file import File
     from app.schemas.tenant.backup_export import BackupEstimate, BackupToolEstimate
     from app.services.tenant.attachments import get_guild_storage_usage
 
@@ -1580,7 +1684,7 @@ async def estimate_backup(
                     .select_from(File)
                     .where(
                         File.id.in_(file_ids),
-                        File.file_type == FileType.file,
+                        File.current_version_id.is_not(None),
                     )
                 )
             ).one()

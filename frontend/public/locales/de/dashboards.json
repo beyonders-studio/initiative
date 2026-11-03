@@ -107,7 +107,7 @@
     "pluginParamPlaceholder": "Wählen…",
     "pluginParamNeedsSibling": "Wähle zuerst den Wert darüber.",
     "pluginParamListHint": "Werte durch Kommas trennen.",
-    "all_property": "Keine Eigenschaft",
+    "all_property": "Keine Metadaten oder Eigenschaft",
     "sqlHelp": "Ein reines Lese-SELECT über die Daten dieser Community. Es läuft unter deinem Konto und liefert daher nur, was du ohnehin sehen kannst."
   },
   "picker": {
@@ -169,8 +169,8 @@
     "description": "Beschreibung",
     "updated_at": "Aktualisiert",
     "created_by": "Erstellt von",
-    "property": "Eigenschaft",
-    "property_id": "Eigenschaft",
+    "property": "Metadaten oder Eigenschaft",
+    "property_id": "Metadaten oder Eigenschaft",
     "value_text": "Text",
     "value_number": "Zahl",
     "value_boolean": "Kontrollkästchen",
@@ -307,8 +307,8 @@
     "counters": "Zähler",
     "counter_groups": "Zählergruppen",
     "task_statuses": "Aufgabenstatus",
-    "property_values": "Eigenschaftswerte",
-    "property_definitions": "Eigenschaften",
+    "metadata_values": "Werte von Metadaten und Eigenschaften",
+    "metadata_definitions": "Metadaten und Eigenschaften",
     "relationships": "Verknüpfungen"
   },
   "viewMode": {

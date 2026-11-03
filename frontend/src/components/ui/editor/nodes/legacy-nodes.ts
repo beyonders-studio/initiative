@@ -8,9 +8,6 @@ import {
   type LexicalNode,
 } from "lexical";
 
-import { $convertLegacyWikilink } from "@/components/ui/editor/nodes/entity-mention-node";
-import { WikilinkNode } from "@/components/ui/editor/nodes/wikilink-node";
-
 /**
  * Node types documents still hold that nothing writes any more.
  *
@@ -18,21 +15,11 @@ import { WikilinkNode } from "@/components/ui/editor/nodes/wikilink-node";
  * type it does not know — and each one is rewritten as current content on the
  * way in.
  */
-export const LEGACY_NODES: Klass<LexicalNode>[] = [WikilinkNode, HashtagNode];
+export const LEGACY_NODES: Klass<LexicalNode>[] = [HashtagNode];
 
 /** What a legacy node is in today's document. */
 function $modernize(node: LexicalNode): void {
-  if (node instanceof WikilinkNode) {
-    // `[[ ]]` wrote its own node before references were one thing. One that
-    // resolved to a document is that reference, and renders live like the rest;
-    // one that never resolved names nothing, so only its words remain.
-    node.replace(
-      $convertLegacyWikilink({
-        documentId: node.getDocumentId(),
-        documentTitle: node.getDocumentTitle(),
-      }) ?? $createTextNode(node.getDocumentTitle())
-    );
-  } else if (node instanceof HashtagNode) {
+  if (node instanceof HashtagNode) {
     // `#` opens the reference picker now, so the word after it names a thing
     // rather than styling itself. What was stored reads back as the plain word
     // it already looked like.

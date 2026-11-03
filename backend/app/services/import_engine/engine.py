@@ -21,7 +21,7 @@ from pathlib import Path
 from typing import Any, AsyncIterator, BinaryIO
 
 from sqlalchemy import func
-from sqlmodel import select
+from sqlmodel import col, select
 from sqlmodel.ext.asyncio.session import AsyncSession
 
 from app.db.advisory_locks import LockNamespace, advisory_lock
@@ -30,9 +30,10 @@ from app.db.session import raise_flag, routed_guild_id
 from app.core.messages import ImportEngineMessages
 from app.models.platform.guild import CommunityRole
 from app.models.platform.user import User
-from app.models.tenant.import_job import ImportJob, ImportJobStatus
+from app.models.tenant.data_job import DataJob, DataJobDirection, DataJobStatus
 from app.models.tenant.initiative import Initiative
-from app.core.tools import tool_for_create_permission
+from app.core.legacy_references import rewrite_body, rewrite_ref, rewrite_text
+from app.core.tools import Tool, tool_envelope_type, tool_for_create_permission
 from app.schemas.tenant.import_job import BackupPlanPerson, EnvelopeImportPlan
 from app.services.import_engine.common import (
     handle_key,
@@ -45,16 +46,120 @@ from app.services.import_engine.contract import (
     InlineImport,
 )
 from app.services.import_engine import limits as import_limits
+from app.services.tenant.initiative_tools import tool_on_in
 
 # Statuses that count against the per-user active-job cap.
 _ACTIVE_STATUSES = (
-    ImportJobStatus.staged,
+    DataJobStatus.staged,
     # A fetch is the slowest thing a job does and the one most worth
     # capping — it is somebody else's API being read on our schedule.
-    ImportJobStatus.fetching,
-    ImportJobStatus.queued,
-    ImportJobStatus.running,
+    DataJobStatus.fetching,
+    DataJobStatus.queued,
+    DataJobStatus.running,
 )
+
+
+#: How an archive or an envelope written by an older build names files (once
+#: documents): the manifest's tool, its tool switches and envelope type, the
+#: keys holding a file's type and the files filed in a wiki or attached to an
+#: item, the refs naming one, and the role permissions for the tool. Read on
+#: restore and on a lone envelope's import, and rewritten to this build's names
+#: before anything else looks at them; nothing writes them. A gallery's backup
+#: entry is filed with the files, since its pictures are restored as files and
+#: a collection.
+_LEGACY_ENVELOPE_TYPES = {"initiative-document": tool_envelope_type(Tool.file)}
+_LEGACY_TOOLS = {"document": Tool.file.value}
+_LEGACY_ENTRY_TOOLS = {**_LEGACY_TOOLS, "gallery": Tool.file.value}
+_LEGACY_KEYS = {"documents": "files", "document_type": "file_type"}
+_LEGACY_PERMISSIONS = {
+    "documents_enabled": Tool.file.view_permission,
+    "create_documents": Tool.file.create_permission,
+}
+
+
+#: Where an archive or an envelope holds what an older build may have written
+#: a reference in, as the stored columns hold it: an editor body (a Lexical
+#: state, or a comment's markdown), and running text, each string of it (a
+#: description, a task's checklist, what a repeat carries over, a type's
+#: starting values). Any other string is left as written, and so is any other
+#: body: a spreadsheet's cells and a whiteboard's text are what was typed.
+_BODY_KEYS = frozenset({"content", "body"})
+_TEXT_KEYS = frozenset(
+    {
+        "description",
+        "location",
+        "notes",
+        "checklist",
+        "recurrence_carry",
+        "starting_values",
+    }
+)
+
+
+def _rewrite_strings(value: Any) -> Any:
+    if isinstance(value, str):
+        return rewrite_text(value, {})
+    if isinstance(value, list):
+        return [_rewrite_strings(item) for item in value]
+    if isinstance(value, dict):
+        return {key: _rewrite_strings(item) for key, item in value.items()}
+    return value
+
+
+def current_shape(value: Any) -> Any:
+    """``value``, read from an archive or an envelope, with the names an
+    older build gave files spelled as this one spells them, and every
+    reference in its bodies and running text as well. A gallery's pictures
+    are restored with no id to name them by, so a reference to one is its
+    words."""
+    if isinstance(value, list):
+        return [current_shape(item) for item in value]
+    if not isinstance(value, dict):
+        return value
+    shaped: dict[str, Any] = {}
+    for key, item in value.items():
+        key = _LEGACY_KEYS.get(key, key)
+        if key in _BODY_KEYS:
+            item = (
+                rewrite_text(item, {})
+                if isinstance(item, str)
+                else rewrite_body(item, {})
+            )
+        elif key in _TEXT_KEYS:
+            item = _rewrite_strings(item)
+        else:
+            item = current_shape(item)
+        shaped[key] = item
+    tools = shaped.get("tools")
+    if isinstance(tools, dict):
+        shaped["tools"] = {
+            _LEGACY_TOOLS.get(key, key): item for key, item in tools.items()
+        }
+    kind = shaped.get("type")
+    if isinstance(kind, str) and kind in _LEGACY_ENVELOPE_TYPES:
+        shaped["type"] = _LEGACY_ENVELOPE_TYPES[kind]
+    tool = shaped.get("tool")
+    if isinstance(tool, str) and tool in _LEGACY_ENTRY_TOOLS:
+        shaped["tool"] = _LEGACY_ENTRY_TOOLS[tool]
+    ref = shaped.get("external_ref")
+    if isinstance(ref, str):
+        shaped["external_ref"] = rewrite_ref(ref, {}) or ref
+    permissions = shaped.get("permissions")
+    if isinstance(permissions, list):
+        shaped["permissions"] = [
+            _LEGACY_PERMISSIONS.get(key, key) if isinstance(key, str) else key
+            for key in permissions
+        ]
+    return shaped
+
+
+def require_writable(guild_context: Any) -> None:
+    """Imports are writes, always — no inline carve-out for read-only actors
+    (the inverse of the export engine's read-friendly inline path). A guild in
+    read_only lifecycle can't author rows, and neither can a grantee: a grant
+    reaches existing content, whatever level it carries."""
+    if guild_context.content_read_only or guild_context.is_pam:
+        raise ImportEngineError(ImportEngineMessages.IMPORT_WRITE_REQUIRED, 403)
 
 
 def get_importer(envelope_type: str) -> EnvelopeImporter:
@@ -106,7 +211,7 @@ async def load_target_initiative(
     # (importers/__init__.py), so a miss here is impossible, not "default on".
     permission = PermissionKey(importer.permission)
     tool = tool_for_create_permission(permission.value)
-    if not getattr(initiative, tool.view_permission):
+    if not await tool_on_in(session, initiative, tool):
         raise ImportEngineError(
             ImportEngineMessages.IMPORT_TOOL_DISABLED, status_code=400
         )
@@ -165,7 +270,7 @@ async def start_envelope_import(
     guild_id: int,
     initiative_id: int,
     envelope: dict[str, Any],
-) -> InlineImport | ImportJob:
+) -> InlineImport | DataJob:
     """The shared create path: validate + authorize under RLS, bound, then
     auto-select delivery.
 
@@ -184,6 +289,7 @@ async def start_envelope_import(
     * **Queued**, above it — the payload is staged and the worker
       re-validates and applies it under the creator's RLS session.
     """
+    envelope = current_shape(envelope)
     envelope_type = envelope.get("type")
     if not isinstance(envelope_type, str):
         raise ImportEngineError(ImportEngineMessages.IMPORT_UNKNOWN_TYPE)
@@ -220,18 +326,19 @@ async def start_envelope_import(
     await count_active_jobs_locked(session, user=user)
 
     payload_ref = await asyncio.to_thread(_stage_envelope, guild_id, envelope)
-    job = ImportJob(
+    job = DataJob(
+        direction=DataJobDirection.import_,
         created_by=user.id,
         source=envelope_type,
         params={"initiative_id": initiative.id},
-        payload_ref=payload_ref,
+        file_ref=payload_ref,
         # A staged job is waiting on a person; a queued one is waiting on the
         # worker. The plan rides along only in the first case, because it is
         # the question being asked.
         plan=EnvelopeImportPlan(people=people).model_dump(mode="json")
         if unplaced
         else None,
-        status=ImportJobStatus.staged if unplaced else ImportJobStatus.queued,
+        status=DataJobStatus.staged if unplaced else DataJobStatus.queued,
         expires_at=datetime.now(timezone.utc)
         + timedelta(hours=import_limits.IMPORT_STAGED_TTL_HOURS),
     )
@@ -306,10 +413,11 @@ async def count_active_jobs_locked(session: AsyncSession, *, user: User) -> None
     active = (
         await session.exec(
             select(func.count())
-            .select_from(ImportJob)
+            .select_from(DataJob)
             .where(
-                ImportJob.created_by == user.id,
-                ImportJob.status.in_(_ACTIVE_STATUSES),
+                DataJob.direction == DataJobDirection.import_,
+                DataJob.created_by == user.id,
+                col(DataJob.status).in_(_ACTIVE_STATUSES),
             )
         )
     ).one()

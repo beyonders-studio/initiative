@@ -13,6 +13,7 @@ import {
   WikiReadingWidth,
 } from "@/api/generated/initiativeAPI.schemas";
 import { summarizeWikiPage } from "@/api/generated/wikis/wikis";
+import { NeedAccessOr } from "@/components/access/RequestAccess";
 import { type AISummary, SummarySheet } from "@/components/ai/SummarySheet";
 import { ToolCommentsPanel } from "@/components/comments/ToolCommentsPanel";
 import { WikiChrome } from "@/components/initiativeTools/wikis/WikiChrome";
@@ -354,11 +355,16 @@ export const WikiPageView = () => {
 
   if (!validIds || pageQuery.isError) {
     return (
-      <Card className="mx-auto mt-10 max-w-md">
-        <CardHeader>
-          <CardTitle>{t("pages.notFound")}</CardTitle>
-        </CardHeader>
-      </Card>
+      <NeedAccessOr
+        error={pageQuery.error}
+        entity={validIds ? { kind: "wiki_page", id: pageId } : undefined}
+      >
+        <Card className="mx-auto mt-10 max-w-md">
+          <CardHeader>
+            <CardTitle>{t("pages.notFound")}</CardTitle>
+          </CardHeader>
+        </Card>
+      </NeedAccessOr>
     );
   }
 

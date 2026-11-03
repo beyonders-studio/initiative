@@ -14,7 +14,7 @@ from app.models.tenant.initiative import (
     InitiativeJoinPolicy,
     InitiativeMember,
     InitiativeRoleModel,
-    InitiativeRolePermission,
+    InitiativeRule,
 )
 from app.services.tenant.initiatives import create_builtin_roles, creator_role
 
@@ -101,7 +101,7 @@ INITIATIVES: dict[str, dict[str, dict]] = {
                 "Platform Member",
             ],
             "join_policy": InitiativeJoinPolicy.open,
-            "tools": (*_SMALL_KIT, Tool.dashboard, Tool.catalog),
+            "tools": (*_SMALL_KIT, Tool.dashboard),
         },
         "fringe": {
             "name": "Side Missions: Fringe Space",
@@ -136,7 +136,7 @@ INITIATIVES: dict[str, dict[str, dict]] = {
             ],
             "join_policy": InitiativeJoinPolicy.open,
             "auto_join": True,
-            "tools": (*_SMALL_KIT, Tool.dashboard, Tool.catalog),
+            "tools": (*_SMALL_KIT, Tool.dashboard),
         },
         "navy": {
             "name": "Royal Navy Conflicts",
@@ -273,12 +273,10 @@ async def create_initiative(c: Community, key: str, d: dict) -> Initiative:
     member_tools = d.get("member_tools", tools)
     if member_tools:
         await c.session.exec(
-            update(InitiativeRolePermission)
+            update(InitiativeRule)
             .where(
-                InitiativeRolePermission.initiative_role_id == member_role.id,
-                InitiativeRolePermission.permission_key.in_(
-                    [tool.view_permission for tool in member_tools]
-                ),
+                InitiativeRule.initiative_role_id == member_role.id,
+                InitiativeRule.key.in_([tool.view_permission for tool in member_tools]),
             )
             .values(enabled=True)
         )

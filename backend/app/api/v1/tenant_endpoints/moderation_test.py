@@ -15,7 +15,7 @@ from app.models.platform.guild import CommunityRole
 from app.core.intake import CaseField, IntakeStream
 from app.models.platform.app_setting import AppSetting
 from app.models.tenant.intake import IntakeBinding, IntakeCase
-from app.models.tenant.property import PropertyDefinition, PropertyValue
+from app.models.tenant.metadata import MetadataDefinition, MetadataValue
 from app.models.tenant.comment import Comment
 from app.models.tenant.moderation import ModerationReport, ModerationReportReporter
 from app.models.tenant.task import Task
@@ -638,14 +638,14 @@ async def test_a_reported_community_is_the_cases_subject(
     ).one()
     subject_guild = (
         await session.exec(
-            select(PropertyValue.value_number)
+            select(MetadataValue.value_number)
             .join(
-                PropertyDefinition,
-                PropertyDefinition.id == PropertyValue.property_id,
+                MetadataDefinition,
+                MetadataDefinition.id == MetadataValue.property_id,
             )
-            .where(PropertyValue.entity_type == "task")
-            .where(PropertyValue.entity_id == task.id)
-            .where(PropertyDefinition.name == CaseField.subject_guild.value)
+            .where(MetadataValue.entity_type == "task")
+            .where(MetadataValue.entity_id == task.id)
+            .where(MetadataDefinition.name == CaseField.subject_guild.value)
         )
     ).one()
     assert int(subject_guild) == scene["guild"].id

@@ -1,6 +1,4 @@
-/** What an uploaded file may be, as a file picker's `accept` list. */
-export const FILE_UPLOAD_ACCEPT =
-  ".pdf,.doc,.docx,.xls,.xlsx,.ppt,.pptx,.txt,.html,.htm,.png,.jpg,.jpeg,.gif,.webp,.svg,.md,.markdown";
+import { FileKind, type FileSummary } from "@/api/generated/initiativeAPI.schemas";
 
 /** What a file made from an upload is called until somebody names it. */
 export function nameWithoutExtension(filename: string): string {
@@ -109,5 +107,17 @@ export function getFileTypeLabel(
     return mimeLabels[mimeType];
   }
 
-  return "File";
+  // Any other format is named by its extension: PSD, BLEND, ZIP.
+  return ext ? ext.toUpperCase() : "File";
 }
+
+/**
+ * The picture a file is shown by on a card or a tile: its thumbnail for a
+ * picture or a video, a picture itself until its thumbnail is drawn, and any
+ * other file's featured image. `null` where it has none, and its icon stands
+ * in.
+ */
+export const filePicture = (
+  file: Pick<FileSummary, "thumbnail_url" | "kind" | "file_url" | "featured_image_url">
+): string | null =>
+  file.thumbnail_url ?? (file.kind === FileKind.image ? file.file_url : file.featured_image_url);

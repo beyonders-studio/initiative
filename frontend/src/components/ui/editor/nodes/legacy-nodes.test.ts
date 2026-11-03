@@ -1,11 +1,6 @@
 import { createEditor } from "lexical";
 import { describe, expect, it } from "vitest";
 
-import { SearchEntityType } from "@/api/generated/initiativeAPI.schemas";
-import {
-  $isEntityMentionNode,
-  EntityMentionNode,
-} from "@/components/ui/editor/nodes/entity-mention-node";
 import { LEGACY_NODES, registerLegacyNodes } from "@/components/ui/editor/nodes/legacy-nodes";
 
 const text = (extra: Record<string, unknown>) => ({
@@ -18,11 +13,11 @@ const text = (extra: Record<string, unknown>) => ({
 });
 
 /** What one node of a stored document is, once today's editor has opened it. */
-type Opened = { type: string; text: string; entityType?: string; entityId?: number };
+type Opened = { type: string; text: string };
 
 function opened(children: Record<string, unknown>[]): Opened[] {
   const editor = createEditor({
-    nodes: [EntityMentionNode, ...LEGACY_NODES],
+    nodes: LEGACY_NODES,
     onError: (error) => {
       throw error;
     },
@@ -49,13 +44,7 @@ function opened(children: Record<string, unknown>[]): Opened[] {
   editor.getEditorState().read(() => {
     for (const node of editor.getEditorState()._nodeMap.values()) {
       if (node.getType() === "root" || node.getType() === "paragraph") continue;
-      found.push({
-        type: node.getType(),
-        text: node.getTextContent(),
-        ...($isEntityMentionNode(node)
-          ? { entityType: node.getEntityType(), entityId: node.getEntityId() }
-          : {}),
-      });
+      found.push({ type: node.getType(), text: node.getTextContent() });
     }
   });
   return found;
@@ -68,29 +57,5 @@ describe("a document written before references were one thing", () => {
     expect(opened([text({ type: "hashtag", text: "#launch" })])).toEqual([
       { type: "text", text: "#launch" },
     ]);
-  });
-
-  it("reads a resolved wikilink as the reference it always was", () => {
-    expect(
-      opened([
-        text({ type: "wikilink", text: "Roadmap", documentId: 12, documentTitle: "Roadmap" }),
-      ])
-    ).toEqual([
-      {
-        type: "entity-mention",
-        text: "Roadmap",
-        entityType: SearchEntityType.file,
-        entityId: 12,
-      },
-    ]);
-  });
-
-  it("keeps the words of a wikilink that never resolved", () => {
-    // It names nothing, so there is nothing to carry over but what it says.
-    expect(
-      opened([
-        text({ type: "wikilink", text: "Nowhere", documentId: null, documentTitle: "Nowhere" }),
-      ])
-    ).toEqual([{ type: "text", text: "Nowhere" }]);
   });
 });

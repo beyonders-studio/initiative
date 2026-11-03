@@ -16,7 +16,7 @@ import type {
   CommunityPluginRead,
   CommunityPluginUninstallNotice,
   CommunityPluginUpdate,
-  DetailLayoutReadKind,
+  ItemKind,
   PluginActionResult,
   PluginPlacementRead,
 } from "@/api/generated/initiativeAPI.schemas";
@@ -152,12 +152,10 @@ export const useSetPluginScopes = (
 };
 
 /** The reads that show an item of each kind plug-ins draw on. */
-const ITEM_READS: Record<DetailLayoutReadKind, (id: number) => Spec[]> = {
+const ITEM_READS: Record<ItemKind, (id: number) => Spec[]> = {
   task: (id) => [q.allTasks(), q.task(id)],
   calendar_event: (id) => [q.allCalendarEvents(), q.calendarEvent(id)],
   queue_item: (id) => [q.allQueues(), q.queueItem(id)],
-  // A picture is read under its catalog, which an action names no more of.
-  catalog_item: () => [q.allCatalogs()],
   counter: (id) => [q.allCounterGroups(), q.counter(id)],
   post: (id) => [q.allPosts(), q.post(id)],
 };
@@ -172,7 +170,7 @@ export const useRunPluginAction = () =>
     {
       pluginId: number;
       actionId: string;
-      kind: DetailLayoutReadKind;
+      kind: ItemKind;
       itemId: number;
       params?: Record<string, unknown>;
       element?: string;

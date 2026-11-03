@@ -1,5 +1,6 @@
 {
   "open": "Editar diseños",
+  "editLayout": "Editar {{name}}",
   "title": "Editar diseños",
   "close": "Cerrar el editor",
   "previewWidth": "Ancho de la vista previa",
@@ -23,7 +24,8 @@
   "card": "Tarjeta",
   "row": "Fila",
   "group": "Grupo",
-  "allProperties": "Todas las propiedades",
+  "allMetadata": "Todos los metadatos",
+  "allPropertiesAndMetadata": "Todas las propiedades y metadatos",
   "missingPart": "Una parte que ya no está disponible",
   "missingField": "Un campo que ya no está disponible",
   "columns": "Columnas",
@@ -38,11 +40,14 @@
   "emptyGroup": "Vacío. Suelta aquí una parte o añade una.",
   "builtIn": "Integrados",
   "properties": "Propiedades",
+  "propertiesShownOn": "Se muestra en {{layouts}}",
+  "propertiesNowhere": "Aún no se muestra en ningún diseño. Colócala con Añadir.",
+  "propertiesPlacementHelp": "Una página que muestra todas las propiedades muestra una nueva al instante. Las tarjetas y las tablas solo muestran lo que les añades.",
   "layoutParts": "Diseño",
   "hidePart": "Ocultar",
   "settings": "Ajustes",
-  "cardHelp": "Lo que muestra cada tarea en el tablero. Selecciona una parte para cambiarla o añade una bajo el esquema.",
-  "propertiesHelp": "Muestra cada propiedad para la que una tarea tiene un valor.",
+  "cardHelp": "Lo que muestra cada elemento en su tarjeta. Selecciona una parte para cambiarla o añade una bajo el esquema.",
+  "propertiesHelp": "Muestra cada propiedad y cada metadato para los que una tarea tiene un valor.",
   "pluginPartHelp": "La dibuja el plug-in con sus propios valores y acciones.",
   "fieldHelp": "Muestra este campo cuando una tarea tiene un valor para él.",
   "layout": "Diseño que se edita",
@@ -95,7 +100,7 @@
   "typedTaskLayout": "Página de {{name}}",
   "detailHelp": "Cómo se organiza el detalle de cada tarea de este proyecto. Lo que deja fuera queda oculto.",
   "useShipped": "Usar el diseño original",
-  "shipped": "Este es el diseño original. Cambiarlo lo convierte en el del proyecto.",
+  "shipped": "Este es el diseño original. Un cambio se aplica a todos los que lo ven.",
   "detailTitleHelp": "El detalle de cada tarea muestra su título.",
   "opensFirst": "Se abre primero",
   "shownInMenu": "Mostrar en el menú de diseños",
@@ -203,10 +208,12 @@
     "rowHelp": "Pone lado a lado lo que contiene."
   },
   "boxWith": "Caja con {{name}}",
-  "newField": "Campo nuevo",
-  "fieldsGroup": "Campos",
+  "newProperty": "Propiedad nueva",
+  "newMetadata": "Metadatos nuevos",
+  "projectProperties": "Propiedades de este proyecto",
+  "collectionProperties": "Propiedades de esta colección",
+  "initiativeMetadata": "Metadatos de la iniciativa",
   "panels": "Paneles",
-  "fromProperty": "Propiedad",
   "search": "Buscar",
   "noMatches": "No hay coincidencias.",
   "sectionHelp": "Con título se abre y se cierra; sin él es una caja.",
@@ -228,28 +235,6 @@
   },
   "tab": "Diseños",
   "settingsDescription": "Cómo dispone lo que contiene: cada diseño, cuándo cambió por última vez y el acceso al editor. Todos los que pueden abrirlo los ven; lo que cada persona filtra y ordena es suyo.",
-  "catalogItemDetail": {
-    "name": "Detalle de la imagen",
-    "help": "Cómo se muestra cada imagen de este catálogo al abrirla. Lo que deja fuera queda oculto.",
-    "shipped": "Este es el diseño tal como viene. Cambiarlo lo convierte en el del catálogo.",
-    "titleHelp": "Cada imagen muestra su título.",
-    "hiddenHelp": "Cada imagen puede mostrar esto. Si se quita, queda oculto, y Añadir lo vuelve a poner.",
-    "parts": {
-      "actions": "Menú",
-      "relations": "Relaciones",
-      "picture": "Imagen",
-      "about": "De dónde viene",
-      "versions": "Versiones"
-    },
-    "partHelp": {
-      "actions": "Qué más se puede hacer con la imagen: denunciar, descargar, usar como portada y quitar.",
-      "relations": "Con qué está vinculada la imagen.",
-      "picture": "La imagen en sí.",
-      "about": "Quién la añadió y cuándo, y su archivo.",
-      "versions": "Cada versión subida, y subir una nueva."
-    },
-    "noItems": "Añade una imagen al catálogo para ver aquí su diseño."
-  },
   "counterDetail": {
     "name": "Detalle del contador",
     "help": "Cómo se muestra cada contador de este grupo al abrirlo para editarlo. Lo que deja fuera queda oculto.",
@@ -267,6 +252,14 @@
       "count": "Su cuenta, a pasos o fijada."
     },
     "noItems": "Añade un contador al grupo para ver aquí su diseño."
+  },
+  "fileDetail": {
+    "name": "Página del archivo",
+    "help": "Cómo se muestra un archivo abierto desde esta colección, junto a su imagen o junto a la colección, una vez que la colección tiene propiedades propias. Lo que deja fuera queda oculto.",
+    "shipped": "Este es el diseño tal como viene. Cambiarlo lo convierte en el de la colección.",
+    "titleHelp": "Cada archivo muestra su nombre.",
+    "hiddenHelp": "Cada archivo puede mostrar esto. Si se quita, queda oculto, y Añadir lo vuelve a poner.",
+    "noItems": "Añade un archivo a la colección para ver aquí su diseño."
   },
   "postDetail": {
     "name": "Detalle del aviso",
@@ -294,5 +287,33 @@
     },
     "noItems": "Escribe un aviso en esta iniciativa para ver aquí su diseño."
   },
-  "calendarNote": "Un calendario no tiene tarjeta ni columnas que organizar. Si se muestra, y si el proyecto se abre en él, se ajusta a la derecha."
+  "calendarNote": "Un calendario no tiene tarjeta ni columnas que organizar. Si se muestra, y si el proyecto se abre en él, se ajusta a la derecha.",
+  "makeOpensFirst": "Abrir primero con {{name}}",
+  "scaleDisplay": {
+    "label": "Mostrar la escala como",
+    "number": "Un número",
+    "stars": "Estrellas",
+    "bar": "Una barra"
+  },
+  "fieldProperty": {
+    "metadata": "Metadatos",
+    "metadataHelp": "Son metadatos de la iniciativa, que se editan en su configuración.",
+    "openSettings": "Abrir la configuración de la iniciativa"
+  },
+  "required": {
+    "label": "Obligatorio",
+    "help": "Quien añada uno tiene que rellenarlo y no puede vaciarlo después. Si se oculta, deja de ser obligatorio.",
+    "always": "El título siempre es obligatorio.",
+    "on": "Obligatorio. Pulsa para hacerlo opcional.",
+    "off": "No obligatorio. Pulsa para hacerlo obligatorio.",
+    "onFor": "{{name}}: obligatorio. Pulsa para hacerlo opcional.",
+    "offFor": "{{name}}: no obligatorio. Pulsa para hacerlo obligatorio.",
+    "alwaysFor": "{{name}}: obligatorio. El título siempre es obligatorio.",
+    "missing": "Obligatorio y aún sin rellenar.",
+    "toAdd": "Rellena lo obligatorio para añadirlo.",
+    "ask": "Su nueva página pide estos campos y aún están vacíos. Rellénalos y el cambio se hace con ellos.",
+    "confirm": "Continuar",
+    "retypeTitle": "Lo que pide la página {{type}}",
+    "moveTitle": "Lo que pide {{project}}"
+  }
 }

@@ -13,8 +13,8 @@ A queued Atlassian job with no payload has not been fetched yet; one with a
 payload has been, and was confirmed. That is the whole of how the worker tells
 the two apart (:func:`awaits_fetch`), and it is why a re-claimed fetch drops
 its payload on the way back into the queue. The one exception is an uploaded
-Confluence HTML export: it is staged under :data:`EXPORT_SUFFIX`, which reads
-as not yet fetched, and the fetch converts it rather than calling a site.
+Confluence HTML export: its job says so (``confluence_export``) and has no
+plan until the fetch converts it rather than calling a site.
 
 **The credential is spent by the fetch.** Everything the apply needs is in the
 bundle, so the moment the bundle is staged the token has no further use and is
@@ -40,7 +40,8 @@ from app.core.messages import ImportEngineMessages
 from app.core.tools import Tool, tool_envelope_type
 from app.core.version import get_version
 from app.models.platform.user import User, UserStatus
-from app.models.tenant.import_job import ImportJob, ImportJobStatus
+from app.models.tenant.data_job import DataJob, DataJobDirection, DataJobStatus
+from app.models.tenant.initiative import Initiative
 from app.core.encryption import (
     SALT_IMPORT_CREDENTIAL,
     decrypt_field,
@@ -68,7 +69,7 @@ from app.services.tenant import attachments as attachments_service
 
 logger = logging.getLogger(__name__)
 
-#: ``import_jobs.source`` for every import read from an Atlassian site.
+#: ``data_jobs.source`` for every import read from an Atlassian site.
 SOURCE = "atlassian"
 
 #: The provider a credential has to have been stored under to start one.
@@ -87,16 +88,16 @@ _CALENDAR_ENVELOPE = tool_envelope_type(Tool.calendar)
 _FILE_ENVELOPE = tool_envelope_type(Tool.file)
 
 
-#: How an uploaded Confluence HTML export is staged, so the worker knows it
-#: still has to be read rather than applied.
+#: What an uploaded Confluence HTML export is staged as.
 EXPORT_SUFFIX = "confluence-export.zip"
 
 
-def awaits_fetch(job: ImportJob) -> bool:
+def awaits_fetch(job: DataJob) -> bool:
     """Whether the worker should read the source for this job rather than
     apply it: a site not yet read, or an export not yet converted."""
     return job.source == SOURCE and (
-        not job.payload_ref or job.payload_ref.endswith(EXPORT_SUFFIX)
+        not job.file_ref
+        or (bool((job.params or {}).get("confluence_export")) and job.plan is None)
     )
 
 
@@ -174,7 +175,7 @@ async def start_import(
     space_keys: list[str],
     include_comments: bool = True,
     include_attachments: bool = True,
-) -> ImportJob:
+) -> DataJob:
     """Queue a job that reads these Jira projects and Confluence spaces into
     ``initiative_id`` — projects as projects, each space as a wiki.
 
@@ -212,7 +213,8 @@ async def start_import(
     assert initiative is not None
     await import_engine.count_active_jobs_locked(session, user=user)
 
-    job = ImportJob(
+    job = DataJob(
+        direction=DataJobDirection.import_,
         created_by=user.id,
         source=SOURCE,
         params={
@@ -227,7 +229,7 @@ async def start_import(
             "include_attachments": include_attachments,
         },
         secret_encrypted=encrypt_field(credential.api_token, SALT_IMPORT_CREDENTIAL),
-        status=ImportJobStatus.queued,
+        status=DataJobStatus.queued,
         expires_at=datetime.now(timezone.utc)
         + timedelta(hours=import_limits.IMPORT_STAGED_TTL_HOURS),
     )
@@ -235,6 +237,20 @@ async def start_import(
     await session.commit()
     await session.refresh(job)
     return job
+
+
+async def export_initiative(
+    session: AsyncSession, *, user: User, guild_id: int, initiative_id: int
+) -> Initiative:
+    """The initiative an export is read into, refused unless ``user`` may make
+    a wiki there."""
+    return await import_engine.load_target_initiative(
+        session,
+        guild_id=guild_id,
+        initiative_id=initiative_id,
+        importer=import_engine.get_importer(_WIKI_ENVELOPE),
+        user=user,
+    )
 
 
 async def start_export(
@@ -245,34 +261,34 @@ async def start_export(
     initiative_id: int,
     payload: bytes | Path,
     include_attachments: bool = True,
-) -> ImportJob:
+    payload_ref: str | None = None,
+) -> DataJob:
     """Queue a job that reads a Confluence space's HTML export into
     ``initiative_id`` as a wiki.
 
     The zip is checked for being one — a zip, within the bounds a restore
     accepts, with pages in it — and staged for the worker, which converts it
     the way it reads a site; everything after that is the same review.
-    ``payload`` is the zip itself or the file holding it.
+    ``payload`` is the zip itself or the file holding it; ``payload_ref``,
+    where it is already in the community's storage (a resumable upload).
     """
     await asyncio.to_thread(_check_export, payload)
 
-    initiative = await import_engine.load_target_initiative(
-        session,
-        guild_id=guild_id,
-        initiative_id=initiative_id,
-        importer=import_engine.get_importer(_WIKI_ENVELOPE),
-        user=user,
+    initiative = await export_initiative(
+        session, user=user, guild_id=guild_id, initiative_id=initiative_id
     )
     await import_engine.count_active_jobs_locked(session, user=user)
-    if isinstance(payload, Path):
-        payload_ref = await asyncio.to_thread(
-            import_engine.stage_payload_file, guild_id, payload, suffix=EXPORT_SUFFIX
+    if payload_ref is None:
+        stage = (
+            import_engine.stage_payload_file
+            if isinstance(payload, Path)
+            else import_engine.stage_payload
         )
-    else:
         payload_ref = await asyncio.to_thread(
-            import_engine.stage_payload, guild_id, payload, suffix=EXPORT_SUFFIX
+            stage, guild_id, payload, suffix=EXPORT_SUFFIX
         )
-    job = ImportJob(
+    job = DataJob(
+        direction=DataJobDirection.import_,
         created_by=user.id,
         source=SOURCE,
         params={
@@ -280,8 +296,8 @@ async def start_export(
             "confluence_export": True,
             "include_attachments": include_attachments,
         },
-        payload_ref=payload_ref,
-        status=ImportJobStatus.queued,
+        file_ref=payload_ref,
+        status=DataJobStatus.queued,
         expires_at=datetime.now(timezone.utc)
         + timedelta(hours=import_limits.IMPORT_STAGED_TTL_HOURS),
     )
@@ -303,14 +319,14 @@ def _check_export(payload: bytes | Path) -> None:
 
 
 async def _fetch_export(
-    job: ImportJob,
+    job: DataJob,
     *,
     guild_id: int,
     open_user_session: Callable[[], AsyncContextManager[AsyncSession]],
     progress: Callable[[AtlassianFetchSummary], Awaitable[None]] | None,
 ) -> StagedFetch:
     """Convert an uploaded HTML export into the bundle a site fetch writes."""
-    raw_ref = job.payload_ref
+    raw_ref = job.file_ref
     if not raw_ref:
         raise ImportEngineError(ImportEngineMessages.IMPORT_INVALID_PARAMS)
     async with import_engine.open_payload(guild_id, raw_ref) as upload:
@@ -325,7 +341,7 @@ async def _fetch_export(
             # starts over from nothing, and says so, rather than finding half
             # of one. The open archive keeps reading the file it opened.
             await asyncio.to_thread(import_engine.delete_payload, guild_id, raw_ref)
-            job.payload_ref = None
+            job.file_ref = None
         if archive is None:
             raise ImportEngineError(ImportEngineMessages.IMPORT_INVALID_PARAMS)
         with archive:
@@ -339,7 +355,7 @@ async def _fetch_export(
 
 
 async def _convert_export(
-    job: ImportJob,
+    job: DataJob,
     archive: zipfile.ZipFile,
     *,
     guild_id: int,
@@ -516,7 +532,7 @@ class FetchCancelled(Exception):
 
 
 async def fetch(
-    job: ImportJob,
+    job: DataJob,
     *,
     guild_id: int,
     open_user_session: Callable[[], AsyncContextManager[AsyncSession]],
@@ -540,7 +556,7 @@ async def fetch(
 
 
 async def _read(
-    job: ImportJob,
+    job: DataJob,
     *,
     guild_id: int,
     open_user_session: Callable[[], AsyncContextManager[AsyncSession]],

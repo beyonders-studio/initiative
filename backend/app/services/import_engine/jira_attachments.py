@@ -184,21 +184,11 @@ def file_extension(filename: str) -> str:
 
 
 def file_can_hold(filename: str, media_type: str) -> bool:
-    """Whether a file that is not a picture can become a file here: a
-    uploaded file of a type one may hold, or a table of text, which becomes a
-    spreadsheet."""
-    from app.services.tenant.attachments import (
-        ALLOWED_FILE_MIME_TYPES,
-        EXTENSION_TO_MIME,
-    )
-    from app.services.tenant.spreadsheet_import import TEXT_TABLE_SUFFIXES
+    """Whether a file that is not a picture can become a file here: anything
+    but a program."""
+    from app.core.file_types import is_refused
 
-    extension = file_extension(filename)
-    return (
-        media_type in ALLOWED_FILE_MIME_TYPES
-        or extension in EXTENSION_TO_MIME
-        or extension in TEXT_TABLE_SUFFIXES
-    )
+    return not is_refused(media_type, filename)
 
 
 def storage_key(attachment: Attachment) -> str:

@@ -32,6 +32,7 @@ import { PropertyValueCell } from "@/components/properties/PropertyValueCell";
 import {
   isEmptyPropertyValue,
   normalizePropertyValue,
+  ownProperties,
   propertyStubFromDefinition,
   userReferenceValue,
 } from "@/components/properties/propertyHelpers";
@@ -56,7 +57,7 @@ import {
   useItemFieldSave,
 } from "@/hooks/useFieldSave";
 import { usePastedImages } from "@/hooks/usePastedImages";
-import { useProperties } from "@/hooks/useProperties";
+import { type MetadataOwner, useOwnedDefinitions } from "@/hooks/useProperties";
 import type { MemberSearchScope } from "@/hooks/useUsers";
 import { getHttpStatus } from "@/lib/errorMessage";
 import { currentServerKey } from "@/lib/offlineSession";
@@ -144,6 +145,7 @@ export const TitleField = <I, P>({
   subscribe,
   marks,
   below,
+  trailing,
   mention,
 }: {
   id: string;
@@ -162,6 +164,8 @@ export const TitleField = <I, P>({
   marks?: readonly { start: number; end: number; className: string }[];
   /** Drawn under the title, inside its frame. */
   below?: ReactNode;
+  /** Drawn at the end of the title's first line, beside the field. */
+  trailing?: ReactNode;
   /** `@` offers these people, and writes the picked one's handle. */
   mention?: { members: MemberSearchScope; onPick?: (member: UserSummary) => void };
 }) => {
@@ -211,30 +215,34 @@ export const TitleField = <I, P>({
       className="grow basis-72"
     >
       <h1 className="sr-only">{value}</h1>
-      <div className="relative">
-        {marks?.length ? <TitleMarks text={draft.value} marks={marks} /> : null}
-        {/* One line of text that wraps, so a long title shows whole on a phone. */}
-        <Textarea
-          ref={box}
-          id={id}
-          rows={1}
-          aria-multiline="false"
-          value={draft.value}
-          onChange={(event) => {
-            const text = event.target.value.replace(/\s*[\r\n]+\s*/g, " ");
-            draft.change(text);
-            people.sync(event.target, text);
-          }}
-          {...people.handlers}
-          // A list open under the field takes Escape for itself.
-          data-picking={people.open || undefined}
-          placeholder={placeholder}
-          className={cn(
-            TITLE_TEXT,
-            "relative min-h-0 resize-none shadow-none focus-visible:ring-0"
-          )}
-        />
-        {people.popover}
+      <div className="flex items-start gap-1">
+        <div className="relative min-w-0 grow">
+          {marks?.length ? <TitleMarks text={draft.value} marks={marks} /> : null}
+          {/* One line of text that wraps, so a long title shows whole on a phone. */}
+          <Textarea
+            ref={box}
+            id={id}
+            rows={1}
+            aria-multiline="false"
+            value={draft.value}
+            onChange={(event) => {
+              const text = event.target.value.replace(/\s*[\r\n]+\s*/g, " ");
+              draft.change(text);
+              people.sync(event.target, text);
+            }}
+            {...people.handlers}
+            // A list open under the field takes Escape for itself.
+            data-picking={people.open || undefined}
+            placeholder={placeholder}
+            className={cn(
+              TITLE_TEXT,
+              "relative min-h-0 resize-none shadow-none focus-visible:ring-0"
+            )}
+          />
+          {people.popover}
+        </div>
+        {/* Centred on the first line of the title, as tall as it is set. */}
+        {trailing ? <div className="mt-1.5 shrink-0 sm:mt-2">{trailing}</div> : null}
       </div>
       {below}
     </FieldFrame>
@@ -293,8 +301,13 @@ type PropertiesProps<I extends { properties: PropertySummary[] }, P> = {
   properties: PropertySummary[];
   readOnly: boolean;
   initiativeId: number | null;
-  /** Whose people a person-valued property may name: who can open this tool. */
-  canOpen: { tool: Tool; id: number | null | undefined };
+  /** Whose people a person-valued property may name: who can open this tool.
+   *  Left out (a collection, which has no sharing of its own), the
+   *  initiative's members. */
+  canOpen?: { tool: Tool; id: number | null | undefined };
+  /** The project whose metadata the item holds beside the initiative's
+   *  properties: a task's. */
+  owner?: MetadataOwner;
 };
 
 /** The item's properties with `property` as it reads after `value`, added
@@ -431,7 +444,18 @@ export const ColorField = <
   );
 };
 
-/** An item's custom properties, each saved on its own, and adding one. */
+/** One holder per read of a row's properties, so a copy passed again is the
+ *  same copy ({@link useHeldItem}). */
+const holders = new WeakMap<PropertySummary[], { properties: PropertySummary[] }>();
+const holderOf = (properties: PropertySummary[]) => {
+  let holder = holders.get(properties);
+  if (!holder) {
+    holder = { properties };
+    holders.set(properties, holder);
+  }
+  return holder;
+};
+
 /**
  * One property placed on the layout on its own: drawn whether or not the item
  * has a value for it yet, and saved on its own. A reader sees it only where it
@@ -439,15 +463,27 @@ export const ColorField = <
  */
 export const PlacedPropertyField = <I extends { properties: PropertySummary[] }, P>({
   propertyId,
+  definitions: given,
   ...props
-}: PropertiesProps<I, P> & { propertyId: number }) => {
+}: PropertiesProps<I, P> & {
+  propertyId: number;
+  /** Where its definition is, where not among the initiative's properties
+   *  and the owner's metadata: a collection's metadata. */
+  definitions?: PropertyDefinitionRead[];
+}) => {
   const { t } = useTranslation(["properties", "common"]);
-  const definitions = useProperties({
+  const definitions = useOwnedDefinitions({
     initiativeId: props.initiativeId ?? undefined,
-    enabled: props.initiativeId !== null,
+    owner: props.owner,
+    enabled: props.initiativeId !== null && given === undefined,
   });
-  const definition = definitions.data?.find((each) => each.id === propertyId);
-  const held = props.properties.find((each) => each.property_id === propertyId);
+  const { properties } = useHeldItem(
+    props.kind as unknown as FieldSaveKind<{ properties: PropertySummary[] }, P>,
+    props.id,
+    holderOf(props.properties)
+  );
+  const definition = (given ?? definitions.data)?.find((each) => each.id === propertyId);
+  const held = properties.find((each) => each.property_id === propertyId);
   const property = held ?? (definition ? propertyStubFromDefinition(definition) : undefined);
   // Not loaded is not deleted: an editor is told, and can ask again.
   if (!property && definitions.isError && !props.readOnly) {
@@ -469,21 +505,10 @@ export const PlacedPropertyField = <I extends { properties: PropertySummary[] },
       </ReadField>
     );
   }
-  return <PropertyField {...props} property={property} placed />;
+  return <PropertyField {...props} properties={properties} property={property} placed />;
 };
 
-/** One holder per read of a row's properties, so a copy passed again is the
- *  same copy ({@link useHeldItem}). */
-const holders = new WeakMap<PropertySummary[], { properties: PropertySummary[] }>();
-const holderOf = (properties: PropertySummary[]) => {
-  let holder = holders.get(properties);
-  if (!holder) {
-    holder = { properties };
-    holders.set(properties, holder);
-  }
-  return holder;
-};
-
+/** An item's custom properties, each saved on its own, and adding one. */
 export const PropertiesField = <I extends { properties: PropertySummary[] }, P>({
   except,
   hideLabel = false,
@@ -501,8 +526,12 @@ export const PropertiesField = <I extends { properties: PropertySummary[] }, P>(
     id,
     holderOf(props.properties)
   );
-  const listed = except ? properties.filter((each) => !except.has(each.property_id)) : properties;
-  const label = t("title");
+  // Its own values: a collection's metadata is the collection's, and a
+  // plug-in's values are drawn as its fields.
+  const listed = ownProperties(properties).filter((each) => !except?.has(each.property_id));
+  // Where the item also holds its project's metadata, the panel says so.
+  const label = t(props.owner ? "titleWithMetadata" : "title");
+  const none = t(props.owner ? "noPropertiesOrMetadata" : "noMetadata");
   const save = useItemFieldSave(kind, id, label);
   const add = (definition: PropertyDefinitionRead) => {
     if (properties.some((p) => p.property_id === definition.id)) return;
@@ -520,7 +549,7 @@ export const PropertiesField = <I extends { properties: PropertySummary[] }, P>(
       <div className="space-y-2">
         {hideLabel ? null : <p className="font-medium text-sm">{label}</p>}
         {sorted.length === 0 ? (
-          <p className="text-muted-foreground text-sm">{t("noProperties")}</p>
+          <p className="text-muted-foreground text-sm">{none}</p>
         ) : (
           <ul className="space-y-2">
             {sorted.map((property) => {
@@ -546,7 +575,7 @@ export const PropertiesField = <I extends { properties: PropertySummary[] }, P>(
   return (
     <FieldFrame label={label} save={save} hideLabel={hideLabel}>
       {sorted.length === 0 ? (
-        <p className="text-muted-foreground text-sm">{t("noProperties")}</p>
+        <p className="text-muted-foreground text-sm">{none}</p>
       ) : (
         sorted.map((property) => (
           // Keyed by the row too: a host that moves to another row starts
@@ -561,6 +590,7 @@ export const PropertiesField = <I extends { properties: PropertySummary[] }, P>(
       )}
       <AddPropertyButton
         initiativeId={initiativeId ?? 0}
+        owner={props.owner}
         currentPropertyIds={[...listed.map((p) => p.property_id), ...(except ?? [])]}
         onAdd={add}
         disabled={readOnly || !initiativeId}
@@ -678,10 +708,13 @@ export const DescriptionField = <I, P>({
 
   const current = value ?? "";
   // One being added is written straight into it: nothing is saved until Add.
+  // It names what it held when it was opened, so a change of an item that
+  // exists is refused where somebody wrote over it meanwhile.
   const adding = useContext(ItemDraftContext) !== null;
+  const openedOn = useRef(value ?? null);
   const write = (text: string) =>
     void save.save({
-      patch: { [field]: text || null } as P,
+      patch: { [field]: text || null, [`${field}_base`]: openedOn.current } as P,
       shows: { [field]: text || null } as Partial<I>,
     });
   // A reader who can no longer edit keeps the draft on the device, but sees

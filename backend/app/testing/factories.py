@@ -21,7 +21,7 @@ import functools
 import json
 import uuid
 from datetime import datetime, timedelta, timezone
-from typing import Any, Sequence
+from typing import Any, Iterable, Sequence
 
 from cryptography.hazmat.primitives import serialization
 from cryptography.hazmat.primitives.asymmetric import ed25519
@@ -35,6 +35,7 @@ from app.core.relationships import Provenance, RelationshipType
 from app.core.search import SearchEntityType
 from app.models.tenant.relationship import EntityRelationship
 from app.services.tenant import relationships as relationships_service
+from app.services.platform import grant_cases, rules
 from app.core.tools import CHILD_KINDS, Tool
 from app.core.security import (
     get_password_hash,
@@ -51,7 +52,7 @@ from app.models.platform.marketplace import (
 )
 from app.models.tenant.dashboard import Dashboard
 from app.models.tenant.post import Post
-from app.models.tenant.catalog import Catalog, CatalogItem
+from app.models.tenant.collection import Collection, CollectionFile
 from app.models.tenant.wiki import Wiki, WikiPage
 from app.models.tenant.post_poll import PostPoll, PostPollOption
 from app.models.tenant.guild_plugin import GuildPlugin
@@ -61,7 +62,8 @@ from app.models.tenant.guild_plugin_user_connection import GuildPluginUserConnec
 from app.models.tenant.calendar_event import CalendarEvent, CalendarEventAttendee
 from app.models.tenant.comment import Comment
 from app.models.tenant.counter import Counter, CounterGroup
-from app.models.tenant.file import File, FileType
+from app.core.file_types import FileType, type_of_media
+from app.models.tenant.file import File
 from app.models.platform.access_grant import AccessGrant
 from app.models.platform.guild import Guild, GuildMembership, CommunityRole
 from app.core.guild_auth_options import CommunityAuthOption
@@ -76,13 +78,14 @@ from app.services.tenant.plugin_config import mint_connection_ref
 from app.services.tenant.dashboard_definition import (
     normalize_dashboard_definition,
 )
+from app.models.tenant.claim_rule_initiative import ClaimRuleInitiative
 from app.models.tenant.initiative import Initiative, InitiativeMember
 from app.models.tenant.project import Project
 from app.models.tenant.resource_grant import ResourceGrant, ResourceAccessLevel
-from app.models.tenant.property import (
-    PropertyDefinition,
-    PropertyType,
-    PropertyValue,
+from app.models.tenant.metadata import (
+    MetadataDefinition,
+    MetadataType,
+    MetadataValue,
 )
 from app.models.tenant.queue import Queue, QueueItem
 from app.models.tenant.reaction import Reaction
@@ -95,12 +98,17 @@ from app.models.tenant.task import (
     TaskStatusCategory,
 )
 from app.models.tenant.upload import Upload
-from app.models.tenant.export_job import ExportJob
-from app.models.tenant.import_job import ImportJob
+from app.models.tenant.webhook_subscription import WebhookSubscription
+from app.models.tenant.data_job import DataJob, DataJobDirection
 from app.models.platform.auth_provider import AuthProvider, AuthProviderKind
 from app.models.platform.guild_provider_connection import GuildProviderConnection
+from app.models.platform.oidc_claim_mapping import (
+    OIDCClaimMapping,
+    OIDCMappingTargetType,
+)
 from app.models.platform.federated_identity import FederatedIdentity
-from app.models.platform.guild_auth_policy import GuildAuthPolicy
+from app.core.login_methods import LoginMethod
+from app.core.rules import OPTION_RULES, SetBy, SignInRequirement
 from app.models.platform.user import User, UserRole, UserStatus
 from app.services.auth.platform_provider import PLATFORM_OIDC_SLUG
 from app.core import usernames
@@ -253,8 +261,9 @@ async def create_guild(
     a filler account and has no members.
 
     Overrides for the operator-set fields (``max_storage_bytes``, ``max_users``,
-    ``max_guests``, ``tier_name``, ``auth_options``) land on ``guild_administration``; the rest
-    on the guild. Example: ``guild = await create_guild(session, name="Test")``.
+    ``max_guests``, ``tier_name``, ``auth_options``) go through
+    :func:`guild_administration`; the rest land on the guild. Example:
+    ``guild = await create_guild(session, name="Test")``.
     """
     # Test guilds hold every sign-in option by default so the guild-auth
     # surface is exercisable without extra setup; production guilds hold none
@@ -313,14 +322,31 @@ async def create_guild(
     return guild
 
 
+async def community_plan(session: AsyncSession, guild_id: int) -> rules.Values:
+    """What one community's rules say now, its plan among them."""
+    return (await rules.community_values(session, [guild_id]))[guild_id]
+
+
+#: The operator's fields by the names its API uses, and the paid rule each is.
+_PLAN_FIELDS = {
+    "max_storage_bytes": "max_storage_bytes",
+    "max_users": "max_users",
+    "max_guests": "max_guests",
+    "banner_image_enabled": "banner_image",
+    "support_enabled": "help_requests",
+}
+
+
 async def guild_administration(
     session: AsyncSession, guild: Guild, commit: bool = True, **fields: Any
 ) -> GuildAdministration:
-    """Read (and optionally set) a guild's operator-set row.
+    """Read (and optionally set) what the deployment says of one community,
+    by the names the operator's API uses.
 
-    The caps, plan label, and sign-in entitlement live on ``guild_administration``
-    rather than on the guild, so a test that used to poke ``guild.max_users``
-    goes through here instead. Called with no ``fields`` it is a plain read.
+    The caps and entitlements are its paid rules, written as the deployment's
+    rows (``auth_options`` as the two sign-in options); the plan label and
+    billing's bookkeeping are on ``guild_administration``, whose row this
+    returns. Called with no ``fields`` it is a plain read.
     """
     row = (
         await session.exec(
@@ -328,7 +354,26 @@ async def guild_administration(
         )
     ).one()
     for name, value in fields.items():
-        setattr(row, name, value)
+        if name in _PLAN_FIELDS:
+            await rules.put(
+                session,
+                _PLAN_FIELDS[name],
+                value,
+                guild_id=guild.id,
+                set_by=SetBy.deployment,
+            )
+        elif name == "auth_options":
+            held = {CommunityAuthOption(option) for option in value}
+            for option, key in OPTION_RULES.items():
+                await rules.put(
+                    session,
+                    key,
+                    option in held,
+                    guild_id=guild.id,
+                    set_by=SetBy.deployment,
+                )
+        else:
+            setattr(row, name, value)
     if fields:
         session.add(row)
         if commit:
@@ -347,30 +392,40 @@ async def create_access_grant(
     access_level: str = "read",
     purpose: str = "content",
     minutes: int = 60,
+    case_task_id: int | None = None,
     commit: bool = True,
+    **overrides: Any,
 ) -> AccessGrant:
     """A live, approved grant — what the seam reads when somebody reaches a
     community they do not belong to.
 
     Self-approved, which is what a break-glass row is; a requested-then-approved
     one differs only in who decided it, and nothing that reads a grant asks.
+    ``case_task_id`` links it to that case in the operations community, as
+    asking for it for a case does.
     """
     now = datetime.now(timezone.utc)
     grant = AccessGrant(
-        user_id=user.id,
-        guild_id=guild.id,
-        access_level=access_level,
-        status="approved",
-        purpose=purpose,
-        reason="test",
-        requested_duration_minutes=minutes,
-        requested_by_id=user.id,
-        approved_by_id=user.id,
-        requested_at=now,
-        decided_at=now,
-        expires_at=now + timedelta(minutes=minutes),
+        **{
+            "user_id": user.id,
+            "guild_id": guild.id,
+            "access_level": access_level,
+            "status": "approved",
+            "purpose": purpose,
+            "reason": "test",
+            "requested_duration_minutes": minutes,
+            "requested_by_id": user.id,
+            "approved_by_id": user.id,
+            "requested_at": now,
+            "decided_at": now,
+            "expires_at": now + timedelta(minutes=minutes),
+            **overrides,
+        }
     )
     session.add(grant)
+    if case_task_id is not None:
+        await session.flush()
+        await grant_cases.link(case_task_id, [int(grant.id)])
     if commit:
         await session.commit()
         await session.refresh(grant)
@@ -394,7 +449,8 @@ async def create_guild_membership(
         guild: Guild to add user to (will be created if not provided)
         role: Guild role for the user (default: member)
         commit: Whether to commit the transaction (default True)
-        **overrides: Override any default field values
+        **overrides: Override any default field values. ``api_keys_allowed``,
+            when given, sets the member's ``api_keys`` rule instead.
 
     Returns:
         Created GuildMembership instance
@@ -420,6 +476,7 @@ async def create_guild_membership(
         "position": 0,
     }
 
+    api_keys_allowed = overrides.pop("api_keys_allowed", None)
     membership_data = {**defaults, **overrides}
     # The creator already has one (``create_guild`` seats them), so asking for
     # theirs again says what role they should hold rather than adding a second
@@ -439,6 +496,11 @@ async def create_guild_membership(
     else:
         membership = GuildMembership(**membership_data)
     session.add(membership)
+    if api_keys_allowed is not None:
+        await session.flush()
+        await rules.put(
+            session, "api_keys", api_keys_allowed, guild_id=guild.id, user_id=user.id
+        )
 
     if commit:
         await session.commit()
@@ -648,15 +710,13 @@ async def create_initiative(
             from sqlalchemy import update as sa_update
 
             from app.core.tools import Tool as _Tool
-            from app.models.tenant.initiative import InitiativeRolePermission
+            from app.models.tenant.initiative import InitiativeRule
 
             await session.exec(
-                sa_update(InitiativeRolePermission)
+                sa_update(InitiativeRule)
                 .where(
-                    InitiativeRolePermission.initiative_role_id == member_role.id,
-                    InitiativeRolePermission.permission_key.in_(
-                        [tool.view_permission for tool in _Tool]
-                    ),
+                    InitiativeRule.initiative_role_id == member_role.id,
+                    InitiativeRule.key.in_([tool.view_permission for tool in _Tool]),
                 )
                 .values(enabled=True)
             )
@@ -986,7 +1046,7 @@ async def grant_role_permission(
     """
     from app.models.tenant.initiative import (
         InitiativeRoleModel,
-        InitiativeRolePermission,
+        InitiativeRule,
     )
     from sqlmodel import select
 
@@ -1001,17 +1061,18 @@ async def grant_role_permission(
     ).one()
     existing = (
         await session.exec(
-            select(InitiativeRolePermission).where(
-                InitiativeRolePermission.initiative_role_id == role.id,
-                InitiativeRolePermission.permission_key == permission_key,
+            select(InitiativeRule).where(
+                InitiativeRule.initiative_role_id == role.id,
+                InitiativeRule.key == permission_key,
             )
         )
     ).one_or_none()
     if existing is None:
         session.add(
-            InitiativeRolePermission(
+            InitiativeRule(
+                initiative_id=initiative.id,
                 initiative_role_id=role.id,
-                permission_key=permission_key,
+                key=permission_key,
                 enabled=enabled,
             )
         )
@@ -1023,22 +1084,30 @@ async def grant_role_permission(
 
 async def create_property_definition(
     session: AsyncSession,
-    initiative: Initiative,
+    initiative: Initiative | None,
     *,
     name: str | None = None,
-    type: PropertyType = PropertyType.text,
+    type: MetadataType = MetadataType.text,
     options: list[dict] | None = None,
     color: str | None = None,
     position: float = 0.0,
+    project: Project | None = None,
+    collection: Collection | None = None,
+    plugin: GuildPlugin | None = None,
+    key: str | None = None,
     commit: bool = True,
     **overrides: Any,
-) -> PropertyDefinition:
+) -> MetadataDefinition:
     """
-    Create a test property definition with sensible defaults.
+    Create a test metadata definition with sensible defaults.
 
     Auto-generates a unique name if not provided. When ``type`` is a
     select/multi_select and ``options`` is None, seeds a default option
-    list so the definition is valid.
+    list so the definition is valid; money is in US dollars. With
+    ``project`` or ``collection``, it is that project's or collection's
+    metadata. With ``plugin`` (and no ``initiative``), it is the install's
+    metadata under ``key``, named by it; ``list`` and ``shown_on`` go in
+    ``overrides``.
 
     Args:
         session: Database session
@@ -1052,33 +1121,38 @@ async def create_property_definition(
         **overrides: Override any default field values
 
     Returns:
-        Created PropertyDefinition instance
+        Created MetadataDefinition instance
     """
-    await route_session_to_guild(session, guild_of(initiative))
+    await route_session_to_guild(session, guild_of(initiative or plugin))
 
     if name is None:
-        name = f"Prop {datetime.now(timezone.utc).timestamp()}"
+        name = key or f"Prop {datetime.now(timezone.utc).timestamp()}"
 
-    if type in {PropertyType.select, PropertyType.multi_select} and options is None:
+    if type in {MetadataType.select, MetadataType.multi_select} and options is None:
         options = [
             {"value": "a", "label": "A"},
             {"value": "b", "label": "B"},
         ]
-    elif type not in {PropertyType.select, PropertyType.multi_select}:
+    elif type not in {MetadataType.select, MetadataType.multi_select}:
         # Non-select types don't store options.
         options = None
 
     defaults = {
-        "initiative_id": initiative.id,
+        "initiative_id": initiative.id if initiative is not None else None,
+        "project_id": project.id if project is not None else None,
+        "collection_id": collection.id if collection is not None else None,
+        "install_id": plugin.id if plugin is not None else None,
+        "key": key,
         "name": name,
         "type": type,
         "position": position,
         "color": color,
         "options": options,
+        "currency": "USD" if type is MetadataType.currency else None,
     }
 
     data = {**defaults, **overrides}
-    definition = PropertyDefinition(**data)
+    definition = MetadataDefinition(**data)
     session.add(definition)
 
     if commit:
@@ -1091,32 +1165,33 @@ async def create_property_definition(
 async def create_property_value(
     session: AsyncSession,
     entity: Any,
-    definition: PropertyDefinition,
+    definition: MetadataDefinition,
     *,
     commit: bool = True,
     **value_kwargs: Any,
-) -> PropertyValue:
+) -> MetadataValue:
     """
-    Attach a typed property value to any tool or sub-tool row.
+    Attach a typed metadata value to any tool or sub-tool row.
 
     Accepts any of ``value_text``, ``value_number``, ``value_boolean``,
-    ``value_date``, ``value_datetime``, ``value_user_id``, ``value_json``.
+    ``value_date``, ``value_datetime``, ``value_user_id``, ``value_json``,
+    and a plug-in value's ``ref`` and ``state``.
 
     Args:
         session: Database session
         entity: The row to attach the value to (a task, a file, a queue, …)
-        definition: PropertyDefinition the value references
+        definition: MetadataDefinition the value references
         commit: Whether to commit the transaction (default True)
         **value_kwargs: Typed column values
 
     Returns:
-        Created PropertyValue instance
+        Created MetadataValue instance
     """
-    from app.services.tenant.properties import link_for
+    from app.services.tenant.metadata import link_for
 
     await route_session_to_guild(session, guild_of(entity))
 
-    row = PropertyValue(
+    row = MetadataValue(
         entity_type=link_for(entity).target,
         entity_id=entity.id,
         property_id=definition.id,
@@ -1302,6 +1377,30 @@ async def create_plugin_user_connection(
         await session.commit()
     await session.refresh(row)
     return row
+
+
+async def create_webhook_subscription(
+    session: AsyncSession, guild: Guild, creator: User | None = None, **overrides: Any
+) -> WebhookSubscription:
+    """A subscription to ``tasks.created`` against a URL of the creator's own,
+    for the whole community unless ``initiative_id`` says otherwise."""
+    await route_session_to_guild(session, guild.id)
+    now = datetime.now(timezone.utc)
+    subscription = WebhookSubscription(
+        **{
+            "created_by": None if creator is None else creator.id,
+            "target_url": "https://example.test/hook",
+            "hmac_secret": uuid.uuid4().hex,
+            "event_types": ["tasks.created"],
+            "created_at": now,
+            "updated_at": now,
+            **overrides,
+        }
+    )
+    session.add(subscription)
+    await session.commit()
+    await session.refresh(subscription)
+    return subscription
 
 
 _TEST_PLUGIN_KEY = ed25519.Ed25519PrivateKey.generate()
@@ -1841,106 +1940,53 @@ def png_bytes(
     )
 
 
-async def create_catalog(
+async def create_collection(
     session: AsyncSession,
     initiative: Initiative,
     creator: User,
     *,
+    files: Sequence[File] = (),
     name: str | None = None,
+    shape: str | None = None,
     commit: bool = True,
     **overrides: Any,
-) -> Catalog:
-    """Create a test catalog with sensible defaults.
+) -> Collection:
+    """Create a test collection holding ``files``, each added by ``creator``,
+    made as the ready-made ``shape`` of that key (its words in English) when
+    one is named.
 
-    Mirrors the create endpoint's default sharing: the creator owns it and
-    every initiative member can read it. The initiative is expected to be
-    catalogs-enabled.
+    A collection is seen through its files, so one made with none reads as
+    absent to everyone but the community's admins.
     """
     await route_session_to_guild(session, guild_of(initiative))
 
     defaults = {
         "initiative_id": initiative.id,
         "created_by": creator.id,
-        "name": name or f"Catalog {datetime.now(timezone.utc).timestamp()}",
+        "name": name or f"Collection {datetime.now(timezone.utc).timestamp()}",
     }
-    catalog = Catalog(**{**defaults, **overrides})
-    session.add(catalog)
-
-    if commit:
-        await session.commit()
-        await session.refresh(catalog)
-
-        await create_resource_grant(
-            session,
-            catalog,
-            level=ResourceAccessLevel.owner,
-            user=creator,
-            commit=False,
-        )
-        await create_resource_grant(session, catalog, all_initiative_members=True)
-
-    return catalog
-
-
-async def create_catalog_item(
-    session: AsyncSession,
-    catalog: Catalog,
-    uploader: User,
-    *,
-    title: str | None = None,
-    width: int = 4,
-    height: int = 4,
-    write_blob: bool = True,
-    commit: bool = True,
-    **overrides: Any,
-) -> CatalogItem:
-    """Create a test picture in a catalog, with its first version and its
-    ``uploads`` row. File overrides (``thumbnail_url``, …) go on the version.
-
-    ``write_blob`` puts a real PNG in the guild's storage under the version's
-    ``file_url``, so a test that serves or purges the picture finds bytes
-    there; a test about the rows alone can skip it.
-    """
-    from app.services.storage import get_guild_storage
-
-    await route_session_to_guild(session, guild_of(catalog))
-
-    data = png_bytes(width, height)
-    filename = f"{uuid.uuid4().hex}.png"
-    file_url = f"/uploads/{guild_of(catalog)}/{filename}"
-    if write_blob:
-        get_guild_storage(guild_of(catalog)).write(
-            filename, data, content_type="image/png"
-        )
-    session.add(
-        Upload(
-            filename=filename,
-            created_by=uploader.id,
-            size_bytes=len(data),
-            content_type="image/png",
-        )
-    )
-
-    picture = {
-        "file_url": file_url,
-        "file_content_type": "image/png",
-        "file_size": len(data),
-        "original_filename": f"{title or 'picture'}.png",
-        "width": width,
-        "height": height,
-        **_file_overrides(overrides),
-    }
-    defaults = {"catalog_id": catalog.id, "created_by": uploader.id, "title": title}
-    image = CatalogItem(**{**defaults, **overrides})
-    session.add(image)
+    collection = Collection(**{**defaults, **overrides})
+    session.add(collection)
     await session.flush()
-    await file_versions.add_version(session, image, created_by=uploader.id, **picture)
+    session.add_all(
+        CollectionFile(
+            collection_id=collection.id,
+            file_id=file.id,
+            initiative_id=initiative.id,
+            added_by=creator.id,
+        )
+        for file in files
+    )
+    await session.flush()
+    if shape is not None:
+        from app.core.collection_shapes import SHAPES_BY_KEY
+        from app.services.tenant.collections import apply_shape
 
+        await apply_shape(session, collection, SHAPES_BY_KEY[shape], locale="en")
     if commit:
         await session.commit()
-        await session.refresh(image)
-
-    return image
+        await session.refresh(collection)
+    return collection
 
 
 async def create_calendar_event(
@@ -2001,18 +2047,22 @@ async def create_file(
 ) -> File:
     """Create a test file with sensible defaults.
 
-    Defaults to a ``native`` (editor) file with empty content and an
+    Defaults to a ``lexical`` (editor) file with empty content and an
     owner grant for ``creator``, mirroring the create endpoint's DAC setup.
     File overrides (``file_url``, …) make its first version, as an upload does,
-    typed ``application/pdf`` unless one is given.
+    typed ``application/pdf`` unless one is given; the file takes its type.
     """
     await route_session_to_guild(session, guild_of(initiative))
 
     stored = _file_overrides(overrides)
+    if stored:
+        stored.setdefault("file_content_type", "application/pdf")
     defaults = {
         "initiative_id": initiative.id,
         "name": name or f"Test File {datetime.now(timezone.utc).timestamp()}",
-        "file_type": FileType.native,
+        "file_type": (
+            type_of_media(stored["file_content_type"]) if stored else FileType.lexical
+        ),
         "created_by": creator.id,
     }
     file = File(**{**defaults, **overrides})
@@ -2029,7 +2079,6 @@ async def create_file(
         session, file, level=ResourceAccessLevel.owner, user=creator, commit=commit
     )
     if stored:
-        stored.setdefault("file_content_type", "application/pdf")
         await file_versions.add_version(session, file, created_by=creator.id, **stored)
         await (session.commit() if commit else session.flush())
 
@@ -2043,7 +2092,6 @@ def _file_overrides(overrides: dict[str, Any]) -> dict[str, Any]:
         key: overrides.pop(key)
         for key in (
             "file_url",
-            "thumbnail_url",
             "file_content_type",
             "file_size",
             "original_filename",
@@ -2066,16 +2114,17 @@ async def create_comment(
     calendar: Calendar | None = None,
     dashboard: Dashboard | None = None,
     post: Post | None = None,
-    catalog: Catalog | None = None,
+    collection: Collection | None = None,
     content: str = "A test comment",
     commit: bool = True,
     **overrides: Any,
 ) -> Comment:
     """Create a comment on exactly one parent — any tool entity, or one of the
-    content-level extras (a task, a wiki page)."""
+    content-level extras (a task, a wiki page, a collection)."""
     named = {
         "task": task,
         "wiki_page": wiki_page,
+        "collection": collection,
         Tool.project.value: project,
         Tool.file.value: file,
         Tool.queue.value: queue,
@@ -2083,7 +2132,6 @@ async def create_comment(
         Tool.calendar.value: calendar,
         Tool.dashboard.value: dashboard,
         Tool.post.value: post,
-        Tool.catalog.value: catalog,
         Tool.wiki.value: wiki,
     }
     # Keyed by the enum rather than by string literals, and checked against it:
@@ -2306,17 +2354,18 @@ async def create_upload(
 
 async def create_export_job(
     session: AsyncSession, guild: Guild, creator: User, **overrides: Any
-) -> ExportJob:
+) -> DataJob:
     """Create a task-list PDF export job, queued unless ``status`` says
     otherwise."""
     await route_session_to_guild(session, guild.id)
     defaults = {
+        "direction": DataJobDirection.export,
         "created_by": creator.id,
         "source": "tasks",
         "template_id": "task-table",
         "format": "pdf",
     }
-    job = ExportJob(**{**defaults, **overrides})
+    job = DataJob(**{**defaults, **overrides})
     session.add(job)
     await session.commit()
     await session.refresh(job)
@@ -2325,10 +2374,17 @@ async def create_export_job(
 
 async def create_import_job(
     session: AsyncSession, guild: Guild, creator: User, **overrides: Any
-) -> ImportJob:
+) -> DataJob:
     """Create a backup import job, queued unless ``status`` says otherwise."""
     await route_session_to_guild(session, guild.id)
-    job = ImportJob(**{"created_by": creator.id, "source": "backup", **overrides})
+    job = DataJob(
+        **{
+            "direction": DataJobDirection.import_,
+            "created_by": creator.id,
+            "source": "backup",
+            **overrides,
+        }
+    )
     session.add(job)
     await session.commit()
     await session.refresh(job)
@@ -2430,50 +2486,91 @@ async def create_guild_provider_connection(
     return connection
 
 
+async def create_claim_rule(
+    session: AsyncSession,
+    *,
+    provider: AuthProvider,
+    guild: "Guild",
+    initiative: Initiative | None = None,
+    initiative_role_id: int | None = None,
+    **overrides: Any,
+) -> OIDCClaimMapping:
+    """A community's sign-in rule placing whoever carries ``staff`` in
+    ``guild`` as a member, and in ``initiative`` at ``initiative_role_id`` too
+    where one is given: that half is kept in the community's schema
+    (``claim_rule_initiatives``), under the rule's id."""
+    rule = OIDCClaimMapping(
+        **{
+            "provider_id": provider.id,
+            "claim_value": "staff",
+            "target_type": OIDCMappingTargetType.initiative
+            if initiative is not None
+            else OIDCMappingTargetType.guild,
+            "guild_id": guild.id,
+            "guild_role": CommunityRole.member.value,
+            **overrides,
+        }
+    )
+    session.add(rule)
+    await session.flush()
+    if initiative is not None:
+        assert rule.id is not None and initiative.id is not None
+        assert initiative_role_id is not None
+        await route_session_to_guild(session, guild.id)
+        session.add(
+            ClaimRuleInitiative(
+                rule_id=rule.id,
+                initiative_id=initiative.id,
+                initiative_role_id=initiative_role_id,
+            )
+        )
+    await session.commit()
+    await session.refresh(rule)
+    return rule
+
+
 async def create_guild_auth_policy(
     session: AsyncSession,
     guild: "Guild",
-    provider: "AuthProvider",
+    provider: "AuthProvider | None" = None,
     *,
     commit: bool = True,
-    **overrides: Any,
-) -> GuildAuthPolicy:
-    """Make ``guild`` require a sign-in through ``provider``.
+    guest: bool = False,
+    methods: Iterable[LoginMethod] = (),
+) -> SignInRequirement:
+    """Make ``guild`` require a sign-in of its members or, with ``guest``, of
+    its guests: through ``provider``, by ``methods``, or both.
 
     Connects the community to the provider first where it is not connected
     already: the endpoint refuses a requirement naming a provider the
     community does not count as its own, and the gate answers the same way, so
-    a policy without a connection is a state production cannot reach.
-
-    ``provider_slug`` is denormalised onto the row in production so a step-up
-    response can name the provider without a registry read; this keeps the two
-    in step the same way.
+    a requirement without a connection is a state production cannot reach.
     """
-    connected = (
-        await session.exec(
-            select(GuildProviderConnection).where(
-                GuildProviderConnection.guild_id == guild.id,
-                GuildProviderConnection.provider_id == provider.id,
+    if provider is not None:
+        connected = (
+            await session.exec(
+                select(GuildProviderConnection).where(
+                    GuildProviderConnection.guild_id == guild.id,
+                    GuildProviderConnection.provider_id == provider.id,
+                )
             )
-        )
-    ).first()
-    if connected is None:
-        await create_guild_provider_connection(
-            session, guild=guild, provider=provider, commit=commit
-        )
-
-    defaults = {
-        "guild_id": guild.id,
-        "policy": "required",
-        "provider_id": provider.id,
-        "provider_slug": provider.slug,
-    }
-    policy = GuildAuthPolicy(**{**defaults, **overrides})
-    session.add(policy)
+        ).first()
+        if connected is None:
+            await create_guild_provider_connection(
+                session, guild=guild, provider=provider, commit=commit
+            )
+    requirement = SignInRequirement(
+        "required", provider.id if provider else None, frozenset(methods)
+    )
+    await rules.put(
+        session,
+        "guest_auth_policy" if guest else "auth_policy",
+        requirement,
+        guild_id=guild.id,
+    )
     if commit:
         await session.commit()
-        await session.refresh(policy)
-    return policy
+    return requirement
 
 
 async def create_federated_identity(
@@ -2612,7 +2709,6 @@ TOOL_FACTORIES: dict[Tool, Any] = {
     Tool.calendar: create_calendar,
     Tool.dashboard: create_dashboard,
     Tool.post: create_post,
-    Tool.catalog: create_catalog,
     Tool.wiki: create_wiki,
 }
 
@@ -2637,6 +2733,17 @@ async def create_tool_entity(
     return await TOOL_FACTORIES[tool](session, initiative, creator, **overrides)
 
 
+async def _collection_holding(
+    session: AsyncSession, file: File, creator: User, **overrides: Any
+) -> Collection:
+    await route_session_to_guild(session, guild_of(file))
+    initiative = await session.get(Initiative, file.initiative_id)
+    assert initiative is not None
+    return await create_collection(
+        session, initiative, creator, files=[file], **overrides
+    )
+
+
 # The same for what lives inside a tool, keyed by ``CHILD_KINDS``: each takes
 # its tool's row and a creator, and the ones that name no creator ignore it.
 CHILD_FACTORIES: dict[str, Any] = {
@@ -2648,8 +2755,10 @@ CHILD_FACTORIES: dict[str, Any] = {
     "counter": lambda session, group, creator, **kw: create_counter(
         session, group, **kw
     ),
-    "catalog_item": create_catalog_item,
     "wiki_page": create_wiki_page,
+    # A collection is in Files rather than in one file: its tool row is the
+    # file it starts with.
+    "collection": _collection_holding,
 }
 
 if set(CHILD_FACTORIES) != set(CHILD_KINDS):

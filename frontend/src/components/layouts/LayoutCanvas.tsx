@@ -620,6 +620,7 @@ export const LayoutCanvas = ({
           onDragCancel={noop}
           onToggleCollapse={noop}
           card={card}
+          displays={definition.displays}
           columnLimits={columnLimits}
           grouping={grouping}
           viewGroupings={definition.groupings}
@@ -644,6 +645,7 @@ export const LayoutCanvas = ({
           taskHref={taskHref}
           tableState={tableState}
           viewColumns={columnsOf(definition, fields)}
+          displays={definition.displays}
           viewGroupings={definition.groupings}
           editing
         />

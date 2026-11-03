@@ -10,7 +10,7 @@ from sqlalchemy import text
 from app.models.platform.guild import CommunityRole
 from app.models.platform.user_dm_settings import DmPolicy
 from app.models.platform.user_ignore import UserIgnore
-from app.services.platform import app_settings as app_settings_service
+from app.services.platform import rules
 from app.testing import (
     create_guild,
     create_user,
@@ -59,9 +59,9 @@ async def test_raising_the_policy_needs_an_age_answer(client, session, acting_us
 
 
 async def test_no_age_check_raises_the_policy_unasked(client, session, acting_user):
-    await app_settings_service.update_community_settings(
-        session, community_directory_enabled=False, community_age_gate_enabled=False
-    )
+    await rules.put(session, "community_directory_enabled", False)
+    await rules.put(session, "community_age_gate_enabled", False)
+    await session.commit()
     a = await acting_user()
     a.user.age_confirmed_at = None
     session.add(a.user)

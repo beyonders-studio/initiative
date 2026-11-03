@@ -9,7 +9,16 @@
       "title": "Tâches en retard",
       "body_one": "{{count}} tâche est en retard : {{title}}",
       "body_other": "{{count}} tâches sont en retard, dont {{title}}"
+    },
+    "reminder": {
+      "title": "Rappel",
+      "body": "{{task}}"
     }
+  },
+  "comingUp": {
+    "title": "À venir",
+    "body_one": "{{count}} chose à venir : {{title}}",
+    "body_other": "{{count}} choses à venir, à commencer par {{title}}"
   },
   "initiative": {
     "added": {
@@ -48,9 +57,9 @@
       "title": "Votre tâche a été mentionnée",
       "body": "{{actor}} a mentionné {{task}} dans {{context}}"
     },
-    "taskDescription": {
+    "description": {
       "title": "Vous avez été mentionné(e)",
-      "body": "{{actor}} vous a mentionné(e) dans la description de {{task}}"
+      "body": "{{actor}} vous a mentionné(e) dans la description de {{title}}"
     }
   },
   "comment": {
@@ -212,6 +221,14 @@
     "account": {
       "title": "Un avis concernant votre compte",
       "body": "Ouvrez Initiative pour le lire."
+    },
+    "overdue": {
+      "title": "Vous avez des tâches en retard",
+      "body": "Ouvrez Initiative pour les voir."
+    },
+    "coming_up": {
+      "title": "Vous avez des échéances à venir",
+      "body": "Ouvrez Initiative pour les voir."
     }
   },
   "quietHours": {
@@ -263,6 +280,37 @@
     "replied": {
       "title": "Une réponse sur un dossier que personne n'a pris",
       "body": "Ouvrez Initiative pour la lire."
+    }
+  },
+  "share": {
+    "requested": {
+      "read": {
+        "title": "Demande de consultation",
+        "body_one": "{{requester}} demande à voir {{title}}",
+        "body_other": "{{requester}} demande à voir {{count}} fichiers"
+      },
+      "write": {
+        "title": "Demande de modification",
+        "body_one": "{{requester}} demande à modifier {{title}}",
+        "body_other": "{{requester}} demande à modifier {{count}} fichiers"
+      }
+    },
+    "granted": {
+      "read": {
+        "title": "Vous pouvez le voir",
+        "body_one": "{{answerer}} vous a permis de voir {{title}}",
+        "body_other": "{{answerer}} vous a permis de voir {{count}} fichiers"
+      },
+      "write": {
+        "title": "Vous pouvez le modifier",
+        "body_one": "{{answerer}} vous a permis de modifier {{title}}",
+        "body_other": "{{answerer}} vous a permis de modifier {{count}} fichiers"
+      }
+    },
+    "declined": {
+      "title": "Demande refusée",
+      "body_one": "{{answerer}} a refusé votre demande",
+      "body_other": "{{answerer}} a refusé votre demande pour {{count}} fichiers"
     }
   }
 }

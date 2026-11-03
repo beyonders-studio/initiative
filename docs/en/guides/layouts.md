@@ -17,7 +17,7 @@ You can ignore this page entirely. Every layout ships ready to use, and plenty o
 | [Projects](projects-and-tasks.md#layouts) | **Table**, **Board**, **Gantt**, **Calendar** (each shown or hidden; all four to start with), and a page for each [task type](projects-and-tasks.md#task-types), per project. |
 | [Queues](queues.md) | **Queue item detail**, per queue. |
 | [Counters](counters.md) | **Counter detail**, per counter group. |
-| [Catalogs](catalogs.md) | **Picture detail**, per catalog. |
+| [Collections](files.md#collections) | **Grid**, **Table**, **Masonry**, **Timeline** (each shown or hidden), per collection. |
 | [Calendar](calendar.md) | **Event detail** and the calendar's presets, once for the whole initiative. |
 | [Posts](posts.md) | **Notice detail**, once for the whole initiative. |
 
@@ -27,7 +27,8 @@ A project's layouts go wherever the project goes: into a [duplicate](tools.md#du
 
 ## Who can change them
 
-- **A project, queue, counter group or catalog:** whoever owns it, anyone with full access in the initiative, a manager who can edit it, and community admins.
+- **A collection:** anyone who can change it.
+- **A project, queue, counter group:** whoever owns it, anyone with full access in the initiative, a manager who can edit it, and community admins.
 - **The calendar and posts:** the initiative's managers and community admins.
 
 ## The editor
@@ -45,11 +46,17 @@ Nothing changes for anyone until you save, and leaving with unsaved changes asks
 
 ### What goes in
 
-- **Fields.** The built-ins, and the initiative's [custom properties](initiatives.md#custom-properties) one at a time, or **All properties** for every property a thing has a value for. Pick a type under **New field** to make a property without leaving the editor.
+- **Fields.** The built-ins, a project's or a collection's properties, and the initiative's [metadata](initiatives.md#metadata), each under its own heading, or **All metadata** (**All properties and metadata** on a project's tasks) for every value a thing has. Pick a type under **New property** (**New metadata** where there's no project or collection) to make one without leaving the editor; in a project or a collection, it asks whose it is.
 - **Plug-in parts**, from plug-ins installed in your community, on a card or a detail.
 - **Row**, which puts what it holds side by side. A detail also takes an **Accordion** (a titled section that opens and closes, and can **Start closed**) and a **Box** (a border round what it holds).
 
 A table takes fields and nothing else, since a column is a column.
+
+### Properties
+
+Click the layout's name at the top of the outline and, in a project or a collection, its properties are listed on the right, each saying which layouts show it. Reorder, edit or delete them there, or make a **New property**; a project's are also in **Settings → Properties**. Deleting one takes every value of it with it, so it asks first. A page that shows all properties picks up a new one straight away; cards and tables show only what you add.
+
+The initiative's metadata is edited in [its settings](initiatives.md#metadata). Select a field that shows some and its settings link there.
 
 A table or board layout also says what people may **group by**, what it **starts grouped by**, and which groups to leave out, such as finished sprints. A date groups by day, week, month, quarter or year; pick which beside it. A board's **Column limits** cap how many open tasks a status column holds; once one is full, nobody adds or moves a task into it until one leaves.
 
@@ -58,6 +65,20 @@ A detail layout has three regions: **Header** across the top, **Main** the wide 
 Taking a part out hides it. It doesn't delete anything: the values are all still there, and **Add** puts the part back. The title is the one thing every layout keeps.
 
 **Opens first**, on a project's lists, picks the one the project opens on for anybody who hasn't picked their own.
+
+## Required fields
+
+Some things are no use half filled in. A bug report with no steps. A booking with no room. A photo in the shop catalogue with no price, which is how the good teapot went for nothing at the last fete.
+
+So a page can say a field is **required**: press the asterisk beside it in the editor's outline. Press it again to take the requirement off. That works on a task type's page, the calendar's event page, the posts page and a collection's file page.
+
+- **What can be required:** anything somebody fills in. A description, a checklist, people, tags, dates, how it repeats, a property, a collection's own property. A task's start and due dates count as one, and either date fills them.
+- **What can't:** the title, because it always is. Its asterisk stays pressed and won't budge. Also anything that's never empty (a task's type, status and priority), anything nobody fills in (who made it, when), a checkbox, and a plug-in's fields, which the plug-in fills. None of those gets an asterisk.
+- **What it does:** the add dialog puts required fields up top, never under **More options**, and waits until they're filled. Once filled, nobody can empty one. A required checklist needs one item. One will do.
+- **What it leaves alone:** everything that already exists. A task made last Tuesday without a description keeps going without one, and its page marks the gap so the next person to open it can fill it in. Imports, automations, plug-ins and the next copy of a repeating task go through too, and get the same mark.
+- **What counts as arriving:** a task changing type, or moving to another project, meets the new page's requirements as if it were new. Anything its new page wants and it hasn't got, Initiative asks for on the spot, in a small box listing only those, and the change goes through with them. Values that came along from the old project count.
+
+Hiding a field lifts the requirement with it. Nobody can fill in what they can't see.
 
 ## Presets
 

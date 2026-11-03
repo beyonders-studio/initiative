@@ -29,7 +29,6 @@ export function buildQueueItem(overrides: Partial<QueueItemRead> = {}): QueueIte
     tags: [],
     properties: [],
     attachment_count: 0,
-    plugin_values: [],
     created_by: null,
     created_at: "2026-01-15T00:00:00.000Z",
     ...overrides,

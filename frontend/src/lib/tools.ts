@@ -36,7 +36,6 @@ import {
   Files,
   GalleryHorizontalEnd,
   Gauge,
-  Images,
   LayoutDashboard,
   ListTodo,
   type LucideIcon,
@@ -58,7 +57,6 @@ export const TOOL_ICONS: Record<Tool, LucideIcon> = {
   [Tool.calendar]: CalendarDays,
   [Tool.dashboard]: LayoutDashboard,
   [Tool.post]: Megaphone,
-  [Tool.catalog]: Images,
   [Tool.wiki]: BookText,
 };
 
@@ -172,7 +170,6 @@ export const SIDEBAR_TOOLS: Tool[] = [
   Tool.calendar,
   Tool.dashboard,
   Tool.file,
-  Tool.catalog,
   Tool.post,
   Tool.queue,
   Tool.counter_group,
@@ -185,7 +182,7 @@ export const SIDEBAR_TOOLS: Tool[] = [
 // ---------------------------------------------------------------------------
 
 /**
- * "counter_group" → "counter_groups", "catalog" → "catalogs".
+ * "counter_group" → "counter_groups", "collection" → "collections".
  *
  * One rule, mirrored from the backend's `Tool.plural`: a trailing `y` after a
  * consonant becomes `ies`, and everything else takes an `s`.
@@ -195,7 +192,7 @@ export const toolPlural = (tool: Tool | ChildKind): string =>
 
 /**
  * Inverse of {@link toolPlural} for any table-ish plural the bus names —
- * "catalogs" → "catalog", "counter_groups" → "counter_group". The one
+ * "collections" → "collection", "counter_groups" → "counter_group". The one
  * spelling rule, read backwards, so a resource type is never singularized by
  * chopping an `s` off.
  */
@@ -243,7 +240,7 @@ export const toolCamelSingular = (tool: Tool): string =>
 export const toolPascalSingular = (tool: Tool): string =>
   tool.replace(/(?:^|_)(\w)/g, (_, c: string) => c.toUpperCase());
 
-/** "counter_group" → "CounterGroups", "catalog" → "Catalogs" — the stem of
+/** "counter_group" → "CounterGroups", "post" → "Posts" — the stem of
  *  the per-tool permission label keys. */
 export const toolPascalPlural = (tool: Tool): string =>
   toolPlural(tool).replace(/(?:^|_)(\w)/g, (_, c: string) => c.toUpperCase());
@@ -341,12 +338,12 @@ export const counterRoute = (
   counterId: number
 ): string => `${toolDetailRoute(Tool.counter_group, initiativeId, groupId)}/counter/${counterId}`;
 
-/** e.g. "/i/1/catalogs/5/items/12": the catalog, with that item open beside it. */
-export const catalogItemRoute = (
-  initiativeId: number | null,
-  catalogId: number,
-  itemId: number
-): string => `${toolDetailRoute(Tool.catalog, initiativeId, catalogId)}/items/${itemId}`;
+/**
+ * e.g. "/i/1/files/collections/5": a collection, which is in the initiative's
+ * Files rather than in one file.
+ */
+export const collectionRoute = (initiativeId: number | null, collectionId: number): string =>
+  `${toolListRoute(Tool.file, initiativeId)}/collections/${collectionId}`;
 
 /** e.g. "/i/1/wikis/4/pages/11". */
 export const wikiPageRoute = (
@@ -483,7 +480,7 @@ export const PARENT_TOOL = {
   task: Tool.project,
   calendar_event: Tool.calendar,
   counter: Tool.counter_group,
-  catalog_item: Tool.catalog,
+  collection: Tool.file,
   queue_item: Tool.queue,
   wiki_page: Tool.wiki,
 } as const satisfies Record<string, Tool>;

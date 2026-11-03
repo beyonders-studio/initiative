@@ -53,6 +53,8 @@ export interface ToolsSectionProps {
   onManageRoles?: () => void;
   /** Grant a tool's view permission to every non-manager role, in one step. */
   onGrantToEveryone?: (tool: Tool) => void;
+  /** The switches the community set for every initiative: shown, not changed. */
+  setByCommunity?: Partial<Record<Tool, boolean>>;
 }
 
 interface ToolPickerCardProps {
@@ -207,6 +209,7 @@ export const ToolsSection = ({
   roles,
   onManageRoles,
   onGrantToEveryone,
+  setByCommunity = {},
 }: ToolsSectionProps) => {
   const { t } = useTranslation("initiatives");
   const disabled = !canManage || isSaving;
@@ -221,6 +224,7 @@ export const ToolsSection = ({
         // Unset means the tool's own default, not off — projects and files
         // are in this list now and start on.
         const enabled = values[tool] ?? DEFAULT_ENABLED_TOOLS.has(tool);
+        const fixed = tool in setByCommunity;
         return (
           <ToolPickerCard
             key={tool}
@@ -230,9 +234,13 @@ export const ToolsSection = ({
             description={t(`${camel}FeatureDescription` as never)}
             checked={enabled}
             onCheckedChange={(value) => onToggle(tool, value)}
-            disabled={disabled}
+            disabled={disabled || fixed}
             audience={
-              enabled && roles ? (
+              fixed ? (
+                <p className="border-t pt-2 text-muted-foreground text-xs">
+                  {t("settings.setByCommunity")}
+                </p>
+              ) : enabled && roles ? (
                 <ToolAudience
                   tool={tool}
                   roles={roles}

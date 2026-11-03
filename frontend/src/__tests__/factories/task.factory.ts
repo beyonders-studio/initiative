@@ -96,7 +96,6 @@ export function buildTask(overrides: Partial<TaskListRead> = {}): TaskListRead {
     completed_at: null,
     tags: [],
     properties: [],
-    plugin_values: [],
     ...overrides,
   };
 }

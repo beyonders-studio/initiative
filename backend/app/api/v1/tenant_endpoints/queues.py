@@ -19,7 +19,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from app.db.session import routed_guild_id
 from app.core.relationships import RelationshipType
 from app.core.search import SearchEntityType
-from app.services.tenant import properties as properties_service
+from app.services.tenant import metadata as metadata_service
 from app.services.tenant import attachments as attachments_service
 from app.services.tenant import overwrites
 from app.services.tenant import relationships
@@ -57,7 +57,6 @@ from app.core.tools import Tool
 from app.db.session import require_actor_context
 from app.services.tenant import queues as queues_service
 from app.services.tenant import named_people
-from app.services.tenant import plugin_metadata
 from app.services.tenant import tags as tags_service
 from app.services.content_sockets import sockets
 from app.api.content_socket import serve_tool_stream
@@ -74,15 +73,11 @@ async def _serialized_queue(
         [item.id for item in active_items(queue)],
         relationship_type=RelationshipType.attached,
     )
-    items = active_items(queue)
     return serialize_queue(
         queue,
         context=require_actor_context(session),
         user_id=user_id,
         attachment_counts=counts,
-        plugin_values=await plugin_metadata.values_on(
-            session, "queue_item", {item.id: queue.initiative_id for item in items}
-        ),
     )
 
 
@@ -95,14 +90,7 @@ async def _serialized_queue_item(
         [item.id],
         relationship_type=RelationshipType.attached,
     )
-    values = await plugin_metadata.values_on(
-        session, "queue_item", {item.id: cast(Queue, item.queue).initiative_id}
-    )
-    return serialize_queue_item(
-        item,
-        attachment_count=counts.get(item.id, 0),
-        plugin_values=values.get(item.id, ()),
-    )
+    return serialize_queue_item(item, attachment_count=counts.get(item.id, 0))
 
 
 router = APIRouter(route_class=ActorRoute)
@@ -269,7 +257,7 @@ async def create_queue(
         grants=queue_in.grants,
     )
     await attachments_service.claim_uploads(session, queue)
-    await properties_service.write_on_create(session, queue, queue_in.properties)
+    await metadata_service.write_on_create(session, queue, queue_in.properties)
     await session.commit()
     return await read_after_write(session, queue.id, current_user, guild_context)
 
@@ -355,7 +343,7 @@ async def add_queue_item(
         )
 
     await attachments_service.claim_uploads(session, item)
-    await properties_service.write_on_create(session, item, item_in.properties)
+    await metadata_service.write_on_create(session, item, item_in.properties)
     return await _item_committed(session, item, "item_added")
 
 
@@ -391,7 +379,7 @@ async def update_queue_item(
             tag_ids=item_in.tag_ids,
         )
     if item_in.properties is not None:
-        await properties_service.write_on_update(session, item, item_in.properties)
+        await metadata_service.write_on_update(session, item, item_in.properties)
     session.add(item)
     await attachments_service.claim_uploads(session, item)
     return await _item_committed(session, item, "item_updated")

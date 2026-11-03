@@ -16,6 +16,7 @@ path that gives a long file several.
 
 from __future__ import annotations
 
+import enum
 import hashlib
 from collections.abc import Callable
 from typing import Any
@@ -24,6 +25,7 @@ from dataclasses import dataclass, replace
 from sqlalchemy import JSON, DateTime, Enum, MetaData
 from sqlmodel import SQLModel
 
+from app.core.file_types import FileType
 from app.core.identity_boundary import STORED_MENTION
 from app.core.search import SearchEntityType
 from app.core.tools import KINDS, Tool
@@ -182,7 +184,7 @@ def _with_words(expr: str) -> str:
 def _post_text(row: str) -> str:
     """A post's searchable text: every word in its Lexical body.
 
-    The same recursive ``text`` path a native file uses — a text node, a
+    The same recursive ``text`` path a lexical file uses — a text node, a
     mention, and a smart chip's label all keep their words in a field of that
     name — read from ``body`` rather than ``content``, which is what a post
     calls the column. A post whose body is only a picture indexes on its
@@ -194,7 +196,7 @@ def _post_text(row: str) -> str:
 def _wiki_page_text(row: str) -> str:
     """A wiki page's searchable text: every word in its Lexical body.
 
-    The same recursive ``text`` path a post and a native file use. A page
+    The same recursive ``text`` path a post and a lexical file use. A page
     needs no branch of its own — a page is always prose, where a file's
     ``content`` holds a different shape per type.
     """
@@ -210,21 +212,14 @@ def _current_filename(row: str, versions: str) -> str:
     )
 
 
-def _catalog_item_text(row: str) -> str:
-    """A picture's searchable text: its caption, and the filename split into
-    words so ``round-4-detail.png`` is found by ``detail``."""
-    filename = _current_filename(row, "catalog_item_versions")
-    return f"coalesce({row}.caption, '') || ' ' || {_with_words(filename)}"
-
-
 def _file_text(row: str) -> str:
     """A file's searchable text, by what kind of file it is.
 
     ``content`` holds a different shape per type, so there is no single
-    expression. ``native`` and ``whiteboard`` share one: a Lexical text node
+    expression. ``lexical`` and ``excalidraw`` share one: a Lexical text node
     and an Excalidraw text or label element both keep their text in a field
     named ``text``, and the recursive path reaches nested cases — a mention, a
-    wikilink, an image caption's own editor state.
+    reference, an image caption's own editor state.
 
     An uploaded file contributes nothing here: its bytes live in ``uploads``,
     so its name, description and uploaded filename are all there is to index.
@@ -241,10 +236,10 @@ def _file_text(row: str) -> str:
     url = _with_words(f"coalesce({row}.content ->> 'url', '')")
     return (
         f"(CASE {row}.file_type::text"
-        f" WHEN 'native' THEN {leaves}"
-        f" WHEN 'whiteboard' THEN {leaves}"
-        f" WHEN 'spreadsheet' THEN {cells}"
-        f" WHEN 'smart_link' THEN {url}"
+        f" WHEN '{FileType.lexical.value}' THEN {leaves}"
+        f" WHEN '{FileType.excalidraw.value}' THEN {leaves}"
+        f" WHEN '{FileType.sheet.value}' THEN {cells}"
+        f" WHEN '{FileType.url.value}' THEN {url}"
         " ELSE '' END)"
         " || ' ' || " + _with_words(_current_filename(row, "file_versions"))
     )
@@ -292,7 +287,7 @@ def _comment_archive_parents() -> tuple[ArchiveParent, ...]:
     for column, parent in COMMENT_PARENTS.items():
         if "archived_at" in tables[parent.table].columns:
             parents.append(ArchiveParent(parent.table, column))
-        elif parent.tool_fk is not None:
+        elif parent.tool_fk is not None and parent.governed_by is not None:
             parents.append(
                 ArchiveParent(
                     parent.governed_by.plural,
@@ -314,6 +309,9 @@ def _comment_dac(row: str) -> tuple[str, str]:
     tools: list[str] = []
     ids: list[str] = []
     for column, parent in COMMENT_PARENTS.items():
+        if parent.governed_by is None:
+            # No sharing to stamp: the entry is reached as the comment is.
+            continue
         ident = (
             f"{row}.{column}"
             if parent.tool_fk is None
@@ -384,12 +382,21 @@ def _archived_expr(table: str, source: "SearchSource", row: str) -> str | None:
 
 def _written(table: str, source: "SearchSource") -> tuple[str, ...]:
     """The body columns somebody writes in: all of them, less a column that only
-    names a kind (an enum) or another row (a foreign key)."""
+    names a kind (an enum, in the database or on the model) or another row (a
+    foreign key)."""
+    from app.db.base import MODELS_BY_TABLE
+
     columns = SQLModel.metadata.tables[table].columns
+    fields = MODELS_BY_TABLE[table].model_fields
+
+    def names_a_kind(column: str) -> bool:
+        annotation = fields[column].annotation if column in fields else None
+        return isinstance(columns[column].type, Enum) or (
+            isinstance(annotation, type) and issubclass(annotation, enum.Enum)
+        )
+
     return tuple(
-        c
-        for c in source.body
-        if not isinstance(columns[c].type, Enum) and not columns[c].foreign_keys
+        c for c in source.body if not names_a_kind(c) and not columns[c].foreign_keys
     )
 
 
@@ -494,20 +501,14 @@ SEARCH_SOURCES: dict[str, SearchSource] = {
         title="title",
         body=("description", "location"),
     ),
-    # A picture is found by what somebody called it, or failing that by the
-    # name of the file they uploaded — which is often the only name it has.
-    "catalog_items": _inside(
-        SearchEntityType.catalog_item,
-        title="title",
-        title_sql=lambda row: (
-            f"coalesce(nullif({row}.title, ''),"
-            f" {_current_filename(row, 'catalog_item_versions')})"
-        ),
-        body=("caption", "current_version_id"),
-        body_sql=_catalog_item_text,
+    # A collection is found by its name and what it is described as. It has no
+    # sharing to stamp: its entry is reached as the collection itself is
+    # (``initiative_rls.named_tool_path``).
+    "collections": SearchSource(
+        SearchEntityType.collection, title="name", body=("description",)
     ),
     # A page is found by its title and by what is written on it. Its body is a
-    # Lexical state, the same shape a native file's is, so it is read by the
+    # Lexical state, the same shape a lexical file's is, so it is read by the
     # same extractor rather than a second one.
     "wiki_pages": _inside(
         SearchEntityType.wiki_page,
@@ -561,10 +562,11 @@ NOT_SEARCHABLE: dict[str, str] = {
     "event_outbox": "change log, not content",
     "plugin_event_outbox": "plug-in events awaiting delivery, not content",
     "resource_grants": "sharing rows carry no text",
-    "property_definitions": "field config, reached from the tool it configures",
+    "metadata_definitions": "field config, reached from the tool it configures",
     "webhook_subscriptions": "integration config",
     "intake_bindings": "routing config, reached from the settings page",
     "guest_invite_grants": "an invite's terms, reached from the invite",
+    "share_requests": "who asked for what, read where it is answered",
     "moderation_reports": "moderation work, reached from its own surface",
     "moderation_report_reporters": "who reported a thing; never a search result",
     "moderation_actions": "the moderation log, reached from its own surface",
@@ -576,14 +578,13 @@ NOT_SEARCHABLE: dict[str, str] = {
     "task_statuses": "column names, reached from the project",
     "task_types": "type names, reached from the project",
     "file_versions": "history of a file already indexed",
-    "catalog_item_versions": "history of a picture already indexed",
+    "collection_files": "which files a collection holds; each file is indexed",
     "post_polls": "the question a notice asks, reached from the notice",
     "post_poll_options": "a poll's choices, reached from the notice",
     "calendar_event_answers": "one invitee's answer, reached from the event",
     "initiatives": "structural; discovery is the join surface, not search",
     "event_reminder_dispatches": "scheduler bookkeeping",
-    "task_assignment_digest_items": "scheduler bookkeeping",
-    "reaction_digest_items": "scheduler bookkeeping",
+    "batched_notices": "scheduler bookkeeping",
     "timer_marks": "scheduler bookkeeping",
     "subscription_progress": "notification bookkeeping",
     "reactions": "a gesture with no text of its own",

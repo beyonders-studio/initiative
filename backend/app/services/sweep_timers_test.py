@@ -20,14 +20,14 @@ from app.models.platform.community_timer import CommunityTimer
 from app.models.tenant.guild_plugin import GuildPlugin
 from app.models.tenant.post import Post
 from app.models.tenant.task import TaskStatus, TaskStatusCategory
-from app.models.tenant.task_assignment_digest import TaskAssignmentDigestItem
+from app.models.tenant.batched_notice import BatchedNotice, BatchedNoticeKind
 from app.models.tenant.personal_item import PersonalItem
 from app.models.tenant.webhook_subscription import WebhookSubscription
-from app.models.platform.user_notification_prefs import EmailCadence
+from app.models.platform.user_notification_prefs import DigestCadence
 from app.services import notifications, sweep_timers
 from app.services.guild_sweeps import Scan, Scope
 from app.services.platform import notify_bus
-from app.services.platform.notification_prefs import EmailSchedule
+from app.services.platform.notification_prefs import DigestSchedule, digest_slot
 from app.services.tenant import outbox_poller, personal_items, post_publication
 from app.services.tenant.expiry import Expiring
 from app.testing import (
@@ -491,29 +491,32 @@ async def test_a_kept_tab_is_not_work_but_an_old_view_is(session: AsyncSession):
     assert await next_due() == old + personal_items.WINDOW
 
 
-async def test_a_digest_is_armed_for_when_its_items_are_due(session: AsyncSession):
+async def test_a_batch_is_armed_for_when_its_items_are_due(session: AsyncSession):
     """The finish answers each community's next due time: here, the end of
     the quiet period after the one item waiting."""
     author, initiative, community_id = await _community(session)
     project = await create_project(session, initiative, author)
     task = await create_task(session, project)
     await route_session_to_guild(session, community_id)
-    item = TaskAssignmentDigestItem(
+    item = BatchedNotice(
         user_id=author.id,
-        task_id=task.id,
+        kind=BatchedNoticeKind.task_assignment,
+        actor_name="Assigner",
+        target_type="task",
+        target_id=task.id,
+        target_path=f"/go/task/{task.id}",
+        title=task.title,
         project_id=project.id,
-        task_title=task.title,
         project_name=project.name,
-        assigned_by_name="Assigner",
     )
     session.add(item)
     await session.commit()
-    due = item.created_at + notifications.ASSIGNMENT_DIGEST.quiet_period
-    await _due_now(session, community_id, "task_digest")
+    due = item.created_at + notifications.ASSIGNMENT_BATCH.quiet_period
+    await _due_now(session, community_id, notifications.ASSIGNMENT_BATCH.name)
 
     await sweep_timers.process_due_timers()
 
-    [(_c, _k, armed)] = await _timers(session, "task_digest")
+    [(_c, _k, armed)] = await _timers(session, notifications.ASSIGNMENT_BATCH.name)
     assert abs((armed - due).total_seconds()) < 5
 
 
@@ -593,8 +596,18 @@ async def test_a_catalog_release_arms_the_communities_that_installed_it(
         (
             "PUT",
             "/api/v1/me/notification-preferences",
-            {"email": {"cadence": "daily", "at": "07:00"}},
+            {"digests": {"overdue": {"cadence": "daily", "at": "07:00"}}},
             "overdue",
+        ),
+        (
+            "PUT",
+            "/api/v1/me/notification-preferences",
+            {
+                "channels": [
+                    {"category": "coming_up", "channel": "email", "enabled": True}
+                ]
+            },
+            "coming_up",
         ),
     ],
 )
@@ -609,12 +622,11 @@ async def test_a_preference_that_brings_work_sooner_arms_it(
     assert [community for community, *_ in await _timers(session, kind)] == [a.guild.id]
 
 
-def test_a_weekly_overdue_digest_waits_for_its_day():
-    schedule = EmailSchedule(
-        cadence=EmailCadence.weekly, at="09:00", weekday=1, personal_instant=False
-    )
+def test_a_weekly_digest_waits_for_its_day():
+    schedule = DigestSchedule(cadence=DigestCadence.weekly, at="09:00", weekday=1)
     friday = datetime(2026, 10, 16, 9, tzinfo=timezone.utc)
 
-    assert notifications._following_digest(friday, schedule) == datetime(
-        2026, 10, 19, 9, tzinfo=timezone.utc
-    )
+    slot = digest_slot(schedule, tz_name="UTC", now=friday)
+
+    assert not slot.on_today
+    assert slot.following == datetime(2026, 10, 19, 9, tzinfo=timezone.utc)

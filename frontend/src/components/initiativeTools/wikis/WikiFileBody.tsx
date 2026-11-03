@@ -2,7 +2,7 @@ import { Loader2 } from "lucide-react";
 import { Suspense, useMemo } from "react";
 
 import type { FileRead } from "@/api/generated/initiativeAPI.schemas";
-import { FILE_BODIES } from "@/components/files/detail/fileBodies";
+import { fileBody } from "@/components/files/detail/fileBodies";
 import { useCollaboration } from "@/hooks/useCollaboration";
 
 const ignore = () => {};
@@ -10,7 +10,7 @@ const ignore = () => {};
 /** Whether a file reads best across the wiki's wide column: everything
  * that is not written prose. */
 export const isWideFile = (file: FileRead | undefined) =>
-  file !== undefined && !FILE_BODIES[file.file_type].prose;
+  file !== undefined && !fileBody(file.file_type).prose;
 
 /**
  * A file in a wiki, drawn by the body its own page draws it with — a file
@@ -21,7 +21,7 @@ export const isWideFile = (file: FileRead | undefined) =>
 export const WikiFileBody = ({ file }: { file: FileRead }) => {
   // What the file page holds for a body that joins no room.
   const collaboration = useCollaboration({ socketPath: null, enabled: false });
-  const { Body, saved, prose } = FILE_BODIES[file.file_type];
+  const { Body, saved, prose } = fileBody(file.file_type);
   const content = useMemo(() => saved(file), [saved, file]);
 
   return (

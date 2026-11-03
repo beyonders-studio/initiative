@@ -37,6 +37,7 @@ from app.core.rate_limit import limiter
 from app.core.messages import CalendarMessages, GuildMessages
 from app.core.tools import Tool
 from app.core.user_input_validators import resolve_zone
+from app.models.platform.guild import AdminSurface
 from app.models.tenant.calendar import Calendar
 from app.models.tenant.guild_plugin import GuildPlugin
 from app.models.platform.user import User
@@ -48,7 +49,7 @@ from app.schemas.tenant.calendar import (
 from app.schemas.tenant.tool import serialize_tool
 from app.services.export.adapters.calendar_events import event_dicts
 from app.services.export.engine import count_within_bound, get_adapter
-from app.services.tenant import properties as properties_service
+from app.services.tenant import metadata as metadata_service
 from app.services.tenant import attachments as attachments_service
 from app.services.tenant import calendars as calendars_service
 from app.services.tenant import guild_plugins as guild_plugins_service
@@ -189,7 +190,7 @@ async def create_calendar(
             detail=CalendarMessages.PLUGIN_INITIATIVE_REQUIRED,
         )
     if initiative_id is None:
-        if not guild_context.is_admin:
+        if not guild_context.holds_surface(AdminSurface.community_calendars):
             raise HTTPException(
                 status_code=status.HTTP_403_FORBIDDEN,
                 detail=GuildMessages.COMMUNITY_ADMIN_REQUIRED,
@@ -249,7 +250,7 @@ async def create_calendar(
         )
 
     await attachments_service.claim_uploads(session, calendar)
-    await properties_service.write_on_create(session, calendar, calendar_in.properties)
+    await metadata_service.write_on_create(session, calendar, calendar_in.properties)
     await session.commit()
     return await read_after_write(session, calendar.id, current_user, guild_context)
 

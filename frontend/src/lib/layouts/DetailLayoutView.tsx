@@ -1,5 +1,5 @@
 import type { FlatNamespace } from "i18next";
-import { ChevronDown } from "lucide-react";
+import { ChevronDown, CircleAlert } from "lucide-react";
 import {
   type ComponentType,
   createContext,
@@ -22,9 +22,11 @@ import type {
 import { EntityLinkField } from "@/components/entities/EntityLinkField";
 import type { RelationsLayout } from "@/components/entities/RelationsSection";
 import { ToolRelationsPanel } from "@/components/entities/ToolRelationsPanel";
+import { ownProperties } from "@/components/properties/propertyHelpers";
 import { Button } from "@/components/ui/button";
 import { useActiveCommunityId } from "@/hooks/useActiveCommunityId";
 import { type FieldSaveKind, ItemDraftContext } from "@/hooks/useFieldSave";
+import type { MetadataOwner } from "@/hooks/useProperties";
 import { useCommunityPath } from "@/lib/communityUrl";
 import type { LinkedRef } from "@/lib/relationships";
 import type { ToolRelationEntity } from "@/lib/tools";
@@ -34,8 +36,11 @@ import type { TranslateFn } from "@/types/i18n";
 import {
   addingTree,
   type DetailLayoutSpec,
+  isRequired,
   PlacedProperties,
   placedProperties,
+  requiredKey,
+  requiredKeys,
   type StoredRegions,
 } from "./detailLayout";
 import { indexPaths } from "./draft";
@@ -47,6 +52,7 @@ import {
   PluginFieldOnDetail,
   type PluginItem,
   pluginFields,
+  pluginKindOf,
   shippedPluginParts,
   usePluginsOnItems,
 } from "./plugins";
@@ -66,6 +72,9 @@ export interface ItemHome<I, P> {
   initiativeId: number | null;
   /** The tool it is opened in: whose members a person-valued property names. */
   canOpen: { tool: Tool; id: number };
+  /** The project whose metadata it holds beside its initiative's properties:
+   *  a task's. */
+  owner?: MetadataOwner;
   /** What its links are kept under: the tool entity, and the item itself
    *  where it is not that entity. */
   links: {
@@ -106,9 +115,14 @@ export interface DetailKind<I extends Item, C, P> {
   /** Its own parts an item being added draws: those that need nothing saved. */
   addingParts?: readonly string[];
   /** Where an item being added is drawn on one column, with its side folded
-   *  under More options: the fields of its side drawn up front all the same.
-   *  Without it, one being added is drawn as its page is. */
+   *  under More options: the fields of its side drawn up front all the same,
+   *  and every field its layout requires. Without it, one being added is
+   *  drawn as its page is. */
   addingUpFront?: readonly string[];
+  /** Whether an item fills in what its layout can require, by its key
+   *  (`requiredKey`), with what is being sent for it (an item being added)
+   *  applied: a kind whose layout requires nothing has none. */
+  filled?: (item: I, key: string, sent?: Partial<P>) => boolean;
 }
 
 interface Drawn {
@@ -135,6 +149,7 @@ const propertiesOf = (item: Item, home: ItemHome<Item, unknown>) => ({
   readOnly: home.readOnly,
   initiativeId: home.initiativeId,
   canOpen: home.canOpen,
+  owner: home.owner,
 });
 
 /** One field, by its id: one of its initiative's properties, a plug-in's, or
@@ -164,7 +179,8 @@ const ItemProperties = ({ item }: { item: Item }) => {
   const { home } = useDrawn();
   const placed = useContext(PlacedProperties);
   if (home.initiativeId === null) return null;
-  if (home.readOnly && item.properties.every((each) => placed.has(each.property_id))) return null;
+  if (home.readOnly && ownProperties(item.properties).every((each) => placed.has(each.property_id)))
+    return null;
   return <PropertiesField {...propertiesOf(item, home)} except={placed} />;
 };
 
@@ -193,6 +209,61 @@ const ItemActions = () => {
     </div>
   ) : null;
 };
+
+/** A part its layout requires, marked while it is empty for whoever can fill
+ *  it in: as required while the item is being added, and as missing on an
+ *  item that lacks it. */
+const RequiredMark = ({
+  node,
+  item,
+  children,
+}: {
+  node: LayoutNode;
+  item: Item;
+  children: ReactNode;
+}) => {
+  const { t } = useTranslation("layouts");
+  const { detail, home } = useDrawn();
+  const draft = useContext(ItemDraftContext);
+  const adding = draft !== null;
+  const key = requiredKey(node);
+  if (home.readOnly) return children;
+  const missing = !(detail.filled?.(item, key, draft?.sent()) ?? true);
+  // One frame whether or not it is filled, so filling it in keeps the editor
+  // (and what is being typed in it) where it is.
+  return (
+    <div className="flex min-w-0 flex-col gap-1" data-required-missing={missing ? key : undefined}>
+      {children}
+      {missing ? (
+        <p
+          className={cn(
+            "flex items-center gap-1 text-xs",
+            adding ? "text-muted-foreground" : "text-destructive"
+          )}
+        >
+          <CircleAlert className="h-3.5 w-3.5 shrink-0" aria-hidden="true" />
+          {t(adding ? "required.label" : "required.missing")}
+        </p>
+      ) : null}
+    </div>
+  );
+};
+
+/** Each part drawn as `parts` draws it, marked where its layout requires it. */
+const markRequired = <I,>(parts: Parts<I>): Parts<I> =>
+  Object.fromEntries(
+    Object.entries(parts).map(([type, draw]) => [
+      type,
+      (node: LayoutNode, item: I, view: LayoutContext, all: Parts<I>) =>
+        isRequired(node) ? (
+          <RequiredMark node={node} item={item as Item}>
+            {draw(node, item, view, all)}
+          </RequiredMark>
+        ) : (
+          draw(node, item, view, all)
+        ),
+    ])
+  );
 
 /** The links an item being added is to be made with. */
 export const AddingLinks = createContext<{
@@ -280,11 +351,13 @@ const partsOf = <I extends Item>(own: Parts<I> = {}, adding?: readonly string[])
     actions: () => <ItemActions />,
     ...own,
   };
-  if (!adding) return parts;
+  if (!adding) return markRequired(parts);
   return {
-    ...Object.fromEntries(
-      Object.entries(parts).filter(([type]) =>
-        Object.hasOwn(own, type) ? adding.includes(type) : type !== "plugin" && type !== "actions"
+    ...markRequired(
+      Object.fromEntries(
+        Object.entries(parts).filter(([type]) =>
+          Object.hasOwn(own, type) ? adding.includes(type) : type !== "plugin" && type !== "actions"
+        )
       )
     ),
     ...ADDING_PARTS,
@@ -328,12 +401,12 @@ const ItemDetail = <I extends Item, C, P>({
     [taskRoute, gp, item, context]
   );
   const env = useProjectLayoutEnv(taskHref);
-  const plugins = usePluginsOnItems(home.initiativeId, true, spec.kind);
+  const plugins = usePluginsOnItems(home.initiativeId, true, pluginKindOf(spec.kind));
   const adding = useContext(ItemDraftContext) !== null;
   const upFront = adding ? detail.addingUpFront : undefined;
   const tree = useMemo(() => {
     const laidOut = spec.tree(layout, shippedPluginParts(plugins));
-    return upFront ? addingTree(laidOut, upFront) : laidOut;
+    return upFront ? addingTree(laidOut, [...upFront, ...requiredKeys(layout)]) : laidOut;
   }, [spec, layout, plugins, upFront]);
   const placed = useMemo(() => placedProperties(tree), [tree]);
   const inParts = useMemo(() => fieldsInParts(tree, plugins), [tree, plugins]);

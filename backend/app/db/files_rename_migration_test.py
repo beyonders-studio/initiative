@@ -17,6 +17,7 @@ from alembic.migration import MigrationContext
 from alembic.operations import Operations
 from sqlalchemy import text
 
+from app.testing.later_revisions import step_later_revisions
 from app.core.relationships import RelationshipType
 from app.core.search import SearchEntityType
 from app.models.platform.notification import NotificationType
@@ -69,8 +70,15 @@ _PLUGIN_BINDING = {"source": "plugin", "params": {"document_id": 5}}
 
 
 def _guild_runner(schema: str):
-    """Revision 0464 one way or the other, on one guild's schema only."""
+    """Revision 0464 one way or the other, on one guild's schema only. The
+    metadata store (20261027_0550), the galleries conversion (20261027_0546),
+    and the later revisions (``app.testing.later_revisions``) come off first
+    and go back last:
+    the checks 0464 restates name the permissions as they were then, and it
+    respells the exports in the table they had then."""
     files = _load("20261006_0464_documents_are_files.py")
+    collections = _load("20261027_0546_galleries_are_collections.py")
+    metadata = _load("20261027_0550_metadata_is_one_store.py")
 
     def run(forward: bool):
         def apply(sync_session) -> None:
@@ -84,7 +92,16 @@ def _guild_runner(schema: str):
                 step()
 
             with Operations.context(MigrationContext.configure(bind)):
-                files._convert(bind, forward, in_schema)
+                if forward:
+                    files._convert(bind, True, in_schema)
+                    collections._convert(bind, True, in_schema)
+                    in_schema(lambda: metadata._apply(True))
+                    step_later_revisions(bind, schema, forward=True)
+                else:
+                    step_later_revisions(bind, schema, forward=False)
+                    in_schema(lambda: metadata._apply(False))
+                    collections._convert(bind, False, in_schema)
+                    files._convert(bind, False, in_schema)
 
         return apply
 
@@ -100,8 +117,17 @@ async def _guild_values(session, schema: str, ids: dict[str, int]) -> dict:
             "WHERE resource_id = :id AND resource_type IN ('file', 'document')",
             id=ids["file"],
         ),
+        # The values' table, by the name it has on either side.
         "property": await _rows(
-            session, f"SELECT entity_type FROM {s}.property_values"
+            session,
+            "SELECT entity_type FROM "
+            + (
+                await _rows(
+                    session,
+                    f"SELECT COALESCE(to_regclass('{s}.metadata_values'), "
+                    f"to_regclass('{s}.property_values'))::text",
+                )
+            )[0][0],
         ),
         "edge": await _rows(
             session,
@@ -114,9 +140,15 @@ async def _guild_values(session, schema: str, ids: dict[str, int]) -> dict:
             "WHERE entity_id = :id AND entity_type IN ('file', 'document')",
             id=ids["file"],
         ),
+        # The permissions' table and key, by the names they have on either side.
         "permissions": await _rows(
             session,
-            f"SELECT DISTINCT permission_key FROM {s}.initiative_role_permissions "
+            f"SELECT DISTINCT key FROM {s}.initiative_rules "
+            "WHERE key ~ '(file|document)' ORDER BY 1"
+            if (await _rows(session, f"SELECT to_regclass('{s}.initiative_rules')"))[0][
+                0
+            ]
+            else f"SELECT DISTINCT permission_key FROM {s}.initiative_role_permissions "
             "WHERE permission_key ~ '(file|document)' ORDER BY 1",
         ),
         "outbox": await _rows(
@@ -136,10 +168,18 @@ async def _guild_values(session, schema: str, ids: dict[str, int]) -> dict:
             f"SELECT definition, config FROM {s}.dashboards WHERE id = :id",
             id=ids["dashboard"],
         ),
+        # The one export, in the table it has on either side; the data jobs
+        # table gives it a new id.
         "export": await _rows(
             session,
-            f"SELECT source, params FROM {s}.export_jobs WHERE id = :id",
-            id=ids["export"],
+            "SELECT source, params FROM "
+            + (
+                await _rows(
+                    session,
+                    f"SELECT COALESCE(to_regclass('{s}.export_jobs'), "
+                    f"to_regclass('{s}.data_jobs'))::text",
+                )
+            )[0][0],
         ),
     }
 
@@ -187,7 +227,7 @@ async def test_guild_values_say_file_and_back(session) -> None:
             }
         },
     )
-    job = await create_export_job(
+    await create_export_job(
         session,
         guild,
         user,
@@ -225,7 +265,6 @@ async def test_guild_values_say_file_and_back(session) -> None:
             "file": file.id,
             "outbox": outbox_id,
             "dashboard": dashboard.id,
-            "export": job.id,
         }
         old = await _guild_values(session, schema, ids)
 
@@ -561,9 +600,6 @@ async def test_public_values_say_file_and_back(session) -> None:
             u=user.id,
         )
         assert kept == [("my-tasks",)]
-        assert await _rows(session, "SELECT to_regtype('public.file_type')") != [
-            (None,)
-        ]
     finally:
         await session.run_sync(run(migration.downgrade))
         await session.commit()

@@ -18,6 +18,7 @@ import { useTranslation } from "react-i18next";
 import type {
   CardPartInput,
   LayoutGrouping,
+  ListLayoutDefinitionInputDisplays,
   ListTasksParams,
   PropertyDefinitionRead,
   TaskListRead,
@@ -33,12 +34,13 @@ import { GroupBySelect } from "@/components/ui/data-table";
 import { MentionText } from "@/components/user/MentionText";
 import { type ColumnLimits, NO_COLUMN_LIMITS } from "@/hooks/useColumnLimits";
 import { useProjectTaskTypes } from "@/hooks/useProjects";
-import { useProperties } from "@/hooks/useProperties";
+import { NO_DEFINITIONS, useOwnedDefinitions } from "@/hooks/useProperties";
 import { useTaskGroupings } from "@/hooks/useTaskGroupings";
 import { useMoveTaskToGroup } from "@/hooks/useTasks";
+import { useTaskTypeChange } from "@/hooks/useTaskTypeChange";
 import { formatDateTime } from "@/lib/formatDate";
 import { cardOf } from "@/lib/layouts/draft";
-import { useProjectLayoutEnv } from "@/lib/layouts/fields";
+import { useProjectLayoutEnv, withDisplays } from "@/lib/layouts/fields";
 import { boardBands } from "@/lib/layouts/grouping";
 import { pluginFields, usePluginsOnItems } from "@/lib/layouts/plugins";
 import { taskFields } from "@/lib/layouts/tasks";
@@ -79,6 +81,8 @@ type ProjectTasksKanbanViewProps = {
   /** The view's card, where it has its own. */
   /** The project's own card; none draws the shipped one. */
   card?: LayoutNode | null;
+  /** How the card draws each scale, as the layout says. */
+  displays?: ListLayoutDefinitionInputDisplays;
   /** What the board is grouped by, as its reader's view keeps it. */
   grouping?: GroupingState;
   /** Where the reader picks what it is grouped by; left out, nowhere. */
@@ -93,8 +97,20 @@ type ProjectTasksKanbanViewProps = {
 
 // One empty list while the definitions load, so the fields aren't rebuilt on
 // every pass until they arrive.
-const NO_DEFINITIONS: PropertyDefinitionRead[] = [];
 const NOT_GROUPED: GroupingState = [];
+
+/** A drop as it was released, kept to be placed after something is asked:
+ *  where the card was let go, which the drag stops holding once it ends, and
+ *  what it was last over where it ended over nothing, which the board stops
+ *  holding once the drag is cancelled. */
+const heldDrop = (event: DragEndEvent, lastOver: DragOverEvent["over"] | null): DragEndEvent => ({
+  ...event,
+  over: event.over ?? lastOver,
+  active: {
+    ...event.active,
+    rect: { current: { ...event.active.rect.current } },
+  },
+});
 
 export const ProjectTasksKanbanView = ({
   projectId,
@@ -118,6 +134,7 @@ export const ProjectTasksKanbanView = ({
   isArchivingDoneTasks,
   propertyDefinitions: givenDefinitions,
   card: ownCard,
+  displays,
   grouping = NOT_GROUPED,
   onGroupingChange,
   viewGroupings,
@@ -127,10 +144,11 @@ export const ProjectTasksKanbanView = ({
   const scrollContainerRef = useRef<HTMLDivElement | null>(null);
   useHorizontalDragScroll(scrollContainerRef);
 
-  // The properties the cards can show, scoped to this project's initiative.
-  // What a card shows is its view's card.
-  const { data: fetchedDefinitions = NO_DEFINITIONS } = useProperties({
+  // The project's metadata and its initiative's properties, which the cards
+  // can show. What a card shows is its view's card.
+  const { data: fetchedDefinitions = NO_DEFINITIONS } = useOwnedDefinitions({
     initiativeId,
+    owner: { kind: "project", id: projectId },
     enabled: !givenDefinitions,
   });
   const propertyDefinitions = givenDefinitions ?? fetchedDefinitions;
@@ -170,8 +188,12 @@ export const ProjectTasksKanbanView = ({
   // A project with one type shows none: it tells no task apart.
   const typed = (useProjectTaskTypes(projectId).data?.length ?? 0) > 1;
   const fields = useMemo(
-    () => taskFields(propertyDefinitions, pluginFields(plugins, i18n.language), { typed }),
-    [propertyDefinitions, plugins, i18n.language, typed]
+    () =>
+      withDisplays(
+        taskFields(propertyDefinitions, pluginFields(plugins, i18n.language), { typed }),
+        displays
+      ),
+    [propertyDefinitions, plugins, i18n.language, typed, displays]
   );
   const card = useMemo(
     () => cardOf({ card: ownCard as CardPartInput | null | undefined }, fields),
@@ -216,14 +238,17 @@ export const ProjectTasksKanbanView = ({
   // A card dropped into another band changes the field the board is grouped
   // by, beside what the drop does to its column and its place in it. One
   // dropped on an empty part of a cell in its own column changes only that.
-  const { mutate: moveTask } = useMoveTaskToGroup();
+  const { mutate: moveTask, mutateAsync: moveTaskNow } = useMoveTaskToGroup();
+  // A drop into another type asks first for what that type's page requires.
+  const typeChange = useTaskTypeChange(projectId, initiativeId);
   const lastOver = useRef<DragOverEvent["over"] | null>(null);
   const handleDragOver = (event: DragOverEvent) => {
     if (event.over) lastOver.current = event.over;
     onDragOver(event);
   };
   const handleDragEnd = (event: DragEndEvent) => {
-    const target = resolveKanbanDropTarget(event, lastOver.current);
+    const wasOver = lastOver.current;
+    const target = resolveKanbanDropTarget(event, wasOver);
     lastOver.current = null;
     const dragged = event.active.data.current;
     const from = dragged?.group;
@@ -239,14 +264,53 @@ export const ProjectTasksKanbanView = ({
       typeof from === "string" &&
       typeof to === "string" &&
       from !== to;
-    if (intoBand && target?.data?.type === "column" && target.data.statusId === dragged?.statusId) {
+    const move =
+      intoBand && typeof from === "string" && typeof to === "string"
+        ? active?.grouping.move?.(from, to)
+        : undefined;
+    // Into its own column's empty cell, only the band changes.
+    const inPlace = target?.data?.type === "column" && target.data.statusId === dragged?.statusId;
+    const typeId = move && "patch" in move ? move.patch.task_type_id : undefined;
+    if (
+      move &&
+      "patch" in move &&
+      typeof typeId === "number" &&
+      typeof dragged?.taskId === "number" &&
+      typeChange.requires(typeId)
+    ) {
+      // A type whose page requires something is checked first, and asked for
+      // when the task lacks it: until the drop is saved, whole, the card stays
+      // where it was, and leaving the question leaves the task as it was.
+      onDragCancel();
+      const taskId = dragged.taskId;
+      const statusId = target?.data?.statusId;
+      const later = heldDrop(event, wasOver);
+      void typeChange.change(taskId, typeId, async (changes) => {
+        await moveTaskNow({
+          taskId,
+          move: {
+            patch: {
+              ...move.patch,
+              ...changes,
+              ...(statusId !== undefined && statusId !== dragged.statusId
+                ? { task_status_id: statusId }
+                : {}),
+            },
+          },
+        });
+        // Its place in the column, once it is of the type.
+        if (!inPlace) onDragEnd(later);
+      });
+      return;
+    }
+    if (intoBand && inPlace) {
       onDragCancel();
     } else {
       onDragEnd(event);
     }
-    if (!intoBand || typeof dragged?.taskId !== "number") return;
-    const move = active.grouping.move?.(from, to);
-    if (move && !("status" in move)) moveTask({ taskId: dragged.taskId, move });
+    if (move && !("status" in move) && typeof dragged?.taskId === "number") {
+      moveTask({ taskId: dragged.taskId, move });
+    }
   };
 
   const taskStatusesLength = taskStatuses.length;
@@ -258,6 +322,7 @@ export const ProjectTasksKanbanView = ({
 
   return (
     <BoardActionsContext.Provider value={boardActions}>
+      {typeChange.dialog}
       {onGroupingChange && offered.length > 0 && !editing ? (
         <div className="mb-3 flex justify-end">
           <GroupBySelect

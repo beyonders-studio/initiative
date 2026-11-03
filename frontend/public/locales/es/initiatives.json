@@ -98,7 +98,6 @@
     "dashboards": "Paneles",
     "counterGroups": "Contadores",
     "posts": "Publicaciones",
-    "catalogs": "Catálogos",
     "wikis": "Wikis"
   },
   "settings": {
@@ -175,6 +174,8 @@
     "rolesDescription": "Lo que cada rol puede ver y lo que puede crear. Los gestores lo tienen todo.",
     "loadingRoles": "Cargando roles...",
     "addCustomRole": "Agregar rol personalizado",
+    "setByCommunity": "Tu comunidad define esto para todas las iniciativas.",
+    "customRolesOff": "Tu comunidad limita las iniciativas a sus roles integrados.",
     "builtIn": "Integrado",
     "manager": "Gerente",
     "fullAccess": "Acceso total",
@@ -227,7 +228,6 @@
       "dashboards": "Paneles",
       "counterGroups": "Contadores",
       "posts": "Publicaciones",
-      "catalogs": "Catálogos",
       "wikis": "Wikis"
     },
     "permissions": {
@@ -245,8 +245,6 @@
       "createCounterGroups": "Crear contadores",
       "viewPosts": "Ver publicaciones",
       "createPosts": "Crear publicaciones",
-      "viewCatalogs": "Ver catálogos",
-      "createCatalogs": "Crear catálogos",
       "viewShort": "Ver",
       "createShort": "Crear",
       "viewWikis": "Ver wikis",
@@ -294,8 +292,6 @@
   "counterGroupsFeatureDescription": "Números que se mueven. Recuentos, totales, puntuaciones, plazas libres, puntos de vida: un número en el que todos en la sala coinciden.",
   "postsFeature": "Publicaciones",
   "postsFeatureDescription": "Un tablón de anuncios. Avisos, encuestas, quién los ha leído — con el importante fijado arriba, para que no se lo pierdan cuatro personas.",
-  "catalogsFeature": "Catálogos",
-  "catalogsFeatureDescription": "Una pared de imágenes. Maquetas, capturas, los cuatro logos que perdieron.",
   "projectsFeature": "Proyectos",
   "projectsFeatureDescription": "Tableros de pendientes: quién lo lleva, en qué fase está, qué falta. Míralos como tabla, tablero Kanban o calendario: las mismas tareas, tú eliges.",
   "filesFeature": "Archivos",
@@ -329,5 +325,21 @@
     "firstIntroLink": "Leer más aquí"
   },
   "wikisFeature": "Wikis",
-  "wikisFeatureDescription": "Páginas que se enlazan entre sí. Manuales, referencias, eso que todo el mundo pregunta una y otra vez."
+  "wikisFeatureDescription": "Páginas que se enlazan entre sí. Manuales, referencias, eso que todo el mundo pregunta una y otra vez.",
+  "communityDefaults": {
+    "title": "Todas las iniciativas",
+    "description": "Una herramienta o un permiso de miembro que definas aquí se aplica en todas las iniciativas de esta comunidad; sus responsables lo ven como definido. Si lo dejas a cada iniciativa, sigue siendo suyo.",
+    "toolsHeading": "Herramientas",
+    "memberHeading": "Lo que pueden hacer los miembros",
+    "memberHelp": "Para el rol integrado Miembro en cada iniciativa.",
+    "choice": {
+      "initiative": "Cada iniciativa decide",
+      "on": "Activado en todas",
+      "off": "Desactivado en todas"
+    },
+    "customRolesLabel": "Los responsables pueden añadir roles",
+    "customRolesHelp": "Si está desactivado, las iniciativas no pueden añadir roles, y los roles propios que ya tengan no pueden hacer más que los miembros.",
+    "saved": "Guardado para todas las iniciativas",
+    "error": "No se pudo guardar"
+  }
 }

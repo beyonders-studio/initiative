@@ -98,7 +98,6 @@
     "dashboards": "Tableaux de bord",
     "counterGroups": "Compteurs",
     "posts": "Publications",
-    "catalogs": "Catalogues",
     "wikis": "Wikis"
   },
   "settings": {
@@ -175,6 +174,8 @@
     "rolesDescription": "Ce que chaque rôle peut voir, et ce qu'il peut créer. Les gestionnaires ont tout.",
     "loadingRoles": "Chargement des rôles…",
     "addCustomRole": "Ajouter un rôle personnalisé",
+    "setByCommunity": "Ta communauté définit ce réglage pour toutes les initiatives.",
+    "customRolesOff": "Ta communauté limite les initiatives à leurs rôles intégrés.",
     "builtIn": "Intégré",
     "manager": "Responsable",
     "fullAccess": "Accès complet",
@@ -227,7 +228,6 @@
       "dashboards": "Tableaux de bord",
       "counterGroups": "Compteurs",
       "posts": "Publications",
-      "catalogs": "Catalogues",
       "wikis": "Wikis"
     },
     "permissions": {
@@ -245,8 +245,6 @@
       "createCounterGroups": "Créer des compteurs",
       "viewPosts": "Voir les publications",
       "createPosts": "Créer des publications",
-      "viewCatalogs": "Voir les catalogues",
-      "createCatalogs": "Créer des catalogues",
       "viewShort": "Voir",
       "createShort": "Créer",
       "viewWikis": "Voir les wikis",
@@ -294,8 +292,6 @@
   "counterGroupsFeatureDescription": "Des nombres qui bougent. Décomptes, totaux, scores, places restantes, points de vie — un seul nombre sur lequel toute la salle est d'accord.",
   "postsFeature": "Publications",
   "postsFeatureDescription": "Un panneau d'affichage. Annonces, sondages, qui les a lues — l'importante épinglée en haut, pour que quatre personnes ne la ratent pas.",
-  "catalogsFeature": "Catalogues",
-  "catalogsFeatureDescription": "Un mur d'images. Maquettes, captures, les quatre logos qui ont perdu.",
   "projectsFeature": "Projets",
   "projectsFeatureDescription": "Des tableaux de choses à faire : qui s'en occupe, où ça en est, ce qui reste. En tableau, en Kanban ou en calendrier — les mêmes tâches, à vous de choisir.",
   "filesFeature": "Fichiers",
@@ -329,5 +325,21 @@
     "firstIntroLink": "En savoir plus ici"
   },
   "wikisFeature": "Wikis",
-  "wikisFeatureDescription": "Des pages qui se renvoient les unes aux autres. Manuels, références, la question que tout le monde repose."
+  "wikisFeatureDescription": "Des pages qui se renvoient les unes aux autres. Manuels, références, la question que tout le monde repose.",
+  "communityDefaults": {
+    "title": "Toutes les initiatives",
+    "description": "Un outil ou une autorisation de membre défini ici s'applique dans toutes les initiatives de cette communauté ; leurs responsables le voient comme défini. Laissé à chaque initiative, il reste le leur.",
+    "toolsHeading": "Outils",
+    "memberHeading": "Ce que les membres peuvent faire",
+    "memberHelp": "Pour le rôle intégré Membre dans chaque initiative.",
+    "choice": {
+      "initiative": "Chaque initiative décide",
+      "on": "Activé partout",
+      "off": "Désactivé partout"
+    },
+    "customRolesLabel": "Les responsables peuvent ajouter des rôles",
+    "customRolesHelp": "Désactivé, les initiatives ne peuvent pas ajouter de rôles, et leurs rôles personnalisés existants ne peuvent pas faire plus que les membres.",
+    "saved": "Enregistré pour toutes les initiatives",
+    "error": "Enregistrement impossible"
+  }
 }

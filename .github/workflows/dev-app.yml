@@ -27,6 +27,8 @@ concurrency:
 
 jobs:
   build:
+    # Signed with this repository's dev keystore; a fork builds none.
+    if: ${{ github.repository == 'beyonders-studio/initiative' }}
     runs-on: ubuntu-24.04
     timeout-minutes: 30
     # Holds the dev Android keystore.

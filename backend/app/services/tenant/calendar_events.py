@@ -40,7 +40,7 @@ from app.services import permissions as permissions_service
 from app.services.cross_guild import gather_across_guilds, member_guild_ids
 from app.services.tenant import calendar_occurrences as occurrences_service
 from app.services.tenant import named_people
-from app.services.tenant import properties as properties_service
+from app.services.tenant import metadata as metadata_service
 from app.services.tenant import tags as tags_service
 from app.services.tenant.tool_listing import initiative_switch_clause
 
@@ -80,7 +80,7 @@ async def get_event(
     event = result.one_or_none()
     if event is not None:
         await tags_service.annotate_tags(session, [event])
-        await properties_service.annotate_properties(session, [event])
+        await metadata_service.annotate_properties(session, [event])
     return event
 
 
@@ -248,7 +248,7 @@ async def _exec_events(session, stmt) -> list[CalendarEvent]:
     result = await session.exec(stmt)
     events = list(result.unique().all())
     await tags_service.annotate_tags(session, events)
-    await properties_service.annotate_properties(session, events)
+    await metadata_service.annotate_properties(session, events)
     return events
 
 
@@ -305,7 +305,7 @@ async def guild_calendar_event_conditions(
     window = series_in_window if whole_series else starts_in_window
     conditions += window(start_after, start_before, tz)
 
-    conditions += await properties_service.property_filter_clauses(
+    conditions += await metadata_service.property_filter_clauses(
         session, "calendar_event", property_filters, names_people=True
     )
 

@@ -1,23 +1,24 @@
 import { AlertTriangle, ExternalLink, FileUp, Loader2 } from "lucide-react";
-import { type FormEvent, useEffect, useState } from "react";
+import { type FormEvent, useEffect, useRef, useState } from "react";
 import { useTranslation } from "react-i18next";
 
+import { useGetDataJob } from "@/api/generated/data-jobs/data-jobs";
 import {
   useCancelImportJob,
   useConnectAtlassian,
-  useGetImportJob,
   useStartAtlassianImport,
   useStartConfluenceExportImport,
 } from "@/api/generated/imports/imports";
 import type {
   AtlassianConfluenceSpace,
   AtlassianJiraProject,
-  ImportJobRead,
+  DataJobRead,
 } from "@/api/generated/initiativeAPI.schemas";
 import { Button } from "@/components/ui/button";
 import { Checkbox } from "@/components/ui/checkbox";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
+import { Progress } from "@/components/ui/progress";
 import {
   Select,
   SelectContent,
@@ -29,6 +30,8 @@ import { Switch } from "@/components/ui/switch";
 import { useActiveCommunityId } from "@/hooks/useActiveCommunityId";
 import { getErrorCode, getErrorMessage, messageForCode } from "@/lib/errorMessage";
 import { formatBytes } from "@/lib/fileUtils";
+import { numberFormat } from "@/lib/intl";
+import { uploadInPieces } from "@/lib/resumableUpload";
 
 /** Where somebody makes the token the connect step asks for. */
 const API_TOKEN_URL = "https://id.atlassian.com/manage-profile/security/api-tokens";
@@ -99,7 +102,7 @@ export interface AtlassianPlanSummary {
   dropped_macros?: Array<{ name: string; count: number }>;
 }
 
-export function atlassianSummary(job: ImportJobRead | null | undefined): AtlassianPlanSummary {
+export function atlassianSummary(job: DataJobRead | null | undefined): AtlassianPlanSummary {
   const plan = job?.plan as { atlassian?: AtlassianPlanSummary } | null | undefined;
   return plan?.atlassian ?? {};
 }
@@ -225,16 +228,25 @@ export function AtlassianConnectStep({ onConnected, onUseExport }: AtlassianConn
 
 export interface AtlassianExportStepProps {
   initiatives: AtlassianTarget[];
-  onStarted: (job: ImportJobRead) => void;
+  onStarted: (job: DataJobRead) => void;
 }
 
 /** The zip Confluence's space export writes, for a site this server cannot
  * reach or nobody wants to hand a token to. Uploaded, then read the way a
  * site is — the same review follows. */
 export function AtlassianExportStep({ initiatives, onStarted }: AtlassianExportStepProps) {
-  const { t } = useTranslation("imports");
+  const { t, i18n } = useTranslation("imports");
+  const percent = numberFormat(i18n.resolvedLanguage ?? i18n.language, {
+    style: "percent",
+    maximumFractionDigits: 0,
+  });
   const communityId = useActiveCommunityId();
   const start = useStartConfluenceExportImport();
+  // How much of the export has arrived while it is on its way, and how to
+  // stop it on leaving.
+  const [sent, setSent] = useState<number | null>(null);
+  const sending = useRef<AbortController | null>(null);
+  useEffect(() => () => sending.current?.abort(), []);
   const [file, setFile] = useState<File | null>(null);
   const [initiativeId, setInitiativeId] = useState<string>("");
   const [includeAttachments, setIncludeAttachments] = useState(true);
@@ -250,17 +262,32 @@ export function AtlassianExportStep({ initiatives, onStarted }: AtlassianExportS
   const handleStart = async () => {
     if (!file) return;
     setError(null);
+    sending.current = new AbortController();
+    setSent(0);
+    const initiativeId = Number(chosen);
     try {
-      const job = await start.mutateAsync({
-        communityId: communityId,
-        data: {
-          file,
-          initiative_id: Number(chosen),
-          include_attachments: includeAttachments,
-        },
-      });
+      const job = await uploadInPieces(
+        communityId,
+        file,
+        file.name,
+        { purpose: "atlassian_export", initiativeId },
+        (upload_id) =>
+          start.mutateAsync({
+            communityId,
+            data: {
+              initiative_id: initiativeId,
+              include_attachments: includeAttachments,
+              upload_id,
+            },
+          }),
+        {
+          signal: sending.current.signal,
+          onProgress: (arrived, total) => setSent(total ? arrived / total : 1),
+        }
+      );
       onStarted(job);
     } catch (err) {
+      if (sending.current?.signal.aborted) return;
       // A zip that is not a space export is a different mistake from a
       // broken backup, and says so.
       setError(
@@ -268,8 +295,11 @@ export function AtlassianExportStep({ initiatives, onStarted }: AtlassianExportS
           ? t("wizard.atlassian.export.notExport")
           : getErrorMessage(err, "imports:wizard.atlassian.export.failed")
       );
+    } finally {
+      setSent(null);
     }
   };
+  const busy = sent !== null || start.isPending;
 
   return (
     <div className="space-y-4">
@@ -317,12 +347,18 @@ export function AtlassianExportStep({ initiatives, onStarted }: AtlassianExportS
 
       <p className="text-muted-foreground text-xs">{t("wizard.atlassian.export.note")}</p>
       {error && <p className="text-destructive text-sm">{error}</p>}
+      {sent !== null && (
+        <div className="flex items-center gap-3">
+          <Progress value={sent * 100} aria-label={t("wizard.atlassian.choose.submit")} />
+          <span className="text-muted-foreground text-xs tabular-nums">{percent.format(sent)}</span>
+        </div>
+      )}
       <Button
         className="w-full"
-        disabled={!file || !chosen || start.isPending}
+        disabled={!file || !chosen || busy}
         onClick={() => void handleStart()}
       >
-        {start.isPending && <Loader2 className="h-4 w-4 animate-spin" />}
+        {busy && <Loader2 className="h-4 w-4 animate-spin" />}
         {t("wizard.atlassian.choose.submit")}
       </Button>
     </div>
@@ -344,7 +380,7 @@ export interface AtlassianTarget {
 export interface AtlassianChooseStepProps {
   connection: AtlassianConnection;
   initiatives: AtlassianTarget[];
-  onStarted: (job: ImportJobRead) => void;
+  onStarted: (job: DataJobRead) => void;
 }
 
 function useTicks() {
@@ -570,7 +606,7 @@ export function AtlassianChooseStep({
 export interface AtlassianFetchingStepProps {
   jobId: number;
   /** The site has been read and the job is waiting for review. */
-  onStaged: (job: ImportJobRead) => void;
+  onStaged: (job: DataJobRead) => void;
   /** The fetch is over without a bundle — cancelled, or failed and dismissed. */
   onStopped: () => void;
 }
@@ -582,7 +618,7 @@ export function AtlassianFetchingStep({ jobId, onStaged, onStopped }: AtlassianF
   const { t } = useTranslation("imports");
   const communityId = useActiveCommunityId();
   const cancel = useCancelImportJob();
-  const jobQuery = useGetImportJob(communityId, jobId, {
+  const jobQuery = useGetDataJob(communityId, jobId, {
     query: {
       refetchInterval: (query) =>
         FETCHING.has(query.state.data?.status ?? "queued") ? FETCH_POLL_MS : false,
@@ -649,7 +685,7 @@ export function AtlassianFetchingStep({ jobId, onStaged, onStopped }: AtlassianF
 // ---------------------------------------------------------------------------
 
 export interface JiraReviewSummaryProps {
-  job: ImportJobRead;
+  job: DataJobRead;
   /** Property names unticked so far. */
   excluded: Set<string>;
   onExcludedChange: (next: Set<string>) => void;
@@ -796,7 +832,7 @@ export function JiraReviewSummary({ job, excluded, onExcludedChange }: JiraRevie
 
 /** What reading the spaces found, before anything is written: the pages
  * arriving, and what they held that will not. */
-export function ConfluenceReviewSummary({ job }: { job: ImportJobRead }) {
+export function ConfluenceReviewSummary({ job }: { job: DataJobRead }) {
   const { t } = useTranslation("imports");
   const summary = atlassianSummary(job);
 

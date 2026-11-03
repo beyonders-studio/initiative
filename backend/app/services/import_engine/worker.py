@@ -1,4 +1,4 @@
-"""Import worker: claims queued ImportJobs, re-validates, applies.
+"""Import worker: claims queued import jobs, re-validates, applies.
 
 Jobs are claimed and run by the dispatcher imports share with exports
 (``app.services.data_jobs``): a community runs one import at a time, a process
@@ -41,7 +41,7 @@ import logging
 from contextlib import AbstractAsyncContextManager
 from datetime import datetime, timedelta, timezone
 
-from sqlmodel import select
+from sqlmodel import col, select
 from sqlmodel.ext.asyncio.session import AsyncSession
 
 from app.core.messages import ImportEngineMessages
@@ -49,7 +49,7 @@ from app.db import cohorts
 from app.db.advisory_locks import LockNamespace
 from app.models.platform.notification import NotificationType
 from app.models.platform.user import UserStatus
-from app.models.tenant.import_job import ImportJob, ImportJobStatus
+from app.models.tenant.data_job import DataJob, DataJobDirection, DataJobStatus
 from app.services import data_jobs
 from app.services.data_jobs import JobOutcome
 from app.services.import_engine import atlassian_job
@@ -92,12 +92,12 @@ def _slots(kind: str) -> int:
     )
 
 
-def _kind_of(job: ImportJob) -> str:
+def _kind_of(job: DataJob) -> str:
     return _FETCH if atlassian_job.awaits_fetch(job) else _APPLY
 
 
-def _start_status(kind: str) -> str:
-    return ImportJobStatus.fetching if kind == _FETCH else ImportJobStatus.running
+def _start_status(kind: str) -> DataJobStatus:
+    return DataJobStatus.fetching if kind == _FETCH else DataJobStatus.running
 
 
 async def _sweep(
@@ -114,11 +114,12 @@ async def _sweep(
     # Fail interrupted applies closed — never re-run them (duplicates).
     stale = list(
         await session.exec(
-            select(ImportJob)
+            select(DataJob)
             .where(
-                ImportJob.status == ImportJobStatus.running,
-                ImportJob.updated_at < now - STALE_RUNNING,
-                ImportJob.id.not_in(own),  # type: ignore[union-attr]
+                DataJob.direction == DataJobDirection.import_,
+                DataJob.status == DataJobStatus.running,
+                DataJob.updated_at < now - STALE_RUNNING,
+                col(DataJob.id).not_in(own),
             )
             .with_for_update()
         )
@@ -130,11 +131,11 @@ async def _sweep(
             guild_id,
             job.source,
         )
-        job.status = ImportJobStatus.failed
+        job.status = DataJobStatus.failed
         job.error = ImportEngineMessages.IMPORT_INTERRUPTED
         job.updated_at = now
-        await asyncio.to_thread(import_engine.delete_payload, guild_id, job.payload_ref)
-        job.payload_ref = None
+        await asyncio.to_thread(import_engine.delete_payload, guild_id, job.file_ref)
+        job.file_ref = None
         job.secret_encrypted = None
         session.add(job)
         outcomes.append(_outcome(job, guild_id))
@@ -145,11 +146,12 @@ async def _sweep(
     # partial payload is discarded and the job queues again from the start.
     abandoned = list(
         await session.exec(
-            select(ImportJob)
+            select(DataJob)
             .where(
-                ImportJob.status == ImportJobStatus.fetching,
-                ImportJob.updated_at < now - STALE_FETCHING,
-                ImportJob.id.not_in(own),  # type: ignore[union-attr]
+                DataJob.direction == DataJobDirection.import_,
+                DataJob.status == DataJobStatus.fetching,
+                DataJob.updated_at < now - STALE_FETCHING,
+                col(DataJob.id).not_in(own),
             )
             .with_for_update()
         )
@@ -161,9 +163,9 @@ async def _sweep(
             guild_id,
             job.source,
         )
-        await asyncio.to_thread(import_engine.delete_payload, guild_id, job.payload_ref)
-        job.payload_ref = None
-        job.status = ImportJobStatus.queued
+        await asyncio.to_thread(import_engine.delete_payload, guild_id, job.file_ref)
+        job.file_ref = None
+        job.status = DataJobStatus.queued
         job.updated_at = now
         session.add(job)
     if abandoned:
@@ -172,7 +174,7 @@ async def _sweep(
 
 
 async def _run(
-    session: AsyncSession, job: ImportJob, *, guild_id: int, kind: str
+    session: AsyncSession, job: DataJob, *, guild_id: int, kind: str
 ) -> JobOutcome | None:
     """One claimed job: a fetch or an apply, by the slot it holds."""
     if kind == _FETCH:
@@ -180,12 +182,11 @@ async def _run(
     return await _apply(session, job, guild_id=guild_id)
 
 
-jobs: data_jobs.Dispatcher[ImportJob] = data_jobs.Dispatcher(
+jobs = data_jobs.Dispatcher(
     name="import",
-    model=ImportJob,
+    direction=DataJobDirection.import_,
     lock_namespace=LockNamespace.IMPORT_CLAIM,
-    queued=ImportJobStatus.queued,
-    active=(ImportJobStatus.fetching, ImportJobStatus.running),
+    active=(DataJobStatus.fetching, DataJobStatus.running),
     kinds=(_FETCH, _APPLY),
     kind_of=_kind_of,
     start_status=_start_status,
@@ -201,7 +202,7 @@ async def process_import_jobs() -> None:
     await jobs.process()
 
 
-async def _apply(session: AsyncSession, job: ImportJob, *, guild_id: int) -> JobOutcome:
+async def _apply(session: AsyncSession, job: DataJob, *, guild_id: int) -> JobOutcome:
     """Apply a claimed job and record how it ended."""
     try:
         result = await _execute(session, job, guild_id=guild_id)
@@ -215,23 +216,23 @@ async def _apply(session: AsyncSession, job: ImportJob, *, guild_id: int) -> Job
         # Whatever failed may have been a heartbeat's write; start clean.
         await session.rollback()
         await session.refresh(job)
-        job.status = ImportJobStatus.failed
+        job.status = DataJobStatus.failed
         job.error = _error_code(exc)
     else:
-        job.status = ImportJobStatus.done
+        job.status = DataJobStatus.done
         job.result = result
         job.error = None
     job.updated_at = datetime.now(timezone.utc)
-    await asyncio.to_thread(import_engine.delete_payload, guild_id, job.payload_ref)
+    await asyncio.to_thread(import_engine.delete_payload, guild_id, job.file_ref)
     job.secret_encrypted = None
-    job.payload_ref = None
+    job.file_ref = None
     session.add(job)
     await session.commit()
     return _outcome(job, guild_id)
 
 
 async def _fetch(
-    session: AsyncSession, job: ImportJob, *, guild_id: int
+    session: AsyncSession, job: DataJob, *, guild_id: int
 ) -> JobOutcome | None:
     """Read a foreign source into a bundle and park the job for review. The
     job was claimed as ``fetching`` by :func:`_claim`.
@@ -249,7 +250,7 @@ async def _fetch(
 
     async def still_fetching() -> bool:
         await session.refresh(job, with_for_update=True)
-        return job.status == ImportJobStatus.fetching
+        return job.status == DataJobStatus.fetching
 
     async def heartbeat(summary) -> None:
         if not await still_fetching():
@@ -288,7 +289,7 @@ async def _fetch(
             session.add(job)
             await session.commit()
             return None
-        job.status = ImportJobStatus.failed
+        job.status = DataJobStatus.failed
         job.error = _error_code(exc)
         job.secret_encrypted = None
         job.updated_at = datetime.now(timezone.utc)
@@ -306,8 +307,8 @@ async def _fetch(
         return None
     now = datetime.now(timezone.utc)
     job.secret_encrypted = None
-    job.status = ImportJobStatus.staged
-    job.payload_ref = staged.payload_ref
+    job.status = DataJobStatus.staged
+    job.file_ref = staged.payload_ref
     job.plan = staged.plan
     job.updated_at = now
     # The review gets a whole window of its own, however long the read took.
@@ -317,11 +318,11 @@ async def _fetch(
     return None
 
 
-def _outcome(job: ImportJob, guild_id: int) -> JobOutcome:
+def _outcome(job: DataJob, guild_id: int) -> JobOutcome:
     return (
         job.created_by,
         NotificationType.import_ready
-        if job.status == ImportJobStatus.done
+        if job.status == DataJobStatus.done
         else NotificationType.import_failed,
         {
             "community_id": guild_id,
@@ -331,7 +332,7 @@ def _outcome(job: ImportJob, guild_id: int) -> JobOutcome:
     )
 
 
-async def _execute(session: AsyncSession, job: ImportJob, *, guild_id: int) -> dict:
+async def _execute(session: AsyncSession, job: DataJob, *, guild_id: int) -> dict:
     """Re-validate the staged payload and apply it as the job's creator."""
     from app.api.deps import establish_guild_access
 
@@ -341,7 +342,7 @@ async def _execute(session: AsyncSession, job: ImportJob, *, guild_id: int) -> d
     if user is None or user.status != UserStatus.active:
         raise ImportEngineError(ImportEngineMessages.IMPORT_CREATOR_INACTIVE)
 
-    if not job.payload_ref:
+    if not job.file_ref:
         raise ImportEngineError(ImportEngineMessages.IMPORT_INVALID_PARAMS)
 
     if job.source in ("backup", atlassian_job.SOURCE):
@@ -362,7 +363,7 @@ async def _execute(session: AsyncSession, job: ImportJob, *, guild_id: int) -> d
         # read from, so they land the same distance from now, and ``join``,
         # who joins the initiatives it creates.
         anchor = (job.params or {}).get("anchor")
-        async with import_engine.open_payload(guild_id, job.payload_ref) as bundle:
+        async with import_engine.open_payload(guild_id, job.file_ref) as bundle:
             if bundle is None:
                 raise ImportEngineError(ImportEngineMessages.IMPORT_INVALID_PARAMS)
             async with _open_user_session(guild_id) as user_session:
@@ -392,7 +393,7 @@ async def _execute(session: AsyncSession, job: ImportJob, *, guild_id: int) -> d
         return backup_result.model_dump(mode="json")
 
     payload = await asyncio.to_thread(
-        import_engine.read_payload, guild_id, job.payload_ref
+        import_engine.read_payload, guild_id, job.file_ref
     )
     if payload is None:
         raise ImportEngineError(ImportEngineMessages.IMPORT_INVALID_PARAMS)
@@ -436,56 +437,3 @@ def _error_code(exc: Exception) -> str:
     if isinstance(exc, GuildAccessError):
         return ImportEngineMessages.IMPORT_ACCESS_REVOKED
     return ImportEngineMessages.IMPORT_APPLY_FAILED
-
-
-async def expire_payloads(session: AsyncSession, guild_id: int) -> None:
-    """Expire the community's unconfirmed/undelivered staged payloads past
-    ``expires_at``: delete the payload and mark the job expired. Terminal rows
-    keep their (small) result reports — only payloads are GC'd — and any
-    secret one still holds is cleared.
-
-    Visited in every community whose schema exists, whatever its status: a
-    read-only or suspended community's payloads expire like anyone's."""
-    now = datetime.now(timezone.utc)
-    expired = list(
-        await session.exec(
-            select(ImportJob).where(
-                ImportJob.status.in_(
-                    (
-                        ImportJobStatus.staged,
-                        ImportJobStatus.fetching,
-                        ImportJobStatus.queued,
-                    )
-                ),
-                ImportJob.expires_at.is_not(None),
-                ImportJob.expires_at < now,
-            )
-        )
-    )
-    for job in expired:
-        await asyncio.to_thread(import_engine.delete_payload, guild_id, job.payload_ref)
-        job.secret_encrypted = None
-        job.status = ImportJobStatus.expired
-        job.payload_ref = None
-        job.updated_at = now
-        session.add(job)
-    # A job that is over needs no secret, however it ended.
-    lent = list(
-        await session.exec(
-            select(ImportJob).where(
-                ImportJob.status.in_(
-                    (
-                        ImportJobStatus.done,
-                        ImportJobStatus.failed,
-                        ImportJobStatus.cancelled,
-                        ImportJobStatus.expired,
-                    )
-                ),
-                ImportJob.secret_encrypted.is_not(None),
-            )
-        )
-    )
-    for job in lent:
-        job.secret_encrypted = None
-        session.add(job)
-    await session.commit()

@@ -1,8 +1,9 @@
-"""What an operator has granted one guild.
+"""Which sign-in options one community's plan gives it.
 
-The single read of ``guild_administration.auth_options``. Both the management
-gates and the just-in-time provisioning check come through here, so "has this
-guild been granted X" is one query with one answer.
+The single read of the two paid switches behind ``CommunityAuthOption``
+(``app.core.rules.OPTION_RULES``), deployment rows of ``community_rules``. The
+management gates come through here, so "has this community been granted X" is
+one query with one answer.
 """
 
 from __future__ import annotations
@@ -10,66 +11,42 @@ from __future__ import annotations
 from typing import Any
 
 from fastapi import HTTPException, status
-from sqlalchemy import literal, or_
 from sqlalchemy.sql.elements import ColumnElement
 from sqlmodel import func, select
 from sqlmodel.ext.asyncio.session import AsyncSession
 
-from app.core.guild_auth_options import CommunityAuthOption, effective_options
+from app.core.guild_auth_options import CommunityAuthOption
 from app.core.messages import GuildMessages
-from app.models.platform.guild import GuildMembership
-from app.models.platform.guild_administration import GuildAdministration
+from app.core.rules import OPTION_RULES, SetBy
+from app.models.platform.rule import CommunityRule
 
 
 async def auth_options_for(
     session: AsyncSession, guild_id: int
 ) -> frozenset[CommunityAuthOption]:
-    """The sign-in options this guild holds. Empty when it holds none, and
-    empty when it has no administration row at all — a guild nobody has granted
-    anything is the same as a guild with nothing granted.
-
-    What is stored goes through :func:`effective_options`, so an option ticked
-    under a master nobody granted reads here the way it reads everywhere."""
-    administration = (
-        await session.exec(
-            select(GuildAdministration).where(GuildAdministration.guild_id == guild_id)
-        )
-    ).one_or_none()
-    if administration is None:
-        return frozenset()
-    return effective_options(administration.auth_options)
+    """The sign-in options this community holds. Empty when it holds none: a
+    community nobody has granted anything has no row for either."""
+    held = set(
+        (
+            await session.exec(
+                select(CommunityRule.key).where(
+                    CommunityRule.guild_id == guild_id,
+                    CommunityRule.key.in_(OPTION_RULES.values()),  # type: ignore[attr-defined]
+                    CommunityRule.user_id.is_(None),  # type: ignore[union-attr]
+                    CommunityRule.set_by == SetBy.deployment.value,
+                    CommunityRule.enabled.is_(True),  # type: ignore[union-attr]
+                )
+            )
+        ).all()
+    )
+    return frozenset(option for option, key in OPTION_RULES.items() if key in held)
 
 
 def holds_option(guild_id: Any, option: CommunityAuthOption) -> ColumnElement[bool]:
     """Whether a rule that needs ``option`` applies to the community:
-    ``public.guild_holds_option``, the answer the sign-in gate gives. True
-    unless the row the session reads shows the option withdrawn."""
-    return func.public.guild_holds_option(guild_id, option.value)
-
-
-def accepts_api_keys(guild_id: Any, api_keys_allowed: Any) -> ColumnElement[bool]:
-    """Whether a community accepts its member's personal API keys: unless its
-    superadmin turned them off for that member, which applies while the
-    community holds the ``restrictions`` option.
-
-    The one statement of the rule. The guild-access gate and key creation ask
-    it through :func:`refuses_api_keys`; the cross-guild aggregates and the
-    community list select it beside the membership row they read.
-    """
-    return or_(
-        api_keys_allowed.is_(True),
-        ~holds_option(guild_id, CommunityAuthOption.restrictions),
-    )
-
-
-async def refuses_api_keys(session: AsyncSession, membership: GuildMembership) -> bool:
-    """:func:`accepts_api_keys`, refused, for one membership row already read.
-    A member whose keys are allowed is answered without a query."""
-    if membership.api_keys_allowed:
-        return False
-    return not await session.scalar(
-        select(accepts_api_keys(membership.guild_id, literal(False)))
-    )
+    ``public.guild_holds_option``, the answer the sign-in gate gives, over the
+    option's paid key (``app.core.rules.OPTION_RULES``)."""
+    return func.public.guild_holds_option(guild_id, OPTION_RULES[option])
 
 
 async def has_auth_option(

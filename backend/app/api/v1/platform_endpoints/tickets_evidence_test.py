@@ -111,6 +111,64 @@ async def test_a_filing_stores_its_files_sealed_beside_the_opening_words(
     assert b"JFIF" not in sealed
 
 
+async def _opened(session, guild_id: int, row: Evidence) -> bytes:
+    await set_rls_context(session, SystemGuild(guild_id))
+    obj = await evidence_service.sealed(session, row.id)
+    await set_rls_context(session, Unattributed())
+    assert obj is not None
+    return b"".join(evidence_service.plaintext(guild_id, obj))
+
+
+async def test_with_storage_encrypted_evidence_goes_with_the_community_key(
+    client, session, desk, asker
+):
+    from app.db import session as db_session
+    from app.services import storage_keys
+    from app.services.storage_keys import DatabaseKeyStore, Keyring, LocalRoot
+
+    storage_keys.use_keyring(Keyring(DatabaseKeyStore(), LocalRoot()))
+    try:
+        response = await _ask(client, asker, asker.guild.id, [_jpeg()])
+        assert response.status_code == 202, response.text
+        (row,) = await _evidence(session, desk["guild_id"])
+        assert row.kek_version == blob_crypto.COMMUNITY_KEK_VERSION
+        assert (await _opened(session, desk["guild_id"], row)).startswith(b"\xff\xd8")
+
+        async with db_session.SystemSessionLocal() as system:
+            await storage_keys.destroy(system, desk["guild_id"])
+            await system.commit()
+        with pytest.raises(blob_crypto.BlobCryptoError):
+            await _opened(session, desk["guild_id"], row)
+    finally:
+        storage_keys.use_keyring(None)
+
+
+async def test_evidence_sealed_before_encryption_moves_onto_the_community_key(
+    client, session, desk, asker
+):
+    from app.services import storage_keys
+    from app.services.storage_keys import DatabaseKeyStore, Keyring, LocalRoot
+
+    response = await _ask(client, asker, asker.guild.id, [_jpeg()])
+    assert response.status_code == 202, response.text
+    (row,) = await _evidence(session, desk["guild_id"])
+    assert row.kek_version == blob_crypto.KEK_VERSION
+
+    storage_keys.use_keyring(Keyring(DatabaseKeyStore(), LocalRoot()))
+    try:
+        await set_rls_context(session, SystemGuild(desk["guild_id"]))
+        assert (
+            await evidence_service.adopt_community_key(session, desk["guild_id"]) == 1
+        )
+        await session.commit()
+        await set_rls_context(session, Unattributed())
+        (moved,) = await _evidence(session, desk["guild_id"])
+        assert moved.kek_version == blob_crypto.COMMUNITY_KEK_VERSION
+        assert (await _opened(session, desk["guild_id"], moved)).startswith(b"\xff\xd8")
+    finally:
+        storage_keys.use_keyring(None)
+
+
 async def test_a_file_the_stream_does_not_take_files_nothing(
     client,
     session,

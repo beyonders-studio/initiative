@@ -1,6 +1,6 @@
 /**
  * THE index page a tool's entities are browsed from — one initiative's shelf of
- * projects, files, wikis, catalogs, queues, counter groups or dashboards.
+ * projects, files, wikis, queues, counter groups or dashboards.
  *
  * Each of those pages carried its own copy of the same thing: the view toggle,
  * the filter panel, the create button and its dialog, the loading, error,
@@ -42,10 +42,11 @@ import type { BulkAccessItem } from "@/components/access/BulkEditAccessDialog";
 import { SelectableGridItem } from "@/components/access/SelectableGridItem";
 import { BookmarkButton } from "@/components/BookmarkButton";
 import { CreateFileDialog } from "@/components/files/CreateFileDialog";
+import { AddToCollectionButton } from "@/components/files/collections/AddToCollectionButton";
+import { CollectionFilterField } from "@/components/files/collections/CollectionFilterField";
 import { FileCard } from "@/components/files/FileCard";
 import { useFileColumns } from "@/components/files/fileColumns";
 import { ToolImportAction, useToolImportAction } from "@/components/imports/ToolImportAction";
-import { CatalogCard } from "@/components/initiativeTools/catalogs/CatalogCard";
 import { CounterGroupCard } from "@/components/initiativeTools/counters/CounterGroupCard";
 import { DashboardCard } from "@/components/initiativeTools/dashboards/DashboardCard";
 import { QueueCard } from "@/components/initiativeTools/queues/QueueCard";
@@ -84,7 +85,6 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/com
 import { DropOverlay } from "@/components/ui/file-drop";
 import { TOOL_HOOKS } from "@/hooks/toolHooks";
 import { useActiveCommunityId } from "@/hooks/useActiveCommunityId";
-import { useAppConfig } from "@/hooks/useAppConfig";
 import { useCreateFromSearchParam } from "@/hooks/useCreateFromSearchParam";
 import { useDebouncedValue } from "@/hooks/useDebouncedValue";
 import { useFileDrop } from "@/hooks/useFileDrop";
@@ -104,7 +104,6 @@ import { useTagTreeSelection } from "@/hooks/useTagTreeSelection";
 import { useToolCounts } from "@/hooks/useToolCounts";
 import { useUnreadTree } from "@/hooks/useUnreadTree";
 import { useCommunityPath } from "@/lib/communityUrl";
-import { FILE_UPLOAD_ACCEPT } from "@/lib/fileUtils";
 import type { AppColumnDef } from "@/lib/table";
 import {
   isToolView,
@@ -206,12 +205,24 @@ export type ToolIndexEntry = {
   CreateDialog?: ComponentType<ToolIndexCreateDialogProps>;
   /** Files dropped anywhere on the list open the create dialog holding the
    *  first; `label` is the overlay's key in the tool's namespace. */
-  fileDrop?: { accept: string; label: string };
+  fileDrop?: { label: string };
   /** The list layout as a sortable table, with these columns after the shared
    *  ones. Without it the list layout is one line a row. */
   table?: { useColumns: () => AppColumnDef<ToolIndexRow>[] };
   /** The list can be narrowed to rows with no tag, which the tag tree offers. */
   untagged?: true;
+  /** A filter of the tool's own, beside its filter fields. */
+  FilterField?: ComponentType<{
+    value: ToolListFilters;
+    onChange: (next: ToolListFilters) => void;
+    initiativeId: number;
+  }>;
+  /** Bulk actions of the tool's own, before the shared ones. */
+  BulkActions?: ComponentType<{
+    initiativeId: number;
+    rows: ToolIndexRow[];
+    onDone: () => void;
+  }>;
   /**
    * The reader keeps an order of their own, which is the list's order until
    * they pick one in the table, and drag the cards to change it. The mutation
@@ -351,10 +362,18 @@ const TOOL_INDEX: Record<Tool, ToolIndexEntry | ToolIndexOwnPage> = {
     tiles: true,
     // Made from a type, an upload, a link or a template, not just a name.
     CreateDialog: CreateFileDialog,
-    fileDrop: { accept: FILE_UPLOAD_ACCEPT, label: "dropToUpload" },
+    fileDrop: { label: "dropToUpload" },
     // The rows are files, which is what these columns read.
     table: { useColumns: useFileColumns as unknown as () => AppColumnDef<ToolIndexRow>[] },
     untagged: true,
+    FilterField: CollectionFilterField,
+    BulkActions: ({ initiativeId, rows, onDone }) => (
+      <AddToCollectionButton
+        initiativeId={initiativeId}
+        fileIds={rows.map((row) => row.id)}
+        onDone={onDone}
+      />
+    ),
   },
 
   [Tool.queue]: {
@@ -399,21 +418,6 @@ const TOOL_INDEX: Record<Tool, ToolIndexEntry | ToolIndexOwnPage> = {
       noMatches: "filters.noMatchingDashboards",
       emptyTitle: "noDashboards",
       emptyBody: "noDashboardsDescription",
-    },
-  },
-
-  [Tool.catalog]: {
-    useList: makeRows(
-      TOOL_HOOKS[Tool.catalog].useList,
-      (catalog) => <CatalogCard catalog={catalog} />,
-      WITH_PREVIEW
-    ),
-    text: {
-      create: "createCatalog",
-      createDescription: "createCatalogDescription",
-      noMatches: "filters.noMatchingCatalogs",
-      emptyTitle: "noCatalogs",
-      emptyBody: "noCatalogsDescription",
     },
   },
 
@@ -513,11 +517,12 @@ const toolListViewSpec = (
   initiativeId: number,
   reorders: boolean
 ): ListViewSpec<ToolListFilters> => ({
-  key: viewKey(communityId, "initiative", initiativeId, toolRouteSegment(tool)),
+  key: viewKey("initiative", initiativeId, toolRouteSegment(tool)),
+  communityId,
   read: readToolListFilters,
   defaults: { filters: {}, ...NO_PART_VIEW, sorting: reorders ? [] : NEWEST_FIRST },
-  carryOver: (items) => {
-    const layout = items[`${tool}:view-mode`];
+  carryOver: (_items, account) => {
+    const layout = account[`${tool}:view-mode`];
     const order = deviceJSON(toolTableStorageKey(tool, "order")) as { sorting?: unknown } | null;
     const columns = deviceJSON(toolTableStorageKey(tool, "columns"));
     if (typeof layout !== "string" && !order && !columns) return null;
@@ -692,7 +697,6 @@ const ToolIndexBody = ({ tool, entry, fixedInitiativeId, canCreate }: ToolIndexB
   // A file dragged in from the desktop lands wherever the cursor is, in any
   // layout, and opens the create dialog holding it. Off while a dialog is up:
   // those are portalled, and React would carry a drop on one back up to here.
-  const { maxUploadBytes } = useAppConfig();
   const [droppedFile, setDroppedFile] = useState<File | null>(null);
   const drop = useFileDrop(
     Boolean(entry.fileDrop) && canCreateHere && !createOpen && !selection.active,
@@ -700,8 +704,7 @@ const ToolIndexBody = ({ tool, entry, fixedInitiativeId, canCreate }: ToolIndexB
       if (!first) return;
       setDroppedFile(first);
       setCreateOpen(true);
-    },
-    { accept: entry.fileDrop?.accept, maxBytes: maxUploadBytes }
+    }
   );
   const onCreateOpenChange = (open: boolean) => {
     if (!open) setDroppedFile(null);
@@ -860,7 +863,15 @@ const ToolIndexBody = ({ tool, entry, fixedInitiativeId, canCreate }: ToolIndexB
           value={filters}
           onChange={changeFilters}
           initiativeId={fixedInitiativeId}
-        />
+        >
+          {entry.FilterField ? (
+            <entry.FilterField
+              value={filters}
+              onChange={changeFilters}
+              initiativeId={fixedInitiativeId}
+            />
+          ) : null}
+        </ToolFilterFields>
       </ToolFilterPanel>
 
       {list.isLoading ? (
@@ -878,6 +889,15 @@ const ToolIndexBody = ({ tool, entry, fixedInitiativeId, canCreate }: ToolIndexB
             selection={selection}
             tool={tool}
             invalidate={() => invalidate(q.toolList(tool))}
+            actions={
+              entry.BulkActions ? (
+                <entry.BulkActions
+                  initiativeId={fixedInitiativeId}
+                  rows={selection.selectedItems}
+                  onDone={selection.exit}
+                />
+              ) : null
+            }
           />
           {layout === "tags" ? (
             <TagBrowseLayout

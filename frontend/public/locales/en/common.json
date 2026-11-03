@@ -170,7 +170,7 @@
     "tags": "Tags",
     "tagsDescription": "Add tags to organize and filter.",
     "tagsNoAccess": "You need write access to manage tags.",
-    "propertiesDescription": "Values for the custom properties this initiative defines.",
+    "propertiesDescription": "Values for the metadata this initiative defines.",
     "comments": "Comments",
     "commentsDescription": "Let people comment on this. Turning comments off keeps everything already posted — it comes back when you turn them on again.",
     "commentsToggle": "Enable comments",
@@ -292,8 +292,7 @@
   },
   "fileDrop": {
     "release": "Drop it here",
-    "unsupported": "That kind of file can't be uploaded here.",
-    "tooLarge": "That file is larger than this server accepts."
+    "unsupported": "That kind of file can't be uploaded here."
   },
   "archiveError": "Couldn't archive that. Please try again.",
   "unarchiveError": "Couldn't unarchive that. Please try again.",
@@ -314,6 +313,8 @@
     "taskList": "Task list",
     "more": "More formatting",
     "image": "Image",
+    "uploadImage": "Upload a picture",
+    "imageFromFiles": "From Files",
     "uploadingImage": "Uploading {{name}}…",
     "imageUploadFailed": "Couldn't add that picture."
   },
@@ -422,11 +423,6 @@
       "this": "this post",
       "plural": "posts"
     },
-    "catalog": {
-      "name": "Catalog",
-      "this": "this catalog",
-      "plural": "catalogs"
-    },
     "wiki": {
       "name": "Wiki",
       "this": "this wiki",
@@ -452,11 +448,6 @@
       "this": "this counter",
       "plural": "counters"
     },
-    "catalog_item": {
-      "name": "Picture",
-      "this": "this picture",
-      "plural": "pictures"
-    },
     "wiki_page": {
       "name": "Page",
       "this": "this page",
@@ -466,6 +457,11 @@
       "name": "Tag",
       "this": "this tag",
       "plural": "tags"
+    },
+    "collection": {
+      "name": "Collection",
+      "this": "this collection",
+      "plural": "collections"
     }
   }
 }

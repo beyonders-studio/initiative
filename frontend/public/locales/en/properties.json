@@ -1,11 +1,14 @@
 {
-  "title": "Properties",
-  "addProperty": "Add property",
-  "noProperties": "No properties",
+  "title": "Metadata",
+  "titleWithMetadata": "Properties and metadata",
+  "addMetadata": "Add metadata",
+  "addPropertyOrMetadata": "Add property or metadata",
+  "noMetadata": "No metadata",
+  "noPropertiesOrMetadata": "No properties or metadata",
   "saving": "Saving…",
   "saved": "Saved",
-  "remove": "Remove property",
-  "loadError": "Couldn't load this property.",
+  "remove": "Remove",
+  "loadError": "Couldn't load this value.",
   "types": {
     "text": "Text",
     "number": "Number",
@@ -15,13 +18,25 @@
     "url": "URL",
     "select": "Select",
     "multi_select": "Multi-select",
-    "user_reference": "Person"
+    "user_reference": "Person",
+    "currency": "Money",
+    "scale": "Scale",
+    "link": "Link",
+    "badge": "Badge",
+    "json": "Data"
   },
   "picker": {
-    "placeholder": "Search properties…",
-    "empty": "No properties match",
-    "createHeading": "Create new property",
-    "namePlaceholder": "Property name",
+    "placeholder": "Search…",
+    "empty": "Nothing matches",
+    "createHeading": "New metadata",
+    "createPropertyHeading": "New property",
+    "ownerLabel": "Belongs to",
+    "owner": {
+      "project": "This project's properties",
+      "collection": "This collection's properties",
+      "initiative": "The initiative's metadata"
+    },
+    "namePlaceholder": "Name",
     "typeLabel": "Type",
     "createButton": "Create",
     "optionLabelPlaceholder": "Option label",
@@ -41,17 +56,20 @@
     "searchOptions": "Search or create option…",
     "createOption": "Create \"{{label}}\"",
     "optionAdded": "Option added",
-    "optionAddFailed": "Could not add option"
+    "optionAddFailed": "Could not add option",
+    "scalePlaceholder": "0–100",
+    "stars_one": "{{count}} star",
+    "stars_other": "{{count}} stars"
   },
   "cell": {
     "emptyValue": "—",
     "none": "None"
   },
   "manager": {
-    "title": "Custom properties",
-    "description": "Define reusable metadata for anything in this initiative.",
-    "newDefinition": "New property",
-    "editDefinition": "Edit property",
+    "title": "Metadata",
+    "description": "Metadata holds values on anything in this initiative: its tasks, files, events and the rest.",
+    "newDefinition": "New metadata",
+    "editDefinition": "Edit metadata",
     "nameLabel": "Name",
     "typeLabel": "Type",
     "optionsLabel": "Options",
@@ -59,20 +77,46 @@
     "removeOption": "Remove option",
     "optionLabelPlaceholder": "Option label",
     "colorLabel": "Color",
-    "delete": "Delete property",
-    "deleteConfirmTitle": "Delete this property?",
-    "deleteConfirmBody": "This will remove the property and every value set for it in this initiative.",
+    "delete": "Delete metadata",
+    "deleteConfirmTitle": "Delete this metadata?",
+    "deleteConfirmBody": "This removes it and every value set for it in this initiative.",
     "orphanedWarning": "{{count}} existing values reference removed options. They'll show as 'Unknown option' until updated.",
-    "createError": "Failed to create property",
-    "updateError": "Failed to update property",
-    "deleteError": "Failed to delete property",
-    "setValuesError": "Failed to save property value"
+    "createError": "Couldn't create it",
+    "updateError": "Couldn't save the change",
+    "deleteError": "Couldn't delete it",
+    "setValuesError": "Couldn't save the value",
+    "moveUp": "Move {{name}} up",
+    "moveDown": "Move {{name}} down",
+    "toolsTitle": "Project and collection properties",
+    "toolsDescription": "Each project's and collection's own properties that you may edit. They're also made, edited and deleted in its layout editor.",
+    "noTools": "No properties you can edit",
+    "owner": {
+      "project": "Project",
+      "collection": "Collection"
+    },
+    "select": "Select {{name}}",
+    "selected_one": "{{count}} selected",
+    "selected_other": "{{count}} selected",
+    "promote": "Promote to metadata",
+    "promoteBody_one": "It becomes metadata of this initiative, on everything in it. Its values move across, every layout that shows it shows the metadata instead, and it is deleted.",
+    "promoteBody_other": "They become one metadata field of this initiative, on everything in it. Their values move across, every layout that shows one shows the metadata instead, and they are deleted. Where something holds values of several, the most recently changed one is kept.",
+    "promoteInto": "Merges into the metadata “{{name}}”, which is of the same type.",
+    "promoteTaken": "This initiative already has metadata of this name, of another type.",
+    "promoteHint": "Select properties of one type to promote them to metadata.",
+    "promoted": "Promoted to “{{name}}”",
+    "promoteError": "Couldn't promote them",
+    "bulkDeleteTitle_one": "Delete {{count}} field?",
+    "bulkDeleteTitle_other": "Delete {{count}} fields?",
+    "bulkDeleteBody": "Each goes with every value set for it.",
+    "bulkDeleted_one": "Deleted {{count}} field",
+    "bulkDeleted_other": "Deleted {{count}} fields",
+    "bulkDeleteError": "Couldn't delete them"
   },
   "filter": {
-    "addFilter": "Add property filter",
-    "property": "Property",
+    "addFilter": "Add filter",
+    "property": "Filter by",
     "operator": "Op",
-    "remove": "Remove property filter",
+    "remove": "Remove filter",
     "ops": {
       "eq": "is",
       "lt": "<",
@@ -83,5 +127,10 @@
       "ilike": "contains",
       "is_null": "is empty"
     }
+  },
+  "currency": {
+    "label": "Currency",
+    "none": "No currency matches",
+    "default": "USD"
   }
 }

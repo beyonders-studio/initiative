@@ -14,7 +14,6 @@ import { useTranslation } from "react-i18next";
 
 import type {
   ListCalendarsParams,
-  ListCatalogsParams,
   ListCounterGroupsParams,
   ListDashboardsParams,
   ListFilesParams,
@@ -23,7 +22,7 @@ import type {
   ListQueuesParams,
   ListWikisParams,
 } from "@/api/generated/initiativeAPI.schemas";
-import { FileType, Tool } from "@/api/generated/initiativeAPI.schemas";
+import { FileKind, Tool } from "@/api/generated/initiativeAPI.schemas";
 import { PropertyFilterParam } from "@/components/properties/PropertyFilter";
 import { TagFilterPicker } from "@/components/tags/TagFilterPicker";
 import { Input } from "@/components/ui/input";
@@ -47,7 +46,6 @@ type ToolListParams = {
   [Tool.calendar]: ListCalendarsParams;
   [Tool.dashboard]: ListDashboardsParams;
   [Tool.post]: ListPostsParams;
-  [Tool.catalog]: ListCatalogsParams;
   [Tool.wiki]: ListWikisParams;
 };
 
@@ -68,7 +66,7 @@ type NotAFilter =
 export type ToolListFilters<T extends Tool = Tool> = Omit<ToolListParams[T], NotAFilter>;
 
 /** A tool list's filters as kept, with what has the wrong type dropped: a
- *  list of ids is numbers, everything else a switch or a value. */
+ *  list of ids is numbers, everything else a switch, an id or a value. */
 export const readToolListFilters = (raw: unknown): ToolListFilters => {
   if (raw === null || typeof raw !== "object" || Array.isArray(raw)) return {};
   return Object.fromEntries(
@@ -76,7 +74,11 @@ export const readToolListFilters = (raw: unknown): ToolListFilters => {
       if (Array.isArray(value)) {
         return [[key, value.filter((id) => typeof id === "number")]];
       }
-      return typeof value === "string" || typeof value === "boolean" ? [[key, value]] : [];
+      return typeof value === "string" ||
+        typeof value === "boolean" ||
+        (typeof value === "number" && Number.isFinite(value))
+        ? [[key, value]]
+        : [];
     })
   ) as ToolListFilters;
 };
@@ -210,7 +212,10 @@ const QueueFilterFields = ({
 };
 
 /** "All" is a sentinel: the underlying filter is absent, not a value. */
-const ALL_FILE_TYPES = "all";
+const ALL_FILE_KINDS = "all";
+
+/** The kinds a files list offers to narrow by: every one there is. */
+const FILE_FILTER_KINDS = Object.values(FileKind);
 
 /** A files list is also narrowed to one type of file. */
 const FileFilterFields = ({
@@ -235,11 +240,11 @@ const FileFilterFields = ({
           {t("filters.type")}
         </Label>
         <Select
-          value={value.file_type ?? ALL_FILE_TYPES}
+          value={value.kind ?? ALL_FILE_KINDS}
           onValueChange={(next) =>
             onChange({
               ...value,
-              file_type: next === ALL_FILE_TYPES ? undefined : (next as FileType),
+              kind: next === ALL_FILE_KINDS ? undefined : (next as FileKind),
             })
           }
         >
@@ -247,10 +252,10 @@ const FileFilterFields = ({
             <SelectValue />
           </SelectTrigger>
           <SelectContent>
-            <SelectItem value={ALL_FILE_TYPES}>{t("filters.allTypes")}</SelectItem>
-            {Object.values(FileType).map((type) => (
-              <SelectItem key={type} value={type}>
-                {t(`filters.types.${type}`)}
+            <SelectItem value={ALL_FILE_KINDS}>{t("filters.allTypes")}</SelectItem>
+            {FILE_FILTER_KINDS.map((kind) => (
+              <SelectItem key={kind} value={kind}>
+                {t(`filters.kinds.${kind}`)}
               </SelectItem>
             ))}
           </SelectContent>
@@ -275,7 +280,6 @@ const TOOL_FILTER_FIELDS: { [T in Tool]: ComponentType<ToolFilterFieldsProps<T>>
   [Tool.calendar]: searchAndTags(Tool.calendar, "filters.searchCalendars"),
   [Tool.dashboard]: searchAndTags(Tool.dashboard, "filters.searchDashboards"),
   [Tool.post]: searchAndTags(Tool.post, "filters.searchPosts"),
-  [Tool.catalog]: searchAndTags(Tool.catalog, "filters.searchCatalogs"),
   [Tool.wiki]: searchAndTags(Tool.wiki, "filters.searchWikis"),
 };
 

@@ -6,7 +6,9 @@ import { describe, expect, it, vi } from "vitest";
 
 import {
   buildProjectTaskStatus,
+  buildTag,
   buildTaskType,
+  buildToolLayoutSet,
   buildUser,
   buildUserSummary,
 } from "@/__tests__/factories";
@@ -131,10 +133,13 @@ const AddingTask = ({
   types,
   create,
   onOpenChange = () => {},
+  laidOut = false,
 }: {
   types: TaskTypeRead[];
   create: (written: Written<TaskRead, TaskUpdate>) => Promise<{ id: number }>;
   onOpenChange?: (open: boolean) => void;
+  /** Its type's page is the project's own, as the server reads it. */
+  laidOut?: boolean;
 }) => {
   const leaving = useRef(false);
   const status = buildProjectTaskStatus();
@@ -154,7 +159,7 @@ const AddingTask = ({
         actions: null,
         leaving,
       }}
-      layouts={() => null}
+      layouts={() => (laidOut ? { tool: "project", tool_id: 1 } : null)}
       title="Create task"
       ready={() => true}
       create={create}
@@ -199,6 +204,111 @@ describe("adding a task", () => {
     expect(screen.getByRole("combobox", { name: "Priority" })).toBeInTheDocument();
     // The type is drawn up front, not again in the fold.
     expect(screen.getAllByRole("combobox", { name: "Type" })).toHaveLength(1);
+  });
+
+  it("puts what its type's page requires up front, and waits for it", async () => {
+    const type = buildTaskType({ id: 1, name: "Feature" });
+    server.use(
+      communityHttp.get("/tags/", () => HttpResponse.json([buildTag({ id: 7, name: "Lore" })])),
+      communityHttp.get("/layouts/", () =>
+        HttpResponse.json(
+          buildToolLayoutSet({
+            layouts: [
+              {
+                kind: "task",
+                task_type_id: type.id,
+                task_type_name: type.name,
+                definition: {
+                  side: [
+                    {
+                      type: "section",
+                      children: [
+                        { type: "field", props: { field: "priority" } },
+                        { type: "field", props: { field: "tags", required: true } },
+                      ],
+                    },
+                  ],
+                },
+                updated_at: "2026-10-01T12:00:00.000Z",
+              },
+            ],
+          })
+        )
+      )
+    );
+    const create = vi.fn(async () => ({ id: 5 }));
+    renderPage(() => <AddingTask types={[type]} create={create} laidOut />);
+    const user = userEvent.setup();
+
+    await waitFor(() =>
+      expect(document.querySelector('[data-required-missing="tags"]')).toBeInTheDocument()
+    );
+    const tags = document.querySelector('[data-required-missing="tags"]') as HTMLElement;
+    expect(within(tags).getByText("Required")).toBeVisible();
+    // The rest of the side stays folded.
+    expect(screen.queryByRole("combobox", { name: "Priority" })).not.toBeInTheDocument();
+    const add = screen.getByRole("button", { name: "Create task" });
+    expect(add).toBeDisabled();
+    expect(screen.getByText("Fill in what is required to add it.")).toBeInTheDocument();
+
+    await user.click(within(tags).getByRole("combobox"));
+    await user.click(await screen.findByRole("option", { name: "Lore" }));
+    await waitFor(() => expect(add).toBeEnabled());
+    expect(document.querySelector("[data-required-missing]")).not.toBeInTheDocument();
+    await user.click(add);
+
+    await waitFor(() =>
+      expect(create).toHaveBeenCalledWith(
+        expect.objectContaining({ fields: expect.objectContaining({ tag_ids: [7] }) })
+      )
+    );
+  });
+
+  it("takes a checklist a type requires, written before the task exists", async () => {
+    const type = buildTaskType({ id: 1, name: "Packing" });
+    server.use(
+      communityHttp.get("/layouts/", () =>
+        HttpResponse.json(
+          buildToolLayoutSet({
+            layouts: [
+              {
+                kind: "task",
+                task_type_id: type.id,
+                task_type_name: type.name,
+                definition: {
+                  main: [{ type: "field", props: { field: "checklist", required: true } }],
+                },
+                updated_at: "2026-10-01T12:00:00.000Z",
+              },
+            ],
+          })
+        )
+      )
+    );
+    const create = vi.fn(async () => ({ id: 5 }));
+    renderPage(() => <AddingTask types={[type]} create={create} laidOut />);
+    const user = userEvent.setup();
+
+    // Its page, once read, holds the checklist alone, marked.
+    await waitFor(() =>
+      expect(document.querySelector('[data-required-missing="checklist"]')).not.toBeNull()
+    );
+    const line = screen.getByPlaceholderText("Add checklist item");
+    const add = screen.getByRole("button", { name: "Create task" });
+    expect(add).toBeDisabled();
+    await user.type(line, "Tent{Enter}");
+    await waitFor(() => expect(add).toBeEnabled());
+    await user.click(add);
+
+    await waitFor(() =>
+      expect(create).toHaveBeenCalledWith(
+        expect.objectContaining({
+          fields: expect.objectContaining({
+            checklist: [expect.objectContaining({ text: "Tent", done: false })],
+          }),
+        })
+      )
+    );
   });
 
   it("keeps More options open when the type changes the page", async () => {
@@ -359,6 +469,47 @@ describe("adding a task with its title read", () => {
     expect(item.priority).toBe("medium");
   });
 
+  it("sets the type a title starts with, and adds it without its name", async () => {
+    const plain = buildTaskType({ name: "Task" });
+    const bug = buildTaskType({ name: "Bug" });
+    server.use(
+      communityHttp.get("/projects/:id/task-types/", () => HttpResponse.json([plain, bug]))
+    );
+    const create = vi.fn(async () => ({ id: 5 }));
+    renderPage(() => <AddingTask types={[plain, bug]} create={create} />, reader);
+    const user = userEvent.setup();
+
+    await user.type(await screen.findByPlaceholderText(/task title/i), "bug: login broken");
+    const read = await screen.findByRole("list", { name: "Read from the title" });
+    await waitFor(() => expect(read).toHaveTextContent("Bug"));
+    await waitFor(() =>
+      expect(screen.getByRole("combobox", { name: "Type" })).toHaveTextContent("Bug")
+    );
+    await user.click(screen.getByRole("button", { name: "Create task" }));
+
+    await waitFor(() => expect(create).toHaveBeenCalled());
+    const { item, fields } = sent(create);
+    expect(fields.title).toBe("login broken");
+    expect(item.task_type_id).toBe(bug.id);
+  });
+
+  it("says what a title can say, on a pointer and on a tap", async () => {
+    renderPage(() => <AddingTask types={[buildTaskType()]} create={vi.fn()} />, reader);
+    const user = userEvent.setup();
+
+    const help = await screen.findByRole("button", { name: "What a title can say" });
+    await user.click(help);
+    expect(await screen.findByText("Type the details into the title")).toBeInTheDocument();
+    expect(screen.getByText("bug:")).toBeInTheDocument();
+    // A tap on it again closes it.
+    await user.pointer({ keys: "[TouchA]", target: help });
+    await waitFor(() =>
+      expect(screen.queryByText("Type the details into the title")).not.toBeInTheDocument()
+    );
+    await user.pointer({ keys: "[TouchA]", target: help });
+    expect(await screen.findByText("Type the details into the title")).toBeInTheDocument();
+  });
+
   it("adds the title as typed where the reader has it off", async () => {
     const create = vi.fn(async () => ({ id: 5 }));
     renderPage(() => <AddingTask types={[buildTaskType()]} create={create} />, asTyped);
@@ -366,6 +517,7 @@ describe("adding a task with its title read", () => {
 
     await user.type(await screen.findByPlaceholderText(/task title/i), "Fix the login !urgent");
     expect(screen.queryByRole("list", { name: "Read from the title" })).not.toBeInTheDocument();
+    expect(screen.queryByRole("button", { name: "What a title can say" })).not.toBeInTheDocument();
     await user.click(screen.getByRole("button", { name: "Create task" }));
 
     await waitFor(() => expect(create).toHaveBeenCalled());
@@ -417,6 +569,59 @@ describe("naming somebody in a task's title", () => {
     expect(sent(create).fields).toMatchObject({
       title: "Review the draft",
       assignee_ids: [42],
+    });
+  });
+
+  it("counts the people and the repeat it is sent with as filled in", async () => {
+    stubPeople();
+    const type = buildTaskType({ id: 1 });
+    server.use(
+      communityHttp.get("/layouts/", () =>
+        HttpResponse.json(
+          buildToolLayoutSet({
+            layouts: [
+              {
+                kind: "task",
+                task_type_id: type.id,
+                task_type_name: type.name,
+                definition: {
+                  side: [
+                    { type: "field", props: { field: "assignees", required: true } },
+                    { type: "field", props: { field: "recurrence", required: true } },
+                  ],
+                },
+                updated_at: "2026-10-01T12:00:00.000Z",
+              },
+            ],
+          })
+        )
+      )
+    );
+    const create = vi.fn(async () => ({ id: 5 }));
+    renderPage(() => <AddingTask types={[type]} create={create} laidOut />, reader);
+    const user = userEvent.setup();
+
+    const title = await screen.findByPlaceholderText(/task title/i);
+    const add = screen.getByRole("button", { name: "Create task" });
+    await waitFor(() =>
+      expect(document.querySelectorAll("[data-required-missing]")).toHaveLength(2)
+    );
+    await user.type(title, "Review @sa");
+    await user.click(await screen.findByRole("button", { name: /Sam Vimes/ }));
+    await waitFor(() =>
+      expect(document.querySelector('[data-required-missing="assignees"]')).toBeNull()
+    );
+    expect(add).toBeDisabled();
+
+    await user.click(screen.getByRole("combobox", { name: "Repeat" }));
+    await user.click(await screen.findByRole("option", { name: "Daily" }));
+    await waitFor(() => expect(add).toBeEnabled());
+    await user.click(add);
+
+    await waitFor(() => expect(create).toHaveBeenCalled());
+    expect(sent(create).fields).toMatchObject({
+      assignee_ids: [42],
+      recurrence: expect.stringContaining("FREQ=DAILY"),
     });
   });
 

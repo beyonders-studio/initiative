@@ -3,7 +3,13 @@ import userEvent from "@testing-library/user-event";
 import { HttpResponse } from "msw";
 import { describe, expect, it } from "vitest";
 
-import { buildTagSummary, buildTask, buildUser, buildUserSummary } from "@/__tests__/factories";
+import {
+  buildTagSummary,
+  buildTask,
+  buildTaskType,
+  buildUser,
+  buildUserSummary,
+} from "@/__tests__/factories";
 import { communityHttp } from "@/__tests__/helpers/communityHttp";
 import { server } from "@/__tests__/helpers/msw-server";
 import { renderWithProviders } from "@/__tests__/helpers/render";
@@ -54,6 +60,35 @@ describe("QuickAddTask", () => {
       assignee_ids: [7],
     });
     expect(typeof sent[0].due_date).toBe("string");
+  });
+
+  it("gives the task the type its title starts with", async () => {
+    const sent = stubAdd();
+    const milestone = buildTaskType({ id: 61, name: "Milestone" });
+    server.use(
+      communityHttp.get("/projects/:id/task-types/", () =>
+        HttpResponse.json([buildTaskType({ id: 60, name: "Task" }), milestone])
+      )
+    );
+    renderBox(true);
+    await userEvent.type(screen.getByRole("textbox"), "Milestone: Ship v2");
+    const read = await screen.findByRole("list", { name: /read from the title/i });
+    await waitFor(() => expect(read).toHaveTextContent("Milestone"));
+
+    await userEvent.click(screen.getByRole("button", { name: /^add$/i }));
+    await waitFor(() => expect(sent).toHaveLength(1));
+    expect(sent[0]).toMatchObject({ title: "Ship v2", task_type_id: 61 });
+  });
+
+  it("offers what a title can say only where the reader has titles read", async () => {
+    renderBox(true);
+    await userEvent.click(screen.getByRole("button", { name: /what a title can say/i }));
+    expect(await screen.findByText(/type the details into the title/i)).toBeInTheDocument();
+  });
+
+  it("offers no hints where the reader has titles read as typed", () => {
+    renderBox(false);
+    expect(screen.queryByRole("button", { name: /what a title can say/i })).not.toBeInTheDocument();
   });
 
   it("keeps words taken off the list in the title", async () => {

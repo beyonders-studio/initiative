@@ -27,7 +27,7 @@ from typing import Any, Callable, Iterable, Optional
 
 from app.core.relationships import RelationshipType
 from app.core.task_types import MAX_TASK_TYPES
-from app.models.tenant.property import PropertyType
+from app.models.tenant.metadata import MetadataType
 from app.models.tenant.task import TaskPriority, TaskStatusCategory
 from app.services.import_engine.adf import adf_to_markdown
 from app.services.import_engine.jira_attachments import (
@@ -647,7 +647,7 @@ def keep_issue_types(
     definitions.append(
         {
             "name": name,
-            "type": PropertyType.select.value,
+            "type": MetadataType.select.value,
             "position": len(definitions),
             "options": [
                 {"value": option, "label": option} for option in dict.fromkeys(names)
@@ -660,7 +660,7 @@ def keep_issue_types(
             task["properties"].append(
                 {
                     "property_name": name,
-                    "property_type": PropertyType.select.value,
+                    "property_type": MetadataType.select.value,
                     "value_text": task["type_name"],
                 }
             )

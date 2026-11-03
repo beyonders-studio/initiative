@@ -63,14 +63,14 @@ describe("a queue item, opened", () => {
     expect(screen.queryByRole("textbox")).not.toBeInTheDocument();
     expect(screen.queryByRole("spinbutton")).not.toBeInTheDocument();
     // An item with no properties shows a reader none, not an empty list.
-    expect(screen.queryByText("Properties")).not.toBeInTheDocument();
+    expect(screen.queryByText("Metadata")).not.toBeInTheDocument();
   });
 
   it("shows a reader the properties it holds", async () => {
     const property = buildPropertySummary({ name: "Initiative roll", value: "17" });
     open(buildQueueItem({ id: 9, label: "Troll", properties: [property] }), true);
 
-    expect(await screen.findByText("Properties")).toBeInTheDocument();
+    expect(await screen.findByText("Metadata")).toBeInTheDocument();
     expect(screen.getByText("Initiative roll")).toBeInTheDocument();
     expect(screen.getByText("17")).toBeInTheDocument();
   });
@@ -80,6 +80,6 @@ describe("a queue item, opened", () => {
     serve(item);
     open(item);
 
-    expect(await screen.findByRole("button", { name: "Add property" })).toBeInTheDocument();
+    expect(await screen.findByRole("button", { name: "Add metadata" })).toBeInTheDocument();
   });
 });

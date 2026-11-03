@@ -14,7 +14,7 @@ import { Activity, MessageSquare, UserRound } from "lucide-react";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { useTranslation } from "react-i18next";
 
-import { FeedView } from "@/api/generated/initiativeAPI.schemas";
+import { AdminSurface, FeedView } from "@/api/generated/initiativeAPI.schemas";
 import { CatchUpButton } from "@/components/activity/CatchUpButton";
 import { CommunityLocationLine } from "@/components/communities/CommunityLocationLine";
 import { CommunityActivityFeed } from "@/components/communityHome/CommunityActivityFeed";
@@ -30,6 +30,7 @@ import { NodeRail, TRAY_SURFACE } from "@/components/toolBrowser/NodeRail";
 import { useActiveCommunityId } from "@/hooks/useActiveCommunityId";
 import { useAuth } from "@/hooks/useAuth";
 import { useCommunities } from "@/hooks/useCommunities";
+import { useHeldSurfaces } from "@/hooks/useCustomRoles";
 import { liveInitiatives, useInitiativeAccess } from "@/hooks/useInitiativeAccess";
 import { useInitiativeDirectory, useInitiatives } from "@/hooks/useInitiatives";
 import { useLastVisit } from "@/hooks/useLastVisit";
@@ -70,9 +71,13 @@ export function CommunityHomePage() {
   const directoryEntries = directoryQuery.data ?? [];
   const { isCommunityAdmin } = useInitiativeAccess();
 
-  // Creating an initiative is community-admin only (the backend enforces it), and
-  // the affordance is threaded down as a callback: passing one IS the gate.
-  const canCreateInitiatives = Boolean(activeCommunity && isCommunityAdmin);
+  // Creating an initiative takes the community's initiatives surface (the
+  // backend enforces it), and the affordance is threaded down as a callback:
+  // passing one IS the gate.
+  const heldSurfaces = useHeldSurfaces();
+  const canCreateInitiatives = Boolean(
+    activeCommunity && heldSurfaces.holds(AdminSurface.initiatives)
+  );
   const [createDialogOpen, setCreateDialogOpen] = useState(false);
   const openCreateDialog = useCallback(() => setCreateDialogOpen(true), []);
   const onCreate = canCreateInitiatives ? openCreateDialog : undefined;

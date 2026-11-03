@@ -274,11 +274,12 @@ describe("tool routes", () => {
   });
 
   it("pluralizes and singularizes by one rule, not by adding or chopping an s", () => {
-    expect(toolPlural(Tool.catalog)).toBe("catalogs");
-    expect(toolRouteSegment(Tool.catalog)).toBe("catalogs");
-    expect(toolCamelPlural(Tool.catalog)).toBe("catalogs");
-    expect(toolPascalPlural(Tool.catalog)).toBe("Catalogs");
-    expect(singularOf("catalogs")).toBe("catalog");
+    expect(toolPlural(Tool.counter_group)).toBe("counter_groups");
+    expect(toolRouteSegment(Tool.counter_group)).toBe("counter-groups");
+    expect(toolCamelPlural(Tool.counter_group)).toBe("counterGroups");
+    expect(toolPascalPlural(Tool.counter_group)).toBe("CounterGroups");
+    expect(toolPlural("calendar_entry" as Tool)).toBe("calendar_entries");
+    expect(singularOf("calendar_entries")).toBe("calendar_entry");
     expect(singularOf("counter_groups")).toBe("counter_group");
     expect(singularOf("tasks")).toBe("task");
   });
@@ -378,7 +379,7 @@ describe("tool relations", () => {
     expect(Object.values(PARENT_TOOL).every((tool) => TOOLS.includes(tool))).toBe(true);
     expect(Object.keys(PARENT_TOOL).sort()).toEqual([
       "calendar_event",
-      "catalog_item",
+      "collection",
       "counter",
       "queue_item",
       "task",
@@ -439,7 +440,7 @@ describe("tool surfaces are wired, not just typed", () => {
 
 describe("tool exports", () => {
   it("every bulk-export tool has a format source, and only those", async () => {
-    const { FILE_TYPE_FORMATS, TOOL_EXPORT_FORMATS } = await import("@/components/exports/formats");
+    const { fileTypeFormats, TOOL_EXPORT_FORMATS } = await import("@/components/exports/formats");
     const { FileType } = await import("@/api/generated/initiativeAPI.schemas");
     const { BULK_EXPORT_TOOLS } = await import("@/lib/tools");
 
@@ -453,9 +454,7 @@ describe("tool exports", () => {
       ).toBeGreaterThan(0);
     }
     for (const type of Object.values(FileType)) {
-      expect(FILE_TYPE_FORMATS[type]?.length, `missing FILE_TYPE_FORMATS.${type}`).toBeGreaterThan(
-        0
-      );
+      expect(fileTypeFormats(type).length, `missing formats for ${type}`).toBeGreaterThan(0);
     }
     // Exact coverage: a formats entry for a non-export tool is drift too.
     for (const tool of TOOLS) {

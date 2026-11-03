@@ -141,7 +141,7 @@ SUPPORT_WRITE_PROTECTED_TABLES: tuple[str, ...] = (
 # identity instead of putting a comments UPDATE, or a scan of the whole change
 # log every five seconds, through initiative_access() one row at a time.
 SYSTEM_GUILD_MAINTENANCE_GRANTS: dict[str, tuple[str, ...]] = {
-    "task_assignment_digest_items": ("SELECT", "UPDATE"),
+    "batched_notices": ("SELECT", "UPDATE"),
     # The frozen-ancestor guard reads each supported parent into a composite
     # record (``SELECT *``) before capture/search triggers resolve identifiers.
     # PostgreSQL therefore requires table-level SELECT for these dependencies.
@@ -150,7 +150,7 @@ SYSTEM_GUILD_MAINTENANCE_GRANTS: dict[str, tuple[str, ...]] = {
     "counter_groups": ("SELECT",),
     "calendars": ("SELECT",),
     "dashboards": ("SELECT",),
-    "catalogs": ("SELECT",),
+    "collections": ("SELECT",),
     # A comment can hang off a wiki, and off one of its pages — which is where
     # a wiki's conversation actually happens — so the guard reads both while
     # the scrub rewrites that comment.
@@ -548,7 +548,7 @@ PLUGIN_ROLE_MACHINERY_READS: dict[str, tuple[str, ...]] = {
         "granted_access",
         "revoked_at",
     ),
-    "initiative_role_permissions": ("initiative_role_id", "permission_key", "enabled"),
+    "initiative_rules": ("initiative_id", "initiative_role_id", "key", "enabled"),
     "resource_grants": (),
     "tool_layouts": ("initiative_id", "tool", "tool_id", "kind", "definition"),
 }
@@ -734,6 +734,24 @@ def _grant_statements(schema: str, guild_id: int) -> list[str]:
         stmts.extend(
             guest_role_grant_statements(schema, guest, writes=writes, members=members)
         )
+    # What a member may know exists: read by every role whose policies ask it
+    # (``app.db.presence``), which answers only a person's own request.
+    from app.db.presence import view_statements
+
+    stmts.extend(
+        view_statements(
+            schema,
+            (
+                role,
+                ro_role,
+                support_role,
+                query_role,
+                plugin_role,
+                guest_role,
+                guest_ro_role,
+            ),
+        )
+    )
     return stmts
 
 
@@ -881,6 +899,18 @@ async def deprovision_guild(guild_id: int) -> None:
     await refuse_while_held(guild_id)
     async with db_session.provisioning_engine.begin() as conn:
         await drop_guild_schema(conn, guild_id)
+    # Destroy the guild's storage key first: that is what makes everything it
+    # stored encrypted unreadable — here, in the bucket's old versions, and in
+    # any copy anyone made — whatever becomes of the purge below.
+    try:
+        from app.services import storage_keys
+
+        async with db_session.SystemSessionLocal() as session:
+            if await storage_keys.destroy(session, guild_id):
+                logger.info("deprovision guild %s: destroyed its storage key", guild_id)
+            await session.commit()
+    except Exception:  # noqa: BLE001 — logged loudly; the row's FK cascades with the guild
+        logger.exception("failed to destroy the storage key of guild %s", guild_id)
     # Remove the guild's stored blobs (the ``guild_<id>/`` storage namespace).
     # Best-effort and after the schema drop succeeds: a storage hiccup must not
     # strand a half-deleted guild, and delete_prefix needs no DB so order is moot.

@@ -43,11 +43,9 @@ from app.services.auth.assurance import (
     carries_passkey,
 )
 from app.core.login_methods import SecondFactorRequirement
-from app.models.platform.app_setting import AppSetting
 from app.core.guild_auth_options import CommunityAuthOption
 from app.services.platform import auth_posture
-from app.services.platform import guild_entitlements
-from app.services.platform.app_settings import GLOBAL_SETTINGS_ID
+from app.services.platform import guild_entitlements, rules
 from app.core import audit_context
 from app.core.messages import (
     AccessGrantMessages,
@@ -100,12 +98,14 @@ from app.models.platform.access_grant import (
 )
 from app.models.platform.guild import (
     LIVE_STATUS_VALUES,
+    AdminSurface,
     Guild,
     GuildMembership,
     CommunityRole,
     CommunityStatus,
 )
-from app.models.platform.guild_auth_policy import GuildAuthPolicy, SignInHalf
+from app.core.rules import SignInRequirement
+from app.models.platform.auth_provider import AuthProvider
 from app.models.platform.user import (
     LOGIN_STATUSES,
     User,
@@ -546,7 +546,7 @@ def _sign_in(satisfied: frozenset[int], on_behalf: bool) -> SignIn:
 
 async def _enforce_guild_auth_policy(
     session: AsyncSession,
-    policy: SignInHalf | None,
+    policy: SignInRequirement,
     guild_id: int,
     satisfied: frozenset[int],
     markers: frozenset[str] = frozenset(),
@@ -555,21 +555,20 @@ async def _enforce_guild_auth_policy(
 ) -> None:
     """Gate 0 of guild access: the guild's
     sign-in policy must be satisfied by THIS session — membership and PAM
-    grants alike. No policy row (or ``open``) admits any authenticated
-    session.
+    grants alike. An ``open`` requirement admits any authenticated session.
 
     Decided by ``public.guild_auth_satisfied()``, which the standing statement
     asks for every request. This is the same rule read in Python, run once the
     standing has said no, to name the step-up the session owes.
 
-    A row can ask two things and a session has to answer both. ``provider_id``
-    names one provider the session must have come through; ``require_methods``
-    asks for any of this community's connections without naming which. Both
-    are one question to ``guild_connection_admits``, which also applies the
-    narrowing a community put on the connection.
+    A requirement can ask two things and a session has to answer both.
+    ``provider_id`` names one provider the session must have come through;
+    ``methods`` asks for any of this community's connections without naming
+    which. Both are one question to ``guild_connection_admits``, which also
+    applies the narrowing a community put on the connection.
 
-    ``policy`` is the half of the guild's row that applies to this request
-    (its guests' for a guest), read under the routed session. A second factor
+    ``policy`` is the requirement that applies to this request (its guests'
+    for a guest), read under the routed session. A second factor
     the community asks for applies while it holds the option it needs, read as
     the database gate reads it.
     """
@@ -594,13 +593,20 @@ async def _enforce_guild_auth_policy(
             GuildMessages.COMMUNITY_AUTH_FACTOR_REQUIRED,
             step_up_guild_id=guild_id,
         )
-    if policy is None or policy.policy == "open":
+    if policy.policy == "open":
         return
 
-    def _refuse() -> None:
+    async def _refuse() -> NoReturn:
+        # The step-up names the provider by its slug, which the registry
+        # holds and the request path does not read.
+        slug = None
+        if policy.provider_id is not None:
+            async with cohorts.system_session(guild_id) as system_session:
+                provider = await system_session.get(AuthProvider, policy.provider_id)
+                slug = provider.slug if provider else None
         raise GuildAccessError(
             detail=GuildMessages.COMMUNITY_AUTH_STEP_UP_REQUIRED,
-            step_up_provider_slug=policy.provider_slug,
+            step_up_provider_slug=slug,
             step_up_guild_id=guild_id,
         )
 
@@ -610,23 +616,23 @@ async def _enforce_guild_auth_policy(
             session, guild_id=guild_id, provider_id=policy.provider_id
         )
     ):
-        _refuse()
+        await _refuse()
 
     # "Any of ours": any connection this community holds, narrowing included.
-    # Named rather than counted: ``require_methods`` may hold more than one
+    # Named rather than counted: ``methods`` may hold more than one
     # method, and each is read as itself. The matching leg in
-    # ``public.guild_auth_satisfied()`` reads the same row.
-    if LoginMethod.sso in policy.require_methods and not (
+    # ``public.guild_auth_satisfied()`` reads the same rule.
+    if LoginMethod.sso in policy.methods and not (
         await guild_connections.admits_this_session(session, guild_id=guild_id)
     ):
-        _refuse()
+        await _refuse()
 
     # And the account's own second factor, where the community asks for one.
     # The answer names no provider, so the step-up says a factor is what is
     # wanted rather than pointing at a sign-in page.
     if (
         factors_apply
-        and LoginMethod.totp in policy.require_methods
+        and LoginMethod.totp in policy.methods
         and SECOND_FACTOR_AMR not in markers
     ):
         raise GuildAccessError(
@@ -639,7 +645,7 @@ async def _enforce_guild_auth_policy(
     # an assertion records the second factor as well as the key.
     if (
         factors_apply
-        and LoginMethod.passkey in policy.require_methods
+        and LoginMethod.passkey in policy.methods
         and not carries_passkey(markers)
     ):
         raise GuildAccessError(
@@ -660,7 +666,7 @@ async def _enforce_guild_api_access(
     session: AsyncSession, membership: GuildMembership
 ) -> None:
     """A member whose API access the community turned off does not reach it
-    with a personal API key (:func:`guild_entitlements.accepts_api_keys`).
+    with a personal API key (the ``api_keys`` rule).
 
     Runs beside the sign-in gate, for members. A grantee is never reached with
     a personal API key at all; the grant branch refuses one before this. The
@@ -672,8 +678,10 @@ async def _enforce_guild_api_access(
     feeds, the realtime sockets and the keepalive. The cross-guild aggregates,
     which pick their guilds themselves, ask the same question where they do it.
     """
-    if auth_context.current().api_key_credential and (
-        await guild_entitlements.refuses_api_keys(session, membership)
+    if auth_context.current().api_key_credential and not (
+        await rules.member_value(
+            session, membership.guild_id, membership.user_id, "api_keys"
+        )
     ):
         raise GuildAccessError(detail=GuildMessages.COMMUNITY_API_KEYS_REFUSED)
 
@@ -681,14 +689,14 @@ async def _enforce_guild_api_access(
 async def _read_membership_gate(
     session: AsyncSession, guild_id: int, user_id: int
 ) -> tuple[GuildMembership, Guild, SecondFactorRequirement, bool] | None:
-    """The three rows the gate needs about a member, in one query.
+    """The two rows the gate needs about a member, in one query.
 
     ``guild_memberships`` and ``guilds`` both live in ``public`` and are both
     keyed on the guild this request addresses, so asking for them separately
-    was two trips for one answer. The settings singleton rides along for the
-    same reason — what the deployment asks of an account is
-    decided in the same breath as what the community asks of the session, and a
-    read of its own would be a round trip on every guild request there is.
+    was two trips for one answer. Two of the deployment's rules ride along for
+    the same reason — what it asks of an account is decided in the same breath
+    as what the community asks of the session, and a read of its own would be a
+    round trip on every guild request there is.
 
     Each row still comes back under its own policies — an outer join to a row
     the session may not read yields NULL, exactly as its own SELECT would have.
@@ -697,10 +705,14 @@ async def _read_membership_gate(
     """
     row = (
         await session.exec(
-            select(GuildMembership, Guild, AppSetting)
+            select(
+                GuildMembership,
+                Guild,
+                rules.platform_rule_sql("second_factor_requirement"),
+                rules.platform_rule_sql("community_age_gate_enabled"),
+            )
             .select_from(GuildMembership)
             .outerjoin(Guild, Guild.id == GuildMembership.guild_id)
-            .outerjoin(AppSetting, AppSetting.id == GLOBAL_SETTINGS_ID)
             .where(
                 GuildMembership.guild_id == guild_id,
                 GuildMembership.user_id == user_id,
@@ -710,16 +722,10 @@ async def _read_membership_gate(
     ).one_or_none()
     if row is None:
         return None
-    membership, guild, settings_row = row
+    membership, guild, asked, age_gate_on = row
     if guild is None:
         raise ValueError(GuildMessages.COMMUNITY_NOT_FOUND)
-    # The age switch rides along for the same reason the factor requirement
-    # does: it is decided from this same row, and reading it separately would
-    # be a round trip on every guild request there is.
-    age_gate_on = bool(
-        settings_row is not None and settings_row.community_age_gate_enabled
-    )
-    return membership, guild, asked_of_an_account(settings_row), age_gate_on
+    return membership, guild, asked_of_an_account(asked), bool(age_gate_on)
 
 
 async def _read_grant_gate(
@@ -730,9 +736,8 @@ async def _read_grant_gate(
     read cannot be folded into the membership one above."""
     row = (
         await session.exec(
-            select(Guild, AppSetting)
+            select(Guild, rules.platform_rule_sql("second_factor_requirement"))
             .select_from(Guild)
-            .outerjoin(AppSetting, AppSetting.id == GLOBAL_SETTINGS_ID)
             .where(Guild.id == guild_id)
         )
     ).one_or_none()
@@ -1020,12 +1025,10 @@ def require_seat(
 
 def _rung_refusal(roles: tuple[CommunityRole, ...]) -> str:
     """The code a guard answers with, from the rung it names: a guard for
-    the seat says so, one for an administrator says so, and one naming
-    anything else says a permission is missing."""
+    the seat says so, and one naming anything else says a permission is
+    missing."""
     if roles == (CommunityRole.superadmin,):
         return GuildMessages.COMMUNITY_SUPERADMIN_REQUIRED
-    if roles == (CommunityRole.admin,):
-        return GuildMessages.COMMUNITY_ADMIN_REQUIRED
     return GuildMessages.COMMUNITY_PERMISSION_REQUIRED
 
 
@@ -1041,7 +1044,12 @@ def require_guild_roles(
     that changes something: a grantee is then also asked for the
     ``read_write`` grant beside the rung (:func:`require_grant_writes`).
     The refusal's code comes from the rung named (:func:`_rung_refusal`).
+
+    An admin route names the part of administering the community it guards
+    instead (:func:`require_surface`), so this refuses the admin rung.
     """
+    if CommunityRole.admin in roles:
+        raise ValueError("an admin route guards a surface: use require_surface")
     establish = get_guild_settings_context if settings else get_guild_membership
     detail = _rung_refusal(roles)
 
@@ -1057,9 +1065,32 @@ def require_guild_roles(
     return dependency
 
 
-GuildAdminContext = Annotated[
-    GuildContext, Depends(require_guild_roles(CommunityRole.admin))
-]
+def require_surface(
+    surface: AdminSurface, *, settings: bool = False, write: bool = False
+) -> Callable:
+    """Guard an admin route on the part of administering the community it is
+    (:class:`AdminSurface`), by the standing: the reader holds it, or, on the
+    configuration surface (``settings``), a settings grant answers at the
+    rung it lends, as :func:`require_guild_roles` reads it. ``write`` asks a
+    grantee for the ``read_write`` grant beside it."""
+    establish = get_guild_settings_context if settings else get_guild_membership
+
+    async def dependency(
+        context: Annotated[GuildContext, Depends(establish)],
+    ) -> GuildContext:
+        if not (
+            context.holds_surface(surface)
+            or (settings and context.settings_rung is not None)
+        ):
+            raise HTTPException(
+                status_code=status.HTTP_403_FORBIDDEN,
+                detail=GuildMessages.COMMUNITY_ADMIN_REQUIRED,
+            )
+        if write:
+            require_grant_writes(context)
+        return context
+
+    return dependency
 
 
 def _note_privileged_request(current_user: User, guild_context: GuildContext) -> None:
@@ -1323,14 +1354,20 @@ async def _refuse_sign_in(
     rule, under the routing, to name the step-up the caller owes.
     """
     guild_id = guild_context.guild_id
-    row = await session.get(GuildAuthPolicy, guild_id)
     await _enforce_guild_auth_policy(
         session,
-        row.half(guild_context.routes_as_guest) if row is not None else None,
+        await rules.community_value(
+            session,
+            guild_id,
+            "guest_auth_policy" if guild_context.routes_as_guest else "auth_policy",
+            applied=False,
+        ),
         guild_id,
         satisfied,
         auth_context.current().session_amr,
-        require_second_factor=guild_context.guild.require_second_factor,
+        require_second_factor=await rules.community_value(
+            session, guild_id, "require_second_factor", applied=False
+        ),
     )
     raise GuildAccessError()
 
@@ -1519,7 +1556,7 @@ def _strings_in(value: Any) -> list[str]:
     return found
 
 
-async def _named_refs(request: Request) -> list[str]:
+async def named_refs(request: Request) -> list[str]:
     """The references an installed plug-in's request names: in its path, its query
     string and its JSON body, a mention in its text included.
 
@@ -1568,7 +1605,7 @@ async def _establish_install_request(
         user_id=unsealed.user_id,
         purpose=unsealed.purpose,
     )
-    named = await _named_refs(request)
+    named = await named_refs(request)
     try:
         context = await establish_install_access(session, install, named)
     except InstallAccessError as exc:
@@ -1944,17 +1981,9 @@ async def get_guild_seat_payment_session(
 # Dependency for routes that need RLS-aware database access
 RLSSessionDep = Annotated[AsyncSession, Depends(get_guild_session)]
 SettingsContextDep = Annotated[GuildContext, Depends(get_guild_settings_context)]
-# The configuration surface, by rung: what an administrator keeps while the
-# content is closed and what a settings grant may serve, and — for a route
-# that changes something — asking a grantee for the read_write grant beside
-# the rung.
-SettingsAdminContextDep = Annotated[
-    GuildContext, Depends(require_guild_roles(CommunityRole.admin, settings=True))
-]
-SettingsAdminWriteContextDep = Annotated[
-    GuildContext,
-    Depends(require_guild_roles(CommunityRole.admin, settings=True, write=True)),
-]
+# The configuration surface at the seat's rung: what the seat keeps while the
+# content is closed and what a settings grant at that rung may serve, asking a
+# grantee for the read_write grant beside it.
 SettingsSeatWriteContextDep = Annotated[
     GuildContext,
     Depends(require_guild_roles(CommunityRole.superadmin, settings=True, write=True)),
@@ -2148,6 +2177,42 @@ async def authenticate_feed(
     )
     await _require_platform_factor(request, session, user)
     return user
+
+
+def require_surface_open(
+    key: str, session_dependency: Callable[..., Any]
+) -> Callable[..., Awaitable[None]]:
+    """A route that configures a surface the deployment may take away from one
+    community (``app.core.rules``, ``surface.*``), refused while it is closed.
+
+    It reads on the route's own session: ``session_dependency`` is the one the
+    route takes, which FastAPI resolves once a request.
+
+    The surface's tables refuse the seat's writes as well; this is the answer a
+    person can read. Nothing the community set up is deleted, so reopening it
+    has only to stop refusing.
+    """
+
+    async def _open(
+        guild_id: CommunityIdPath,
+        session: Annotated[AsyncSession, Depends(session_dependency)],
+    ) -> None:
+        await refuse_closed_surface(session, guild_id, key)
+
+    return _open
+
+
+async def refuse_closed_surface(session: AsyncSession, guild_id: int, key: str) -> None:
+    """Refuse while the deployment has closed surface ``key`` for the
+    community: :func:`require_surface_open`, for a route that configures the
+    surface on only one of its branches."""
+    from app.services.platform import rules
+
+    if not await rules.community_value(session, guild_id, key):
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail=GuildMessages.COMMUNITY_SURFACE_CLOSED,
+        )
 
 
 async def require_direct_messages_enabled(session: UserSessionDep) -> None:

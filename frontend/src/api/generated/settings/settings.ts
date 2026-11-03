@@ -657,6 +657,9 @@ export const useUpdateNotificationSettings = <
   return useMutation(getUpdateNotificationSettingsMutationOptions(options), queryClient);
 };
 /**
+ * The accent colours, and whether arriving visitors are asked about
+ * cookies. ``cookie_consent_enabled`` is left alone when omitted, so saving a
+ * colour does not silently answer it.
  * @summary Update Interface Settings
  */
 export const updateInterfaceSettings = (

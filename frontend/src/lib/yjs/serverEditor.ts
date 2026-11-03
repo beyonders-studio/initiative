@@ -11,6 +11,7 @@
  * state is written as.
  */
 import { buildEditorFromExtensions } from "@lexical/extension";
+import { $convertFromMarkdownString } from "@lexical/markdown";
 import {
   type Binding,
   createBinding,
@@ -19,7 +20,9 @@ import {
   syncYjsChangesToLexical,
 } from "@lexical/yjs";
 import {
+  $createLineBreakNode,
   $createParagraphNode,
+  $createTextNode,
   $getRoot,
   $isElementNode,
   $isTextNode,
@@ -40,6 +43,7 @@ import {
 } from "yjs";
 
 import { documentExtension } from "@/components/ui/editor/document-extension";
+import { MARKDOWN_TRANSFORMERS } from "@/components/ui/editor/extensions/markdown-shortcuts-extension";
 import { COLLAB_EXCLUDED_PROPERTIES } from "@/components/ui/editor/nodes/image-node";
 import { registerLegacyNodes } from "@/components/ui/editor/nodes/legacy-nodes";
 
@@ -337,4 +341,41 @@ function apply(state: string, json: string, clientId: number): string {
   });
 }
 
-(globalThis as { serverEditor?: unknown }).serverEditor = { apply, bootstrap, render };
+/**
+ * The editor JSON a text reads as: Markdown through the transformers the
+ * editor's own Markdown view uses, or, `plain`, as paragraphs, split at blank
+ * lines, with each line kept.
+ */
+function fromMarkdown(text: string, plain: boolean): string {
+  return withEditor(null, (editor) => {
+    editor.update(
+      () => {
+        const root = $getRoot();
+        root.clear();
+        if (plain) {
+          for (const block of text.replace(/\r\n?/g, "\n").split(/\n{2,}/)) {
+            const paragraph = $createParagraphNode();
+            block.split("\n").forEach((line, index) => {
+              if (index > 0) paragraph.append($createLineBreakNode());
+              if (line) paragraph.append($createTextNode(line));
+            });
+            root.append(paragraph);
+          }
+        } else {
+          $convertFromMarkdownString(text, MARKDOWN_TRANSFORMERS);
+        }
+        if (root.getChildrenSize() === 0) root.append($createParagraphNode());
+      },
+      { discrete: true }
+    );
+    modernize(editor);
+    return JSON.stringify(editor.getEditorState().toJSON());
+  });
+}
+
+(globalThis as { serverEditor?: unknown }).serverEditor = {
+  apply,
+  bootstrap,
+  fromMarkdown,
+  render,
+};

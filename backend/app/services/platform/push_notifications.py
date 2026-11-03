@@ -45,6 +45,11 @@ PUSH_CHANNELS: dict[NotificationType, str] = {
     NotificationType.initiative_join_requested: "initiative_added",
     NotificationType.initiative_join_approved: "initiative_added",
     NotificationType.initiative_join_denied: "initiative_added",
+    # Asking for something in an initiative is the same kind of news, one
+    # level down.
+    NotificationType.share_requested: "initiative_added",
+    NotificationType.share_granted: "initiative_added",
+    NotificationType.share_declined: "initiative_added",
     NotificationType.project_added: "project_added",
     NotificationType.mention: "mention",
     NotificationType.comment_on_task: "comments",
@@ -75,6 +80,12 @@ PUSH_CHANNELS: dict[NotificationType, str] = {
     NotificationType.event_cancelled: "calendar_events",
     NotificationType.event_rsvp: "calendar_events",
     NotificationType.event_reminder: "event_reminder",
+    # Tasks and events alike, which no channel the installed app registers
+    # describes, so the general one until the digests share a channel (#3065).
+    NotificationType.coming_up: DEFAULT_CHANNEL,
+    # A reminder too, so it rides the channel event reminders already register:
+    # a new channel id would mean a native release.
+    NotificationType.task_reminder: "event_reminder",
     NotificationType.access_grant_requested: "access_grants",
     NotificationType.access_grant_approved: "access_grants",
     NotificationType.access_grant_denied: "access_grants",

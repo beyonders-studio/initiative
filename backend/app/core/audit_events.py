@@ -276,6 +276,14 @@ class AuditEventType(str, Enum):
     #: Between member and admin. A change to or from the seat that holds a
     #: community's sign-in is ``GUILD_SUPERADMIN_CHANGED`` instead.
     GUILD_MEMBER_ROLE_CHANGED = "guild.member_role_changed", AuditCategory.AUTHORIZATION
+    #: A custom role made, changed or deleted: what it holds and on which
+    #: rung. ``detail.action`` says which.
+    GUILD_CUSTOM_ROLE_CHANGED = "guild.custom_role_changed", AuditCategory.AUTHORIZATION
+    #: A custom role given to a member, or taken off.
+    GUILD_CUSTOM_ROLE_ASSIGNED = (
+        "guild.custom_role_assigned",
+        AuditCategory.AUTHORIZATION,
+    )
     #: The seat turning one member's personal API keys off or on for the
     #: community.
     GUILD_MEMBER_API_ACCESS_CHANGED = (

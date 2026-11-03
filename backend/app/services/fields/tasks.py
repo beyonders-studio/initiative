@@ -35,7 +35,7 @@ from app.services.fields.spec import (
     SortContext,
     computed,
 )
-from app.services.tenant import properties as properties_service
+from app.services.tenant import metadata as metadata_service
 
 #: Columns that are the recurrence feature's own state — the rule, its end, the
 #: strategy that applies it, the counter that tracks it and the series a task
@@ -122,7 +122,7 @@ def _property_values(op: FilterOp, value: Any, ctx: FieldContext) -> Any:
         # Unknown or cross-guild property — silently skip (defense in depth,
         # consistent with the rest of apply_filters).
         return None
-    return properties_service.build_single_property_clause(
+    return metadata_service.build_single_property_clause(
         "task", pid, op, value.get("value"), defn
     )
 
@@ -135,15 +135,12 @@ def _plugin_values(op: FilterOp, value: Any, ctx: FieldContext) -> Any:
     by the key a value names for it. A field the person is not drawn, or a
     facet it does not declare, contributes nothing, as an unknown property
     does."""
-    # Local: the plug-in values service reads schemas that read this registry.
-    from app.services.tenant import plugin_metadata  # noqa: WPS433
-
     if not isinstance(value, dict):
         return None
     field = ctx.plugin_fields.get(str(value.get("field")))
     if field is None:
         return None
-    return plugin_metadata.filter_clause(
+    return metadata_service.filter_clause(
         field, op, value.get("value"), value.get("facet")
     )
 

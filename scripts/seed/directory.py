@@ -37,8 +37,7 @@ DIRECTORY: list[dict] = [
         "categories": [CommunityCategory.art, CommunityCategory.ttrpg],
         "admin": "Elara Moonwhisper",
         "members": ["Thorn Ironforge", "Vex Shadowstep"],
-        "icon": ((8, 145, 178), (14, 116, 144)),
-        "banner": ((6, 78, 96), (8, 145, 178)),
+        "photo": "book-pages",
         "initiatives": [
             {
                 "name": "Map Swap",
@@ -89,8 +88,7 @@ DIRECTORY: list[dict] = [
             "Aurelia Brightshield",
             "Thorn Ironforge",
         ],
-        "icon": ((124, 58, 237), (76, 29, 149)),
-        "banner": ((49, 16, 100), (124, 58, 237)),
+        "photo": "theater",
         "initiatives": [
             {
                 "name": "Playtest Queue",
@@ -137,8 +135,7 @@ DIRECTORY: list[dict] = [
             "Platform Member",
             "Platform Support",
         ],
-        "icon": ((234, 88, 12), (194, 65, 12)),
-        "banner": ((124, 45, 18), (234, 88, 12)),
+        "photo": "breakfast-club",
         "initiatives": [
             {
                 "name": "This Month's Tables",
@@ -178,8 +175,7 @@ DIRECTORY: list[dict] = [
         "categories": [CommunityCategory.art, CommunityCategory.technology],
         "admin": "Vex Shadowstep",
         "members": ["Elara Moonwhisper", "Seraphina Dawnlight"],
-        "icon": ((219, 39, 119), (157, 23, 77)),
-        "banner": ((131, 24, 67), (219, 39, 119)),
+        "photo": "classroom",
         "initiatives": [
             {
                 "name": "Studio",
@@ -225,8 +221,7 @@ DIRECTORY: list[dict] = [
             "Dungeon Master",
             "Kael Windrunner",
         ],
-        "icon": ((22, 163, 74), (21, 128, 61)),
-        "banner": ((20, 83, 45), (22, 163, 74)),
+        "photo": "street",
         "initiatives": [
             {
                 "name": "Season Plan",
@@ -271,8 +266,7 @@ DIRECTORY: list[dict] = [
         "categories": [CommunityCategory.business, CommunityCategory.education],
         "admin": "Thorn Ironforge",
         "members": ["Platform Operator", "Platform Moderator"],
-        "icon": ((15, 118, 110), (17, 94, 89)),
-        "banner": ((4, 47, 46), (15, 118, 110)),
+        "photo": "campus",
         "initiatives": [
             {
                 "name": "Roundtable",
@@ -339,7 +333,7 @@ async def _community(
         creator=users[spec["admin"]],
     )
     await guilds.list_in_directory(session, guild, categories=spec["categories"])
-    await guilds.set_images(session, guild, icon=spec["icon"], banner=spec["banner"])
+    await guilds.set_images(session, guild, spec["photo"])
     await session.commit()
     guilds.expunge_guild_scoped(session)
     await provision_guild(guild.id)

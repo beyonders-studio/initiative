@@ -102,7 +102,7 @@ class TestNobodyIsCarried:
     def test_a_body_mention_and_reference_become_text_and_uploads_go(self):
         file = {
             "type": "initiative-file",
-            "file_type": "native",
+            "file_type": "lexical",
             "name": "Notes",
             "mention_handles": ["alice#1234"],
             "content": _editor(
@@ -298,17 +298,3 @@ class TestPictures:
         }
         paragraph = strip_for_listing(Tool.post, post)["body"]["root"]["children"][0]
         assert paragraph["children"] == [{"type": "image", "src": kept}]
-
-    def test_a_catalog_keeps_only_what_travelled(self):
-        from app.services.marketplace.media import media_path
-
-        kept = media_path(self.DIGEST)
-        catalog = {
-            "type": "initiative-catalog",
-            "name": "Moodboard",
-            "cover": "abc.png",
-            "items": [{"storage_key": kept}, {"storage_key": "abc.png"}],
-        }
-        stripped = strip_for_listing(Tool.catalog, catalog)
-        assert stripped["items"] == [{"storage_key": kept}]
-        assert stripped["cover"] is None

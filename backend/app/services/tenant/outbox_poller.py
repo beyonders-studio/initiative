@@ -635,12 +635,16 @@ async def _drain_subscription(
             )
         else:
             actor_id, actor_plugin = None, plugin_events[0][1]
-        guild_ref, actor_refs = await webhook_refs.name_for_subscriber(
+        named = await webhook_refs.name_for_subscriber(
             guild_id=guild_id,
             plugin=subscriber,
             subscription_id=subscription.id,
             actor_ids=() if actor_id is None else (actor_id,),
         )
+        if named is None:
+            # Deleted while this pass read it: there is nobody to tell.
+            continue
+        guild_ref, actor_refs = named
 
         accepted = await deliver(
             target_url=subscription.target_url,

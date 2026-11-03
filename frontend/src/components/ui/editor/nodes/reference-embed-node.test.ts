@@ -66,32 +66,6 @@ describe("an embed in markdown", () => {
     expect(exported).toBe(source);
   });
 
-  it("reads a kind stored under its earlier spelling as today's", () => {
-    const editor = makeEditor();
-    editor.update(() => $convertFromMarkdownString("![[document:7|Brief]]", [EMBED]), {
-      discrete: true,
-    });
-    editor.getEditorState().read(() => {
-      const embed = $getRoot().getFirstChild();
-      expect($isReferenceEmbedNode(embed) && embed.getEntityType()).toBe(SearchEntityType.file);
-    });
-
-    let stored: string | undefined;
-    editor.update(
-      () => {
-        stored = ReferenceEmbedNode.importJSON({
-          type: "reference-embed",
-          version: 1,
-          entityType: "document" as SearchEntityType,
-          entityId: 7,
-          text: "Brief",
-        }).getEntityType();
-      },
-      { discrete: true }
-    );
-    expect(stored).toBe(SearchEntityType.file);
-  });
-
   it("stays text when it names no kind of thing", () => {
     const editor = makeEditor();
     editor.update(() => $convertFromMarkdownString("![[spell:3|Fireball]]", [EMBED]), {

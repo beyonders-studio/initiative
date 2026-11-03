@@ -1,7 +1,7 @@
 from datetime import date, datetime, timezone
 from typing import List, Optional, TYPE_CHECKING
 
-from sqlalchemy import Column, Date, DateTime, Text
+from sqlalchemy import Column, Date, DateTime, Text, UniqueConstraint
 from sqlmodel import Field, Relationship
 
 from app.core.tools import Tool
@@ -37,7 +37,12 @@ class Project(
     # A tool row is written before anything has been shared, so it is read
     # back by no RETURNING clause: the id comes from the sequence first and
     # the INSERT stands alone. See app/db/initiative_rls.py.
-    __table_args__ = {"implicit_returning": False}
+    __table_args__ = (
+        # What a project's metadata is keyed to, so it is in the project's
+        # initiative.
+        UniqueConstraint("id", "initiative_id", name="uq_projects_id_initiative"),
+        {"implicit_returning": False},
+    )
 
     id: Optional[int] = Field(default=None, primary_key=True)
     name: str = Field(index=True, nullable=False)

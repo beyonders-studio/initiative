@@ -29,16 +29,10 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
-import { useAppConfig } from "@/hooks/useAppConfig";
 import { useUploadFile } from "@/hooks/useFiles";
 import { type ToolRef, useRelate } from "@/hooks/useRelationships";
 import { fileIcon } from "@/lib/fileIcon";
-import {
-  FILE_UPLOAD_ACCEPT,
-  formatBytes,
-  getFileTypeLabel,
-  nameWithoutExtension,
-} from "@/lib/fileUtils";
+import { formatBytes, getFileTypeLabel, nameWithoutExtension } from "@/lib/fileUtils";
 import { toast } from "@/lib/mascotToast";
 import {
   canAssert,
@@ -86,7 +80,6 @@ export const AddLinkDialog = ({
   onClose,
 }: AddLinkDialogProps) => {
   const { t } = useTranslation(["relations", "files"]);
-  const { maxUploadBytes } = useAppConfig();
 
   /** Set only once somebody overrides what was proposed for what they picked. */
   const [groupKey, setGroupKey] = useState<RelationGroupKey | null>(null);
@@ -153,10 +146,6 @@ export const AddLinkDialog = ({
   };
 
   const chooseFile = (next: File) => {
-    if (maxUploadBytes !== null && next.size > maxUploadBytes) {
-      toast.error(t("files:create.fileTooLarge"));
-      return;
-    }
     if (farType !== SearchEntityType.file) setGroupKey(null);
     setPicked(null);
     setFile(next);
@@ -213,9 +202,7 @@ export const AddLinkDialog = ({
     defaultValue: t("anchor.generic"),
   });
 
-  const fileMark = file
-    ? fileIcon({ file_type: "file", mime_type: file.type, original_filename: file.name })
-    : null;
+  const fileMark = file ? fileIcon({ mime_type: file.type, original_filename: file.name }) : null;
 
   return (
     <Dialog open onOpenChange={(open) => (open ? null : onClose())}>
@@ -282,11 +269,7 @@ export const AddLinkDialog = ({
           ) : canUpload ? (
             /* The other way to name the far end: something that is not in the
                app yet. */
-            <FileDropArea
-              accept={FILE_UPLOAD_ACCEPT}
-              onFile={chooseFile}
-              prompt={t("dialog.upload.prompt")}
-            />
+            <FileDropArea onFile={chooseFile} prompt={t("dialog.upload.prompt")} />
           ) : null}
 
           {farType && farTitle ? (

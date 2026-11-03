@@ -32,7 +32,7 @@ import {
 import { Tabs, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { ToggleGroup, ToggleGroupItem } from "@/components/ui/toggle-group";
 import { useAllProjects, useProjectTaskStatuses } from "@/hooks/useProjects";
-import { useProperties } from "@/hooks/useProperties";
+import { NO_DEFINITIONS, useOwnedDefinitions } from "@/hooks/useProperties";
 import {
   CARD,
   type EmbedDisplay,
@@ -42,7 +42,7 @@ import {
   TASK_MODES,
   type TaskQuery,
 } from "@/lib/embeds";
-import { LAYOUT_NAMESPACES } from "@/lib/layouts/fields";
+import { groupFields, LAYOUT_NAMESPACES } from "@/lib/layouts/fields";
 import { pluginFields, usePluginsOnItems } from "@/lib/layouts/plugins";
 import { TASK_COLUMNS, taskFields } from "@/lib/layouts/tasks";
 import { entityIcon } from "@/lib/searchResults";
@@ -323,7 +323,11 @@ function TaskSettings({
   const { t: fieldName } = useTranslation(LAYOUT_NAMESPACES);
   const { data: projects } = useAllProjects({ initiative_id: query.initiative_id });
   const { data: statuses = [] } = useProjectTaskStatuses(query.project_id);
-  const { data: definitions = [] } = useProperties({ initiativeId: query.initiative_id });
+  // One project's tasks can show its metadata too.
+  const { data: definitions = NO_DEFINITIONS } = useOwnedDefinitions({
+    initiativeId: query.initiative_id,
+    owner: query.project_id === null ? undefined : { kind: "project", id: query.project_id },
+  });
   const plugins = usePluginsOnItems(query.initiative_id);
   const fields = useMemo(
     () => taskFields(definitions, pluginFields(plugins, i18n.language)),
@@ -344,7 +348,9 @@ function TaskSettings({
         />
       </div>
       <div className="space-y-2">
-        <Label className="block text-muted-foreground text-xs">{t("embeds.tasks.from")}</Label>
+        <Label htmlFor="embed-tasks-from" className="block text-muted-foreground text-xs">
+          {t("embeds.tasks.from")}
+        </Label>
         <Select
           value={query.project_id === null ? WHOLE_INITIATIVE : String(query.project_id)}
           onValueChange={(value) =>
@@ -356,7 +362,7 @@ function TaskSettings({
             })
           }
         >
-          <SelectTrigger>
+          <SelectTrigger id="embed-tasks-from">
             <SelectValue />
           </SelectTrigger>
           <SelectContent>
@@ -375,6 +381,7 @@ function TaskSettings({
           memberScope: { type: "initiative", initiativeId: query.initiative_id },
           statuses: query.project_id === null ? [] : statuses,
           initiativeId: query.initiative_id,
+          projectId: query.project_id ?? undefined,
         }}
         value={query.filters}
         onChange={(filters) => onQuery({ ...query, filters })}
@@ -394,16 +401,24 @@ function TaskSettings({
           onDisplay(mode === "table" ? { mode, columns: TASK_COLUMNS } : { mode })
         }
       />
-      {display.mode === "table" ? (
-        <Choices
-          options={[...fields.values()].map((field) => ({
-            value: field.id,
-            label: field.source === "builtin" ? fieldName(field.label as never) : field.label,
-          }))}
-          chosen={display.columns ?? TASK_COLUMNS}
-          onChange={(columns) => onDisplay({ mode: "table", columns })}
-        />
-      ) : null}
+      {display.mode === "table"
+        ? // Each column under whose it is, as the layout editor lists fields.
+          groupFields([...fields.values()]).map((group) => (
+            <fieldset key={group.key} className="space-y-2">
+              <legend className="mb-2 text-muted-foreground text-xs">
+                {group.plugin === undefined ? fieldName(group.heading as never) : group.heading}
+              </legend>
+              <Choices
+                options={group.fields.map((field) => ({
+                  value: field.id,
+                  label: field.source === "builtin" ? fieldName(field.label as never) : field.label,
+                }))}
+                chosen={display.columns ?? TASK_COLUMNS}
+                onChange={(columns) => onDisplay({ mode: "table", columns })}
+              />
+            </fieldset>
+          ))
+        : null}
     </div>
   );
 }

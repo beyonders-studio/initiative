@@ -14,7 +14,6 @@ from sqlmodel.ext.asyncio.session import AsyncSession
 from app.models.platform.guild import CommunityRole
 from app.models.platform.push_token import PushToken
 from app.models.platform.user import UserRole
-from app.services.platform import app_settings as app_settings_service
 from app.services.platform import notification_policy, push_tokens
 from app.testing import (
     create_guild,
@@ -22,6 +21,7 @@ from app.testing import (
     get_auth_headers,
     guild_administration,
 )
+from app.services.platform import rules
 
 
 PLATFORM = "/api/v1/settings/notifications"
@@ -174,9 +174,11 @@ async def test_the_seat_sets_its_communitys_answers(
     body = written.json()
     assert body["allow_push_notifications"] is False
     assert body["redact_notification_content"] is True
-    await session.refresh(seat.guild)
-    assert seat.guild.allow_push_notifications is False
-    assert seat.guild.redact_notification_content is True
+    stored = (await rules.community_values(session, [seat.guild.id], applied=False))[
+        seat.guild.id
+    ]
+    assert stored["allow_push_notifications"] is False
+    assert stored["redact_notification_content"] is True
     assert not (await notification_policy.resolve(session, seat.guild.id)).push
 
     # They apply while it holds the ``restrictions`` option they need.
@@ -193,10 +195,8 @@ async def test_the_page_is_told_what_the_deployment_already_asks(
     answer twice."""
     seat = await acting_user(guild_role=CommunityRole.superadmin)
     await guild_administration(session, seat.guild, auth_options=["restrictions"])
-    row = await app_settings_service.ensure_settings_row(session)
-    row.push_notifications_enabled = False
-    row.redact_notification_content = True
-    session.add(row)
+    await rules.put(session, "push_notifications_enabled", False)
+    await rules.put(session, "redact_notification_content", True)
     await session.commit()
 
     body = (await client.get(_settings(seat.guild.id), headers=seat.headers)).json()
@@ -227,7 +227,9 @@ async def test_one_communitys_answer_does_not_reach_another(
         headers=seat.headers,
     )
 
-    await session.refresh(elsewhere)
-    assert elsewhere.allow_push_notifications is True
-    assert elsewhere.allow_email_notifications is True
-    assert elsewhere.redact_notification_content is False
+    stored = (await rules.community_values(session, [elsewhere.id], applied=False))[
+        elsewhere.id
+    ]
+    assert stored["allow_push_notifications"] is True
+    assert stored["allow_email_notifications"] is True
+    assert stored["redact_notification_content"] is False

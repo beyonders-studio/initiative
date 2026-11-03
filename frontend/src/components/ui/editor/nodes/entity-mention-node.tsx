@@ -24,7 +24,7 @@ import {
 } from "lexical";
 import type { JSX } from "react";
 
-import { SearchEntityType } from "@/api/generated/initiativeAPI.schemas";
+import type { SearchEntityType } from "@/api/generated/initiativeAPI.schemas";
 import { EditorEntityReference } from "@/components/ui/editor/nodes/entity-reference";
 import { storedEntityType } from "@/lib/smartChips";
 
@@ -161,25 +161,4 @@ export function $isEntityMentionNode(
   node: LexicalNode | null | undefined
 ): node is EntityMentionNode {
   return node instanceof EntityMentionNode;
-}
-
-/**
- * A stored `wikilink` read as the reference it always was.
- *
- * `[[ ]]` wrote its own node before references were one thing, and those are
- * still sitting in documents. Registering this conversion means they render
- * live like everything else, and are rewritten as references the next time the
- * document is saved — no migration, and nothing lost if it never is.
- */
-export function $convertLegacyWikilink(serialized: {
-  documentId: number | null;
-  documentTitle?: string;
-  text?: string;
-}): EntityMentionNode | null {
-  if (typeof serialized.documentId !== "number" || serialized.documentId <= 0) return null;
-  return $createEntityMentionNode(
-    SearchEntityType.file,
-    serialized.documentId,
-    serialized.documentTitle ?? serialized.text ?? ""
-  );
 }

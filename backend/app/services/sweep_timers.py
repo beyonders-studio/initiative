@@ -130,22 +130,25 @@ def sweeps() -> tuple[Sweep, ...]:
     """Every sweep that runs on timers, read once."""
     from app.core.intake import IntakeStream, meta
     from app.db.soft_delete_filter import SOFT_DELETE_MODELS
+    from app.models.tenant.batched_notice import BatchedNotice
     from app.models.tenant.calendar_event import CalendarEvent, CalendarEventAttendee
     from app.models.tenant.content_hold import ContentHold
     from app.models.tenant.engagement_level import EngagementLevel
     from app.models.tenant.event_outbox import EventOutbox
     from app.models.tenant.evidence import Evidence
-    from app.models.tenant.export_job import ExportJob, ExportJobStatus
+    from app.models.tenant.data_job import (
+        HOLDS_FILE,
+        DataJob,
+        DataJobDirection,
+        DataJobStatus,
+    )
     from app.models.tenant.guild_plugin import GuildPlugin
-    from app.models.tenant.import_job import ImportJob, ImportJobStatus
     from app.models.tenant.intake import IntakeCase
     from app.models.tenant.moderation import ModerationReport
     from app.models.tenant.personal_item import PersonalItem
-    from app.models.tenant.reaction_digest import ReactionDigestItem
     from app.models.tenant.task import Task, TaskStatus, TaskStatusCategory
-    from app.models.tenant.task_assignment_digest import TaskAssignmentDigestItem
     from app.models.tenant.upload import Upload
-    from app.services import notifications
+    from app.services import data_jobs, notifications, resumable
     from app.services.export import worker as export_worker
     from app.services.import_engine import worker as import_worker
     from app.services.marketplace import community_hooks, plugin_installs
@@ -161,6 +164,7 @@ def sweeps() -> tuple[Sweep, ...]:
         plugin_updates,
         post_publication,
         subscription_notices,
+        thumbnails,
         trash_purge,
     )
     from app.services.tenant.attachments import (
@@ -177,16 +181,14 @@ def sweeps() -> tuple[Sweep, ...]:
         return select(func.now()).where(condition)
 
     hour, minute = timedelta(hours=1), timedelta(minutes=1)
-    imports_pending = (
-        ImportJobStatus.staged.value,
-        ImportJobStatus.fetching.value,
-        ImportJobStatus.queued.value,
-    )
-    imports_finished = tuple(
-        status.value
-        for status in ImportJobStatus
-        if status.value not in (*imports_pending, ImportJobStatus.running.value)
-    )
+    dispatchers = (export_worker.jobs, import_worker.jobs)
+
+    def job_is(direction: DataJobDirection, statuses: Iterable[DataJobStatus]) -> str:
+        """A trigger's ``when``: the written data job goes that way and holds
+        one of the statuses."""
+        listed = ", ".join(f"'{status.value}'" for status in statuses)
+        return f"(NEW.direction = '{direction.value}' AND NEW.status IN ({listed}))"
+
     change_log_sources = (
         on_insert(
             "event_outbox",
@@ -194,7 +196,6 @@ def sweeps() -> tuple[Sweep, ...]:
         ),
         on_insert("plugin_event_outbox", after=change_log.RETENTION),
     )
-    digest_items = (TaskAssignmentDigestItem, ReactionDigestItem)
     case_keep = {
         stream.value: timedelta(days=meta(stream).retention_days)
         for stream in IntakeStream
@@ -317,25 +318,22 @@ def sweeps() -> tuple[Sweep, ...]:
             visit=claim_jobs,
             # Armed at once by a job queued or ended, so it is claimed now.
             next_due=lambda _now: least(
-                when_exists(
-                    exists().where(ExportJob.status == ExportJobStatus.queued.value)
-                    & ~exists().where(ExportJob.status == ExportJobStatus.running.value)
-                ),
-                when_exists(
-                    exists().where(ImportJob.status == ImportJobStatus.queued.value)
-                    & ~exists().where(
-                        col(ImportJob.status).in_(
-                            (
-                                ImportJobStatus.fetching.value,
-                                ImportJobStatus.running.value,
-                            )
+                *(
+                    when_exists(
+                        exists().where(
+                            DataJob.direction == jobs.direction,
+                            DataJob.status == DataJobStatus.queued,
+                        )
+                        & ~exists().where(
+                            DataJob.direction == jobs.direction,
+                            col(DataJob.status).in_(jobs.active),
                         )
                     )
-                ),
+                    for jobs in dispatchers
+                )
             ),
-            sources=tuple(
-                on_row(table, "now()", events="INSERT OR UPDATE OF status")
-                for table in ("export_jobs", "import_jobs")
+            sources=(
+                on_row("data_jobs", "now()", events="INSERT OR UPDATE OF status"),
             ),
         ),
         Sweep(
@@ -366,33 +364,42 @@ def sweeps() -> tuple[Sweep, ...]:
             # Heartbeats only push these later, so they arm nothing.
             next_due=lambda _now: least(
                 select(
-                    func.min(ExportJob.updated_at) + export_worker.STALE_RUNNING
-                ).where(ExportJob.status == ExportJobStatus.running.value),
+                    func.min(DataJob.updated_at) + export_worker.STALE_RUNNING
+                ).where(
+                    DataJob.direction == DataJobDirection.export,
+                    DataJob.status == DataJobStatus.running,
+                ),
                 select(
-                    func.min(ImportJob.updated_at) + import_worker.STALE_RUNNING
-                ).where(ImportJob.status == ImportJobStatus.running.value),
+                    func.min(DataJob.updated_at) + import_worker.STALE_RUNNING
+                ).where(
+                    DataJob.direction == DataJobDirection.import_,
+                    DataJob.status == DataJobStatus.running,
+                ),
                 select(
-                    func.min(ImportJob.updated_at) + import_worker.STALE_FETCHING
-                ).where(ImportJob.status == ImportJobStatus.fetching.value),
+                    func.min(DataJob.updated_at) + import_worker.STALE_FETCHING
+                ).where(
+                    DataJob.direction == DataJobDirection.import_,
+                    DataJob.status == DataJobStatus.fetching,
+                ),
             ),
             sources=(
                 on_row(
-                    "export_jobs",
+                    "data_jobs",
                     "now()",
                     after=export_worker.STALE_RUNNING,
                     events="INSERT OR UPDATE OF status",
-                    when=f"NEW.status = '{ExportJobStatus.running.value}'",
+                    when=job_is(DataJobDirection.export, (DataJobStatus.running,)),
                 ),
                 on_row(
-                    "import_jobs",
+                    "data_jobs",
                     "now()",
                     after=min(
                         import_worker.STALE_RUNNING, import_worker.STALE_FETCHING
                     ),
                     events="INSERT OR UPDATE OF status",
-                    when=(
-                        f"NEW.status IN ('{ImportJobStatus.running.value}',"
-                        f" '{ImportJobStatus.fetching.value}')"
+                    when=job_is(
+                        DataJobDirection.import_,
+                        (DataJobStatus.running, DataJobStatus.fetching),
                     ),
                 ),
             ),
@@ -434,58 +441,69 @@ def sweeps() -> tuple[Sweep, ...]:
                 ),
             ),
         ),
+        # Resumable uploads nobody finished or took.
         Sweep(
-            kind="export_expiry",
+            kind="resumable_uploads",
             scope=Scope.PROVISIONED,
             every=hour,
-            visit=export_worker.expire_artifacts,
-            next_due=lambda _now: select(func.min(ExportJob.expires_at)).where(
-                ExportJob.status == ExportJobStatus.done.value,
-                col(ExportJob.expires_at).is_not(None),
-            ),
+            visit=resumable.expire,
+            next_due=resumable.next_due,
+            sources=(on_row("pending_uploads", "{row}.expires_at"),),
+        ),
+        # Uploaded pictures drawn smaller, as they arrive.
+        Sweep(
+            kind="thumbnails",
+            scope=Scope.ACTIVE,
+            every=minute,
+            visit=thumbnails.draw_pending,
+            next_due=thumbnails.next_due,
             sources=(
                 on_row(
-                    "export_jobs",
-                    "{row}.expires_at",
-                    events="INSERT OR UPDATE OF expires_at, status",
-                    when=(
-                        f"NEW.status = '{ExportJobStatus.done.value}'"
-                        " AND NEW.expires_at IS NOT NULL"
-                    ),
+                    "file_versions",
+                    "now()",
+                    events="INSERT OR UPDATE OF thumbnail_state",
+                    when="NEW.thumbnail_state = 'pending'",
                 ),
             ),
         ),
         Sweep(
-            kind="import_expiry",
+            kind="data_job_expiry",
             scope=Scope.PROVISIONED,
             every=hour,
-            visit=import_worker.expire_payloads,
+            visit=data_jobs.expire_files,
             next_due=lambda _now: least(
-                select(func.min(ImportJob.expires_at)).where(
-                    col(ImportJob.status).in_(imports_pending),
-                    col(ImportJob.expires_at).is_not(None),
+                select(func.min(DataJob.expires_at)).where(
+                    data_jobs.holds_file(), col(DataJob.expires_at).is_not(None)
                 ),
                 when_exists(
                     exists().where(
-                        col(ImportJob.status).in_(imports_finished),
-                        col(ImportJob.secret_encrypted).is_not(None),
+                        DataJob.direction == DataJobDirection.import_,
+                        col(DataJob.status).in_(data_jobs.IMPORT_OVER),
+                        col(DataJob.secret_encrypted).is_not(None),
                     )
                 ),
             ),
             sources=(
                 on_row(
-                    "import_jobs",
+                    "data_jobs",
                     "{row}.expires_at",
-                    events="INSERT OR UPDATE OF expires_at",
-                    when="NEW.expires_at IS NOT NULL",
+                    events="INSERT OR UPDATE OF expires_at, status",
+                    when=(
+                        "NEW.expires_at IS NOT NULL AND ("
+                        + " OR ".join(
+                            job_is(direction, statuses)
+                            for direction, statuses in HOLDS_FILE.items()
+                        )
+                        + ")"
+                    ),
                 ),
                 on_row(
-                    "import_jobs",
+                    "data_jobs",
                     "now()",
                     events="UPDATE OF status",
                     when=(
-                        f"NEW.status IN ({', '.join(repr(s) for s in imports_finished)})"
-                        " AND NEW.secret_encrypted IS NOT NULL"
+                        job_is(DataJobDirection.import_, data_jobs.IMPORT_OVER)
+                        + " AND NEW.secret_encrypted IS NOT NULL"
                     ),
                 ),
             ),
@@ -601,47 +619,43 @@ def sweeps() -> tuple[Sweep, ...]:
             ),
         ),
         Sweep(
-            kind="digest_gc",
+            kind="batch_gc",
             scope=Scope.LIVE,
             every=hour,
-            visit=notifications.expire_digest_items,
-            next_due=lambda _now: least(
-                *(
-                    select(
-                        func.min(item.created_at)
-                        + notifications.ASSIGNMENT_ITEM_RETENTION
-                    )
-                    for item in digest_items
-                )
+            visit=notifications.expire_batched_notices,
+            next_due=lambda _now: select(
+                func.min(BatchedNotice.created_at) + notifications.BATCH_RETENTION
             ),
-            sources=tuple(
-                on_insert(
-                    str(item.__tablename__),
-                    after=notifications.ASSIGNMENT_ITEM_RETENTION,
-                )
-                for item in digest_items
+            sources=(
+                on_insert("batched_notices", after=notifications.BATCH_RETENTION),
             ),
         ),
         *(
             Sweep(
-                kind=spec.name.replace("-", "_"),
+                kind=spec.name,
                 scope=Scope.LIVE,
                 every=minute,
-                # A person's digest gathers from every community they are in;
+                # A person's batch gathers from every community they are in;
                 # the finish answers when each community's waiting items are
                 # next due.
-                prepare=partial(_digest, spec),
+                prepare=partial(_batch, spec),
                 next_due=lambda now, spec=spec: select(
-                    func.min(spec.model.created_at) + spec.quiet_period
+                    func.min(BatchedNotice.created_at) + spec.quiet_period
                 ).where(
-                    col(spec.model.processed_at).is_(None),
-                    spec.model.created_at > now - timedelta(days=1),
+                    col(BatchedNotice.kind) == spec.kind,
+                    col(BatchedNotice.processed_at).is_(None),
+                    BatchedNotice.created_at > now - timedelta(days=1),
                 ),
                 sources=(
-                    on_insert(str(spec.model.__tablename__), after=spec.quiet_period),
+                    on_row(
+                        "batched_notices",
+                        "{row}.created_at",
+                        after=spec.quiet_period,
+                        when=f"NEW.kind = '{spec.kind.value}'",
+                    ),
                 ),
             )
-            for spec in (notifications.ASSIGNMENT_DIGEST, notifications.REACTION_DIGEST)
+            for spec in notifications.BATCHES
         ),
         Sweep(
             kind="reminders",
@@ -692,6 +706,25 @@ def sweeps() -> tuple[Sweep, ...]:
             ),
         ),
         Sweep(
+            kind="task_reminders",
+            scope=Scope.LIVE,
+            every=minute,
+            prepare=_task_reminders,
+            answers=True,
+            next_due=lambda _now: select(func.min(PersonalItem.remind_at)).where(
+                col(PersonalItem.remind_at).is_not(None),
+                col(PersonalItem.reminded_at).is_(None),
+            ),
+            sources=(
+                on_row(
+                    "personal_items",
+                    "{row}.remind_at",
+                    events="INSERT OR UPDATE OF remind_at, reminded_at",
+                    when="NEW.remind_at IS NOT NULL AND NEW.reminded_at IS NULL",
+                ),
+            ),
+        ),
+        Sweep(
             kind="overdue",
             scope=Scope.LIVE,
             every=timedelta(minutes=5),
@@ -707,6 +740,54 @@ def sweeps() -> tuple[Sweep, ...]:
                     when="NEW.due_date IS NOT NULL AND NEW.archived_at IS NULL",
                 ),
                 on_row("task_assignees", "now()"),
+                on_row(
+                    "projects",
+                    "now()",
+                    events="UPDATE OF archived_at, is_template",
+                ),
+                # A status moved out of done reopens its tasks.
+                on_row("task_statuses", "now()", events="UPDATE OF category"),
+            ),
+        ),
+        Sweep(
+            kind="coming_up",
+            scope=Scope.LIVE,
+            every=timedelta(minutes=5),
+            # The finish answers each community's next digest time: the
+            # soonest of its people with something coming up.
+            prepare=_coming_up,
+            next_due=lambda now: least(
+                notifications.coming_up_tasks(
+                    func.min(Task.due_date) - notifications.COMING_UP_REACH,
+                    after=now,
+                    until=None,
+                ),
+                notifications.attending(
+                    func.min(CalendarEvent.start_at) - notifications.COMING_UP_REACH,
+                    after=now,
+                    until=None,
+                ),
+            ),
+            sources=(
+                on_row(
+                    "tasks",
+                    "{row}.due_date - interval '8 days'",
+                    events="INSERT OR UPDATE OF due_date, task_status_id, archived_at",
+                    when="NEW.due_date IS NOT NULL AND NEW.archived_at IS NULL",
+                ),
+                on_row("task_assignees", "now()"),
+                on_row(
+                    "calendar_events",
+                    "CASE WHEN {row}.recurrence IS NULL"
+                    " THEN {row}.start_at - interval '8 days' ELSE now() END",
+                    events=(
+                        "INSERT OR UPDATE OF start_at, recurrence,"
+                        " recurrence_until, deleted_at"
+                    ),
+                    when="NEW.deleted_at IS NULL",
+                ),
+                on_row("calendar_event_attendees", "now()"),
+                on_row("calendar_event_answers", "now()", events="INSERT OR UPDATE"),
                 on_row(
                     "projects",
                     "now()",
@@ -763,10 +844,10 @@ def sweeps() -> tuple[Sweep, ...]:
     )
 
 
-async def _digest(spec: Any) -> Scan:
+async def _batch(spec: Any) -> Scan:
     from app.services import notifications
 
-    return notifications.digest_scan(spec, now=datetime.now(timezone.utc))
+    return notifications.batch_scan(spec, now=datetime.now(timezone.utc))
 
 
 async def _reminders() -> Scan:
@@ -775,10 +856,22 @@ async def _reminders() -> Scan:
     return await notifications.reminder_scan(now=datetime.now(timezone.utc))
 
 
+async def _task_reminders() -> Scan:
+    from app.services import notifications
+
+    return notifications.task_reminder_scan(now=datetime.now(timezone.utc))
+
+
 async def _overdue() -> Scan:
     from app.services import notifications
 
     return notifications.overdue_scan(now=datetime.now(timezone.utc))
+
+
+async def _coming_up() -> Scan:
+    from app.services import notifications
+
+    return notifications.coming_up_scan(now=datetime.now(timezone.utc))
 
 
 def _by_kind() -> dict[str, Sweep]:

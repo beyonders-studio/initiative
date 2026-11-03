@@ -1,80 +1,25 @@
 from typing import Optional
 
 from sqlalchemy import (
-    ARRAY,
     Boolean,
-    CheckConstraint,
     Column,
     ForeignKey,
     Integer,
     String,
     text,
 )
-from sqlalchemy.dialects.postgresql import ENUM as PGEnum, JSONB
-from sqlmodel import Enum as SQLEnum, Field, SQLModel
+from sqlalchemy.dialects.postgresql import JSONB
+from sqlmodel import Field, SQLModel
 from pydantic import ConfigDict
 
-from app.core.login_methods import (
-    DEFAULT_LOGIN_METHODS,
-    LoginMethod,
-    SecondFactorRequirement,
-)
-from app.models.platform.user_dm_settings import DmPolicy
 
 # Platform OIDC config lives on the provider registry row (``auth_providers``
-# slug ``oidc``), not here. Which ways in the deployment permits does — see
-# ``login_methods`` below and ``app.services.platform.auth_posture``.
-
-
-#: ``DEFAULT_LOGIN_METHODS`` as Postgres writes an array literal, so the set is
-#: stated once rather than here and in ``login_methods`` below. The migrations
-#: that moved this default keep their own copies: a migration is the record of
-#: what changed when, and is not read for what the default is now.
-_DEFAULT_LOGIN_METHODS_SQL = "{%s}" % ",".join(m.value for m in DEFAULT_LOGIN_METHODS)
-
-
-#: The retention window a deployment gets until it says otherwise, in days.
-#:
-#: The figure is the deployment's, not a community's: one answer for everybody
-#: on the server, set by whoever runs it. A community cannot shorten or extend
-#: its own, which is what makes the window mean something to the person
-#: deleting theirs.
-DEFAULT_GUILD_RETENTION_DAYS = 90
-
-#: The window a deployment gets for a deleted **account**, in days.
-#:
-#: Shorter than the community one by default: a community's window protects a
-#: body of work that several people made, an account's protects one person
-#: from a decision they made in a moment, and thirty days is what somebody
-#: takes to change their mind.
-#:
-#: It is a separate figure from the community's rather than one setting for
-#: both, because they answer to different things — what a deployment owes the
-#: people in it, and what it owes the person leaving.
-DEFAULT_ACCOUNT_RETENTION_DAYS = 30
-
-#: How long a community sits on hold before it is deleted, in days.
-#:
-#: Deleted, not destroyed: once this runs out the community moves to
-#: ``deleted`` and the retention window above starts, so an operator can still
-#: put it back. The figure is the deployment's, like the retention window.
-DEFAULT_HOLD_DELETION_DAYS = 30
-
-#: The shortest window a deployment may set, for either. A day, because a
-#: window measured in hours is not one somebody notices their mistake inside
-#: of.
-MIN_GUILD_RETENTION_DAYS = 1
-
-#: The longest. Past this, the answer being asked for is "never", which is what
-#: clearing the figure says.
-MAX_GUILD_RETENTION_DAYS = 3650
+# slug ``oidc``), not here. Which ways in the deployment permits is the rule
+# ``login_methods`` (``app.core.rules``).
 
 
 class AppSetting(SQLModel, table=True):
     __tablename__ = "app_settings"
-    __table_args__ = (
-        CheckConstraint("max_guest_days >= 1", name="ck_app_settings_max_guest_days"),
-    )
     __allow_unmapped__ = True
     model_config = ConfigDict(arbitrary_types_allowed=True)
 
@@ -87,17 +32,6 @@ class AppSetting(SQLModel, table=True):
     dark_accent_color: str = Field(
         default="#60a5fa",
         sa_column=Column(String(20), nullable=False, server_default="#60a5fa"),
-    )
-
-    # Whether an arriving visitor is asked what this deployment may keep in
-    # their browser. Off by default: most deployments are a group's own server,
-    # reached by people who were sent a link, and a question nobody needed is
-    # just something in the way. An owner running a public front door turns it
-    # on. The answer itself lives in that browser and never reaches here —
-    # there is no account behind a landing-page visitor to attach it to.
-    cookie_consent_enabled: bool = Field(
-        default=False,
-        sa_column=Column(Boolean, nullable=False, server_default="false"),
     )
 
     # What this deployment is running, and what it was running before that.
@@ -118,106 +52,6 @@ class AppSetting(SQLModel, table=True):
     transitions: dict[str, str] = Field(
         default_factory=dict,
         sa_column=Column(JSONB, nullable=False, server_default=text("'{}'::jsonb")),
-    )
-
-    # Which ways in this deployment permits. A Postgres enum array: adding a
-    # method later is a value on the type, not a column per method, and the
-    # database validates the elements rather than a hand-kept CHECK list. The
-    # non-empty constraint is the "at least one" rule — see
-    # ``app.core.login_methods``.
-    # How long somebody may stay signed in before signing in again, in hours.
-    # This is the *absolute* limit; ``AUTH_REFRESH_TTL_DAYS`` is the separate
-    # question of how long they may leave the app alone.
-    #
-    # NULL, the default, asks for no limit — a self-hosted deployment is not
-    # answering to anybody, and the idle window already ends a session nobody
-    # uses. It also has to be longer than that window to mean anything: set
-    # equal to it, the absolute limit always binds first and the idle window
-    # stops sliding, so a daily user is signed out on a timer regardless.
-    session_max_hours: Optional[int] = Field(
-        default=None,
-        sa_column=Column(Integer, nullable=True),
-    )
-
-    # And the other half: the longest a session may be left alone. NULL keeps
-    # ``AUTH_REFRESH_TTL_DAYS``, which is where this question was answered
-    # before and still is for a deployment that says nothing. A figure here
-    # narrows it; a community held to the compliance standard narrows it
-    # further. Whichever is strictest binds, which is what a limit means.
-    session_idle_minutes: Optional[int] = Field(
-        default=None,
-        sa_column=Column(Integer, nullable=True),
-    )
-
-    # How long a deleted community is kept before it is destroyed, in days.
-    #
-    # NULL is not the default here, unlike the limit above: it means **never**
-    # destroy one. A deployment that has undertaken to keep what its members
-    # put in it — or that is holding everything pending something unresolved —
-    # says so by clearing this, and deleted communities then sit in the
-    # operator's list until somebody restores or purges one deliberately.
-    #
-    # 90 days on a fresh install and on every upgrade, because that is the
-    # figure the retention window shipped as.
-    # How long a deleted account is kept before it is erased, in days.
-    #
-    # NULL means never, as it does above: the deployment keeps the account and
-    # nothing erases it on a timer. That is the answer for one required to keep
-    # accounts rather than to remove them, and the reason this is a setting at
-    # all rather than the constant it started as.
-    deleted_account_retention_days: Optional[int] = Field(
-        default=DEFAULT_ACCOUNT_RETENTION_DAYS,
-        sa_column=Column(
-            Integer, nullable=True, server_default=str(DEFAULT_ACCOUNT_RETENTION_DAYS)
-        ),
-    )
-
-    deleted_community_retention_days: Optional[int] = Field(
-        default=DEFAULT_GUILD_RETENTION_DAYS,
-        sa_column=Column(
-            Integer, nullable=True, server_default=str(DEFAULT_GUILD_RETENTION_DAYS)
-        ),
-    )
-    # How long a community stays on hold before it is deleted, in days, counted
-    # from when it was put there. NULL means never: a held community waits for
-    # somebody to lift the hold or delete it.
-    on_hold_community_deletion_days: Optional[int] = Field(
-        default=DEFAULT_HOLD_DELETION_DAYS,
-        sa_column=Column(
-            Integer, nullable=True, server_default=str(DEFAULT_HOLD_DELETION_DAYS)
-        ),
-    )
-    login_methods: list[str] = Field(
-        default_factory=lambda: [m.value for m in DEFAULT_LOGIN_METHODS],
-        sa_column=Column(
-            ARRAY(PGEnum(LoginMethod, name="login_method", create_type=False)),
-            nullable=False,
-            server_default=_DEFAULT_LOGIN_METHODS_SQL,
-        ),
-    )
-
-    # Who this deployment asks to hold a second factor. A Postgres enum for
-    # the same reason ``login_methods`` is one: the database validates the
-    # value, and a rung added later is a value on the type rather than a
-    # column here. ``nobody`` on every fresh and upgraded install, so an
-    # upgrade asks nothing of anybody it was not already asking.
-    #
-    # What answers it is the account holding one — a confirmed authenticator
-    # or a registered passkey — or a session that presented one, which is what
-    # an identity provider's own second factor looks like from here. The
-    # per-session reading is a community's question (``require_methods``);
-    # this one is about the account.
-    second_factor_requirement: SecondFactorRequirement = Field(
-        default=SecondFactorRequirement.nobody,
-        sa_column=Column(
-            PGEnum(
-                SecondFactorRequirement,
-                name="second_factor_requirement",
-                create_type=False,
-            ),
-            nullable=False,
-            server_default=SecondFactorRequirement.nobody.value,
-        ),
     )
 
     smtp_host: Optional[str] = Field(
@@ -245,44 +79,6 @@ class AppSetting(SQLModel, table=True):
         default=None, sa_column=Column(String(255), nullable=True)
     )
 
-    # Whether this deployment runs a community directory at all: the browsable
-    # list of guilds that have opted in, and the invite-free join that goes with
-    # it. Off until an owner turns it on, so a deployment that never wanted a
-    # public front door does not grow one on upgrade.
-    community_directory_enabled: bool = Field(
-        default=False,
-        sa_column=Column(Boolean, nullable=False, server_default="false"),
-    )
-
-    # Whether this deployment checks age at all. On, sign-up refuses anyone
-    # under their country's minimum, an account says it is 16 or older before
-    # it joins a guild listed in that directory or opens its direct messages,
-    # and a plug-in's minimum age applies. A private guild is its own to answer
-    # for, and asks nobody's age.
-    # On by default, and only a platform owner
-    # turns it off — doing so is that owner asserting that every account on the
-    # deployment already belongs to an adult, which is a thing an enterprise
-    # rollout knows and a public one does not. Off, nothing asks and every
-    # account counts as an adult. Independent of the directory switch above so
-    # the assertion survives the directory being toggled.
-    community_age_gate_enabled: bool = Field(
-        default=True,
-        sa_column=Column(Boolean, nullable=False, server_default="true"),
-    )
-
-    # Whether communities may have guests: outside people in for a set time,
-    # who take no seat. Off by default, so a deployment has guests only once
-    # its owner turns them on. Off, no guest membership admits anybody.
-    guests_enabled: bool = Field(
-        default=False,
-        sa_column=Column(Boolean, nullable=False, server_default="false"),
-    )
-    # The longest a guest membership may run, in days. A community's own
-    # longest sits under it.
-    max_guest_days: int = Field(
-        default=90,
-        sa_column=Column(Integer, nullable=False, server_default="90"),
-    )
     # Whether this deployment runs as the demo (``DEMO_MODE``), written from
     # the environment at every boot. Only here may a guest membership carry a
     # rung above ``guest``.
@@ -291,103 +87,6 @@ class AppSetting(SQLModel, table=True):
         sa_column=Column(Boolean, nullable=False, server_default="false"),
     )
 
-    # Whether the platform's sign-in placement rules apply to every community
-    # they name, rather than only to the communities that accepted them on
-    # their connection. For a deployment that is one organisation, where the
-    # communities are its teams. Every change is recorded.
-    provider_placement_everywhere: bool = Field(
-        default=False,
-        sa_column=Column(Boolean, nullable=False, server_default="false"),
-    )
-
-    # Whether this deployment offers direct messages at all -- My Messages,
-    # and every connection and message request that feeds it. On by default, so
-    # a deployment that upgrades into it keeps the messaging its people are
-    # already using; a platform owner turns it off for somewhere messaging does
-    # not belong. Switching it off keeps every channel and policy exactly as it
-    # was, so switching it back on restores them rather than rebuilding them.
-    direct_messages_enabled: bool = Field(
-        default=True,
-        sa_column=Column(Boolean, nullable=False, server_default="true"),
-    )
-
-    # Whether search may order a community's content by how many members
-    # engaged with it lately. Each community is asked too, and off wins, so a
-    # community can turn off what this allows and never the reverse.
-    engagement_ranking_enabled: bool = Field(
-        default=True,
-        sa_column=Column(Boolean, nullable=False, server_default="true"),
-    )
-
-    # Whether a member's share to this deployment's marketplace goes on the
-    # shelf straight away. Off by default: each one waits for the owner to
-    # approve it. A deployment whose members all know each other turns it on.
-    marketplace_members_publish_directly: bool = Field(
-        default=False,
-        sa_column=Column(Boolean, nullable=False, server_default="false"),
-    )
-
-    # Whether this deployment follows the marketplace registry: listings,
-    # publishers and plug-in registrations from the TUF repository whose root
-    # ships in the image (or the one ``MARKETPLACE_REGISTRY_ROOT`` names). On
-    # by default. Off stops the background refresh; what already arrived stays.
-    marketplace_registry_enabled: bool = Field(
-        default=True,
-        sa_column=Column(Boolean, nullable=False, server_default="true"),
-    )
-
-    # The direct-message policy a newly created account starts on. Read once,
-    # when the account is created, and copied into its ``user_dm_settings`` row;
-    # changing it later moves nobody, so raising it opens no existing account
-    # and lowering it revokes no channel anybody is using.
-    default_dm_policy: DmPolicy = Field(
-        default=DmPolicy.private,
-        sa_column=Column(
-            SQLEnum(DmPolicy, name="user_dm_policy", create_type=False),
-            nullable=False,
-            server_default=DmPolicy.private.value,
-        ),
-    )
-
-    # Whether a notification may reach a phone at all. On by default, which is
-    # what every deployment has had. Off means this deployment sends none: no
-    # push leaves it, the registration endpoint declines, and the push tokens
-    # it was holding are dropped, so switching it off is the whole answer rather
-    # than the delivery half of one. Devices register again when it comes back.
-    push_notifications_enabled: bool = Field(
-        default=True,
-        sa_column=Column(Boolean, nullable=False, server_default="true"),
-    )
-
-    # And the other place a notification lands: a mailbox. Off means no
-    # notification email is written, on any cadence. It is the *notification*
-    # half of email and nothing else — a sign-in code, an address to confirm, a
-    # password reset and the notices an account gets about itself are not
-    # notifications and keep going, because switching this off must not lock
-    # anybody out of their account.
-    email_notifications_enabled: bool = Field(
-        default=True,
-        sa_column=Column(Boolean, nullable=False, server_default="true"),
-    )
-
-    # Whether a notification that leaves the app may say what it is about. Off
-    # by default: a push that reads "Ana mentioned you in Q3 budget" is the one
-    # worth sending. On, a notification that leaves reduces to the kind of thing
-    # that happened — "You were mentioned in a comment" — and the app is where
-    # the rest of it is. The bell inside the app is unaffected either way.
-    redact_notification_content: bool = Field(
-        default=False,
-        sa_column=Column(Boolean, nullable=False, server_default="false"),
-    )
-
-    # AI config ownership mode: "platform" (the operator's connections apply to
-    # every guild), "guild" (each guild admin configures its own), or "disabled".
-    # Provider config itself lives in platform_ai_connections /
-    # guild_ai_connections; only the global mode lives here.
-    ai_config_mode: str = Field(
-        default="disabled",
-        sa_column=Column(String(20), nullable=False, server_default="disabled"),
-    )
     # Monotonic counter bumped on every operator AI-config write (mode or
     # platform connection). Read on the request's own (guild) session as the
     # cross-worker cache-freshness signal, so a change is picked up by every

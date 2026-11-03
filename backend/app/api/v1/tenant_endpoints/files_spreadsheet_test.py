@@ -43,7 +43,7 @@ async def _create_sheet(
     payload: dict[str, Any] = {
         "name": "Sheet",
         "initiative_id": a.initiative.id,
-        "file_type": "spreadsheet",
+        "file_type": "sheet",
         **fields,
     }
     if content is not None:
@@ -89,7 +89,7 @@ async def test_create_spreadsheet_round_trips_cells(client: AsyncClient, author:
         name="Q2 Numbers",
     )
     assert created.status_code == 201, created.text
-    assert created.json()["file_type"] == "spreadsheet"
+    assert created.json()["file_type"] == "sheet"
 
     # GET round-trip preserves the cell map exactly.
     response = await client.get(
@@ -640,7 +640,7 @@ async def test_import_refuses_a_file_that_is_not_a_spreadsheet(
         json={
             "name": "Just notes",
             "initiative_id": author.initiative.id,
-            "file_type": "native",
+            "file_type": "lexical",
             "content": {},
         },
     )

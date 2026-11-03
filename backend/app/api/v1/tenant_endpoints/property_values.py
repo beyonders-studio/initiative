@@ -3,7 +3,7 @@
 Every target in ``PROPERTY_TARGETS`` is written here and nowhere else; each
 target's read carries its values as ``properties``. Which tool governs a target
 and how a row reaches it come from the properties seam
-(``properties_service.PROPERTY_LINKS``), so a new tool is writable here the
+(``metadata_service.PROPERTY_LINKS``), so a new tool is writable here the
 moment it exists.
 """
 
@@ -28,7 +28,8 @@ from app.schemas.tenant.property import (
     PropertyTarget,
     PropertyValuesSetRequest,
 )
-from app.services.tenant import properties as properties_service
+from app.services.tenant import metadata as metadata_service
+from app.services.tenant import required_fields
 
 router = APIRouter(route_class=ActorRoute)
 
@@ -41,7 +42,7 @@ PropertiesWrite = Annotated[
             "target",
             {
                 target: f"{tool_resource(spec.tool).value}:write"
-                for target, spec in properties_service.PROPERTY_LINKS.items()
+                for target, spec in metadata_service.PROPERTY_LINKS.items()
             },
         )
     ),
@@ -68,9 +69,14 @@ async def set_properties(
     type and options. An installed plug-in names the person a person-valued
     property holds by its reference for them. An empty list clears them all.
     """
-    spec = properties_service.PROPERTY_LINKS[target.value]
+    spec = metadata_service.PROPERTY_LINKS[target.value]
     row: Any
-    if spec.via is None:
+    if not spec.shared:
+        row = await resource_access.load_child(
+            session, spec.model, entity_id, access="write"
+        )
+        initiative_id = row.initiative_id
+    elif spec.via is None:
         row = await resource_access.load_authorized(
             session, spec.tool, entity_id, current_user, guild_context, access="write"
         )
@@ -91,8 +97,9 @@ async def set_properties(
         )
         initiative_id = governing.initiative_id
 
+    required = await required_fields.required_of(session, guild_context, row)
     try:
-        await properties_service.set_values(
+        await metadata_service.set_values(
             session,
             row,
             payload.values,
@@ -100,11 +107,12 @@ async def set_properties(
             removed=payload.removed if payload.merge else None,
             options=payload.options,
         )
+        await required_fields.refuse_emptied(session, required)
     except (HTTPException, CodedError):
         await session.rollback()
         raise
     await session.commit()
-    summaries = await properties_service.summaries_by_id(
+    summaries = await metadata_service.summaries_by_id(
         session, target.value, [entity_id]
     )
     return summaries.get(entity_id, [])

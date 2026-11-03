@@ -89,7 +89,7 @@ ALLOWED_DYNAMIC_SQL: dict[str, str] = {
     "app/testing/guild_pool.py::drop": (
         "test harness: int-derived test_pool_<id> schema name"
     ),
-    "app/models/tenant/property.py::PropertyValue": (
+    "app/models/tenant/metadata.py::MetadataValue": (
         "model DDL: the CHECK lists the PROPERTY_TARGETS constant, the partial "
         "indexes name the model's own value columns"
     ),
@@ -107,6 +107,9 @@ ALLOWED_DYNAMIC_SQL: dict[str, str] = {
         "digest of the registry render"
     ),
     "app/db/backfill_uploads_to_s3.py::_guild_upload_meta": (
+        "admin backfill job; schema name is int-derived guild_<id>"
+    ),
+    "app/db/backfill_uploads_to_s3.py::_guild_import_payloads": (
         "admin backfill job; schema name is int-derived guild_<id>"
     ),
     "app/db/bootstrap.py::_revoke_former_set_config_holders": (

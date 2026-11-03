@@ -21,7 +21,7 @@ from sqlmodel import select
 from app.models.tenant.initiative import (
     InitiativeMember,
     InitiativeRoleModel,
-    InitiativeRolePermission,
+    InitiativeRule,
     PermissionKey,
     DEFAULT_PERMISSION_VALUES,
 )
@@ -30,6 +30,7 @@ from app.models.platform.user import User
 # Re-export the RLS context helper so callers can import from a single place.
 from app.db.session import require_guild_context, set_rls_context  # noqa: F401
 from app.db.authorization import standing_arg
+from app.services.tenant.initiative_tools import member_permission_sql
 
 
 # ---------------------------------------------------------------------------
@@ -97,16 +98,20 @@ def _role_permits(permission_key: PermissionKey):
     default = DEFAULT_PERMISSION_VALUES.get(permission_key, False)
     return or_(
         InitiativeRoleModel.is_manager,
-        func.coalesce(InitiativeRolePermission.enabled, default),
+        func.coalesce(
+            member_permission_sql(InitiativeRoleModel, permission_key.value),
+            InitiativeRule.enabled,
+            default,
+        ),
     )
 
 
 def _with_permission_row(statement, permission_key: PermissionKey):
     return statement.outerjoin(
-        InitiativeRolePermission,
+        InitiativeRule,
         and_(
-            InitiativeRolePermission.initiative_role_id == InitiativeRoleModel.id,
-            InitiativeRolePermission.permission_key == permission_key,
+            InitiativeRule.initiative_role_id == InitiativeRoleModel.id,
+            InitiativeRule.key == permission_key,
         ),
     )
 

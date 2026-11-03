@@ -1,6 +1,14 @@
 import { SiAtlassian, SiTicktick, SiTodoist, SiVikunja } from "@icons-pack/react-simple-icons";
 import { AlertTriangle, CheckCircle2, FileUp, Loader2, XCircle } from "lucide-react";
-import { type ChangeEvent, type ReactNode, useCallback, useEffect, useMemo, useState } from "react";
+import {
+  type ChangeEvent,
+  type ReactNode,
+  useCallback,
+  useEffect,
+  useMemo,
+  useRef,
+  useState,
+} from "react";
 import { useTranslation } from "react-i18next";
 
 import {
@@ -10,7 +18,7 @@ import {
   usePreviewForeignImport,
   useUploadBackup,
 } from "@/api/generated/imports/imports";
-import type { ForeignPreview, ImportJobRead } from "@/api/generated/initiativeAPI.schemas";
+import type { DataJobRead, ForeignPreview } from "@/api/generated/initiativeAPI.schemas";
 import { Tool } from "@/api/generated/initiativeAPI.schemas";
 import {
   AtlassianChooseStep,
@@ -26,6 +34,7 @@ import { LogoIcon } from "@/components/LogoIcon";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
+import { Progress } from "@/components/ui/progress";
 import {
   Select,
   SelectContent,
@@ -43,7 +52,9 @@ import { BackupPeekError, type PeekedManifest, peekBackupManifest } from "@/lib/
 import { getErrorMessage } from "@/lib/errorMessage";
 import { formatBytes } from "@/lib/fileUtils";
 import { formatDateTime } from "@/lib/formatDate";
+import { numberFormat } from "@/lib/intl";
 import { toast } from "@/lib/mascotToast";
+import { uploadInPieces } from "@/lib/resumableUpload";
 import { getItem, removeItem, setItem } from "@/lib/storage";
 
 // Mirrors the backend's IMPORT_MAX_BACKUP_UPLOAD_BYTES — the UX
@@ -124,7 +135,11 @@ type Step =
  * the inbox notification.
  */
 export function ImportWizard({ open, onOpenChange }: ImportWizardProps) {
-  const { t } = useTranslation("imports");
+  const { t, i18n } = useTranslation("imports");
+  const percent = numberFormat(i18n.resolvedLanguage ?? i18n.language, {
+    style: "percent",
+    maximumFractionDigits: 0,
+  });
   const communityId = useActiveCommunityId();
   const importJob = useImportJob();
 
@@ -152,7 +167,15 @@ export function ImportWizard({ open, onOpenChange }: ImportWizardProps) {
   const [excludedProperties, setExcludedProperties] = useState<Set<string>>(new Set());
 
   const [pickError, setPickError] = useState<string | null>(null);
-  const [stagedJob, setStagedJob] = useState<ImportJobRead | null>(null);
+  const [stagedJob, setStagedJob] = useState<DataJobRead | null>(null);
+  // How much of the backup has arrived, and how to stop it.
+  const [sent, setSent] = useState(0);
+  const sending = useRef<AbortController | null>(null);
+  // Closing the wizard stops a backup still on its way.
+  useEffect(() => {
+    if (!open) sending.current?.abort();
+  }, [open]);
+  useEffect(() => () => sending.current?.abort(), []);
   // Source handle → the account picked for it. Seeded from the plan's exact
   // matches; a handle left out of it stays unmapped on purpose.
   const [peopleMap, setPeopleMap] = useState<Record<string, number | null>>({});
@@ -248,7 +271,7 @@ export function ImportWizard({ open, onOpenChange }: ImportWizardProps) {
 
   const forgetJiraJob = () => removeItem(atlassianJobKey(communityId));
 
-  const handleJiraStarted = (job: ImportJobRead) => {
+  const handleJiraStarted = (job: DataJobRead) => {
     setItem(atlassianJobKey(communityId), String(job.id));
     setJiraJobId(job.id);
     // Past this point the site is being read; the way out is Cancel.
@@ -256,7 +279,7 @@ export function ImportWizard({ open, onOpenChange }: ImportWizardProps) {
   };
 
   const handleJiraStaged = useCallback(
-    (job: ImportJobRead) => {
+    (job: DataJobRead) => {
       setStagedJob(job);
       commit("review");
     },
@@ -344,11 +367,25 @@ export function ImportWizard({ open, onOpenChange }: ImportWizardProps) {
       return;
     }
     go("uploading");
+    sending.current = new AbortController();
+    setSent(0);
     try {
-      const job = await uploadMutation.mutateAsync({ communityId: communityId, data: { file } });
+      const job = await uploadInPieces(
+        communityId,
+        file,
+        file.name,
+        { purpose: "backup" },
+        (upload_id) => uploadMutation.mutateAsync({ communityId, data: { upload_id } }),
+        {
+          signal: sending.current.signal,
+          onProgress: (arrived, total) => setSent(total ? arrived / total : 1),
+        }
+      );
       setStagedJob(job);
       commit("plan");
     } catch (err) {
+      // Stopped by closing the wizard: nothing went wrong.
+      if (sending.current?.signal.aborted) return;
       toast.error(getErrorMessage(err, "imports:envelope.error"));
       back();
     }
@@ -367,7 +404,7 @@ export function ImportWizard({ open, onOpenChange }: ImportWizardProps) {
           selection,
           content: foreignText,
         },
-      })) as { result: { entity_title: string; unmatched_handles: string[] } } | ImportJobRead;
+      })) as { result: { entity_title: string; unmatched_handles: string[] } } | DataJobRead;
       // `id` rather than `result`, which a job row also carries (its report):
       // only a job has an id, so that is what tells the two apart.
       if (!("id" in response)) {
@@ -766,6 +803,8 @@ export function ImportWizard({ open, onOpenChange }: ImportWizardProps) {
         <div className="flex flex-col items-center gap-3 py-8">
           <Loader2 className="h-8 w-8 animate-spin text-muted-foreground" />
           <p className="text-muted-foreground text-sm">{t("wizard.uploading")}</p>
+          <Progress value={sent * 100} aria-label={t("wizard.uploading")} />
+          <p className="text-muted-foreground text-xs tabular-nums">{percent.format(sent)}</p>
         </div>
       )}
 

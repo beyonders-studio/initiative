@@ -19,6 +19,7 @@ from typing import Any, Callable, Iterable, Mapping, Optional, Sequence
 
 from fastapi import HTTPException, status
 from pydantic import ValidationError
+from sqlalchemy import and_, or_
 from sqlmodel import col, delete, select
 from sqlmodel.ext.asyncio.session import AsyncSession
 
@@ -27,12 +28,15 @@ from app.core.messages import TaskTypeMessages, ToolLayoutMessages
 from app.core.tools import (
     DETAIL_LAYOUTS,
     LAYOUT_DEFAULT,
+    LAYOUT_KIND_TARGETS,
+    LISTS_HIDDEN_AS_SHIPPED,
     LIST_LAYOUTS,
     TYPED_DETAILS,
     Tool,
 )
 from app.db.advisory_locks import LockNamespace, advisory_lock
 from app.db.session import require_guild_context
+from app.models.tenant.metadata import MetadataDefinition, MetadataType
 from app.models.tenant.task import TaskType
 from app.models.tenant.tool_layout import ToolLayout
 from app.schemas.tenant.tool_layout import (
@@ -53,7 +57,8 @@ from app.schemas.tenant.tool_layout import (
     DetailStackPart,
     CounterDetailFieldId,
     EventDetailFieldId,
-    CatalogItemDetailFieldId,
+    FieldPart,
+    FileFieldId,
     PostDetailFieldId,
     QueueItemDetailFieldId,
     ListLayoutDefinition,
@@ -63,6 +68,7 @@ from app.schemas.tenant.tool_layout import (
     SectionPart,
     StackPart,
     TaskDetailFieldId,
+    TaskFieldId,
     TaskFilterSpec,
     ToolLayoutDefaultWrite,
     ToolLayoutRead,
@@ -90,8 +96,6 @@ DETAIL_PARTS: dict[str, frozenset[str]] = {
     "calendar_event": _LAYOUT_PARTS
     | {"plugin", "dates", "rsvp", "actions", "relations"},
     "queue_item": _LAYOUT_PARTS | {"plugin", "actions", "relations"},
-    "catalog_item": _LAYOUT_PARTS
-    | {"plugin", "actions", "relations", "picture", "about", "versions"},
     "counter": _LAYOUT_PARTS | {"plugin", "actions", "relations", "count"},
     "post": _LAYOUT_PARTS
     | {
@@ -104,6 +108,9 @@ DETAIL_PARTS: dict[str, frozenset[str]] = {
         "relations",
         "comments",
     },
+    #: A file opened from a collection: its own fields, which it does not
+    #: edit, and the collection's fields and the initiative's properties.
+    "file": _LAYOUT_PARTS,
 }
 
 #: The built-in fields each kind of detail edits.
@@ -111,20 +118,73 @@ DETAIL_FIELDS: dict[str, frozenset[str]] = {
     "task": frozenset(field.value for field in TaskDetailFieldId),
     "calendar_event": frozenset(field.value for field in EventDetailFieldId),
     "queue_item": frozenset(field.value for field in QueueItemDetailFieldId),
-    "catalog_item": frozenset(field.value for field in CatalogItemDetailFieldId),
     "counter": frozenset(field.value for field in CounterDetailFieldId),
     "post": frozenset(field.value for field in PostDetailFieldId),
+    "file": frozenset(field.value for field in FileFieldId),
 }
+
+
+#: What a person fills in on each kind of detail that can require it: its
+#: built-in fields, and its parts that edit one (a task's dates, as one). Any
+#: of its properties can be required there too. A title is always required;
+#: what is never empty (a task's type, status and priority, an event's dates),
+#: what a plug-in fills and what nobody fills (who made it, when) cannot be.
+REQUIREABLE: dict[str, frozenset[str]] = {
+    "task": frozenset(
+        {"description", "assignees", "checklist", "recurrence", "tags", "dates"}
+    ),
+    "calendar_event": frozenset(
+        {"description", "location", "recurrence", "attendees", "tags"}
+    ),
+    "post": frozenset({"tags"}),
+    #: A collection's file page requires the collection's own metadata alone.
+    "file": frozenset(),
+}
+
+
+def required_keys(definition: Mapping[str, Any]) -> list[str]:
+    """What a stored detail layout requires, in the order it places them: a
+    field by its id, a part by its type."""
+    found: list[str] = []
+
+    def walk(nodes: Any) -> None:
+        for node in nodes or ():
+            if not isinstance(node, dict):
+                continue
+            props = node.get("props") or {}
+            if props.get("required"):
+                found.append(
+                    str(props.get("field"))
+                    if node.get("type") == "field"
+                    else str(node.get("type"))
+                )
+            walk(node.get("children"))
+
+    for region in ("header", "main", "side"):
+        walk(definition.get(region))
+    return list(dict.fromkeys(found))
+
+
+def _requireable(kind: str, key: str) -> bool:
+    return kind in REQUIREABLE and (
+        key in REQUIREABLE[kind] or key.startswith(PROPERTY_FIELD_PREFIX)
+    )
 
 
 @dataclass(frozen=True)
 class Target:
     """What a set of layouts is for."""
 
-    tool: Tool
+    #: A ``LAYOUT_TARGETS`` value: a tool, or a kind inside one that lays out
+    #: what it holds (a collection).
+    tool: str
     #: The instance, or None for the initiative's shared tool.
     tool_id: Optional[int]
     initiative_id: int
+
+    def __post_init__(self) -> None:
+        # A Tool member is held as the value it is stored as.
+        object.__setattr__(self, "tool", getattr(self.tool, "value", self.tool))
 
 
 def _bad_request(detail: str) -> HTTPException:
@@ -134,7 +194,7 @@ def _bad_request(detail: str) -> HTTPException:
 def _of(target: Target) -> tuple[Any, ...]:
     return (
         ToolLayout.initiative_id == target.initiative_id,
-        ToolLayout.tool == target.tool.value,
+        ToolLayout.tool == target.tool,
         col(ToolLayout.tool_id).is_not_distinct_from(target.tool_id),
     )
 
@@ -192,14 +252,15 @@ async def item_types_by_instance(
     return found
 
 
-def shown_lists(tool: Tool, stored: Mapping[str, dict[str, Any]]) -> tuple[str, ...]:
+def shown_lists(tool: str, stored: Mapping[str, dict[str, Any]]) -> tuple[str, ...]:
     """The lists a target shows, in order, from the definitions it stores by
     kind: each that its own definition does not hide. As shipped, every list
-    shows."""
+    shows but those ``LISTS_HIDDEN_AS_SHIPPED`` names."""
+    hidden = LISTS_HIDDEN_AS_SHIPPED.get(tool, frozenset())
     return tuple(
         kind
         for kind in LIST_LAYOUTS.get(tool, ())
-        if not stored.get(kind, {}).get("hidden", False)
+        if not stored.get(kind, {}).get("hidden", kind in hidden)
     )
 
 
@@ -223,7 +284,7 @@ def _require_one_shown(
 
 
 def read_set(
-    tool: Tool, rows: list[ToolLayout], types: Sequence[TaskType] = ()
+    tool: str, rows: list[ToolLayout], types: Sequence[TaskType] = ()
 ) -> list[ToolLayoutRead]:
     """Every layout the tool draws, its lists then its details, each as stored
     or as shipped. The target opens on its default list, or on the first. A
@@ -361,11 +422,12 @@ def check(target: Target, write: ToolLayoutWrite) -> dict[str, Any]:
         _within_limits(stored, roots, 0)
         if not all(
             _drawn_on(part, write.kind) for root in roots for part, _ in _parts(root, 1)
-        ):
+        ) or not all(_requireable(write.kind, key) for key in required_keys(stored)):
             raise _bad_request(ToolLayoutMessages.KIND_NOT_ALLOWED)
     else:
         _require(write.kind, LIST_LAYOUTS.get(target.tool, ()))
         assert isinstance(definition, ListLayoutDefinition)
+        _check_list_fields(target, write.kind, stored, definition)
         _check_presets(target.tool, write.kind, stored.get("presets") or [])
         if write.kind not in GROUPED_LISTS and (
             "groupings" in stored or "group_by" in stored
@@ -380,6 +442,49 @@ def check(target: Target, write: ToolLayoutWrite) -> dict[str, Any]:
             len(definition.columns or ()),
         )
     return stored
+
+
+#: The built-in fields a list may show, by what it lists: a collection's files,
+#: and every other list's tasks.
+_FILE_FIELDS = frozenset(field.value for field in FileFieldId)
+_TASK_FIELDS = frozenset(field.value for field in TaskFieldId)
+#: The parts a collection's card is made of. A plug-in's parts and fields are
+#: drawn on items, which a file is not.
+_FILE_CARD_PARTS = frozenset({"card", "stack", "field", "properties"})
+
+
+def _check_list_fields(
+    target: Target, kind: str, stored: dict[str, Any], definition: ListLayoutDefinition
+) -> None:
+    """Each built-in field a list shows one of what it lists. A collection's
+    list holds whether it is shown and what it shows of each file — its table
+    its columns, its other lists a card — and how its scales are drawn."""
+    cards = [definition.card] if definition.card is not None else []
+    parts = [part for root in cards for part, _ in _parts(root, 1)]
+    shown = [
+        getattr(field, "value", field)
+        for field in (
+            *(definition.columns or ()),
+            *(part.props.field for part in parts if isinstance(part, FieldPart)),
+        )
+    ]
+    builtin = {
+        field
+        for field in shown
+        if not field.startswith((PROPERTY_FIELD_PREFIX, PLUGIN_FIELD_PREFIX))
+    }
+    if target.tool not in LAYOUT_KIND_TARGETS:
+        if builtin - _TASK_FIELDS:
+            raise _bad_request(ToolLayoutMessages.KIND_NOT_ALLOWED)
+        return
+    held = {"hidden", "displays", "columns" if kind == "table" else "card"}
+    if (
+        set(stored) - held
+        or builtin - _FILE_FIELDS
+        or any(field.startswith(PLUGIN_FIELD_PREFIX) for field in shown)
+        or any(part.type not in _FILE_CARD_PARTS for part in parts)
+    ):
+        raise _bad_request(ToolLayoutMessages.KIND_NOT_ALLOWED)
 
 
 #: The lists that group their tasks: a project's table, board and Gantt.
@@ -426,7 +531,7 @@ PRESET_FILTERS: dict[Tool, type[TaskFilterSpec] | type[CalendarFilterSpec]] = {
 }
 
 
-def _check_presets(tool: Tool, kind: str, presets: list[dict[str, Any]]) -> None:
+def _check_presets(tool: str, kind: str, presets: list[dict[str, Any]]) -> None:
     """Refuse presets whose filters are not the tool's shape, or a sort on a
     list other than a table, the one a person sorts by its own."""
     shape = PRESET_FILTERS.get(tool)
@@ -446,7 +551,7 @@ async def _locked_rows(session: AsyncSession, target: Target) -> list[ToolLayout
     await advisory_lock(
         session,
         LockNamespace.TOOL_LAYOUTS,
-        f"{guild_id}:{target.tool.value}:{target.tool_id}:{target.initiative_id}",
+        f"{guild_id}:{target.tool}:{target.tool_id}:{target.initiative_id}",
     )
     return await list_rows(session, target)
 
@@ -487,7 +592,7 @@ async def _keep(
         session.add(
             ToolLayout(
                 initiative_id=target.initiative_id,
-                tool=target.tool.value,
+                tool=target.tool,
                 tool_id=target.tool_id,
                 kind=kind,
                 task_type_id=task_type_id,
@@ -501,11 +606,84 @@ async def _keep(
     await session.flush()
 
 
+async def start(
+    session: AsyncSession,
+    target: Target,
+    lists: Mapping[str, dict[str, Any]],
+    default: str,
+) -> None:
+    """Lay out a target made in this transaction: each of ``lists`` as its
+    definition, held to what a write of it would be, opening on ``default``.
+    Nothing else can have laid it out yet, so nothing is read first."""
+    for kind, definition in lists.items():
+        stored = check(
+            target,
+            ListLayoutWrite.model_validate({"kind": kind, "definition": definition}),
+        )
+        session.add(
+            ToolLayout(
+                initiative_id=target.initiative_id,
+                tool=target.tool,
+                tool_id=target.tool_id,
+                kind=kind,
+                definition=stored,
+            )
+        )
+    _require(default, shown_lists(target.tool, lists))
+    session.add(
+        ToolLayout(
+            initiative_id=target.initiative_id,
+            tool=target.tool,
+            tool_id=target.tool_id,
+            kind=LAYOUT_DEFAULT,
+            definition={"kind": default},
+        )
+    )
+    await session.flush()
+
+
+async def _require_requireable_properties(
+    session: AsyncSession, target: Target, kind: str, definition: dict[str, Any]
+) -> None:
+    """A 400 unless each property the layout requires is one its items carry
+    and a person fills in: the initiative's (or on a task, its project's), or
+    on a file the collection's own metadata. A checkbox is never empty, so it
+    is never required. One the initiative no longer has requires nothing, as
+    at enforcement, so a page that places it still saves."""
+    ids = {
+        int(key.removeprefix(PROPERTY_FIELD_PREFIX))
+        for key in required_keys(definition)
+        if key.startswith(PROPERTY_FIELD_PREFIX)
+    }
+    if not ids:
+        return
+    collection_id = target.tool_id if kind == "file" else None
+    project_id = target.tool_id if target.tool == Tool.project.value else None
+    held = await session.exec(
+        select(
+            MetadataDefinition.collection_id,
+            MetadataDefinition.project_id,
+            MetadataDefinition.type,
+        ).where(
+            col(MetadataDefinition.id).in_(ids),
+            MetadataDefinition.initiative_id == target.initiative_id,
+        )
+    )
+    if any(
+        owner != collection_id
+        or project not in (None, project_id)
+        or kind_of is MetadataType.checkbox
+        for owner, project, kind_of in held.all()
+    ):
+        raise _bad_request(ToolLayoutMessages.KIND_NOT_ALLOWED)
+
+
 async def save(session: AsyncSession, target: Target, write: ToolLayoutWrite) -> None:
     """Change one of the target's layouts, so long as it still shows a list."""
     definition = check(target, write)
     task_type_id = getattr(write, "task_type_id", None)
     await _require_type(session, target, task_type_id)
+    await _require_requireable_properties(session, target, write.kind, definition)
     rows = await _locked_rows(session, target)
     _require_one_shown(target, rows, write.kind, definition)
     await _keep(session, target, write.kind, definition, task_type_id, rows=rows)
@@ -668,6 +846,12 @@ def remapped_definition(definition: dict[str, Any], remap: Remap) -> dict[str, A
         copy["columns"] = [
             mapped for column in definition["columns"] if (mapped := field(column))
         ]
+    if isinstance(definition.get("displays"), dict):
+        copy["displays"] = {
+            mapped: display
+            for key, display in definition["displays"].items()
+            if (mapped := field(key))
+        }
     if isinstance(definition.get("limits"), list):
         copy["limits"] = [
             {**entry, "status_id": mapped}
@@ -711,16 +895,20 @@ async def copy_layouts(
     *,
     status_mapping: dict[int, int],
     type_mapping: dict[int, int],
+    fields: Optional[Mapping[int, int]] = None,
 ) -> None:
     """Give ``copy`` what ``source`` stored, its presets' statuses and its
-    pages' types its own."""
+    pages' types its own, and a collection's own fields (``fields``, by the
+    source's field id) the copy's."""
+    same = copy.initiative_id == source.initiative_id
+    fields = fields or {}
     for row in await list_rows(session, source):
         if row.task_type_id is not None and row.task_type_id not in type_mapping:
             continue
         session.add(
             ToolLayout(
                 initiative_id=copy.initiative_id,
-                tool=copy.tool.value,
+                tool=copy.tool,
                 tool_id=copy.tool_id,
                 kind=row.kind,
                 task_type_id=(
@@ -732,10 +920,8 @@ async def copy_layouts(
                     row.definition,
                     Remap(
                         statuses=status_mapping.get,
-                        properties=(
-                            None
-                            if copy.initiative_id == source.initiative_id
-                            else lambda _id: None
+                        properties=lambda property_id: fields.get(
+                            property_id, property_id if same else None
                         ),
                         types=type_mapping.get,
                     ),
@@ -798,7 +984,7 @@ async def restore_layouts(
         session.add(
             ToolLayout(
                 initiative_id=target.initiative_id,
-                tool=target.tool.value,
+                tool=target.tool,
                 tool_id=target.tool_id,
                 kind=kind,
                 task_type_id=task_type_id,
@@ -809,14 +995,14 @@ async def restore_layouts(
 
 
 async def drop_for_instances(
-    session: AsyncSession, tool: Tool, tool_ids: Iterable[int]
+    session: AsyncSession, tool: str, tool_ids: Iterable[int]
 ) -> None:
     """Remove these instances' layouts, as they are purged."""
     ids = list(tool_ids)
     if ids:
         await session.exec(
             delete(ToolLayout).where(
-                ToolLayout.tool == tool.value, col(ToolLayout.tool_id).in_(ids)
+                ToolLayout.tool == tool, col(ToolLayout.tool_id).in_(ids)
             )
         )
 
@@ -949,6 +1135,95 @@ async def add_to_saved_lists(
     await session.flush()
 
 
+async def repoint_properties(
+    session: AsyncSession,
+    initiative_id: int,
+    instances: Iterable[tuple[str, int]],
+    moved: Mapping[int, int],
+) -> None:
+    """In every stored layout of these instances (``(tool, tool_id)``), show
+    each property ``moved`` names, by id, as the one it maps to: what merging
+    properties leaves behind. A layout that showed two of them, or one and the
+    one it maps to, shows it once, where it first did."""
+    held: dict[str, set[int]] = {}
+    for tool, tool_id in instances:
+        held.setdefault(tool, set()).add(tool_id)
+    if not held or not moved:
+        return
+    rows = await session.exec(
+        select(ToolLayout)
+        .where(
+            ToolLayout.initiative_id == initiative_id,
+            or_(
+                *(
+                    and_(ToolLayout.tool == tool, col(ToolLayout.tool_id).in_(ids))
+                    for tool, ids in held.items()
+                )
+            ),
+        )
+        .with_for_update()
+    )
+    remap = Remap(
+        statuses=lambda status_id: status_id,
+        properties=lambda property_id: moved.get(property_id, property_id),
+    )
+    merged = frozenset(f"{PROPERTY_FIELD_PREFIX}{to}" for to in moved.values())
+    for row in rows.all():
+        definition = _shown_once(remapped_definition(row.definition, remap), merged)
+        if definition == row.definition:
+            continue
+        write = (
+            DetailLayoutWrite
+            if row.kind in DETAIL_LAYOUTS.get(row.tool, ())
+            else ListLayoutWrite
+        )
+        _rewrite(session, row, write, definition)
+    await session.flush()
+
+
+def _shown_once(definition: dict[str, Any], fields: frozenset[str]) -> dict[str, Any]:
+    """``definition`` showing each of ``fields`` once, where it first did: as
+    a part, a column and a grouping."""
+    seen: set[str] = set()
+
+    def first(field: Any) -> bool:
+        if field not in fields:
+            return True
+        if field in seen:
+            return False
+        seen.add(field)
+        return True
+
+    def nodes(parts: list[Any]) -> list[Any]:
+        kept: list[Any] = []
+        for node in parts:
+            if isinstance(node, dict):
+                if node.get("type") == "field" and not first(
+                    (node.get("props") or {}).get("field")
+                ):
+                    continue
+                if isinstance(node.get("children"), list):
+                    node = {**node, "children": nodes(node["children"])}
+            kept.append(node)
+        return kept
+
+    copy = dict(definition)
+    for region in ("header", "main", "side"):
+        if isinstance(copy.get(region), list):
+            copy[region] = nodes(copy[region])
+    if isinstance(copy.get("card"), dict):
+        [copy["card"]] = nodes([copy["card"]])
+    if isinstance(copy.get("columns"), list):
+        seen.clear()
+        copy["columns"] = [column for column in copy["columns"] if first(column)]
+    if isinstance(copy.get("groupings"), list):
+        seen.clear()
+        copy["groupings"] = [
+            grouping for grouping in copy["groupings"] if first(grouping.get("field"))
+        ]
+    return copy
+
+
 def _rewrite(
     session: AsyncSession,
     row: ToolLayout,
@@ -956,7 +1231,7 @@ def _rewrite(
     definition: dict[str, Any],
 ) -> None:
     """Store ``definition`` on ``row``, unless it is not a layout it could hold."""
-    target = Target(Tool(row.tool), row.tool_id, row.initiative_id)
+    target = Target(row.tool, row.tool_id, row.initiative_id)
     try:
         typed = {"task_type_id": row.task_type_id} if row.task_type_id else {}
         check(

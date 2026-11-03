@@ -37,7 +37,7 @@ class ToolItemSpec:
 def _file_extra(file: File) -> dict[str, Any]:
     version = file.current_version
     return {
-        "file_type": (file.file_type.value if file.file_type is not None else None),
+        "file_type": file.file_type,
         "mime_type": getattr(version, "file_content_type", None),
         "original_filename": getattr(version, "original_filename", None),
     }

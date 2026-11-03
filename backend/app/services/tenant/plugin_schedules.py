@@ -23,7 +23,7 @@ A declarative plug-in has no hook to call: Initiative runs each of its
 schedules itself (:func:`declarative.run_schedule`). The schedule's read is
 made as the installation, with the params its ``params`` answers from the
 same ``since``, and the changes its ``write`` answers from the read's answer
-are made as the install (:func:`plugin_metadata.apply_changes`), on the
+are made as the install (:func:`metadata.apply_changes`), on the
 install's own sessions while the visit's holds no transaction. The row is then
 settled as a container's is: a read that answers unavailable or cannot be
 made, an expression that fails, or changes that are refused fail the run.
@@ -71,7 +71,7 @@ from app.services.marketplace.registration_lookup import (
 from app.services.marketplace.service_plugins import schedule_minutes
 from app.services.tenant import guild_plugins as guild_plugins_service
 from app.services.tenant import plugin_connection_flows as flows
-from app.services.tenant import plugin_metadata
+from app.services.tenant import metadata
 from app.services.tenant.plugin_channels import (
     PluginChannelError,
     owns_install,
@@ -401,9 +401,7 @@ async def _run_schedule(
             schedule=schedule,
             since=since,
         )
-        await plugin_metadata.apply_changes(
-            plugin, registration, writes, guild_id=guild_id
-        )
+        await metadata.apply_changes(plugin, registration, writes, guild_id=guild_id)
     except (PluginDataError, PluginChannelError) as exc:
         if exc.code == PluginChannelMessages.CONNECTION_NO_TOKEN:
             return None

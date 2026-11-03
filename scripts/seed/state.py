@@ -12,7 +12,7 @@ import app.db.session as db_session
 from app.db.request_context import Unattributed
 from app.db.session import SystemSessionLocal, set_rls_context
 from app.models.platform.user import User
-from app.services.platform.app_settings import get_app_settings
+from app.services.platform import rules
 
 STATE_FILE = Path(__file__).resolve().parents[2] / ".vscode" / ".dev_seed_ids.json"
 
@@ -118,15 +118,13 @@ async def clean() -> None:
         f"  Dropped {len(schemas)} community schema(s) + {dropped}/{len(roles)} role(s); wiped users + communities"
     )
 
-    # The directory switch is a platform setting, so it outlives every community
+    # The directory switch is a platform rule, so it outlives every community
     # that was listed in it. Put it back to the off state a fresh install has,
     # or the next un-seeded dev database starts with a directory nobody asked
-    # for. app_settings is not truncated above, so this is its own write.
+    # for. platform_rules is not truncated above, so this is its own write.
     async with SystemSessionLocal() as session:
         await set_rls_context(session, Unattributed())
-        app_settings = await get_app_settings(session)
-        app_settings.community_directory_enabled = False
-        session.add(app_settings)
+        await rules.put(session, "community_directory_enabled", False)
         await session.commit()
     print("  Community directory switched back off")
 

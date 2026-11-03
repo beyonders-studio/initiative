@@ -9,7 +9,7 @@
   "avatar_url": "/marketplace/core-hiring-pipeline.svg",
   "images": [],
   "version": "1.2.0",
-  "release_notes": "Candidates and volunteers are each their own type, with a page of their own, and each starts with a checklist of its steps.",
+  "release_notes": "Candidates and volunteers are each their own type, with a page of their own, and each starts with a checklist of its steps. The project's fields are its own properties rather than the initiative's metadata.",
   "definition": {
     "type": "initiative-project",
     "schema_version": 1,
@@ -116,7 +116,8 @@
         "type": "text",
         "position": 0.0,
         "color": null,
-        "options": null
+        "options": null,
+        "project": true
       },
       {
         "name": "Source",
@@ -144,7 +145,8 @@
             "label": "Recruiter",
             "color": "#F59E0B"
           }
-        ]
+        ],
+        "project": true
       },
       {
         "name": "Work location",
@@ -167,21 +169,24 @@
             "label": "Remote",
             "color": null
           }
-        ]
+        ],
+        "project": true
       },
       {
         "name": "Interview date",
         "type": "date",
         "position": 3.0,
         "color": null,
-        "options": null
+        "options": null,
+        "project": true
       },
       {
         "name": "Portfolio",
         "type": "url",
         "position": 4.0,
         "color": null,
-        "options": null
+        "options": null,
+        "project": true
       }
     ],
     "tasks": [],
@@ -682,7 +687,8 @@
         "type": "text",
         "position": 0.0,
         "color": null,
-        "options": null
+        "options": null,
+        "project": true
       },
       {
         "name": "Source",
@@ -710,7 +716,8 @@
             "label": "Recruiter",
             "color": "#F59E0B"
           }
-        ]
+        ],
+        "project": true
       },
       {
         "name": "Work location",
@@ -733,21 +740,24 @@
             "label": "Remote",
             "color": null
           }
-        ]
+        ],
+        "project": true
       },
       {
         "name": "Interview date",
         "type": "date",
         "position": 3.0,
         "color": null,
-        "options": null
+        "options": null,
+        "project": true
       },
       {
         "name": "Portfolio",
         "type": "url",
         "position": 4.0,
         "color": null,
-        "options": null
+        "options": null,
+        "project": true
       }
     ],
     "tasks": [
@@ -788,17 +798,20 @@
           {
             "property_name": "Role",
             "property_type": "text",
-            "value_text": "Support specialist"
+            "value_text": "Support specialist",
+            "project": true
           },
           {
             "property_name": "Source",
             "property_type": "select",
-            "value_text": "careers-page"
+            "value_text": "careers-page",
+            "project": true
           },
           {
             "property_name": "Work location",
             "property_type": "select",
-            "value_text": "remote"
+            "value_text": "remote",
+            "project": true
           }
         ],
         "type_name": "Candidate"
@@ -840,17 +853,20 @@
           {
             "property_name": "Role",
             "property_type": "text",
-            "value_text": "Office manager"
+            "value_text": "Office manager",
+            "project": true
           },
           {
             "property_name": "Source",
             "property_type": "select",
-            "value_text": "job-board"
+            "value_text": "job-board",
+            "project": true
           },
           {
             "property_name": "Work location",
             "property_type": "select",
-            "value_text": "on-site"
+            "value_text": "on-site",
+            "project": true
           }
         ],
         "type_name": "Candidate"
@@ -892,22 +908,26 @@
           {
             "property_name": "Role",
             "property_type": "text",
-            "value_text": "Frontend engineer"
+            "value_text": "Frontend engineer",
+            "project": true
           },
           {
             "property_name": "Source",
             "property_type": "select",
-            "value_text": "referral"
+            "value_text": "referral",
+            "project": true
           },
           {
             "property_name": "Work location",
             "property_type": "select",
-            "value_text": "hybrid"
+            "value_text": "hybrid",
+            "project": true
           },
           {
             "property_name": "Interview date",
             "property_type": "date",
-            "value_text": "2000-01-05"
+            "value_text": "2000-01-05",
+            "project": true
           }
         ],
         "type_name": "Candidate"
@@ -949,22 +969,26 @@
           {
             "property_name": "Role",
             "property_type": "text",
-            "value_text": "Support specialist"
+            "value_text": "Support specialist",
+            "project": true
           },
           {
             "property_name": "Source",
             "property_type": "select",
-            "value_text": "job-board"
+            "value_text": "job-board",
+            "project": true
           },
           {
             "property_name": "Work location",
             "property_type": "select",
-            "value_text": "remote"
+            "value_text": "remote",
+            "project": true
           },
           {
             "property_name": "Interview date",
             "property_type": "date",
-            "value_text": "2000-01-07"
+            "value_text": "2000-01-07",
+            "project": true
           }
         ],
         "type_name": "Candidate"
@@ -1006,22 +1030,26 @@
           {
             "property_name": "Role",
             "property_type": "text",
-            "value_text": "Frontend engineer"
+            "value_text": "Frontend engineer",
+            "project": true
           },
           {
             "property_name": "Source",
             "property_type": "select",
-            "value_text": "recruiter"
+            "value_text": "recruiter",
+            "project": true
           },
           {
             "property_name": "Work location",
             "property_type": "select",
-            "value_text": "remote"
+            "value_text": "remote",
+            "project": true
           },
           {
             "property_name": "Interview date",
             "property_type": "date",
-            "value_text": "2000-01-04"
+            "value_text": "2000-01-04",
+            "project": true
           }
         ],
         "type_name": "Candidate"
@@ -1063,22 +1091,26 @@
           {
             "property_name": "Role",
             "property_type": "text",
-            "value_text": "Office manager"
+            "value_text": "Office manager",
+            "project": true
           },
           {
             "property_name": "Source",
             "property_type": "select",
-            "value_text": "referral"
+            "value_text": "referral",
+            "project": true
           },
           {
             "property_name": "Work location",
             "property_type": "select",
-            "value_text": "on-site"
+            "value_text": "on-site",
+            "project": true
           },
           {
             "property_name": "Interview date",
             "property_type": "date",
-            "value_text": "2000-01-03"
+            "value_text": "2000-01-03",
+            "project": true
           }
         ],
         "type_name": "Candidate"
@@ -1120,22 +1152,26 @@
           {
             "property_name": "Role",
             "property_type": "text",
-            "value_text": "Frontend engineer"
+            "value_text": "Frontend engineer",
+            "project": true
           },
           {
             "property_name": "Source",
             "property_type": "select",
-            "value_text": "careers-page"
+            "value_text": "careers-page",
+            "project": true
           },
           {
             "property_name": "Work location",
             "property_type": "select",
-            "value_text": "hybrid"
+            "value_text": "hybrid",
+            "project": true
           },
           {
             "property_name": "Interview date",
             "property_type": "date",
-            "value_text": "2000-01-03"
+            "value_text": "2000-01-03",
+            "project": true
           }
         ],
         "type_name": "Candidate"
@@ -1173,17 +1209,20 @@
           {
             "property_name": "Role",
             "property_type": "text",
-            "value_text": "Weekend driver"
+            "value_text": "Weekend driver",
+            "project": true
           },
           {
             "property_name": "Source",
             "property_type": "select",
-            "value_text": "referral"
+            "value_text": "referral",
+            "project": true
           },
           {
             "property_name": "Interview date",
             "property_type": "date",
-            "value_text": "2000-01-07"
+            "value_text": "2000-01-07",
+            "project": true
           }
         ],
         "type_name": "Volunteer",

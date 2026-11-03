@@ -48,8 +48,9 @@ export const DropOverlay = ({
 );
 
 interface FileDropAreaProps {
-  /** An `accept` list of extensions, for the picker and for a drop alike. */
-  accept: string;
+  /** An `accept` list of extensions, for the picker and for a drop alike;
+   *  any file without one. */
+  accept?: string;
   onFile: (file: File) => void;
   /** The line above the button, saying what a file dropped here becomes. */
   prompt: string;
@@ -96,7 +97,7 @@ export const FileDropArea = ({
       <ImagePicker
         variant="button"
         buttonSize="sm"
-        accept={accept}
+        accept={accept ?? ""}
         onSelect={onFile}
         disabled={disabled}
       >

@@ -24,7 +24,7 @@ be imported by ``tenancy`` and by the build-time generator alike.
 from __future__ import annotations
 
 import re
-from dataclasses import dataclass
+from dataclasses import dataclass, replace
 from typing import Callable, Iterable
 
 from app.db import gucs
@@ -44,9 +44,12 @@ from app.core.tools import (
     ITEM_KINDS,
     KINDS,
     PROPERTY_TARGETS,
-    LAYOUTS_PER_INSTANCE,
+    LAYOUT_INSTANCE_TABLES,
     Tool,
 )
+from app.models.platform.guild import AdminSurface
+from app.models.tenant.batched_notice import BatchedNoticeKind
+from app.db.presence import present, present_to_member
 from app.db.authorization import (
     IN_POLICY,
     POLICY_SETTINGS_ADMIN,
@@ -577,30 +580,6 @@ def via_post_poll(fk: str = "poll_id") -> InitiativePath:
     )
 
 
-def via_catalog_item(fk: str = "catalog_item_id") -> InitiativePath:
-    """Two hops: ``table.<fk> -> catalog_items -> catalogs.initiative_id``."""
-    return InitiativePath(
-        predicate=lambda t, w: (
-            f"EXISTS (SELECT 1 FROM catalog_items ci "
-            f"JOIN catalogs cat ON cat.id = ci.catalog_id "
-            f"WHERE ci.id = {t}.{fk} "
-            f"AND {_access('cat.initiative_id', w)})"
-        ),
-        initiative_expr=lambda r: (
-            f"(SELECT cat.initiative_id FROM catalog_items ci "  # noqa: S608
-            f"JOIN catalogs cat ON cat.id = ci.catalog_id WHERE ci.id = {r}.{fk})"
-        ),
-        parents=lambda r: _parent_chain(
-            "catalog_items ci",
-            "ci.id",
-            f"{r}.{fk}",
-            ("catalog_items", "ci.id"),
-            ("catalogs", "ci.catalog_id"),
-        ),
-        dac=_dac_two_hop("catalog_items", "catalog_id", "catalogs", fk),
-    )
-
-
 def via_event_calendar(fk: str = "calendar_event_id") -> InitiativePath:
     """Two hops: ``table.<fk> -> calendar_events -> calendars.initiative_id``."""
     return InitiativePath(
@@ -654,8 +633,9 @@ class CommentParent:
     chain: tuple[tuple[str, str], ...]
     #: The parent's own table.
     table: str
-    #: The tool whose sharing governs this parent's rows.
-    governed_by: Tool
+    #: The tool whose sharing governs this parent's rows, or ``None`` for a
+    #: parent no sharing governs (a collection), whose own row answers.
+    governed_by: Tool | None
     #: The column of :attr:`table` holding that tool's id, or ``None`` when the
     #: parent IS the tool row and ``column`` already names it.
     tool_fk: str | None = None
@@ -712,6 +692,15 @@ _COMMENT_PARENTS: tuple[CommentParent, ...] = (
         table="wiki_pages",
         governed_by=Tool.wiki,
         tool_fk="wiki_id",
+    ),
+    CommentParent(
+        "collection_id",
+        "collections",
+        "collections.id",
+        "collections.initiative_id",
+        (("collections", "collections.id"),),
+        table="collections",
+        governed_by=None,
     ),
     *(_tool_comment_parent(tool) for tool in Tool),
 )
@@ -786,40 +775,41 @@ def comments_path() -> InitiativePath:
     )
 
 
-def reactions_path() -> InitiativePath:
-    """A reaction is reached by whoever can reach the thing it is on.
+def _target_path(
+    legs: dict[str, tuple[str, InitiativePath]],
+    share_write: Callable[[str], str] | None = None,
+) -> InitiativePath:
+    """A row reached by whoever can reach the ``(target_type, target_id)`` it
+    names, which is the pair :data:`ENTITY_ACCESS_FN` takes, so the policy is
+    one call and the target's own entry decides inside it. ``legs`` names each
+    target kind's table and path, for the row's initiative and parents.
 
-    Polymorphic over ``(target_type, target_id)``, which is the pair
-    :data:`ENTITY_ACCESS_FN` takes, so the policy is one call and the target's
-    own entry decides inside it: the comment arm walks to the comment's parent,
-    the post arm asks the post. A new reactable kind adds a ``ReactionTarget``
-    member, which puts its table on the function's arms; nothing about the
-    gate is written twice. Sharing rides in the call as read — reacting is
-    responding.
+    Sharing rides in the call as read unless a command asks write of it
+    (``DAC_WRITE_COMMANDS``), and then only for the rows ``share_write`` names.
     """
-    legs: dict[ReactionTarget, InitiativePath] = {
-        ReactionTarget.comment: comments_path(),
-        ReactionTarget.post: direct(),
-    }
 
     def folded(t: str, w: WriteFlag, sw: WriteFlag) -> str:
+        if share_write is not None and sw is True:
+            sw = share_write(t)
+        elif share_write is not None and isinstance(sw, str):
+            sw = f"({sw} AND {share_write(t)})"
         return _entity_call(f"{t}.target_type", f"{t}.target_id", w, sw)
 
     def locate(r: str) -> str:
         arms = " ".join(
-            f"WHEN '{target.value}' THEN "
-            f"(SELECT {path.initiative_expr('rt')} FROM {target.table} rt "  # noqa: S608
+            f"WHEN '{kind}' THEN "
+            f"(SELECT {path.initiative_expr('rt')} FROM {table} rt "  # noqa: S608
             f"WHERE rt.id = {r}.target_id)"
-            for target, path in legs.items()
+            for kind, (table, path) in legs.items()
         )
         return f"(CASE {r}.target_type {arms} END)"
 
     def chain(r: str) -> str:
         arms = " ".join(
-            f"WHEN '{target.value}' THEN "
-            f"(SELECT {path.parents('rt')} FROM {target.table} rt "  # noqa: S608
+            f"WHEN '{kind}' THEN "
+            f"(SELECT {path.parents('rt')} FROM {table} rt "  # noqa: S608
             f"WHERE rt.id = {r}.target_id)"
-            for target, path in legs.items()
+            for kind, (table, path) in legs.items()
         )
         return f"COALESCE((CASE {r}.target_type {arms} END), {NO_PARENTS})"
 
@@ -828,6 +818,37 @@ def reactions_path() -> InitiativePath:
         initiative_expr=locate,
         parents=chain,
         folded=folded,
+    )
+
+
+def _reaction_legs() -> dict[str, tuple[str, InitiativePath]]:
+    paths: dict[ReactionTarget, InitiativePath] = {
+        ReactionTarget.comment: comments_path(),
+        ReactionTarget.post: direct(),
+    }
+    return {target.value: (target.table, path) for target, path in paths.items()}
+
+
+def reactions_path() -> InitiativePath:
+    """A reaction is reached by whoever can reach the thing it is on: the
+    comment arm walks to the comment's parent, the post arm asks the post. A
+    new reactable kind adds a ``ReactionTarget`` member, which puts its table on
+    the function's arms; nothing about the gate is written twice. Sharing rides
+    in the call as read — reacting is responding.
+    """
+    return _target_path(_reaction_legs())
+
+
+def batched_notices_path() -> InitiativePath:
+    """A queued line is reached like what it is about: the task assigned, or
+    what was reacted to. An assignment's line is queued by whoever assigned,
+    who writes to the task, so inserting one asks write of its sharing; taking
+    or clearing it is the recipient's own business, and a reaction's line
+    answers as the reaction did.
+    """
+    return _target_path(
+        {**_reaction_legs(), "task": ("tasks", via("projects", "project_id"))},
+        share_write=lambda t: f"{t}.kind = '{BatchedNoticeKind.task_assignment.value}'",
     )
 
 
@@ -888,14 +909,16 @@ def _entity_dac(table: str) -> DacPath | None:
     real table, so the tool is named.
 
     A kind that reaches its resource through a parent keeps the leg its own
-    entry declares: that walk names each table, so it survives the alias.
+    entry declares: that walk names each table, so it survives the alias. So
+    does a kind no tool governs whose entry states its own leg (a collection's
+    writer rule), which reads only the row it is handed.
     """
     path = INITIATIVE_PATHS.get(table)
     dac = path.dac if path is not None else None
     if dac is None or dac.via:
         return dac
     tool = dac.tool or _TOOL_BY_TABLE.get(table)
-    return _dac_self(tool) if tool is not None else None
+    return _dac_self(tool) if tool is not None else dac
 
 
 def _entity_arm(table: str) -> str:
@@ -1065,63 +1088,76 @@ def _entity_readable(t: str, kinds: Iterable[str]) -> str:
     return f"(CASE {t}.entity_type {arms} ELSE false END)"
 
 
-def property_values_path() -> InitiativePath:
-    """A property value is read by whoever can read the thing it is on, and
-    written by whoever can edit that thing.
+def metadata_values_path() -> InitiativePath:
+    """A metadata value is reached through the thing it is on and what its
+    definition's owner adds, read off the definition in one ``EXISTS``.
 
-    Polymorphic over ``(entity_type, entity_id)``. A read is one ``EXISTS`` per
-    kind (:func:`_entity_readable`); a write is one
-    :data:`ENTITY_ACCESS_FN` call, since a write touches a row at a time. A write also asks that the definition belongs to the thing's own
-    initiative: definitions are initiative-level, so a value from another
-    initiative's definition — or on a thing that belongs to none — is refused.
+    Polymorphic over ``(entity_type, entity_id)``. Reading asks that the thing
+    can be read: one ``EXISTS`` per kind (:func:`_entity_readable`). Writing
+    asks one :data:`ENTITY_ACCESS_FN` call, since a write touches a row at a
+    time. Then, by the definition's owner:
+
+    * the initiative (a property): a write edits the thing, and the definition
+      belongs to the thing's own initiative, so a value from another
+      initiative's definition, or on a thing that belongs to none, is refused;
+    * a project: as a property, on a task in that project;
+    * a collection: its value is on a file in the collection, and written by
+      whoever may change the collection, with no edit on the file asked;
+    * a plug-in: written by the install that keeps it, on an item it can read,
+      and on the install itself (``entity_type = 'plugin'``), which belongs to
+      no initiative and is reached by that install alone. On an item, the
+      community's admin reaches it too (as the item is purged), and whoever
+      can read the item reads it where its definition is shown on the item's
+      kind.
+
+    The system engine reaches every value.
     """
 
     def build(t: str, w: bool) -> str:
+        own = f"(md.install_id = {_P.install_id} AND {_P.this_guild} AND {_P.auth_ok})"
+        on_install = f"{t}.entity_type = '{INSTALL_METADATA_KIND}'"
         if not w:
-            return _entity_readable(t, PROPERTY_TARGETS)
-        reach = _entity_call(f"{t}.entity_type", f"{t}.entity_id", w, w)
-        return (
-            f"({_P.system} OR ({reach} AND EXISTS (SELECT 1 FROM property_definitions pd "  # noqa: S608
-            f"WHERE pd.id = {t}.property_id AND pd.initiative_id = "
-            f"{ENTITY_INITIATIVE_FN}({t}.entity_type, {t}.entity_id))))"
+            # The thing a value is on is read once, whoever owns the value: a
+            # plug-in's is on an item, or on the install itself, which only
+            # the install reads; on an item, its install, the community's
+            # admin, and whoever reads it where the definition is shown.
+            items = ", ".join(f"'{kind}'" for kind in ITEM_KINDS)
+            return (
+                f"({_P.system} OR EXISTS (SELECT 1 FROM metadata_definitions md "  # noqa: S608
+                f"WHERE md.id = {t}.property_id AND (CASE WHEN {on_install}"
+                f" THEN md.install_id IS NOT NULL AND {t}.entity_id = md.install_id"
+                f" ELSE (md.install_id IS NULL OR {t}.entity_type IN ({items}))"
+                f" AND {_entity_readable(t, PROPERTY_TARGETS)} END)"
+                f" AND (md.install_id IS NULL OR {own} OR (NOT {on_install}"
+                f" AND ({_P.admin} OR {t}.entity_type = ANY (md.shown_on))))))"
+            )
+        held = f"{ENTITY_INITIATIVE_FN}({t}.entity_type, {t}.entity_id)"
+        field = (
+            f"{t}.entity_type = '{Tool.file.value}' AND EXISTS (SELECT 1 "  # noqa: S608
+            f"FROM collection_files cf WHERE cf.collection_id = md.collection_id "
+            f"AND cf.file_id = {t}.entity_id) AND {_access('md.initiative_id', True)}"
+            f" AND {_collection_writer('md.initiative_id')}"
         )
-
-    return InitiativePath(
-        predicate=build,
-        initiative_expr=lambda r: (
-            f"{ENTITY_INITIATIVE_FN}({r}.entity_type, {r}.entity_id)"
-        ),
-    )
-
-
-def plugin_metadata_path() -> InitiativePath:
-    """An install's values are reached by the install that keeps them, and on
-    an item by the community's admin too, in each case only while the item
-    itself can be read. A shown value on an item is also read by whoever can
-    read the item. The install's own values (``entity_type = 'plugin'``)
-    belong to no initiative and are reached by that install alone. The system
-    engine reaches both.
-
-    Otherwise reading and writing ask the same: writing a value changes
-    nothing on the item. A read is one ``EXISTS`` per kind
-    (:func:`_entity_readable`); a write asks the same of one read-only
-    :data:`ENTITY_ACCESS_FN` call, as a property value's write does. What an
-    install also needs, the read scope of the item's tool, is its
-    ``plugin_scope_*`` policies (``app.db.guild_ddl``).
-    """
-
-    def build(t: str, w: bool) -> str:
-        own = f"({t}.install_id = {_P.install_id} AND {_P.this_guild} AND {_P.auth_ok})"
-        reach = f"{own} OR {_P.admin}" if w else f"{own} OR {_P.admin} OR {t}.shown"
+        on_task = (
+            f"{t}.entity_type = 'task' AND EXISTS (SELECT 1 FROM tasks tk "  # noqa: S608
+            f"WHERE tk.id = {t}.entity_id AND tk.project_id = md.project_id)"
+        )
+        # One call asks of the item what its owner's values take: an edit of
+        # it, and of a plug-in's, only that it can be read.
+        unowned = "md.install_id IS NULL"
+        need = unowned if w is True else f"({unowned} AND {_sql_bool(w)})"
         item = (
-            _entity_call(f"{t}.entity_type", f"{t}.entity_id", False, False)
-            if w
-            else _entity_readable(t, ITEM_KINDS)
+            f"{ENTITY_ACCESS_FN}({t}.entity_type, {t}.entity_id, {need}, "
+            f"{need}, {STANDING})"
         )
         return (
-            f"({_P.system} OR (CASE WHEN {t}.entity_type = '{INSTALL_METADATA_KIND}'"
-            f" THEN ({own} AND {t}.entity_id = {t}.install_id)"
-            f" ELSE (({reach}) AND {item}) END))"
+            f"({_P.system} OR EXISTS (SELECT 1 FROM metadata_definitions md "  # noqa: S608
+            f"WHERE md.id = {t}.property_id AND ({unowned} OR {own}"
+            f" OR ({_P.admin} AND NOT {on_install})) AND (CASE"
+            f" WHEN md.collection_id IS NOT NULL THEN ({field})"
+            f" WHEN {on_install} THEN NOT {unowned} AND {t}.entity_id = md.install_id"
+            f" ELSE {item} AND (NOT {unowned} OR (CASE WHEN md.project_id IS NOT NULL"
+            f" THEN {on_task} ELSE md.initiative_id = {held} END)) END)))"
         )
 
     return InitiativePath(
@@ -1132,29 +1168,37 @@ def plugin_metadata_path() -> InitiativePath:
     )
 
 
-#: The community's administration: its admin, a settings rung writing beside
-#: a read_write grant, or the system engine.
-_ADMINISTRATION = (
-    f"({_P.system} OR {_P.admin} OR ({POLICY_SETTINGS_ADMIN} AND {_P.pam_write}))"
-)
+def _administration(surface: AdminSurface) -> str:
+    """Who administers ``surface``: its holder, a settings rung writing beside
+    a read_write grant, or the system engine."""
+    return (
+        f"({_P.system} OR {_P.holds(surface)}"
+        f" OR ({POLICY_SETTINGS_ADMIN} AND {_P.pam_write}))"
+    )
 
 
 def managed_write(initiative_expr: str) -> str:
     """Who changes what an initiative is set up with: its managers by the
-    standing, or the community's administration. The structural initiative
-    tables' ``managed_*`` policies, and a shared page's views."""
+    standing, or the community's administration of its initiatives. The
+    structural initiative tables' ``managed_*`` policies, and a shared page's
+    views."""
     return (
-        f"({_ADMINISTRATION} OR ({_P.this_guild}"
+        f"({_administration(AdminSurface.initiatives)} OR ({_P.this_guild}"
         f" AND ({initiative_expr}) = ANY ({_P.field('manager_initiatives')})))"
     )
 
 
 def administration_path() -> InitiativePath:
-    """A row the community's administration alone reads and writes, whatever
-    initiative it names: what a guest invite gives, which the invites
-    themselves answer to."""
+    """A row the community's administration of its invites alone reads and
+    writes, whatever initiative it names: what a guest invite gives, which the
+    invites themselves answer to. Naming any initiative takes the admin rung's
+    reach into all of them beside the surface."""
+    predicate = (
+        f"({_P.system} OR ({POLICY_SETTINGS_ADMIN} AND {_P.pam_write})"
+        f" OR ({_P.holds(AdminSurface.invites)} AND {_P.admin}))"
+    )
     return InitiativePath(
-        predicate=lambda t, w: _ADMINISTRATION,
+        predicate=lambda t, w: predicate,
         initiative_expr=lambda r: f"{r}.initiative_id",
     )
 
@@ -1228,13 +1272,20 @@ def relationships_path() -> InitiativePath:
             if w
             else "false"
         )
-        return (
-            "("
-            + _entity_call(f"{t}.source_type", f"{t}.source_id", need_write, need_write)
-            + " AND "
-            + _entity_call(f"{t}.target_type", f"{t}.target_id", False, False)
-            + ")"
+        source = _entity_call(
+            f"{t}.source_type", f"{t}.source_id", need_write, need_write
         )
+        target = _entity_call(f"{t}.target_type", f"{t}.target_id", False, False)
+        if w:
+            return f"({source} AND {target})"
+        # What files a thing under a place reads wherever the place does, even
+        # where the thing is only known to be there (``app.db.presence``): a
+        # wiki can say how many of its files a member can't open.
+        filed = (
+            f"({t}.relationship_type = '{RelationshipType.part_of.value}'"
+            f" AND {present(f'{t}.source_type', f'{t}.source_id')})"
+        )
+        return f"({target} AND ({source} OR {filed}))"
 
     def locate(r: str) -> str:
         """The initiative this edge belongs to, either end answering.
@@ -1277,16 +1328,17 @@ def webhook_subscription_path() -> InitiativePath:
     Naming NO initiative is the guild-wide case, and there the ordinary
     ``initiative_access`` answer is wrong: a NULL means "the initiative gate has
     nothing to decide", which admits any member. A guild-wide subscription
-    reports across every initiative, so reaching it is guild-admin authority —
-    the one role that already spans them — or an installed plug-in's whose token is
-    not narrowed to one initiative. A plug-in sees and changes only the
+    reports across every initiative, so reaching it is the holder of
+    ``AdminSurface.webhooks``'s — the admin rung, which already spans them — or
+    an installed plug-in's whose token is not narrowed to one initiative. A plug-in sees and changes only the
     subscriptions it registered (the ``plugin_scope_*`` policies), and what one
     delivers is capped by where the plug-in is placed and the scopes it holds.
     """
     return InitiativePath(
         predicate=lambda t, w: (
             f"(CASE WHEN {t}.initiative_id IS NULL "
-            f"THEN ({_GUILD_ADMIN} OR {_UNNARROWED_INSTALL}) "
+            f"THEN ({_P.system} OR {_P.holds(AdminSurface.webhooks)}"
+            f" OR {_UNNARROWED_INSTALL}) "
             f"ELSE {_access(f'{t}.initiative_id', w)} END)"
         ),
         initiative_expr=lambda r: f"{r}.initiative_id",
@@ -1332,7 +1384,23 @@ def _named_tool_gate(t: str, write: bool) -> str:
     )
 
 
-def named_tool_path() -> InitiativePath:
+def _unstamped_leg(t: str, kind_column: str, id_column: str) -> str:
+    """An entry that stamps no sharing, about a kind no sharing governs (a
+    collection) or a comment on one, is reached as the row it describes is:
+    that row's own policy decides."""
+    tables = {k.value: k.table for k in KINDS.values() if k.standalone}
+    tables["comment"] = "comments"
+    arms = " ".join(
+        f"WHEN '{kind}' THEN EXISTS (SELECT 1 FROM {table} sk"  # noqa: S608
+        f" WHERE sk.id = {t}.{id_column})"
+        for kind, table in tables.items()
+    )
+    return (
+        f"({t}.dac_tool IS NOT NULL OR (CASE {t}.{kind_column} {arms} ELSE true END))"
+    )
+
+
+def named_tool_path(entity: tuple[str, str] | None = None) -> InitiativePath:
     """A row about content, reached exactly like the content it describes: the
     search index, and the change log.
 
@@ -1346,13 +1414,24 @@ def named_tool_path() -> InitiativePath:
     already sees everywhere else in the app. It is not an ungated leg — a row
     carrying a ``dac_tool`` still answers to sharing, and reaching this schema
     at all is the guild gate.
+
+    ``entity`` names the columns an entry names its thing by, for the index:
+    an entry about a kind no sharing governs, or a comment on one, is reached
+    as that row is.
     """
-    return InitiativePath(
-        predicate=lambda t, w: (
+
+    def predicate(t: str, w: bool) -> str:
+        gate = (
             f"(CASE WHEN {t}.initiative_id IS NULL "
             f"THEN true "
             f"ELSE {_access(f'{t}.initiative_id', w)} END)"
-        ),
+        )
+        if entity is None:
+            return gate
+        return f"({gate} AND {_unstamped_leg(t, *entity)})"
+
+    return InitiativePath(
+        predicate=predicate,
         initiative_expr=lambda r: f"{r}.initiative_id",
         # The index stores the governing pair, so the legs need no join. Which
         # tool governs an entry differs per row, so the two that name a tool are
@@ -1419,6 +1498,125 @@ def evidence_path() -> InitiativePath:
     )
 
 
+def _collection_writer(initiative: str) -> str:
+    """Changing a collection: the Files switch on in its initiative, and a role
+    there that creates files. Its own sharing is none, so nothing else."""
+    return (
+        f"({_switch_leg(Tool.file, initiative)}"
+        f" AND initiative_role_permits({initiative}, {gucs.USER_ID}, "
+        f"'{Tool.file.create_permission}', false, {STANDING}))"
+    )
+
+
+def metadata_definitions_path() -> InitiativePath:
+    """Who may read and define metadata, by the definition's owner.
+
+    * The initiative's property: read and written by its members.
+    * A collection's: also read only by whoever sees the collection — one
+      ``EXISTS`` into it, whose own policy answers — and written only by
+      whoever may change it (:func:`_collection_writer`).
+    * A project's: read by whoever reads the project, and written, as the
+      project's tasks are, by whoever may write the project: its sharing at
+      write, the same leg every write of a project's content takes.
+    * A plug-in's: declared by its manifest and kept by its install, which
+      alone writes it besides the system engine. It belongs to no
+      initiative, and anybody in the community reads it, as they read which
+      plug-ins are installed.
+    """
+    project = via("projects", "project_id")
+    sharing = _dac_via("projects", "project_id")
+
+    def project_sharing(t: str, c: str, w: bool) -> str | None:
+        # Reading is the project's own SELECT policy, reached by the walk
+        # above; only a write asks the project's sharing.
+        if c == "SELECT":
+            return None
+        return f"({t}.project_id IS NULL OR {sharing.predicate(t, c, w)})"
+
+    def predicate(t: str, w: bool) -> str:
+        seen = f"EXISTS (SELECT 1 FROM collections c WHERE c.id = {t}.collection_id)"  # noqa: S608
+        if w:
+            seen = f"({seen} AND {_collection_writer(f'{t}.initiative_id')})"
+        plugin = (
+            f"({_P.system} OR ({t}.install_id = {_P.install_id} AND {_P.this_guild}"
+            f" AND {_P.auth_ok}))"
+            if w
+            else "true"
+        )
+        return (
+            f"(CASE WHEN {t}.install_id IS NOT NULL THEN {plugin}"
+            f" WHEN {t}.project_id IS NOT NULL THEN {project.predicate(t, w)}"
+            f" ELSE ({_access(f'{t}.initiative_id', w)}"
+            f" AND ({t}.collection_id IS NULL OR {seen})) END)"
+        )
+
+    return InitiativePath(
+        predicate=predicate,
+        initiative_expr=lambda r: f"{r}.initiative_id",
+        parents=_no_parents,
+        dac=DacPath(predicate=project_sharing),
+    )
+
+
+def collections_path() -> InitiativePath:
+    """A collection is seen through its files and changed by the initiative's
+    file makers.
+
+    Reading is one ``EXISTS`` into its entries joined to their files, whose
+    own read policy answers: whoever can open a file in it sees it, and
+    nobody else but the community's administration and the system engine. The
+    join is what asks it, since an entry alone reads for every member of the
+    initiative (:func:`collection_files_path`). Writing asks membership
+    at write level, and, in the slot a tool's sharing takes, the writer rule
+    (:func:`_collection_writer`) — on INSERT too, since there is no sharing
+    for a new one to lack.
+    """
+
+    def predicate(t: str, w: bool) -> str:
+        if w:
+            return _access(f"{t}.initiative_id", True)
+        return (
+            f"({_P.system_or_admin} OR EXISTS (SELECT 1 FROM collection_files cf "
+            f"JOIN files f ON f.id = cf.file_id WHERE cf.collection_id = {t}.id))"
+        )
+
+    return InitiativePath(
+        predicate=predicate,
+        initiative_expr=lambda r: f"{r}.initiative_id",
+        parents=_no_parents,
+        dac=DacPath(
+            predicate=lambda t, c, w: (
+                None if c == "SELECT" else _collection_writer(f"{t}.initiative_id")
+            )
+        ),
+    )
+
+
+def collection_files_path() -> InitiativePath:
+    """A collection's entry reads as its file — one ``EXISTS`` into ``files``,
+    whose own policy answers — and to every member of its initiative besides,
+    who may know a file is there without opening it (``app.db.presence``):
+    an entry is two ids. Adding or taking one out is changing the collection,
+    in the entry's own initiative — which the keys hold to be the
+    collection's and the file's — with the file in sight.
+    """
+
+    def predicate(t: str, w: bool) -> str:
+        walk = f"EXISTS (SELECT 1 FROM files WHERE files.id = {t}.file_id)"
+        if not w:
+            return f"({walk} OR {present_to_member(f'{t}.initiative_id')})"
+        return (
+            f"({_access(f'{t}.initiative_id', True)} AND {walk}"
+            f" AND {_collection_writer(f'{t}.initiative_id')})"
+        )
+
+    return InitiativePath(
+        predicate=predicate,
+        initiative_expr=lambda r: f"{r}.initiative_id",
+        parents=lambda r: _one_parent("collections", f"{r}.collection_id"),
+    )
+
+
 def content_kind_path() -> InitiativePath:
     """A row about one piece of content, reached exactly like the content
     itself: ``(entity_type, entity_id)`` is the pair the entity function takes,
@@ -1453,11 +1651,14 @@ INITIATIVE_PATHS: dict[str, InitiativePath] = {
         tool.plural: direct_or_guild() if tool is Tool.calendar else direct()
         for tool in Tool
     },
-    "property_definitions": direct(),
+    "metadata_definitions": metadata_definitions_path(),
     # Sharing itself. It carries no sharing leg of its own: resource_access
     # reads this table, so a policy here that called it would not resolve.
     # ``direct()`` derives none, because the table is no tool's own.
     "resource_grants": direct(),
+    # Who asked for a resource, and the answer: the initiative's gate, with
+    # who reads and writes which rows narrowed in ``app.db.guild_ddl``.
+    "share_requests": direct(),
     # The change log itself, read like the content each change describes: a
     # person reads a change only where they can open the tool instance that
     # governs it (``dac_tool``/``dac_id``, stamped by the capture trigger), as
@@ -1471,7 +1672,7 @@ INITIATIVE_PATHS: dict[str, InitiativePath] = {
     # (app.db.guild_ddl._WRITTEN_BY) and read by the poller.
     "plugin_event_outbox": direct(),
     # The search index. Derived from the content tables, and gated like them.
-    "search_entries": named_tool_path(),
+    "search_entries": named_tool_path(entity=("entity_type", "entity_id")),
     # Integration config, reached by whoever can reach what it watches.
     "webhook_subscriptions": webhook_subscription_path(),
     "guest_invite_grants": administration_path(),
@@ -1504,10 +1705,9 @@ INITIATIVE_PATHS: dict[str, InitiativePath] = {
     # One hop -> dashboards
     # One hop -> posts
     "post_reads": via("posts", "post_id"),
-    # One hop -> catalogs
-    "catalog_items": via("catalogs", "catalog_id"),
-    # Two hops -> catalog_items -> catalogs
-    "catalog_item_versions": via_catalog_item("catalog_item_id"),
+    # Seen through their files, changed by the initiative's file makers.
+    "collections": collections_path(),
+    "collection_files": collection_files_path(),
     "post_polls": via("posts", "post_id"),
     # Two hops -> tasks -> projects
     "task_assignees": via_task_project("task_id"),
@@ -1523,22 +1723,18 @@ INITIATIVE_PATHS: dict[str, InitiativePath] = {
     # Two hops -> calendar_events -> calendars
     "calendar_event_attendees": via_event_calendar("calendar_event_id"),
     "calendar_event_answers": via_event_calendar("calendar_event_id"),
-    # Every tool and sub-tool's custom property values, by (entity_type, entity_id)
-    "property_values": property_values_path(),
-    # What an installed plug-in keeps on items and on itself, by (entity_type,
-    # entity_id).
-    "plugin_metadata": plugin_metadata_path(),
+    # Every metadata value, properties included, on any tool and sub-tool and
+    # on an install, by (entity_type, entity_id).
+    "metadata_values": metadata_values_path(),
     # An initiative's views of one tool instance, or of a shared page.
     "tool_layouts": tool_layouts_path(),
     "comments": comments_path(),
     # Polymorphic over what it is on; gated by that thing's own path.
     "reactions": reactions_path(),
     "relationships": relationships_path(),
-    # Per-user state, scoped via the entity it points at
-    "task_assignment_digest_items": via("projects", "project_id"),
-    # Same polymorphic target columns as the reactions themselves, so the
-    # queued line is gated exactly like the gesture it describes.
-    "reaction_digest_items": reactions_path(),
+    # Per-user state, scoped via the entity it points at: a queued line is
+    # gated like the task or the reacted-to thing it describes.
+    "batched_notices": batched_notices_path(),
     "event_reminder_dispatches": via_event_calendar("event_id"),
     "personal_items": content_kind_path(),
     "engagement_levels": content_kind_path(),
@@ -1564,8 +1760,10 @@ NAMED_PEOPLE: tuple[NamedPerson, ...] = (
     NamedPerson("task_assignees", "user_id"),
     NamedPerson("calendar_event_attendees", "user_id"),
     NamedPerson("calendar_event_answers", "user_id"),
-    NamedPerson("property_values", "value_user_id", clear=True),
+    NamedPerson("metadata_values", "value_user_id", clear=True),
     NamedPerson("queue_items", "user_id", clear=True),
+    # What somebody asked for goes with them: nobody is left to answer for.
+    NamedPerson("share_requests", "user_id"),
 )
 
 
@@ -1625,14 +1823,11 @@ DAC_WRITE_COMMANDS: dict[str, frozenset[str]] = {
     "event_reminder_dispatches": _RESPONDING,
     "comments": _RESPONDING,
     "reactions": _RESPONDING,
-    # The queued line describing a reaction is written in the SAME request as
-    # the reaction, so it answers at the same level. It shares
-    # ``reactions_path``; this is the other half of that sharing.
-    "reaction_digest_items": _RESPONDING,
-    # An assignee's queued line about a task is queued by whoever assigned
-    # them, who writes to the project; taking or clearing it is the assignee's
-    # own business, done as them.
-    "task_assignment_digest_items": frozenset({"INSERT"}),
+    # A queued line is written in the same request as what it describes. An
+    # assignment's asks write of the task's sharing when it is queued
+    # (``batched_notices_path`` narrows this to those rows); taking or clearing
+    # it is the recipient's own business, done as them.
+    "batched_notices": frozenset({"INSERT"}),
 }
 
 #: The default: a command that writes asks at write level.
@@ -1735,6 +1930,14 @@ class ReportsAs:
     #: chain needs no counterpart — it already resolves from the resource the
     #: report names.
     initiative_expr: RowLocator | None = None
+    #: The label a row going away reports under, where it differs from the one
+    #: a row arriving reports under (``facet``): a junction whose direction is
+    #: the news. ``None`` where one label says both.
+    facet_on_delete: str | None = None
+    #: The chain this report carries, read off the row, where the resource it
+    #: names is not where the row hangs: a file reported as added to a
+    #: collection names that collection. ``None`` borrows the resource's own.
+    parents: ParentsLocator | None = None
 
 
 def reports_as(parent: str, fk: str, facet: str) -> ReportsAs:
@@ -1897,10 +2100,12 @@ def values_report_on_their_target(kinds: Iterable[str], facet: str) -> ReportsAs
 def layouts_report_on_their_target() -> ReportsAs:
     """A layout is a facet of the instance it is for, or of its initiative when
     it is for a shared tool. Whoever shows the set re-reads it."""
-    arms = " ".join(f"WHEN '{t.value}' THEN '{t.plural}'" for t in LAYOUTS_PER_INSTANCE)
+    arms = " ".join(
+        f"WHEN '{target}' THEN '{table}'"
+        for target, table in LAYOUT_INSTANCE_TABLES.items()
+    )
     return ReportsAs(
-        resource_types=frozenset(t.plural for t in LAYOUTS_PER_INSTANCE)
-        | {"initiatives"},
+        resource_types=frozenset(LAYOUT_INSTANCE_TABLES.values()) | {"initiatives"},
         id_expr=lambda r: f"COALESCE({r}.tool_id, {r}.initiative_id)",
         facet="layouts",
         type_expr=lambda r: (
@@ -1925,14 +2130,6 @@ def poll_options_report_on_their_post() -> ReportsAs:
             f"WHERE post_polls.id = {r}.poll_id)"
         ),
         facet="poll",
-    )
-
-
-def _role_initiative(r: str) -> str:
-    """The initiative a row's ``initiative_role_id`` belongs to."""
-    return (
-        f"(SELECT initiative_roles.initiative_id FROM initiative_roles "  # noqa: S608
-        f"WHERE initiative_roles.id = {r}.initiative_role_id)"
     )
 
 
@@ -1994,14 +2191,16 @@ EVENT_SOURCES: dict[str, Emit | Silent] = {
     "personal_items": Silent(
         "one member's own opens, bookmarks, subscriptions and order"
     ),
-    "task_assignment_digest_items": Silent("internal digest bookkeeping"),
-    "reaction_digest_items": Silent("internal digest bookkeeping"),
+    "batched_notices": Silent("internal batching bookkeeping"),
     "event_reminder_dispatches": Silent("internal reminder bookkeeping"),
     "webhook_subscriptions": Silent(
         "integration config; it reports on content, not on itself"
     ),
     "intake_bindings": Silent("routing config; it reports on no content"),
     "guest_invite_grants": Silent("an invite's terms; redeeming it is recorded"),
+    "share_requests": Silent(
+        "a person asking; the sharing an answer writes is what changes"
+    ),
     "moderation_reports": Silent("who reported whom is not an automation signal"),
     "moderation_report_reporters": Silent("the reporters behind one report"),
     "moderation_actions": Silent("the moderation log, read on its own surface"),
@@ -2022,14 +2221,9 @@ EVENT_SOURCES: dict[str, Emit | Silent] = {
         initiative=lambda r: f"{r}.initiative_id",
         reports_as=reports_as("initiatives", "initiative_id", "roles"),
     ),
-    "initiative_role_permissions": Emit(
-        initiative=_role_initiative,
-        # The resource IS the initiative, so its id is the same lookup.
-        reports_as=ReportsAs(
-            resource_types=frozenset({"initiatives"}),
-            id_expr=_role_initiative,
-            facet="roles",
-        ),
+    "initiative_rules": Emit(
+        initiative=lambda r: f"{r}.initiative_id",
+        reports_as=reports_as("initiatives", "initiative_id", "roles"),
     ),
     # -- Guild-wide: no initiative at all -----------------------------------
     # The row carries a NULL initiative_id, which the access function reads as
@@ -2061,9 +2255,22 @@ EVENT_SOURCES: dict[str, Emit | Silent] = {
     "task_statuses": Emit(reports_as=reports_as("projects", "project_id", "statuses")),
     "task_types": Emit(reports_as=reports_as("projects", "project_id", "types")),
     # A property definition is read in its initiative's list, not at an
-    # address of its own, so a change to one reports as that initiative.
-    "property_definitions": Emit(
-        reports_as=reports_as("initiatives", "initiative_id", "properties")
+    # address of its own, so a change to one reports as that initiative; a
+    # project's or a collection's metadata is read with its owner, and
+    # reports as it. A plug-in's is its manifest's, and reports as nothing.
+    "metadata_definitions": Emit(
+        reports_as=ReportsAs(
+            resource_types=frozenset({"initiatives", "projects", "collections"}),
+            id_expr=lambda r: (
+                f"COALESCE({r}.project_id, {r}.collection_id, {r}.initiative_id)"
+            ),
+            facet="properties",
+            type_expr=lambda r: (
+                f"(CASE WHEN {r}.project_id IS NOT NULL THEN 'projects'"
+                f" WHEN {r}.collection_id IS NOT NULL THEN 'collections'"
+                " ELSE 'initiatives' END)"
+            ),
+        )
     ),
     # A layout is read in its instance's set, or its initiative's for a shared
     # tool, so a change reports as that.
@@ -2073,12 +2280,25 @@ EVENT_SOURCES: dict[str, Emit | Silent] = {
         reports_as=reports_as("calendar_events", "calendar_event_id", "answers")
     ),
     "file_versions": Emit(reports_as=reports_as("files", "file_id", "versions")),
+    # A file going into a collection or out of one changes the collection's
+    # list, and is news about the file too: which file, which collection, and
+    # which way, the collection in the file's chain.
+    "collection_files": Emit(
+        reports_as=(
+            reports_as("collections", "collection_id", "files"),
+            ReportsAs(
+                resource_types=frozenset({"files"}),
+                id_expr=lambda r: f"{r}.file_id",
+                facet="added_to_collection",
+                facet_on_delete="removed_from_collection",
+                parents=lambda r: _one_parent("collections", f"{r}.collection_id"),
+                label="file",
+            ),
+        )
+    ),
     # A draft page is read only by the wiki's writers, so like an unpublished
     # notice it is not news until it is finished.
     "wiki_pages": Emit(quiet_when=lambda r: f"{r}.is_draft"),
-    "catalog_item_versions": Emit(
-        reports_as=reports_as("catalog_items", "catalog_item_id", "versions")
-    ),
     "resource_grants": Emit(reports_as=grants_report_on_their_resource()),
     "post_polls": Emit(reports_as=reports_as("posts", "post_id", "poll")),
     "post_poll_options": Emit(reports_as=poll_options_report_on_their_post()),
@@ -2116,16 +2336,25 @@ def event_source(table: str) -> Emit:
 # endpoints report against, so it can only be built once every endpoint's own
 # entry above exists.
 EVENT_SOURCES["relationships"] = Emit(reports_as=relationships_report_on_both_ends())
-# The same, for whatever a property value is on.
-EVENT_SOURCES["property_values"] = Emit(
-    reports_as=values_report_on_their_target(PROPERTY_TARGETS, "properties")
-)
-# A plug-in's shown values on an item; its values on itself name no item, and
-# are skipped.
-EVENT_SOURCES["plugin_metadata"] = Emit(
-    reports_as=values_report_on_their_target(ITEM_KINDS, "plugin_values"),
-    # A private value is the plug-in's own and changes nothing a reader sees.
-    when=lambda r: f"{r}.shown",
+# The same, for whatever a metadata value is on; an install's values on itself
+# name no item, and are skipped. A plug-in's values report as ``plugin_values``,
+# which is no news about the item (``activity_feed.QUIET_FACETS``), and one no
+# reader is shown is the plug-in's own and changes nothing a reader sees.
+EVENT_SOURCES["metadata_values"] = Emit(
+    quiet_when=lambda r: (
+        "EXISTS (SELECT 1 FROM metadata_definitions md "  # noqa: S608
+        f"WHERE md.id = {r}.property_id AND md.install_id IS NOT NULL"
+        f" AND NOT {r}.entity_type = ANY (md.shown_on))"
+    ),
+    reports_as=replace(
+        values_report_on_their_target(PROPERTY_TARGETS, "properties"),
+        facet_expr=lambda r: (
+            "(CASE WHEN EXISTS (SELECT 1 FROM metadata_definitions md "  # noqa: S608
+            f"WHERE md.id = {r}.property_id AND md.install_id IS NOT NULL)"
+            " THEN 'plugin_values' ELSE 'properties' END)"
+        ),
+        facet_values=frozenset({"properties", "plugin_values"}),
+    ),
 )
 
 

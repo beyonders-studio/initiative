@@ -45,9 +45,9 @@ from app.models.platform.guild import Guild
 from app.models.platform.user import User
 from app.models.tenant.comment import Comment, in_thread
 from app.models.tenant.project import Project
-from app.models.tenant.property import (
-    PropertyDefinition,
-    PropertyType,
+from app.models.tenant.metadata import (
+    MetadataDefinition,
+    MetadataType,
 )
 from app.models.tenant.relationship import EntityRelationship
 from app.models.tenant.task import RecurrenceStrategy, Task, TaskAssignee, TaskPriority
@@ -59,8 +59,7 @@ from app.services.cross_guild import gather_across_guilds, member_guild_ids
 from app.services.export.markdown import blocks_from_markdown, runs_of
 from app.services.fields.spec import FieldContext, SortContext
 from app.services.permissions import with_tool
-from app.services.tenant import plugin_metadata
-from app.services.tenant import properties as properties_service
+from app.services.tenant import metadata as metadata_service
 from app.services.tenant import tags as tags_service
 from app.services.tenant import task_checklist as checklist_service
 from app.services.tenant import task_hierarchy
@@ -197,7 +196,7 @@ def _build_task_filter_fields(
     *,
     guild_id: int,
     current_user_id: int | None,
-    property_definitions: Optional[dict[int, PropertyDefinition]] = None,
+    property_definitions: Optional[dict[int, MetadataDefinition]] = None,
     plugin_fields: Optional[dict] = None,
 ) -> dict:
     """The ``allowed_fields`` mapping for a task filter, from the field registry.
@@ -442,8 +441,7 @@ async def list_reads(
     tasks = [row[0] for row in rows]
     await _annotate_tasks(session, tasks)
     await tags_service.annotate_tags(session, tasks)
-    await properties_service.annotate_properties(session, tasks)
-    await plugin_metadata.annotate_plugin_values(session, tasks)
+    await metadata_service.annotate_properties(session, tasks)
     return [
         _task_to_list_read(task, head, has_description, guild_id=guild_id)
         for task, head, has_description in rows
@@ -512,8 +510,7 @@ async def load_tasks(session: AsyncSession, task_ids: list[int]) -> list[Task]:
         blocker_counts={row[0].id: row[2] for row in rows},
     )
     await tags_service.annotate_tags(session, tasks)
-    await properties_service.annotate_properties(session, tasks)
-    await plugin_metadata.annotate_plugin_values(session, tasks)
+    await metadata_service.annotate_properties(session, tasks)
     await _annotate_series_sizes(session, tasks)
     return tasks
 
@@ -771,8 +768,7 @@ async def _gather_global_task_reads(
             blocker_counts=blocker_counts,
         )
         await tags_service.annotate_tags(guild_session, tasks)
-        await properties_service.annotate_properties(guild_session, tasks)
-        await plugin_metadata.annotate_plugin_values(guild_session, tasks)
+        await metadata_service.annotate_properties(guild_session, tasks)
         return [
             (
                 placement[(_guild_id, task.id)],
@@ -876,7 +872,7 @@ class TaskListQuery:
     project_id: Optional[int]
     guild_ids: Optional[list]
     property_definitions: dict
-    #: The plug-in fields the reader may filter by (``plugin_metadata.filter_fields``).
+    #: The plug-in fields the reader may filter by (``metadata.filter_fields``).
     plugin_fields: dict
 
 
@@ -900,7 +896,7 @@ def check_task_conditions(
     if (
         len(_property_value_leaves(user_conditions))
         + len(_property_value_leaves(user_conditions, "plugin_values"))
-        > properties_service.MAX_PROPERTY_FILTERS
+        > metadata_service.MAX_PROPERTY_FILTERS
     ):
         raise ValueError("too many property filters")
     return user_conditions
@@ -955,7 +951,7 @@ async def parse_task_list_query(
             session, across_guilds_for, property_ids_needed, guild_ids
         )
     else:
-        property_definitions = await properties_service.load_definitions_by_ids(
+        property_definitions = await metadata_service.load_definitions_by_ids(
             session, property_ids_needed
         )
 
@@ -963,7 +959,7 @@ async def parse_task_list_query(
     plugin_fields = (
         {}
         if across_guilds_for is not None
-        else await plugin_metadata.filter_fields(
+        else await metadata_service.filter_fields(
             session,
             [
                 str(cond.value.get("field"))
@@ -1003,7 +999,7 @@ def refuse_person_filters(q: TaskListQuery) -> None:
                 defn = q.property_definitions.get(int(cond.value.get("property_id")))
             except (TypeError, ValueError):
                 defn = None
-            named = defn is not None and defn.type is PropertyType.user_reference
+            named = defn is not None and defn.type is MetadataType.user_reference
         if named:
             raise HTTPException(
                 status_code=status.HTTP_400_BAD_REQUEST,
@@ -1016,7 +1012,7 @@ async def _load_property_definitions_across_guilds(
     current_user: User,
     needed: list[int],
     guild_ids: Optional[list],
-) -> dict[int, PropertyDefinition]:
+) -> dict[int, MetadataDefinition]:
     """Load the property definitions a cross-guild ``/me`` list needs, routing
     into each of the user's guild schemas.
 
@@ -1035,13 +1031,13 @@ async def _load_property_definitions_across_guilds(
     )
 
     async def _fetch(guild_session, _guild_id: int):
-        defs = await properties_service.load_definitions_by_ids(guild_session, needed)
+        defs = await metadata_service.load_definitions_by_ids(guild_session, needed)
         return list(defs.values())
 
     definitions = await gather_across_guilds(
         session, {current_user.id: target_guilds}, _fetch
     )
-    merged: dict[int, PropertyDefinition] = {}
+    merged: dict[int, MetadataDefinition] = {}
     for defn in definitions:
         merged.setdefault(defn.id, defn)
     return merged

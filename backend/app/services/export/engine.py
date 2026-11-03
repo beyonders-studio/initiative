@@ -5,7 +5,7 @@ the data under the caller's RLS session and shapes it into a backend-agnostic
 ``RenderRequest``; the engine picks inline-vs-job delivery, invokes the
 configured ``RenderBackend``, and confines all storage access. The engine
 never makes an authorization decision — RLS already gated the rows when the
-adapter queried, and the download endpoint re-gates on the ExportJob row.
+adapter queried, and the download endpoint re-gates on the DataJob row.
 """
 
 from __future__ import annotations
@@ -17,14 +17,14 @@ from datetime import datetime
 from typing import Any, Protocol
 
 from sqlalchemy import func
-from sqlmodel import select
+from sqlmodel import col, select
 from sqlmodel.ext.asyncio.session import AsyncSession
 
 from app.core.errors import CodedError
 from app.core.config import settings
 from app.db.advisory_locks import LockNamespace, advisory_lock
 from app.models.platform.user import User
-from app.models.tenant.export_job import ExportJob, ExportJobStatus
+from app.models.tenant.data_job import DataJob, DataJobDirection, DataJobStatus
 from app.services.export.contract import (
     RenderBackend,
     RenderedArtifact,
@@ -145,10 +145,10 @@ async def start_export(
     format: str,
     params: dict[str, Any],
     allow_job: bool,
-) -> InlineExport | ExportJob:
+) -> InlineExport | DataJob:
     """The shared create path: count under RLS, bound, then auto-select
     delivery — render inline at/under EXPORT_INLINE_MAX_ROWS, else persist a
-    queued ExportJob (the filter selector only, never content) for the worker,
+    queued DataJob (the filter selector only, never content) for the worker,
     which re-runs the query under the creator's RLS session at render time.
 
     ``allow_job`` is the caller's write-ability: a read-only actor (guild in
@@ -198,17 +198,19 @@ async def start_export(
     active = (
         await session.exec(
             select(func.count())
-            .select_from(ExportJob)
+            .select_from(DataJob)
             .where(
-                ExportJob.created_by == user.id,
-                ExportJob.status.in_((ExportJobStatus.queued, ExportJobStatus.running)),
+                DataJob.direction == DataJobDirection.export,
+                DataJob.created_by == user.id,
+                col(DataJob.status).in_((DataJobStatus.queued, DataJobStatus.running)),
             )
         )
     ).one()
     if active >= export_limits.EXPORT_MAX_ACTIVE_JOBS_PER_USER:
         raise ExportError(ExportMessages.EXPORT_JOB_LIMIT_REACHED, status_code=429)
 
-    job = ExportJob(
+    job = DataJob(
+        direction=DataJobDirection.export,
         created_by=user.id,
         source=source,
         template_id=adapter.template_id,

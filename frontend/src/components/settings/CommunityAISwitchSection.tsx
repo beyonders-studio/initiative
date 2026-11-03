@@ -30,6 +30,9 @@ export const CommunityAISwitchSection = ({ communityId }: { communityId: number 
   const saved = query.data;
   if (!saved?.ai_offered_by_platform) return null;
 
+  // Set for this community by whoever runs the server.
+  const fixed = saved.set_by_deployment.includes("allow_ai");
+
   const change = (next: boolean) => {
     setError(null);
     update.mutate(
@@ -57,13 +60,15 @@ export const CommunityAISwitchSection = ({ communityId }: { communityId: number 
             <Label htmlFor="community-ai" className="font-medium">
               {t("communityAI.switchLabel")}
             </Label>
-            <p className="text-muted-foreground text-sm">{t("communityAI.switchHelp")}</p>
+            <p className="text-muted-foreground text-sm">
+              {fixed ? t("communityAuth.setByDeployment") : t("communityAI.switchHelp")}
+            </p>
           </div>
           <Switch
             id="community-ai"
             checked={saved.allow_ai}
             onCheckedChange={change}
-            disabled={update.isPending}
+            disabled={update.isPending || fixed}
           />
         </div>
         {error && (

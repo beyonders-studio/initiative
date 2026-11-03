@@ -144,6 +144,7 @@ export function EventDetailPage() {
         keys="calendars:"
         backTo={leaveTo}
         backLabel={t("backToEvents")}
+        entity={{ kind: "calendar_event", id: parsedId }}
       />
     );
   }

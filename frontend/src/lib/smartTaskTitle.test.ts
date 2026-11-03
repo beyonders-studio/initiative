@@ -1,6 +1,11 @@
 import { describe, expect, it } from "vitest";
 
-import { buildTagSummary, buildTask, buildTaskAssignee } from "@/__tests__/factories";
+import {
+  buildTagSummary,
+  buildTask,
+  buildTaskAssignee,
+  buildTaskType,
+} from "@/__tests__/factories";
 import type { TaskRead } from "@/api/generated/initiativeAPI.schemas";
 import { createRecurrenceFromPreset, type RecurrenceRule, shiftFor } from "@/lib/recurrence";
 import type { TitlePerson, TitleReading } from "@/lib/smartTitle";
@@ -19,6 +24,7 @@ const reading = (overrides: Partial<TitleReading> = {}): TitleReading => ({
   repeatStrategy: "fixed",
   tags: [],
   people: [],
+  type: null,
   ...overrides,
 });
 
@@ -138,6 +144,90 @@ describe("readingEdit", () => {
   });
 });
 
+describe("readingEdit — task types", () => {
+  const PLAIN = buildTaskType({ id: 1, name: "Task" });
+  const BUG = buildTaskType({
+    id: 2,
+    name: "Bug",
+    starting_values: {
+      description: "What happened?",
+      checklist: [],
+      priority: "high",
+      recurrence: null,
+      recurrence_strategy: null,
+    },
+  });
+  const typed = (overrides: Partial<TaskRead> = {}) =>
+    blank({ task_type_id: PLAIN.id, task_type: PLAIN, description: null, ...overrides });
+  /** The task as the add dialog shows it once an edit is taken. */
+  const shown = (task: TaskRead, shows: Partial<TaskRead> | undefined) =>
+    ({ ...task, ...shows }) as TaskRead;
+
+  it("sets the type, with what it starts with", () => {
+    const { edit } = readingEdit(typed(), reading({ type: BUG }), NOTHING_APPLIED);
+    expect(edit?.patch).toMatchObject({
+      task_type_id: BUG.id,
+      description: "What happened?",
+      priority: "high",
+    });
+    expect(edit?.shows).toMatchObject({ task_type_id: BUG.id, task_type: BUG, priority: "high" });
+  });
+
+  it("goes back to the type it had once its words go", () => {
+    const task = typed();
+    const first = readingEdit(task, reading({ type: BUG }), NOTHING_APPLIED);
+    const { edit } = readingEdit(shown(task, first.edit?.shows), reading(), first.applied);
+    expect(edit?.patch).toEqual({
+      task_type_id: PLAIN.id,
+      description: null,
+      priority: "medium",
+    });
+  });
+
+  it("keeps a type picked by hand once the title's words for it go", () => {
+    const first = readingEdit(typed(), reading({ type: BUG }), NOTHING_APPLIED);
+    const other = buildTaskType({ id: 3, name: "Idea" });
+    const picked = typed({ task_type_id: other.id, task_type: other });
+    const { edit } = readingEdit(picked, reading(), first.applied);
+    expect(edit).toBeNull();
+  });
+
+  it("sets nothing when the title names the type the task already is", () => {
+    const { edit } = readingEdit(typed(), reading({ type: PLAIN }), {
+      ...NOTHING_APPLIED,
+      title: "Send the invoice",
+    });
+    expect(edit).toBeNull();
+  });
+
+  it("sets the title's priority over the type's, and goes back to the type's", () => {
+    const task = typed();
+    const first = readingEdit(task, reading({ type: BUG, priority: "low" }), NOTHING_APPLIED);
+    expect(first.edit?.patch).toMatchObject({ task_type_id: BUG.id, priority: "low" });
+    const { edit } = readingEdit(
+      shown(task, first.edit?.shows),
+      reading({ type: BUG }),
+      first.applied
+    );
+    expect(edit?.patch).toEqual({ priority: "high" });
+  });
+
+  it("moves what the title's priority goes back to when the type comes after it", () => {
+    const task = typed();
+    const first = readingEdit(task, reading({ priority: "low" }), NOTHING_APPLIED);
+    const second = readingEdit(
+      shown(task, first.edit?.shows),
+      reading({ type: BUG, priority: "low" }),
+      first.applied
+    );
+    expect(second.edit?.patch).toMatchObject({ task_type_id: BUG.id });
+    expect(second.edit?.patch).not.toHaveProperty("priority");
+    const now = shown(shown(task, first.edit?.shows), second.edit?.shows);
+    const { edit } = readingEdit(now, reading({ type: BUG }), second.applied);
+    expect(edit?.patch).toEqual({ priority: "high" });
+  });
+});
+
 describe("readingEdit — repeats that need more than a rule", () => {
   it("counts an hourly repeat from completion, and shows it as the server keeps it", () => {
     const rule = { ...createRecurrenceFromPreset("hourly"), interval: 4 } as RecurrenceRule;
@@ -205,6 +295,14 @@ describe("readingCreate", () => {
       priority: "high",
       tag_ids: [9],
       assignee_ids: [7, 2],
+    });
+  });
+
+  it("adds the type the title names", () => {
+    const type = buildTaskType({ id: 4, name: "Bug" });
+    expect(readingCreate(reading({ type }))).toEqual({
+      title: "Send the invoice",
+      task_type_id: 4,
     });
   });
 

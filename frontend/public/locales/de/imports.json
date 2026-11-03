@@ -84,7 +84,7 @@
     "people": {
       "prompt": "Wer sind diese Personen hier?",
       "note": "Wähle, wer jede Person hier ist. Genaue Handle-Treffer sind schon eingetragen; leer gelassen bleibt nur der Name.",
-      "access": "Wer zugewiesen, eingeladen oder in einer Eigenschaft genannt wird, wird der Initiative hinzugefügt, wenn du sie verwaltest, und erhält Zugriff auf das Importierte.",
+      "access": "Wer zugewiesen, eingeladen oder in Metadaten genannt wird, wird der Initiative hinzugefügt, wenn du sie verwaltest, und erhält Zugriff auf das Importierte.",
       "comments_one": "{{count}} Kommentar",
       "comments_other": "{{count}} Kommentare",
       "unmapped": "Niemand hier",
@@ -172,7 +172,7 @@
         "files_other": "{{count}} angehängte Dateien, jeweils an ihrer Aufgabe ({{size}})",
         "sprints_one": "{{count}} Sprint in {{calendars}} Kalender(n)",
         "sprints_other": "{{count}} Sprints in {{calendars}} Kalender(n)",
-        "propertiesTitle": "Felder, die zu Eigenschaften werden",
+        "propertiesTitle": "Felder, die zu Metadaten werden",
         "propertiesHint": "Entferne das Häkchen bei allem, was dieser Initiative nicht hinzugefügt werden soll.",
         "propertyCount_one": "{{count}} Aufgabe",
         "propertyCount_other": "{{count}} Aufgaben",
@@ -228,7 +228,7 @@
   },
   "envelope": {
     "title": "Aus Datei importieren",
-    "description": "Importiere eine aus Initiative exportierte Datei: eine JSON-Datei oder eine ZIP-Datei, wenn der Export seine Dateien mitbringt, etwa die Bilder eines Katalogs. Der Inhalt wird in der gewählten Initiative erstellt.",
+    "description": "Importiere eine aus Initiative exportierte Datei: eine JSON-Datei oder eine ZIP-Datei, wenn der Export seine Dateien mitbringt, etwa die eines Wikis. Der Inhalt wird in der gewählten Initiative erstellt.",
     "selectFile": "Exportdatei",
     "parseError": "Diese Datei ist kein bekannter Initiative-Export.",
     "wrongTool": "Diese Datei ist ein {{type}}-Export — importiere sie über die Seite dieses Werkzeugs.",
@@ -274,7 +274,6 @@
       "initiative-calendar": "Kalender",
       "initiative-post": "Beitrag",
       "initiative-wiki": "Wiki",
-      "initiative-catalog": "Katalog",
       "initiative-counter-group": "Zählergruppe",
       "initiative-dashboard": "Dashboard"
     },

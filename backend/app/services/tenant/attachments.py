@@ -1,27 +1,48 @@
 from __future__ import annotations
 
 import asyncio
+import functools
 import hashlib
+import io
 import json
 import logging
 import re
+import unicodedata
+import zipfile
 from contextlib import asynccontextmanager
 from datetime import datetime, timedelta, timezone
 from pathlib import Path
-from typing import Any, AsyncIterator, Dict, Iterable, Mapping, Set, Tuple
+from typing import (
+    Any,
+    AsyncIterator,
+    BinaryIO,
+    Dict,
+    Iterable,
+    Iterator,
+    Mapping,
+    Set,
+    Tuple,
+)
 from urllib.parse import urlparse
 from uuid import uuid4
 
 from fastapi import UploadFile
 
 from app.core.errors import CodedError
+from app.core.file_types import (
+    FileType,
+    is_refused,
+    spec_of,
+    type_of_media,
+    type_of_name,
+)
 from app.core.identity_boundary import UPLOAD_PATH_SHAPE
 from app.core.messages import AttachmentMessages
 from app.core.image_headers import read_image_header
 from app.db.advisory_locks import LockNamespace, advisory_lock
 from app.db.query import ids_in
 from app.services.platform import billing_changes
-from app.services.storage import get_guild_storage
+from app.services.storage import ReadableBlob, get_guild_storage, open_seekable
 
 logger = logging.getLogger(__name__)
 
@@ -31,8 +52,13 @@ UPLOADS_URL_PREFIX = "/uploads/"
 #: description, a comment — starts with. The server chooses every stored name,
 #: so this is how an upload says it was pasted, and only an upload that says so
 #: is ever deleted because the text stopped showing it. An image copied in from
-#: a file or a catalog keeps its own name and is never touched.
+#: a file keeps its own name and is never touched.
 PASTED_IMAGE_PREFIX = "pasted-"
+
+#: What the stored name of a thumbnail the app made starts with. A thumbnail
+#: is made again whenever it is wanted, so it counts toward no storage limit
+#: and no backup carries it.
+THUMBNAIL_PREFIX = "thumbnail-"
 
 #: An upload's address inside markdown: ``/uploads/{community_id}/{filename}``,
 #: optionally behind an origin.
@@ -87,50 +113,6 @@ def compute_content_hash(data: bytes) -> str:
     return hashlib.sha256(data).hexdigest()
 
 
-# Supported MIME types for uploaded files (based on react-doc-viewer support)
-ALLOWED_FILE_MIME_TYPES: Dict[str, str] = {
-    "application/pdf": ".pdf",
-    "application/msword": ".doc",
-    "application/vnd.openxmlformats-officedocument.wordprocessingml.document": ".docx",
-    "application/vnd.ms-excel": ".xls",
-    "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet": ".xlsx",
-    "application/vnd.ms-powerpoint": ".ppt",
-    "application/vnd.openxmlformats-officedocument.presentationml.presentation": ".pptx",
-    "text/plain": ".txt",
-    "text/html": ".html",
-    # Images
-    "image/png": ".png",
-    "image/jpeg": ".jpg",
-    "image/gif": ".gif",
-    "image/webp": ".webp",
-    "image/svg+xml": ".svg",
-    # Markdown
-    "text/markdown": ".md",
-}
-
-# Extension to MIME type mapping for validation
-EXTENSION_TO_MIME: Dict[str, str] = {
-    ".pdf": "application/pdf",
-    ".doc": "application/msword",
-    ".docx": "application/vnd.openxmlformats-officedocument.wordprocessingml.document",
-    ".xls": "application/vnd.ms-excel",
-    ".xlsx": "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
-    ".ppt": "application/vnd.ms-powerpoint",
-    ".pptx": "application/vnd.openxmlformats-officedocument.presentationml.presentation",
-    ".txt": "text/plain",
-    ".html": "text/html",
-    ".htm": "text/html",
-    ".png": "image/png",
-    ".jpg": "image/jpeg",
-    ".jpeg": "image/jpeg",
-    ".gif": "image/gif",
-    ".webp": "image/webp",
-    ".svg": "image/svg+xml",
-    ".md": "text/markdown",
-    ".markdown": "text/markdown",
-}
-
-
 def normalize_upload_url(url: str | None) -> str | None:
     if not url or not isinstance(url, str):
         return None
@@ -169,10 +151,11 @@ def upload_names(urls: Iterable[str | None]) -> Set[str]:
 async def purge_file_uploads(session, files: Iterable[Any]) -> Set[str]:
     """Delete the uploads of files about to be hard-purged.
 
-    An uploaded file's blob, and every version of it, backs that file alone,
-    so they go with it. What a file shows — pictures in its body, its
-    featured image — goes only when nothing that stays shows it too; a trashed
-    file still counts, since it may be restored.
+    A version's thumbnail backs that version alone, so it goes with it. The
+    version's own file may also be shown by a page a picture was picked into,
+    and it goes, like what a file shows — pictures in its body, its featured
+    image — only when nothing that stays shows it too; a trashed file still
+    counts, since it may be restored.
 
     Caller must use a session that can DELETE from ``uploads``; caller commits,
     then deletes the blobs of the stored names returned.
@@ -186,44 +169,29 @@ async def purge_file_uploads(session, files: Iterable[Any]) -> Set[str]:
         return set()
     doomed_ids = {d.id for d in doomed}
 
-    versions = await session.exec(
-        select(FileVersion.file_url).where(FileVersion.file_id.in_(doomed_ids))
+    versions = (
+        await session.exec(
+            select(
+                FileVersion.id, FileVersion.file_url, FileVersion.thumbnail_url
+            ).where(FileVersion.file_id.in_(doomed_ids))
+        )
+    ).all()
+    shown = {row.file_url for row in versions if row.file_url}
+    # A small picture is its own thumbnail, so that name is the version's file.
+    removed = await _drop_upload_rows(
+        session,
+        upload_names(row.thumbnail_url for row in versions) - upload_names(shown),
     )
-    removed = await _drop_upload_rows(session, upload_names(versions.all()))
 
-    shown: Set[str] = set()
     for d in doomed:
         shown |= extract_upload_urls(d.content)
         if d.featured_image_url:
             shown.add(d.featured_image_url)
-    return removed | await release_uploads(session, shown, leaving={File: doomed_ids})
-
-
-async def purge_catalog_item_uploads(session, images: Iterable[Any]) -> Set[str]:
-    """Delete Upload rows + blobs for pictures about to be hard-purged.
-
-    A picture's blobs back exactly one picture by construction — the file and
-    the thumbnail of every version — so there is no orphan check to run: the
-    version rows go with the picture (FK cascade), and this takes their
-    ``Upload`` rows and the bytes behind them.
-
-    Caller must use a session that can DELETE from ``uploads``; caller commits,
-    then deletes the blobs of the stored names returned.
-    """
-    from sqlmodel import select
-
-    from app.models.tenant.catalog import CatalogItemVersion
-
-    doomed = list(images)
-    if not doomed:
-        return set()
-    versions = await session.exec(
-        select(CatalogItemVersion.file_url, CatalogItemVersion.thumbnail_url).where(
-            CatalogItemVersion.catalog_item_id.in_({i.id for i in doomed})
-        )
+    return removed | await release_uploads(
+        session,
+        shown,
+        leaving={File: doomed_ids, FileVersion: {row.id for row in versions}},
     )
-    urls = [u for row in versions.all() for u in row]
-    return await _drop_upload_rows(session, upload_names(urls))
 
 
 def upload_urls_in_markdown(text: str | None) -> Set[str]:
@@ -249,11 +217,10 @@ UNCLAIMED_PASTED_IMAGE_GRACE = timedelta(hours=24)
 
 def _upload_columns() -> tuple[tuple[type, str], ...]:
     """Every column a stored upload can be shown from: every column somebody
-    writes in, a file's featured image, and the files of every version of
-    an uploaded file or a picture."""
+    writes in, a file's featured image, and the files and thumbnails of every
+    version of an uploaded file."""
     from app.db.search_index import written_columns
     from app.models.tenant.file import File, FileVersion
-    from app.models.tenant.catalog import CatalogItemVersion
 
     return (
         *(
@@ -263,8 +230,7 @@ def _upload_columns() -> tuple[tuple[type, str], ...]:
         ),
         (File, "featured_image_url"),
         (FileVersion, "file_url"),
-        (CatalogItemVersion, "file_url"),
-        (CatalogItemVersion, "thumbnail_url"),
+        (FileVersion, "thumbnail_url"),
     )
 
 
@@ -795,93 +761,174 @@ async def purge_initiative_uploads(session, initiative_ids: Iterable[int]) -> Se
     return dropped
 
 
-def detect_mime_type(content: bytes, filename: str | None = None) -> str | None:
-    """Detect MIME type using python-magic, with fallback to extension.
+#: What the bytes of a text file say whatever kind of text it is; its name says
+#: which (Markdown, HTML, plain).
+_PLAIN_TEXT = frozenset({"text/plain", "text/x-markdown"})
+#: Office formats whose bytes are a zip package; the name says which.
+_OFFICE_PACKAGES = frozenset(
+    {
+        "application/vnd.openxmlformats-officedocument.wordprocessingml.document",
+        "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+        "application/vnd.openxmlformats-officedocument.presentationml.presentation",
+    }
+)
+#: Older Office formats, whose bytes are a compound-document container.
+_OFFICE_CONTAINERS = frozenset(
+    {"application/msword", "application/vnd.ms-excel", "application/vnd.ms-powerpoint"}
+)
+_CONTAINER_TYPES = frozenset({"application/CDFV2", "application/x-ole-storage"})
 
-    Returns the detected MIME type or None if detection fails.
-    """
+
+class RefusedFileTypeError(ValueError):
+    """A program, which no upload may be (``file_types.is_refused``)."""
+
+
+def detect_mime_type(content: bytes) -> str | None:
+    """The type ``content``'s bytes say it is, or ``None`` where they can't be
+    read."""
     try:
         import magic
 
-        detected = magic.from_buffer(content, mime=True)
-        if detected:
-            return detected
-    except Exception as exc:
-        logger.warning("Failed to detect MIME type with magic: %s", exc)
-
-    # Fallback to extension-based detection
-    if filename:
-        ext = Path(filename).suffix.lower()
-        if ext in EXTENSION_TO_MIME:
-            return EXTENSION_TO_MIME[ext]
-
-    return None
+        return magic.from_buffer(content, mime=True) or None
+    except Exception:
+        logger.exception("upload_type_detection_failed")
+        return None
 
 
-def validate_file(
-    content: bytes,
-    filename: str | None,
-    content_type: str | None,
-) -> Tuple[str, str]:
-    """Validate an uploaded file.
+def _zip_names(source: BinaryIO) -> list[str]:
+    try:
+        with zipfile.ZipFile(source) as package:
+            return package.namelist()
+    except zipfile.BadZipFile:
+        return []
 
-    Args:
-        content: File content bytes
-        filename: Original filename
-        content_type: Content-Type header from upload
 
-    Returns:
-        Tuple of (validated_mime_type, extension)
+def _is_app_package(source: BinaryIO) -> bool:
+    """Whether a zip is a Java, Android or iOS app."""
+    return any(
+        name in ("META-INF/MANIFEST.MF", "AndroidManifest.xml")
+        or (name.startswith("Payload/") and ".app/" in name)
+        for name in _zip_names(source)
+    )
 
-    Raises:
-        ValueError: If validation fails
+
+def _name_settles(detected: str, named_type: FileType, source: BinaryIO) -> bool:
+    """Whether a file's name may make it ``named_type`` where its bytes said
+    ``detected``: only where the bytes say no more than the family."""
+    if detected in spec_of(named_type).containers:
+        return True
+    named = spec_of(named_type).media_types[0]
+    if detected in _PLAIN_TEXT:
+        return named.startswith("text/") or named == "application/json"
+    if named in _OFFICE_PACKAGES:
+        return "[Content_Types].xml" in _zip_names(source)
+    return named in _OFFICE_CONTAINERS and detected in _CONTAINER_TYPES
+
+
+def validate_file(content: bytes, filename: str | None) -> Tuple[str, str]:
+    """The type and stored extension of an uploaded file, read from its bytes.
+
+    Any format is taken but a program. The name only narrows what the bytes
+    allow (:func:`_name_settles`); the type the client sent is never asked.
+    Bytes nothing can read are ``application/octet-stream``. Raises
+    :class:`RefusedFileTypeError` for a program, and ``ValueError`` for a file
+    that is empty or too large.
     """
     if len(content) > MAX_FILE_SIZE:
         raise ValueError(
             f"File exceeds maximum size of {MAX_FILE_SIZE // (1024 * 1024)} MB"
         )
-
     if not content:
         raise ValueError("Uploaded file is empty")
+    return _type_of(detect_mime_type(content), io.BytesIO(content), filename)
 
-    # Detect actual MIME type
-    detected_mime = detect_mime_type(content, filename)
 
-    if detected_mime and detected_mime not in ALLOWED_FILE_MIME_TYPES:
-        # Magic returned an unrecognized type — fall back to extension if it
-        # maps to an allowed type (e.g. magic returns text/x-markdown for .md)
-        if filename:
-            file_ext = Path(filename).suffix.lower()
-            ext_mime = EXTENSION_TO_MIME.get(file_ext)
-            if ext_mime and ext_mime in ALLOWED_FILE_MIME_TYPES:
-                detected_mime = ext_mime
-            else:
-                raise ValueError(f"Unsupported file type: {detected_mime}")
-        else:
-            raise ValueError(f"Unsupported file type: {detected_mime}")
+@functools.cache
+def _head_bytes() -> int:
+    """How much of a file the type library reads to name its type."""
+    import magic
 
-    # If we couldn't detect the MIME type, fall back to Content-Type header
-    if not detected_mime:
-        if content_type and content_type in ALLOWED_FILE_MIME_TYPES:
-            detected_mime = content_type
-        else:
-            raise ValueError(
-                "Unable to determine file type. Supported types: PDF, Word, Excel, PowerPoint, TXT, HTML, images, Markdown"
-            )
+    return magic.Magic(mime=True).getparam(magic.MAGIC_PARAM_BYTES_MAX)
 
-    # Get extension for the detected MIME type
-    extension = ALLOWED_FILE_MIME_TYPES.get(detected_mime, "")
 
-    # If we have a filename, prefer its extension if it matches
-    if filename:
-        file_ext = Path(filename).suffix.lower()
-        if (
-            file_ext in EXTENSION_TO_MIME
-            and EXTENSION_TO_MIME[file_ext] == detected_mime
-        ):
-            extension = file_ext
+def validate_stored(guild_id: int, key: str, size: int, filename: str | None) -> str:
+    """The type of a file already in the guild's storage under ``key``, a
+    finished resumable upload, read as :func:`validate_file` reads one: from
+    its first bytes, and from a zip's own list of what it holds, without
+    fetching the rest. Raises as :func:`validate_file` does.
 
-    return detected_mime, extension
+    Then, where the deployment scans uploads, the whole file is streamed to
+    the scanner (``app.services.upload_scanning``), which raises unless it is
+    clean: a file that arrived in parts is checked like any other before it
+    is taken."""
+    if not size:
+        raise ValueError("Uploaded file is empty")
+    storage = get_guild_storage(guild_id)
+    source = open_seekable(storage, key, size)
+    if source is None:
+        raise ValueError("Uploaded file is missing")
+    with source:
+        detected = detect_mime_type(source.read(_head_bytes()))
+        mime = _type_of(detected, source, filename)[0]
+    from app.services import upload_scanning
+
+    if upload_scanning.enabled():
+        blob = storage.open_readable(key)
+        if blob is None:
+            raise ValueError("Uploaded file is missing")
+        upload_scanning.scan_stream(_pieces(blob), size)
+    return mime
+
+
+def _pieces(blob: ReadableBlob) -> Iterator[bytes]:
+    """A stored file's bytes a piece at a time, from disk or from a stream."""
+    if blob.path is None:
+        yield from blob.stream or ()
+        return
+    with blob.path.open("rb") as handle:
+        while piece := handle.read(1024 * 1024):
+            yield piece
+
+
+def _type_of(
+    detected: str | None, source: BinaryIO, filename: str | None
+) -> Tuple[str, str]:
+    """The type and stored extension of a file whose bytes said ``detected``,
+    with ``source`` to read a zip's list from."""
+    # Read as the name the file is kept and downloaded under.
+    filename = display_filename(filename)
+    detected = detected or "application/octet-stream"
+    if is_refused(detected, filename) or (
+        detected == "application/zip" and _is_app_package(source)
+    ):
+        raise RefusedFileTypeError(f"Refused file type: {detected}")
+    named_type = type_of_name(filename)
+    mime = detected
+    if named_type is not None and named_type is not type_of_media(detected):
+        if _name_settles(detected, named_type, source):
+            mime = spec_of(named_type).media_types[0]
+    extensions = spec_of(type_of_media(mime)).extensions
+    suffix = Path(filename).suffix.lower() if filename else ""
+    return mime, suffix if suffix in extensions else next(iter(extensions), "")
+
+
+#: The longest name a file keeps; most filesystems stop at 255.
+MAX_DISPLAY_NAME = 255
+
+
+def display_filename(name: str | None) -> str | None:
+    """``name`` as a file shows it and downloads under it: without control or
+    formatting characters, which never belong in a name, trimmed of the
+    spaces and dots a desktop drops, and cut to 255 characters, keeping its
+    extension."""
+    if name is None:
+        return None
+    kept = "".join(c for c in name if unicodedata.category(c) not in ("Cc", "Cf"))
+    kept = kept.strip().rstrip(". ")
+    if len(kept) > MAX_DISPLAY_NAME:
+        suffix = Path(kept).suffix[:16]
+        kept = kept[: MAX_DISPLAY_NAME - len(suffix)] + suffix
+    return kept or None
 
 
 def new_upload_filename(extension: str, *, prefix: str = "") -> str:
@@ -911,22 +958,58 @@ async def store_upload(
     and the commit. ``initiative_id`` is the initiative a file written together
     with what shows it is kept for; without it the file waits to be claimed
     (:func:`claim_uploads`).
-    """
-    from app.models.tenant.upload import Upload
 
+    Scanned first where the deployment scans uploads
+    (``app.services.upload_scanning``): a file the scanner refuses, or any
+    file while it cannot answer, is never written. The pictures the app draws
+    itself (:data:`THUMBNAIL_PREFIX`) are not uploads and are not sent.
+    """
+    from app.services import upload_scanning
+
+    if upload_scanning.enabled() and not filename.startswith(THUMBNAIL_PREFIX):
+        await asyncio.to_thread(upload_scanning.scan_bytes, data)
     await asyncio.to_thread(
         get_guild_storage(guild_id).write,
         filename,
         data,
         content_type=content_type or "application/octet-stream",
     )
+    return record_upload(
+        session,
+        guild_id=guild_id,
+        filename=filename,
+        size=len(data),
+        content_type=content_type,
+        content_hash=compute_content_hash(data),
+        created_by=created_by,
+        initiative_id=initiative_id,
+    )
+
+
+def record_upload(
+    session,
+    *,
+    guild_id: int,
+    filename: str,
+    size: int,
+    content_type: str | None,
+    content_hash: str | None,
+    created_by: int | None,
+    initiative_id: int | None,
+) -> str:
+    """Record what is already in the guild's storage as ``filename`` in
+    ``uploads``, as :func:`store_upload` records what it writes, and return
+    its served URL. A finished resumable upload is recorded where it was
+    staged, without its hash, which would mean reading it all again."""
+    from app.models.tenant.upload import Upload
+
     session.add(
         Upload(
             filename=filename,
             created_by=created_by,
-            size_bytes=len(data),
+            size_bytes=size,
             content_type=content_type,
-            content_hash=compute_content_hash(data),
+            content_hash=content_hash,
             initiative_id=initiative_id,
             claimed_at=None if initiative_id is None else datetime.now(timezone.utc),
         )
@@ -938,34 +1021,39 @@ async def store_upload(
 
 async def get_guild_storage_usage(guild_id: int) -> int:
     """Total stored blob bytes for the guild — ``SUM(uploads.size_bytes)`` over
-    every upload it stores, read on :func:`guild_wide`."""
+    every upload it stores but the thumbnails the app made
+    (:data:`THUMBNAIL_PREFIX`), plus the declared length of every file still
+    arriving to be kept (``pending_uploads`` of a stored purpose), read on
+    :func:`guild_wide`."""
     from sqlalchemy import func
-    from sqlmodel import select
+    from sqlmodel import col, select
 
+    from app.models.tenant.pending_upload import PendingUpload
     from app.models.tenant.upload import Upload
+    from app.services.resumable import STORED_PURPOSES
 
+    stored = (
+        select(func.coalesce(func.sum(Upload.size_bytes), 0))
+        .where(~col(Upload.filename).startswith(THUMBNAIL_PREFIX))
+        .scalar_subquery()
+    )
+    arriving = (
+        select(func.coalesce(func.sum(PendingUpload.length), 0))
+        .where(col(PendingUpload.purpose).in_(STORED_PURPOSES))
+        .scalar_subquery()
+    )
     async with guild_wide(guild_id) as session:
-        return (
-            await session.exec(select(func.coalesce(func.sum(Upload.size_bytes), 0)))
-        ).one()
+        return int((await session.exec(select(stored + arriving))).one())
 
 
 async def _storage_limit(guild_id: int) -> int | None:
-    """The guild's ``max_storage_bytes``, ``None`` for no limit. A setting of
-    the community rather than of whoever is writing, so it is read on
-    :func:`guild_wide`, as the usage it is compared with is."""
-    from sqlmodel import select
-
-    from app.models.platform.guild_administration import GuildAdministration
+    """The community's ``max_storage_bytes`` rule, ``None`` for no limit. A
+    setting of the community rather than of whoever is writing, so it is read
+    on :func:`guild_wide`, as the usage it is compared with is."""
+    from app.services.platform import rules
 
     async with guild_wide(guild_id) as session:
-        return (
-            await session.exec(
-                select(GuildAdministration.max_storage_bytes).where(
-                    GuildAdministration.guild_id == guild_id
-                )
-            )
-        ).one_or_none()
+        return await rules.community_value(session, guild_id, "max_storage_bytes")
 
 
 async def storage_left(guild_id: int) -> int | None:
@@ -1051,11 +1139,30 @@ def _opens_an_svg(contents: bytes) -> bool:
     return name[:3] == b"svg" and name[3:4] in _ROOT_NAME_ENDS
 
 
+#: The largest document image.
+MAX_IMAGE_BYTES = 10 * 1024 * 1024
+
+#: What a document image may be, and the suffix its stored copy takes. The four
+#: raster formats ``read_image_header`` identifies, plus the three
+#: :func:`detect_document_image_type` allows on top of them: TIFF and ICO, which
+#: it does not read, and SVG, which is markup rather than a raster and so is
+#: served as a download.
+IMAGE_SUFFIXES = {
+    "image/png": ".png",
+    "image/jpeg": ".jpg",
+    "image/gif": ".gif",
+    "image/webp": ".webp",
+    "image/tiff": ".tiff",
+    "image/x-icon": ".ico",
+    "image/svg+xml": ".svg",
+}
+
+
 def detect_document_image_type(contents: bytes) -> str | None:
     """Identify a document image from its bytes, or ``None`` if it is not one.
 
     The client's ``Content-Type`` and filename are not consulted — the rule the
-    catalog, avatar, guild-image and announcement paths already follow, and a
+    avatar, guild-image and announcement paths already follow, and a
     mislabelled PNG is still a PNG. What comes back is what the stored row, the
     stored name and the served response all describe the file as.
     """

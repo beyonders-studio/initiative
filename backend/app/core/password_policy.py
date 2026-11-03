@@ -18,9 +18,14 @@ must call ``validate_new_password`` immediately before hashing.
 
 from __future__ import annotations
 
+from typing import TYPE_CHECKING
+
 from app.core.errors import CodedError
 from app.core.messages import PasswordMessages
 from app.services import hibp
+
+if TYPE_CHECKING:
+    from sqlmodel.ext.asyncio.session import AsyncSession
 
 
 # Mirrored by ``frontend/src/lib/passwordPolicy.ts`` — keep both in sync
@@ -40,13 +45,19 @@ class PasswordPolicyError(CodedError):
     status_code = 422
 
 
-async def validate_new_password(password: str) -> None:
+async def validate_new_password(session: AsyncSession, password: str) -> None:
     """Validate a candidate password or raise ``PasswordPolicyError``.
 
     Order matters: cheap local check first, network check last, so
-    obviously-short inputs never reach HIBP.
+    obviously-short inputs never reach HIBP. The breach check runs while the
+    deployment's rule ``breached_password_check_enabled`` is on.
     """
+    from app.services.platform import rules
+
     if len(password) < PASSWORD_MIN_LENGTH:
         raise PasswordPolicyError(PasswordMessages.TOO_SHORT)
-    if await hibp.is_password_breached(password):
+    checks_breaches = (await rules.platform_values(session))[
+        "breached_password_check_enabled"
+    ]
+    if checks_breaches and await hibp.is_password_breached(password):
         raise PasswordPolicyError(PasswordMessages.BREACHED)

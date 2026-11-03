@@ -10,9 +10,12 @@
   "columns": {
     "owner": "Propietario",
     "type": "Tipo",
+    "created": "Creado",
+    "added": "Añadido",
     "community": "Comunidad",
     "initiative": "Iniciativa",
-    "ownerFallback": "Usuario {{id}}"
+    "ownerFallback": "Usuario {{id}}",
+    "size": "Tamaño"
   },
   "create": {
     "title": "Nuevo archivo",
@@ -47,11 +50,11 @@
     "templateToggle": "Alternar estado de plantilla",
     "fileLabel": "Archivo",
     "dropPrompt": "Suelta un archivo aquí, o",
-    "fileHelp": "Soportados: PDF, Word, Excel, PowerPoint, TXT, HTML, imágenes, Markdown (máx. 50 MB)",
-    "fileTooLarge": "El archivo es demasiado grande. El tamaño máximo es 50 MB.",
+    "fileHelp": "Cualquier archivo excepto un programa. Un archivo grande sigue donde se quedó si se corta la conexión.",
     "creating": "Creando…",
     "createFile": "Crear archivo",
     "uploadingFile": "Subiendo…",
+    "uploadingProgress": "Subiendo… {{percent}}",
     "uploadFile": "Subir archivo",
     "createdAttached": "Archivo creado y adjuntado.",
     "created": "Archivo creado.",
@@ -103,9 +106,16 @@
   "featuredImage": {
     "label": "Imagen destacada",
     "upload": "Subir imagen",
+    "fromFiles": "Desde Archivos",
     "replace": "Reemplazar",
     "remove": "Quitar",
     "uploading": "Subiendo…"
+  },
+  "imageChooser": {
+    "title": "Elegir una imagen de Archivos",
+    "description": "Se inserta tal como está ahora: una versión más reciente del archivo no la cambia.",
+    "none": "No hay imágenes aquí.",
+    "more": "Mostrar más"
   },
   "outline": {
     "show": "Mostrar contenido",
@@ -311,6 +321,26 @@
     "uploadError": "No se pudo subir la nueva versión",
     "deleteError": "No se pudo eliminar la versión"
   },
+  "convert": {
+    "edit": "Editar",
+    "title": "¿Convertir para editar?",
+    "toSheet": {
+      "xlsx": "Se convierte en una hoja de cálculo que puedes editar aquí. Se conservan sus hojas, valores, fórmulas, rellenos, bordes y formatos de número; los gráficos, imágenes y macros no.",
+      "ods": "Se convierte en una hoja de cálculo que puedes editar aquí. Se conservan sus hojas, valores y fórmulas; el formato no.",
+      "values": "Se convierte en una hoja de cálculo que puedes editar aquí. Se conservan sus hojas y valores. Las fórmulas pasan como los valores que muestran y el formato no se conserva.",
+      "table": "Se convierte en una hoja de cálculo que puedes editar aquí, con sus filas y columnas en una sola hoja."
+    },
+    "toDocument": {
+      "markdown": "Se convierte en un documento que puedes editar aquí. Se conservan los títulos, listas, tablas, enlaces y el formato del texto.",
+      "text": "Se convierte en un documento que puedes editar aquí, con su texto en párrafos.",
+      "word": "Se convierte en un documento que puedes editar aquí. Se conservan los títulos, el formato del texto, las listas, las tablas, los enlaces y las imágenes. El diseño de página, los encabezados y pies de página, las notas al pie, los comentarios y los cuadros de texto no, y los cambios con seguimiento llegan aceptados."
+    },
+    "replaces": "El archivo subido y sus versiones anteriores se reemplazan. La exportación te devuelve un archivo cuando lo necesites.",
+    "confirm": "Convertir",
+    "converting": "Convirtiendo…",
+    "success": "Convertido. Ya puedes editarlo.",
+    "error": "No se pudo convertir este archivo."
+  },
   "viewer": {
     "loadError": "No se pudo cargar el archivo",
     "openNewTab": "Abrir en nueva pestaña",
@@ -329,6 +359,8 @@
     "unknownFileType": "Este tipo de archivo no se puede previsualizar en el navegador.",
     "downloadFile": "Descargar archivo",
     "image": "Imagen",
+    "video": "Vídeo",
+    "audio": "Audio",
     "markdownDocument": "Documento Markdown",
     "showSource": "Ver código fuente",
     "showRendered": "Ver renderizado"
@@ -350,12 +382,124 @@
     "noMatchingFiles": "Ningún archivo coincide con tus filtros.",
     "type": "Filtrar por tipo",
     "allTypes": "Todos los tipos",
-    "types": {
-      "native": "Documento de texto",
-      "file": "Archivo",
+    "kinds": {
+      "document": "Documento",
+      "spreadsheet": "Hoja de cálculo",
+      "presentation": "Presentación",
       "whiteboard": "Pizarra",
-      "smart_link": "Enlace inteligente",
-      "spreadsheet": "Hoja de cálculo"
+      "pdf": "PDF",
+      "image": "Imagen",
+      "video": "Vídeo",
+      "audio": "Audio",
+      "text": "Texto",
+      "compressed": "Comprimido",
+      "design": "Diseño",
+      "3d": "3D",
+      "font": "Fuente",
+      "raw": "RAW de cámara",
+      "code": "Código",
+      "ebook": "Libro electrónico",
+      "cad": "CAD",
+      "link": "Enlace",
+      "other": "Otro"
+    }
+  },
+  "collections": {
+    "heading": "Colecciones",
+    "fileCount_one": "{{count}} archivo",
+    "fileCount_other": "{{count}} archivos",
+    "addTo": "Añadir a una colección",
+    "addToDescription_one": "Pon este archivo en una colección. Sigue en Archivos, y quién puede abrirlo no cambia.",
+    "addToDescription_other": "Pon estos {{count}} archivos en una colección. Siguen en Archivos, y quién puede abrirlos no cambia.",
+    "noneToAddTo": "Aún no hay colecciones a las que añadir. Nombra una nueva abajo.",
+    "namePlaceholder": "Nombre de la nueva colección",
+    "addToNew": "Añadir a una nueva colección",
+    "added_one": "Añadido a {{name}}",
+    "added_other": "{{count}} archivos añadidos a {{name}}",
+    "created": "{{name}} creada",
+    "addFiles": "Añadir archivos",
+    "pickFile": "¿Qué archivo?",
+    "noFilesToAdd": "No hay archivos que añadir",
+    "fileAdded": "Archivo añadido a la colección",
+    "uploadFiles": "Subir archivos",
+    "dropPrompt": "Suelta archivos para subirlos a esta colección",
+    "removeFrom": "Quitar de la colección",
+    "removed_one": "{{count}} archivo quitado de la colección",
+    "removed_other": "{{count}} archivos quitados de la colección",
+    "emptied": "Su último archivo ya no está, así que la colección pasó a la papelera",
+    "trash": "Mover a la papelera",
+    "trashTitle": "¿Mover esta colección a la papelera?",
+    "trashDescription": "Sus archivos se quedan donde están. Se puede restaurar desde la papelera antes de que termine el periodo de retención.",
+    "trashed": "Colección movida a la papelera",
+    "noFiles": "Aún no hay archivos en esta colección",
+    "noFilesDescription": "Añade archivos de esta iniciativa, o suelta archivos en cualquier parte de esta página para subirlos.",
+    "loadingFiles": "Cargando archivos...",
+    "openFile": "Abrir archivo",
+    "filter": "Colección",
+    "anyCollection": "Cualquier colección",
+    "groupByTag": "Agrupar por etiqueta",
+    "order": "Orden",
+    "newestFirst": "Más recientes primero",
+    "oldestFirst": "Más antiguos primero",
+    "views": {
+      "label": "Vista",
+      "masonry": "Mosaico",
+      "timeline": "Cronología"
+    },
+    "groups": {
+      "untagged": "Sin etiqueta",
+      "count_one": "{{count}} archivo",
+      "count_other": "{{count}} archivos"
+    },
+    "upload": {
+      "progress": "Subiendo {{done}} de {{total}}...",
+      "finished_one": "{{count}} archivo añadido",
+      "finished_other": "{{count}} archivos añadidos",
+      "finishedWithFailures": "{{done}} añadidos, {{failed}} no se pudieron",
+      "dismiss": "Descartar",
+      "tooLarge": "más grande de lo que acepta este servidor"
+    },
+    "backToFiles": "Volver a Archivos",
+    "notFound": "Colección no encontrada",
+    "notFoundDescription": "La colección que buscas no existe, o ninguno de sus archivos es uno que puedas abrir.",
+    "noAccess": "Acceso denegado",
+    "noAccessDescription": "No tienes permiso para ver esta colección.",
+    "error": "No se pudo cambiar la colección",
+    "properties": {
+      "description": "Lo que cada archivo de esta colección puede tener aquí: sus valores pertenecen a la colección, no al archivo.",
+      "create": "Nueva propiedad",
+      "edit": "Editar propiedad",
+      "delete": "Eliminar propiedad",
+      "deleteTitle": "¿Eliminar esta propiedad?",
+      "deleteBody": "Se eliminarán la propiedad y el valor que cada archivo tenga en esta colección.",
+      "none": "Aún no hay propiedades",
+      "heading": "En esta colección",
+      "saveError": "No se pudo guardar el valor",
+      "of": "Propiedades de {{name}}"
+    },
+    "addedOn": "Añadido {{date}}",
+    "createdOn": "Creado {{date}}",
+    "listHelp": {
+      "masonry": "Cada archivo con su propia forma, agrupado en columnas: lo que su tarjeta muestra bajo la imagen.",
+      "grid": "Cada archivo como un mosaico cuadrado: lo que su tarjeta muestra bajo la imagen.",
+      "timeline": "Los archivos según el día en que se añadieron: lo que cada tarjeta muestra bajo la imagen.",
+      "table": "Los archivos de la colección como tabla: qué columnas, en qué orden."
+    },
+    "shapes": {
+      "name": "Nombre",
+      "blank": "En blanco",
+      "blankHint": "Una cuadrícula y una tabla, todavía sin propiedades propias.",
+      "lists": "Muestra {{lists}}",
+      "properties": "Propiedades: {{properties}}",
+      "copyLabel": "O copiar la forma de",
+      "copyPlaceholder": "Otra colección",
+      "copyHint": "Sus propiedades y lo que muestran sus listas, sin sus archivos ni sus valores.",
+      "create": "Crear colección"
+    },
+    "required": {
+      "title": "Lo que pide {{name}}",
+      "description": "Cada archivo que entra en esta colección empieza con estos valores.",
+      "confirm": "Continuar"
     }
   }
 }

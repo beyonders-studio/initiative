@@ -351,6 +351,59 @@ BUILTIN_ANNOUNCEMENTS: tuple[BuiltinAnnouncement, ...] = (
             ),
         ),
     ),
+    BuiltinAnnouncement(
+        slug="0-78-galleries-are-collections",
+        title="Galleries are now collections",
+        category=AnnouncementCategory.info,
+        published_at=datetime(2026, 10, 27, tzinfo=timezone.utc),
+        # For the people who had galleries. A new account and a fresh install
+        # start with collections and nothing to look for.
+        audience_accounts=AnnouncementAudienceAccounts.existing,
+        only_upgrading_from_below="0.78.0",
+        trigger_route="/c/**",
+        sections=(
+            AnnouncementSection(
+                heading="Why",
+                body=(
+                    "Files started out as documents. Over time they grew to hold "
+                    "every kind of file, and once all of them lived in one place, "
+                    "keeping pictures in a separate container stopped making "
+                    "sense.\n\n"
+                    "So each gallery is now a **collection**, in **Files**, with "
+                    "its comments, tags and links. Each picture is a file, shared "
+                    "as its gallery was, and its caption is in the collection's "
+                    "**Caption** field."
+                ),
+            ),
+            AnnouncementSection(
+                heading="What a collection is",
+                body=(
+                    "Add any files to it and lay it out however suits you: a "
+                    "gallery, a library, a catalog, whatever makes the most sense. "
+                    "A file can be in several collections and stays in the Files "
+                    "list, and a collection can have fields of its own, such as a "
+                    "price or a rating."
+                ),
+                image_url="/announcement-images/collections.png",
+                image_alt=(
+                    "A collection of maps and handouts in Files, laid out as a "
+                    "masonry gallery"
+                ),
+            ),
+            AnnouncementSection(
+                starts_page=True,
+                heading="Upload almost anything",
+                body=(
+                    "Audio, video, archives, OpenDocument, design files, 3D "
+                    "models, fonts, e-books and more upload as files, each with "
+                    "its category's icon. Videos and recordings play in the app, "
+                    "and a Word or OpenDocument file can be turned into a "
+                    "document you edit here.\n\n"
+                    "Programs and scripts are the one thing refused."
+                ),
+            ),
+        ),
+    ),
 )
 
 

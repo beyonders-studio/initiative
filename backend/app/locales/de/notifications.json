@@ -9,7 +9,16 @@
       "title": "Überfällige Aufgaben",
       "body_one": "{{count}} Aufgabe ist überfällig: {{title}}",
       "body_other": "{{count}} Aufgaben sind überfällig, darunter {{title}}"
+    },
+    "reminder": {
+      "title": "Erinnerung",
+      "body": "{{task}}"
     }
+  },
+  "comingUp": {
+    "title": "Demnächst",
+    "body_one": "{{count}} Sache steht an: {{title}}",
+    "body_other": "{{count}} Sachen stehen an, zuerst {{title}}"
   },
   "initiative": {
     "added": {
@@ -48,9 +57,9 @@
       "title": "Deine Aufgabe wurde erwähnt",
       "body": "{{actor}} hat {{task}} in {{context}} erwähnt"
     },
-    "taskDescription": {
+    "description": {
       "title": "Du wurdest erwähnt",
-      "body": "{{actor}} hat dich in der Beschreibung von {{task}} erwähnt"
+      "body": "{{actor}} hat dich in der Beschreibung von {{title}} erwähnt"
     }
   },
   "comment": {
@@ -212,6 +221,14 @@
     "account": {
       "title": "Ein Hinweis zu deinem Konto",
       "body": "Öffne Initiative, um ihn zu lesen."
+    },
+    "overdue": {
+      "title": "Du hast überfällige Aufgaben",
+      "body": "Öffne Initiative, um sie zu sehen."
+    },
+    "coming_up": {
+      "title": "Bei dir steht etwas an",
+      "body": "Öffne Initiative, um es zu sehen."
     }
   },
   "quietHours": {
@@ -263,6 +280,37 @@
     "replied": {
       "title": "Eine Antwort auf einen Fall, den niemand übernommen hat",
       "body": "Öffne Initiative, um sie zu lesen."
+    }
+  },
+  "share": {
+    "requested": {
+      "read": {
+        "title": "Bitte um Ansicht",
+        "body_one": "{{requester}} möchte {{title}} ansehen",
+        "body_other": "{{requester}} möchte {{count}} Dateien ansehen"
+      },
+      "write": {
+        "title": "Bitte um Bearbeitung",
+        "body_one": "{{requester}} möchte {{title}} bearbeiten",
+        "body_other": "{{requester}} möchte {{count}} Dateien bearbeiten"
+      }
+    },
+    "granted": {
+      "read": {
+        "title": "Du kannst es jetzt ansehen",
+        "body_one": "{{answerer}} hat dir {{title}} zum Ansehen freigegeben",
+        "body_other": "{{answerer}} hat dir {{count}} Dateien zum Ansehen freigegeben"
+      },
+      "write": {
+        "title": "Du kannst es jetzt bearbeiten",
+        "body_one": "{{answerer}} hat dir {{title}} zum Bearbeiten freigegeben",
+        "body_other": "{{answerer}} hat dir {{count}} Dateien zum Bearbeiten freigegeben"
+      }
+    },
+    "declined": {
+      "title": "Anfrage abgelehnt",
+      "body_one": "{{answerer}} hat deine Anfrage abgelehnt",
+      "body_other": "{{answerer}} hat deine Anfrage für {{count}} Dateien abgelehnt"
     }
   }
 }

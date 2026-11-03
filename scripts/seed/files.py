@@ -6,7 +6,8 @@ from __future__ import annotations
 from app.core.relationships import Provenance, RelationshipType
 from app.core.search import SearchEntityType
 from app.core.tools import Tool
-from app.models.tenant.file import File, FileType
+from app.core.file_types import FileType
+from app.models.tenant.file import File
 from app.models.tenant.resource_grant import ResourceAccessLevel
 from app.services.tenant import relationships as relationships_service
 
@@ -213,7 +214,7 @@ FILES: dict[str, list[dict]] = {
             "title": "Party Provisioning Ledger",
             "initiative": "strahd",
             "creator": "Dungeon Master",
-            "file_type": FileType.spreadsheet,
+            "file_type": FileType.sheet,
             "general": ResourceAccessLevel.read,
             "content": spreadsheet_workbook(
                 order_title="Vallaki Market — Party Order",
@@ -392,7 +393,7 @@ FILES: dict[str, list[dict]] = {
             "title": "Fleet Requisition Sheet",
             "initiative": "starfall",
             "creator": "Admin User",
-            "file_type": FileType.spreadsheet,
+            "file_type": FileType.sheet,
             "general": ResourceAccessLevel.read,
             "content": spreadsheet_workbook(
                 order_title="Exodus Fleet — Quartermaster Requisition",
@@ -485,7 +486,7 @@ FILES: dict[str, list[dict]] = {
             "title": "Crimson Maiden Cargo Manifest",
             "initiative": "crimson",
             "creator": "Finley Goldtongue",
-            "file_type": FileType.spreadsheet,
+            "file_type": FileType.sheet,
             "general": ResourceAccessLevel.read,
             "content": spreadsheet_workbook(
                 order_title="Port of Saltmere — Cargo Order",
@@ -606,7 +607,7 @@ async def seed(c: Community) -> None:
             name=d["title"],
             content=d.get("content")
             or lexical([para(text) for text in d["paragraphs"]]),
-            file_type=d.get("file_type", FileType.native),
+            file_type=d.get("file_type", FileType.lexical),
             created_by=creator.id,
         )
         c.session.add(doc)

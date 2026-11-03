@@ -81,7 +81,7 @@ async def test_provision_creates_every_guild_scoped_table(engine):
             res = await conn.execute(
                 text(
                     "SELECT table_name FROM information_schema.tables "
-                    "WHERE table_schema = :s"
+                    "WHERE table_schema = :s AND table_type = 'BASE TABLE'"
                 ),
                 {"s": schema},
             )
@@ -155,7 +155,7 @@ async def test_provision_is_idempotent(engine):
             count = await conn.scalar(
                 text(
                     "SELECT count(*) FROM information_schema.tables "
-                    "WHERE table_schema = :s"
+                    "WHERE table_schema = :s AND table_type = 'BASE TABLE'"
                 ),
                 {"s": schema},
             )
@@ -255,10 +255,10 @@ async def test_the_seat_role_is_the_guild_role_plus_the_communitys_own_settings(
                 assert (
                     await conn.scalar(
                         text("SELECT has_table_privilege(:r, :t, :p)"),
-                        {"r": seat, "t": "public.guild_auth_policies", "p": verb},
+                        {"r": seat, "t": "public.community_rules", "p": verb},
                     )
                     is True
-                ), f"the seat role must hold {verb} on guild_auth_policies"
+                ), f"the seat role must hold {verb} on community_rules"
                 # The community's own role reaches its content as before, and
                 # the seat role inherits that reach.
                 assert (
@@ -273,10 +273,10 @@ async def test_the_seat_role_is_the_guild_role_plus_the_communitys_own_settings(
                 assert (
                     await conn.scalar(
                         text("SELECT has_table_privilege(:r, :t, :p)"),
-                        {"r": role, "t": "public.guild_auth_policies", "p": verb},
+                        {"r": role, "t": "public.community_rules", "p": verb},
                     )
                     is False
-                ), f"the guild role must not hold {verb} on guild_auth_policies"
+                ), f"the guild role must not hold {verb} on community_rules"
     finally:
         async with engine.begin() as conn:
             await drop_guild_schema(conn, gid)
@@ -315,7 +315,7 @@ async def test_the_plugin_role_holds_only_what_a_plugin_reaches(engine):
                 "guild_plugins",
                 "guild_plugin_secrets",
                 "plugin_placements",
-                "initiative_role_permissions",
+                "initiative_rules",
             ):
                 for verb in ("SELECT", "INSERT", "UPDATE", "DELETE"):
                     assert await held(conn, table, verb) is False, f"{table} {verb}"
@@ -458,7 +458,7 @@ async def test_support_role_write_capped_on_protected_tables(engine):
                 "guild_settings",
                 "initiative_members",
                 "initiative_roles",
-                "initiative_role_permissions",
+                "initiative_rules",
             ):
                 for verb in ("SELECT", "INSERT", "UPDATE", "DELETE"):
                     assert await priv(table, verb) is True, f"{table} {verb}"
@@ -792,6 +792,7 @@ async def test_the_template_strip_removes_only_what_a_render_put_there(engine):
     """``guild_template`` carries structure. Boots before it became
     structure-only rendered the registries into it; the boot back-fill now
     strips those, and must leave the migrations' own triggers where they are."""
+    from app.db import presence
     from app.db.authorization import GUILD_FUNCTION_SIGNATURES
 
     async def counts(conn):
@@ -825,8 +826,12 @@ async def test_the_template_strip_removes_only_what_a_render_put_there(engine):
             int(functions),
         )
 
-    # What an earlier boot did: render the registry into the template.
+    # What an earlier boot did: render the registry into the template. Its
+    # policies name the presence view, which provisioning makes beside them.
+    view = f'"{_TEMPLATE_SCHEMA}".{presence.VIEW}'
+    body = "\nUNION ALL\n".join(arm.select(_TEMPLATE_SCHEMA) for arm in presence.arms())
     async with engine.begin() as conn:
+        await conn.execute(text(f"CREATE VIEW {view} AS\n{body}"))
         await apply_guild_rls(conn, _TEMPLATE_SCHEMA)
     async with engine.connect() as conn:
         policies, rendered, own, functions = await counts(conn)
@@ -842,6 +847,7 @@ async def test_the_template_strip_removes_only_what_a_render_put_there(engine):
     # And once clean, there is nothing to do.
     async with engine.begin() as conn:
         assert await strip_template_registry_objects(conn) == 0
+        await conn.execute(text(f"DROP VIEW {view}"))
 
 
 async def test_public_schema_has_no_tenant_tables(engine):
@@ -904,7 +910,7 @@ async def test_backfill_provisions_a_guild_missing_its_schema(engine):
             tables = await conn.scalar(
                 text(
                     "SELECT count(*) FROM information_schema.tables "
-                    "WHERE table_schema = :s"
+                    "WHERE table_schema = :s AND table_type = 'BASE TABLE'"
                 ),
                 {"s": missing_schema},
             )
@@ -1003,7 +1009,7 @@ async def test_backfill_continues_past_a_failing_guild(engine, monkeypatch):
                 tables = await conn.scalar(
                     text(
                         "SELECT count(*) FROM information_schema.tables "
-                        "WHERE table_schema = :s"
+                        "WHERE table_schema = :s AND table_type = 'BASE TABLE'"
                     ),
                     {"s": guild_schema_name(gid)},
                 )

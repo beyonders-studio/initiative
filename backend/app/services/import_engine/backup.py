@@ -32,22 +32,27 @@ import logging
 import zipfile
 from datetime import datetime, timedelta, timezone
 from pathlib import Path
-from typing import Any, Awaitable, Callable
+from typing import Any, Awaitable, Callable, Optional
+
+from pydantic import ConfigDict
 
 from sqlmodel import select
 from sqlmodel.ext.asyncio.session import AsyncSession
 
 from app.db import gucs
 from app.db.session import raise_flag, routed_guild_id
-from app.core.references import format_ref, parse_ref
+from app.core.references import format_ref
 from app.core.relationships import RelationshipType
 from app.core.search import SearchEntityType
 from app.core.tools import BULK_EXPORT_TOOLS, Tool, tool_envelope_type
 from app.core.messages import ImportEngineMessages
 from app.models.platform.user import User
-from app.models.tenant.import_job import ImportJob, ImportJobStatus
+from app.models.tenant.data_job import DataJob, DataJobDirection, DataJobStatus
 from app.models.tenant.initiative import Initiative
 from app.models.tenant.resource_grant import ResourceAccessLevel, ResourceGrant
+from app.schemas.base import SanitizedBaseModel
+from app.schemas.tenant.import_envelopes import EnvelopePropertyValue
+from app.schemas.tenant.project_export import ProjectExportPropertyDefinition
 from app.schemas.tenant.backup_export import (
     BACKUP_SCHEMA_VERSION,
     MIN_SUPPORTED_IMPORT_VERSION,
@@ -69,9 +74,12 @@ from app.services.import_engine.archive_assets import (
     restore_assets,
 )
 from app.services.import_engine.common import (
+    decode_property_value,
     handle_key,
     load_guild_member_handles,
+    load_initiative_member_handles,
     unique_name,
+    unique_name_in_initiative,
 )
 from app.services.tenant.attachments import claim_shown
 from app.services.import_engine.contract import (
@@ -84,7 +92,7 @@ from app.services.import_engine.context import (
     exported_from_here,
 )
 from app.services.import_engine.links import resolve_page_links
-from app.services.import_engine.references import SOURCE_REF, resolve_references
+from app.services.import_engine.references import resolve_references
 from app.services.marketplace.publish_profile import shift_dates
 from app.services.import_engine.zip_bounds import (
     json_cap,
@@ -103,9 +111,13 @@ _TOOL_ORDER = tuple(t.value for t in BULK_EXPORT_TOOLS)
 # inside it. They carry no Tool and no registry importer — like ``file``
 # entries, they are applied here — and they go FIRST, because the content
 # behind them refers to what they establish: a value binds to a property
-# definition, and a member holds a role.
+# definition, and a member holds a role. Its collections go LAST: each is put
+# together from files the entries before it made.
 _STRUCTURAL_TOOL = "initiative"
-_STRUCTURAL_TYPES = frozenset({"initiative-structure", "initiative-properties"})
+_COLLECTIONS_TYPE = "initiative-collections"
+_STRUCTURAL_TYPES = frozenset(
+    {"initiative-structure", "initiative-properties", _COLLECTIONS_TYPE}
+)
 
 # Refresh the routed session's authorization context this often (see the
 # export backup adapter's identical constant).
@@ -126,70 +138,8 @@ _ATTACH_RELATIONSHIPS: dict[str, RelationshipType] = {
     "wiki": RelationshipType.part_of,
 }
 
-#: How an archive written by an older build names files (once documents) and
-#: catalogs (once galleries): the
-#: manifest's tool, its tool switches and envelope type, the keys holding a file's type and the
-#: files filed in a wiki or attached to an item, the refs naming one, and the
-#: role permissions for the tool. Read on restore and rewritten to this build's names before
-#: anything else looks at the archive; nothing writes them.
-_LEGACY_ENVELOPE_TYPES = {
-    "initiative-document": tool_envelope_type(Tool.file),
-    "initiative-gallery": tool_envelope_type(Tool.catalog),
-}
-_LEGACY_TOOLS = {"document": Tool.file.value, "gallery": Tool.catalog.value}
-_LEGACY_KEYS = {
-    "documents": "files",
-    "document_type": "file_type",
-    "galleries": "catalogs",
-}
-#: The keys only a gallery's envelope spelled differently: its pictures.
-_LEGACY_CATALOG_KEYS = {"images": "items"}
-_LEGACY_REF_KEYS = ("external_ref", SOURCE_REF)
-_LEGACY_PERMISSIONS = {
-    "documents_enabled": Tool.file.view_permission,
-    "create_documents": Tool.file.create_permission,
-    "galleries_enabled": Tool.catalog.view_permission,
-    "create_galleries": Tool.catalog.create_permission,
-}
-
-
-def _current_shape(value: Any) -> Any:
-    """``value``, read from an archive, with the names an older build gave
-    files spelled as this one spells them."""
-    if isinstance(value, list):
-        return [_current_shape(item) for item in value]
-    if not isinstance(value, dict):
-        return value
-    shaped = {
-        _LEGACY_KEYS.get(key, key): _current_shape(item) for key, item in value.items()
-    }
-    tools = shaped.get("tools")
-    if isinstance(tools, dict):
-        shaped["tools"] = {
-            _LEGACY_TOOLS.get(key, key): item for key, item in tools.items()
-        }
-    kind = shaped.get("type")
-    if kind == "initiative-gallery":
-        shaped = {
-            _LEGACY_CATALOG_KEYS.get(key, key): item for key, item in shaped.items()
-        }
-    if isinstance(kind, str) and kind in _LEGACY_ENVELOPE_TYPES:
-        shaped["type"] = _LEGACY_ENVELOPE_TYPES[kind]
-    tool = shaped.get("tool")
-    if isinstance(tool, str) and tool in _LEGACY_TOOLS:
-        shaped["tool"] = _LEGACY_TOOLS[tool]
-    for key in _LEGACY_REF_KEYS:
-        ref = shaped.get(key)
-        parsed = parse_ref(ref) if isinstance(ref, str) else None
-        if parsed is not None:
-            shaped[key] = format_ref(*parsed)
-    permissions = shaped.get("permissions")
-    if isinstance(permissions, list):
-        shaped["permissions"] = [
-            _LEGACY_PERMISSIONS.get(key, key) if isinstance(key, str) else key
-            for key in permissions
-        ]
-    return shaped
+#: An older build's gallery entry: its pictures become files in a collection.
+_GALLERY_TYPE = "initiative-gallery"
 
 
 def _entry_ref(path: str) -> str:
@@ -232,7 +182,7 @@ def read_manifest(archive: zipfile.ZipFile, *, fetched: bool = False) -> BackupM
     except Exception as exc:
         raise ImportEngineError(ImportEngineMessages.IMPORT_ZIP_INVALID) from exc
     try:
-        manifest = BackupManifest.model_validate(_current_shape(raw))
+        manifest = BackupManifest.model_validate(import_engine.current_shape(raw))
     except Exception as exc:
         raise ImportEngineError(ImportEngineMessages.IMPORT_ZIP_INVALID) from exc
     if not (
@@ -349,13 +299,15 @@ async def stage_backup_job(
     guild_id: int,
     user: User,
     payload: Path,
-    status: ImportJobStatus,
+    status: DataJobStatus,
     anchor: datetime | None = None,
     people_map: dict[str, int] | None = None,
     join: list[int] | None = None,
-) -> ImportJob:
+    payload_ref: str | None = None,
+) -> DataJob:
     """Plan the backup zip at ``payload``, stage it in the community's storage
     and add its job, created by ``user``, to ``session`` without committing.
+    ``payload_ref`` names it where it is already there (a resumable upload).
 
     ``session`` is routed into the community, and the plan suggests who each
     name in the archive is from the roster it reads there. A ``staged`` job
@@ -372,9 +324,10 @@ async def stage_backup_job(
         member_ids_by_handle=roster,
     )
     await import_engine.count_active_jobs_locked(session, user=user)
-    payload_ref = await asyncio.to_thread(
-        import_engine.stage_payload_file, guild_id, payload, suffix="zip"
-    )
+    if payload_ref is None:
+        payload_ref = await asyncio.to_thread(
+            import_engine.stage_payload_file, guild_id, payload, suffix="zip"
+        )
     params: dict[str, Any] = {}
     if anchor is not None:
         params["anchor"] = anchor.isoformat()
@@ -382,11 +335,12 @@ async def stage_backup_job(
         params["people_map"] = people_map
     if join:
         params["join"] = join
-    job = ImportJob(
+    job = DataJob(
+        direction=DataJobDirection.import_,
         created_by=user.id,
         source="backup",
         params=params,
-        payload_ref=payload_ref,
+        file_ref=payload_ref,
         plan=plan.model_dump(mode="json"),
         status=status,
         expires_at=datetime.now(timezone.utc)
@@ -402,8 +356,8 @@ def _manifest_tool_flags(tools: dict[str, str] | None) -> dict[str, bool]:
     "disabled" -> off; "included"/"excluded" -> on, because the switch records
     the source's configuration rather than what this import was asked to carry.
 
-    Spelled through the enum rather than ``tool + "s"``, which is wrong for
-    ``catalog``. A manifest also names things that are not tools — a backup
+    Spelled through the enum rather than ``tool + "s"``. A manifest also names
+    things that are not tools — a backup
     written by a newer version, or a sub-resource like ``calendar_event`` — and
     those name no switch, so they are skipped rather than raising on an
     initiative that is otherwise importable.
@@ -554,7 +508,9 @@ async def apply_backup(
             entries = sorted(
                 entries_here,
                 key=lambda e: (
-                    -1
+                    len(_TOOL_ORDER) + 1
+                    if e.type == _COLLECTIONS_TYPE
+                    else -1
                     if e.tool == _STRUCTURAL_TOOL
                     else _TOOL_ORDER.index(e.tool)
                     if e.tool in _TOOL_ORDER
@@ -702,7 +658,9 @@ async def _resolve_target_initiative(
         # A file entry is a file whatever tool it was filed under, so it
         # is the file importer's permission that governs it.
         envelope_type = (
-            tool_envelope_type(Tool.file) if entry.type == "file" else entry.type
+            tool_envelope_type(Tool.file)
+            if entry.type in ("file", _GALLERY_TYPE)
+            else entry.type
         )
         if envelope_type in seen:
             continue
@@ -772,6 +730,17 @@ async def _apply_entry(
         )
         _record_entry(context, entry, outcome)
         return outcome
+    if entry.type == _GALLERY_TYPE:
+        return await _apply_gallery_entry(
+            session,
+            archive,
+            entry,
+            initiative,
+            user,
+            base,
+            max_json_bytes,
+            context=context,
+        )
     if entry.type in _STRUCTURAL_TYPES:
         return await _apply_structural_entry(
             session,
@@ -792,7 +761,7 @@ async def _apply_entry(
         raw = await asyncio.to_thread(
             read_json_member, archive, entry.path, max_bytes=max_json_bytes
         )
-        envelope = _current_shape(raw)
+        envelope = import_engine.current_shape(raw)
         if shift_days and isinstance(envelope, dict) and entry.tool in _TOOL_ORDER:
             envelope = shift_dates(Tool(entry.tool), envelope, shift_days)
         validated = importer.validate(envelope)
@@ -878,8 +847,8 @@ async def _apply_structural_entry(
     *,
     context: ImportContext | None = None,
 ) -> EntryResult:
-    """An initiative's own shape: its property definitions, or its roles and
-    members.
+    """An initiative's own shape: its property definitions, its roles and
+    members, or its collections.
 
     Both are **additive**. They create what the target does not have and leave
     what it does alone: a role of the same name, or a definition of the same
@@ -900,12 +869,16 @@ async def _apply_structural_entry(
         return invalid
     if not isinstance(payload, dict):
         return invalid
-    payload = _current_shape(payload)
+    payload = import_engine.current_shape(payload)
     try:
         async with session.begin_nested():
             if entry.type == "initiative-properties":
                 created = await _apply_property_definitions(
                     session, initiative, payload, context=context
+                )
+            elif entry.type == _COLLECTIONS_TYPE:
+                created = await _apply_collections(
+                    session, initiative, user, payload, context=context
                 )
             else:
                 created = await _apply_initiative_structure(
@@ -934,7 +907,6 @@ async def _apply_property_definitions(
     binds the definitions an envelope declares."""
     from pydantic import ValidationError
 
-    from app.schemas.tenant.project_export import ProjectExportPropertyDefinition
     from app.services.import_engine.importers._base import PropertyRestore
 
     declared = []
@@ -949,6 +921,146 @@ async def _apply_property_definitions(
     return {"property_definitions": props.created}
 
 
+class _CollectionRecord(SanitizedBaseModel):
+    """One collection as a backup carries it: its files and cover by the ids
+    they had where it was exported, its metadata, each file's values of it by
+    the file's id there, and its layouts, naming its metadata by place and
+    then the initiative's properties they name (``layout_properties``)."""
+
+    model_config = ConfigDict(extra="ignore")
+
+    id: int
+    name: str
+    description: Optional[str] = None
+    cover_file_id: Optional[int] = None
+    file_ids: list[int] = []
+    tags: list[str] = []
+    properties: list[EnvelopePropertyValue] = []
+    fields: list[ProjectExportPropertyDefinition] = []
+    values: dict[int, list[EnvelopePropertyValue]] = {}
+    layouts: list[dict] = []
+    layout_properties: list[ProjectExportPropertyDefinition] = []
+
+
+async def _apply_collections(
+    session: AsyncSession,
+    initiative,
+    user: User,
+    payload: dict,
+    *,
+    context: ImportContext | None,
+) -> dict:
+    """Make each collection that holds a file this job made, with the files
+    made of its own, its fields and their values on those files. One whose
+    files none came over is not made: a collection is never empty. A person a
+    value names is placed as any property's is, and a value placing nobody is
+    left out."""
+    from app.models.tenant.collection import Collection
+    from app.models.tenant.metadata import MetadataDefinition, MetadataValue
+    from app.services.import_engine.importers._base import (
+        PropertyRestore,
+        TagRestore,
+    )
+    from app.services.tenant import collections as collections_service
+    from app.services.tenant import metadata as metadata_service
+    from app.services.tenant import tool_layouts as tool_layouts_service
+
+    if context is None:
+        return {}
+    members = await load_initiative_member_handles(session, initiative_id=initiative.id)
+    made = 0
+    for raw in payload.get("collections") or []:
+        record = _CollectionRecord.model_validate(raw)
+        files: dict[int, int] = {}
+        for source_id in record.file_ids:
+            found = context.links.lookup(format_ref(SearchEntityType.file, source_id))
+            if found is not None and found.kind == SearchEntityType.file:
+                files[source_id] = found.id
+        if not files:
+            continue
+        collection = Collection(
+            initiative_id=initiative.id,
+            name=record.name,
+            description=record.description,
+            cover_file_id=files.get(record.cover_file_id or 0),
+            created_by=user.id,
+        )
+        session.add(collection)
+        await session.flush()
+        await collections_service.add_files(
+            session, collection, list(files.values()), added_by=user.id
+        )
+        made_ids = await metadata_service.copy_definitions(
+            session,
+            [
+                MetadataDefinition(id=place, **field.model_dump(exclude={"project"}))
+                for place, field in enumerate(record.fields, start=1)
+            ],
+            initiative_id=initiative.id,
+            collection_id=collection.id,
+        )
+        fields = {
+            (field.name, field.type): made_ids[place]
+            for place, field in enumerate(record.fields, start=1)
+        }
+        for source_id, values in record.values.items():
+            for value in values:
+                field_id = fields.get((value.property_name, value.property_type))
+                columns = (
+                    decode_property_value(value, members, people=context.people)
+                    if source_id in files and field_id is not None
+                    else None
+                )
+                if columns is not None:
+                    session.add(
+                        MetadataValue(
+                            entity_type=Tool.file.value,
+                            entity_id=files[source_id],
+                            property_id=field_id,
+                            **columns,
+                        )
+                    )
+        # The initiative's properties its layouts name bind as an envelope's
+        # do, and are named at their places after its own metadata.
+        props = PropertyRestore(session, initiative_id=initiative.id, context=context)
+        await props.declare(record.layout_properties)
+        placed = {
+            **made_ids,
+            **{
+                len(record.fields) + place: props.bound_id(declared.name, declared.type)
+                for place, declared in enumerate(record.layout_properties, start=1)
+            },
+        }
+        await tool_layouts_service.restore_layouts(
+            session,
+            tool_layouts_service.Target("collection", collection.id, initiative.id),
+            (
+                tool_layouts_service.Restored(
+                    str(layout.get("kind")),
+                    tool_layouts_service.remapped_definition(
+                        layout.get("definition") or {},
+                        tool_layouts_service.Remap(
+                            statuses=lambda _: None, properties=placed.get
+                        ),
+                    ),
+                )
+                for layout in record.layouts
+                if isinstance(layout, dict)
+            ),
+        )
+        await TagRestore(session).attach(collection, record.tags)
+        await props.attach(collection, record.properties)
+        await props.settle(collection)
+        context.links.register(
+            format_ref(SearchEntityType.collection, record.id),
+            SearchEntityType.collection,
+            collection.id,
+        )
+        made += 1
+    await session.flush()
+    return {"collections": made}
+
+
 async def _apply_initiative_structure(session, initiative, user: User, payload) -> dict:
     """Create the roles the target lacks, then place people it can name.
 
@@ -961,7 +1073,7 @@ async def _apply_initiative_structure(session, initiative, user: User, payload) 
     from app.models.tenant.initiative import (
         InitiativeMember,
         InitiativeRoleModel,
-        InitiativeRolePermission,
+        InitiativeRule,
         PermissionKey,
     )
 
@@ -998,9 +1110,10 @@ async def _apply_initiative_structure(session, initiative, user: User, payload) 
             except ValueError:
                 continue  # a permission this build does not have
             session.add(
-                InitiativeRolePermission(
+                InitiativeRule(
+                    initiative_id=role.initiative_id,
                     initiative_role_id=role.id,
-                    permission_key=permission_key,
+                    key=permission_key,
                     enabled=True,
                 )
             )
@@ -1040,6 +1153,216 @@ async def _apply_initiative_structure(session, initiative, user: User, payload) 
     return {"initiative_roles": roles_created, "initiative_members": placed}
 
 
+async def _uploaded_file(
+    session: AsyncSession,
+    storage_key: str,
+    *,
+    name: str,
+    filename: str,
+    initiative,
+    user: User,
+) -> tuple[Any, dict[str, Any]] | None:
+    """A file of the initiative for a restored upload, and its first version's
+    columns — or ``None`` where the blob was not restored or is not a type an
+    uploaded file holds."""
+    from app.core.file_types import type_of_media
+    from app.models.tenant.file import File
+    from app.models.tenant.upload import Upload
+    from app.services.tenant import file_versions
+
+    upload = (
+        await session.exec(select(Upload).where(Upload.filename == storage_key))
+    ).one_or_none()
+    if upload is None:
+        return None
+    content_type = await file_versions.stored_file_type(
+        routed_guild_id(session), storage_key, filename=filename
+    )
+    if content_type is None:
+        return None
+    file = File(
+        name=name,
+        file_type=type_of_media(content_type),
+        content={},
+        initiative_id=initiative.id,
+        created_by=user.id,
+    )
+    stored = {
+        "file_url": f"/uploads/{routed_guild_id(session)}/{storage_key}",
+        "original_filename": filename,
+        "file_content_type": content_type,
+        "file_size": upload.size_bytes,
+    }
+    return file, stored
+
+
+class _GalleryPicture(SanitizedBaseModel):
+    model_config = ConfigDict(extra="ignore")
+
+    storage_key: str
+    title: Optional[str] = None
+    caption: Optional[str] = None
+    original_filename: Optional[str] = None
+    tags: list[str] = []
+    properties: list[EnvelopePropertyValue] = []
+
+
+class _Gallery(SanitizedBaseModel):
+    """An older build's gallery envelope, as much of it as a collection keeps."""
+
+    model_config = ConfigDict(extra="ignore")
+
+    name: str
+    description: Optional[str] = None
+    cover: Optional[str] = None
+    tags: list[str] = []
+    properties: list[EnvelopePropertyValue] = []
+    images: list[_GalleryPicture] = []
+
+
+async def _apply_gallery_entry(
+    session: AsyncSession,
+    archive: zipfile.ZipFile,
+    entry: ManifestEntry,
+    initiative,
+    user: User,
+    base: dict,
+    max_json_bytes: int,
+    *,
+    context: ImportContext | None = None,
+) -> EntryResult:
+    """An older build's gallery: each picture whose bytes were restored is a
+    file of the initiative, owned by the importer, and the files one collection
+    named as the gallery was, made as the Gallery shape in the importer's
+    language. The gallery's tags and properties go on the collection, each
+    picture's on its file, and its caption is its file's Caption."""
+    from app.core.collection_shapes import SHAPES_BY_KEY
+    from app.models.tenant.collection import Collection
+    from app.models.tenant.file import File
+    from app.models.tenant.metadata import MetadataValue
+    from app.services.import_engine.importers._base import (
+        PropertyRestore,
+        TagRestore,
+        grant_ownership,
+    )
+    from app.services.tenant import collections as collections_service
+    from app.services.tenant import file_versions
+
+    try:
+        raw = await asyncio.to_thread(
+            read_json_member, archive, entry.path, max_bytes=max_json_bytes
+        )
+        gallery = _Gallery.model_validate(raw)
+    except ImportEngineError as exc:
+        return EntryResult(**base, status="failed", error=exc.code)
+    except ValueError:
+        return EntryResult(
+            **base, status="failed", error=ImportEngineMessages.IMPORT_INVALID_ENVELOPE
+        )
+    missing = 0
+    files: list[Any] = []
+    captions: dict[int, str] = {}
+    cover: int | None = None
+    try:
+        async with session.begin_nested():
+            tags = TagRestore(session)
+            props = PropertyRestore(
+                session, initiative_id=initiative.id, context=context
+            )
+            for picture in gallery.images:
+                key = picture.storage_key
+                filename = picture.original_filename or key
+                made = await _uploaded_file(
+                    session,
+                    key,
+                    name=await unique_name_in_initiative(
+                        session, File, initiative.id, picture.title or filename
+                    ),
+                    filename=filename,
+                    initiative=initiative,
+                    user=user,
+                )
+                if made is None:
+                    missing += 1
+                    continue
+                file, stored = made
+                session.add(file)
+                await session.flush()
+                await grant_ownership(
+                    session,
+                    tool=Tool.file,
+                    entity_id=file.id,
+                    target_initiative=initiative,
+                    importer=user,
+                )
+                await file_versions.add_version(
+                    session, file, created_by=user.id, **stored
+                )
+                await tags.attach(file, picture.tags)
+                await props.attach(file, picture.properties)
+                files.append(file)
+                if picture.caption and picture.caption.strip():
+                    captions[file.id] = picture.caption.strip()
+                if gallery.cover and key == gallery.cover:
+                    cover = file.id
+            collection = None
+            if files:
+                collection = Collection(
+                    initiative_id=initiative.id,
+                    name=gallery.name,
+                    description=gallery.description,
+                    cover_file_id=cover,
+                    created_by=user.id,
+                )
+                session.add(collection)
+                await session.flush()
+                await collections_service.add_files(
+                    session, collection, [f.id for f in files], added_by=user.id
+                )
+                shaped = await collections_service.apply_shape(
+                    session,
+                    collection,
+                    SHAPES_BY_KEY["gallery"],
+                    locale=user.locale or "en",
+                )
+                session.add_all(
+                    MetadataValue(
+                        entity_type=Tool.file.value,
+                        entity_id=file_id,
+                        property_id=shaped["caption"].id,
+                        value_text=caption,
+                    )
+                    for file_id, caption in captions.items()
+                )
+                await tags.attach(collection, gallery.tags)
+                await props.attach(collection, gallery.properties)
+            unmatched: set[str] = set()
+            for row in [*files, *([collection] if collection else [])]:
+                unmatched.update(await props.settle(row))
+            unmatched_handles = sorted(unmatched)
+    except Exception:
+        logger.exception("backup gallery entry failed path=%s", entry.path)
+        return EntryResult(
+            **base, status="failed", error=ImportEngineMessages.IMPORT_APPLY_FAILED
+        )
+    if collection is None:
+        return EntryResult(
+            **base, status="skipped", error=ImportEngineMessages.IMPORT_ASSET_MISSING
+        )
+    return EntryResult(
+        **base,
+        status="created",
+        detail=EnvelopeImportResult(
+            entity_id=collection.id,
+            entity_title=collection.name,
+            created={Tool.file.plural: len(files), "collections": 1},
+            failed={Tool.file.plural: missing} if missing else {},
+            unmatched_handles=unmatched_handles,
+            warnings=[f"missing_image_files:{missing}"] if missing else [],
+        ),
+    )
+
+
 async def _apply_file_entry(
     session: AsyncSession,
     archive: zipfile.ZipFile,
@@ -1054,9 +1377,8 @@ async def _apply_file_entry(
     """An uploaded file: its content is the restored ``assets/`` blob. A table
     of text, which an uploaded file cannot hold, becomes a spreadsheet read
     from the zip instead."""
-    from app.models.tenant.file import File, FileType
-    from app.models.tenant.upload import Upload
-    from app.schemas.tenant.import_envelopes import EnvelopePropertyValue
+    from app.core.file_types import FileType
+    from app.models.tenant.file import File
     from app.services.import_engine.importers._base import (
         PropertyRestore,
         TagRestore,
@@ -1093,30 +1415,23 @@ async def _apply_file_entry(
             return EntryResult(**base, status="failed", error=exc.code)
         file = File(
             name=entry.title,
-            file_type=FileType.spreadsheet,
+            file_type=FileType.sheet,
             content={"schema_version": 3, "kind": "spreadsheet", "sheets": sheets},
             initiative_id=initiative.id,
             created_by=user.id,
         )
     else:
-        upload = (
-            await session.exec(select(Upload).where(Upload.filename == storage_key))
-        ).one_or_none()
         # The original name lives in the manifest's asset record — the
         # uploads row's filename IS the storage key.
-        filename = asset.original_filename if asset is not None else storage_key
-        content_type = (
-            await file_versions.stored_file_type(
-                File,
-                routed_guild_id(session),
-                storage_key,
-                filename=filename,
-                hint=upload.content_type,
-            )
-            if upload is not None
-            else None
+        made = await _uploaded_file(
+            session,
+            storage_key,
+            name=entry.title,
+            filename=asset.original_filename if asset is not None else storage_key,
+            initiative=initiative,
+            user=user,
         )
-        if upload is None or content_type is None:
+        if made is None:
             # Uploads were excluded from this backup, the blob was not
             # restored, or it is not a type an uploaded file holds — recorded, not
             # silently dropped.
@@ -1125,19 +1440,7 @@ async def _apply_file_entry(
                 status="skipped",
                 error=ImportEngineMessages.IMPORT_ASSET_MISSING,
             )
-        file = File(
-            name=entry.title,
-            file_type=FileType.file,
-            content={},
-            initiative_id=initiative.id,
-            created_by=user.id,
-        )
-        stored = {
-            "file_url": f"/uploads/{routed_guild_id(session)}/{storage_key}",
-            "original_filename": filename,
-            "file_content_type": content_type,
-            "file_size": upload.size_bytes,
-        }
+        file, stored = made
 
     try:
         async with session.begin_nested():

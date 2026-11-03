@@ -33,7 +33,10 @@ export const SettingsCommunityAIPage = () => {
   // The resolved settings name the global AI mode, and every member reads them.
   const modeQuery = useAIEnabled();
   const mode = modeQuery.data?.source;
-  const canManageConnections = mode === "community";
+  // Whoever runs the server can take the community's own connections over;
+  // the ones the community set up are kept, just not used, and not edited here.
+  const connectionsClosed = Boolean(activeCommunity?.closed_surfaces?.includes("ai_connections"));
+  const canManageConnections = mode === "community" && !connectionsClosed;
 
   const connectionsQuery = useCommunityConnections({
     enabled: Boolean(holdsTheSeat) && canManageConnections,
@@ -76,14 +79,18 @@ export const SettingsCommunityAIPage = () => {
 
   const aiSwitch = activeCommunity && <CommunityAISwitchSection communityId={activeCommunity.id} />;
 
-  if (mode === "platform") {
+  if (!canManageConnections) {
     return (
       <div className="space-y-6">
         {aiSwitch}
         <Card>
           <CardHeader>
             <CardTitle>{t("communityAI.title")}</CardTitle>
-            <CardDescription>{t("communityAI.managedByPlatform")}</CardDescription>
+            <CardDescription>
+              {mode === "platform"
+                ? t("communityAI.managedByPlatform")
+                : t("communityAI.managedByServer")}
+            </CardDescription>
           </CardHeader>
         </Card>
       </div>

@@ -72,6 +72,7 @@ describe("the layout editor's ?layout=", () => {
   it("names a list, the task page, or one task type's page", () => {
     expect(parseLayoutKind("board")).toBe("board");
     expect(parseLayoutKind("task")).toBe("task");
+    expect(parseLayoutKind("file")).toBe("file");
     expect(parseLayoutKind("task:12")).toBe("task:12");
     expect(parseLayoutKind("task:0")).toBeUndefined();
     expect(parseLayoutKind("task:x")).toBeUndefined();

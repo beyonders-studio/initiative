@@ -21,7 +21,6 @@ See plan & ``project_export.py`` for the format. The algorithm:
 
 from __future__ import annotations
 
-import re
 from datetime import datetime, timezone
 from typing import Any, Optional
 
@@ -36,7 +35,7 @@ from app.core.search import SearchEntityType
 from app.models.tenant.comment import Comment
 from app.models.tenant.initiative import Initiative
 from app.models.tenant.project import Project
-from app.models.tenant.property import PropertyType
+from app.models.tenant.metadata import MetadataType
 
 from app.models.tenant.task import (
     Task,
@@ -65,6 +64,7 @@ from app.services.import_engine.importers._base import (
     grant_ownership,
 )
 from app.services.import_engine.links import links_to_pages
+from app.services.import_engine.mentions import place_markdown_mentions
 from app.services.import_engine.references import (
     has_source_references,
     note_or_settle,
@@ -72,7 +72,6 @@ from app.services.import_engine.references import (
 from app.services.import_engine.people import (
     PeopleMap,
     initiative_member_id,
-    quoted_account,
     bring_in_named,
 )
 from app.services.tenant import guild_plugins as guild_plugins_service
@@ -209,7 +208,7 @@ async def import_project(
         context=context,
         member_handles=initiative_member_handles,
     )
-    await props.declare(envelope.property_definitions)
+    await props.declare(envelope.property_definitions, project_id=project.id)
     await props.attach(project, envelope.project.properties)
 
     # 5. Its tasks
@@ -246,7 +245,9 @@ async def import_project(
     # plug-ins placed here shown on them as they are on every saved layout.
     if envelope.layouts:
         property_by_place = {
-            place: props.bound_id(declared.name, declared.type)
+            place: props.bound_id(
+                declared.name, declared.type, project=declared.project
+            )
             for place, declared in enumerate(envelope.property_definitions, start=1)
         }
         remap = tool_layouts_service.Remap(
@@ -256,7 +257,7 @@ async def import_project(
             people=frozenset(
                 place
                 for place, declared in enumerate(envelope.property_definitions, start=1)
-                if declared.type == PropertyType.user_reference
+                if declared.type == MetadataType.user_reference
             ),
             types=type_by_place.get,
         )
@@ -424,7 +425,7 @@ async def _import_task(
             (envelope_task.type_name or "").strip().lower(), default_type_id
         ),
         title=envelope_task.title,
-        description=_link_mentions(
+        description=place_markdown_mentions(
             envelope_task.description,
             envelope_task.mention_handles,
             context=context,
@@ -487,7 +488,7 @@ async def _import_task(
                 context,
                 SearchEntityType.task,
                 task.id,
-                _link_mentions(
+                place_markdown_mentions(
                     carry["description"],
                     envelope_task.mention_handles,
                     context=context,
@@ -596,7 +597,7 @@ async def _import_task(
         )
         comment = Comment(
             task_id=task.id,
-            content=_link_mentions(
+            content=place_markdown_mentions(
                 body,
                 envelope_comment.mention_handles,
                 context=context,
@@ -637,45 +638,6 @@ def _timestamps(envelope_task: ProjectExportTask) -> dict[str, datetime]:
     if envelope_task.updated_at is not None:
         stamps["updated_at"] = envelope_task.updated_at
     return stamps
-
-
-def _link_mentions(
-    text: str | None,
-    handles: list[str],
-    *,
-    context: ImportContext | None,
-    initiative_member_handles: dict[str, int],
-) -> str | None:
-    """``text`` with each ``@<handle>`` it mentions linked to an account here.
-
-    Placed the way a comment's author is (:func:`_comment_author`): the
-    account the people step mapped the handle to, else a member of the target
-    initiative with that exact handle, and is stored by id alone, as every
-    mention is. A mention nobody places stays the name it arrived as. Handles
-    are tried longest first, so ``@Ann Lee`` is never read as ``@Ann``
-    followed by a surname.
-    """
-    if not text or not handles:
-        return text
-    people = context.people if context is not None else PeopleMap()
-    targets: dict[str, int] = {}
-    for handle in handles:
-        mapped = quoted_account(
-            handle, people=people, member_handles=initiative_member_handles
-        )
-        if mapped is not None:
-            targets[handle] = mapped
-    if not targets:
-        return text
-    ordered = sorted(set(handles), key=len, reverse=True)
-    pattern = re.compile("@(" + "|".join(re.escape(h) for h in ordered) + r")(?![\w])")
-
-    def link(match: re.Match[str]) -> str:
-        handle = match.group(1)
-        user_id = targets.get(handle)
-        return match.group(0) if user_id is None else f"@[]({user_id})"
-
-    return pattern.sub(link, text)
 
 
 def _comment_author(

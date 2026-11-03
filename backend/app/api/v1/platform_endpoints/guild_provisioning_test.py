@@ -18,7 +18,7 @@ import app.api.v1.platform_endpoints.guilds as guilds_endpoint
 from app.db import post_commit
 from app.db.schema_provisioning import guild_role_name, guild_schema_name
 from app.models.platform.guild import Guild, CommunityStatus
-from app.models.platform.app_setting import DEFAULT_GUILD_RETENTION_DAYS
+from app.core.rules import DEFAULT_GUILD_RETENTION_DAYS
 from app.services.platform import guild_purge
 from app.testing.factories import (
     create_user,

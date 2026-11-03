@@ -32,6 +32,7 @@ import { VIEW_PREFERENCES_QUERY_KEY } from "@/hooks/useViewPreference";
 import { queryClient } from "@/lib/queryClient";
 import { setItem } from "@/lib/storage";
 import { TOOLS, toolCamelPlural, toolRouteSegment, toolViews } from "@/lib/tools";
+import { viewPreferencesQueryKey } from "@/lib/viewPreferences";
 import type { TranslateFn } from "@/types/i18n";
 
 const INITIATIVE_ID = 1;
@@ -59,7 +60,9 @@ const shared = (key: string) => translate(key, { ns: "common" });
  */
 const CARD_FIELDS: Partial<Record<Tool, Record<string, unknown>>> = {
   file: {
-    file_type: "native",
+    file_type: "lexical",
+    kind: "document",
+    file_url: null,
     featured_image_url: null,
     is_template: false,
     properties: [],
@@ -67,7 +70,6 @@ const CARD_FIELDS: Partial<Record<Tool, Record<string, unknown>>> = {
     original_filename: null,
     smart_link_url: null,
   },
-  catalog: { cover: null, preview: [] },
   project: {
     icon: null,
     is_template: false,
@@ -341,45 +343,6 @@ describe("the queue index page", () => {
   });
 });
 
-describe("the catalog index page", () => {
-  it("draws the newest four pictures of a catalog nobody chose a cover for", async () => {
-    const preview = [1, 2, 3, 4].map((id) => ({
-      item_id: id,
-      file_url: `/uploads/picture-${id}.png`,
-      thumbnail_url: null,
-      width: null,
-      height: null,
-    }));
-    // The list carries the pictures only when it is asked for them.
-    server.use(
-      communityHttp.get(`/${toolRouteSegment(Tool.catalog)}/`, ({ request }) => {
-        const asked = new URL(request.url).searchParams.get("include_preview") === "true";
-        return HttpResponse.json({
-          items: [
-            {
-              ...row(Tool.catalog, { id: 1, name: "Store assets" }),
-              preview: asked ? preview : [],
-            },
-          ],
-          total_count: 1,
-          page: 1,
-          page_size: 100,
-          has_next: false,
-        });
-      })
-    );
-
-    const { container } = renderIndex(Tool.catalog);
-    await screen.findByText("Store assets");
-
-    await waitFor(() =>
-      expect(
-        Array.from(container.querySelectorAll("img"), (img) => img.getAttribute("src"))
-      ).toEqual(preview.map((picture) => expect.stringContaining(picture.file_url)))
-    );
-  });
-});
-
 describe("the tool index page's templates", () => {
   it.each(CASES.filter(({ tool }) => toolViews(tool).includes("templates")))(
     "$tool keeps its templates in a view of their own, with nothing to create there",
@@ -508,7 +471,8 @@ describe("the tool index page's bulk actions", () => {
 describe("the file index page", () => {
   const files = (key: string) => translate(key, { ns: "files" });
 
-  /** Rendered in the layout a reader left the list in. */
+  /** Rendered in the layout a reader left every files list in, as an older
+   *  release kept it on the account, with what community 1 keeps. */
   const renderIn = (
     layout: "grid" | "list" | "tags",
     canCreate = true,
@@ -516,8 +480,9 @@ describe("the file index page", () => {
   ) => {
     const queryClient = createTestQueryClient();
     queryClient.setQueryData(VIEW_PREFERENCES_QUERY_KEY, {
-      items: { [`${Tool.file}:view-mode`]: layout, ...kept },
+      items: { [`${Tool.file}:view-mode`]: layout },
     });
+    queryClient.setQueryData(viewPreferencesQueryKey(1), { items: { ...kept } });
     return renderPage(
       () => (
         <ToolIndexPage tool={Tool.file} fixedInitiativeId={INITIATIVE_ID} canCreate={canCreate} />
@@ -531,15 +496,15 @@ describe("the file index page", () => {
 
     renderIndex(Tool.file);
     await screen.findByText(copy(Tool.file, "emptyTitle"));
-    expect(requests.at(-1)?.get("file_type")).toBeNull();
+    expect(requests.at(-1)?.get("kind")).toBeNull();
 
     await userEvent.click(screen.getByRole("button", { name: shared("toolbar.filters") }));
     await userEvent.click(screen.getByRole("combobox", { name: files("filters.type") }));
     await userEvent.click(
-      await screen.findByRole("option", { name: files("filters.types.whiteboard") })
+      await screen.findByRole("option", { name: files("filters.kinds.whiteboard") })
     );
 
-    await waitFor(() => expect(requests.at(-1)?.get("file_type")).toBe("whiteboard"));
+    await waitFor(() => expect(requests.at(-1)?.get("kind")).toBe("whiteboard"));
     expect(requests.at(-1)?.get("is_template")).toBe("false");
   });
 
@@ -557,7 +522,7 @@ describe("the file index page", () => {
 
   it("opens its table newest first, and remembers another order for the next visit", async () => {
     const requests = stubList(Tool.file, [row(Tool.file, { id: 1, name: "Brief" })]);
-    const kept = keepViewPreferences();
+    const kept = keepViewPreferences(1);
 
     const first = renderIn("list");
     await screen.findByText("Brief");

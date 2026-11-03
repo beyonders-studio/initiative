@@ -19,7 +19,7 @@ from app.models.tenant.queue import (
 )
 from app.schemas.tenant.queue import QueueTurnPreview
 from app.services.permissions import with_tool
-from app.services.tenant import properties as properties_service
+from app.services.tenant import metadata as metadata_service
 from app.services.tenant import tags as tags_service
 
 
@@ -77,9 +77,9 @@ async def get_queue_hydrated(
     queue = (await session.exec(stmt)).one_or_none()
     if queue is not None:
         await tags_service.annotate_tags(session, [queue])
-        await properties_service.annotate_properties(session, [queue])
+        await metadata_service.annotate_properties(session, [queue])
         await tags_service.annotate_tags(session, queue.items)
-        await properties_service.annotate_properties(session, queue.items)
+        await metadata_service.annotate_properties(session, queue.items)
     return queue
 
 
@@ -105,7 +105,7 @@ async def get_queue_item(
     item = result.one_or_none()
     if item is not None:
         await tags_service.annotate_tags(session, [item])
-        await properties_service.annotate_properties(session, [item])
+        await metadata_service.annotate_properties(session, [item])
     return item
 
 
