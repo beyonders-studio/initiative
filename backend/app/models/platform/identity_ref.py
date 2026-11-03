@@ -15,10 +15,11 @@ key is, and this deployment rotates ``SECRET_KEY``
 (``app.db.secret_key_rotation``). A reference has to outlast that.
 
 This is the pairwise pseudonymous identifier of OpenID Connect Core §8.1,
-generalised: ``purpose`` is the sector. A sector that lives inside one guild
-also carries ``sector_guild_id``, and says which thing in that guild it is: a
-plug-in by its ``public_id`` in ``sector_plugin``, a webhook subscription by its
-row id in ``sector_id``. See ``services.marketplace.plugin_refs``.
+generalised: ``purpose`` is the sector. A plug-in's sector lives inside one
+guild, so it also carries ``sector_guild_id``, and the plug-in's ``public_id``
+in ``sector_plugin``. See ``services.marketplace.plugin_refs``. A webhook
+subscription's sector is a row in a guild's own schema, and so are its names
+(``models.tenant.webhook_ref``).
 
 Minted on the system engine, and read there for every sector but one: the
 request path holds ``SELECT`` and a policy admitting ``client``, the sector an
@@ -76,9 +77,11 @@ class IdentityPurpose(str, Enum):
     or purging the guild, drops them.
 
     ``webhook``'s sector is one subscription, for a target nothing else here
-    knows: a member's own URL rather than an installed plug-in. A subscription
-    a plug-in registered is named in that plug-in's ``plugin`` sector instead,
-    so the guild and the member arrive under the names it already holds.
+    knows: a member's own URL rather than an installed plug-in. Its names are
+    the guild's own, kept in its schema under the subscription
+    (``models.tenant.webhook_ref``) and never in this table. A subscription a
+    plug-in registered is named in that plug-in's ``plugin`` sector instead, so
+    the guild and the member arrive under the names it already holds.
 
     ``client``'s sector is the deployment's own front ends — the browser tab
     and the native app, one sector for the platform. It names the account in an
@@ -134,11 +137,13 @@ class IdentityRef(SQLModel, table=True):
     __tablename__ = "identity_refs"
     __table_args__ = (
         UniqueConstraint("ref", name="identity_refs_unique_ref"),
-        # A ``plugin`` reference names its plug-in and no row id; nothing else
-        # names a plug-in.
+        # A ``plugin`` reference names its plug-in and the guild it is in, and
+        # nothing else names either. A ``webhook`` one is kept in its guild's
+        # own schema.
         CheckConstraint(
             "(purpose = 'plugin') = (sector_plugin IS NOT NULL)"
-            " AND (purpose <> 'plugin' OR sector_id IS NULL)",
+            " AND (purpose = 'plugin') = (sector_guild_id IS NOT NULL)"
+            " AND purpose <> 'webhook'",
             name="identity_refs_plugin_sector",
         ),
         # One live reference per entity per sector. Retired rows are excluded
@@ -155,18 +160,14 @@ class IdentityRef(SQLModel, table=True):
             "entity_id",
             "purpose",
             "sector_guild_id",
-            "sector_id",
             "sector_plugin",
             unique=True,
             postgresql_where=text("retired_at IS NULL"),
             postgresql_nulls_not_distinct=True,
         ),
-        # Removing a subscription's references, and a guild's. Neither can be a
-        # foreign key: ``webhook_subscriptions`` lives in a guild schema and this
-        # table does not, so both are deleted explicitly.
-        Index("ix_identity_refs_sector", "sector_guild_id", "sector_id"),
         # Removing what one plug-in calls everyone in a guild, when the guild
-        # erases its data.
+        # erases its data, and what every plug-in there does, when it is
+        # purged. Not a foreign key: a plug-in's sector outlives its install.
         Index("ix_identity_refs_sector_plugin", "sector_guild_id", "sector_plugin"),
         # Sweeping the rows a re-issue left behind.
         Index("ix_identity_refs_retired_at", "retired_at"),
@@ -188,15 +189,9 @@ class IdentityRef(SQLModel, table=True):
     #: Which sector this reference is for — see ``IdentityPurpose``.
     purpose: IdentityPurpose = Field(sa_column=Column(String(64), nullable=False))
 
-    #: Which guild the sector belongs to, for a purpose that has one. NULL for
-    #: a platform-wide sector such as ``billing``.
+    #: Which guild the sector belongs to, for ``plugin``. NULL for a
+    #: platform-wide sector such as ``billing``.
     sector_guild_id: Optional[int] = Field(
-        default=None, sa_column=Column(Integer, nullable=True)
-    )
-    #: Which row inside that guild is the sector — a subscription, for
-    #: ``webhook``. Paired with ``sector_guild_id`` because these ids are
-    #: per-guild-schema and so are not unique on their own.
-    sector_id: Optional[int] = Field(
         default=None, sa_column=Column(Integer, nullable=True)
     )
     #: Which plug-in inside that guild is the sector, by its registration's
