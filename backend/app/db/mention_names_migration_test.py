@@ -23,6 +23,7 @@ from app.models.tenant.file import File
 from app.models.tenant.task import Task
 from app.services.tenant.mention_parser import nameless_state
 from app.testing import MENTIONING_YJS_STATE, route_session_to_guild
+from app.testing.later_revisions import step_later_revisions
 from app.testing.factories import (
     checklist_items,
     create_comment,
@@ -108,8 +109,12 @@ async def test_a_mention_written_before_keeps_no_name(session):
                 {"sp": f"{schema}, public"},
             )
             with Operations.context(MigrationContext.configure(bind)):
+                if not forward:
+                    step_later_revisions(bind, schema, forward=False)
                 for apply in later if forward else reversed(later):
                     apply(forward)
+                if forward:
+                    step_later_revisions(bind, schema, forward=True)
 
         renamed(False)
         bind.execute(text(f"COMMENT ON TABLE \"{schema}\".search_entries IS 'current'"))

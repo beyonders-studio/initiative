@@ -9,7 +9,7 @@ from app.models.tenant.custom_role import (
     CUSTOM_ROLE_NAME_MAX_LENGTH,
     CUSTOM_ROLE_RUNGS,
 )
-from app.schemas.base import SanitizedBaseModel
+from app.schemas.base import SanitizedBaseModel, TitleStr
 
 
 class CustomRoleRead(SanitizedBaseModel):
@@ -21,7 +21,7 @@ class CustomRoleRead(SanitizedBaseModel):
 
 
 class CustomRoleCreate(SanitizedBaseModel):
-    name: str = Field(min_length=1, max_length=CUSTOM_ROLE_NAME_MAX_LENGTH)
+    name: TitleStr = Field(min_length=1, max_length=CUSTOM_ROLE_NAME_MAX_LENGTH)
     #: ``member`` or ``admin`` (``CUSTOM_ROLE_RUNGS``).
     base_rung: CommunityRole
     surfaces: list[AdminSurface] = Field(default_factory=list)
@@ -35,7 +35,7 @@ class CustomRoleCreate(SanitizedBaseModel):
 
 
 class CustomRoleUpdate(SanitizedBaseModel):
-    name: Optional[str] = Field(
+    name: Optional[TitleStr] = Field(
         default=None, min_length=1, max_length=CUSTOM_ROLE_NAME_MAX_LENGTH
     )
     surfaces: Optional[list[AdminSurface]] = None

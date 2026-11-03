@@ -442,18 +442,37 @@ async def replace_resource_grants(
 
         tool = Tool(resource_type)
         view_key = PermissionKey(tool.view_permission)
-        permitted_users = await rls_service.members_permitted(
-            session,
-            initiative_id=initiative_id,
-            user_ids=valid_users,
-            permission_key=view_key,
-        )
-        permitted_roles = await rls_service.roles_permitting(
-            session,
-            initiative_id=initiative_id,
-            role_ids=valid_roles,
-            permission_key=view_key,
-        )
+
+        async def permitted(reader: Any) -> tuple[set[int], set[int]]:
+            return (
+                await rls_service.members_permitted(
+                    reader,
+                    initiative_id=initiative_id,
+                    user_ids=valid_users,
+                    permission_key=view_key,
+                ),
+                await rls_service.roles_permitting(
+                    reader,
+                    initiative_id=initiative_id,
+                    role_ids=valid_roles,
+                    permission_key=view_key,
+                ),
+            )
+
+        if by_install:
+            # What a role may do is the initiative's administration, out of an
+            # installed plug-in's reach. Whether the people it names may use
+            # the tool is asked on the system engine; the grants themselves are
+            # still written under the install's own policies.
+            from app.db import cohorts
+            from app.db.request_context import SystemGuild
+            from app.db.session import set_rls_context
+
+            async with cohorts.system_session(guild_id) as system:
+                await set_rls_context(system, SystemGuild(guild_id, read_only=True))
+                permitted_users, permitted_roles = await permitted(system)
+        else:
+            permitted_users, permitted_roles = await permitted(session)
         if valid_users - permitted_users or valid_roles - permitted_roles:
             raise tool.grantee_lacks_access()
         valid_users, valid_roles = permitted_users, permitted_roles
