@@ -131,4 +131,23 @@ describe("SettingsCommunityRolesPage", () => {
     // Doors holds what the reader lacks, so it has no actions; Roll does.
     expect(screen.getAllByRole("button", { name: /Roll|Doors/ })).toHaveLength(1);
   });
+
+  it("offers no change to a role the deployment defines", async () => {
+    server.use(
+      communityHttp.get("/custom-roles/", () =>
+        HttpResponse.json([
+          { id: 1, name: "Door", base_rung: "member", surfaces: [], set_by: "deployment" },
+          { id: 2, name: "Roll", base_rung: "member", surfaces: [], set_by: "community" },
+        ])
+      )
+    );
+    setup();
+
+    expect(
+      await screen.findByText(
+        "Whoever runs this server defines this role. You can give it to people here, but not change or delete it."
+      )
+    ).toBeInTheDocument();
+    expect(screen.getAllByRole("button", { name: /Roll|Door/ })).toHaveLength(1);
+  });
 });

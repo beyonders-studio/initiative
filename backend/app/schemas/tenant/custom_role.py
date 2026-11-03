@@ -4,6 +4,7 @@ from typing import Optional
 
 from pydantic import Field, field_validator
 
+from app.core.rules import SetBy
 from app.models.platform.guild import AdminSurface, CommunityRole
 from app.models.tenant.custom_role import (
     CUSTOM_ROLE_NAME_MAX_LENGTH,
@@ -18,6 +19,9 @@ class CustomRoleRead(SanitizedBaseModel):
     #: The rung the role applies on: ``member`` or ``admin``.
     base_rung: CommunityRole
     surfaces: list[AdminSurface]
+    #: Who defined the role. The community gives a role the deployment
+    #: defined, and does not change or delete it.
+    set_by: SetBy
 
 
 class CustomRoleCreate(SanitizedBaseModel):

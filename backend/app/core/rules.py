@@ -80,8 +80,8 @@ class StoredRule:
 
 
 class SetBy(str, Enum):
-    """Who wrote a community's rule row. A value set above is owned above: a
-    ``deployment`` row wins over the community's own."""
+    """Who wrote a community's rule row or custom role. A value set above is
+    owned above: a ``deployment`` row wins over the community's own."""
 
     #: The community, through its seat.
     community = "community"

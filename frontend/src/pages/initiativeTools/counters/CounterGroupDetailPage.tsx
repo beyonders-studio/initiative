@@ -112,8 +112,8 @@ export function CounterGroupDetailPage() {
   const communityId = useActiveCommunityId();
   const viewSpec = useMemo(
     () =>
-      layoutViewSpec(viewKey(communityId, "counter-group", groupId ?? 0), (items) =>
-        groupId !== null ? items[layoutStorageKey(groupId)] : undefined
+      layoutViewSpec(communityId, viewKey("counter-group", groupId ?? 0), (account) =>
+        groupId !== null ? account[layoutStorageKey(groupId)] : undefined
       ),
     [communityId, groupId]
   );

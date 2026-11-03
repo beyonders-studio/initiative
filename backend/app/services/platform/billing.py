@@ -39,10 +39,14 @@ from app.models.platform.guild_administration import GuildAdministration
 from app.models.platform.rule import CommunityRule
 from app.schemas.platform.billing import CommunityFields
 from app.core.audit_events import AuditEventType
+from app.db import cohorts
+from app.db.request_context import SystemGuild
+from app.db.session import set_rls_context
 from app.services import audit as audit_service
 from app.services.marketplace import community_hooks
 from app.services.platform import billing_envelope as envelope
 from app.services.platform import rules
+from app.services.tenant import custom_roles as custom_roles_service
 
 logger = logging.getLogger(__name__)
 
@@ -278,7 +282,8 @@ async def apply_community_sync(
     write that renames the tier. A status write never moves a community out
     of ``suspended`` or ``deleted``; it's recorded, and a suspension that
     lifts returns the community to it. A rule the deployment does not offer
-    the means to meet refuses the item; ``system`` reads what it offers.
+    the means to meet refuses the item; ``system`` reads what it offers. The
+    deployment's custom roles are written in the community's schema first.
     """
     # Locked, so two syncs for one community take turns: each reads the
     # version the other wrote, and an older one never lands after a newer.
@@ -290,6 +295,7 @@ async def apply_community_sync(
 
     synced = {rule.key: rule.value for rule in fields.rules if rule.key in SYNCED_RULES}
     await _refuse_what_is_not_offered(system, guild_id, synced)
+    await _apply_custom_roles(guild_id, fields)
 
     now = datetime.now(timezone.utc)
     administration_values: dict[str, Any] = {
@@ -352,6 +358,18 @@ async def apply_community_sync(
     # stays a fact about the guild.
     await session.exec(update(Guild).where(Guild.id == guild_id).values(**guild_values))
     return Synced(version=version, went_on_hold=went_on_hold)
+
+
+async def _apply_custom_roles(guild_id: int, fields: CommunityFields) -> None:
+    """The deployment's custom roles, in the community's own schema and
+    committed there before the public half: an item that then fails is sent
+    again, and applying the same roles again writes nothing."""
+    async with cohorts.system_session(guild_id) as guild_session:
+        await set_rls_context(guild_session, SystemGuild(guild_id))
+        await custom_roles_service.apply_deployment_roles(
+            guild_session, guild_id, fields.custom_roles
+        )
+        await guild_session.commit()
 
 
 async def _refuse_what_is_not_offered(

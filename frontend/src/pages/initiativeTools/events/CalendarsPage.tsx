@@ -125,14 +125,15 @@ const calendarsViewSpec = (
   communityId: number,
   ...names: (string | number)[]
 ): ListViewSpec<CalendarViewFilters> => ({
-  key: viewKey(communityId, ...names),
+  key: viewKey(...names),
+  communityId,
   read: calendarViewFiltersFromStored,
   defaults: CALENDAR_VIEW_DEFAULTS,
-  carryOver: (items) => {
+  carryOver: (_items, account) => {
     const carried = carriedCalendarView({
       prefs: deviceJSON("initiative-calendars-prefs"),
       visibility: deviceJSON(`initiative-calendar-visibility:${communityId}`),
-      mode: items[CALENDAR_VIEW_MODE_KEY],
+      mode: account[CALENDAR_VIEW_MODE_KEY],
     });
     return carried && { mode: carried.mode, parts: { [LIST]: { filters: carried.filters } } };
   },

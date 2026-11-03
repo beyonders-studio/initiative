@@ -34,7 +34,7 @@ from datetime import datetime, timedelta, timezone
 from typing import TYPE_CHECKING, AsyncIterator, Literal, Optional, Sequence
 
 from sqlalchemy import func
-from sqlmodel import select
+from sqlmodel import col, select
 from sqlmodel.sql.expression import Select
 from sqlmodel.ext.asyncio.session import AsyncSession
 
@@ -1033,22 +1033,30 @@ async def release_subject_guild(task_id: int, guild_id: int) -> None:
             await session.rollback()
             return
         # Another request may have found the case named so and been made on
-        # the strength of it: then the name stays.
-        # Grants are shared rows, read on the system engine itself: this
-        # session is routed into the operations community.
+        # the strength of it: then the name stays. The case's grants are
+        # linked in this community; the grants are shared rows, read on the
+        # system engine itself.
         from app.db.session import SystemSessionLocal
         from app.models.platform.access_grant import AccessGrant, AccessGrantStatus
+        from app.models.tenant.case_grant import CaseGrant
 
-        async with SystemSessionLocal() as shared:
-            relied_on = (
-                await shared.exec(
-                    select(AccessGrant.id)
-                    .where(AccessGrant.case_task_id == task_id)
-                    .where(AccessGrant.guild_id == guild_id)
-                    .where(AccessGrant.status != AccessGrantStatus.denied.value)
-                    .limit(1)
-                )
-            ).first()
+        linked = (
+            await session.exec(
+                select(CaseGrant.grant_id).where(CaseGrant.task_id == task_id)
+            )
+        ).all()
+        relied_on = None
+        if linked:
+            async with SystemSessionLocal() as shared:
+                relied_on = (
+                    await shared.exec(
+                        select(AccessGrant.id)
+                        .where(col(AccessGrant.id).in_(linked))
+                        .where(AccessGrant.guild_id == guild_id)
+                        .where(AccessGrant.status != AccessGrantStatus.denied.value)
+                        .limit(1)
+                    )
+                ).first()
         if relied_on is None:
             await session.delete(named)
         await session.commit()

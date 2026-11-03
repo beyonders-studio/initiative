@@ -2,24 +2,34 @@
 
 The routes in front of these say why a write is refused; the policies on
 ``custom_roles`` and ``custom_role_members`` refuse it either way
-(``app.db.guild_ddl``).
+(``app.db.guild_ddl``). The deployment's roles are written by
+:func:`apply_deployment_roles`, from billing's sync.
 """
 
 from __future__ import annotations
 
-from typing import Optional
+from collections.abc import Collection, Sequence
+from itertools import count
+from typing import TYPE_CHECKING, Optional
 
 from sqlalchemy import and_, delete, func, or_
 from sqlalchemy.dialects.postgresql import insert as pg_insert
 from sqlmodel import col, select
 from sqlmodel.ext.asyncio.session import AsyncSession
 
+from app.core.audit_events import AuditEventType
+from app.core.rules import SetBy
 from app.models.platform.guild import GuildMembership
 from app.models.tenant.custom_role import (
+    CUSTOM_ROLE_NAME_MAX_LENGTH,
     CustomRole,
     CustomRoleClaimRule,
     CustomRoleMember,
 )
+from app.services import audit as audit_service
+
+if TYPE_CHECKING:
+    from app.schemas.platform.billing import SyncedCustomRole
 
 
 async def list_roles(session: AsyncSession) -> list[CustomRole]:
@@ -30,6 +40,102 @@ async def list_roles(session: AsyncSession) -> list[CustomRole]:
 
 async def get_role(session: AsyncSession, role_id: int) -> Optional[CustomRole]:
     return await session.get(CustomRole, role_id)
+
+
+async def reserved(session: AsyncSession, name: str) -> bool:
+    """Whether a role the deployment defined has ``name``, capitals aside."""
+    return (
+        await session.scalar(
+            select(func.count())
+            .select_from(CustomRole)
+            .where(
+                CustomRole.set_by == SetBy.deployment.value,
+                func.lower(CustomRole.name) == name.lower(),
+            )
+        )
+    ) > 0
+
+
+def _communitys(name: str, taken: Collection[str]) -> str:
+    """``name`` marked as the community's own, and free."""
+    for n in count(1):
+        suffix = " (community)" if n == 1 else f" (community {n})"
+        renamed = name[: CUSTOM_ROLE_NAME_MAX_LENGTH - len(suffix)] + suffix
+        if renamed.lower() not in taken:
+            return renamed
+    raise AssertionError  # pragma: no cover
+
+
+async def apply_deployment_roles(
+    session: AsyncSession, guild_id: int, roles: Sequence[SyncedCustomRole]
+) -> None:
+    """Bring the deployment's roles in the community to ``roles``, on a
+    session routed into it as the system engine, writing only what differs.
+
+    A role is matched by its name, capitals aside. One ``roles`` no longer
+    names is deleted, and its assignments and claim rules with it, so its
+    holders stand on their rung; one whose rung moved is made anew, since a
+    role keeps its rung. A role of the community's own with a name the
+    deployment takes is renamed as the community's, once: from then on the
+    name is reserved.
+    """
+    existing = await list_roles(session)
+    wanted = {role.name.lower(): role for role in roles}
+    ours = {
+        role.name.lower(): role
+        for role in existing
+        if role.set_by == SetBy.deployment.value
+    }
+    changes: list[tuple[str, CustomRole]] = []
+    for key, row in list(ours.items()):
+        role = wanted.get(key)
+        if role is None or row.base_rung != role.base_rung.value:
+            changes.append(("deleted", row))
+            await session.delete(row)
+            del ours[key]
+    await session.flush()
+    taken = {role.name.lower() for role in existing} | set(wanted)
+    for key, role in wanted.items():
+        surfaces = sorted(surface.value for surface in role.surfaces)
+        row = ours.get(key)
+        if row is not None:
+            if row.name != role.name or sorted(row.surfaces) != surfaces:
+                row.name, row.surfaces = role.name, surfaces
+                session.add(row)
+                changes.append(("updated", row))
+            continue
+        for theirs in existing:
+            if theirs.set_by == SetBy.community.value and theirs.name.lower() == key:
+                theirs.name = _communitys(theirs.name, taken)
+                taken.add(theirs.name.lower())
+                session.add(theirs)
+                changes.append(("renamed", theirs))
+                await session.flush()
+        row = CustomRole(
+            name=role.name,
+            base_rung=role.base_rung.value,
+            surfaces=surfaces,
+            set_by=SetBy.deployment.value,
+        )
+        session.add(row)
+        changes.append(("created", row))
+    await session.flush()
+    for action, row in changes:
+        await audit_service.record(
+            session,
+            event_type=AuditEventType.GUILD_CUSTOM_ROLE_CHANGED,
+            actor_user_id=None,
+            guild_id=guild_id,
+            target_type="custom_role",
+            target_id=row.id,
+            detail={
+                "action": action,
+                "via": "deployment",
+                "name": row.name,
+                "base_rung": row.base_rung,
+                "surfaces": sorted(row.surfaces),
+            },
+        )
 
 
 async def holders(session: AsyncSession, guild_id: int) -> list[tuple[int, int]]:

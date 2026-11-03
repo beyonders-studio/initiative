@@ -13,6 +13,7 @@ import { CommunityHomeSkeleton, PageSkeleton } from "@/components/skeletons/Page
 import { HelpLink } from "@/components/support/HelpLink";
 import { useCommunities } from "@/hooks/useCommunities";
 import { useToolPageTitle } from "@/hooks/useToolPageTitle";
+import { prefetchViewPreferences } from "@/lib/viewPreferences";
 
 export const Route = createFileRoute("/_serverRequired/_authenticated/c/$communityId")({
   beforeLoad: async ({ context, params, cause }) => {
@@ -58,6 +59,9 @@ export const Route = createFileRoute("/_serverRequired/_authenticated/c/$communi
     // query keys) before child routes render. Per-tab and local only — the
     // community itself travels in each request's /c/{communityId} path.
     await communities?.syncCommunityFromUrl(communityId);
+    // The person's views of the community's lists, which most of its pages
+    // open with.
+    prefetchViewPreferences(communityId);
 
     // Provide validated community info to child routes via route context
     return { urlCommunityId: communityId, urlCommunity: community };

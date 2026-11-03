@@ -7,9 +7,10 @@ Pinned:
   every claim, the key bundle's rotation, and the self-host default (503);
 * ``communities/sync``: a community takes billing's whole state at a version
   only when it's newer, and is answered with the version it holds; each item
-  stands alone; a capability package replaces rather than merges; the pushed
-  storage cap is the one uploads are held to; a suspension is never lifted;
-  a hold tells the seat once;
+  stands alone; a capability package replaces rather than merges; the
+  deployment's custom roles are its own; the pushed storage cap is the one
+  uploads are held to; a suspension is never lifted; a hold tells the seat
+  once;
 * ``communities/read``: status, usage, members, guests, name, the version
   held and each statement's version, and nothing for a community that isn't
   there.
@@ -313,6 +314,87 @@ async def test_the_deployments_rules_stand_over_the_seat_until_withdrawn(
         [{"key": "allow_ai", "value": True}, {"key": "allow_ai", "value": False}],
     ):
         refused_item = await _sync(client, (guild_id, 4, {**restricted, "rules": bad}))
+        assert refused_item.json()["results"][0]["error"] == "BILLING_INVALID_PAYLOAD"
+
+
+async def test_the_deployments_custom_roles_are_set_by_its_sync(
+    client: AsyncClient, acting_user
+):
+    """The sync's custom roles land in the community, set by the deployment:
+    its admins give one and change or delete none, and its name is reserved,
+    so a role of the community's own with it is renamed as the community's.
+    The same roles again change nothing; one whose rung moved is made anew,
+    and one left out goes, with its holders."""
+    admin = await acting_user(guild_role=CommunityRole.admin)
+    member = await acting_user(guild_role=CommunityRole.member, guild=admin.guild)
+    gid = admin.guild.id
+    base = admin.g("/custom-roles/")
+
+    async def listed() -> dict[str, dict]:
+        response = await client.get(base, headers=admin.headers)
+        return {role["name"]: role for role in response.json()}
+
+    own = await client.post(
+        base,
+        headers=admin.headers,
+        json={"name": "Door", "base_rung": "member", "surfaces": ["invites"]},
+    )
+    assert own.status_code == 201, own.text
+    doors = [
+        {"name": "door", "base_rung": "member", "surfaces": ["members", "invites"]}
+    ]
+    synced = await _sync(client, (gid, 1, _fields(custom_roles=doors)))
+    assert synced.json()["results"][0]["version"] == 1, synced.text
+    roles = await listed()
+    assert roles["Door (community)"]["set_by"] == "community"
+    deployed = roles["door"]
+    assert deployed["set_by"] == "deployment"
+    assert deployed["surfaces"] == ["invites", "members"]
+
+    given = await client.put(
+        admin.g(f"/custom-roles/holders/{member.user.id}"),
+        headers=admin.headers,
+        json={"role_id": deployed["id"]},
+    )
+    assert given.status_code == 204, given.text
+    for refused in (
+        await client.patch(
+            admin.g(f"/custom-roles/{deployed['id']}"),
+            headers=admin.headers,
+            json={"name": "Gate"},
+        ),
+        await client.delete(
+            admin.g(f"/custom-roles/{deployed['id']}"), headers=admin.headers
+        ),
+    ):
+        assert refused.status_code == 409
+        assert refused.json()["detail"] == "CUSTOM_ROLE_SET_BY_DEPLOYMENT"
+    taken = await client.post(
+        base,
+        headers=admin.headers,
+        json={"name": "DOOR", "base_rung": "member", "surfaces": []},
+    )
+    assert taken.status_code == 409
+    assert taken.json()["detail"] == "CUSTOM_ROLE_NAME_RESERVED"
+
+    await _sync(client, (gid, 2, _fields(custom_roles=doors)))
+    assert (await listed())["door"] == deployed
+    moved = [{"name": "door", "base_rung": "admin", "surfaces": ["invites"]}]
+    await _sync(client, (gid, 3, _fields(custom_roles=moved)))
+    anew = (await listed())["door"]
+    assert anew["id"] != deployed["id"] and anew["base_rung"] == "admin"
+    holders = await client.get(admin.g("/custom-roles/holders"), headers=admin.headers)
+    assert holders.json() == []
+
+    await _sync(client, (gid, 4, _fields()))
+    assert set(await listed()) == {"Door (community)"}
+
+    for bad in (
+        [*doors, {**doors[0], "name": "DOOR"}],
+        [{"name": "Bins", "base_rung": "member", "surfaces": ["trash"]}],
+        [{"name": "Seat", "base_rung": "superadmin", "surfaces": []}],
+    ):
+        refused_item = await _sync(client, (gid, 5, _fields(custom_roles=bad)))
         assert refused_item.json()["results"][0]["error"] == "BILLING_INVALID_PAYLOAD"
 
 

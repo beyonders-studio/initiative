@@ -114,3 +114,21 @@ async def test_nobody_writes_a_role_past_what_they_hold(
         admin, f"UPDATE custom_roles SET base_rung = 'member' WHERE id = {kept.id}"
     )
     assert await writes(admin, unassign)
+
+    # A role the deployment defined is the system engine's to change; the
+    # community gives it.
+    await route_session_to_guild(session, gid)
+    deployed = CustomRole(name="Door", base_rung="member", set_by="deployment")
+    session.add(deployed)
+    await session.commit()
+    add = (
+        "INSERT INTO custom_roles (name, base_rung, surfaces, created_at, set_by)"
+        " VALUES ('{name}', 'member', '{{}}', now(), '{set_by}')"
+    )
+    for sql in (
+        f"UPDATE custom_roles SET surfaces = '{{}}' WHERE id = {deployed.id}",
+        f"DELETE FROM custom_roles WHERE id = {deployed.id}",
+        add.format(name="Gate", set_by="deployment"),
+    ):
+        assert not await writes(admin, sql)
+    assert await writes(admin, add.format(name="Gate", set_by="community"))

@@ -217,6 +217,8 @@ export const SettingsCommunityRolesPage = () => {
       (role.base_rung !== "admin" || Boolean(activeCommunity?.can.administer)));
   const deletable = (role: CustomRoleRead) =>
     editable(role) && (lent || role.base_rung !== "admin" || holdsEvery);
+  // A role the deployment defined is given here, and changed only by it.
+  const fromDeployment = (role: CustomRoleRead) => role.set_by === "deployment";
 
   if (!held.holds("roles")) {
     return <p className="text-muted-foreground text-sm">{t("communityLayout.permissionDenied")}</p>;
@@ -281,7 +283,11 @@ export const SettingsCommunityRolesPage = () => {
                         {t("customRoles.holdsNothing")}
                       </p>
                     )}
-                    {changes && !editable(role) ? (
+                    {fromDeployment(role) ? (
+                      <p className="text-muted-foreground text-xs">
+                        {t("customRoles.setByDeployment")}
+                      </p>
+                    ) : changes && !editable(role) ? (
                       <p className="text-muted-foreground text-xs">
                         {t("customRoles.beyondYours")}
                       </p>
@@ -291,7 +297,7 @@ export const SettingsCommunityRolesPage = () => {
                       </p>
                     ) : null}
                   </div>
-                  {changes && editable(role) ? (
+                  {changes && editable(role) && !fromDeployment(role) ? (
                     <RowActionsMenu subject={role.name}>
                       <DropdownMenuItem onSelect={() => setEditing(role)}>
                         <Pencil className="h-4 w-4" />

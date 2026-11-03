@@ -396,9 +396,15 @@ EXEMPT: dict[str, str] = {
     # The platform's record of what it holds here. Not the community's to
     # read, so not the community's to carry out.
     "content_holds": "platform",
+    # Which of the platform's access grants serves which case: grants only
+    # this instance holds, and not the community's to read either.
+    "case_grants": "platform",
     # Half of a sign-in rule, whose other half (public.oidc_claim_mappings)
     # names this instance's providers and no archive carries.
     "claim_rule_initiatives": "sign_in",
+    # How each member shows the community's lists: theirs rather than the
+    # community's, and keyed to ids this instance gave.
+    "view_preferences": "personal",
     # Sign-in configuration: it names the deployment's providers, which mean
     # nothing to the instance reading the archive.
     "custom_role_claim_rules": "sign_in",

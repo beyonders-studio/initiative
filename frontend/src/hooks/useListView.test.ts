@@ -15,29 +15,37 @@ import {
   viewKey,
 } from "./useListView";
 
+/** What an older release kept on the account for every files list. */
+const OLDER = { "file:view-mode": "grid" };
+
 const spec = {
-  key: viewKey(4, "initiative", 2, "files"),
+  key: viewKey("initiative", 2, "files"),
+  communityId: 4,
   read: (raw: unknown) => raw as { tag_ids: number[] },
   defaults: { filters: { tag_ids: [] }, ...NO_PART_VIEW, sorting: [{ id: "name", desc: false }] },
-  carryOver: () => ({
-    layout: "grid",
-    parts: { [LIST]: { sorting: [{ id: "updated_at", desc: true }] } },
-  }),
+  carryOver: (
+    _items: Readonly<Record<string, unknown>>,
+    account: Readonly<Record<string, unknown>>
+  ) =>
+    account["file:view-mode"] === "grid"
+      ? { layout: "grid", parts: { [LIST]: { sorting: [{ id: "updated_at", desc: true }] } } }
+      : null,
 };
 
 describe("a person's view of a list", () => {
-  it("is kept under the community, then what names the list", () => {
-    expect(spec.key).toBe("view:4:initiative:2:files");
+  it("is kept in the community's map, under what names the list", () => {
+    expect(spec.key).toBe("view:initiative:2:files");
   });
 
-  it("reads what is kept, else what an older release kept", () => {
+  it("reads what is kept, else what an older release kept on the account", () => {
     const kept = { layout: "list", parts: { [LIST]: { filters: { tag_ids: [7] } } } };
-    expect(keptView({ [spec.key]: kept }, spec).view.layout).toBe("list");
-    expect(keptView({}, spec).view.layout).toBe("grid");
+    expect(keptView({ [spec.key]: kept }, spec, OLDER).view.layout).toBe("list");
+    expect(keptView({}, spec, OLDER).view.layout).toBe("grid");
+    expect(keptView(OLDER, spec, {}).view.layout).toBeUndefined();
   });
 
   it("fills what a part keeps with the list's defaults", () => {
-    const view = keptView({}, spec).view;
+    const view = keptView({}, spec, OLDER).view;
     expect(partOf(view, LIST, spec)).toEqual({
       filters: { tag_ids: [] },
       sorting: [{ id: "updated_at", desc: true }],
@@ -59,7 +67,8 @@ describe("a person's view of a list", () => {
   });
 
   it("applies a change made before it is in to it, and saves no change that leaves it as it was", async () => {
-    const kept = keepViewPreferences();
+    const account = keepViewPreferences();
+    const kept = keepViewPreferences(4);
     kept[spec.key] = { layout: "list" };
     let view!: ReturnType<typeof useListView<{ tag_ids: number[] }>>;
     const Probe = () => {
@@ -72,6 +81,7 @@ describe("a person's view of a list", () => {
     await waitFor(() => expect(view.mode).toBe("week"));
     expect(view.layout).toBe("list");
     await waitFor(() => expect(kept[spec.key]).toMatchObject({ layout: "list", mode: "week" }));
+    expect(account).toEqual({});
 
     const saved = kept[spec.key];
     act(() => view.rememberLayout("list"));

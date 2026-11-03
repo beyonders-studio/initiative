@@ -517,11 +517,12 @@ const toolListViewSpec = (
   initiativeId: number,
   reorders: boolean
 ): ListViewSpec<ToolListFilters> => ({
-  key: viewKey(communityId, "initiative", initiativeId, toolRouteSegment(tool)),
+  key: viewKey("initiative", initiativeId, toolRouteSegment(tool)),
+  communityId,
   read: readToolListFilters,
   defaults: { filters: {}, ...NO_PART_VIEW, sorting: reorders ? [] : NEWEST_FIRST },
-  carryOver: (items) => {
-    const layout = items[`${tool}:view-mode`];
+  carryOver: (_items, account) => {
+    const layout = account[`${tool}:view-mode`];
     const order = deviceJSON(toolTableStorageKey(tool, "order")) as { sorting?: unknown } | null;
     const columns = deviceJSON(toolTableStorageKey(tool, "columns"));
     if (typeof layout !== "string" && !order && !columns) return null;

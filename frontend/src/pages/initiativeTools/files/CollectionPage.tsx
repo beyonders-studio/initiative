@@ -141,12 +141,12 @@ const collectionViewSpec = (
   communityId: number,
   collectionId: number
 ): ListViewSpec<FileFilters> => ({
-  key: viewKey(communityId, "collection", collectionId),
+  key: viewKey("collection", collectionId),
+  communityId,
   read: (raw) => readToolListFilters(raw) as FileFilters,
   defaults: { filters: {}, ...NO_PART_VIEW },
   carryOver: (items) =>
-    (items[viewKey(communityId, "gallery", collectionId)] as Record<string, unknown> | undefined) ??
-    null,
+    (items[viewKey("gallery", collectionId)] as Record<string, unknown> | undefined) ?? null,
 });
 
 /**

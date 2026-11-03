@@ -1820,6 +1820,9 @@ class BillingMessages:
     #: A sync's rule asks for something this deployment does not offer, such
     #: as a second factor where no kind of factor is permitted.
     RULE_NOT_OFFERED = "BILLING_RULE_NOT_OFFERED"
+    #: A sync's custom roles name one twice (capitals aside), or give a role
+    #: on the member rung a surface that is for admins.
+    CUSTOM_ROLES_NOT_SYNCED = "BILLING_CUSTOM_ROLES_NOT_SYNCED"
     #: The notice could not be written down. Nothing was recorded, so the same
     #: key may be sent again.
     NOTICE_NOT_DELIVERED = "BILLING_NOTICE_NOT_DELIVERED"
@@ -1935,6 +1938,14 @@ class DemoMessages:
     DEMO_LINK_EXPIRY_INVALID = "DEMO_LINK_EXPIRY_INVALID"
 
 
+class ViewPreferenceMessages:
+    """A person's kept views of lists."""
+
+    #: A view of a community's list is kept in that community, not with the
+    #: account.
+    VIEW_KEPT_IN_THE_COMMUNITY = "VIEW_KEPT_IN_THE_COMMUNITY"
+
+
 class CustomRoleMessages:
     """A community's custom roles."""
 
@@ -1951,3 +1962,8 @@ class CustomRoleMessages:
     CUSTOM_ROLE_SURFACE_NOT_FOR_MEMBERS = "CUSTOM_ROLE_SURFACE_NOT_FOR_MEMBERS"
     #: The person given a role is not a member of the community.
     CUSTOM_ROLE_HOLDER_NOT_MEMBER = "CUSTOM_ROLE_HOLDER_NOT_MEMBER"
+    #: The deployment defined the role: the community gives it, and does not
+    #: change or delete it.
+    CUSTOM_ROLE_SET_BY_DEPLOYMENT = "CUSTOM_ROLE_SET_BY_DEPLOYMENT"
+    #: A role the deployment defined has the name, capitals aside.
+    CUSTOM_ROLE_NAME_RESERVED = "CUSTOM_ROLE_NAME_RESERVED"

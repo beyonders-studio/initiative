@@ -4996,11 +4996,23 @@ export interface CustomRoleHolder {
   role_id: number;
 }
 
+/**
+ * Who wrote a community's rule row or custom role. A value set above is
+ * owned above: a ``deployment`` row wins over the community's own.
+ */
+export type SetBy = (typeof SetBy)[keyof typeof SetBy];
+
+export const SetBy = {
+  community: "community",
+  deployment: "deployment",
+} as const;
+
 export interface CustomRoleRead {
   id: number;
   name: string;
   base_rung: CommunityRole;
   surfaces: AdminSurface[];
+  set_by: SetBy;
 }
 
 export interface CustomRoleUpdate {
