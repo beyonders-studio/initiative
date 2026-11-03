@@ -277,9 +277,12 @@ beforeAll(() => {
   server.listen({ onUnhandledFrame: "warn" });
 });
 
-afterEach(() => {
-  server.resetHandlers();
+afterEach(async () => {
+  // Unmounting can still send a request (a field saving as it loses focus):
+  // one tick lets this test's handlers answer it, not the next test's.
   cleanup();
+  await new Promise((resolve) => setTimeout(resolve, 0));
+  server.resetHandlers();
   localStorage.clear();
 });
 
