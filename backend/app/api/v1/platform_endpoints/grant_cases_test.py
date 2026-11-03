@@ -19,15 +19,18 @@ from app.models.platform.access_grant_activity import AccessGrantActivity
 from app.models.platform.app_setting import AppSetting
 from app.models.platform.guild import CommunityRole
 from app.models.platform.user import User
+from app.models.tenant.case_grant import CaseGrant
 from app.models.tenant.comment import Comment
 from app.models.tenant.intake import IntakeBinding
 from app.models.tenant.task import Task, TaskStatus, TaskStatusCategory
 from app.services.platform import grant_cases
 from app.services.platform.intake import CaseRefs, open_case
+from app.services.tenant.soft_delete import hard_purge_entity
 from app.services.tenant import task_statuses as task_statuses_service
 from app.models.tenant.resource_grant import ResourceAccessLevel
 from app.testing import (
     Actor,
+    create_access_grant,
     create_guild,
     create_resource_grant,
     create_user,
@@ -151,10 +154,19 @@ async def test_a_request_for_a_case_tells_the_case_and_names_its_community(
     emitted(capfd)
     response = await _request(client, desk["agent"], target.id, case_task_id=task_id)
     assert response.status_code == 201, response.text
+    grant_id = response.json()["id"]
     assert response.json()["case_task_id"] == task_id
     (linked,) = emitted(capfd, AuditEventType.ACCESS_GRANT_CASE_LINKED)
-    assert linked["target"] == {"type": "access_grant", "id": response.json()["id"]}
+    assert linked["target"] == {"type": "access_grant", "id": grant_id}
     assert linked["detail"]["case_task_id"] == task_id
+
+    # The link is kept in the operations community, and the listing reads it.
+    await set_rls_context(session, SystemGuild(desk["guild_id"]))
+    links = (await session.exec(select(CaseGrant.grant_id, CaseGrant.task_id))).all()
+    assert list(links) == [(grant_id, task_id)]
+    await set_rls_context(session, Unattributed())
+    listed = await client.get(GRANTS, headers=desk["agent"].headers)
+    assert [g["case_task_id"] for g in listed.json()["items"]] == [task_id]
 
     (requested,) = await _notes(session, desk, task_id)
     assert requested.system_kind == "grant_requested"
@@ -282,24 +294,19 @@ async def test_the_case_lists_its_grants(
 # ── What a grant did ─────────────────────────────────────────────────────────
 
 
-async def _live_grant(session: AsyncSession, *, user, guild_id: int, case: int, ago):
+async def _live_grant(session: AsyncSession, *, user, guild, case: int, ago, **extra):
     now = datetime.now(timezone.utc)
-    grant = AccessGrant(
-        user_id=user.id,
-        guild_id=guild_id,
-        access_level="read",
-        status="approved",
+    return await create_access_grant(
+        session,
+        user=user,
+        guild=guild,
+        minutes=240,
+        case_task_id=case,
         reason="the case",
-        requested_duration_minutes=240,
-        requested_by_id=user.id,
-        approved_by_id=user.id,
         decided_at=now - ago,
         expires_at=now + timedelta(hours=2),
-        case_task_id=case,
+        **extra,
     )
-    session.add(grant)
-    await session.commit()
-    return grant
 
 
 async def test_a_request_through_a_grant_is_recorded(
@@ -310,7 +317,7 @@ async def test_a_request_through_a_grant_is_recorded(
     grant = await _live_grant(
         session,
         user=desk["agent"].user,
-        guild_id=owner_of.guild.id,
+        guild=owner_of.guild,
         case=task_id,
         ago=timedelta(minutes=5),
     )
@@ -339,7 +346,7 @@ async def test_a_live_grant_reports_hourly_and_an_ended_one_in_full(
     grant = await _live_grant(
         session,
         user=desk["agent"].user,
-        guild_id=target.id,
+        guild=target,
         case=task_id,
         ago=timedelta(minutes=90),
     )
@@ -419,7 +426,7 @@ async def test_an_ended_grant_waits_for_requests_still_finishing(
     grant = await _live_grant(
         session,
         user=desk["agent"].user,
-        guild_id=target.id,
+        guild=target,
         case=task_id,
         ago=timedelta(minutes=30),
     )
@@ -480,12 +487,14 @@ async def test_a_suspension_under_a_grant_is_told_to_its_case(
     target = await create_guild(session)
     task_id = await _case()
     moderator = await create_user(session, role=UserRole.moderator)
-    grant = await _live_grant(
-        session, user=moderator, guild_id=target.id, case=task_id, ago=timedelta(0)
+    await _live_grant(
+        session,
+        user=moderator,
+        guild=target,
+        case=task_id,
+        ago=timedelta(0),
+        access_level="moderate",
     )
-    grant.access_level = "moderate"
-    session.add(grant)
-    await session.commit()
 
     response = await client.post(
         f"/api/v1/settings/communities/{target.id}/suspension",
@@ -583,7 +592,7 @@ async def test_a_request_finishing_after_close_out_is_told_on_its_own(
     grant = await _live_grant(
         session,
         user=desk["agent"].user,
-        guild_id=target.id,
+        guild=target,
         case=task_id,
         ago=timedelta(minutes=30),
     )
@@ -638,7 +647,7 @@ async def test_releasing_keeps_a_name_another_grant_rests_on(
     await _live_grant(
         session,
         user=desk["agent"].user,
-        guild_id=target.id,
+        guild=target,
         case=task_id,
         ago=timedelta(0),
     )
@@ -655,7 +664,7 @@ async def test_a_summary_that_could_not_be_written_is_tried_again(
     grant = await _live_grant(
         session,
         user=desk["agent"].user,
-        guild_id=target.id,
+        guild=target,
         case=task_id,
         ago=timedelta(minutes=30),
     )
@@ -712,12 +721,26 @@ async def test_suspending_a_suspended_account_tells_its_case_nothing(
 
 
 async def test_a_grant_whose_case_is_gone_is_closed_out_untold(
-    session: AsyncSession, desk
+    session: AsyncSession, desk, mail_on
 ):
-    target = await create_guild(session)
+    """Purging a case takes its links with it. A grant that owes its
+    community a letter once it ends is still closed out, with nothing told
+    on the case, and the community still gets its letter."""
+    seat_id = (await create_user(session)).id
+    target = await create_guild(session, creator=await session.get(User, seat_id))
     task_id = await _case()
-    assert await grant_cases.case_exists(task_id)
-    # One in the trash may be restored, so it is still there.
+    grant = await _live_grant(
+        session,
+        user=desk["agent"].user,
+        guild=target,
+        case=task_id,
+        ago=timedelta(minutes=30),
+        community_notice="when_ended",
+    )
+    grant_id = grant.id
+    ended = grant.expires_at + grant_cases.ENDED_GRACE * 2
+    # One in the trash may be restored, so it is still there, and still
+    # served.
     await set_rls_context(session, SystemGuild(desk["guild_id"]))
     trashed = (await session.exec(select(Task).where(Task.id == task_id))).one()
     trashed.deleted_at = datetime.now(timezone.utc)
@@ -725,26 +748,23 @@ async def test_a_grant_whose_case_is_gone_is_closed_out_untold(
     await session.commit()
     await set_rls_context(session, Unattributed())
     assert await grant_cases.case_exists(task_id)
-    purged = task_id + 10_000
-    assert not await grant_cases.case_exists(purged)
-    grant = await _live_grant(
-        session,
-        user=desk["agent"].user,
-        guild_id=target.id,
-        case=purged,
-        ago=timedelta(minutes=30),
-    )
-    grant_id = grant.id
-    ended = grant.expires_at + grant_cases.ENDED_GRACE * 2
-    await set_rls_context(session, Unattributed())
-    assert await grant_cases.report_activity(session, now=ended) == 0
+    assert await grant_cases.cases_of([grant_id]) == {grant_id: task_id}
 
+    await set_rls_context(session, SystemGuild(desk["guild_id"]))
+    await hard_purge_entity(session, trashed)
+    await session.commit()
+    await set_rls_context(session, Unattributed())
+    assert not await grant_cases.case_exists(task_id)
+    assert await grant_cases.cases_of([grant_id]) == {}
+
+    assert await grant_cases.report_activity(session, now=ended) == 0
     await set_rls_context(session, Unattributed())
     session.expire_all()
     closed = (
         await session.exec(select(AccessGrant).where(AccessGrant.id == grant_id))
     ).one()
     assert closed.closed_out_at is not None
+    assert len(await _letters(session, seat_id)) == 1
 
 
 # ── Telling the community ────────────────────────────────────────────────────
@@ -843,13 +863,16 @@ async def test_a_security_case_may_tell_the_community_once_access_ends(
     assert broke.status_code == 201, broke.text
     assert await _letters(session, seat_id) == []
 
-    # Both halves of the pair have since ended.
+    # Both halves of the pair serve the case, and have since ended.
     now = datetime.now(timezone.utc)
     grants = (
         await session.exec(
-            select(AccessGrant).where(AccessGrant.case_task_id == task_id)
+            select(AccessGrant).where(AccessGrant.user_id == broke.json()["user_id"])
         )
     ).all()
+    assert set(
+        (await grant_cases.cases_of([grant.id for grant in grants])).values()
+    ) == {task_id}
     assert {grant.community_notice for grant in grants} == {"when_ended"}
     for grant in grants:
         grant.expires_at = now - timedelta(hours=1)

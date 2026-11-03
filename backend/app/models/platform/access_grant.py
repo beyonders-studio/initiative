@@ -219,13 +219,9 @@ class AccessGrant(SQLModel, table=True):
     revoked_at: Optional[datetime] = Field(
         default=None, sa_column=Column(DateTime(timezone=True), nullable=True)
     )
-    #: The operations case this grant serves: a task in the operations
-    #: community, by id. A weak ref, like every case reference on this plane:
-    #: the case is in a community the grant does not name. What the grant
-    #: does is reported there.
-    case_task_id: Optional[int] = Field(
-        default=None, sa_column=Column(Integer, nullable=True)
-    )
+    # The operations case a grant serves is linked in the operations
+    # community, under the case (``app.models.tenant.case_grant``). What the
+    # grant does is reported there.
     #: When what the grant did was last reported on its case, while it is
     #: live.
     activity_noted_at: Optional[datetime] = Field(
