@@ -18,7 +18,7 @@ from datetime import datetime, timedelta, timezone
 from typing import cast
 
 from sqlalchemy import exists, func, or_
-from sqlmodel import select
+from sqlmodel import col, select
 from sqlmodel.ext.asyncio.session import AsyncSession
 
 from app.core import webhook_events
@@ -165,7 +165,6 @@ async def redeem(
             sandbox.state = DemoSandboxState.live
             sandbox.invite_id = link.id
             sandbox.claimed_at = now
-            sandbox.import_job_id = job_id
             sandbox.visitor_id = visitor_id
             session.add(sandbox)
             first_open = link.uses == 0
@@ -286,8 +285,6 @@ class AccountCopy:
     expires_at: datetime | None
     #: The link, an invite into the pitch, it was opened from, while kept.
     invite_id: int | None
-    #: The import filling it, in its own schema.
-    import_job_id: int | None
 
 
 async def account_copy(user_id: int) -> AccountCopy | None:
@@ -300,7 +297,6 @@ async def account_copy(user_id: int) -> AccountCopy | None:
                     DemoSandbox.guild_id,
                     GuildMembership.guest_until,
                     DemoSandbox.invite_id,
-                    DemoSandbox.import_job_id,
                 )
                 .join(DemoSandbox, DemoSandbox.guild_id == GuildMembership.guild_id)
                 .where(
@@ -314,17 +310,17 @@ async def account_copy(user_id: int) -> AccountCopy | None:
 
 
 async def copy_import(copy: AccountCopy) -> DataJobStatus:
-    """Where the import filling the copy stands; one that is missing counts as
-    failed. Read on the system engine routed into the copy: a member visitor
-    does not read import jobs."""
+    """Where the import filling the copy stands: its first import, which opening
+    it staged; one that is missing counts as failed. Read on the system engine
+    routed into the copy: a member visitor does not read import jobs."""
     async with cohorts.system_session(copy.guild_id) as session:
         await set_rls_context(session, SystemGuild(copy.guild_id))
         status = (
             await session.exec(
-                select(DataJob.status).where(
-                    DataJob.id == copy.import_job_id,
-                    DataJob.direction == DataJobDirection.import_,
-                )
+                select(DataJob.status)
+                .where(DataJob.direction == DataJobDirection.import_)
+                .order_by(col(DataJob.id))
+                .limit(1)
             )
         ).first()
     return DataJobStatus.failed if status is None else DataJobStatus(status)

@@ -245,7 +245,6 @@ async def test_a_failed_opening_spends_nothing(pitch, session, monkeypatch):
     session.expire_all()
     sandbox = await session.get(DemoSandbox, copy_id)
     assert sandbox is not None and sandbox.state == DemoSandboxState.pooled
-    assert sandbox.import_job_id is None
     assert (await session.exec(select(GuildInvite.uses))).one() == 0
     assert (
         await session.exec(
