@@ -49,10 +49,8 @@ async def test_the_request_path_reads_a_client_reference(session, role_session):
             IdentityPurpose.plugin,
             {"sector_guild_id": 1, "sector_plugin": "acme.tracker"},
         ),
-        # One webhook subscription in one community.
-        (IdentityPurpose.webhook, {"sector_guild_id": 1, "sector_id": 1}),
     ],
-    ids=["billing", "plugin", "webhook"],
+    ids=["billing", "plugin"],
 )
 async def test_the_request_path_reads_no_other_sector(
     session, role_session, purpose: IdentityPurpose, sector: dict

@@ -339,6 +339,9 @@ EXEMPT: dict[str, str] = {
     # describe a history that did not happen in the instance reading them.
     "data_jobs": "operational",
     "webhook_deliveries": "operational",
+    # What each subscription calls the community and its people, for a
+    # receiver of this instance's alone.
+    "webhook_refs": "operational",
     "plugin_hook_deliveries": "operational",
     "plugin_schedule_runs": "operational",
     "timer_marks": "operational",

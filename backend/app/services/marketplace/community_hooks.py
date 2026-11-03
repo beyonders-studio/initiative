@@ -109,7 +109,6 @@ from app.models.platform.plugin_community_hook import (
     PluginCommunityHook,
 )
 from app.models.platform.plugin_install import PluginInstall
-from app.models.platform.identity_ref import IdentityPurpose
 from app.services.marketplace import plugin_refs, registration_lookup
 from app.services.platform import identity_refs
 from app.services.marketplace.registration_lookup import RegistrationSnapshot
@@ -625,7 +624,6 @@ async def _settle(
                 session,
                 sector_guild_id=row.guild_id,
                 sector_plugin=row.public_id,
-                purpose=IdentityPurpose.plugin,
             )
         await session.commit()
     if erased:
