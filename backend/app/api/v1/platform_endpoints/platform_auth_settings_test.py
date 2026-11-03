@@ -501,32 +501,6 @@ async def _enrol(session: AsyncSession, user) -> None:
     await session.commit()
 
 
-async def test_the_column_default_is_the_set_the_code_names(session: AsyncSession):
-    """What a fresh row gets, as the database itself holds it.
-
-    ``DEFAULT_LOGIN_METHODS`` feeds the model's ``server_default``, so those two
-    cannot disagree. The live column default is a third thing — written by a
-    migration, and not reissued when the tuple changes — so it is read back
-    from the catalogue rather than assumed.
-    """
-    from sqlalchemy import text
-
-    from app.core.login_methods import DEFAULT_LOGIN_METHODS
-
-    rendered = await session.scalar(
-        text(
-            "SELECT column_default FROM information_schema.columns "
-            "WHERE table_schema = 'public' AND table_name = 'app_settings' "
-            "AND column_name = 'login_methods'"
-        )
-    )
-    assert rendered, "the column has no default"
-    stored = rendered[rendered.index("{") + 1 : rendered.index("}")]
-    assert {v.strip().strip("\"'") for v in stored.split(",")} == {
-        m.value for m in DEFAULT_LOGIN_METHODS
-    }
-
-
 async def test_the_emailed_code_needs_a_way_to_send_mail(
     client: AsyncClient, session: AsyncSession
 ):

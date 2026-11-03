@@ -65,10 +65,12 @@ async def test_member_preamble_round_trips(session, role_session, acting_user):
     # second-factor answer among them, rather than as a read of its own on
     # every guild request there is.
     (gate_read,) = [
-        stmt for stmt in sent if "guild_memberships" in stmt and "app_settings" in stmt
+        stmt
+        for stmt in sent
+        if "guild_memberships" in stmt and "platform_rules" in stmt
     ]
     assert "guilds" in gate_read
-    assert sum("app_settings" in stmt for stmt in sent) == 1
+    assert sum("platform_rules" in stmt for stmt in sent) == 1
     # The community's sign-in rule is answered by the standing statement.
     assert sum("guild_auth_satisfied" in stmt for stmt in sent) == 1
     # ...and the "Full access" set is resolved and recorded in one statement,

@@ -75,3 +75,40 @@ def test_builtin_source_is_a_known_listing_source():
     from app.services.marketplace.definitions import LISTING_SOURCES
 
     assert BUILTIN_SOURCE in LISTING_SOURCES
+
+
+async def test_the_roles_section_carries_each_role_and_who_holds_it(
+    session, acting_user
+):
+    from app.models.platform.guild import CommunityRole
+    from app.models.tenant.custom_role import CustomRole, CustomRoleMember
+    from app.services.export.guild_sections import GUILD_SECTIONS, SectionContext
+    from app.db.request_context import SystemGuild
+    from app.db.session import set_rls_context
+    from app.testing.schema_harness import route_session_to_guild
+
+    admin = await acting_user(guild_role=CommunityRole.admin)
+    member = await acting_user(guild_role=CommunityRole.member, guild=admin.guild)
+    await route_session_to_guild(session, admin.guild.id)
+    doors = CustomRole(name="Doors", base_rung="member", surfaces=["invites"])
+    session.add(doors)
+    await session.flush()
+    session.add(CustomRoleMember(user_id=member.user.id, role_id=doors.id))
+    await session.commit()
+
+    (section,) = [s for s in GUILD_SECTIONS if s.key == "roles"]
+    await set_rls_context(session, SystemGuild(admin.guild.id))
+    built = await section.build(
+        SectionContext(session=session, user=admin.user, guild_id=admin.guild.id)
+    )
+    assert built is not None
+    payload, count = built
+
+    assert count == 1
+    (role,) = payload["roles"]
+    assert (role["name"], role["base_rung"], role["surfaces"]) == (
+        "Doors",
+        "member",
+        ["invites"],
+    )
+    assert len(role["holders"]) == 1

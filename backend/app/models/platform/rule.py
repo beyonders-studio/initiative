@@ -19,13 +19,14 @@ from sqlalchemy import (
 from sqlalchemy.dialects.postgresql import ARRAY, ENUM as PGEnum
 from sqlmodel import Field, SQLModel
 
-from app.core.login_methods import LoginMethod
+from app.core.login_methods import PRIMARY_LOGIN_METHODS, LoginMethod
 
 #: A row holds its value in exactly one slot; ``app.core.rules`` says which.
 _ONE_SLOT = "num_nonnulls(enabled, amount, choice, methods) = 1"
 #: The deployment's ways in include one that can begin a session.
 _BEGINS_A_SESSION = (
-    "methods IS NULL OR methods && '{password,sso,passkey}'::login_method[]"
+    "methods IS NULL OR methods && "
+    f"'{{{','.join(m.value for m in PRIMARY_LOGIN_METHODS)}}}'::login_method[]"
 )
 #: A community's may also hold a sign-in requirement: its methods, and beside
 #: them, only there, the provider it names.

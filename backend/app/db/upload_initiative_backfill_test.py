@@ -20,6 +20,7 @@ from app.core.config import settings
 from app.models.tenant.task import Task
 from app.models.tenant.upload import Upload
 from app.services.storage import get_guild_storage
+from app.testing.later_revisions import step_later_revisions
 from app.testing import (
     create_calendar,
     create_calendar_event,
@@ -97,6 +98,7 @@ async def test_the_backfill_places_copies_and_leaves_alone(
         )
         files = _load(_FILES)
         with Operations.context(MigrationContext.configure(bind)):
+            step_later_revisions(bind, schema, forward=False)
             _load(_METADATA)._apply(False)
             _load(_COLLECTIONS)._apply(False)
             files._apply(False)
