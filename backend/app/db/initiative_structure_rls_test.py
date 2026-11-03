@@ -7,6 +7,7 @@ guard of its own: what the database accepts is what the managed policies allow.
 from __future__ import annotations
 
 import pytest
+from sqlalchemy import text
 from sqlalchemy.exc import DBAPIError
 from sqlmodel import select
 
@@ -216,3 +217,37 @@ async def test_only_an_admin_writes_the_communitys_initiative_defaults(
 
     assert not await writes(pm)
     assert await writes(admin)
+
+
+async def test_whether_an_initiative_auto_joins_or_is_archived_is_the_communitys(
+    acting_user, role_session
+):
+    """Its managers rename it; joining new members to it and archiving it are
+    the community's: a holder of the initiatives surface."""
+    admin = await acting_user(guild_role=CommunityRole.admin, initiative=True)
+    manager = await acting_user(
+        guild_role=CommunityRole.member,
+        guild=admin.guild,
+        initiative=admin.initiative,
+        initiative_role="project_manager",
+    )
+    iid = admin.initiative.id
+
+    async def changes(actor, assignment: str) -> bool:
+        s = await _writing_as(
+            role_session, user_id=actor.user.id, guild_id=admin.guild.id
+        )
+        try:
+            await s.exec(text(f"UPDATE initiatives SET {assignment} WHERE id = {iid}"))
+            await s.commit()
+        except DBAPIError:
+            return False
+        finally:
+            await s.rollback()
+        return True
+
+    assert await changes(manager, "name = 'Renamed'")
+    assert not await changes(manager, "join_policy = 'open', auto_join = true")
+    assert not await changes(manager, "archived_at = now()")
+    assert await changes(admin, "join_policy = 'open', auto_join = true")
+    assert await changes(admin, "archived_at = now()")
