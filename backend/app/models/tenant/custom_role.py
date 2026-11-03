@@ -8,6 +8,11 @@ a few surfaces. It applies only while its holder's rung, which
 assignment made during the membership the holder has now. Otherwise the holder
 stands on their plain rung. Both tables are the community's own: nothing outside
 it reads them.
+
+A role is the community's own or the deployment's (``set_by``). The deployment
+defines its roles once for every community, through billing's sync; a community
+gives them as it gives its own, and only the system engine changes or deletes
+one.
 """
 
 from collections.abc import Iterable
@@ -29,6 +34,7 @@ from sqlalchemy import (
 )
 from sqlmodel import Field, SQLModel
 
+from app.core.rules import SetBy
 from app.db.registry_checks import FROM_REGISTRY
 from app.models.platform.guild import MEMBER_ROLE_SURFACES, AdminSurface, CommunityRole
 from app.models.tenant._mixins import CreatedByMixin
@@ -68,6 +74,11 @@ class CustomRole(CreatedByMixin, table=True):
             name="ck_custom_roles_surfaces",
             info={FROM_REGISTRY: True},
         ),
+        CheckConstraint(
+            f"set_by IN ({_listed(SetBy)})",
+            name="ck_custom_roles_set_by",
+            info={FROM_REGISTRY: True},
+        ),
     )
 
     id: Optional[int] = Field(default=None, primary_key=True)
@@ -81,6 +92,16 @@ class CustomRole(CreatedByMixin, table=True):
         default_factory=list,
         sa_column=Column(
             ARRAY(Text), nullable=False, server_default=text("'{}'::text[]")
+        ),
+    )
+    #: Who defined the role: the community, or the deployment for every
+    #: community (``SetBy``).
+    set_by: str = Field(
+        default=SetBy.community.value,
+        sa_column=Column(
+            String(length=16),
+            nullable=False,
+            server_default=SetBy.community.value,
         ),
     )
     created_at: datetime = Field(

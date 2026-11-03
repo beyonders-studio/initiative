@@ -2287,7 +2287,8 @@
       }
     },
     "beyondYours": "You can't change this role: it holds something you don't.",
-    "widensAnAdmin": "Only an admin who holds everything can delete an admin role: its holders get everything back."
+    "widensAnAdmin": "Only an admin who holds everything can delete an admin role: its holders get everything back.",
+    "setByDeployment": "Whoever runs this server defines this role. You can give it to people here, but not change or delete it."
   },
   "customRoleRules": {
     "title": "Custom roles by group",
