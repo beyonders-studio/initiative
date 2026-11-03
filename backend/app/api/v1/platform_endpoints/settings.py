@@ -1392,7 +1392,7 @@ async def set_platform_community_suspension(
     await session.commit()
     if grant is not None:
         await grant_cases.note(
-            grant.case_task_id,
+            (await grant_cases.cases_of([grant.id])).get(grant.id),
             case_activity.ActivityKind.guild_act,
             f"{handle_of(moderator)} "
             + ("suspended" if payload.suspended else "lifted the suspension of")

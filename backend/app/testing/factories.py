@@ -35,7 +35,7 @@ from app.core.relationships import Provenance, RelationshipType
 from app.core.search import SearchEntityType
 from app.models.tenant.relationship import EntityRelationship
 from app.services.tenant import relationships as relationships_service
-from app.services.platform import rules
+from app.services.platform import grant_cases, rules
 from app.core.tools import CHILD_KINDS, Tool
 from app.core.security import (
     get_password_hash,
@@ -392,30 +392,40 @@ async def create_access_grant(
     access_level: str = "read",
     purpose: str = "content",
     minutes: int = 60,
+    case_task_id: int | None = None,
     commit: bool = True,
+    **overrides: Any,
 ) -> AccessGrant:
     """A live, approved grant — what the seam reads when somebody reaches a
     community they do not belong to.
 
     Self-approved, which is what a break-glass row is; a requested-then-approved
     one differs only in who decided it, and nothing that reads a grant asks.
+    ``case_task_id`` links it to that case in the operations community, as
+    asking for it for a case does.
     """
     now = datetime.now(timezone.utc)
     grant = AccessGrant(
-        user_id=user.id,
-        guild_id=guild.id,
-        access_level=access_level,
-        status="approved",
-        purpose=purpose,
-        reason="test",
-        requested_duration_minutes=minutes,
-        requested_by_id=user.id,
-        approved_by_id=user.id,
-        requested_at=now,
-        decided_at=now,
-        expires_at=now + timedelta(minutes=minutes),
+        **{
+            "user_id": user.id,
+            "guild_id": guild.id,
+            "access_level": access_level,
+            "status": "approved",
+            "purpose": purpose,
+            "reason": "test",
+            "requested_duration_minutes": minutes,
+            "requested_by_id": user.id,
+            "approved_by_id": user.id,
+            "requested_at": now,
+            "decided_at": now,
+            "expires_at": now + timedelta(minutes=minutes),
+            **overrides,
+        }
     )
     session.add(grant)
+    if case_task_id is not None:
+        await session.flush()
+        await grant_cases.link(case_task_id, [int(grant.id)])
     if commit:
         await session.commit()
         await session.refresh(grant)

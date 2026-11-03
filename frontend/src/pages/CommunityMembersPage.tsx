@@ -51,7 +51,8 @@ const SEARCH_SETTLES_MS = 250;
 
 /** Where one person's view of a community's roster is kept: its columns. */
 const membersViewSpec = (communityId: number): ListViewSpec<null> => ({
-  key: viewKey(communityId, "members"),
+  key: viewKey("members"),
+  communityId,
   read: () => null,
   defaults: { filters: null, ...NO_PART_VIEW },
   carryOver: () => {

@@ -1938,6 +1938,14 @@ class DemoMessages:
     DEMO_LINK_EXPIRY_INVALID = "DEMO_LINK_EXPIRY_INVALID"
 
 
+class ViewPreferenceMessages:
+    """A person's kept views of lists."""
+
+    #: A view of a community's list is kept in that community, not with the
+    #: account.
+    VIEW_KEPT_IN_THE_COMMUNITY = "VIEW_KEPT_IN_THE_COMMUNITY"
+
+
 class CustomRoleMessages:
     """A community's custom roles."""
 

@@ -98,7 +98,8 @@ const NO_TAGS: number[] = [];
 
 /** Where one person's view of an initiative's board is kept. */
 const postsViewSpec = (communityId: number, initiativeId: number): ListViewSpec<PostsFilters> => ({
-  key: viewKey(communityId, "initiative", initiativeId, "posts"),
+  key: viewKey("initiative", initiativeId, "posts"),
+  communityId,
   read: readPostsFilters,
   defaults: { filters: { read: "all" }, ...NO_PART_VIEW },
 });

@@ -835,5 +835,6 @@
   "CUSTOM_ROLE_SURFACE_NOT_FOR_MEMBERS": "Eine Rolle für Mitglieder kann das nicht enthalten. Gib es stattdessen einer Admin-Rolle.",
   "CUSTOM_ROLE_HOLDER_NOT_MEMBER": "Diese Person ist kein Mitglied dieser Community.",
   "CUSTOM_ROLE_SET_BY_DEPLOYMENT": "Diese Rolle wird von den Serverbetreibenden festgelegt und kann hier nicht geändert oder gelöscht werden.",
-  "CUSTOM_ROLE_NAME_RESERVED": "Wer diesen Server betreibt, hat bereits eine Rolle mit diesem Namen. Wähle einen anderen."
+  "CUSTOM_ROLE_NAME_RESERVED": "Wer diesen Server betreibt, hat bereits eine Rolle mit diesem Namen. Wähle einen anderen.",
+  "VIEW_KEPT_IN_THE_COMMUNITY": "Lade die App neu, um diese Ansicht zu behalten."
 }

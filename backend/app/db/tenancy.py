@@ -134,6 +134,8 @@ GUILD_LEVEL_TABLES: frozenset[str] = frozenset(
         # its own; read through its subscription (LEDGER_TABLES below).
         "webhook_refs",  # what each subscription calls the community and its
         # people; the system engine's alone (LEDGER_TABLES below).
+        "case_grants",  # which access grant serves which operations case;
+        # the system engine's alone (LEDGER_TABLES below).
         "subscription_progress",  # how far through the change log subscribers
         # were told; the system engine's alone (LEDGER_TABLES below).
         "plugin_hook_deliveries",  # vendor webhook deliveries an install accepted;
@@ -179,6 +181,11 @@ GUILD_LEVEL_TABLES: frozenset[str] = frozenset(
         # own_row_* policies. A member token's standing reads the member's own
         # row for its install.
         "plugin_member_consents",
+        # How a member shows the community's lists: their filters, order and
+        # layout for a project, a tool list, a queue, the roster. One owner per
+        # row; no initiative of its own, since a key may name the community's
+        # roster or its calendars together.
+        "view_preferences",
         # The platform's record of what it holds in the community: why, by
         # whom, under which case. Read by the system engine and a ``moderate``
         # grantee alone, never by the community — its policies are rendered
@@ -214,6 +221,7 @@ OWN_ROW_TABLES: dict[str, str] = {
     "data_jobs": "created_by",
     "pending_uploads": "created_by",
     "plugin_member_consents": "user_id",
+    "view_preferences": "user_id",
 }
 
 # --- Private-row overlay on initiative-scoped tables --------------------------
@@ -320,6 +328,7 @@ SEAT_READ_TABLES: frozenset[str] = frozenset(
 LEDGER_TABLES: dict[str, tuple[str, str] | None] = {
     "webhook_deliveries": ("webhook_subscriptions", "subscription_id"),
     "webhook_refs": None,
+    "case_grants": None,
     "subscription_progress": None,
     "plugin_hook_deliveries": ("guild_plugins", "install_id"),
     "plugin_schedule_runs": ("guild_plugins", "install_id"),
@@ -355,6 +364,7 @@ CREATED_BY_EXEMPT_TABLES: frozenset[str] = frozenset(
         "guild_plugin_user_connections",
         "plugin_member_consents",
         "post_reads",
+        "view_preferences",
         # A fact about an install: where it appears. The rows a new initiative's
         # trigger writes have no person placing them.
         "plugin_placements",
@@ -393,6 +403,9 @@ CREATED_BY_EXEMPT_TABLES: frozenset[str] = frozenset(
         # The key -> task map the intake writer reads. The case it points at
         # carries the author, and a system-opened one has none by design.
         "intake_cases",
+        # Which access grant serves which case. The grant names who asked for
+        # it.
+        "case_grants",
         # A report is not authored — it is a thing several people said about
         # one target. Who said it is the reporters table, and who settled it is
         # ``decided_by``; a creator column would be a third answer to neither
