@@ -1841,6 +1841,29 @@ async def test_only_the_seat_may_send_a_backup_in_pieces(client, acting_user):
     assert refused.json()["detail"] == "IMPORT_SUPERADMIN_REQUIRED"
 
 
+async def test_a_backup_sent_in_pieces_may_weigh_as_much_as_a_bundle(
+    client, acting_user
+):
+    from app.testing.resumable import TUS, upload_metadata
+
+    a = await acting_user(guild_role=CommunityRole.superadmin, initiative=True)
+
+    async def create(length: int) -> int:
+        response = await client.post(
+            a.g("/resumable-uploads"),
+            headers={
+                **a.headers,
+                **TUS,
+                "Upload-Length": str(length),
+                "Upload-Metadata": upload_metadata(purpose="backup", filename="b.zip"),
+            },
+        )
+        return response.status_code
+
+    assert await create(import_limits.IMPORT_MAX_BACKUP_UPLOAD_BYTES + 1) == 201
+    assert await create(import_limits.IMPORT_MAX_BUNDLE_BYTES + 1) == 413
+
+
 async def test_a_backup_on_its_way_needs_no_room_in_the_communitys_storage(
     client, acting_user, session
 ):
@@ -1922,12 +1945,15 @@ async def test_backup_restores_fresh_assets_into_storage(
     client, acting_user, session, monkeypatch, role_session
 ):
     """A cross-guild restore: the storage key doesn't exist here, so the blob
-    is written into guild storage, an uploads row is registered, and the uploaded file serves from the restored key."""
+    is written into guild storage, an uploads row is registered, and the uploaded file serves from the restored key.
+    A file is restored however large, past what one sent with a request may be."""
+    import hashlib
     from pathlib import Path
 
     from sqlmodel import select
 
     from app.models.tenant.upload import Upload
+    from app.services.tenant import attachments
 
     a = await acting_user(
         guild_role=CommunityRole.superadmin, initiative=True, project=True
@@ -1945,6 +1971,7 @@ async def test_backup_restores_fresh_assets_into_storage(
         ],
     )
     zip_bytes = _make_backup_zip(manifest, {"assets/from-elsewhere.pdf": payload})
+    monkeypatch.setattr(attachments, "MAX_FILE_SIZE", len(payload) - 1)
 
     resp = await _upload_backup(client, a, zip_bytes)
     job_id = resp.json()["id"]
@@ -1972,6 +1999,7 @@ async def test_backup_restores_fresh_assets_into_storage(
     ).one()
     assert upload.size_bytes == len(payload)
     assert upload.content_type == "application/pdf"
+    assert upload.content_hash == hashlib.sha256(payload).hexdigest()
 
 
 async def test_backup_quota_uses_zip_sizes_not_manifest_claims(

@@ -73,14 +73,14 @@ def bundle_budget(storage_left: int | None = None) -> AssetBudget:
     """
     bytes_left = max(
         0,
-        import_limits.IMPORT_FETCH_MAX_BUNDLE_BYTES - _BUNDLE_RESERVE_BYTES,
+        import_limits.IMPORT_MAX_BUNDLE_BYTES - _BUNDLE_RESERVE_BYTES,
     )
     if storage_left is not None:
         bytes_left = min(bytes_left, max(0, storage_left))
     return AssetBudget(
         bytes_left=bytes_left,
         files_left=max(
-            0, import_limits.IMPORT_FETCH_MAX_ZIP_MEMBERS - _BUNDLE_RESERVE_FILES
+            0, import_limits.IMPORT_MAX_BUNDLE_MEMBERS - _BUNDLE_RESERVE_FILES
         ),
     )
 
