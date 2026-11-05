@@ -1,13 +1,16 @@
 import { Copy, Trash2 } from "lucide-react";
-import type { ReactNode } from "react";
+import { type FormEvent, type ReactNode, useState } from "react";
 import { useTranslation } from "react-i18next";
 
-import type { CommunityInviteRead } from "@/api/generated/initiativeAPI.schemas";
+import { type CommunityInviteRead, SupportTopic } from "@/api/generated/initiativeAPI.schemas";
 import { ListSkeleton, SkeletonRegion } from "@/components/skeletons/PageSkeletons";
+import { HelpLink } from "@/components/support/HelpLink";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
-import type { InviteLinkLimits } from "@/hooks/useCommunityInvites";
+import { useBillingPortal } from "@/hooks/useBillingPortal";
+import { useCommunities } from "@/hooks/useCommunities";
+import type { InviteLinkLimits, useCommunityInvites } from "@/hooks/useCommunityInvites";
 import { useRelativeTime } from "@/hooks/useRelativeTime";
 import { toast } from "@/lib/mascotToast";
 
@@ -142,5 +145,75 @@ export const CommunityInviteList = ({
         ))}
       </div>
     </>
+  );
+};
+
+/**
+ * Inviting members to the active community: the form that makes a link, what
+ * stops it at the seat cap, the link just made, and the live ones. Settings ›
+ * Users shows it, and so does the invite dialog the community's banner and
+ * members page open.
+ */
+export const MemberInvites = ({ invites }: { invites: ReturnType<typeof useCommunityInvites> }) => {
+  const { t } = useTranslation("communities");
+  const { activeCommunity } = useCommunities();
+  const { canSell, openPortal } = useBillingPortal();
+  const [limits, setLimits] = useState<InviteLinkLimits>({ maxUses: 1, expiresDays: 7 });
+
+  // Seat cap, admin-only on the payload and null when uncapped. A full community
+  // mints no invite (the server refuses), so the form says so up front instead
+  // of failing on submit. Where a billing portal exists the cap travels with
+  // the plan — raising it is an upgrade, not a request to an operator — so the
+  // message and its action differ from the self-hosted one.
+  const communityId = activeCommunity?.id ?? null;
+  const maxUsers = activeCommunity?.max_users ?? null;
+  const atUserLimit = maxUsers !== null && (activeCommunity?.member_count ?? 0) >= maxUsers;
+  const planName = activeCommunity?.tier_name ?? null;
+
+  const create = (event: FormEvent<HTMLFormElement>) => {
+    event.preventDefault();
+    if (!atUserLimit) void invites.create(limits);
+  };
+
+  return (
+    <div className="space-y-4">
+      <form className="grid grid-cols-fill-48/3 gap-4" onSubmit={create}>
+        <InviteLimitFields idPrefix="invite" value={limits} onChange={setLimits} />
+        <div className="flex items-end">
+          <Button type="submit" disabled={invites.submitting || atUserLimit}>
+            {invites.submitting ? t("users.generatingInvite") : t("users.generateInvite")}
+          </Button>
+        </div>
+      </form>
+      {atUserLimit && canSell && communityId && activeCommunity?.can.seat ? (
+        <div className="flex flex-wrap items-center justify-between gap-3">
+          <p className="text-muted-foreground text-sm">
+            {planName
+              ? t("users.inviteSeatsFullPlan", { plan: planName, count: maxUsers ?? 0 })
+              : t("users.inviteSeatsFullUpgrade", { count: maxUsers ?? 0 })}
+          </p>
+          <Button size="sm" onClick={() => void openPortal(communityId, "upgrade")}>
+            {t("usagePanel.upgrade")}
+          </Button>
+        </div>
+      ) : atUserLimit ? (
+        <div className="flex flex-wrap items-center gap-x-3 gap-y-1">
+          <p className="text-muted-foreground text-sm">
+            {t("users.inviteSeatsFull", { max: maxUsers })}
+          </p>
+          <HelpLink topic={SupportTopic.community} communityId={communityId} />
+        </div>
+      ) : null}
+      {invites.newInviteCode ? <NewInviteLink code={invites.newInviteCode} /> : null}
+      <div className="h-px bg-border" />
+      {/* Guest invites are Settings › Guests'; these are for members. */}
+      <CommunityInviteList
+        invites={invites.invites.filter((invite) => invite.guest_days == null)}
+        isLoading={invites.isLoading}
+        error={invites.error}
+        emptyText={t("users.noActiveInvites")}
+        onDelete={(inviteId) => void invites.remove(inviteId)}
+      />
+    </div>
   );
 };

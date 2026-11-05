@@ -8,10 +8,14 @@
  */
 import { act, screen, waitFor } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
+import { HttpResponse } from "msw";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 
 import { buildCommunity } from "@/__tests__/factories";
+import { communityHttp } from "@/__tests__/helpers/communityHttp";
+import { server } from "@/__tests__/helpers/msw-server";
 import { renderPage } from "@/__tests__/helpers/render";
+import type { CommunityRole } from "@/api/generated/initiativeAPI.schemas";
 
 // The reader, so a row can be told apart from their own.
 vi.mock("@/hooks/useAuth", async (importOriginal) => ({
@@ -27,11 +31,16 @@ const mocks = vi.hoisted(() => ({
   ignored: vi.fn(),
   ignore: vi.fn(),
   setOwnName: vi.fn(),
+  setRung: vi.fn(),
+  createInvite: vi.fn(),
 }));
 
 vi.mock("@/api/generated/communities/communities", async (importOriginal) => ({
   ...(await importOriginal<Record<string, unknown>>()),
   setOwnDisplayName: mocks.setOwnName,
+  updateCommunityMembership: mocks.setRung,
+  createCommunityInvite: mocks.createInvite,
+  useListCommunityInvites: () => ({ data: [], isLoading: false, isError: false, refetch: vi.fn() }),
 }));
 
 vi.mock("@/hooks/useUsers", async (importOriginal) => ({
@@ -70,12 +79,21 @@ const answer = (items: ReturnType<typeof person>[], total = items.length) =>
     isError: false,
   });
 
-const setup = (displayName: string | null = null) =>
-  renderPage(() => <CommunityMembersPage />, {
+const setup = (displayName: string | null = null, role: CommunityRole = "member") => {
+  const community = buildCommunity({ id: 7, display_name: displayName, role });
+  return renderPage(() => <CommunityMembersPage />, {
     initialRoute: "/c/$communityId/members",
     routeParams: { communityId: "7" },
-    communities: { communities: [buildCommunity({ id: 7, display_name: displayName })] },
+    communities: { communities: [community], activeCommunityId: 7, activeCommunity: community },
   });
+};
+
+// Each read that lands redraws the rows, which closes a menu open in one: wait
+// for the last to land, and for the redraw it schedules.
+const settled = async ({ queryClient }: ReturnType<typeof setup>) => {
+  await waitFor(() => expect(queryClient.isFetching()).toBe(0));
+  await act(() => new Promise((resolve) => setTimeout(resolve, 0)));
+};
 
 beforeEach(() => {
   vi.clearAllMocks();
@@ -251,6 +269,57 @@ describe("a community's members page", () => {
     await userEvent.click(screen.getByRole("button", { name: "Save" }));
 
     await waitFor(() => expect(mocks.setOwnName).toHaveBeenCalledWith(7, { display_name: null }));
+  });
+
+  it("runs what a custom role holds from here: invites, and members below admin", async () => {
+    // A member whose role holds the roster and invites, and nothing else.
+    server.use(
+      communityHttp.get("/custom-roles/held", () =>
+        HttpResponse.json({ surfaces: ["members", "invites"] })
+      ),
+      communityHttp.get("/custom-roles/", () =>
+        HttpResponse.json([
+          { id: 1, name: "Doors", base_rung: "member", surfaces: ["invites"] },
+          { id: 2, name: "Roll", base_rung: "admin", surfaces: ["members"] },
+        ])
+      )
+    );
+    mocks.createInvite.mockResolvedValue({ id: 5, code: "door" });
+    answer([person(1, "ada"), person(2, "bram", { community_role: "admin" })]);
+    await settled(setup());
+
+    await userEvent.click(await screen.findByRole("button", { name: "Invite members" }));
+    await userEvent.click(await screen.findByRole("button", { name: "Generate invite" }));
+    expect(await screen.findByText(/\/invite\/door$/)).toBeInTheDocument();
+    expect(mocks.createInvite).toHaveBeenCalledWith(7, expect.objectContaining({ max_uses: 1 }));
+    await userEvent.keyboard("{Escape}");
+
+    await userEvent.click(screen.getByRole("button", { name: /actions for ada/i }));
+    expect(await screen.findByRole("menuitem", { name: "Set display name" })).toBeInTheDocument();
+    expect(screen.getByRole("menuitem", { name: "Remove from community" })).toBeInTheDocument();
+    // Making or unmaking an admin takes every part, which this role lacks.
+    expect(screen.queryByRole("menuitem", { name: "Community role" })).toBeNull();
+    // And it gives only the roles it could make: none on the admin rung.
+    await userEvent.click(screen.getByRole("menuitem", { name: "Custom role" }));
+    expect(await screen.findByRole("menuitemradio", { name: "Doors" })).toBeInTheDocument();
+    expect(screen.queryByRole("menuitemradio", { name: /Roll/ })).toBeNull();
+    await userEvent.keyboard("{Escape}");
+
+    await userEvent.click(screen.getByRole("button", { name: /actions for bram/i }));
+    expect(await screen.findByRole("menuitem", { name: "Set display name" })).toBeInTheDocument();
+    expect(screen.queryByRole("menuitem", { name: "Remove from community" })).toBeNull();
+  });
+
+  it("lets an admin change a member's rung from the row", async () => {
+    mocks.setRung.mockResolvedValue(undefined);
+    answer([person(1, "ada")]);
+    await settled(setup(null, "admin"));
+
+    await userEvent.click(await screen.findByRole("button", { name: /actions for ada/i }));
+    await userEvent.click(await screen.findByRole("menuitem", { name: "Community role" }));
+    await userEvent.click(await screen.findByRole("menuitemradio", { name: "Admin" }));
+
+    await waitFor(() => expect(mocks.setRung).toHaveBeenCalledWith(7, 1, { role: "admin" }));
   });
 
   it("says so when the roster cannot be read", async () => {

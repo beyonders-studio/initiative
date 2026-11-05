@@ -4,7 +4,8 @@
  * The two counts a community's front page can answer that no page inside it can:
  * the roster is the size of the place, and the room is whether anything is
  * happening in it. They ride on the banner because that is the one element on
- * the page that is about the community rather than about its contents.
+ * the page that is about the community rather than about its contents. Beside
+ * them, for whoever hands out invites, is the way to add to the count.
  *
  * They are dressed in the banner's own ink rather than in the app's palette —
  * a tint of it for the chip, the colour itself for the words — so one stored
@@ -14,7 +15,7 @@
  */
 
 import { Link } from "@tanstack/react-router";
-import { Users } from "lucide-react";
+import { UserPlus, Users } from "lucide-react";
 import { useTranslation } from "react-i18next";
 
 import { readableTextShadow } from "@/lib/contrastColor";
@@ -27,6 +28,9 @@ export type CommunityBannerBadgesProps = {
   onlineCount: number;
   /** The banner's text colour, which these are tinted from. */
   ink: string;
+  /** Opens the invite dialog, for whoever hands out invites; passing it is
+   *  the gate. */
+  onInvite?: () => void;
 };
 
 export const CommunityBannerBadges = ({
@@ -34,6 +38,7 @@ export const CommunityBannerBadges = ({
   memberCount,
   onlineCount,
   ink,
+  onInvite,
 }: CommunityBannerBadgesProps) => {
   const { t } = useTranslation("communities");
 
@@ -43,6 +48,8 @@ export const CommunityBannerBadges = ({
     color: ink,
     textShadow: readableTextShadow(ink),
   };
+  const pressable =
+    "flex items-center gap-1.5 rounded-full border px-2.5 py-1 font-medium text-xs backdrop-blur-sm transition hover:brightness-110 focus-visible:outline-2 focus-visible:outline-current";
 
   return (
     <>
@@ -51,7 +58,7 @@ export const CommunityBannerBadges = ({
       <Link
         to="/c/$communityId/members"
         params={{ communityId: String(communityId) }}
-        className="flex items-center gap-1.5 rounded-full border px-2.5 py-1 font-medium text-xs backdrop-blur-sm transition hover:brightness-110 focus-visible:outline-2 focus-visible:outline-current"
+        className={pressable}
         style={chip}
       >
         <Users className="h-3.5 w-3.5" aria-hidden="true" />
@@ -67,6 +74,12 @@ export const CommunityBannerBadges = ({
           <span className="size-2 rounded-full bg-emerald-400" aria-hidden="true" />
           {t("community.onlineCount", { count: onlineCount })}
         </span>
+      ) : null}
+      {onInvite ? (
+        <button type="button" onClick={onInvite} className={pressable} style={chip}>
+          <UserPlus className="h-3.5 w-3.5" aria-hidden="true" />
+          {t("inviteMembers")}
+        </button>
       ) : null}
     </>
   );
