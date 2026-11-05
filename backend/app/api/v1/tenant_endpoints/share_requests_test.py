@@ -297,7 +297,7 @@ async def test_leaving_the_initiative_takes_what_they_asked_for(client, session,
         headers=owner.headers,
     )
 
-    assert removed.status_code == 200
+    assert removed.status_code == 204
     assert (
         await client.get(
             owner.g(f"/share-requests/?batch_id={batch}"), headers=owner.headers

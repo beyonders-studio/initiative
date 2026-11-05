@@ -440,8 +440,8 @@ async def test_initiative_statuses_refused_to_a_non_member(
         headers=outsider.headers,
     )
 
-    assert response.status_code == 403
-    assert response.json()["detail"] == "INITIATIVE_NOT_A_MEMBER"
+    assert response.status_code == 404
+    assert response.json()["detail"] == "INITIATIVE_NOT_FOUND"
 
 
 async def test_initiative_statuses_404_for_an_unknown_initiative(
