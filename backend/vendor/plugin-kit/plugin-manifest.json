@@ -33,7 +33,7 @@
         },
         "scopes": {
           "type": "array",
-          "maxItems": 52,
+          "maxItems": 54,
           "uniqueItems": true,
           "items": {
             "anyOf": [
@@ -53,6 +53,8 @@
                   "posts:write",
                   "wikis:read",
                   "wikis:write",
+                  "contacts:read",
+                  "contacts:write",
                   "comments:read",
                   "comments:write",
                   "relationships:read",
@@ -140,7 +142,7 @@
     },
     "scopes": {
       "type": "array",
-      "maxItems": 52,
+      "maxItems": 54,
       "uniqueItems": true,
       "items": {
         "anyOf": [
@@ -160,6 +162,8 @@
               "posts:write",
               "wikis:read",
               "wikis:write",
+              "contacts:read",
+              "contacts:write",
               "comments:read",
               "comments:write",
               "relationships:read",
