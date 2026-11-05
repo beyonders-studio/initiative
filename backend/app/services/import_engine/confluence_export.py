@@ -107,6 +107,8 @@ class ExportSpace:
     users: dict[str, str]
     #: The site the pages link issues to, when one of them does.
     site_url: str
+    #: Pages past what may be held at once, and so left out.
+    left_behind: int = 0
 
 
 def _classes(element: _Element) -> set[str]:
@@ -166,8 +168,11 @@ def read_export(archive: zipfile.ZipFile) -> ExportSpace:
 
     A page at a time: every page is parsed once for its title, which a link
     from any other page may need, and again when its body is translated, so
-    no more than one page's tree is held at once. Blocking; run it in a
-    thread from async code."""
+    no more than one page's tree is held at once. The translated bodies are
+    held within the size a zip's whole content may declare
+    (``IMPORT_MAX_ZIP_UNCOMPRESSED_BYTES``); the pages past it are left out
+    and counted, as the pages past a space's budget are. Blocking; run it in
+    a thread from async code."""
     names = [info.filename for info in archive.infolist() if not info.is_dir()]
     root = _root(names)
     prefix = f"{root}/" if root else ""
@@ -205,6 +210,7 @@ def read_export(archive: zipfile.ZipFile) -> ExportSpace:
     users: dict[str, str] = {}
     site = ""
     pages: list[ExportPage] = []
+    held = 0
     for file in page_files:
         doc = _parse(_read(archive, prefix + file))
         attachments = _listed_attachments(doc, prefix, sizes)
@@ -217,6 +223,9 @@ def read_export(archive: zipfile.ZipFile) -> ExportSpace:
         )
         main = _find(doc, lambda e: e.attr("id") == "main-content")
         body = translator.markup(main.children) if main is not None else ""
+        held += len(body)
+        if held > import_limits.IMPORT_MAX_ZIP_UNCOMPRESSED_BYTES:
+            break
         for extra in translator.found_attachments:
             if extra.path not in {a.path for a in attachments}:
                 attachments.append(extra)
@@ -241,7 +250,14 @@ def read_export(archive: zipfile.ZipFile) -> ExportSpace:
                 attachments=attachments,
             )
         )
-    return ExportSpace(key=key, name=name, pages=pages, users=users, site_url=site)
+    return ExportSpace(
+        key=key,
+        name=name,
+        pages=pages,
+        users=users,
+        site_url=site,
+        left_behind=len(page_files) - len(pages),
+    )
 
 
 def _space_details(index: _Element) -> dict[str, str]:
@@ -823,6 +839,8 @@ async def export_to_fetched(
         files_allowed=files_allowed,
     )
     gathered.add(space.key, mapped, counted_references=asset_budget is None)
-    gathered.report.pages_over_limit += max(0, len(space.pages) - len(pages))
+    gathered.report.pages_over_limit += (
+        max(0, len(space.pages) - len(pages)) + space.left_behind
+    )
     gathered.settle()
     return gathered.fetched(), space.site_url

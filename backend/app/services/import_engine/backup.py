@@ -231,7 +231,7 @@ def plan_backup(
     """
     from app.services.import_engine.importers import IMPORTERS
 
-    with open_zip(payload, backup=True) as archive:
+    with open_zip(payload, bundle=True) as archive:
         manifest = read_manifest(archive, fetched=fetched)
 
     unknown_types = sorted(
@@ -406,7 +406,7 @@ async def apply_backup(
     from app.services.platform import guilds as guilds_service
     from app.services.tenant import initiatives as initiatives_service
 
-    with await asyncio.to_thread(open_zip, payload, backup=True) as archive:
+    with await asyncio.to_thread(open_zip, payload, bundle=True) as archive:
         manifest = await asyncio.to_thread(read_manifest, archive, fetched=fetched)
         max_json_bytes = json_cap(fetched=fetched)
         result = BackupImportResult()

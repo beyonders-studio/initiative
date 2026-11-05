@@ -15,10 +15,11 @@ IMPORT_MAX_ENVELOPE_BYTES = 20_971_520  # 20 MiB
 #: Staged payloads awaiting confirm/apply expire after this.
 IMPORT_STAGED_TTL_HOURS = 24
 
-#: The most a zip may weigh — a backup sent with one request, a wiki with its
-#: files, a Confluence space's HTML export — plus the bounds every zip but a
-#: backup is opened within, independent of the transfer cap: total declared
-#: uncompressed size and member count.
+#: The most a zip sent with one request may weigh — a backup, a wiki with its
+#: files, a Confluence space's HTML export — plus the bounds an exported
+#: tool's zip is opened within, independent of the transfer cap: total
+#: declared uncompressed size and member count. A Confluence export's pages
+#: are held within the same size once translated.
 IMPORT_MAX_BACKUP_UPLOAD_BYTES = 268_435_456  # 256 MiB
 IMPORT_MAX_ZIP_UNCOMPRESSED_BYTES = 1_073_741_824  # 4x the upload cap
 IMPORT_MAX_ZIP_MEMBERS = 20_000
@@ -34,13 +35,13 @@ IMPORT_FETCH_DEADLINE_SECONDS = 4 * 60 * 60
 IMPORT_FETCH_SLOTS = 3
 IMPORT_APPLY_SLOTS = 2
 
-#: A backup, and a bundle a fetch writes itself — read from an Atlassian site,
-#: or converted from a Confluence export — are opened within these rather than
-#: the zip bounds above: a backup holds what an export puts in one, as much as
-#: ``EXPORT_MAX_BACKUP_UPLOAD_BYTES`` of files beside its envelopes, and one
-#: sent in pieces may weigh up to :data:`IMPORT_MAX_BUNDLE_BYTES`. The
-#: community's storage quota narrows the attachment budget further
-#: (``jira_attachments``).
+#: A backup, a Confluence space's HTML export, and a bundle a fetch writes
+#: itself — read from an Atlassian site, or converted from a Confluence export
+#: — are opened within these rather than the zip bounds above: a backup holds
+#: what an export puts in one, as much as ``EXPORT_MAX_BACKUP_UPLOAD_BYTES`` of
+#: files beside its envelopes, and a backup or an export sent in pieces may
+#: weigh up to :data:`IMPORT_MAX_BUNDLE_BYTES`. The community's storage quota
+#: narrows the attachment budget further (``jira_attachments``).
 #: Rows one fetch may bring: tasks, comments, pages, uploaded files.
 IMPORT_FETCH_MAX_ROWS = 250_000
 #: Declared uncompressed size of a bundle, files and envelopes together. Each

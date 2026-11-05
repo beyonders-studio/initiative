@@ -266,8 +266,8 @@ async def start_export(
     """Queue a job that reads a Confluence space's HTML export into
     ``initiative_id`` as a wiki.
 
-    The zip is checked for being one — a zip, within the bounds an uploaded
-    zip is opened within, with pages in it — and staged for the worker, which
+    The zip is checked for being one — a zip, within the bundle bounds, with
+    pages in it — and staged for the worker, which
     converts it the way it reads a site; everything after that is the same
     review. ``payload`` is the zip itself or the file holding it;
     ``payload_ref``, where it is already in the community's storage (a
@@ -311,9 +311,9 @@ async def start_export(
 
 
 def _check_export(payload: bytes | Path | BinaryIO) -> None:
-    """Refuse a payload that is not a zip within the upload bounds, or holds
+    """Refuse a payload that is not a zip within the bundle bounds, or holds
     no page. Blocking; run it in a thread."""
-    with open_zip(payload) as archive:
+    with open_zip(payload, bundle=True) as archive:
         if not any(
             info.filename.endswith(".html") and not info.filename.endswith("index.html")
             for info in archive.infolist()
@@ -335,7 +335,7 @@ async def _fetch_export(
     async with import_engine.open_payload(guild_id, raw_ref) as upload:
         try:
             archive = (
-                await asyncio.to_thread(open_zip, upload)
+                await asyncio.to_thread(open_zip, upload, bundle=True)
                 if upload is not None
                 else None
             )
