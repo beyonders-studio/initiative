@@ -28,6 +28,9 @@ const MANIFEST_NAME = "manifest.json";
 const EOCD_SEARCH_SPAN = 22 + 65_536;
 // A manifest is small; refuse to inflate something absurd.
 const MAX_MANIFEST_BYTES = 8 * 1024 * 1024;
+// The central directory is read this much at a time, however large it says
+// it is. One entry is at most 46 bytes and three 64 KiB fields, so it fits.
+const DIRECTORY_PIECE_BYTES = 1024 * 1024;
 
 /** Why a peek failed, in terms the UI can act on:
  * - ``not_backup`` — the file isn't an Initiative backup (wrong file, wrong
@@ -94,38 +97,51 @@ interface MemberRef {
   localHeaderOffset: number;
 }
 
-/** Find the manifest's entry in the central directory. */
+/** Find the manifest's entry in the central directory, read a piece at a
+ * time. */
 async function findManifestRef(file: File): Promise<MemberRef> {
   const { offset, size, count } = await findCentralDirectory(file);
-  const dir = await bytes(file, offset, Math.min(offset + size, file.size));
+  const end = Math.min(offset + size, file.size);
   const nameBytes = new TextEncoder().encode(MANIFEST_NAME);
-  let pos = 0;
-  for (let i = 0; i < count && pos + 46 <= dir.byteLength; i++) {
-    if (dir.getUint32(pos, true) !== CEN_SIG) {
+  let dir = new DataView(new ArrayBuffer(0));
+  let dirAt = offset;
+  // Where the `length` bytes at `at` sit in the piece held, reading the piece
+  // that starts there when they run past it.
+  const within = async (at: number, length: number) => {
+    if (at < dirAt || at + length > dirAt + dir.byteLength) {
+      if (at + length > end) {
+        throw new BackupPeekError("not_backup");
+      }
+      dirAt = at;
+      dir = await bytes(file, at, Math.min(end, at + Math.max(length, DIRECTORY_PIECE_BYTES)));
+    }
+    return at - dirAt;
+  };
+  let pos = offset;
+  for (let i = 0; i < count && pos + 46 <= end; i++) {
+    const head = await within(pos, 46);
+    if (dir.getUint32(head, true) !== CEN_SIG) {
       throw new BackupPeekError("not_backup");
     }
-    const compression = dir.getUint16(pos + 10, true);
-    const compressedSize = dir.getUint32(pos + 20, true);
-    const uncompressedSize = dir.getUint32(pos + 24, true);
-    const nameLen = dir.getUint16(pos + 28, true);
-    const extraLen = dir.getUint16(pos + 30, true);
-    const commentLen = dir.getUint16(pos + 32, true);
-    const localHeaderOffset = dir.getUint32(pos + 42, true);
+    const nameLen = dir.getUint16(head + 28, true);
+    const extraLen = dir.getUint16(head + 30, true);
+    const commentLen = dir.getUint16(head + 32, true);
+    const at = await within(pos, 46 + nameLen + extraLen + commentLen);
     let matches = nameLen === nameBytes.length;
     if (matches) {
       for (let j = 0; j < nameLen; j++) {
-        if (dir.getUint8(pos + 46 + j) !== nameBytes[j]) {
+        if (dir.getUint8(at + 46 + j) !== nameBytes[j]) {
           matches = false;
           break;
         }
       }
     }
     if (matches) {
-      return withZip64Figures(dir, pos + 46 + nameLen, extraLen, {
-        compression,
-        compressedSize,
-        uncompressedSize,
-        localHeaderOffset,
+      return withZip64Figures(dir, at + 46 + nameLen, extraLen, {
+        compression: dir.getUint16(at + 10, true),
+        compressedSize: dir.getUint32(at + 20, true),
+        uncompressedSize: dir.getUint32(at + 24, true),
+        localHeaderOffset: dir.getUint32(at + 42, true),
       });
     }
     pos += 46 + nameLen + extraLen + commentLen;

@@ -1,5 +1,5 @@
 import { strToU8, zipSync } from "fflate";
-import { describe, expect, it } from "vitest";
+import { describe, expect, it, vi } from "vitest";
 
 import { peekBackupManifest } from "./backupPeek";
 
@@ -71,5 +71,21 @@ describe("peekBackupManifest", () => {
     const manifest = { type: "initiative-backup", guild: { name: "The Fete" } };
 
     await expect(peekBackupManifest(zip64Backup(manifest))).resolves.toEqual(manifest);
+  });
+
+  it("reads a directory a piece at a time, however large it says it is", async () => {
+    const claimed = 3 * 1024 * 1024;
+    const file = new File(
+      [
+        new Uint8Array(claimed),
+        le([4, 0x06054b50], [2, 0], [2, 0], [2, 1], [2, 1], [4, claimed], [4, 0], [2, 0]),
+      ],
+      "backup.zip"
+    );
+    const slice = vi.spyOn(file, "slice");
+
+    await expect(peekBackupManifest(file)).rejects.toMatchObject({ code: "not_backup" });
+    const read = slice.mock.calls.map(([start = 0, end = file.size]) => end - start);
+    expect(Math.max(...read)).toBeLessThanOrEqual(1024 * 1024);
   });
 });
