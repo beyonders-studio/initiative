@@ -89,8 +89,9 @@ class Purpose:
     #: Refuses a person who may not write there; answers the initiative the
     #: file will be kept for.
     admit: Callable[[AsyncSession, Any, User, dict[str, str]], Awaitable[int | None]]
-    #: Whether it becomes a stored file, and so holds room in the community's
-    #: storage while it arrives. An import's zip is read and thrown away.
+    #: Whether it holds room in the community's storage while it arrives: a
+    #: file does, and so does a Confluence export, most of whose weight is the
+    #: attachments the community keeps; a backup does not.
     stored: bool = True
 
 
@@ -155,13 +156,7 @@ async def _admit_atlassian_export(
     return initiative.id
 
 
-def _import_cap() -> int:
-    from app.services.import_engine import limits as import_limits
-
-    return import_limits.IMPORT_MAX_BACKUP_UPLOAD_BYTES
-
-
-def _backup_cap() -> int:
+def _bundle_cap() -> int:
     from app.services.import_engine import limits as import_limits
 
     return import_limits.IMPORT_MAX_BUNDLE_BYTES
@@ -170,12 +165,9 @@ def _backup_cap() -> int:
 PURPOSES: dict[str, Purpose] = {
     # A file's size is bounded by the community's storage alone.
     "file": Purpose(cap=lambda: None, admit=_admit_file),
-    # A backup may be as large as an export makes one; a Confluence export
-    # keeps the bound a single upload of it has.
-    "backup": Purpose(cap=_backup_cap, admit=_admit_backup, stored=False),
-    "atlassian_export": Purpose(
-        cap=_import_cap, admit=_admit_atlassian_export, stored=False
-    ),
+    # A backup or a Confluence export may weigh as much as a bundle.
+    "backup": Purpose(cap=_bundle_cap, admit=_admit_backup, stored=False),
+    "atlassian_export": Purpose(cap=_bundle_cap, admit=_admit_atlassian_export),
 }
 
 #: The purposes whose uploads hold room in the community's storage.

@@ -9,8 +9,9 @@ directory: how many members there are, what they declare they add up to, and
 that every name is a relative path. Reading decompresses a member a chunk at a
 time and stops once it passes its cap, whatever size the member declared.
 
-A backup, and a bundle the app wrote itself from a fetch, is held to the
-bundle bounds rather than another zip's, as :mod:`limits` explains.
+A backup, a Confluence HTML export, and a bundle the app wrote itself from a
+fetch, are held to the bundle bounds rather than another zip's, as
+:mod:`limits` explains.
 """
 
 from __future__ import annotations
@@ -31,20 +32,21 @@ _CHUNK_BYTES = 1024 * 1024
 
 
 def open_zip(
-    payload: bytes | Path | BinaryIO, *, backup: bool = False
+    payload: bytes | Path | BinaryIO, *, bundle: bool = False
 ) -> zipfile.ZipFile:
     """Open a zip held in memory, read from a file or from an open seekable
-    one, and check its central directory, as a ``backup`` when it is one.
+    one, and check its central directory, within the ``bundle`` bounds when
+    it is one of the zips held to them.
     Raises ``IMPORT_ZIP_INVALID`` or ``IMPORT_TOO_LARGE`` before any member
     is read."""
     max_members = (
         import_limits.IMPORT_MAX_BUNDLE_MEMBERS
-        if backup
+        if bundle
         else import_limits.IMPORT_MAX_ZIP_MEMBERS
     )
     max_bytes = (
         import_limits.IMPORT_MAX_BUNDLE_BYTES
-        if backup
+        if bundle
         else import_limits.IMPORT_MAX_ZIP_UNCOMPRESSED_BYTES
     )
     try:

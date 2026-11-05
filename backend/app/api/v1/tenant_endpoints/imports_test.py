@@ -1841,8 +1841,9 @@ async def test_only_the_seat_may_send_a_backup_in_pieces(client, acting_user):
     assert refused.json()["detail"] == "IMPORT_SUPERADMIN_REQUIRED"
 
 
-async def test_a_backup_sent_in_pieces_may_weigh_as_much_as_a_bundle(
-    client, acting_user
+@pytest.mark.parametrize("purpose", ["backup", "atlassian_export"])
+async def test_an_import_sent_in_pieces_may_weigh_as_much_as_a_bundle(
+    client, acting_user, purpose
 ):
     from app.testing.resumable import TUS, upload_metadata
 
@@ -1855,7 +1856,11 @@ async def test_a_backup_sent_in_pieces_may_weigh_as_much_as_a_bundle(
                 **a.headers,
                 **TUS,
                 "Upload-Length": str(length),
-                "Upload-Metadata": upload_metadata(purpose="backup", filename="b.zip"),
+                "Upload-Metadata": upload_metadata(
+                    purpose=purpose,
+                    filename="import.zip",
+                    initiative_id=str(a.initiative.id),
+                ),
             },
         )
         return response.status_code
@@ -1883,6 +1888,28 @@ async def test_a_backup_on_its_way_needs_no_room_in_the_communitys_storage(
     )
 
     assert await attachments.get_guild_storage_usage(a.guild.id) == 0
+
+
+async def test_a_confluence_export_on_its_way_holds_room_in_the_communitys_storage(
+    client, acting_user
+):
+    from app.services.import_engine.confluence_export_test import export_bytes
+    from app.services.tenant import attachments
+    from app.testing.resumable import send_in_pieces
+
+    a = await acting_user(guild_role=CommunityRole.member, initiative=True)
+    export = export_bytes()
+
+    await send_in_pieces(
+        client,
+        a,
+        export,
+        purpose="atlassian_export",
+        filename="export.zip",
+        initiative_id=str(a.initiative.id),
+    )
+
+    assert await attachments.get_guild_storage_usage(a.guild.id) == len(export)
 
 
 async def test_backup_staged_expiry_and_cancel(
