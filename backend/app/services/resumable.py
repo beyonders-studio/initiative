@@ -161,11 +161,18 @@ def _import_cap() -> int:
     return import_limits.IMPORT_MAX_BACKUP_UPLOAD_BYTES
 
 
+def _backup_cap() -> int:
+    from app.services.import_engine import limits as import_limits
+
+    return import_limits.IMPORT_MAX_BUNDLE_BYTES
+
+
 PURPOSES: dict[str, Purpose] = {
     # A file's size is bounded by the community's storage alone.
     "file": Purpose(cap=lambda: None, admit=_admit_file),
-    # Imports keep the bound a single upload of them has.
-    "backup": Purpose(cap=_import_cap, admit=_admit_backup, stored=False),
+    # A backup may be as large as an export makes one; a Confluence export
+    # keeps the bound a single upload of it has.
+    "backup": Purpose(cap=_backup_cap, admit=_admit_backup, stored=False),
     "atlassian_export": Purpose(
         cap=_import_cap, admit=_admit_atlassian_export, stored=False
     ),

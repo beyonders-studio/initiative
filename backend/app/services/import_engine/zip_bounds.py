@@ -3,14 +3,14 @@ member read no further than its cap.
 
 Every zip the import engine reads — a backup, an exported tool's zip, a
 Confluence HTML export, a bundle a fetch wrote — is opened by
-:func:`open_zip` and its members read by :func:`read_member` or
-:func:`read_json_member`. Opening checks the central directory: how many
-members there are, what they declare they add up to, and that every name is a
-relative path. Reading decompresses a member a chunk at a time and stops once
-it passes its cap, whatever size the member declared.
+:func:`open_zip` and its members read by :func:`read_member`,
+:func:`read_json_member` or :func:`copy_member`. Opening checks the central
+directory: how many members there are, what they declare they add up to, and
+that every name is a relative path. Reading decompresses a member a chunk at a
+time and stops once it passes its cap, whatever size the member declared.
 
-A bundle the app wrote itself from a fetch (``fetched``) is held to the
-fetch's bounds rather than an upload's, as :mod:`limits` explains.
+A backup, and a bundle the app wrote itself from a fetch, is held to the
+bundle bounds rather than another zip's, as :mod:`limits` explains.
 """
 
 from __future__ import annotations
@@ -18,8 +18,9 @@ from __future__ import annotations
 import io
 import json
 import zipfile
+from collections.abc import Iterator
 from pathlib import Path
-from typing import Any
+from typing import Any, BinaryIO
 
 from app.core.messages import ImportEngineMessages
 from app.services.import_engine import limits as import_limits
@@ -29,23 +30,26 @@ from app.services.import_engine.contract import ImportEngineError
 _CHUNK_BYTES = 1024 * 1024
 
 
-def open_zip(payload: bytes | Path, *, fetched: bool = False) -> zipfile.ZipFile:
-    """Open a zip held in memory or read from a file, and check its central
-    directory. Raises ``IMPORT_ZIP_INVALID`` or ``IMPORT_TOO_LARGE`` before
-    any member is read."""
+def open_zip(
+    payload: bytes | Path | BinaryIO, *, backup: bool = False
+) -> zipfile.ZipFile:
+    """Open a zip held in memory, read from a file or from an open seekable
+    one, and check its central directory, as a ``backup`` when it is one.
+    Raises ``IMPORT_ZIP_INVALID`` or ``IMPORT_TOO_LARGE`` before any member
+    is read."""
     max_members = (
-        import_limits.IMPORT_FETCH_MAX_ZIP_MEMBERS
-        if fetched
+        import_limits.IMPORT_MAX_BUNDLE_MEMBERS
+        if backup
         else import_limits.IMPORT_MAX_ZIP_MEMBERS
     )
     max_bytes = (
-        import_limits.IMPORT_FETCH_MAX_BUNDLE_BYTES
-        if fetched
-        else import_limits.IMPORT_MAX_BACKUP_UNCOMPRESSED_BYTES
+        import_limits.IMPORT_MAX_BUNDLE_BYTES
+        if backup
+        else import_limits.IMPORT_MAX_ZIP_UNCOMPRESSED_BYTES
     )
     try:
         archive = zipfile.ZipFile(
-            payload if isinstance(payload, Path) else io.BytesIO(payload)
+            io.BytesIO(payload) if isinstance(payload, bytes) else payload
         )
     except Exception as exc:
         raise ImportEngineError(ImportEngineMessages.IMPORT_ZIP_INVALID) from exc
@@ -72,7 +76,8 @@ def open_zip(payload: bytes | Path, *, fetched: bool = False) -> zipfile.ZipFile
 
 
 def json_cap(*, fetched: bool = False) -> int:
-    """The most one JSON member — an envelope or a manifest — may hold."""
+    """The most one JSON member — an envelope or a manifest — may hold, more
+    in a bundle the app ``fetched`` and wrote itself."""
     return (
         import_limits.IMPORT_FETCH_MAX_ENVELOPE_BYTES
         if fetched
@@ -96,21 +101,44 @@ def read_member(
     a name the zip does not hold. Blocking; run it in a thread from async
     code.
     """
+    return b"".join(_chunks(archive, member, max_bytes=max_bytes, code=code))
+
+
+def copy_member(
+    archive: zipfile.ZipFile,
+    member: str | zipfile.ZipInfo,
+    target: BinaryIO,
+    *,
+    max_bytes: int,
+    code: str = ImportEngineMessages.IMPORT_TOO_LARGE,
+) -> int:
+    """Write one member to ``target`` a chunk at a time, read up to
+    ``max_bytes`` as :func:`read_member` reads one, and answer how many bytes
+    it wrote. Blocking; run it in a thread from async code."""
+    written = 0
+    for chunk in _chunks(archive, member, max_bytes=max_bytes, code=code):
+        target.write(chunk)
+        written += len(chunk)
+    return written
+
+
+def _chunks(
+    archive: zipfile.ZipFile,
+    member: str | zipfile.ZipInfo,
+    *,
+    max_bytes: int,
+    code: str,
+) -> Iterator[bytes]:
     info = member if isinstance(member, zipfile.ZipInfo) else archive.getinfo(member)
     if info.file_size > max_bytes:
         raise ImportEngineError(code)
-    chunks: list[bytes] = []
     total = 0
     with archive.open(info) as handle:
-        while True:
-            chunk = handle.read(min(_CHUNK_BYTES, max_bytes + 1 - total))
-            if not chunk:
-                break
+        while chunk := handle.read(min(_CHUNK_BYTES, max_bytes + 1 - total)):
             total += len(chunk)
             if total > max_bytes:
                 raise ImportEngineError(code)
-            chunks.append(chunk)
-    return b"".join(chunks)
+            yield chunk
 
 
 def read_json_member(

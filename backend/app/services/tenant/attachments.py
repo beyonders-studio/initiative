@@ -107,9 +107,13 @@ async def read_upload_bounded(file: UploadFile, max_size: int) -> bytes:
     return contents
 
 
-def compute_content_hash(data: bytes) -> str:
-    """SHA-256 hex of blob bytes — recorded on the ``uploads`` row for integrity
-    verification (object-store migration) and future content dedup."""
+def compute_content_hash(data: bytes | Path) -> str:
+    """SHA-256 hex of blob bytes, or of the file at a path read a piece at a
+    time — recorded on the ``uploads`` row for integrity verification
+    (object-store migration) and future content dedup."""
+    if isinstance(data, Path):
+        with data.open("rb") as handle:
+            return hashlib.file_digest(handle, "sha256").hexdigest()
     return hashlib.sha256(data).hexdigest()
 
 
@@ -868,8 +872,7 @@ def validate_stored(guild_id: int, key: str, size: int, filename: str | None) ->
     if source is None:
         raise ValueError("Uploaded file is missing")
     with source:
-        detected = detect_mime_type(source.read(_head_bytes()))
-        mime = _type_of(detected, source, filename)[0]
+        mime = validate_source(source, filename)
     from app.services import upload_scanning
 
     if upload_scanning.enabled():
@@ -878,6 +881,15 @@ def validate_stored(guild_id: int, key: str, size: int, filename: str | None) ->
             raise ValueError("Uploaded file is missing")
         upload_scanning.scan_stream(_pieces(blob), size)
     return mime
+
+
+def validate_source(source: BinaryIO, filename: str | None) -> str:
+    """The type of the file ``source`` reads from its start, read as
+    :func:`validate_file` reads one, whatever its size: from its first bytes,
+    and from a zip's own list of what it holds, without reading the rest.
+    Raises :class:`RefusedFileTypeError` for a program."""
+    detected = detect_mime_type(source.read(_head_bytes()))
+    return _type_of(detected, source, filename)[0]
 
 
 def _pieces(blob: ReadableBlob) -> Iterator[bytes]:
@@ -944,12 +956,13 @@ async def store_upload(
     *,
     guild_id: int,
     filename: str,
-    data: bytes,
+    data: bytes | Path,
     content_type: str | None,
     created_by: int | None,
     initiative_id: int | None = None,
 ) -> str:
-    """Write ``data`` to the guild's storage as ``filename`` and record it in
+    """Write ``data``, or the file at that path without reading it into
+    memory, to the guild's storage as ``filename`` and record it in
     ``uploads``. Returns the served URL, ``/uploads/{community_id}/{filename}``.
 
     Every upload a person or an import brings into a guild is stored here.
@@ -966,21 +979,30 @@ async def store_upload(
     """
     from app.services import upload_scanning
 
-    if upload_scanning.enabled() and not filename.startswith(THUMBNAIL_PREFIX):
-        await asyncio.to_thread(upload_scanning.scan_bytes, data)
-    await asyncio.to_thread(
-        get_guild_storage(guild_id).write,
-        filename,
-        data,
-        content_type=content_type or "application/octet-stream",
-    )
+    scan = upload_scanning.enabled() and not filename.startswith(THUMBNAIL_PREFIX)
+    storage = get_guild_storage(guild_id)
+    stored_type = content_type or "application/octet-stream"
+    if isinstance(data, Path):
+        size = data.stat().st_size
+        if scan:
+            await asyncio.to_thread(
+                upload_scanning.scan_stream, _pieces(ReadableBlob(path=data)), size
+            )
+        await asyncio.to_thread(
+            storage.write_file, filename, data, content_type=stored_type
+        )
+    else:
+        size = len(data)
+        if scan:
+            await asyncio.to_thread(upload_scanning.scan_bytes, data)
+        await asyncio.to_thread(storage.write, filename, data, content_type=stored_type)
     return record_upload(
         session,
         guild_id=guild_id,
         filename=filename,
-        size=len(data),
+        size=size,
         content_type=content_type,
-        content_hash=compute_content_hash(data),
+        content_hash=await asyncio.to_thread(compute_content_hash, data),
         created_by=created_by,
         initiative_id=initiative_id,
     )

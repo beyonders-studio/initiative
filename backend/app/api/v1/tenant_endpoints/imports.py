@@ -12,7 +12,7 @@ from collections.abc import AsyncIterator
 from contextlib import asynccontextmanager
 from datetime import datetime, timedelta, timezone
 from pathlib import Path
-from typing import Annotated, Optional
+from typing import Annotated, BinaryIO, Optional
 
 from fastapi import (
     APIRouter,
@@ -67,6 +67,7 @@ from app.services.import_engine.engine import (
     spooled_upload,
 )
 from app.services.import_engine import limits as import_limits
+from app.services.storage import get_guild_storage, open_seekable
 
 logger = logging.getLogger(__name__)
 
@@ -479,10 +480,11 @@ async def _payload(
     upload_id: str | None,
     purpose: str,
     initiative_id: int | None,
-) -> AsyncIterator[tuple[Path, str | None]]:
-    """An import's zip as a local file for the block, with its key in the
-    community's storage when it is already there: sent with the request as
-    ``file``, or taken from the resumable upload ``upload_id``."""
+) -> AsyncIterator[tuple[Path | BinaryIO, str | None]]:
+    """An import's zip for the block, with its key in the community's storage
+    when it is already there: sent with the request as ``file`` and copied to
+    a local file, or taken from the resumable upload ``upload_id`` and read
+    where it is stored, a range at a time."""
     if (file is None) == (upload_id is None):
         raise HTTPException(
             status_code=status.HTTP_400_BAD_REQUEST,
@@ -506,15 +508,19 @@ async def _payload(
         user_id=guild_context.user_id,
         initiative_id=initiative_id,
     )
-    async with import_engine.open_payload(
-        guild_context.guild_id, staged.staging_key
-    ) as payload:
-        if payload is None:
-            raise HTTPException(
-                status_code=status.HTTP_404_NOT_FOUND,
-                detail=ResumableMessages.NOT_FOUND,
-            )
-        yield payload, staged.staging_key
+    source = await asyncio.to_thread(
+        open_seekable,
+        get_guild_storage(guild_context.guild_id),
+        staged.staging_key,
+        staged.length,
+    )
+    if source is None:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail=ResumableMessages.NOT_FOUND,
+        )
+    with source:
+        yield source, staged.staging_key
 
 
 # ---------------------------------------------------------------------------

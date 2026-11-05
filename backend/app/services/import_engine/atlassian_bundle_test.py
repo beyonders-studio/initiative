@@ -86,9 +86,9 @@ def test_an_unfinished_bundle_leaves_no_file_behind():
     assert not path.exists()
 
 
-def test_a_fetched_bundle_opens_past_the_upload_bounds(monkeypatch):
-    """The upload bounds are for zips somebody else built; one this app wrote
-    from a fetch is held to the fetch's own."""
+def test_a_backup_opens_past_the_upload_bounds(monkeypatch):
+    """A backup, an uploaded one or one this app wrote from a fetch, is held
+    to the bundle bounds rather than another zip's."""
     import io
 
     from app.services.import_engine import limits as import_limits
@@ -103,8 +103,8 @@ def test_a_fetched_bundle_opens_past_the_upload_bounds(monkeypatch):
 
     with pytest.raises(ImportEngineError):
         open_zip(payload)
-    assert len(open_zip(payload, fetched=True).infolist()) == 3
+    assert len(open_zip(payload, backup=True).infolist()) == 3
 
-    monkeypatch.setattr(import_limits, "IMPORT_FETCH_MAX_ZIP_MEMBERS", 2)
+    monkeypatch.setattr(import_limits, "IMPORT_MAX_BUNDLE_MEMBERS", 2)
     with pytest.raises(ImportEngineError):
-        open_zip(payload, fetched=True)
+        open_zip(payload, backup=True)
