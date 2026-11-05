@@ -319,7 +319,7 @@ Point `targets` at the app's own port, or at your proxy with `scheme: https` add
 | `initiative_http_requests_total` | Requests answered, by `method`, `route` and `status`. `route` is the pattern (`/api/v1/c/{community_id}/initiatives/`), so every community shares one line. |
 | `initiative_http_request_duration_seconds` | How long those took, as a histogram. |
 | `initiative_http_requests_in_progress` | Requests being answered right now. |
-| `initiative_websocket_connections` | Live connections: notifications, live editing, queues and counters. One open tab holds several. |
+| `initiative_websocket_connections` | Live connections: notifications, live editing and counters. One open tab holds several. |
 | `initiative_db_statement_duration_seconds` | How long database statements took, by `engine`. |
 | `initiative_db_slow_statements_total` | Statements that took longer than half a second. |
 | `initiative_db_pool_connections` | Database connections each engine holds, by `state`: `checked_out`, `idle`, `overflow`. |

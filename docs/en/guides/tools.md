@@ -26,12 +26,6 @@ Everything that lives inside an initiative is a **tool**. There are nine kinds. 
 
     [:octicons-arrow-right-24: Calendar](calendar.md)
 
--   :material-format-list-numbered: __Queues__
-
-    Whose turn it is. Rotas, running orders, chore wheels.
-
-    [:octicons-arrow-right-24: Queues](queues.md)
-
 -   :material-counter: __Counters__
 
     Numbers that move. Tallies, totals, scores, seats left.
@@ -63,7 +57,6 @@ Everything that lives inside an initiative is a **tool**. There are nine kinds. 
 Most groups run on projects and files for a good long while, and there is nothing wrong with that. The others each have a fairly specific moment where you'll suddenly want them:
 
 - A **calendar**, when scheduling has visibly outgrown the group chat.
-- A **queue**, the second time somebody asks whose turn it is.
 - **Counters**, when a number needs to be the *same* number for everyone in the room.
 - A **dashboard**, when somebody who isn't doing the work starts asking how the work is going.
 - A **board**, the third time something important was announced in a chat and missed by four people.
@@ -77,7 +70,7 @@ That goes for projects and files too. They're the two an initiative starts with,
 
 Tools appear in the sidebar under an initiative once your [role](../sharing/initiative-roles.md) allows them. A role decides which *kinds* of tool you can view and create; [sharing](../sharing/sharing-projects-and-files.md) then decides which specific ones you can reach.
 
-So "I can't see Queues at all" is a role question, for an initiative manager. And "I can see Queues but not *that* queue" is a sharing question, for whoever owns it. Two different people, two different conversations, and it's worth knowing which one you're having.
+So "I can't see Dashboards at all" is a role question, for an initiative manager. And "I can see Dashboards but not *that* dashboard" is a sharing question, for whoever owns it. Two different people, two different conversations, and it's worth knowing which one you're having.
 
 ## What they all have in common
 
@@ -96,11 +89,11 @@ Learn it once and it's true of the next one. That's the entire point of doing it
 
 ## The top of every tool page
 
-Open a project, a queue, a dashboard or any other tool and the top of the page is laid out the same way:
+Open a project, a dashboard or any other tool and the top of the page is laid out the same way:
 
 - **A band in the initiative's colour**, so you always know which initiative you're standing in. It holds the breadcrumb back out, and **Settings** across from it if you're allowed to change things.
 - **The name and description.** Click the name to rename it. A file is the one exception: its title is the field at the top of the file. The bookmark beside the name adds it to your [Bookmarks](your-space.md#bookmarks), and the bell beside that [subscribes](your-space.md#subscribing) you to it.
-- **A strip underneath**, with **Status**, **Tags** and **Metadata**, all changeable right there, beside whatever only that tool has — a project's progress and dates, a queue's turn controls.
+- **A strip underneath**, with **Status**, **Tags** and **Metadata**, all changeable right there, beside whatever only that tool has — a project's progress and dates.
 
 ![The top of a project: the initiative's band with the breadcrumb and Settings, the name, and the strip with status, progress, dates, tags and metadata](../images/tools/connections.png)
 
@@ -110,7 +103,7 @@ A wiki is laid out differently, because a wiki is for reading. See [Wikis](wikis
 
 ## Lists
 
-Each tool has a tab on the initiative's page listing everything of that kind you can reach. Projects, files, queues, counters, dashboards and wikis can each be shown three ways, and each remembers the one you picked:
+Each tool has a tab on the initiative's page listing everything of that kind you can reach. Projects, files, counters, dashboards and wikis can each be shown three ways, and each remembers the one you picked:
 
 | View | What it's for |
 |---|---|
@@ -120,7 +113,7 @@ Each tool has a tab on the initiative's page listing everything of that kind you
 
 ![Files shown by tag, with the tag tree beside the cards](../images/tools/list-views.png)
 
-Some cards show what's inside without opening anything: a dashboard's card is a small copy of the dashboard, a counter group's shows its first counters, and a queue's shows whose turn it is and who's next.
+Some cards show what's inside without opening anything: a dashboard's card is a small copy of the dashboard, and a counter group's shows its first counters.
 
 ![Dashboard cards, each a small copy of its dashboard](../images/tools/card-previews.png)
 
@@ -146,7 +139,7 @@ Every tool but a notice can be copied from **Settings → Advanced → Duplicate
 
 A notice is posted once. The next one is a new notice.
 
-The things inside a tool copy on their own, too: a task, a counter, a queue item, an event, a wiki page. The copy lands in the same place as the original, with "(Copy)" on its name, and brings its tags, links and metadata. Each tool's own page says where its **Duplicate** lives.
+The things inside a tool copy on their own, too: a task, a counter, an event, a wiki page. The copy lands in the same place as the original, with "(Copy)" on its name, and brings its tags, links and metadata. Each tool's own page says where its **Duplicate** lives.
 
 ## Related
 

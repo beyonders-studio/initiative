@@ -212,7 +212,7 @@ All user-facing strings must be externalized for localization. **Never hardcode 
 
 Translation files live in `frontend/public/locales/en/<namespace>.json`. The app uses `i18next-http-backend` to lazy-load namespaces on first use.
 
-**Namespaces**: `common`, `auth`, `nav`, `projects`, `tasks`, `documents`, `initiatives`, `settings`, `tags`, `guilds`, `import`, `notifications`, `stats`, `landing`, `errors`, `dates`, `access`, `command`, `counters`, `dashboard`, `events`, `properties`, `queues`, `trash`
+**Namespaces**: `common`, `auth`, `nav`, `projects`, `tasks`, `documents`, `initiatives`, `settings`, `tags`, `guilds`, `import`, `notifications`, `stats`, `landing`, `errors`, `dates`, `access`, `command`, `counters`, `dashboard`, `events`, `properties`, `trash`
 
 **Rules:**
 

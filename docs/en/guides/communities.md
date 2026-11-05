@@ -45,7 +45,7 @@ A few things never make a card. Your own changes, because you were there. Reacti
 
 Below that are the community's initiatives, the ones you're in and the ones you could join, and then **Coming up**: everything with a date in the next seven days.
 
-To see every project, file or queue that has reached you, here and in your other communities, open [My Tools](your-space.md#my-tools).
+To see every project, file or dashboard that has reached you, here and in your other communities, open [My Tools](your-space.md#my-tools).
 
 !!! screenshot
     The community front page: the banner, the All circle with its tray of this week's activity, the initiatives and Coming up. Save as `docs/en/images/communities/community-front-page.png`.
@@ -267,7 +267,7 @@ Admins can set or clear a member's from the row menu under **Community settings 
 
 ## Reporting something
 
-Something here that shouldn't be? Comments, notices, pictures, wiki pages, queue items, events, profiles and directory listings all carry a small flag: **Report**. Say what's wrong, add a line if you like, and **Send report**. It isn't offered on your own things, because you can already edit or delete those. **Illegal** and **Other** need a line saying what's wrong.
+Something here that shouldn't be? Comments, notices, pictures, wiki pages, events, profiles and directory listings all carry a small flag: **Report**. Say what's wrong, add a line if you like, and **Send report**. It isn't offered on your own things, because you can already edit or delete those. **Illegal** and **Other** need a line saying what's wrong.
 
 | What you report | Who looks at it |
 |---|---|
