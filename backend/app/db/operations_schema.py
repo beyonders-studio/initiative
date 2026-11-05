@@ -44,6 +44,8 @@ case is theirs.
 from __future__ import annotations
 
 import logging
+from collections.abc import AsyncIterator
+from contextlib import asynccontextmanager
 from typing import Optional
 
 from sqlalchemy import text
@@ -396,32 +398,37 @@ async def _drop_case_files(conn: AsyncConnection, schema: str) -> list[str]:
     return sorted(keys - still)
 
 
-async def reconcile_operations() -> None:
-    """Make the operations tables and the filer role exist where the
-    operations community is, as the deployment names it now.
-
-    Run when the choice changes, and by boot after the guild back-fill:
-    re-asserts the operations community's, and takes them from every other
-    community, left behind by a move the process did not finish. With no
-    operations community, only the filer role goes: the tables stay for the
-    community that had them, until another is chosen.
-
-    One runs at a time across the deployment, and each reads the choice once
-    it has its turn: one that started before a later choice acts on the later
-    one.
-    """
-    from app.services.platform.intake import configured_operations_guild_id
-
+@asynccontextmanager
+async def choice_turn() -> AsyncIterator[None]:
+    """The deployment's one turn at the choice of operations community: who
+    changes it, and who makes the tables follow it, holds this throughout, so
+    neither acts on a choice another has since replaced."""
     async with db_session.provisioning_engine.connect() as turn:
         await advisory_lock(turn, LockNamespace.OPERATIONS_CHOICE, xact=False)
         await turn.commit()
         try:
-            await _reconcile(await configured_operations_guild_id())
+            yield
         finally:
             await advisory_unlock(turn, LockNamespace.OPERATIONS_CHOICE)
 
 
-async def _reconcile(operations_guild_id: Optional[int]) -> None:
+async def reconcile_operations() -> None:
+    """Make the operations tables and the filer role follow the choice as it
+    stands: boot's half, after the guild back-fill, which finishes a move the
+    process did not."""
+    from app.services.platform.intake import configured_operations_guild_id
+
+    async with choice_turn():
+        await follow_choice(await configured_operations_guild_id())
+
+
+async def follow_choice(operations_guild_id: Optional[int]) -> None:
+    """Make the operations tables and the filer role exist where
+    ``operations_guild_id`` is, holding :func:`choice_turn`: re-assert them
+    there, and take them from every other community. With no operations
+    community, only the filer role goes: the tables stay for the community
+    that had them, until another is chosen.
+    """
     from app.db.schema_provisioning import guild_schema_name
 
     keep = guild_schema_name(operations_guild_id) if operations_guild_id else None

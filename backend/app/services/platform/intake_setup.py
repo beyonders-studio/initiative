@@ -106,18 +106,21 @@ async def set_operations_guild(
                 detail=IntakeMessages.GUILD_NOT_ACTIVE,
             )
 
-    row = await _settings_row(session)
-    row.operations_guild_id = guild_id
-    session.add(row)
-    await session.commit()
-    # A plug-in limited to the operations community follows the choice too.
-    invalidate_registrations()
     # The operations tables and the filer role follow the choice: created in
-    # the community chosen, dropped from the one it replaces with its cases'
-    # files. Unsetting it keeps the tables, so pointing back restores them.
-    # Boot does the same, so a move this process did not finish is finished
-    # there.
-    await operations_schema.reconcile_operations()
+    # the community chosen before work is routed there, and dropped from the
+    # one it replaces with its cases' files. Unsetting it keeps the tables, so
+    # pointing back restores them. One choice at a time; boot finishes a move
+    # this process did not.
+    async with operations_schema.choice_turn():
+        if guild_id is not None:
+            await operations_schema.provision_operations(guild_id)
+        row = await _settings_row(session)
+        row.operations_guild_id = guild_id
+        session.add(row)
+        await session.commit()
+        # A plug-in limited to the operations community follows the choice too.
+        invalidate_registrations()
+        await operations_schema.follow_choice(guild_id)
     return guild_id
 
 
