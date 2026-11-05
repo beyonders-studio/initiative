@@ -24,8 +24,6 @@
     "project": "Projet",
     "task": "Tâche",
     "file": "Fichier",
-    "queue": "File",
-    "queue_item": "Élément de file",
     "counter_group": "Groupe de compteurs",
     "counter": "Compteur",
     "calendar": "Calendrier",

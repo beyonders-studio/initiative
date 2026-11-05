@@ -27,7 +27,6 @@ import { CalendarsView } from "./initiativeTools/events/CalendarsPage";
 import { FilesView } from "./initiativeTools/files/FilesPage";
 import { PostsView } from "./initiativeTools/posts/PostsPage";
 import { ProjectsView } from "./initiativeTools/projects/ProjectsPage";
-import { QueuesView } from "./initiativeTools/queues/QueuesPage";
 import { WikisView } from "./initiativeTools/wikis/WikisPage";
 
 type ToolViewProps = { fixedInitiativeId: number; canCreate: boolean };
@@ -39,7 +38,6 @@ type ToolViewProps = { fixedInitiativeId: number; canCreate: boolean };
 const TOOL_VIEWS: Record<Tool, ComponentType<ToolViewProps>> = {
   [Tool.project]: ProjectsView,
   [Tool.file]: FilesView,
-  [Tool.queue]: QueuesView,
   [Tool.counter_group]: CounterGroupsView,
   [Tool.calendar]: CalendarsView,
   [Tool.dashboard]: DashboardsView,
@@ -142,7 +140,7 @@ export const InitiativeDetailPage = ({ tool }: InitiativeDetailPageProps = {}) =
   }
 
   // Local Suspense fallback for tab content — keeps the placeholder below the
-  // tabs while a lazily-loaded i18n namespace (queues/events/counters)
+  // tabs while a lazily-loaded i18n namespace (events/counters)
   // resolves, instead of letting the suspension bubble up to a full-page
   // fallback.
   const tabFallback = (
@@ -247,7 +245,7 @@ export const InitiativeDetailPage = ({ tool }: InitiativeDetailPageProps = {}) =
             >
               {/* A real link, so a tab is shareable and answers the back
                     button. `search={{}}` clears the page cursor: all six tabs
-                    now share one search schema, so a ?page from the queue tab
+                    now share one search schema, so a ?page from the projects tab
                     would otherwise follow the reader into files. */}
               <Link to={gp(toolListRoute(tabTool, initiative.id))} search={{}}>
                 {t(`detail.${toolCamelPlural(tabTool)}` as never)}

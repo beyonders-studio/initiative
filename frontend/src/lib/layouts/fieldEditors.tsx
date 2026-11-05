@@ -88,8 +88,7 @@ const useFittedHeight = (text: string) => {
   return box;
 };
 
-/** An item's title, which is its detail's heading, saved as `field` (a queue
- *  item's is its `label`). It cannot be emptied: leaving it blank puts the
+/** An item's title, which is its detail's heading, saved as `field`. It cannot be emptied: leaving it blank puts the
  *  saved one back. A reader who cannot change it sees the heading alone. */
 /** How a title's text is set, which its marks are set the same way to line up
  *  with it. */
@@ -643,7 +642,7 @@ export const DescriptionField = <I, P>({
   suggest,
   maxLength,
 }: {
-  /** What the item calls it (a queue item's `notes`). A save names the text
+  /** What the item calls it. A save names the text
    *  it was written over as `<field>_base`, which the server refuses once
    *  that has changed. */
   field?: string;

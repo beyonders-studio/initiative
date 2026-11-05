@@ -398,11 +398,6 @@
       "this": "este archivo",
       "plural": "archivos"
     },
-    "queue": {
-      "name": "Cola",
-      "this": "esta cola",
-      "plural": "colas"
-    },
     "counter_group": {
       "name": "Grupo de contadores",
       "this": "este grupo de contadores",
@@ -432,11 +427,6 @@
       "name": "Tarea",
       "this": "esta tarea",
       "plural": "tareas"
-    },
-    "queue_item": {
-      "name": "Elemento de cola",
-      "this": "este elemento de cola",
-      "plural": "elementos de cola"
     },
     "calendar_event": {
       "name": "Evento",

@@ -97,19 +97,6 @@ export const TOOL_PALETTE: Record<Tool, ToolPaletteSource> = {
       });
     },
   },
-  [Tool.queue]: {
-    useHeading: () => useGroupHeading(Tool.queue),
-    useItems: (ctx) => {
-      const query = useToolPaletteList(TOOL_HOOKS[Tool.queue].listQuery, BROWSE_PAGE, ctx);
-      return (query.data?.items ?? []).map((queue) => ({
-        id: queue.id,
-        label: queue.name,
-        keywords: [queue.description ?? ""],
-        icon: null,
-        path: toolDetailRoute(Tool.queue, queue.initiative_id, queue.id),
-      }));
-    },
-  },
   [Tool.counter_group]: {
     useHeading: () => useGroupHeading(Tool.counter_group),
     useItems: (ctx) => {

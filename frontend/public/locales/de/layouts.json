@@ -217,22 +217,6 @@
   "search": "Suchen",
   "noMatches": "Nichts gefunden.",
   "sectionHelp": "Mit Titel lässt er sich auf- und zuklappen; ohne ist er eine Box.",
-  "queueItemDetail": {
-    "name": "Detailansicht des Warteschlangeneintrags",
-    "help": "Wie jeder Eintrag dieser Warteschlange beim Öffnen angezeigt wird. Was es weglässt, ist ausgeblendet.",
-    "shipped": "Das ist das Layout wie ausgeliefert. Eine Änderung macht es zum Layout der Warteschlange.",
-    "titleHelp": "Jeder Eintrag zeigt seine Bezeichnung.",
-    "hiddenHelp": "Jeder Eintrag kann dies zeigen. Entfernt ist es ausgeblendet, und Hinzufügen bringt es zurück.",
-    "parts": {
-      "actions": "Menü",
-      "relations": "Beziehungen"
-    },
-    "partHelp": {
-      "actions": "Was sonst mit dem Eintrag möglich ist: melden, duplizieren und entfernen.",
-      "relations": "Womit der Eintrag verknüpft ist."
-    },
-    "noItems": "Füge der Warteschlange einen Eintrag hinzu, um hier sein Layout zu sehen."
-  },
   "tab": "Layouts",
   "settingsDescription": "Wie es anordnet, was es enthält: jedes Layout, wann es zuletzt geändert wurde, und der Weg in den Editor. Alle, die es öffnen können, sehen sie; was jede Person filtert und sortiert, gehört ihr.",
   "counterDetail": {

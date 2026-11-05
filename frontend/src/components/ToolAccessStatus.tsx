@@ -16,7 +16,6 @@ type AccessKeys =
   | "files:detail."
   | "posts:"
   | "projects:detail."
-  | "queues:"
   | "tasks:edit."
   | "wikis:";
 

@@ -21,9 +21,8 @@ import type { ExportExtraAction, ExportFormatOption } from "@/components/exports
 import type { ExportContentSeed } from "@/components/exports/ExportWizard";
 
 /**
- * The slice of a tool's read schema its settings need. Every tool — queues,
- * counter groups, calendars, dashboards, projects, and files — satisfies
- * it as-is.
+ * The slice of a tool's read schema its settings need. Every tool — counter
+ * groups, calendars, dashboards, projects, and files — satisfies it as-is.
  */
 export interface ToolSettingsEntity {
   id: number;

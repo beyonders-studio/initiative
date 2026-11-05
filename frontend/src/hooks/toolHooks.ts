@@ -85,7 +85,6 @@ import {
   getListMyFilesQueryKey,
   getListMyPostsQueryKey,
   getListMyProjectsQueryKey,
-  getListMyQueuesQueryKey,
   getListMyWikisQueryKey,
   listMyCalendars,
   listMyCounterGroups,
@@ -93,7 +92,6 @@ import {
   listMyFiles,
   listMyPosts,
   listMyProjects,
-  listMyQueues,
   listMyWikis,
 } from "@/api/generated/my-tools/my-tools";
 import {
@@ -118,17 +116,6 @@ import {
   setProjectGrants,
   updateProject,
 } from "@/api/generated/projects/projects";
-import {
-  createQueue,
-  deleteQueue,
-  duplicateQueue,
-  getListQueuesQueryKey,
-  getReadQueueQueryKey,
-  listQueues,
-  readQueue,
-  setQueueGrants,
-  updateQueue,
-} from "@/api/generated/queues/queues";
 import {
   createWiki,
   deleteWiki,
@@ -559,21 +546,6 @@ const projectEndpoints = {
   tool: Tool.project,
 };
 
-const queueEndpoints = {
-  listKey: getListQueuesQueryKey,
-  list: listQueues,
-  myListKey: getListMyQueuesQueryKey,
-  myList: listMyQueues,
-  detailKey: getReadQueueQueryKey,
-  detail: readQueue,
-  create: createQueue,
-  update: updateQueue,
-  remove: deleteQueue,
-  setGrants: setQueueGrants,
-  duplicate: duplicateQueue,
-  tool: Tool.queue,
-};
-
 const wikiEndpoints = {
   listKey: getListWikisQueryKey,
   list: listWikis,
@@ -634,7 +606,6 @@ interface ToolQueries {
 export const TOOL_HOOKS = {
   [Tool.project]: makeToolHooks(projectEndpoints, { seedsDetailOnUpdate: true }),
   [Tool.file]: fileHooks,
-  [Tool.queue]: makeToolHooks(queueEndpoints),
   [Tool.counter_group]: makeToolHooks(counterGroupEndpoints),
   [Tool.calendar]: makeToolHooks(calendarEndpoints, { seedsDetailOnUpdate: true }),
   [Tool.dashboard]: makeToolHooks(dashboardEndpoints, { seedsDetailOnUpdate: true }),

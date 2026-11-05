@@ -122,7 +122,7 @@ export interface UserSearchOptions {
   /** Bounded page size (server caps at 100). */
   pageSize?: number;
   /** Only the people who can open this row: who may be named on what it
-   *  holds (assignees, attendees, person properties, queue items). */
+   *  holds (assignees, attendees, person properties). */
   canOpen?: { tool: Tool; id: number | null | undefined };
   /** Gate the request — pass the picker's `open` state so we don't fetch until
    *  the dropdown is shown. */
@@ -310,7 +310,7 @@ export const useInitiativeMemberSearch = (
  * - `initiative`: one initiative's members (mentions, linked members).
  * - `canOpen`: the people who can open one row, who are the ones that may be
  *   named on what it holds (task assignees, event attendees, person
- *   properties, queue items).
+ *   properties).
  */
 export type MemberSearchScope =
   | { type: "community"; communityIdOverride?: number }

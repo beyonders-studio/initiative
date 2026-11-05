@@ -96,14 +96,6 @@ export const TOOL_EXPORT_FORMATS: Partial<Record<Tool, ExportFormatOption[]>> = 
     { format: "csv", labelKey: "export.formatCsv" },
     { format: "xlsx", labelKey: "export.formatXlsx" },
   ],
-  [Tool.queue]: [
-    // Reports (Markdown renders a numbered turn order), then the envelope.
-    { format: "pdf", labelKey: "export.formatPdf" },
-    { format: "csv", labelKey: "export.formatCsv" },
-    { format: "xlsx", labelKey: "export.formatXlsx" },
-    { format: "md", labelKey: "export.formatMarkdown" },
-    { format: "json", labelKey: "export.formatJson" },
-  ],
   [Tool.counter_group]: [
     // Table reports, then the importable envelope.
     { format: "pdf", labelKey: "export.formatPdf" },
@@ -153,12 +145,6 @@ export const REPORT_TOOL_FORMATS: Partial<Record<Tool, ExportFormatOption[]>> = 
     { format: "pdf", labelKey: "export.formatPdf" },
     { format: "csv", labelKey: "export.formatCsv" },
     { format: "xlsx", labelKey: "export.formatXlsx" },
-  ],
-  [Tool.queue]: [
-    { format: "pdf", labelKey: "export.formatPdf" },
-    { format: "csv", labelKey: "export.formatCsv" },
-    { format: "xlsx", labelKey: "export.formatXlsx" },
-    { format: "md", labelKey: "export.formatMarkdown" },
   ],
   [Tool.counter_group]: [
     { format: "pdf", labelKey: "export.formatPdf" },

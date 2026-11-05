@@ -4,8 +4,7 @@
  * Every tool entity now lives inside its initiative — `/i/{initiative}/{tool}/{id}` —
  * so a link needs the whole chain, not just the id. Most callers already hold
  * the parent and should build the route directly with `lib/tools.ts`. A few
- * genuinely can't: a `@mention` is an id embedded in comment text, a queue
- * item's linked entity is a bare id, and a notification's target path was
+ * genuinely can't: a `@mention` is an id embedded in comment text, and a notification's target path was
  * written to the database before anyone knew where the entity would live.
  *
  * Those go through `/go/{refType}/{id}`, whose loader calls
@@ -32,12 +31,6 @@ import {
 import { SearchEntityType, Tool } from "@/api/generated/initiativeAPI.schemas";
 import { getReadPostQueryKey, readPost } from "@/api/generated/posts/posts";
 import { getReadProjectQueryKey, readProject } from "@/api/generated/projects/projects";
-import {
-  getReadQueueItemQueryKey,
-  getReadQueueQueryKey,
-  readQueue,
-  readQueueItem,
-} from "@/api/generated/queues/queues";
 import { getReadTaskQueryKey, readTask } from "@/api/generated/tasks/tasks";
 import {
   getReadWikiPageQueryKey,
@@ -80,10 +73,6 @@ const TOOL_READS: Record<
     key: getReadFileQueryKey,
     read: readFile,
   },
-  [Tool.queue]: {
-    key: getReadQueueQueryKey,
-    read: readQueue,
-  },
   [Tool.counter_group]: {
     key: getReadCounterGroupQueryKey,
     read: readCounterGroup,
@@ -123,8 +112,7 @@ type Resolve = (read: Read, communityId: number, id: number) => Promise<string>;
 /**
  * The kinds that live inside a tool and can be read by their own id, keyed by
  * the child-kind registry ({@link PARENT_TOOL}). A counter is read by id
- * (`/counters/{id}`), but nothing links to one yet. A queue item opens its
- * queue: a moderation case about one links to it.
+ * (`/counters/{id}`), but nothing links to one yet.
  */
 const CHILD_RESOLVERS: Partial<Record<keyof typeof PARENT_TOOL, Resolve>> = {
   task: async (read, communityId, id) => {
@@ -141,16 +129,6 @@ const CHILD_RESOLVERS: Partial<Record<keyof typeof PARENT_TOOL, Resolve>> = {
       readCalendarEvent(communityId, id)
     );
     return eventRoute(event.initiative_id, event.calendar_id, id);
-  },
-  queue_item: async (read, communityId, id) => {
-    const item = await read(getReadQueueItemQueryKey(communityId, id), () =>
-      readQueueItem(communityId, id)
-    );
-    return toolDetailRoute(
-      Tool.queue,
-      await toolInitiative(read, communityId, Tool.queue, item.queue_id),
-      item.queue_id
-    );
   },
   // In the initiative's Files rather than in one file, so it names its
   // initiative itself.
@@ -222,8 +200,7 @@ export const isSearchEntityType = (value: string): value is SearchEntityType =>
 
 /**
  * The ref type addressing an entity of a given kind — its kebab singular — or
- * `null` for a kind that has no address of its own (a counter, a queue item, a
- * tag).
+ * `null` for a kind that has no address of its own (a counter, a tag).
  */
 export const entityRefTypeFor = (type: SearchEntityType): string | null => {
   const kebab = type.replaceAll("_", "-");

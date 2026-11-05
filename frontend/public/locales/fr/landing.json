@@ -62,7 +62,6 @@
     "note": "Activez ceux dont votre groupe a besoin. En désactiver un plus tard ne supprime rien.",
     "projects": "Tableaux, listes et calendriers des mêmes tâches, avec des confettis si le cœur vous en dit.",
     "files": "Pages, tableurs et tableaux blancs que vous modifiez ensemble en direct.",
-    "queues": "Gardez la trace de qui a son tour, puisque apparemment ce n'est jamais personne.",
     "counterGroups": "Billets vendus, gâteaux promis, chaises toujours introuvables.",
     "calendars": "Des événements avec réponses et rappels, pour que ce ne soit pas vous qui relanciez tout le monde.",
     "dashboards": "Vos chiffres sur un seul écran, et chacun ne voit que ce à quoi il a accès.",
@@ -155,10 +154,6 @@
       "rsvpMaybe": "Peut-être",
       "rsvpNo": "Impossible",
       "reminder": "Rappel une heure avant"
-    },
-    "rota": {
-      "title": "Tour des snacks",
-      "detail": "Tour 6, c'est Luis cette semaine"
     },
     "points": {
       "planTitle": "Organiser ensemble",

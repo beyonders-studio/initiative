@@ -135,7 +135,7 @@ export const AppSidebar = () => {
   // Helper to create community-scoped paths
   const gp = (path: string) => (activeCommunityId ? communityPath(activeCommunityId, path) : path);
 
-  // The community tree (initiatives/projects/files/queues/counters/tags) is
+  // The community tree (initiatives/projects/files/counters/tags) is
   // only rendered on /c/ routes, and only there does the server-held community
   // context line up with it — on personal pages these community-scoped queries
   // would 409 (no context) and cache errors that linger as zeroed counts.

@@ -64,18 +64,10 @@ export {
   resetCounter as resetPropertyCounter,
 } from "./properties";
 export {
-  buildQueue,
-  buildQueueItem,
-  buildQueueListResponse,
-  buildQueueSummary,
-  resetCounter as resetQueueCounter,
-} from "./queue.factory";
-export {
   buildRecentCounterGroupItem,
   buildRecentFileItem,
   buildRecentItem,
   buildRecentProjectItem,
-  buildRecentQueueItem,
   resetRecentCounter,
 } from "./recent.factory";
 export {
@@ -129,7 +121,6 @@ import { resetCounter as resetNotificationCounter } from "./notification.factory
 import { resetCounter as resetPostCounter } from "./post.factory";
 import { resetCounter as resetProjectCounter } from "./project.factory";
 import { resetCounter as resetPropertyCounter } from "./properties";
-import { resetCounter as resetQueueCounter } from "./queue.factory";
 import { resetRecentCounter } from "./recent.factory";
 import { resetCounter as resetSearchCounter } from "./search.factory";
 import { resetCounter as resetShareRequestCounter } from "./shareRequest.factory";
@@ -155,7 +146,6 @@ export function resetFactories(): void {
   resetDataJobCounter();
   resetCommentCounter();
   resetNotificationCounter();
-  resetQueueCounter();
   resetPropertyCounter();
   resetRecentCounter();
   resetMarketplaceCounter();

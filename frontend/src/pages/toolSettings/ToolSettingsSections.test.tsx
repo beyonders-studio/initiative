@@ -70,7 +70,7 @@ const noopMutation = () => ({ mutate: vi.fn(), isPending: false });
 const renderSection = (
   Section: React.ComponentType,
   entity: ToolSettingsEntity,
-  tool: Tool = Tool.queue,
+  tool: Tool = Tool.counter_group,
   template?: ToolMutation<{ is_template: boolean }>
 ) =>
   renderPage(() => (
@@ -328,7 +328,7 @@ describe("ToolSettingsAdvancedPage", () => {
     resetFactories();
     let sent: { format: string | null; ids: string | null } | null = null;
     server.use(
-      communityHttp.get("/exports/queue", ({ request }) => {
+      communityHttp.get("/exports/counter_group", ({ request }) => {
         const url = new URL(request.url);
         sent = {
           format: url.searchParams.get("format"),

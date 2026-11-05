@@ -87,7 +87,6 @@ const RESOURCE_SPECS: Record<string, (id: number, recount: boolean) => Spec[]> =
   comments: () => [q.recentComments()],
   calendar_events: (id) => [q.calendarEvent(id), q.allCalendarEvents()],
   // Their own reads, which an opened item shows; the tool is named as parent.
-  queue_items: (id) => [q.queueItem(id)],
   counters: (id) => [q.counter(id)],
   // The wiki it is in is named as its parent, which refreshes the tree.
   wiki_pages: (id) => [q.wikiPage(id)],
@@ -118,7 +117,7 @@ const RESOURCE_SPECS: Record<string, (id: number, recount: boolean) => Spec[]> =
  *
  * The resource a change sits directly in (`direct`) also has its lists read
  * again, because a list row carries what is inside it: a comment count, a
- * queue's items, a board's reactions and polls. Nothing further out does, and
+ * board's reactions and polls. Nothing further out does, and
  * nothing here touches a count — a task is not a project, and a comment is
  * not a tool. An initiative is absent on purpose: a change in one of its tools
  * leaves its own read, its roster and its roles as they were.

@@ -34,7 +34,6 @@ import type posts from "../../public/locales/en/posts.json";
 import type profiles from "../../public/locales/en/profiles.json";
 import type projects from "../../public/locales/en/projects.json";
 import type properties from "../../public/locales/en/properties.json";
-import type queues from "../../public/locales/en/queues.json";
 import type relations from "../../public/locales/en/relations.json";
 import type search from "../../public/locales/en/search.json";
 import type settings from "../../public/locales/en/settings.json";
@@ -87,7 +86,6 @@ declare module "i18next" {
       properties: typeof properties;
       posts: typeof posts;
       wikis: typeof wikis;
-      queues: typeof queues;
       relations: typeof relations;
       search: typeof search;
       settings: typeof settings;

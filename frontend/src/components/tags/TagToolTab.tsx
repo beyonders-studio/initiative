@@ -332,7 +332,7 @@ const TagTasksTable = ({ tagId }: { tagId: number }) => {
 };
 
 /** The things of one kind inside a tool carrying the tag — a wiki's pages, a
- *  queue's items — by name, each beside the tool it lives in. */
+ *  calendar's events — by name, each beside the tool it lives in. */
 const TagEntityTable = ({
   kind,
   tagId,

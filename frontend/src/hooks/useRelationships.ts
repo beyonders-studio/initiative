@@ -5,8 +5,8 @@
  * of things rather than about either: the same hook serves a project's
  * attachments, a task's dependencies and a file's backlinks.
  *
- * The per-tool attach hooks in `useProjects` / `useQueues` stay, because they
- * keep a shape their own callers already expect. What is different here is that
+ * The per-tool attach hooks in `useProjects` stay, because they keep a shape
+ * their own callers already expect. What is different here is that
  * a write says which tool sits at *each* end and refreshes both.
  */
 
@@ -77,7 +77,7 @@ const toolRefOf = (end: RelatedEnd): ToolRef | null =>
  *
  * Both ends, because a link is a fact about a pair and several tools still
  * serialise their own side of one — a project lists its files, a file
- * lists its projects, a queue item its files and tasks. Those shapes read
+ * lists its projects. Those shapes read
  * differently the moment an edge moves, whichever end was clicked.
  */
 const invalidateEdge = (...ends: (ToolRef | null | undefined)[]) =>

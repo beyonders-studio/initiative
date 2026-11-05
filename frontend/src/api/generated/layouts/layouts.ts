@@ -278,9 +278,9 @@ export const usePutLayout = <TError = ErrorType<HTTPValidationError>, TContext =
 };
 /**
  * The layouts of every instance in the initiative the reader can open,
- * of each tool whose instances lay out their own items (a project's, a
- * queue's), by tool and name, for the initiative's settings. A layout is
- * changed on its own target.
+ * of each tool whose instances lay out their own items (a project's), by
+ * tool and name, for the initiative's settings. A layout is changed on its
+ * own target.
  * @summary Get Initiative Layouts
  */
 export const getInitiativeLayouts = (

@@ -398,11 +398,6 @@
       "this": "diese Datei",
       "plural": "Dateien"
     },
-    "queue": {
-      "name": "Warteschlange",
-      "this": "diese Warteschlange",
-      "plural": "Warteschlangen"
-    },
     "counter_group": {
       "name": "Zählergruppe",
       "this": "diese Zählergruppe",
@@ -432,11 +427,6 @@
       "name": "Aufgabe",
       "this": "diese Aufgabe",
       "plural": "Aufgaben"
-    },
-    "queue_item": {
-      "name": "Warteschlangenelement",
-      "this": "dieses Warteschlangenelement",
-      "plural": "Warteschlangenelemente"
     },
     "calendar_event": {
       "name": "Termin",

@@ -1,5 +1,5 @@
 /**
- * A thing named inside a document — `#task`, `[[Queue]]`, and anything else
+ * A thing named inside a document — `#task`, `[[Project]]`, and anything else
  * that points at work.
  *
  * A `DecoratorNode`, because the name it shows is read rather than stored: it

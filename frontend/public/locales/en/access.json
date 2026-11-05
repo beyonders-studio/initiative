@@ -102,8 +102,6 @@
     "resource_project_other": "projects",
     "resource_file_one": "file",
     "resource_file_other": "files",
-    "resource_queue_one": "queue",
-    "resource_queue_other": "queues",
     "resource_counter_group_one": "counter group",
     "resource_counter_group_other": "counter groups",
     "resource_calendar_one": "calendar",

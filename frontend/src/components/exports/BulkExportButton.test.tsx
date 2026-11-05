@@ -22,7 +22,7 @@ describe("BulkExportButton", () => {
   it("exports a selection its viewer owns every item of", () => {
     renderWithProviders(
       <BulkExportButton
-        tool={Tool.queue}
+        tool={Tool.counter_group}
         items={[
           { id: 1, can: ownerCan() },
           { id: 2, can: ownerCan() },
@@ -36,7 +36,7 @@ describe("BulkExportButton", () => {
   it("says why when one of the selection is only theirs to edit", () => {
     renderWithProviders(
       <BulkExportButton
-        tool={Tool.queue}
+        tool={Tool.counter_group}
         items={[
           { id: 1, can: ownerCan() },
           { id: 2, can: writerCan() },

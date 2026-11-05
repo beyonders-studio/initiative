@@ -102,8 +102,6 @@
     "resource_project_other": "projets",
     "resource_file_one": "fichier",
     "resource_file_other": "fichiers",
-    "resource_queue_one": "file",
-    "resource_queue_other": "files",
     "resource_counter_group_one": "groupe de compteurs",
     "resource_counter_group_other": "groupes de compteurs",
     "resource_calendar_one": "calendrier",

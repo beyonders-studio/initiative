@@ -11,7 +11,7 @@ export interface GridToggleOptions {
 const NO_ITEMS: readonly never[] = [];
 
 /**
- * Multi-select state for a card/grid list (projects, queues, counter groups, …).
+ * Multi-select state for a card/grid list (projects, counter groups, …).
  * Selection is a mode you enter explicitly — cards become checkboxes and their
  * links stop navigating while it's active.
  *

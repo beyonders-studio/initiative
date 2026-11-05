@@ -18,7 +18,6 @@ import {
   MessageSquare,
   SquareCheckBig,
   Tag,
-  Ticket,
 } from "lucide-react";
 
 import type { SearchHit } from "@/api/generated/initiativeAPI.schemas";
@@ -55,12 +54,7 @@ interface ToolChild {
   standalone?: true;
 }
 
-/**
- * The entities addressed inside a tool rather than as one.
- *
- * A queue item has no page of its own — a queue is read as a whole — so it
- * lands on its queue.
- */
+/** The entities addressed inside a tool rather than as one. */
 const TOOL_CHILDREN: Partial<Record<SearchEntityType, ToolChild>> = {
   [SearchEntityType.task]: { icon: SquareCheckBig, path: taskRoute },
   [SearchEntityType.calendar_event]: {
@@ -68,10 +62,6 @@ const TOOL_CHILDREN: Partial<Record<SearchEntityType, ToolChild>> = {
     path: eventRoute,
   },
   [SearchEntityType.counter]: { icon: Hash, path: counterRoute },
-  [SearchEntityType.queue_item]: {
-    icon: Ticket,
-    path: (initiativeId, queueId) => toolDetailRoute(Tool.queue, initiativeId, queueId),
-  },
   [SearchEntityType.collection]: {
     icon: COLLECTION_ICON,
     path: (initiativeId, _parentId, collectionId) => collectionRoute(initiativeId, collectionId),

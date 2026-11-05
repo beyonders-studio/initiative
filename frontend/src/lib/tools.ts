@@ -34,7 +34,6 @@ import {
   BookText,
   CalendarDays,
   Files,
-  GalleryHorizontalEnd,
   Gauge,
   LayoutDashboard,
   ListTodo,
@@ -52,7 +51,6 @@ import { ListingKind, Tool } from "@/api/generated/initiativeAPI.schemas";
 export const TOOL_ICONS: Record<Tool, LucideIcon> = {
   [Tool.project]: ListTodo,
   [Tool.file]: Files,
-  [Tool.queue]: GalleryHorizontalEnd,
   [Tool.counter_group]: Gauge,
   [Tool.calendar]: CalendarDays,
   [Tool.dashboard]: LayoutDashboard,
@@ -171,7 +169,6 @@ export const SIDEBAR_TOOLS: Tool[] = [
   Tool.dashboard,
   Tool.file,
   Tool.post,
-  Tool.queue,
   Tool.counter_group,
   Tool.wiki,
   Tool.project,
@@ -372,8 +369,8 @@ export const wikiFileRoute = (
  * with the canonical address.
  *
  * Use ONLY where the caller genuinely holds nothing but an id — a @mention, a
- * queue item's linked entity, a stored notification target. Anywhere the parent
- * is already loaded, build the real route: the resolver costs a round trip.
+ * stored notification target. Anywhere the parent is already loaded, build the
+ * real route: the resolver costs a round trip.
  */
 export const entityRefRoute = (refType: string, id: number): string => `/go/${refType}/${id}`;
 
@@ -481,7 +478,6 @@ export const PARENT_TOOL = {
   calendar_event: Tool.calendar,
   counter: Tool.counter_group,
   collection: Tool.file,
-  queue_item: Tool.queue,
   wiki_page: Tool.wiki,
 } as const satisfies Record<string, Tool>;
 

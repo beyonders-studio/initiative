@@ -31,7 +31,6 @@ import { useCalendarEntries } from "@/hooks/useCalendarEntries";
 import { useCalendarEvent } from "@/hooks/useCalendarEvents";
 import { useCounterGroup } from "@/hooks/useCounters";
 import { usePost, usePostsFeed } from "@/hooks/usePosts";
-import { useQueue } from "@/hooks/useQueues";
 import { useTask, useTasks } from "@/hooks/useTasks";
 import { type CalendarFilters, EMPTY_CALENDAR_FILTERS } from "@/lib/filters/calendarFilters";
 import { buildTaskListParams, EMPTY_TASK_FILTERS } from "@/lib/filters/taskFilters";
@@ -44,7 +43,6 @@ import { FILE_DETAIL } from "@/lib/layouts/fileLayout";
 import { collectionFileFields } from "@/lib/layouts/files";
 import { POST_DETAIL } from "@/lib/layouts/postLayout";
 import { CALENDAR_PRESETS, TASK_PRESETS } from "@/lib/layouts/presets";
-import { QUEUE_ITEM_DETAIL } from "@/lib/layouts/queueItemLayout";
 import { TASK_DETAIL } from "@/lib/layouts/taskLayout";
 import { taskLayoutFor } from "@/lib/layouts/tasks";
 import type { LayoutNode } from "@/lib/layouts/tree";
@@ -247,36 +245,6 @@ const EventPreview = ({ initiativeId, tree }: { initiativeId: number; tree: Layo
   );
 };
 
-/** The queue's item detail drawn with its first item. */
-const QueueItemPreview = ({
-  queueId,
-  initiativeId,
-  tree,
-}: {
-  queueId: number;
-  initiativeId: number;
-  tree: LayoutNode;
-}) => {
-  const queue = useQueue(queueId);
-  return (
-    <ItemPreview
-      detail={QUEUE_ITEM_DETAIL}
-      tree={tree}
-      item={queue.data?.items[0]}
-      none={queue.isSuccess}
-      empty="queueItemDetail.noItems"
-      context={() => ({
-        readOnly: false,
-        queueId,
-        initiativeId,
-        leaving: LEFT,
-        actions: <ActionsPreview />,
-        preview: true,
-      })}
-    />
-  );
-};
-
 /** The group's counter detail drawn with its first counter. */
 const CounterPreview = ({
   groupId,
@@ -356,14 +324,6 @@ export const eventDetail = (initiativeId: number): EditableDetail => ({
   preview: (tree) => <EventPreview initiativeId={initiativeId} tree={tree} />,
 });
 
-/** A queue's item detail. */
-export const queueItemDetail = (queueId: number, initiativeId: number): EditableDetail => ({
-  spec: QUEUE_ITEM_DETAIL.spec,
-  words: wordsOf("queueItemDetail"),
-  fields: QUEUE_ITEM_DETAIL.fields,
-  preview: (tree) => <QueueItemPreview queueId={queueId} initiativeId={initiativeId} tree={tree} />,
-});
-
 /** A counter group's counter detail. */
 export const counterDetail = (groupId: number, initiativeId: number): EditableDetail => ({
   spec: COUNTER_DETAIL.spec,
@@ -438,7 +398,6 @@ export const postDetail = (initiativeId: number): EditableDetail => ({
 export const ITEM_DETAILS: Partial<
   Record<Tool, (id: number, initiativeId: number) => EditableDetail>
 > = {
-  [Tool.queue]: queueItemDetail,
   [Tool.counter_group]: counterDetail,
 };
 

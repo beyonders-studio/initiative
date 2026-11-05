@@ -37,7 +37,6 @@ const invalidateTagBearers = () => {
     q.allTasks(),
     q.allProjects(),
     q.allFiles(),
-    q.allQueues(),
     q.allCounterGroups(),
     q.allCalendars()
   );

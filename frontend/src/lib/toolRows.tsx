@@ -20,7 +20,6 @@ import type {
   FileListResponse,
   PostListResponse,
   ProjectListResponse,
-  QueueListResponse,
   TagSummary,
   WikiListResponse,
 } from "@/api/generated/initiativeAPI.schemas";
@@ -57,7 +56,6 @@ export interface ToolRow {
 export const TOOL_HAS_DETAIL: Record<Tool, boolean> = {
   [Tool.project]: true,
   [Tool.file]: true,
-  [Tool.queue]: false,
   [Tool.counter_group]: false,
   [Tool.calendar]: true,
   [Tool.dashboard]: true,
@@ -79,7 +77,6 @@ export const TOOL_HAS_DETAIL: Record<Tool, boolean> = {
 export type ToolResponses = {
   [Tool.project]: ProjectListResponse | undefined;
   [Tool.file]: FileListResponse | undefined;
-  [Tool.queue]: QueueListResponse | undefined;
   [Tool.counter_group]: CounterGroupListResponse | undefined;
   [Tool.calendar]: CalendarListResponse | undefined;
   [Tool.dashboard]: DashboardListResponse | undefined;
@@ -162,17 +159,6 @@ export function buildToolRows(
         tags: file.tags,
         updatedAt: file.updated_at,
         detail: <Badge variant="secondary">{t(`detail.fileKind.${file.kind}`)}</Badge>,
-      }));
-    case Tool.queue:
-      return (data[Tool.queue]?.items ?? []).map((queue) => ({
-        id: queue.id,
-        communityId: queue.community_id ?? fallbackCommunityId,
-        name: queue.name,
-        href: href(queue.id, queue.initiative_id),
-        glyph: null,
-        initiativeId: queue.initiative_id,
-        tags: queue.tags,
-        updatedAt: queue.updated_at,
       }));
     case Tool.counter_group:
       return (data[Tool.counter_group]?.items ?? []).map((group) => ({

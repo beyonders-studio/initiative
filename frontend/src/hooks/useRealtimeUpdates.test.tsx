@@ -287,24 +287,24 @@ describe("realtime resource frames", () => {
   });
 
   it("moves the counts only when a row arrives, leaves or changes where it counts", () => {
-    const list = seed([`/api/v1/c/${COMMUNITY}/queues/`, { page: 1 }]);
+    const list = seed([`/api/v1/c/${COMMUNITY}/counter-groups/`, { page: 1 }]);
     const counts = seed([`/api/v1/c/${COMMUNITY}/tools/counts/by-initiative`]);
-    const queue = (action: string, changed: string[]) => ({
-      resource: { type: "queues", id: ENTITY_ID },
+    const group = (action: string, changed: string[]) => ({
+      resource: { type: "counter_groups", id: ENTITY_ID },
       parents: [],
       action,
       changed,
     });
 
-    applyChanges([queue("updated", ["current_round", "name"])], COMMUNITY);
+    applyChanges([group("updated", ["name"])], COMMUNITY);
     expect(list(), "list after a rename").toBe(true);
     expect(counts(), "counts after a rename").toBe(false);
 
     for (const change of [
-      queue("updated", ["archived_at"]),
-      queue("updated", ["sharing"]),
-      queue("created", []),
-      queue("deleted", []),
+      group("updated", ["archived_at"]),
+      group("updated", ["sharing"]),
+      group("created", []),
+      group("deleted", []),
     ]) {
       seed([`/api/v1/c/${COMMUNITY}/tools/counts/by-initiative`]);
       applyChanges([change], COMMUNITY);
@@ -474,7 +474,7 @@ describe("realtime resource frames", () => {
     applyChanges(
       [
         {
-          resource: { type: "queue_items", id: 3 },
+          resource: { type: "mystery_items", id: 3 },
           parents: [{ type: "projects", id: 7 }],
           action: "updated",
         },

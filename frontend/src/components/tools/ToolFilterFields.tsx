@@ -19,7 +19,6 @@ import type {
   ListFilesParams,
   ListPostsParams,
   ListProjectsParams,
-  ListQueuesParams,
   ListWikisParams,
 } from "@/api/generated/initiativeAPI.schemas";
 import { FileKind, Tool } from "@/api/generated/initiativeAPI.schemas";
@@ -41,7 +40,6 @@ import type { TranslateFn } from "@/types/i18n";
 type ToolListParams = {
   [Tool.project]: ListProjectsParams;
   [Tool.file]: ListFilesParams;
-  [Tool.queue]: ListQueuesParams;
   [Tool.counter_group]: ListCounterGroupsParams;
   [Tool.calendar]: ListCalendarsParams;
   [Tool.dashboard]: ListDashboardsParams;
@@ -155,62 +153,6 @@ const SearchTagFields = ({
   );
 };
 
-/** A queue list's status choices, each with the `is_active` it sends. */
-const QUEUE_STATUSES = [
-  { value: "all", isActive: undefined, label: "filters.allStatuses" },
-  { value: "active", isActive: true, label: "filters.activeOnly" },
-  { value: "inactive", isActive: false, label: "filters.inactiveOnly" },
-] as const;
-
-/** A queue list is also narrowed to running or stopped queues. */
-const QueueFilterFields = ({
-  value,
-  onChange,
-  initiativeId,
-  children,
-}: ToolFilterFieldsProps<typeof Tool.queue>) => {
-  const { t } = useTranslation("queues");
-  const id = useId();
-  const status = QUEUE_STATUSES.find((s) => s.isActive === (value.is_active ?? undefined));
-
-  return (
-    <SearchTagFields
-      tool={Tool.queue}
-      placeholder="filters.searchQueues"
-      value={value}
-      onChange={onChange}
-      initiativeId={initiativeId}
-    >
-      <div className="w-full space-y-2 sm:w-48">
-        <Label htmlFor={`${id}-status`} className="block font-medium text-muted-foreground text-xs">
-          {t("filters.status")}
-        </Label>
-        <Select
-          value={status?.value}
-          onValueChange={(next) =>
-            onChange({
-              ...value,
-              is_active: QUEUE_STATUSES.find((s) => s.value === next)?.isActive,
-            })
-          }
-        >
-          <SelectTrigger id={`${id}-status`}>
-            <SelectValue />
-          </SelectTrigger>
-          <SelectContent>
-            {QUEUE_STATUSES.map((s) => (
-              <SelectItem key={s.value} value={s.value}>
-                {t(s.label)}
-              </SelectItem>
-            ))}
-          </SelectContent>
-        </Select>
-      </div>
-      {children}
-    </SearchTagFields>
-  );
-};
-
 /** "All" is a sentinel: the underlying filter is absent, not a value. */
 const ALL_FILE_KINDS = "all";
 
@@ -275,7 +217,6 @@ const searchAndTags = (tool: Tool, placeholder: string) => (props: ToolFilterFie
 const TOOL_FILTER_FIELDS: { [T in Tool]: ComponentType<ToolFilterFieldsProps<T>> } = {
   [Tool.project]: searchAndTags(Tool.project, "filters.searchProjects"),
   [Tool.file]: FileFilterFields,
-  [Tool.queue]: QueueFilterFields,
   [Tool.counter_group]: searchAndTags(Tool.counter_group, "filters.searchGroups"),
   [Tool.calendar]: searchAndTags(Tool.calendar, "filters.searchCalendars"),
   [Tool.dashboard]: searchAndTags(Tool.dashboard, "filters.searchDashboards"),

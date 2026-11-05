@@ -7,11 +7,10 @@ import { resolveEntityPath } from "@/lib/entityResolver";
  * Resolve a bare entity reference to the URL that addresses it.
  *
  * A tool entity's address names its initiative, and a few callers hold only an
- * id — a `@mention` in comment text, a queue item's linked entity, a stored
- * notification target, a reported comment. They link here; the loader reads the
- * entity, works out where it lives, and redirects before anything renders,
- * keeping the query (an event's `occurrence`) and, for a comment, landing on
- * the comment itself.
+ * id — a `@mention` in comment text, a stored notification target, a reported
+ * comment. They link here; the loader reads the entity, works out where it
+ * lives, and redirects before anything renders, keeping the query (an event's
+ * `occurrence`) and, for a comment, landing on the comment itself.
  */
 export const Route = createFileRoute(
   "/_serverRequired/_authenticated/c/$communityId/go/$refType/$refId"

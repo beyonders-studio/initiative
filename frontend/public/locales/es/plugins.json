@@ -266,10 +266,6 @@
         "read": "Leer archivos",
         "write": "Leer y cambiar archivos"
       },
-      "queues": {
-        "read": "Leer colas",
-        "write": "Leer y cambiar colas"
-      },
       "counter_groups": {
         "read": "Leer contadores",
         "write": "Leer y cambiar contadores"

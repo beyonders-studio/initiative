@@ -398,11 +398,6 @@
       "this": "this file",
       "plural": "files"
     },
-    "queue": {
-      "name": "Queue",
-      "this": "this queue",
-      "plural": "queues"
-    },
     "counter_group": {
       "name": "Counter group",
       "this": "this counter group",
@@ -432,11 +427,6 @@
       "name": "Task",
       "this": "this task",
       "plural": "tasks"
-    },
-    "queue_item": {
-      "name": "Queue item",
-      "this": "this queue item",
-      "plural": "queue items"
     },
     "calendar_event": {
       "name": "Event",
