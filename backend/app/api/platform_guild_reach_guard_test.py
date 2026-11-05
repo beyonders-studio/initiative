@@ -121,6 +121,14 @@ _WRAPPERS: dict[tuple[str, str], str] = {
     (f"{_ENDPOINTS}/settings.py", "_routed_to_community"): (
         "routes the operator's community sheet into a community that is still there"
     ),
+    (f"{_SERVICES}/billing.py", "_apply_custom_roles"): (
+        "writes the deployment's custom roles in one community's own schema, "
+        "for the billing sync that names it"
+    ),
+    (f"{_SERVICES}/billing.py", "apply_community_sync"): (
+        "brings one community to billing's state, its custom roles written in "
+        "its own schema"
+    ),
 }
 
 #: Every call site that routes into a community, and why it may.
@@ -168,6 +176,10 @@ _ALLOWED: dict[tuple[str, str], str] = {
     (f"{_SERVICES}/guild_purge.py", "destroy_now"): (
         "destroys a community without a retention window, letting go of its "
         "plug-in connections in its own schema"
+    ),
+    (f"{_ENDPOINTS}/billing.py", "sync_communities"): (
+        "billing's signed community sync: the deployment's custom roles, in "
+        "each community it names"
     ),
     # --- Aggregates ----------------------------------------------------------
     (f"{_ENDPOINTS}/settings.py", "list_community_plugin_summaries"): (
@@ -221,6 +233,14 @@ _ALLOWED: dict[tuple[str, str], str] = {
     (f"{_SERVICES}/grant_cases.py", "cases_required"): (
         "grant cases: reads whether the operations community takes cases a "
         "grant may serve"
+    ),
+    (f"{_SERVICES}/grant_cases.py", "link"): (
+        "grant cases: writes down, in the operations community, which grants "
+        "serve a case"
+    ),
+    (f"{_SERVICES}/grant_cases.py", "cases_of"): (
+        "grant cases: reads the case each grant serves from the operations "
+        "community's links"
     ),
     (f"{_SERVICES}/intake.py", "open_case_counts"): (
         "intake: counts the open cases about an account, for the staff roster, "

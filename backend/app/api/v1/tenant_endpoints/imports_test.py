@@ -604,12 +604,12 @@ async def test_envelope_import_authorization_gates(client, acting_user, session)
     assert denied.status_code == 403
     assert denied.json()["detail"] == "IMPORT_PERMISSION_REQUIRED"
 
-    # A guild member outside the initiative: the structural initiative row is
-    # guild-visible (only content is initiative-hidden), so this is a clean
-    # permission refusal, not a 404.
+    # A guild member outside the initiative: a private initiative's row reads
+    # as absent to them, so there is nothing to import into.
     outsider = await acting_user(guild_role=CommunityRole.member, guild=a.guild)
     hidden = await _import_envelope(client, outsider, doc_envelope, a.initiative.id)
-    assert hidden.status_code == 403
+    assert hidden.status_code == 404
+    assert hidden.json()["detail"] == "IMPORT_INVALID_PARAMS"
 
 
 async def test_large_envelope_becomes_job_and_worker_applies_it(

@@ -744,8 +744,8 @@ async def test_an_export_is_served_while_its_initiatives_are_reached(
     client: AsyncClient, acting_user, session, monkeypatch
 ):
     """The job records the initiatives its artifact holds, and the download
-    asks for each one that still exists: a member removed from one is refused,
-    and one deleted since the render, purged or in the trash, is skipped."""
+    asks for each one: one in the trash, one purged since the render and one
+    the member was removed from are not reached, and the file is refused."""
     monkeypatch.setattr(export_limits, "EXPORT_INLINE_MAX_ROWS", 0)
     a = await _actor_with_tasks(acting_user, session)
     guild_id, initiative_id, user_id = a.guild.id, a.initiative.id, a.user.id
@@ -755,10 +755,26 @@ async def test_an_export_is_served_while_its_initiatives_are_reached(
     await route_session_to_guild(session, guild_id)
     job = await session.get(DataJob, job_id)
     assert job.initiative_ids == [initiative_id]
+    await _download(client, a, job_id)
+
+    initiative = await session.get(Initiative, initiative_id)
+    initiative.deleted_at = datetime.now(timezone.utc)
+    session.add(initiative)
+    await session.commit()
+    dl = await client.get(a.g(f"/exports/jobs/{job_id}/download"), headers=a.headers)
+    assert dl.json()["detail"] == "EXPORT_OUT_OF_REACH"
+    initiative.deleted_at = None
+    session.add(initiative)
+    await session.commit()
+
     job.initiative_ids = [initiative_id, initiative_id + 1000]
     session.add(job)
     await session.commit()
-    await _download(client, a, job_id)
+    dl = await client.get(a.g(f"/exports/jobs/{job_id}/download"), headers=a.headers)
+    assert dl.json()["detail"] == "EXPORT_OUT_OF_REACH"
+    job.initiative_ids = [initiative_id]
+    session.add(job)
+    await session.commit()
 
     # Once one of its initiatives keeps its content in, the file is not
     # served, and a new list export holding it is refused.
@@ -785,12 +801,6 @@ async def test_an_export_is_served_while_its_initiatives_are_reached(
     dl = await client.get(a.g(f"/exports/jobs/{job_id}/download"), headers=a.headers)
     assert dl.status_code == 403
     assert dl.json()["detail"] == "EXPORT_OUT_OF_REACH"
-
-    initiative = await session.get(Initiative, initiative_id)
-    initiative.deleted_at = datetime.now(timezone.utc)
-    session.add(initiative)
-    await session.commit()
-    await _download(client, a, job_id)
 
 
 async def test_worker_renders_job_and_download_succeeds(

@@ -51,7 +51,7 @@ async def test_initiative_removal_ends_file_access(client: AsyncClient, acting_u
         admin.g(f"/initiatives/{initiative.id}/members/{member.user.id}"),
         headers=admin_headers,
     )
-    assert response.status_code == 200
+    assert response.status_code == 204
 
     # Access is gone: once out of the initiative, the initiative RLS hides the
     # file entirely — open is 404 (not 403), and the list no longer
