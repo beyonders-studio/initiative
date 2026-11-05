@@ -7,8 +7,8 @@ import { useTranslation } from "react-i18next";
 import type { UserSummary } from "@/api/generated/initiativeAPI.schemas";
 import { CommunityRole } from "@/api/generated/initiativeAPI.schemas";
 import { MemberDisplayNameDialog } from "@/components/communities/MemberDisplayNameDialog";
-import { ContactActionButtons } from "@/components/contacts/ContactActionButtons";
-import { ContactActionsMenu } from "@/components/contacts/ContactActionsMenu";
+import { ConnectionActionButtons } from "@/components/connections/ConnectionActionButtons";
+import { ConnectionActionsMenu } from "@/components/connections/ConnectionActionsMenu";
 import { StatusMessage } from "@/components/StatusMessage";
 import { UserHandle } from "@/components/UserHandle";
 import { Badge } from "@/components/ui/badge";
@@ -37,7 +37,7 @@ import { getUrlHandle } from "@/lib/userDisplay";
  *
  * The badge on the community's banner counts people; this is where that count
  * leads. It reads the community's own roster — the same one every member picker
- * reads — rather than the contacts aggregate, which answers a different
+ * reads — rather than the people aggregate, which answers a different
  * question: who this reader may *message*. A page that dropped everybody who
  * takes no messages would be a members page missing members.
  *
@@ -186,12 +186,15 @@ export const CommunityMembersPage = () => {
           };
           return (
             <div className="flex items-center justify-end gap-1">
-              <ContactActionButtons user={person} permission={answers[String(person.id)] ?? null} />
+              <ConnectionActionButtons
+                user={person}
+                permission={answers[String(person.id)] ?? null}
+              />
               {/* Everything else a person can be to you — ignoring above all,
                   which a roster is the likeliest place to want. Same menu as
-                  their profile and their contacts row, so it holds no surprise
+                  their profile and their person row, so it holds no surprise
                   and nothing has to be kept in step. */}
-              <ContactActionsMenu
+              <ConnectionActionsMenu
                 user={person}
                 omit={["profile", "message", "connect", "ask"]}
                 permission={answers[String(person.id)] ?? null}

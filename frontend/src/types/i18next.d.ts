@@ -9,7 +9,7 @@ import type comments from "../../public/locales/en/comments.json";
 import type common from "../../public/locales/en/common.json";
 import type communities from "../../public/locales/en/communities.json";
 import type communityHome from "../../public/locales/en/communityHome.json";
-import type contacts from "../../public/locales/en/contacts.json";
+import type connections from "../../public/locales/en/connections.json";
 import type counterGroups from "../../public/locales/en/counterGroups.json";
 import type dashboards from "../../public/locales/en/dashboards.json";
 import type dates from "../../public/locales/en/dates.json";
@@ -66,7 +66,7 @@ declare module "i18next" {
       messages: typeof messages;
       myTools: typeof myTools;
       home: typeof home;
-      contacts: typeof contacts;
+      connections: typeof connections;
       files: typeof files;
       editor: typeof editor;
       errors: typeof errors;

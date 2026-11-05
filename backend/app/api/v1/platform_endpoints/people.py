@@ -1,4 +1,4 @@
-"""My Contacts — the personal, cross-guild directory of people.
+"""People — the personal, cross-guild directory of who the reader could message.
 
 Everything here is served on ``UserSessionDep``: the guild rosters through the
 per-guild routing loop every other ``/me`` aggregate uses. No system engine on
@@ -13,8 +13,8 @@ from fastapi import APIRouter, Depends, Query
 
 from app.api.deps import UserSessionDep, get_current_active_user
 from app.models.platform.user import User
-from app.schemas.platform.contact import ContactSectionsResponse
-from app.services.platform import contacts as contacts_service
+from app.schemas.platform.people import PeopleSectionsResponse
+from app.services.platform import people as people_service
 
 me_router = APIRouter()
 
@@ -32,15 +32,15 @@ SearchQuery = Annotated[
 ]
 
 
-@me_router.get("/contacts", response_model=ContactSectionsResponse)
-async def list_contact_sections(
+@me_router.get("/people", response_model=PeopleSectionsResponse)
+async def list_people_sections(
     session: UserSessionDep,
     current_user: Annotated[User, Depends(get_current_active_user)],
     search: SearchQuery = None,
     guild_ids: Annotated[Optional[List[int]], Query(alias="community_ids")] = None,
     page: int = Query(default=1, ge=1),
-    page_size: int = Query(default=contacts_service.DEFAULT_PAGE_SIZE, ge=1, le=100),
-) -> ContactSectionsResponse:
+    page_size: int = Query(default=people_service.DEFAULT_PAGE_SIZE, ge=1, le=100),
+) -> PeopleSectionsResponse:
     """Every guild the caller is in, each with a page of its members.
 
     Sections come back in the caller's own rail order
@@ -52,14 +52,14 @@ async def list_contact_sections(
     section here: like every other ``/me`` aggregate, this walks real
     memberships.
     """
-    guilds = await contacts_service.ordered_member_guilds(
+    guilds = await people_service.ordered_member_guilds(
         session, user_id=current_user.id
     )
     if guild_ids:
         wanted = set(guild_ids)
         guilds = [row for row in guilds if row[0] in wanted]
 
-    sections = await contacts_service.guild_sections(
+    sections = await people_service.guild_sections(
         session,
         user_id=current_user.id,
         guilds=guilds,
@@ -69,4 +69,4 @@ async def list_contact_sections(
     )
     if search and search.strip():
         sections = [section for section in sections if section.items]
-    return ContactSectionsResponse(sections=sections, page=page, page_size=page_size)
+    return PeopleSectionsResponse(sections=sections, page=page, page_size=page_size)

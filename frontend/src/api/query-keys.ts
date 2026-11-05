@@ -257,7 +257,7 @@ const recentComments = (): Spec => ({ communityPrefix: ["/api/v1/comments/recent
 
 const notifications = (): Spec => ({ personalPrefix: ["/api/v1/notifications"] });
 
-// ── Contacts: who may reach you, and who you have agreed with ────────────────
+// ── Connections: who may reach you, and who you have agreed with ─────────────
 
 /** The policy and its per-community toggles. */
 const dmSettings = (): Spec => ({ personalExact: ["/api/v1/me/dm-settings"] });
@@ -271,7 +271,7 @@ const contactGrants = (): Spec => ({
 const ignoredAccounts = (): Spec => ({ personalPrefix: ["/api/v1/me/ignored"] });
 
 /** Everyone the reader may reach: the community sections. */
-const contacts = (): Spec => ({ personalPrefix: ["/api/v1/me/contacts"] });
+const people = (): Spec => ({ personalPrefix: ["/api/v1/me/people"] });
 
 /**
  * The direct-message mailbox.
@@ -714,7 +714,6 @@ export const q = {
   filedTickets,
   moderationReports,
   contactGrants,
-  contacts,
   counterGroup,
   customRoles,
   currentUser,
@@ -725,6 +724,7 @@ export const q = {
   fileVersions,
   emailSettings,
   personalItems,
+  people,
   activity,
   fcmConfig,
   communityAIConnections,

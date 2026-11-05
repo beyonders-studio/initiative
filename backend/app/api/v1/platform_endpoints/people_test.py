@@ -1,4 +1,4 @@
-"""Integration tests for /api/v1/me/contacts."""
+"""Integration tests for /api/v1/me/people."""
 
 from __future__ import annotations
 
@@ -15,7 +15,7 @@ from app.testing.factories import (
     create_user,
 )
 
-SECTIONS = "/api/v1/me/contacts"
+SECTIONS = "/api/v1/me/people"
 
 
 @pytest.fixture(autouse=True)
@@ -27,7 +27,7 @@ async def community_by_default(session: AsyncSession):
     the paging, search and naming below have nothing to describe. Setting the
     operator's default here is what gives them members to be about; the default
     itself, and the empty page it makes, are
-    ``services/platform/contacts_reachable_test.py``.
+    ``services/platform/people_reachable_test.py``.
 
     Set before any account is made: the default is copied into the account when
     it is created, and moving it afterwards moves nobody.
@@ -130,7 +130,7 @@ async def test_only_a_community_the_caller_shares_gets_a_section(
 async def test_a_section_names_the_other_people_who_are_still_here(
     client: AsyncClient, session: AsyncSession, acting_user
 ):
-    """The caller is not their own contact, and a suspended account leaves the
+    """The caller is not on their own roster, and a suspended account leaves the
     roster — count and all."""
     a = await acting_user(guild_role=CommunityRole.member)
     other = await _join(session, a.guild)

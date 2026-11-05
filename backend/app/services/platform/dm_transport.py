@@ -832,7 +832,7 @@ async def _people_on(
     columns of an account to every signed-in session. ``public.users`` itself is
     own-row for the request path below moderator, so a query there answers for
     nobody; the projection is what that view is for, and it is the same one the
-    contact list and every other surface that draws a person reads.
+    people roster and every other surface that draws a person reads.
 
     All of them in one question. The list is not paginated and nothing bounds
     how many conversations an account has, so a query each is a round trip each.

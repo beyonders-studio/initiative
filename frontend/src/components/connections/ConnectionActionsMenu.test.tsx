@@ -35,14 +35,18 @@ vi.mock("@/hooks/useDirectMessages", () => ({
   useStopIgnoring: () => ({ mutate: mocks.stopIgnoring, isPending: false }),
 }));
 
-import { ContactActionsMenu } from "./ContactActionsMenu";
+import { ConnectionActionsMenu } from "./ConnectionActionsMenu";
 
 const ADA = { id: 7, username: "ada", discriminator: 1234 };
 
 // Through a router: two of the items are links -- to the person, and to the
 // conversation -- and a `Link` outside a router does not render at all.
-const open = async ({ omit }: { omit?: Parameters<typeof ContactActionsMenu>[0]["omit"] } = {}) => {
-  renderPage(() => <ContactActionsMenu user={ADA} omit={omit} />);
+const open = async ({
+  omit,
+}: {
+  omit?: Parameters<typeof ConnectionActionsMenu>[0]["omit"];
+} = {}) => {
+  renderPage(() => <ConnectionActionsMenu user={ADA} omit={omit} />);
   await userEvent.click(await screen.findByRole("button", { name: /Actions for ada/i }));
 };
 
@@ -53,7 +57,7 @@ beforeEach(() => {
   mocks.ignored.mockReturnValue({ data: { items: [], total: 0 } });
 });
 
-describe("ContactActionsMenu", () => {
+describe("ConnectionActionsMenu", () => {
   it("offers ignoring somebody where you met them", async () => {
     await open();
     await userEvent.click(await screen.findByRole("menuitem", { name: "Ignore" }));

@@ -278,7 +278,7 @@ async def test_a_connection_is_addressed_by_handle(client, session, acting_user)
 
 
 async def test_a_grant_row_carries_what_the_person_wears(client, session, acting_user):
-    """A grant is listed as a contact row, and a row draws the whole person."""
+    """A grant is listed as a person row, and a row draws the whole person."""
     a = await acting_user()
     b = await acting_user()
     b.user.profile_decorations = {"frame": "core.gold"}

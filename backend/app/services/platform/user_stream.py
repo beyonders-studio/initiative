@@ -8,7 +8,7 @@ and never waits on a reader.
 
 Four channels sit on this: :mod:`~app.services.platform.notification_stream`
 (the inbox moved), :mod:`~app.services.platform.account_stream` (your standing
-changed), :mod:`~app.services.platform.contacts_stream` and
+changed), :mod:`~app.services.platform.connections_stream` and
 :mod:`~app.services.platform.dm_stream`. They send the same shape and none owns
 the machinery, so there is one place to look when a frame does not arrive.
 

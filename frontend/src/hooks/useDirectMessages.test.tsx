@@ -1,5 +1,5 @@
 /**
- * What every contacts mutation does when it fails.
+ * What every connections mutation does when it fails.
  *
  * These are ordinary conflicts, not bugs — accepting a request that was
  * withdrawn a moment ago, removing a connection somebody else already removed.
@@ -58,7 +58,7 @@ import {
   useStopIgnoring,
 } from "./useDirectMessages";
 
-describe("contacts mutations", () => {
+describe("connections mutations", () => {
   beforeEach(() => vi.clearAllMocks());
 
   it.each([

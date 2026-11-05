@@ -9,7 +9,7 @@ endpoints, and those requests — own-row, or answered by
 
 Its own channel rather than an arm on the account one, because an ``account``
 frame means "re-read ``GET /me``", and a membership change would
-otherwise drag a refetch of three contact lists behind it.
+otherwise drag a refetch of three connection lists behind it.
 
 **Being ignored sends nothing.** The account that was ignored is signalled
 neither when it happens, nor when it is lifted, nor for a request of theirs
@@ -24,10 +24,10 @@ from typing import Any
 from app.services.platform import user_stream
 
 #: What the client switches on to tell this channel from the other two.
-RESOURCE = "contacts"
+RESOURCE = "connections"
 
 
-def queue_contacts_signal(
+def queue_connections_signal(
     session: Any, user_id: int | None, action: str = "changed"
 ) -> None:
     """Note that this session changed what those lists would answer.

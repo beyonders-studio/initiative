@@ -1,7 +1,7 @@
 """The per-user channel: which frames reach which tabs, and how they leave.
 
 The routing half of the shared transport, pinned here because every channel
-rides it — the inbox, the account, contacts and direct messages. What each
+rides it — the inbox, the account, connections and direct messages. What each
 frame *means* belongs to the channel that sends it.
 """
 

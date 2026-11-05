@@ -9,6 +9,15 @@ matter and can be deleted.
 
 ## After 0.77.1
 
+### The message roster is people, not contacts
+
+The roster the new-conversation picker reads moved to `GET /api/v1/me/people`,
+so the word "contacts" is free for the Contacts tool. Its schemas are
+`PersonRead`, `PeopleCommunitySection` and `PeopleSectionsResponse`; the body
+is unchanged.
+
+- GET /api/v1/me/contacts api path removed without deprecation
+
 ### A link can end at a person
 
 An end of a link is an `EndpointKind`: every kind a reference names, and

@@ -170,7 +170,7 @@ describe("useNotificationStream", () => {
     expect(timesNamed(q.contactGrants())).toBe(0);
   });
 
-  it("re-reads the contact lists when the server says they moved", () => {
+  it("re-reads the connection lists when the server says they moved", () => {
     const refreshUser = vi.fn();
     renderWithProviders(<Probe />, { auth: { refreshUser } });
     const socket = latestSocket();
@@ -178,7 +178,7 @@ describe("useNotificationStream", () => {
     refreshUser.mockClear();
     invalidations.mockClear();
 
-    socket.receive({ resource: "contacts", action: "changed", ids: {} });
+    socket.receive({ resource: "connections", action: "changed", ids: {} });
 
     // All three move together: accepting a connection opens a channel, and
     // leaving a community closes one.

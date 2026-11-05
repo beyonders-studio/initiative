@@ -2,7 +2,7 @@ import { Loader2 } from "lucide-react";
 import { useTranslation } from "react-i18next";
 
 import type { PollOptionRead, PollVoter } from "@/api/generated/initiativeAPI.schemas";
-import { ContactPersonRow } from "@/components/contacts/ContactPersonRow";
+import { PersonRow } from "@/components/connections/PersonRow";
 import {
   Dialog,
   DialogContent,
@@ -37,7 +37,7 @@ const Group = ({ heading, people }: { heading: string; people: PollVoter[] }) =>
     </h3>
     <ul className="divide-y">
       {people.map((person) => (
-        <ContactPersonRow key={person.id} user={person} />
+        <PersonRow key={person.id} user={person} />
       ))}
     </ul>
   </section>

@@ -16,7 +16,7 @@ import { toast } from "@/lib/mascotToast";
 import { getUrlHandle } from "@/lib/userDisplay";
 import { cn } from "@/lib/utils";
 
-interface ContactActionButtonsProps {
+interface ConnectionActionButtonsProps {
   /** The account being acted on. A connection is addressed by handle, so both
    *  halves of it are needed rather than only the id. */
   user: { id: number; username: string; discriminator: number };
@@ -40,12 +40,12 @@ interface ContactActionButtonsProps {
  * A request already sent stays on screen as a disabled button rather than
  * disappearing: the gap where it was would read as the ask having failed.
  */
-export const ContactActionButtons = ({
+export const ConnectionActionButtons = ({
   user,
   className,
   permission: supplied,
-}: ContactActionButtonsProps) => {
-  const { t } = useTranslation(["contacts", "settings"]);
+}: ConnectionActionButtonsProps) => {
+  const { t } = useTranslation(["connections", "settings"]);
 
   // Only where the caller has not already been told.
   const own = useDmPermission(supplied === undefined ? user.id : undefined);

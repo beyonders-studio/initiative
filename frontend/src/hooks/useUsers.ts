@@ -456,7 +456,7 @@ type SetDisplayNameVars = { communityId: number; userId?: number; displayName: s
 /**
  * What somebody is called in one community — their own, without `userId`, or
  * a member's, by an administrator. The name is drawn wherever the community
- * draws people, so its content, its rosters and the contacts lists refresh
+ * draws people, so its content, its rosters and the people lists refresh
  * along with the community list.
  */
 export const useSetMemberDisplayName = (options?: MutationOpts<void, SetDisplayNameVars>) =>
@@ -469,7 +469,7 @@ export const useSetMemberDisplayName = (options?: MutationOpts<void, SetDisplayN
           : setMemberDisplayName(communityId, userId, body));
       },
       invalidate: () =>
-        invalidate(q.communityContent(), q.communityMembers(), q.contacts(), q.allCommunities()),
+        invalidate(q.communityContent(), q.communityMembers(), q.people(), q.allCommunities()),
     },
     options
   );

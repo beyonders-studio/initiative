@@ -23,9 +23,9 @@ from app.testing import create_guild_membership, create_user, get_auth_headers
 
 
 async def _reachable_from_their_communities(session, *user_ids: int) -> None:
-    """Put these accounts on the policy that makes co-members contacts.
+    """Put these accounts on the policy that lets co-members reach each other.
 
-    The default is ``private``, on which nobody is anybody's contact -- so
+    The default is ``private``, on which nobody can reach anybody -- so
     without this the roster assertion below would pass whatever the switch did.
     """
     await session.exec(
@@ -195,20 +195,20 @@ async def test_an_accepted_channel_survives_the_switch(
     assert [g["user_id"] for g in response.json()["accepted"]] == [b.user.id]
 
 
-# ---------------------------------------------------------------- contacts ---
+# ------------------------------------------------------------------ people ---
 
 
-async def test_contacts_list_nobody_while_messaging_is_off(
+async def test_people_list_nobody_while_messaging_is_off(
     client, session, acting_user
 ) -> None:
-    """A contact is somebody you could reach out to, and there is nothing to
-    reach them with."""
+    """A person listed is somebody you could reach out to, and there is nothing
+    to reach them with."""
     a = await acting_user(guild_role=CommunityRole.member)
     b = await create_user(session)
     await create_guild_membership(session, user=b, guild=a.guild)
     await _reachable_from_their_communities(session, a.user.id, b.id)
 
-    listed = await client.get("/api/v1/me/contacts", headers=a.headers)
+    listed = await client.get("/api/v1/me/people", headers=a.headers)
     assert listed.status_code == 200, listed.text
     assert any(section["items"] for section in listed.json()["sections"]), (
         "the fixture must list somebody for the assertion below to mean anything"
@@ -216,6 +216,6 @@ async def test_contacts_list_nobody_while_messaging_is_off(
 
     await _set_switch(session, enabled=False)
 
-    response = await client.get("/api/v1/me/contacts", headers=a.headers)
+    response = await client.get("/api/v1/me/people", headers=a.headers)
     assert response.status_code == 200, response.text
     assert all(not section["items"] for section in response.json()["sections"])
