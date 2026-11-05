@@ -11,7 +11,8 @@ shape a body takes — a Lexical editor state or running text:
 * a kind whose rows became another's under new ids (:data:`MOVED`) is that
   kind, under the id ``moved`` maps the old one to: ``gallery_image`` is
   ``file``, ``queue`` is ``project`` and ``queue_item`` is ``task``. A row the
-  map has no id for leaves the words the reference was written with;
+  map has no id for leaves the words the reference was written with, and a
+  kind ``moved`` does not name is left as written;
 * a ``wikilink`` is an ``entity-mention`` of its file, or its words when it
   never named one, as the browser's editor converted one on opening;
 * ``#doc`` and ``#document`` are ``#file``, ``#gallery`` is ``#collection``,
@@ -43,6 +44,8 @@ _FILE = "file"
 MOVED = {"gallery_image": _FILE, "queue": "project", "queue_item": "task"}
 #: Each moved kind's ids: old id -> the id of the row it became.
 Moved = Mapping[str, Mapping[int, int]]
+#: Every moved kind with no ids: references to them become their words.
+UNMAPPED: Moved = {kind: {} for kind in MOVED}
 #: The words after ``#`` the composer wrote for those kinds.
 _TRIGGERS = {"doc": _FILE, "document": _FILE, "gallery": "collection"}
 _MOVED_TRIGGERS = {
@@ -52,6 +55,11 @@ _MOVED_TRIGGERS = {
 #: A reference in running text, by id (``#doc[Spec](7)``) or, in a backup, by
 #: the ref it had (``#doc[Spec](document:7)``).
 _TEXT_REFERENCE = re.compile(r"#([\w-]+)\[([^\]]*)\]\(((?:[a-z_]+:)?)(\d+)\)")
+
+
+def _moves(kind: str, moved: Moved) -> bool:
+    """Whether ``kind`` is a moved kind ``moved`` has the ids of."""
+    return kind in MOVED and kind in moved
 
 
 def _moved_id(kind: str, old: Any, moved: Moved) -> int | None:
@@ -67,7 +75,7 @@ def rewrite_ref(ref: str, moved: Moved) -> str | None:
     """``kind:id`` as this build spells it, or ``None`` for a moved row with no
     new id."""
     kind, separator, rest = ref.partition(REF_SEPARATOR)
-    if kind in MOVED:
+    if _moves(kind, moved):
         old, aspect_separator, aspect = rest.partition(REF_SEPARATOR)
         new_id = _moved_id(kind, old, moved)
         if new_id is None:
@@ -109,7 +117,7 @@ def _reference(node: dict[str, Any], moved: Moved) -> dict[str, Any]:
         return node
     kind, separator, aspect = value.partition(REF_SEPARATOR)
     out = dict(node)
-    if kind in MOVED:
+    if _moves(kind, moved):
         new_id = _moved_id(kind, node.get("entityId"), moved)
         if new_id is None:
             return reference_as_text(node)
@@ -155,7 +163,7 @@ def rewrite_text(text: str | None, moved: Moved) -> str | None:
         word, label, prefix, number = match.groups()
         old_kind = prefix.removesuffix(REF_SEPARATOR)
         kind = old_kind if old_kind in MOVED else _MOVED_TRIGGERS.get(word)
-        if kind is not None:
+        if kind is not None and _moves(kind, moved):
             new_id = moved.get(kind, {}).get(int(number))
             if new_id is None:
                 return label

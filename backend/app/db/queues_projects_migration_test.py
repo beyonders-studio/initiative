@@ -124,8 +124,9 @@ async def test_a_queue_becomes_a_project_of_tasks(session) -> None:
     queue = await _one(
         session,
         f"INSERT INTO {s}.queues (initiative_id, name, description, created_by, "
-        "current_round, is_active, created_at, updated_at) VALUES (:i, 'Chores', "
-        "'Whose week it is', :u, 3, true, '2026-01-01', '2026-01-02') RETURNING id",
+        "current_round, is_active, created_at, updated_at, archived_at) VALUES "
+        "(:i, 'Chores', 'Whose week it is', :u, 3, true, '2026-01-01', "
+        "'2026-01-02', '2026-01-03') RETURNING id",
         i=initiative.id,
         u=owner.id,
     )
@@ -202,21 +203,37 @@ async def test_a_queue_becomes_a_project_of_tasks(session) -> None:
         q=queue,
         i=items["Hoover"],
     )
+    batched = await _one(
+        session,
+        f"INSERT INTO {s}.batched_notices (user_id, kind, actor_name, target_type, "
+        "target_id, target_path, title, created_at) VALUES (:u, 'reaction', 'Sam', "
+        "'comment', :c, :p, 'Swap with me?', now()) RETURNING id",
+        u=owner.id,
+        c=comment,
+        p=f"/go/queue/{queue}",
+    )
     await connection.execute(text("SET LOCAL session_replication_role = origin"))
     await session.commit()
 
     await session.run_sync(run(True))
     await session.commit()
 
-    converted, description, projects_on = (
+    converted, description, projects_on, archived = (
         await _rows(
             session,
-            f"SELECT p.id, p.description, i.projects_enabled FROM {s}.projects p "
-            f"JOIN {s}.initiatives i ON i.id = p.initiative_id WHERE p.name = 'Chores'",
+            f"SELECT p.id, p.description, i.projects_enabled, p.archived_at "
+            f"FROM {s}.projects p JOIN {s}.initiatives i ON i.id = p.initiative_id "
+            "WHERE p.name = 'Chores'",
         )
     )[0]
     assert description == "Whose week it is\n\nRound 3 when this was a queue."
     assert projects_on
+    assert archived is not None
+    assert await _rows(
+        session,
+        f"SELECT DISTINCT archived_at FROM {s}.tasks WHERE project_id = :p",
+        p=converted,
+    ) == [(archived,)]
     tasks = await _rows(
         session,
         f"SELECT t.id, t.title, s.name, ty.name, t.description FROM {s}.tasks t "
@@ -301,6 +318,9 @@ async def test_a_queue_becomes_a_project_of_tasks(session) -> None:
             {"target_path": f"/go/task/{by_title['Hoover']}"},
         )
     ]
+    assert await _rows(
+        session, f"SELECT target_path FROM {s}.batched_notices WHERE id = :b", b=batched
+    ) == [(f"/go/project/{converted}",)]
     for table in ("queues", "queue_items"):
         assert (
             await _one(session, "SELECT to_regclass(:t)", t=f"{schema}.{table}") is None

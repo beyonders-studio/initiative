@@ -2,7 +2,7 @@
 
 from __future__ import annotations
 
-from app.core.legacy_references import rewrite_body, rewrite_text
+from app.core.legacy_references import UNMAPPED, rewrite_body, rewrite_text
 from app.core.references import SOURCE_REF, text_node
 
 #: Picture 12 became file 40, queue 2 project 50 and queue item 21 task 60;
@@ -99,6 +99,17 @@ def test_a_body_names_what_each_old_kind_became():
     # A block of its own keeps a paragraph for its words.
     assert embed["type"] == "paragraph" and embed["children"] == [text_node("Lost")]
 
+    # A moved kind the map does not name is left as written.
+    paragraph = {
+        "type": "paragraph",
+        "children": [_mention("queue", 2), _mention("gallery_image", 13, "Lost")],
+    }
+    kept = rewrite_body({"root": {"children": [paragraph]}}, {"gallery_image": {}})
+    assert kept["root"]["children"][0]["children"] == [
+        _mention("queue", 2),
+        text_node("Lost"),
+    ]
+
 
 def test_running_text_names_what_each_old_kind_became():
     assert (
@@ -114,7 +125,14 @@ def test_running_text_names_what_each_old_kind_became():
     # A backup's text names the ref it had.
     assert (
         rewrite_text(
-            "#doc[Spec](document:5) #gallery-image[Lost](gallery_image:13)", {}
+            "#doc[Spec](document:5) #gallery-image[Lost](gallery_image:13)", UNMAPPED
         )
         == "#file[Spec](file:5) Lost"
+    )
+    # A moved kind the map does not name is left as written.
+    assert (
+        rewrite_text(
+            "#queue[Chores](2) #gallery-image[Lost](13)", {"gallery_image": {}}
+        )
+        == "#queue[Chores](2) Lost"
     )

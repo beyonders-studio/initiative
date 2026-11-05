@@ -15,14 +15,15 @@ task. In ``guild_template`` and every ``guild_<id>``:
   queue's project, titled by its label and described by its notes, in the
   order the queue showed it. The item a running queue was on is Up now, a held
   item Held, a hidden item Sitting out and every other Waiting. Its trash and
-  hold state come with it; its colour does not.
+  hold state come with it, and the queue's archive state, as archiving the
+  project would have left it (a held task stays as it is); its colour does not.
 * **An item's member** is a ``related_to`` link from its task to them.
 * **What named a queue or an item** names its project or task: sharing
   (``resource_grants``, ``guest_invite_grants``, ``share_requests``), metadata
   values, personal items, engagement levels, relationships (both ends), holds,
   moderation reports and acts; ``comments.queue_id`` becomes
-  ``comments.project_id``. A row naming neither a mapped queue nor a mapped
-  item is removed. Their search entries are removed and the search generation
+  ``comments.project_id``, and a batched notice's address names the project or
+  task. A row naming neither a mapped queue nor a mapped item is removed. Their search entries are removed and the search generation
   cleared, so the next start indexes the projects and tasks.
 * **Lists** — a converted project shows its board and table and opens on the
   board.
@@ -142,6 +143,7 @@ _TOUCHED = (
     "moderation_reports",
     "moderation_actions",
     "comments",
+    "batched_notices",
     "initiatives",
     "initiative_rules",
     "tool_layouts",
@@ -576,13 +578,15 @@ def _tasks(bind: Connection) -> None:
     waiting, up_now, held, sitting_out, _done = (name for name, *_ in _STATUSES)
     bind.exec_driver_sql(
         "INSERT INTO tasks (id, project_id, task_status_id, task_type_id, title, "
-        "description, priority, position, created_by, created_at, updated_at, "
-        "deleted_at, deleted_by, purge_at, held_at, hold_id) "
+        "description, priority, recurrence_strategy, recurrence_occurrence_count, "
+        "position, created_by, created_at, updated_at, deleted_at, deleted_by, "
+        "purge_at, held_at, hold_id, archived_at) "
         "SELECT m.task_id, m.project_id, s.id, t.id, i.label, i.notes, "
-        "CAST('medium' AS task_priority), "
+        "CAST('medium' AS task_priority), 'fixed', 0, "
         "row_number() OVER (PARTITION BY i.queue_id ORDER BY i.position DESC, i.id) - 1, "
         "i.created_by, i.created_at, i.created_at, i.deleted_at, i.deleted_by, "
-        "i.purge_at, i.held_at, i.hold_id "
+        "i.purge_at, i.held_at, i.hold_id, "
+        "CASE WHEN i.held_at IS NULL THEN q.archived_at END "
         f"FROM queue_items i JOIN {_ITEM_MAP} m ON m.item_id = i.id AND {_IN_SCHEMA} "
         "JOIN queues q ON q.id = i.queue_id "
         "JOIN task_types t ON t.project_id = m.project_id "
@@ -633,6 +637,16 @@ def _retarget_all(bind: Connection) -> None:
         "UPDATE comments c SET project_id = m.project_id, queue_id = NULL "
         f"FROM {_QUEUE_MAP} m WHERE {_IN_SCHEMA} AND c.queue_id = m.queue_id"
     )
+    # A waiting line opens the address it was written with.
+    for map_table, old_id, new_id, old_path, new_path in (
+        (_QUEUE_MAP, "queue_id", "project_id", "queue", "project"),
+        (_ITEM_MAP, "item_id", "task_id", "queue-item", "task"),
+    ):
+        bind.exec_driver_sql(
+            f"UPDATE batched_notices b SET target_path = '/go/{new_path}/' || m.{new_id} "
+            f"FROM {map_table} m WHERE {_IN_SCHEMA} "
+            f"AND b.target_path = '/go/{old_path}/' || m.{old_id}"
+        )
 
 
 def _layouts(bind: Connection) -> None:
