@@ -52,7 +52,7 @@ from sqlmodel.ext.asyncio.session import AsyncSession
 
 from app.core.config import settings
 from app.db import gucs
-from app.db.advisory_locks import LockNamespace, advisory_lock
+from app.db.advisory_locks import LockNamespace, advisory_lock, advisory_unlock
 from app.db import session as db_session
 from app.db.tenancy import OPERATIONS_TABLES
 
@@ -297,9 +297,12 @@ async def provision_operations(guild_id: int) -> None:
 async def deprovision_operations(guild_id: int) -> None:
     """Take from ``guild_id``'s schema what only the operations community has:
     the files its cases held, the filer role, the operations community's own
-    sweep triggers, and the operations tables. Safe where there are none."""
-    from app.db import cohorts
-    from app.db.request_context import SystemGuild
+    sweep triggers, and the operations tables. Safe where there are none.
+
+    One transaction: the tables are locked first, so whoever is writing a
+    case finishes before the files are read and nobody starts another; the
+    tables go before anyone else can reach them.
+    """
     from app.db.schema_provisioning import _exec_batch, guild_schema_name
     from app.db.timers import drop_operations_timers_ddl
     from app.services import sweep_timers
@@ -307,46 +310,118 @@ async def deprovision_operations(guild_id: int) -> None:
     from app.services.platform import evidence
 
     schema = guild_schema_name(guild_id)
-    async with db_session.provisioning_engine.connect() as conn:
+    tables = [f'"{schema}".{table}' for table in sorted(OPERATIONS_TABLES)]
+    gone: list[str] = []
+    async with db_session.provisioning_engine.begin() as conn:
+        await advisory_lock(conn, LockNamespace.GUILD_PROVISION, guild_id)
         holds = await holds_operations(conn, schema)
+        if holds:
+            await conn.exec_driver_sql(
+                f"LOCK TABLE {', '.join(tables)} IN ACCESS EXCLUSIVE MODE"
+            )
+            gone = await _drop_case_files(conn, schema)
+        # The filer's policies first: some are on the tables that go next.
+        await _deprovision(conn, filer_role_name(guild_id), schema)
+        if holds:
+            statements = [
+                f'SET LOCAL search_path TO "{schema}", public',
+                *(s for s in drop_operations_timers_ddl().split(";\n") if s),
+            ]
+            # Every table's policies, then row security, then the tables: a
+            # policy on one may read another.
+            for table in tables:
+                statements += [
+                    f'DROP POLICY IF EXISTS "{name}" ON {table}'
+                    for name in (
+                        await conn.execute(
+                            text(
+                                "SELECT polname FROM pg_policy"
+                                " WHERE polrelid = to_regclass(:t)"
+                            ),
+                            {"t": table},
+                        )
+                    ).scalars()
+                ]
+                statements.append(f"ALTER TABLE {table} DISABLE ROW LEVEL SECURITY")
+            statements += [f"DROP TABLE {table}" for table in tables]
+            await _exec_batch(conn, statements)
     if holds:
-        async with cohorts.system_session(guild_id) as session:
-            await db_session.set_rls_context(session, SystemGuild(guild_id))
-            gone = await evidence.drop_cases(session)
-            await session.commit()
         evidence.discard(guild_id, gone)
         await sweep_timers.disarm(
             guild_id,
             (s.kind for s in sweep_timers.sweeps() if s.scope is Scope.OPERATIONS),
         )
-    async with db_session.provisioning_engine.begin() as conn:
-        await advisory_lock(conn, LockNamespace.GUILD_PROVISION, guild_id)
-        # The filer's policies first: some are on the tables that go next.
-        await _deprovision(conn, filer_role_name(guild_id), schema)
-        if await holds_operations(conn, schema):
-            await _exec_batch(
-                conn,
-                [
-                    f'SET LOCAL search_path TO "{schema}", public',
-                    *(s for s in drop_operations_timers_ddl().split(";\n") if s),
-                    *(
-                        f'DROP TABLE IF EXISTS "{schema}"."{table}" CASCADE'
-                        for table in sorted(OPERATIONS_TABLES)
-                    ),
-                ],
+
+
+async def _drop_case_files(conn: AsyncConnection, schema: str) -> list[str]:
+    """Delete the rows of the files ``schema``'s cases held, and return the
+    stored objects no remaining row names, to remove once the transaction has
+    committed. Row security is lifted from ``evidence`` for the delete and put
+    back as it was."""
+    evidence = f'"{schema}".evidence'
+    forced = await conn.scalar(
+        text("SELECT relforcerowsecurity FROM pg_class WHERE oid = to_regclass(:t)"),
+        {"t": evidence},
+    )
+    if forced:
+        await conn.exec_driver_sql(
+            f"ALTER TABLE {evidence} NO FORCE ROW LEVEL SECURITY"
+        )
+    keys = set(
+        (
+            await conn.execute(
+                text(
+                    f"DELETE FROM {evidence} WHERE case_task_id IS NOT NULL"
+                    " RETURNING storage_key"
+                )
             )
+        ).scalars()
+    )
+    still = (
+        set(
+            (
+                await conn.execute(
+                    text(
+                        f"SELECT storage_key FROM {evidence} WHERE storage_key = ANY(:k)"
+                    ),
+                    {"k": sorted(keys)},
+                )
+            ).scalars()
+        )
+        if keys
+        else set()
+    )
+    if forced:
+        await conn.exec_driver_sql(f"ALTER TABLE {evidence} FORCE ROW LEVEL SECURITY")
+    return sorted(keys - still)
 
 
-async def reconcile_operations(operations_guild_id: Optional[int]) -> None:
+async def reconcile_operations() -> None:
     """Make the operations tables and the filer role exist where the
-    operations community is.
+    operations community is, as the deployment names it now.
 
     Run when the choice changes, and by boot after the guild back-fill:
     re-asserts the operations community's, and takes them from every other
     community, left behind by a move the process did not finish. With no
     operations community, only the filer role goes: the tables stay for the
     community that had them, until another is chosen.
+
+    One runs at a time across the deployment, and each reads the choice once
+    it has its turn: one that started before a later choice acts on the later
+    one.
     """
+    from app.services.platform.intake import configured_operations_guild_id
+
+    async with db_session.provisioning_engine.connect() as turn:
+        await advisory_lock(turn, LockNamespace.OPERATIONS_CHOICE, xact=False)
+        await turn.commit()
+        try:
+            await _reconcile(await configured_operations_guild_id())
+        finally:
+            await advisory_unlock(turn, LockNamespace.OPERATIONS_CHOICE)
+
+
+async def _reconcile(operations_guild_id: Optional[int]) -> None:
     from app.db.schema_provisioning import guild_schema_name
 
     keep = guild_schema_name(operations_guild_id) if operations_guild_id else None

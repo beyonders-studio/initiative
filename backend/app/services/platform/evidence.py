@@ -940,27 +940,6 @@ async def released_by_purge(
     return keys - still
 
 
-async def drop_cases(session: AsyncSession) -> set[str]:
-    """Delete the files of every case in the community ``session`` is routed
-    into, once it is no longer the operations one. Returns the stored objects
-    no remaining row names, for the caller to remove once its commit has
-    landed."""
-    tasks = (
-        await session.exec(
-            select(Evidence.case_task_id)
-            .where(Evidence.case_task_id.is_not(None))  # type: ignore[union-attr]
-            .distinct()
-        )
-    ).all()
-    if not tasks:
-        return set()
-    gone = await released_by_purge(session, task_ids=[int(t) for t in tasks if t])
-    await session.exec(
-        delete(Evidence).where(Evidence.case_task_id.is_not(None))  # type: ignore[union-attr]
-    )
-    return gone
-
-
 # -- Key rotation -------------------------------------------------------------
 
 

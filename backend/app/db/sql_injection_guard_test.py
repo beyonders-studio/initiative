@@ -76,6 +76,12 @@ ALLOWED_DYNAMIC_SQL: dict[str, str] = {
     "app/db/schema_provisioning.py::_run_in_schema": (
         "int-derived schema name + the bundle's registry-rendered operations DDL"
     ),
+    "app/db/operations_schema.py::deprovision_operations": (
+        "int-derived schema name + the constant operations table names"
+    ),
+    "app/db/operations_schema.py::_drop_case_files": (
+        "int-derived schema name; values are bound"
+    ),
     "app/db/schema_provisioning.py::reindex_guild_search": (
         "int-derived guild_<id> schema name, registry-rendered "
         "reindex statements (constants), and a hex-digest generation marker"

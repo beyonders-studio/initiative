@@ -215,7 +215,7 @@ async def test_there_is_no_filer_role_outside_the_operations_community(
     elsewhere = await create_guild(session)
     await set_rls_context(session, Unattributed())
 
-    await operations_schema.reconcile_operations(operations["guild"].id)
+    await operations_schema.reconcile_operations()
 
     present = (
         await session.exec(
@@ -257,7 +257,8 @@ async def test_a_moved_operations_community_takes_its_tables_and_role_with_it(
     moved_to = await create_guild(session)
     await set_rls_context(session, Unattributed())
 
-    await operations_schema.reconcile_operations(moved_to.id)
+    await make_operations_community(session, moved_to.id)
+    await operations_schema.reconcile_operations()
 
     assert await _has_tables(session, left) == set()
     assert await _has_tables(session, moved_to.id) == OPERATIONS_TABLES
@@ -283,7 +284,7 @@ async def test_clearing_the_choice_keeps_the_tables_and_drops_the_role(
     session, operations
 ):
     await make_operations_community(session, None)
-    await operations_schema.reconcile_operations(None)
+    await operations_schema.reconcile_operations()
 
     assert await _has_tables(session, operations["guild"].id) == OPERATIONS_TABLES
     assert (

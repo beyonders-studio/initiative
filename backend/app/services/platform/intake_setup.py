@@ -117,7 +117,7 @@ async def set_operations_guild(
     # files. Unsetting it keeps the tables, so pointing back restores them.
     # Boot does the same, so a move this process did not finish is finished
     # there.
-    await operations_schema.reconcile_operations(guild_id)
+    await operations_schema.reconcile_operations()
     return guild_id
 
 

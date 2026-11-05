@@ -445,9 +445,8 @@ async def _prepare_database() -> None:
     # community alone. Re-asserted after the back-fill, and dropped from any
     # community they were left in.
     from app.db.operations_schema import reconcile_operations
-    from app.services.platform.intake import configured_operations_guild_id
 
-    await reconcile_operations(await configured_operations_guild_id())
+    await reconcile_operations()
 
     # Every schema the back-fill reached now binds its own copies of the
     # guild functions, so the copies the migrations left in public can go.
