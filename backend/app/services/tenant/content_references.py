@@ -95,16 +95,12 @@ async def sync_for_entity(
 
     live = await _live_targets(session, wanted)
     if relationships_service.records_edges(session):
-        # A person is named as a link to one is: somebody in the community.
         people = (
             markdown_mention_ids(body)
             if isinstance(body, str)
             else editor_mention_ids(body)
         )
-        live |= {
-            (EndpointKind(PERSON.value), user_id)
-            for user_id in await named_people.members(session, people)
-        }
+        live |= {(EndpointKind(PERSON.value), user_id) for user_id in people}
         await _reconcile(session, entity, live, author_id=author_id)
 
 
@@ -241,9 +237,10 @@ async def _reconcile(
 ) -> None:
     """Add what the content now names, drop what it no longer does.
 
-    Only the additions ask whether the far end is still taking writes, which a
-    person always is. What removes an edge here is the sentence going, and a
-    far end being archived afterwards is not that.
+    Only the additions ask whether the far end is still taking writes, or, for a
+    person, whether they are in the community, as a link to one asks. What
+    removes an edge here is the sentence going, and a far end being archived,
+    or a person leaving, afterwards is not that.
     """
     existing = (
         await session.exec(
@@ -267,6 +264,7 @@ async def _reconcile(
 
     adding = wanted - set(have)
     people = {pair for pair in adding if pair[0] == PERSON.value}
+    members = await named_people.members(session, (pair[1] for pair in people))
     await relationships_service.create_many(
         session,
         source=entity,
@@ -274,7 +272,8 @@ async def _reconcile(
         targets=[
             Endpoint(kind, entity_id)
             for kind, entity_id in sorted(
-                await _accepting_links(session, adding - people) | people,
+                await _accepting_links(session, adding - people)
+                | {pair for pair in people if pair[1] in members},
                 key=lambda pair: (pair[0].value, pair[1]),
             )
         ],

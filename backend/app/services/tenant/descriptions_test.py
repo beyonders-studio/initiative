@@ -6,12 +6,12 @@ about it".
 """
 
 from httpx import AsyncClient
-from sqlmodel import select
+from sqlmodel import delete, select
 from sqlmodel.ext.asyncio.session import AsyncSession
 
 from app.core.relationships import RelationshipType
 from app.core.search import SearchEntityType
-from app.models.platform.guild import CommunityRole
+from app.models.platform.guild import CommunityRole, GuildMembership
 from app.models.platform.notification import Notification, NotificationType
 from app.models.tenant.relationship import EntityRelationship
 from app.services.tenant.relationships import Endpoint
@@ -199,6 +199,28 @@ async def test_what_a_description_names_becomes_the_task_s_references(
     assert await _references(
         session, writer.guild.id, Endpoint(SearchEntityType.task, task.id)
     ) == {("file", doc.id), ("user", teammate.user.id)}
+
+    # The teammate leaving takes nothing while the sentence still names them,
+    # whoever saves it next.
+    await session.exec(
+        delete(GuildMembership).where(
+            GuildMembership.user_id == teammate.user.id,
+            GuildMembership.guild_id == writer.guild.id,
+        )
+    )
+    await session.commit()
+    session.expunge_all()
+    response = await client.patch(
+        writer.g(f"/tasks/{task.id}"),
+        headers=writer.headers,
+        json={
+            "description": f"Spec: #file[Spec]({doc.id}), still with @[]({teammate.user.id})"
+        },
+    )
+    assert response.status_code == 200, response.text
+    assert ("user", teammate.user.id) in await _references(
+        session, writer.guild.id, Endpoint(SearchEntityType.task, task.id)
+    )
 
     # Writing the sentence out takes the edges with it.
     session.expunge_all()
