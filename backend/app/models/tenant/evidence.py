@@ -59,7 +59,7 @@ class Evidence(CreatedByMixin, table=True):
     __tablename__ = "evidence"
     __table_args__ = (
         CheckConstraint(
-            "num_nonnulls(report_id, case_id) = 1", name="ck_evidence_one_parent"
+            "num_nonnulls(report_id, case_task_id) = 1", name="ck_evidence_one_parent"
         ),
         CheckConstraint(f"kind IN ({_KIND_SQL})", name="ck_evidence_kind"),
     )
@@ -75,11 +75,13 @@ class Evidence(CreatedByMixin, table=True):
             index=True,
         ),
     )
-    case_id: Optional[int] = Field(
+    #: The operations case, named by its task: a case is its task, and every
+    #: community's schema has ``tasks``.
+    case_task_id: Optional[int] = Field(
         default=None,
         sa_column=Column(
             Integer,
-            ForeignKey("intake_cases.id", ondelete="CASCADE"),
+            ForeignKey("tasks.id", ondelete="CASCADE"),
             nullable=True,
             index=True,
         ),

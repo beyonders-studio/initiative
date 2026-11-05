@@ -87,9 +87,9 @@ async def operations(session):
         )
     )
 
-    def attached(case_id: int, by: int, name: str) -> Evidence:
+    def attached(case_task_id: int, by: int, name: str) -> Evidence:
         return Evidence(
-            case_id=case_id,
+            case_task_id=case_task_id,
             origin_guild_id=guild.id,
             origin_id=uuid.uuid4(),
             storage_key=f"evidence-{uuid.uuid4().hex}.iev",
@@ -102,9 +102,9 @@ async def operations(session):
             created_by=by,
         )
 
-    session.add(attached(mine.case_id, asker.id, "mine.txt"))
-    session.add(attached(mine.case_id, staff.id, "staff-notes.txt"))
-    session.add(attached(theirs.case_id, other.id, "theirs.txt"))
+    session.add(attached(mine.task_id, asker.id, "mine.txt"))
+    session.add(attached(mine.task_id, staff.id, "staff-notes.txt"))
+    session.add(attached(theirs.task_id, other.id, "theirs.txt"))
     await session.commit()
     await set_rls_context(session, Unattributed())
     yield {
@@ -180,7 +180,7 @@ async def test_a_filer_reads_their_task_s_status_and_not_its_words(
         "SELECT id, category::text FROM task_statuses",
         "SELECT id, awaiting_filer_status_id FROM intake_bindings",
         "SELECT id, content, created_by FROM comments",
-        "SELECT id, case_id, display_name FROM evidence",
+        "SELECT id, case_task_id, display_name FROM evidence",
     ],
 )
 async def test_a_filer_reads_on_a_connection_whose_plans_are_kept(

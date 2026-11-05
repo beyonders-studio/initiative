@@ -1465,35 +1465,31 @@ def evidence_path() -> InitiativePath:
 
     Reading walks to the parent, whose own policy answers. Writing asks the
     parent's own write question: full access for a report, the case task's
-    initiative for a case.
+    initiative for a case. A case is reached through its task, as
+    ``intake_cases`` is.
     """
     report_walk = (
         "EXISTS (SELECT 1 FROM moderation_reports mr WHERE mr.id = {t}.report_id"
     )
-    case_walk = "EXISTS (SELECT 1 FROM intake_cases ic WHERE ic.id = {t}.case_id"
+    case = via_task_project("case_task_id")
 
     def predicate(t: str, w: bool) -> str:
         if not w:
             report = report_walk.format(t=t) + ")"
-            case = case_walk.format(t=t) + ")"
         else:
             report = (
                 report_walk.format(t=t) + f" AND {_full_access('mr.initiative_id', w)})"
             )
-            case = (
-                "EXISTS (SELECT 1 FROM intake_cases ic JOIN tasks tk ON tk.id = ic.task_id"
-                f" JOIN projects pr ON pr.id = tk.project_id WHERE ic.id = {t}.case_id"
-                f" AND {_access('pr.initiative_id', w)})"
-            )
-        return f"(CASE WHEN {t}.report_id IS NOT NULL THEN {report} ELSE {case} END)"
+        return (
+            f"(CASE WHEN {t}.report_id IS NOT NULL THEN {report}"
+            f" ELSE {case.predicate(t, w)} END)"
+        )
 
     return InitiativePath(
         predicate=predicate,
         initiative_expr=lambda r: (
             f"COALESCE((SELECT mr.initiative_id FROM moderation_reports mr "  # noqa: S608
-            f"WHERE mr.id = {r}.report_id), (SELECT pr.initiative_id FROM intake_cases ic "
-            f"JOIN tasks tk ON tk.id = ic.task_id JOIN projects pr ON pr.id = tk.project_id "
-            f"WHERE ic.id = {r}.case_id))"
+            f"WHERE mr.id = {r}.report_id), {case.initiative_expr(r)})"
         ),
     )
 
