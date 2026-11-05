@@ -395,8 +395,7 @@ async def read_filed(user: User, task_id: int) -> FiledTicketDetail:
                     Evidence.size_bytes,
                     Evidence.created_at,
                 )
-                .join(IntakeCase, IntakeCase.id == Evidence.case_id)
-                .where(IntakeCase.task_id == task_id)
+                .where(Evidence.case_task_id == task_id)
                 .order_by(Evidence.created_at, Evidence.id)
             )
         ).all()
@@ -443,9 +442,8 @@ async def filed_evidence(user: User, task_id: int, evidence_id: int) -> int:
         found = (
             await session.exec(
                 select(Evidence.id)
-                .join(IntakeCase, IntakeCase.id == Evidence.case_id)
                 .where(Evidence.id == evidence_id)
-                .where(IntakeCase.task_id == task_id)
+                .where(Evidence.case_task_id == task_id)
             )
         ).first()
         guild_id = routed_guild_id(session)

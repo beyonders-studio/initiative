@@ -97,7 +97,7 @@ async def test_a_filing_stores_its_files_sealed_beside_the_opening_words(
         )
     ).one()
     await set_rls_context(session, Unattributed())
-    assert row.case_id == case.id
+    assert row.case_task_id == case.task_id
     assert row.comment_id == opening.id
     assert row.created_by == asker.user.id
     assert row.content_type == "image/jpeg"
@@ -628,7 +628,7 @@ async def test_what_was_written_before_a_failed_write_is_removed(
     )
     with pytest.raises(OSError):
         with evidence_service.Sealing(gid) as sealing:
-            sealing.store(session, prepared=files, created_by=None, case_id=1)
+            sealing.store(session, prepared=files, created_by=None, case_task_id=1)
     assert len(written) == 2
     assert not storage.exists(written[0])
 
@@ -644,7 +644,9 @@ async def test_what_was_written_for_rows_that_never_landed_is_removed(session, d
     with pytest.raises(DBAPIError):
         with evidence_service.Sealing(gid) as sealing:
             # No such case: the commit is refused.
-            sealing.store(session, prepared=files, created_by=None, case_id=999_999)
+            sealing.store(
+                session, prepared=files, created_by=None, case_task_id=999_999
+            )
             await session.commit()
             sealing.keep()
     await session.rollback()
