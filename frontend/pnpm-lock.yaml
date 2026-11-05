@@ -601,8 +601,8 @@ importers:
         specifier: ^10.1.0
         version: 10.1.0
       emojibase-data:
-        specifier: ^17.0.0
-        version: 17.0.0(emojibase@17.0.0)
+        specifier: ^18.0.0
+        version: 18.0.0(emojibase@17.0.0)
       esbuild:
         specifier: 0.28.2
         version: 0.28.2
@@ -4224,8 +4224,8 @@ packages:
   emoji-regex@8.0.0:
     resolution: {integrity: sha512-MSjYzcWNOA0ewAHpz0MxpYFvwg6yjy1NG3xteoqz644VCo/RPgnr1/GGt+ic3iJTzQ8Eu3TdM14SawnVUmGE6A==}
 
-  emojibase-data@17.0.0:
-    resolution: {integrity: sha512-Yvgb5AWoHViHV/gq1qr5ZAarcBip+B27/ZLRsUJkbgAEaLlZ/fof9g882LTpmEpyhBNEC0m2SEmItljHsTygjA==}
+  emojibase-data@18.0.0:
+    resolution: {integrity: sha512-TPPRRYv2zPd0jKI+pTpMquwWNZXYAsC3IVsCMeg2X8y8fEzKwOks4/5bz0YavF5r6d71aGPpb6oDnUEwSLLMoA==}
     peerDependencies:
       emojibase: '*'
 
@@ -9938,7 +9938,7 @@ snapshots:
 
   emoji-regex@8.0.0: {}
 
-  emojibase-data@17.0.0(emojibase@17.0.0):
+  emojibase-data@18.0.0(emojibase@17.0.0):
     dependencies:
       emojibase: 17.0.0
 
