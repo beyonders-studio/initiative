@@ -6,7 +6,8 @@
  * the way in.
  */
 import { screen } from "@testing-library/react";
-import { describe, expect, it } from "vitest";
+import userEvent from "@testing-library/user-event";
+import { describe, expect, it, vi } from "vitest";
 
 import { renderPage } from "@/__tests__/helpers/render";
 
@@ -32,5 +33,16 @@ describe("the banner badges", () => {
 
     expect(await screen.findByRole("link", { name: /12 members/i })).toBeInTheDocument();
     expect(screen.queryByText(/online/i)).toBeNull();
+    // Nor offers an invite to somebody who hands none out.
+    expect(screen.queryByRole("button", { name: "Invite members" })).toBeNull();
+  });
+
+  it("offers an invite beside the count to whoever hands them out", async () => {
+    const onInvite = vi.fn();
+    setup({ onInvite });
+
+    await userEvent.click(await screen.findByRole("button", { name: "Invite members" }));
+
+    expect(onInvite).toHaveBeenCalledOnce();
   });
 });

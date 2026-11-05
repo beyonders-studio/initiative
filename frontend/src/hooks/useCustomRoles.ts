@@ -83,6 +83,16 @@ export interface HeldSurfaces {
   holdsAny: boolean;
   /** Whether the reader may change what they hold, not only read it. */
   writes: boolean;
+  /** Whether the reader may make or unmake an admin, or remove one: holding
+   *  every part, as the admin rung does, or on a settings grant. */
+  managesAdmins: boolean;
+  /** Whether the reader may give `role`: it holds nothing the reader lacks,
+   *  and a role on the admin rung only for an admin. */
+  gives: (role: CustomRoleRead) => boolean;
+  /** Whether the reader may take `role` off its holders: as giving it, and
+   *  an admin's role, which gives its holder everything back, only for
+   *  somebody who may make an admin. */
+  takesOff: (role: CustomRoleRead) => boolean;
 }
 
 /**
@@ -128,6 +138,18 @@ export const useHeldSurfaces = (
     [own, lent]
   );
   const holdsAny = ADMIN_SURFACES.some(holds);
+  // What the server allows, so nobody is offered a change it must refuse. A
+  // settings grant answers for itself.
+  const managesAdmins = lent || ADMIN_SURFACES.every(holds);
+  const gives = useCallback(
+    (role: CustomRoleRead) =>
+      lent || (role.surfaces.every(holds) && (role.base_rung !== "admin" || administers)),
+    [lent, holds, administers]
+  );
+  const takesOff = useCallback(
+    (role: CustomRoleRead) => gives(role) && (role.base_rung !== "admin" || managesAdmins),
+    [gives, managesAdmins]
+  );
   return {
     isLoading: asked && query.isPending,
     holds,
@@ -135,6 +157,9 @@ export const useHeldSurfaces = (
     // The admin rung writes where the server says it may; a member writes
     // what their role gives them.
     writes: configures || (!administers && own.length > 0),
+    managesAdmins,
+    gives,
+    takesOff,
   };
 };
 

@@ -1,12 +1,14 @@
 import { Link, useNavigate, useParams, useSearch } from "@tanstack/react-router";
 import type { PaginationState } from "@tanstack/react-table";
-import { IdCard, UsersRound } from "lucide-react";
+import { IdCard, UserMinus, UserPlus, UsersRound } from "lucide-react";
 import { useCallback, useEffect, useMemo, useState } from "react";
 import { useTranslation } from "react-i18next";
 
 import type { UserSummary } from "@/api/generated/initiativeAPI.schemas";
 import { CommunityRole } from "@/api/generated/initiativeAPI.schemas";
+import { InviteMembersDialog } from "@/components/communities/InviteMembersDialog";
 import { MemberDisplayNameDialog } from "@/components/communities/MemberDisplayNameDialog";
+import { RemoveCommunityMemberDialog } from "@/components/communities/RemoveCommunityMemberDialog";
 import { ConnectionActionButtons } from "@/components/connections/ConnectionActionButtons";
 import { ConnectionActionsMenu } from "@/components/connections/ConnectionActionsMenu";
 import { StatusMessage } from "@/components/StatusMessage";
@@ -14,9 +16,24 @@ import { UserHandle } from "@/components/UserHandle";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { DataTable } from "@/components/ui/data-table";
+import {
+  DropdownMenuItem,
+  DropdownMenuPortal,
+  DropdownMenuRadioGroup,
+  DropdownMenuRadioItem,
+  DropdownMenuSub,
+  DropdownMenuSubContent,
+  DropdownMenuSubTrigger,
+} from "@/components/ui/dropdown-menu";
 import { ProfileAvatar } from "@/components/user/ProfileAvatar";
 import { useAuth } from "@/hooks/useAuth";
 import { useCommunities } from "@/hooks/useCommunities";
+import {
+  useAssignCustomRole,
+  useCustomRoleHolders,
+  useCustomRoles,
+  useHeldSurfaces,
+} from "@/hooks/useCustomRoles";
 import { useDebouncedValue } from "@/hooks/useDebouncedValue";
 import { useDmPermissions } from "@/hooks/useDirectMessages";
 import {
@@ -27,10 +44,16 @@ import {
   useListView,
   viewKey,
 } from "@/hooks/useListView";
-import { USER_SEARCH_PAGE_SIZE, useUserSearch } from "@/hooks/useUsers";
-import { isAdminRole } from "@/lib/permissions";
+import {
+  USER_SEARCH_PAGE_SIZE,
+  useUpdateCommunityMembership,
+  useUserSearch,
+} from "@/hooks/useUsers";
+import { getErrorMessage } from "@/lib/errorMessage";
+import { toast } from "@/lib/mascotToast";
+import { assignableCommunityRoles, isAdminRole } from "@/lib/permissions";
 import type { AppColumnDef } from "@/lib/table";
-import { getUrlHandle } from "@/lib/userDisplay";
+import { getUrlHandle, getUserDisplayName, getUserHandle } from "@/lib/userDisplay";
 
 /**
  * Everyone in this community, and a way to reach them.
@@ -45,9 +68,16 @@ import { getUrlHandle } from "@/lib/userDisplay";
  * still follow what the server says the reader may do. So somebody who takes
  * no messages is listed like anyone else and simply offers nothing to click,
  * which is the honest shape: they are here, and they are not reachable.
+ *
+ * Whoever hands out invites or keeps the roster does that here too, with the
+ * same invites and changes as Settings › Users, so a custom role that holds
+ * only those never needs settings. A change is offered only where the server
+ * would make it.
  */
 /** How long typing settles before the address and the roster follow it. */
 const SEARCH_SETTLES_MS = 250;
+/** The custom role picker's "none", since a radio item's value is a string. */
+const NO_CUSTOM_ROLE = "none";
 
 /** Where one person's view of a community's roster is kept: its columns. */
 const membersViewSpec = (communityId: number): ListViewSpec<null> => ({
@@ -62,7 +92,7 @@ const membersViewSpec = (communityId: number): ListViewSpec<null> => ({
 });
 
 export const CommunityMembersPage = () => {
-  const { t } = useTranslation("communities");
+  const { t } = useTranslation(["communities", "settings"]);
   const { communityId } = useParams({ strict: false }) as { communityId: string };
   const { page = 1, q = "" } = useSearch({ strict: false }) as { page?: number; q?: string };
   const navigate = useNavigate();
@@ -73,7 +103,33 @@ export const CommunityMembersPage = () => {
   // grant to visit carries no name of its own to set.
   const ownEntry = useCommunities().communities.find((community) => community.id === id);
   const canNameSelf = ownEntry !== undefined && ownEntry.accessType !== "grant";
-  const [namingSelf, setNamingSelf] = useState(false);
+  // Who is being named: yourself, or a member whose name you keep.
+  const [naming, setNaming] = useState<UserSummary | "self" | null>(null);
+  const [removing, setRemoving] = useState<UserSummary | null>(null);
+  const [inviting, setInviting] = useState(false);
+
+  const held = useHeldSurfaces();
+  const invites = held.writes && held.holds("invites");
+  const manages = held.writes && held.holds("members");
+  const { managesAdmins, gives, takesOff } = held;
+  const holdsSeat = Boolean(ownEntry?.can.seat);
+  // Custom roles are given by whoever keeps the roster, while the community
+  // has them open. A query that is not enabled still answers from the cache,
+  // which another page may have filled, so the answer is gated too.
+  const givesRoles = manages && !ownEntry?.closed_surfaces?.includes("custom_roles");
+  const customRoles = useCustomRoles({ enabled: givesRoles }).data;
+  const roleHolders = useCustomRoleHolders({
+    enabled: givesRoles && Boolean(customRoles?.length),
+  }).data;
+  const heldRoleIds = useMemo(
+    () => new Map((roleHolders ?? []).map((holder) => [holder.user_id, holder.role_id])),
+    [roleHolders]
+  );
+  const { mutate: assignRole } = useAssignCustomRole();
+  const { mutate: changeRung } = useUpdateCommunityMembership({
+    onError: (error: unknown) =>
+      toast.error(getErrorMessage(error, "communities:users.failedToUpdateRole")),
+  });
   const members = useUserSearch({
     search: q || undefined,
     page,
@@ -179,11 +235,28 @@ export const CommunityMembersPage = () => {
           // way in are refused for yourself, so offering them is offering
           // errors.
           if (row.original.id === me?.id) return null;
+          const member = row.original;
           const person = {
-            id: row.original.id,
-            username: row.original.username,
-            discriminator: row.original.discriminator,
+            id: member.id,
+            username: member.username,
+            discriminator: member.discriminator,
           };
+          // Somebody's rung, and removing them, answer to whoever may make an
+          // admin when they are one, and to the seat when they hold it. A
+          // guest's rung is set where guests are.
+          const rung = member.community_role ?? CommunityRole.member;
+          const isGuest = rung === CommunityRole.guest;
+          const standsOn = isAdminRole(rung) ? "admin" : "member";
+          const reaches =
+            (rung !== CommunityRole.superadmin || holdsSeat) &&
+            (!isAdminRole(rung) || managesAdmins);
+          // A custom role is given only by somebody who could take off the
+          // one they hold now.
+          const heldRole = customRoles?.find((role) => role.id === heldRoleIds.get(member.id));
+          const givable =
+            !givesRoles || isGuest || (heldRole && !takesOff(heldRole))
+              ? []
+              : (customRoles ?? []).filter(gives);
           return (
             <div className="flex items-center justify-end gap-1">
               <ConnectionActionButtons
@@ -198,13 +271,113 @@ export const CommunityMembersPage = () => {
                 user={person}
                 omit={["profile", "message", "connect", "ask"]}
                 permission={answers[String(person.id)] ?? null}
-              />
+              >
+                {manages ? (
+                  <>
+                    {reaches && managesAdmins && !isGuest ? (
+                      <DropdownMenuSub>
+                        <DropdownMenuSubTrigger>
+                          {t("users.communityRoleColumn")}
+                        </DropdownMenuSubTrigger>
+                        <DropdownMenuPortal>
+                          <DropdownMenuSubContent>
+                            <DropdownMenuRadioGroup
+                              value={rung}
+                              onValueChange={(value) => {
+                                if (value === rung) return;
+                                changeRung({
+                                  communityId: id,
+                                  userId: member.id,
+                                  role: value as CommunityRole,
+                                });
+                              }}
+                            >
+                              {assignableCommunityRoles(holdsSeat).map((option) => (
+                                <DropdownMenuRadioItem key={option} value={option}>
+                                  {t(`users.communityRole.${option}` as never)}
+                                </DropdownMenuRadioItem>
+                              ))}
+                            </DropdownMenuRadioGroup>
+                          </DropdownMenuSubContent>
+                        </DropdownMenuPortal>
+                      </DropdownMenuSub>
+                    ) : null}
+                    {givable.length > 0 ? (
+                      <DropdownMenuSub>
+                        <DropdownMenuSubTrigger>
+                          {t("settings:customRoles.column")}
+                        </DropdownMenuSubTrigger>
+                        <DropdownMenuPortal>
+                          <DropdownMenuSubContent>
+                            <DropdownMenuRadioGroup
+                              value={heldRole ? String(heldRole.id) : NO_CUSTOM_ROLE}
+                              onValueChange={(value) =>
+                                assignRole({
+                                  userId: member.id,
+                                  roleId: value === NO_CUSTOM_ROLE ? null : Number(value),
+                                })
+                              }
+                            >
+                              <DropdownMenuRadioItem value={NO_CUSTOM_ROLE}>
+                                {t("settings:customRoles.none")}
+                              </DropdownMenuRadioItem>
+                              {givable.map((role) => (
+                                <DropdownMenuRadioItem key={role.id} value={String(role.id)}>
+                                  <span className="flex flex-col">
+                                    <span>{role.name}</span>
+                                    {/* A role applies while its holder stands on its rung. */}
+                                    {role.base_rung === standsOn ? null : (
+                                      <span className="text-muted-foreground text-xs">
+                                        {role.base_rung === "admin"
+                                          ? t("settings:customRoles.appliesWhileAdmin")
+                                          : t("settings:customRoles.appliesWhileMember")}
+                                      </span>
+                                    )}
+                                  </span>
+                                </DropdownMenuRadioItem>
+                              ))}
+                            </DropdownMenuRadioGroup>
+                          </DropdownMenuSubContent>
+                        </DropdownMenuPortal>
+                      </DropdownMenuSub>
+                    ) : null}
+                    <DropdownMenuItem onSelect={() => setNaming(member)}>
+                      <IdCard className="h-4 w-4" />
+                      {t("displayName.adminAction")}
+                    </DropdownMenuItem>
+                    {reaches ? (
+                      <DropdownMenuItem
+                        className="text-destructive"
+                        onSelect={() => setRemoving(member)}
+                      >
+                        <UserMinus className="h-4 w-4" />
+                        {t("users.removeFromCommunity")}
+                      </DropdownMenuItem>
+                    ) : null}
+                  </>
+                ) : null}
+              </ConnectionActionsMenu>
             </div>
           );
         },
       },
     ],
-    [t, me?.id, answers]
+    [
+      t,
+      me?.id,
+      answers,
+      id,
+      manages,
+      givesRoles,
+      managesAdmins,
+      gives,
+      takesOff,
+      holdsSeat,
+      customRoles,
+      heldRoleIds,
+      assignRole,
+      changeRung,
+    ]
   );
 
   return (
@@ -216,12 +389,20 @@ export const CommunityMembersPage = () => {
           <h1 className="font-semibold text-3xl tracking-tight">{t("members.title")}</h1>
           <p className="text-muted-foreground text-sm">{t("memberCount", { count: total })}</p>
         </div>
-        {canNameSelf ? (
-          <Button variant="outline" size="sm" onClick={() => setNamingSelf(true)}>
-            <IdCard className="h-4 w-4" />
-            {t("displayName.menuItem")}
-          </Button>
-        ) : null}
+        <div className="flex flex-wrap gap-2">
+          {invites ? (
+            <Button variant="outline" size="sm" onClick={() => setInviting(true)}>
+              <UserPlus className="h-4 w-4" />
+              {t("inviteMembers")}
+            </Button>
+          ) : null}
+          {canNameSelf ? (
+            <Button variant="outline" size="sm" onClick={() => setNaming("self")}>
+              <IdCard className="h-4 w-4" />
+              {t("displayName.menuItem")}
+            </Button>
+          ) : null}
+        </div>
       </header>
 
       {members.isError ? (
@@ -258,10 +439,20 @@ export const CommunityMembersPage = () => {
 
       <MemberDisplayNameDialog
         communityId={id}
-        current={ownEntry?.display_name}
-        open={namingSelf}
-        onOpenChange={setNamingSelf}
+        member={
+          naming && naming !== "self" ? { id: naming.id, name: getUserHandle(naming) } : undefined
+        }
+        current={naming === "self" ? ownEntry?.display_name : naming?.display_name}
+        open={naming !== null}
+        onOpenChange={(open) => !open && setNaming(null)}
       />
+      <RemoveCommunityMemberDialog
+        open={removing !== null}
+        onOpenChange={(open) => !open && setRemoving(null)}
+        userId={removing?.id ?? null}
+        email={removing ? getUserDisplayName(removing) : ""}
+      />
+      {inviting ? <InviteMembersDialog open onOpenChange={setInviting} /> : null}
     </div>
   );
 };

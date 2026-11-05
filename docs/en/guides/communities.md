@@ -114,14 +114,15 @@ The card shows the location exactly as you typed it, and tapping it on your comm
 ??? techspec "Where the suggestions come from"
     The places are [GeoNames](https://www.geonames.org/) data (every town of a thousand people or more) that ships with the app, so typing a place sends nothing anywhere. "Closest to you" starts from the place you've already picked, or else from the city your device's time zone is named after. A picked place saves its country and its coordinates; **Near me** measures the distance between those.
 
-## Inviting people (admins)
+## Inviting people
 
-1. **Community settings → Users**.
-2. Create an **invite link**.
-3. Optionally limit it:
+Admins can invite people, and so can anybody whose [custom role](#custom-roles) includes invites.
+
+1. **Invite members**, beside the member count on the community's front page or at the top of its **Members** page. **Community settings → Users** has the same links.
+2. Optionally limit it:
     - **Max uses** — how many people can get in on this one link.
     - **Expires in (days)** — when it stops working.
-4. **Copy it** and send it however you like. Email, chat, read it aloud down the phone. Copy it now: the link is shown once, when you make it.
+3. **Generate invite**, then **copy it** and send it however you like. Email, chat, read it aloud down the phone. Copy it now: the link is shown once, when you make it.
 
 Anyone who opens it joins after signing in or making an account.
 
@@ -137,7 +138,7 @@ Somebody who needs one project for a fortnight rather than the whole community f
 | **Admin** | All of that, **plus** run the community: members, invites, initiatives, settings. An admin can see and manage everything in their community. |
 | **Superadmin** | All of that, plus how people **get in** — the community's own sign-in. Whoever made the community holds it. |
 
-Promote and demote from **Community settings → Users**.
+Promote and demote from somebody's menu on the **Members** page, or from **Community settings → Users**.
 
 Promoting somebody to admin also lifts the **initiative roles they already hold**: in every initiative they're in, they move to **Moderator**, unless they're a Manager there already. The app then treats them as the authority they actually are — they're told when somebody asks to join, and waiting requests show up on their front page. Demoting somebody leaves their initiative roles exactly where they are.
 
@@ -153,7 +154,7 @@ So the top seat is its own rung, and it's narrow on purpose: the [Security and I
 
 ### Custom roles
 
-The person who should be sending out invites is not always the person who should be able to delete the summer fete. A **custom role** is a named handful of the jobs of running the community, given to one person at a time. Make them under **Community settings → Roles**, and give one to somebody from **Users**.
+The person who should be sending out invites is not always the person who should be able to delete the summer fete. A **custom role** is a named handful of the jobs of running the community, given to one person at a time. Make them under **Community settings → Roles**, and give one to somebody from their menu on the **Members** page, or from **Users**.
 
 | A role on… | Does |
 |---|---|
@@ -162,6 +163,7 @@ The person who should be sending out invites is not always the person who should
 
 - **One role each.** A role only counts while the person is still on its rung, so demoting an admin quietly retires their admin role. Somebody who leaves and comes back starts with none.
 - **Nobody hands out more than they hold.** You can't make or give a role that can do something you can't. Taking a role off an admin gives them every job back, so only an admin who can do everything can do that, and the same goes for promoting, demoting or removing an admin.
+- **Settings are optional.** Invites and the member list work from the **Members** page and the front page, so your door person never has to go looking for Community settings.
 - **Your server can switch custom roles off** for a community. The roles you have keep working; you just can't change them.
 
 Most communities never need one. If yours doesn't, the Roles tab stays empty and nothing else changes.
@@ -263,7 +265,7 @@ Everyone is their handle, `jordan#1234`, until they say otherwise. To go by some
 
 It shows wherever that community shows people, and people can search for it. Clear the box and you're back to your handle.
 
-Admins can set or clear a member's from the row menu under **Community settings → Users**. Handy when four people are called Sam.
+Whoever keeps the member list can set or clear a member's from that person's menu on the **Members** page, or under **Community settings → Users**. Handy when four people are called Sam.
 
 ## Reporting something
 

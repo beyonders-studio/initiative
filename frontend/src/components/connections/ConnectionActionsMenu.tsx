@@ -1,6 +1,6 @@
 import { Link } from "@tanstack/react-router";
 import { MoreHorizontal } from "lucide-react";
-import { useState } from "react";
+import { type ReactNode, useState } from "react";
 import { useTranslation } from "react-i18next";
 
 import type { DirectMessagePermissionRead } from "@/api/generated/initiativeAPI.schemas";
@@ -10,6 +10,7 @@ import {
   DropdownMenu,
   DropdownMenuContent,
   DropdownMenuItem,
+  DropdownMenuSeparator,
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
 import {
@@ -53,6 +54,9 @@ interface ConnectionActionsMenuProps {
    * offered the same thing twice and never quietly missing an action either.
    */
   omit?: ReadonlyArray<MenuAction>;
+  /** What the surface itself may do about this person, after the rest: a
+   *  community's roster adds the changes to their membership. */
+  children?: ReactNode;
 }
 
 /**
@@ -79,6 +83,7 @@ export const ConnectionActionsMenu = ({
   className,
   omit = [],
   permission: supplied,
+  children,
 }: ConnectionActionsMenuProps) => {
   const { t } = useTranslation(["connections", "settings"]);
   const [confirmingRemove, setConfirmingRemove] = useState(false);
@@ -195,6 +200,12 @@ export const ConnectionActionsMenu = ({
               {t("actions.ignore")}
             </DropdownMenuItem>
           )}
+          {children ? (
+            <>
+              <DropdownMenuSeparator />
+              {children}
+            </>
+          ) : null}
         </DropdownMenuContent>
       </DropdownMenu>
 
