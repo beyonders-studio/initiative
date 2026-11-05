@@ -311,12 +311,14 @@ describe("tool route builders", () => {
     );
   });
 
-  // Only calendars have community-level entities (a plug-in installs one). A null
-  // initiative means "address me at the community route", never "unknown".
+  // Calendars and contacts have community-level entities (a community plug-in
+  // holds them). A null initiative means "address me at the community route",
+  // never "unknown".
   it("keeps a community-level entity at its community route", () => {
     expect(toolListRoute(Tool.calendar, null)).toBe("/calendars");
     expect(toolDetailRoute(Tool.calendar, null, 3)).toBe("/calendars/3");
     expect(toolSettingsRoute(Tool.calendar, null, 3)).toBe("/calendars/3/settings");
+    expect(toolDetailRoute(Tool.contact, null, 4)).toBe("/contacts/4");
   });
 
   it("nests a child entity under its parent", () => {

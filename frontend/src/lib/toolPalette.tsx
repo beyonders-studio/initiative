@@ -167,6 +167,20 @@ export const TOOL_PALETTE: Record<Tool, ToolPaletteSource> = {
       }));
     },
   },
+  [Tool.contact]: {
+    useHeading: () => useGroupHeading(Tool.contact),
+    useItems: (ctx) => {
+      const query = useToolPaletteList(TOOL_HOOKS[Tool.contact].listQuery, BROWSE_PAGE, ctx);
+      return (query.data?.items ?? []).map((contact) => ({
+        id: contact.id,
+        label: contact.name,
+        // Found by how they are reached as well as by name.
+        keywords: [...contact.emails, ...contact.phones].map((detail) => detail.value),
+        icon: null,
+        path: toolDetailRoute(Tool.contact, contact.initiative_id, contact.id),
+      }));
+    },
+  },
 };
 
 /** Tools that get a command-palette group, in display order — every tool does. */

@@ -32,6 +32,7 @@
 import type { ParseKeys } from "i18next";
 import {
   BookText,
+  BookUser,
   CalendarDays,
   Files,
   Gauge,
@@ -56,6 +57,7 @@ export const TOOL_ICONS: Record<Tool, LucideIcon> = {
   [Tool.dashboard]: LayoutDashboard,
   [Tool.post]: Megaphone,
   [Tool.wiki]: BookText,
+  [Tool.contact]: BookUser,
 };
 
 /** Every tool, in canonical enum order. */
@@ -166,6 +168,7 @@ export const toolViewParams = (tool: Tool, view: ToolView): ToolViewParams =>
  */
 export const SIDEBAR_TOOLS: Tool[] = [
   Tool.calendar,
+  Tool.contact,
   Tool.dashboard,
   Tool.file,
   Tool.post,
@@ -265,10 +268,10 @@ export const initiativeRoute = (initiativeId: number): string =>
  * Community-relative list route for a tool inside one initiative — which is also
  * the initiative page with that tool's tab selected, e.g. "/i/12/counter-groups".
  *
- * `initiativeId === null` names a COMMUNITY-LEVEL entity. Calendars are the only
- * tool that has any (an plugin-installed calendar has no `initiative_id`), and
- * they keep their community routes. Treat `null` as "address me at the community
- * route", never as "initiative unknown".
+ * `initiativeId === null` names a COMMUNITY-LEVEL entity. Calendars and contacts
+ * are the tools that have any (one a community plug-in holds has no
+ * `initiative_id`), and they keep their community routes. Treat `null` as
+ * "address me at the community route", never as "initiative unknown".
  */
 export const toolListRoute = (tool: Tool, initiativeId: number | null): string =>
   initiativeId === null

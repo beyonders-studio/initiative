@@ -183,12 +183,17 @@
       "assignee": "Persona asignada",
       "checklist": "Hecha",
       "due": "Fecha de vencimiento",
+      "email": "Correo",
+      "phone": "Teléfono",
       "priority": "Prioridad",
       "progress": "Progreso",
       "status": "Estado",
       "value": "Valor",
       "when": "Fecha"
     },
+    "callHint": "Haz clic para llamar",
+    "contactEmail": "Correo del contacto",
+    "contactPhone": "Teléfono del contacto",
     "counterValue": "Valor del contador",
     "eventWhen": "Fecha del evento",
     "insert": "Chip inteligente",
@@ -207,7 +212,8 @@
     "taskDue": "Fecha de vencimiento",
     "taskPriority": "Prioridad",
     "taskStatus": "Estado de la tarea",
-    "whichFact": "¿Qué dato debe mostrar el chip?"
+    "whichFact": "¿Qué dato debe mostrar el chip?",
+    "writeHint": "Haz clic para escribir"
   },
   "summary": {
     "title": "Resumen",

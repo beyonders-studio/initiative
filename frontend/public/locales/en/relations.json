@@ -120,6 +120,7 @@
     "task": "This task",
     "wiki": "This wiki",
     "wiki_page": "This page",
+    "contact": "This contact",
     "collection": "This collection"
   },
   "blockers": {
@@ -134,5 +135,6 @@
   "empty_dashboard": "Nothing linked yet. Link the project this reports on, or the file that reads it.",
   "empty_post": "Nothing linked yet. Link the project this announces, or the file behind it.",
   "empty_wiki_page": "Nothing linked yet. Mention this page with [[ from anywhere and it will show up here.",
+  "empty_contact": "Nothing linked yet. Link the task you're doing for them, the event they'll be at, or their contract.",
   "empty_collection": "Nothing linked yet. Link the project these files are for."
 }

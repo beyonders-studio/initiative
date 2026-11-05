@@ -10,6 +10,7 @@ import { getErrorMessage, getHttpStatus } from "@/lib/errorMessage";
  *  a `…Description` beside it. */
 type AccessKeys =
   | "calendars:"
+  | "contacts:"
   | "counterGroups:"
   | "dashboards:"
   | "files:collections."

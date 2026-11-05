@@ -75,6 +75,7 @@ const RESTORED: Record<EntityType, () => Spec> = {
   post: q.allPosts,
   collection: q.allCollections,
   dashboard: q.allDashboards,
+  contact: q.allContacts,
 };
 
 export type RestoreTrashVars = {

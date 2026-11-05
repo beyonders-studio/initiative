@@ -90,6 +90,7 @@ const farEnd = {
   smart_link_url: null,
   handle: null,
   is_open: null,
+  starts_at: null,
 };
 
 const row = (

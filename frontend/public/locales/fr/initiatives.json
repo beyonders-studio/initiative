@@ -97,7 +97,8 @@
     "dashboards": "Tableaux de bord",
     "counterGroups": "Compteurs",
     "posts": "Publications",
-    "wikis": "Wikis"
+    "wikis": "Wikis",
+    "contacts": "Contacts"
   },
   "settings": {
     "title": "Paramètres de l'initiative",
@@ -226,7 +227,8 @@
       "dashboards": "Tableaux de bord",
       "counterGroups": "Compteurs",
       "posts": "Publications",
-      "wikis": "Wikis"
+      "wikis": "Wikis",
+      "contacts": "Contacts"
     },
     "permissions": {
       "viewFiles": "Voir les fichiers",
@@ -245,6 +247,8 @@
       "createShort": "Créer",
       "viewWikis": "Voir les wikis",
       "createWikis": "Créer des wikis",
+      "viewContacts": "Voir les contacts",
+      "createContacts": "Créer des contacts",
       "dashboards_run_as_initiative": "Exécuter les tableaux de bord en tant qu'Initiative"
     },
     "handleColumn": "Identifiant",
@@ -320,6 +324,8 @@
   },
   "wikisFeature": "Wikis",
   "wikisFeatureDescription": "Des pages qui se renvoient les unes aux autres. Manuels, références, la question que tout le monde repose.",
+  "contactsFeature": "Contacts",
+  "contactsFeatureDescription": "Les personnes et entreprises pour qui ou avec qui vous travaillez : le client, le lieu, le fournisseur, à un geste d’un appel.",
   "communityDefaults": {
     "title": "Toutes les initiatives",
     "description": "Un outil ou une autorisation de membre défini ici s'applique dans toutes les initiatives de cette communauté ; leurs responsables le voient comme défini. Laissé à chaque initiative, il reste le leur.",

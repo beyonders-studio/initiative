@@ -183,12 +183,17 @@
       "assignee": "Personne assignée",
       "checklist": "Terminée",
       "due": "Date d'échéance",
+      "email": "E-mail",
+      "phone": "Téléphone",
       "priority": "Priorité",
       "progress": "Avancement",
       "status": "Statut",
       "value": "Valeur",
       "when": "Date"
     },
+    "callHint": "Cliquez pour appeler",
+    "contactEmail": "E-mail du contact",
+    "contactPhone": "Téléphone du contact",
     "counterValue": "Valeur du compteur",
     "eventWhen": "Date de l'événement",
     "insert": "Puce intelligente",
@@ -207,7 +212,8 @@
     "taskDue": "Date d'échéance",
     "taskPriority": "Priorité",
     "taskStatus": "Statut de la tâche",
-    "whichFact": "Quelle information la puce doit-elle afficher ?"
+    "whichFact": "Quelle information la puce doit-elle afficher ?",
+    "writeHint": "Cliquez pour écrire"
   },
   "summary": {
     "title": "Résumé",

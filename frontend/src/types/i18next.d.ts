@@ -10,6 +10,7 @@ import type common from "../../public/locales/en/common.json";
 import type communities from "../../public/locales/en/communities.json";
 import type communityHome from "../../public/locales/en/communityHome.json";
 import type connections from "../../public/locales/en/connections.json";
+import type contacts from "../../public/locales/en/contacts.json";
 import type counterGroups from "../../public/locales/en/counterGroups.json";
 import type dashboards from "../../public/locales/en/dashboards.json";
 import type dates from "../../public/locales/en/dates.json";
@@ -66,6 +67,7 @@ declare module "i18next" {
       myTools: typeof myTools;
       home: typeof home;
       connections: typeof connections;
+      contacts: typeof contacts;
       files: typeof files;
       editor: typeof editor;
       errors: typeof errors;

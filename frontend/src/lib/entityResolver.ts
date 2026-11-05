@@ -20,6 +20,7 @@ import {
 } from "@/api/generated/calendar-events/calendar-events";
 import { getReadCalendarQueryKey, readCalendar } from "@/api/generated/calendars/calendars";
 import { getReadCommentQueryKey, readComment } from "@/api/generated/comments/comments";
+import { getReadContactQueryKey, readContact } from "@/api/generated/contacts/contacts";
 import { getReadCounterGroupQueryKey, readCounterGroup } from "@/api/generated/counters/counters";
 import { getReadDashboardQueryKey, readDashboard } from "@/api/generated/dashboards/dashboards";
 import {
@@ -93,10 +94,15 @@ const TOOL_READS: Record<
     key: getReadWikiQueryKey,
     read: readWiki,
   },
+  [Tool.contact]: {
+    key: getReadContactQueryKey,
+    read: readContact,
+  },
 };
 
-/** The initiative a tool row lives in. `null` is a community-level row (an
- *  plugin-installed calendar), which keeps a community address — not a failure. */
+/** The initiative a tool row lives in. `null` is a community-level row (a
+ *  calendar or contact a community plug-in holds), which keeps a community
+ *  address — not a failure. */
 const toolInitiative = async (
   read: Read,
   communityId: number,

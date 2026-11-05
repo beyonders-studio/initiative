@@ -17,7 +17,8 @@ import { canonicalInitiativePath } from "@/lib/communityUrl";
  * gets the entity's initiative back.
  *
  * Pass `undefined` while loading. Pass `null` for a genuinely community-level
- * entity (only calendars have any) — that is an address, not a missing value.
+ * entity (a calendar or contact a community plug-in holds) — that is an
+ * address, not a missing value.
  */
 export function useCanonicalInitiativeId(
   entityInitiativeId: number | null | undefined

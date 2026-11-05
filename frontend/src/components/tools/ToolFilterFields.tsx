@@ -14,6 +14,7 @@ import { useTranslation } from "react-i18next";
 
 import type {
   ListCalendarsParams,
+  ListContactsParams,
   ListCounterGroupsParams,
   ListDashboardsParams,
   ListFilesParams,
@@ -45,6 +46,7 @@ type ToolListParams = {
   [Tool.dashboard]: ListDashboardsParams;
   [Tool.post]: ListPostsParams;
   [Tool.wiki]: ListWikisParams;
+  [Tool.contact]: ListContactsParams;
 };
 
 /** The params the list's caller decides rather than the person filtering:
@@ -208,6 +210,64 @@ const FileFilterFields = ({
   );
 };
 
+/** A contacts list's kinds, each with the `is_organization` it sends. */
+const CONTACT_KINDS = [
+  { value: "all", isOrganization: undefined, label: "filters.allKinds" },
+  { value: "people", isOrganization: false, label: "filters.people" },
+  { value: "organizations", isOrganization: true, label: "filters.organizations" },
+] as const;
+
+/** A contacts list is also narrowed to people or to organizations. */
+const ContactFilterFields = ({
+  value,
+  onChange,
+  initiativeId,
+  children,
+}: ToolFilterFieldsProps<typeof Tool.contact>) => {
+  const { t } = useTranslation("contacts");
+  const id = useId();
+  const kind = CONTACT_KINDS.find(
+    (each) => each.isOrganization === (value.is_organization ?? undefined)
+  );
+
+  return (
+    <SearchTagFields
+      tool={Tool.contact}
+      placeholder="filters.searchContacts"
+      value={value}
+      onChange={onChange}
+      initiativeId={initiativeId}
+    >
+      <div className="w-full space-y-2 sm:w-48">
+        <Label htmlFor={`${id}-kind`} className="block font-medium text-muted-foreground text-xs">
+          {t("filters.kind")}
+        </Label>
+        <Select
+          value={kind?.value}
+          onValueChange={(next) =>
+            onChange({
+              ...value,
+              is_organization: CONTACT_KINDS.find((each) => each.value === next)?.isOrganization,
+            })
+          }
+        >
+          <SelectTrigger id={`${id}-kind`}>
+            <SelectValue />
+          </SelectTrigger>
+          <SelectContent>
+            {CONTACT_KINDS.map((each) => (
+              <SelectItem key={each.value} value={each.value}>
+                {t(each.label)}
+              </SelectItem>
+            ))}
+          </SelectContent>
+        </Select>
+      </div>
+      {children}
+    </SearchTagFields>
+  );
+};
+
 const searchAndTags = (tool: Tool, placeholder: string) => (props: ToolFilterFieldsProps) => (
   <SearchTagFields tool={tool} placeholder={placeholder} {...props} />
 );
@@ -222,6 +282,7 @@ const TOOL_FILTER_FIELDS: { [T in Tool]: ComponentType<ToolFilterFieldsProps<T>>
   [Tool.dashboard]: searchAndTags(Tool.dashboard, "filters.searchDashboards"),
   [Tool.post]: searchAndTags(Tool.post, "filters.searchPosts"),
   [Tool.wiki]: searchAndTags(Tool.wiki, "filters.searchWikis"),
+  [Tool.contact]: ContactFilterFields,
 };
 
 /** A tool's filter fields, by tool. */

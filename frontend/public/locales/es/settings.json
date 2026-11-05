@@ -2269,6 +2269,10 @@
         "label": "Calendarios de la comunidad",
         "description": "Añadir y cambiar los calendarios propios de la comunidad."
       },
+      "community_contacts": {
+        "label": "Contactos de la comunidad",
+        "description": "Añadir y cambiar los contactos propios de la comunidad, y mover a ellos los contactos de una iniciativa."
+      },
       "webhooks": {
         "label": "Webhooks",
         "description": "Configurar los webhooks de la comunidad."

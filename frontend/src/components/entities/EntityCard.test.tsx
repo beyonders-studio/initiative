@@ -33,6 +33,7 @@ const end = (overrides: Partial<RelatedEnd> = {}): RelatedEnd => ({
   original_filename: null,
   smart_link_url: null,
   is_open: null,
+  starts_at: null,
   ...overrides,
 });
 

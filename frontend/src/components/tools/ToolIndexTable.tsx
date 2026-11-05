@@ -47,7 +47,8 @@ interface TableSelection {
 
 type ToolIndexTableProps = {
   tool: Tool;
-  initiativeId: number;
+  /** Null for the community's own rows, which carry no properties. */
+  initiativeId: number | null;
   rows: ToolIndexRow[];
   /** The tool's own columns, after the shared ones (its entry's `table`). */
   useColumns?: () => AppColumnDef<ToolIndexRow>[];
@@ -89,7 +90,10 @@ export const ToolIndexTable = ({
   const communityId = useActiveCommunityId();
   const unread = useUnreadTree();
 
-  const { data: definitions = [] } = useProperties({ initiativeId, enabled: !laidOut });
+  const { data: definitions = [] } = useProperties({
+    initiativeId: initiativeId ?? undefined,
+    enabled: !laidOut && initiativeId !== null,
+  });
   // Property columns start hidden; the column menu turns them on.
   const hiddenByDefault = useMemo(() => propertyColumnIds(definitions), [definitions]);
   // A property column nobody chose about starts hidden.
@@ -114,6 +118,7 @@ export const ToolIndexTable = ({
       header: ({ column }) => <SortHeader column={column} label={t("name")} />,
       cell: ({ row }) => (
         <div className="flex min-w-[220px] items-center gap-2 sm:min-w-0">
+          {row.original.mark}
           <Link
             to={gp(toolDetailRoute(tool, row.original.initiative_id, row.original.id))}
             className="font-medium text-primary hover:underline"

@@ -111,7 +111,9 @@
     "resource_post_one": "publication",
     "resource_post_other": "publications",
     "resource_wiki_one": "wiki",
-    "resource_wiki_other": "wikis"
+    "resource_wiki_other": "wikis",
+    "resource_contact_one": "contact",
+    "resource_contact_other": "contacts"
   },
   "request": {
     "needAccess": "Vous avez besoin d'un accès",

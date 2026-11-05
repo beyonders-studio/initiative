@@ -37,6 +37,7 @@ export const MEMBER_ROLE_SURFACES: readonly AdminSurface[] = [
   AdminSurface.invites,
   AdminSurface.members,
   AdminSurface.community_calendars,
+  AdminSurface.community_contacts,
   AdminSurface.usage,
 ];
 

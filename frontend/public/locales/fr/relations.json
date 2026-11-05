@@ -120,6 +120,7 @@
     "task": "Cette tâche",
     "wiki": "Ce wiki",
     "wiki_page": "Cette page",
+    "contact": "Ce contact",
     "collection": "Cette collection"
   },
   "blockers": {
@@ -134,5 +135,6 @@
   "empty_dashboard": "Rien n'est encore lié. Lie le projet dont ceci rend compte, ou le fichier qui le lit.",
   "empty_post": "Rien n'est encore lié. Lie le projet annoncé, ou le fichier qui le sous-tend.",
   "empty_wiki_page": "Rien n'est encore lié. Mentionnez cette page avec [[ depuis n’importe où et elle apparaîtra ici.",
+  "empty_contact": "Rien n’est encore lié. Liez la tâche que vous faites pour eux, l’événement où ils seront, ou leur contrat.",
   "empty_collection": "Rien n'est encore lié. Lie le projet auquel ces fichiers sont destinés."
 }

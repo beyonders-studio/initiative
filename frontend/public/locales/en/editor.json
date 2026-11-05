@@ -183,12 +183,17 @@
       "assignee": "Assignee",
       "checklist": "Done",
       "due": "Due date",
+      "email": "Email",
+      "phone": "Phone",
       "priority": "Priority",
       "progress": "Progress",
       "status": "Status",
       "value": "Value",
       "when": "Date"
     },
+    "callHint": "Click to call",
+    "contactEmail": "Contact email",
+    "contactPhone": "Contact phone",
     "counterValue": "Counter value",
     "eventWhen": "Event date",
     "insert": "Smart chip",
@@ -207,7 +212,8 @@
     "taskDue": "Task due date",
     "taskPriority": "Task priority",
     "taskStatus": "Task status",
-    "whichFact": "Which fact should the chip show?"
+    "whichFact": "Which fact should the chip show?",
+    "writeHint": "Click to write"
   },
   "summary": {
     "title": "Summary",

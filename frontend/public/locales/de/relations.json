@@ -120,6 +120,7 @@
     "task": "Diese Aufgabe",
     "wiki": "Dieses Wiki",
     "wiki_page": "Diese Seite",
+    "contact": "Dieser Kontakt",
     "collection": "Diese Sammlung"
   },
   "blockers": {
@@ -134,5 +135,6 @@
   "empty_dashboard": "Noch nichts verknüpft. Verknüpfe das Projekt, über das dies berichtet, oder die Datei, die es auswertet.",
   "empty_post": "Noch nichts verknüpft. Verknüpfe das Projekt, das hier angekündigt wird, oder die Datei dahinter.",
   "empty_wiki_page": "Noch nichts verknüpft. Erwähne diese Seite mit [[ von irgendwo – dann erscheint sie hier.",
+  "empty_contact": "Noch nichts verknüpft. Verknüpfe die Aufgabe für sie, den Termin, bei dem sie dabei sind, oder ihren Vertrag.",
   "empty_collection": "Noch nichts verknüpft. Verknüpfe das Projekt, für das diese Dateien sind."
 }

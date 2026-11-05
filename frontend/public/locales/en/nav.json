@@ -90,6 +90,8 @@
   "moderation": "Moderation",
   "wikis": "Wikis",
   "createWiki": "New Wiki",
+  "contacts": "Contacts",
+  "createContact": "New Contact",
   "sidebar": {
     "resize": "Drag to resize the sidebar"
   },

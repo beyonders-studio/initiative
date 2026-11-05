@@ -344,6 +344,35 @@ const WikiSketch = ({ active }: SketchProps) => (
   </Frame>
 );
 
+/** How a contact is reached, a row each; the first is the one a tap calls. */
+const CONTACT_ROWS = [
+  { id: "phone", width: "w-1/2", tone: accent },
+  { id: "email", width: "w-2/3", tone: faint },
+  { id: "address", width: "w-3/5", tone: faint },
+] as const;
+
+/** A contact's card: a face and a name over the organization they are at,
+ *  then a row for each way to reach them. */
+const ContactSketch = ({ active }: SketchProps) => (
+  <Frame>
+    <div className="flex h-full flex-col gap-1.5">
+      <div className="flex items-center gap-1.5">
+        <Avatar active={active} size="h-7 w-7" />
+        <div className="flex flex-1 flex-col gap-1">
+          <div className={cn("h-2 w-1/2 rounded-sm", ink(active))} />
+          <div className={cn("h-1 w-1/3 rounded-sm", faint(active))} />
+        </div>
+      </div>
+      {CONTACT_ROWS.map((row) => (
+        <div key={row.id} className="flex items-center gap-1.5 px-1">
+          <div className={cn("h-2 w-2 shrink-0 rounded-full", row.tone(active))} />
+          <div className={cn("h-1 rounded-sm", row.width, ink(active))} />
+        </div>
+      ))}
+    </div>
+  </Frame>
+);
+
 export const TOOL_SKETCHES: Record<Tool, (props: SketchProps) => ReactNode> = {
   [Tool.project]: ProjectSketch,
   [Tool.file]: FileSketch,
@@ -352,6 +381,7 @@ export const TOOL_SKETCHES: Record<Tool, (props: SketchProps) => ReactNode> = {
   [Tool.dashboard]: DashboardSketch,
   [Tool.post]: PostSketch,
   [Tool.wiki]: WikiSketch,
+  [Tool.contact]: ContactSketch,
 };
 
 export interface ToolSketchProps extends SketchProps {

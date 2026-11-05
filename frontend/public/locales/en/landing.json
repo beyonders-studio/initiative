@@ -66,7 +66,8 @@
     "calendars": "Events with RSVPs and reminders, so you're not the one reminding everyone.",
     "dashboards": "Your numbers on one screen, and people only see what they have access to.",
     "wikis": "Write down what the group knows, with links that keep working after a rename.",
-    "posts": "Announcements that don't get buried, with polls and read receipts."
+    "posts": "Announcements that don't get buried, with polls and read receipts.",
+    "contacts": "Everyone the work is for or with, one tap from a call, with what's open for each."
   },
   "together": {
     "titleStart": "Built for doing it",

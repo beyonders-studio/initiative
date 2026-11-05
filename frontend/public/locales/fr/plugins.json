@@ -286,6 +286,10 @@
         "read": "Lire les wikis",
         "write": "Lire et modifier les wikis"
       },
+      "contacts": {
+        "read": "Lire les contacts",
+        "write": "Lire et modifier les contacts"
+      },
       "comments": {
         "read": "Lire les commentaires",
         "write": "Lire et écrire des commentaires"

@@ -120,6 +120,7 @@
     "task": "Esta tarea",
     "wiki": "Esta wiki",
     "wiki_page": "Esta página",
+    "contact": "Este contacto",
     "collection": "Esta colección"
   },
   "blockers": {
@@ -134,5 +135,6 @@
   "empty_dashboard": "Aún no hay nada enlazado. Enlaza el proyecto del que informa, o el archivo que lo interpreta.",
   "empty_post": "Aún no hay nada enlazado. Enlaza el proyecto que anuncia, o el archivo que hay detrás.",
   "empty_wiki_page": "Aún no hay nada enlazado. Menciona esta página con [[ desde cualquier sitio y aparecerá aquí.",
+  "empty_contact": "Aún no hay nada enlazado. Enlaza la tarea que haces para ellos, el evento al que irán o su contrato.",
   "empty_collection": "Aún no hay nada enlazado. Enlaza el proyecto para el que son estos archivos."
 }
