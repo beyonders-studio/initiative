@@ -6,6 +6,7 @@
  * here is that it asks for the right one, pages within it, and offers each
  * person the same way in that they get anywhere else.
  */
+import { QueryClient } from "@tanstack/react-query";
 import { act, screen, waitFor } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { HttpResponse } from "msw";
@@ -15,6 +16,7 @@ import { buildCommunity } from "@/__tests__/factories";
 import { communityHttp } from "@/__tests__/helpers/communityHttp";
 import { server } from "@/__tests__/helpers/msw-server";
 import { renderPage } from "@/__tests__/helpers/render";
+import { getListCustomRolesQueryKey } from "@/api/generated/custom-roles/custom-roles";
 import type { CommunityRole } from "@/api/generated/initiativeAPI.schemas";
 
 // The reader, so a row can be told apart from their own.
@@ -79,12 +81,25 @@ const answer = (items: ReturnType<typeof person>[], total = items.length) =>
     isError: false,
   });
 
-const setup = (displayName: string | null = null, role: CommunityRole = "member") => {
-  const community = buildCommunity({ id: 7, display_name: displayName, role });
+const setup = (
+  displayName: string | null = null,
+  role: CommunityRole = "member",
+  {
+    closedSurfaces = null,
+    queryClient,
+  }: { closedSurfaces?: string[] | null; queryClient?: QueryClient } = {}
+) => {
+  const community = buildCommunity({
+    id: 7,
+    display_name: displayName,
+    role,
+    closed_surfaces: closedSurfaces,
+  });
   return renderPage(() => <CommunityMembersPage />, {
     initialRoute: "/c/$communityId/members",
     routeParams: { communityId: "7" },
     communities: { communities: [community], activeCommunityId: 7, activeCommunity: community },
+    queryClient,
   });
 };
 
@@ -310,13 +325,20 @@ describe("a community's members page", () => {
     expect(screen.queryByRole("menuitem", { name: "Remove from community" })).toBeNull();
   });
 
-  it("lets an admin change a member's rung from the row", async () => {
+  it("lets an admin change a member's rung, and gives no custom role while they are off", async () => {
     mocks.setRung.mockResolvedValue(undefined);
     answer([person(1, "ada")]);
-    await settled(setup(null, "admin"));
+    // Custom roles are switched off here, and another page has already read
+    // this community's into the cache, which keeps them.
+    const queryClient = new QueryClient({ defaultOptions: { queries: { retry: false } } });
+    queryClient.setQueryData(getListCustomRolesQueryKey(7), [
+      { id: 1, name: "Doors", base_rung: "member", surfaces: ["invites"] },
+    ]);
+    await settled(setup(null, "admin", { closedSurfaces: ["custom_roles"], queryClient }));
 
     await userEvent.click(await screen.findByRole("button", { name: /actions for ada/i }));
     await userEvent.click(await screen.findByRole("menuitem", { name: "Community role" }));
+    expect(screen.queryByRole("menuitem", { name: "Custom role" })).toBeNull();
     await userEvent.click(await screen.findByRole("menuitemradio", { name: "Admin" }));
 
     await waitFor(() => expect(mocks.setRung).toHaveBeenCalledWith(7, 1, { role: "admin" }));

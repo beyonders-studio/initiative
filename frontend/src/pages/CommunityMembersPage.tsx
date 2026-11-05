@@ -113,9 +113,14 @@ export const CommunityMembersPage = () => {
   const manages = held.writes && held.holds("members");
   const { managesAdmins, gives, takesOff } = held;
   const holdsSeat = Boolean(ownEntry?.can.seat);
-  const rolesClosed = Boolean(ownEntry?.closed_surfaces?.includes("custom_roles"));
-  const customRoles = useCustomRoles({ enabled: manages && !rolesClosed }).data;
-  const roleHolders = useCustomRoleHolders({ enabled: Boolean(customRoles?.length) }).data;
+  // Custom roles are given by whoever keeps the roster, while the community
+  // has them open. A query that is not enabled still answers from the cache,
+  // which another page may have filled, so the answer is gated too.
+  const givesRoles = manages && !ownEntry?.closed_surfaces?.includes("custom_roles");
+  const customRoles = useCustomRoles({ enabled: givesRoles }).data;
+  const roleHolders = useCustomRoleHolders({
+    enabled: givesRoles && Boolean(customRoles?.length),
+  }).data;
   const heldRoleIds = useMemo(
     () => new Map((roleHolders ?? []).map((holder) => [holder.user_id, holder.role_id])),
     [roleHolders]
@@ -249,7 +254,9 @@ export const CommunityMembersPage = () => {
           // one they hold now.
           const heldRole = customRoles?.find((role) => role.id === heldRoleIds.get(member.id));
           const givable =
-            isGuest || (heldRole && !takesOff(heldRole)) ? [] : (customRoles ?? []).filter(gives);
+            !givesRoles || isGuest || (heldRole && !takesOff(heldRole))
+              ? []
+              : (customRoles ?? []).filter(gives);
           return (
             <div className="flex items-center justify-end gap-1">
               <ConnectionActionButtons
@@ -361,6 +368,7 @@ export const CommunityMembersPage = () => {
       answers,
       id,
       manages,
+      givesRoles,
       managesAdmins,
       gives,
       takesOff,
