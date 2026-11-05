@@ -57,7 +57,7 @@ import {
 import {
   useDirectMessagesEnabled,
   useDmSettings,
-  usePendingContactRequests,
+  usePendingConnectionRequests,
 } from "@/hooks/useDirectMessages";
 import { getErrorMessage } from "@/lib/errorMessage";
 import { toast } from "@/lib/mascotToast";
@@ -425,7 +425,7 @@ export function useDismissHistoryAsk() {
 }
 
 export function useMessagesWaiting(): number {
-  const pending = usePendingContactRequests();
+  const pending = usePendingConnectionRequests();
   const conversations = useConversations();
   const unread = useUnreadMessages((conversations.data?.conversations ?? []).map((row) => row.id));
   const unreadTotal = [...(unread.data?.values() ?? [])].reduce((total, count) => total + count, 0);

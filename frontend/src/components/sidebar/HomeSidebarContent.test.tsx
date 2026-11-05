@@ -36,7 +36,7 @@ vi.mock("@/hooks/useMyMessages", async (importOriginal) => ({
 vi.mock("@/hooks/useDirectMessages", async (importOriginal) => ({
   ...(await importOriginal<Record<string, unknown>>()),
   useMessageRequests: () => mocks.messageRequests(),
-  usePendingContactRequests: () => mocks.pending(),
+  usePendingConnectionRequests: () => mocks.pending(),
   useDirectMessagesEnabled: () => mocks.dmEnabled(),
   useAcceptMessageRequest: () => ({ mutate: vi.fn(), isPending: false }),
   useRemoveMessageRequest: () => ({ mutate: vi.fn(), isPending: false }),

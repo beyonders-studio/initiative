@@ -34,7 +34,7 @@ import { getUrlHandle, getUserHandle } from "@/lib/userDisplay";
  */
 type MenuAction = "profile" | "message" | "connect" | "ask";
 
-interface ContactActionsMenuProps {
+interface ConnectionActionsMenuProps {
   /** The account being acted on. The handle is what a connection is addressed
    *  by, so both halves of it are needed, not just the id. */
   user: { id: number; username: string; discriminator: number };
@@ -74,13 +74,13 @@ interface ContactActionsMenuProps {
  * ``denied`` — and because every refusal collapses into that one word, a menu
  * built from it says nothing about which refusal it is.
  */
-export const ContactActionsMenu = ({
+export const ConnectionActionsMenu = ({
   user,
   className,
   omit = [],
   permission: supplied,
-}: ContactActionsMenuProps) => {
-  const { t } = useTranslation(["contacts", "settings"]);
+}: ConnectionActionsMenuProps) => {
+  const { t } = useTranslation(["connections", "settings"]);
   const [confirmingRemove, setConfirmingRemove] = useState(false);
 
   const hidden = new Set(omit);

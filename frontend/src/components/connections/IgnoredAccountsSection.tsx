@@ -1,7 +1,7 @@
 import { useTranslation } from "react-i18next";
 
-import { ContactPersonRow } from "@/components/contacts/ContactPersonRow";
-import { HandleField } from "@/components/contacts/HandleField";
+import { HandleField } from "@/components/connections/HandleField";
+import { PersonRow } from "@/components/connections/PersonRow";
 import { Button } from "@/components/ui/button";
 import {
   useIgnoreAccountByHandle,
@@ -34,7 +34,7 @@ export const IgnoredAccountsSection = () => {
       ) : (
         <ul className="divide-y">
           {items.map((account) => (
-            <ContactPersonRow
+            <PersonRow
               key={account.user_id}
               user={{
                 id: account.user_id,
@@ -51,7 +51,7 @@ export const IgnoredAccountsSection = () => {
               >
                 {t("privacy.ignored.stop")}
               </Button>
-            </ContactPersonRow>
+            </PersonRow>
           ))}
         </ul>
       )}

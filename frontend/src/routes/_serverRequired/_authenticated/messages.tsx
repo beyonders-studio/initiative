@@ -2,7 +2,7 @@ import { createFileRoute, lazyRouteComponent } from "@tanstack/react-router";
 
 /**
  * Who the page should open a conversation with, as a URL handle —
- * `/messages?with=jordan1234`. It is what a contacts row links to, so somebody
+ * `/messages?with=jordan1234`. It is what a person row links to, so somebody
  * you have never messaged is reachable in one click and the page decides what
  * that means: an open channel, or an offer to ask for one.
  */

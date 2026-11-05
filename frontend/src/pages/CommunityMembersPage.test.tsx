@@ -1,7 +1,7 @@
 /**
  * The roster a community's member count leads to.
  *
- * The page adds a surface rather than a source: it asks the same contacts
+ * The page adds a surface rather than a source: it asks the same people
  * aggregate the new-conversation picker reads, for one community. So what is worth asserting
  * here is that it asks for the right one, pages within it, and offers each
  * person the same way in that they get anywhere else.
@@ -125,7 +125,7 @@ describe("a community's members page", () => {
   });
 
   it("lists somebody who takes no messages, with nothing to click", async () => {
-    // The point of reading the roster rather than the contacts aggregate: a
+    // The point of reading the roster rather than the people aggregate: a
     // members page that hid everyone unreachable would be missing members.
     answer([person(1, "ada")]);
     setup();

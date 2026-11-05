@@ -741,7 +741,7 @@ describe("My Messages", () => {
   });
 
   it("opens the conversation the address names", async () => {
-    // A contacts row links straight here. Landing on the page is not enough —
+    // A person row links straight here. Landing on the page is not enough —
     // it has to land on that person's thread.
     mocks.conversations.mockResolvedValue({
       conversations: [conversation],
@@ -832,8 +832,8 @@ describe("My Messages", () => {
   });
 
   it("offers to ask, for somebody there is no channel with", async () => {
-    // The common case, because a contact is somebody you share a community
-    // with rather than somebody who agreed to hear from you.
+    // The common case, because a person listed is somebody you share a
+    // community with rather than somebody who agreed to hear from you.
     mocks.userProfile.mockReturnValue(profile(9, "bram"));
     mocks.dmPermission.mockReturnValue({ data: { permission: "may_request" } });
 

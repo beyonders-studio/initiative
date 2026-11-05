@@ -37,7 +37,7 @@ export const unreachableReason = (
  * one field.
  */
 export const AgeConfirmationForm = ({ id }: { id: string }) => {
-  const { t } = useTranslation(["contacts", "settings"]);
+  const { t } = useTranslation(["connections", "settings"]);
   const { birthdate, setBirthdate, submitting, error, confirm } = useAgeConfirmation();
 
   return (
@@ -65,10 +65,10 @@ export const AgeConfirmationForm = ({ id }: { id: string }) => {
  * and the only thing keeping the answer honest is that nothing here gave a
  * reason to get it wrong.
  */
-export const AgeUnansweredPanel = ({ id = "contacts-age" }: { id?: string } = {}) => {
+export const AgeUnansweredPanel = ({ id = "connections-age" }: { id?: string } = {}) => {
   // The rule and the fact are the Privacy tab's own words: two surfaces say
   // the same thing to the same account, and one string keeps them agreeing.
-  const { t } = useTranslation(["contacts", "settings"]);
+  const { t } = useTranslation(["connections", "settings"]);
 
   return (
     <section className="space-y-3 rounded-lg border p-4">
@@ -93,7 +93,7 @@ export const AgeUnansweredPanel = ({ id = "contacts-age" }: { id?: string } = {}
  * ask.
  */
 export const PrivatePanel = () => {
-  const { t } = useTranslation("contacts");
+  const { t } = useTranslation("connections");
   const updateSettings = useUpdateDmSettings();
 
   return (

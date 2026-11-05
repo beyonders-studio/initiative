@@ -130,13 +130,13 @@ export const notificationLink = (notification: NotificationRead): string | null 
       // device's own store, so there is nothing for a route param to fetch.
       return "/messages";
     // Each lands where it is answered: a message request in the inbox that
-    // would carry the conversation, a connection on the contacts page.
+    // would carry the conversation, a connection in privacy settings.
     case "message_request_received":
     case "message_request_accepted":
       return "/messages";
     case "connection_requested":
     case "connection_accepted":
-      return "/contacts";
+      return "/profile/privacy";
     case "mention":
     case "comment_reply":
     case "comment_on_resource":

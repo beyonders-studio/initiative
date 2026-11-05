@@ -34,7 +34,7 @@ import { toast } from "@/lib/mascotToast";
  * and the copy below does not try to.
  */
 export const StartWithPerson = ({ person }: { person: UserProfile }) => {
-  const { t } = useTranslation(["messages", "contacts", "settings"]);
+  const { t } = useTranslation(["messages", "connections", "settings"]);
 
   const { data: permission } = useDmPermission(person.id);
   const { data: requests } = useMessageRequests();
@@ -81,11 +81,11 @@ export const StartWithPerson = ({ person }: { person: UserProfile }) => {
             onClick={() =>
               requestMessage.mutate(
                 { data: { user_id: person.id } },
-                { onSuccess: () => toast.success(t("contacts:actions.askSent")) }
+                { onSuccess: () => toast.success(t("connections:actions.askSent")) }
               )
             }
           >
-            {t("contacts:actions.ask")}
+            {t("connections:actions.ask")}
           </Button>
         ) : null}
       </div>

@@ -6,7 +6,7 @@ import { buildPage } from "@/__tests__/factories/page.factory";
  * The direct-message surfaces, answering empty.
  *
  * Every page that draws a person now reads some of these — the actions menu on
- * a contact row asks what it may offer about them — so the default is a quiet,
+ * a person row asks what it may offer about them — so the default is a quiet,
  * complete answer rather than an unhandled request warning in every unrelated
  * suite. A test about any of it overrides the one handler it cares about.
  */
@@ -35,10 +35,8 @@ export const dmHandlers = [
   // The same two answers for a page of people at once, which is what a list
   // asks rather than one question per row.
   http.post("/api/v1/me/dm-permissions", () => HttpResponse.json({ permissions: {} })),
-  // The contact rosters: the walk of the reader's communities.
-  http.get("/api/v1/me/contacts", () =>
-    HttpResponse.json({ sections: [], page: 1, page_size: 20 })
-  ),
+  // The people rosters: the walk of the reader's communities.
+  http.get("/api/v1/me/people", () => HttpResponse.json({ sections: [], page: 1, page_size: 20 })),
   // Read by the sidebar's unread badge, so every suite that draws the sidebar
   // asks it — including ones that are not about messages at all.
   http.get("/api/v1/me/dm/conversations", () => HttpResponse.json({ conversations: [] })),

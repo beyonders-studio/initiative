@@ -4,11 +4,11 @@ import { useMemo, useState } from "react";
 import { useTranslation } from "react-i18next";
 
 import type {
-  ContactCommunitySection,
-  ContactRead,
   DirectMessagePermissionRead,
+  PeopleCommunitySection,
+  PersonRead,
 } from "@/api/generated/initiativeAPI.schemas";
-import { ContactActionsMenu } from "@/components/contacts/ContactActionsMenu";
+import { ConnectionActionsMenu } from "@/components/connections/ConnectionActionsMenu";
 import { UserHandle } from "@/components/UserHandle";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { Button } from "@/components/ui/button";
@@ -23,10 +23,10 @@ import {
 import { Input } from "@/components/ui/input";
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip";
 import { ProfileAvatar } from "@/components/user/ProfileAvatar";
-import { useContactSections, useMoreCommunityContacts } from "@/hooks/useContacts";
 import { useDebouncedValue } from "@/hooks/useDebouncedValue";
 import { parseHandle, useDmPermissions, useRequestConnection } from "@/hooks/useDirectMessages";
 import { useRosterCheck, useStartGroup } from "@/hooks/useMyMessages";
+import { useMoreCommunityPeople, usePeopleSections } from "@/hooks/usePeople";
 import { getErrorMessage } from "@/lib/errorMessage";
 import { getInitials } from "@/lib/initials";
 import { toast } from "@/lib/mascotToast";
@@ -46,7 +46,7 @@ const SEARCH_SETTLES_MS = 250;
  * whole handle, number included, also offers a connection: that is the one
  * shape that reaches an account no roster of yours will ever list.
  *
- * This is what My Contacts used to be, minus the browsing: that page listed
+ * This replaces a page of its own, minus the browsing: that page listed
  * everyone you shared a community with, and the only thing anybody did from a
  * row was reach for one of them.
  *
@@ -56,7 +56,7 @@ const SEARCH_SETTLES_MS = 250;
  * what to offer instead.
  */
 export const NewConversationDialog = () => {
-  const { t } = useTranslation(["messages", "contacts", "settings"]);
+  const { t } = useTranslation(["messages", "connections", "settings"]);
   const navigate = useNavigate();
   const [open, setOpen] = useState(false);
   const [term, setTerm] = useState("");
@@ -69,13 +69,13 @@ export const NewConversationDialog = () => {
    * group is built by adding rather than by picking, so the two do not compete
    * for the same gesture.
    */
-  const [gathered, setGathered] = useState<ContactRead[]>([]);
+  const [gathered, setGathered] = useState<PersonRead[]>([]);
 
   // The field answers every keystroke; the request waits for typing to stop.
   const settled = useDebouncedValue(term, SEARCH_SETTLES_MS);
   // Not until it is opened: the aggregate walks every community the reader
   // is in, and a button nobody has pressed is no reason to walk them.
-  const sections = useContactSections(settled, { enabled: open });
+  const sections = usePeopleSections(settled, { enabled: open });
 
   const groups = useMemo(() => sections.data?.sections ?? [], [sections.data]);
   const ids = useMemo(() => {
@@ -100,7 +100,7 @@ export const NewConversationDialog = () => {
     setGathered([]);
   };
 
-  const gather = (person: ContactRead) =>
+  const gather = (person: PersonRead) =>
     setGathered((held) =>
       held.some((one) => one.id === person.id)
         ? held.filter((one) => one.id !== person.id)
@@ -139,7 +139,7 @@ export const NewConversationDialog = () => {
     });
   };
 
-  const pick = (person: ContactRead) => {
+  const pick = (person: PersonRead) => {
     close();
     void navigate({ to: "/messages", search: { with: getUrlHandle(person) } });
   };
@@ -356,16 +356,16 @@ const CommunityRoster = ({
   onGather,
   gathered,
 }: {
-  section: ContactCommunitySection;
+  section: PeopleCommunitySection;
   search: string;
   answers: Record<string, DirectMessagePermissionRead>;
-  onPick: (person: ContactRead) => void;
-  onGather: (person: ContactRead) => void;
+  onPick: (person: PersonRead) => void;
+  onGather: (person: PersonRead) => void;
   gathered: Set<number>;
 }) => {
-  const { t } = useTranslation(["messages", "contacts"]);
+  const { t } = useTranslation(["messages", "connections"]);
   const [wantsMore, setWantsMore] = useState(false);
-  const more = useMoreCommunityContacts(section.community_id, search, wantsMore);
+  const more = useMoreCommunityPeople(section.community_id, search, wantsMore);
 
   const extra = useMemo(
     () => more.data?.pages.flatMap((page) => page.sections?.[0]?.items ?? []) ?? [],
@@ -438,13 +438,13 @@ const PickerPerson = ({
   onGather,
   gathered,
 }: {
-  person: ContactRead;
+  person: PersonRead;
   answer: DirectMessagePermissionRead | undefined;
-  onPick: (person: ContactRead) => void;
-  onGather: (person: ContactRead) => void;
+  onPick: (person: PersonRead) => void;
+  onGather: (person: PersonRead) => void;
   gathered: boolean;
 }) => {
-  const { t } = useTranslation(["messages", "contacts"]);
+  const { t } = useTranslation(["messages", "connections"]);
   const denied = answer?.permission === "denied";
 
   return (
@@ -474,7 +474,7 @@ const PickerPerson = ({
           {denied
             ? t("messages:newConversation.unreachable")
             : answer?.permission === "may_request"
-              ? t("contacts:actions.ask")
+              ? t("connections:actions.ask")
               : null}
         </span>
       </button>
@@ -500,7 +500,7 @@ const PickerPerson = ({
       {/* Outside the button, and outside its `disabled`: if the way in is
           shut, everything else you might do about them stays open -- go and
           look at them, connect, ignore. */}
-      <ContactActionsMenu
+      <ConnectionActionsMenu
         user={{
           id: person.id,
           username: person.username,

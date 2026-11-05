@@ -2,7 +2,7 @@ import { Loader2 } from "lucide-react";
 import { useTranslation } from "react-i18next";
 
 import type { PostReader } from "@/api/generated/initiativeAPI.schemas";
-import { ContactPersonRow } from "@/components/contacts/ContactPersonRow";
+import { PersonRow } from "@/components/connections/PersonRow";
 import {
   Dialog,
   DialogContent,
@@ -39,11 +39,11 @@ const ROSTER_LIST = "max-h-80 divide-y overflow-y-auto px-2";
  * list of people in the app, not like a list this one screen invented.
  */
 const Person = ({ person }: { person: PostReader }) => (
-  <ContactPersonRow user={person}>
+  <PersonRow user={person}>
     {person.read_at ? (
       <RelativeTime date={person.read_at} className="shrink-0 text-muted-foreground text-xs" />
     ) : null}
-  </ContactPersonRow>
+  </PersonRow>
 );
 
 /**

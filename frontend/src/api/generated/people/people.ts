@@ -18,9 +18,9 @@ import type {
 } from "@tanstack/react-query";
 
 import type {
-  ContactSectionsResponse,
   HTTPValidationError,
-  ListContactSectionsParams,
+  ListPeopleSectionsParams,
+  PeopleSectionsResponse,
 } from "../initiativeAPI.schemas";
 
 import { apiMutator } from "../../mutator";
@@ -54,68 +54,64 @@ const withQueryKey = <T extends object, K>(query: T, queryKey: K): T & { queryKe
  * A guild reachable only through a live PAM or break-glass grant has no
  * section here: like every other ``/me`` aggregate, this walks real
  * memberships.
- * @summary List Contact Sections
+ * @summary List People Sections
  */
-export const listContactSections = (
-  params?: ListContactSectionsParams,
+export const listPeopleSections = (
+  params?: ListPeopleSectionsParams,
   options?: SecondParameter<typeof apiMutator>,
   signal?: AbortSignal
 ) => {
-  return apiMutator<ContactSectionsResponse>(
-    { url: `/api/v1/me/contacts`, method: "GET", params, signal },
+  return apiMutator<PeopleSectionsResponse>(
+    { url: `/api/v1/me/people`, method: "GET", params, signal },
     options
   );
 };
 
-export const getListContactSectionsQueryKey = (params?: ListContactSectionsParams) => {
-  return [`/api/v1/me/contacts`, ...(params ? [params] : [])] as const;
+export const getListPeopleSectionsQueryKey = (params?: ListPeopleSectionsParams) => {
+  return [`/api/v1/me/people`, ...(params ? [params] : [])] as const;
 };
 
-export const getListContactSectionsQueryOptions = <
-  TData = Awaited<ReturnType<typeof listContactSections>>,
+export const getListPeopleSectionsQueryOptions = <
+  TData = Awaited<ReturnType<typeof listPeopleSections>>,
   TError = ErrorType<HTTPValidationError>,
 >(
-  params?: ListContactSectionsParams,
+  params?: ListPeopleSectionsParams,
   options?: {
-    query?: Partial<
-      UseQueryOptions<Awaited<ReturnType<typeof listContactSections>>, TError, TData>
-    >;
+    query?: Partial<UseQueryOptions<Awaited<ReturnType<typeof listPeopleSections>>, TError, TData>>;
     request?: SecondParameter<typeof apiMutator>;
   }
 ) => {
   const { query: queryOptions, request: requestOptions } = options ?? {};
 
-  const queryKey = queryOptions?.queryKey ?? getListContactSectionsQueryKey(params);
+  const queryKey = queryOptions?.queryKey ?? getListPeopleSectionsQueryKey(params);
 
-  const queryFn: QueryFunction<Awaited<ReturnType<typeof listContactSections>>> = ({ signal }) =>
-    listContactSections(params, requestOptions, signal);
+  const queryFn: QueryFunction<Awaited<ReturnType<typeof listPeopleSections>>> = ({ signal }) =>
+    listPeopleSections(params, requestOptions, signal);
 
   return { queryKey, queryFn, ...queryOptions } as UseQueryOptions<
-    Awaited<ReturnType<typeof listContactSections>>,
+    Awaited<ReturnType<typeof listPeopleSections>>,
     TError,
     TData
   > & { queryKey: DataTag<QueryKey, TData, TError> };
 };
 
-export type ListContactSectionsQueryResult = NonNullable<
-  Awaited<ReturnType<typeof listContactSections>>
+export type ListPeopleSectionsQueryResult = NonNullable<
+  Awaited<ReturnType<typeof listPeopleSections>>
 >;
-export type ListContactSectionsQueryError = ErrorType<HTTPValidationError>;
+export type ListPeopleSectionsQueryError = ErrorType<HTTPValidationError>;
 
-export function useListContactSections<
-  TData = Awaited<ReturnType<typeof listContactSections>>,
+export function useListPeopleSections<
+  TData = Awaited<ReturnType<typeof listPeopleSections>>,
   TError = ErrorType<HTTPValidationError>,
 >(
-  params: undefined | ListContactSectionsParams,
+  params: undefined | ListPeopleSectionsParams,
   options: {
-    query: Partial<
-      UseQueryOptions<Awaited<ReturnType<typeof listContactSections>>, TError, TData>
-    > &
+    query: Partial<UseQueryOptions<Awaited<ReturnType<typeof listPeopleSections>>, TError, TData>> &
       Pick<
         DefinedInitialDataOptions<
-          Awaited<ReturnType<typeof listContactSections>>,
+          Awaited<ReturnType<typeof listPeopleSections>>,
           TError,
-          Awaited<ReturnType<typeof listContactSections>>
+          Awaited<ReturnType<typeof listPeopleSections>>
         >,
         "initialData"
       >;
@@ -123,20 +119,20 @@ export function useListContactSections<
   },
   queryClient?: QueryClient
 ): DefinedUseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData, TError> };
-export function useListContactSections<
-  TData = Awaited<ReturnType<typeof listContactSections>>,
+export function useListPeopleSections<
+  TData = Awaited<ReturnType<typeof listPeopleSections>>,
   TError = ErrorType<HTTPValidationError>,
 >(
-  params?: ListContactSectionsParams,
+  params?: ListPeopleSectionsParams,
   options?: {
     query?: Partial<
-      UseQueryOptions<Awaited<ReturnType<typeof listContactSections>>, TError, TData>
+      UseQueryOptions<Awaited<ReturnType<typeof listPeopleSections>>, TError, TData>
     > &
       Pick<
         UndefinedInitialDataOptions<
-          Awaited<ReturnType<typeof listContactSections>>,
+          Awaited<ReturnType<typeof listPeopleSections>>,
           TError,
-          Awaited<ReturnType<typeof listContactSections>>
+          Awaited<ReturnType<typeof listPeopleSections>>
         >,
         "initialData"
       >;
@@ -144,37 +140,33 @@ export function useListContactSections<
   },
   queryClient?: QueryClient
 ): UseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData, TError> };
-export function useListContactSections<
-  TData = Awaited<ReturnType<typeof listContactSections>>,
+export function useListPeopleSections<
+  TData = Awaited<ReturnType<typeof listPeopleSections>>,
   TError = ErrorType<HTTPValidationError>,
 >(
-  params?: ListContactSectionsParams,
+  params?: ListPeopleSectionsParams,
   options?: {
-    query?: Partial<
-      UseQueryOptions<Awaited<ReturnType<typeof listContactSections>>, TError, TData>
-    >;
+    query?: Partial<UseQueryOptions<Awaited<ReturnType<typeof listPeopleSections>>, TError, TData>>;
     request?: SecondParameter<typeof apiMutator>;
   },
   queryClient?: QueryClient
 ): UseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData, TError> };
 /**
- * @summary List Contact Sections
+ * @summary List People Sections
  */
 
-export function useListContactSections<
-  TData = Awaited<ReturnType<typeof listContactSections>>,
+export function useListPeopleSections<
+  TData = Awaited<ReturnType<typeof listPeopleSections>>,
   TError = ErrorType<HTTPValidationError>,
 >(
-  params?: ListContactSectionsParams,
+  params?: ListPeopleSectionsParams,
   options?: {
-    query?: Partial<
-      UseQueryOptions<Awaited<ReturnType<typeof listContactSections>>, TError, TData>
-    >;
+    query?: Partial<UseQueryOptions<Awaited<ReturnType<typeof listPeopleSections>>, TError, TData>>;
     request?: SecondParameter<typeof apiMutator>;
   },
   queryClient?: QueryClient
 ): UseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData, TError> } {
-  const queryOptions = getListContactSectionsQueryOptions(params, options);
+  const queryOptions = getListPeopleSectionsQueryOptions(params, options);
 
   const query = useQuery(queryOptions, queryClient) as UseQueryResult<TData, TError> & {
     queryKey: DataTag<QueryKey, TData, TError>;

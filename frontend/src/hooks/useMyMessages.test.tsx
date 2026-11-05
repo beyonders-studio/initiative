@@ -46,7 +46,7 @@ vi.mock("@/api/generated/direct-messages/direct-messages", async (importOriginal
 
 vi.mock("@/hooks/useDirectMessages", () => ({
   useDmSettings: () => ({ data: { send_receipts: true }, isSuccess: true }),
-  usePendingContactRequests: () => ({ data: [] }),
+  usePendingConnectionRequests: () => ({ data: [] }),
   // The deployment's switch, which every hook here is behind. On unless a test
   // says otherwise, which is what a deployment offering messaging looks like.
   useDirectMessagesEnabled: () => mocks.dmEnabled(),

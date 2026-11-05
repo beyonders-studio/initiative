@@ -6,28 +6,27 @@
  * community past its first page is a second read: a request for that
  * community alone.
  *
- * These were My Contacts' reads; the page is gone and the new-conversation
- * picker on My Messages makes them now.
+ * The new-conversation picker on My Messages makes these reads.
  */
 
 import { useInfiniteQuery } from "@tanstack/react-query";
 
-import { listContactSections, useListContactSections } from "@/api/generated/contacts/contacts";
+import { listPeopleSections, useListPeopleSections } from "@/api/generated/people/people";
 
 /** Members read per community at a time. */
-const CONTACTS_PAGE_SIZE = 20;
+const PEOPLE_PAGE_SIZE = 20;
 
 /** How long a page of a community stays fresh enough to reuse. */
 const PAGE_STALE_MS = 30_000;
 
 const sectionParams = (search: string) =>
-  search.trim() ? { search, page_size: CONTACTS_PAGE_SIZE } : { page_size: CONTACTS_PAGE_SIZE };
+  search.trim() ? { search, page_size: PEOPLE_PAGE_SIZE } : { page_size: PEOPLE_PAGE_SIZE };
 
 /** One community, one page — the request a roster makes for itself. */
 const communityPageParams = (communityId: number, page: number, search: string) => ({
   community_ids: [communityId],
   page,
-  page_size: CONTACTS_PAGE_SIZE,
+  page_size: PEOPLE_PAGE_SIZE,
   ...(search.trim() ? { search } : {}),
 });
 
@@ -38,8 +37,8 @@ const communityPageParams = (communityId: number, page: number, search: string) 
  * button — where the aggregate is a whole walk of the reader's communities and
  * there is no reason to walk it until somebody opens the thing.
  */
-export const useContactSections = (search: string, options?: { enabled?: boolean }) =>
-  useListContactSections(sectionParams(search), {
+export const usePeopleSections = (search: string, options?: { enabled?: boolean }) =>
+  useListPeopleSections(sectionParams(search), {
     query: { enabled: options?.enabled ?? true },
   });
 
@@ -60,11 +59,11 @@ export const useContactSections = (search: string, options?: { enabled?: boolean
  * community, and it does not run at all until the reader asks for more, so a
  * roster nobody reaches the bottom of costs nothing.
  */
-export const useMoreCommunityContacts = (communityId: number, search: string, enabled: boolean) =>
+export const useMoreCommunityPeople = (communityId: number, search: string, enabled: boolean) =>
   useInfiniteQuery({
-    queryKey: ["contacts", "community", communityId, search.trim()] as const,
+    queryKey: ["people", "community", communityId, search.trim()] as const,
     queryFn: ({ pageParam }) =>
-      listContactSections(communityPageParams(communityId, pageParam, search)),
+      listPeopleSections(communityPageParams(communityId, pageParam, search)),
     initialPageParam: 2,
     // The section says whether there is one after it; the page number is how
     // many have been fetched, offset by the one that arrived with the walk.

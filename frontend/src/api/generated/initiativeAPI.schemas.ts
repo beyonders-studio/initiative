@@ -4532,38 +4532,6 @@ export interface ConnectionRequestCreate {
 }
 
 /**
- * One person, on one row of the page.
- *
- * Inherits ``UserSummary``'s ``display_name``: the name the person set in
- * the guild this row was read under, which the cross-guild loop reads per
- * guild.
- */
-export interface ContactRead {
-  id: number;
-  username: string;
-  discriminator: number;
-  avatar_url: string | null;
-  status: UserStatus;
-  display_name: string | null;
-  profile_decorations: ProfileDecorationsOutput;
-  community_role: string | null;
-  presence: Presence;
-  shared_community_ids: number[];
-}
-
-/**
- * One guild's roster, as one accordion section.
- */
-export interface ContactCommunitySection {
-  community_id: number;
-  community_name: string;
-  icon_url: string | null;
-  total_count: number;
-  items: ContactRead[];
-  has_next: boolean;
-}
-
-/**
  * One connection or message request, from the reader's side of it.
  */
 export interface ContactGrantRead {
@@ -4584,18 +4552,6 @@ export interface ContactGrantsResponse {
   accepted: ContactGrantRead[];
   incoming: ContactGrantRead[];
   outgoing: ContactGrantRead[];
-}
-
-/**
- * Every guild section, in the reader's own rail order.
- *
- * Paginated *within* each section rather than across a merged list: the
- * response is grouped, so a flat offset would not mean anything.
- */
-export interface ContactSectionsResponse {
-  sections: ContactCommunitySection[];
-  page: number;
-  page_size: number;
 }
 
 /**
@@ -8973,6 +8929,50 @@ export interface PasswordResetSubmit {
   token: string;
   /** @maxLength 256 */
   password: string;
+}
+
+/**
+ * One person, on one row of the roster.
+ *
+ * Inherits ``UserSummary``'s ``display_name``: the name the person set in
+ * the guild this row was read under, which the cross-guild loop reads per
+ * guild.
+ */
+export interface PersonRead {
+  id: number;
+  username: string;
+  discriminator: number;
+  avatar_url: string | null;
+  status: UserStatus;
+  display_name: string | null;
+  profile_decorations: ProfileDecorationsOutput;
+  community_role: string | null;
+  presence: Presence;
+  shared_community_ids: number[];
+}
+
+/**
+ * One guild's roster, as one accordion section.
+ */
+export interface PeopleCommunitySection {
+  community_id: number;
+  community_name: string;
+  icon_url: string | null;
+  total_count: number;
+  items: PersonRead[];
+  has_next: boolean;
+}
+
+/**
+ * Every guild section, in the reader's own rail order.
+ *
+ * Paginated *within* each section rather than across a merged list: the
+ * response is grouped, so a flat offset would not mean anything.
+ */
+export interface PeopleSectionsResponse {
+  sections: PeopleCommunitySection[];
+  page: number;
+  page_size: number;
 }
 
 /**
@@ -14719,7 +14719,7 @@ export type ListMyTrashParams = {
   page_size?: number;
 };
 
-export type ListContactSectionsParams = {
+export type ListPeopleSectionsParams = {
   /**
    * Narrows every section. Matches the handle, plus the real name in a guild that shows names; type a whole handle (`foobar#1234`) to pin one person.
    */

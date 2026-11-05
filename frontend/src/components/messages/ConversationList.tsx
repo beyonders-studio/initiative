@@ -9,8 +9,8 @@ import type {
   Presence,
   ProfileDecorationsOutput,
 } from "@/api/generated/initiativeAPI.schemas";
-import { ContactActionsMenu } from "@/components/contacts/ContactActionsMenu";
-import { PrivatePanel, unreachableReason } from "@/components/contacts/UnreachableEmptyState";
+import { ConnectionActionsMenu } from "@/components/connections/ConnectionActionsMenu";
+import { PrivatePanel, unreachableReason } from "@/components/connections/UnreachableEmptyState";
 import { NewConversationDialog } from "@/components/messages/NewConversationDialog";
 import { UserHandle } from "@/components/UserHandle";
 import { Button } from "@/components/ui/button";
@@ -176,7 +176,7 @@ interface PendingRequest {
  * what a back button, a middle click and a shared address all understand.
  */
 export const ConversationList = ({ explain = false }: { explain?: boolean } = {}) => {
-  const { t } = useTranslation(["messages", "contacts"]);
+  const { t } = useTranslation(["messages", "connections"]);
   const { with: openHandle, thread: openThread } = useSearch({ strict: false }) as {
     with?: string;
     thread?: string;
@@ -400,7 +400,7 @@ export const ConversationList = ({ explain = false }: { explain?: boolean } = {}
         {/* Outside the link, because acting on somebody is not the same
                 gesture as opening what they said. The ways in are left out:
                 the row is one, and clicking it is the conversation. */}
-        <ContactActionsMenu
+        <ConnectionActionsMenu
           user={{
             id: them.user_id,
             username: them.username,
@@ -570,7 +570,7 @@ export const ConversationList = ({ explain = false }: { explain?: boolean } = {}
               <div className="space-y-2 px-2 py-1">
                 <p className="text-muted-foreground text-sm">{t("ageLocked")}</p>
                 <Button variant="outline" size="sm" asChild>
-                  <Link to="/profile/privacy">{t("contacts:unreachable.private.settings")}</Link>
+                  <Link to="/profile/privacy">{t("connections:unreachable.private.settings")}</Link>
                 </Button>
               </div>
             ) : reason === "private" && explain ? (

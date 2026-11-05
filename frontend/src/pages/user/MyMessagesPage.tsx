@@ -14,7 +14,7 @@ import { Fragment, useCallback, useEffect, useMemo, useRef, useState } from "rea
 import { useTranslation } from "react-i18next";
 
 import type { ProfileDecorationsOutput } from "@/api/generated/initiativeAPI.schemas";
-import { AgeUnansweredPanel } from "@/components/contacts/UnreachableEmptyState";
+import { AgeUnansweredPanel } from "@/components/connections/UnreachableEmptyState";
 import { ConversationList } from "@/components/messages/ConversationList";
 import { HistoryAskNotice } from "@/components/messages/HistoryAskNotice";
 import { MessageContent } from "@/components/messages/MessageContent";
@@ -70,11 +70,11 @@ import type { TranslateFn } from "@/types/i18n";
  * * **A device that has never been here has no history.** That is what forward
  *   secrecy costs, and the page says so rather than looking broken.
  *
- * It is also the page a contacts row points at, via `?with=<handle>`. Most of
- * the people it can be opened for have no channel yet — a contact is somebody
- * you share a community with, not somebody who agreed to hear from you — so the
- * handle is a request to open a conversation, and what comes back may be the
- * offer to ask for one instead.
+ * It is also the page a person row points at, via `?with=<handle>`. Most of
+ * the people it can be opened for have no channel yet — a person listed is
+ * somebody you share a community with, not somebody who agreed to hear from
+ * you — so the handle is a request to open a conversation, and what comes back
+ * may be the offer to ask for one instead.
  */
 export function MyMessagesPage() {
   const { t } = useTranslation(["messages", "nav", "common"]);

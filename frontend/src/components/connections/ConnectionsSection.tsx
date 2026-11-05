@@ -1,8 +1,8 @@
 import { useTranslation } from "react-i18next";
 
 import type { ContactGrantRead } from "@/api/generated/initiativeAPI.schemas";
-import { ContactPersonRow } from "@/components/contacts/ContactPersonRow";
-import { HandleField } from "@/components/contacts/HandleField";
+import { HandleField } from "@/components/connections/HandleField";
+import { PersonRow } from "@/components/connections/PersonRow";
 import { Button } from "@/components/ui/button";
 import {
   useConnections,
@@ -55,7 +55,7 @@ export const ConnectionsSection = ({ allowAdding = true }: ConnectionsSectionPro
       ) : (
         <ul className="divide-y">
           {accepted.map((connection) => (
-            <ContactPersonRow
+            <PersonRow
               key={connection.user_id}
               user={{ ...connection, id: connection.user_id }}
               detail={
@@ -74,7 +74,7 @@ export const ConnectionsSection = ({ allowAdding = true }: ConnectionsSectionPro
               >
                 {t("privacy.connections.remove")}
               </Button>
-            </ContactPersonRow>
+            </PersonRow>
           ))}
         </ul>
       )}

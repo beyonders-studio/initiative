@@ -2,7 +2,7 @@ import type { ReactNode } from "react";
 import { useTranslation } from "react-i18next";
 
 import type { ContactGrantRead } from "@/api/generated/initiativeAPI.schemas";
-import { ContactPersonRow } from "@/components/contacts/ContactPersonRow";
+import { PersonRow } from "@/components/connections/PersonRow";
 import { Button } from "@/components/ui/button";
 import {
   useAcceptConnection,
@@ -27,7 +27,7 @@ type PendingRow = ContactGrantRead & { kind: Kind };
  * A request from an account the reader ignores never arrives here: the server
  * leaves it out, so there is nothing to filter and nothing that hints at it.
  */
-export const ContactRequestsSection = ({
+export const ConnectionRequestsSection = ({
   whenEmpty,
 }: {
   /** What to show with nothing waiting. A page that only offers the section
@@ -82,7 +82,7 @@ export const ContactRequestsSection = ({
   return (
     <ul className="divide-y">
       {rows.map((row) => (
-        <ContactPersonRow
+        <PersonRow
           key={`${row.kind}-${row.user_id}`}
           user={{ ...row, id: row.user_id }}
           detail={detailFor(row)}
@@ -101,7 +101,7 @@ export const ContactRequestsSection = ({
               </Button>
             </>
           )}
-        </ContactPersonRow>
+        </PersonRow>
       ))}
     </ul>
   );
