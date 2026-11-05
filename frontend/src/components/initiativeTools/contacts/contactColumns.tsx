@@ -1,10 +1,17 @@
+import { Link } from "@tanstack/react-router";
 import { useMemo } from "react";
 import { useTranslation } from "react-i18next";
 
-import type { ContactDetail, ContactSummary } from "@/api/generated/initiativeAPI.schemas";
-import { ContactOrganization } from "@/components/initiativeTools/contacts/ContactCard";
+import {
+  type ContactDetail,
+  type ContactOrganization,
+  type ContactSummary,
+  Tool,
+} from "@/api/generated/initiativeAPI.schemas";
+import { useCommunityPath } from "@/lib/communityUrl";
 import { mailtoHref, telHref } from "@/lib/contacts";
 import type { AppColumnDef } from "@/lib/table";
+import { toolDetailRoute } from "@/lib/tools";
 
 const NONE = <span className="text-muted-foreground">—</span>;
 
@@ -22,6 +29,20 @@ const FirstDetail = ({
     <a href={href(first.value)} className="whitespace-nowrap hover:underline">
       {first.value}
     </a>
+  );
+};
+
+/** The organization a person is part of, as the list read it, linked. */
+const OrganizationCell = ({ organization }: { organization: ContactOrganization | null }) => {
+  const gp = useCommunityPath();
+  if (!organization) return NONE;
+  return (
+    <Link
+      to={gp(toolDetailRoute(Tool.contact, organization.initiative_id ?? null, organization.id))}
+      className="whitespace-nowrap hover:underline"
+    >
+      {organization.name}
+    </Link>
   );
 };
 
@@ -46,7 +67,7 @@ export const useContactColumns = (): AppColumnDef<ContactSummary>[] => {
       {
         id: "organization",
         header: t("columns.organization"),
-        cell: ({ row }) => <ContactOrganization contact={row.original} />,
+        cell: ({ row }) => <OrganizationCell organization={row.original.organization} />,
       },
     ],
     [t]

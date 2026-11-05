@@ -2,12 +2,10 @@ import { Link } from "@tanstack/react-router";
 import { Building2, Mail, Phone, UserRound } from "lucide-react";
 import { useTranslation } from "react-i18next";
 
-import { type ContactSummary, EndpointKind, Tool } from "@/api/generated/initiativeAPI.schemas";
+import { type ContactSummary, Tool } from "@/api/generated/initiativeAPI.schemas";
 import { TagBadgeList } from "@/components/tags/TagBadge";
 import { Avatar, AvatarFallback } from "@/components/ui/avatar";
-import { useRelationshipsFor } from "@/hooks/useRelationships";
 import { useCommunityPath } from "@/lib/communityUrl";
-import { organizationOf } from "@/lib/contacts";
 import { getInitials } from "@/lib/initials";
 import { toolDetailRoute } from "@/lib/tools";
 import { cn } from "@/lib/utils";
@@ -40,34 +38,6 @@ export const ContactMark = ({ contact }: { contact: ContactKind }) => {
       role="img"
       aria-label={t(contact.is_organization ? "organization" : "person")}
     />
-  );
-};
-
-/**
- * The organization a person is part of, linked, read from their links. An
- * organization, or a person at none, shows nothing.
- */
-export const ContactOrganization = ({
-  contact,
-  className,
-}: {
-  contact: Pick<ContactSummary, "id" | "is_organization">;
-  className?: string;
-}) => {
-  const gp = useCommunityPath();
-  const { data: rows = [] } = useRelationshipsFor(
-    { type: EndpointKind.contact, id: contact.id },
-    { enabled: !contact.is_organization }
-  );
-  const organization = organizationOf(rows);
-  if (!organization) return null;
-  return (
-    <Link
-      to={gp(toolDetailRoute(Tool.contact, organization.initiative_id, organization.id))}
-      className={cn("hover:underline", className)}
-    >
-      {organization.title}
-    </Link>
   );
 };
 

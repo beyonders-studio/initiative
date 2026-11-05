@@ -120,6 +120,15 @@ class ContactUpdate(SanitizedBaseModel):
     )
 
 
+class ContactOrganization(SanitizedBaseModel):
+    """The organization a person is ``part_of``."""
+
+    id: int
+    name: str
+    #: NULL when it is a community contact.
+    initiative_id: Optional[int] = None
+
+
 class ContactSummary(ToolSummaryBase):
     #: NULL on a community contact.
     initiative_id: Optional[int] = None
@@ -129,6 +138,9 @@ class ContactSummary(ToolSummaryBase):
     phones: List[ContactDetail] = Field(default_factory=list)
     addresses: List[ContactDetail] = Field(default_factory=list)
     websites: List[ContactDetail] = Field(default_factory=list)
+    #: A person's organization, read from their ``part_of`` link where the
+    #: reader can open both; filled for a list page, None on a single read.
+    organization: Optional[ContactOrganization] = None
 
 
 class ContactRead(ContactSummary):

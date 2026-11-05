@@ -8,11 +8,16 @@ contacts plug-in (``authorization.COMMUNITY_ROWS``).
 
 from __future__ import annotations
 
+from collections.abc import Iterable
+
 from sqlalchemy.orm import selectinload, undefer
-from sqlmodel import select
+from sqlmodel import col, select
 from sqlmodel.ext.asyncio.session import AsyncSession
 
+from app.core.relationships import RelationshipType
+from app.core.search import SearchEntityType
 from app.models.tenant.contact import Contact
+from app.models.tenant.relationship import EntityRelationship
 from app.services.tenant import metadata as metadata_service
 from app.services.tenant import tags as tags_service
 
@@ -53,3 +58,37 @@ async def get_contact_hydrated(
         await tags_service.annotate_tags(session, [contact])
         await metadata_service.annotate_properties(session, [contact])
     return contact
+
+
+async def organizations_of(
+    session: AsyncSession, person_ids: Iterable[int]
+) -> dict[int, tuple[int, str, int | None]]:
+    """The organization each person is ``part_of``, as ``(id, name, initiative_id)``, for a
+    page of people at once. Read as the reader may see both the link and the
+    organization; a person with several takes the one linked first."""
+    ids = sorted(set(person_ids))
+    if not ids:
+        return {}
+    kind = SearchEntityType.contact.value
+    rows = await session.exec(
+        select(
+            EntityRelationship.source_id,
+            Contact.id,
+            Contact.name,
+            Contact.initiative_id,
+        )
+        .join(Contact, col(Contact.id) == EntityRelationship.target_id)
+        .where(
+            EntityRelationship.source_type == kind,
+            col(EntityRelationship.source_id).in_(ids),
+            EntityRelationship.target_type == kind,
+            EntityRelationship.relationship_type == RelationshipType.part_of.value,
+            col(EntityRelationship.removed_at).is_(None),
+            col(Contact.is_organization).is_(True),
+        )
+        .order_by(col(EntityRelationship.created_at), col(EntityRelationship.id))
+    )
+    found: dict[int, tuple[int, str, int | None]] = {}
+    for person_id, org_id, name, initiative_id in rows.all():
+        found.setdefault(person_id, (org_id, name, initiative_id))
+    return found

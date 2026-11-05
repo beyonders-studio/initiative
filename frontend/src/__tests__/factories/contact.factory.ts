@@ -18,6 +18,7 @@ export function buildContact(overrides: Partial<ContactRead> = {}): ContactRead 
     phones: [],
     addresses: [],
     websites: [],
+    organization: null,
     initiative_id: 1,
     community_id: 1,
     created_by: 1,

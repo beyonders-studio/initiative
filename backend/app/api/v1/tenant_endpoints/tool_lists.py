@@ -91,6 +91,7 @@ from app.schemas.tenant.calendar import (
     CalendarSummary,
 )
 from app.schemas.tenant.contact import (
+    ContactOrganization,
     ContactListResponse,
     ContactRead,
     ContactSummary,
@@ -671,6 +672,25 @@ def _post_order(req: ListRequest) -> list:
     return posts_service.board_order(anchored=req.values.get("until") is not None)
 
 
+_contact_summaries = _summaries(ContactSummary)
+
+
+async def _serialize_contacts(spec: ToolListSpec, req: ListRequest, rows: list) -> list:
+    """The ordinary page, with each person's organization read for the page
+    at once."""
+    items = await _contact_summaries(spec, req, rows)
+    organizations = await contacts_service.organizations_of(
+        req.session, (item.id for item in items if not item.is_organization)
+    )
+    for item in items:
+        if (found := organizations.get(item.id)) is not None:
+            org_id, name, initiative_id = found
+            item.organization = ContactOrganization(
+                id=org_id, name=name, initiative_id=initiative_id
+            )
+    return items
+
+
 async def _serialize_posts(spec: ToolListSpec, req: ListRequest, rows: list) -> list:
     # One grouped query each for the page, so a board of twenty asks a handful
     # of times rather than forty.
@@ -1005,7 +1025,7 @@ TOOL_LISTS: dict[Tool, ToolListSpec] = {
         response_model=ContactListResponse,
         loader_options=_loads(contacts_service.list_loader_options),
         default_order=_order(Contact.name.asc(), Contact.id.asc()),
-        serialize=_summaries(ContactSummary),
+        serialize=_serialize_contacts,
         conditions=_contact_conditions,
         # A contact may belong to the community rather than to an initiative:
         # the plug-in holds it, as it does a community calendar.

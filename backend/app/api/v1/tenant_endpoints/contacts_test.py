@@ -127,6 +127,37 @@ async def test_an_initiative_contact_is_made_read_changed_and_trashed(
     assert [p["value"] for p in read.json()["phones"]] == ["555 0100", "555 0101"]
     assert read.json()["emails"] == body["emails"]
 
+    # A list names each person's organization, read for the page at once.
+    person = await client.post(
+        a.g("/contacts/"),
+        headers=a.headers,
+        json={"name": "Ada", "initiative_id": a.initiative.id},
+    )
+    assert person.status_code == 201, person.text
+    linked = await client.post(
+        a.g("/relationships/"),
+        headers=a.headers,
+        json={
+            "source": {"type": "contact", "id": person.json()["id"]},
+            "relationship_type": "part_of",
+            "target": {"type": "contact", "id": body["id"]},
+        },
+    )
+    assert linked.status_code == 201, linked.text
+    listed = await client.get(
+        a.g("/contacts/"), headers=a.headers, params={"initiative_id": a.initiative.id}
+    )
+    assert listed.status_code == 200, listed.text
+    organizations = {row["name"]: row["organization"] for row in listed.json()["items"]}
+    assert organizations == {
+        "Ada": {
+            "id": body["id"],
+            "name": "Lakeside Lodge & Gardens",
+            "initiative_id": a.initiative.id,
+        },
+        "Lakeside Lodge & Gardens": None,
+    }
+
     trashed = await client.delete(a.g(f"/contacts/{body['id']}"), headers=a.headers)
     assert trashed.status_code == 204, trashed.text
     gone = await client.get(a.g(f"/contacts/{body['id']}"), headers=a.headers)
