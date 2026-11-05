@@ -599,6 +599,8 @@
   "FILE_SPREADSHEET_FILE_TOO_LARGE": "Ese archivo es demasiado grande para importarlo. Contiene más hojas o celdas de las que admite una hoja de cálculo aquí.",
   "RELATIONSHIP_BAD_ENDPOINT": "Eso no se puede vincular",
   "RELATIONSHIP_SOURCE_NOT_WRITABLE": "Solo puedes leer eso, así que no puedes crear un vínculo desde ahí. Créalo desde este lado.",
+  "RELATIONSHIP_ITEM_NOT_WRITABLE": "Solo puedes leer eso, así que no puedes vincularle una persona",
+  "RELATIONSHIP_BETWEEN_PEOPLE": "No se puede vincular a dos personas entre sí",
   "RELATIONSHIP_ENDPOINT_NOT_FOUND": "Uno de estos ya no existe o no se ha compartido contigo",
   "RELATIONSHIP_CROSS_INITIATIVE": "Ambos deben pertenecer a la misma iniciativa",
   "RELATIONSHIP_SELF": "Algo no puede vincularse consigo mismo",

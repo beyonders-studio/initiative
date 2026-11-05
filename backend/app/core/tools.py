@@ -151,7 +151,8 @@ class Kind:
 
 #: Every kind, keyed by its wire name. Append-only: a new kind takes the next
 #: unused code, and no existing code ever moves. 7 and 8 were the libraries'
-#: and stay retired. The initial set was assigned in
+#: and stay retired. 18 is the person's (``app.core.relationships.PERSON``), an
+#: edge end that is not a kind, and is never reused. The initial set was assigned in
 #: alphabetical order, which is where the resemblance ends — a derived ordinal
 #: changes under you the first time a member is added in the middle. Declared
 #: tools first, then what lives inside them, then the guild's vocabulary; the

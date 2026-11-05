@@ -107,8 +107,9 @@ def test_a_hash_naming_no_known_kind_is_not_a_reference():
     assert references_in_text("#widget[Nope](3)") == set()
 
 
-def test_a_user_mention_is_not_a_reference():
-    """People are not things an edge connects."""
+def test_a_user_mention_is_not_a_hash_reference():
+    """A person is not a thing ``#`` names: a body's mentions of people are
+    read on their own."""
     assert references_in_text("thanks @[Ada](4)") == set()
 
 

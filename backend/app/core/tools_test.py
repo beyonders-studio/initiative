@@ -44,14 +44,16 @@ def test_kinds_keep_their_codes_and_live_where_their_sharing_says():
 
     Changing one silently re-encodes a kind: rows written before keep the old
     value, rows after get the new one, and nothing errors. This is the test that
-    holds that rule, because the database cannot. A kind inside a tool names
-    the tool whose sharing the policies already gate it by; one in no one
-    instance of its tool has no sharing to be gated by.
+    holds that rule, because the database cannot. The person's code comes
+    from the same sequence. A kind inside a tool names the tool whose sharing
+    the policies already gate it by; one in no one instance of its tool has no
+    sharing to be gated by.
     """
+    from app.core.relationships import PERSON
     from app.core.tools import KINDS
     from app.db.initiative_rls import governing_path
 
-    codes = [kind.code for kind in KINDS.values()]
+    codes = [kind.code for kind in (*KINDS.values(), PERSON)]
     assert len(codes) == len(set(codes))
     assert all(code > 0 for code in codes)
     for kind in KINDS.values():

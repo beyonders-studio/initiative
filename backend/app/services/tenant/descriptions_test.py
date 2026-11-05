@@ -179,12 +179,11 @@ async def test_naming_yourself_tells_nobody(
     assert await _mentions_for(session, writer.user.id) == []
 
 
-async def test_a_description_s_hash_becomes_the_task_s_reference(
+async def test_what_a_description_names_becomes_the_task_s_references(
     client: AsyncClient, session: AsyncSession, acting_user
 ):
-    writer = await acting_user(
-        guild_role=CommunityRole.member, initiative=True, project=True
-    )
+    """A thing named with ``#`` and a person with ``@``, one edge each."""
+    writer, teammate = await _workspace(acting_user, session)
     doc = await create_file(session, writer.initiative, writer.user)
     task = await create_task(session, writer.project)
     await session.commit()
@@ -192,14 +191,16 @@ async def test_a_description_s_hash_becomes_the_task_s_reference(
     response = await client.patch(
         writer.g(f"/tasks/{task.id}"),
         headers=writer.headers,
-        json={"description": f"Spec: #file[Spec]({doc.id})"},
+        json={
+            "description": f"Spec: #file[Spec]({doc.id}), with @[]({teammate.user.id})"
+        },
     )
     assert response.status_code == 200, response.text
     assert await _references(
         session, writer.guild.id, Endpoint(SearchEntityType.task, task.id)
-    ) == {("file", doc.id)}
+    ) == {("file", doc.id), ("user", teammate.user.id)}
 
-    # Writing the sentence out takes the edge with it.
+    # Writing the sentence out takes the edges with it.
     session.expunge_all()
     response = await client.patch(
         writer.g(f"/tasks/{task.id}"),
@@ -235,5 +236,5 @@ async def test_a_duplicate_points_where_its_original_does_and_tells_nobody(
 
     assert await _references(
         session, writer.guild.id, Endpoint(SearchEntityType.task, copy_id)
-    ) == {("file", doc.id)}
+    ) == {("file", doc.id), ("user", teammate.user.id)}
     assert await _mentions_for(session, teammate.user.id) == []

@@ -599,6 +599,8 @@
   "FILE_SPREADSHEET_FILE_TOO_LARGE": "That file is too large to import. It holds more sheets or cells than a spreadsheet here can take.",
   "RELATIONSHIP_BAD_ENDPOINT": "That is not something links can name",
   "RELATIONSHIP_SOURCE_NOT_WRITABLE": "You can only read that, so you can't make a link from it. Try making the link from this side instead.",
+  "RELATIONSHIP_ITEM_NOT_WRITABLE": "You can only read that, so you can't link a person to it",
+  "RELATIONSHIP_BETWEEN_PEOPLE": "Two people can't be linked to each other",
   "RELATIONSHIP_ENDPOINT_NOT_FOUND": "One of these no longer exists, or is not shared with you",
   "RELATIONSHIP_CROSS_INITIATIVE": "Both of these must be in the same initiative",
   "RELATIONSHIP_SELF": "Something cannot be linked to itself",

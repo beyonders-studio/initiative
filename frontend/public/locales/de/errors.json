@@ -599,6 +599,8 @@
   "FILE_SPREADSHEET_FILE_TOO_LARGE": "Diese Datei ist zu groß für den Import. Sie enthält mehr Blätter oder Zellen, als eine Tabelle hier aufnehmen kann.",
   "RELATIONSHIP_BAD_ENDPOINT": "Das kann nicht verknüpft werden",
   "RELATIONSHIP_SOURCE_NOT_WRITABLE": "Du kannst das nur lesen und daher keine Verknüpfung davon ausgehen lassen. Erstelle die Verknüpfung stattdessen von hier aus.",
+  "RELATIONSHIP_ITEM_NOT_WRITABLE": "Du kannst das nur lesen und daher keine Person damit verknüpfen",
+  "RELATIONSHIP_BETWEEN_PEOPLE": "Zwei Personen können nicht miteinander verknüpft werden",
   "RELATIONSHIP_ENDPOINT_NOT_FOUND": "Eines davon existiert nicht mehr oder wurde nicht mit dir geteilt",
   "RELATIONSHIP_CROSS_INITIATIVE": "Beide müssen zur selben Initiative gehören",
   "RELATIONSHIP_SELF": "Etwas kann nicht mit sich selbst verknüpft werden",

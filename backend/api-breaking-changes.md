@@ -9,6 +9,22 @@ matter and can be deleted.
 
 ## After 0.77.1
 
+### A link can end at a person
+
+An end of a link is an `EndpointKind`: every kind a reference names, and
+`user`, a person in the community. A link's far end can now be a person, and a
+comment, which no link could ever name, is no longer offered as an end.
+
+- GET /api/v1/c/{community_id}/relationships/ added the new `user` enum value to the `items/other/type` response property for the response status `200`
+- POST /api/v1/c/{community_id}/relationships/ removed the enum value `comment` of the request property `source/type`
+- POST /api/v1/c/{community_id}/relationships/ removed the enum value `comment` of the request property `target/type`
+- POST /api/v1/c/{community_id}/relationships/ added the new `user` enum value to the `other/type` response property for the response status `201`
+- PUT /api/v1/c/{community_id}/relationships/ removed the enum value `comment` from the `query` request parameter `other_type`
+- PUT /api/v1/c/{community_id}/relationships/ added the new `user` enum value to the `items/other/type` response property for the response status `200`
+- GET /api/v1/c/{community_id}/relationships/neighbourhood added the new `user` enum value to the `edges/items/anchor/type` response property for the response status `200`
+- GET /api/v1/c/{community_id}/relationships/neighbourhood added the new `user` enum value to the `edges/items/other/type` response property for the response status `200`
+- GET /api/v1/c/{community_id}/relationships/neighbourhood added the new `user` enum value to the `nodes/items/end/type` response property for the response status `200`
+
 ### Removing someone from an initiative answers with nothing
 
 A private initiative now reads as absent, in the database, to anybody not in

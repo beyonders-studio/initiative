@@ -222,6 +222,7 @@ async def _erase_in_guild(
 
     ``guild_session`` is a system session routed into ``guild_id``.
     """
+    from app.core.relationships import PERSON, EndpointKind
     from app.models.platform.identity_ref import IdentityEntity
     from app.models.tenant.calendar_event import CalendarEventAttendee
     from app.models.tenant.custom_role import CustomRoleMember
@@ -229,6 +230,7 @@ async def _erase_in_guild(
     from app.models.tenant.queue import QueueItem
     from app.models.tenant.view_preference import ViewPreference
     from app.models.tenant.webhook_ref import WebhookRef
+    from app.services.tenant import relationships as relationships_service
     from app.services.tenant.mention_parser import anonymize_user_mentions
 
     # Releases their owner grants (content is left unowned) and drops their
@@ -304,6 +306,10 @@ async def _erase_in_guild(
         update(MetadataValue)
         .where(MetadataValue.value_user_id == user_id)
         .values(value_user_id=None)
+    )
+    # Every link with them on an end, from either side, tombstones included.
+    await relationships_service.purge_for_entities(
+        guild_session, EndpointKind(PERSON.value), [user_id]
     )
 
 
