@@ -204,6 +204,14 @@ async def test_lists_with_the_filters_a_scan_sends(
     )
     assert by_person.status_code == 200, by_person.text
     assert [t["title"] for t in by_person.json()["items"]] == ["Late"]
+    # JSON that leads with whitespace names the same person.
+    padded = await client.get(
+        guild_url(installed.guild.id, "/tasks/"),
+        headers=headers,
+        params={"conditions": " \n\t" + _assigned_to(seat["id"])["conditions"]},
+    )
+    assert padded.status_code == 200, padded.text
+    assert [t["title"] for t in padded.json()["items"]] == ["Late"]
     for named in (installed.seat.user.id, "uplu_" + "x" * 32):
         refused = await client.get(
             guild_url(installed.guild.id, "/tasks/"),

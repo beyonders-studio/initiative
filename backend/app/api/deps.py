@@ -1567,7 +1567,8 @@ async def named_refs(request: Request) -> list[str]:
     values: list[str] = [str(v) for v in request.path_params.values()]
     for _, value in request.query_params.multi_items():
         values.append(value)
-        if value[:1] in ("[", "{"):
+        # JSON may lead with whitespace, as the filter parser reads it.
+        if value.lstrip(" \t\n\r")[:1] in ("[", "{"):
             try:
                 values.extend(_strings_in(json.loads(value)))
             except ValueError:
