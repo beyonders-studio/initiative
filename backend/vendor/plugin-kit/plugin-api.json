@@ -5,7 +5,7 @@
     "version": "9.0.1",
     "x-initiative-source": {
       "version": "0.77.1",
-      "commit": "efa16ee25a363fd946adac3d4a3626d322922156"
+      "commit": "9174ffd7efa9e6da0933a1df37694ee9f1ed50ca"
     }
   },
   "servers": [
@@ -70,7 +70,6 @@
             "initiatives:read",
             "posts:read",
             "projects:read",
-            "queues:read",
             "tags:read",
             "wikis:read"
           ]
@@ -101,7 +100,7 @@
           "webhooks"
         ],
         "summary": "Delete Subscription",
-        "description": "Hard-delete a subscription. Who may is the DELETE policy, the same gates\nthat govern the content it watches; a cross-guild lookup is a 404. An\ninstalled plug-in reaches only the subscriptions it registered, and any other\nis a 404.",
+        "description": "Hard-delete a subscription. Who may is the DELETE policy, the same gates\nthat govern the content it watches; a cross-guild lookup is a 404. An\ninstalled plug-in reaches only the subscriptions it registered, and any other\nis a 404.\n\nThe names it minted for itself go with it. One a plug-in registered is\nnamed in that plug-in's sector, which outlives any single subscription.",
         "operationId": "delete_subscription",
         "security": [
           {
@@ -134,7 +133,6 @@
             "initiatives:read",
             "posts:read",
             "projects:read",
-            "queues:read",
             "tags:read",
             "wikis:read"
           ]
@@ -817,306 +815,6 @@
           }
         },
         "x-plugin-scope": "files:write",
-        "parameters": [
-          {
-            "name": "session_token",
-            "in": "cookie",
-            "required": false,
-            "schema": {
-              "anyOf": [
-                {
-                  "type": "string"
-                },
-                {
-                  "type": "null"
-                }
-              ],
-              "title": "Session Token"
-            }
-          }
-        ]
-      }
-    },
-    "/queues/": {
-      "get": {
-        "tags": [
-          "queues"
-        ],
-        "summary": "List Queues",
-        "description": "List queues visible to the current user (guild admins see all).",
-        "operationId": "list_queues",
-        "security": [
-          {
-            "PluginToken": []
-          }
-        ],
-        "responses": {
-          "200": {
-            "description": "Successful Response",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/QueueListResponse"
-                }
-              }
-            }
-          },
-          "422": {
-            "description": "Validation Error",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/HTTPValidationError"
-                }
-              }
-            }
-          }
-        },
-        "x-plugin-scope": "queues:read",
-        "parameters": [
-          {
-            "name": "initiative_id",
-            "in": "query",
-            "required": false,
-            "schema": {
-              "anyOf": [
-                {
-                  "type": "integer"
-                },
-                {
-                  "type": "null"
-                }
-              ],
-              "title": "Initiative Id"
-            }
-          },
-          {
-            "name": "search",
-            "in": "query",
-            "required": false,
-            "schema": {
-              "anyOf": [
-                {
-                  "type": "string"
-                },
-                {
-                  "type": "null"
-                }
-              ],
-              "description": "Full-text match over the row — its name and its description. Reads the same index the search page does, so a list's filter box and a search agree about what matches.",
-              "title": "Search"
-            },
-            "description": "Full-text match over the row — its name and its description. Reads the same index the search page does, so a list's filter box and a search agree about what matches."
-          },
-          {
-            "name": "sort_by",
-            "in": "query",
-            "required": false,
-            "schema": {
-              "anyOf": [
-                {
-                  "type": "string"
-                },
-                {
-                  "type": "null"
-                }
-              ],
-              "description": "Order by one of: name, initiative, updated_at. Omit for this tool's own default order.",
-              "title": "Sort By"
-            },
-            "description": "Order by one of: name, initiative, updated_at. Omit for this tool's own default order."
-          },
-          {
-            "name": "sort_dir",
-            "in": "query",
-            "required": false,
-            "schema": {
-              "anyOf": [
-                {
-                  "type": "string"
-                },
-                {
-                  "type": "null"
-                }
-              ],
-              "description": "asc (default) or desc.",
-              "title": "Sort Dir"
-            },
-            "description": "asc (default) or desc."
-          },
-          {
-            "name": "tag_ids",
-            "in": "query",
-            "required": false,
-            "schema": {
-              "anyOf": [
-                {
-                  "type": "array",
-                  "items": {
-                    "type": "integer"
-                  }
-                },
-                {
-                  "type": "null"
-                }
-              ],
-              "description": "Only queues carrying any of these tags.",
-              "title": "Tag Ids"
-            },
-            "description": "Only queues carrying any of these tags."
-          },
-          {
-            "name": "property_filters",
-            "in": "query",
-            "required": false,
-            "schema": {
-              "anyOf": [
-                {
-                  "type": "string"
-                },
-                {
-                  "type": "null"
-                }
-              ],
-              "description": "JSON-encoded list of property-value filters, e.g. `[{\"property_id\": 12, \"op\": \"eq\", \"value\": \"live\"}]`. Maximum 5 conditions per request.",
-              "title": "Property Filters"
-            },
-            "description": "JSON-encoded list of property-value filters, e.g. `[{\"property_id\": 12, \"op\": \"eq\", \"value\": \"live\"}]`. Maximum 5 conditions per request."
-          },
-          {
-            "name": "archived",
-            "in": "query",
-            "required": false,
-            "schema": {
-              "anyOf": [
-                {
-                  "type": "boolean"
-                },
-                {
-                  "type": "null"
-                }
-              ],
-              "description": "true lists what has been archived instead of what is live. Omit for the live list, which is what every other view shows.",
-              "title": "Archived"
-            },
-            "description": "true lists what has been archived instead of what is live. Omit for the live list, which is what every other view shows."
-          },
-          {
-            "name": "is_active",
-            "in": "query",
-            "required": false,
-            "schema": {
-              "anyOf": [
-                {
-                  "type": "boolean"
-                },
-                {
-                  "type": "null"
-                }
-              ],
-              "description": "Only running queues, or only stopped ones.",
-              "title": "Is Active"
-            },
-            "description": "Only running queues, or only stopped ones."
-          },
-          {
-            "name": "include_preview",
-            "in": "query",
-            "required": false,
-            "schema": {
-              "type": "boolean",
-              "description": "Also send what each row's card shows of what is inside it, read for the whole page at once.",
-              "default": false,
-              "title": "Include Preview"
-            },
-            "description": "Also send what each row's card shows of what is inside it, read for the whole page at once."
-          },
-          {
-            "name": "page",
-            "in": "query",
-            "required": false,
-            "schema": {
-              "type": "integer",
-              "minimum": 1,
-              "default": 1,
-              "title": "Page"
-            }
-          },
-          {
-            "name": "page_size",
-            "in": "query",
-            "required": false,
-            "schema": {
-              "type": "integer",
-              "maximum": 100,
-              "minimum": 1,
-              "default": 20,
-              "title": "Page Size"
-            }
-          },
-          {
-            "name": "session_token",
-            "in": "cookie",
-            "required": false,
-            "schema": {
-              "anyOf": [
-                {
-                  "type": "string"
-                },
-                {
-                  "type": "null"
-                }
-              ],
-              "title": "Session Token"
-            }
-          }
-        ]
-      },
-      "post": {
-        "tags": [
-          "queues"
-        ],
-        "summary": "Create Queue",
-        "description": "Create a new queue in an initiative.\n\nRequires create_queues permission on the initiative (or guild admin).\nThe creator automatically gets owner-level permission.",
-        "operationId": "create_queue",
-        "security": [
-          {
-            "PluginToken": []
-          }
-        ],
-        "requestBody": {
-          "required": true,
-          "content": {
-            "application/json": {
-              "schema": {
-                "$ref": "#/components/schemas/QueueCreate"
-              }
-            }
-          }
-        },
-        "responses": {
-          "201": {
-            "description": "Successful Response",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/QueueRead"
-                }
-              }
-            }
-          },
-          "422": {
-            "description": "Validation Error",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/HTTPValidationError"
-                }
-              }
-            }
-          }
-        },
-        "x-plugin-scope": "queues:write",
         "parameters": [
           {
             "name": "session_token",
@@ -2585,7 +2283,7 @@
           "files"
         ],
         "summary": "Add Collection Files",
-        "description": "Put files in a collection: each a file of its initiative the reader can\nopen. One already in it stays as it is.",
+        "description": "Put files in a collection: each a file of its initiative the reader can\nopen, starting with ``metadata``'s values of the collection's metadata.\nOne already in it stays as it is. A person gives each value the\ncollection's file page requires.",
         "operationId": "add_collection_files",
         "security": [
           {
@@ -2597,7 +2295,7 @@
           "content": {
             "application/json": {
               "schema": {
-                "$ref": "#/components/schemas/CollectionFiles"
+                "$ref": "#/components/schemas/CollectionFilesAdd"
               }
             }
           }
@@ -4524,23 +4222,6 @@
             }
           },
           {
-            "name": "queue_id",
-            "in": "query",
-            "required": false,
-            "schema": {
-              "anyOf": [
-                {
-                  "type": "integer",
-                  "exclusiveMinimum": 0
-                },
-                {
-                  "type": "null"
-                }
-              ],
-              "title": "Queue Id"
-            }
-          },
-          {
             "name": "counter_group_id",
             "in": "query",
             "required": false,
@@ -4727,7 +4408,7 @@
           "initiatives"
         ],
         "summary": "List Initiatives",
-        "description": "The initiatives the caller belongs to, or — for a guild admin asking for\n``scope=community`` — every initiative in the guild.\n\nThe default is the caller's own workspace: what the sidebar and the\ninitiative pickers show. A guild admin's authority over their whole guild is\nunchanged; it simply no longer decides what appears in their navigation.\nThey bring an initiative into it by taking the project manager role from the\nguild-settings initiative table, which is also what ``scope=community`` feeds.",
+        "description": "The initiatives the caller belongs to, or — for a guild admin asking for\n``scope=community`` — every initiative in the guild, which the admin rung's\nreach into all content already reads.\n\nThe default is the caller's own workspace: what the sidebar and the\ninitiative pickers show. A guild admin's authority over their whole guild is\nunchanged; it simply no longer decides what appears in their navigation.\nThey bring an initiative into it by taking the project manager role from the\nguild-settings initiative table, which is also what ``scope=community`` feeds.",
         "operationId": "list_initiatives",
         "security": [
           {
@@ -5709,995 +5390,6 @@
             "schema": {
               "type": "integer",
               "title": "File Id"
-            }
-          },
-          {
-            "name": "session_token",
-            "in": "cookie",
-            "required": false,
-            "schema": {
-              "anyOf": [
-                {
-                  "type": "string"
-                },
-                {
-                  "type": "null"
-                }
-              ],
-              "title": "Session Token"
-            }
-          }
-        ]
-      }
-    },
-    "/queues/{queue_id}": {
-      "get": {
-        "tags": [
-          "queues"
-        ],
-        "summary": "Read Queue",
-        "operationId": "read_queue",
-        "security": [
-          {
-            "PluginToken": []
-          }
-        ],
-        "responses": {
-          "200": {
-            "description": "Successful Response",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/QueueRead"
-                }
-              }
-            }
-          },
-          "422": {
-            "description": "Validation Error",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/HTTPValidationError"
-                }
-              }
-            }
-          }
-        },
-        "x-plugin-scope": "queues:read",
-        "parameters": [
-          {
-            "name": "queue_id",
-            "in": "path",
-            "required": true,
-            "schema": {
-              "type": "integer",
-              "title": "Queue Id"
-            }
-          },
-          {
-            "name": "include_deleted",
-            "in": "query",
-            "required": false,
-            "schema": {
-              "type": "boolean",
-              "description": "Also return the resource if it is in the trash. For reading a resource back after a deleted event — the row still exists until retention purges it, and access is checked exactly as for a live one.",
-              "default": false,
-              "title": "Include Deleted"
-            },
-            "description": "Also return the resource if it is in the trash. For reading a resource back after a deleted event — the row still exists until retention purges it, and access is checked exactly as for a live one."
-          },
-          {
-            "name": "session_token",
-            "in": "cookie",
-            "required": false,
-            "schema": {
-              "anyOf": [
-                {
-                  "type": "string"
-                },
-                {
-                  "type": "null"
-                }
-              ],
-              "title": "Session Token"
-            }
-          }
-        ]
-      },
-      "patch": {
-        "tags": [
-          "queues"
-        ],
-        "summary": "Update Queue",
-        "description": "Update queue name/description. Requires write access.",
-        "operationId": "update_queue",
-        "security": [
-          {
-            "PluginToken": []
-          }
-        ],
-        "requestBody": {
-          "required": true,
-          "content": {
-            "application/json": {
-              "schema": {
-                "$ref": "#/components/schemas/QueueUpdate"
-              }
-            }
-          }
-        },
-        "responses": {
-          "200": {
-            "description": "Successful Response",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/QueueRead"
-                }
-              }
-            }
-          },
-          "422": {
-            "description": "Validation Error",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/HTTPValidationError"
-                }
-              }
-            }
-          }
-        },
-        "x-plugin-scope": "queues:write",
-        "parameters": [
-          {
-            "name": "queue_id",
-            "in": "path",
-            "required": true,
-            "schema": {
-              "type": "integer",
-              "title": "Queue Id"
-            }
-          },
-          {
-            "name": "session_token",
-            "in": "cookie",
-            "required": false,
-            "schema": {
-              "anyOf": [
-                {
-                  "type": "string"
-                },
-                {
-                  "type": "null"
-                }
-              ],
-              "title": "Session Token"
-            }
-          }
-        ]
-      }
-    },
-    "/queues/{queue_id}/items": {
-      "post": {
-        "tags": [
-          "queues"
-        ],
-        "summary": "Add Queue Item",
-        "description": "Add an item to a queue. Requires write access.",
-        "operationId": "add_queue_item",
-        "security": [
-          {
-            "PluginToken": []
-          }
-        ],
-        "requestBody": {
-          "required": true,
-          "content": {
-            "application/json": {
-              "schema": {
-                "$ref": "#/components/schemas/QueueItemCreate"
-              }
-            }
-          }
-        },
-        "responses": {
-          "201": {
-            "description": "Successful Response",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/QueueItemRead"
-                }
-              }
-            }
-          },
-          "422": {
-            "description": "Validation Error",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/HTTPValidationError"
-                }
-              }
-            }
-          }
-        },
-        "x-plugin-scope": "queues:write",
-        "parameters": [
-          {
-            "name": "queue_id",
-            "in": "path",
-            "required": true,
-            "schema": {
-              "type": "integer",
-              "title": "Queue Id"
-            }
-          },
-          {
-            "name": "session_token",
-            "in": "cookie",
-            "required": false,
-            "schema": {
-              "anyOf": [
-                {
-                  "type": "string"
-                },
-                {
-                  "type": "null"
-                }
-              ],
-              "title": "Session Token"
-            }
-          }
-        ]
-      }
-    },
-    "/queues/{queue_id}/start": {
-      "post": {
-        "tags": [
-          "queues"
-        ],
-        "summary": "Start Queue",
-        "description": "Start the queue: set active, reset to first item, round 1.",
-        "operationId": "start_queue",
-        "security": [
-          {
-            "PluginToken": []
-          }
-        ],
-        "responses": {
-          "200": {
-            "description": "Successful Response",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/QueueRead"
-                }
-              }
-            }
-          },
-          "422": {
-            "description": "Validation Error",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/HTTPValidationError"
-                }
-              }
-            }
-          }
-        },
-        "x-plugin-scope": "queues:write",
-        "parameters": [
-          {
-            "name": "queue_id",
-            "in": "path",
-            "required": true,
-            "schema": {
-              "type": "integer",
-              "title": "Queue Id"
-            }
-          },
-          {
-            "name": "session_token",
-            "in": "cookie",
-            "required": false,
-            "schema": {
-              "anyOf": [
-                {
-                  "type": "string"
-                },
-                {
-                  "type": "null"
-                }
-              ],
-              "title": "Session Token"
-            }
-          }
-        ]
-      }
-    },
-    "/queues/{queue_id}/stop": {
-      "post": {
-        "tags": [
-          "queues"
-        ],
-        "summary": "Stop Queue",
-        "description": "Stop the queue: set inactive but keep current position.",
-        "operationId": "stop_queue",
-        "security": [
-          {
-            "PluginToken": []
-          }
-        ],
-        "responses": {
-          "200": {
-            "description": "Successful Response",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/QueueRead"
-                }
-              }
-            }
-          },
-          "422": {
-            "description": "Validation Error",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/HTTPValidationError"
-                }
-              }
-            }
-          }
-        },
-        "x-plugin-scope": "queues:write",
-        "parameters": [
-          {
-            "name": "queue_id",
-            "in": "path",
-            "required": true,
-            "schema": {
-              "type": "integer",
-              "title": "Queue Id"
-            }
-          },
-          {
-            "name": "session_token",
-            "in": "cookie",
-            "required": false,
-            "schema": {
-              "anyOf": [
-                {
-                  "type": "string"
-                },
-                {
-                  "type": "null"
-                }
-              ],
-              "title": "Session Token"
-            }
-          }
-        ]
-      }
-    },
-    "/queues/{queue_id}/next": {
-      "post": {
-        "tags": [
-          "queues"
-        ],
-        "summary": "Advance Turn",
-        "description": "Advance to the next visible item. Wraps around and increments round.",
-        "operationId": "advance_turn",
-        "security": [
-          {
-            "PluginToken": []
-          }
-        ],
-        "responses": {
-          "200": {
-            "description": "Successful Response",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/QueueRead"
-                }
-              }
-            }
-          },
-          "422": {
-            "description": "Validation Error",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/HTTPValidationError"
-                }
-              }
-            }
-          }
-        },
-        "x-plugin-scope": "queues:write",
-        "parameters": [
-          {
-            "name": "queue_id",
-            "in": "path",
-            "required": true,
-            "schema": {
-              "type": "integer",
-              "title": "Queue Id"
-            }
-          },
-          {
-            "name": "session_token",
-            "in": "cookie",
-            "required": false,
-            "schema": {
-              "anyOf": [
-                {
-                  "type": "string"
-                },
-                {
-                  "type": "null"
-                }
-              ],
-              "title": "Session Token"
-            }
-          }
-        ]
-      }
-    },
-    "/queues/{queue_id}/previous": {
-      "post": {
-        "tags": [
-          "queues"
-        ],
-        "summary": "Previous Turn",
-        "description": "Move to the previous visible item. Wraps around and decrements round.",
-        "operationId": "previous_turn",
-        "security": [
-          {
-            "PluginToken": []
-          }
-        ],
-        "responses": {
-          "200": {
-            "description": "Successful Response",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/QueueRead"
-                }
-              }
-            }
-          },
-          "422": {
-            "description": "Validation Error",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/HTTPValidationError"
-                }
-              }
-            }
-          }
-        },
-        "x-plugin-scope": "queues:write",
-        "parameters": [
-          {
-            "name": "queue_id",
-            "in": "path",
-            "required": true,
-            "schema": {
-              "type": "integer",
-              "title": "Queue Id"
-            }
-          },
-          {
-            "name": "session_token",
-            "in": "cookie",
-            "required": false,
-            "schema": {
-              "anyOf": [
-                {
-                  "type": "string"
-                },
-                {
-                  "type": "null"
-                }
-              ],
-              "title": "Session Token"
-            }
-          }
-        ]
-      }
-    },
-    "/queues/{queue_id}/set-active/{item_id}": {
-      "post": {
-        "tags": [
-          "queues"
-        ],
-        "summary": "Set Active Item",
-        "description": "Jump to a specific item in the queue.",
-        "operationId": "set_active_item",
-        "security": [
-          {
-            "PluginToken": []
-          }
-        ],
-        "responses": {
-          "200": {
-            "description": "Successful Response",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/QueueRead"
-                }
-              }
-            }
-          },
-          "422": {
-            "description": "Validation Error",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/HTTPValidationError"
-                }
-              }
-            }
-          }
-        },
-        "x-plugin-scope": "queues:write",
-        "parameters": [
-          {
-            "name": "queue_id",
-            "in": "path",
-            "required": true,
-            "schema": {
-              "type": "integer",
-              "title": "Queue Id"
-            }
-          },
-          {
-            "name": "item_id",
-            "in": "path",
-            "required": true,
-            "schema": {
-              "type": "integer",
-              "title": "Item Id"
-            }
-          },
-          {
-            "name": "session_token",
-            "in": "cookie",
-            "required": false,
-            "schema": {
-              "anyOf": [
-                {
-                  "type": "string"
-                },
-                {
-                  "type": "null"
-                }
-              ],
-              "title": "Session Token"
-            }
-          }
-        ]
-      }
-    },
-    "/queues/{queue_id}/reset": {
-      "post": {
-        "tags": [
-          "queues"
-        ],
-        "summary": "Reset Queue",
-        "description": "Reset the queue to round 1, first visible item.",
-        "operationId": "reset_queue",
-        "security": [
-          {
-            "PluginToken": []
-          }
-        ],
-        "responses": {
-          "200": {
-            "description": "Successful Response",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/QueueRead"
-                }
-              }
-            }
-          },
-          "422": {
-            "description": "Validation Error",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/HTTPValidationError"
-                }
-              }
-            }
-          }
-        },
-        "x-plugin-scope": "queues:write",
-        "parameters": [
-          {
-            "name": "queue_id",
-            "in": "path",
-            "required": true,
-            "schema": {
-              "type": "integer",
-              "title": "Queue Id"
-            }
-          },
-          {
-            "name": "session_token",
-            "in": "cookie",
-            "required": false,
-            "schema": {
-              "anyOf": [
-                {
-                  "type": "string"
-                },
-                {
-                  "type": "null"
-                }
-              ],
-              "title": "Session Token"
-            }
-          }
-        ]
-      }
-    },
-    "/queues/{queue_id}/hold": {
-      "post": {
-        "tags": [
-          "queues"
-        ],
-        "summary": "Hold Current Turn",
-        "description": "Hold the current turn — the item leaves the rotation until it acts.\n\nThe held item is recorded with the current round; the rotation\nauto-releases it when its natural position-desc slot comes back around in\na later round. Users can also call ``/release/{item_id}`` to act sooner.",
-        "operationId": "hold_current_turn",
-        "security": [
-          {
-            "PluginToken": []
-          }
-        ],
-        "responses": {
-          "200": {
-            "description": "Successful Response",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/QueueRead"
-                }
-              }
-            }
-          },
-          "422": {
-            "description": "Validation Error",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/HTTPValidationError"
-                }
-              }
-            }
-          }
-        },
-        "x-plugin-scope": "queues:write",
-        "parameters": [
-          {
-            "name": "queue_id",
-            "in": "path",
-            "required": true,
-            "schema": {
-              "type": "integer",
-              "title": "Queue Id"
-            }
-          },
-          {
-            "name": "session_token",
-            "in": "cookie",
-            "required": false,
-            "schema": {
-              "anyOf": [
-                {
-                  "type": "string"
-                },
-                {
-                  "type": "null"
-                }
-              ],
-              "title": "Session Token"
-            }
-          }
-        ]
-      }
-    },
-    "/queues/{queue_id}/release/{item_id}": {
-      "post": {
-        "tags": [
-          "queues"
-        ],
-        "summary": "Release Held Item",
-        "description": "Release a held item back into the rotation.\n\nClears ``held_at_round`` on the target so it rejoins the active rotation.\nThe rotation pointer is unchanged, so this doesn't pull current back onto\nitems that already took their turn this round.\n\nWhen ``options.reposition`` is True (PF2e Delay semantics), the released\nitem's ``position`` is rewritten to land just after the current item in\nturn order — the new initiative slot persists for the rest of the\nencounter. Default ``False`` keeps the released item at its original\nposition so it acts at its natural slot next time the rotation reaches\nit.",
-        "operationId": "release_held_item",
-        "security": [
-          {
-            "PluginToken": []
-          }
-        ],
-        "requestBody": {
-          "content": {
-            "application/json": {
-              "schema": {
-                "$ref": "#/components/schemas/QueueReleaseRequest",
-                "default": {
-                  "reposition": false
-                }
-              }
-            }
-          }
-        },
-        "responses": {
-          "200": {
-            "description": "Successful Response",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/QueueRead"
-                }
-              }
-            }
-          },
-          "422": {
-            "description": "Validation Error",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/HTTPValidationError"
-                }
-              }
-            }
-          }
-        },
-        "x-plugin-scope": "queues:write",
-        "parameters": [
-          {
-            "name": "queue_id",
-            "in": "path",
-            "required": true,
-            "schema": {
-              "type": "integer",
-              "title": "Queue Id"
-            }
-          },
-          {
-            "name": "item_id",
-            "in": "path",
-            "required": true,
-            "schema": {
-              "type": "integer",
-              "title": "Item Id"
-            }
-          },
-          {
-            "name": "session_token",
-            "in": "cookie",
-            "required": false,
-            "schema": {
-              "anyOf": [
-                {
-                  "type": "string"
-                },
-                {
-                  "type": "null"
-                }
-              ],
-              "title": "Session Token"
-            }
-          }
-        ]
-      }
-    },
-    "/queue-items/{item_id}": {
-      "get": {
-        "tags": [
-          "queues"
-        ],
-        "summary": "Read Queue Item",
-        "description": "One queue item by id — the read-back for a ``queue_items.*`` event.\n\nGated by read access on the queue it belongs to, like listing it. The item's\nown id is the whole address, so there is no parent to mismatch.",
-        "operationId": "read_queue_item",
-        "security": [
-          {
-            "PluginToken": []
-          }
-        ],
-        "responses": {
-          "200": {
-            "description": "Successful Response",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/QueueItemRead"
-                }
-              }
-            }
-          },
-          "422": {
-            "description": "Validation Error",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/HTTPValidationError"
-                }
-              }
-            }
-          }
-        },
-        "x-plugin-scope": "queues:read",
-        "parameters": [
-          {
-            "name": "item_id",
-            "in": "path",
-            "required": true,
-            "schema": {
-              "type": "integer",
-              "title": "Item Id"
-            }
-          },
-          {
-            "name": "include_deleted",
-            "in": "query",
-            "required": false,
-            "schema": {
-              "type": "boolean",
-              "description": "Also return the resource if it is in the trash. For reading a resource back after a deleted event — the row still exists until retention purges it, and access is checked exactly as for a live one.",
-              "default": false,
-              "title": "Include Deleted"
-            },
-            "description": "Also return the resource if it is in the trash. For reading a resource back after a deleted event — the row still exists until retention purges it, and access is checked exactly as for a live one."
-          },
-          {
-            "name": "session_token",
-            "in": "cookie",
-            "required": false,
-            "schema": {
-              "anyOf": [
-                {
-                  "type": "string"
-                },
-                {
-                  "type": "null"
-                }
-              ],
-              "title": "Session Token"
-            }
-          }
-        ]
-      },
-      "patch": {
-        "tags": [
-          "queues"
-        ],
-        "summary": "Update Queue Item",
-        "description": "Update a queue item. Requires write access on the queue.",
-        "operationId": "update_queue_item",
-        "security": [
-          {
-            "PluginToken": []
-          }
-        ],
-        "requestBody": {
-          "required": true,
-          "content": {
-            "application/json": {
-              "schema": {
-                "$ref": "#/components/schemas/QueueItemUpdate"
-              }
-            }
-          }
-        },
-        "responses": {
-          "200": {
-            "description": "Successful Response",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/QueueItemRead"
-                }
-              }
-            }
-          },
-          "422": {
-            "description": "Validation Error",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/HTTPValidationError"
-                }
-              }
-            }
-          }
-        },
-        "x-plugin-scope": "queues:write",
-        "parameters": [
-          {
-            "name": "item_id",
-            "in": "path",
-            "required": true,
-            "schema": {
-              "type": "integer",
-              "title": "Item Id"
-            }
-          },
-          {
-            "name": "session_token",
-            "in": "cookie",
-            "required": false,
-            "schema": {
-              "anyOf": [
-                {
-                  "type": "string"
-                },
-                {
-                  "type": "null"
-                }
-              ],
-              "title": "Session Token"
-            }
-          }
-        ]
-      }
-    },
-    "/queue-items/{item_id}/duplicate": {
-      "post": {
-        "tags": [
-          "queues"
-        ],
-        "summary": "Duplicate Queue Item",
-        "description": "Copy the item beside itself, at the same place in the turn order, as\n\"<label> (Copy)\", with its person, tags, links and properties.",
-        "operationId": "duplicate_queue_item",
-        "security": [
-          {
-            "PluginToken": []
-          }
-        ],
-        "responses": {
-          "201": {
-            "description": "Successful Response",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/QueueItemRead"
-                }
-              }
-            }
-          },
-          "422": {
-            "description": "Validation Error",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/HTTPValidationError"
-                }
-              }
-            }
-          }
-        },
-        "x-plugin-scope": "queues:write",
-        "parameters": [
-          {
-            "name": "item_id",
-            "in": "path",
-            "required": true,
-            "schema": {
-              "type": "integer",
-              "title": "Item Id"
             }
           },
           {
@@ -9235,7 +7927,7 @@
           "tags"
         ],
         "summary": "Bulk Edit Tags",
-        "description": "Add and/or remove tags across many entities of one type, atomically.\n\nEvery target is authorized with write on the tool that governs it, read\nfrom the registry its RLS policy is rendered from: a tool row asks itself,\na sub-resource (a task, a queue item, a wiki page, …) asks its parent tool.\nNothing is applied unless every target passes — one transaction, and a\nparent tool's ``updated_at`` moves once for all of its sub-resources rather\nthan once per row.",
+        "description": "Add and/or remove tags across many entities of one type, atomically.\n\nEvery target is authorized with write on the tool that governs it, read\nfrom the registry its RLS policy is rendered from: a tool row asks itself,\na sub-resource (a task, a counter, a wiki page, …) asks its parent tool.\nNothing is applied unless every target passes — one transaction, and a\nparent tool's ``updated_at`` moves once for all of its sub-resources rather\nthan once per row.",
         "operationId": "bulk_edit_tags",
         "security": [
           {
@@ -9432,85 +8124,6 @@
             "schema": {
               "type": "integer",
               "title": "File Id"
-            }
-          },
-          {
-            "name": "session_token",
-            "in": "cookie",
-            "required": false,
-            "schema": {
-              "anyOf": [
-                {
-                  "type": "string"
-                },
-                {
-                  "type": "null"
-                }
-              ],
-              "title": "Session Token"
-            }
-          }
-        ]
-      }
-    },
-    "/queues/{queue_id}/grants": {
-      "put": {
-        "tags": [
-          "queues"
-        ],
-        "summary": "Set Queue Grants",
-        "description": "Replace the queue's entire sharing state in one call — the body is the\nfull list of grants (all-initiative-members / per-user / per-role). Every\nnon-owner grant is rebuilt from it; the owner is always preserved.\n\nAnyone the new sharing no longer lets open the queue is taken off\nwhatever in it names them.",
-        "operationId": "set_queue_grants",
-        "security": [
-          {
-            "PluginToken": []
-          }
-        ],
-        "requestBody": {
-          "required": true,
-          "content": {
-            "application/json": {
-              "schema": {
-                "type": "array",
-                "items": {
-                  "$ref": "#/components/schemas/ResourceGrantSchema"
-                },
-                "title": "Grants"
-              }
-            }
-          }
-        },
-        "responses": {
-          "200": {
-            "description": "Successful Response",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/QueueRead"
-                }
-              }
-            }
-          },
-          "422": {
-            "description": "Validation Error",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/HTTPValidationError"
-                }
-              }
-            }
-          }
-        },
-        "x-plugin-scope": "sharing:write",
-        "parameters": [
-          {
-            "name": "queue_id",
-            "in": "path",
-            "required": true,
-            "schema": {
-              "type": "integer",
-              "title": "Queue Id"
             }
           },
           {
@@ -10012,88 +8625,6 @@
         ]
       }
     },
-    "/queues/{queue_id}/duplicate": {
-      "post": {
-        "tags": [
-          "queues"
-        ],
-        "summary": "Duplicate Queue",
-        "description": "Copy it, with everything inside it, into an initiative: its own unless the body names another. Read is enough to copy a template; anything else needs write. The copy is shared as its source is while it stays in the same initiative, and carries the tags its maker may set: an installed plug-in's copy carries them only when it holds the scope to tag.",
-        "operationId": "duplicate_queue",
-        "security": [
-          {
-            "PluginToken": []
-          }
-        ],
-        "requestBody": {
-          "content": {
-            "application/json": {
-              "schema": {
-                "anyOf": [
-                  {
-                    "$ref": "#/components/schemas/ToolDuplicateRequest"
-                  },
-                  {
-                    "type": "null"
-                  }
-                ],
-                "title": "Body"
-              }
-            }
-          }
-        },
-        "responses": {
-          "201": {
-            "description": "Successful Response",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/QueueRead"
-                }
-              }
-            }
-          },
-          "422": {
-            "description": "Validation Error",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/HTTPValidationError"
-                }
-              }
-            }
-          }
-        },
-        "x-plugin-scope": "queues:write",
-        "parameters": [
-          {
-            "name": "queue_id",
-            "in": "path",
-            "required": true,
-            "schema": {
-              "type": "integer",
-              "title": "Queue Id"
-            }
-          },
-          {
-            "name": "session_token",
-            "in": "cookie",
-            "required": false,
-            "schema": {
-              "anyOf": [
-                {
-                  "type": "string"
-                },
-                {
-                  "type": "null"
-                }
-              ],
-              "title": "Session Token"
-            }
-          }
-        ]
-      }
-    },
     "/counter-groups/{group_id}/duplicate": {
       "post": {
         "tags": [
@@ -10471,7 +9002,6 @@
             "files:read",
             "posts:read",
             "projects:read",
-            "queues:read",
             "tags:read",
             "wikis:read"
           ]
@@ -10505,10 +9035,10 @@
                   "type": "null"
                 }
               ],
-              "description": "Restrict to these entity types. Omit for the default scope (calendar, calendar_event, collection, counter, counter_group, dashboard, file, post, project, queue, queue_item, tag, task, wiki, wiki_page); naming a type reaches it explicitly.",
+              "description": "Restrict to these entity types. Omit for the default scope (calendar, calendar_event, collection, counter, counter_group, dashboard, file, post, project, tag, task, wiki, wiki_page); naming a type reaches it explicitly.",
               "title": "Types"
             },
-            "description": "Restrict to these entity types. Omit for the default scope (calendar, calendar_event, collection, counter, counter_group, dashboard, file, post, project, queue, queue_item, tag, task, wiki, wiki_page); naming a type reaches it explicitly."
+            "description": "Restrict to these entity types. Omit for the default scope (calendar, calendar_event, collection, counter, counter_group, dashboard, file, post, project, tag, task, wiki, wiki_page); naming a type reaches it explicitly."
           },
           {
             "name": "initiative_id",
@@ -10643,7 +9173,6 @@
             "posts:read",
             "projects:read",
             "properties:read",
-            "queues:read",
             "wikis:read"
           ]
         },
@@ -10742,6 +9271,222 @@
         },
         "responses": {
           "201": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/PropertyDefinitionRead"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        },
+        "x-plugin-scope": {
+          "per": "owner's_scope",
+          "any_of": [
+            "files:write",
+            "projects:write",
+            "properties:write"
+          ]
+        },
+        "parameters": [
+          {
+            "name": "session_token",
+            "in": "cookie",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Session Token"
+            }
+          }
+        ]
+      }
+    },
+    "/property-definitions/by-owner": {
+      "get": {
+        "tags": [
+          "property-definitions"
+        ],
+        "summary": "List Property Definitions By Owner",
+        "description": "The initiative's metadata, then the properties of each of its projects\nand each of its collections, under the owner's name.\n\nA project's or a collection's are listed only to whoever may edit them,\nas making, changing and removing one asks; a role that reaches every\nproject and collection (the community's admin, a live grant) is listed\nthem all. ``can_edit`` says whether the reader may rename, reorder and\ndelete a group's: a project's and a collection's always, as listed, and\nthe initiative's for its managers and the community's admin.",
+        "operationId": "list_property_definitions_by_owner",
+        "security": [
+          {
+            "PluginToken": []
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/PropertyDefinitionGroups"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        },
+        "x-plugin-scope": {
+          "per": "tool",
+          "any_of": [
+            "calendars:read",
+            "counter_groups:read",
+            "dashboards:read",
+            "files:read",
+            "posts:read",
+            "projects:read",
+            "properties:read",
+            "wikis:read"
+          ]
+        },
+        "parameters": [
+          {
+            "name": "initiative_id",
+            "in": "query",
+            "required": true,
+            "schema": {
+              "type": "integer",
+              "title": "Initiative Id"
+            }
+          },
+          {
+            "name": "session_token",
+            "in": "cookie",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Session Token"
+            }
+          }
+        ]
+      }
+    },
+    "/property-definitions/bulk-delete": {
+      "post": {
+        "tags": [
+          "property-definitions"
+        ],
+        "summary": "Delete Property Definitions",
+        "description": "Delete several of the initiative's definitions at once, with every\nvalue of each: all of them, or, when any may not be removed as deleting it\nalone asks, none.",
+        "operationId": "delete_property_definitions",
+        "security": [
+          {
+            "PluginToken": []
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/PropertyDefinitionBulkDelete"
+              }
+            }
+          }
+        },
+        "responses": {
+          "204": {
+            "description": "Successful Response"
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        },
+        "x-plugin-scope": {
+          "per": "owner's_scope",
+          "any_of": [
+            "files:write",
+            "projects:write",
+            "properties:write"
+          ]
+        },
+        "parameters": [
+          {
+            "name": "session_token",
+            "in": "cookie",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Session Token"
+            }
+          }
+        ]
+      }
+    },
+    "/property-definitions/promote": {
+      "post": {
+        "tags": [
+          "property-definitions"
+        ],
+        "summary": "Promote Property Definitions",
+        "description": "Merge properties of one type, from the initiative's projects and\ncollections, into one of its metadata named ``name``, answering it.\n\nIt is the initiative's metadata of that name and type if there is one, or\na new one. Its options gain theirs, their values move to it, every layout\nshowing one of them shows it instead, and they are deleted, in one\ntransaction (``metadata_service.promote``). It asks to remove each of them\nas deleting it alone does, and to define the initiative's metadata, as\nmaking one does; an installed plug-in also needs ``properties:write``.",
+        "operationId": "promote_property_definitions",
+        "security": [
+          {
+            "PluginToken": []
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/PropertyDefinitionPromote"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
             "description": "Successful Response",
             "content": {
               "application/json": {
@@ -10996,8 +9741,6 @@
             "file": "files:write",
             "post": "posts:write",
             "project": "projects:write",
-            "queue": "queues:write",
-            "queue_item": "queues:write",
             "task": "projects:write",
             "wiki": "wikis:write",
             "wiki_page": "wikis:write"
@@ -11085,7 +9828,6 @@
             "file": "files:write",
             "post": "posts:write",
             "project": "projects:write",
-            "queue": "queues:write",
             "task": "projects:write",
             "wiki": "wikis:write"
           }
@@ -11390,7 +10132,6 @@
         "enum": [
           "project",
           "file",
-          "queue",
           "counter_group",
           "calendar",
           "dashboard",
@@ -13123,7 +11864,7 @@
         "title": "CollectionFileSummary",
         "description": "A file as its collection lists it: with when it was added there, and\nits values of the collection's metadata."
       },
-      "CollectionFiles": {
+      "CollectionFilesAdd": {
         "properties": {
           "file_ids": {
             "items": {
@@ -13133,14 +11874,21 @@
             "maxItems": 500,
             "minItems": 1,
             "title": "File Ids"
+          },
+          "metadata": {
+            "items": {
+              "$ref": "#/components/schemas/PropertyValueInput"
+            },
+            "type": "array",
+            "title": "Metadata"
           }
         },
         "type": "object",
         "required": [
           "file_ids"
         ],
-        "title": "CollectionFiles",
-        "description": "Files to put in a collection or take out of it."
+        "title": "CollectionFilesAdd",
+        "description": "Files to put in a collection, and the values of the collection's\nmetadata each one it takes starts with: what its file page requires."
       },
       "CollectionListResponse": {
         "properties": {
@@ -13644,18 +12392,6 @@
             ],
             "title": "File Id"
           },
-          "queue_id": {
-            "anyOf": [
-              {
-                "type": "integer",
-                "exclusiveMinimum": 0
-              },
-              {
-                "type": "null"
-              }
-            ],
-            "title": "Queue Id"
-          },
           "counter_group_id": {
             "anyOf": [
               {
@@ -13843,17 +12579,6 @@
             ],
             "title": "File Id"
           },
-          "queue_id": {
-            "anyOf": [
-              {
-                "type": "integer"
-              },
-              {
-                "type": "null"
-              }
-            ],
-            "title": "Queue Id"
-          },
           "counter_group_id": {
             "anyOf": [
               {
@@ -14020,7 +12745,6 @@
           "collection_id",
           "project_id",
           "file_id",
-          "queue_id",
           "counter_group_id",
           "calendar_id",
           "dashboard_id",
@@ -16331,11 +15055,6 @@
             "title": "Files Enabled",
             "default": true
           },
-          "queues_enabled": {
-            "type": "boolean",
-            "title": "Queues Enabled",
-            "default": false
-          },
           "counter_groups_enabled": {
             "type": "boolean",
             "title": "Counter Groups Enabled",
@@ -16466,7 +15185,6 @@
         "required": [
           "projects_enabled",
           "files_enabled",
-          "queues_enabled",
           "counter_groups_enabled",
           "calendars_enabled",
           "dashboards_enabled",
@@ -16558,6 +15276,16 @@
         ],
         "title": "InitiativeTaskStatusRead",
         "description": "A status column as it appears across one initiative's projects.\n\nEntries are aggregated by ``(name, category)``, so the same column\nconfigured in several projects collapses to a single row; ``color`` and\n``icon`` come from the first project that defines it. ``project_count`` is\nhow many of the projects the caller can read carry the column, out of\n``projects_total``."
+      },
+      "MetadataOwnerKind": {
+        "type": "string",
+        "enum": [
+          "initiative",
+          "project",
+          "collection"
+        ],
+        "title": "MetadataOwnerKind",
+        "description": "Who owns a definition people define: the initiative (its metadata), or\na project or a collection (its properties)."
       },
       "MetadataType": {
         "type": "string",
@@ -17894,6 +16622,30 @@
         "type": "object",
         "title": "ProjectUpdate"
       },
+      "PropertyDefinitionBulkDelete": {
+        "properties": {
+          "initiative_id": {
+            "type": "integer",
+            "title": "Initiative Id"
+          },
+          "ids": {
+            "items": {
+              "type": "integer"
+            },
+            "type": "array",
+            "maxItems": 100,
+            "minItems": 1,
+            "title": "Ids"
+          }
+        },
+        "type": "object",
+        "required": [
+          "initiative_id",
+          "ids"
+        ],
+        "title": "PropertyDefinitionBulkDelete",
+        "description": "Definitions of one initiative to delete together, or none of them."
+      },
       "PropertyDefinitionCreate": {
         "properties": {
           "name": {
@@ -17980,6 +16732,104 @@
           "initiative_id"
         ],
         "title": "PropertyDefinitionCreate"
+      },
+      "PropertyDefinitionGroup": {
+        "properties": {
+          "owner": {
+            "$ref": "#/components/schemas/MetadataOwnerKind"
+          },
+          "owner_id": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Owner Id"
+          },
+          "name": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Name"
+          },
+          "can_edit": {
+            "type": "boolean",
+            "title": "Can Edit"
+          },
+          "definitions": {
+            "items": {
+              "$ref": "#/components/schemas/PropertyDefinitionRead"
+            },
+            "type": "array",
+            "title": "Definitions"
+          }
+        },
+        "type": "object",
+        "required": [
+          "owner",
+          "owner_id",
+          "name",
+          "can_edit",
+          "definitions"
+        ],
+        "title": "PropertyDefinitionGroup",
+        "description": "One owner's definitions, as the initiative's settings list them."
+      },
+      "PropertyDefinitionGroups": {
+        "properties": {
+          "groups": {
+            "items": {
+              "$ref": "#/components/schemas/PropertyDefinitionGroup"
+            },
+            "type": "array",
+            "title": "Groups"
+          }
+        },
+        "type": "object",
+        "required": [
+          "groups"
+        ],
+        "title": "PropertyDefinitionGroups",
+        "description": "An initiative's metadata, then the properties of each project and each\ncollection in it the reader may edit, each under its owner."
+      },
+      "PropertyDefinitionPromote": {
+        "properties": {
+          "initiative_id": {
+            "type": "integer",
+            "title": "Initiative Id"
+          },
+          "ids": {
+            "items": {
+              "type": "integer"
+            },
+            "type": "array",
+            "maxItems": 100,
+            "minItems": 1,
+            "title": "Ids"
+          },
+          "name": {
+            "type": "string",
+            "maxLength": 100,
+            "minLength": 1,
+            "title": "Name"
+          }
+        },
+        "type": "object",
+        "required": [
+          "initiative_id",
+          "ids",
+          "name"
+        ],
+        "title": "PropertyDefinitionPromote",
+        "description": "Properties of one type, from the initiative's projects and\ncollections, merged into one of its metadata, named ``name``."
       },
       "PropertyDefinitionRead": {
         "properties": {
@@ -18350,14 +17200,12 @@
         "enum": [
           "project",
           "file",
-          "queue",
           "counter_group",
           "calendar",
           "dashboard",
           "post",
           "wiki",
           "task",
-          "queue_item",
           "calendar_event",
           "counter",
           "wiki_page",
@@ -18417,834 +17265,6 @@
         "type": "object",
         "title": "PropertyValuesSetRequest",
         "description": "Payload for ``PUT /properties/{target}/{entity_id}``: replace-all, or\nwith ``merge`` only the properties it names.\n\nReplacing, an empty list clears every property value on the entity."
-      },
-      "QueueCreate": {
-        "properties": {
-          "properties": {
-            "items": {
-              "$ref": "#/components/schemas/PropertyValueInput"
-            },
-            "type": "array",
-            "title": "Properties"
-          },
-          "name": {
-            "type": "string",
-            "maxLength": 255,
-            "minLength": 1,
-            "title": "Name"
-          },
-          "description": {
-            "anyOf": [
-              {
-                "type": "string",
-                "x-mentions": "markdown",
-                "description": "A person is mentioned as `@[](<reference>)`, by your reference for them, with no name: read who they are from the members search (`members:read`). Write a mention the same way. A stored file comes without its path: `![alt]()`, `[name]()`."
-              },
-              {
-                "type": "null"
-              }
-            ],
-            "title": "Description"
-          },
-          "initiative_id": {
-            "type": "integer",
-            "title": "Initiative Id"
-          },
-          "grants": {
-            "items": {
-              "$ref": "#/components/schemas/ResourceGrantSchema"
-            },
-            "type": "array",
-            "title": "Grants"
-          }
-        },
-        "type": "object",
-        "required": [
-          "name",
-          "initiative_id"
-        ],
-        "title": "QueueCreate"
-      },
-      "QueueItemCreate": {
-        "properties": {
-          "properties": {
-            "items": {
-              "$ref": "#/components/schemas/PropertyValueInput"
-            },
-            "type": "array",
-            "title": "Properties"
-          },
-          "label": {
-            "type": "string",
-            "maxLength": 255,
-            "minLength": 1,
-            "title": "Label"
-          },
-          "position": {
-            "type": "number",
-            "title": "Position",
-            "default": 0
-          },
-          "color": {
-            "anyOf": [
-              {
-                "type": "string"
-              },
-              {
-                "type": "null"
-              }
-            ],
-            "title": "Color"
-          },
-          "notes": {
-            "anyOf": [
-              {
-                "type": "string",
-                "x-mentions": "markdown",
-                "description": "A person is mentioned as `@[](<reference>)`, by your reference for them, with no name: read who they are from the members search (`members:read`). Write a mention the same way. A stored file comes without its path: `![alt]()`, `[name]()`."
-              },
-              {
-                "type": "null"
-              }
-            ],
-            "title": "Notes"
-          },
-          "is_visible": {
-            "type": "boolean",
-            "title": "Is Visible",
-            "default": true
-          },
-          "user_id": {
-            "anyOf": [
-              {
-                "type": "string",
-                "x-identity": "person"
-              },
-              {
-                "type": "null"
-              }
-            ],
-            "title": "User Id"
-          },
-          "tag_ids": {
-            "anyOf": [
-              {
-                "items": {
-                  "type": "integer"
-                },
-                "type": "array"
-              },
-              {
-                "type": "null"
-              }
-            ],
-            "title": "Tag Ids"
-          },
-          "task_ids": {
-            "anyOf": [
-              {
-                "items": {
-                  "type": "integer"
-                },
-                "type": "array"
-              },
-              {
-                "type": "null"
-              }
-            ],
-            "title": "Task Ids"
-          }
-        },
-        "type": "object",
-        "required": [
-          "label"
-        ],
-        "title": "QueueItemCreate"
-      },
-      "QueueItemRead": {
-        "properties": {
-          "label": {
-            "type": "string",
-            "maxLength": 255,
-            "minLength": 1,
-            "title": "Label"
-          },
-          "position": {
-            "type": "number",
-            "title": "Position",
-            "default": 0
-          },
-          "color": {
-            "anyOf": [
-              {
-                "type": "string"
-              },
-              {
-                "type": "null"
-              }
-            ],
-            "title": "Color"
-          },
-          "notes": {
-            "anyOf": [
-              {
-                "type": "string",
-                "x-mentions": "markdown",
-                "description": "A person is mentioned as `@[](<reference>)`, by your reference for them, with no name: read who they are from the members search (`members:read`). Write a mention the same way. A stored file comes without its path: `![alt]()`, `[name]()`."
-              },
-              {
-                "type": "null"
-              }
-            ],
-            "title": "Notes"
-          },
-          "is_visible": {
-            "type": "boolean",
-            "title": "Is Visible",
-            "default": true
-          },
-          "id": {
-            "type": "integer",
-            "title": "Id"
-          },
-          "queue_id": {
-            "type": "integer",
-            "title": "Queue Id"
-          },
-          "user_id": {
-            "anyOf": [
-              {
-                "type": "string",
-                "x-identity": "person"
-              },
-              {
-                "type": "null"
-              }
-            ],
-            "title": "User Id"
-          },
-          "user": {
-            "anyOf": [
-              {
-                "$ref": "#/components/schemas/PluginPerson"
-              },
-              {
-                "type": "null"
-              }
-            ]
-          },
-          "tags": {
-            "items": {
-              "$ref": "#/components/schemas/TagSummary"
-            },
-            "type": "array",
-            "title": "Tags"
-          },
-          "properties": {
-            "items": {
-              "$ref": "#/components/schemas/PropertySummary"
-            },
-            "type": "array",
-            "title": "Properties"
-          },
-          "attachment_count": {
-            "type": "integer",
-            "title": "Attachment Count",
-            "default": 0
-          },
-          "held_at_round": {
-            "anyOf": [
-              {
-                "type": "integer"
-              },
-              {
-                "type": "null"
-              }
-            ],
-            "title": "Held At Round"
-          },
-          "created_by": {
-            "anyOf": [
-              {
-                "type": "string",
-                "x-identity": "person"
-              },
-              {
-                "type": "null"
-              }
-            ],
-            "title": "Created By"
-          },
-          "created_at": {
-            "type": "string",
-            "format": "date-time",
-            "title": "Created At"
-          }
-        },
-        "type": "object",
-        "required": [
-          "label",
-          "position",
-          "color",
-          "notes",
-          "is_visible",
-          "id",
-          "queue_id",
-          "user_id",
-          "user",
-          "tags",
-          "properties",
-          "attachment_count",
-          "held_at_round",
-          "created_by",
-          "created_at"
-        ],
-        "title": "QueueItemRead"
-      },
-      "QueueItemUpdate": {
-        "properties": {
-          "properties": {
-            "anyOf": [
-              {
-                "items": {
-                  "$ref": "#/components/schemas/PropertyValueInput"
-                },
-                "type": "array"
-              },
-              {
-                "type": "null"
-              }
-            ],
-            "title": "Properties"
-          },
-          "label": {
-            "anyOf": [
-              {
-                "type": "string",
-                "maxLength": 255,
-                "minLength": 1
-              },
-              {
-                "type": "null"
-              }
-            ],
-            "title": "Label"
-          },
-          "position": {
-            "anyOf": [
-              {
-                "type": "number"
-              },
-              {
-                "type": "null"
-              }
-            ],
-            "title": "Position"
-          },
-          "user_id": {
-            "anyOf": [
-              {
-                "type": "string",
-                "x-identity": "person"
-              },
-              {
-                "type": "null"
-              }
-            ],
-            "title": "User Id"
-          },
-          "color": {
-            "anyOf": [
-              {
-                "type": "string"
-              },
-              {
-                "type": "null"
-              }
-            ],
-            "title": "Color"
-          },
-          "notes": {
-            "anyOf": [
-              {
-                "type": "string",
-                "x-mentions": "markdown",
-                "description": "A person is mentioned as `@[](<reference>)`, by your reference for them, with no name: read who they are from the members search (`members:read`). Write a mention the same way. A stored file comes without its path: `![alt]()`, `[name]()`."
-              },
-              {
-                "type": "null"
-              }
-            ],
-            "title": "Notes"
-          },
-          "is_visible": {
-            "anyOf": [
-              {
-                "type": "boolean"
-              },
-              {
-                "type": "null"
-              }
-            ],
-            "title": "Is Visible"
-          },
-          "tag_ids": {
-            "anyOf": [
-              {
-                "items": {
-                  "type": "integer"
-                },
-                "type": "array",
-                "maxItems": 100
-              },
-              {
-                "type": "null"
-              }
-            ],
-            "title": "Tag Ids"
-          },
-          "notes_base": {
-            "anyOf": [
-              {
-                "type": "string",
-                "x-mentions": "markdown",
-                "description": "A person is mentioned as `@[](<reference>)`, by your reference for them, with no name: read who they are from the members search (`members:read`). Write a mention the same way. A stored file comes without its path: `![alt]()`, `[name]()`."
-              },
-              {
-                "type": "null"
-              }
-            ],
-            "title": "Notes Base"
-          }
-        },
-        "type": "object",
-        "title": "QueueItemUpdate"
-      },
-      "QueueListResponse": {
-        "properties": {
-          "total_count": {
-            "type": "integer",
-            "title": "Total Count"
-          },
-          "page": {
-            "type": "integer",
-            "title": "Page"
-          },
-          "page_size": {
-            "type": "integer",
-            "title": "Page Size"
-          },
-          "has_next": {
-            "type": "boolean",
-            "title": "Has Next"
-          },
-          "has_prev": {
-            "type": "boolean",
-            "title": "Has Prev"
-          },
-          "items": {
-            "items": {
-              "$ref": "#/components/schemas/QueueSummary"
-            },
-            "type": "array",
-            "title": "Items"
-          }
-        },
-        "type": "object",
-        "required": [
-          "total_count",
-          "page",
-          "page_size",
-          "has_next",
-          "has_prev",
-          "items"
-        ],
-        "title": "QueueListResponse"
-      },
-      "QueueRead": {
-        "properties": {
-          "archived_at": {
-            "anyOf": [
-              {
-                "type": "string",
-                "format": "date-time"
-              },
-              {
-                "type": "null"
-              }
-            ],
-            "title": "Archived At"
-          },
-          "can": {
-            "$ref": "#/components/schemas/ToolCan"
-          },
-          "id": {
-            "type": "integer",
-            "title": "Id"
-          },
-          "initiative_id": {
-            "type": "integer",
-            "title": "Initiative Id"
-          },
-          "community_id": {
-            "title": "Community Id",
-            "type": "string",
-            "x-identity": "community"
-          },
-          "created_by": {
-            "anyOf": [
-              {
-                "type": "string",
-                "x-identity": "person"
-              },
-              {
-                "type": "null"
-              }
-            ],
-            "title": "Created By"
-          },
-          "created_at": {
-            "type": "string",
-            "format": "date-time",
-            "title": "Created At"
-          },
-          "updated_at": {
-            "type": "string",
-            "format": "date-time",
-            "title": "Updated At"
-          },
-          "comments_enabled": {
-            "type": "boolean",
-            "title": "Comments Enabled",
-            "default": true
-          },
-          "tags": {
-            "items": {
-              "$ref": "#/components/schemas/TagSummary"
-            },
-            "type": "array",
-            "title": "Tags"
-          },
-          "properties": {
-            "items": {
-              "$ref": "#/components/schemas/PropertySummary"
-            },
-            "type": "array",
-            "title": "Properties"
-          },
-          "grants": {
-            "items": {
-              "$ref": "#/components/schemas/ResourceGrantSchema"
-            },
-            "type": "array",
-            "title": "Grants"
-          },
-          "name": {
-            "type": "string",
-            "maxLength": 255,
-            "minLength": 1,
-            "title": "Name"
-          },
-          "description": {
-            "anyOf": [
-              {
-                "type": "string",
-                "x-mentions": "markdown",
-                "description": "A person is mentioned as `@[](<reference>)`, by your reference for them, with no name: read who they are from the members search (`members:read`). Write a mention the same way. A stored file comes without its path: `![alt]()`, `[name]()`."
-              },
-              {
-                "type": "null"
-              }
-            ],
-            "title": "Description"
-          },
-          "current_round": {
-            "type": "integer",
-            "title": "Current Round"
-          },
-          "is_active": {
-            "type": "boolean",
-            "title": "Is Active"
-          },
-          "preview": {
-            "anyOf": [
-              {
-                "items": {
-                  "$ref": "#/components/schemas/QueueTurnPreview"
-                },
-                "type": "array"
-              },
-              {
-                "type": "null"
-              }
-            ],
-            "title": "Preview"
-          },
-          "items": {
-            "items": {
-              "$ref": "#/components/schemas/QueueItemRead"
-            },
-            "type": "array",
-            "title": "Items"
-          },
-          "current_item_id": {
-            "anyOf": [
-              {
-                "type": "integer"
-              },
-              {
-                "type": "null"
-              }
-            ],
-            "title": "Current Item Id"
-          }
-        },
-        "type": "object",
-        "required": [
-          "archived_at",
-          "can",
-          "id",
-          "initiative_id",
-          "community_id",
-          "created_by",
-          "created_at",
-          "updated_at",
-          "comments_enabled",
-          "tags",
-          "properties",
-          "grants",
-          "name",
-          "description",
-          "current_round",
-          "is_active",
-          "preview",
-          "items",
-          "current_item_id"
-        ],
-        "title": "QueueRead"
-      },
-      "QueueReleaseRequest": {
-        "properties": {
-          "reposition": {
-            "type": "boolean",
-            "title": "Reposition",
-            "default": false
-          }
-        },
-        "type": "object",
-        "title": "QueueReleaseRequest",
-        "description": "Options for releasing a held queue item back into the rotation."
-      },
-      "QueueSummary": {
-        "properties": {
-          "archived_at": {
-            "anyOf": [
-              {
-                "type": "string",
-                "format": "date-time"
-              },
-              {
-                "type": "null"
-              }
-            ],
-            "title": "Archived At"
-          },
-          "can": {
-            "$ref": "#/components/schemas/ToolCan"
-          },
-          "id": {
-            "type": "integer",
-            "title": "Id"
-          },
-          "initiative_id": {
-            "type": "integer",
-            "title": "Initiative Id"
-          },
-          "community_id": {
-            "title": "Community Id",
-            "type": "string",
-            "x-identity": "community"
-          },
-          "created_by": {
-            "anyOf": [
-              {
-                "type": "string",
-                "x-identity": "person"
-              },
-              {
-                "type": "null"
-              }
-            ],
-            "title": "Created By"
-          },
-          "created_at": {
-            "type": "string",
-            "format": "date-time",
-            "title": "Created At"
-          },
-          "updated_at": {
-            "type": "string",
-            "format": "date-time",
-            "title": "Updated At"
-          },
-          "comments_enabled": {
-            "type": "boolean",
-            "title": "Comments Enabled",
-            "default": true
-          },
-          "tags": {
-            "items": {
-              "$ref": "#/components/schemas/TagSummary"
-            },
-            "type": "array",
-            "title": "Tags"
-          },
-          "properties": {
-            "items": {
-              "$ref": "#/components/schemas/PropertySummary"
-            },
-            "type": "array",
-            "title": "Properties"
-          },
-          "grants": {
-            "items": {
-              "$ref": "#/components/schemas/ResourceGrantSchema"
-            },
-            "type": "array",
-            "title": "Grants"
-          },
-          "name": {
-            "type": "string",
-            "maxLength": 255,
-            "minLength": 1,
-            "title": "Name"
-          },
-          "description": {
-            "anyOf": [
-              {
-                "type": "string",
-                "x-mentions": "markdown",
-                "description": "A person is mentioned as `@[](<reference>)`, by your reference for them, with no name: read who they are from the members search (`members:read`). Write a mention the same way. A stored file comes without its path: `![alt]()`, `[name]()`."
-              },
-              {
-                "type": "null"
-              }
-            ],
-            "title": "Description"
-          },
-          "current_round": {
-            "type": "integer",
-            "title": "Current Round"
-          },
-          "is_active": {
-            "type": "boolean",
-            "title": "Is Active"
-          },
-          "preview": {
-            "anyOf": [
-              {
-                "items": {
-                  "$ref": "#/components/schemas/QueueTurnPreview"
-                },
-                "type": "array"
-              },
-              {
-                "type": "null"
-              }
-            ],
-            "title": "Preview"
-          }
-        },
-        "type": "object",
-        "required": [
-          "archived_at",
-          "can",
-          "id",
-          "initiative_id",
-          "community_id",
-          "created_by",
-          "created_at",
-          "updated_at",
-          "comments_enabled",
-          "tags",
-          "properties",
-          "grants",
-          "name",
-          "description",
-          "current_round",
-          "is_active",
-          "preview"
-        ],
-        "title": "QueueSummary"
-      },
-      "QueueTurnPreview": {
-        "properties": {
-          "id": {
-            "type": "integer",
-            "title": "Id"
-          },
-          "label": {
-            "type": "string",
-            "title": "Label"
-          },
-          "color": {
-            "anyOf": [
-              {
-                "type": "string"
-              },
-              {
-                "type": "null"
-              }
-            ],
-            "title": "Color"
-          },
-          "current": {
-            "type": "boolean",
-            "title": "Current",
-            "default": false
-          }
-        },
-        "type": "object",
-        "required": [
-          "id",
-          "label",
-          "color",
-          "current"
-        ],
-        "title": "QueueTurnPreview",
-        "description": "One turn as a list's card draws it: who, in what colour, and whether it\nis theirs now."
-      },
-      "QueueUpdate": {
-        "properties": {
-          "name": {
-            "anyOf": [
-              {
-                "type": "string",
-                "maxLength": 255,
-                "minLength": 1
-              },
-              {
-                "type": "null"
-              }
-            ],
-            "title": "Name"
-          },
-          "description": {
-            "anyOf": [
-              {
-                "type": "string",
-                "x-mentions": "markdown",
-                "description": "A person is mentioned as `@[](<reference>)`, by your reference for them, with no name: read who they are from the members search (`members:read`). Write a mention the same way. A stored file comes without its path: `![alt]()`, `[name]()`."
-              },
-              {
-                "type": "null"
-              }
-            ],
-            "title": "Description"
-          }
-        },
-        "type": "object",
-        "title": "QueueUpdate"
       },
       "RSVPStatus": {
         "type": "string",
@@ -19399,8 +17419,6 @@
           "file",
           "post",
           "project",
-          "queue",
-          "queue_item",
           "tag",
           "task",
           "wiki",
@@ -19643,14 +17661,12 @@
         "enum": [
           "project",
           "file",
-          "queue",
           "counter_group",
           "calendar",
           "dashboard",
           "post",
           "wiki",
           "task",
-          "queue_item",
           "calendar_event",
           "wiki_page",
           "collection"
@@ -20251,6 +18267,16 @@
             "type": "integer",
             "exclusiveMinimum": 0,
             "title": "Target Project Id"
+          },
+          "changes": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/TaskUpdate"
+              },
+              {
+                "type": "null"
+              }
+            ]
           }
         },
         "type": "object",
@@ -21211,6 +19237,11 @@
             ],
             "title": "Recurrence Limit"
           },
+          "merge_properties": {
+            "type": "boolean",
+            "title": "Merge Properties",
+            "default": false
+          },
           "tag_ids": {
             "anyOf": [
               {
@@ -21323,7 +19354,6 @@
         "enum": [
           "project",
           "file",
-          "queue",
           "counter_group",
           "calendar",
           "dashboard",

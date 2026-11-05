@@ -33,7 +33,7 @@
         },
         "scopes": {
           "type": "array",
-          "maxItems": 54,
+          "maxItems": 52,
           "uniqueItems": true,
           "items": {
             "anyOf": [
@@ -43,8 +43,6 @@
                   "projects:write",
                   "files:read",
                   "files:write",
-                  "queues:read",
-                  "queues:write",
                   "counter_groups:read",
                   "counter_groups:write",
                   "calendars:read",
@@ -142,7 +140,7 @@
     },
     "scopes": {
       "type": "array",
-      "maxItems": 54,
+      "maxItems": 52,
       "uniqueItems": true,
       "items": {
         "anyOf": [
@@ -152,8 +150,6 @@
               "projects:write",
               "files:read",
               "files:write",
-              "queues:read",
-              "queues:write",
               "counter_groups:read",
               "counter_groups:write",
               "calendars:read",
@@ -1327,13 +1323,12 @@
         "on": {
           "type": "array",
           "minItems": 1,
-          "maxItems": 5,
+          "maxItems": 4,
           "uniqueItems": true,
           "items": {
             "enum": [
               "task",
               "calendar_event",
-              "queue_item",
               "counter",
               "post"
             ]
@@ -1783,13 +1778,12 @@
         "on": {
           "type": "array",
           "minItems": 1,
-          "maxItems": 5,
+          "maxItems": 4,
           "uniqueItems": true,
           "items": {
             "enum": [
               "task",
               "calendar_event",
-              "queue_item",
               "counter",
               "post"
             ]
@@ -1847,13 +1841,12 @@
         "on": {
           "type": "array",
           "minItems": 1,
-          "maxItems": 5,
+          "maxItems": 4,
           "uniqueItems": true,
           "items": {
             "enum": [
               "task",
               "calendar_event",
-              "queue_item",
               "counter",
               "post"
             ]
@@ -2013,7 +2006,6 @@
               "enum": [
                 "task",
                 "calendar_event",
-                "queue_item",
                 "counter",
                 "post"
               ]
