@@ -442,7 +442,7 @@ async def _set_state(session, desk, task_id: int, *, done_days_ago: float | None
 
 async def _sweep(session, desk) -> int:
     await set_rls_context(session, SystemGuild(desk["guild_id"]))
-    return await evidence_service.purge_due(session, desk["guild_id"])
+    return await evidence_service.purge_cases_due(session, desk["guild_id"])
 
 
 async def test_a_closed_cases_files_are_kept_for_the_stream_then_go(
@@ -517,7 +517,7 @@ async def test_the_sweep_waits_while_a_hold_naming_the_case_is_placed(
         await set_rls_context(session, SystemGuild(desk["guild_id"]))
         await session.exec(text("SET LOCAL lock_timeout = '200ms'"))
         with pytest.raises(DBAPIError):
-            await evidence_service.purge_due(session, desk["guild_id"])
+            await evidence_service.purge_cases_due(session, desk["guild_id"])
         await session.rollback()
     assert len(await _evidence(session, desk["guild_id"])) == 1
     assert await _sweep(session, desk) == 1

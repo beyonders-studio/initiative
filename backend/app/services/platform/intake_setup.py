@@ -24,7 +24,7 @@ from sqlmodel.ext.asyncio.session import AsyncSession
 from app.core.intake import Conversation, IntakeStream, meta
 from app.core.tools import Tool
 from app.core.messages import GuildMessages, InitiativeMessages, IntakeMessages
-from app.db import cohorts, filer_access
+from app.db import cohorts, operations_schema
 from app.db.advisory_locks import LockNamespace, advisory_lock
 from app.db.session import routed_guild_id, set_rls_context
 from app.models.platform.app_setting import AppSetting
@@ -106,16 +106,21 @@ async def set_operations_guild(
                 detail=IntakeMessages.GUILD_NOT_ACTIVE,
             )
 
-    row = await _settings_row(session)
-    row.operations_guild_id = guild_id
-    session.add(row)
-    await session.commit()
-    # A plug-in limited to the operations community follows the choice too.
-    invalidate_registrations()
-    # The filer role follows the choice: created in the community chosen,
-    # dropped from the one it replaces. Boot does the same, so a move this
-    # process did not finish is finished there.
-    await filer_access.reconcile_filer_access(guild_id)
+    # The operations tables and the filer role follow the choice: created in
+    # the community chosen before work is routed there, and dropped from the
+    # one it replaces with its cases' files. Unsetting it keeps the tables, so
+    # pointing back restores them. One choice at a time; boot finishes a move
+    # this process did not.
+    async with operations_schema.choice_turn():
+        if guild_id is not None:
+            await operations_schema.provision_operations(guild_id)
+        row = await _settings_row(session)
+        row.operations_guild_id = guild_id
+        session.add(row)
+        await session.commit()
+        # A plug-in limited to the operations community follows the choice too.
+        invalidate_registrations()
+        await operations_schema.follow_choice(guild_id)
     return guild_id
 
 

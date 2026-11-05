@@ -53,8 +53,23 @@ class CaseView:
     topic: Optional[str] = None
 
 
+async def holds_cases(session: AsyncSession) -> bool:
+    """Whether the community ``session`` is routed into has cases: only the
+    operations community's schema has their tables."""
+    from app.db.operations_schema import holds_operations
+    from app.db.schema_provisioning import guild_schema_name
+    from app.db.session import routed_guild_id
+
+    guild_id = routed_guild_id(session)
+    return guild_id is not None and await holds_operations(
+        session, guild_schema_name(guild_id)
+    )
+
+
 async def read_case(session: AsyncSession, task_id: int) -> Optional[CaseView]:
     """The case behind ``task_id``, or ``None`` where the task is not one."""
+    if not await holds_cases(session):
+        return None
     case = (
         await session.exec(select(IntakeCase).where(IntakeCase.task_id == task_id))
     ).first()
@@ -146,6 +161,8 @@ async def take(session: AsyncSession, task: Task, user_id: int) -> Optional[bool
     """
     from app.services.tenant import task_creation
 
+    if not await holds_cases(session):
+        return None
     found = (
         await session.exec(
             select(IntakeCase.id, IntakeBinding.active_status_id)

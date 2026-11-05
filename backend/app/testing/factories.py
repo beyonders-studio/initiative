@@ -432,6 +432,27 @@ async def create_access_grant(
     return grant
 
 
+async def make_operations_community(
+    session: AsyncSession, guild_id: int | None
+) -> None:
+    """Point the deployment's operations work at ``guild_id``, or at nothing,
+    and give that community's schema the operations tables and the filer role,
+    as choosing it in the platform settings does."""
+    from app.db.operations_schema import provision_operations
+    from app.db.request_context import Unattributed
+    from app.db.session import set_rls_context
+    from app.models.platform.app_setting import AppSetting
+
+    await set_rls_context(session, Unattributed())
+    row = (await session.exec(select(AppSetting).where(AppSetting.id == 1))).first()
+    row = row or AppSetting(id=1)
+    row.operations_guild_id = guild_id
+    session.add(row)
+    await session.commit()
+    if guild_id is not None:
+        await provision_operations(guild_id)
+
+
 async def create_guild_membership(
     session: AsyncSession,
     user: User | None = None,

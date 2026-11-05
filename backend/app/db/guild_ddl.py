@@ -47,6 +47,7 @@ from app.db.plugin_rls import (
     SEARCH_ENTRY_READ_SCOPE,
     PluginTableKind,
 )
+from app.db.guild_migrations import split_sql_statements
 from app.db.initiative_rls import (
     ANSWERED,
     COMMENT_PARENTS,
@@ -93,6 +94,7 @@ from app.db.soft_delete_filter import SOFT_DELETE_TABLES
 from app.db.tenancy import (
     GUILD_SCOPED_TABLES,
     LEDGER_TABLES,
+    OPERATIONS_TABLES,
     MANAGED_TABLES,
     OWN_ROW_TABLES,
     MEMBER_CREDENTIAL_TABLES,
@@ -1935,14 +1937,12 @@ _CONSTRAINT_SQL = text(
 )
 
 
-def _build_tables(sync_conn) -> list[str]:
+def _build_tables(sync_conn, tables: frozenset[str]) -> list[str]:
     md = MetaData()
-    md.reflect(
-        bind=sync_conn, schema=_SRC_SCHEMA, only=lambda n, _m: n in GUILD_SCOPED_TABLES
-    )
+    md.reflect(bind=sync_conn, schema=_SRC_SCHEMA, only=lambda n, _m: n in tables)
     rel = MetaData()
     out: list[str] = []
-    for name in sorted(GUILD_SCOPED_TABLES):
+    for name in sorted(tables):
         t = md.tables[f"{_SRC_SCHEMA}.{name}"].to_metadata(rel, schema=None)
         # CHECK + FK come from pg_get_constraintdef below; drop them here so the
         # CREATE TABLE only carries columns + PRIMARY KEY + UNIQUE.
@@ -2045,6 +2045,7 @@ def _registry_ddl() -> str:
             render_guild_capture_ddl(),
             render_guild_search_ddl(None),
             render_guild_timer_ddl(),
+            render_guild_timer_ddl(operations=True),
         )
     )
 
@@ -2072,6 +2073,41 @@ def rendered_constraint_names() -> frozenset[str]:
     return frozenset(_CONSTRAINT_NAME_RE.findall(_registry_ddl()))
 
 
+#: The table a statement acts on: after ``ON`` (a policy, a trigger, a grant),
+#: or after ``ALTER TABLE``.
+_STATEMENT_TARGET = re.compile(
+    r'\bON\s+(?:TABLE\s+)?(?:"?\w+"?\.)?"?(\w+)"?'
+    r'|\bALTER TABLE\s+(?:"?\w+"?\.)?"?(\w+)"?'
+)
+_OPERATIONS_NAME = re.compile(r"\b(" + "|".join(sorted(OPERATIONS_TABLES)) + r")\b")
+
+
+def is_operations_statement(statement: str) -> bool:
+    """Whether ``statement`` acts on one of :data:`OPERATIONS_TABLES`, which
+    the operations community's schema alone has. Raises for one that names
+    such a table while acting on another: what every community has may not
+    depend on them."""
+    if not _OPERATIONS_NAME.search(statement):
+        return False
+    target = _STATEMENT_TARGET.search(statement)
+    acts_on = target and (target.group(1) or target.group(2))
+    if acts_on not in OPERATIONS_TABLES:
+        raise ValueError(
+            f"a statement on {acts_on} names an operations table: {statement[:120]}"
+        )
+    return True
+
+
+def split_operations(ddl: str) -> tuple[str, str]:
+    """``ddl`` in two: what every community's schema applies, and what the
+    operations community's applies besides."""
+    every: list[str] = []
+    operations: list[str] = []
+    for statement in split_sql_statements(ddl):
+        (operations if is_operations_statement(statement) else every).append(statement)
+    return "".join(f"{s};\n" for s in every), "".join(f"{s};\n" for s in operations)
+
+
 def _guard(conname: str, body: str) -> str:
     # Idempotent ADD CONSTRAINT: skip if a constraint of this name already exists
     # in the current schema (search_path puts the guild schema first).
@@ -2082,23 +2118,24 @@ def _guard(conname: str, body: str) -> str:
     )
 
 
-async def render_guild_schema_ddl(engine: AsyncEngine) -> str:
+async def render_guild_schema_ddl(
+    engine: AsyncEngine,
+    tables: frozenset[str] = GUILD_SCOPED_TABLES - OPERATIONS_TABLES,
+) -> str:
     """Reflect the live ``guild_template`` and return the schema-relative,
-    idempotent structure DDL for provisioning a guild schema."""
+    idempotent structure DDL of ``tables`` for provisioning a guild schema:
+    by default every community's, and :data:`OPERATIONS_TABLES` for the
+    operations community's own."""
     async with engine.connect() as conn:
         # Visible-name resolution: with the template first on the search_path,
         # pg_get_*def emit its tables unqualified (and shared public objects
         # qualified only when shadowed) — keeping the DDL schema-relative.
         await conn.execute(text(f'SET search_path TO "{_SRC_SCHEMA}", public'))
-        table_stmts = await conn.run_sync(_build_tables)
-        index_rows = (
-            await conn.execute(_INDEX_SQL, {"t": sorted(GUILD_SCOPED_TABLES)})
-        ).fetchall()
-        rows = (
-            await conn.execute(_CONSTRAINT_SQL, {"t": sorted(GUILD_SCOPED_TABLES)})
-        ).fetchall()
+        table_stmts = await conn.run_sync(_build_tables, tables)
+        index_rows = (await conn.execute(_INDEX_SQL, {"t": sorted(tables)})).fetchall()
+        rows = (await conn.execute(_CONSTRAINT_SQL, {"t": sorted(tables)})).fetchall()
         trigger_rows = (
-            await conn.execute(_TRIGGER_SQL, {"t": sorted(GUILD_SCOPED_TABLES)})
+            await conn.execute(_TRIGGER_SQL, {"t": sorted(tables)})
         ).fetchall()
 
     rendered = rendered_trigger_names()
@@ -2119,6 +2156,11 @@ async def render_guild_schema_ddl(engine: AsyncEngine) -> str:
                 )
             )
         elif r.contype == "f" and r.tgt in GUILD_SCOPED_TABLES:  # intra-schema only
+            if r.tgt in OPERATIONS_TABLES and r.tbl not in OPERATIONS_TABLES:
+                raise ValueError(
+                    f"{r.tbl}.{r.conname} names {r.tgt}, which only the"
+                    " operations community's schema has"
+                )
             fks.append(
                 _guard(
                     r.conname,

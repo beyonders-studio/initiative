@@ -21,7 +21,6 @@ from app.testing import community_plan
 from app.core.intake import IntakeStream
 from app.core.messages import GuildMessages
 from app.db.session import set_rls_context
-from app.models.platform.app_setting import AppSetting
 from app.models.platform.guild import Guild, CommunityRole, CommunityStatus
 from app.models.platform.access_grant import AccessLevel
 from app.models.platform.user import UserRole
@@ -35,6 +34,7 @@ from app.testing import (
     create_user,
     guild_administration,
     drain_notices,
+    make_operations_community,
 )
 from sqlmodel import select
 from app.db.request_context import SystemGuild, Unattributed
@@ -1273,13 +1273,7 @@ async def _bind_support_stream(session: AsyncSession) -> None:
     initiative = await create_initiative(session, staff, staff_user)
     project = await create_project(session, initiative, staff_user)
 
-    await set_rls_context(session, Unattributed())
-    row = (await session.exec(select(AppSetting).where(AppSetting.id == 1))).first()
-    if row is None:
-        row = AppSetting(id=1)
-    row.operations_guild_id = staff.id
-    session.add(row)
-    await session.commit()
+    await make_operations_community(session, staff.id)
 
     await set_rls_context(session, SystemGuild(staff.id))
     session.add(IntakeBinding(stream=IntakeStream.support, project_id=project.id))

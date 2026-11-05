@@ -741,8 +741,9 @@ async def _ensure_said_to_a_filer(
     """
     from app.core.intake import Conversation, IntakeStream, conversation_for
     from app.models.tenant.intake import IntakeCase
+    from app.services.tenant.cases import holds_cases
 
-    if person is None or column != "task_id":
+    if person is None or column != "task_id" or not await holds_cases(session):
         raise CommentValidationError(CommentMessages.NOT_SAID_TO_A_FILER)
     case = (
         await session.exec(

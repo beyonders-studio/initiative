@@ -17,10 +17,10 @@ from sqlmodel import select
 
 from app.api.deps import FilerAccessError, establish_filer_access
 from app.core.intake import IntakeStream
-from app.db import filer_access
+from app.db import operations_schema
+from app.db.tenancy import OPERATIONS_TABLES
 from app.db.request_context import SystemGuild, Unattributed
 from app.db.session import set_rls_context
-from app.models.platform.app_setting import AppSetting
 from app.models.tenant.comment import Comment, CommentAudience
 from app.models.tenant.evidence import Evidence
 from app.models.tenant.intake import IntakeBinding, IntakeCase
@@ -31,17 +31,8 @@ from app.testing import (
     create_initiative,
     create_project,
     create_user,
+    make_operations_community,
 )
-
-
-async def _point_at(session, guild_id: int | None) -> None:
-    await set_rls_context(session, Unattributed())
-    row = (await session.exec(select(AppSetting).where(AppSetting.id == 1))).first()
-    if row is None:
-        row = AppSetting(id=1)
-    row.operations_guild_id = guild_id
-    session.add(row)
-    await session.commit()
 
 
 @pytest.fixture
@@ -52,11 +43,10 @@ async def operations(session):
     guild = await create_guild(session, creator=staff)
     initiative = await create_initiative(session, guild, staff)
     project = await create_project(session, initiative, staff)
-    await _point_at(session, guild.id)
+    await make_operations_community(session, guild.id)
     await set_rls_context(session, SystemGuild(guild.id))
     session.add(IntakeBinding(stream=IntakeStream.support, project_id=project.id))
     await session.commit()
-    await filer_access.provision_filer_access(guild.id)
 
     await set_rls_context(session, Unattributed())
     asker = await create_user(session)
@@ -113,7 +103,7 @@ async def operations(session):
         "mine": mine.task_id,
         "theirs": theirs.task_id,
     }
-    await filer_access.deprovision_filer_access(guild.id)
+    await operations_schema.deprovision_operations(guild.id)
 
 
 async def _read_as_filer(role_session, user, statement):
@@ -225,45 +215,90 @@ async def test_there_is_no_filer_role_outside_the_operations_community(
     elsewhere = await create_guild(session)
     await set_rls_context(session, Unattributed())
 
-    await filer_access.reconcile_filer_access(operations["guild"].id)
+    await operations_schema.reconcile_operations()
 
     present = (
         await session.exec(
             text("SELECT rolname FROM pg_roles WHERE rolname ~ :p"),
-            params={"p": filer_access.filer_role_pattern()},
+            params={"p": operations_schema.filer_role_pattern()},
         )
     ).all()
     assert [row[0] for row in present] == [
-        filer_access.filer_role_name(operations["guild"].id)
+        operations_schema.filer_role_name(operations["guild"].id)
     ]
-    assert filer_access.filer_role_name(elsewhere.id) not in {r[0] for r in present}
+    assert operations_schema.filer_role_name(elsewhere.id) not in {
+        r[0] for r in present
+    }
 
 
-async def test_a_moved_operations_community_takes_the_role_with_it(
+async def _has_tables(session, guild_id: int) -> set[str]:
+    return {
+        table
+        for table in OPERATIONS_TABLES
+        if (
+            await session.exec(
+                text("SELECT to_regclass(:t) IS NOT NULL"),
+                params={"t": f'"guild_{guild_id}".{table}'},
+            )
+        ).one()[0]
+    }
+
+
+async def test_a_community_has_no_operations_tables_until_it_is_chosen(session):
+    guild = await create_guild(session)
+    await set_rls_context(session, Unattributed())
+    assert await _has_tables(session, guild.id) == set()
+
+
+async def test_a_moved_operations_community_takes_its_tables_and_role_with_it(
     session, role_session, operations
 ):
+    left = operations["guild"].id
     moved_to = await create_guild(session)
     await set_rls_context(session, Unattributed())
 
-    await filer_access.reconcile_filer_access(moved_to.id)
+    await make_operations_community(session, moved_to.id)
+    await operations_schema.reconcile_operations()
+
+    assert await _has_tables(session, left) == set()
+    assert await _has_tables(session, moved_to.id) == OPERATIONS_TABLES
+    # The cases' files go with them; the cases' tasks stay.
+    assert (
+        await session.exec(text(f'SELECT count(*) FROM "guild_{left}".evidence'))
+    ).one()[0] == 0
 
     present = {
         row[0]
         for row in (
             await session.exec(
                 text("SELECT rolname FROM pg_roles WHERE rolname ~ :p"),
-                params={"p": filer_access.filer_role_pattern()},
+                params={"p": operations_schema.filer_role_pattern()},
             )
         ).all()
     }
-    assert present == {filer_access.filer_role_name(moved_to.id)}
-    await filer_access.deprovision_filer_access(moved_to.id)
+    assert present == {operations_schema.filer_role_name(moved_to.id)}
+    await operations_schema.deprovision_operations(moved_to.id)
+
+
+async def test_clearing_the_choice_keeps_the_tables_and_drops_the_role(
+    session, operations
+):
+    await make_operations_community(session, None)
+    await operations_schema.reconcile_operations()
+
+    assert await _has_tables(session, operations["guild"].id) == OPERATIONS_TABLES
+    assert (
+        await session.exec(
+            text("SELECT count(*) FROM pg_roles WHERE rolname ~ :p"),
+            params={"p": operations_schema.filer_role_pattern()},
+        )
+    ).one()[0] == 0
 
 
 async def test_with_no_operations_community_there_is_nothing_to_route_into(
     session, role_session
 ):
-    await _point_at(session, None)
+    await make_operations_community(session, None)
     routed = await role_session("app_user")
     user = await create_user(session)
 

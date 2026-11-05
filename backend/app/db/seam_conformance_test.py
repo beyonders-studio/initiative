@@ -179,18 +179,18 @@ _FILER_GUILDS: list[int] = []
 @pytest.fixture(autouse=True)
 async def _drop_filer_roles():
     yield
-    from app.db import filer_access
+    from app.db import operations_schema
 
     while _FILER_GUILDS:
-        await filer_access.deprovision_filer_access(_FILER_GUILDS.pop())
+        await operations_schema.deprovision_operations(_FILER_GUILDS.pop())
 
 
 async def _as_filer(w: World, s) -> None:
     """Someone who filed a case, reading it from outside the community: its
     filer role, provisioned as choosing it for operations work does."""
-    from app.db import filer_access
+    from app.db import operations_schema
 
-    await filer_access.provision_filer_access(w.guild_id)
+    await operations_schema.provision_operations(w.guild_id)
     _FILER_GUILDS.append(w.guild_id)
     await set_rls_context(s, Filer(guild_id=w.guild_id, user_id=w.member_id))
 

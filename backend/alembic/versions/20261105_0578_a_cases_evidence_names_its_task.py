@@ -14,7 +14,10 @@ again: their render changed with the column, so every schema's stamp moves.
 ``intake_cases`` is policy-bound for this revision's role, so it is unforced
 for the copy and put back as it was.
 
-The downgrade turns each task back into its case the same way.
+The downgrade turns each task back into its case the same way. A schema
+without ``intake_cases``, which a later revision took from every community
+but the operations one, keeps no case and gets no key: the previous
+release's start renders both back.
 
 Revision ID: 20261105_0578
 Revises: 20261031_0577
@@ -108,22 +111,29 @@ def _upgrade() -> None:
 
 
 def _downgrade() -> None:
+    cases = (
+        op.get_bind()
+        .execute(sa.text("SELECT to_regclass('intake_cases') IS NOT NULL"))
+        .scalar()
+    )
     with _policies_lifted("evidence"):
         op.drop_constraint("evidence_case_task_id_fkey", "evidence", type_="foreignkey")
-        with _unforced("intake_cases"):
-            op.execute(
-                "UPDATE evidence e SET case_task_id = c.id"
-                " FROM intake_cases c WHERE c.task_id = e.case_task_id"
-            )
+        if cases:
+            with _unforced("intake_cases"):
+                op.execute(
+                    "UPDATE evidence e SET case_task_id = c.id"
+                    " FROM intake_cases c WHERE c.task_id = e.case_task_id"
+                )
         op.alter_column("evidence", "case_task_id", new_column_name="case_id")
-        op.create_foreign_key(
-            "evidence_case_id_fkey",
-            "evidence",
-            "intake_cases",
-            ["case_id"],
-            ["id"],
-            ondelete="CASCADE",
-        )
+        if cases:
+            op.create_foreign_key(
+                "evidence_case_id_fkey",
+                "evidence",
+                "intake_cases",
+                ["case_id"],
+                ["id"],
+                ondelete="CASCADE",
+            )
         op.execute("ALTER INDEX ix_evidence_case_task_id RENAME TO ix_evidence_case_id")
 
 
