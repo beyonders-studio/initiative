@@ -1,4 +1,5 @@
 import fs from "node:fs";
+import { createRequire } from "node:module";
 import path from "node:path";
 
 import { describe, expect, it } from "vitest";
@@ -7,23 +8,30 @@ import { describe, expect, it } from "vitest";
  * The browser MCP server in .mcp.json runs with `--browser chromium`: the
  * Chromium that `pnpm exec playwright install chromium` downloads for the
  * journeys and the release screenshots. Each Playwright release wants its own
- * Chromium build, so @playwright/mcp has to be one built on the same Playwright
- * minor as @playwright/test, or it looks for a browser nobody installed.
+ * Chromium build, so pnpm-workspace.yaml holds @playwright/mcp to the
+ * Playwright @playwright/test is on, whichever of the two moves.
  */
-const installed = (name: string) =>
-  JSON.parse(
-    fs.readFileSync(path.resolve(__dirname, "../../node_modules", name, "package.json"), "utf8")
-  ) as { version: string; dependencies?: Record<string, string> };
+const root = path.resolve(__dirname, "../..");
 
-const minor = (version: string) => version.split(".").slice(0, 2).join(".");
+/** Where `name` resolves to from the package in `from`. */
+const resolveFrom = (from: string, name: string) =>
+  path.dirname(createRequire(path.join(from, "package.json")).resolve(`${name}/package.json`));
+
+const chromium = (playwrightCore: string) =>
+  (
+    JSON.parse(fs.readFileSync(path.join(playwrightCore, "browsers.json"), "utf8")) as {
+      browsers: { name: string; revision: string; browserVersion?: string }[];
+    }
+  ).browsers.find((browser) => browser.name === "chromium");
 
 describe("the browser MCP server", () => {
-  it("is built on the Playwright the tests use", () => {
-    const test = installed("@playwright/test").version;
-    const mcp = installed("@playwright/mcp").dependencies?.["playwright-core"] ?? "";
+  it("runs the Chromium the tests install", () => {
+    const test = resolveFrom(root, "@playwright/test");
+    const installs = chromium(resolveFrom(resolveFrom(test, "playwright"), "playwright-core"));
+    const runs = chromium(resolveFrom(resolveFrom(root, "@playwright/mcp"), "playwright-core"));
     expect(
-      minor(mcp),
-      `@playwright/mcp is built on Playwright ${mcp}, @playwright/test is ${test}: pick the @playwright/mcp release built on ${minor(test)}`
-    ).toBe(minor(test));
+      runs?.revision,
+      `@playwright/mcp runs Chromium ${runs?.browserVersion}, @playwright/test installs ${installs?.browserVersion}: the overrides in pnpm-workspace.yaml keep them on one Playwright`
+    ).toBe(installs?.revision);
   });
 });

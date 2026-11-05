@@ -119,7 +119,7 @@ describe("a collection's page", () => {
     ).toEqual(["Grid", "Table"]);
 
     await user.click(within(lists).getByRole("tab", { name: "Table" }));
-    expect(await screen.findByRole("link", { name: "Hero" })).toBeInTheDocument();
+    await screen.findByRole("link", { name: "Hero" });
 
     await user.click(screen.getByRole("button", { name: "More actions" }));
     await user.click(await screen.findByRole("menuitem", { name: "Select items" }));
