@@ -61,6 +61,10 @@ overrides:
   # '>=' let js-yaml 5.x through into a tool asking for 4.x when this was
   # first tried.
   js-yaml@<4.3.2: ^4.3.2
+  # The browser MCP server (.mcp.json) runs the Playwright @playwright/test
+  # installs, so the two always want the same Chromium, whichever moves.
+  '@playwright/mcp>playwright': $@playwright/test
+  '@playwright/mcp>playwright-core': $@playwright/test
   sharp@<0.35.4: ^0.35.4
   fast-uri@<3.1.6: ^3.1.6
   mermaid@<11.16.1: ^11.16.1
