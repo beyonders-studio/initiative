@@ -225,22 +225,26 @@ async def test_the_export_maps_to_a_wiki_with_its_files():
 
 
 async def test_pages_past_what_may_be_held_are_left_out_and_counted(monkeypatch):
+    import sys
+
     from app.services.import_engine import limits as import_limits
 
-    first = ce.read_export(export_zip()).pages[0]
+    # Held as the memory it takes, four bytes a character for these.
+    bunting = {"DOCS/Bunting_050.html": _page("Bunting", "<p>" + "🎪" * 200 + "</p>")}
+    first = ce.read_export(export_zip(**bunting)).pages[0]
     monkeypatch.setattr(
-        import_limits, "IMPORT_MAX_ZIP_UNCOMPRESSED_BYTES", len(first.body)
+        import_limits, "IMPORT_MAX_ZIP_UNCOMPRESSED_BYTES", sys.getsizeof(first.body)
     )
 
     fetched, _site = await ce.export_to_fetched(
-        export_zip(),
+        export_zip(**bunting),
         guild_id=1,
         app_version="0.0.0-test",
         asset_budget=None,
         files_allowed=True,
     )
 
-    assert (fetched.report.pages, fetched.report.pages_over_limit) == (1, 3)
+    assert (fetched.report.pages, fetched.report.pages_over_limit) == (1, 4)
 
 
 async def test_without_a_budget_no_file_is_read():

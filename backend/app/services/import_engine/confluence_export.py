@@ -21,6 +21,7 @@ import logging
 import mimetypes
 import posixpath
 import re
+import sys
 import zipfile
 from dataclasses import dataclass, field
 from datetime import datetime
@@ -169,10 +170,10 @@ def read_export(archive: zipfile.ZipFile) -> ExportSpace:
     A page at a time: every page is parsed once for its title, which a link
     from any other page may need, and again when its body is translated, so
     no more than one page's tree is held at once. The translated bodies are
-    held within the size a zip's whole content may declare
-    (``IMPORT_MAX_ZIP_UNCOMPRESSED_BYTES``); the pages past it are left out
-    and counted, as the pages past a space's budget are. Blocking; run it in
-    a thread from async code."""
+    held, measured as the memory they take, within the size a zip's whole
+    content may declare (``IMPORT_MAX_ZIP_UNCOMPRESSED_BYTES``); the pages
+    past it are left out and counted, as the pages past a space's budget
+    are. Blocking; run it in a thread from async code."""
     names = [info.filename for info in archive.infolist() if not info.is_dir()]
     root = _root(names)
     prefix = f"{root}/" if root else ""
@@ -196,8 +197,11 @@ def read_export(archive: zipfile.ZipFile) -> ExportSpace:
     tree = _index_tree(index, set(page_files)) if index is not None else {}
     del index
 
+    # Each kept as long as a page's title may be.
     titles = {
-        file: _page_title(_parse(_read(archive, prefix + file)), name, key) or file
+        file: (_page_title(_parse(_read(archive, prefix + file)), name, key) or file)[
+            : confluence_mapping.MAX_TITLE_LENGTH
+        ]
         for file in page_files
     }
 
@@ -223,7 +227,7 @@ def read_export(archive: zipfile.ZipFile) -> ExportSpace:
         )
         main = _find(doc, lambda e: e.attr("id") == "main-content")
         body = translator.markup(main.children) if main is not None else ""
-        held += len(body)
+        held += sys.getsizeof(body)
         if held > import_limits.IMPORT_MAX_ZIP_UNCOMPRESSED_BYTES:
             break
         for extra in translator.found_attachments:
