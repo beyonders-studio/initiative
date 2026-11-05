@@ -423,6 +423,11 @@
       "this": "ce wiki",
       "plural": "wikis"
     },
+    "contact": {
+      "name": "Contact",
+      "this": "ce contact",
+      "plural": "contacts"
+    },
     "task": {
       "name": "Tâche",
       "this": "cette tâche",

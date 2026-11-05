@@ -8,6 +8,7 @@ from app.services.export.adapters.backup import (
 )
 from app.services.export.adapters.calendar import CalendarAdapter
 from app.services.export.adapters.calendar_events import CalendarEventsAdapter
+from app.services.export.adapters.contact import ContactAdapter
 from app.services.export.adapters.counter_group import CounterGroupAdapter
 from app.services.export.adapters.dashboard import DashboardAdapter
 from app.services.export.adapters.file import FileAdapter
@@ -28,6 +29,7 @@ ADAPTERS = {
         CalendarAdapter(),
         PostAdapter(),
         WikiAdapter(),
+        ContactAdapter(),
         InitiativeExportAdapter(),
         GuildExportAdapter(),
     )

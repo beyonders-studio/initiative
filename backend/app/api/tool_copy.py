@@ -629,6 +629,7 @@ TOOL_COPIERS: dict[Tool, ToolCopier] = {
         copies=frozenset({CalendarEvent}), contents=_calendar_contents
     ),
     Tool.wiki: ToolCopier(copies=frozenset({WikiPage}), contents=_wiki_contents),
+    Tool.contact: ToolCopier(),
     # A copy of a notice is a draft: not published, scheduled or pinned.
     Tool.post: ToolCopier(
         contents=_post_contents,

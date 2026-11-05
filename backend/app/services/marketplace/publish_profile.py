@@ -235,9 +235,9 @@ def _strip_calendar(env: dict[str, Any]) -> None:
 
 
 def _strip_nothing(env: dict[str, Any]) -> None:
-    """A counter group and a dashboard name nobody and point at nothing a
-    listing could carry. (A dashboard's configuration, which does, is dropped
-    by the dashboard's own canonical form.)"""
+    """A counter group, a dashboard and a contact name nobody in the community
+    and point at nothing a listing could carry. (A dashboard's configuration,
+    which does, is dropped by the dashboard's own canonical form.)"""
 
 
 _STRIPPERS: dict[Tool, Callable[[dict[str, Any]], None]] = {
@@ -248,6 +248,7 @@ _STRIPPERS: dict[Tool, Callable[[dict[str, Any]], None]] = {
     Tool.dashboard: _strip_nothing,
     Tool.post: _strip_post,
     Tool.wiki: _strip_wiki,
+    Tool.contact: _strip_nothing,
 }
 
 

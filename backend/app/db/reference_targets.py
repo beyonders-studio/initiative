@@ -369,6 +369,9 @@ class Resolved:
     #: something else up. None for a kind that never finishes, which is most of
     #: them; see :mod:`app.db.blocking`.
     is_open: bool | None = None
+    #: When it starts, for a kind that happens at a time: an event. None for
+    #: every other kind.
+    starts_at: datetime | None = None
 
 
 async def resolve_many(
@@ -419,6 +422,7 @@ async def resolve_many(
         else literal(False)
     )
     updated = table.c["updated_at"] if "updated_at" in table.c else null()
+    starts = table.c["start_at"] if "start_at" in table.c else null()
     images, icon, color, doc_type, mime, filename, link_url = _visual_exprs(
         table_name, table
     )
@@ -442,6 +446,7 @@ async def resolve_many(
         link_url,
         tool_title,
         is_open,
+        starts,
     ).select_from(table)
     if container is not None:
         # Left: a container this reader cannot see leaves the name blank rather
@@ -473,6 +478,7 @@ async def resolve_many(
             smart_link_url=row[12],
             tool_title=row[13],
             is_open=None if row[14] is None else bool(row[14]),
+            starts_at=row[15],
         )
         for row in rows.all()
     }

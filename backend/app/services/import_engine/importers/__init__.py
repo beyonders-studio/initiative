@@ -6,6 +6,7 @@ backup orchestrator — an unknown discriminator is rejected centrally by
 """
 
 from app.services.import_engine.importers.calendar import CalendarImporter
+from app.services.import_engine.importers.contact import ContactImporter
 from app.services.import_engine.importers.counter_group import CounterGroupImporter
 from app.services.import_engine.importers.dashboard import DashboardImporter
 from app.services.import_engine.importers.file import FileImporter
@@ -23,6 +24,7 @@ IMPORTERS = {
         CalendarImporter(),
         PostImporter(),
         WikiImporter(),
+        ContactImporter(),
     )
 }
 

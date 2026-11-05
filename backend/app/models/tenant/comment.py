@@ -124,6 +124,12 @@ class Comment(HoldMixin, CreatedByMixin, SoftDeleteMixin, table=True):
             Integer, ForeignKey("wikis.id", ondelete="CASCADE"), nullable=True
         ),
     )
+    contact_id: Optional[int] = Field(
+        default=None,
+        sa_column=Column(
+            Integer, ForeignKey("contacts.id", ondelete="CASCADE"), nullable=True
+        ),
+    )
     # A wiki's conversation happens on its pages: a note about the rota belongs
     # on the rota. The wiki's own column above stays a parent so the tool is
     # commentable like every other, but the thread people use is this one.

@@ -14,6 +14,7 @@ from __future__ import annotations
 
 from app.core.tools import Tool
 from app.models.tenant.calendar import Calendar
+from app.models.tenant.contact import Contact
 from app.models.tenant.counter import Counter, CounterGroup
 from app.models.tenant.dashboard import Dashboard
 from app.models.tenant.file import File, FileVersion
@@ -123,6 +124,10 @@ def build_collections() -> Dataset:
 
 def build_wikis() -> Dataset:
     return Dataset(model=Wiki, tool=Tool.wiki, fields=derive_fields(Wiki))
+
+
+def build_contacts() -> Dataset:
+    return Dataset(model=Contact, tool=Tool.contact, fields=derive_fields(Contact))
 
 
 def build_wiki_pages() -> Dataset:

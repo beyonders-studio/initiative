@@ -44,6 +44,7 @@ from app.models.platform.plugin_service_registration import PluginServiceRegistr
 from app.models.platform.publisher import Publisher, publisher_prefix
 from app.core.reactions import ReactionTarget
 from app.models.tenant.calendar import Calendar
+from app.models.tenant.contact import Contact
 from app.models.platform.marketplace import (
     MarketplaceListing,
     UID_ALPHABET,
@@ -2050,6 +2051,7 @@ async def create_comment(
     calendar: Calendar | None = None,
     dashboard: Dashboard | None = None,
     post: Post | None = None,
+    contact: Contact | None = None,
     collection: Collection | None = None,
     content: str = "A test comment",
     commit: bool = True,
@@ -2068,6 +2070,7 @@ async def create_comment(
         Tool.dashboard.value: dashboard,
         Tool.post.value: post,
         Tool.wiki.value: wiki,
+        Tool.contact.value: contact,
     }
     # Keyed by the enum rather than by string literals, and checked against it:
     # a new tool that has no keyword here fails on the first test that comments
@@ -2631,6 +2634,46 @@ async def create_wiki_page(
     return page
 
 
+async def create_contact(
+    session: AsyncSession,
+    initiative: Initiative,
+    creator: User,
+    *,
+    name: str | None = None,
+    commit: bool = True,
+    **overrides: Any,
+) -> Contact:
+    """Create a test contact in ``initiative`` with sensible defaults.
+
+    Mirrors the create endpoint's default sharing: the creator owns it and
+    every initiative member can read it.
+    """
+    await route_session_to_guild(session, guild_of(initiative))
+
+    defaults = {
+        "initiative_id": initiative.id,
+        "created_by": creator.id,
+        "name": name or f"Contact {datetime.now(timezone.utc).timestamp()}",
+    }
+    contact = Contact(**{**defaults, **overrides})
+    session.add(contact)
+
+    if commit:
+        await session.commit()
+        await session.refresh(contact)
+
+        await create_resource_grant(
+            session,
+            contact,
+            level=ResourceAccessLevel.owner,
+            user=creator,
+            commit=False,
+        )
+        await create_resource_grant(session, contact, all_initiative_members=True)
+
+    return contact
+
+
 # One arm per Tool, so a test that needs "an instance of every tool" derives it
 # from the enum instead of restating the list. The completeness check runs at
 # import time: a new Tool member fails here once, with a message naming it,
@@ -2644,6 +2687,7 @@ TOOL_FACTORIES: dict[Tool, Any] = {
     Tool.dashboard: create_dashboard,
     Tool.post: create_post,
     Tool.wiki: create_wiki,
+    Tool.contact: create_contact,
 }
 
 if set(TOOL_FACTORIES) != set(Tool):

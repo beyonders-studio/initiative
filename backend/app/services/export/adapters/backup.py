@@ -1615,6 +1615,7 @@ _SECTIONS: tuple[BackupSection, ...] = (
     BackupSection(Tool.calendar, report_formats=frozenset({"ics", "json"})),
     BackupSection(Tool.post, in_reports=False),
     BackupSection(Tool.wiki, in_reports=False, fetch=_fetch_wiki_pages),
+    BackupSection(Tool.contact, in_reports=False),
     # A dashboard is a live canvas, not a document, so a report carries its
     # envelope too.
     BackupSection(Tool.dashboard, finish=_ScopeBuilder._record_foreign_dashboards),
