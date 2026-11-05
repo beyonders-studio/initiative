@@ -8,15 +8,15 @@
 import { describe, expect, it } from "vitest";
 
 import { SearchEntityType } from "@/api/generated/initiativeAPI.schemas";
-import { idsByKind, type LinkedRef, sameIds } from "@/lib/relationships";
+import { type ItemEndKind, idsByKind, type LinkedRef, sameIds } from "@/lib/relationships";
 
-const ref = (type: SearchEntityType, id: number): LinkedRef => ({ type, id, title: null });
+const ref = (type: ItemEndKind, id: number): LinkedRef => ({ type, id, title: null });
 
 /** The decision `useSetQueueItemLinks` makes, stated on its own. */
 const kindsWritten = (links: LinkedRef[], previous: LinkedRef[], force = false) => {
   const wanted = idsByKind(links);
   const had = idsByKind(previous);
-  const written: SearchEntityType[] = [];
+  const written: ItemEndKind[] = [];
   for (const kind of new Set([...wanted.keys(), ...had.keys()])) {
     const next = wanted.get(kind) ?? [];
     if (!force && sameIds(next, had.get(kind) ?? [])) continue;

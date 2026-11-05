@@ -3,13 +3,14 @@ import { useMemo, useState } from "react";
 import { useTranslation } from "react-i18next";
 
 import {
+  EndpointKind,
   type EndpointRef,
   type FileRead,
-  SearchEntityType,
-  type SearchSuggestion,
 } from "@/api/generated/initiativeAPI.schemas";
 import { DEFAULT_GRANTS } from "@/components/access/grants";
-import { EntityPicker } from "@/components/entities/EntityPicker";
+import { EntityPicker, type LinkableSuggestion } from "@/components/entities/EntityPicker";
+import { MemberSelect, type MemberSummary } from "@/components/members/MemberSearchSelect";
+import { SearchCategoryTabs } from "@/components/search/SearchCategoryTabs";
 import { Button } from "@/components/ui/button";
 import {
   Dialog,
@@ -29,8 +30,10 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
+import { Tabs, TabsContent } from "@/components/ui/tabs";
 import { useUploadFile } from "@/hooks/useFiles";
 import { type ToolRef, useRelate } from "@/hooks/useRelationships";
+import type { MemberSearchScope } from "@/hooks/useUsers";
 import { fileIcon } from "@/lib/fileIcon";
 import { formatBytes, getFileTypeLabel, nameWithoutExtension } from "@/lib/fileUtils";
 import { toast } from "@/lib/mascotToast";
@@ -43,7 +46,22 @@ import {
   type RelationGroup,
   type RelationGroupKey,
 } from "@/lib/relationships";
+import {
+  DEFAULT_SEARCH_CATEGORY,
+  isSearchCategory,
+  type SearchCategory,
+} from "@/lib/searchResults";
+import { getUserDisplayName } from "@/lib/userDisplay";
 import { cn } from "@/lib/utils";
+
+/** What a link can end at, as the search tabs name them: a thing, or a member. */
+const LINK_CATEGORIES: SearchCategory[] = ["tool", "member"];
+
+/**
+ * Anybody in the community. Who a link names need not be able to open the
+ * thing it is on: "depends on our accountant" is still worth saying.
+ */
+const PEOPLE: MemberSearchScope = { type: "community" };
 
 interface AddLinkDialogProps {
   /** The thing being linked from. */
@@ -61,7 +79,8 @@ interface AddLinkDialogProps {
 }
 
 /**
- * Make one link: find the thing, or upload it, then say how the two relate.
+ * Make one link: find the thing or the person, or upload a file, then say how
+ * the two relate.
  *
  * Mounted only while open, so every opening starts from nothing — or from the
  * file somebody dropped on the section to open it.
@@ -83,7 +102,9 @@ export const AddLinkDialog = ({
 
   /** Set only once somebody overrides what was proposed for what they picked. */
   const [groupKey, setGroupKey] = useState<RelationGroupKey | null>(null);
-  const [picked, setPicked] = useState<SearchSuggestion | null>(null);
+  const [category, setCategory] = useState<SearchCategory>(DEFAULT_SEARCH_CATEGORY);
+  const [picked, setPicked] = useState<LinkableSuggestion | null>(null);
+  const [person, setPerson] = useState<MemberSummary | null>(null);
   const [file, setFile] = useState<File | null>(canUpload ? initialFile : null);
   const [fileName, setFileName] = useState(() =>
     canUpload && initialFile ? nameWithoutExtension(initialFile.name) : ""
@@ -95,11 +116,19 @@ export const AddLinkDialog = ({
    */
   const [uploaded, setUploaded] = useState<{ file: File; created: FileRead } | null>(null);
 
-  /** The far end's kind: what was picked, or the file an upload will become. */
-  const farType = picked?.entity_type ?? (file ? SearchEntityType.file : null);
-  /** A file somebody uploads is theirs, so every link to it is theirs to make. */
-  const farWritable = file ? true : picked?.can_write !== false;
-  const farTitle = picked?.title ?? (file ? fileName.trim() || file.name : null);
+  /** The far end's kind: who or what was picked, or the file an upload will become. */
+  const farType = person
+    ? EndpointKind.user
+    : (picked?.entity_type ?? (file ? EndpointKind.file : null));
+  /**
+   * A file somebody uploads is theirs, so every link to it is theirs to make.
+   * A link to a person is the thing's to make, whichever way it runs, and this
+   * dialog only opens for somebody who may change the thing.
+   */
+  const farWritable = person || file ? true : picked?.can_write !== false;
+  const farTitle = person
+    ? getUserDisplayName(person)
+    : (picked?.title ?? (file ? fileName.trim() || file.name : null));
 
   /**
    * The links that can actually be made to what was picked.
@@ -139,14 +168,14 @@ export const AddLinkDialog = ({
    * "blocked by" is correcting the thing, not the claim, and that choice is
    * kept.
    */
-  const pick = (next: SearchSuggestion | null) => {
+  const pick = (next: LinkableSuggestion | null) => {
     if (next?.entity_type !== farType) setGroupKey(null);
     setPicked(next);
     setFile(null);
   };
 
   const chooseFile = (next: File) => {
-    if (farType !== SearchEntityType.file) setGroupKey(null);
+    if (farType !== EndpointKind.file) setGroupKey(null);
     setPicked(null);
     setFile(next);
     setFileName(nameWithoutExtension(next.name));
@@ -155,6 +184,16 @@ export const AddLinkDialog = ({
   const clearFile = () => {
     setFile(null);
     setFileName("");
+  };
+
+  /** Another tab is another kind of far end, so what was picked on this one goes. */
+  const switchTo = (next: string) => {
+    if (!isSearchCategory(next)) return;
+    setCategory(next);
+    setGroupKey(null);
+    setPicked(null);
+    setPerson(null);
+    clearFile();
   };
 
   const upload = useUploadFile();
@@ -166,12 +205,16 @@ export const AddLinkDialog = ({
   });
 
   const pending = upload.isPending || relate.isPending;
-  const ready = Boolean(chosenGroup && (picked || (file && fileName.trim() && initiativeId)));
+  const ready = Boolean(
+    chosenGroup && (person || picked || (file && fileName.trim() && initiativeId))
+  );
 
   const submit = async () => {
     if (!chosenGroup) return;
     let other: EndpointRef;
-    if (file) {
+    if (person) {
+      other = { type: EndpointKind.user, id: person.id };
+    } else if (file) {
       if (initiativeId == null) return;
       let created = uploaded?.file === file ? uploaded.created : null;
       if (!created) {
@@ -188,7 +231,7 @@ export const AddLinkDialog = ({
         }
         setUploaded({ file, created });
       }
-      other = { type: SearchEntityType.file, id: created.id };
+      other = { type: EndpointKind.file, id: created.id };
     } else if (picked) {
       other = { type: picked.entity_type, id: picked.entity_id };
     } else {
@@ -218,59 +261,73 @@ export const AddLinkDialog = ({
               think of the file they mean, and the picker offers what they
               looked at recently before they have typed anything. What the
               link SAYS is asked below, once there are two real names to say
-              it about. */}
-          <div className="space-y-2">
-            <Label>{t("dialog.entity")}</Label>
-            {file && fileMark ? (
-              <div className="flex items-center justify-between gap-3 rounded-lg border p-3">
-                <div className="flex min-w-0 items-center gap-3">
-                  <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-lg bg-muted">
-                    <fileMark.Icon className={cn("h-5 w-5", fileMark.colorClass)} />
+              it about. A person is found where search finds people: on the
+              Members tab, from the roster rather than the index. */}
+          <Tabs value={category} onValueChange={switchTo}>
+            <SearchCategoryTabs categories={LINK_CATEGORIES} />
+            <TabsContent value="tool" className="space-y-4">
+              {file && fileMark ? (
+                <div className="flex items-center justify-between gap-3 rounded-lg border p-3">
+                  <div className="flex min-w-0 items-center gap-3">
+                    <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-lg bg-muted">
+                      <fileMark.Icon className={cn("h-5 w-5", fileMark.colorClass)} />
+                    </div>
+                    <div className="min-w-0">
+                      <p className="truncate font-medium text-sm">{file.name}</p>
+                      <p className="text-muted-foreground text-xs">
+                        {getFileTypeLabel(file.type, file.name)} • {formatBytes(file.size)}
+                      </p>
+                    </div>
                   </div>
-                  <div className="min-w-0">
-                    <p className="truncate font-medium text-sm">{file.name}</p>
-                    <p className="text-muted-foreground text-xs">
-                      {getFileTypeLabel(file.type, file.name)} • {formatBytes(file.size)}
-                    </p>
-                  </div>
+                  <Button
+                    type="button"
+                    variant="ghost"
+                    size="icon"
+                    className="h-8 w-8 shrink-0"
+                    onClick={clearFile}
+                    disabled={pending}
+                    aria-label={t("dialog.upload.remove")}
+                  >
+                    <X className="h-4 w-4" />
+                  </Button>
                 </div>
-                <Button
-                  type="button"
-                  variant="ghost"
-                  size="icon"
-                  className="h-8 w-8 shrink-0"
-                  onClick={clearFile}
-                  disabled={pending}
-                  aria-label={t("dialog.upload.remove")}
-                >
-                  <X className="h-4 w-4" />
-                </Button>
-              </div>
-            ) : (
-              <EntityPicker
-                subject={entity}
-                initiativeId={initiativeId}
-                value={picked}
-                onChange={pick}
-              />
-            )}
-          </div>
+              ) : (
+                <EntityPicker
+                  subject={entity}
+                  initiativeId={initiativeId}
+                  value={picked}
+                  onChange={pick}
+                />
+              )}
 
-          {file ? (
-            <div className="space-y-2">
-              <Label htmlFor="relation-upload-name">{t("dialog.upload.name")}</Label>
-              <Input
-                id="relation-upload-name"
-                value={fileName}
-                onChange={(event) => setFileName(event.target.value)}
-                disabled={pending}
+              {file ? (
+                <div className="space-y-2">
+                  <Label htmlFor="relation-upload-name">{t("dialog.upload.name")}</Label>
+                  <Input
+                    id="relation-upload-name"
+                    value={fileName}
+                    onChange={(event) => setFileName(event.target.value)}
+                    disabled={pending}
+                  />
+                </div>
+              ) : canUpload ? (
+                /* The other way to name the far end: something that is not in
+                   the app yet. */
+                <FileDropArea onFile={chooseFile} prompt={t("dialog.upload.prompt")} />
+              ) : null}
+            </TabsContent>
+            <TabsContent value="member">
+              <MemberSelect
+                scope={PEOPLE}
+                value={person?.id ?? null}
+                selectedUser={person}
+                onChange={(_id, member) => setPerson(member ?? null)}
+                placeholder={t("dialog.entityPlaceholder")}
+                emptyMessage={t("dialog.noPeople")}
+                aria-label={t("dialog.person")}
               />
-            </div>
-          ) : canUpload ? (
-            /* The other way to name the far end: something that is not in the
-               app yet. */
-            <FileDropArea onFile={chooseFile} prompt={t("dialog.upload.prompt")} />
-          ) : null}
+            </TabsContent>
+          </Tabs>
 
           {farType && farTitle ? (
             <div className="space-y-2">

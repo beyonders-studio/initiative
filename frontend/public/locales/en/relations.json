@@ -29,11 +29,13 @@
   "removed": "Link removed.",
   "dialog": {
     "title": "Add a link",
-    "description": "Find the thing first, then say how the two relate.",
-    "descriptionUpload": "Find the thing first, or upload a file, then say how the two relate.",
+    "description": "Find the thing or person first, then say how the two relate.",
+    "descriptionUpload": "Find the thing or person first, or upload a file, then say how the two relate.",
     "entity": "Thing",
     "entityPlaceholder": "Search by name…",
     "noResults": "Nothing matches.",
+    "person": "Person",
+    "noPeople": "No one matches.",
     "relationship": "Relationship",
     "sentenceLabel": "How the two relate",
     "submit": "Add link",
@@ -49,6 +51,7 @@
   },
   "card": {
     "kindLinked": "{{kind}} · linked {{date}}",
+    "person": "Person",
     "unreachable": "This version of the app cannot open that.",
     "remove": "Remove the link to {{title}}"
   },

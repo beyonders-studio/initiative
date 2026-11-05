@@ -29,11 +29,13 @@
   "removed": "Verknüpfung entfernt.",
   "dialog": {
     "title": "Verknüpfung hinzufügen",
-    "description": "Such zuerst das Objekt, sag dann, wie die beiden zusammenhängen.",
-    "descriptionUpload": "Such zuerst das Objekt oder lade eine Datei hoch, sag dann, wie die beiden zusammenhängen.",
+    "description": "Such zuerst das Objekt oder die Person, sag dann, wie die beiden zusammenhängen.",
+    "descriptionUpload": "Such zuerst das Objekt oder die Person oder lade eine Datei hoch, sag dann, wie die beiden zusammenhängen.",
     "entity": "Objekt",
     "entityPlaceholder": "Nach Namen suchen…",
     "noResults": "Keine Treffer.",
+    "person": "Person",
+    "noPeople": "Niemand gefunden.",
     "relationship": "Beziehung",
     "sentenceLabel": "Wie die beiden zusammenhängen",
     "submit": "Verknüpfung hinzufügen",
@@ -49,6 +51,7 @@
   },
   "card": {
     "kindLinked": "{{kind}} · verknüpft {{date}}",
+    "person": "Person",
     "unreachable": "Diese Version der App kann das nicht öffnen.",
     "remove": "Verknüpfung zu {{title}} entfernen"
   },

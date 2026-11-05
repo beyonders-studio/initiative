@@ -29,11 +29,13 @@
   "removed": "Enlace eliminado.",
   "dialog": {
     "title": "Añadir un enlace",
-    "description": "Busca primero la cosa y luego di cómo se relacionan.",
-    "descriptionUpload": "Busca primero la cosa, o sube un archivo, y luego di cómo se relacionan.",
+    "description": "Busca primero la cosa o la persona y luego di cómo se relacionan.",
+    "descriptionUpload": "Busca primero la cosa o la persona, o sube un archivo, y luego di cómo se relacionan.",
     "entity": "Cosa",
     "entityPlaceholder": "Buscar por nombre…",
     "noResults": "No hay coincidencias.",
+    "person": "Persona",
+    "noPeople": "Nadie coincide.",
     "relationship": "Relación",
     "sentenceLabel": "Cómo se relacionan",
     "submit": "Añadir enlace",
@@ -49,6 +51,7 @@
   },
   "card": {
     "kindLinked": "{{kind}} · enlazado {{date}}",
+    "person": "Persona",
     "unreachable": "Esta versión de la aplicación no puede abrir eso.",
     "remove": "Quitar el enlace con {{title}}"
   },
