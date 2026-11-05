@@ -57,6 +57,7 @@ from functools import lru_cache
 from typing import Annotated, Any, Optional
 from urllib.parse import urlsplit
 
+from fastapi import HTTPException, status
 from pydantic import (
     GetCoreSchemaHandler,
     GetJsonSchemaHandler,
@@ -87,6 +88,7 @@ __all__ = [
     "admit_install",
     "boundary_scope",
     "current_install_boundary",
+    "filter_people",
     "names_withheld",
     "responding_to_install",
     "with_mention_markup",
@@ -214,6 +216,25 @@ def current_install_boundary() -> Optional[InstallBoundary]:
     """The install boundary of the request in progress, or ``None``."""
     slot = _SLOT.get()
     return None if slot is None else slot.boundary
+
+
+def filter_people(value: Any) -> Any:
+    """The row ids a list filter names, for an installed plug-in, which names
+    each person by a reference: one, or a list of them. A 422
+    (``PLUGIN_REFERENCE_UNKNOWN``) for one that names nobody in its sector, as
+    a :data:`PersonId` field answers."""
+    boundary = current_install_boundary()
+    try:
+        if boundary is None:
+            raise _unknown()
+        if isinstance(value, list):
+            return [boundary.resolve(item, IdentityEntity.user) for item in value]
+        return boundary.resolve(value, IdentityEntity.user)
+    except PydanticCustomError:
+        raise HTTPException(
+            status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
+            detail=PluginMessages.REFERENCE_UNKNOWN,
+        ) from None
 
 
 def _boundary_in(phase: BoundaryPhase) -> Optional[InstallBoundary]:

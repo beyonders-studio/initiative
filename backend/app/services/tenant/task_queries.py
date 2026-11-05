@@ -22,6 +22,7 @@ from sqlmodel import select
 from sqlmodel.ext.asyncio.session import AsyncSession
 
 from app.core import recurrence
+from app.core.identity_boundary import filter_people
 from app.core.messages import CalendarEventMessages, QueryMessages
 from app.core.relationships import RelationshipType
 from app.core.search import SearchEntityType
@@ -984,27 +985,29 @@ async def parse_task_list_query(
 _PERSON_FILTER_FIELDS = frozenset({"assignee_ids", "created_by"})
 
 
-def refuse_person_filters(q: TaskListQuery) -> None:
-    """Refuse, for an installed plug-in, a filter that names people.
-
-    A filter's values are row ids inside a JSON string, which a plug-in does not
-    hold, so the fields that take one are left to people: ``assignee_ids``
-    and ``created_by`` (bar asking whether there is one), and a
-    person-valued custom property.
-    """
+def read_person_filters(q: TaskListQuery) -> None:
+    """Read, for an installed plug-in, the people a filter names by reference
+    as their row ids: ``assignee_ids`` and ``created_by`` (bar asking whether
+    there is one), and a person-valued custom property's value."""
     for cond in iter_leaf_conditions(q.user_conditions):
-        named = cond.field in _PERSON_FILTER_FIELDS and cond.op is not FilterOp.is_null
-        if cond.field == "property_values" and isinstance(cond.value, dict):
+        if cond.op is FilterOp.is_null:
+            continue
+        if cond.field in _PERSON_FILTER_FIELDS:
+            cond.value = filter_people(cond.value)
+        elif cond.field == "property_values" and isinstance(cond.value, dict):
             try:
                 defn = q.property_definitions.get(int(cond.value.get("property_id")))
             except (TypeError, ValueError):
                 defn = None
-            named = defn is not None and defn.type is MetadataType.user_reference
-        if named:
-            raise HTTPException(
-                status_code=status.HTTP_400_BAD_REQUEST,
-                detail=QueryMessages.INVALID_CONDITIONS,
-            )
+            if (
+                defn is not None
+                and defn.type is MetadataType.user_reference
+                and cond.value.get("value") is not None
+            ):
+                cond.value = {
+                    **cond.value,
+                    "value": filter_people(cond.value["value"]),
+                }
 
 
 async def _load_property_definitions_across_guilds(

@@ -74,7 +74,7 @@ from sqlmodel import SQLModel, col, delete, select
 from sqlmodel.ext.asyncio.session import AsyncSession
 
 from app.core.errors import PluginChannelError
-from app.core.identity_boundary import current_install_boundary
+from app.core.identity_boundary import current_install_boundary, filter_people
 from app.core.messages import (
     PluginChannelMessages,
     PluginMessages,
@@ -1686,14 +1686,15 @@ async def load_definitions_by_ids(
 
 
 async def property_filter_clauses(
-    session: AsyncSession, target: str, raw: Optional[str], *, names_people: bool
+    session: AsyncSession, target: str, raw: Optional[str]
 ) -> list:
     """WHERE clauses for the ``property_filters`` a list of ``target`` carries.
 
     The one reading of the param, for every list and every view of one (a
     tool's list, the event list, the posts timeline). A filter on a
-    person-valued property takes row ids, which an installed plug-in does not
-    hold, so it is left to people (``names_people``), as the task list does.
+    person-valued property takes row ids from a person, and from an installed
+    plug-in the references it names people by, read as row ids as the task list
+    reads them.
     """
     from app.schemas.query import FilterOp  # noqa: WPS433 - local to avoid cycles
 
@@ -1709,16 +1710,17 @@ async def property_filter_clauses(
     definitions = await load_definitions_by_ids(
         session, [condition.property_id for condition in parsed]
     )
-    if not names_people and any(
-        condition.op is not FilterOp.is_null
-        and (definition := definitions.get(condition.property_id)) is not None
-        and definition.type is MetadataType.user_reference
-        for condition in parsed
-    ):
-        raise HTTPException(
-            status_code=status.HTTP_400_BAD_REQUEST,
-            detail=QueryMessages.INVALID_CONDITIONS,
-        )
+    if current_install_boundary() is not None:
+        parsed = [
+            ParsedPropertyFilter(
+                condition.property_id, condition.op, filter_people(condition.value)
+            )
+            if condition.op is not FilterOp.is_null
+            and (definition := definitions.get(condition.property_id)) is not None
+            and definition.type is MetadataType.user_reference
+            else condition
+            for condition in parsed
+        ]
     return build_property_filter_clauses(target, parsed, definitions)
 
 
