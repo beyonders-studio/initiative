@@ -7,6 +7,9 @@
 # migrations use. Branching on `config` mirrors alembic's bundled multidb
 # template.
 guild_autogen = config.attributes.get("guild_autogen", False)
+# The operations tables are in guild_template and the operations community's
+# schema alone (app.db.tenancy.OPERATIONS_TABLES): a change to them runs there.
+where = ", operations=True" if config.attributes.get("operations_only") else ""
 %>"""${message}"""
 
 revision = ${repr(up_revision)}
@@ -25,7 +28,7 @@ ${imports if imports else ""}
 % if guild_autogen:
 
 def upgrade() -> None:
-    run_for_each_guild_schema(op.get_bind(), _apply_upgrade)
+    run_for_each_guild_schema(op.get_bind(), _apply_upgrade${where})
 
 
 def _apply_upgrade() -> None:
@@ -33,7 +36,7 @@ def _apply_upgrade() -> None:
 
 
 def downgrade() -> None:
-    run_for_each_guild_schema(op.get_bind(), _apply_downgrade)
+    run_for_each_guild_schema(op.get_bind(), _apply_downgrade${where})
 
 
 def _apply_downgrade() -> None:

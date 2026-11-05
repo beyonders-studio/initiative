@@ -1,13 +1,28 @@
-"""What the person who filed a case may read of it, held by the database.
+"""What the operations community's schema has that no other community's does.
 
-A filer is not a member of the operations community. They reach the cases they
+The operations community is the one ``app_settings.operations_guild_id``
+names. Two things exist there alone:
+
+* **Its tables**, :data:`app.db.tenancy.OPERATIONS_TABLES`: where each stream
+  lands, the cases, and the access grants each case asked for. Provisioning
+  leaves them out of every community, and they are created here from
+  ``guild_template`` with their policies, grants and the sweeps only this
+  community runs (``app.services.guild_sweeps.Scope.OPERATIONS``). Their
+  presence is how a session tells it is in the operations community
+  (:func:`holds_operations`).
+* **The filer role**, ``guild_<ops>_filer``, below.
+
+Choosing the operations community creates both. Moving the choice to another
+community drops both from the one it leaves, with the files its cases held.
+Clearing it drops the filer role and keeps the tables, so choosing the same
+community again finds its streams where they were. Boot re-asserts them and
+removes what a move left behind.
+
+What the person who filed a case may read of it is held by the database. A
+filer is not a member of the operations community. They reach the cases they
 filed, and within those only their status and the part of the conversation
-said to them, through one role that exists in the operations community alone:
-``guild_<ops>_filer``. Choosing the operations community creates it; moving or
-clearing that choice drops it; boot re-asserts it and removes any copy left in
-a community that is no longer the operations one.
-
-Two things bound it, and both are the database's:
+said to them, through the filer role. Two things bound it, and both are the
+database's:
 
 * **Grants.** The role holds ``SELECT`` on the columns in
   :data:`FILER_TABLE_ACCESS` and on the columns the community's own row
@@ -33,13 +48,18 @@ from typing import Optional
 
 from sqlalchemy import text
 from sqlalchemy.ext.asyncio import AsyncConnection
+from sqlmodel.ext.asyncio.session import AsyncSession
 
 from app.core.config import settings
 from app.db import gucs
 from app.db.advisory_locks import LockNamespace, advisory_lock
 from app.db import session as db_session
+from app.db.tenancy import OPERATIONS_TABLES
 
 logger = logging.getLogger(__name__)
+
+#: The operations table whose presence :func:`holds_operations` reads.
+OPERATIONS_MARKER = "intake_cases"
 
 #: The filer role's suffix. Not a ``GuildRoleKind``: those exist in every
 #: community, and this one exists only in the operations community.
@@ -233,51 +253,125 @@ async def _deprovision(conn: AsyncConnection, role: str, schema: Optional[str]) 
     await _exec_batch(conn, statements)
 
 
-async def provision_filer_access(guild_id: int) -> None:
-    """Create or re-assert the filer role, its grants and its policies in
-    ``guild_id``. Idempotent."""
+async def holds_operations(conn: AsyncConnection | AsyncSession, schema: str) -> bool:
+    """Whether ``schema`` has the operations tables, which they all mark
+    together: created and dropped as one."""
+    return bool(
+        await conn.scalar(
+            text("SELECT to_regclass(:t) IS NOT NULL"),
+            {"t": f'"{schema}".{OPERATIONS_MARKER}'},
+        )
+    )
+
+
+async def operations_schemas(conn: AsyncConnection) -> set[str]:
+    """The community schemas that have the operations tables: the operations
+    community's, and any a move has not finished leaving."""
+    from app.db.guild_migrations import GUILD_SCHEMA_REGEX
+
+    rows = await conn.execute(
+        text(
+            "SELECT n.nspname FROM pg_class c"
+            " JOIN pg_namespace n ON n.oid = c.relnamespace"
+            " WHERE c.relname = :t AND c.relkind = 'r' AND n.nspname ~ :schemas"
+        ),
+        {"t": OPERATIONS_MARKER, "schemas": GUILD_SCHEMA_REGEX},
+    )
+    return set(rows.scalars())
+
+
+async def provision_operations(guild_id: int) -> None:
+    """Make ``guild_id``'s schema the operations community's: its tables, with
+    everything provisioning applies to them, where they are not there yet, and
+    the filer role re-asserted. Idempotent."""
+    from app.db.schema_provisioning import PARTS, _apply_parts, guild_schema_name
+
+    schema = guild_schema_name(guild_id)
     async with db_session.provisioning_engine.begin() as conn:
+        await advisory_lock(conn, LockNamespace.GUILD_PROVISION, guild_id)
+        if not await holds_operations(conn, schema):
+            await _apply_parts(conn, guild_id, PARTS, operations=True)
         await _provision(conn, guild_id)
 
 
-async def deprovision_filer_access(guild_id: int) -> None:
-    """Drop ``guild_id``'s filer role and policies. Safe where there are none."""
-    from app.db.schema_provisioning import guild_schema_name
+async def deprovision_operations(guild_id: int) -> None:
+    """Take from ``guild_id``'s schema what only the operations community has:
+    the files its cases held, the filer role, the operations community's own
+    sweep triggers, and the operations tables. Safe where there are none."""
+    from app.db import cohorts
+    from app.db.request_context import SystemGuild
+    from app.db.schema_provisioning import _exec_batch, guild_schema_name
+    from app.db.timers import drop_operations_timers_ddl
+    from app.services.platform import evidence
 
+    schema = guild_schema_name(guild_id)
+    async with db_session.provisioning_engine.connect() as conn:
+        holds = await holds_operations(conn, schema)
+    if holds:
+        async with cohorts.system_session(guild_id) as session:
+            await db_session.set_rls_context(session, SystemGuild(guild_id))
+            gone = await evidence.drop_cases(session)
+            await session.commit()
+        evidence.discard(guild_id, gone)
     async with db_session.provisioning_engine.begin() as conn:
-        await _deprovision(conn, filer_role_name(guild_id), guild_schema_name(guild_id))
+        await advisory_lock(conn, LockNamespace.GUILD_PROVISION, guild_id)
+        # The filer's policies first: some are on the tables that go next.
+        await _deprovision(conn, filer_role_name(guild_id), schema)
+        if await holds_operations(conn, schema):
+            await _exec_batch(
+                conn,
+                [
+                    f'SET LOCAL search_path TO "{schema}", public',
+                    *(s for s in drop_operations_timers_ddl().split(";\n") if s),
+                    *(
+                        f'DROP TABLE IF EXISTS "{schema}"."{table}" CASCADE'
+                        for table in sorted(OPERATIONS_TABLES)
+                    ),
+                ],
+            )
 
 
-async def reconcile_filer_access(operations_guild_id: Optional[int]) -> None:
-    """Make the filer role exist exactly where the operations community is.
+async def reconcile_operations(operations_guild_id: Optional[int]) -> None:
+    """Make the operations tables and the filer role exist where the
+    operations community is.
 
-    Boot's half of the lifecycle, after the guild back-fill: re-asserts the
-    operations community's role, grants and policies, and drops every other
-    community's — left behind by a move the process did not finish.
+    Run when the choice changes, and by boot after the guild back-fill:
+    re-asserts the operations community's, and takes them from every other
+    community, left behind by a move the process did not finish. With no
+    operations community, only the filer role goes: the tables stay for the
+    community that had them, until another is chosen.
     """
     from app.db.schema_provisioning import guild_schema_name
 
-    keep = filer_role_name(operations_guild_id) if operations_guild_id else None
+    keep = guild_schema_name(operations_guild_id) if operations_guild_id else None
     async with db_session.provisioning_engine.begin() as conn:
-        found = (
+        holders = await operations_schemas(conn)
+        roles = (
             await conn.execute(
                 text("SELECT rolname FROM pg_roles WHERE rolname ~ :p"),
                 {"p": filer_role_pattern()},
             )
         ).scalars()
-        strays = [role for role in found if role != keep]
-    for role in strays:
-        guild_id = int(
-            role[
-                len(settings.GUILD_ROLE_PREFIX) + len("guild_") : -len(
-                    FILER_ROLE_SUFFIX
+        prefix = len(settings.GUILD_ROLE_PREFIX) + len("guild_")
+        left = {int(schema.removeprefix("guild_")) for schema in holders} | {
+            int(role[prefix : -len(FILER_ROLE_SUFFIX)]) for role in roles
+        }
+        exists = operations_guild_id is not None and bool(
+            await conn.scalar(
+                text("SELECT 1 FROM pg_namespace WHERE nspname = :s"), {"s": keep}
+            )
+        )
+    for guild_id in sorted(left - {operations_guild_id}):
+        if operations_guild_id is None:
+            async with db_session.provisioning_engine.begin() as conn:
+                await _deprovision(
+                    conn, filer_role_name(guild_id), guild_schema_name(guild_id)
                 )
-            ]
-        )
+            continue
         logger.info(
-            "filer access: dropping %s, no longer the operations community", role
+            "operations: leaving community %s, no longer the operations one",
+            guild_id,
         )
-        async with db_session.provisioning_engine.begin() as conn:
-            await _deprovision(conn, role, guild_schema_name(guild_id))
-    if operations_guild_id is not None:
-        await provision_filer_access(operations_guild_id)
+        await deprovision_operations(guild_id)
+    if exists:
+        await provision_operations(operations_guild_id)

@@ -481,7 +481,7 @@ class Filer:
     Not a member and not a grantee: they hold no standing in the community and
     are routed into the one role that exists for this, ``guild_<id>_filer``,
     whose grants and row policies admit their own cases and nothing else (see
-    ``app.db.filer_access``). Only the account and its cases are written. The community is the
+    ``app.db.operations_schema``). Only the account and its cases are written. The community is the
     schema and the role, never ``app.current_guild_id``, which the shared
     tables read as membership.
     """
@@ -501,7 +501,7 @@ class Filer:
         object.__setattr__(self, "cases", tuple(sorted(int(c) for c in self.cases)))
 
     def route(self) -> Route:
-        from app.db.filer_access import filer_role_name
+        from app.db.operations_schema import filer_role_name
 
         return Route(
             {gucs.USER_ID: self.user_id, gucs.FILER_CASES: self.cases},

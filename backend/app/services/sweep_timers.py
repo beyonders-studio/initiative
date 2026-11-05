@@ -555,11 +555,30 @@ def sweeps() -> tuple[Sweep, ...]:
             kind="evidence",
             scope=Scope.ACTIVE,
             every=hour,
-            visit=evidence.purge_due,
+            visit=evidence.purge_reports_due,
+            next_due=lambda _now: select(
+                func.min(ModerationReport.decided_at) + report_keep
+            ).where(col(ModerationReport.id).in_(select(Evidence.report_id))),
+            sources=(
+                on_row("evidence", "now()"),
+                on_row(
+                    "moderation_reports",
+                    "{row}.decided_at",
+                    after=report_keep,
+                    events="UPDATE OF decided_at",
+                    when="NEW.decided_at IS NOT NULL",
+                ),
+            ),
+        ),
+        Sweep(
+            kind="case_evidence",
+            scope=Scope.OPERATIONS,
+            every=hour,
+            visit=evidence.purge_cases_due,
             # A case's evidence is kept from when its task closes, for its
             # stream's retention: any task closing arms the shortest, which is
             # never later.
-            next_due=lambda _now: least(
+            next_due=lambda _now: (
                 select(
                     func.min(
                         func.least(
@@ -577,10 +596,7 @@ def sweeps() -> tuple[Sweep, ...]:
                 .select_from(IntakeCase)
                 .join(Task, col(Task.id) == IntakeCase.task_id)
                 .join(TaskStatus, col(TaskStatus.id) == Task.task_status_id)
-                .where(col(IntakeCase.task_id).in_(select(Evidence.case_task_id))),
-                select(func.min(ModerationReport.decided_at) + report_keep).where(
-                    col(ModerationReport.id).in_(select(Evidence.report_id))
-                ),
+                .where(col(IntakeCase.task_id).in_(select(Evidence.case_task_id)))
             ),
             sources=(
                 on_row("evidence", "now()"),
@@ -590,13 +606,6 @@ def sweeps() -> tuple[Sweep, ...]:
                     after=shortest_case_keep,
                     events="UPDATE OF completed_at, deleted_at",
                     when="NEW.completed_at IS NOT NULL OR NEW.deleted_at IS NOT NULL",
-                ),
-                on_row(
-                    "moderation_reports",
-                    "{row}.decided_at",
-                    after=report_keep,
-                    events="UPDATE OF decided_at",
-                    when="NEW.decided_at IS NOT NULL",
                 ),
             ),
         ),

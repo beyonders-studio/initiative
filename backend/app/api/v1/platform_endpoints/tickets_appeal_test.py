@@ -10,7 +10,7 @@ from sqlmodel import select
 
 from app.core.intake import IntakeStream
 from app.core.messages import AppealMessages, AuthMessages, TicketMessages
-from app.db import filer_access
+from app.db import operations_schema
 from app.db.request_context import SystemGuild, Unattributed
 from app.db.session import set_rls_context
 from app.models.platform.app_setting import AppSetting
@@ -50,11 +50,11 @@ async def appeals_desk(session, acting_user):
         session.add(IntakeBinding(stream=stream, project_id=staff.project.id))
     await session.commit()
     await set_rls_context(session, Unattributed())
-    await filer_access.provision_filer_access(guild_id)
+    await operations_schema.provision_operations(guild_id)
 
     yield {"staff": staff, "guild_id": guild_id, "project_id": staff.project.id}
     await session.rollback()
-    await filer_access.deprovision_filer_access(guild_id)
+    await operations_schema.deprovision_operations(guild_id)
 
 
 async def _suspend(client, session, user, reason="Spam in three communities"):

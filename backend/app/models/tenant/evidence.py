@@ -4,7 +4,7 @@ A guild-schema table, one row per stored object. A row hangs off exactly one
 parent — the community report it came with, or the operations case — and is
 reached exactly as that parent is: a report's evidence by those who settle the
 report, a case's by those in the case's initiative, and its filer's own by the
-filer through their filer role (``app.db.filer_access``).
+filer through their filer role (``app.db.operations_schema``).
 
 The object itself is never in ``uploads`` and never served by the upload route.
 It is stored encrypted under a key of its own (``app.core.blob_crypto``), and

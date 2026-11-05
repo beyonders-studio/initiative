@@ -60,6 +60,7 @@ __all__ = [
     "CREATED_BY_EXEMPT_TABLES",
     "INITIATIVE_SCOPED_TABLES",
     "GUILD_SCOPED_TABLES",
+    "OPERATIONS_TABLES",
     "ALL_CLASSIFIED_TABLES",
     "is_guild_scoped",
     "is_shared",
@@ -423,6 +424,16 @@ CREATED_BY_EXEMPT_TABLES: frozenset[str] = frozenset(
 # content (keys of INITIATIVE_PATHS) plus the guild-level exemptions. Derived,
 # so a guild table is declared in exactly ONE place.
 GUILD_SCOPED_TABLES: frozenset[str] = INITIATIVE_SCOPED_TABLES | GUILD_LEVEL_TABLES
+
+# Guild tables only the operations community fills
+# (``app_settings.operations_guild_id``). ``guild_template`` has them like every
+# guild table, and one community's schema does: provisioning leaves them out,
+# and choosing the operations community creates them
+# (``app.db.operations_schema``). Each is still classified above, which is how
+# it is secured there.
+OPERATIONS_TABLES: frozenset[str] = frozenset(
+    {"intake_bindings", "intake_cases", "case_grants"}
+)
 
 # Union of every table that has an explicit placement decision.
 ALL_CLASSIFIED_TABLES: frozenset[str] = SHARED_TABLES | GUILD_SCOPED_TABLES

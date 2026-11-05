@@ -12,7 +12,7 @@ from sqlmodel import select
 
 from app.core.intake import IntakeStream
 from app.core.messages import CommentMessages, TaskMessages, TicketMessages
-from app.db import filer_access
+from app.db import operations_schema
 from app.db.request_context import SystemGuild, Unattributed
 from app.db.session import set_rls_context
 from app.models.platform.app_setting import AppSetting
@@ -83,7 +83,7 @@ async def desk(session, acting_user):
         )
     await session.commit()
     await set_rls_context(session, Unattributed())
-    await filer_access.provision_filer_access(guild_id)
+    await operations_schema.provision_operations(guild_id)
 
     yield {
         "staff": staff,
@@ -95,7 +95,7 @@ async def desk(session, acting_user):
     }
     # Dropping the policies waits on every open reader of those tables.
     await session.rollback()
-    await filer_access.deprovision_filer_access(guild_id)
+    await operations_schema.deprovision_operations(guild_id)
 
 
 async def _file(user, stream=IntakeStream.support, subject="Lost my phone") -> int:

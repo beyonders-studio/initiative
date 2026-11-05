@@ -15,8 +15,8 @@ Every path that handles an attached file goes through here:
 - :func:`transfer` carries a report's files into the operations case it was
   escalated to: the stored bytes are copied as they are and only the key is
   wrapped again.
-- :func:`purge_due` and :func:`rewrap_guild` are the retention sweep's and the
-  key rotation's halves.
+- :func:`purge_cases_due`, :func:`purge_reports_due` and :func:`rewrap_guild`
+  are the retention sweeps' and the key rotation's halves.
 
 Files are never written to ``uploads``: a community's uploads are readable
 community-wide, and evidence is readable only through its own row.
@@ -709,21 +709,20 @@ async def carry_report(
 # -- Retention ----------------------------------------------------------------
 
 
-async def purge_due(session: AsyncSession, guild_id: int) -> int:
-    """One community's retention: delete the evidence of what closed long
-    enough ago — the rows, then the objects. Returns how many went.
+async def purge_cases_due(session: AsyncSession, guild_id: int) -> int:
+    """The operations community's retention for its cases: delete the evidence
+    of those that closed long enough ago — the rows, then the objects. Returns
+    how many went.
 
     A case closes when its task is done or in the trash, and its evidence is
-    kept for its stream's ``retention_days`` from then. A report closes when it
-    is settled, and its evidence is kept for the moderation stream's. Each is
-    read from the parent as it stands when the rows are deleted, so a reopened
-    case keeps its files, and one closed again counts from the new close. The
-    tasks are locked while that is decided, so a reopen at the same moment
-    either lands first and keeps the files, or waits for them to go. A case
-    a hold still names keeps its files until the hold is released.
+    kept for its stream's ``retention_days`` from then, read from the task as
+    it stands when the rows are deleted, so a reopened case keeps its files,
+    and one closed again counts from the new close. The tasks are locked while
+    that is decided, so a reopen at the same moment either lands first and
+    keeps the files, or waits for them to go. A case a hold still names keeps
+    its files until the hold is released.
     """
     from app.models.tenant.intake import IntakeCase
-    from app.models.tenant.moderation import ModerationReport
     from app.models.tenant.task import Task, TaskStatus, TaskStatusCategory
 
     now = datetime.now(timezone.utc)
@@ -769,8 +768,19 @@ async def purge_due(session: AsyncSession, guild_id: int) -> int:
             .scalars()
             .all()
         )
-    report_cutoff = now - timedelta(days=meta(IntakeStream.moderation).retention_days)
-    gone += (
+    return await _purged(session, guild_id, gone)
+
+
+async def purge_reports_due(session: AsyncSession, guild_id: int) -> int:
+    """One community's retention for its reports: delete the evidence of those
+    settled long enough ago, kept for the moderation stream's
+    ``retention_days`` — the rows, then the objects. Returns how many went."""
+    from app.models.tenant.moderation import ModerationReport
+
+    report_cutoff = datetime.now(timezone.utc) - timedelta(
+        days=meta(IntakeStream.moderation).retention_days
+    )
+    gone = (
         (
             await session.exec(
                 delete(Evidence)
@@ -787,6 +797,12 @@ async def purge_due(session: AsyncSession, guild_id: int) -> int:
         .scalars()
         .all()
     )
+    return await _purged(session, guild_id, gone)
+
+
+async def _purged(session: AsyncSession, guild_id: int, gone: Sequence[str]) -> int:
+    """Commit a purge, then remove the objects its rows named that no row still
+    does."""
     await session.commit()
     if gone:
         await _remove_unnamed(session, guild_id, gone)
@@ -922,6 +938,27 @@ async def released_by_purge(
         ).all()
     )
     return keys - still
+
+
+async def drop_cases(session: AsyncSession) -> set[str]:
+    """Delete the files of every case in the community ``session`` is routed
+    into, once it is no longer the operations one. Returns the stored objects
+    no remaining row names, for the caller to remove once its commit has
+    landed."""
+    tasks = (
+        await session.exec(
+            select(Evidence.case_task_id)
+            .where(Evidence.case_task_id.is_not(None))  # type: ignore[union-attr]
+            .distinct()
+        )
+    ).all()
+    if not tasks:
+        return set()
+    gone = await released_by_purge(session, task_ids=[int(t) for t in tasks if t])
+    await session.exec(
+        delete(Evidence).where(Evidence.case_task_id.is_not(None))  # type: ignore[union-attr]
+    )
+    return gone
 
 
 # -- Key rotation -------------------------------------------------------------

@@ -24,7 +24,7 @@ from sqlmodel.ext.asyncio.session import AsyncSession
 from app.core.intake import Conversation, IntakeStream, meta
 from app.core.tools import Tool
 from app.core.messages import GuildMessages, InitiativeMessages, IntakeMessages
-from app.db import cohorts, filer_access
+from app.db import cohorts, operations_schema
 from app.db.advisory_locks import LockNamespace, advisory_lock
 from app.db.session import routed_guild_id, set_rls_context
 from app.models.platform.app_setting import AppSetting
@@ -112,10 +112,12 @@ async def set_operations_guild(
     await session.commit()
     # A plug-in limited to the operations community follows the choice too.
     invalidate_registrations()
-    # The filer role follows the choice: created in the community chosen,
-    # dropped from the one it replaces. Boot does the same, so a move this
-    # process did not finish is finished there.
-    await filer_access.reconcile_filer_access(guild_id)
+    # The operations tables and the filer role follow the choice: created in
+    # the community chosen, dropped from the one it replaces with its cases'
+    # files. Unsetting it keeps the tables, so pointing back restores them.
+    # Boot does the same, so a move this process did not finish is finished
+    # there.
+    await operations_schema.reconcile_operations(guild_id)
     return guild_id
 
 

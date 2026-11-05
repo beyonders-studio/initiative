@@ -9,7 +9,7 @@ Two routes, both the signed-in person's own:
 
 And the cases they filed, which they follow: the list, one case with what has
 been said to them about it, and their answer. What a filer reads is decided by
-the operations community's filer role (``app.db.filer_access``), which these
+the operations community's filer role (``app.db.operations_schema``), which these
 routes read through.
 
 A suspended account reaches these too, for one shape: it may appeal its
