@@ -7,7 +7,7 @@ provisioning now creates them in the operations community alone
 (``app.db.operations_schema``).
 
 Every other ``guild_<id>`` loses the three tables where they hold nothing:
-their policies first, then their row security, then the table. One that holds
+their policies first, then their row security, then the tables. One that holds
 something was the operations community once; it keeps them until the next
 start, which takes them, and its cases' files, if another community is the
 operations one, and leaves them where none is. Every schema loses
@@ -96,8 +96,9 @@ def _holds_anything(schema: str) -> bool:
 
 
 def _drop(schema: str) -> None:
-    """Drop the operations tables from ``schema``: each one's policies first,
-    then its row security, then the table."""
+    """Drop the operations tables from ``schema``: every one's policies first,
+    since a policy on one may read another, then their row security, then the
+    tables."""
     bind = op.get_bind()
     for table in TABLES:
         qualified = f'"{schema}".{table}'
@@ -107,7 +108,8 @@ def _drop(schema: str) -> None:
         ).all():
             op.execute(f'DROP POLICY IF EXISTS "{name}" ON {qualified}')
         op.execute(f"ALTER TABLE {qualified} DISABLE ROW LEVEL SECURITY")
-        op.execute(f"DROP TABLE {qualified}")
+    for table in TABLES:
+        op.execute(f'DROP TABLE "{schema}".{table}')
 
 
 def upgrade() -> None:

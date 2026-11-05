@@ -21,7 +21,6 @@ from app.db import operations_schema
 from app.db.tenancy import OPERATIONS_TABLES
 from app.db.request_context import SystemGuild, Unattributed
 from app.db.session import set_rls_context
-from app.models.platform.app_setting import AppSetting
 from app.models.tenant.comment import Comment, CommentAudience
 from app.models.tenant.evidence import Evidence
 from app.models.tenant.intake import IntakeBinding, IntakeCase
@@ -32,17 +31,8 @@ from app.testing import (
     create_initiative,
     create_project,
     create_user,
+    make_operations_community,
 )
-
-
-async def _point_at(session, guild_id: int | None) -> None:
-    await set_rls_context(session, Unattributed())
-    row = (await session.exec(select(AppSetting).where(AppSetting.id == 1))).first()
-    if row is None:
-        row = AppSetting(id=1)
-    row.operations_guild_id = guild_id
-    session.add(row)
-    await session.commit()
 
 
 @pytest.fixture
@@ -53,8 +43,7 @@ async def operations(session):
     guild = await create_guild(session, creator=staff)
     initiative = await create_initiative(session, guild, staff)
     project = await create_project(session, initiative, staff)
-    await _point_at(session, guild.id)
-    await operations_schema.provision_operations(guild.id)
+    await make_operations_community(session, guild.id)
     await set_rls_context(session, SystemGuild(guild.id))
     session.add(IntakeBinding(stream=IntakeStream.support, project_id=project.id))
     await session.commit()
@@ -293,7 +282,7 @@ async def test_a_moved_operations_community_takes_its_tables_and_role_with_it(
 async def test_clearing_the_choice_keeps_the_tables_and_drops_the_role(
     session, operations
 ):
-    await _point_at(session, None)
+    await make_operations_community(session, None)
     await operations_schema.reconcile_operations(None)
 
     assert await _has_tables(session, operations["guild"].id) == OPERATIONS_TABLES
@@ -308,7 +297,7 @@ async def test_clearing_the_choice_keeps_the_tables_and_drops_the_role(
 async def test_with_no_operations_community_there_is_nothing_to_route_into(
     session, role_session
 ):
-    await _point_at(session, None)
+    await make_operations_community(session, None)
     routed = await role_session("app_user")
     user = await create_user(session)
 

@@ -177,6 +177,8 @@ Security notes, moderation reports, support requests and feedback each open a ca
 
 It's all one page, **Settings → Platform → Intake**. Pick the community, then say which of its projects each kind lands in, and if you like, which of that project's task types its cases are — or choose **Set this up for me** and get a ready-made project with its own statuses and fields. Pause a kind and it stops receiving; choose no community at all and nothing is routed anywhere.
 
+Choosing no community leaves everything where it is, so picking the same one again carries on. Picking a different one starts fresh there. The community you leave keeps its cases as ordinary tasks, but their attachments are deleted, its project choices are cleared, and requesters stop seeing those cases in **My Tickets**.
+
 Give security and moderation an initiative each, so only the people working those cases can read them. The page says so if two kinds share one.
 
 A moderation case about one thing carries a **subject_link** that opens it in its community: the task, page or post, or the thread a comment is in, scrolled to the comment. It opens only for someone who can read it there, so staff take an [access grant](#cross-community-access-break-glass-and-time-bound-grants) on the community first. A reported picture has no page of its own and gets no link.

@@ -15,6 +15,7 @@ from app.testing.audit import emitted
 from app.testing.captcha import captcha_switched_on
 from app.testing.factories import (
     create_access_grant,
+    make_operations_community,
     grant_role_permission,
     TOOL_FACTORIES,
     billing_guild_ref,
@@ -159,6 +160,7 @@ __all__ = [
     "create_federated_identity",
     "create_guild_auth_policy",
     "create_access_grant",
+    "make_operations_community",
     "create_guild",
     "community_plan",
     "guild_administration",

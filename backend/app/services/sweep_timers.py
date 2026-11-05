@@ -1040,6 +1040,20 @@ async def _claim(now: datetime, *, outward: bool) -> list[Any]:
     return list(rows)
 
 
+async def disarm(guild_id: int, kinds: Iterable[str]) -> None:
+    """Remove the community's timers for ``kinds``, sweeps it no longer
+    runs."""
+    async with cohorts.system_session(None) as session:
+        await set_rls_context(session, Unattributed())
+        await session.exec(
+            text(
+                "DELETE FROM community_timers"
+                " WHERE community_id = :guild_id AND kind = ANY(:kinds)"
+            ).bindparams(guild_id=guild_id, kinds=sorted(kinds))  # type: ignore[call-overload]
+        )
+        await session.commit()
+
+
 async def _delete(ids: set[int]) -> None:
     if not ids:
         return
@@ -1173,12 +1187,19 @@ async def _pending_kinds(guild_id: int) -> set[str]:
 async def reconcile(session: AsyncSession, guild_id: int) -> datetime:
     """Arm every sweep that has work in the community and no timer for it, and
     count each one: a write no source covered. Returns the next reconcile."""
+    from app.db.operations_schema import holds_operations
+    from app.db.schema_provisioning import guild_schema_name
+
     now = datetime.now(timezone.utc)
     pending = await _pending_kinds(guild_id)
+    # The operations community's own sweeps read tables only it has.
+    operations = await holds_operations(session, guild_schema_name(guild_id))
     checked = [
         sweep
         for sweep in sweeps()
-        if sweep.kind != RECONCILE and sweep.due_outside is None
+        if sweep.kind != RECONCILE
+        and sweep.due_outside is None
+        and (operations or sweep.scope is not Scope.OPERATIONS)
     ]
     probe = select(
         *(sweep.next_due(now).scalar_subquery().label(sweep.kind) for sweep in checked)

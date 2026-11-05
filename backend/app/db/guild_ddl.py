@@ -2045,6 +2045,7 @@ def _registry_ddl() -> str:
             render_guild_capture_ddl(),
             render_guild_search_ddl(None),
             render_guild_timer_ddl(),
+            render_guild_timer_ddl(operations=True),
         )
     )
 

@@ -29,6 +29,7 @@ from app.testing import (
     create_project,
     create_task,
     create_user,
+    make_operations_community,
 )
 
 _MIGRATION = (
@@ -63,6 +64,7 @@ async def test_a_cases_evidence_moves_from_its_case_to_its_task(session) -> None
     # A first task with no case, so the case's row and its task differ in id.
     await create_task(session, project)
     task = await create_task(session, project)
+    await make_operations_community(session, guild.id)
     now = datetime.now(timezone.utc)
     await set_rls_context(session, SystemGuild(guild.id))
     case = IntakeCase(

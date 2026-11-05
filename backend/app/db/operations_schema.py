@@ -302,6 +302,8 @@ async def deprovision_operations(guild_id: int) -> None:
     from app.db.request_context import SystemGuild
     from app.db.schema_provisioning import _exec_batch, guild_schema_name
     from app.db.timers import drop_operations_timers_ddl
+    from app.services import sweep_timers
+    from app.services.guild_sweeps import Scope
     from app.services.platform import evidence
 
     schema = guild_schema_name(guild_id)
@@ -313,6 +315,10 @@ async def deprovision_operations(guild_id: int) -> None:
             gone = await evidence.drop_cases(session)
             await session.commit()
         evidence.discard(guild_id, gone)
+        await sweep_timers.disarm(
+            guild_id,
+            (s.kind for s in sweep_timers.sweeps() if s.scope is Scope.OPERATIONS),
+        )
     async with db_session.provisioning_engine.begin() as conn:
         await advisory_lock(conn, LockNamespace.GUILD_PROVISION, guild_id)
         # The filer's policies first: some are on the tables that go next.

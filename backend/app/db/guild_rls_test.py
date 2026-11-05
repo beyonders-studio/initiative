@@ -25,6 +25,8 @@ from app.db.initiative_rls import (
     render_entity_access_fn,
 )
 from app.db.schema_provisioning import (
+    PARTS,
+    _apply_parts,
     drop_guild_schema,
     guild_schema_name,
     provision_guild_schema,
@@ -143,6 +145,8 @@ async def test_every_initiative_scoped_table_has_policies(engine):
     try:
         async with engine.begin() as conn:
             await provision_guild_schema(conn, _GID_POLICIES)
+            # As the operations community, so its own tables are checked too.
+            await _apply_parts(conn, _GID_POLICIES, PARTS, operations=True)
         async with engine.connect() as conn:
             pol_rows = await conn.execute(
                 text(
@@ -309,6 +313,7 @@ async def test_seat_and_ledger_tables_have_policies(engine):
     try:
         async with engine.begin() as conn:
             await provision_guild_schema(conn, gid)
+            await _apply_parts(conn, gid, PARTS, operations=True)
         async with engine.connect() as conn:
             rows = await conn.execute(
                 text(

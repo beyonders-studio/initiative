@@ -73,6 +73,9 @@ ALLOWED_DYNAMIC_SQL: dict[str, str] = {
     "app/db/schema_provisioning.py::apply_guild_timers": (
         "int-derived schema name + registry-rendered trigger DDL (constants)"
     ),
+    "app/db/schema_provisioning.py::_run_in_schema": (
+        "int-derived schema name + the bundle's registry-rendered operations DDL"
+    ),
     "app/db/schema_provisioning.py::reindex_guild_search": (
         "int-derived guild_<id> schema name, registry-rendered "
         "reindex statements (constants), and a hex-digest generation marker"

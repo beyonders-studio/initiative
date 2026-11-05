@@ -16,7 +16,6 @@ from app.db.request_context import SystemGuild, Unattributed
 from app.db.session import set_rls_context
 from app.models.platform.access_grant import AccessGrant
 from app.models.platform.access_grant_activity import AccessGrantActivity
-from app.models.platform.app_setting import AppSetting
 from app.models.platform.guild import CommunityRole
 from app.models.platform.user import User
 from app.models.tenant.case_grant import CaseGrant
@@ -35,6 +34,7 @@ from app.testing import (
     create_resource_grant,
     create_user,
     get_auth_headers,
+    make_operations_community,
 )
 
 GRANTS = "/api/v1/access-grants/"
@@ -60,12 +60,7 @@ async def desk(session: AsyncSession, acting_user):
         guild_role=CommunityRole.admin, initiative=True, project=True
     )
     guild_id = staff.guild.id
-    await set_rls_context(session, Unattributed())
-    row = (await session.exec(select(AppSetting).where(AppSetting.id == 1))).first()
-    row = row or AppSetting(id=1)
-    row.operations_guild_id = guild_id
-    session.add(row)
-    await session.commit()
+    await make_operations_community(session, guild_id)
 
     await set_rls_context(session, SystemGuild(guild_id))
     await task_statuses_service.ensure_default_statuses(

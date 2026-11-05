@@ -15,7 +15,6 @@ from app.core.messages import CommentMessages, TaskMessages, TicketMessages
 from app.db import operations_schema
 from app.db.request_context import SystemGuild, Unattributed
 from app.db.session import set_rls_context
-from app.models.platform.app_setting import AppSetting
 from app.models.platform.guild import CommunityRole
 from app.models.platform.notice_outbox import NoticeOutboxItem
 from app.models.platform.notification import NotificationType
@@ -25,6 +24,7 @@ from app.models.tenant.task import Task, TaskAssignee, TaskStatus, TaskStatusCat
 from app.services.platform.intake import CaseFiler, open_case
 from app.services.platform.ticket_notices import notify_filers
 from app.services.tenant import task_statuses as task_statuses_service
+from app.testing import make_operations_community
 
 TICKETS = "/api/v1/me/tickets"
 
@@ -51,13 +51,7 @@ async def desk(session, acting_user):
     guild_id = staff.guild.id
     project_id = staff.project.id
 
-    await set_rls_context(session, Unattributed())
-    row = (await session.exec(select(AppSetting).where(AppSetting.id == 1))).first()
-    if row is None:
-        row = AppSetting(id=1)
-    row.operations_guild_id = guild_id
-    session.add(row)
-    await session.commit()
+    await make_operations_community(session, guild_id)
 
     await set_rls_context(session, SystemGuild(guild_id))
     await task_statuses_service.ensure_default_statuses(
@@ -83,7 +77,6 @@ async def desk(session, acting_user):
         )
     await session.commit()
     await set_rls_context(session, Unattributed())
-    await operations_schema.provision_operations(guild_id)
 
     yield {
         "staff": staff,
@@ -658,6 +651,27 @@ async def test_what_leaves_the_app_names_no_case(session, acting_user, desk):
     for text in filter(None, leaving):
         assert "Staff title" not in text
         assert "Secret subject" not in text
+
+
+async def test_a_task_in_any_other_community_is_not_a_case(client, acting_user):
+    """Only the operations community has cases; every task page asks."""
+    member = await acting_user(
+        guild_role=CommunityRole.admin, initiative=True, project=True
+    )
+    created = await client.post(
+        member.g("/tasks/"),
+        json={"title": "Plain", "project_id": member.project.id},
+        headers=member.headers,
+    )
+    assert created.status_code == 201, created.text
+    task_id = created.json()["id"]
+
+    for response in (
+        await client.get(member.g(f"/tasks/{task_id}/case"), headers=member.headers),
+        await _take(client, member, task_id),
+    ):
+        assert response.status_code == 404
+        assert response.json()["detail"] == TaskMessages.NOT_A_CASE
 
 
 async def test_taking_needs_write_and_a_case(client, session, acting_user, desk):
