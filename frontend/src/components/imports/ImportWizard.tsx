@@ -57,9 +57,9 @@ import { toast } from "@/lib/mascotToast";
 import { uploadInPieces } from "@/lib/resumableUpload";
 import { getItem, removeItem, setItem } from "@/lib/storage";
 
-// Mirrors the backend's IMPORT_MAX_BACKUP_UPLOAD_BYTES — the UX
-// layer; the server (ASGI middleware + bounded read) is the enforcement.
-const MAX_UPLOAD_BYTES = 268_435_456;
+// Mirrors the backend's IMPORT_MAX_BUNDLE_BYTES, the most a backup sent in
+// pieces may weigh — the UX layer; the server is the enforcement.
+const MAX_UPLOAD_BYTES = 20 * 1024 * 1024 * 1024;
 
 // Mirrors IMPORT_MAX_ENVELOPE_BYTES, for the same reason: a foreign export
 // travels as its own text in the request body.
