@@ -1,4 +1,4 @@
-"""The contacts channel: who gets poked, and — mostly — who does not.
+"""The connections channel: who gets poked, and — mostly — who does not.
 
 The channel is content-free, so what is worth asserting is the addressing. Half
 of these are about an account that must hear nothing: a frame is as much a tell
@@ -14,7 +14,12 @@ from app.models.platform.contact_grant import ContactGrantKind
 from app.models.platform.user_dm_settings import DmPolicy
 from app.models.platform.user_ignore import UserIgnore
 from app.services.platform import contact_grants as contact_grants_service
-from app.services.platform import contacts_stream, notify_bus, user_ignores, user_stream
+from app.services.platform import (
+    connections_stream,
+    notify_bus,
+    user_ignores,
+    user_stream,
+)
 from app.testing.sockets import FakeWebSocket, settle
 from app.testing import create_user
 from sqlalchemy import text
@@ -24,8 +29,8 @@ async def _socket_for(account_socket, user) -> FakeWebSocket:
     return account_socket(user.id)
 
 
-def _contacts_frames(socket: FakeWebSocket) -> list[dict]:
-    return [f for f in socket.sent if f.get("resource") == contacts_stream.RESOURCE]
+def _connections_frames(socket: FakeWebSocket) -> list[dict]:
+    return [f for f in socket.sent if f.get("resource") == connections_stream.RESOURCE]
 
 
 async def _as(session, user) -> None:
@@ -61,8 +66,10 @@ async def test_a_request_pokes_both_parties(session, account_socket):
     )
     await settle()
 
-    assert _contacts_frames(to_ada), "the recipient is told there is something to see"
-    assert _contacts_frames(to_bram), "and the requester that theirs is pending"
+    assert _connections_frames(to_ada), (
+        "the recipient is told there is something to see"
+    )
+    assert _connections_frames(to_bram), "and the requester that theirs is pending"
 
 
 async def test_an_ignored_requester_pokes_only_themselves(session, account_socket):
@@ -83,8 +90,8 @@ async def test_an_ignored_requester_pokes_only_themselves(session, account_socke
     )
     await settle()
 
-    assert _contacts_frames(to_ada) == []
-    assert _contacts_frames(to_bram), "and it looks entirely ordinary to them"
+    assert _connections_frames(to_ada) == []
+    assert _connections_frames(to_bram), "and it looks entirely ordinary to them"
 
 
 async def test_ignoring_pokes_the_holder_and_nobody_else(session, account_socket):
@@ -98,8 +105,8 @@ async def test_ignoring_pokes_the_holder_and_nobody_else(session, account_socket
     await user_ignores.add(session, user_id=ada.id, ignored_user_id=bram.id)
     await settle()
 
-    assert _contacts_frames(to_ada)
-    assert _contacts_frames(to_bram) == []
+    assert _connections_frames(to_ada)
+    assert _connections_frames(to_bram) == []
 
 
 async def test_lifting_an_ignore_pokes_the_holder_and_nobody_else(
@@ -117,8 +124,8 @@ async def test_lifting_an_ignore_pokes_the_holder_and_nobody_else(
     await user_ignores.remove(session, user_id=ada.id, ignored_user_id=bram.id)
     await settle()
 
-    assert _contacts_frames(to_ada)
-    assert _contacts_frames(to_bram) == []
+    assert _connections_frames(to_ada)
+    assert _connections_frames(to_bram) == []
 
 
 async def test_the_frame_carries_nothing(session, account_socket):
@@ -130,8 +137,8 @@ async def test_the_frame_carries_nothing(session, account_socket):
     await user_ignores.add(session, user_id=ada.id, ignored_user_id=bram.id)
     await settle()
 
-    frame = _contacts_frames(to_ada)[0]
-    assert frame["resource"] == "contacts"
+    frame = _connections_frames(to_ada)[0]
+    assert frame["resource"] == "connections"
     assert frame["ids"] == {}
     assert set(frame) == {"resource", "action", "ids", "timestamp"}
 
@@ -159,9 +166,9 @@ async def test_a_fan_out_publishes_for_everyone_it_names(
 
     monkeypatch.setattr(notify_bus, "notify", _capture)
 
-    user_stream.queue_signals(session, [here.id, away.id], contacts_stream.RESOURCE)
+    user_stream.queue_signals(session, [here.id, away.id], connections_stream.RESOURCE)
     await session.commit()
     await settle()
 
-    assert _contacts_frames(to_here)
+    assert _connections_frames(to_here)
     assert [notice["user_ids"] for notice in notices] == [[here.id, away.id]]

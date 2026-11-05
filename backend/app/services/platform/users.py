@@ -599,7 +599,7 @@ async def _erase_personal_rows(session: AsyncSession, *, user_id: int) -> None:
     A hard delete gets all of these from the ``users`` foreign key. Anonymizing
     keeps the row, so the cascade never fires and each one is deleted here.
     Rows that pair this account with somebody else go from both sides: a husk
-    on another person's contacts, ignore list or conversation is a trace of
+    on another person's connections, ignore list or conversation is a trace of
     the account just the same.
     """
     from app.models.platform.announcement import AnnouncementReadReceipt

@@ -1,4 +1,4 @@
-"""My Contacts lists the people you could actually reach out to.
+"""The people roster lists the people you could actually reach out to.
 
 The two to keep are the last: an ignore governs what arrives, so it takes the
 account you ignored off your own roster and leaves you on theirs.
@@ -24,7 +24,7 @@ async def _policy(session, user, policy: DmPolicy) -> None:
 
 
 async def _roster(client, actor) -> set[int]:
-    response = await client.get("/api/v1/me/contacts", headers=actor.headers)
+    response = await client.get("/api/v1/me/people", headers=actor.headers)
     assert response.status_code == 200, response.text
     return {
         item["id"]

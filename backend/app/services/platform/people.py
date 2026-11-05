@@ -1,4 +1,4 @@
-"""What the My Contacts page reads.
+"""What the people roster reads.
 
 The rosters of the reader's own guilds, gathered the way every other ``/me``
 aggregate is: one routed visit per guild, via ``gather_across_guilds``.
@@ -22,9 +22,9 @@ from app.services.membership import live_membership_clause
 from app.models.platform.guild_image import GuildImageVariant
 from app.models.platform.user import User, UserStatus
 from app.models.platform.user_profile_view import MemberProfile
-from app.schemas.platform.contact import (
-    ContactCommunitySection,
-    ContactRead,
+from app.schemas.platform.people import (
+    PeopleCommunitySection,
+    PersonRead,
 )
 from app.services.cross_guild import gather_across_guilds
 from app.services.platform import guild_images as guild_images_service
@@ -78,7 +78,7 @@ async def ordered_member_guilds(
     ]
 
 
-def _reads(users: Iterable[MemberProfile]) -> list[ContactRead]:
+def _reads(users: Iterable[MemberProfile]) -> list[PersonRead]:
     """Validate inside the caller's current guild context.
 
     Each ``MemberProfile`` was read in its guild's routed context, so its
@@ -86,7 +86,7 @@ def _reads(users: Iterable[MemberProfile]) -> list[ContactRead]:
     """
     reads = []
     for user in users:
-        read = ContactRead.model_validate(user)
+        read = PersonRead.model_validate(user)
         read.presence = presence_service.online.presence_of(user.id)
         reads.append(read)
     return reads
@@ -100,7 +100,7 @@ async def guild_sections(
     search: Optional[str] = None,
     page: int = 1,
     page_size: int = DEFAULT_PAGE_SIZE,
-) -> list[ContactCommunitySection]:
+) -> list[PeopleCommunitySection]:
     """One section per guild, in the order given.
 
     Each guild is visited in its own routed context, which is what makes both
@@ -110,7 +110,7 @@ async def guild_sections(
     if not guilds:
         return []
 
-    sections: dict[int, ContactCommunitySection] = {}
+    sections: dict[int, PeopleCommunitySection] = {}
     # The guilds the walk below could enter; one it cannot reach right now
     # contributes nothing, section or shared membership.
     visited: set[int] = set()
@@ -150,9 +150,9 @@ async def guild_sections(
         base = users_service.guild_members(
             select(MemberProfile), guild_id=guild_id
         ).where(
-            # You are not your own contact.
+            # You are not on your own roster.
             MemberProfile.id != user_id,
-            # And a contact is somebody you could actually reach out to.
+            # And everyone on it is somebody you could actually reach out to.
             ids_in(MemberProfile.id, listable.get(guild_id, set())),
         )
         closest = None
@@ -182,7 +182,7 @@ async def guild_sections(
         ).all()
 
         name, icon = named[guild_id]
-        sections[guild_id] = ContactCommunitySection(
+        sections[guild_id] = PeopleCommunitySection(
             community_id=guild_id,
             community_name=name,
             icon_url=icon,
@@ -224,8 +224,8 @@ async def listable_by_guild(
     Deliberately **not** narrowed by who has ignored the reader: an ignore
     governs what arrives, not who is listed, so both rosters stay as they were.
 
-    Nobody is listed where the deployment offers no direct messages: a contact
-    is somebody you could reach out to, and there is nothing to reach them
+    Nobody is listed where the deployment offers no direct messages: a person
+    listed is somebody you could reach out to, and there is nothing to reach them
     with. Asked here, alongside the routes that refuse, because this is the one
     surface built on the messaging rule that is not itself a messaging route.
     """

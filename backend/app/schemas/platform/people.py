@@ -1,8 +1,8 @@
-"""Shapes for the My Contacts page.
+"""Shapes for the people roster.
 
-A contact is a person the reader can already see — someone in one of their
-guilds. ``ContactRead`` is ``UserSummary`` plus the
-few things only this page asks for, kept off the shared picker projection so
+A person here is somebody the reader can already see — someone in one of their
+guilds. ``PersonRead`` is ``UserSummary`` plus the
+few things only this roster asks for, kept off the shared picker projection so
 every other caller of that shape is untouched.
 """
 
@@ -15,8 +15,8 @@ from app.models.platform.user import Presence
 from app.schemas.platform.user import ProfileDecorations, UserSummary
 
 
-class ContactRead(UserSummary):
-    """One person, on one row of the page.
+class PersonRead(UserSummary):
+    """One person, on one row of the roster.
 
     Inherits ``UserSummary``'s ``display_name``: the name the person set in
     the guild this row was read under, which the cross-guild loop reads per
@@ -42,7 +42,7 @@ class ContactRead(UserSummary):
     )
 
 
-class ContactCommunitySection(SanitizedBaseModel):
+class PeopleCommunitySection(SanitizedBaseModel):
     """One guild's roster, as one accordion section."""
 
     model_config = ConfigDict(json_schema_serialization_defaults_required=True)
@@ -54,11 +54,11 @@ class ContactCommunitySection(SanitizedBaseModel):
     icon_url: Optional[str] = None
     #: Everyone in the guild the reader may be shown, not just this page.
     total_count: int
-    items: List[ContactRead]
+    items: List[PersonRead]
     has_next: bool
 
 
-class ContactSectionsResponse(SanitizedBaseModel):
+class PeopleSectionsResponse(SanitizedBaseModel):
     """Every guild section, in the reader's own rail order.
 
     Paginated *within* each section rather than across a merged list: the
@@ -67,6 +67,6 @@ class ContactSectionsResponse(SanitizedBaseModel):
 
     model_config = ConfigDict(json_schema_serialization_defaults_required=True)
 
-    sections: List[ContactCommunitySection]
+    sections: List[PeopleCommunitySection]
     page: int
     page_size: int

@@ -94,7 +94,6 @@ from app.api.v1.platform_endpoints import (
     provider_placement,
     billing,
     config,
-    contacts,
     demo,
     guild_provider_connections,
     guilds,
@@ -108,6 +107,7 @@ from app.api.v1.platform_endpoints import (
     push,
     intake,
     passkeys,
+    people,
     email_otp,
     passwordless,
     second_factor,
@@ -440,7 +440,7 @@ me_router.include_router(personal_items.me_router, tags=["personal-items"])
 me_router.include_router(calendar_entries.me_router, tags=["calendar-entries"])
 me_router.include_router(me_trash.me_router, tags=["trash"])
 me_router.include_router(notification_prefs.me_router, tags=["notifications"])
-me_router.include_router(contacts.me_router, tags=["contacts"])
+me_router.include_router(people.me_router, tags=["people"])
 me_router.include_router(
     dm.me_router, tags=["direct-messages"], dependencies=[DirectMessagesEnabledDep]
 )

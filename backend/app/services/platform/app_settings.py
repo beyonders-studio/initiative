@@ -722,7 +722,7 @@ async def direct_messages_enabled(session: AsyncSession) -> bool:
     """Whether this deployment offers direct messages at all.
 
     The one read of the switch. Every direct-message endpoint is gated on it,
-    and so is the roster of people My Contacts says you could reach, so turning
+    and so is the people roster of who you could reach, so turning
     it off closes the feature and everything that advertises it at once.
     """
     return (await rules.platform_values(session))["direct_messages_enabled"]
