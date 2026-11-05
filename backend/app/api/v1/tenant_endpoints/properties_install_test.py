@@ -14,7 +14,7 @@ from typing import Any
 
 import pytest
 
-from app.core.messages import InitiativeMessages, PluginMessages, QueryMessages
+from app.core.messages import InitiativeMessages, PluginMessages
 from app.models.tenant.metadata import MetadataType
 from app.services.marketplace import plugin_refs
 from app.testing import (
@@ -291,17 +291,24 @@ async def test_a_person_named_any_other_way_is_a_422(
         assert response.json()["detail"] == PluginMessages.REFERENCE_UNKNOWN
 
 
-async def test_a_file_list_filter_that_names_a_person_is_refused(
+async def test_a_file_list_filter_names_a_person_by_reference(
     client, session, acting_user, role_session
 ):
     scopes = ["files:read", "files:write", "initiatives:read", "members:read"]
     installed = await install_plugin(session, acting_user, role_session, granted=scopes)
     headers = install_headers(installed, scopes)
     guild_id = installed.guild.id
-    await _file(client, session, installed, headers)
+    file_id = await _file(client, session, installed, headers)
     owner = await create_property_definition(
         session, installed.placed, name="Owner", type=MetadataType.user_reference
     )
+    seat_ref = await _seat_reference(client, installed, headers)
+    written = await client.put(
+        guild_url(guild_id, f"/properties/file/{file_id}"),
+        headers=headers,
+        json={"values": [{"property_id": owner.id, "value": seat_ref}]},
+    )
+    assert written.status_code == 200, written.text
 
     def _filters(op: str, value: Any) -> dict:
         return {
@@ -313,10 +320,18 @@ async def test_a_file_list_filter_that_names_a_person_is_refused(
     named = await client.get(
         guild_url(guild_id, "/files/"),
         headers=headers,
-        params=_filters("eq", installed.seat.user.id),
+        params=_filters("eq", seat_ref),
     )
-    assert named.status_code == 400, named.text
-    assert named.json()["detail"] == QueryMessages.INVALID_CONDITIONS
+    assert named.status_code == 200, named.text
+    assert [f["id"] for f in named.json()["items"]] == [file_id]
+    for unknown in (installed.seat.user.id, "uplu_" + "x" * 32):
+        refused = await client.get(
+            guild_url(guild_id, "/files/"),
+            headers=headers,
+            params=_filters("eq", unknown),
+        )
+        assert refused.status_code == 422, (unknown, refused.text)
+        assert refused.json()["detail"] == PluginMessages.REFERENCE_UNKNOWN
 
     # Asking whether anyone is set names nobody.
     unset = await client.get(

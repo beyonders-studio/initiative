@@ -1,3 +1,4 @@
+import json
 from collections.abc import Awaitable, Callable, Iterable, Mapping
 from dataclasses import dataclass
 from typing import Annotated, Any, NoReturn, Optional, Sequence
@@ -9,22 +10,10 @@ from sqlalchemy.exc import DBAPIError
 from sqlmodel import select
 from sqlmodel.ext.asyncio.session import AsyncSession
 
-from app.core.plugin_access_token import InstallAccessToken
-from app.core.plugin_scopes import (
-    UnknownPluginScope,
-    parse_scope,
-    validate_scopes,
-)
+from app.core import audit_context, auth_context
 from app.core.capabilities import Capability, user_has_capability
 from app.core.config import API_V1_STR
-from app.core.login_methods import LoginMethod
-from app.core import auth_context
-from app.services.membership import live_membership_clause
-from app.services.tenant import plugin_age
-from app.services.tenant.plugin_age import AgeViewer
-from app.services.auth import credentials
-from app.services.auth import guild_provider_connections as guild_connections
-from app.core.tools import Tool
+from app.core.guild_auth_options import CommunityAuthOption
 from app.core.identify import (
     FEED_URL_CREDENTIALS,
     CredentialKind,
@@ -33,37 +22,32 @@ from app.core.identify import (
     identify,
     identify_url_token,
 )
-from app.services.auth.credentials import (
-    Authenticated,
-    CredentialRefused,
-    asked_of_an_account,
-)
-from app.services.auth.assurance import (
-    SECOND_FACTOR_AMR,
-    carries_passkey,
-)
-from app.core.login_methods import SecondFactorRequirement
-from app.core.guild_auth_options import CommunityAuthOption
-from app.services.platform import auth_posture
-from app.services.platform import guild_entitlements, rules
-from app.core import audit_context
-from app.core.messages import (
-    AccessGrantMessages,
-    PluginMessages,
-    AuthMessages,
-    DirectMessageMessages,
-    GuildMessages,
-    UserMessages,
-)
-from app.core.security import (
-    SESSION_COOKIE_NAME,
-    STEP_UP_CHALLENGE,
-)
 from app.core.identity_boundary import (
     InstallBoundary,
     admit_install,
     written_mention_refs,
 )
+from app.core.login_methods import LoginMethod, SecondFactorRequirement
+from app.core.messages import (
+    AccessGrantMessages,
+    AuthMessages,
+    DirectMessageMessages,
+    GuildMessages,
+    PluginMessages,
+    UserMessages,
+)
+from app.core.plugin_access_token import InstallAccessToken
+from app.core.plugin_scopes import (
+    UnknownPluginScope,
+    parse_scope,
+    validate_scopes,
+)
+from app.core.rules import SignInRequirement
+from app.core.security import (
+    SESSION_COOKIE_NAME,
+    STEP_UP_CHALLENGE,
+)
+from app.core.tools import Tool
 from app.db import cohorts
 from app.db.guild_standing import (
     ActorContext,
@@ -71,16 +55,15 @@ from app.db.guild_standing import (
     InstallContext,
     named_ref_candidates,
 )
-from app.models.platform.identity_ref import IdentityEntity
 from app.db.public_rls import PLATFORM_SUSPENDED
 from app.db.request_context import (
-    Filer,
     ContentGrantee,
-    SignIn,
+    Filer,
     Install,
     Member,
     Platform,
     SettingsGrantee,
+    SignIn,
 )
 from app.db.session import (
     apply_guild_standing,
@@ -96,22 +79,37 @@ from app.models.platform.access_grant import (
     AccessGrantPurpose,
     AccessLevel,
 )
+from app.models.platform.auth_provider import AuthProvider
 from app.models.platform.guild import (
     LIVE_STATUS_VALUES,
     AdminSurface,
-    Guild,
-    GuildMembership,
     CommunityRole,
     CommunityStatus,
+    Guild,
+    GuildMembership,
 )
-from app.core.rules import SignInRequirement
-from app.models.platform.auth_provider import AuthProvider
+from app.models.platform.identity_ref import IdentityEntity
 from app.models.platform.user import (
     LOGIN_STATUSES,
     User,
     UserStatus,
 )
+from app.services.auth import credentials
+from app.services.auth import guild_provider_connections as guild_connections
+from app.services.auth.assurance import (
+    SECOND_FACTOR_AMR,
+    carries_passkey,
+)
+from app.services.auth.credentials import (
+    Authenticated,
+    CredentialRefused,
+    asked_of_an_account,
+)
+from app.services.membership import live_membership_clause
 from app.services.platform import access_grants as access_grants_service
+from app.services.platform import auth_posture, guild_entitlements, rules
+from app.services.tenant import plugin_age
+from app.services.tenant.plugin_age import AgeViewer
 
 SessionDep = Annotated[AsyncSession, Depends(get_session)]
 SystemSessionDep = Annotated[AsyncSession, Depends(get_system_session)]
@@ -1558,7 +1556,8 @@ def _strings_in(value: Any) -> list[str]:
 
 async def named_refs(request: Request) -> list[str]:
     """The references an installed plug-in's request names: in its path, its query
-    string and its JSON body, a mention in its text included.
+    string (inside a value that is JSON too, as a list's filters are) and its
+    JSON body, a mention in its text included.
 
     Read before FastAPI validates any of them, so the standing statement can
     resolve them in the same round trip. Starlette keeps the body it read, so
@@ -1566,7 +1565,13 @@ async def named_refs(request: Request) -> list[str]:
     nobody here; FastAPI answers for it.
     """
     values: list[str] = [str(v) for v in request.path_params.values()]
-    values.extend(v for _, v in request.query_params.multi_items())
+    for _, value in request.query_params.multi_items():
+        values.append(value)
+        if value[:1] in ("[", "{"):
+            try:
+                values.extend(_strings_in(json.loads(value)))
+            except ValueError:
+                pass
     content_type = request.headers.get("content-type", "")
     if "json" in content_type and await request.body():
         try:

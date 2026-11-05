@@ -306,7 +306,7 @@ async def guild_calendar_event_conditions(
     conditions += window(start_after, start_before, tz)
 
     conditions += await metadata_service.property_filter_clauses(
-        session, "calendar_event", property_filters, names_people=True
+        session, "calendar_event", property_filters
     )
 
     # An event is reached through its calendar, so the sharing gate applies to
