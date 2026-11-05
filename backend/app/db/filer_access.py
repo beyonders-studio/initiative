@@ -78,7 +78,7 @@ FILER_TABLE_ACCESS: dict[str, tuple[str, ...]] = {
     # once this read has shown the file is theirs.
     "evidence": (
         "id",
-        "case_id",
+        "case_task_id",
         "comment_id",
         "display_name",
         "content_type",
@@ -124,10 +124,7 @@ FILER_ROWS: dict[str, str] = {
         " WHERE c.stream = intake_bindings.stream)"
     ),
     "comments": f"audience = 'filer' AND task_id = ANY ({_CASES})",
-    "evidence": (
-        f'created_by = {_UID} AND EXISTS (SELECT 1 FROM "{{s}}".intake_cases c'
-        f" WHERE c.id = evidence.case_id AND c.task_id = ANY ({_CASES}))"
-    ),
+    "evidence": f"created_by = {_UID} AND case_task_id = ANY ({_CASES})",
 }
 
 #: The policies that hold a filer to those rows, on each table: one

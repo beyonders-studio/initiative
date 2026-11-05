@@ -77,7 +77,7 @@ async def read_case(session: AsyncSession, task_id: int) -> Optional[CaseView]:
         ).first()
     from app.services.platform import evidence as evidence_service
 
-    attached = await evidence_service.listed(session, case_ids=[int(case.id)])
+    attached = await evidence_service.listed(session, case_task_ids=[task_id])
     return CaseView(
         stream=stream,
         opened_at=case.opened_at,
@@ -102,7 +102,7 @@ async def read_case(session: AsyncSession, task_id: int) -> Optional[CaseView]:
                 )
             ).all()
         ),
-        evidence=attached.get(("case", int(case.id)), []),
+        evidence=attached.get(("case", task_id), []),
         **await _subject(session, task_id),
     )
 

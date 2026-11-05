@@ -577,7 +577,7 @@ def sweeps() -> tuple[Sweep, ...]:
                 .select_from(IntakeCase)
                 .join(Task, col(Task.id) == IntakeCase.task_id)
                 .join(TaskStatus, col(TaskStatus.id) == Task.task_status_id)
-                .where(col(IntakeCase.id).in_(select(Evidence.case_id))),
+                .where(col(IntakeCase.task_id).in_(select(Evidence.case_task_id))),
                 select(func.min(ModerationReport.decided_at) + report_keep).where(
                     col(ModerationReport.id).in_(select(Evidence.report_id))
                 ),

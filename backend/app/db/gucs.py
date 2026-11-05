@@ -256,8 +256,8 @@ HELD_SURFACES = Guc("app.held_surfaces", Kind.NAMES, standing=True)
 # --- Somebody who filed a case ------------------------------------------------
 #: The tasks of the cases the routed account filed, read by the filer seam
 #: through the filer role's own row on ``intake_cases``. What the filer
-#: policies on a case's task and its comments admit, so neither has to read
-#: ``intake_cases`` back — whose own policy reads ``tasks``.
+#: policies on a case's task, its comments and its evidence admit, so none has
+#: to read ``intake_cases`` back — whose own policy reads ``tasks``.
 FILER_CASES = Guc("app.filer_cases", Kind.IDS, read_once=True)
 
 # --- Per-transaction flags ----------------------------------------------------

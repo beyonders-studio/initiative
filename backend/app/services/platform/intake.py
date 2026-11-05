@@ -163,8 +163,6 @@ class CaseOutcome:
     task_id: int
     #: False when a repeat landed in a case that was already open.
     opened: bool
-    #: The case's own row.
-    case_id: int = 0
 
 
 async def operations_guild_id(session: AsyncSession) -> Optional[int]:
@@ -595,13 +593,11 @@ async def open_case(
                         session,
                         prepared=evidence,
                         created_by=attached_by,
-                        case_id=existing.id,
+                        case_task_id=existing.task_id,
                     )
                     await session.commit()
                     sealing.keep()
-                return CaseOutcome(
-                    task_id=existing.task_id, opened=False, case_id=int(existing.id)
-                )
+                return CaseOutcome(task_id=existing.task_id, opened=False)
 
         cap, by_topic = meta(stream).open_cap_for(topic)
         if filer is not None and cap is not None:
@@ -700,12 +696,12 @@ async def open_case(
                 session,
                 prepared=evidence,
                 created_by=attached_by,
-                case_id=case.id,
+                case_task_id=task.id,
                 comment_id=opening.id if opening is not None else None,
             )
             await session.commit()
             sealing.keep()
-        return CaseOutcome(task_id=task.id, opened=True, case_id=int(case.id))
+        return CaseOutcome(task_id=task.id, opened=True)
 
 
 async def add_filer_reply(
@@ -740,7 +736,7 @@ async def add_filer_reply(
         await set_rls_context(session, SystemGuild(guild_id))
         found = (
             await session.exec(
-                select(Task, IntakeCase.id, IntakeCase.topic)
+                select(Task, IntakeCase.topic)
                 .join(IntakeCase, IntakeCase.task_id == Task.id)
                 .where(Task.id == task_id)
                 .where(IntakeCase.filer_user_id == filer.id)
@@ -750,7 +746,7 @@ async def add_filer_reply(
         ).one_or_none()
         if found is None:
             return False
-        task, case_id, topic = found
+        task, topic = found
         category = (
             await session.exec(
                 select(TaskStatus.category).where(TaskStatus.id == task.task_status_id)
@@ -782,7 +778,7 @@ async def add_filer_reply(
                 session,
                 prepared=evidence,
                 created_by=filer.id,
-                case_id=case_id,
+                case_task_id=task_id,
                 comment_id=comment.id,
             )
             if await case_notices.is_taken(session, task_id):

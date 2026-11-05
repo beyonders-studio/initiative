@@ -349,7 +349,7 @@ def store(
     prepared: Iterable[PreparedEvidence],
     created_by: Optional[int],
     written: list[str],
-    case_id: Optional[int] = None,
+    case_task_id: Optional[int] = None,
     report_id: Optional[int] = None,
     comment_id: Optional[int] = None,
 ) -> list[Evidence]:
@@ -375,7 +375,7 @@ def store(
         )
         row = Evidence(
             report_id=report_id,
-            case_id=case_id,
+            case_task_id=case_task_id,
             comment_id=comment_id,
             kind=EvidenceKind.attachment,
             origin_guild_id=guild_id,
@@ -414,7 +414,7 @@ class Sealing:
     wherever. Call :meth:`keep` straight after the commit that holds the rows::
 
         with Sealing(guild_id) as sealing:
-            sealing.store(session, prepared=files, created_by=user_id, case_id=1)
+            sealing.store(session, prepared=files, created_by=user_id, case_task_id=1)
             ...
             await session.commit()
             sealing.keep()
@@ -438,7 +438,7 @@ class Sealing:
         *,
         prepared: Iterable[PreparedEvidence],
         created_by: Optional[int],
-        case_id: Optional[int] = None,
+        case_task_id: Optional[int] = None,
         report_id: Optional[int] = None,
         comment_id: Optional[int] = None,
     ) -> list[Evidence]:
@@ -448,7 +448,7 @@ class Sealing:
             prepared=prepared,
             created_by=created_by,
             written=self.written,
-            case_id=case_id,
+            case_task_id=case_task_id,
             report_id=report_id,
             comment_id=comment_id,
         )
@@ -465,18 +465,18 @@ async def listed(
     session: AsyncSession,
     *,
     report_ids: Sequence[int] = (),
-    case_ids: Sequence[int] = (),
+    case_task_ids: Sequence[int] = (),
 ) -> dict[tuple[str, int], list[Evidence]]:
     """The files attached to these reports and cases, read on ``session`` and
-    keyed ``("report", id)`` or ``("case", id)``, oldest first. One statement,
+    keyed ``("report", id)`` or ``("case", task id)``, oldest first. One statement,
     whatever the page holds."""
-    if not report_ids and not case_ids:
+    if not report_ids and not case_task_ids:
         return {}
     conditions = []
     if report_ids:
         conditions.append(Evidence.report_id.in_(tuple(report_ids)))  # type: ignore[union-attr]
-    if case_ids:
-        conditions.append(Evidence.case_id.in_(tuple(case_ids)))  # type: ignore[union-attr]
+    if case_task_ids:
+        conditions.append(Evidence.case_task_id.in_(tuple(case_task_ids)))  # type: ignore[union-attr]
     rows = (
         await session.exec(
             select(Evidence)
@@ -486,7 +486,7 @@ async def listed(
     ).all()
     found: dict[tuple[str, int], list[Evidence]] = {}
     for row in rows:
-        key = ("report", row.report_id) if row.report_id else ("case", row.case_id)
+        key = ("report", row.report_id) if row.report_id else ("case", row.case_task_id)
         found.setdefault(key, []).append(row)  # type: ignore[arg-type]
     return found
 
@@ -596,11 +596,11 @@ async def transfer(
     rows: Sequence[Evidence],
     destination: AsyncSession,
     destination_guild_id: int,
-    case_id: int,
+    case_task_id: int,
     written: list[str],
 ) -> list[Evidence]:
     """Carry ``rows`` — read in ``source_guild_id`` — into the operations case
-    ``case_id``, on ``destination``, a system session routed into
+    whose task is ``case_task_id``, on ``destination``, a system session routed into
     ``destination_guild_id``.
 
     Each object is copied as it is stored; it is never opened. Its key is
@@ -612,7 +612,7 @@ async def transfer(
     already = set(
         (
             await destination.exec(
-                select(Evidence.origin_id).where(Evidence.case_id == case_id)
+                select(Evidence.origin_id).where(Evidence.case_task_id == case_task_id)
             )
         ).all()
     )
@@ -643,7 +643,7 @@ async def transfer(
             version=row.kek_version,
         )
         copy = Evidence(
-            case_id=case_id,
+            case_task_id=case_task_id,
             kind=row.kind,
             origin_guild_id=row.origin_guild_id,
             origin_id=row.origin_id,
@@ -671,11 +671,11 @@ async def carry_report(
     *,
     source_guild_id: int,
     report_id: int,
-    case_id: int,
+    case_task_id: int,
 ) -> int:
     """Carry what was attached to community report ``report_id`` — read on
-    ``session``, routed into ``source_guild_id`` — into operations case
-    ``case_id``. Returns how many files were carried.
+    ``session``, routed into ``source_guild_id`` — into the operations case
+    whose task is ``case_task_id``. Returns how many files were carried.
 
     Its own transaction in the operations community, committed before the
     report closes: a report closed as escalated has handed its files over.
@@ -698,7 +698,7 @@ async def carry_report(
                 rows=rows,
                 destination=destination,
                 destination_guild_id=operations,
-                case_id=case_id,
+                case_task_id=case_task_id,
                 written=sealing.written,
             )
             await destination.commit()
@@ -733,11 +733,11 @@ async def purge_due(session: AsyncSession, guild_id: int) -> int:
         due = (
             await session.exec(
                 # A case in the trash is closed too.
-                select_including_deleted(IntakeCase.id, IntakeCase.task_id)
+                select_including_deleted(IntakeCase.task_id)
                 .join(Task, Task.id == IntakeCase.task_id)
                 .join(TaskStatus, TaskStatus.id == Task.task_status_id)
                 .where(IntakeCase.stream == stream.value)
-                .where(IntakeCase.id.in_(select(Evidence.case_id)))  # type: ignore[union-attr]
+                .where(IntakeCase.task_id.in_(select(Evidence.case_task_id)))  # type: ignore[union-attr]
                 .where(
                     or_(
                         Task.deleted_at < cutoff,  # type: ignore[operator]
@@ -754,15 +754,15 @@ async def purge_due(session: AsyncSession, guild_id: int) -> int:
             continue
         # A case a hold still names keeps its files for as long as the hold
         # stands, however long ago it closed.
-        held = await held_cases(session, [int(task_id) for _id, task_id in due])
-        kept = [int(case_id) for case_id, task_id in due if task_id not in held]
+        held = await held_cases(session, [int(task_id) for task_id in due])
+        kept = [int(task_id) for task_id in due if task_id not in held]
         if not kept:
             continue
         gone += (
             (
                 await session.exec(
                     delete(Evidence)
-                    .where(Evidence.case_id.in_(kept))  # type: ignore[union-attr]
+                    .where(Evidence.case_task_id.in_(kept))  # type: ignore[union-attr]
                     .returning(Evidence.storage_key)
                 )
             )
@@ -889,18 +889,11 @@ async def released_by_purge(
     Read before the parents are deleted, on the purging session; the caller
     removes what this returns once its commit has landed.
     """
-    from app.models.tenant.intake import IntakeCase
     from app.models.tenant.moderation import ModerationReport
 
     conditions = []
     if task_ids:
-        conditions.append(
-            Evidence.case_id.in_(  # type: ignore[union-attr]
-                select(IntakeCase.id).where(
-                    IntakeCase.task_id.in_(tuple(task_ids))  # type: ignore[union-attr]
-                )
-            )
-        )
+        conditions.append(Evidence.case_task_id.in_(tuple(task_ids)))  # type: ignore[union-attr]
     if initiative_ids:
         conditions.append(
             Evidence.report_id.in_(  # type: ignore[union-attr]
