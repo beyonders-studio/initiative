@@ -11,7 +11,6 @@ from app.services.import_engine.importers.dashboard import DashboardImporter
 from app.services.import_engine.importers.file import FileImporter
 from app.services.import_engine.importers.post import PostImporter
 from app.services.import_engine.importers.project import ProjectImporter
-from app.services.import_engine.importers.queue import QueueImporter
 from app.services.import_engine.importers.wiki import WikiImporter
 
 IMPORTERS = {
@@ -19,7 +18,6 @@ IMPORTERS = {
     for importer in (
         ProjectImporter(),
         FileImporter(),
-        QueueImporter(),
         CounterGroupImporter(),
         DashboardImporter(),
         CalendarImporter(),

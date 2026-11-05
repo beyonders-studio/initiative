@@ -9,7 +9,7 @@ schema describes per-guild content or shared/platform data.
 
 | Folder | Serializes payloads for | Examples |
 |---|---|---|
-| `tenant/` | per-guild content (lives in `guild_<id>` schemas) | project, task, file, queue, counter, calendar_event, comment, initiative, property, tag, import/export, stats over guild content |
+| `tenant/` | per-guild content (lives in `guild_<id>` schemas) | project, task, file, counter, calendar_event, comment, initiative, property, tag, import/export, stats over guild content |
 | `platform/` | shared/public-schema resources | auth, user, guild, settings, operator, access_grant, notification, push, token, view preferences |
 | *root* (here) | generic, used by both sides | `base.py` (sanitized base model), `query.py` (filter/sort/pagination), `ai_generation.py`, `ai_settings.py` (which AI connection a community uses) |
 

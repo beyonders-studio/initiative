@@ -1,10 +1,10 @@
 """Import-side pydantic mirrors of the export envelopes.
 
 Each model parses the dict shape its export adapter emits (see
-``services/export/adapters/{file,queue,counter_group,calendar,post}.py``)
-with ``extra="ignore"``: informational export fields (queue member/file/
-task display text, event ids and timestamps, linked file titles) parse
-and drop — they reference guild-local state an import cannot rebind.
+``services/export/adapters/{file,counter_group,calendar,post}.py``)
+with ``extra="ignore"``: informational export fields (event ids and
+timestamps, linked file titles) parse and drop — they reference guild-local
+state an import cannot rebind.
 
 Every envelope is schema version 1. There is no support for reading an
 earlier shape: the app imports what this build exports, and nothing else. The
@@ -195,37 +195,6 @@ class WikiEnvelope(_EnvelopeBase):
     pages: list[WikiPageEnvelope] = []
     #: The files filed in the wiki, when its export carried them.
     files: list[WikiFiledFile] = []
-
-
-class QueueEnvelopeItem(SanitizedBaseModel):
-    model_config = ConfigDict(extra="ignore")
-
-    label: str
-    position: float = 0.0
-    color: Optional[str] = None
-    notes: Optional[str] = None
-    is_visible: bool = True
-    held_at_round: Optional[int] = None
-    is_current: bool = False
-    tags: list[str] = []
-    properties: list[EnvelopePropertyValue] = []
-    # `member`, `files`, `tasks` are informational display text in the
-    # export — ignored here (extra="ignore"), counted as a warning on apply.
-    member: Optional[str] = None
-    #: What this item was called where it came from — a thing a reference
-    #: elsewhere in the same import can name. Refs live for one job.
-    external_ref: Optional[str] = None
-
-
-class QueueEnvelope(_EnvelopeBase):
-    type: Literal["initiative-queue"]
-    name: str
-    description: Optional[str] = None
-    is_active: bool = False
-    current_round: int = 1
-    tags: list[str] = []
-    properties: list[EnvelopePropertyValue] = []
-    items: list[QueueEnvelopeItem] = []
 
 
 class CounterEnvelopeItem(SanitizedBaseModel):

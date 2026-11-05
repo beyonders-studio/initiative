@@ -94,12 +94,6 @@ class Comment(HoldMixin, CreatedByMixin, SoftDeleteMixin, table=True):
             Integer, ForeignKey("projects.id", ondelete="CASCADE"), nullable=True
         ),
     )
-    queue_id: Optional[int] = Field(
-        default=None,
-        sa_column=Column(
-            Integer, ForeignKey("queues.id", ondelete="CASCADE"), nullable=True
-        ),
-    )
     counter_group_id: Optional[int] = Field(
         default=None,
         sa_column=Column(

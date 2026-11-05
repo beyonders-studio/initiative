@@ -404,6 +404,38 @@ BUILTIN_ANNOUNCEMENTS: tuple[BuiltinAnnouncement, ...] = (
             ),
         ),
     ),
+    BuiltinAnnouncement(
+        slug="0-78-queues-are-projects",
+        title="Queues are now projects",
+        category=AnnouncementCategory.info,
+        published_at=datetime(2026, 11, 5, tzinfo=timezone.utc),
+        # For the people who had queues. A new account and a fresh install
+        # never had one to look for.
+        audience_accounts=AnnouncementAudienceAccounts.existing,
+        only_upgrading_from_below="0.78.0",
+        trigger_route="/c/**",
+        sections=(
+            AnnouncementSection(
+                heading="Where your queues went",
+                body=(
+                    "Each queue is now a **project** in the same initiative, and "
+                    "each of its items a task, in the order the queue showed "
+                    "them. The item it was on is **Up now**, held items are "
+                    "**Held**, hidden ones **Sitting out** and the rest "
+                    "**Waiting**. An item's member is linked to its task, and its "
+                    "comments, sharing, tags and links came with it."
+                ),
+            ),
+            AnnouncementSection(
+                heading="Taking turns",
+                body=(
+                    "A project has no **Next** button or rounds. Move a task to "
+                    "**Up now** when it's someone's turn, and to **Done** once "
+                    "it's finished."
+                ),
+            ),
+        ),
+    ),
 )
 
 

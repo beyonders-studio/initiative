@@ -227,7 +227,6 @@ async def _erase_in_guild(
     from app.models.tenant.calendar_event import CalendarEventAttendee
     from app.models.tenant.custom_role import CustomRoleMember
     from app.models.tenant.metadata import MetadataValue
-    from app.models.tenant.queue import QueueItem
     from app.models.tenant.view_preference import ViewPreference
     from app.models.tenant.webhook_ref import WebhookRef
     from app.services.tenant import relationships as relationships_service
@@ -275,8 +274,8 @@ async def _erase_in_guild(
         .where(col(BatchedNotice.actor_id) == user_id)
         .values(actor_id=None)
     )
-    # All per-user DAC grants (project, file, queue, counter group, calendar
-    # event) live in the polymorphic resource_grants table; one delete clears
+    # All per-user DAC grants (project, file, counter group, calendar event)
+    # live in the polymorphic resource_grants table; one delete clears
     # every resource type for this user in the schema.
     await guild_session.exec(
         delete(ResourceGrant).where(ResourceGrant.user_id == user_id)
@@ -292,10 +291,6 @@ async def _erase_in_guild(
     )
     await guild_session.exec(
         delete(TaskAssignee).where(TaskAssignee.user_id == user_id)
-    )
-    # Queue items: assigned-to is nullable, so just clear the pointer.
-    await guild_session.exec(
-        update(QueueItem).where(QueueItem.user_id == user_id).values(user_id=None)
     )
     await guild_session.exec(
         delete(CalendarEventAttendee).where(CalendarEventAttendee.user_id == user_id)

@@ -696,9 +696,8 @@ async def related_ids(
 ) -> list[int]:
     """Ids of one kind connected to this entity by one type.
 
-    What the per-tool read schemas ask for: a project's attached files, a
-    queue item's tasks. Order is by when the edge was made, which is the order
-    the junctions produced.
+    What the per-tool read schemas ask for: a project's attached files. Order
+    is by when the edge was made, which is the order the junctions produced.
     """
     rows = await list_for_entity(
         session,

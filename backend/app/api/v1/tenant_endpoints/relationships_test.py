@@ -240,8 +240,8 @@ async def test_a_link_you_made_is_yours_to_remove(
 async def test_a_task_link_is_addressed_by_the_same_surface(
     client: AsyncClient, acting_user, session
 ):
-    """The point of one router: a queue item's tasks and a project's files
-    are the same request with different kinds in it."""
+    """The point of one router: an event's files and a task's files are the
+    same request with different kinds in it."""
     a = await acting_user(
         guild_role=CommunityRole.member, initiative=True, project=True
     )

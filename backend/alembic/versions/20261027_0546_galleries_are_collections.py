@@ -117,7 +117,7 @@ from sqlalchemy import text
 from sqlalchemy.engine import Connection
 from sqlalchemy.util import await_only
 
-from app.core.legacy_references import rewrite_body, rewrite_text
+from app.core.legacy_references import Moved, rewrite_body, rewrite_text
 from app.db.guild_migrations import run_for_each_guild_schema
 import app.services.editor_engine as editor_engine
 
@@ -1054,7 +1054,7 @@ def _nameless(value: Any) -> Any:
     return {**out, "mentionName": "", "text": ""}
 
 
-def _rewrite_live(state: bytes, files: Mapping[int, int]) -> tuple[Any, bytes] | None:
+def _rewrite_live(state: bytes, files: Moved) -> tuple[Any, bytes] | None:
     """A body's JSON and Yjs state with its links rewritten, read and written
     through the editor; ``None`` when its state says nothing to rewrite.
     Raises :class:`editor_engine.EditorError` for a state the editor refuses."""
@@ -1084,7 +1084,7 @@ def _is_json(bind: Connection, table: str, column: str) -> bool:
     )
 
 
-def _strings(value: Any, files: Mapping[int, int]) -> Any:
+def _strings(value: Any, files: Moved) -> Any:
     if isinstance(value, str):
         return rewrite_text(value, files)
     if isinstance(value, list):
@@ -1120,11 +1120,13 @@ def _write(
 
 
 def _rewrite_links(bind: Connection) -> None:
-    files = dict(
-        bind.execute(
-            text(f"SELECT image_id, file_id FROM {_MAP} m WHERE {_IN_SCHEMA}")
-        ).all()
-    )
+    files = {
+        _PICTURE: dict(
+            bind.execute(
+                text(f"SELECT image_id, file_id FROM {_MAP} m WHERE {_IN_SCHEMA}")
+            ).all()
+        )
+    }
     in_yjs = " OR ".join(
         f"position(CAST(:n{i} AS bytea) IN yjs_state) > 0"
         for i in range(len(_OLD_IN_YJS))

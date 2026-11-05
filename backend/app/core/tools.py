@@ -33,7 +33,6 @@ def plural_of(stem: str) -> str:
 class Tool(str, Enum):
     project = "project"
     file = "file"
-    queue = "queue"
     counter_group = "counter_group"
     calendar = "calendar"
     dashboard = "dashboard"
@@ -150,11 +149,12 @@ class Kind:
 
 
 #: Every kind, keyed by its wire name. Append-only: a new kind takes the next
-#: unused code, and no existing code ever moves. 7 and 8 were the libraries'
-#: and stay retired. 18 is the person's (``app.core.relationships.PERSON``), an
-#: edge end that is not a kind, and is never reused. The initial set was assigned in
-#: alphabetical order, which is where the resemblance ends — a derived ordinal
-#: changes under you the first time a member is added in the middle. Declared
+#: unused code, and no existing code ever moves. 7 and 8 were the libraries',
+#: 11 and 12 were the queues', and all four stay retired. 18 is the person's
+#: (``app.core.relationships.PERSON``), an edge end that is not a kind, and is
+#: never reused. The initial set was assigned in alphabetical order, which is
+#: where the resemblance ends — a derived ordinal changes under you the first
+#: time a member is added in the middle. Declared
 #: tools first, then what lives inside them, then the guild's vocabulary; the
 #: lists below derived from it keep that order.
 KINDS: dict[str, Kind] = {
@@ -162,14 +162,12 @@ KINDS: dict[str, Kind] = {
     for kind in (
         Kind(Tool.project.value, 10),
         Kind(Tool.file.value, 6),
-        Kind(Tool.queue.value, 11),
         Kind(Tool.counter_group.value, 4),
         Kind(Tool.calendar.value, 1),
         Kind(Tool.dashboard.value, 5),
         Kind(Tool.post.value, 9),
         Kind(Tool.wiki.value, 15),
         Kind("task", 14, parent=Tool.project),
-        Kind("queue_item", 12, parent=Tool.queue),
         Kind("calendar_event", 2, parent=Tool.calendar),
         Kind("counter", 3, parent=Tool.counter_group),
         Kind("wiki_page", 16, parent=Tool.wiki),
@@ -295,12 +293,11 @@ METADATA_TARGETS: tuple[str, ...] = ITEM_KINDS + (INSTALL_METADATA_KIND,)
 
 # Layouts (``tool_layouts``): how an instance of a tool draws its items, and
 # one of them. Each of these tools has its own layouts per instance (a
-# project's, a queue's); the calendar and the posts feed are one page per
+# project's, a counter group's); the calendar and the posts feed are one page per
 # initiative, so their layouts belong to the initiative and name no instance.
 # The table's CHECKs, its policies, its events and its purge derive from these.
 LAYOUTS_PER_INSTANCE: tuple[Tool, ...] = (
     Tool.project,
-    Tool.queue,
     Tool.counter_group,
 )
 LAYOUTS_SHARED: tuple[Tool, ...] = (Tool.calendar, Tool.post)
@@ -336,7 +333,6 @@ LISTS_HIDDEN_AS_SHIPPED: dict[str, frozenset[str]] = {
 DETAIL_LAYOUTS: dict[str, tuple[str, ...]] = {
     Tool.project: ("task",),
     Tool.calendar: ("calendar_event",),
-    Tool.queue: ("queue_item",),
     Tool.counter_group: ("counter",),
     Tool.post: ("post",),
     "collection": ("file",),

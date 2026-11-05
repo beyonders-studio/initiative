@@ -5,7 +5,6 @@
   "footer": {
     "tasks": "Aufgaben-Export",
     "project": "{{name}} — Projektbericht",
-    "queue": "{{name}} — Ablauf-Export",
     "counters": "{{name}} — Zähler-Export"
   },
   "summary": {

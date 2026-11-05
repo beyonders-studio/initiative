@@ -145,7 +145,7 @@ async def bulk_edit_tags(
 
     Every target is authorized with write on the tool that governs it, read
     from the registry its RLS policy is rendered from: a tool row asks itself,
-    a sub-resource (a task, a queue item, a wiki page, …) asks its parent tool.
+    a sub-resource (a task, a counter, a wiki page, …) asks its parent tool.
     Nothing is applied unless every target passes — one transaction, and a
     parent tool's ``updated_at`` moves once for all of its sub-resources rather
     than once per row.

@@ -51,7 +51,6 @@ from app.api.v1.tenant_endpoints import (
     projects,
     property_definitions,
     property_values,
-    queues,
     reactions,
     personal_items,
     relationships,
@@ -329,12 +328,10 @@ guild_router.include_router(demo.community_router, prefix="/demo", tags=["demo"]
 guild_router.include_router(demo.sales_router, prefix="/demo", tags=["demo"])
 guild_router.include_router(imports.router, prefix="/imports", tags=["imports"])
 guild_router.include_router(resumable_uploads.router, prefix="/resumable-uploads")
-guild_router.include_router(queues.router, **_tool_mount(Tool.queue))
-# Flat read-back routes, at the guild root: an event envelope names a
-# resource by its own id, so every evented resource must resolve from one.
-guild_router.include_router(queues.items_router, tags=_tool_mount(Tool.queue)["tags"])
 
 guild_router.include_router(counters.router, **_tool_mount(Tool.counter_group))
+# Flat read-back routes, at the guild root: an event envelope names a
+# resource by its own id, so every evented resource must resolve from one.
 guild_router.include_router(counters.counters_router, tags=["counters"])
 guild_router.include_router(calendars.router, **_tool_mount(Tool.calendar))
 guild_router.include_router(dashboards.router, **_tool_mount(Tool.dashboard))

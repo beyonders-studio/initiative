@@ -303,7 +303,7 @@ def _parse_json_param(raw: Optional[str]) -> Optional[dict]:
 _FILTERS_DESCRIPTION = (
     "JSON object of tool→filters narrowing what each tool exports: the tool's "
     "own list filters (as its list route takes them, such as "
-    '``{"queue": {"tag_ids": [3]}}``), and for calendars an ``events`` date '
+    '``{"project": {"tag_ids": [3]}}``), and for calendars an ``events`` date '
     "range. ``archived`` omitted exports live and archived rows alike."
 )
 
@@ -405,7 +405,7 @@ async def export_initiative(
     include: Optional[str] = Query(
         default=None,
         description=(
-            'JSON object of tool→bool, e.g. {"project": true, "queue": false}. '
+            'JSON object of tool→bool, e.g. {"project": true, "calendar": false}. '
             "Omitted = every tool."
         ),
     ),

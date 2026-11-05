@@ -60,7 +60,6 @@ from app.schemas.tenant.tool_layout import (
     FieldPart,
     FileFieldId,
     PostDetailFieldId,
-    QueueItemDetailFieldId,
     ListLayoutDefinition,
     ListLayoutRead,
     ListLayoutWrite,
@@ -95,7 +94,6 @@ DETAIL_PARTS: dict[str, frozenset[str]] = {
     },
     "calendar_event": _LAYOUT_PARTS
     | {"plugin", "dates", "rsvp", "actions", "relations"},
-    "queue_item": _LAYOUT_PARTS | {"plugin", "actions", "relations"},
     "counter": _LAYOUT_PARTS | {"plugin", "actions", "relations", "count"},
     "post": _LAYOUT_PARTS
     | {
@@ -117,7 +115,6 @@ DETAIL_PARTS: dict[str, frozenset[str]] = {
 DETAIL_FIELDS: dict[str, frozenset[str]] = {
     "task": frozenset(field.value for field in TaskDetailFieldId),
     "calendar_event": frozenset(field.value for field in EventDetailFieldId),
-    "queue_item": frozenset(field.value for field in QueueItemDetailFieldId),
     "counter": frozenset(field.value for field in CounterDetailFieldId),
     "post": frozenset(field.value for field in PostDetailFieldId),
     "file": frozenset(field.value for field in FileFieldId),

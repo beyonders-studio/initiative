@@ -5,8 +5,9 @@ from __future__ import annotations
 from app.core.legacy_references import rewrite_body, rewrite_text
 from app.core.references import SOURCE_REF, text_node
 
-#: Picture 12 became file 40; picture 13 had no file.
-FILES = {12: 40}
+#: Picture 12 became file 40, queue 2 project 50 and queue item 21 task 60;
+#: picture 13 had no file.
+MOVED = {"gallery_image": {12: 40}, "queue": {2: 50}, "queue_item": {21: 60}}
 
 
 def _mention(kind: str, entity_id: int, text: str = "x") -> dict:
@@ -29,6 +30,9 @@ def test_a_body_names_what_each_old_kind_became():
                         _mention("gallery_image", 13, "Lost"),
                         _mention("gallery", 3),
                         _mention("document", 5),
+                        _mention("queue", 2),
+                        _mention("queue_item", 21),
+                        _mention("queue_item", 22, "Gone"),
                         {
                             "type": "smart-chip",
                             "chipKind": "document:status",
@@ -64,13 +68,16 @@ def test_a_body_names_what_each_old_kind_became():
         }
     }
 
-    inline, embed = rewrite_body(body, FILES)["root"]["children"]
+    inline, embed = rewrite_body(body, MOVED)["root"]["children"]
 
     assert inline["children"] == [
         _mention("file", 40),
         text_node("Lost"),
         _mention("collection", 3),
         _mention("file", 5),
+        _mention("project", 50),
+        _mention("task", 60),
+        text_node("Gone"),
         {"type": "smart-chip", "chipKind": "file:status", "entityId": 6},
         {
             "type": "entity-mention",
@@ -97,10 +104,12 @@ def test_running_text_names_what_each_old_kind_became():
     assert (
         rewrite_text(
             "#doc[Spec](5) #document[Plan](6) #gallery[Wall](3) #gallery-image[Sunset](12) "
-            "#gallery_image[Lost](13) #task[Keep](9)",
-            FILES,
+            "#gallery_image[Lost](13) #task[Keep](9) #queue[Chores](2) "
+            "#queue-item[Dishes](21)",
+            MOVED,
         )
-        == "#file[Spec](5) #file[Plan](6) #collection[Wall](3) #file[Sunset](40) Lost #task[Keep](9)"
+        == "#file[Spec](5) #file[Plan](6) #collection[Wall](3) #file[Sunset](40) "
+        "Lost #task[Keep](9) #project[Chores](50) #task[Dishes](60)"
     )
     # A backup's text names the ref it had.
     assert (

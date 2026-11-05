@@ -1,9 +1,9 @@
 """The shape a tool's history takes when it is drawn as a timeline.
 
 Deliberately not the post schema's. A timeline is a rail of periods with a
-count and a place to jump to, and nothing about that is a notice — a queue's
-rounds, a calendar's months and a project's activity could each hand back this
-same list. What is NOT shared is the query behind it: every tool scopes its own
+count and a place to jump to, and nothing about that is a notice — a
+calendar's months and a project's activity could each hand back this same
+list. What is NOT shared is the query behind it: every tool scopes its own
 rows through its own gates, and a generic "give me any tool's dates" endpoint
 would be one place to get that wrong for all of them at once.
 """

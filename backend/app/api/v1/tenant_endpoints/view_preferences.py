@@ -2,7 +2,7 @@
 
 The community's half of the view-preference store: the same key/value/JSON
 shape as ``/user-view-preferences``, kept in the community's own schema for the
-lists inside it (a project's, an initiative tool's, a queue's, the roster). The
+lists inside it (a project's, an initiative tool's, the roster). The
 key names the list inside the community, so it carries no community id
 (``view:project:12``). Every read and write is the caller's own row.
 """

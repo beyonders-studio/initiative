@@ -37,6 +37,8 @@ from app.testing import (
     Actor,
     create_calendar,
     create_calendar_event,
+    create_counter,
+    create_counter_group,
     create_file,
     create_collection,
     create_guild,
@@ -45,8 +47,6 @@ from app.testing import (
     create_project,
     create_property_definition,
     create_property_value,
-    create_queue,
-    create_queue_item,
     create_resource_grant,
     create_task,
     create_tool_entity,
@@ -668,8 +668,8 @@ async def test_list_filters_by_a_selected_option(
 async def test_every_tool_and_its_sub_tools_read_back_what_they_carry(
     client: AsyncClient, session: AsyncSession, acting_user
 ):
-    """Every tool, a queue's items and a wiki's pages are written like any
-    other target, and each one's own read returns its values."""
+    """Every tool, a counter group's counters and a wiki's pages are written
+    like any other target, and each one's own read returns its values."""
     a = await acting_user(guild_role=CommunityRole.admin, initiative=True)
     await enable_all_tools(session, a.initiative)
     defn = await create_property_definition(session, a.initiative, name="Note")
@@ -692,16 +692,16 @@ async def test_every_tool_and_its_sub_tools_read_back_what_they_carry(
         assert read.status_code == 200, (tool, read.text)
         assert _values(read.json()["properties"]) == {defn.id: tool.value}, tool
 
-    queue = await create_queue(session, a.initiative, a.user)
-    item = await create_queue_item(session, queue)
+    group = await create_counter_group(session, a.initiative, a.user)
+    counter = await create_counter(session, group)
     page = await create_wiki_page(
         session, await create_wiki(session, a.initiative, a.user), a.user
     )
-    await write("queue_item", item.id)
+    await write("counter", counter.id)
     await write("wiki_page", page.id)
-    queue_read = await client.get(a.g(f"/queues/{queue.id}"), headers=a.headers)
-    [item_read] = queue_read.json()["items"]
-    assert _values(item_read["properties"]) == {defn.id: "queue_item"}
+    group_read = await client.get(a.g(f"/counter-groups/{group.id}"), headers=a.headers)
+    [counter_read] = group_read.json()["counters"]
+    assert _values(counter_read["properties"]) == {defn.id: "counter"}
     page_read = await client.get(a.g(f"/wiki-pages/{page.id}"), headers=a.headers)
     assert page_read.status_code == 200, page_read.text
     assert _values(page_read.json()["properties"]) == {defn.id: "wiki_page"}
@@ -727,8 +727,8 @@ async def test_every_tool_and_its_sub_tools_read_back_what_they_carry(
 async def test_a_create_writes_its_values_with_the_row(
     client: AsyncClient, session: AsyncSession, acting_user
 ):
-    """A create carries its values in its own transaction: a queue and an item
-    in it come back holding them, and a task naming a person who cannot open
+    """A create carries its values in its own transaction: a counter group and
+    a counter in it come back holding them, and a task naming a person who cannot open
     its project is refused whole — no task is left without its values. A
     task's update does the same."""
     a = await acting_user(guild_role=CommunityRole.admin, initiative=True, project=True)
@@ -738,27 +738,27 @@ async def test_a_create_writes_its_values_with_the_row(
         session, a.initiative, name="Owner", type=MetadataType.user_reference
     )
 
-    queue = await client.post(
-        a.g("/queues/"),
+    group = await client.post(
+        a.g("/counter-groups/"),
         headers=a.headers,
         json={
             "initiative_id": a.initiative.id,
-            "name": "Rota",
-            "properties": [{"property_id": note.id, "value": "queue"}],
+            "name": "Tally",
+            "properties": [{"property_id": note.id, "value": "group"}],
         },
     )
-    assert queue.status_code == 201, queue.text
-    assert _values(queue.json()["properties"]) == {note.id: "queue"}
-    item = await client.post(
-        a.g(f"/queues/{queue.json()['id']}/items"),
+    assert group.status_code == 201, group.text
+    assert _values(group.json()["properties"]) == {note.id: "group"}
+    counter = await client.post(
+        a.g(f"/counter-groups/{group.json()['id']}/counters"),
         headers=a.headers,
         json={
-            "label": "First",
-            "properties": [{"property_id": note.id, "value": "item"}],
+            "name": "First",
+            "properties": [{"property_id": note.id, "value": "counter"}],
         },
     )
-    assert item.status_code == 201, item.text
-    assert _values(item.json()["properties"]) == {note.id: "item"}
+    assert counter.status_code == 201, counter.text
+    assert _values(counter.json()["properties"]) == {note.id: "counter"}
 
     outsider = await create_user(session)
     await create_guild_membership(
@@ -1108,8 +1108,8 @@ async def test_purging_an_initiative_takes_every_value_in_it_with_it(
         session, a.initiative, name="Topic", type=MetadataType.text
     )
     await _write(client, a, EVENTS, event, [{"property_id": defn.id, "value": "hold"}])
-    queue = await create_queue(session, a.initiative, a.user)
-    for row in (queue, await create_queue_item(session, queue)):
+    group = await create_counter_group(session, a.initiative, a.user)
+    for row in (group, await create_counter(session, group)):
         await create_property_value(session, row, defn, value_text="hold")
 
     deleted = await client.delete(

@@ -118,7 +118,6 @@ VISUALS: dict[str, Visual] = {
     "projects": Visual(icon="icon"),
     "calendars": Visual(color="color"),
     "counters": Visual(color="color"),
-    "queue_items": Visual(color="color"),
     "tags": Visual(color="color"),
 }
 

@@ -15,10 +15,10 @@ from alembic.operations import Operations
 from sqlalchemy import text
 
 from app.testing import (
+    create_counter_group,
     create_guild,
     create_initiative,
     create_project,
-    create_queue,
     create_task,
     create_user,
 )
@@ -46,7 +46,7 @@ async def test_opens_stars_and_orders_merge_and_come_back(session) -> None:
     initiative = await create_initiative(session, guild, user)
     project = await create_project(session, initiative, user, name="All three")
     lone = await create_project(session, initiative, user, name="Ordered only")
-    queue = await create_queue(session, initiative, user)
+    group = await create_counter_group(session, initiative, user)
     task = await create_task(session, project)
     migration = _load("20261017_0517_personal_items")
 
@@ -83,10 +83,10 @@ async def test_opens_stars_and_orders_merge_and_come_back(session) -> None:
     )
     await sql(
         f"INSERT INTO {schema}.favorites (user_id, entity_type, entity_id, created_at)"
-        " VALUES (:u, 'project', :p, :jan), (:u, 'queue', :q, :feb)",
+        " VALUES (:u, 'project', :p, :jan), (:u, 'counter_group', :g, :feb)",
         u=user.id,
         p=project.id,
-        q=queue.id,
+        g=group.id,
         jan=jan,
         feb=feb,
     )
@@ -110,7 +110,7 @@ async def test_opens_stars_and_orders_merge_and_come_back(session) -> None:
         [
             (user.id, "project", project.id, feb, "search", jan, None, 1.0),
             (user.id, "project", lone.id, None, None, None, None, 0.0),
-            (user.id, "queue", queue.id, None, None, feb, None, None),
+            (user.id, "counter_group", group.id, None, None, feb, None, None),
             (other.id, "task", task.id, jan, "direct", None, None, None),
         ],
         key=lambda r: (r[0], r[1], r[2]),
@@ -146,7 +146,7 @@ async def test_opens_stars_and_orders_merge_and_come_back(session) -> None:
     bookmarks = (
         await sql(f"SELECT entity_type FROM {schema}.favorites ORDER BY created_at")
     ).all()
-    assert [r.entity_type for r in bookmarks] == ["project", "queue"]
+    assert [r.entity_type for r in bookmarks] == ["project", "counter_group"]
     orders = (
         await sql(f"SELECT project_id FROM {schema}.project_orders ORDER BY sort_order")
     ).all()

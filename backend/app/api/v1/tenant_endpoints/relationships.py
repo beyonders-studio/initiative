@@ -1,9 +1,8 @@
 """One surface for how things connect.
 
-Replaces the per-tool attach endpoints — a project's files, a queue item's
-files and tasks, an event's files — which were five routes saying the
-same thing about four pairs of kinds. What varies between them is which two
-kinds are named, and that is a parameter.
+Replaces the per-tool attach endpoints — a project's files, an event's
+files — which said the same thing about each pair of kinds. What varies
+between them is which two kinds are named, and that is a parameter.
 
 **What a write asks is the table's to decide, not this router's.** RLS gates
 both endpoints on every statement, per type: write on the end an edge describes

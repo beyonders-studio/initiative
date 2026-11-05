@@ -56,8 +56,6 @@ _BUILDERS: dict[str, Callable[[], Dataset]] = {
     # nothing to say about any of them individually (app.services.fields.tools).
     "files": tool_datasets.build_files,
     "file_versions": tool_datasets.build_file_versions,
-    "queues": tool_datasets.build_queues,
-    "queue_items": tool_datasets.build_queue_items,
     "calendars": tool_datasets.build_calendars,
     "dashboards": tool_datasets.build_dashboards,
     "posts": tool_datasets.build_posts,

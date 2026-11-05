@@ -446,17 +446,17 @@ async def test_my_tool_counts(client: AsyncClient, acting_user):
     """Every tool is answered for, with a zero where the caller has none."""
     a = await acting_user(guild_role=CommunityRole.admin, initiative=True)
     await _enable_tools(client, a)
-    await _create(client, a, Tool.queue, "Standup")
-    await _create(client, a, Tool.queue, "Retro")
+    await _create(client, a, Tool.counter_group, "Standup")
+    await _create(client, a, Tool.counter_group, "Retro")
 
     response = await client.get("/api/v1/me/tools/counts", headers=a.headers)
 
     assert response.status_code == 200
     counts = response.json()["counts"]
-    assert counts["queue"] == 2
+    assert counts["counter_group"] == 2
     # Present rather than absent: the page needs "none" to be distinguishable
     # from "not asked" when it decides which tabs to draw.
-    assert counts["counter_group"] == 0
+    assert counts["dashboard"] == 0
     # Derived from the enum rather than listed: every tool has a tab on this
     # page, so a new one belongs here the day it exists.
     assert set(counts) == {tool.value for tool in Tool}
@@ -472,14 +472,14 @@ async def test_my_tool_counts_created_by_me(client: AsyncClient, acting_user):
         initiative=admin.initiative,
         initiative_role="member",
     )
-    await _create(client, admin, Tool.queue, "Admin's Queue")
+    await _create(client, admin, Tool.counter_group, "Admin's Counters")
 
     everything = await client.get("/api/v1/me/tools/counts", headers=other.headers)
     assert everything.status_code == 200
-    assert everything.json()["counts"]["queue"] == 1
+    assert everything.json()["counts"]["counter_group"] == 1
 
     mine = await client.get(
         "/api/v1/me/tools/counts?created_by_me=true", headers=other.headers
     )
     assert mine.status_code == 200
-    assert mine.json()["counts"]["queue"] == 0
+    assert mine.json()["counts"]["counter_group"] == 0

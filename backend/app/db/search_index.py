@@ -79,7 +79,7 @@ class ArchiveParent:
 
     The archive cascade stamps every archivable child, so a row that can carry
     its own ``archived_at`` needs none of these. One that cannot — a comment, a
-    wiki page, a queue item — reads it off what it sits under, and a trigger on
+    wiki page, a counter — reads it off what it sits under, and a trigger on
     that table rewrites its entries when the stamp moves.
     """
 
@@ -486,11 +486,6 @@ SEARCH_SOURCES: dict[str, SearchSource] = {
         title="title",
         body=("description", "checklist"),
         body_sql=_task_text,
-    ),
-    "queue_items": _inside(
-        SearchEntityType.queue_item,
-        title="label",
-        body=("notes",),
     ),
     "counters": _inside(
         SearchEntityType.counter,

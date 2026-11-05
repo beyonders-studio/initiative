@@ -13,7 +13,6 @@ from app.services.export.adapters.dashboard import DashboardAdapter
 from app.services.export.adapters.file import FileAdapter
 from app.services.export.adapters.post import PostAdapter
 from app.services.export.adapters.project import ProjectAdapter
-from app.services.export.adapters.queue import QueueAdapter
 from app.services.export.adapters.tasks_table import TasksTableAdapter
 from app.services.export.adapters.wiki import WikiAdapter
 
@@ -24,7 +23,6 @@ ADAPTERS = {
         CalendarEventsAdapter(),
         ProjectAdapter(),
         FileAdapter(),
-        QueueAdapter(),
         CounterGroupAdapter(),
         DashboardAdapter(),
         CalendarAdapter(),

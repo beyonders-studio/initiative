@@ -2120,7 +2120,7 @@ class TestActions:
             (
                 "member",
                 "shared",
-                {"entity_type": "queue_item"},
+                {"entity_type": "counter"},
                 404,
                 "ACTION_NOT_FOUND",
             ),

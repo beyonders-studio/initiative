@@ -512,7 +512,6 @@ async def test_a_case_whose_task_was_moved_away_is_not_this_projects_case(
     [
         ("comment", True),
         ("task", True),
-        ("queue_item", True),
         ("collection", True),
         ("tag", False),
     ],

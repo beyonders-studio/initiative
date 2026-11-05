@@ -1709,8 +1709,6 @@ INITIATIVE_PATHS: dict[str, InitiativePath] = {
     "task_types": via("projects", "project_id"),
     # One hop -> files
     "file_versions": via("files", "file_id"),
-    # One hop -> queues
-    "queue_items": via("queues", "queue_id"),
     # One hop -> counter_groups
     "counters": via("counter_groups", "counter_group_id"),
     # One hop -> wikis. The page tree is a column on this table, not a
@@ -1733,7 +1731,6 @@ INITIATIVE_PATHS: dict[str, InitiativePath] = {
     "intake_cases": via_task_project("task_id"),
     # What a person attached: reached as its report or its case is.
     "evidence": evidence_path(),
-    # Two hops -> queue_items -> queues
     # Two hops -> post_polls -> posts
     "post_poll_options": via_post_poll("poll_id"),
     "post_poll_votes": via_post_poll("poll_id"),
@@ -1778,7 +1775,6 @@ NAMED_PEOPLE: tuple[NamedPerson, ...] = (
     NamedPerson("calendar_event_attendees", "user_id"),
     NamedPerson("calendar_event_answers", "user_id"),
     NamedPerson("metadata_values", "value_user_id", clear=True),
-    NamedPerson("queue_items", "user_id", clear=True),
     # What somebody asked for goes with them: nobody is left to answer for.
     NamedPerson("share_requests", "user_id"),
 )
@@ -1970,7 +1966,7 @@ def grants_report_on_their_resource() -> ReportsAs:
     """A grant is sharing ON something — report it against that something.
 
     ``resource_type`` holds the Tool value and ``resource_id`` its id, so the
-    event lands on the project (or file, queue, …) whose access changed.
+    event lands on the project (or file, counter group, …) whose access changed.
     That is both what a subscriber wants to hear and already resolvable, where
     the grant row's own id resolves nowhere.
 

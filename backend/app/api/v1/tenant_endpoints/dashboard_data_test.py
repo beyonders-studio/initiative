@@ -19,11 +19,11 @@ from app.models.tenant.task import TaskStatusCategory
 from app.services.query import executor
 from app.services.tenant.view_as_test import dashboard_body, dashboards_on
 from app.testing import (
+    create_counter_group,
     create_initiative,
     create_project,
     create_property_definition,
     create_property_value,
-    create_queue,
     create_task,
 )
 
@@ -164,9 +164,9 @@ async def test_a_property_is_reported_across_the_initiative(
         session, author.initiative, name="Points", type=MetadataType.number
     )
     task = await create_task(session, project, title="Pointed")
-    queue = await create_queue(session, author.initiative, author.user)
+    group = await create_counter_group(session, author.initiative, author.user)
     await create_property_value(session, task, points, value_number=5)
-    await create_property_value(session, queue, points, value_number=3)
+    await create_property_value(session, group, points, value_number=3)
 
     elsewhere = await create_initiative(session, author.guild, author.user)
     elsewhere_points = await create_property_definition(

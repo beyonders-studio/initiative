@@ -25,7 +25,6 @@ from app.services.tenant import tool_layouts as tool_layouts_service
 from app.testing import (
     create_counter_group,
     create_project,
-    create_queue,
     create_resource_grant,
     route_session_to_guild,
 )
@@ -456,19 +455,18 @@ async def test_tools_lay_out_their_items(
 ):
     """Each its own item detail, listed among the initiative's layouts."""
     a = await acting_user(guild_role=CommunityRole.admin, initiative=True)
-    queue = await create_queue(session, a.initiative, a.user, name="Turns")
     group = await create_counter_group(session, a.initiative, a.user, name="Tally")
     detail = _detail(
-        "queue_item",
-        {"type": "section", "children": [_field("person"), _field("property:12")]},
-        _field("tags"),
+        "counter",
+        {"type": "count"},
+        {"type": "section", "children": [_field("step"), _field("property:12")]},
         {"type": "relations"},
         _plugin_part(3),
     )
 
     saved = await client.put(
         a.g("/layouts/"),
-        params={"tool": "queue", "tool_id": queue.id},
+        params={"tool": "counter_group", "tool_id": group.id},
         json=detail,
         headers=a.headers,
     )
@@ -479,18 +477,9 @@ async def test_tools_lay_out_their_items(
     )
 
     assert saved.status_code == 200, saved.text
-    assert [layout["kind"] for layout in saved.json()["layouts"]] == ["queue_item"]
-    counters = await client.put(
-        a.g("/layouts/"),
-        params={"tool": "counter_group", "tool_id": group.id},
-        json=_detail("counter", {"type": "count"}, _field("step")),
-        headers=a.headers,
-    )
-    assert counters.status_code == 200, counters.text
-    assert [layout["kind"] for layout in counters.json()["layouts"]] == ["counter"]
+    assert [layout["kind"] for layout in saved.json()["layouts"]] == ["counter"]
     assert sorted((each["tool"], each["name"]) for each in listed.json()) == [
         ("counter_group", "Tally"),
-        ("queue", "Turns"),
     ]
 
 
