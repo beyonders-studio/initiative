@@ -22,7 +22,6 @@ from pydantic import Field
 
 from fastapi import APIRouter, Depends, HTTPException, Query, Response, status
 from fastapi.responses import JSONResponse, RedirectResponse
-from sqlalchemy import func, not_
 from sqlmodel import col, select
 
 from app.api.deps import (
@@ -578,23 +577,20 @@ async def read_community_export_status(
 async def _require_reach(
     session: RLSSessionDep, user: User, initiative_ids: list[int]
 ) -> None:
-    """Refuse unless the caller reaches every initiative in ``initiative_ids``
-    that still exists. One deleted since the render, in the trash or purged,
-    is skipped."""
+    """Refuse unless the caller reaches every initiative in ``initiative_ids``.
+    One they cannot see, purged, in a trash they don't see or private to
+    others, is not reached."""
     if not initiative_ids:
         return
-    unreached = (
+    reached = (
         await session.exec(
-            select(func.count())
-            .select_from(Initiative)
-            .where(
+            select(Initiative.id).where(
                 Initiative.id.in_(initiative_ids),
-                Initiative.deleted_at.is_(None),
-                not_(initiative_scope_clause(user.id, Initiative.id)),
+                initiative_scope_clause(user.id, Initiative.id),
             )
         )
-    ).one()
-    if unreached:
+    ).all()
+    if set(initiative_ids) - set(reached):
         raise HTTPException(
             status_code=status.HTTP_403_FORBIDDEN,
             detail=ExportMessages.EXPORT_OUT_OF_REACH,
