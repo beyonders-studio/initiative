@@ -76,7 +76,7 @@ from __future__ import annotations
 
 import json
 import re
-from collections.abc import Callable, Iterator
+from collections.abc import Callable, Iterator, Mapping
 from contextlib import contextmanager
 from typing import Any
 
@@ -1101,7 +1101,7 @@ def _notice_respeller(moved: Moved) -> dict[str, Callable[..., Any]]:
     return {"address": address, "rollup": rollup, "data": data, "kind": kind}
 
 
-def _all_maps(bind: Connection) -> dict[int | None, Moved]:
+def _all_maps(bind: Connection) -> dict[int | None, dict[str, dict[int, int]]]:
     """The maps, by community."""
     found: dict[int | None, dict[str, dict[int, int]]] = {}
 
@@ -1121,7 +1121,7 @@ def _all_maps(bind: Connection) -> dict[int | None, Moved]:
     return found
 
 
-def _notifications(bind: Connection, maps: dict[int | None, Moved]) -> None:
+def _notifications(bind: Connection, maps: Mapping[int | None, Moved]) -> None:
     rows = bind.execute(
         text(
             "SELECT id, guild_id, tool, resource_id, subject_type, subject_id, data "
@@ -1160,7 +1160,7 @@ def _notifications(bind: Connection, maps: dict[int | None, Moved]) -> None:
         )
 
 
-def _notice_outbox(bind: Connection, maps: dict[int | None, Moved]) -> None:
+def _notice_outbox(bind: Connection, maps: Mapping[int | None, Moved]) -> None:
     rows = bind.execute(
         text(
             "SELECT id, guild_id, data, push_data, rollup_key, email_link "
