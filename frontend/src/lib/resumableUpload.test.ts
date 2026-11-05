@@ -61,6 +61,36 @@ describe("uploadInPieces", () => {
     vi.useRealTimers();
   });
 
+  it("waits out the server's request limit and carries on", async () => {
+    vi.useFakeTimers({ shouldAdvanceTime: true });
+    let limited = false;
+    server.use(
+      communityHttp.patch("/resumable-uploads/:id", () => {
+        if (!limited) {
+          limited = true;
+          return new HttpResponse(null, { status: 429 });
+        }
+        return new HttpResponse(null, { status: 204, headers: { "Upload-Offset": "8" } });
+      }),
+      communityHttp.head(
+        "/resumable-uploads/:id",
+        () => new HttpResponse(null, { headers: { "Upload-Offset": "0" } })
+      )
+    );
+
+    const sending = uploadInPieces(
+      3,
+      new File(["a report"], "agenda.pdf"),
+      "agenda.pdf",
+      { purpose: "file", initiativeId: 4 },
+      async (uploadId) => uploadId
+    );
+    await vi.advanceTimersByTimeAsync(2_000);
+
+    await expect(sending).resolves.toMatch(/^up-/);
+    vi.useRealTimers();
+  });
+
   it.each([
     ["refuses it", () => new HttpResponse(null, { status: 413 })],
     ["refuses it unseen from another origin", () => HttpResponse.error()],

@@ -40,7 +40,7 @@ const metadata = (values: Record<string, string>) =>
 const retryable = (error: unknown) => {
   if (!isAxiosError(error)) return false;
   const status = error.response?.status;
-  return status === undefined || status >= 500 || status === 409 || status === 423;
+  return status === undefined || status >= 500 || [409, 423, 429].includes(status);
 };
 
 /** Whether a piece may have been too large for something between here and
