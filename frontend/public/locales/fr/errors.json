@@ -599,6 +599,8 @@
   "FILE_SPREADSHEET_FILE_TOO_LARGE": "Ce fichier est trop volumineux pour être importé. Il contient plus de feuilles ou de cellules qu'un tableur ne peut en accueillir ici.",
   "RELATIONSHIP_BAD_ENDPOINT": "Cet élément ne peut pas être lié",
   "RELATIONSHIP_SOURCE_NOT_WRITABLE": "Tu peux seulement lire cela, donc tu ne peux pas en faire partir un lien. Crée-le depuis ce côté-ci.",
+  "RELATIONSHIP_ITEM_NOT_WRITABLE": "Tu peux seulement lire cela, donc tu ne peux pas y lier une personne.",
+  "RELATIONSHIP_BETWEEN_PEOPLE": "Deux personnes ne peuvent pas être liées entre elles",
   "RELATIONSHIP_ENDPOINT_NOT_FOUND": "L'un de ces éléments n'existe plus ou n'est pas partagé avec vous",
   "RELATIONSHIP_CROSS_INITIATIVE": "Les deux doivent appartenir à la même initiative",
   "RELATIONSHIP_SELF": "Un élément ne peut pas être lié à lui-même",

@@ -22,6 +22,7 @@ import { useTranslation } from "react-i18next";
 
 import { type SearchSuggestion, Tool } from "@/api/generated/initiativeAPI.schemas";
 import { InitiativeMark } from "@/components/icons/InitiativeMark";
+import { SearchCategoryTabs } from "@/components/search/SearchCategoryTabs";
 import { getOpenCreateTaskWizard } from "@/components/tasks/CreateTaskWizard";
 import { openFeedback, useFeedbackOffered } from "@/components/tickets/FeedbackSheet";
 import { useSecurityReporting } from "@/components/tickets/ReportSecurityProblem";
@@ -35,6 +36,7 @@ import {
   CommandItem,
   CommandList,
 } from "@/components/ui/command";
+import { Tabs } from "@/components/ui/tabs";
 import { MentionText } from "@/components/user/MentionText";
 import { useAuth } from "@/hooks/useAuth";
 import { useCommunities } from "@/hooks/useCommunities";
@@ -58,6 +60,7 @@ import {
   DEFAULT_SEARCH_CATEGORY,
   FROM_SEARCH,
   hitIcon,
+  isSearchCategory,
   SEARCH_CATEGORIES,
   type SearchCategory,
   searchHitPath,
@@ -70,7 +73,6 @@ import {
   getUrlHandle,
   getUserDisplayName,
 } from "@/lib/userDisplay";
-import { cn } from "@/lib/utils";
 
 // Module-level callback so other components can open the command center
 let openCommandCenter: (() => void) | null = null;
@@ -332,32 +334,18 @@ export function CommandCenter() {
         })}
       />
       {isSearching && (
-        <div
-          className="flex items-center gap-1 border-b px-2 py-1.5"
-          role="tablist"
-          aria-label={t("search:title")}
+        <Tabs
+          value={scope}
+          onValueChange={(next) => {
+            if (isSearchCategory(next)) setScope(next);
+          }}
         >
-          {SEARCH_CATEGORIES.map((category) => (
-            <button
-              key={category}
-              type="button"
-              role="tab"
-              aria-selected={scope === category}
-              onClick={() => setScope(category)}
-              className={cn(
-                "rounded-md px-2 py-1 text-sm transition-colors",
-                scope === category
-                  ? "bg-accent font-medium text-accent-foreground"
-                  : "text-muted-foreground hover:text-foreground"
-              )}
-            >
-              {t(`search:tabs.${category}`)}
-            </button>
-          ))}
-          <span className="ml-auto pr-1 text-muted-foreground text-xs">
-            {t("search:switchHint")}
-          </span>
-        </div>
+          <SearchCategoryTabs variant="strip">
+            <span className="ml-auto pr-1 text-muted-foreground text-xs">
+              {t("search:switchHint")}
+            </span>
+          </SearchCategoryTabs>
+        </Tabs>
       )}
 
       <CommandList>

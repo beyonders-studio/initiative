@@ -11,6 +11,7 @@
  */
 
 import type { InitiativeRead, SearchEntityType, Tool } from "@/api/generated/initiativeAPI.schemas";
+import type { ItemEndKind } from "@/lib/relationships";
 import { isToolEnabled, TOOLS } from "@/lib/tools";
 
 /**
@@ -22,9 +23,8 @@ import { isToolEnabled, TOOLS } from "@/lib/tools";
  * holds them to it: a tool whose spellings drifted apart would still compile,
  * and would quietly stop being excluded from its own comment thread's picker.
  */
-export const referenceTypeFor = (
-  tool: Tool | "task" | "wiki_page" | "collection"
-): SearchEntityType => tool as unknown as SearchEntityType;
+export const referenceTypeFor = (tool: Tool | "task" | "wiki_page" | "collection"): ItemEndKind =>
+  tool as unknown as ItemEndKind;
 
 /**
  * The tools `[[ ]]` may offer in one initiative.

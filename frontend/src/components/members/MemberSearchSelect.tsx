@@ -90,7 +90,8 @@ export const useSeenMembers = (
   return seen;
 };
 
-const MemberAvatar = ({ user, className }: { user: MemberLike; className?: string }) => {
+/** A person's picture, or their initials in their own colour. */
+export const MemberAvatar = ({ user, className }: { user: MemberLike; className?: string }) => {
   const src = getAvatarSrc(user);
   const label = getUserDisplayName(user);
   return (
@@ -399,7 +400,8 @@ export const MemberMultiSelect = ({
 interface MemberSelectProps {
   scope: MemberSearchScope;
   value: number | null;
-  onChange: (id: number | null) => void;
+  /** The id picked, and the member it names, for a caller that shows them. */
+  onChange: (id: number | null, user?: MemberSummary) => void;
   /** Display info for the current value so the trigger shows a name without a
    *  search round-trip. */
   selectedUser?: MemberLike | null;
@@ -500,7 +502,7 @@ export const MemberSelect = ({
                         key={user.id}
                         value={String(user.id)}
                         onSelect={() => {
-                          onChange(user.id);
+                          onChange(user.id, user);
                           handleOpenChange(false);
                         }}
                         className="cursor-pointer"

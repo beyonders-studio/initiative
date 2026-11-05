@@ -10,10 +10,11 @@ both are a picker's business to warn about (see :func:`walk`).
 Who may write an edge is the table's to decide: RLS gates both endpoints on
 every statement. A link a person makes also answers to the rules of the surface
 — both ends readable, in one initiative, neither archived, a directional link
-written by its source — and :func:`link` is where those live, so every writer of
-one goes through the same door. The *removal* rule — your own edge, or one on a
-resource you can write — belongs to the endpoint, which is where the resource
-and the caller's access to it are already in hand.
+written by its source, a link to a person written by the item on its other end
+and naming somebody in the community — and :func:`link` is where those live, so
+every writer of one goes through the same door. The *removal* rule — your own
+edge, or one on a resource you can write — belongs to the endpoint, which is
+where the resource and the caller's access to it are already in hand.
 """
 
 from __future__ import annotations
@@ -33,7 +34,9 @@ from app.core.messages import RelationshipMessages
 from app.core.relationships import (
     DERIVED_TYPES,
     ENDPOINT_KINDS,
+    PERSON,
     SPECS,
+    EndpointKind,
     Related,
     Provenance,
     RelationshipType,
@@ -45,6 +48,7 @@ from app.core.search import SearchEntityType
 from app.db import reference_targets
 from app.db.session import install_context, require_actor_context
 from app.models.tenant.relationship import EntityRelationship
+from app.services.tenant import named_people
 
 #: How deep a walk may go, whatever it is asked for. A graph that permits cycles
 #: needs this even with the CYCLE clause below, because a mixed-type path can
@@ -60,7 +64,7 @@ Direction = Literal["inbound", "outbound", "both"]
 class Endpoint:
     """One end of an edge: what kind of thing, and which one."""
 
-    kind: SearchEntityType
+    kind: EndpointKind
     id: int
 
     @property
@@ -163,7 +167,7 @@ async def link(
     """
     refuse_derived(made.relationship_type)
     ends = await _resolve_ends(session, [made], user_id)
-    writable = await _writable_sources(session, [made], user_id)
+    writable = await _writable_ends(session, [made], user_id)
     _refuse_link(made, ends, writable)
     try:
         return await _create_link(session, made, user_id)
@@ -178,11 +182,11 @@ async def link_many(
 ) -> None:
     """:func:`link` for a batch, leaving behind each link it would refuse.
 
-    The ends are resolved, and the sources' write access asked, once per kind
+    The ends are resolved, and the written ends' access asked, once per kind
     for the whole batch rather than once per link.
     """
     ends = await _resolve_ends(session, links, user_id)
-    writable = await _writable_sources(session, links, user_id)
+    writable = await _writable_ends(session, links, user_id)
     for made in links:
         try:
             refuse_derived(made.relationship_type)
@@ -217,10 +221,17 @@ def _refuse_link(
     source is the end an edge describes, which is what makes "who may write
     this" derivable: changing what is said *about* something asks to change
     that thing. A symmetric link describes neither end and asks only that both
-    be readable, which resolving them already proved. The table says the same
-    thing and would refuse the write on its own; asking here is so the refusal
-    arrives with a name the caller can act on.
+    be readable, which resolving them already proved. A link to a person
+    describes the item on its other end, whatever its type (see
+    :func:`_written_end`). The table says the same thing and would refuse the
+    write on its own; asking here is so the refusal arrives with a name the
+    caller can act on.
     """
+    if made.source.kind == PERSON.value and made.target.kind == PERSON.value:
+        raise Refused(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail=RelationshipMessages.BETWEEN_PEOPLE,
+        )
     source_row = ends.get(made.source.node)
     target_row = ends.get(made.target.node)
     if source_row is None or target_row is None:
@@ -230,39 +241,69 @@ def _refuse_link(
         )
     refuse_across_initiatives(source_row, target_row)
     refuse_archived(source_row, target_row)
-    if not is_symmetric(made.relationship_type) and made.source.node not in writable:
+    written = _written_end(made)
+    if written is not None and written.node not in writable:
         raise Refused(
             status_code=status.HTTP_403_FORBIDDEN,
-            detail=RelationshipMessages.SOURCE_NOT_WRITABLE,
+            detail=RelationshipMessages.ITEM_NOT_WRITABLE
+            if PERSON.value in (made.source.kind, made.target.kind)
+            else RelationshipMessages.SOURCE_NOT_WRITABLE,
         )
+
+
+def _written_end(made: Link) -> Endpoint | None:
+    """The end making this link changes, if it changes either.
+
+    The source of a directional link, and the item beside a person whatever the
+    type: "this task depends on Jane" says something about the task. A person's
+    end is never it. A link between two people has none, and is refused.
+    """
+    if made.target.kind == PERSON.value:
+        return None if made.source.kind == PERSON.value else made.source
+    if made.source.kind == PERSON.value:
+        return made.target
+    return None if is_symmetric(made.relationship_type) else made.source
 
 
 async def _resolve_ends(
     session: AsyncSession, links: Sequence[Link], user_id: int | None
 ) -> dict[int, reference_targets.Resolved]:
     """Every end the reader may open, by node id: one query per kind."""
-    wanted: dict[SearchEntityType, list[int]] = {}
+    wanted: dict[EndpointKind, list[int]] = {}
     for made in links:
         for end in (made.source, made.target):
             wanted.setdefault(end.kind, []).append(end.id)
     found: dict[int, reference_targets.Resolved] = {}
     for kind, ids in wanted.items():
-        for entity_id, row in (
-            await reference_targets.resolve_many(session, kind, ids, user_id=user_id)
-        ).items():
+        for entity_id, row in (await _linkable(session, kind, ids, user_id)).items():
             found[node_id(kind, entity_id)] = row
     return found
 
 
-async def _writable_sources(
+async def _linkable(
+    session: AsyncSession, kind: EndpointKind, ids: Sequence[int], user_id: int | None
+) -> dict[int, reference_targets.Resolved]:
+    """The ends of one kind a link made for this reader may name, by id.
+
+    A person has to be in the community, guests included while they are in, as
+    the reader reads its roster; anyone else is absent, as an end the reader
+    cannot open is.
+    """
+    if kind == PERSON.value:
+        ids = sorted(await named_people.members(session, ids))
+    return await reference_targets.resolve_many(session, kind, ids, user_id=user_id)
+
+
+async def _writable_ends(
     session: AsyncSession, links: Sequence[Link], user_id: int | None
 ) -> set[int]:
-    """The directional links' sources the reader may edit, by node id: one
-    query per kind."""
-    wanted: dict[SearchEntityType, set[int]] = {}
+    """The ends these links change (:func:`_written_end`) that the reader may
+    edit, by node id: one query per kind."""
+    wanted: dict[EndpointKind, set[int]] = {}
     for made in links:
-        if not is_symmetric(made.relationship_type):
-            wanted.setdefault(made.source.kind, set()).add(made.source.id)
+        written = _written_end(made)
+        if written is not None:
+            wanted.setdefault(written.kind, set()).add(written.id)
     writable: set[int] = set()
     for kind, ids in wanted.items():
         rows = await session.exec(
@@ -459,7 +500,7 @@ async def list_for_entity(
     entity: Endpoint,
     *,
     relationship_type: RelationshipType | None = None,
-    other_kind: SearchEntityType | None = None,
+    other_kind: EndpointKind | None = None,
     direction: Direction = "both",
 ) -> list[EntityRelationship]:
     """Every live edge touching this entity, from either side.
@@ -674,7 +715,7 @@ async def set_related(
     entity: Endpoint,
     *,
     relationship_type: RelationshipType,
-    other_kind: SearchEntityType,
+    other_kind: EndpointKind,
     ids: Sequence[int],
     user_id: int | None,
 ) -> None:
@@ -682,8 +723,9 @@ async def set_related(
     multi-select dialog does.
 
     Asks of the entity and of every id named what :func:`link` asks of a link's
-    two ends: each resolves for this reader, they share an initiative, and
-    neither is archived. Who may drop an edge is the caller's to ask first.
+    two ends: each resolves for this reader, a person is in the community, they
+    share an initiative, and neither is archived. Who may drop an edge is the
+    caller's to ask first.
 
     Removing here is a plain delete rather than a tombstone: a replace is the UI
     restating the whole set, not a person pointing at one link and taking it
@@ -694,9 +736,7 @@ async def set_related(
     anchor = await resolve(session, entity, user_id)
     refuse_archived(anchor)
     wanted = list(dict.fromkeys(ids))
-    resolved = await reference_targets.resolve_many(
-        session, other_kind, wanted, user_id=user_id
-    )
+    resolved = await _linkable(session, other_kind, wanted, user_id)
     for other_id in wanted:
         found = resolved.get(other_id)
         if found is None:
@@ -738,17 +778,21 @@ def _walk_sql(frm: str, to: str) -> str:
     Written out per direction rather than interpolated: the request path builds
     no SQL text, and a walk has exactly two directions, so there is nothing a
     format string would save.
+
+    A person is reached and not walked on from: what links to somebody is read
+    from each item's side, never gathered from theirs.
     """
     return f"""
         WITH RECURSIVE reachable(node, depth) AS (
             SELECT CAST(:start AS bigint), 0
           UNION ALL
-            SELECT r.{to}, w.depth + 1
+            SELECT r.{to}_node, w.depth + 1
             FROM reachable w
             JOIN relationships r
-              ON r.{frm} = w.node
+              ON r.{frm}_node = w.node
              AND r.relationship_type = :rtype
              AND r.removed_at IS NULL
+             AND r.{frm}_type <> '{PERSON.value}'
             WHERE w.depth < :depth
         ) CYCLE node SET is_cycle USING path
         SELECT node, depth, is_cycle FROM reachable WHERE depth > 0
@@ -757,8 +801,8 @@ def _walk_sql(frm: str, to: str) -> str:
 
 #: The two walks, rendered once at import. ``CYCLE … SET … USING path`` is the
 #: SQL-standard clause (PG14+), so a cyclic graph terminates on its own.
-_WALK_OUTBOUND = _walk_sql("source_node", "target_node")
-_WALK_INBOUND = _walk_sql("target_node", "source_node")
+_WALK_OUTBOUND = _walk_sql("source", "target")
+_WALK_INBOUND = _walk_sql("target", "source")
 
 
 async def walk(
@@ -914,7 +958,7 @@ async def neighbourhood(
 
     Labels are left out of the walk unless asked for. A tag is shared by
     everything carrying it, so walking through one reaches the whole community
-    in a hop.
+    in a hop. A person is reached and never walked on from, as in :func:`walk`.
     """
     bounded = max(1, min(hops, MAX_NEIGHBOURHOOD_HOPS))
     depths: dict[Endpoint, int] = {start: 0}
@@ -935,10 +979,10 @@ async def neighbourhood(
             ):
                 anchor = anchors.get(anchor_node)
                 if anchor is not None:
-                    other = Endpoint(SearchEntityType(kind), other_id)
+                    other = Endpoint(EndpointKind(kind), other_id)
                     crossings.append(Crossing(row=row, anchor=anchor, other=other))
 
-        wanted: dict[SearchEntityType, list[int]] = {}
+        wanted: dict[EndpointKind, list[int]] = {}
         for crossing in crossings:
             if crossing.other not in depths:
                 wanted.setdefault(crossing.other.kind, []).append(crossing.other.id)
@@ -962,7 +1006,7 @@ async def neighbourhood(
             if crossing.other in depths:
                 continue
             depths[crossing.other] = depth
-            if len(frontier) < HOP_BUDGET:
+            if len(frontier) < HOP_BUDGET and crossing.other.kind != PERSON.value:
                 frontier.append(crossing.other)
 
     del depths[start]
@@ -971,7 +1015,7 @@ async def neighbourhood(
 
 async def purge_for_entities(
     session: AsyncSession,
-    kind: SearchEntityType,
+    kind: EndpointKind,
     entity_ids: Iterable[int],
 ) -> None:
     """Drop every edge naming one of these, tombstones included.
@@ -1070,8 +1114,8 @@ async def copy_links(
     edges = {row.id: row for row in rows if row.id is not None}
 
     def remapped(end_kind: str, entity_id: int) -> Endpoint:
-        resolved = SearchEntityType(end_kind)
-        if resolved is kind:
+        resolved = EndpointKind(end_kind)
+        if resolved == kind:
             entity_id = copies.get(entity_id, entity_id)
         return Endpoint(resolved, entity_id)
 

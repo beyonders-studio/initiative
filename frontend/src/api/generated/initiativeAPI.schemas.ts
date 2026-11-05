@@ -6221,11 +6221,32 @@ export interface EmbedRead {
   refs?: string[];
 }
 
+export type EndpointKind = (typeof EndpointKind)[keyof typeof EndpointKind];
+
+export const EndpointKind = {
+  calendar: "calendar",
+  calendar_event: "calendar_event",
+  collection: "collection",
+  counter: "counter",
+  counter_group: "counter_group",
+  dashboard: "dashboard",
+  file: "file",
+  post: "post",
+  project: "project",
+  queue: "queue",
+  queue_item: "queue_item",
+  tag: "tag",
+  task: "task",
+  user: "user",
+  wiki: "wiki",
+  wiki_page: "wiki_page",
+} as const;
+
 /**
  * One end of an edge: what kind of thing, and which one.
  */
 export interface EndpointRef {
-  type: SearchEntityType;
+  type: EndpointKind;
   id: number;
 }
 
@@ -8210,7 +8231,7 @@ export interface NeighbourhoodEdge {
  * is called, what it looks like or where it lives.
  */
 export interface RelatedEnd {
-  type: SearchEntityType;
+  type: EndpointKind;
   id: number;
   title: string | null;
   initiative_id: number | null;
@@ -8225,6 +8246,7 @@ export interface RelatedEnd {
   mime_type: string | null;
   original_filename: string | null;
   smart_link_url: string | null;
+  handle: string | null;
   is_open: boolean | null;
 }
 
@@ -14167,7 +14189,7 @@ export type ListRelationshipsParams = {
    */
   entity: string;
   relationship_type?: RelationshipType | null;
-  other_type?: SearchEntityType | null;
+  other_type?: EndpointKind | null;
   direction?: ListRelationshipsDirection;
 };
 
@@ -14186,7 +14208,7 @@ export type ReplaceRelationshipSliceParams = {
    */
   entity: string;
   relationship_type: RelationshipType;
-  other_type: SearchEntityType;
+  other_type: EndpointKind;
 };
 
 export type ListTaskEdgesParams = {

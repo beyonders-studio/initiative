@@ -15,12 +15,14 @@ import {
   buildInitiative,
   buildSearchSuggestion,
   buildUser,
+  buildUserSummary,
   initiativeCan,
 } from "@/__tests__/factories";
 import { communityHttp } from "@/__tests__/helpers/communityHttp";
 import { server } from "@/__tests__/helpers/msw-server";
 import { renderPage } from "@/__tests__/helpers/render";
 import {
+  EndpointKind,
   type RelationshipRead,
   SearchEntityType,
   Tool,
@@ -86,6 +88,7 @@ const farEnd = {
   mime_type: null,
   original_filename: null,
   smart_link_url: null,
+  handle: null,
   is_open: null,
 };
 
@@ -542,6 +545,80 @@ describe("RelationsSection", () => {
     const verb = within(dialog).getByRole("combobox", { name: "How the two relate" });
     // Never a dependency on somebody's behalf — that claim is theirs to make.
     expect(verb).not.toHaveTextContent("is blocked by");
+  });
+
+  it("draws a linked person by their name, and opens their profile", async () => {
+    // A person is reached by their own profile, outside the community, rather
+    // than by a page in it.
+    const link = row("related_to", "outbound", "Jane Accountant");
+    renderSection([
+      {
+        ...link,
+        other: {
+          ...farEnd,
+          type: EndpointKind.user,
+          id: 42,
+          title: "Jane Accountant",
+          handle: "jane0042",
+        },
+      },
+    ]);
+
+    const section = await sectionNamed("See also");
+    expect(within(section).getByRole("link", { name: /Jane Accountant/ })).toHaveAttribute(
+      "href",
+      "/u/jane0042"
+    );
+  });
+
+  it("links a member found on the Members tab, from the whole roster", async () => {
+    // Who a link names need not be able to open the thing it is on, so the
+    // search is not narrowed to the task.
+    const user = userEvent.setup();
+    const searched: URLSearchParams[] = [];
+    const linked: unknown[] = [];
+    server.use(
+      communityHttp.get("/users/search", ({ request }) => {
+        searched.push(new URL(request.url).searchParams);
+        const items = [buildUserSummary({ id: 42, display_name: "Jane Accountant" })];
+        return HttpResponse.json({
+          items,
+          total_count: items.length,
+          page: 1,
+          page_size: 25,
+          has_next: false,
+          has_prev: false,
+        });
+      }),
+      communityHttp.post("/relationships/", async ({ request }) => {
+        linked.push(await request.json());
+        return HttpResponse.json(row("related_to", "outbound", "Jane Accountant"));
+      })
+    );
+    renderSection([]);
+
+    await user.click(await screen.findByRole("button", { name: "Add link" }));
+    const dialog = await screen.findByRole("dialog");
+    await user.click(within(dialog).getByRole("tab", { name: "Members" }));
+    await user.click(within(dialog).getByRole("combobox", { name: "Person" }));
+    await user.click(await screen.findByText("Jane Accountant"));
+
+    // A person is related to the task, never attached to it on their behalf.
+    const verb = within(dialog).getByRole("combobox", { name: "How the two relate" });
+    expect(verb).toHaveTextContent("is related to");
+    await user.click(within(dialog).getByRole("button", { name: "Add link" }));
+
+    await waitFor(() => expect(linked).toHaveLength(1));
+    expect(linked[0]).toMatchObject({
+      source: { type: "task", id: 1 },
+      relationship_type: "related_to",
+      target: { type: "user", id: 42 },
+    });
+    expect(searched.length).toBeGreaterThan(0);
+    for (const params of searched) {
+      expect(params.has("tool")).toBe(false);
+      expect(params.has("resource_id")).toBe(false);
+    }
   });
 
   describe("uploading a file to link", () => {

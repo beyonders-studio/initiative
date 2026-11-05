@@ -31,8 +31,7 @@ from sqlalchemy.orm import selectinload
 from sqlmodel import select
 from sqlmodel.ext.asyncio.session import AsyncSession
 
-from app.core.relationships import Provenance, RelationshipType
-from app.core.search import SearchEntityType
+from app.core.relationships import EndpointKind, Provenance, RelationshipType
 from app.models.tenant.relationship import EntityRelationship
 from app.services.tenant import relationships as relationships_service
 from app.services.platform import grant_cases, rules
@@ -2815,8 +2814,8 @@ async def create_relationship(
     session: AsyncSession,
     guild: Guild,
     *,
-    source: tuple[SearchEntityType, int],
-    target: tuple[SearchEntityType, int],
+    source: tuple[EndpointKind, int],
+    target: tuple[EndpointKind, int],
     relationship_type: RelationshipType = RelationshipType.attached,
     provenance: Provenance = Provenance.manual,
     created_by: int | None = None,
@@ -2824,8 +2823,8 @@ async def create_relationship(
 ) -> EntityRelationship:
     """Create one edge between two things.
 
-    Endpoints are ``(kind, id)`` pairs, and a symmetric type is stored in the
-    order the constraint requires, so a test may name its two ends in whichever
+    Endpoints are ``(kind, id)`` pairs, a person's ``(EndpointKind.user, id)``,
+    and a symmetric type is stored in the order the constraint requires, so a test may name its two ends in whichever
     order reads better.
     """
     await route_session_to_guild(session, guild.id)

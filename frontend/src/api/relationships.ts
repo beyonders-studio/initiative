@@ -9,11 +9,11 @@
  */
 
 import {
+  type EndpointKind,
   type EndpointRef,
   type RelationshipCreate,
   type RelationshipRead,
   RelationshipType,
-  type SearchEntityType,
 } from "@/api/generated/initiativeAPI.schemas";
 import {
   createRelationship as createRelationshipRequest,
@@ -45,7 +45,7 @@ export type Direction = "inbound" | "outbound" | "both";
 export const listRelated = (
   communityId: number,
   entity: EndpointRef,
-  otherType: SearchEntityType | null = null,
+  otherType: EndpointKind | null = null,
   relationshipType: RelationshipType | null = null,
   direction: Direction = "both"
 ): Promise<RelationshipRead[]> =>
@@ -85,7 +85,7 @@ export const createRelationship = (
 export const setRelated = (
   communityId: number,
   entity: EndpointRef,
-  otherType: SearchEntityType,
+  otherType: EndpointKind,
   otherIds: number[],
   relationshipType: RelationshipType = RelationshipType.attached
 ): Promise<RelationshipRead[]> =>

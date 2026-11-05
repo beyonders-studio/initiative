@@ -14,9 +14,9 @@ import {
 import { useTranslation } from "react-i18next";
 
 import type {
+  EndpointRef,
   PropertyDefinitionRead,
   PropertySummary,
-  SearchEntityType,
   Tool,
 } from "@/api/generated/initiativeAPI.schemas";
 import { EntityLinkField } from "@/components/entities/EntityLinkField";
@@ -79,7 +79,7 @@ export interface ItemHome<I, P> {
    *  where it is not that entity. */
   links: {
     entity: ToolRelationEntity;
-    target?: { type: SearchEntityType; id: number };
+    target?: EndpointRef;
     title?: string;
     layout?: RelationsLayout;
   };

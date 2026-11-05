@@ -17,6 +17,7 @@ from app.testing import create_resource_grant, guild_of
 from app.core.relationships import (
     ENDPOINT_KINDS,
     SPECS,
+    EndpointKind,
     Provenance,
     RelationshipType,
     decode_node_id,
@@ -45,7 +46,7 @@ from app.testing.factories import (
 
 
 def test_node_ids_round_trip():
-    for kind in ENDPOINT_KINDS:
+    for kind in EndpointKind:
         assert decode_node_id(node_id(kind, 4242)) == (kind, 4242)
 
 

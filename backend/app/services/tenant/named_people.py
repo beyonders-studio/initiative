@@ -64,7 +64,7 @@ from app.models.tenant.queue import QueueItem
 from app.models.tenant.resource_grant import ResourceGrant
 from app.models.tenant.task import Task, TaskAssignee
 from app.services.membership import live_membership_clause
-from app.services.platform.users import visible_to_other_people
+from app.services.platform.users import guild_members, visible_to_other_people
 from app.db.request_context import SystemGuild
 from app.services.tenant.initiative_tools import member_permission_sql, tool_on_sql
 
@@ -294,6 +294,22 @@ async def readers(
     stmt = select(MemberProfile.id).where(
         MemberProfile.id.in_(ids),
         MemberProfile.id.in_(readers_of(governing, guild_id)),
+    )
+    async with roster_session(session) as reader:
+        return set((await reader.exec(stmt)).all())
+
+
+async def members(session: AsyncSession, user_ids: Iterable[int]) -> set[int]:
+    """Those of ``user_ids`` in the routed community, its guests among them
+    while they are in, read on :func:`roster_session`: who a link may name."""
+    ids = sorted(set(user_ids))
+    guild_id = routed_guild_id(session)
+    if not ids or guild_id is None:
+        return set()
+    stmt = guild_members(
+        select(MemberProfile.id).where(MemberProfile.id.in_(ids)),
+        guild_id=guild_id,
+        guests=True,
     )
     async with roster_session(session) as reader:
         return set((await reader.exec(stmt)).all())

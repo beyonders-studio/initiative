@@ -19,12 +19,13 @@ import { useTranslation } from "react-i18next";
 
 import { StatusMessage } from "@/components/StatusMessage";
 import { MemberResultRow } from "@/components/search/MemberResultRow";
+import { SearchCategoryTabs } from "@/components/search/SearchCategoryTabs";
 import { SearchResultList } from "@/components/search/SearchResultRow";
 import { ListSkeleton, SkeletonRegion } from "@/components/skeletons/PageSkeletons";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Switch } from "@/components/ui/switch";
-import { Tabs, TabsBar, TabsContent, TabsTrigger } from "@/components/ui/tabs";
+import { Tabs, TabsContent } from "@/components/ui/tabs";
 import { useCommunities } from "@/hooks/useCommunities";
 import { useDebouncedValue } from "@/hooks/useDebouncedValue";
 import { useCommunitySearch } from "@/hooks/useSearch";
@@ -187,17 +188,7 @@ export function SearchPage() {
       ) : (
         <Tabs value={tab} onValueChange={setTab} className="space-y-4">
           <div className="flex flex-wrap items-center justify-between gap-3">
-            <TabsBar>
-              {SEARCH_CATEGORIES.map((category) => (
-                // Every tab stays open, including one holding nothing: closing
-                // it off leaves the reader unable to confirm that for themselves,
-                // and unable to get back once a changed query fills it. An empty
-                // tab says so.
-                <TabsTrigger key={category} value={category}>
-                  {t(`search:tabs.${category}`)}
-                </TabsTrigger>
-              ))}
-            </TabsBar>
+            <SearchCategoryTabs />
             {tab !== "member" && (
               <div className="flex items-center gap-2">
                 <Switch

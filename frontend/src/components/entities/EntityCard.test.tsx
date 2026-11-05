@@ -20,6 +20,7 @@ const end = (overrides: Partial<RelatedEnd> = {}): RelatedEnd => ({
   id: 4,
   title: "Onboarding checklist",
   initiative_id: 3,
+  handle: null,
   updated_at: null,
   tool: Tool.file,
   tool_id: 4,

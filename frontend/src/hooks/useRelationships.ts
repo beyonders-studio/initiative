@@ -151,7 +151,7 @@ export interface Neighbourhood {
   walkFailed: boolean;
 }
 
-const keyOf = (ref: { type: SearchEntityType; id: number }) => `${ref.type}:${ref.id}`;
+const keyOf = (ref: EndpointRef) => `${ref.type}:${ref.id}`;
 
 /**
  * Everything within `hops` of one thing.
@@ -243,7 +243,7 @@ export const useRelationsNeighbourhood = (
 /** The links an item is set to have, of every kind. */
 interface ItemLinks {
   /** The item, which the tool `useSetItemLinks` was given holds. */
-  item: { type: SearchEntityType; id: number };
+  item: EndpointRef;
   links: LinkedRef[];
   /** What it was last set to, so only the kinds that moved are written. */
   previous: LinkedRef[];

@@ -645,6 +645,11 @@ class RelationshipMessages:
     #: that end. Refused here with a name, rather than left to arrive as the
     #: database declining the write.
     SOURCE_NOT_WRITABLE = "RELATIONSHIP_SOURCE_NOT_WRITABLE"
+    #: A link to a person says something about the item on its other end, so
+    #: making one asks to change that item, whichever side it is on.
+    ITEM_NOT_WRITABLE = "RELATIONSHIP_ITEM_NOT_WRITABLE"
+    #: A link has an item on at least one end.
+    BETWEEN_PEOPLE = "RELATIONSHIP_BETWEEN_PEOPLE"
     ENDPOINT_NOT_FOUND = "RELATIONSHIP_ENDPOINT_NOT_FOUND"
     CROSS_INITIATIVE = "RELATIONSHIP_CROSS_INITIATIVE"
     ENDPOINT_ARCHIVED = "RELATIONSHIP_ENDPOINT_ARCHIVED"

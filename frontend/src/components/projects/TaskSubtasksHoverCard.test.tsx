@@ -36,6 +36,7 @@ const row = (
     id: 40 + id,
     title,
     initiative_id: 3,
+    handle: null,
     updated_at: null,
     tool: Tool.project,
     tool_id: 1,
