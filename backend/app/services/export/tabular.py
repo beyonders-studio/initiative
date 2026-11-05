@@ -66,8 +66,6 @@ def render_md(item: RenderItem) -> bytes:
         lines.append(f"<{item.data.get('url', '')}>")
     elif layout == "checklist":
         lines.extend(_md_checklist(item))
-    elif layout == "numbered":
-        lines.extend(_md_numbered(item))
     else:
         lines.extend(_md_table(item))
     lines.append("")
@@ -97,7 +95,7 @@ def _md_table(item: RenderItem) -> list[str]:
 
 
 def _md_details(row: dict, detail_keys: list[str]) -> str:
-    """The parenthesized detail trail shared by the list layouts. ``None``
+    """The parenthesized detail trail after a checklist row's title. ``None``
     must be skipped BEFORE stringifying — ``str(None)`` is truthy, and
     ``_md_cell(None)`` returns ``""``, so a None value would otherwise add
     an empty segment (and its spurious ``·`` separator) to the join."""
@@ -125,23 +123,6 @@ def _md_checklist(item: RenderItem) -> list[str]:
         title = _md_cell(row.get("title", "")) or untitled
         details = _md_details(row, detail_keys)
         lines.append(f"- [{box}] {title}" + (f" ({details})" if details else ""))
-    return lines
-
-
-def _md_numbered(item: RenderItem) -> list[str]:
-    """Ordered list: one numbered entry per row (a queue's turn order), with
-    the non-title columns as a detail trail. The row driving the rotation
-    (``current`` flag) renders bold."""
-    columns = item.data.get("columns") or []
-    detail_keys = [c["key"] for c in columns if c["key"] not in ("title", "order")]
-    untitled = _untitled(item)
-    lines: list[str] = []
-    for order, row in enumerate(item.data.get("rows") or [], start=1):
-        title = _md_cell(row.get("title", "")) or untitled
-        if row.get("current"):
-            title = f"**{title}**"
-        details = _md_details(row, detail_keys)
-        lines.append(f"{order}. {title}" + (f" ({details})" if details else ""))
     return lines
 
 

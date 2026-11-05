@@ -7,8 +7,8 @@
  * Two things set it apart from a plain list of each tool:
  *
  * - **A tab only appears for a tool you have something of.** `/me/tools/counts`
- *   answers for all six in one request; a reader who has never touched a queue
- *   is not offered an empty queue table.
+ *   answers for every tool in one request; a reader who has never touched a
+ *   wiki is not offered an empty wiki table.
  * - **Two views of the same list.** "Everything" is what reaches you — what was
  *   shared with you, with a role you hold, or with an initiative you're in.
  *   "Made by me" is what you wrote. The toggle is in the address, like the

@@ -25,16 +25,21 @@ const failed = (status: number): AxiosError => {
 describe("ToolAccessStatus", () => {
   it.each([
     ["no access on a 403", failed(403), "Access Denied"],
-    ["not found on a 404", failed(404), "Queue not found"],
-    ["not found when there was nothing to read", null, "Queue not found"],
+    ["not found on a 404", failed(404), "Counter group not found"],
+    ["not found when there was nothing to read", null, "Counter group not found"],
     ["the failure itself otherwise", failed(500), "Something went wrong. Please try again."],
   ])("says %s", async (_, error, title) => {
     renderPage(() => (
-      <ToolAccessStatus error={error} keys="queues:" backTo="/" backLabel="Back to Queues" />
+      <ToolAccessStatus
+        error={error}
+        keys="counterGroups:"
+        backTo="/"
+        backLabel="Back to Counter Groups"
+      />
     ));
 
     expect(await screen.findByText(title)).toBeInTheDocument();
-    expect(screen.getByRole("link", { name: "Back to Queues" })).toBeInTheDocument();
+    expect(screen.getByRole("link", { name: "Back to Counter Groups" })).toBeInTheDocument();
   });
 });
 
@@ -43,9 +48,9 @@ describe("ToolAccessStatus — something the reader may ask for", () => {
     renderPage(() => (
       <ToolAccessStatus
         error={failed(404)}
-        keys="queues:"
+        keys="counterGroups:"
         backTo="/"
-        backLabel="Back to Queues"
+        backLabel="Back to Counter Groups"
         entity={{ kind: "task", id: 9 }}
       />
     ));
@@ -76,7 +81,7 @@ describe("ToolAccessStatus — something the reader may ask for", () => {
         message: "For the launch",
       })
     );
-    expect(screen.getByRole("link", { name: "Back to Queues" })).toBeInTheDocument();
+    expect(screen.getByRole("link", { name: "Back to Counter Groups" })).toBeInTheDocument();
   });
 
   it("says it was asked for instead of asking again", async () => {
@@ -94,7 +99,7 @@ describe("ToolAccessStatus — something the reader may ask for", () => {
   it("stays not found when there is nothing to ask for", async () => {
     renderRefused();
 
-    expect(await screen.findByText("Queue not found")).toBeInTheDocument();
+    expect(await screen.findByText("Counter group not found")).toBeInTheDocument();
     expect(screen.queryByText("You need access")).not.toBeInTheDocument();
   });
 });

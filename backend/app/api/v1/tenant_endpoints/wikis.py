@@ -81,8 +81,8 @@ from app.services.tenant import tags as tags_service
 from app.services.tenant import wikis as wikis_service
 
 router = APIRouter(route_class=ActorRoute)
-#: A page addressed by its own id, mounted at the guild root the way a queue
-#: item is. Only adding one names its wiki.
+#: A page addressed by its own id, mounted at the guild root the way a counter
+#: is. Only adding one names its wiki.
 pages_router = APIRouter(route_class=ActorRoute)
 
 CurrentUserDep = Annotated[User, Depends(get_current_active_user)]

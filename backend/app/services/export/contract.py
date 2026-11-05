@@ -36,8 +36,8 @@ class RenderItem:
 
     ``format`` / ``template_id`` override the request's values for THIS item —
     the aggregate sources mix formats in one batch (a backup zips envelopes
-    beside file blobs; an à-la-carte report zips a project PDF beside a queue
-    CSV). ``None`` inherits the request value, so single-format sources are
+    beside file blobs; an à-la-carte report zips a project PDF beside a
+    counter group CSV). ``None`` inherits the request value, so single-format sources are
     untouched."""
 
     key: str

@@ -95,7 +95,6 @@ export type RelationsLayout = "tiles" | "rows" | "carousel" | "graph";
 const LAYOUT_ICONS: Record<RelationsLayout, LucideIcon> = {
   tiles: LayoutGrid,
   rows: Rows3,
-  // Not `GalleryHorizontalEnd`: that one is already the queue's own mark.
   carousel: GalleryHorizontal,
   graph: Waypoints,
 };

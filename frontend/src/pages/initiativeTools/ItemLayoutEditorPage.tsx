@@ -1,6 +1,6 @@
 /**
  * `/<tool>/$id/layouts` — how a tool's items are shown when one is opened (a
- * queue's items), laid out in place.
+ * counter group's counters), laid out in place.
  *
  * Who may is the server's answer on the set (the tool's owner, the
  * initiative's managers, a community admin). The editor itself says when the

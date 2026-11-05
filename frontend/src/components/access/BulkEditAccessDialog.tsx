@@ -55,7 +55,7 @@ import { getUserDisplayName, getUserHandle } from "@/lib/userDisplay";
 import { cn } from "@/lib/utils";
 import type { DialogWithSuccessProps } from "@/types/dialog";
 
-/** The minimal shape the bulk dialog needs from any tool (project, queue, …). */
+/** The minimal shape the bulk dialog needs from any tool (project, file, …). */
 export interface BulkAccessItem {
   id: number;
   initiative_id: number;
@@ -105,7 +105,7 @@ const toSelectableUser = (member: UserSummary): SelectableUser => ({
  * Bulk-edit sharing across many resources of one tool type. Keeps a safe
  * additive add/remove model (People / Roles) plus an All-members mode, and
  * persists every change in one bulk request per chunk. Resource-agnostic — the
- * per-tool wrappers (files, projects, queues, counters) supply `items`,
+ * per-tool wrappers (files, projects, counters) supply `items`,
  * `resourceType`, and how to invalidate their caches.
  */
 export function BulkEditAccessDialog({
@@ -119,7 +119,7 @@ export function BulkEditAccessDialog({
   const { t } = useTranslation(["access", "common"]);
   const communityId = useActiveCommunityId();
   const { user: currentUser } = useAuth();
-  // The tool noun, pluralized for `count`, so descriptions/toasts read "2 queues"
+  // The tool noun, pluralized for `count`, so descriptions/toasts read "2 projects"
   // rather than a hardcoded "files".
   const resourceNoun = useCallback(
     (n: number) => t(`bulkBar.resource_${resourceType}`, { count: n }),

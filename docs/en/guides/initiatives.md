@@ -114,7 +114,7 @@ Every initiative comes with three: **Manager** (think project lead) and **Modera
 
 Name them after how your group actually talks about itself, not after anything Initiative expects. Nobody has ever introduced themselves at a committee meeting as a view-only contributor.
 
-Permissions are grouped by tool — **Projects**, **Files**, **Queues**, **Counters**, **Events**, **Dashboards**, **Posts**, **Wikis** — each offering **View** and **Create**. So "Volunteer" might view projects and files but create nothing, while "Coordinator" creates everything.
+Permissions are grouped by tool — **Projects**, **Files**, **Counters**, **Events**, **Dashboards**, **Posts**, **Wikis** — each offering **View** and **Create**. So "Volunteer" might view projects and files but create nothing, while "Coordinator" creates everything.
 
 ![Setting permissions for an initiative role](../images/initiatives/roles.png)
 
@@ -145,7 +145,7 @@ Open the reported thing to see it where it lives, then come back and settle it, 
 
 A report of something illegal shows **Platform notified**: it went to whoever runs the server as well, and they look at it whatever you decide here.
 
-You don't need a report to act. Moderators and community admins get a shield menu on comments, posts, pictures, wiki pages, queue items, events and tasks:
+You don't need a report to act. Moderators and community admins get a shield menu on comments, posts, pictures, wiki pages, events and tasks:
 
 - **Remove…**, as above.
 - **Warn…** — sends whoever wrote it what you type, as above, and leaves it up.

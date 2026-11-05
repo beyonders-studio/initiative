@@ -111,7 +111,7 @@ describe("switching between a link and an embed", () => {
     const editor = makeEditor();
     editor.update(
       () => {
-        const link = $createEntityMentionNode(SearchEntityType.queue, 4, "Intake");
+        const link = $createEntityMentionNode(SearchEntityType.counter_group, 4, "Intake");
         $getRoot().clear().append($createParagraphNode().append(link));
         $showAsEmbed(link);
       },

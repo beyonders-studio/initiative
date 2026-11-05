@@ -46,12 +46,6 @@ Not sure how the pieces fit together yet? [How Initiative is organized](../conce
 
     [:octicons-arrow-right-24: Calendar](calendar.md)
 
--   :material-format-list-numbered: __Queues__
-
-    Whose turn it is. Rotas, running orders, chore wheels.
-
-    [:octicons-arrow-right-24: Queues](queues.md)
-
 -   :material-counter: __Counters__
 
     Numbers that move. Tallies, totals, scores, seats left.

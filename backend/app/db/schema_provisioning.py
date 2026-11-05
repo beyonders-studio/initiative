@@ -146,7 +146,6 @@ SYSTEM_GUILD_MAINTENANCE_GRANTS: dict[str, tuple[str, ...]] = {
     # record (``SELECT *``) before capture/search triggers resolve identifiers.
     # PostgreSQL therefore requires table-level SELECT for these dependencies.
     "projects": ("SELECT",),
-    "queues": ("SELECT",),
     "counter_groups": ("SELECT",),
     "calendars": ("SELECT",),
     "dashboards": ("SELECT",),

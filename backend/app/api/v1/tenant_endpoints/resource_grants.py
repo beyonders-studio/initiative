@@ -1,6 +1,6 @@
 """Unified resource-grants endpoint — set sharing on many resources at once.
 
-Every DAC resource (project, file, queue, counter group, calendar event)
+Every DAC resource (project, file, counter group, calendar event)
 already replaces its sharing the same way through
 ``resource_access.set_resource_grants``. This router exposes that one flow in
 bulk so the client can share/unshare a multi-selection in a single request

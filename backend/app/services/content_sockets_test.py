@@ -128,39 +128,42 @@ async def test_a_signal_is_isolated_by_guild_and_kind(register) -> None:
     same = FakeWebSocket()
     other_guild_same_id = FakeWebSocket()
     same_guild_other_kind = FakeWebSocket()
-    _join(register, same, rooms={resource_room(1, "queue", 5)})
+    _join(register, same, rooms={resource_room(1, "counter_group", 5)})
     _join(
-        register, other_guild_same_id, rooms={resource_room(2, "queue", 5)}, guild_id=2
+        register,
+        other_guild_same_id,
+        rooms={resource_room(2, "counter_group", 5)},
+        guild_id=2,
     )
-    _join(register, same_guild_other_kind, rooms={resource_room(1, "counter_group", 5)})
+    _join(register, same_guild_other_kind, rooms={resource_room(1, "calendar", 5)})
 
-    register.signal(1, Tool.queue, 5, "turn_held")
+    register.signal(1, Tool.counter_group, 5, "counter_updated")
     await settle()
 
     assert len(same.sent) == 1
-    # queue 5 in guild 2 is a different queue (per-schema ids).
+    # counter group 5 in guild 2 is a different group (per-schema ids).
     assert other_guild_same_id.sent == []
     assert same_guild_other_kind.sent == []
 
 
 async def test_a_signal_names_the_change_and_carries_no_content(register) -> None:
     ws = FakeWebSocket()
-    _join(register, ws, rooms={resource_room(1, "queue", 5)})
+    _join(register, ws, rooms={resource_room(1, "counter_group", 5)})
 
-    register.signal(1, Tool.queue, 5, "item_added")
+    register.signal(1, Tool.counter_group, 5, "counter_added")
     await settle()
 
     (frame,) = ws.sent
     assert set(frame) == {"type", "id", "timestamp"}
-    assert frame["type"] == "item_added"
+    assert frame["type"] == "counter_added"
     assert frame["id"] == 5
 
 
 async def test_an_unrouted_signal_sends_nothing(register) -> None:
     ws = FakeWebSocket()
-    _join(register, ws, rooms={resource_room(1, "queue", 5)})
+    _join(register, ws, rooms={resource_room(1, "counter_group", 5)})
 
-    register.signal(None, Tool.queue, 5, "item_added")
+    register.signal(None, Tool.counter_group, 5, "counter_added")
     await settle()
 
     assert ws.sent == []
@@ -271,13 +274,13 @@ async def test_room_members_carries_the_channels_own_state(register) -> None:
 async def test_presence_counts_people_not_sockets_and_only_presence_sockets(
     register,
 ) -> None:
-    tab_one, tab_two, queue_page = FakeWebSocket(), FakeWebSocket(), FakeWebSocket()
+    tab_one, tab_two, counters_page = FakeWebSocket(), FakeWebSocket(), FakeWebSocket()
     _join(register, tab_one, rooms={guild_room(1)}, presence=True)
     _join(register, tab_two, rooms={guild_room(1)}, presence=True)
     _join(
         register,
-        queue_page,
-        rooms={resource_room(1, "queue", 4)},
+        counters_page,
+        rooms={resource_room(1, "counter_group", 4)},
         user=SimpleNamespace(id=2),
     )
 
@@ -439,9 +442,9 @@ async def test_a_recheck_replaces_the_rooms(register, monkeypatch) -> None:
 async def test_one_guild_entry_serves_every_socket_of_one_sign_in(
     register, monkeypatch
 ) -> None:
-    """A board, a queue and a file open in one guild cost one entry."""
+    """A board, a counter group and a file open in one guild cost one entry."""
     seen = _patch_entry(monkeypatch)
-    for key in (guild_room(1), resource_room(1, "queue", 4), DOC):
+    for key in (guild_room(1), resource_room(1, "counter_group", 4), DOC):
         _join(register, FakeWebSocket(), rooms={key}, authorize=_answers(key))
 
     await register.revoke_user(1, USER.id)

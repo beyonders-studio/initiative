@@ -114,8 +114,6 @@
       "projects:write",
       "files:read",
       "files:write",
-      "queues:read",
-      "queues:write",
       "counter_groups:read",
       "counter_groups:write",
       "calendars:read",
@@ -157,7 +155,6 @@
     "itemKind": [
       "task",
       "calendar_event",
-      "queue_item",
       "counter",
       "post"
     ],

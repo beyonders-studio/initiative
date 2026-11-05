@@ -39,7 +39,7 @@ Every tool's list — projects, files and the rest — shows as **Grid**, **List
 
 - **Search instead of clicking.** Press ++cmd+k++ / ++ctrl+k++ and start typing a project, task, or file name to jump straight there — usually quicker than the sidebar. See [Search & shortcuts](../guides/search-and-shortcuts.md).
 - **The recent tab bar** along the top works like browser tabs — click to revisit, close when done.
-- **Drag and drop** to reorder things: tasks between Kanban columns, items in a queue, counters in a group.
+- **Drag and drop** to reorder things: tasks between Kanban columns, counters in a group.
 
 !!! tip "When you can't find something, check the dots"
     A lot of actions live behind the **⋯ (more)** menus on projects, tasks and files. If you're hunting for a thing you're sure exists, that's the first place to look and it's usually there.

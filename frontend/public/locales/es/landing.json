@@ -62,7 +62,6 @@
     "note": "Activa las que necesite tu grupo. Desactivar una más tarde no borra nada.",
     "projects": "Tableros, tablas y calendarios con las mismas tareas, con confeti si quieres.",
     "files": "Páginas, hojas de cálculo y pizarras que editáis juntos en directo.",
-    "queues": "Lleva la cuenta de a quién le toca, porque al parecer nunca le toca a nadie.",
     "counterGroups": "Entradas vendidas, pasteles prometidos, sillas que siguen faltando.",
     "calendars": "Eventos con confirmaciones y recordatorios, para que no tengas que recordárselo tú a todo el mundo.",
     "dashboards": "Tus números en una sola pantalla, y cada persona solo ve lo que puede ver.",
@@ -155,10 +154,6 @@
       "rsvpMaybe": "Quizá",
       "rsvpNo": "No puedo",
       "reminder": "Recordatorio una hora antes"
-    },
-    "rota": {
-      "title": "Turno de snacks",
-      "detail": "Ronda 6, esta semana le toca a Luis"
     },
     "points": {
       "planTitle": "Organizad cosas juntos",

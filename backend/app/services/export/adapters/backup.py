@@ -9,8 +9,8 @@ worker):
   (see ``schemas/tenant/backup_export.py``). One archive a future import
   wizard consumes whole.
 * ``report`` — the same enumeration rendered in per-tool report formats
-  chosen by the caller (a project PDF beside a queue CSV beside a calendar
-  ICS), zipped with the same folder layout, no manifest/assets.
+  chosen by the caller (a project PDF beside a counter group CSV beside a
+  calendar ICS), zipped with the same folder layout, no manifest/assets.
 
 Layout (identical for both scopes — an initiative backup is a guild backup
 with one ``initiatives/`` entry, so ONE import path serves both)::
@@ -18,7 +18,6 @@ with one ``initiatives/`` entry, so ONE import path serves both)::
     manifest.json                                   (backup mode)
     initiatives/{id}-{slug}/projects/{id}-{slug}.initiative-project.json
     initiatives/{id}-{slug}/files/{id}-{slug}.json
-    initiatives/{id}-{slug}/queues/{id}-{slug}.initiative-queue.json
     initiatives/{id}-{slug}/counter-groups/{id}-{slug}.initiative-counter-group.json
     initiatives/{id}-{slug}/calendars/{id}-{slug}.initiative-calendar.json
     initiatives/{id}-{slug}/posts/{id}-{slug}.initiative-post.json
@@ -1547,7 +1546,7 @@ class BackupSection:
     #: zip of PDFs and spreadsheets.
     in_reports: bool = True
     #: Whether an envelope's file name carries its envelope type
-    #: (``<slug>.initiative-queue.json``). A file's is ``<slug>.json``.
+    #: (``<slug>.initiative-project.json``). A file's is ``<slug>.json``.
     type_in_filename: bool = True
     #: Loads one entity; the adapter's ``fetch`` at the read rung otherwise.
     fetch: Fetch | None = None
@@ -1610,7 +1609,6 @@ _SECTIONS: tuple[BackupSection, ...] = (
         write_apart=_ScopeBuilder._write_uploaded_file,
         before_envelope=_ScopeBuilder._collect_embedded_assets,
     ),
-    BackupSection(Tool.queue, report_formats=frozenset({"pdf", "csv", "xlsx", "md"})),
     BackupSection(
         Tool.counter_group, report_formats=frozenset({"pdf", "csv", "xlsx", "md"})
     ),

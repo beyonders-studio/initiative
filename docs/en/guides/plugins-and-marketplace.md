@@ -108,7 +108,7 @@ Ticking either lets the plug-in ask for that standing; it doesn't use it everywh
 
 ### What a plug-in puts on items
 
-Some plug-ins add to the things you already work with: an invoice number on a task, a **Paid** tick on a queue item, a progress bar on a counter that is very nearly at its fundraising target. They can appear on tasks, calendar events, queue items, counters and posts.
+Some plug-ins add to the things you already work with: an invoice number on a task, a **Paid** tick on an event, a progress bar on a counter that is very nearly at its fundraising target. They can appear on tasks, calendar events, counters and posts.
 
 | | What you see |
 |---|---|
@@ -245,6 +245,6 @@ Plug-ins your community has already added open as usual. The first time you open
 ## Related
 
 - [Profile & preferences](../account/profile-and-preferences.md) — wearing what a decoration pack gave you.
-- [Tools](tools.md) — the calendar, queues, counters, dashboards and boards built into every initiative.
+- [Tools](tools.md) — the calendar, counters, dashboards and boards built into every initiative.
 - [Sharing & access](../sharing/index.md) — who can see what you add.
 - [Publishing your own listings](../running-a-server/publishing-listings.md) — for whoever runs the server, adding to its marketplace.

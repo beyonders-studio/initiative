@@ -24,7 +24,7 @@ Initiative comes two ways. Same software, same protections, either way. The diff
 
 Initiative itself, entirely. There is no "community edition" here with the good bits quietly filed off.
 
-- **Every feature in the app.** Projects, files, whiteboards, the calendar, queues, counters, dashboards, boards, tags, the marketplace, encrypted messages. All of it, both ways.
+- **Every feature in the app.** Projects, files, whiteboards, the calendar, counters, dashboards, boards, tags, the marketplace, encrypted messages. All of it, both ways.
 - **Every protection.** The same isolation between groups, the same access model, the same end-to-end encryption on direct messages.
 - **Your data stays yours either way.** Export it, delete it, take it somewhere else. See [Data & compliance](security/data-and-compliance.md).
 

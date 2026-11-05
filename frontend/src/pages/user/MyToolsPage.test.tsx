@@ -10,7 +10,6 @@ import {
   buildProject,
   buildUser,
 } from "@/__tests__/factories";
-import { buildQueueSummary } from "@/__tests__/factories/queue.factory";
 import { communityHttp } from "@/__tests__/helpers/communityHttp";
 import { server } from "@/__tests__/helpers/msw-server";
 import { renderPage } from "@/__tests__/helpers/render";
@@ -37,12 +36,10 @@ function stubMyTools({
   counts = {},
   projects = [],
   files = [],
-  queues = [],
 }: {
   counts?: Record<string, number>;
   projects?: unknown[];
   files?: unknown[];
-  queues?: unknown[];
 } = {}) {
   server.use(
     http.get("/api/v1/me/tools/counts", () =>
@@ -50,7 +47,6 @@ function stubMyTools({
         counts: {
           project: 0,
           file: 0,
-          queue: 0,
           counter_group: 0,
           calendar: 0,
           dashboard: 0,
@@ -60,7 +56,6 @@ function stubMyTools({
     ),
     http.get("/api/v1/me/projects", () => page(projects)),
     http.get("/api/v1/me/files", () => page(files)),
-    http.get("/api/v1/me/queues", () => page(queues)),
     http.get("/api/v1/me/counter-groups", () => page([])),
     http.get("/api/v1/me/calendars", () => page([])),
     http.get("/api/v1/me/dashboards", () => page([])),
@@ -83,16 +78,15 @@ describe("MyToolsPage", () => {
 
   it("offers a tab only for the tools the reader has something of", async () => {
     stubMyTools({
-      counts: { project: 3, queue: 1 },
+      counts: { project: 3, file: 1 },
       projects: [buildProject({ name: "Apollo", community_id: HOME.id })],
     });
 
     render();
 
     expect(await screen.findByRole("link", { name: "Projects" })).toBeInTheDocument();
-    expect(screen.getByRole("link", { name: "Queues" })).toBeInTheDocument();
+    expect(screen.getByRole("link", { name: "Files" })).toBeInTheDocument();
     // Nothing in any of these anywhere, so no tab onto an empty table.
-    expect(screen.queryByRole("link", { name: "Files" })).not.toBeInTheDocument();
     expect(screen.queryByRole("link", { name: "Calendars" })).not.toBeInTheDocument();
     expect(screen.queryByRole("link", { name: "Dashboards" })).not.toBeInTheDocument();
   });
@@ -122,15 +116,15 @@ describe("MyToolsPage", () => {
 
   it("switches the whole view to what the reader made", async () => {
     let lastCreatedByMe: string | null = null;
-    stubMyTools({ counts: { queue: 1 }, queues: [buildQueueSummary({ name: "Standup" })] });
+    stubMyTools({ counts: { file: 1 }, files: [buildFileSummary({ name: "Standup" })] });
     server.use(
-      http.get("/api/v1/me/queues", ({ request }) => {
+      http.get("/api/v1/me/files", ({ request }) => {
         lastCreatedByMe = new URL(request.url).searchParams.get("created_by_me");
-        return page([buildQueueSummary({ name: "Standup" })]);
+        return page([buildFileSummary({ name: "Standup" })]);
       })
     );
 
-    render({ tool: "queues" });
+    render({ tool: "files" });
     await screen.findByRole("link", { name: "Standup" });
     expect(lastCreatedByMe).toBeNull();
 

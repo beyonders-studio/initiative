@@ -266,10 +266,6 @@
         "read": "Lire les fichiers",
         "write": "Lire et modifier les fichiers"
       },
-      "queues": {
-        "read": "Lire les files",
-        "write": "Lire et modifier les files"
-      },
       "counter_groups": {
         "read": "Lire les compteurs",
         "write": "Lire et modifier les compteurs"

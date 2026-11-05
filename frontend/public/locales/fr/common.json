@@ -398,11 +398,6 @@
       "this": "ce fichier",
       "plural": "fichiers"
     },
-    "queue": {
-      "name": "File",
-      "this": "cette file",
-      "plural": "files"
-    },
     "counter_group": {
       "name": "Groupe de compteurs",
       "this": "ce groupe de compteurs",
@@ -432,11 +427,6 @@
       "name": "Tâche",
       "this": "cette tâche",
       "plural": "tâches"
-    },
-    "queue_item": {
-      "name": "Élément de file",
-      "this": "cet élément de file",
-      "plural": "éléments de file"
     },
     "calendar_event": {
       "name": "Événement",

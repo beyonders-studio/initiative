@@ -9,8 +9,8 @@ import { toolRouteSegment } from "@/lib/tools";
 import { buildCommunityWsUrl } from "@/lib/wsUrl";
 
 /**
- * Subscribe to one tool entity's change signal (a queue's or a counter
- * group's) and refetch it and its lists on every change, so React Query reads
+ * Subscribe to one tool entity's change signal (a counter group's) and
+ * refetch it and its lists on every change, so React Query reads
  * the latest state through the normal endpoints. A frame names a change and
  * never carries the resource.
  *

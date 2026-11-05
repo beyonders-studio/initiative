@@ -70,7 +70,6 @@ from app.testing import (
     create_counter_group,
     create_file,
     create_project,
-    create_queue,
     create_wiki,
     create_wiki_page,
     get_auth_token,
@@ -421,7 +420,6 @@ async def test_every_socket_admits_through_the_seam(
         session, user=visitor, guild=guild, purpose="settings", access_level="admin"
     )
     group = await create_counter_group(session, initiative, owner)
-    queue = await create_queue(session, initiative, owner)
     file = await create_file(session, initiative, owner)
     wiki = await create_wiki(session, initiative, owner)
     page = await create_wiki_page(session, wiki, owner)
@@ -432,7 +430,6 @@ async def test_every_socket_admits_through_the_seam(
     #: community's configuration and none of its content — or, for the
     #: account's own stream, a token that is none.
     channels = {
-        "/api/v1/c/{community_id}/queues/{queue_id}/ws": f"{base}/queues/{queue.id}/ws",
         "/api/v1/c/{community_id}/counter-groups/{group_id}/ws": (
             f"{base}/counter-groups/{group.id}/ws"
         ),

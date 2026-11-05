@@ -58,8 +58,8 @@ const HERO_COMMUNITIES: ExampleCommunity[] = [
     initials: "TD",
     color: "#7c3aed",
     members: 6,
-    tools: [Tool.queue, Tool.calendar, Tool.wiki],
-    activity: Tool.queue,
+    tools: [Tool.calendar, Tool.wiki, Tool.counter_group],
+    activity: Tool.calendar,
     centered: true,
   },
   {

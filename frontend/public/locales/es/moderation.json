@@ -43,8 +43,6 @@
     "task": "Una tarea",
     "file": "Un archivo",
     "project": "Un proyecto",
-    "queue": "Una cola",
-    "queue_item": "Un elemento",
     "calendar": "Un calendario",
     "calendar_event": "Un evento",
     "counter": "Un contador",

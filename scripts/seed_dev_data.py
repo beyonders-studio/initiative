@@ -66,7 +66,6 @@ from seed import (  # noqa: E402
     posts,
     projects,
     properties,
-    queues,
     tags,
     tickets,
     wikis,
@@ -87,7 +86,6 @@ AREAS = (
     projects,
     files,
     comments,
-    queues,
     counters,
     dashboards,
     calendars,
@@ -170,7 +168,6 @@ async def seed() -> None:
     )
     print(f"  {len(ids['projects'])} projects, {len(ids['tasks'])} tasks")
     print(f"  {len(ids['files'])} files, {len(ids['tags'])} tags")
-    print(f"  {len(ids['queues'])} queues, {len(ids['queue_items'])} queue items")
     print(
         f"  {len(ids['counter_groups'])} counter groups, "
         f"{len(ids['counters'])} counters"

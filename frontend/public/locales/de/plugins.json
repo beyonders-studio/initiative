@@ -266,10 +266,6 @@
         "read": "Dateien lesen",
         "write": "Dateien lesen und ändern"
       },
-      "queues": {
-        "read": "Abläufe lesen",
-        "write": "Abläufe lesen und ändern"
-      },
       "counter_groups": {
         "read": "Zähler lesen",
         "write": "Zähler lesen und ändern"

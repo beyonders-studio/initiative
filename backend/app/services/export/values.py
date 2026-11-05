@@ -1,6 +1,6 @@
 """A list's values as table cells, written by the kind of value they are.
 
-Every table export (tasks, a project's report, a queue, a counter group)
+Every table export (tasks, a project's report, a counter group)
 draws ``columns`` and fills each cell from its row: one :class:`Column` per
 field, named for the field as the field registry names it (``fields.<name>``
 in the exports catalogue). What a cell holds is decided by the kind of value,

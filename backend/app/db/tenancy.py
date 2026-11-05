@@ -183,7 +183,7 @@ GUILD_LEVEL_TABLES: frozenset[str] = frozenset(
         # row for its install.
         "plugin_member_consents",
         # How a member shows the community's lists: their filters, order and
-        # layout for a project, a tool list, a queue, the roster. One owner per
+        # layout for a project, a tool list, the roster. One owner per
         # row; no initiative of its own, since a key may name the community's
         # roster or its calendars together.
         "view_preferences",

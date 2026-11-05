@@ -76,14 +76,6 @@ describe("searchHitPath", () => {
     ).toBe("/i/5/wikis/4/pages/31");
   });
 
-  it("sends a queue item to its queue, which is where it is read", () => {
-    expect(
-      searchHitPath(
-        target({ entity_type: "queue_item", entity_id: 4, tool: Tool.queue, tool_id: 2 })
-      )
-    ).toBe("/i/5/queues/2");
-  });
-
   it("sends a comment to the thing it is on, which is where it is read", () => {
     // A comment has no page of its own. It names the tool that governs it, so
     // that is where it goes — including a comment on a task, which is shared,
@@ -189,16 +181,18 @@ describe("hitIcon", () => {
   it("marks a tool from its kind when nobody filled in the tool", () => {
     // A relation being composed knows what kind it points at and not the tool
     // that governs it — which for a tool's own row is the same thing. Falling
-    // through to the tag mark made every queue and wiki look like a label.
-    expect(hitIcon(target({ entity_type: SearchEntityType.queue }))).toBe(TOOL_ICONS[Tool.queue]);
+    // through to the tag mark made every counter group and wiki look like a label.
+    expect(hitIcon(target({ entity_type: SearchEntityType.counter_group }))).toBe(
+      TOOL_ICONS[Tool.counter_group]
+    );
     expect(hitIcon(target({ entity_type: SearchEntityType.wiki }))).toBe(TOOL_ICONS[Tool.wiki]);
     expect(hitIcon(target({ entity_type: SearchEntityType.file }))).toBe(TOOL_ICONS[Tool.file]);
   });
 
   it("still takes the tool a hit names", () => {
-    expect(hitIcon(target({ entity_type: SearchEntityType.queue, tool: Tool.queue }))).toBe(
-      TOOL_ICONS[Tool.queue]
-    );
+    expect(
+      hitIcon(target({ entity_type: SearchEntityType.counter_group, tool: Tool.counter_group }))
+    ).toBe(TOOL_ICONS[Tool.counter_group]);
   });
 
   it("marks a thing inside a tool with its own icon, not its tool's", () => {

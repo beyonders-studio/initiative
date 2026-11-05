@@ -30,12 +30,10 @@ import type {
   ListMyFilesParams,
   ListMyPostsParams,
   ListMyProjectsParams,
-  ListMyQueuesParams,
   ListMyWikisParams,
   MyToolCountsResponse,
   PostListResponse,
   ProjectListResponse,
-  QueueListResponse,
   WikiListResponse,
 } from "../initiativeAPI.schemas";
 
@@ -420,125 +418,6 @@ export function useListMyFiles<
   queryClient?: QueryClient
 ): UseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData, TError> } {
   const queryOptions = getListMyFilesQueryOptions(params, options);
-
-  const query = useQuery(queryOptions, queryClient) as UseQueryResult<TData, TError> & {
-    queryKey: DataTag<QueryKey, TData, TError>;
-  };
-
-  return withQueryKey(query, queryOptions.queryKey);
-}
-
-/**
- * Queues that reach the caller across every guild they belong to.
- * @summary List My Queues
- */
-export const listMyQueues = (
-  params?: ListMyQueuesParams,
-  options?: SecondParameter<typeof apiMutator>,
-  signal?: AbortSignal
-) => {
-  return apiMutator<QueueListResponse>(
-    { url: `/api/v1/me/queues`, method: "GET", params, signal },
-    options
-  );
-};
-
-export const getListMyQueuesQueryKey = (params?: ListMyQueuesParams) => {
-  return [`/api/v1/me/queues`, ...(params ? [params] : [])] as const;
-};
-
-export const getListMyQueuesQueryOptions = <
-  TData = Awaited<ReturnType<typeof listMyQueues>>,
-  TError = ErrorType<HTTPValidationError>,
->(
-  params?: ListMyQueuesParams,
-  options?: {
-    query?: Partial<UseQueryOptions<Awaited<ReturnType<typeof listMyQueues>>, TError, TData>>;
-    request?: SecondParameter<typeof apiMutator>;
-  }
-) => {
-  const { query: queryOptions, request: requestOptions } = options ?? {};
-
-  const queryKey = queryOptions?.queryKey ?? getListMyQueuesQueryKey(params);
-
-  const queryFn: QueryFunction<Awaited<ReturnType<typeof listMyQueues>>> = ({ signal }) =>
-    listMyQueues(params, requestOptions, signal);
-
-  return { queryKey, queryFn, ...queryOptions } as UseQueryOptions<
-    Awaited<ReturnType<typeof listMyQueues>>,
-    TError,
-    TData
-  > & { queryKey: DataTag<QueryKey, TData, TError> };
-};
-
-export type ListMyQueuesQueryResult = NonNullable<Awaited<ReturnType<typeof listMyQueues>>>;
-export type ListMyQueuesQueryError = ErrorType<HTTPValidationError>;
-
-export function useListMyQueues<
-  TData = Awaited<ReturnType<typeof listMyQueues>>,
-  TError = ErrorType<HTTPValidationError>,
->(
-  params: undefined | ListMyQueuesParams,
-  options: {
-    query: Partial<UseQueryOptions<Awaited<ReturnType<typeof listMyQueues>>, TError, TData>> &
-      Pick<
-        DefinedInitialDataOptions<
-          Awaited<ReturnType<typeof listMyQueues>>,
-          TError,
-          Awaited<ReturnType<typeof listMyQueues>>
-        >,
-        "initialData"
-      >;
-    request?: SecondParameter<typeof apiMutator>;
-  },
-  queryClient?: QueryClient
-): DefinedUseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData, TError> };
-export function useListMyQueues<
-  TData = Awaited<ReturnType<typeof listMyQueues>>,
-  TError = ErrorType<HTTPValidationError>,
->(
-  params?: ListMyQueuesParams,
-  options?: {
-    query?: Partial<UseQueryOptions<Awaited<ReturnType<typeof listMyQueues>>, TError, TData>> &
-      Pick<
-        UndefinedInitialDataOptions<
-          Awaited<ReturnType<typeof listMyQueues>>,
-          TError,
-          Awaited<ReturnType<typeof listMyQueues>>
-        >,
-        "initialData"
-      >;
-    request?: SecondParameter<typeof apiMutator>;
-  },
-  queryClient?: QueryClient
-): UseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData, TError> };
-export function useListMyQueues<
-  TData = Awaited<ReturnType<typeof listMyQueues>>,
-  TError = ErrorType<HTTPValidationError>,
->(
-  params?: ListMyQueuesParams,
-  options?: {
-    query?: Partial<UseQueryOptions<Awaited<ReturnType<typeof listMyQueues>>, TError, TData>>;
-    request?: SecondParameter<typeof apiMutator>;
-  },
-  queryClient?: QueryClient
-): UseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData, TError> };
-/**
- * @summary List My Queues
- */
-
-export function useListMyQueues<
-  TData = Awaited<ReturnType<typeof listMyQueues>>,
-  TError = ErrorType<HTTPValidationError>,
->(
-  params?: ListMyQueuesParams,
-  options?: {
-    query?: Partial<UseQueryOptions<Awaited<ReturnType<typeof listMyQueues>>, TError, TData>>;
-    request?: SecondParameter<typeof apiMutator>;
-  },
-  queryClient?: QueryClient
-): UseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData, TError> } {
-  const queryOptions = getListMyQueuesQueryOptions(params, options);
 
   const query = useQuery(queryOptions, queryClient) as UseQueryResult<TData, TError> & {
     queryKey: DataTag<QueryKey, TData, TError>;

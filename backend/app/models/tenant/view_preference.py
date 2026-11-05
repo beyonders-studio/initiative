@@ -3,9 +3,9 @@ what they narrow it to, order it by and group it by.
 
 The community's half of the view-preference store
 (``app.models.platform.user_view_preference`` keeps the account's own): a
-project's, an initiative tool's, a queue's, a collection's or the roster's
-view, whose filters name the community's tags and people. Keyed by
-``(user_id, scope_key)``; the key names the list inside this community
+project's, an initiative tool's, a collection's or the roster's view, whose
+filters name the community's tags and people. Keyed by ``(user_id,
+scope_key)``; the key names the list inside this community
 (``view:project:12``) and the ``value`` is the frontend's own JSON, kept
 verbatim.
 

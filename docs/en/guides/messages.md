@@ -13,7 +13,7 @@ Open them from the **Initiative logo** in the top-left corner, then **My Message
 !!! info "A message with a few people on it, not a room"
     A group message here is a thread. It has no name, no topic, no pinned post and nobody in charge of it — it's the people on it, the way a text with three friends is.
 
-    That's deliberate, because the conversation about your *work* has a better home. **Everything in Initiative has comments** — projects, tasks, files, queues, counters, calendars, dashboards, posts, the lot — so the discussion about a thing lives *on* that thing, where the next person finds it. **And comments are searchable.** Half-remember somebody saying something about the venue deposit? Search it. It comes back.
+    That's deliberate, because the conversation about your *work* has a better home. **Everything in Initiative has comments** — projects, tasks, files, counters, calendars, dashboards, posts, the lot — so the discussion about a thing lives *on* that thing, where the next person finds it. **And comments are searchable.** Half-remember somebody saying something about the venue deposit? Search it. It comes back.
 
     Which is the trouble with the other kind: somebody pastes the thing that should have been a document, and six months later everyone is scrolling for it, and Jenny has left, and somebody is looking at the printer in a way the printer has done nothing to deserve.
 

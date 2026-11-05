@@ -255,7 +255,7 @@ async def test_unowned_covers_released_and_orphaned(session):
     await create_initiative_member(session, initiative, leaver, "project_manager")
 
     released = await TOOL_FACTORIES[Tool.project](session, initiative, leaver)
-    orphaned = await TOOL_FACTORIES[Tool.queue](session, initiative, leaver)
+    orphaned = await TOOL_FACTORIES[Tool.counter_group](session, initiative, leaver)
 
     await route_session_to_guild(session, guild.id)
     # Released: no owner row at all.
@@ -283,7 +283,7 @@ async def test_unowned_covers_released_and_orphaned(session):
     )
     found = {(i.tool, i.id) for i in items}
     assert (Tool.project, released.id) in found
-    assert (Tool.queue, orphaned.id) in found
+    assert (Tool.counter_group, orphaned.id) in found
 
 
 async def test_restore_gives_content_back_to_a_present_author(session):

@@ -371,9 +371,9 @@ async def remove_user_from_guild_initiatives(
 
     Deleting each membership row runs ``tr_initiative_members_departure``,
     which drops every grant naming them in that initiative, owner rows
-    included, and takes them off its tasks, events, person fields and queue
-    items. ``member_departs`` with no initiative does the same for content
-    that belongs to the community itself. What they owned is left **unowned**
+    included, and takes them off its tasks, events and person fields.
+    ``member_departs`` with no initiative does the same for content that
+    belongs to the community itself. What they owned is left **unowned**
     rather than handed to anyone; guild admins can claim it whenever they
     choose (``app.services.tenant.ownership``). What they kept about its items
     (opens, bookmarks, subscriptions) goes too.

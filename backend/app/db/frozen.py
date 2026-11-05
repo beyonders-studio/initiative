@@ -589,7 +589,7 @@ def frozen_write_triggers(table: str) -> list[str]:
     That inheriting row gets the two halves of the rule on two triggers, because
     they are asked about different states. Content is read-only under anything
     frozen. But coming out unstamped is refused only under something in the
-    TRASH: a comment, a queue item, a counter, a picture and a calendar event
+    TRASH: a comment, a counter, a picture and a calendar event
     carry no ``archived_at``, so unstamped inside an archived thing is the only
     state they have — it is what they were in before the trash took them, and it
     is what a restore has to put them back to.
@@ -1015,7 +1015,7 @@ def _trashed_ancestor_leg(table: str, alias: str) -> str | None:
     That is the ordering a cascaded restore depends on: the parent's
     ``deleted_at`` is cleared first, so by the time the child is written the
     walk sees an archive (if anything) and the child may come back unstamped —
-    which for a comment, a queue item, a counter, a picture or a calendar event
+    which for a comment, a counter, a picture or a calendar event
     is the only way it can come back at all.
 
     Asked of each way up on its own. A reply sits under its comment and under

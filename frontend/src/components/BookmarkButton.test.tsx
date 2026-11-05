@@ -8,12 +8,12 @@ import { renderWithProviders } from "@/__tests__/helpers/render";
 
 import { BookmarkButton } from "./BookmarkButton";
 
-const bookmarkedQueue = {
-  entity_type: "queue",
+const bookmarkedCounterGroup = {
+  entity_type: "counter_group",
   entity_id: 7,
   community_id: 3,
   initiative_id: 2,
-  name: "Tea rota",
+  name: "Summer fete",
   bookmarked_at: "2026-10-10T00:00:00Z",
   icon: null,
   file_type: null,
@@ -24,17 +24,17 @@ const bookmarkedQueue = {
 describe("BookmarkButton", () => {
   it("reads its bookmark from the community's list and bookmarks a tool of any kind", async () => {
     const user = userEvent.setup();
-    let bookmarks: (typeof bookmarkedQueue)[] = [];
+    let bookmarks: (typeof bookmarkedCounterGroup)[] = [];
     const written: string[] = [];
     server.use(
       http.get("/api/v1/c/3/personal-items", () => HttpResponse.json(bookmarks)),
       http.put("/api/v1/c/3/personal-items/bookmark/:tool/:id", ({ params }) => {
         written.push(`${params.tool}/${params.id}`);
-        bookmarks = [bookmarkedQueue];
+        bookmarks = [bookmarkedCounterGroup];
         return new HttpResponse(null, { status: 204 });
       })
     );
-    renderWithProviders(<BookmarkButton tool="queue" entityId={7} name="Tea rota" />, {
+    renderWithProviders(<BookmarkButton tool="counter_group" entityId={7} name="Summer fete" />, {
       communities: { activeCommunityId: 3 },
     });
 
@@ -47,7 +47,7 @@ describe("BookmarkButton", () => {
       "aria-pressed",
       "true"
     );
-    expect(written).toEqual(["queue/7"]);
+    expect(written).toEqual(["counter_group/7"]);
   });
 
   it("puts the bookmark back when bookmarking fails", async () => {
@@ -92,7 +92,7 @@ describe("BookmarkButton", () => {
         return new HttpResponse(null, { status: 204 });
       })
     );
-    renderWithProviders(<BookmarkButton tool="queue" entityId={7} />, {
+    renderWithProviders(<BookmarkButton tool="counter_group" entityId={7} />, {
       communities: { activeCommunityId: 3 },
     });
 

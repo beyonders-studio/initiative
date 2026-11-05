@@ -243,7 +243,6 @@ async def test_every_tag_target_is_bulk_tagged_and_listed_on_its_tag(
     from app.testing import (
         create_calendar_event,
         create_collection,
-        create_queue_item,
         create_tool_entity,
         create_wiki_page,
         enable_all_tools,
@@ -258,7 +257,6 @@ async def test_every_tag_target_is_bulk_tagged_and_listed_on_its_tag(
     }
     extras = {
         "task": await create_task(session, tools[Tool.project]),
-        "queue_item": await create_queue_item(session, tools[Tool.queue]),
         "calendar_event": await create_calendar_event(
             session, tools[Tool.calendar], a.user
         ),

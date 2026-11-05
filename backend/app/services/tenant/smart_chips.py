@@ -379,8 +379,8 @@ async def _titles(
 ) -> dict[int, str]:
     """What these things are called right now.
 
-    The column is whichever one the kind calls its name — derived, so a queue
-    item answers with its label and a task with its title without either being
+    The column is whichever one the kind calls its name — derived, so a counter
+    answers with its name and a task with its title without either being
     written down here.
     """
     table = reference_targets.id_column(entity_type).table

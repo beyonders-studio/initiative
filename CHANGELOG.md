@@ -58,6 +58,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Removed
 
+- **Queues.** Upgrading turns each queue into a project in the same initiative and each item into a task, in the order the queue showed them: the item it was on is **Up now**, held items **Held**, hidden ones **Sitting out** and the rest **Waiting**. An item's member is linked to its task, and comments, sharing, tags and links come along; item colours don't. Where queues were in use, Projects is switched on, and roles that could view or add queues can view or add projects. **Next**, rounds and holds have no replacement: move a task to **Up now** when it's someone's turn. A backup's queues aren't restored, a plug-in's queue access and webhook subscriptions to queue events are removed, and dashboard SQL reading the queue tables needs rewriting.
 - **Seven decoration packs.** Pride, Disability, Faith and Belief, Black heritage, First Nations, Multicultural and Family leave the marketplace. Their pieces come off every profile wearing them and out of every collection.
 
 ### Fixed

@@ -57,7 +57,6 @@ _WRITE_PREFIXES = (
     "start_",
     "stop_",
     "sort_",
-    "advance_",
     "hold_",
     "release_",
     "upgrade_",
@@ -70,8 +69,6 @@ _SAFE_WRITES = {
     "update_project",
     "create_file",
     "update_file",
-    "create_queue",
-    "update_queue",
     "create_counter_group",
     "update_counter_group",
     "create_calendar",
@@ -82,17 +79,14 @@ _SAFE_WRITES = {
     "update_post",
     "create_wiki",
     "update_wiki",
-    # And what those tools hold: a project's tasks, a queue's items, a counter
-    # group's counters, a calendar's events, a wiki's pages, and the comments on
-    # any of them.
+    # And what those tools hold: a project's tasks, a counter group's counters,
+    # a calendar's events, a wiki's pages, and the comments on any of them.
     "create_task",
     "update_task",
     "move_task",
     # One checklist tick. The task update rewrites the list's lines but never
     # its done flags, so this is the only way to mark a piece of a task done.
     "toggle_checklist_item",
-    "add_queue_item",
-    "update_queue_item",
     "add_counter",
     "update_counter",
     "create_calendar_event",
@@ -161,7 +155,7 @@ async def test_mcp_tools_are_curated():
             f"no MCP tool reads {tool.value}"
         )
     # And what those tools hold reads back by its own id.
-    assert {"read_queue_item", "read_counter", "read_wiki_page"} <= set(names)
+    assert {"read_counter", "read_wiki_page"} <= set(names)
 
     # Join requests sit on the initiatives router and would otherwise ride in on
     # its tag, but they name who asked to be let in and quote their note — a
@@ -266,8 +260,8 @@ async def test_the_tool_writes_stop_short_of_these():
     names = [t.name.lower() for t in await build_mcp_server(app).list_tools()]
     writes = {n for n in names if n.startswith(_WRITE_PREFIXES)}
 
-    # Nothing that removes or empties: delete, trash, archive, reset a counter
-    # or a queue, discard the done column.
+    # Nothing that removes or empties: delete, trash, archive, reset a counter,
+    # discard the done column.
     assert not [w for w in writes if w.startswith(("delete_", "archive_", "reset_"))]
     # Nothing that acts on a whole collection at once.
     assert not [

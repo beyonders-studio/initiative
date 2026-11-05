@@ -266,10 +266,6 @@
         "read": "Read files",
         "write": "Read and change files"
       },
-      "queues": {
-        "read": "Read queues",
-        "write": "Read and change queues"
-      },
       "counter_groups": {
         "read": "Read counters",
         "write": "Read and change counters"

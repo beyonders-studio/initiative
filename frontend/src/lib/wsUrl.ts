@@ -26,7 +26,7 @@ export const buildApiWsUrl = (subpath: string): string => {
 
 /**
  * Build the ws/wss URL for a community-scoped WebSocket endpoint. `subpath` is
- * relative to the community root, e.g. `queues/5/ws`.
+ * relative to the community root, e.g. `projects/5/ws`.
  */
 export const buildCommunityWsUrl = (communityId: number, subpath: string): string =>
   buildApiWsUrl(`c/${communityId}/${subpath}`);

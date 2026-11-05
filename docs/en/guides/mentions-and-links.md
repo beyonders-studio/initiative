@@ -32,9 +32,9 @@ Searching for that name or handle finds what mentions them, even mentions writte
 
 ## `#` — linking to a thing
 
-Type `#` and Initiative offers you everything in the initiative: every [tool](tools.md), and what's inside them — tasks, events, counters, queue items, pictures, wiki pages. Pick one and its name drops into your text as a link.
+Type `#` and Initiative offers you everything in the initiative: every [tool](tools.md), and what's inside them — tasks, events, counters, pictures, wiki pages. Pick one and its name drops into your text as a link.
 
-Already know what kind of thing you want? Say so and the list narrows: `#task:`, `#file:`, `#project:`, `#queue:`, `#counter-group:`, `#calendar:`, `#dashboard:`, `#post:`, `#collection:`, `#wiki:`, `#wiki-page:`.
+Already know what kind of thing you want? Say so and the list narrows: `#task:`, `#file:`, `#project:`, `#counter-group:`, `#calendar:`, `#dashboard:`, `#post:`, `#collection:`, `#wiki:`, `#wiki-page:`.
 
 You never *have* to. `#` on its own searches the lot — the prefixes are just a shortcut for when half the community has named something "Planning".
 

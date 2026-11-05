@@ -478,8 +478,6 @@ export const SearchEntityType = {
   file: "file",
   post: "post",
   project: "project",
-  queue: "queue",
-  queue_item: "queue_item",
   tag: "tag",
   task: "task",
   wiki: "wiki",
@@ -491,7 +489,6 @@ export type Tool = (typeof Tool)[keyof typeof Tool];
 export const Tool = {
   project: "project",
   file: "file",
-  queue: "queue",
   counter_group: "counter_group",
   calendar: "calendar",
   dashboard: "dashboard",
@@ -858,7 +855,6 @@ export type ArchivableType = (typeof ArchivableType)[keyof typeof ArchivableType
 export const ArchivableType = {
   project: "project",
   file: "file",
-  queue: "queue",
   counter_group: "counter_group",
   calendar: "calendar",
   dashboard: "dashboard",
@@ -1234,7 +1230,6 @@ export const ListingKind = {
   post: "post",
   profile_pack: "profile_pack",
   project: "project",
-  queue: "queue",
   wiki: "wiki",
 } as const;
 
@@ -3007,7 +3002,6 @@ export interface CommentCreate {
   collection_id?: number | null;
   project_id?: number | null;
   file_id?: number | null;
-  queue_id?: number | null;
   counter_group_id?: number | null;
   calendar_id?: number | null;
   dashboard_id?: number | null;
@@ -3067,7 +3061,6 @@ export interface CommentRead {
   collection_id: number | null;
   project_id: number | null;
   file_id: number | null;
-  queue_id: number | null;
   counter_group_id: number | null;
   calendar_id: number | null;
   dashboard_id: number | null;
@@ -4623,14 +4616,12 @@ export type ContentKind = (typeof ContentKind)[keyof typeof ContentKind];
 export const ContentKind = {
   project: "project",
   file: "file",
-  queue: "queue",
   counter_group: "counter_group",
   calendar: "calendar",
   dashboard: "dashboard",
   post: "post",
   wiki: "wiki",
   task: "task",
-  queue_item: "queue_item",
   calendar_event: "calendar_event",
   counter: "counter",
   wiki_page: "wiki_page",
@@ -5211,8 +5202,6 @@ export const DatasetName = {
   relationships: "relationships",
   files: "files",
   file_versions: "file_versions",
-  queues: "queues",
-  queue_items: "queue_items",
   calendars: "calendars",
   dashboards: "dashboards",
   posts: "posts",
@@ -5382,23 +5371,6 @@ export const EventDetailFieldId = {
 } as const;
 
 /**
- * What a queue item's detail edits as a field. What is linked to it, and
- * what can be done with it, are parts of their own.
- */
-export type QueueItemDetailFieldId =
-  (typeof QueueItemDetailFieldId)[keyof typeof QueueItemDetailFieldId];
-
-export const QueueItemDetailFieldId = {
-  label: "label",
-  notes: "notes",
-  position: "position",
-  color: "color",
-  visible: "visible",
-  person: "person",
-  tags: "tags",
-} as const;
-
-/**
  * What a notice's detail draws as a field. Its title, tags and properties
  * are its tool's, in its header; what it says, asks and answers, and when it
  * goes up, are parts of their own.
@@ -5413,7 +5385,6 @@ export interface DetailFieldProps {
   field:
     | TaskDetailFieldId
     | EventDetailFieldId
-    | QueueItemDetailFieldId
     | CounterDetailFieldId
     | PostDetailFieldId
     | FileFieldId
@@ -5601,7 +5572,6 @@ export type DetailLayoutReadKind = (typeof DetailLayoutReadKind)[keyof typeof De
 export const DetailLayoutReadKind = {
   task: "task",
   calendar_event: "calendar_event",
-  queue_item: "queue_item",
   counter: "counter",
   post: "post",
   file: "file",
@@ -5624,7 +5594,6 @@ export type DetailLayoutWriteKind =
 export const DetailLayoutWriteKind = {
   task: "task",
   calendar_event: "calendar_event",
-  queue_item: "queue_item",
   counter: "counter",
   post: "post",
   file: "file",
@@ -6189,8 +6158,6 @@ export const EndpointKind = {
   file: "file",
   post: "post",
   project: "project",
-  queue: "queue",
-  queue_item: "queue_item",
   tag: "tag",
   task: "task",
   user: "user",
@@ -6214,14 +6181,12 @@ export type EntityType = (typeof EntityType)[keyof typeof EntityType];
 export const EntityType = {
   project: "project",
   file: "file",
-  queue: "queue",
   counter_group: "counter_group",
   calendar: "calendar",
   dashboard: "dashboard",
   post: "post",
   wiki: "wiki",
   task: "task",
-  queue_item: "queue_item",
   calendar_event: "calendar_event",
   counter: "counter",
   wiki_page: "wiki_page",
@@ -6925,7 +6890,6 @@ export const InitiativeJoinPolicy = {
 export interface InitiativeCreate {
   projects_enabled?: boolean;
   files_enabled?: boolean;
-  queues_enabled?: boolean;
   counter_groups_enabled?: boolean;
   calendars_enabled?: boolean;
   dashboards_enabled?: boolean;
@@ -6944,8 +6908,6 @@ export const PermissionKey = {
   create_projects: "create_projects",
   files_enabled: "files_enabled",
   create_files: "create_files",
-  queues_enabled: "queues_enabled",
-  create_queues: "create_queues",
   counter_groups_enabled: "counter_groups_enabled",
   create_counter_groups: "create_counter_groups",
   calendars_enabled: "calendars_enabled",
@@ -7135,7 +7097,6 @@ export interface InitiativeMemberUpdate {
 export interface InitiativeRead {
   projects_enabled: boolean;
   files_enabled: boolean;
-  queues_enabled: boolean;
   counter_groups_enabled: boolean;
   calendars_enabled: boolean;
   dashboards_enabled: boolean;
@@ -7410,7 +7371,6 @@ export interface InitiativeToolLayoutsRead {
 export interface InitiativeUpdate {
   projects_enabled?: boolean | null;
   files_enabled?: boolean | null;
-  queues_enabled?: boolean | null;
   counter_groups_enabled?: boolean | null;
   calendars_enabled?: boolean | null;
   dashboards_enabled?: boolean | null;
@@ -7549,7 +7509,6 @@ export type ItemKind = (typeof ItemKind)[keyof typeof ItemKind];
 
 export const ItemKind = {
   task: "task",
-  queue_item: "queue_item",
   calendar_event: "calendar_event",
   counter: "counter",
   post: "post",
@@ -7563,7 +7522,6 @@ export type LayoutTarget = (typeof LayoutTarget)[keyof typeof LayoutTarget];
 export const LayoutTarget = {
   project: "project",
   file: "file",
-  queue: "queue",
   counter_group: "counter_group",
   calendar: "calendar",
   dashboard: "dashboard",
@@ -10042,14 +10000,12 @@ export type PropertyTarget = (typeof PropertyTarget)[keyof typeof PropertyTarget
 export const PropertyTarget = {
   project: "project",
   file: "file",
-  queue: "queue",
   counter_group: "counter_group",
   calendar: "calendar",
   dashboard: "dashboard",
   post: "post",
   wiki: "wiki",
   task: "task",
-  queue_item: "queue_item",
   calendar_event: "calendar_event",
   counter: "counter",
   wiki_page: "wiki_page",
@@ -10288,150 +10244,6 @@ export interface QueryVocabulary {
   datasets: string[];
   functions: string[];
   tokens?: string[];
-}
-
-export interface QueueCreate {
-  properties?: PropertyValueInput[];
-  /**
-   * @minLength 1
-   * @maxLength 255
-   */
-  name: string;
-  description?: string | null;
-  initiative_id: number;
-  grants?: ResourceGrantSchema[];
-}
-
-export interface QueueItemCreate {
-  properties?: PropertyValueInput[];
-  /**
-   * @minLength 1
-   * @maxLength 255
-   */
-  label: string;
-  position?: number;
-  color?: string | null;
-  notes?: string | null;
-  is_visible?: boolean;
-  user_id?: number | null;
-  tag_ids?: number[] | null;
-  task_ids?: number[] | null;
-}
-
-export interface QueueItemRead {
-  /**
-   * @minLength 1
-   * @maxLength 255
-   */
-  label: string;
-  position: number;
-  color: string | null;
-  notes: string | null;
-  is_visible: boolean;
-  id: number;
-  queue_id: number;
-  user_id: number | null;
-  user: UserPublic | null;
-  tags: TagSummary[];
-  properties: PropertySummary[];
-  attachment_count: number;
-  held_at_round: number | null;
-  created_by: number | null;
-  created_at: string;
-}
-
-export interface QueueItemUpdate {
-  properties?: PropertyValueInput[] | null;
-  label?: string | null;
-  position?: number | null;
-  user_id?: number | null;
-  color?: string | null;
-  notes?: string | null;
-  is_visible?: boolean | null;
-  tag_ids?: number[] | null;
-  notes_base?: string | null;
-}
-
-/**
- * One turn as a list's card draws it: who, in what colour, and whether it
- * is theirs now.
- */
-export interface QueueTurnPreview {
-  id: number;
-  label: string;
-  color: string | null;
-  current: boolean;
-}
-
-export interface QueueSummary {
-  archived_at: string | null;
-  can: ToolCan;
-  id: number;
-  initiative_id: number;
-  community_id: number;
-  created_by: number | null;
-  created_at: string;
-  updated_at: string;
-  comments_enabled: boolean;
-  tags: TagSummary[];
-  properties: PropertySummary[];
-  grants: ResourceGrantSchema[];
-  /**
-   * @minLength 1
-   * @maxLength 255
-   */
-  name: string;
-  description: string | null;
-  current_round: number;
-  is_active: boolean;
-  preview: QueueTurnPreview[] | null;
-}
-
-export interface QueueListResponse {
-  total_count: number;
-  page: number;
-  page_size: number;
-  has_next: boolean;
-  has_prev: boolean;
-  items: QueueSummary[];
-}
-
-export interface QueueRead {
-  archived_at: string | null;
-  can: ToolCan;
-  id: number;
-  initiative_id: number;
-  community_id: number;
-  created_by: number | null;
-  created_at: string;
-  updated_at: string;
-  comments_enabled: boolean;
-  tags: TagSummary[];
-  properties: PropertySummary[];
-  grants: ResourceGrantSchema[];
-  /**
-   * @minLength 1
-   * @maxLength 255
-   */
-  name: string;
-  description: string | null;
-  current_round: number;
-  is_active: boolean;
-  preview: QueueTurnPreview[] | null;
-  items: QueueItemRead[];
-  current_item_id: number | null;
-}
-
-/**
- * Options for releasing a held queue item back into the rotation.
- */
-export interface QueueReleaseRequest {
-  reposition?: boolean;
-}
-
-export interface QueueUpdate {
-  name?: string | null;
-  description?: string | null;
 }
 
 /**
@@ -11158,14 +10970,12 @@ export type TagTarget = (typeof TagTarget)[keyof typeof TagTarget];
 export const TagTarget = {
   project: "project",
   file: "file",
-  queue: "queue",
   counter_group: "counter_group",
   calendar: "calendar",
   dashboard: "dashboard",
   post: "post",
   wiki: "wiki",
   task: "task",
-  queue_item: "queue_item",
   calendar_event: "calendar_event",
   wiki_page: "wiki_page",
   collection: "collection",
@@ -13149,51 +12959,6 @@ export type ListFilesParams = {
   archived?: boolean | null;
 };
 
-export type ListQueuesParams = {
-  initiative_id?: number | null;
-  /**
-   * Full-text match over the row — its name and its description. Reads the same index the search page does, so a list's filter box and a search agree about what matches.
-   */
-  search?: string | null;
-  /**
-   * Order by one of: name, initiative, updated_at. Omit for this tool's own default order.
-   */
-  sort_by?: string | null;
-  /**
-   * asc (default) or desc.
-   */
-  sort_dir?: string | null;
-  /**
-   * Only queues carrying any of these tags.
-   */
-  tag_ids?: number[] | null;
-  /**
-   * JSON-encoded list of property-value filters, e.g. `[{"property_id": 12, "op": "eq", "value": "live"}]`. Maximum 5 conditions per request.
-   */
-  property_filters?: string | null;
-  /**
-   * true lists what has been archived instead of what is live. Omit for the live list, which is what every other view shows.
-   */
-  archived?: boolean | null;
-  /**
-   * Only running queues, or only stopped ones.
-   */
-  is_active?: boolean | null;
-  /**
-   * Also send what each row's card shows of what is inside it, read for the whole page at once.
-   */
-  include_preview?: boolean;
-  /**
-   * @minimum 1
-   */
-  page?: number;
-  /**
-   * @minimum 1
-   * @maximum 100
-   */
-  page_size?: number;
-};
-
 export type ListCounterGroupsParams = {
   initiative_id?: number | null;
   /**
@@ -13654,7 +13419,6 @@ export type ListCommentsParams = {
   collection_id?: number | null;
   project_id?: number | null;
   file_id?: number | null;
-  queue_id?: number | null;
   counter_group_id?: number | null;
   calendar_id?: number | null;
   dashboard_id?: number | null;
@@ -13872,7 +13636,7 @@ export type EstimateAggregateExportParams = {
   initiative_id?: number | null;
   include_uploads?: boolean;
   /**
-   * JSON object of tool→filters narrowing what each tool exports: the tool's own list filters (as its list route takes them, such as ``{"queue": {"tag_ids": [3]}}``), and for calendars an ``events`` date range. ``archived`` omitted exports live and archived rows alike.
+   * JSON object of tool→filters narrowing what each tool exports: the tool's own list filters (as its list route takes them, such as ``{"project": {"tag_ids": [3]}}``), and for calendars an ``events`` date range. ``archived`` omitted exports live and archived rows alike.
    */
   filters?: string | null;
 };
@@ -13889,7 +13653,7 @@ export type ExportInitiativeParams = {
   initiative_id: number;
   mode?: ExportInitiativeMode;
   /**
-   * JSON object of tool→bool, e.g. {"project": true, "queue": false}. Omitted = every tool.
+   * JSON object of tool→bool, e.g. {"project": true, "calendar": false}. Omitted = every tool.
    */
   include?: string | null;
   /**
@@ -13901,7 +13665,7 @@ export type ExportInitiativeParams = {
    */
   include_uploads?: boolean;
   /**
-   * JSON object of tool→filters narrowing what each tool exports: the tool's own list filters (as its list route takes them, such as ``{"queue": {"tag_ids": [3]}}``), and for calendars an ``events`` date range. ``archived`` omitted exports live and archived rows alike.
+   * JSON object of tool→filters narrowing what each tool exports: the tool's own list filters (as its list route takes them, such as ``{"project": {"tag_ids": [3]}}``), and for calendars an ``events`` date range. ``archived`` omitted exports live and archived rows alike.
    */
   filters?: string | null;
   /**
@@ -13932,7 +13696,7 @@ export type ExportCommunityParams = {
    */
   include_uploads?: boolean;
   /**
-   * JSON object of tool→filters narrowing what each tool exports: the tool's own list filters (as its list route takes them, such as ``{"queue": {"tag_ids": [3]}}``), and for calendars an ``events`` date range. ``archived`` omitted exports live and archived rows alike.
+   * JSON object of tool→filters narrowing what each tool exports: the tool's own list filters (as its list route takes them, such as ``{"project": {"tag_ids": [3]}}``), and for calendars an ``events`` date range. ``archived`` omitted exports live and archived rows alike.
    */
   filters?: string | null;
   /**
@@ -13954,7 +13718,7 @@ export type ExportToolParams = {
    */
   ids?: number[] | null;
   /**
-   * One of the tool's export formats (project: json, pdf, csv, xlsx; file: json, md, pdf, docx, csv, xlsx, file; queue: json, pdf, csv, xlsx, md; counter_group: json, pdf, csv, xlsx, md; calendar: ics, json; dashboard: json; post: json; wiki: json, pdf, md, docx). ``json`` is the importable envelope. A file's formats depend on its type, so it has no default; a calendar defaults to ``ics``, every other tool to ``json``
+   * One of the tool's export formats (project: json, pdf, csv, xlsx; file: json, md, pdf, docx, csv, xlsx, file; counter_group: json, pdf, csv, xlsx, md; calendar: ics, json; dashboard: json; post: json; wiki: json, pdf, md, docx). ``json`` is the importable envelope. A file's formats depend on its type, so it has no default; a calendar defaults to ``ics``, every other tool to ``json``
    */
   format?: ExportToolFormat;
   /**
@@ -13985,20 +13749,6 @@ export const ExportToolFormat = {
 } as const;
 
 export type ConfirmImportBody = { [key: string]: unknown } | null;
-
-export type ReadQueueParams = {
-  /**
-   * Also return the resource if it is in the trash. For reading a resource back after a deleted event — the row still exists until retention purges it, and access is checked exactly as for a live one.
-   */
-  include_deleted?: boolean;
-};
-
-export type ReadQueueItemParams = {
-  /**
-   * Also return the resource if it is in the trash. For reading a resource back after a deleted event — the row still exists until retention purges it, and access is checked exactly as for a live one.
-   */
-  include_deleted?: boolean;
-};
 
 export type ReadCounterGroupParams = {
   /**
@@ -14265,7 +14015,7 @@ export type SearchCommunityParams = {
    */
   search: string;
   /**
-   * Restrict to these entity types. Omit for the default scope (calendar, calendar_event, collection, counter, counter_group, dashboard, file, post, project, queue, queue_item, tag, task, wiki, wiki_page); naming a type reaches it explicitly.
+   * Restrict to these entity types. Omit for the default scope (calendar, calendar_event, collection, counter, counter_group, dashboard, file, post, project, tag, task, wiki, wiki_page); naming a type reaches it explicitly.
    */
   types?: SearchEntityType[] | null;
   /**
@@ -14293,7 +14043,7 @@ export type SearchCommunityParams = {
 
 export type RecentCommunityParams = {
   /**
-   * Restrict to these entity types. Omit for the default scope (calendar, calendar_event, collection, counter, counter_group, dashboard, file, post, project, queue, queue_item, tag, task, wiki, wiki_page); naming a type reaches it explicitly.
+   * Restrict to these entity types. Omit for the default scope (calendar, calendar_event, collection, counter, counter_group, dashboard, file, post, project, tag, task, wiki, wiki_page); naming a type reaches it explicitly.
    */
   types?: SearchEntityType[] | null;
   /**
@@ -14321,7 +14071,7 @@ export type SuggestCommunityParams = {
    */
   search: string;
   /**
-   * Restrict to these entity types. Omit for the default scope (calendar, calendar_event, collection, counter, counter_group, dashboard, file, post, project, queue, queue_item, tag, task, wiki, wiki_page); naming a type reaches it explicitly.
+   * Restrict to these entity types. Omit for the default scope (calendar, calendar_event, collection, counter, counter_group, dashboard, file, post, project, tag, task, wiki, wiki_page); naming a type reaches it explicitly.
    */
   types?: SearchEntityType[] | null;
   /**
@@ -14513,32 +14263,6 @@ export type ListMyFilesParams = {
   search?: string | null;
   /**
    * Narrow to files the caller created.
-   */
-  created_by_me?: boolean;
-  /**
-   * Order by one of: name, updated_at, created_at. Omit for this tool's own default order. There is no `initiative` here — a merged cross-guild list is ordered by what the tool's own rows carry, and an initiative name is not one of them.
-   */
-  sort_by?: string | null;
-  /**
-   * asc (default) or desc.
-   */
-  sort_dir?: string | null;
-  /**
-   * @minimum 1
-   */
-  page?: number;
-  /**
-   * @minimum 0
-   * @maximum 100
-   */
-  page_size?: number;
-};
-
-export type ListMyQueuesParams = {
-  community_ids?: number[] | null;
-  search?: string | null;
-  /**
-   * Narrow to queues the caller created.
    */
   created_by_me?: boolean;
   /**

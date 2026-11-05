@@ -117,8 +117,6 @@
     "generic": "Dies",
     "post": "Dieser Beitrag",
     "project": "Dieses Projekt",
-    "queue": "Diese Warteschlange",
-    "queue_item": "Dieser Eintrag",
     "task": "Diese Aufgabe",
     "wiki": "Dieses Wiki",
     "wiki_page": "Diese Seite",
@@ -135,8 +133,6 @@
   "empty_counter_group": "Noch nichts verknüpft. Verknüpfe das Projekt, um dessen Zahlen es geht.",
   "empty_dashboard": "Noch nichts verknüpft. Verknüpfe das Projekt, über das dies berichtet, oder die Datei, die es auswertet.",
   "empty_post": "Noch nichts verknüpft. Verknüpfe das Projekt, das hier angekündigt wird, oder die Datei dahinter.",
-  "empty_queue": "Noch nichts verknüpft. Verknüpfe das Projekt, das diese Warteschlange speist.",
-  "empty_queue_item": "Noch nichts verknüpft. Verknüpfe die Aufgabe, die daraus wurde, oder die Datei, aus der es stammt.",
   "empty_wiki_page": "Noch nichts verknüpft. Erwähne diese Seite mit [[ von irgendwo – dann erscheint sie hier.",
   "empty_collection": "Noch nichts verknüpft. Verknüpfe das Projekt, für das diese Dateien sind."
 }

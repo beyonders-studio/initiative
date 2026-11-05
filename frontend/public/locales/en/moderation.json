@@ -43,8 +43,6 @@
     "task": "A task",
     "file": "A file",
     "project": "A project",
-    "queue": "A queue",
-    "queue_item": "A queue item",
     "calendar": "A calendar",
     "calendar_event": "An event",
     "counter": "A counter",

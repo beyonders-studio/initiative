@@ -496,10 +496,6 @@ const counter = (counterId: number): Spec => ({
   communityExact: [`/api/v1/counters/${counterId}`],
 });
 
-const queueItem = (itemId: number): Spec => ({
-  communityExact: [`/api/v1/queue-items/${itemId}`],
-});
-
 // ── Posts (community) ────────────────────────────────────────────────────────────
 
 /**
@@ -582,13 +578,11 @@ const toolLists = (which: Tool): Spec => {
     communityPrefix: [`/api/v1/tools/${which}/counts`],
   });
   if (which === Tool.calendar) return compose(lists, allCalendarEvents());
-  // An initiative's list of layouts names its projects, queues and counter
-  // groups, by name. The entries carry projects by their dates and posts by their
+  // An initiative's list of layouts names its projects and counter groups, by
+  // name. The entries carry projects by their dates and posts by their
   // polls' closing.
   if (which === Tool.project) return compose(lists, initiativeLayouts(), allCalendarEntries());
-  if (which === Tool.queue || which === Tool.counter_group) {
-    return compose(lists, initiativeLayouts());
-  }
+  if (which === Tool.counter_group) return compose(lists, initiativeLayouts());
   if (which === Tool.post) return compose(lists, allCalendarEntries());
   return lists;
 };
@@ -623,7 +617,6 @@ const project = (id: number): Spec => toolEntity(Tool.project, id);
 // so a change to one refreshes them too.
 const allFiles = (): Spec => compose(toolList(Tool.file), allCollections());
 const file = (id: number): Spec => compose(toolEntity(Tool.file, id), allCollections());
-const allQueues = (): Spec => toolList(Tool.queue);
 const allCounterGroups = (): Spec => toolList(Tool.counter_group);
 const counterGroup = (id: number): Spec => toolEntity(Tool.counter_group, id);
 const allCalendars = (): Spec => toolList(Tool.calendar);
@@ -687,7 +680,6 @@ export const q = {
   allProperties,
   allPropertyHolders,
   allReferences,
-  allQueues,
   allSettings,
   allTags,
   allWikis,
@@ -703,7 +695,6 @@ export const q = {
   calendar,
   captchaSettings,
   calendarEvent,
-  queueItem,
   counter,
   communitySettings,
   notificationSettings,

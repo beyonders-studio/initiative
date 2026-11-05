@@ -1,6 +1,6 @@
 /**
  * THE index page a tool's entities are browsed from — one initiative's shelf of
- * projects, files, wikis, queues, counter groups or dashboards.
+ * projects, files, wikis, counter groups or dashboards.
  *
  * Each of those pages carried its own copy of the same thing: the view toggle,
  * the filter panel, the create button and its dialog, the loading, error,
@@ -49,7 +49,6 @@ import { useFileColumns } from "@/components/files/fileColumns";
 import { ToolImportAction, useToolImportAction } from "@/components/imports/ToolImportAction";
 import { CounterGroupCard } from "@/components/initiativeTools/counters/CounterGroupCard";
 import { DashboardCard } from "@/components/initiativeTools/dashboards/DashboardCard";
-import { QueueCard } from "@/components/initiativeTools/queues/QueueCard";
 import { CreateToolDialog } from "@/components/initiativeTools/shared/CreateToolDialog";
 import { ToolFilterPanel } from "@/components/initiativeTools/shared/ToolFilterPanel";
 import { ToolListToolbar } from "@/components/initiativeTools/shared/ToolListToolbar";
@@ -374,21 +373,6 @@ const TOOL_INDEX: Record<Tool, ToolIndexEntry | ToolIndexOwnPage> = {
         onDone={onDone}
       />
     ),
-  },
-
-  [Tool.queue]: {
-    useList: makeRows(
-      TOOL_HOOKS[Tool.queue].useList,
-      (queue) => <QueueCard queue={queue} />,
-      WITH_PREVIEW
-    ),
-    text: {
-      create: "createQueue",
-      createDescription: "noQueuesDescription",
-      noMatches: "filters.noMatchingQueues",
-      emptyTitle: "noQueues",
-      emptyBody: "noQueuesDescription",
-    },
   },
 
   [Tool.counter_group]: {

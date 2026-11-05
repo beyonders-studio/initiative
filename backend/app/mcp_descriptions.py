@@ -65,7 +65,7 @@ TOOL_DESCRIPTIONS: dict[str, str] = {
     ),
     "list_initiatives": (
         "The initiatives the caller belongs to in a community. An initiative "
-        "holds the projects, files, queues and other tools; most lists narrow "
+        "holds the projects, files and other tools; most lists narrow "
         "by its `id` as `initiative_id`. A community admin can pass "
         "`scope=community` for every initiative in the community."
     ),
@@ -218,13 +218,6 @@ TOOL_DESCRIPTIONS: dict[str, str] = {
         "and the file should be read again."
     ),
     "list_file_versions": "The stored versions of an uploaded file, newest first.",
-    # --- Queues -------------------------------------------------------------
-    "add_queue_item": (
-        "Add an item to a queue. `position` orders it among the others; "
-        "`user_id` names who it is for."
-    ),
-    "read_queue_item": "Read one queue item by id.",
-    "update_queue_item": "Change a queue item. Only the fields sent change.",
     # --- Counters -----------------------------------------------------------
     "add_counter": (
         "Add a counter to a counter group. `min`, `max` and `step` bound and "

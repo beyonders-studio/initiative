@@ -1,9 +1,9 @@
 """Who may be named on a piece of content.
 
-A task's assignees, an event's attendees, a person-valued property and a queue
-item's person all name somebody on a row that lives inside a tool. Whoever is
-named must be able to open that tool's row: the rule is the same for all of
-them, and it is asked here.
+A task's assignees, an event's attendees and a person-valued property all name
+somebody on a row that lives inside a tool. Whoever is named must be able to
+open that tool's row: the rule is the same for all of them, and it is asked
+here.
 
 "Able to open" is the database's own answer for that person, restated for a
 person other than the one asking. The policies read the requester's standing,
@@ -60,7 +60,6 @@ from app.models.tenant.initiative import (
 )
 from app.models.tenant.calendar_event import CalendarEvent, CalendarEventAttendee
 from app.models.tenant.metadata import MetadataValue
-from app.models.tenant.queue import QueueItem
 from app.models.tenant.resource_grant import ResourceGrant
 from app.models.tenant.task import Task, TaskAssignee
 from app.services.membership import live_membership_clause
@@ -335,8 +334,8 @@ async def require_readers(
 class PersonRef:
     """A column naming a person on content inside a tool. ``within`` picks the
     rows inside one governing row; ``clears`` empties the column rather than
-    deleting the row, where the row is more than the name (a property value,
-    a queue item)."""
+    deleting the row, where the row is more than the name (a property
+    value)."""
 
     column: Any
     within: Callable[[int], ColumnElement[bool]]
@@ -361,11 +360,6 @@ PERSON_REFS: dict[Tool, tuple[PersonRef, ...]] = {
             lambda cid: CalendarEventAttendee.calendar_event_id.in_(
                 sa_select(CalendarEvent.id).where(CalendarEvent.calendar_id == cid)
             ),
-        ),
-    ),
-    Tool.queue: (
-        PersonRef(
-            QueueItem.user_id, lambda qid: QueueItem.queue_id == qid, clears=True
         ),
     ),
 }

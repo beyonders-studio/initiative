@@ -73,9 +73,9 @@ interface ToolPickerCardProps {
 /**
  * One tool, as something you can look at rather than a row with a switch.
  *
- * The sketch is the point: "queue" and "counter" mean nothing to somebody who
- * has not seen one, and this card is where both the create wizard and the
- * settings screen ask them to decide. Same card in both places, so the picture
+ * The sketch is the point: "counter" means nothing to somebody who has not
+ * seen one, and this card is where both the create wizard and the settings
+ * screen ask them to decide. Same card in both places, so the picture
  * somebody learned the tool from is the picture they see again later.
  */
 export const ToolPickerCard = ({

@@ -190,7 +190,6 @@ const COMMENT_TARGETS = [
   "collection_id",
   "file_id",
   "project_id",
-  "queue_id",
   "counter_group_id",
   "calendar_id",
   "dashboard_id",

@@ -64,7 +64,6 @@ from app.api.v1.tenant_endpoints import dashboards as dashboards_endpoints
 from app.api.v1.tenant_endpoints import files as files_endpoints
 from app.api.v1.tenant_endpoints import posts as posts_endpoints
 from app.api.v1.tenant_endpoints import projects as projects_endpoints
-from app.api.v1.tenant_endpoints import queues as queues_endpoints
 from app.api.v1.tenant_endpoints import wikis as wikis_endpoints
 from app.core.messages import QueryMessages
 from app.core.tools import Tool
@@ -79,7 +78,6 @@ from app.models.tenant.file import File
 from app.models.tenant.post import Post
 from app.models.tenant.project import Project
 from app.models.tenant.personal_item import PersonalItem
-from app.models.tenant.queue import Queue
 from app.models.tenant.wiki import Wiki
 from app.schemas.tenant.collection import (
     CollectionFileListResponse,
@@ -112,11 +110,6 @@ from app.schemas.tenant.initiative import (
 from app.schemas.tenant.post import PostListResponse, PostRead
 from app.schemas.tenant.timeline import TimelineResponse
 from app.schemas.tenant.project import ProjectListResponse, ProjectRead
-from app.schemas.tenant.queue import (
-    QueueListResponse,
-    QueueRead,
-    QueueSummary,
-)
 from app.schemas.tenant.wiki import (
     WikiListResponse,
     WikiRead,
@@ -133,7 +126,6 @@ from app.services.tenant import dashboards as dashboards_service
 from app.services.tenant import files as files_service
 from app.services.tenant import posts as posts_service
 from app.services.tenant import metadata as metadata_service
-from app.services.tenant import queues as queues_service
 from app.services.tenant import tags as tags_service
 from app.services.tenant import timeline as timeline_service
 from app.services.tenant import tool_listing
@@ -637,14 +629,6 @@ async def _calendar_conditions(spec: ToolListSpec, req: ListRequest) -> list:
 # ---------------------------------------------------------------------------
 
 
-async def _queue_conditions(spec: ToolListSpec, req: ListRequest) -> list:
-    """The shared set, and whether the queue is running."""
-    conditions = await _default_conditions(spec, req)
-    if req.values.get("is_active") is not None:
-        conditions.append(Queue.is_active.is_(req.values["is_active"]))
-    return conditions
-
-
 async def _post_conditions(spec: ToolListSpec, req: ListRequest) -> list:
     values = req.values
     conditions = posts_endpoints.board_conditions(
@@ -797,43 +781,6 @@ TOOL_LISTS: dict[Tool, ToolListSpec] = {
             'Cross-guild "my files" lives under /me/files (see '
             "list_my_files)."
         ),
-    ),
-    Tool.queue: ToolListSpec(
-        tool=Tool.queue,
-        read_model=QueueRead,
-        read_row=queues_endpoints.read_after_write,
-        model=Queue,
-        response_model=QueueListResponse,
-        loader_options=_loads(queues_service.list_loader_options),
-        default_order=_order(Queue.updated_at.desc(), Queue.id.desc()),
-        serialize=_summaries(
-            QueueSummary,
-            preview=lambda session, _guild_id, rows: queues_service.list_previews(
-                session, rows
-            ),
-        ),
-        conditions=_queue_conditions,
-        params=(
-            _initiative_id(),
-            search_param(),
-            sort_by_param(),
-            sort_dir_param(),
-            _tag_ids(Tool.queue),
-            _property_filters(),
-            _archived(),
-            ListParam(
-                "is_active",
-                Optional[bool],
-                Query(
-                    default=None,
-                    description="Only running queues, or only stopped ones.",
-                ),
-            ),
-            _include_preview(),
-            page_param(),
-            page_size_param(20, ge=1, le=100),
-        ),
-        list_doc="List queues visible to the current user (guild admins see all).",
     ),
     Tool.counter_group: ToolListSpec(
         tool=Tool.counter_group,

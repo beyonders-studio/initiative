@@ -24,8 +24,6 @@
     "project": "Project",
     "task": "Task",
     "file": "File",
-    "queue": "Queue",
-    "queue_item": "Queue item",
     "counter_group": "Counter group",
     "counter": "Counter",
     "calendar": "Calendar",

@@ -15,7 +15,7 @@ graph TD
   I2["Initiative"]
   P1["Project<br/>(a task board)"]
   D1["File"]
-  T1["Calendar · Queue · Counter<br/>Dashboard · Posts · Wiki"]
+  T1["Calendar · Counter · Dashboard<br/>Posts · Wiki"]
   TASK["Tasks"]
 
   G --> I1
@@ -83,7 +83,6 @@ A **task** carries a description, a status, a priority, dates, the people doing 
 ### The rest, when you grow into them
 
 - **Calendar & events** — things that happen at a time.
-- **Queues** — whose turn it is.
 - **Counters** — numbers that move.
 - **Dashboards** — one screen that answers "how are we doing?"
 - **Posts** — a noticeboard, for the things that need saying rather than doing.

@@ -94,7 +94,7 @@ describe("NotificationBell export notifications", () => {
       buildNotification({
         id: 2,
         type: "import_failed" as NotificationType,
-        data: { community_id: 1, import_job_id: 8, source: "initiative-queue" },
+        data: { community_id: 1, import_job_id: 8, source: "initiative-wiki" },
       }),
     ]);
     renderWithProviders(<NotificationBell />);

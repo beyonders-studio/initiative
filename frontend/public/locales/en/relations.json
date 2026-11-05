@@ -117,8 +117,6 @@
     "generic": "This",
     "post": "This post",
     "project": "This project",
-    "queue": "This queue",
-    "queue_item": "This item",
     "task": "This task",
     "wiki": "This wiki",
     "wiki_page": "This page",
@@ -135,8 +133,6 @@
   "empty_counter_group": "Nothing linked yet. Link the project these numbers are about.",
   "empty_dashboard": "Nothing linked yet. Link the project this reports on, or the file that reads it.",
   "empty_post": "Nothing linked yet. Link the project this announces, or the file behind it.",
-  "empty_queue": "Nothing linked yet. Link the project this queue feeds.",
-  "empty_queue_item": "Nothing linked yet. Link the task this item became, or the file it came from.",
   "empty_wiki_page": "Nothing linked yet. Mention this page with [[ from anywhere and it will show up here.",
   "empty_collection": "Nothing linked yet. Link the project these files are for."
 }

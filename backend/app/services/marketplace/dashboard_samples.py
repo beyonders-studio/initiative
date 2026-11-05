@@ -80,7 +80,6 @@ _TEXT_VOCABULARY: tuple[tuple[str, tuple[str, ...]], ...] = (
     ("initiative", _GROUPS),
     ("calendar", _GROUPS),
     ("group", _GROUPS),
-    ("queue", _GROUPS),
 )
 
 

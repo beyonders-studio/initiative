@@ -117,8 +117,6 @@
     "generic": "Esto",
     "post": "Esta publicación",
     "project": "Este proyecto",
-    "queue": "Esta cola",
-    "queue_item": "Este elemento",
     "task": "Esta tarea",
     "wiki": "Esta wiki",
     "wiki_page": "Esta página",
@@ -135,8 +133,6 @@
   "empty_counter_group": "Aún no hay nada enlazado. Enlaza el proyecto del que hablan estos números.",
   "empty_dashboard": "Aún no hay nada enlazado. Enlaza el proyecto del que informa, o el archivo que lo interpreta.",
   "empty_post": "Aún no hay nada enlazado. Enlaza el proyecto que anuncia, o el archivo que hay detrás.",
-  "empty_queue": "Aún no hay nada enlazado. Enlaza el proyecto que alimenta esta cola.",
-  "empty_queue_item": "Aún no hay nada enlazado. Enlaza la tarea en la que se convirtió, o el archivo del que salió.",
   "empty_wiki_page": "Aún no hay nada enlazado. Menciona esta página con [[ desde cualquier sitio y aparecerá aquí.",
   "empty_collection": "Aún no hay nada enlazado. Enlaza el proyecto para el que son estos archivos."
 }

@@ -12,7 +12,7 @@ class CommonMessages:
     UNKNOWN_TIMEZONE = "UNKNOWN_TIMEZONE"
 
     #: Somebody named on the content (an assignee, an attendee, a person
-    #: property, a queue item's person) cannot open what it sits in.
+    #: property) cannot open what it sits in.
     PERSON_CANNOT_READ = "PERSON_CANNOT_READ"
 
     #: The write reached content that is archived or in the trash, or something
@@ -1379,12 +1379,6 @@ class MarketplaceRegistryMessages:
     #: A package's terms for a listing are not in the expected format, or name
     #: a combination terms never take. The listing keeps the terms it had.
     TERMS_INVALID = "MARKETPLACE_REGISTRY_TERMS_INVALID"
-
-
-class QueueMessages:
-    NO_ITEMS = "QUEUE_NO_ITEMS"
-    NO_CURRENT_ITEM = "QUEUE_NO_CURRENT_ITEM"
-    ITEM_NOT_HELD = "QUEUE_ITEM_NOT_HELD"
 
 
 class CounterMessages:

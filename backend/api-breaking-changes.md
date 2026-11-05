@@ -18,6 +18,116 @@ is unchanged.
 
 - GET /api/v1/me/contacts api path removed without deprecation
 
+### Queues are gone
+
+The queue tool is removed: each queue is now a project and each item a task.
+Its routes go, and `queue` and `queue_item` leave every enum that named a tool
+or a kind.
+
+- DELETE /api/v1/c/{community_id}/layouts/{kind} removed the enum value `queue` from the `query` request parameter `tool`
+- DELETE /api/v1/c/{community_id}/personal-items/bookmark/{tool}/{entity_id} removed the enum value `queue` from the `path` request parameter `tool`
+- DELETE /api/v1/c/{community_id}/personal-items/subscribe/{kind}/{entity_id} removed the enum value `queue_item` from the `path` request parameter `kind`
+- DELETE /api/v1/c/{community_id}/personal-items/subscribe/{kind}/{entity_id} removed the enum value `queue` from the `path` request parameter `kind`
+- DELETE /api/v1/c/{community_id}/personal-items/view/{kind}/{entity_id} removed the enum value `queue_item` from the `path` request parameter `kind`
+- DELETE /api/v1/c/{community_id}/personal-items/view/{kind}/{entity_id} removed the enum value `queue` from the `path` request parameter `kind`
+- DELETE /api/v1/c/{community_id}/queue-items/{item_id} api path removed without deprecation
+- DELETE /api/v1/c/{community_id}/queues/{queue_id} api path removed without deprecation
+- DELETE /api/v1/c/{community_id}/trash/{entity_type}/{entity_id}/purge removed the enum value `queue_item` from the `path` request parameter `entity_type`
+- DELETE /api/v1/c/{community_id}/trash/{entity_type}/{entity_id}/purge removed the enum value `queue` from the `path` request parameter `entity_type`
+- GET /api/v1/c/{community_id}/activity/ removed the enum value `queue` from the property `anyOf[subschema #1: Tool]/` of the `query` request parameter `tool`
+- GET /api/v1/c/{community_id}/comments/ removed the required property `comments/items/queue_id` from the response with the `200` status
+- GET /api/v1/c/{community_id}/comments/{comment_id} removed the required property `queue_id` from the response with the `200` status
+- GET /api/v1/c/{community_id}/exports/{tool} removed the enum value `queue` from the `path` request parameter `tool`
+- GET /api/v1/c/{community_id}/initiatives/ removed the required property `items/queues_enabled` from the response with the `200` status
+- GET /api/v1/c/{community_id}/initiatives/{initiative_id} removed the required property `queues_enabled` from the response with the `200` status
+- GET /api/v1/c/{community_id}/layouts/ removed the enum value `queue` from the `query` request parameter `tool`
+- GET /api/v1/c/{community_id}/marketplace/listings removed the enum value `queue` from the property `anyOf[subschema #1: ListingKind]/` of the `query` request parameter `kind`
+- GET /api/v1/c/{community_id}/personal-items/{kind}/{entity_id} removed the enum value `queue_item` from the `path` request parameter `kind`
+- GET /api/v1/c/{community_id}/personal-items/{kind}/{entity_id} removed the enum value `queue` from the `path` request parameter `kind`
+- GET /api/v1/c/{community_id}/queue-items/{item_id} api path removed without deprecation
+- GET /api/v1/c/{community_id}/queues/ api path removed without deprecation
+- GET /api/v1/c/{community_id}/queues/{queue_id} api path removed without deprecation
+- GET /api/v1/c/{community_id}/search/ removed the enum value `queue_item` from the property `anyOf[subschema #1]/items/` of the `query` request parameter `types`
+- GET /api/v1/c/{community_id}/search/ removed the enum value `queue` from the property `anyOf[subschema #1]/items/` of the `query` request parameter `types`
+- GET /api/v1/c/{community_id}/search/recent removed the enum value `queue_item` from the property `anyOf[subschema #1]/items/` of the `query` request parameter `types`
+- GET /api/v1/c/{community_id}/search/recent removed the enum value `queue` from the property `anyOf[subschema #1]/items/` of the `query` request parameter `types`
+- GET /api/v1/c/{community_id}/search/suggest removed the enum value `queue_item` from the property `anyOf[subschema #1]/items/` of the `query` request parameter `types`
+- GET /api/v1/c/{community_id}/search/suggest removed the enum value `queue` from the property `anyOf[subschema #1]/items/` of the `query` request parameter `types`
+- GET /api/v1/c/{community_id}/tags/{tag_id}/entities removed the enum value `queue_item` from the `query` request parameter `kind`
+- GET /api/v1/c/{community_id}/tags/{tag_id}/entities removed the enum value `queue` from the `query` request parameter `kind`
+- GET /api/v1/c/{community_id}/tools/{tool}/counts removed the enum value `queue` from the `path` request parameter `tool`
+- GET /api/v1/c/{community_id}/users/search removed the enum value `queue` from the property `anyOf[subschema #1: Tool]/` of the `query` request parameter `tool`
+- GET /api/v1/fields/{dataset} removed the enum value `queue_items` from the `path` request parameter `dataset`
+- GET /api/v1/fields/{dataset} removed the enum value `queues` from the `path` request parameter `dataset`
+- GET /api/v1/me/queues api path removed without deprecation
+- PATCH /api/v1/c/{community_id}/comments/{comment_id} removed the required property `queue_id` from the response with the `200` status
+- PATCH /api/v1/c/{community_id}/initiatives/{initiative_id} removed the required property `queues_enabled` from the response with the `200` status
+- PATCH /api/v1/c/{community_id}/initiatives/{initiative_id}/members/{user_id} removed the required property `queues_enabled` from the response with the `200` status
+- PATCH /api/v1/c/{community_id}/initiatives/{initiative_id}/roles/{role_id} removed the enum value `create_queues` of the request property `permissions/anyOf[subschema #1]/propertyNames/`
+- PATCH /api/v1/c/{community_id}/initiatives/{initiative_id}/roles/{role_id} removed the enum value `queues_enabled` of the request property `permissions/anyOf[subschema #1]/propertyNames/`
+- PATCH /api/v1/c/{community_id}/queue-items/{item_id} api path removed without deprecation
+- PATCH /api/v1/c/{community_id}/queues/{queue_id} api path removed without deprecation
+- POST /api/v1/c/{community_id}/archive/{entity_type}/{entity_id} removed the enum value `queue` from the `path` request parameter `entity_type`
+- POST /api/v1/c/{community_id}/comments/ removed the required property `queue_id` from the response with the `201` status
+- POST /api/v1/c/{community_id}/initiatives/ removed the required property `queues_enabled` from the response with the `201` status
+- POST /api/v1/c/{community_id}/initiatives/{initiative_id}/join removed the required property `queues_enabled` from the response with the `200` status
+- POST /api/v1/c/{community_id}/initiatives/{initiative_id}/members removed the required property `queues_enabled` from the response with the `200` status
+- POST /api/v1/c/{community_id}/initiatives/{initiative_id}/roles removed the enum value `create_queues` of the request property `permissions/anyOf[subschema #1]/propertyNames/`
+- POST /api/v1/c/{community_id}/initiatives/{initiative_id}/roles removed the enum value `queues_enabled` of the request property `permissions/anyOf[subschema #1]/propertyNames/`
+- POST /api/v1/c/{community_id}/marketplace/share removed the enum value `queue` of the request property `kind`
+- POST /api/v1/c/{community_id}/plugins/{plugin_id}/actions/{action_id} removed the enum value `queue_item` of the request property `entity_type`
+- POST /api/v1/c/{community_id}/queue-items/{item_id}/duplicate api path removed without deprecation
+- POST /api/v1/c/{community_id}/queues/ api path removed without deprecation
+- POST /api/v1/c/{community_id}/queues/{queue_id}/duplicate api path removed without deprecation
+- POST /api/v1/c/{community_id}/queues/{queue_id}/hold api path removed without deprecation
+- POST /api/v1/c/{community_id}/queues/{queue_id}/items api path removed without deprecation
+- POST /api/v1/c/{community_id}/queues/{queue_id}/next api path removed without deprecation
+- POST /api/v1/c/{community_id}/queues/{queue_id}/previous api path removed without deprecation
+- POST /api/v1/c/{community_id}/queues/{queue_id}/release/{item_id} api path removed without deprecation
+- POST /api/v1/c/{community_id}/queues/{queue_id}/reset api path removed without deprecation
+- POST /api/v1/c/{community_id}/queues/{queue_id}/set-active/{item_id} api path removed without deprecation
+- POST /api/v1/c/{community_id}/queues/{queue_id}/start api path removed without deprecation
+- POST /api/v1/c/{community_id}/queues/{queue_id}/stop api path removed without deprecation
+- POST /api/v1/c/{community_id}/relationships/ removed the enum value `queue_item` of the request property `source/type`
+- POST /api/v1/c/{community_id}/relationships/ removed the enum value `queue_item` of the request property `target/type`
+- POST /api/v1/c/{community_id}/relationships/ removed the enum value `queue` of the request property `source/type`
+- POST /api/v1/c/{community_id}/relationships/ removed the enum value `queue` of the request property `target/type`
+- POST /api/v1/c/{community_id}/tags/bulk removed the enum value `queue_item` of the request property `target_type`
+- POST /api/v1/c/{community_id}/tags/bulk removed the enum value `queue` of the request property `target_type`
+- POST /api/v1/c/{community_id}/trash/{entity_type}/{entity_id}/restore removed the enum value `queue_item` from the `path` request parameter `entity_type`
+- POST /api/v1/c/{community_id}/trash/{entity_type}/{entity_id}/restore removed the enum value `queue` from the `path` request parameter `entity_type`
+- POST /api/v1/c/{community_id}/unarchive/{entity_type}/{entity_id} removed the enum value `queue` from the `path` request parameter `entity_type`
+- POST /api/v1/communities/{community_id}/invites removed the enum value `queue` of the request property `grants/items/resource_type/anyOf[subschema #1: Tool]/`
+- POST /api/v1/me/api-keys removed the enum value `queue` of the request property `resource_type/anyOf[subschema #1: Tool]/`
+- PUT /api/v1/c/{community_id}/layouts/ removed `#/components/schemas/QueueItemDetailFieldId, #/components/schemas/GalleryImageDetailFieldId` from the `oneOf[subschema #2: DetailLayoutWrite]/definition/header/anyOf[subschema #1]/items/oneOf[subschema #1: DetailStackPart]/children/items/oneOf[subschema #2: SectionPart]/children/items/oneOf[subschema #3: DetailFieldPart]/props/field` request property `anyOf` list
+- PUT /api/v1/c/{community_id}/layouts/ removed `#/components/schemas/QueueItemDetailFieldId, #/components/schemas/GalleryImageDetailFieldId` from the `oneOf[subschema #2: DetailLayoutWrite]/definition/header/anyOf[subschema #1]/items/oneOf[subschema #1: DetailStackPart]/children/items/oneOf[subschema #3: DetailFieldPart]/props/field` request property `anyOf` list
+- PUT /api/v1/c/{community_id}/layouts/ removed `#/components/schemas/QueueItemDetailFieldId, #/components/schemas/GalleryImageDetailFieldId` from the `oneOf[subschema #2: DetailLayoutWrite]/definition/header/anyOf[subschema #1]/items/oneOf[subschema #2: SectionPart]/children/items/oneOf[subschema #3: DetailFieldPart]/props/field` request property `anyOf` list
+- PUT /api/v1/c/{community_id}/layouts/ removed `#/components/schemas/QueueItemDetailFieldId, #/components/schemas/GalleryImageDetailFieldId` from the `oneOf[subschema #2: DetailLayoutWrite]/definition/header/anyOf[subschema #1]/items/oneOf[subschema #3: DetailFieldPart]/props/field` request property `anyOf` list
+- PUT /api/v1/c/{community_id}/layouts/ removed `#/components/schemas/QueueItemDetailFieldId, #/components/schemas/GalleryImageDetailFieldId` from the `oneOf[subschema #2: DetailLayoutWrite]/definition/main/anyOf[subschema #1]/items/oneOf[subschema #1: DetailStackPart]/children/items/oneOf[subschema #2: SectionPart]/children/items/oneOf[subschema #3: DetailFieldPart]/props/field` request property `anyOf` list
+- PUT /api/v1/c/{community_id}/layouts/ removed `#/components/schemas/QueueItemDetailFieldId, #/components/schemas/GalleryImageDetailFieldId` from the `oneOf[subschema #2: DetailLayoutWrite]/definition/main/anyOf[subschema #1]/items/oneOf[subschema #1: DetailStackPart]/children/items/oneOf[subschema #3: DetailFieldPart]/props/field` request property `anyOf` list
+- PUT /api/v1/c/{community_id}/layouts/ removed `#/components/schemas/QueueItemDetailFieldId, #/components/schemas/GalleryImageDetailFieldId` from the `oneOf[subschema #2: DetailLayoutWrite]/definition/main/anyOf[subschema #1]/items/oneOf[subschema #2: SectionPart]/children/items/oneOf[subschema #3: DetailFieldPart]/props/field` request property `anyOf` list
+- PUT /api/v1/c/{community_id}/layouts/ removed `#/components/schemas/QueueItemDetailFieldId, #/components/schemas/GalleryImageDetailFieldId` from the `oneOf[subschema #2: DetailLayoutWrite]/definition/main/anyOf[subschema #1]/items/oneOf[subschema #3: DetailFieldPart]/props/field` request property `anyOf` list
+- PUT /api/v1/c/{community_id}/layouts/ removed `#/components/schemas/QueueItemDetailFieldId, #/components/schemas/GalleryImageDetailFieldId` from the `oneOf[subschema #2: DetailLayoutWrite]/definition/side/anyOf[subschema #1]/items/oneOf[subschema #1: DetailStackPart]/children/items/oneOf[subschema #2: SectionPart]/children/items/oneOf[subschema #3: DetailFieldPart]/props/field` request property `anyOf` list
+- PUT /api/v1/c/{community_id}/layouts/ removed `#/components/schemas/QueueItemDetailFieldId, #/components/schemas/GalleryImageDetailFieldId` from the `oneOf[subschema #2: DetailLayoutWrite]/definition/side/anyOf[subschema #1]/items/oneOf[subschema #1: DetailStackPart]/children/items/oneOf[subschema #3: DetailFieldPart]/props/field` request property `anyOf` list
+- PUT /api/v1/c/{community_id}/layouts/ removed `#/components/schemas/QueueItemDetailFieldId, #/components/schemas/GalleryImageDetailFieldId` from the `oneOf[subschema #2: DetailLayoutWrite]/definition/side/anyOf[subschema #1]/items/oneOf[subschema #2: SectionPart]/children/items/oneOf[subschema #3: DetailFieldPart]/props/field` request property `anyOf` list
+- PUT /api/v1/c/{community_id}/layouts/ removed `#/components/schemas/QueueItemDetailFieldId, #/components/schemas/GalleryImageDetailFieldId` from the `oneOf[subschema #2: DetailLayoutWrite]/definition/side/anyOf[subschema #1]/items/oneOf[subschema #3: DetailFieldPart]/props/field` request property `anyOf` list
+- PUT /api/v1/c/{community_id}/layouts/ removed the enum value `queue_item` of the request property `oneOf[subschema #2: DetailLayoutWrite]/kind`
+- PUT /api/v1/c/{community_id}/layouts/ removed the enum value `queue` from the `query` request parameter `tool`
+- PUT /api/v1/c/{community_id}/layouts/default removed the enum value `queue` from the `query` request parameter `tool`
+- PUT /api/v1/c/{community_id}/personal-items/bookmark/{tool}/{entity_id} removed the enum value `queue` from the `path` request parameter `tool`
+- PUT /api/v1/c/{community_id}/personal-items/subscribe/{kind}/{entity_id} removed the enum value `queue_item` from the `path` request parameter `kind`
+- PUT /api/v1/c/{community_id}/personal-items/subscribe/{kind}/{entity_id} removed the enum value `queue` from the `path` request parameter `kind`
+- PUT /api/v1/c/{community_id}/personal-items/view/{kind}/{entity_id} removed the enum value `queue_item` from the `path` request parameter `kind`
+- PUT /api/v1/c/{community_id}/personal-items/view/{kind}/{entity_id} removed the enum value `queue` from the `path` request parameter `kind`
+- PUT /api/v1/c/{community_id}/properties/{target}/{entity_id} removed the enum value `queue_item` from the `path` request parameter `target`
+- PUT /api/v1/c/{community_id}/properties/{target}/{entity_id} removed the enum value `queue` from the `path` request parameter `target`
+- PUT /api/v1/c/{community_id}/queues/{queue_id}/grants api path removed without deprecation
+- PUT /api/v1/c/{community_id}/relationships/ removed the enum value `queue_item` from the `query` request parameter `other_type`
+- PUT /api/v1/c/{community_id}/relationships/ removed the enum value `queue` from the `query` request parameter `other_type`
+- PUT /api/v1/c/{community_id}/resource-grants/bulk removed the enum value `queue` of the request property `items/items/resource_type`
+- PUT /api/v1/c/{community_id}/tools/{tool}/{tool_id}/comments removed the enum value `queue` from the `path` request parameter `tool`
+- PUT /api/v1/c/{community_id}/tools/{tool}/{tool_id}/tags removed the enum value `queue` from the `path` request parameter `tool`
+
 ### A link can end at a person
 
 An end of a link is an `EndpointKind`: every kind a reference names, and

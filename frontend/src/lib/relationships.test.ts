@@ -197,8 +197,6 @@ describe("relatedTarget", () => {
 
 describe("comparing sets of links", () => {
   it("reads a reorder as no change", () => {
-    // The old queue dialog compared these position by position, so reordering
-    // the same files counted as a change and a straight swap did not.
     expect(sameIds([1, 2, 3], [3, 1, 2])).toBe(true);
     expect(sameIds([1, 2], [1, 3])).toBe(false);
     expect(sameIds([1], [1, 2])).toBe(false);

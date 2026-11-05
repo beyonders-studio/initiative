@@ -24,8 +24,6 @@
     "project": "Projekt",
     "task": "Aufgabe",
     "file": "Datei",
-    "queue": "Ablauf",
-    "queue_item": "Ablaufelement",
     "counter_group": "Zählergruppe",
     "counter": "Zähler",
     "calendar": "Kalender",

@@ -7,8 +7,8 @@ import {
   buildOwnedDecoration,
   buildProject,
   buildProjectTaskStatus,
-  buildQueueSummary,
   buildTask,
+  buildWiki,
 } from "@/__tests__/factories";
 import { server } from "@/__tests__/helpers/msw-server";
 import { createTestQueryClient, renderPage } from "@/__tests__/helpers/render";
@@ -475,7 +475,7 @@ describe("HomePage", () => {
     server.use(
       http.get("/api/v1/me/tools/counts", () =>
         HttpResponse.json({
-          counts: { project: 1, queue: 1, file: 0, counter_group: 0, calendar: 0, dashboard: 0 },
+          counts: { project: 1, wiki: 1, file: 0, counter_group: 0, calendar: 0, dashboard: 0 },
         })
       ),
       http.get("/api/v1/me/projects", () => {
@@ -489,12 +489,12 @@ describe("HomePage", () => {
           }),
         ]);
       }),
-      http.get("/api/v1/me/queues", () => {
-        asked.push("queues");
+      http.get("/api/v1/me/wikis", () => {
+        asked.push("wikis");
         return page([
-          buildQueueSummary({
+          buildWiki({
             id: 7,
-            name: "Newer queue",
+            name: "Newer wiki",
             community_id: 3,
             updated_at: "2026-10-10T00:00:00Z",
           }),
@@ -523,8 +523,8 @@ describe("HomePage", () => {
     const names = screen
       .getAllByRole("link")
       .map((link) => link.textContent ?? "")
-      .filter((text) => /older project|newer queue/i.test(text));
-    expect(names[0]).toMatch(/newer queue/i);
+      .filter((text) => /older project|newer wiki/i.test(text));
+    expect(names[0]).toMatch(/newer wiki/i);
     expect(names[1]).toMatch(/older project/i);
     // Nobody asks for the files the reader has none of.
     expect(asked).not.toContain("files");
@@ -554,7 +554,7 @@ describe("HomePage", () => {
       ...over,
     });
     let bookmarks = [
-      bookmarked({ entity_type: "queue", entity_id: 7, name: "Tea rota" }),
+      bookmarked({ entity_type: "counter_group", entity_id: 7, name: "Raffle tickets" }),
       bookmarked({ entity_type: "project", entity_id: 5, name: "Fete stalls", icon: "🎪" }),
     ];
     const removed: string[] = [];
@@ -576,26 +576,28 @@ describe("HomePage", () => {
       "href",
       "/c/3/i/2/projects/5"
     );
-    expect(screen.getByRole("link", { name: /tea rota/i })).toHaveAttribute(
+    expect(screen.getByRole("link", { name: /raffle tickets/i })).toHaveAttribute(
       "href",
-      "/c/3/i/2/queues/7"
+      "/c/3/i/2/counter-groups/7"
     );
 
     const [first] = screen.getAllByRole("button", { name: "Remove bookmark" });
     await user.click(first);
-    await waitFor(() => expect(removed).toEqual(["3/queue/7"]));
+    await waitFor(() => expect(removed).toEqual(["3/counter_group/7"]));
     await waitFor(() =>
-      expect(screen.queryByRole("link", { name: /tea rota/i })).not.toBeInTheDocument()
+      expect(screen.queryByRole("link", { name: /raffle tickets/i })).not.toBeInTheDocument()
     );
 
     await user.click(screen.getByRole("button", { name: "Customize" }));
     await user.click(screen.getByRole("button", { name: "Bookmarks settings" }));
     await user.click(await screen.findByRole("combobox", { name: "Tools" }));
-    await user.click(await screen.findByRole("option", { name: "Queues" }));
-    await waitFor(() => expect(keptLayout(kept).widgets[0].options).toEqual({ tools: ["queue"] }));
+    await user.click(await screen.findByRole("option", { name: "Counters" }));
+    await waitFor(() =>
+      expect(keptLayout(kept).widgets[0].options).toEqual({ tools: ["counter_group"] })
+    );
     await user.keyboard("{Escape}");
     await user.keyboard("{Escape}");
-    expect(await screen.findByRole("heading", { name: "Bookmarked Queues" })).toBeInTheDocument();
+    expect(await screen.findByRole("heading", { name: "Bookmarked Counters" })).toBeInTheDocument();
     expect(await screen.findByText(/nothing bookmarked yet/i)).toBeInTheDocument();
   });
 
@@ -603,7 +605,7 @@ describe("HomePage", () => {
     server.use(
       http.get("/api/v1/me/tools/counts", () =>
         HttpResponse.json({
-          counts: { project: 1, queue: 1, file: 0, counter_group: 0, calendar: 0, dashboard: 0 },
+          counts: { project: 1, file: 0, counter_group: 0, calendar: 0, dashboard: 0 },
         })
       ),
       http.get("/api/v1/me/projects", () => new HttpResponse(null, { status: 500 }))

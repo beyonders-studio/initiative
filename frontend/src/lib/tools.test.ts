@@ -381,7 +381,6 @@ describe("tool relations", () => {
       "calendar_event",
       "collection",
       "counter",
-      "queue_item",
       "task",
       "wiki_page",
     ]);
@@ -538,7 +537,10 @@ describe("toolInPath", () => {
   it("reads the outermost tool, so what it holds and its settings name it", () => {
     expect(toolInPath("/c/1/i/2/projects/3/tasks/5")).toEqual({ tool: Tool.project, id: 3 });
     expect(toolInPath("/c/1/i/2/wikis/4/files/8")).toEqual({ tool: Tool.wiki, id: 4 });
-    expect(toolInPath("/c/1/i/2/queues/6/settings/access")).toEqual({ tool: Tool.queue, id: 6 });
+    expect(toolInPath("/c/1/i/2/dashboards/6/settings/access")).toEqual({
+      tool: Tool.dashboard,
+      id: 6,
+    });
   });
 
   it("is null anywhere that is no tool's page", () => {

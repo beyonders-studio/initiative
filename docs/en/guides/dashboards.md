@@ -56,7 +56,7 @@ Usually faster than starting from a blank canvas, and often better, because some
 
 Two steps, and most people never leave the first.
 
-**Build** is clicking. Pick what to read — tasks, files, queue items, notices, events, your community's own people, or **Metadata and property values**, the initiative's and its projects' and collections' own fields wherever they're set — then which columns, what to group them by, and what to narrow it to. The dashboard writes the query for you.
+**Build** is clicking. Pick what to read — tasks, files, notices, events, your community's own people, or **Metadata and property values**, the initiative's and its projects' and collections' own fields wherever they're set — then which columns, what to group them by, and what to narrow it to. The dashboard writes the query for you.
 
 **SQL** is the tab beside it, for the question clicking can't describe. It's real SQL, with the tables and columns offered as you type and the statement checked as you pause. One thing to know before you start: once you've edited the text, **Build** can't read it back. It offers to build a new query instead, which replaces what you wrote, so it never quietly mangles it.
 

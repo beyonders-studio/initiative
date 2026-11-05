@@ -268,7 +268,7 @@ def test_a_tag_assignment_is_an_edge_like_any_other():
 def test_the_generic_tool_tags_route_is_the_only_tool_set_tags_surface():
     # ONE generic route serves every tool — its {tool} path param is the Tool
     # enum itself, so a new member is covered with no new endpoint. The
-    # content-level extras (tasks, events, queue items) take ``tag_ids`` on
+    # content-level extras (tasks, events) take ``tag_ids`` on
     # their own PATCH; the exact equality means a re-added set-tags route
     # fails here.
     from app.main import app
@@ -372,8 +372,8 @@ def test_tool_models_spell_the_shared_columns_the_same():
     # display column called `name` (files said `title` until 0191), and
     # the shared scope/author/lifecycle columns under their canonical names.
     # A new tool that renames one of these — or labels rows through a synonym
-    # like `title`/`label` — fails here. Sub-resources (tasks, queue items,
-    # calendar events) are not tools and keep their own words.
+    # like `title`/`label` — fails here. Sub-resources (tasks, calendar
+    # events) are not tools and keep their own words.
     from app.services.tenant.tags import TOOL_TAG_LINKS
 
     shared_columns = {

@@ -19,7 +19,7 @@ is there (``import_engine.mentions``). A reference to another thing —
 (``import_engine.references``).
 
 Out of scope (see plan): files, attachments, project-role permissions,
-bookmarks, recents, queues. Those would extend the schema under a future
+bookmarks, recents. Those would extend the schema under a future
 ``schema_version`` bump.
 """
 

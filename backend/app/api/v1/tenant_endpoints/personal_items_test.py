@@ -27,12 +27,12 @@ from app.services.tenant import expiry
 from app.services.tenant.personal_items import DEFAULT_RECENT_VIEWS, WINDOW
 from app.testing import (
     create_calendar,
+    create_counter_group,
     create_guild,
     create_guild_membership,
     create_initiative,
     create_initiative_member,
     create_project,
-    create_queue,
     create_resource_grant,
     create_task,
     create_child_entity,
@@ -57,7 +57,9 @@ async def test_recents_mixed_ordering(
     """Items from different entity types are ordered by their latest open."""
     a = await acting_user(guild_role=CommunityRole.member, initiative=True)
     project = await create_project(session, a.initiative, a.user, name="Older project")
-    queue = await create_queue(session, a.initiative, a.user, name="Newer queue")
+    group = await create_counter_group(
+        session, a.initiative, a.user, name="Newer counter group"
+    )
 
     r1 = await client.put(
         a.g(f"/personal-items/view/project/{project.id}"), headers=a.headers
@@ -66,15 +68,15 @@ async def test_recents_mixed_ordering(
     # Small delay so timestamps differ deterministically.
     await asyncio.sleep(0.05)
     r2 = await client.put(
-        a.g(f"/personal-items/view/queue/{queue.id}"), headers=a.headers
+        a.g(f"/personal-items/view/counter_group/{group.id}"), headers=a.headers
     )
     assert r2.status_code == 200
 
     r = await client.get(TABS, headers=a.headers)
     items = r.json()
-    # Newer queue must come first.
-    assert items[0]["entity_type"] == "queue"
-    assert items[0]["entity_id"] == queue.id
+    # Newer counter group must come first.
+    assert items[0]["entity_type"] == "counter_group"
+    assert items[0]["entity_id"] == group.id
     assert items[1]["entity_type"] == "project"
     assert items[1]["entity_id"] == project.id
 
@@ -463,7 +465,7 @@ async def test_any_tool_can_be_bookmarked_and_listed_newest_first(
     project = await create_project(
         session, a.initiative, a.user, name="Fete", icon="🎪"
     )
-    queue = await create_queue(session, a.initiative, a.user, name="Rota")
+    group = await create_counter_group(session, a.initiative, a.user, name="Tally")
 
     first = await client.put(
         a.g(f"/personal-items/bookmark/project/{project.id}"), headers=a.headers
@@ -471,7 +473,7 @@ async def test_any_tool_can_be_bookmarked_and_listed_newest_first(
     assert first.status_code == 200, first.text
     await asyncio.sleep(0.02)
     second = await client.put(
-        a.g(f"/personal-items/bookmark/queue/{queue.id}"), headers=a.headers
+        a.g(f"/personal-items/bookmark/counter_group/{group.id}"), headers=a.headers
     )
     assert second.status_code == 200, second.text
     # Bookmarking again keeps the bookmark, and its time.
@@ -484,7 +486,7 @@ async def test_any_tool_can_be_bookmarked_and_listed_newest_first(
     assert listed.status_code == 200, listed.text
     items = listed.json()
     assert [(i["entity_type"], i["entity_id"], i["name"]) for i in items] == [
-        ("queue", queue.id, "Rota"),
+        ("counter_group", group.id, "Tally"),
         ("project", project.id, "Fete"),
     ]
     assert items[1]["icon"] == "🎪"
@@ -570,16 +572,17 @@ async def test_making_or_being_named_on_something_subscribes(
 async def test_a_tool_the_reader_cannot_open_cannot_be_bookmarked_or_subscribed_to(
     client: AsyncClient, session: AsyncSession, acting_user
 ):
-    """Both take read access, as the tool's own page does: a queue in an
-    initiative the reader is not in is not there for them."""
+    """Both take read access, as the tool's own page does: a counter group in
+    an initiative the reader is not in is not there for them."""
     a = await acting_user(guild_role=CommunityRole.member, initiative=True)
     owner = await create_user(session)
     elsewhere = await create_initiative(session, a.guild, owner)
-    hidden = await create_queue(session, elsewhere, owner)
+    hidden = await create_counter_group(session, elsewhere, owner)
 
     for mark in ("bookmark", "subscribe"):
         response = await client.put(
-            a.g(f"/personal-items/{mark}/queue/{hidden.id}"), headers=a.headers
+            a.g(f"/personal-items/{mark}/counter_group/{hidden.id}"),
+            headers=a.headers,
         )
         assert response.status_code == 404
     assert (await client.get(a.g(BOOKMARKS), headers=a.headers)).json() == []
@@ -598,9 +601,9 @@ async def test_my_bookmarks_gather_every_community(
 
     await create_guild_membership(session, user=a.user, guild=second.guild)
     await create_initiative_member(session, second.initiative, a.user)
-    there = await create_queue(session, second.initiative, a.user, name="There")
+    there = await create_counter_group(session, second.initiative, a.user, name="There")
     bookmarked = await client.put(
-        f"/api/v1/c/{second.guild.id}/personal-items/bookmark/queue/{there.id}",
+        f"/api/v1/c/{second.guild.id}/personal-items/bookmark/counter_group/{there.id}",
         headers=a.headers,
     )
     assert bookmarked.status_code == 200, bookmarked.text

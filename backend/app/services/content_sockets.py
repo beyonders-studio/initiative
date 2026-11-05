@@ -1,7 +1,7 @@
 """Every socket a page holds open, in one register.
 
 A guild page opens up to three kinds of socket: the events bus
-(``/c/{guild}/events/updates``), a change signal for one queue or counter group
+(``/c/{guild}/events/updates``), a change signal for one counter group
 (``/c/{guild}/{tool}/{id}/ws``) and a collaboration room for one file body.
 Every page also holds the account's own socket (``/notifications/stream``),
 which belongs to no guild: it is registered with ``guild_id=None`` in its
@@ -35,7 +35,7 @@ What they share is everything else, and that lives here once:
 
 A re-check groups sockets by the account, guild and sign-in that opened them,
 and runs one guild entry per group on one session — a person with a board, a
-queue and a file open costs one entry, not three — with at most
+counter group and a file open costs one entry, not three — with at most
 ``RECHECK_CONCURRENCY`` groups in flight.
 
 What this holds is one process's own sockets. Where the API runs as several

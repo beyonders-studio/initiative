@@ -1658,8 +1658,8 @@ _DEPARTURE_SECTION = """\
 -- ===========================================================================
 -- Leaving: when someone's initiative membership row is deleted, every grant
 -- naming them in that initiative is deleted too, owner rows included, and
--- they are taken off its content: task assignees, event attendees, person
--- fields and queue items. Anything they owned there becomes unowned, and a
+-- they are taken off its content: task assignees, event attendees and person
+-- fields. Anything they owned there becomes unowned, and a
 -- community admin can claim it. A trigger, so this happens however the
 -- membership is removed. Leaving the community runs the same function once
 -- more for the community's own content (no initiative).
@@ -1768,7 +1768,7 @@ _FREEZE_SECTION = """\
 --   unstamped, for a row that can be trashed but never archived. Unstamped
 --   inside an archived thing is the only state such a row has, so it is asked
 --   about a trashed ancestry alone — otherwise a restore could never put the
---   comments, queue items, counters, pictures and events back.
+--   comments, counters, pictures and events back.
 --
 -- tr_<t>_frozen_delete / tr_<t>_frozen_ancestor_delete: DELETE has no WITH
 -- CHECK, so RLS could only refuse it by returning no rows. A row that carries

@@ -33,7 +33,7 @@ const isLinkable = (item: SearchSuggestion): item is LinkableSuggestion =>
 interface EntityPickerProps {
   /**
    * The thing being linked from, so it is never offered as its own far end.
-   * Absent while linking from something that does not exist yet — a queue item
+   * Absent while linking from something that does not exist yet — an item
    * being composed — where there is no self to leave out.
    */
   subject?: EndpointRef;

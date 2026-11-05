@@ -115,16 +115,6 @@ describe("resolveEntityPath", () => {
     await expect(resolveEntityPath(queryClient, COMMUNITY, "comment", 21)).resolves.toBe(expected);
   });
 
-  it("opens a queue item's queue", async () => {
-    server.use(
-      communityHttp.get("/queue-items/:id", () => HttpResponse.json({ id: 5, queue_id: 2 })),
-      communityHttp.get("/queues/:id", () => HttpResponse.json({ id: 2, initiative_id: 7 }))
-    );
-    await expect(resolveEntityPath(queryClient, COMMUNITY, "queue-item", 5)).resolves.toBe(
-      "/i/7/queues/2"
-    );
-  });
-
   it("returns null for a comment the reader can't read", async () => {
     server.use(communityHttp.get("/comments/:id", () => HttpResponse.json(null, { status: 404 })));
     await expect(resolveEntityPath(queryClient, COMMUNITY, "comment", 21)).resolves.toBeNull();

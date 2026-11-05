@@ -5,10 +5,10 @@
  * its own copy of these tests. The cases come from the page's own `TOOL_INDEX`:
  * add a tool with an entry and it is covered here the moment it exists.
  *
- * What only one tool's list takes — a queue's status, a file's type — is
- * asked of that tool alone, at the bottom. So is what only one tool configures
- * today (files dropped on the list, the reader's own order): the page does it
- * for any tool whose entry asks, and files and projects are the ones that do.
+ * What only one tool's list takes — a file's type — is asked of that tool
+ * alone, at the bottom. So is what only one tool configures today (files
+ * dropped on the list, the reader's own order): the page does it for any tool
+ * whose entry asks, and files and projects are the ones that do.
  */
 import { fireEvent, screen, waitFor, within } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
@@ -76,7 +76,6 @@ const CARD_FIELDS: Partial<Record<Tool, Record<string, unknown>>> = {
     pinned_at: null,
     task_summary: { total: 0, completed: 0 },
   },
-  queue: { current_round: 1, is_active: true },
 };
 
 const row = (tool: Tool, fields: { id: number; name: string; archived_at?: string | null }) => ({
@@ -298,7 +297,7 @@ describe("the tool index page", () => {
 
 describe("the tool index page's property filter", () => {
   it("offers only the properties of the initiative the list is in", async () => {
-    stubList(Tool.queue, [row(Tool.queue, { id: 1, name: "Running" })]);
+    stubList(Tool.counter_group, [row(Tool.counter_group, { id: 1, name: "Running" })]);
     const asked: URLSearchParams[] = [];
     server.use(
       communityHttp.get("/property-definitions/", ({ request }) => {
@@ -307,7 +306,7 @@ describe("the tool index page's property filter", () => {
       })
     );
 
-    renderIndex(Tool.queue);
+    renderIndex(Tool.counter_group);
     await screen.findByText("Running");
     await userEvent.click(screen.getByRole("button", { name: shared("toolbar.filters") }));
 
@@ -315,31 +314,6 @@ describe("the tool index page's property filter", () => {
     expect(asked.map((params) => params.get("initiative_id"))).toEqual(
       asked.map(() => String(INITIATIVE_ID))
     );
-  });
-});
-
-describe("the queue index page", () => {
-  it("sends the status filter as is_active", async () => {
-    const requests = stubList(Tool.queue, [row(Tool.queue, { id: 1, name: "Running" })]);
-    const pick = async (label: string) => {
-      await userEvent.click(
-        screen.getByRole("combobox", { name: translate("filters.status", { ns: "queues" }) })
-      );
-      await userEvent.click(
-        await screen.findByRole("option", { name: translate(label, { ns: "queues" }) })
-      );
-    };
-
-    renderIndex(Tool.queue);
-    await screen.findByText("Running");
-    await userEvent.click(screen.getByRole("button", { name: shared("toolbar.filters") }));
-
-    await pick("filters.inactiveOnly");
-    await waitFor(() => expect(requests.at(-1)?.get("is_active")).toBe("false"));
-    await pick("filters.activeOnly");
-    await waitFor(() => expect(requests.at(-1)?.get("is_active")).toBe("true"));
-    await pick("filters.allStatuses");
-    await waitFor(() => expect(requests.at(-1)?.has("is_active")).toBe(false));
   });
 });
 
@@ -378,25 +352,25 @@ describe("the tool index page's bulk actions", () => {
   };
 
   it("duplicates and deletes a selection through the tool's own routes", async () => {
-    stubList(Tool.queue, [
-      row(Tool.queue, { id: 4, name: "Standup" }),
-      row(Tool.queue, { id: 5, name: "Retro" }),
+    stubList(Tool.counter_group, [
+      row(Tool.counter_group, { id: 4, name: "Standup" }),
+      row(Tool.counter_group, { id: 5, name: "Retro" }),
     ]);
     const duplicated: string[] = [];
     const deleted: string[] = [];
     server.use(
-      communityHttp.post("/queues/:id/duplicate", ({ params }) => {
+      communityHttp.post("/counter-groups/:id/duplicate", ({ params }) => {
         duplicated.push(String(params.id));
         return HttpResponse.json({ id: 40, initiative_id: INITIATIVE_ID });
       }),
-      communityHttp.delete("/queues/:id", ({ params }) => {
+      communityHttp.delete("/counter-groups/:id", ({ params }) => {
         deleted.push(String(params.id));
         return new HttpResponse(null, { status: 204 });
       })
     );
     vi.spyOn(window, "confirm").mockReturnValue(true);
 
-    renderIndex(Tool.queue);
+    renderIndex(Tool.counter_group);
     await screen.findByText("Standup");
 
     await select("Standup");

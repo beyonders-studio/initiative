@@ -234,12 +234,6 @@ def _strip_calendar(env: dict[str, Any]) -> None:
         event["created_at"] = None
 
 
-def _strip_queue(env: dict[str, Any]) -> None:
-    for item in env.get("items") or []:
-        if isinstance(item, dict):
-            item["member"] = None
-
-
 def _strip_nothing(env: dict[str, Any]) -> None:
     """A counter group and a dashboard name nobody and point at nothing a
     listing could carry. (A dashboard's configuration, which does, is dropped
@@ -249,7 +243,6 @@ def _strip_nothing(env: dict[str, Any]) -> None:
 _STRIPPERS: dict[Tool, Callable[[dict[str, Any]], None]] = {
     Tool.project: _strip_project,
     Tool.file: _strip_file,
-    Tool.queue: _strip_queue,
     Tool.counter_group: _strip_nothing,
     Tool.calendar: _strip_calendar,
     Tool.dashboard: _strip_nothing,
