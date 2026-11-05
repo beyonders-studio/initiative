@@ -277,11 +277,14 @@ beforeAll(() => {
   server.listen({ onUnhandledFrame: "warn" });
 });
 
+// Taken before any test fakes the timers, so the tick below always passes.
+const realSetTimeout = globalThis.setTimeout;
+
 afterEach(async () => {
   // Unmounting can still send a request (a field saving as it loses focus):
   // one tick lets this test's handlers answer it, not the next test's.
   cleanup();
-  await new Promise((resolve) => setTimeout(resolve, 0));
+  await new Promise((resolve) => realSetTimeout(resolve, 0));
   server.resetHandlers();
   localStorage.clear();
 });
