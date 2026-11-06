@@ -84,6 +84,10 @@ export const TOOL_EXPORT_FORMATS: Partial<Record<Tool, ExportFormatOption[]>> = 
     { format: "docx", labelKey: "export.formatWikiDocx" },
     { format: "json", labelKey: "export.formatWikiJson" },
   ],
+  [Tool.contact]: [
+    // The importable envelope; the backend offers no rendered format yet.
+    { format: "json", labelKey: "export.formatJson" },
+  ],
   [Tool.dashboard]: [
     // The importable envelope, and only that: a dashboard is a live canvas
     // over other tools' data, so there is nothing to render it as.

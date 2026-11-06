@@ -55,6 +55,7 @@ from app.services import reachability
 from app.services.tenant import ownership as ownership_service
 from app.services.tenant import calendar_events as events_service
 from app.services.tenant import calendars as calendars_service
+from app.services.tenant import contacts as contacts_service
 from app.services.tenant import counters as counters_service
 from app.services.tenant import dashboards as dashboards_service
 from app.services.tenant import files as files_service
@@ -135,6 +136,11 @@ RESOURCE_ACCESS: dict[Tool, ResourceAccessConfig] = {
         Tool.wiki,
         wikis_service.get_wiki,
         hydrated_loader=wikis_service.get_wiki_hydrated,
+    ),
+    Tool.contact: ResourceAccessConfig(
+        Tool.contact,
+        contacts_service.get_contact,
+        hydrated_loader=contacts_service.get_contact_hydrated,
     ),
 }
 

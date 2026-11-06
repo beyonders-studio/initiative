@@ -113,6 +113,7 @@ def _related_end(
         smart_link_url=found.smart_link_url,
         handle=found.handle,
         is_open=found.is_open,
+        starts_at=found.starts_at,
     )
 
 

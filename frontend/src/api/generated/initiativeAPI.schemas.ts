@@ -472,6 +472,7 @@ export const SearchEntityType = {
   calendar_event: "calendar_event",
   collection: "collection",
   comment: "comment",
+  contact: "contact",
   counter: "counter",
   counter_group: "counter_group",
   dashboard: "dashboard",
@@ -494,6 +495,7 @@ export const Tool = {
   dashboard: "dashboard",
   post: "post",
   wiki: "wiki",
+  contact: "contact",
 } as const;
 
 /**
@@ -566,6 +568,7 @@ export const AdminSurface = {
   members: "members",
   initiatives: "initiatives",
   community_calendars: "community_calendars",
+  community_contacts: "community_contacts",
   webhooks: "webhooks",
   trash: "trash",
   usage: "usage",
@@ -860,6 +863,7 @@ export const ArchivableType = {
   dashboard: "dashboard",
   post: "post",
   wiki: "wiki",
+  contact: "contact",
   task: "task",
   initiative: "initiative",
   collection: "collection",
@@ -1222,6 +1226,7 @@ export type ListingKind = (typeof ListingKind)[keyof typeof ListingKind];
 export const ListingKind = {
   auto: "auto",
   calendar: "calendar",
+  contact: "contact",
   counter_group: "counter_group",
   dashboard: "dashboard",
   file: "file",
@@ -3007,6 +3012,7 @@ export interface CommentCreate {
   dashboard_id?: number | null;
   post_id?: number | null;
   wiki_id?: number | null;
+  contact_id?: number | null;
   parent_comment_id?: number | null;
   audience?: CommentAudience;
 }
@@ -3066,6 +3072,7 @@ export interface CommentRead {
   dashboard_id: number | null;
   post_id: number | null;
   wiki_id: number | null;
+  contact_id: number | null;
   id: number;
   created_by: number | null;
   parent_comment_id: number | null;
@@ -4525,6 +4532,81 @@ export interface ConnectionRequestCreate {
 }
 
 /**
+ * An address, as one block of text written as it is on an envelope, so
+ * any country's form fits.
+ */
+export interface ContactAddress {
+  /** @maxLength 40 */
+  label?: string;
+  /**
+   * @minLength 1
+   * @maxLength 1000
+   */
+  value: string;
+}
+
+export interface ContactEmail {
+  /** @maxLength 40 */
+  label?: string;
+  value: string;
+}
+
+export interface ContactPhone {
+  /** @maxLength 40 */
+  label?: string;
+  /**
+   * @minLength 1
+   * @maxLength 40
+   */
+  value: string;
+}
+
+export interface ContactWebsite {
+  /** @maxLength 40 */
+  label?: string;
+  /**
+   * @minLength 1
+   * @maxLength 2048
+   */
+  value: string;
+}
+
+export interface ContactCreate {
+  properties?: PropertyValueInput[];
+  /**
+   * @minLength 1
+   * @maxLength 255
+   */
+  name: string;
+  is_organization?: boolean;
+  /** @maxItems 20 */
+  emails?: ContactEmail[];
+  /** @maxItems 20 */
+  phones?: ContactPhone[];
+  /** @maxItems 20 */
+  addresses?: ContactAddress[];
+  /** @maxItems 20 */
+  websites?: ContactWebsite[];
+  initiative_id?: number | null;
+  tag_ids?: number[] | null;
+  grants?: ResourceGrantSchema[];
+}
+
+/**
+ * One of a contact's details: its value, and a short label saying which
+ * one it is.
+ */
+export interface ContactDetail {
+  /** @maxLength 40 */
+  label?: string;
+  /**
+   * @minLength 1
+   * @maxLength 1000
+   */
+  value: string;
+}
+
+/**
  * One connection or message request, from the reader's side of it.
  */
 export interface ContactGrantRead {
@@ -4545,6 +4627,81 @@ export interface ContactGrantsResponse {
   accepted: ContactGrantRead[];
   incoming: ContactGrantRead[];
   outgoing: ContactGrantRead[];
+}
+
+/**
+ * The organization a person is ``part_of``.
+ */
+export interface ContactOrganization {
+  id: number;
+  name: string;
+  initiative_id?: number | null;
+}
+
+export interface ContactSummary {
+  archived_at: string | null;
+  can: ToolCan;
+  id: number;
+  initiative_id: number | null;
+  community_id: number;
+  created_by: number | null;
+  created_at: string;
+  updated_at: string;
+  comments_enabled: boolean;
+  tags: TagSummary[];
+  properties: PropertySummary[];
+  grants: ResourceGrantSchema[];
+  name: string;
+  is_organization: boolean;
+  emails: ContactDetail[];
+  phones: ContactDetail[];
+  addresses: ContactDetail[];
+  websites: ContactWebsite[];
+  organization: ContactOrganization | null;
+}
+
+export interface ContactListResponse {
+  total_count: number;
+  page: number;
+  page_size: number;
+  has_next: boolean;
+  has_prev: boolean;
+  items: ContactSummary[];
+}
+
+export interface ContactRead {
+  archived_at: string | null;
+  can: ToolCan;
+  id: number;
+  initiative_id: number | null;
+  community_id: number;
+  created_by: number | null;
+  created_at: string;
+  updated_at: string;
+  comments_enabled: boolean;
+  tags: TagSummary[];
+  properties: PropertySummary[];
+  grants: ResourceGrantSchema[];
+  name: string;
+  is_organization: boolean;
+  emails: ContactDetail[];
+  phones: ContactDetail[];
+  addresses: ContactDetail[];
+  websites: ContactWebsite[];
+  organization: ContactOrganization | null;
+}
+
+/**
+ * A change to a contact. Only what is sent is written; a list sent
+ * replaces the one there.
+ */
+export interface ContactUpdate {
+  name?: string | null;
+  is_organization?: boolean | null;
+  emails?: ContactEmail[] | null;
+  phones?: ContactPhone[] | null;
+  addresses?: ContactAddress[] | null;
+  websites?: ContactWebsite[] | null;
 }
 
 /**
@@ -4621,6 +4778,7 @@ export const ContentKind = {
   dashboard: "dashboard",
   post: "post",
   wiki: "wiki",
+  contact: "contact",
   task: "task",
   calendar_event: "calendar_event",
   counter: "counter",
@@ -5208,6 +5366,7 @@ export const DatasetName = {
   collections: "collections",
   wikis: "wikis",
   wiki_pages: "wiki_pages",
+  contacts: "contacts",
 } as const;
 
 /**
@@ -6152,6 +6311,7 @@ export const EndpointKind = {
   calendar: "calendar",
   calendar_event: "calendar_event",
   collection: "collection",
+  contact: "contact",
   counter: "counter",
   counter_group: "counter_group",
   dashboard: "dashboard",
@@ -6186,6 +6346,7 @@ export const EntityType = {
   dashboard: "dashboard",
   post: "post",
   wiki: "wiki",
+  contact: "contact",
   task: "task",
   calendar_event: "calendar_event",
   counter: "counter",
@@ -6895,6 +7056,7 @@ export interface InitiativeCreate {
   dashboards_enabled?: boolean;
   posts_enabled?: boolean;
   wikis_enabled?: boolean;
+  contacts_enabled?: boolean;
   name: string;
   description?: string | null;
   color?: string | null;
@@ -6918,6 +7080,8 @@ export const PermissionKey = {
   create_posts: "create_posts",
   wikis_enabled: "wikis_enabled",
   create_wikis: "create_wikis",
+  contacts_enabled: "contacts_enabled",
+  create_contacts: "create_contacts",
   dashboards_run_as_initiative: "dashboards_run_as_initiative",
 } as const;
 
@@ -7102,6 +7266,7 @@ export interface InitiativeRead {
   dashboards_enabled: boolean;
   posts_enabled: boolean;
   wikis_enabled: boolean;
+  contacts_enabled: boolean;
   name: string;
   description: string | null;
   color: string | null;
@@ -7376,6 +7541,7 @@ export interface InitiativeUpdate {
   dashboards_enabled?: boolean | null;
   posts_enabled?: boolean | null;
   wikis_enabled?: boolean | null;
+  contacts_enabled?: boolean | null;
   name?: string | null;
   description?: string | null;
   color?: string | null;
@@ -7527,6 +7693,7 @@ export const LayoutTarget = {
   dashboard: "dashboard",
   post: "post",
   wiki: "wiki",
+  contact: "contact",
   collection: "collection",
 } as const;
 
@@ -8162,6 +8329,7 @@ export interface RelatedEnd {
   smart_link_url: string | null;
   handle: string | null;
   is_open: boolean | null;
+  starts_at: string | null;
 }
 
 /**
@@ -10005,6 +10173,7 @@ export const PropertyTarget = {
   dashboard: "dashboard",
   post: "post",
   wiki: "wiki",
+  contact: "contact",
   task: "task",
   calendar_event: "calendar_event",
   counter: "counter",
@@ -10359,7 +10528,7 @@ export interface ReferenceEmbedList {
  */
 export interface ReferenceRead {
   /**
-   * References to read. `task:12` names a thing, `task:12:status` a fact about it. One that names nothing is ignored. Chips: calendar_event:when, counter:value, project:progress, task:assignee, task:due, task:priority, task:status, task:checklist
+   * References to read. `task:12` names a thing, `task:12:status` a fact about it. One that names nothing is ignored. Chips: calendar_event:when, contact:email, contact:phone, counter:value, project:progress, task:assignee, task:due, task:priority, task:status, task:checklist
    * @maxItems 500
    */
   refs?: string[];
@@ -10800,6 +10969,8 @@ export const SmartChipAspect = {
   when: "when",
   progress: "progress",
   checklist: "checklist",
+  phone: "phone",
+  email: "email",
 } as const;
 
 /**
@@ -10975,6 +11146,7 @@ export const TagTarget = {
   dashboard: "dashboard",
   post: "post",
   wiki: "wiki",
+  contact: "contact",
   task: "task",
   calendar_event: "calendar_event",
   wiki_page: "wiki_page",
@@ -12318,6 +12490,8 @@ export type SmartChipKind = (typeof SmartChipKind)[keyof typeof SmartChipKind];
 
 export const SmartChipKind = {
   "calendar_event:when": "calendar_event:when",
+  "contact:email": "contact:email",
+  "contact:phone": "contact:phone",
   "counter:value": "counter:value",
   "project:progress": "project:progress",
   "task:assignee": "task:assignee",
@@ -13162,6 +13336,48 @@ export type ListWikisParams = {
   page_size?: number;
 };
 
+export type ListContactsParams = {
+  initiative_id?: number | null;
+  scope?: "community" | null;
+  /**
+   * Full-text match over the contact's name, through the same index the search page reads.
+   */
+  search?: string | null;
+  /**
+   * Order by one of: name, initiative, updated_at. Omit for by name.
+   */
+  sort_by?: string | null;
+  /**
+   * asc (default) or desc.
+   */
+  sort_dir?: string | null;
+  /**
+   * Only contacts carrying any of these tags.
+   */
+  tag_ids?: number[] | null;
+  /**
+   * JSON-encoded list of property-value filters, e.g. `[{"property_id": 12, "op": "eq", "value": "live"}]`. Maximum 5 conditions per request.
+   */
+  property_filters?: string | null;
+  /**
+   * true lists what has been archived instead of what is live. Omit for the live list, which is what every other view shows.
+   */
+  archived?: boolean | null;
+  /**
+   * Only organizations (true) or only people (false).
+   */
+  is_organization?: boolean | null;
+  /**
+   * @minimum 1
+   */
+  page?: number;
+  /**
+   * @minimum 0
+   * @maximum 500
+   */
+  page_size?: number;
+};
+
 export type ListCollectionFilesParams = {
   initiative_id?: number | null;
   search?: string | null;
@@ -13424,6 +13640,7 @@ export type ListCommentsParams = {
   dashboard_id?: number | null;
   post_id?: number | null;
   wiki_id?: number | null;
+  contact_id?: number | null;
 };
 
 export type RecentCommentsParams = {
@@ -13718,7 +13935,7 @@ export type ExportToolParams = {
    */
   ids?: number[] | null;
   /**
-   * One of the tool's export formats (project: json, pdf, csv, xlsx; file: json, md, pdf, docx, csv, xlsx, file; counter_group: json, pdf, csv, xlsx, md; calendar: ics, json; dashboard: json; post: json; wiki: json, pdf, md, docx). ``json`` is the importable envelope. A file's formats depend on its type, so it has no default; a calendar defaults to ``ics``, every other tool to ``json``
+   * One of the tool's export formats (project: json, pdf, csv, xlsx; file: json, md, pdf, docx, csv, xlsx, file; counter_group: json, pdf, csv, xlsx, md; calendar: ics, json; dashboard: json; post: json; wiki: json, pdf, md, docx; contact: json). ``json`` is the importable envelope. A file's formats depend on its type, so it has no default; a calendar defaults to ``ics``, every other tool to ``json``
    */
   format?: ExportToolFormat;
   /**
@@ -14015,7 +14232,7 @@ export type SearchCommunityParams = {
    */
   search: string;
   /**
-   * Restrict to these entity types. Omit for the default scope (calendar, calendar_event, collection, counter, counter_group, dashboard, file, post, project, tag, task, wiki, wiki_page); naming a type reaches it explicitly.
+   * Restrict to these entity types. Omit for the default scope (calendar, calendar_event, collection, contact, counter, counter_group, dashboard, file, post, project, tag, task, wiki, wiki_page); naming a type reaches it explicitly.
    */
   types?: SearchEntityType[] | null;
   /**
@@ -14043,7 +14260,7 @@ export type SearchCommunityParams = {
 
 export type RecentCommunityParams = {
   /**
-   * Restrict to these entity types. Omit for the default scope (calendar, calendar_event, collection, counter, counter_group, dashboard, file, post, project, tag, task, wiki, wiki_page); naming a type reaches it explicitly.
+   * Restrict to these entity types. Omit for the default scope (calendar, calendar_event, collection, contact, counter, counter_group, dashboard, file, post, project, tag, task, wiki, wiki_page); naming a type reaches it explicitly.
    */
   types?: SearchEntityType[] | null;
   /**
@@ -14071,7 +14288,7 @@ export type SuggestCommunityParams = {
    */
   search: string;
   /**
-   * Restrict to these entity types. Omit for the default scope (calendar, calendar_event, collection, counter, counter_group, dashboard, file, post, project, tag, task, wiki, wiki_page); naming a type reaches it explicitly.
+   * Restrict to these entity types. Omit for the default scope (calendar, calendar_event, collection, contact, counter, counter_group, dashboard, file, post, project, tag, task, wiki, wiki_page); naming a type reaches it explicitly.
    */
   types?: SearchEntityType[] | null;
   /**
@@ -14393,6 +14610,32 @@ export type ListMyWikisParams = {
   search?: string | null;
   /**
    * Narrow to wikis the caller created.
+   */
+  created_by_me?: boolean;
+  /**
+   * Order by one of: name, updated_at, created_at. Omit for this tool's own default order. There is no `initiative` here — a merged cross-guild list is ordered by what the tool's own rows carry, and an initiative name is not one of them.
+   */
+  sort_by?: string | null;
+  /**
+   * asc (default) or desc.
+   */
+  sort_dir?: string | null;
+  /**
+   * @minimum 1
+   */
+  page?: number;
+  /**
+   * @minimum 0
+   * @maximum 100
+   */
+  page_size?: number;
+};
+
+export type ListMyContactsParams = {
+  community_ids?: number[] | null;
+  search?: string | null;
+  /**
+   * Narrow to contacts the caller created.
    */
   created_by_me?: boolean;
   /**

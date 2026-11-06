@@ -66,7 +66,8 @@
     "calendars": "Des événements avec réponses et rappels, pour que ce ne soit pas vous qui relanciez tout le monde.",
     "dashboards": "Vos chiffres sur un seul écran, et chacun ne voit que ce à quoi il a accès.",
     "wikis": "Notez ce que le groupe sait, avec des liens qui marchent toujours après un renommage.",
-    "posts": "Des annonces qui ne se perdent pas, avec sondages et accusés de lecture."
+    "posts": "Des annonces qui ne se perdent pas, avec sondages et accusés de lecture.",
+    "contacts": "Tous ceux pour qui ou avec qui vous travaillez, à un geste d’un appel, avec ce qui reste ouvert pour chacun."
   },
   "together": {
     "titleStart": "Fait pour le faire",

@@ -47,6 +47,7 @@ const blockerRow = (title: string, isOpen: boolean): RelationshipRead => ({
     original_filename: null,
     smart_link_url: null,
     is_open: isOpen,
+    starts_at: null,
   },
 });
 

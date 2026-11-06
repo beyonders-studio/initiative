@@ -12,6 +12,7 @@ import { useActiveCommunityId } from "@/hooks/useActiveCommunityId";
 import { useShareStanding } from "@/hooks/useShareRequests";
 import { useChipState } from "@/hooks/useSmartChips";
 import { communityPath } from "@/lib/communityUrl";
+import { chipReachHref } from "@/lib/contacts";
 import { entityRefTypeFor } from "@/lib/entityResolver";
 import { dateTimeFormat } from "@/lib/intl";
 import { entityIcon } from "@/lib/searchResults";
@@ -76,6 +77,26 @@ function ReadingChip({ chipKind, entityId, fallback }: SmartChipProps) {
   };
 
   const Icon = entityIcon(entityType);
+  const aspect = chipAspect(chipKind);
+  // A contact's phone or email is one tap from a call or a message; the
+  // contact itself is opened from its name on the card.
+  const reachHref = state?.text ? chipReachHref(aspect, state.text) : null;
+  const chipClassName = cn(
+    // Sized in `em`, not a fixed step. A chip is a word in somebody's
+    // sentence, so it belongs to whatever that sentence is set in —
+    // dropped into a heading, a `text-xs` chip reads as a footnote
+    // stuck to the title. 0.85em is what `text-xs` came to inside body
+    // text, so ordinary prose looks exactly as it did and everything
+    // else now scales with what it sits in — padding and margin
+    // included, or the box tightens around the text as it grows.
+    "mx-[0.15em] inline-flex items-center rounded-[0.25em] px-[0.4em] py-[0.15em] align-baseline font-medium text-[0.85em]",
+    display.className,
+    reachable ? "cursor-pointer hover:brightness-95" : "cursor-default"
+  );
+  // A status carries a colour its project chose, which beats any tone.
+  const chipStyle = display.color
+    ? { backgroundColor: `${display.color}26`, color: display.color }
+    : undefined;
 
   // Whether the reader may ask for it is read when they look at the card, so
   // a page of chips asks nothing until one is hovered.
@@ -88,45 +109,56 @@ function ReadingChip({ chipKind, entityId, fallback }: SmartChipProps) {
     <>
       <HoverCard openDelay={200} closeDelay={100} onOpenChange={setLooking}>
         <HoverCardTrigger asChild>
-          <button
-            type="button"
-            onClick={open}
-            // `aria-disabled` rather than `disabled`: a disabled button takes no
-            // pointer events, and the card is what explains why this one is dim.
-            aria-disabled={!reachable}
-            className={cn(
-              // Sized in `em`, not a fixed step. A chip is a word in somebody's
-              // sentence, so it belongs to whatever that sentence is set in —
-              // dropped into a heading, a `text-xs` chip reads as a footnote
-              // stuck to the title. 0.85em is what `text-xs` came to inside body
-              // text, so ordinary prose looks exactly as it did and everything
-              // else now scales with what it sits in — padding and margin
-              // included, or the box tightens around the text as it grows.
-              "mx-[0.15em] inline-flex items-center rounded-[0.25em] px-[0.4em] py-[0.15em] align-baseline font-medium text-[0.85em]",
-              display.className,
-              reachable ? "cursor-pointer hover:brightness-95" : "cursor-default"
-            )}
-            // A status carries a colour its project chose, which beats any tone.
-            style={
-              display.color
-                ? { backgroundColor: `${display.color}26`, color: display.color }
-                : undefined
-            }
-          >
-            {display.text}
-          </button>
+          {reachHref ? (
+            <a href={reachHref} className={chipClassName} style={chipStyle}>
+              {display.text}
+            </a>
+          ) : (
+            <button
+              type="button"
+              onClick={open}
+              // `aria-disabled` rather than `disabled`: a disabled button takes no
+              // pointer events, and the card is what explains why this one is dim.
+              aria-disabled={!reachable}
+              className={chipClassName}
+              style={chipStyle}
+            >
+              {display.text}
+            </button>
+          )}
         </HoverCardTrigger>
         <HoverCardContent align="start" className="w-auto max-w-72 p-3">
           <div className="flex items-start gap-2">
             <Icon className="mt-0.5 size-4 shrink-0 text-muted-foreground" />
             <div className="min-w-0 space-y-1">
-              <p className="truncate font-medium text-sm leading-tight">{liveTitle ?? fallback}</p>
+              {reachHref ? (
+                <button
+                  type="button"
+                  onClick={open}
+                  className="block max-w-full truncate font-medium text-sm leading-tight hover:underline"
+                >
+                  {liveTitle ?? fallback}
+                </button>
+              ) : (
+                <p className="truncate font-medium text-sm leading-tight">
+                  {liveTitle ?? fallback}
+                </p>
+              )}
               <p className="text-muted-foreground text-xs">
                 {t(`search:types.${entityType}` as never)}
                 {" · "}
-                {t(`smartChips.aspects.${chipAspect(chipKind)}` as never)}
+                {t(`smartChips.aspects.${aspect}` as never)}
               </p>
-              {reachable ? (
+              {reachHref ? (
+                <p className="flex items-center gap-1 text-primary text-xs">
+                  <ArrowUpRight className="size-3 shrink-0" />
+                  {t(
+                    aspect === SmartChipAspect.phone
+                      ? "smartChips.callHint"
+                      : "smartChips.writeHint"
+                  )}
+                </p>
+              ) : reachable ? (
                 <p className="flex items-center gap-1 text-primary text-xs">
                   <ArrowUpRight className="size-3 shrink-0" />
                   {t("smartChips.openHint")}

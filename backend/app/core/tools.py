@@ -38,6 +38,7 @@ class Tool(str, Enum):
     dashboard = "dashboard"
     post = "post"
     wiki = "wiki"
+    contact = "contact"
 
     @property
     def plural(self) -> str:
@@ -167,6 +168,7 @@ KINDS: dict[str, Kind] = {
         Kind(Tool.dashboard.value, 5),
         Kind(Tool.post.value, 9),
         Kind(Tool.wiki.value, 15),
+        Kind(Tool.contact.value, 19),
         Kind("task", 14, parent=Tool.project),
         Kind("calendar_event", 2, parent=Tool.calendar),
         Kind("counter", 3, parent=Tool.counter_group),

@@ -124,6 +124,8 @@
       "posts:write",
       "wikis:read",
       "wikis:write",
+      "contacts:read",
+      "contacts:write",
       "comments:read",
       "comments:write",
       "relationships:read",

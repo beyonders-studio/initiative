@@ -49,6 +49,7 @@ const row = (
     original_filename: null,
     smart_link_url: null,
     is_open: true,
+    starts_at: null,
   },
 });
 

@@ -5,7 +5,7 @@
     "version": "9.0.1",
     "x-initiative-source": {
       "version": "0.77.1",
-      "commit": "9174ffd7efa9e6da0933a1df37694ee9f1ed50ca"
+      "commit": "d862d0ebdc3360b92d6a6ceeafee1d945577cdfc"
     }
   },
   "servers": [
@@ -64,6 +64,7 @@
           "any_of": [
             "calendars:read",
             "comments:read",
+            "contacts:read",
             "counter_groups:read",
             "dashboards:read",
             "files:read",
@@ -127,6 +128,7 @@
           "any_of": [
             "calendars:read",
             "comments:read",
+            "contacts:read",
             "counter_groups:read",
             "dashboards:read",
             "files:read",
@@ -1955,6 +1957,311 @@
           }
         },
         "x-plugin-scope": "wikis:write",
+        "parameters": [
+          {
+            "name": "session_token",
+            "in": "cookie",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Session Token"
+            }
+          }
+        ]
+      }
+    },
+    "/contacts/": {
+      "get": {
+        "tags": [
+          "contacts"
+        ],
+        "summary": "List Contacts",
+        "description": "List contacts visible to the current user (guild admins see all).\n\n``scope=community`` narrows to the community's own contacts, the ones the\ncommunity contacts plug-in holds, belonging to no initiative.",
+        "operationId": "list_contacts",
+        "security": [
+          {
+            "PluginToken": []
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ContactListResponse"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        },
+        "x-plugin-scope": "contacts:read",
+        "parameters": [
+          {
+            "name": "initiative_id",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "integer"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Initiative Id"
+            }
+          },
+          {
+            "name": "scope",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "const": "community",
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Scope"
+            }
+          },
+          {
+            "name": "search",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "description": "Full-text match over the contact's name, through the same index the search page reads.",
+              "title": "Search"
+            },
+            "description": "Full-text match over the contact's name, through the same index the search page reads."
+          },
+          {
+            "name": "sort_by",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "description": "Order by one of: name, initiative, updated_at. Omit for by name.",
+              "title": "Sort By"
+            },
+            "description": "Order by one of: name, initiative, updated_at. Omit for by name."
+          },
+          {
+            "name": "sort_dir",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "description": "asc (default) or desc.",
+              "title": "Sort Dir"
+            },
+            "description": "asc (default) or desc."
+          },
+          {
+            "name": "tag_ids",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "array",
+                  "items": {
+                    "type": "integer"
+                  }
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "description": "Only contacts carrying any of these tags.",
+              "title": "Tag Ids"
+            },
+            "description": "Only contacts carrying any of these tags."
+          },
+          {
+            "name": "property_filters",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "description": "JSON-encoded list of property-value filters, e.g. `[{\"property_id\": 12, \"op\": \"eq\", \"value\": \"live\"}]`. Maximum 5 conditions per request.",
+              "title": "Property Filters"
+            },
+            "description": "JSON-encoded list of property-value filters, e.g. `[{\"property_id\": 12, \"op\": \"eq\", \"value\": \"live\"}]`. Maximum 5 conditions per request."
+          },
+          {
+            "name": "archived",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "boolean"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "description": "true lists what has been archived instead of what is live. Omit for the live list, which is what every other view shows.",
+              "title": "Archived"
+            },
+            "description": "true lists what has been archived instead of what is live. Omit for the live list, which is what every other view shows."
+          },
+          {
+            "name": "is_organization",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "boolean"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "description": "Only organizations (true) or only people (false).",
+              "title": "Is Organization"
+            },
+            "description": "Only organizations (true) or only people (false)."
+          },
+          {
+            "name": "page",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "integer",
+              "minimum": 1,
+              "default": 1,
+              "title": "Page"
+            }
+          },
+          {
+            "name": "page_size",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "integer",
+              "maximum": 500,
+              "minimum": 0,
+              "default": 100,
+              "title": "Page Size"
+            }
+          },
+          {
+            "name": "session_token",
+            "in": "cookie",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Session Token"
+            }
+          }
+        ]
+      },
+      "post": {
+        "tags": [
+          "contacts"
+        ],
+        "summary": "Create Contact",
+        "description": "Create a contact.\n\nIn an initiative it needs that initiative's contacts switch on and the\n``create_contacts`` permission (or guild admin), and its maker owns it.\nWith ``initiative_id`` omitted it is one of the community's contacts: it\nneeds the ``community_contacts`` surface and the community contacts\nplug-in, whose install owns it. An installed plug-in creates initiative\ncontacts only, owned by its install.",
+        "operationId": "create_contact",
+        "security": [
+          {
+            "PluginToken": []
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/ContactCreate"
+              }
+            }
+          }
+        },
+        "responses": {
+          "201": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ContactRead"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        },
+        "x-plugin-scope": "contacts:write",
         "parameters": [
           {
             "name": "session_token",
@@ -4304,6 +4611,23 @@
                 }
               ],
               "title": "Wiki Id"
+            }
+          },
+          {
+            "name": "contact_id",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "integer",
+                  "exclusiveMinimum": 0
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Contact Id"
             }
           },
           {
@@ -7125,6 +7449,143 @@
         ]
       }
     },
+    "/contacts/{contact_id}": {
+      "get": {
+        "tags": [
+          "contacts"
+        ],
+        "summary": "Read Contact",
+        "operationId": "read_contact",
+        "security": [
+          {
+            "PluginToken": []
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ContactRead"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        },
+        "x-plugin-scope": "contacts:read",
+        "parameters": [
+          {
+            "name": "contact_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "integer",
+              "title": "Contact Id"
+            }
+          },
+          {
+            "name": "session_token",
+            "in": "cookie",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Session Token"
+            }
+          }
+        ]
+      },
+      "patch": {
+        "tags": [
+          "contacts"
+        ],
+        "summary": "Update Contact",
+        "description": "Change a contact. A list sent replaces the one there.",
+        "operationId": "update_contact",
+        "security": [
+          {
+            "PluginToken": []
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/ContactUpdate"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ContactRead"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        },
+        "x-plugin-scope": "contacts:write",
+        "parameters": [
+          {
+            "name": "contact_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "integer",
+              "title": "Contact Id"
+            }
+          },
+          {
+            "name": "session_token",
+            "in": "cookie",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Session Token"
+            }
+          }
+        ]
+      }
+    },
     "/calendar-events/{event_id}": {
       "get": {
         "tags": [
@@ -8461,6 +8922,85 @@
         ]
       }
     },
+    "/contacts/{contact_id}/grants": {
+      "put": {
+        "tags": [
+          "contacts"
+        ],
+        "summary": "Set Contact Grants",
+        "description": "Replace the contact's entire sharing state in one call — the body is the\nfull list of grants (all-initiative-members / per-user / per-role). Every\nnon-owner grant is rebuilt from it; the owner is always preserved.\n\nAnyone the new sharing no longer lets open the contact is taken off\nwhatever in it names them.",
+        "operationId": "set_contact_grants",
+        "security": [
+          {
+            "PluginToken": []
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "array",
+                "items": {
+                  "$ref": "#/components/schemas/ResourceGrantSchema"
+                },
+                "title": "Grants"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ContactRead"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        },
+        "x-plugin-scope": "sharing:write",
+        "parameters": [
+          {
+            "name": "contact_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "integer",
+              "title": "Contact Id"
+            }
+          },
+          {
+            "name": "session_token",
+            "in": "cookie",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Session Token"
+            }
+          }
+        ]
+      }
+    },
     "/projects/{project_id}/duplicate": {
       "post": {
         "tags": [
@@ -8953,6 +9493,88 @@
         ]
       }
     },
+    "/contacts/{contact_id}/duplicate": {
+      "post": {
+        "tags": [
+          "contacts"
+        ],
+        "summary": "Duplicate Contact",
+        "description": "Copy it, with everything inside it, into an initiative: its own unless the body names another. Read is enough to copy a template; anything else needs write. The copy is shared as its source is while it stays in the same initiative, and carries the tags its maker may set: an installed plug-in's copy carries them only when it holds the scope to tag.",
+        "operationId": "duplicate_contact",
+        "security": [
+          {
+            "PluginToken": []
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "anyOf": [
+                  {
+                    "$ref": "#/components/schemas/ToolDuplicateRequest"
+                  },
+                  {
+                    "type": "null"
+                  }
+                ],
+                "title": "Body"
+              }
+            }
+          }
+        },
+        "responses": {
+          "201": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ContactRead"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        },
+        "x-plugin-scope": "contacts:write",
+        "parameters": [
+          {
+            "name": "contact_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "integer",
+              "title": "Contact Id"
+            }
+          },
+          {
+            "name": "session_token",
+            "in": "cookie",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Session Token"
+            }
+          }
+        ]
+      }
+    },
     "/search/suggest": {
       "get": {
         "tags": [
@@ -8997,6 +9619,7 @@
           "any_of": [
             "calendars:read",
             "comments:read",
+            "contacts:read",
             "counter_groups:read",
             "dashboards:read",
             "files:read",
@@ -9035,10 +9658,10 @@
                   "type": "null"
                 }
               ],
-              "description": "Restrict to these entity types. Omit for the default scope (calendar, calendar_event, collection, counter, counter_group, dashboard, file, post, project, tag, task, wiki, wiki_page); naming a type reaches it explicitly.",
+              "description": "Restrict to these entity types. Omit for the default scope (calendar, calendar_event, collection, contact, counter, counter_group, dashboard, file, post, project, tag, task, wiki, wiki_page); naming a type reaches it explicitly.",
               "title": "Types"
             },
-            "description": "Restrict to these entity types. Omit for the default scope (calendar, calendar_event, collection, counter, counter_group, dashboard, file, post, project, tag, task, wiki, wiki_page); naming a type reaches it explicitly."
+            "description": "Restrict to these entity types. Omit for the default scope (calendar, calendar_event, collection, contact, counter, counter_group, dashboard, file, post, project, tag, task, wiki, wiki_page); naming a type reaches it explicitly."
           },
           {
             "name": "initiative_id",
@@ -9167,6 +9790,7 @@
           "per": "tool",
           "any_of": [
             "calendars:read",
+            "contacts:read",
             "counter_groups:read",
             "dashboards:read",
             "files:read",
@@ -9358,6 +9982,7 @@
           "per": "tool",
           "any_of": [
             "calendars:read",
+            "contacts:read",
             "counter_groups:read",
             "dashboards:read",
             "files:read",
@@ -9735,6 +10360,7 @@
             "calendar": "calendars:write",
             "calendar_event": "calendars:write",
             "collection": "files:write",
+            "contact": "contacts:write",
             "counter": "counter_groups:write",
             "counter_group": "counter_groups:write",
             "dashboard": "dashboards:write",
@@ -9823,6 +10449,7 @@
           "scopes": {
             "calendar": "calendars:write",
             "collection": "files:write",
+            "contact": "contacts:write",
             "counter_group": "counter_groups:write",
             "dashboard": "dashboards:write",
             "file": "files:write",
@@ -10137,6 +10764,7 @@
           "dashboard",
           "post",
           "wiki",
+          "contact",
           "task",
           "initiative",
           "collection"
@@ -12452,6 +13080,18 @@
             ],
             "title": "Wiki Id"
           },
+          "contact_id": {
+            "anyOf": [
+              {
+                "type": "integer",
+                "exclusiveMinimum": 0
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Contact Id"
+          },
           "parent_comment_id": {
             "anyOf": [
               {
@@ -12634,6 +13274,17 @@
             ],
             "title": "Wiki Id"
           },
+          "contact_id": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Contact Id"
+          },
           "id": {
             "type": "integer",
             "title": "Id"
@@ -12750,6 +13401,7 @@
           "dashboard_id",
           "post_id",
           "wiki_id",
+          "contact_id",
           "id",
           "created_by",
           "parent_comment_id",
@@ -12789,6 +13441,627 @@
         ],
         "title": "CommentRemoval",
         "description": "What a tombstone says in place of a comment: who took it out, and,\nfor a moderator, why. Never what it said, or who wrote it."
+      },
+      "ContactAddress": {
+        "properties": {
+          "label": {
+            "type": "string",
+            "maxLength": 40,
+            "title": "Label",
+            "default": ""
+          },
+          "value": {
+            "type": "string",
+            "maxLength": 1000,
+            "minLength": 1,
+            "title": "Value"
+          }
+        },
+        "type": "object",
+        "required": [
+          "value"
+        ],
+        "title": "ContactAddress",
+        "description": "An address, as one block of text written as it is on an envelope, so\nany country's form fits."
+      },
+      "ContactCreate": {
+        "properties": {
+          "properties": {
+            "items": {
+              "$ref": "#/components/schemas/PropertyValueInput"
+            },
+            "type": "array",
+            "title": "Properties"
+          },
+          "name": {
+            "type": "string",
+            "maxLength": 255,
+            "minLength": 1,
+            "title": "Name"
+          },
+          "is_organization": {
+            "type": "boolean",
+            "title": "Is Organization",
+            "default": false
+          },
+          "emails": {
+            "items": {
+              "$ref": "#/components/schemas/ContactEmail"
+            },
+            "type": "array",
+            "maxItems": 20,
+            "title": "Emails"
+          },
+          "phones": {
+            "items": {
+              "$ref": "#/components/schemas/ContactPhone"
+            },
+            "type": "array",
+            "maxItems": 20,
+            "title": "Phones"
+          },
+          "addresses": {
+            "items": {
+              "$ref": "#/components/schemas/ContactAddress"
+            },
+            "type": "array",
+            "maxItems": 20,
+            "title": "Addresses"
+          },
+          "websites": {
+            "items": {
+              "$ref": "#/components/schemas/ContactWebsite"
+            },
+            "type": "array",
+            "maxItems": 20,
+            "title": "Websites"
+          },
+          "initiative_id": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Initiative Id"
+          },
+          "tag_ids": {
+            "anyOf": [
+              {
+                "items": {
+                  "type": "integer"
+                },
+                "type": "array"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Tag Ids"
+          },
+          "grants": {
+            "items": {
+              "$ref": "#/components/schemas/ResourceGrantSchema"
+            },
+            "type": "array",
+            "title": "Grants"
+          }
+        },
+        "type": "object",
+        "required": [
+          "name"
+        ],
+        "title": "ContactCreate"
+      },
+      "ContactDetail": {
+        "properties": {
+          "label": {
+            "type": "string",
+            "maxLength": 40,
+            "title": "Label",
+            "default": ""
+          },
+          "value": {
+            "type": "string",
+            "maxLength": 1000,
+            "minLength": 1,
+            "title": "Value"
+          }
+        },
+        "type": "object",
+        "required": [
+          "value"
+        ],
+        "title": "ContactDetail",
+        "description": "One of a contact's details: its value, and a short label saying which\none it is."
+      },
+      "ContactEmail": {
+        "properties": {
+          "label": {
+            "type": "string",
+            "maxLength": 40,
+            "title": "Label",
+            "default": ""
+          },
+          "value": {
+            "type": "string",
+            "format": "email",
+            "title": "Value"
+          }
+        },
+        "type": "object",
+        "required": [
+          "value"
+        ],
+        "title": "ContactEmail"
+      },
+      "ContactListResponse": {
+        "properties": {
+          "total_count": {
+            "type": "integer",
+            "title": "Total Count"
+          },
+          "page": {
+            "type": "integer",
+            "title": "Page"
+          },
+          "page_size": {
+            "type": "integer",
+            "title": "Page Size"
+          },
+          "has_next": {
+            "type": "boolean",
+            "title": "Has Next"
+          },
+          "has_prev": {
+            "type": "boolean",
+            "title": "Has Prev"
+          },
+          "items": {
+            "items": {
+              "$ref": "#/components/schemas/ContactSummary"
+            },
+            "type": "array",
+            "title": "Items"
+          }
+        },
+        "type": "object",
+        "required": [
+          "total_count",
+          "page",
+          "page_size",
+          "has_next",
+          "has_prev",
+          "items"
+        ],
+        "title": "ContactListResponse"
+      },
+      "ContactPhone": {
+        "properties": {
+          "label": {
+            "type": "string",
+            "maxLength": 40,
+            "title": "Label",
+            "default": ""
+          },
+          "value": {
+            "type": "string",
+            "maxLength": 40,
+            "minLength": 1,
+            "title": "Value"
+          }
+        },
+        "type": "object",
+        "required": [
+          "value"
+        ],
+        "title": "ContactPhone"
+      },
+      "ContactRead": {
+        "properties": {
+          "archived_at": {
+            "anyOf": [
+              {
+                "type": "string",
+                "format": "date-time"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Archived At"
+          },
+          "can": {
+            "$ref": "#/components/schemas/ToolCan"
+          },
+          "id": {
+            "type": "integer",
+            "title": "Id"
+          },
+          "initiative_id": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Initiative Id"
+          },
+          "community_id": {
+            "title": "Community Id",
+            "type": "string",
+            "x-identity": "community"
+          },
+          "created_by": {
+            "anyOf": [
+              {
+                "type": "string",
+                "x-identity": "person"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Created By"
+          },
+          "created_at": {
+            "type": "string",
+            "format": "date-time",
+            "title": "Created At"
+          },
+          "updated_at": {
+            "type": "string",
+            "format": "date-time",
+            "title": "Updated At"
+          },
+          "comments_enabled": {
+            "type": "boolean",
+            "title": "Comments Enabled",
+            "default": true
+          },
+          "tags": {
+            "items": {
+              "$ref": "#/components/schemas/TagSummary"
+            },
+            "type": "array",
+            "title": "Tags"
+          },
+          "properties": {
+            "items": {
+              "$ref": "#/components/schemas/PropertySummary"
+            },
+            "type": "array",
+            "title": "Properties"
+          },
+          "grants": {
+            "items": {
+              "$ref": "#/components/schemas/ResourceGrantSchema"
+            },
+            "type": "array",
+            "title": "Grants"
+          },
+          "name": {
+            "type": "string",
+            "title": "Name"
+          },
+          "is_organization": {
+            "type": "boolean",
+            "title": "Is Organization",
+            "default": false
+          },
+          "emails": {
+            "items": {
+              "$ref": "#/components/schemas/ContactDetail"
+            },
+            "type": "array",
+            "title": "Emails"
+          },
+          "phones": {
+            "items": {
+              "$ref": "#/components/schemas/ContactDetail"
+            },
+            "type": "array",
+            "title": "Phones"
+          },
+          "addresses": {
+            "items": {
+              "$ref": "#/components/schemas/ContactDetail"
+            },
+            "type": "array",
+            "title": "Addresses"
+          },
+          "websites": {
+            "items": {
+              "$ref": "#/components/schemas/ContactDetail"
+            },
+            "type": "array",
+            "title": "Websites"
+          }
+        },
+        "type": "object",
+        "required": [
+          "archived_at",
+          "can",
+          "id",
+          "initiative_id",
+          "community_id",
+          "created_by",
+          "created_at",
+          "updated_at",
+          "comments_enabled",
+          "tags",
+          "properties",
+          "grants",
+          "name",
+          "is_organization",
+          "emails",
+          "phones",
+          "addresses",
+          "websites"
+        ],
+        "title": "ContactRead"
+      },
+      "ContactSummary": {
+        "properties": {
+          "archived_at": {
+            "anyOf": [
+              {
+                "type": "string",
+                "format": "date-time"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Archived At"
+          },
+          "can": {
+            "$ref": "#/components/schemas/ToolCan"
+          },
+          "id": {
+            "type": "integer",
+            "title": "Id"
+          },
+          "initiative_id": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Initiative Id"
+          },
+          "community_id": {
+            "title": "Community Id",
+            "type": "string",
+            "x-identity": "community"
+          },
+          "created_by": {
+            "anyOf": [
+              {
+                "type": "string",
+                "x-identity": "person"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Created By"
+          },
+          "created_at": {
+            "type": "string",
+            "format": "date-time",
+            "title": "Created At"
+          },
+          "updated_at": {
+            "type": "string",
+            "format": "date-time",
+            "title": "Updated At"
+          },
+          "comments_enabled": {
+            "type": "boolean",
+            "title": "Comments Enabled",
+            "default": true
+          },
+          "tags": {
+            "items": {
+              "$ref": "#/components/schemas/TagSummary"
+            },
+            "type": "array",
+            "title": "Tags"
+          },
+          "properties": {
+            "items": {
+              "$ref": "#/components/schemas/PropertySummary"
+            },
+            "type": "array",
+            "title": "Properties"
+          },
+          "grants": {
+            "items": {
+              "$ref": "#/components/schemas/ResourceGrantSchema"
+            },
+            "type": "array",
+            "title": "Grants"
+          },
+          "name": {
+            "type": "string",
+            "title": "Name"
+          },
+          "is_organization": {
+            "type": "boolean",
+            "title": "Is Organization",
+            "default": false
+          },
+          "emails": {
+            "items": {
+              "$ref": "#/components/schemas/ContactDetail"
+            },
+            "type": "array",
+            "title": "Emails"
+          },
+          "phones": {
+            "items": {
+              "$ref": "#/components/schemas/ContactDetail"
+            },
+            "type": "array",
+            "title": "Phones"
+          },
+          "addresses": {
+            "items": {
+              "$ref": "#/components/schemas/ContactDetail"
+            },
+            "type": "array",
+            "title": "Addresses"
+          },
+          "websites": {
+            "items": {
+              "$ref": "#/components/schemas/ContactDetail"
+            },
+            "type": "array",
+            "title": "Websites"
+          }
+        },
+        "type": "object",
+        "required": [
+          "archived_at",
+          "can",
+          "id",
+          "initiative_id",
+          "community_id",
+          "created_by",
+          "created_at",
+          "updated_at",
+          "comments_enabled",
+          "tags",
+          "properties",
+          "grants",
+          "name",
+          "is_organization",
+          "emails",
+          "phones",
+          "addresses",
+          "websites"
+        ],
+        "title": "ContactSummary"
+      },
+      "ContactUpdate": {
+        "properties": {
+          "name": {
+            "anyOf": [
+              {
+                "type": "string",
+                "maxLength": 255,
+                "minLength": 1
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Name"
+          },
+          "is_organization": {
+            "anyOf": [
+              {
+                "type": "boolean"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Is Organization"
+          },
+          "emails": {
+            "anyOf": [
+              {
+                "items": {
+                  "$ref": "#/components/schemas/ContactEmail"
+                },
+                "type": "array",
+                "maxItems": 20
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Emails"
+          },
+          "phones": {
+            "anyOf": [
+              {
+                "items": {
+                  "$ref": "#/components/schemas/ContactPhone"
+                },
+                "type": "array",
+                "maxItems": 20
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Phones"
+          },
+          "addresses": {
+            "anyOf": [
+              {
+                "items": {
+                  "$ref": "#/components/schemas/ContactAddress"
+                },
+                "type": "array",
+                "maxItems": 20
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Addresses"
+          },
+          "websites": {
+            "anyOf": [
+              {
+                "items": {
+                  "$ref": "#/components/schemas/ContactWebsite"
+                },
+                "type": "array",
+                "maxItems": 20
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Websites"
+          }
+        },
+        "type": "object",
+        "title": "ContactUpdate",
+        "description": "A change to a contact. Only what is sent is written; a list sent\nreplaces the one there."
+      },
+      "ContactWebsite": {
+        "properties": {
+          "label": {
+            "type": "string",
+            "maxLength": 40,
+            "title": "Label",
+            "default": ""
+          },
+          "value": {
+            "type": "string",
+            "maxLength": 2048,
+            "minLength": 1,
+            "title": "Value"
+          }
+        },
+        "type": "object",
+        "required": [
+          "value"
+        ],
+        "title": "ContactWebsite"
       },
       "ContentCan": {
         "properties": {
@@ -15080,6 +16353,11 @@
             "title": "Wikis Enabled",
             "default": false
           },
+          "contacts_enabled": {
+            "type": "boolean",
+            "title": "Contacts Enabled",
+            "default": false
+          },
           "name": {
             "type": "string",
             "title": "Name"
@@ -15190,6 +16468,7 @@
           "dashboards_enabled",
           "posts_enabled",
           "wikis_enabled",
+          "contacts_enabled",
           "name",
           "description",
           "color",
@@ -17205,6 +18484,7 @@
           "dashboard",
           "post",
           "wiki",
+          "contact",
           "task",
           "calendar_event",
           "counter",
@@ -17413,6 +18693,7 @@
           "calendar_event",
           "collection",
           "comment",
+          "contact",
           "counter",
           "counter_group",
           "dashboard",
@@ -17666,6 +18947,7 @@
           "dashboard",
           "post",
           "wiki",
+          "contact",
           "task",
           "calendar_event",
           "wiki_page",
@@ -19358,7 +20640,8 @@
           "calendar",
           "dashboard",
           "post",
-          "wiki"
+          "wiki",
+          "contact"
         ],
         "title": "Tool"
       },

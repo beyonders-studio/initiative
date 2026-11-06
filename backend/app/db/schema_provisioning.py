@@ -155,6 +155,7 @@ SYSTEM_GUILD_MAINTENANCE_GRANTS: dict[str, tuple[str, ...]] = {
     # the scrub rewrites that comment.
     "wikis": ("SELECT",),
     "wiki_pages": ("SELECT",),
+    "contacts": ("SELECT",),
     "initiatives": ("SELECT",),
     # Content and search-index triggers must still record the scrub. Their
     # writes are column-scoped where possible; DELETE needs a table privilege.

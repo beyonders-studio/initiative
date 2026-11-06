@@ -94,6 +94,9 @@ class RelatedEnd(SanitizedBaseModel):
     #: kind that has no notion of finishing, which is most of them: a file
     #: is never "done". See :mod:`app.db.blocking`.
     is_open: Optional[bool] = None
+    #: When the far end starts, for an event: what a contact's page orders
+    #: what is coming up by. None for every other kind.
+    starts_at: Optional[datetime] = None
 
 
 class RelationshipRead(SanitizedBaseModel):

@@ -88,6 +88,7 @@ export const EntityLinkField = ({
                   smart_link_url: null,
                   handle: null,
                   is_open: null,
+                  starts_at: null,
                 }}
                 onRemove={
                   readOnly

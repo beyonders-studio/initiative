@@ -58,7 +58,7 @@ import type { DialogWithSuccessProps } from "@/types/dialog";
 /** The minimal shape the bulk dialog needs from any tool (project, file, …). */
 export interface BulkAccessItem {
   id: number;
-  initiative_id: number;
+  initiative_id: number | null;
   archived_at?: string | null;
   /** A template, which anyone who reads it may copy. */
   is_template?: boolean;
@@ -267,6 +267,9 @@ export function BulkEditAccessDialog({
   const revocableRoles = useMemo(() => {
     const roleMap = new Map<number, SelectableRole>();
     for (const item of items) {
+      // Roles are an initiative's; a community-level row carries none.
+      const initiativeId = item.initiative_id;
+      if (initiativeId === null) continue;
       for (const grant of item.grants ?? []) {
         if (grant.role_id == null || roleMap.has(grant.role_id)) continue;
         const known = rolesById.get(grant.role_id);
@@ -274,9 +277,8 @@ export function BulkEditAccessDialog({
           id: grant.role_id,
           name: known?.name ?? `role-${grant.role_id}`,
           displayName: known?.displayName ?? `Role ${grant.role_id}`,
-          initiativeId: item.initiative_id,
-          initiativeName:
-            initiativeNameById.get(item.initiative_id) ?? `Initiative ${item.initiative_id}`,
+          initiativeId,
+          initiativeName: initiativeNameById.get(initiativeId) ?? `Initiative ${initiativeId}`,
         });
       }
     }

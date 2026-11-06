@@ -52,6 +52,7 @@ from app.models.platform.guild import AdminSurface
 from app.models.tenant.batched_notice import BatchedNoticeKind
 from app.db.presence import present, present_to_member
 from app.db.authorization import (
+    COMMUNITY_ROWS,
     IN_POLICY,
     POLICY_SETTINGS_ADMIN,
     STANDING,
@@ -459,22 +460,34 @@ def direct() -> InitiativePath:
     )
 
 
-def direct_or_guild() -> InitiativePath:
+def direct_or_guild(tool: Tool) -> InitiativePath:
     """Own ``initiative_id`` column, or none: a tool made for the whole guild.
 
     A row naming an initiative is gated like any :func:`direct` row. A row
     naming none belongs to the guild, where the initiative gate has nothing to
-    decide: every member reads it as its sharing allows, and writing it is the
-    guild admin's (or a live write grant's), or the installed plug-in's on a token
-    not narrowed to one initiative. Sharing still applies on top, which is how
-    the admin decides who writes what the row holds. ``resource_actions``
-    asks the same writer for ``edit``.
+    decide: every member reads it as its sharing allows, and making or
+    changing it is for the holders of its tool's surface (or a live write
+    grant), or the installed plug-in's on a token not narrowed to one
+    initiative — and, where the tool says so (``COMMUNITY_ROWS``), for whoever
+    its sharing lets write it. Sharing still applies on top, which is how the
+    admin decides who writes what the row holds. ``resource_actions`` asks the
+    same writer for ``edit``.
     """
-    writer = _P.guild_row_writer
+    rows = COMMUNITY_ROWS[tool]
+    writer = _P.guild_row_writer(rows.surface)
+
+    def writes(t: str) -> str:
+        if not rows.granted_writes_row:
+            return writer
+        return (
+            f"({writer} OR resource_access('{tool.value}', {t}.id, {gucs.USER_ID},"
+            f" {t}.initiative_id, true, {STANDING}))"
+        )
+
     return InitiativePath(
         predicate=lambda t, w: (
             f"({_access(f'{t}.initiative_id', w)}"
-            f" AND ({t}.initiative_id IS NOT NULL OR {writer}))"
+            f" AND ({t}.initiative_id IS NOT NULL OR {writes(t)}))"
             if w
             else _access(f"{t}.initiative_id", w)
         ),
@@ -1662,10 +1675,10 @@ def content_kind_path() -> InitiativePath:
 # source of truth: INITIATIVE_SCOPED_TABLES and the rendered RLS DDL (app.db.guild_ddl) both derive from
 # this dict, so a new initiative-scoped table is declared here exactly once.
 INITIATIVE_PATHS: dict[str, InitiativePath] = {
-    # Every tool's table: its own initiative_id column. A calendar may name no
-    # initiative, being made for the whole guild.
+    # Every tool's table: its own initiative_id column. A calendar or a contact
+    # may name no initiative, being made for the whole guild.
     **{
-        tool.plural: direct_or_guild() if tool is Tool.calendar else direct()
+        tool.plural: direct_or_guild(tool) if tool in COMMUNITY_ROWS else direct()
         for tool in Tool
     },
     "metadata_definitions": metadata_definitions_path(),

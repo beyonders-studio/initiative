@@ -111,7 +111,9 @@
     "resource_post_one": "Beitrag",
     "resource_post_other": "Beiträge",
     "resource_wiki_one": "Wiki",
-    "resource_wiki_other": "Wikis"
+    "resource_wiki_other": "Wikis",
+    "resource_contact_one": "Kontakt",
+    "resource_contact_other": "Kontakte"
   },
   "request": {
     "needAccess": "Du brauchst Zugriff",

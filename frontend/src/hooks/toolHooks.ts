@@ -40,6 +40,17 @@ import {
   updateCalendar,
 } from "@/api/generated/calendars/calendars";
 import {
+  createContact,
+  deleteContact,
+  duplicateContact,
+  getListContactsQueryKey,
+  getReadContactQueryKey,
+  listContacts,
+  readContact,
+  setContactGrants,
+  updateContact,
+} from "@/api/generated/contacts/contacts";
+import {
   createCounterGroup,
   deleteCounterGroup,
   duplicateCounterGroup,
@@ -80,6 +91,7 @@ import type {
 import { Tool } from "@/api/generated/initiativeAPI.schemas";
 import {
   getListMyCalendarsQueryKey,
+  getListMyContactsQueryKey,
   getListMyCounterGroupsQueryKey,
   getListMyDashboardsQueryKey,
   getListMyFilesQueryKey,
@@ -87,6 +99,7 @@ import {
   getListMyProjectsQueryKey,
   getListMyWikisQueryKey,
   listMyCalendars,
+  listMyContacts,
   listMyCounterGroups,
   listMyDashboards,
   listMyFiles,
@@ -452,6 +465,21 @@ const calendarEndpoints = {
   tool: Tool.calendar,
 };
 
+const contactEndpoints = {
+  listKey: getListContactsQueryKey,
+  list: listContacts,
+  myListKey: getListMyContactsQueryKey,
+  myList: listMyContacts,
+  detailKey: getReadContactQueryKey,
+  detail: readContact,
+  create: createContact,
+  update: updateContact,
+  remove: deleteContact,
+  setGrants: setContactGrants,
+  duplicate: duplicateContact,
+  tool: Tool.contact,
+};
+
 const counterGroupEndpoints = {
   listKey: getListCounterGroupsQueryKey,
   list: listCounterGroups,
@@ -614,6 +642,7 @@ export const TOOL_HOOKS = {
     refreshesRelationships: true,
   }),
   [Tool.wiki]: makeToolHooks(wikiEndpoints),
+  [Tool.contact]: makeToolHooks(contactEndpoints, { seedsDetailOnUpdate: true }),
 } satisfies Record<Tool, ToolQueries>;
 
 /**

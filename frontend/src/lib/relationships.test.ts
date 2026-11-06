@@ -183,6 +183,7 @@ describe("relatedTarget", () => {
       original_filename: null,
       smart_link_url: null,
       is_open: null,
+      starts_at: null,
       handle: null,
     };
     expect(relatedTarget(end)).toEqual({

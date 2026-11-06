@@ -341,25 +341,31 @@ def refuse_across_initiatives(
 ) -> None:
     """Both ends of a link a person makes belong to the same place.
 
-    Two things can have no initiative, and they are not the same thing:
+    Three things can have no initiative, and they are not the same thing:
 
     * A **tag** belongs to none by its nature — it is the guild's own
       vocabulary, which every initiative shares. It pairs with anything the
       guild holds.
+    * A **community contact** belongs to none because it is the community's
+      address book, which any initiative's work may name. It pairs with
+      anything too.
     * An **event on a guild calendar** belongs to none because that is what a
       guild calendar is: an event takes its initiative from its calendar, and a
       guild calendar has none. So it is guild-level content, and initiative
       content is not its to link.
 
-    What tells them apart is whether the KIND belongs to initiatives at all:
-    ``calendar_events`` does and this row does not, where ``tags`` never does.
+    What tells the first from the last is whether the KIND belongs to
+    initiatives at all: ``calendar_events`` does and this row does not, where
+    ``tags`` never does.
     """
     if a.initiative_id == b.initiative_id:
         return
-    guild_vocabulary = any(
-        end.initiative_id is None and not end.scoped_kind for end in (a, b)
+    shared = any(
+        end.initiative_id is None
+        and (not end.scoped_kind or end.entity_type == SearchEntityType.contact)
+        for end in (a, b)
     )
-    if guild_vocabulary:
+    if shared:
         return
     raise Refused(
         status_code=status.HTTP_400_BAD_REQUEST,

@@ -36,6 +36,7 @@ from app.api.v1.tenant_endpoints import (
     guild_plugins,
     collaboration,
     comments,
+    contacts,
     counters,
     files,
     events,
@@ -338,6 +339,7 @@ guild_router.include_router(dashboards.router, **_tool_mount(Tool.dashboard))
 guild_router.include_router(posts.router, **_tool_mount(Tool.post))
 guild_router.include_router(wikis.router, **_tool_mount(Tool.wiki))
 guild_router.include_router(wikis.pages_router, tags=_tool_mount(Tool.wiki)["tags"])
+guild_router.include_router(contacts.router, **_tool_mount(Tool.contact))
 # Plug-ins installed at guild scope. Every member reads them (the sidebar needs to
 # know what is there); installing and removing are guild-admin actions.
 #

@@ -1175,6 +1175,21 @@ class CalendarMessages:
     PLUGIN_INITIATIVE_REQUIRED = "CALENDAR_PLUGIN_INITIATIVE_REQUIRED"
 
 
+class ContactMessages:
+    # A community contact lives inside the community contacts plug-in, which is
+    # what reaches it and what its removal takes with it.
+    PLUGIN_REQUIRED = "CONTACT_COMMUNITY_PLUGIN_REQUIRED"
+    # An installed plug-in creates a contact in an initiative; a community one
+    # is recorded on the community contacts plug-in's install.
+    PLUGIN_INITIATIVE_REQUIRED = "CONTACT_PLUGIN_INITIATIVE_REQUIRED"
+    # Moving a contact into the community's contacts, when it is there already.
+    ALREADY_IN_COMMUNITY = "CONTACT_ALREADY_IN_COMMUNITY"
+    # A phone number is digits and the marks people group them with.
+    PHONE_INVALID = "CONTACT_PHONE_INVALID"
+    # A website is an http or https address.
+    WEBSITE_INVALID = "CONTACT_WEBSITE_INVALID"
+
+
 class CalendarEventMessages:
     ICAL_PARSE_FAILED = "ICAL_PARSE_FAILED"
     ICAL_NO_EVENTS = "ICAL_NO_EVENTS_FOUND"

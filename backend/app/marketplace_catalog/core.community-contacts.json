@@ -1,0 +1,16 @@
+{
+  "uid": "C9NTK4QW7RXM2B",
+  "public_id": "core.community-contacts",
+  "kind": "plugin",
+  "name": "Community contacts",
+  "publisher": "Initiative",
+  "description": "An address book your whole community shares — the venues, suppliers and people you keep coming back to.",
+  "long_description": "Give your community one address book, rather than a copy of the florist's number in every initiative.\n\nKeep a contact here once and link to it from the work in any initiative: the deposit task, the delivery event, the contract file. Every member can look them up; a guest sees only the ones shared with them.\n\nRemoving the plug-in sends its contacts to the trash, so nothing is lost by accident.",
+  "avatar_url": "/marketplace/core-community-contacts.svg",
+  "images": [],
+  "version": "1.0.0",
+  "definition": {
+    "plugin_kind": "tool_instance",
+    "tool": "contact"
+  }
+}

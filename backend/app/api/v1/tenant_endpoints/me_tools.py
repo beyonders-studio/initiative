@@ -210,6 +210,13 @@ MY_TOOL_LISTS: dict[Tool, MyToolList] = {
         page_size=page_size_param(20, ge=0, le=100),
         list_doc=("Wikis that reach the caller across every guild they belong to."),
     ),
+    Tool.contact: MyToolList(
+        # By name, as an address book is read.
+        default_key=my_tools_service.name_key,
+        default_desc=False,
+        page_size=page_size_param(20, ge=0, le=100),
+        list_doc="Contacts that reach the caller across every guild they belong to.",
+    ),
 }
 
 

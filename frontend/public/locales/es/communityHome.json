@@ -96,7 +96,8 @@
       "files": "Tipo",
       "calendars": "Descripción",
       "dashboards": "Origen",
-      "posts": "Vista previa"
+      "posts": "Vista previa",
+      "contacts": "Teléfono o correo"
     }
   },
   "detail": {

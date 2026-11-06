@@ -21,6 +21,7 @@ import { resolveInitiativeColor } from "@/lib/initiativeColors";
 import { initiativeRoute, TOOLS, toolCamelPlural, toolListRoute } from "@/lib/tools";
 import { cn } from "@/lib/utils";
 
+import { ContactsView } from "./initiativeTools/contacts/ContactsPage";
 import { CounterGroupsView } from "./initiativeTools/counters/CounterGroupsPage";
 import { DashboardsView } from "./initiativeTools/dashboards/DashboardsPage";
 import { CalendarsView } from "./initiativeTools/events/CalendarsPage";
@@ -43,6 +44,7 @@ const TOOL_VIEWS: Record<Tool, ComponentType<ToolViewProps>> = {
   [Tool.dashboard]: DashboardsView,
   [Tool.post]: PostsView,
   [Tool.wiki]: WikisView,
+  [Tool.contact]: ContactsView,
 };
 
 const TOOL_TABS: Array<[Tool, ComponentType<ToolViewProps>]> = TOOLS.map((tool) => [

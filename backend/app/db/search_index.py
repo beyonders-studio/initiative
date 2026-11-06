@@ -467,6 +467,9 @@ TOOL_OVERRIDES: dict[Tool, dict[str, object]] = {
     # A post's text is what it says, not a summary of it: the headline is the
     # title and the Lexical body is the body. There is no `description`.
     Tool.post: {"body": ("body",), "body_sql": _post_text},
+    # A contact is found by its name. How to reach one is not text somebody
+    # writes in, which is what a body is (``written_columns``).
+    Tool.contact: {"body": ()},
 }
 
 #: table -> how its rows are indexed.

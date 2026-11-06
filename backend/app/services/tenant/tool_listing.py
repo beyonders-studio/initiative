@@ -104,8 +104,9 @@ def initiative_switch_clause(
     same way, and neither costs a round trip.
 
     ``guild_level_rows`` admits the rows that belong to the guild rather than
-    to an initiative — calendars, where installing the plug-in is what turned the
-    tool on and no initiative has anything to say about it.
+    to an initiative — a community calendar or contact, where installing the
+    plug-in is what turned the tool on and no initiative has anything to say
+    about it.
     """
     enabled = model.initiative_id.in_(select(Initiative.id).where(tool_on_sql(tool)))
     if guild_level_rows:

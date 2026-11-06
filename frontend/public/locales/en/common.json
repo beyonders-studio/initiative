@@ -423,6 +423,11 @@
       "this": "this wiki",
       "plural": "wikis"
     },
+    "contact": {
+      "name": "Contact",
+      "this": "this contact",
+      "plural": "contacts"
+    },
     "task": {
       "name": "Task",
       "this": "this task",

@@ -79,6 +79,8 @@ _SAFE_WRITES = {
     "update_post",
     "create_wiki",
     "update_wiki",
+    "create_contact",
+    "update_contact",
     # And what those tools hold: a project's tasks, a counter group's counters,
     # a calendar's events, a wiki's pages, and the comments on any of them.
     "create_task",

@@ -15,6 +15,7 @@ import type { ReactNode } from "react";
 
 import type {
   CalendarListResponse,
+  ContactListResponse,
   CounterGroupListResponse,
   DashboardListResponse,
   FileListResponse,
@@ -61,6 +62,7 @@ export const TOOL_HAS_DETAIL: Record<Tool, boolean> = {
   [Tool.dashboard]: true,
   [Tool.post]: true,
   [Tool.wiki]: false,
+  [Tool.contact]: true,
 };
 
 /**
@@ -82,6 +84,7 @@ export type ToolResponses = {
   [Tool.dashboard]: DashboardListResponse | undefined;
   [Tool.post]: PostListResponse | undefined;
   [Tool.wiki]: WikiListResponse | undefined;
+  [Tool.contact]: ContactListResponse | undefined;
 };
 
 /**
@@ -225,6 +228,19 @@ export function buildToolRows(
         initiativeId: wiki.initiative_id,
         tags: wiki.tags,
         updatedAt: wiki.updated_at,
+      }));
+    case Tool.contact:
+      return (data[Tool.contact]?.items ?? []).map((contact) => ({
+        id: contact.id,
+        communityId: contact.community_id ?? fallbackCommunityId,
+        name: contact.name,
+        href: href(contact.id, contact.initiative_id),
+        glyph: null,
+        initiativeId: contact.initiative_id,
+        tags: contact.tags,
+        updatedAt: contact.updated_at,
+        // The first way to reach them, which is what a table of contacts is for.
+        detail: contact.phones[0]?.value ?? contact.emails[0]?.value ?? null,
       }));
   }
 }

@@ -26,6 +26,7 @@ export function buildComment(overrides: Partial<CommentRead> = {}): CommentRead 
     post_id: null,
     collection_id: null,
     wiki_id: null,
+    contact_id: null,
     parent_comment_id: null,
     created_at: "2026-01-15T00:00:00.000Z",
     updated_at: null,

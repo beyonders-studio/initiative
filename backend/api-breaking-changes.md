@@ -12,11 +12,93 @@ matter and can be deleted.
 ### The message roster is people, not contacts
 
 The roster the new-conversation picker reads moved to `GET /api/v1/me/people`,
-so the word "contacts" is free for the Contacts tool. Its schemas are
-`PersonRead`, `PeopleCommunitySection` and `PeopleSectionsResponse`; the body
+so the word "contacts" is free for the Contacts tool, whose list across
+communities `GET /api/v1/me/contacts` now is. The roster's schemas are
+`PersonRead`, `PeopleCommunitySection` and `PeopleSectionsResponse`; its body
 is unchanged.
 
-- GET /api/v1/me/contacts api path removed without deprecation
+- GET /api/v1/me/contacts removed the required property `sections` from the response with the `200` status
+
+### Contacts, a new tool
+
+`contact` joins every list of tools and kinds: `Tool`, the kinds a reference,
+a link, search, the trash and a bookmark name, and the permission keys
+`contacts_enabled` and `create_contacts`. A contact's chips add the aspects
+`phone` and `email`.
+
+- GET /api/v1/c/{community_id}/activity/ added the new `contact` enum value to the `items/items/entity_type` response property for the response status `200`
+- GET /api/v1/c/{community_id}/activity/ added the new `contact` enum value to the `items/items/tool/anyOf[subschema #1: Tool]/` response property for the response status `200`
+- GET /api/v1/c/{community_id}/initiatives/ added the new `contact` enum value to the `items/can/create/items/` response property for the response status `200`
+- GET /api/v1/c/{community_id}/initiatives/ added the new `contact` enum value to the `items/can/view/items/` response property for the response status `200`
+- GET /api/v1/c/{community_id}/initiatives/{initiative_id} added the new `contact` enum value to the `can/create/items/` response property for the response status `200`
+- GET /api/v1/c/{community_id}/initiatives/{initiative_id} added the new `contact` enum value to the `can/view/items/` response property for the response status `200`
+- GET /api/v1/c/{community_id}/initiatives/{initiative_id}/reports added the new `contact` enum value to the `items/items/target_link/anyOf[subschema #1: ReportTargetLink]/entity_type` response property for the response status `200`
+- GET /api/v1/c/{community_id}/initiatives/{initiative_id}/reports added the new `contact` enum value to the `items/items/target_link/anyOf[subschema #1: ReportTargetLink]/tool` response property for the response status `200`
+- GET /api/v1/c/{community_id}/initiatives/{initiative_id}/roles added the new `contacts_enabled` enum value to the `items/permissions/propertyNames/` response property for the response status `200`
+- GET /api/v1/c/{community_id}/initiatives/{initiative_id}/roles added the new `create_contacts` enum value to the `items/permissions/propertyNames/` response property for the response status `200`
+- GET /api/v1/c/{community_id}/layouts/initiative added the new `contact` enum value to the `items/tool` response property for the response status `200`
+- GET /api/v1/c/{community_id}/marketplace/listings added the new `contact` enum value to the `items/items/kind` response property for the response status `200`
+- GET /api/v1/c/{community_id}/marketplace/listings/by-uid/{uid} added the new `contact` enum value to the `kind` response property for the response status `200`
+- GET /api/v1/c/{community_id}/marketplace/listings/{public_id} added the new `contact` enum value to the `kind` response property for the response status `200`
+- GET /api/v1/c/{community_id}/personal-items added the new `contact` enum value to the `items/entity_type` response property for the response status `200`
+- GET /api/v1/c/{community_id}/personal-items/{kind}/{entity_id} added the new `contact` enum value to the `entity_type` response property for the response status `200`
+- GET /api/v1/c/{community_id}/relationships/ added the new `contact` enum value to the `items/other/tool/anyOf[subschema #1: Tool]/` response property for the response status `200`
+- GET /api/v1/c/{community_id}/relationships/ added the new `contact` enum value to the `items/other/type` response property for the response status `200`
+- GET /api/v1/c/{community_id}/relationships/neighbourhood added the new `contact` enum value to the `edges/items/anchor/type` response property for the response status `200`
+- GET /api/v1/c/{community_id}/relationships/neighbourhood added the new `contact` enum value to the `edges/items/other/type` response property for the response status `200`
+- GET /api/v1/c/{community_id}/relationships/neighbourhood added the new `contact` enum value to the `nodes/items/end/tool/anyOf[subschema #1: Tool]/` response property for the response status `200`
+- GET /api/v1/c/{community_id}/relationships/neighbourhood added the new `contact` enum value to the `nodes/items/end/type` response property for the response status `200`
+- GET /api/v1/c/{community_id}/search/ added the new `contact` enum value to the `items/items/entity_type` response property for the response status `200`
+- GET /api/v1/c/{community_id}/search/ added the new `contact` enum value to the `items/items/tool/anyOf[subschema #1: Tool]/` response property for the response status `200`
+- GET /api/v1/c/{community_id}/search/recent added the new `contact` enum value to the `items/entity_type` response property for the response status `200`
+- GET /api/v1/c/{community_id}/search/recent added the new `contact` enum value to the `items/tool/anyOf[subschema #1: Tool]/` response property for the response status `200`
+- GET /api/v1/c/{community_id}/search/suggest added the new `contact` enum value to the `items/entity_type` response property for the response status `200`
+- GET /api/v1/c/{community_id}/search/suggest added the new `contact` enum value to the `items/tool/anyOf[subschema #1: Tool]/` response property for the response status `200`
+- GET /api/v1/c/{community_id}/tags/{tag_id}/entities added the new `contact` enum value to the `items/items/entity_type` response property for the response status `200`
+- GET /api/v1/c/{community_id}/tags/{tag_id}/entities added the new `contact` enum value to the `items/items/tool/anyOf[subschema #1: Tool]/` response property for the response status `200`
+- GET /api/v1/c/{community_id}/tools/counts/by-initiative added the new `contact` enum value to the `counts/propertyNames/` response property for the response status `200`
+- GET /api/v1/c/{community_id}/trash/ added the new `contact` enum value to the `items/items/entity_type` response property for the response status `200`
+- GET /api/v1/c/{community_id}/users/unowned-content added the new `contact` enum value to the `items/items/tool` response property for the response status `200`
+- GET /api/v1/c/{community_id}/users/{user_id}/owned-content added the new `contact` enum value to the `items/items/tool` response property for the response status `200`
+- GET /api/v1/communities/{community_id}/invites added the new `contact` enum value to the `items/grants/items/resource_type/anyOf[subschema #1: Tool]/` response property for the response status `200`
+- GET /api/v1/marketplace/local/mine added the new `contact` enum value to the `items/kind` response property for the response status `200`
+- GET /api/v1/marketplace/local/pending added the new `contact` enum value to the `items/kind` response property for the response status `200`
+- GET /api/v1/me/api-keys added the new `contact` enum value to the `keys/items/resource_type/anyOf[subschema #1: Tool]/` response property for the response status `200`
+- GET /api/v1/me/personal-items added the new `contact` enum value to the `items/entity_type` response property for the response status `200`
+- GET /api/v1/me/trash added the new `contact` enum value to the `items/items/entity_type` response property for the response status `200`
+- PATCH /api/v1/c/{community_id}/initiatives/{initiative_id} added the new `contact` enum value to the `can/create/items/` response property for the response status `200`
+- PATCH /api/v1/c/{community_id}/initiatives/{initiative_id} added the new `contact` enum value to the `can/view/items/` response property for the response status `200`
+- PATCH /api/v1/c/{community_id}/initiatives/{initiative_id}/members/{user_id} added the new `contact` enum value to the `can/create/items/` response property for the response status `200`
+- PATCH /api/v1/c/{community_id}/initiatives/{initiative_id}/members/{user_id} added the new `contact` enum value to the `can/view/items/` response property for the response status `200`
+- PATCH /api/v1/c/{community_id}/initiatives/{initiative_id}/roles/{role_id} added the new `contacts_enabled` enum value to the `permissions/propertyNames/` response property for the response status `200`
+- PATCH /api/v1/c/{community_id}/initiatives/{initiative_id}/roles/{role_id} added the new `create_contacts` enum value to the `permissions/propertyNames/` response property for the response status `200`
+- POST /api/v1/c/{community_id}/archive/{entity_type}/{entity_id} added the new `contact` enum value to the `entity_type` response property for the response status `200`
+- POST /api/v1/c/{community_id}/initiatives/ added the new `contact` enum value to the `can/create/items/` response property for the response status `201`
+- POST /api/v1/c/{community_id}/initiatives/ added the new `contact` enum value to the `can/view/items/` response property for the response status `201`
+- POST /api/v1/c/{community_id}/initiatives/{initiative_id}/join added the new `contact` enum value to the `can/create/items/` response property for the response status `200`
+- POST /api/v1/c/{community_id}/initiatives/{initiative_id}/join added the new `contact` enum value to the `can/view/items/` response property for the response status `200`
+- POST /api/v1/c/{community_id}/initiatives/{initiative_id}/members added the new `contact` enum value to the `can/create/items/` response property for the response status `200`
+- POST /api/v1/c/{community_id}/initiatives/{initiative_id}/members added the new `contact` enum value to the `can/view/items/` response property for the response status `200`
+- POST /api/v1/c/{community_id}/initiatives/{initiative_id}/roles added the new `contacts_enabled` enum value to the `permissions/propertyNames/` response property for the response status `201`
+- POST /api/v1/c/{community_id}/initiatives/{initiative_id}/roles added the new `create_contacts` enum value to the `permissions/propertyNames/` response property for the response status `201`
+- POST /api/v1/c/{community_id}/marketplace/listings/by-uid/{uid}/install added the new `contact` enum value to the `kind` response property for the response status `201`
+- POST /api/v1/c/{community_id}/relationships/ added the new `contact` enum value to the `other/tool/anyOf[subschema #1: Tool]/` response property for the response status `201`
+- POST /api/v1/c/{community_id}/relationships/ added the new `contact` enum value to the `other/type` response property for the response status `201`
+- POST /api/v1/c/{community_id}/reports/{report_id}/settle added the new `contact` enum value to the `target_link/anyOf[subschema #1: ReportTargetLink]/entity_type` response property for the response status `200`
+- POST /api/v1/c/{community_id}/reports/{report_id}/settle added the new `contact` enum value to the `target_link/anyOf[subschema #1: ReportTargetLink]/tool` response property for the response status `200`
+- POST /api/v1/c/{community_id}/smart-chips/ added the new `contact` enum value to the `items/items/entity_type` response property for the response status `200`
+- POST /api/v1/c/{community_id}/smart-chips/ added the new `email` enum value to the `items/items/aspect/anyOf[subschema #1: SmartChipAspect]/` response property for the response status `200`
+- POST /api/v1/c/{community_id}/smart-chips/ added the new `phone` enum value to the `items/items/aspect/anyOf[subschema #1: SmartChipAspect]/` response property for the response status `200`
+- POST /api/v1/c/{community_id}/smart-chips/embeds added the new `contact` enum value to the `items/items/entity_type` response property for the response status `200`
+- POST /api/v1/c/{community_id}/unarchive/{entity_type}/{entity_id} added the new `contact` enum value to the `entity_type` response property for the response status `200`
+- POST /api/v1/communities/{community_id}/invites added the new `contact` enum value to the `grants/items/resource_type/anyOf[subschema #1: Tool]/` response property for the response status `201`
+- POST /api/v1/me/api-keys added the new `contact` enum value to the `api_key/resource_type/anyOf[subschema #1: Tool]/` response property for the response status `201`
+- PUT /api/v1/c/{community_id}/personal-items/bookmark/{tool}/{entity_id} added the new `contact` enum value to the `entity_type` response property for the response status `200`
+- PUT /api/v1/c/{community_id}/personal-items/subscribe/{kind}/{entity_id} added the new `contact` enum value to the `entity_type` response property for the response status `200`
+- PUT /api/v1/c/{community_id}/personal-items/view/{kind}/{entity_id} added the new `contact` enum value to the `entity_type` response property for the response status `200`
+- PUT /api/v1/c/{community_id}/relationships/ added the new `contact` enum value to the `items/other/tool/anyOf[subschema #1: Tool]/` response property for the response status `200`
+- PUT /api/v1/c/{community_id}/relationships/ added the new `contact` enum value to the `items/other/type` response property for the response status `200`
+- PUT /api/v1/c/{community_id}/resource-grants/bulk added the new `contact` enum value to the `results/items/resource_type` response property for the response status `200`
 
 ### Queues are gone
 

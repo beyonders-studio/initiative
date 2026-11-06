@@ -627,6 +627,7 @@ const allPosts = (): Spec => toolList(Tool.post);
 const post = (id: number): Spec => toolEntity(Tool.post, id);
 const allWikis = (): Spec => toolList(Tool.wiki);
 const wiki = (id: number): Spec => toolEntity(Tool.wiki, id);
+const allContacts = (): Spec => toolList(Tool.contact);
 
 // ── Property values (community) ──────────────────────────────────────────────────
 
@@ -669,6 +670,7 @@ export const q = {
   allCalendarEvents,
   allCalendars,
   allComments,
+  allContacts,
   allCounterGroups,
   allDashboards,
   allFiles,

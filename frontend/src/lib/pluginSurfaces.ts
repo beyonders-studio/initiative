@@ -17,7 +17,7 @@
  * door that would not open.
  */
 
-import { initiativeRoute } from "@/lib/tools";
+import { initiativeRoute, TOOLS, toolListRoute } from "@/lib/tools";
 
 export interface PluginPage {
   id: string;
@@ -147,11 +147,12 @@ export const hasInitiativeSurfaces = (definition?: Record<string, unknown> | nul
 export const communityPluginPath = (
   plugin: PluginSurfaceSource & { id: number }
 ): string | null => {
-  if (plugin.tool === "calendar") {
+  const tool = TOOLS.find((each) => each === plugin.tool);
+  if (tool) {
     // No `/i/` prefix on purpose: a plug-in is installed per community, and the
-    // calendars it holds belong to no initiative — the community route is their
-    // real address, not a leftover.
-    return "/calendars";
+    // calendars or contacts it holds belong to no initiative — the community
+    // route is their real address, not a leftover.
+    return toolListRoute(tool, null);
   }
   return pluginPages(plugin).length ? `/plugins/${plugin.id}` : null;
 };
