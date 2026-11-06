@@ -29,7 +29,7 @@ from __future__ import annotations
 import asyncio
 import logging
 from dataclasses import dataclass, field
-from typing import Any, AsyncIterator, Awaitable, Callable, Optional
+from typing import Any, AsyncIterator, Awaitable, BinaryIO, Callable, Optional
 
 from app.core.messages import ImportEngineMessages
 from app.services.import_engine import jira_attachments, jira_mapping, jira_sprints
@@ -37,7 +37,7 @@ from app.services.import_engine.atlassian import (
     AtlassianCredential,
     Heartbeat,
     Walk,
-    get_bytes,
+    get_file,
     get_json,
     throttled,
 )
@@ -411,12 +411,15 @@ async def fetch_project_envelope(
         if store is None:
             raise ValueError("attachments need somewhere to be stored")
 
-        async def fetch_attachment(attachment_id: str, max_bytes: int) -> bytes:
+        async def fetch_attachment(
+            attachment_id: str, max_bytes: int, target: BinaryIO
+        ) -> int:
             # redirect=false: the content itself, not a hop to a media host
             # this client would refuse to follow.
-            return await get_bytes(
+            return await get_file(
                 credential,
                 f"/rest/api/3/attachment/content/{attachment_id}?redirect=false",
+                target,
                 max_bytes=max_bytes,
             )
 

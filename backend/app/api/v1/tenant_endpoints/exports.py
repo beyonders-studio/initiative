@@ -22,6 +22,7 @@ from pydantic import Field
 
 from fastapi import APIRouter, Depends, HTTPException, Query, Response, status
 from fastapi.responses import JSONResponse, RedirectResponse
+from starlette.background import BackgroundTask
 from sqlmodel import col, select
 
 from app.api.deps import (
@@ -75,13 +76,18 @@ CurrentUserDep = Annotated[User, Depends(get_current_active_user)]
 def _inline_response(result: InlineExport) -> Response:
     # The filename can carry user text (file titles, original upload
     # names) — the helper escapes it (RFC 5987) so it can't break the header.
-    return Response(
-        content=result.content,
-        media_type=result.content_type,
-        headers={
-            "Content-Disposition": content_disposition_attachment(result.filename)
-        },
+    headers = {"Content-Disposition": content_disposition_attachment(result.filename)}
+    if isinstance(result.content, bytes):
+        return Response(
+            content=result.content, media_type=result.content_type, headers=headers
+        )
+    # A stored file or an archive on disk streams rather than being read in.
+    response = build_upload_response(
+        result.content, headers=headers, media_type=result.content_type
     )
+    if result.temporary is not None:
+        response.background = BackgroundTask(result.temporary.unlink, missing_ok=True)
+    return response
 
 
 def _allow_job(guild_context: GuildContext) -> bool:

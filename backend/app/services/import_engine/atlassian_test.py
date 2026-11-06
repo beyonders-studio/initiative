@@ -8,6 +8,7 @@ foreign server can misbehave becomes a code rather than prose.
 """
 
 import base64
+import io
 
 import httpx
 import pytest
@@ -42,13 +43,35 @@ def _response(status_code: int, payload=None, *, text: str | None = None):
     return httpx.Response(status_code, json=payload if payload is not None else {})
 
 
+async def answered(
+    method: str, url: str, response: httpx.Response, kw: dict
+) -> httpx.Response:
+    """``response`` as ``request_public_target`` hands one back for the
+    keyword arguments ``kw`` it was called with: bounded, and its body written
+    to the sink when there is one."""
+    from app.services.safe_http import _read_bounded
+
+    if kw.get("max_bytes") is None:
+        return response
+    response.request = httpx.Request(method, url)
+    return await _read_bounded(response, kw["max_bytes"], kw.get("sink"))
+
+
+async def _download(path: str, **kw) -> bytes:
+    """What :func:`atlassian.get_file` writes for ``path``, read back."""
+    target = io.BytesIO()
+    size = await atlassian.get_file(CREDENTIAL, path, target, **kw)
+    assert size == len(target.getvalue())
+    return target.getvalue()
+
+
 def _stub(monkeypatch, handler):
     """Answer every outbound call with ``handler(method, url, json)``."""
     calls: list[dict] = []
 
     async def fake_request(method, url, *, headers=None, json=None, timeout=None, **kw):
         calls.append({"method": method, "url": url, "headers": headers, "json": json})
-        return handler(method, url, json)
+        return await answered(method, url, handler(method, url, json), kw)
 
     monkeypatch.setattr(atlassian, "request_public_target", fake_request)
     return calls
@@ -381,16 +404,12 @@ async def test_the_probe_waits_briefly_because_someone_is_watching(monkeypatch, 
 # --- downloading a file ------------------------------------------------------
 
 
-async def test_a_file_arrives_as_bytes_with_the_retry_a_json_call_gets(
-    monkeypatch, waits
-):
+async def test_a_file_arrives_with_the_retry_a_json_call_gets(monkeypatch, waits):
     calls = _stub(
         monkeypatch,
         _sequence(_throttled("1"), httpx.Response(200, content=b"\x89PNG")),
     )
-    data = await atlassian.get_bytes(
-        CREDENTIAL, "/rest/api/3/attachment/content/10", max_bytes=100
-    )
+    data = await _download("/rest/api/3/attachment/content/10", max_bytes=100)
     assert data == b"\x89PNG"
     assert len(calls) == 2 and len(waits) == 1
     assert calls[0]["headers"]["Accept"] == "*/*"
@@ -399,7 +418,7 @@ async def test_a_file_arrives_as_bytes_with_the_retry_a_json_call_gets(
 async def test_a_file_bigger_than_its_bound_is_refused(monkeypatch):
     _stub(monkeypatch, lambda m, u, j: httpx.Response(200, content=b"x" * 101))
     with pytest.raises(ImportEngineError) as exc:
-        await atlassian.get_bytes(CREDENTIAL, "/f", max_bytes=100)
+        await _download("/f", max_bytes=100)
     assert exc.value.code == ImportEngineMessages.IMPORT_TOO_LARGE
 
 
@@ -418,7 +437,7 @@ async def test_a_file_the_site_will_not_hand_over_is_a_code(
     bytes directly, and a hop elsewhere is not an answer."""
     _stub(monkeypatch, lambda m, u, j: httpx.Response(status_code, content=b""))
     with pytest.raises(ImportEngineError) as exc:
-        await atlassian.get_bytes(CREDENTIAL, "/f", max_bytes=100)
+        await _download("/f", max_bytes=100)
     assert exc.value.code == code
 
 
@@ -434,9 +453,7 @@ async def test_a_download_follows_its_one_hop_without_the_token(monkeypatch):
             else httpx.Response(200, content=b"%PDF")
         ),
     )
-    data = await atlassian.get_bytes(
-        CREDENTIAL, "/wiki/download", max_bytes=100, follow_redirect=True
-    )
+    data = await _download("/wiki/download", max_bytes=100, follow_redirect=True)
     assert data == b"%PDF"
     assert [c["url"] for c in calls] == [
         "https://acme.atlassian.net/wiki/download",
@@ -455,9 +472,7 @@ async def test_a_hop_that_is_not_https_is_not_followed(monkeypatch):
         ),
     )
     with pytest.raises(ImportEngineError) as exc:
-        await atlassian.get_bytes(
-            CREDENTIAL, "/wiki/download", max_bytes=100, follow_redirect=True
-        )
+        await _download("/wiki/download", max_bytes=100, follow_redirect=True)
     assert exc.value.code == ImportEngineMessages.IMPORT_SOURCE_UNREACHABLE
     assert len(calls) == 1
 
@@ -472,9 +487,7 @@ async def test_a_hop_to_a_private_address_is_refused(monkeypatch):
 
     monkeypatch.setattr(atlassian, "request_public_target", fake_request)
     with pytest.raises(ImportEngineError) as exc:
-        await atlassian.get_bytes(
-            CREDENTIAL, "/wiki/download", max_bytes=100, follow_redirect=True
-        )
+        await _download("/wiki/download", max_bytes=100, follow_redirect=True)
     assert exc.value.code == ImportEngineMessages.IMPORT_SOURCE_PRIVATE_HOST
 
 
@@ -484,9 +497,7 @@ async def test_a_second_hop_is_not_followed(monkeypatch):
         lambda m, u, j: httpx.Response(302, headers={"location": MEDIA}),
     )
     with pytest.raises(ImportEngineError) as exc:
-        await atlassian.get_bytes(
-            CREDENTIAL, "/wiki/download", max_bytes=100, follow_redirect=True
-        )
+        await _download("/wiki/download", max_bytes=100, follow_redirect=True)
     assert exc.value.code == ImportEngineMessages.IMPORT_SOURCE_UNREACHABLE
 
 
@@ -499,7 +510,7 @@ def _slow(monkeypatch, seconds: float):
 
     async def fake_request(method, url, *, headers=None, json=None, timeout=None, **kw):
         await asyncio.sleep(seconds)
-        return _response(200, {"ok": True}, text=None)
+        return await answered(method, url, _response(200, {"ok": True}, text=None), kw)
 
     monkeypatch.setattr(atlassian, "request_public_target", fake_request)
 
@@ -528,14 +539,12 @@ async def test_a_download_gets_longer_the_larger_it_may_be(monkeypatch):
         attempts=1, max_wait_seconds=0, call_deadline_seconds=0.05
     )
     # 1,000 bytes at 1,000 a second: a second on top of the call's own.
-    data = await atlassian.get_bytes(
-        CREDENTIAL, "/rest/api/3/attachment/content/1", max_bytes=1000, retry=policy
+    data = await _download(
+        "/rest/api/3/attachment/content/1", max_bytes=1000, retry=policy
     )
     assert data
     with pytest.raises(ImportEngineError) as exc:
-        await atlassian.get_bytes(
-            CREDENTIAL, "/rest/api/3/attachment/content/1", max_bytes=10, retry=policy
-        )
+        await _download("/rest/api/3/attachment/content/1", max_bytes=10, retry=policy)
     assert exc.value.code == ImportEngineMessages.IMPORT_SOURCE_UNREACHABLE
 
 
