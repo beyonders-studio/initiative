@@ -108,6 +108,33 @@ LEFT JOIN tasks p ON p.id = r.target_id AND r.target_type = 'task'
 
 Give a Gantt `parent` as its **Group**, and each parent's bar folds up with its subtasks. The `#` and id keep two parents both called "Launch" from sharing a group. `done` goes to **Done**, which is how the Gantt knows what's finished: each parent fills up as its subtasks get done, and anything past its end and not done turns red. Without a **Done** column it counts the work and leaves the bars unfilled, because a date passing says nothing about whether anybody finished. A link only shows to somebody who can see both of the things it joins, and one that's been unlinked isn't there at all.
 
+### Reading a spreadsheet
+
+Somebody already keeps the budget in a spreadsheet, and nobody is going to retype it. So a tile can read one.
+
+In **Build**, choose **Spreadsheet** as the thing to read, then the file and the sheet. Leave **Range** empty for the whole sheet, or write one the way a spreadsheet does. Every column of the range comes in to start with, named by its header row, or by its letters (A, B, C) when the first row isn't headers. Formulas arrive as what they work out to, so the `=SUM()` at the bottom of the column is a number.
+
+| Range | Reads |
+|---|---|
+| `Q3!A1:D20` | Those cells on the sheet called Q3 |
+| `Q3!A:D` | Columns A to D, down to the last filled row |
+| `Q3!A5:D` | Columns A to D, from row 5 down |
+| `Q3` | The whole sheet |
+| `A1:D20` | Those cells on the first visible sheet |
+
+In **SQL**, a range is `sheet()` in the `FROM`, and from there it behaves like any other table, so it can sit right beside your tasks:
+
+```sql
+SELECT b.project, b.budget, count(t.id) AS open_tasks
+FROM sheet('Budget 2026', 'Q3!A1:B') AS b
+JOIN projects AS p ON p.name = b.project
+JOIN tasks AS t ON t.project_id = p.id
+WHERE t.completed_at IS NULL
+GROUP BY b.project, b.budget
+```
+
+Name the spreadsheet by its name, or by its id if you'd like the tile to survive somebody renaming the file to `Budget 2026 FINAL (2)`. A header with a space in it goes in double quotes, `sum("Q3 total")`, and capitals don't matter. A tile reads the spreadsheet as it was last saved, which is never more than about half a minute behind whoever is typing in it.
+
 ### Boards
 
 One of the tiles is a **board**: your tasks dealt into columns, and you say what a column stands for. A status. The people on the work, so everyone gets a column and you can see who is carrying what. Priority. Project. Any column the tile's query returns will do.
