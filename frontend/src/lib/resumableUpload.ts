@@ -5,6 +5,8 @@ import { getItem, removeItem, setItem } from "@/lib/storage";
 
 /** The most the server takes in one request. */
 const PIECE_BYTES = 50 * 1024 * 1024;
+/** No piece is cut smaller than this. */
+const SMALLEST_PIECE_BYTES = 512 * 1024;
 const TUS = { "Tus-Resumable": "1.0.0" };
 /** How long to wait before each new try of a piece that did not arrive. The
  *  last outlasts the hold a dropped request leaves on the upload. */
@@ -38,8 +40,15 @@ const metadata = (values: Record<string, string>) =>
 const retryable = (error: unknown) => {
   if (!isAxiosError(error)) return false;
   const status = error.response?.status;
-  return status === undefined || status >= 500 || status === 409 || status === 423;
+  return status === undefined || status >= 500 || [409, 423, 429].includes(status);
 };
+
+/** Whether a piece may have been too large for something between here and
+ *  the server: refused as too large, or not answered at all, which is all a
+ *  proxy's refusal shows the app when it talks to the server from another
+ *  origin. */
+const maybeTooLarge = (error: unknown) =>
+  isAxiosError(error) && [413, undefined].includes(error.response?.status);
 
 const wait = (ms: number, signal?: AbortSignal) =>
   new Promise<void>((resolve, reject) => {
@@ -83,7 +92,8 @@ const discard = async (address: string, remembered: string) => {
  * `take`, the endpoint that keeps it, and answer what that answers.
  *
  * A piece that does not arrive is tried again from where the server says the
- * upload stands. The upload is remembered until it is taken, so picking the
+ * upload stands, half the size when it may have been too large. The upload is
+ * remembered until it is taken, so picking the
  * same file again for the same place, after a reload or a refusal, carries on
  * from there rather than sending it all again. Aborting throws it away.
  */
@@ -134,9 +144,12 @@ export const uploadInPieces = async <T>(
     }
     const uploadId = id;
     let failures = 0;
+    let piece = PIECE_BYTES;
     // `null` while where the upload stands is to be asked again.
     let at: number | null = offset;
     while (at === null || at < file.size) {
+      // Set while a piece is on its way, so a failure says what it failed on.
+      let sending = false;
       try {
         if (at === null) {
           at = await standing(uploadId);
@@ -144,9 +157,10 @@ export const uploadInPieces = async <T>(
           continue;
         }
         const from: number = at;
+        sending = true;
         const answer = await apiClient.patch(
           `${base}/${uploadId}`,
-          file.slice(from, from + PIECE_BYTES),
+          file.slice(from, from + piece),
           {
             headers: {
               ...TUS,
@@ -160,9 +174,13 @@ export const uploadInPieces = async <T>(
         at = Number(answer.headers["upload-offset"]);
         failures = 0;
       } catch (error) {
-        if (signal?.aborted || !retryable(error) || failures >= RETRY_DELAYS_MS.length) {
-          throw error;
+        if (signal?.aborted) throw error;
+        if (sending && maybeTooLarge(error) && piece / 2 >= SMALLEST_PIECE_BYTES) {
+          piece /= 2;
+          at = null;
+          continue;
         }
+        if (!retryable(error) || failures >= RETRY_DELAYS_MS.length) throw error;
         await wait(RETRY_DELAYS_MS[failures++], signal);
         at = null;
       }

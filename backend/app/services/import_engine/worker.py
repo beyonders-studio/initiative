@@ -384,8 +384,8 @@ async def _execute(session: AsyncSession, job: DataJob, *, guild_id: int) -> dic
                     people_map=(job.params or {}).get("people_map"),
                     exclude_properties=(job.params or {}).get("exclude_properties"),
                     heartbeat=throttled(touch),
-                    # A fetched bundle is one this app wrote, and is held to
-                    # the fetch's bounds rather than an upload's.
+                    # A fetched bundle is one this app wrote, and its
+                    # envelopes may run larger than an upload's.
                     fetched=job.source == atlassian_job.SOURCE,
                     anchor=datetime.fromisoformat(anchor) if anchor else None,
                     join=(job.params or {}).get("join"),

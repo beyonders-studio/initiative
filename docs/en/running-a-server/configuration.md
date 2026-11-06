@@ -165,7 +165,7 @@ For any real deployment you'll put Initiative behind a reverse proxy that handle
 
     The one setup that needs more is a proxy on another machine that reaches Initiative over a public address. List it in `FORWARDED_ALLOW_IPS`; the log names the address to add when it sees one.
 
-**Let 50 MB through per request.** A file of any size arrives in pieces of up to 50 MB, so that's the most your proxy ever has to pass in one go. nginx stops at 1 MB unless told otherwise, so add `client_max_body_size 50m;` to the server block. Caddy and Traefik pass it as they are.
+**Let 50 MB through per request.** A file of any size arrives in pieces of up to 50 MB, and a picture put in a page arrives in one go. nginx stops at 1 MB unless told otherwise, so add `client_max_body_size 50m;` to the server block. Caddy and Traefik pass it as they are. Behind a tighter limit, files make do with smaller pieces and take a little longer; a picture over the limit doesn't arrive at all.
 
 ## The app association files
 

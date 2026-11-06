@@ -457,7 +457,6 @@ async def list_conditions(spec: ToolListSpec, req: ListRequest) -> list:
             req.session,
             spec.tool.value,
             req.values.get("property_filters"),
-            names_people=req.user is not None,
         ),
     ]
 

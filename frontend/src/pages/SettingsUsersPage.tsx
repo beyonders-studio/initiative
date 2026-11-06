@@ -1,24 +1,15 @@
 import { Link } from "@tanstack/react-router";
 import { Download, HandCoins, IdCard, RefreshCcw, UserMinus } from "lucide-react";
-import { type FormEvent, useState } from "react";
+import { useState } from "react";
 import { useTranslation } from "react-i18next";
 
-import {
-  type CommunityRole,
-  SupportTopic,
-  type UserCommunityMember,
-} from "@/api/generated/initiativeAPI.schemas";
-import {
-  CommunityInviteList,
-  InviteLimitFields,
-  NewInviteLink,
-} from "@/components/communities/CommunityInvites";
+import type { CommunityRole, UserCommunityMember } from "@/api/generated/initiativeAPI.schemas";
+import { MemberInvites } from "@/components/communities/CommunityInvites";
 import { MemberDisplayNameDialog } from "@/components/communities/MemberDisplayNameDialog";
 import { RemoveCommunityMemberDialog } from "@/components/communities/RemoveCommunityMemberDialog";
 import { TransferContentOwnershipDialog } from "@/components/communities/TransferContentOwnershipDialog";
 import { UnownedContentCard } from "@/components/communities/UnownedContentCard";
 import { FormSkeleton, SkeletonRegion, TableSkeleton } from "@/components/skeletons/PageSkeletons";
-import { HelpLink } from "@/components/support/HelpLink";
 import { UserHandle } from "@/components/UserHandle";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
@@ -34,7 +25,6 @@ import {
 } from "@/components/ui/select";
 import { Switch } from "@/components/ui/switch";
 import { useAuth } from "@/hooks/useAuth";
-import { useBillingPortal } from "@/hooks/useBillingPortal";
 import { useCommunities } from "@/hooks/useCommunities";
 import { useCommunityAuthSettings } from "@/hooks/useCommunityAuthPolicy";
 import { useCommunityInvites } from "@/hooks/useCommunityInvites";
@@ -53,15 +43,10 @@ import {
 } from "@/hooks/useUsers";
 import { getErrorMessage } from "@/lib/errorMessage";
 import { toast } from "@/lib/mascotToast";
-import { isAdminRole } from "@/lib/permissions";
+import { assignableCommunityRoles, isAdminRole } from "@/lib/permissions";
 import type { AppColumnDef } from "@/lib/table";
 import { getUrlHandle, getUserDisplayName, getUserHandle } from "@/lib/userDisplay";
 
-//: What this community's roles are, in the order the picker offers them. The
-//: seat is only on the list for somebody who already holds it — an admin can
-//: neither appoint nor demote one, and the server says so too.
-const COMMUNITY_ROLE_OPTIONS: CommunityRole[] = ["admin", "member"];
-const SEAT_ROLE_OPTIONS: CommunityRole[] = ["superadmin", "admin", "member"];
 //: The custom role picker's "none", since a select's value is a string.
 const NO_CUSTOM_ROLE = "none";
 
@@ -70,7 +55,6 @@ export const SettingsUsersPage = () => {
   const { t } = useTranslation(["communities", "settings"]);
 
   const { activeCommunity } = useCommunities();
-  const { canSell, openPortal } = useBillingPortal();
   // Running the community, not reaching its work: the roster and its
   // invites are parts of running it, held by its admins, by a custom role, or
   // by a settings grant standing in. Platform role has nothing to do with it.
@@ -80,7 +64,7 @@ export const SettingsUsersPage = () => {
   // hold, so a grant that only reads does not list them.
   const managesInvites = held.writes && held.holds("invites");
   const opensPage = managesMembers || held.holds("invites");
-  const roleOptions = activeCommunity?.can.seat ? SEAT_ROLE_OPTIONS : COMMUNITY_ROLE_OPTIONS;
+  const roleOptions = assignableCommunityRoles(Boolean(activeCommunity?.can.seat));
 
   const activeCommunityId = activeCommunity?.id ?? null;
 
@@ -95,20 +79,7 @@ export const SettingsUsersPage = () => {
   // Whoever runs the server may set it for the whole community instead.
   const apiAccessFixed = (authSettings?.set_by_deployment ?? []).includes("api_keys");
 
-  // Seat cap, admin-only on the payload and null when uncapped. A full community
-  // mints no invite (the server refuses), so the form says so up front instead
-  // of failing on submit. Where a billing portal exists the cap travels with
-  // the plan — raising it is an upgrade, not a request to an operator — so the
-  // message and its action differ from the self-hosted one.
-  const maxUsers = activeCommunity?.max_users ?? null;
-  const usedSeats = activeCommunity?.member_count ?? 0;
-  const atUserLimit = maxUsers !== null && usedSeats >= maxUsers;
-  const planName = activeCommunity?.tier_name ?? null;
-
   const invites = useCommunityInvites(activeCommunityId, managesInvites);
-  // Guest invites are Settings › Guests'; these are for members.
-  const memberInvites = invites.invites.filter((invite) => invite.guest_days == null);
-  const [inviteLimits, setInviteLimits] = useState({ maxUses: 1, expiresDays: 7 });
   const [deleteUserConfirm, setDeleteUserConfirm] = useState<{
     userId: number;
     email: string;
@@ -419,11 +390,6 @@ export const SettingsUsersPage = () => {
       : []),
   ];
 
-  const createInvite = (event: FormEvent<HTMLFormElement>) => {
-    event.preventDefault();
-    if (!atUserLimit) void invites.create(inviteLimits);
-  };
-
   return (
     <div className="space-y-6">
       {managesInvites ? (
@@ -438,47 +404,8 @@ export const SettingsUsersPage = () => {
               <span className="sr-only">{t("users.refreshInvites")}</span>
             </Button>
           </CardHeader>
-          <CardContent className="space-y-4">
-            <form className="grid grid-cols-fill-48/3 gap-4" onSubmit={createInvite}>
-              <InviteLimitFields
-                idPrefix="invite"
-                value={inviteLimits}
-                onChange={setInviteLimits}
-              />
-              <div className="flex items-end">
-                <Button type="submit" disabled={invites.submitting || atUserLimit}>
-                  {invites.submitting ? t("users.generatingInvite") : t("users.generateInvite")}
-                </Button>
-              </div>
-            </form>
-            {atUserLimit && canSell && activeCommunityId && activeCommunity?.can.seat ? (
-              <div className="flex flex-wrap items-center justify-between gap-3">
-                <p className="text-muted-foreground text-sm">
-                  {planName
-                    ? t("users.inviteSeatsFullPlan", { plan: planName, count: maxUsers ?? 0 })
-                    : t("users.inviteSeatsFullUpgrade", { count: maxUsers ?? 0 })}
-                </p>
-                <Button size="sm" onClick={() => void openPortal(activeCommunityId, "upgrade")}>
-                  {t("usagePanel.upgrade")}
-                </Button>
-              </div>
-            ) : atUserLimit ? (
-              <div className="flex flex-wrap items-center gap-x-3 gap-y-1">
-                <p className="text-muted-foreground text-sm">
-                  {t("users.inviteSeatsFull", { max: maxUsers })}
-                </p>
-                <HelpLink topic={SupportTopic.community} communityId={activeCommunityId} />
-              </div>
-            ) : null}
-            {invites.newInviteCode ? <NewInviteLink code={invites.newInviteCode} /> : null}
-            <div className="h-px bg-border" />
-            <CommunityInviteList
-              invites={memberInvites}
-              isLoading={invites.isLoading}
-              error={invites.error}
-              emptyText={t("users.noActiveInvites")}
-              onDelete={(inviteId) => void invites.remove(inviteId)}
-            />
+          <CardContent>
+            <MemberInvites invites={invites} />
           </CardContent>
         </Card>
       ) : null}

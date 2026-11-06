@@ -333,7 +333,7 @@ async def get_post_timeline(
     )
     # The feed's property filters, as every list applies them.
     scope += await metadata_service.property_filter_clauses(
-        session, Tool.post.value, property_filters, names_people=True
+        session, Tool.post.value, property_filters
     )
     return TimelineResponse(
         buckets=await timeline_service.month_buckets(

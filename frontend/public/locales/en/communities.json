@@ -200,7 +200,7 @@
     "filterByHandle": "Filter by handle...",
     "userIdColumn": "User ID",
     "userColumn": "User",
-    "communityRoleColumn": "Community Role",
+    "communityRoleColumn": "Community role",
     "sourceColumn": "Source",
     "actionsColumn": "Actions",
     "sourceOidc": "OIDC",

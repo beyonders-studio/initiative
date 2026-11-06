@@ -98,7 +98,7 @@ def test_a_name_outside_the_zip_is_refused(name):
 
 
 def test_declared_sizes_past_the_bound_are_refused(monkeypatch):
-    monkeypatch.setattr(import_limits, "IMPORT_MAX_BACKUP_UNCOMPRESSED_BYTES", 8)
+    monkeypatch.setattr(import_limits, "IMPORT_MAX_ZIP_UNCOMPRESSED_BYTES", 8)
     with pytest.raises(ImportEngineError) as caught:
         zip_bounds.open_zip(_zip(**{"a.txt": b"12345", "b.txt": b"12345"}))
     assert caught.value.code == "IMPORT_TOO_LARGE"

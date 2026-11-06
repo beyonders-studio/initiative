@@ -1279,6 +1279,16 @@ class _RangeReader(io.RawIOBase):
         return len(data)
 
 
+def blob_pieces(blob: ReadableBlob) -> Iterator[bytes]:
+    """A stored file's bytes a piece at a time, from disk or from a stream."""
+    if blob.path is None:
+        yield from blob.stream or ()
+        return
+    with blob.path.open("rb") as handle:
+        while piece := handle.read(1024 * 1024):
+            yield piece
+
+
 def open_seekable(backend: StorageBackend, key: str, size: int) -> BinaryIO | None:
     """``key``'s ``size`` bytes as a seekable file, ``None`` when it is
     missing: the file itself where the backend keeps one on disk, otherwise

@@ -205,18 +205,6 @@ export const SettingsCommunityRolesPage = () => {
   // keep applying, and nobody changes them.
   const closed = Boolean(activeCommunity?.closed_surfaces?.includes("custom_roles"));
   const changes = held.writes && !closed;
-  // What the server allows, so nobody fills in a form it must refuse: a role
-  // holding nothing the reader lacks, on the admin rung only for an admin, and
-  // deleting an admin's role (which gives its holders everything back) only for
-  // somebody who holds everything. A settings grant answers for itself.
-  const lent = Boolean(activeCommunity?.grantSettingsLevel);
-  const holdsEvery = ADMIN_SURFACES.every(held.holds);
-  const editable = (role: CustomRoleRead) =>
-    lent ||
-    (role.surfaces.every(held.holds) &&
-      (role.base_rung !== "admin" || Boolean(activeCommunity?.can.administer)));
-  const deletable = (role: CustomRoleRead) =>
-    editable(role) && (lent || role.base_rung !== "admin" || holdsEvery);
   // A role the deployment defined is given here, and changed only by it.
   const fromDeployment = (role: CustomRoleRead) => role.set_by === "deployment";
 
@@ -287,17 +275,17 @@ export const SettingsCommunityRolesPage = () => {
                       <p className="text-muted-foreground text-xs">
                         {t("customRoles.setByDeployment")}
                       </p>
-                    ) : changes && !editable(role) ? (
+                    ) : changes && !held.gives(role) ? (
                       <p className="text-muted-foreground text-xs">
                         {t("customRoles.beyondYours")}
                       </p>
-                    ) : changes && !deletable(role) ? (
+                    ) : changes && !held.takesOff(role) ? (
                       <p className="text-muted-foreground text-xs">
                         {t("customRoles.widensAnAdmin")}
                       </p>
                     ) : null}
                   </div>
-                  {changes && editable(role) && !fromDeployment(role) ? (
+                  {changes && held.gives(role) && !fromDeployment(role) ? (
                     <RowActionsMenu subject={role.name}>
                       <DropdownMenuItem onSelect={() => setEditing(role)}>
                         <Pencil className="h-4 w-4" />
@@ -306,7 +294,7 @@ export const SettingsCommunityRolesPage = () => {
                       <DropdownMenuSeparator />
                       <DropdownMenuItem
                         className="text-destructive"
-                        disabled={!deletable(role)}
+                        disabled={!held.takesOff(role)}
                         onSelect={() => setDeleting(role)}
                       >
                         <Trash2 className="h-4 w-4" />
