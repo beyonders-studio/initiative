@@ -4593,6 +4593,66 @@ export interface ContactCreate {
 }
 
 /**
+ * What a spreadsheet column of contacts holds. The four details take
+ * their field's name, as a contact names them.
+ */
+export type ContactCsvTarget = (typeof ContactCsvTarget)[keyof typeof ContactCsvTarget];
+
+export const ContactCsvTarget = {
+  name: "name",
+  type: "type",
+  emails: "emails",
+  phones: "phones",
+  addresses: "addresses",
+  websites: "websites",
+  organization: "organization",
+  tags: "tags",
+  property: "property",
+} as const;
+
+/**
+ * One column of a spreadsheet of contacts, and what it holds. A column
+ * named by none of them is left out.
+ *
+ * Several columns may hold one target: the names are joined with a space,
+ * a detail's values are kept in column order, and tags are read from each.
+ */
+export interface ContactCsvColumn {
+  /**
+   * @minimum 0
+   * @exclusiveMaximum 1000
+   */
+  column: number;
+  target: ContactCsvTarget;
+  label_column?: number | null;
+  property_id?: number | null;
+}
+
+/**
+ * Body of ``POST /imports/contacts``: the spreadsheet, sent back with
+ * what its columns hold, and where its contacts go — an initiative, or with
+ * none the community's contacts.
+ */
+export interface ContactCsvImportRequest {
+  initiative_id?: number | null;
+  content: string;
+  /** @maxItems 1000 */
+  columns: ContactCsvColumn[];
+}
+
+/**
+ * A spreadsheet of contacts, read without keeping it: its header, how
+ * many rows it holds, the first few of them, and what each column looks
+ * like it holds.
+ */
+export interface ContactCsvPreview {
+  headers: string[];
+  row_count: number;
+  samples: string[][];
+  columns: ContactCsvColumn[];
+}
+
+/**
  * One of a contact's details: its value, and a short label saying which
  * one it is.
  */
@@ -6376,6 +6436,15 @@ export type EnvelopeImportResultMatched = { [key: string]: number };
 export type EnvelopeImportResultFailed = { [key: string]: number };
 
 /**
+ * A row of a spreadsheet that was left out, and the field that stopped
+ * it. ``row`` is the row a spreadsheet shows it on, the header being 1.
+ */
+export interface ImportRowFailure {
+  row: number;
+  field: string;
+}
+
+/**
  * One envelope's apply outcome — JSON-serializable because it is
  * persisted verbatim into ``data_jobs.result`` and rendered by the UI.
  */
@@ -6385,6 +6454,7 @@ export interface EnvelopeImportResult {
   created?: EnvelopeImportResultCreated;
   matched?: EnvelopeImportResultMatched;
   failed?: EnvelopeImportResultFailed;
+  failed_rows?: ImportRowFailure[];
   renamed_properties?: string[];
   renamed_property_count?: number;
   links_created?: number;
@@ -13935,7 +14005,7 @@ export type ExportToolParams = {
    */
   ids?: number[] | null;
   /**
-   * One of the tool's export formats (project: json, pdf, csv, xlsx; file: json, md, pdf, docx, csv, xlsx, file; counter_group: json, pdf, csv, xlsx, md; calendar: ics, json; dashboard: json; post: json; wiki: json, pdf, md, docx; contact: json). ``json`` is the importable envelope. A file's formats depend on its type, so it has no default; a calendar defaults to ``ics``, every other tool to ``json``
+   * One of the tool's export formats (project: json, pdf, csv, xlsx; file: json, md, pdf, docx, csv, xlsx, file; counter_group: json, pdf, csv, xlsx, md; calendar: ics, json; dashboard: json; post: json; wiki: json, pdf, md, docx; contact: json, csv). ``json`` is the importable envelope. A file's formats depend on its type, so it has no default; a calendar defaults to ``ics``, every other tool to ``json``
    */
   format?: ExportToolFormat;
   /**
@@ -13964,6 +14034,13 @@ export const ExportToolFormat = {
   pdf: "pdf",
   xlsx: "xlsx",
 } as const;
+
+export type PreviewContactsImportParams = {
+  /**
+   * The initiative the contacts go into, whose properties a column headed with one's name fills; none for the community's contacts
+   */
+  initiative_id?: number | null;
+};
 
 export type ConfirmImportBody = { [key: string]: unknown } | null;
 

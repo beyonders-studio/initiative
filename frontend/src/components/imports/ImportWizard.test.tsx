@@ -73,12 +73,11 @@ async function chooseBackup() {
   await userEvent.click(screen.getByRole("button", { name: /initiative backup/i }));
 }
 
-function pickFile() {
+function pickFile(
+  file = new File([new Uint8Array([1, 2, 3])], "backup.zip", { type: "application/zip" })
+) {
   const input = document.querySelector<HTMLInputElement>('input[type="file"]');
   if (!input) throw new Error("no file input");
-  const file = new File([new Uint8Array([1, 2, 3])], "backup.zip", {
-    type: "application/zip",
-  });
   Object.defineProperty(input, "files", { value: [file], configurable: true });
   input.dispatchEvent(new Event("change", { bubbles: true }));
 }
@@ -259,5 +258,61 @@ describe("ImportWizard", () => {
     expect(screen.getByText(/left out: toc ×2/i)).toBeInTheDocument();
     // No properties to untick: a wiki carries none.
     expect(screen.queryByRole("checkbox")).not.toBeInTheDocument();
+  });
+
+  it("maps a spreadsheet's columns, imports its contacts and names the rows left out", async () => {
+    const sheet =
+      "Name,E-mail 1 - Value,E-mail 1 - Label,Notes\nPriya,priya@example.com,Work,VIP\n";
+    let sent: Record<string, unknown> | null = null;
+    server.use(
+      communityHttp.post("/imports/contacts/preview", () =>
+        HttpResponse.json({
+          headers: ["Name", "E-mail 1 - Value", "E-mail 1 - Label", "Notes"],
+          row_count: 2,
+          samples: [["Priya", "priya@example.com", "Work", "VIP"]],
+          columns: [
+            { column: 0, target: "name" },
+            { column: 1, target: "emails", label_column: 2 },
+          ],
+        })
+      ),
+      communityHttp.post("/imports/contacts", async ({ request }) => {
+        sent = (await request.json()) as Record<string, unknown>;
+        return HttpResponse.json(
+          {
+            result: {
+              created: { contacts: 1, tags: 1 },
+              failed_rows: [{ row: 3, field: "emails" }],
+            },
+          },
+          { status: 201 }
+        );
+      })
+    );
+    const user = userEvent.setup();
+    renderWithProviders(
+      <ImportWizard open onOpenChange={() => {}} contactsInto={{ initiativeId: null }} />
+    );
+
+    pickFile(new File([sheet], "contacts.csv", { type: "text/csv" }));
+    // The email's labels come from the column the server paired with it.
+    expect(await screen.findByLabelText(/label for e-mail 1 - value/i)).toHaveTextContent(
+      /label from e-mail 1 - label/i
+    );
+    await user.click(screen.getByLabelText(/^notes$/i));
+    await user.click(await screen.findByRole("option", { name: "Tags" }));
+    await user.click(screen.getByRole("button", { name: /start import/i }));
+
+    await waitFor(() => expect(sent).not.toBeNull());
+    expect(sent).toEqual({
+      initiative_id: null,
+      content: sheet,
+      columns: [
+        { column: 0, target: "name" },
+        { column: 1, target: "emails", label_column: 2 },
+        { column: 3, target: "tags", label_column: null },
+      ],
+    });
+    expect(await screen.findByText(/row 3 · email/i)).toBeInTheDocument();
   });
 });

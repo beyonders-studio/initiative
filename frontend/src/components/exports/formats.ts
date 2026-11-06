@@ -85,8 +85,10 @@ export const TOOL_EXPORT_FORMATS: Partial<Record<Tool, ExportFormatOption[]>> = 
     { format: "json", labelKey: "export.formatWikiJson" },
   ],
   [Tool.contact]: [
-    // The importable envelope; the backend offers no rendered format yet.
+    // The importable envelope, then one spreadsheet of the selection, which
+    // the contacts import reads back.
     { format: "json", labelKey: "export.formatJson" },
+    { format: "csv", labelKey: "export.formatCsv" },
   ],
   [Tool.dashboard]: [
     // The importable envelope, and only that: a dashboard is a live canvas
@@ -160,6 +162,8 @@ export const REPORT_TOOL_FORMATS: Partial<Record<Tool, ExportFormatOption[]>> = 
     { format: "ics", labelKey: "export.formatIcs" },
     { format: "json", labelKey: "export.formatJson" },
   ],
+  // One spreadsheet of each initiative's contacts.
+  [Tool.contact]: [{ format: "csv", labelKey: "export.formatCsv" }],
 };
 
 /** Report-mode per-type file formats — mirrors the backend's

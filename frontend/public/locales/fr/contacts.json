@@ -1,6 +1,7 @@
 {
   "title": "Contacts",
   "newContact": "Nouveau contact",
+  "importCsv": "Importer des contacts depuis un CSV",
   "createDescription": "Une personne ou une organisation, et comment la joindre.",
   "addPersonDescription": "Quelqu’un chez {{name}}, et comment le joindre.",
   "creating": "Création...",

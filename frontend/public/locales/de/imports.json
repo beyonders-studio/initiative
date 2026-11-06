@@ -103,7 +103,10 @@
       "assets": "{{restored}} Dateien wiederhergestellt, {{deduped}} bereits vorhanden",
       "unmatchedHandles": "Einige Personen wurden nicht zugeordnet. Niemand hier passt zu ihnen, oder du kannst sie dieser Initiative nicht hinzufügen: {{handles}}",
       "failedEntries": "Nicht importierte Elemente:",
-      "nothing": "Es wurde nichts importiert."
+      "nothing": "Es wurde nichts importiert.",
+      "failedRows_one": "{{count}} Zeile wurde ausgelassen:",
+      "failedRows_other": "{{count}} Zeilen wurden ausgelassen:",
+      "failedRow": "Zeile {{row}} · {{field}}"
     },
     "atlassian": {
       "connect": {
@@ -224,6 +227,32 @@
         "filesBlocked_other": "{{count}} Dateien, weil in dieser Initiative Dateien ausgeschaltet sind",
         "dropped": "Ausgelassen: {{items}}"
       }
+    },
+    "contacts": {
+      "title": "Kontakte importieren",
+      "fileHint": "Eine CSV-Datei: ein Kontakte-Export oder eine als CSV gespeicherte Tabelle.",
+      "filePrompt": "CSV-Datei auswählen",
+      "where": "In einer Tabellenkalkulation: Datei → Herunterladen oder Speichern unter → CSV",
+      "columnsPrompt": "Was steht in jeder Spalte?",
+      "rows_one": "{{count}} Zeile zu importieren",
+      "rows_other": "{{count}} Zeilen zu importieren",
+      "note": "Jede Zeile wird zu einem neuen Kontakt. Eine Zeile, die nicht gelesen werden kann, wird ausgelassen, und der Bericht nennt sie.",
+      "untitled": "Spalte {{n}}",
+      "labelOf": "Bezeichnung für {{column}}",
+      "labelFrom": "Bezeichnung aus {{column}}",
+      "noLabel": "Keine Bezeichnung",
+      "targets": {
+        "ignore": "Auslassen",
+        "name": "Name",
+        "type": "Person oder Organisation",
+        "emails": "E-Mail",
+        "phones": "Telefon",
+        "addresses": "Adresse",
+        "websites": "Website",
+        "organization": "Organisation",
+        "tags": "Tags",
+        "properties": "Eigenschaften"
+      }
     }
   },
   "envelope": {
@@ -275,7 +304,8 @@
       "initiative-wiki": "Wiki",
       "initiative-contact": "Kontakt",
       "initiative-counter-group": "Zählergruppe",
-      "initiative-dashboard": "Dashboard"
+      "initiative-dashboard": "Dashboard",
+      "contacts-csv": "Kontakte aus einer Tabelle"
     },
     "cancel": "Abbrechen",
     "viewReport": "Bericht anzeigen",
