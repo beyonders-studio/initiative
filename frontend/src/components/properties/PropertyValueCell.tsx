@@ -1,5 +1,5 @@
 import { Check, ExternalLink, Minus, Plus, Star } from "lucide-react";
-import { type MouseEvent, useEffect, useMemo, useRef, useState } from "react";
+import { type SyntheticEvent, useEffect, useMemo, useRef, useState } from "react";
 import { useTranslation } from "react-i18next";
 
 import {
@@ -162,8 +162,12 @@ export const CounterValue = ({
   );
 };
 
+/** Kept from the row or card a step button sits on: neither opens, and a
+ *  board's card is not picked up. */
+const keep = (event: SyntheticEvent) => event.stopPropagation();
+
 /** A small button beside a counter in a list, which steps it without
- *  opening the row or the card it sits on. */
+ *  opening the row or the card it sits on, or dragging the card. */
 const StepButton = ({
   label,
   disabled,
@@ -180,8 +184,10 @@ const StepButton = ({
     aria-label={label}
     disabled={disabled}
     className="inline-flex size-5 shrink-0 items-center justify-center rounded-sm border text-muted-foreground hover:bg-accent hover:text-foreground focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring disabled:cursor-not-allowed disabled:opacity-40"
-    onPointerDown={(event) => event.stopPropagation()}
-    onClick={(event: MouseEvent) => {
+    onPointerDown={keep}
+    onMouseDown={keep}
+    onTouchStart={keep}
+    onClick={(event) => {
       event.preventDefault();
       event.stopPropagation();
       onClick();
