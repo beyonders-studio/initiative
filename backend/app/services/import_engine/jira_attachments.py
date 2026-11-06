@@ -8,16 +8,19 @@ the markdown shows it where the description or a comment embedded it.
 Any other file — a PDF, a spreadsheet — becomes an uploaded file of its own,
 attached to the task: a file has one home, the initiative's files, and
 the task is linked to it. Images up to :data:`MAX_IMAGE_BYTES`, other files
-up to :data:`MAX_FILE_BYTES`. SVG is left out on purpose: it is markup, and
+as large as the bundle's budget allows. Each is written to disk as it
+arrives, never held whole. SVG is left out on purpose: it is markup, and
 these are files from somebody else's site.
 """
 
 from __future__ import annotations
 
 import logging
+import tempfile
 import uuid
 from dataclasses import dataclass, field
-from typing import Any, Awaitable, Callable, Optional
+from pathlib import Path
+from typing import Any, Awaitable, BinaryIO, Callable, Optional
 
 from app.core.messages import ImportEngineMessages
 from app.services.import_engine.contract import ImportEngineError
@@ -27,9 +30,6 @@ logger = logging.getLogger(__name__)
 
 #: The design's per-image cap.
 MAX_IMAGE_BYTES = 10 * 1024 * 1024
-
-#: The cap on one attached file that is not a picture.
-MAX_FILE_BYTES = 50 * 1024 * 1024
 
 #: Types never brought over, picture or not.
 REFUSED_TYPES = frozenset({"image/svg+xml"})
@@ -108,9 +108,10 @@ class StoredImage:
     size_bytes: int
 
 
-#: Where a downloaded file goes as soon as it has arrived: the bundle being
-#: written, which keeps the bytes so the fetch does not have to.
-AssetSink = Callable[[StoredImage, bytes], Awaitable[None]]
+#: Where a downloaded file goes as soon as it has arrived, from the file on
+#: disk it was downloaded to: the bundle being written, which keeps the bytes
+#: so the fetch does not have to.
+AssetSink = Callable[[StoredImage, Path], Awaitable[None]]
 
 
 @dataclass
@@ -199,7 +200,9 @@ def storage_key(attachment: Attachment) -> str:
     return f"{uuid.uuid4().hex}{file_extension(attachment.filename)}"
 
 
-Downloader = Callable[[str, int], Awaitable[bytes]]
+#: ``download(attachment_id, max_bytes, target)`` writes the attachment to
+#: ``target`` and answers its size.
+Downloader = Callable[[str, int, BinaryIO], Awaitable[int]]
 
 
 async def download_images(
@@ -214,8 +217,8 @@ async def download_images(
 ) -> ImageReport:
     """Fetch every issue's images, within the per-image cap and a total budget.
 
-    ``download(attachment_id, max_bytes)`` is the site call, and ``store``
-    takes each file as it arrives. An image the site
+    ``download`` is the site call, writing each file to a temporary one, and
+    ``store`` takes it from there as soon as it has arrived. An image the site
     will not hand over is counted and skipped — one broken attachment is not
     a reason to lose the project — but being throttled stops the fetch, as it
     does everywhere else. What would take the bundle past ``budget_bytes`` or
@@ -237,36 +240,41 @@ async def download_images(
             ):
                 report.other_files += 1
                 continue
-            cap = MAX_IMAGE_BYTES if is_image else MAX_FILE_BYTES
+            left = budget_bytes - spent
             if (
-                attachment.size > cap
-                or spent + attachment.size > budget_bytes
+                (is_image and attachment.size > MAX_IMAGE_BYTES)
+                or attachment.size > left
                 or report.images + report.files >= max_files
             ):
                 report.oversize += 1
                 continue
-            try:
-                data = await download(attachment.id, min(cap, budget_bytes - spent))
-            except ImportEngineError as exc:
-                if exc.code == ImportEngineMessages.IMPORT_SOURCE_RATE_LIMITED:
-                    raise
-                if exc.code == ImportEngineMessages.IMPORT_TOO_LARGE:
-                    report.oversize += 1
-                else:
-                    report.unreadable += 1
-                continue
-            finally:
-                if tick is not None:
-                    await tick()
-            spent += len(data)
-            stored = StoredImage(
-                filename=attachment.filename,
-                storage_key=storage_key(attachment),
-                content_type=attachment.mime_type or "application/octet-stream",
-                size_bytes=len(data),
-            )
-            await store(stored, data)
-            del data
+            with tempfile.NamedTemporaryFile(prefix="import-attachment-") as spool:
+                try:
+                    size = await download(
+                        attachment.id,
+                        min(MAX_IMAGE_BYTES, left) if is_image else left,
+                        spool,
+                    )
+                except ImportEngineError as exc:
+                    if exc.code == ImportEngineMessages.IMPORT_SOURCE_RATE_LIMITED:
+                        raise
+                    if exc.code == ImportEngineMessages.IMPORT_TOO_LARGE:
+                        report.oversize += 1
+                    else:
+                        report.unreadable += 1
+                    continue
+                finally:
+                    if tick is not None:
+                        await tick()
+                spent += size
+                stored = StoredImage(
+                    filename=attachment.filename,
+                    storage_key=storage_key(attachment),
+                    content_type=attachment.mime_type or "application/octet-stream",
+                    size_bytes=size,
+                )
+                spool.flush()
+                await store(stored, Path(spool.name))
             if is_image:
                 report.images += 1
                 report.image_bytes += stored.size_bytes

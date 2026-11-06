@@ -1,5 +1,7 @@
 """A Jira issue's images, brought over as uploads."""
 
+from pathlib import Path
+
 import pytest
 
 from app.core.messages import ImportEngineMessages
@@ -18,11 +20,11 @@ def _issue(key, *attachments):
 def _downloader(payloads=None, errors=None):
     calls: list[tuple[str, int]] = []
 
-    async def download(attachment_id, max_bytes):
+    async def download(attachment_id, max_bytes, target):
         calls.append((attachment_id, max_bytes))
         if errors and attachment_id in errors:
             raise ImportEngineError(errors[attachment_id])
-        return (payloads or {}).get(attachment_id, b"x" * 10)
+        return target.write((payloads or {}).get(attachment_id, b"x" * 10))
 
     download.calls = calls  # type: ignore[attr-defined]
     return download
@@ -31,8 +33,8 @@ def _downloader(payloads=None, errors=None):
 def _sink():
     kept: dict[str, bytes] = {}
 
-    async def store(stored, data):
-        kept[stored.storage_key] = data
+    async def store(stored, source):
+        kept[stored.storage_key] = Path(source).read_bytes()
 
     store.kept = kept  # type: ignore[attr-defined]
     return store
@@ -101,6 +103,24 @@ async def test_an_image_over_the_cap_is_never_downloaded():
     )
     assert download.calls == []
     assert report.oversize == 1
+
+
+async def test_a_file_may_take_as_much_of_the_budget_as_is_left():
+    """Only a picture has a cap of its own; any other file is bounded by what
+    the bundle can still hold, and arrives through the sink whole."""
+    download = _downloader(payloads={"11": b"%PDF-the-whole-handbook"})
+    store = _sink()
+    report = await ja.download_images(
+        [_issue("ACME-1", _att("11", "handbook.pdf", "application/pdf", 60 * 2**20))],
+        download=download,
+        store=store,
+        budget_bytes=2**40,
+        max_files=100,
+        files_allowed=True,
+    )
+    assert download.calls == [("11", 2**40)]
+    assert report.files == 1
+    assert list(store.kept.values()) == [b"%PDF-the-whole-handbook"]
 
 
 async def test_the_bundle_budget_stops_downloads_by_bytes_and_by_count():

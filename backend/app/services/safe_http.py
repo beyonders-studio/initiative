@@ -16,7 +16,7 @@ from __future__ import annotations
 import logging
 import time
 from collections.abc import Mapping
-from typing import Any
+from typing import Any, BinaryIO
 
 import httpx
 
@@ -245,6 +245,7 @@ async def request_public_target(
     transport: httpx.AsyncBaseTransport | None = None,
     allow_private: bool = False,
     max_bytes: int | None = None,
+    sink: BinaryIO | None = None,
 ) -> httpx.Response:
     """Send a request to a validated public target. The host is resolved
     once; the request connects to a validated address and, if one fails
@@ -257,7 +258,8 @@ async def request_public_target(
 
     ``max_bytes`` bounds the body as it is read, counted after any content
     decoding, and raises :class:`ResponseTooLargeError` past it. Unset, the
-    body is read whole."""
+    body is read whole. With ``sink`` as well, the body is written to it from
+    its start rather than held, and the response carries none."""
     original = httpx.URL(url)
     target = await resolve_validated_target_async(url, allow_private=allow_private)
     last_exc: httpx.ConnectError | None = None
@@ -287,7 +289,7 @@ async def request_public_target(
                 raise
             if max_bytes is not None:
                 try:
-                    response = await _read_bounded(response, max_bytes)
+                    response = await _read_bounded(response, max_bytes, sink)
                 except (httpx.HTTPError, ResponseTooLargeError) as exc:
                     _log_sent(method, original, began, failure=exc)
                     raise
@@ -300,18 +302,31 @@ async def request_public_target(
     raise RuntimeError(f"no validated address to connect to for {url!r}")
 
 
-async def _read_bounded(response: httpx.Response, max_bytes: int) -> httpx.Response:
-    """A streamed response read into memory up to ``max_bytes`` decoded bytes.
+async def _read_bounded(
+    response: httpx.Response, max_bytes: int, sink: BinaryIO | None = None
+) -> httpx.Response:
+    """A streamed response read up to ``max_bytes`` decoded bytes: into
+    memory, or written to ``sink`` from its start, emptied first, so that
+    after a retry or a redirect it holds the last response's body.
 
-    Returned as a plain response holding the decoded body, so the encoding
-    headers that described the wire form are dropped with it.
+    Returned as a plain response holding the decoded body, or none when it
+    went to ``sink``, so the encoding headers that described the wire form
+    are dropped with it.
     """
     body = bytearray()
+    read = 0
+    if sink is not None:
+        sink.seek(0)
+        sink.truncate()
     try:
         async for chunk in response.aiter_bytes():
-            body += chunk
-            if len(body) > max_bytes:
+            read += len(chunk)
+            if read > max_bytes:
                 raise ResponseTooLargeError(max_bytes, status_code=response.status_code)
+            if sink is None:
+                body += chunk
+            else:
+                sink.write(chunk)
     finally:
         await response.aclose()
     headers = [
