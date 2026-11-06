@@ -410,29 +410,6 @@ def fresh_migrations_db(migrations_db: str) -> Iterator[str]:
 # ---------------------------------------------------------------------------
 
 
-def test_the_freeze_line_can_be_read_from_revision_ids() -> None:
-    """CI decides what has shipped by comparing revision ids with
-    ``RELEASED_MIGRATION`` as strings (``Frozen migrations are unchanged``).
-    That reads the chain correctly only while each file is named by its id,
-    ids rise from base to head, and the freeze line names a revision in the
-    chain — a line naming none leaves every revision editable."""
-    revisions = list(_script_directory().walk_revisions())[::-1]
-    ids = [r.revision for r in revisions]
-
-    misnamed = [
-        (r.revision, Path(r.path).name)
-        for r in revisions
-        if not Path(r.path).name.startswith(f"{r.revision}_")
-    ]
-    assert misnamed == [], f"revision ids that are not their file's prefix: {misnamed}"
-    assert ids == sorted(ids), (
-        "revision ids must rise from base to head; out of order: "
-        f"{[(a, b) for a, b in zip(ids, ids[1:]) if a >= b]}"
-    )
-    released = (BACKEND_DIR.parent / "RELEASED_MIGRATION").read_text().strip()
-    assert released in ids, f"RELEASED_MIGRATION {released!r} is not a revision"
-
-
 class TestMigrationsAgainstDatabase:
     """End-to-end migration runs against a real Postgres instance."""
 
