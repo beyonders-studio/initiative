@@ -1,5 +1,6 @@
 import {
   type CounterSettingsInput,
+  type FileType,
   type ListLayoutDefinitionInputDisplays,
   MetadataType,
   type PropertyDefinitionRead,
@@ -182,13 +183,29 @@ export const userReferenceValue = (property: PropertySummary): MemberLike | null
   return null;
 };
 
+/** The file a ``file`` value names, as the server reads it back: what draws
+ *  it where the reader can open it, its id alone where they cannot. */
+export interface FileFieldValue {
+  id: number;
+  name?: string;
+  file_type?: FileType;
+  smart_link_url?: string | null;
+}
+
+export const fileFieldValue = (raw: unknown): FileFieldValue | null =>
+  raw && typeof raw === "object" && typeof (raw as { id?: unknown }).id === "number"
+    ? (raw as FileFieldValue)
+    : null;
+
 /** Convert a server ``PropertySummary.value`` into the shape an edited value
- *  takes: ``user_reference`` collapses to its numeric id (``PropertyInput``
- *  round-trips the id), everything else passes through. */
+ *  takes: ``user_reference`` and ``file`` collapse to their numeric id
+ *  (``PropertyInput`` round-trips the id), everything else passes through. */
 export const normalizePropertyValue = (property: PropertySummary): unknown =>
   property.type === MetadataType.user_reference
     ? (userReferenceValue(property)?.id ?? null)
-    : (property.value ?? null);
+    : property.type === MetadataType.file
+      ? (fileFieldValue(property.value)?.id ?? null)
+      : (property.value ?? null);
 
 /** What a list draws of `definition` on an item holding `summaries`: its
  *  value, or nothing where it holds none, but a counter, which holds its

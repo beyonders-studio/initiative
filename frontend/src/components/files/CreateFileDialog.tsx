@@ -13,7 +13,7 @@ import {
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { useTranslation } from "react-i18next";
 
-import type { ResourceGrantSchema } from "@/api/generated/initiativeAPI.schemas";
+import type { FileRead, ResourceGrantSchema } from "@/api/generated/initiativeAPI.schemas";
 import { FileType, SearchEntityType } from "@/api/generated/initiativeAPI.schemas";
 import { CreateAccessSection } from "@/components/access/CreateAccessSection";
 import { DEFAULT_GRANTS } from "@/components/access/grants";
@@ -56,7 +56,7 @@ type CreateFileDialogProps = DialogProps & {
   /** If provided, the created file will be auto-attached to this project */
   projectId?: number;
   /** Called after successful creation/upload */
-  onSuccess?: (file: { id: number }) => void;
+  onSuccess?: (file: FileRead) => void;
   /** A file dropped on the page to open this; the dialog opens on Upload holding it. */
   initialFile?: File | null;
 };

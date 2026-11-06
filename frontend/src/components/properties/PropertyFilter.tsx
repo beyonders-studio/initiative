@@ -94,6 +94,8 @@ export const opsForType = (type: MetadataType): BackendOp[] => {
       return ["eq"];
     case MetadataType.user_reference:
       return ["eq", "in_", "is_null"];
+    case MetadataType.file:
+      return ["is_null"];
     default:
       return ["eq"];
   }

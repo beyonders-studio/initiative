@@ -24,6 +24,18 @@ describe("PropertyValueCell", () => {
     expect(screen.getByText(expected)).toBeInTheDocument();
   });
 
+  it("names the file a file field holds, or says the reader cannot open it", () => {
+    const field = buildPropertySummary({
+      type: MetadataType.file,
+      value: { id: 7, name: "Mockup", file_type: "url", smart_link_url: null },
+    });
+    const { rerender } = renderWithProviders(<PropertyValueCell summary={field} />);
+    expect(screen.getByText("Mockup")).toBeInTheDocument();
+
+    rerender(<PropertyValueCell summary={{ ...field, value: { id: 7 } }} />);
+    expect(screen.getByText("A file you can't open")).toBeInTheDocument();
+  });
+
   it("draws a scale as a number, stars or a bar, as its layout says", () => {
     const scale = buildPropertySummary({ type: MetadataType.scale, value: 61 });
     const { rerender } = renderWithProviders(<PropertyValueCell summary={scale} />);

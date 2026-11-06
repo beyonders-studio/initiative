@@ -22,6 +22,7 @@
     "currency": "Importe",
     "scale": "Escala",
     "counter": "Contador",
+    "file": "Archivo",
     "link": "Enlace",
     "badge": "Insignia",
     "json": "Datos"
@@ -63,7 +64,9 @@
     "stars_other": "{{count}} estrellas",
     "stepDown": "Bajar {{name}} un paso",
     "stepUp": "Subir {{name}} un paso",
-    "reset": "Restablecer {{name}}"
+    "reset": "Restablecer {{name}}",
+    "newFile": "Nuevo archivo",
+    "fileUnavailable": "Un archivo que no puedes abrir"
   },
   "cell": {
     "emptyValue": "—",

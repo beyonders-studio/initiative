@@ -5,7 +5,7 @@ import { buildFileSummary } from "@/__tests__/factories";
 import { renderWithProviders } from "@/__tests__/helpers/render";
 import type { FileRead } from "@/api/generated/initiativeAPI.schemas";
 
-import { isWideFile, WikiFileBody } from "./WikiFileBody";
+import { isWideFile, ReadOnlyFileBody } from "./ReadOnlyFileBody";
 
 vi.mock("@tanstack/react-router", async (importOriginal) => ({
   ...(await importOriginal<typeof import("@tanstack/react-router")>()),
@@ -47,7 +47,7 @@ vi.mock("@/components/files/SmartLinkFileViewer", () => ({
 const fileOf = (overrides: Partial<FileRead>) =>
   ({ ...buildFileSummary(), content: {}, ...overrides }) as FileRead;
 
-describe("WikiFileBody", () => {
+describe("ReadOnlyFileBody", () => {
   it.each([
     [
       fileOf({
@@ -62,7 +62,7 @@ describe("WikiFileBody", () => {
     [fileOf({ file_type: "url" }), "link"],
     [fileOf({ file_type: "lexical" }), "prose read-only"],
   ])("draws a file the way its own kind is drawn", async (file, expected) => {
-    renderWithProviders(<WikiFileBody file={file} />);
+    renderWithProviders(<ReadOnlyFileBody file={file} />);
     expect(await screen.findByText(expected)).toBeInTheDocument();
   });
 

@@ -22,6 +22,7 @@
     "currency": "Montant",
     "scale": "Échelle",
     "counter": "Compteur",
+    "file": "Fichier",
     "link": "Lien",
     "badge": "Badge",
     "json": "Données"
@@ -63,7 +64,9 @@
     "stars_other": "{{count}} étoiles",
     "stepDown": "Diminuer {{name}} d'un pas",
     "stepUp": "Augmenter {{name}} d'un pas",
-    "reset": "Réinitialiser {{name}}"
+    "reset": "Réinitialiser {{name}}",
+    "newFile": "Nouveau fichier",
+    "fileUnavailable": "Un fichier que vous ne pouvez pas ouvrir"
   },
   "cell": {
     "emptyValue": "—",
