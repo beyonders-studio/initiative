@@ -198,14 +198,15 @@ Something only one project or one collection cares about is a **property** of th
 | **Person** | Somebody who can open the thing it's on. |
 | **Money** | An amount, in the one currency it names. |
 | **Scale** | 0 to 100. A layout draws it as a percentage, stars or a bar. |
+| **Counter** | A number you tap up and down by its step, never past the minimum or maximum you give it. **Reset** sends it back to its initial value. A layout draws it as a number, a bar or a clock. |
 
-Typing a new option into a select adds it to the list. Deleting metadata deletes every value set for it in the initiative, so it asks first.
+Typing a new option into a select adds it to the list. Two people tapping the same counter at once both count. Deleting metadata deletes every value set for it in the initiative, so it asks first.
 
 #### Everything in one place
 
 Under the initiative's metadata, the page lists the properties of each project and collection, under its name. You see the ones you're allowed to edit: those of the projects and collections you can change. A community admin sees them all.
 
-- **Edit** one with the pencil: its name, its options and their colours, its colour, its currency.
+- **Edit** one with the pencil: its name, its options and their colours, its colour, its currency, a counter's step and bounds.
 - **Tick** several to delete them in one go. Each takes all its values with it, so it asks first.
 - **Promote to metadata** is for the day four projects each grow a "Budget" box and somebody notices. Tick properties of one type, from as many projects and collections as you like, and name the result. They become one piece of the initiative's metadata, or join the one already called that, if it's the same type.
 
