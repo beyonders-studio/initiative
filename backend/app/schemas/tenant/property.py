@@ -14,7 +14,7 @@ from pydantic import (
 )
 
 from app.core.currencies import CURRENCY_CODES
-from app.core.identity_boundary import responding_to_install
+from app.core.identity_boundary import names_withheld, responding_to_install
 from app.core.messages import PropertyMessages
 from app.core.tools import PROPERTY_TARGETS
 from app.schemas.base import SanitizedBaseModel
@@ -369,7 +369,9 @@ class PropertySummary(SanitizedBaseModel):
             "username, discriminator, display_name and avatar_url, or an "
             "PluginPerson when the reader is an installed plug-in. For file, a "
             "file: id, name, file_type and smart_link_url, or its id alone where "
-            "the reader cannot open it. A plug-in's "
+            "the reader cannot open it. For signature, the signer as user (a "
+            "person, shaped as user_reference's), the name they typed and when "
+            "they signed: user, name and signed_at. A plug-in's "
             "value is as the plug-in wrote it: a list field's an array of its "
             "elements, newest first, each with its ref, and a value with a state "
             "the state beside it."
@@ -378,15 +380,21 @@ class PropertySummary(SanitizedBaseModel):
 
     @field_serializer("value")
     def _value_out(self, value: Any) -> Any:
-        """A person a ``user_reference`` value names, as the response's reader
-        knows them: an installed plug-in gets an :class:`PluginPerson`."""
-        if (
-            self.type is not MetadataType.user_reference
-            or not isinstance(value, dict)
-            or not responding_to_install()
-        ):
+        """A person a ``user_reference`` value names, or a signature's signer,
+        as the response's reader knows them: an installed plug-in gets an
+        :class:`PluginPerson`."""
+        if not isinstance(value, dict) or not responding_to_install():
             return value
-        return PluginPerson.model_validate(value).for_install()
+        if self.type is MetadataType.user_reference:
+            return PluginPerson.model_validate(value).for_install()
+        if self.type is MetadataType.signature and isinstance(value["user"], dict):
+            # The typed name is a name, so it goes where names do.
+            return {
+                **value,
+                "user": PluginPerson.model_validate(value["user"]).for_install(),
+                "name": None if names_withheld() else value["name"],
+            }
+        return value
 
 
 def annotated_properties(entity: Any) -> List[PropertySummary]:

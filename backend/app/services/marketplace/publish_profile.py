@@ -44,6 +44,7 @@ from app.core import recurrence
 from app.core.file_types import FileType
 from app.core.references import REFERENCE_NODES, reference_as_text, text_node
 from app.core.tools import Tool, tool_export_source
+from app.models.tenant.metadata import PERSON_TYPES
 
 __all__ = [
     "DATE_ANCHOR",
@@ -59,7 +60,7 @@ DATE_ANCHOR = date(2000, 1, 3)
 
 #: Property types whose value is a person, and whose value therefore stays
 #: behind.
-_PERSON_PROPERTY_TYPES = frozenset({"user_reference"})
+_PERSON_PROPERTY_TYPES = frozenset(kind.value for kind in PERSON_TYPES)
 
 #: Property types whose value is a date the item plans with.
 _DATE_PROPERTY_TYPES = frozenset({"date", "datetime"})

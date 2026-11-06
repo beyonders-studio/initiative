@@ -14,6 +14,8 @@ with one rule set:
 - user_reference   → ``value_handle``, and ``value_name`` beside it
 - file             → ``value_name``, the file's name, which an import leaves
   out: the file is not in the envelope
+- signature        → ``value_name``, the name its signer typed, and when as
+  ``value_text``, which an import leaves out: an import signs for nobody
 
 A task's value of its project's metadata says ``project``, so an import puts
 it on the project's metadata rather than among the initiative's properties.
@@ -68,6 +70,10 @@ def property_export_dict(summary: PropertySummary) -> dict:
     elif prop_type == "file":
         # For a reader; nothing an import could place.
         record["value_name"] = value.get("name") if isinstance(value, dict) else None
+    elif prop_type == "signature" and isinstance(value, dict):
+        # For a reader, as the file's is.
+        record["value_name"] = value["name"]
+        record["value_text"] = _iso(value["signed_at"])
     if summary.currency is not None:
         record["currency"] = summary.currency.value
     if summary.project_id is not None:

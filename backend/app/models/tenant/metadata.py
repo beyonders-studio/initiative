@@ -61,6 +61,9 @@ class MetadataType(str, Enum):
     counter = "counter"
     #: One file of the item's initiative, by its id.
     file = "file"
+    #: Who signed the item and when, and the name they typed. Written only by
+    #: the signer, as themselves.
+    signature = "signature"
     #: ``{url, text?}``.
     link = "link"
     #: ``{text, tone?}``.
@@ -68,6 +71,12 @@ class MetadataType(str, Enum):
     #: Any JSON value: a plug-in's key that no field of its manifest declares.
     json = "json"
 
+
+#: The types whose value names a person, by ``value_user_id``, which a filter
+#: compares.
+PERSON_TYPES: frozenset[MetadataType] = frozenset(
+    {MetadataType.user_reference, MetadataType.signature}
+)
 
 #: The types only a plug-in's definitions take.
 PLUGIN_ONLY_TYPES: frozenset[MetadataType] = frozenset(
@@ -281,7 +290,9 @@ class MetadataValue(SQLModel, table=True):
 
     The value is in the typed column its definition's type keeps it in. A
     file field's names its file by a foreign key, so purging the file empties
-    the field. A link or a badge is kept whole in ``value_json`` and its words, which a
+    the field. A signature's signer is in ``value_user_id``, when they signed
+    in ``value_datetime`` and the name they typed in ``value_text``. A link or
+    a badge is kept whole in ``value_json`` and its words, which a
     filter compares, in ``value_text``. A plug-in's list field holds a value
     per element, each named by its ``ref``; every other value's ``ref`` is
     ``''``. ``state`` is the facets a plug-in's value is in, by facet id.

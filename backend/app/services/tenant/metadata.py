@@ -73,6 +73,7 @@ from sqlalchemy.orm import aliased, selectinload
 from sqlmodel import SQLModel, col, delete, select
 from sqlmodel.ext.asyncio.session import AsyncSession
 
+from app.core.audit_events import AuditEventType
 from app.core.errors import PluginChannelError
 from app.core.identity_boundary import current_install_boundary, filter_people
 from app.core.messages import (
@@ -108,6 +109,7 @@ from app.models.platform.user_profile_view import MemberProfile
 from app.models.tenant.file import File
 from app.models.tenant.guild_plugin import GuildPlugin
 from app.models.tenant.metadata import (
+    PERSON_TYPES,
     REF_LENGTH,
     VALUE_COLUMNS,
     MetadataDefinition,
@@ -132,6 +134,7 @@ from app.schemas.tenant.property import (
     PropertySummary,
     PropertyValueInput,
 )
+from app.services import audit as audit_service
 from app.services.tenant import named_people, tool_layouts
 
 
@@ -445,7 +448,8 @@ def _validate_value_for_type(
 
     Raises ``HTTPException`` 400 on type mismatches or select/option
     issues. Who a ``user_reference`` may name, and which file a ``file`` may,
-    is asked of the whole set by :func:`write_values`.
+    is asked of the whole set by :func:`write_values`, which also signs a
+    ``signature``: its value here is the name the signer typed.
     """
     cols = _empty_columns()
 
@@ -454,7 +458,7 @@ def _validate_value_for_type(
 
     ptype = defn.type
 
-    if ptype is MetadataType.text:
+    if ptype in (MetadataType.text, MetadataType.signature):
         cols["value_text"] = _coerce_text(raw_value)
     elif ptype is MetadataType.number:
         cols["value_number"] = _coerce_number(raw_value)
@@ -528,22 +532,28 @@ async def write_values(
     options: Sequence[PropertyOptionsChange] = (),
     steps: Sequence[PropertyStep] = (),
     collection_id: Optional[int] = None,
-) -> None:
-    """Replace every property value on ``row`` with ``values``. Given
-    ``removed``, write only the properties ``values`` names and take off the
-    ones ``removed`` names, leaving every other value as it is, so two writes
-    of different properties both stand. ``options`` (with ``removed``)
-    changes options of multi-select values, and ``steps`` steps counters,
-    against what each holds when it is written, so two changes of the same
-    value both stand too.
+) -> bool:
+    """Replace every property value on ``row`` with ``values``, but the
+    signatures ``values`` doesn't name. Given ``removed``, write only the
+    properties ``values`` names and take off the ones ``removed`` names,
+    leaving every other value as it is, so two writes of different properties
+    both stand. ``options`` (with ``removed``) changes options of multi-select
+    values, and ``steps`` steps counters, against what each holds when it is
+    written, so two changes of the same value both stand too.
 
     Each value's definition must belong to ``initiative_id`` — the row's own
     initiative — a person a value names must be able to open the tool row
     that governs ``row``, and a file a value names must be one of that
-    initiative's that the writer reads. The values are the initiative's properties and, on a
-    task, its project's metadata; or with ``collection_id`` that collection's
-    metadata on ``row``, a file in it. Neither write touches the other's, nor a
-    plug-in's values. The caller has authorized the write and owns the commit.
+    initiative's that the writer reads. A signature's value is the name its
+    signer types: the writer signs it, now, and only a person writing as
+    themselves may, which a plug-in, an import or a sweep is not. The values
+    are the initiative's properties and, on a task, its project's metadata;
+    or with ``collection_id`` that collection's metadata on ``row``, a file in
+    it. Neither write touches the other's, nor a plug-in's values. The caller
+    has authorized the write and owns the commit.
+
+    Answers whether the write changes ``row`` beyond its signatures, which a
+    replace of every value always does.
     """
     spec = link_for(row)
     held = _of(spec.target, [row.id]) & _values_of(_carried(row, collection_id))
@@ -561,7 +571,13 @@ async def write_values(
         [*(change.property_id for change in options), *(s.property_id for s in steps)],
     )
     if removed is None:
-        await session.exec(delete(MetadataValue).where(held))
+        await session.exec(
+            delete(MetadataValue).where(
+                held,
+                ~_values_of(MetadataDefinition.type == MetadataType.signature)
+                | col(MetadataValue.property_id).in_(named_ids),
+            )
+        )
     elif named_ids:
         await session.exec(
             delete(MetadataValue).where(
@@ -569,8 +585,9 @@ async def write_values(
                 MetadataValue.property_id.in_(named_ids),
             )
         )
+    changed = removed is None or bool(removed or options or steps)
     if not values and not options and not steps:
-        return
+        return changed
 
     requested_ids = [v.property_id for v in values]
     if len(requested_ids) != len(set(requested_ids)):
@@ -633,6 +650,7 @@ async def write_values(
         )
         for step in steps
     ]
+    signer = guild_context(session)
     for entry in values:
         defn = definition(entry.property_id)
         cols = _validate_value_for_type(defn, entry.value)
@@ -640,6 +658,25 @@ async def write_values(
             named.add(cols["value_user_id"])
         if cols["value_file_id"] is not None:
             files.add(cols["value_file_id"])
+        if defn.type is not MetadataType.signature:
+            changed = True
+        elif cols["value_text"] is not None:
+            if signer is None:
+                raise HTTPException(
+                    status_code=status.HTTP_403_FORBIDDEN,
+                    detail=PropertyMessages.SIGNER_ONLY,
+                )
+            cols["value_user_id"] = signer.user_id
+            cols["value_datetime"] = datetime.now(timezone.utc)
+            await audit_service.record(
+                session,
+                event_type=AuditEventType.SIGNATURE_SIGNED,
+                actor_user_id=signer.user_id,
+                guild_id=signer.guild_id,
+                target_type=spec.target,
+                target_id=row.id,
+                detail={"property_id": defn.id},
+            )
         rows.append(
             MetadataValue(
                 entity_type=spec.target,
@@ -659,6 +696,7 @@ async def write_values(
         if files - set(readable.all()):
             raise _bad_value()
     session.add_all(rows)
+    return changed
 
 
 async def _in_turn(
@@ -748,7 +786,7 @@ async def set_values(
     named, as :func:`write_values`; a collection's metadata with
     ``collection_id``), mark the row changed, and let a target whose own shape
     reacts (a repeating event) do so. Authorization is the caller's."""
-    await write_values(
+    changed = await write_values(
         session,
         row,
         await property_values_by_row_id(session, values),
@@ -759,8 +797,9 @@ async def set_values(
         collection_id=collection_id,
     )
     # A collection's metadata is the collection's, so it leaves the file as
-    # it was.
-    if collection_id is None and hasattr(row, "updated_at"):
+    # it was; and signing the row leaves it as it was, so a later signature
+    # doesn't read as a change since an earlier one.
+    if changed and collection_id is None and hasattr(row, "updated_at"):
         row.updated_at = datetime.now(timezone.utc)
         session.add(row)
     await session.flush()
@@ -833,7 +872,8 @@ async def copy_values(
     copy's project with the same name and type (its own, for a copy beside
     it), and the rest is not copied. A collection's metadata stays with the
     files in it, since a copy is in no collection; a plug-in's stays with the
-    source, since only the plug-in writes it.
+    source, since only the plug-in writes it. A signature stays too, on both:
+    the copy was never signed.
     """
     if not copies:
         return
@@ -847,10 +887,10 @@ async def copy_values(
     now = datetime.now(timezone.utc)
     names = ["entity_type", "entity_id", "property_id", *VALUE_COLUMNS]
     held = [getattr(MetadataValue, c) for c in VALUE_COLUMNS]
+    unsigned = MetadataDefinition.type != MetadataType.signature
+    properties = _values_of(and_(_properties(), unsigned))
     await session.exec(
-        delete(MetadataValue).where(
-            _of(target, copies.values()), _values_of(_properties())
-        )
+        delete(MetadataValue).where(_of(target, copies.values()), properties)
     )
     await session.exec(
         insert(MetadataValue).from_select(
@@ -864,12 +904,12 @@ async def copy_values(
                 literal(now),
             )
             .join(pairs, MetadataValue.entity_id == pairs.c.source_id)
-            .where(_of(target, copies.keys()), _values_of(_properties())),
+            .where(_of(target, copies.keys()), properties),
         )
     )
     if model is not Task:
         return
-    projects = col(MetadataDefinition.project_id).is_not(None)
+    projects = col(MetadataDefinition.project_id).is_not(None) & unsigned
     await session.exec(
         delete(MetadataValue).where(_of(target, copies.values()), _values_of(projects))
     )
@@ -896,7 +936,11 @@ async def copy_values(
                     there.type == source.type,
                 ),
             )
-            .where(_of(target, copies.keys()), col(source.project_id).is_not(None)),
+            .where(
+                _of(target, copies.keys()),
+                col(source.project_id).is_not(None),
+                source.type != MetadataType.signature,
+            ),
         )
     )
 
@@ -1249,6 +1293,14 @@ def _rehydrate_value(
         return _person(row.value_user_id, user)
     if ptype is MetadataType.file:
         return _file(row.value_file_id, row.value_file)
+    if ptype is MetadataType.signature:
+        if row.value_user_id is None:
+            return None
+        return {
+            "user": _person(row.value_user_id, user),
+            "name": row.value_text,
+            "signed_at": row.value_datetime,
+        }
     return None  # pragma: no cover
 
 
@@ -1425,7 +1477,7 @@ def typed_column_for_property(property_type: MetadataType) -> Any:
         return MetadataValue.value_date
     if property_type is MetadataType.datetime:
         return MetadataValue.value_datetime
-    if property_type is MetadataType.user_reference:
+    if property_type in PERSON_TYPES:
         return MetadataValue.value_user_id
     if property_type is MetadataType.file:
         return MetadataValue.value_file_id
@@ -1480,7 +1532,7 @@ def _coerce_filter_scalar(property_type: MetadataType, raw: Any) -> Any:
             if isinstance(raw, str):
                 return datetime.fromisoformat(raw.strip().replace("Z", "+00:00"))
             return None
-        if property_type in (MetadataType.user_reference, MetadataType.file):
+        if property_type in PERSON_TYPES or property_type is MetadataType.file:
             if isinstance(raw, bool):
                 return None
             if isinstance(raw, int):
@@ -1826,7 +1878,7 @@ async def property_filter_clauses(
             )
             if condition.op is not FilterOp.is_null
             and (definition := definitions.get(condition.property_id)) is not None
-            and definition.type is MetadataType.user_reference
+            and definition.type in PERSON_TYPES
             else condition
             for condition in parsed
         ]
