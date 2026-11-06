@@ -9,6 +9,127 @@ matter and can be deleted.
 
 ## After 0.77.1
 
+### File fields
+
+`MetadataType` takes `file`, a field holding one file of the item's
+initiative, so every response carrying a property's or a definition's type may
+hold it.
+
+- GET /api/v1/c/{community_id}/calendar-entries/ added the new `file` enum value to the `events/items/properties/items/type` response property for the response status `200`
+- GET /api/v1/c/{community_id}/calendar-entries/ added the new `file` enum value to the `polls/items/properties/items/type` response property for the response status `200`
+- GET /api/v1/c/{community_id}/calendar-entries/ added the new `file` enum value to the `projects/items/properties/items/type` response property for the response status `200`
+- GET /api/v1/c/{community_id}/calendar-entries/ added the new `file` enum value to the `task_occurrences/items/properties/items/type` response property for the response status `200`
+- GET /api/v1/c/{community_id}/calendar-entries/ added the new `file` enum value to the `tasks/items/properties/items/type` response property for the response status `200`
+- POST /api/v1/c/{community_id}/calendar-events/ added the new `file` enum value to the `properties/items/type` response property for the response status `201`
+- GET /api/v1/c/{community_id}/calendar-events/{event_id} added the new `file` enum value to the `properties/items/type` response property for the response status `200`
+- PATCH /api/v1/c/{community_id}/calendar-events/{event_id} added the new `file` enum value to the `properties/items/type` response property for the response status `200`
+- PUT /api/v1/c/{community_id}/calendar-events/{event_id}/attendees added the new `file` enum value to the `properties/items/type` response property for the response status `200`
+- POST /api/v1/c/{community_id}/calendar-events/{event_id}/duplicate added the new `file` enum value to the `properties/items/type` response property for the response status `201`
+- POST /api/v1/c/{community_id}/calendar-events/{event_id}/occurrences added the new `file` enum value to the `properties/items/type` response property for the response status `200`
+- POST /api/v1/c/{community_id}/calendar-events/{event_id}/occurrences/add added the new `file` enum value to the `properties/items/type` response property for the response status `200`
+- POST /api/v1/c/{community_id}/calendar-events/{event_id}/occurrences/detach added the new `file` enum value to the `properties/items/type` response property for the response status `200`
+- POST /api/v1/c/{community_id}/calendar-events/{event_id}/occurrences/restore added the new `file` enum value to the `properties/items/type` response property for the response status `200`
+- PATCH /api/v1/c/{community_id}/calendar-events/{event_id}/rsvp added the new `file` enum value to the `properties/items/type` response property for the response status `200`
+- GET /api/v1/c/{community_id}/calendars/ added the new `file` enum value to the `items/items/properties/items/type` response property for the response status `200`
+- POST /api/v1/c/{community_id}/calendars/ added the new `file` enum value to the `properties/items/type` response property for the response status `201`
+- GET /api/v1/c/{community_id}/calendars/{calendar_id} added the new `file` enum value to the `properties/items/type` response property for the response status `200`
+- PATCH /api/v1/c/{community_id}/calendars/{calendar_id} added the new `file` enum value to the `properties/items/type` response property for the response status `200`
+- POST /api/v1/c/{community_id}/calendars/{calendar_id}/duplicate added the new `file` enum value to the `properties/items/type` response property for the response status `201`
+- PUT /api/v1/c/{community_id}/calendars/{calendar_id}/grants added the new `file` enum value to the `properties/items/type` response property for the response status `200`
+- GET /api/v1/c/{community_id}/counter-groups/ added the new `file` enum value to the `items/items/properties/items/type` response property for the response status `200`
+- POST /api/v1/c/{community_id}/counter-groups/ added the new `file` enum value to the `counters/items/properties/items/type` response property for the response status `201`
+- POST /api/v1/c/{community_id}/counter-groups/ added the new `file` enum value to the `properties/items/type` response property for the response status `201`
+- GET /api/v1/c/{community_id}/counter-groups/{group_id} added the new `file` enum value to the `counters/items/properties/items/type` response property for the response status `200`
+- GET /api/v1/c/{community_id}/counter-groups/{group_id} added the new `file` enum value to the `properties/items/type` response property for the response status `200`
+- PATCH /api/v1/c/{community_id}/counter-groups/{group_id} added the new `file` enum value to the `counters/items/properties/items/type` response property for the response status `200`
+- PATCH /api/v1/c/{community_id}/counter-groups/{group_id} added the new `file` enum value to the `properties/items/type` response property for the response status `200`
+- POST /api/v1/c/{community_id}/counter-groups/{group_id}/counters added the new `file` enum value to the `properties/items/type` response property for the response status `201`
+- POST /api/v1/c/{community_id}/counter-groups/{group_id}/duplicate added the new `file` enum value to the `counters/items/properties/items/type` response property for the response status `201`
+- POST /api/v1/c/{community_id}/counter-groups/{group_id}/duplicate added the new `file` enum value to the `properties/items/type` response property for the response status `201`
+- PUT /api/v1/c/{community_id}/counter-groups/{group_id}/grants added the new `file` enum value to the `counters/items/properties/items/type` response property for the response status `200`
+- PUT /api/v1/c/{community_id}/counter-groups/{group_id}/grants added the new `file` enum value to the `properties/items/type` response property for the response status `200`
+- POST /api/v1/c/{community_id}/counter-groups/{group_id}/reset-all added the new `file` enum value to the `counters/items/properties/items/type` response property for the response status `200`
+- POST /api/v1/c/{community_id}/counter-groups/{group_id}/reset-all added the new `file` enum value to the `properties/items/type` response property for the response status `200`
+- POST /api/v1/c/{community_id}/counter-groups/{group_id}/sort added the new `file` enum value to the `counters/items/properties/items/type` response property for the response status `200`
+- POST /api/v1/c/{community_id}/counter-groups/{group_id}/sort added the new `file` enum value to the `properties/items/type` response property for the response status `200`
+- GET /api/v1/c/{community_id}/counters/{counter_id} added the new `file` enum value to the `properties/items/type` response property for the response status `200`
+- PATCH /api/v1/c/{community_id}/counters/{counter_id} added the new `file` enum value to the `properties/items/type` response property for the response status `200`
+- POST /api/v1/c/{community_id}/counters/{counter_id}/duplicate added the new `file` enum value to the `properties/items/type` response property for the response status `201`
+- POST /api/v1/c/{community_id}/counters/{counter_id}/reset added the new `file` enum value to the `properties/items/type` response property for the response status `200`
+- POST /api/v1/c/{community_id}/counters/{counter_id}/set added the new `file` enum value to the `properties/items/type` response property for the response status `200`
+- POST /api/v1/c/{community_id}/counters/{counter_id}/step added the new `file` enum value to the `properties/items/type` response property for the response status `200`
+- GET /api/v1/c/{community_id}/dashboards/ added the new `file` enum value to the `items/items/properties/items/type` response property for the response status `200`
+- POST /api/v1/c/{community_id}/dashboards/ added the new `file` enum value to the `properties/items/type` response property for the response status `201`
+- GET /api/v1/c/{community_id}/dashboards/{dashboard_id} added the new `file` enum value to the `properties/items/type` response property for the response status `200`
+- PATCH /api/v1/c/{community_id}/dashboards/{dashboard_id} added the new `file` enum value to the `properties/items/type` response property for the response status `200`
+- POST /api/v1/c/{community_id}/dashboards/{dashboard_id}/duplicate added the new `file` enum value to the `properties/items/type` response property for the response status `201`
+- PUT /api/v1/c/{community_id}/dashboards/{dashboard_id}/grants added the new `file` enum value to the `properties/items/type` response property for the response status `200`
+- POST /api/v1/c/{community_id}/dashboards/{dashboard_id}/upgrade added the new `file` enum value to the `properties/items/type` response property for the response status `200`
+- PUT /api/v1/c/{community_id}/dashboards/{dashboard_id}/view-mode added the new `file` enum value to the `properties/items/type` response property for the response status `200`
+- GET /api/v1/c/{community_id}/files/ added the new `file` enum value to the `items/items/properties/items/type` response property for the response status `200`
+- POST /api/v1/c/{community_id}/files/ added the new `file` enum value to the `properties/items/type` response property for the response status `201`
+- POST /api/v1/c/{community_id}/files/upload added the new `file` enum value to the `properties/items/type` response property for the response status `201`
+- GET /api/v1/c/{community_id}/files/{file_id} added the new `file` enum value to the `properties/items/type` response property for the response status `200`
+- PATCH /api/v1/c/{community_id}/files/{file_id} added the new `file` enum value to the `properties/items/type` response property for the response status `200`
+- POST /api/v1/c/{community_id}/files/{file_id}/duplicate added the new `file` enum value to the `properties/items/type` response property for the response status `201`
+- PUT /api/v1/c/{community_id}/files/{file_id}/grants added the new `file` enum value to the `properties/items/type` response property for the response status `200`
+- GET /api/v1/c/{community_id}/posts/ added the new `file` enum value to the `items/items/properties/items/type` response property for the response status `200`
+- POST /api/v1/c/{community_id}/posts/ added the new `file` enum value to the `properties/items/type` response property for the response status `201`
+- GET /api/v1/c/{community_id}/posts/{post_id} added the new `file` enum value to the `properties/items/type` response property for the response status `200`
+- PATCH /api/v1/c/{community_id}/posts/{post_id} added the new `file` enum value to the `properties/items/type` response property for the response status `200`
+- POST /api/v1/c/{community_id}/posts/{post_id}/duplicate added the new `file` enum value to the `properties/items/type` response property for the response status `201`
+- PUT /api/v1/c/{community_id}/posts/{post_id}/grants added the new `file` enum value to the `properties/items/type` response property for the response status `200`
+- PUT /api/v1/c/{community_id}/posts/{post_id}/pin added the new `file` enum value to the `properties/items/type` response property for the response status `200`
+- DELETE /api/v1/c/{community_id}/posts/{post_id}/poll added the new `file` enum value to the `properties/items/type` response property for the response status `200`
+- PUT /api/v1/c/{community_id}/posts/{post_id}/poll added the new `file` enum value to the `properties/items/type` response property for the response status `200`
+- DELETE /api/v1/c/{community_id}/posts/{post_id}/poll/vote added the new `file` enum value to the `properties/items/type` response property for the response status `200`
+- PUT /api/v1/c/{community_id}/posts/{post_id}/poll/vote added the new `file` enum value to the `properties/items/type` response property for the response status `200`
+- GET /api/v1/c/{community_id}/projects/ added the new `file` enum value to the `items/items/properties/items/type` response property for the response status `200`
+- POST /api/v1/c/{community_id}/projects/ added the new `file` enum value to the `properties/items/type` response property for the response status `201`
+- GET /api/v1/c/{community_id}/projects/{project_id} added the new `file` enum value to the `properties/items/type` response property for the response status `200`
+- PATCH /api/v1/c/{community_id}/projects/{project_id} added the new `file` enum value to the `properties/items/type` response property for the response status `200`
+- POST /api/v1/c/{community_id}/projects/{project_id}/duplicate added the new `file` enum value to the `properties/items/type` response property for the response status `201`
+- PUT /api/v1/c/{community_id}/projects/{project_id}/grants added the new `file` enum value to the `properties/items/type` response property for the response status `200`
+- PUT /api/v1/c/{community_id}/properties/{target}/{entity_id} added the new `file` enum value to the `items/type` response property for the response status `200`
+- GET /api/v1/c/{community_id}/property-definitions/ added the new `file` enum value to the `items/type` response property for the response status `200`
+- POST /api/v1/c/{community_id}/property-definitions/ added the new `file` enum value to the `type` response property for the response status `201`
+- PATCH /api/v1/c/{community_id}/property-definitions/{definition_id} added the new `file` enum value to the `definition/type` response property for the response status `200`
+- GET /api/v1/c/{community_id}/tasks/ added the new `file` enum value to the `items/items/properties/items/type` response property for the response status `200`
+- POST /api/v1/c/{community_id}/tasks/ added the new `file` enum value to the `properties/items/type` response property for the response status `201`
+- POST /api/v1/c/{community_id}/tasks/reorder added the new `file` enum value to the `items/properties/items/type` response property for the response status `200`
+- GET /api/v1/c/{community_id}/tasks/{task_id} added the new `file` enum value to the `properties/items/type` response property for the response status `200`
+- PATCH /api/v1/c/{community_id}/tasks/{task_id} added the new `file` enum value to the `properties/items/type` response property for the response status `200`
+- POST /api/v1/c/{community_id}/tasks/{task_id}/case/take added the new `file` enum value to the `properties/items/type` response property for the response status `200`
+- POST /api/v1/c/{community_id}/tasks/{task_id}/checklist/{item_id}/promote added the new `file` enum value to the `properties/items/type` response property for the response status `201`
+- POST /api/v1/c/{community_id}/tasks/{task_id}/duplicate added the new `file` enum value to the `properties/items/type` response property for the response status `201`
+- POST /api/v1/c/{community_id}/tasks/{task_id}/move added the new `file` enum value to the `properties/items/type` response property for the response status `200`
+- POST /api/v1/c/{community_id}/tasks/{task_id}/skip added the new `file` enum value to the `properties/items/type` response property for the response status `200`
+- GET /api/v1/c/{community_id}/wiki-pages/{page_id} added the new `file` enum value to the `properties/items/type` response property for the response status `200`
+- PATCH /api/v1/c/{community_id}/wiki-pages/{page_id} added the new `file` enum value to the `properties/items/type` response property for the response status `200`
+- POST /api/v1/c/{community_id}/wiki-pages/{page_id}/duplicate added the new `file` enum value to the `properties/items/type` response property for the response status `201`
+- POST /api/v1/c/{community_id}/wiki-pages/{page_id}/move added the new `file` enum value to the `properties/items/type` response property for the response status `200`
+- GET /api/v1/c/{community_id}/wikis/ added the new `file` enum value to the `items/items/properties/items/type` response property for the response status `200`
+- POST /api/v1/c/{community_id}/wikis/ added the new `file` enum value to the `properties/items/type` response property for the response status `201`
+- GET /api/v1/c/{community_id}/wikis/{wiki_id} added the new `file` enum value to the `properties/items/type` response property for the response status `200`
+- PATCH /api/v1/c/{community_id}/wikis/{wiki_id} added the new `file` enum value to the `properties/items/type` response property for the response status `200`
+- POST /api/v1/c/{community_id}/wikis/{wiki_id}/duplicate added the new `file` enum value to the `properties/items/type` response property for the response status `201`
+- PUT /api/v1/c/{community_id}/wikis/{wiki_id}/grants added the new `file` enum value to the `properties/items/type` response property for the response status `200`
+- GET /api/v1/c/{community_id}/wikis/{wiki_id}/pages added the new `file` enum value to the `items/items/properties/items/type` response property for the response status `200`
+- POST /api/v1/c/{community_id}/wikis/{wiki_id}/pages added the new `file` enum value to the `properties/items/type` response property for the response status `201`
+- GET /api/v1/me/calendar-entries added the new `file` enum value to the `events/items/properties/items/type` response property for the response status `200`
+- GET /api/v1/me/calendar-entries added the new `file` enum value to the `polls/items/properties/items/type` response property for the response status `200`
+- GET /api/v1/me/calendar-entries added the new `file` enum value to the `projects/items/properties/items/type` response property for the response status `200`
+- GET /api/v1/me/calendar-entries added the new `file` enum value to the `task_occurrences/items/properties/items/type` response property for the response status `200`
+- GET /api/v1/me/calendar-entries added the new `file` enum value to the `tasks/items/properties/items/type` response property for the response status `200`
+- GET /api/v1/me/calendars added the new `file` enum value to the `items/items/properties/items/type` response property for the response status `200`
+- GET /api/v1/me/counter-groups added the new `file` enum value to the `items/items/properties/items/type` response property for the response status `200`
+- GET /api/v1/me/dashboards added the new `file` enum value to the `items/items/properties/items/type` response property for the response status `200`
+- GET /api/v1/me/files added the new `file` enum value to the `items/items/properties/items/type` response property for the response status `200`
+- GET /api/v1/me/posts added the new `file` enum value to the `items/items/properties/items/type` response property for the response status `200`
+- GET /api/v1/me/projects added the new `file` enum value to the `items/items/properties/items/type` response property for the response status `200`
+- GET /api/v1/me/tasks added the new `file` enum value to the `items/items/properties/items/type` response property for the response status `200`
+- GET /api/v1/me/wikis added the new `file` enum value to the `items/items/properties/items/type` response property for the response status `200`
+
 ### Counter fields
 
 `MetadataType` takes `counter`, a field people step up and down, so every

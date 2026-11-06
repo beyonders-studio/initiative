@@ -7,21 +7,22 @@ import { useCollaboration } from "@/hooks/useCollaboration";
 
 const ignore = () => {};
 
-/** Whether a file reads best across the wiki's wide column: everything
- * that is not written prose. */
+/** Whether a file reads best across a wide column: everything that is not
+ * written prose. */
 export const isWideFile = (file: FileRead | undefined) =>
   file !== undefined && !fileBody(file.file_type).prose;
 
 /**
- * A file in a wiki, drawn by the body its own page draws it with — a file
- * in its viewer, a whiteboard on its canvas, a spreadsheet in its grid — and
- * never edited here. Writing happens at the file's own address, so the
- * body joins no room and its edits go nowhere.
+ * A file shown where it does not live (a wiki, a file field), drawn by the
+ * body its own page draws it with — a file in its viewer, a whiteboard on its
+ * canvas, a spreadsheet in its grid — and never edited there. Writing happens
+ * at the file's own address, so the body joins no room and its edits go
+ * nowhere.
  */
-export const WikiFileBody = ({ file }: { file: FileRead }) => {
+export const ReadOnlyFileBody = ({ file, className }: { file: FileRead; className?: string }) => {
   // What the file page holds for a body that joins no room.
   const collaboration = useCollaboration({ socketPath: null, enabled: false });
-  const { Body, saved, prose } = fileBody(file.file_type);
+  const { Body, saved } = fileBody(file.file_type);
   const content = useMemo(() => saved(file), [saved, file]);
 
   return (
@@ -41,10 +42,7 @@ export const WikiFileBody = ({ file }: { file: FileRead }) => {
         live={false}
         settled
         title={file.name}
-        // Prose runs on in the wiki's own column rather than in a card.
-        className={
-          prose ? "max-h-none rounded-none border-0 bg-transparent shadow-none" : undefined
-        }
+        className={className}
         compact
         onChange={ignore}
       />

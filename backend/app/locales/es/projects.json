@@ -88,7 +88,8 @@
         "location": "Lugar",
         "link": "Enlace",
         "amount": "Importe",
-        "cost": "Coste"
+        "cost": "Coste",
+        "design_files": "Archivos de diseño"
       },
       "outlines": {
         "bug": "**Qué pasó**\n\n\n**Qué debería haber pasado**\n\n\n**Cómo reproducirlo**\n\n",

@@ -22,6 +22,7 @@
     "currency": "Geldbetrag",
     "scale": "Skala",
     "counter": "Zähler",
+    "file": "Datei",
     "link": "Link",
     "badge": "Abzeichen",
     "json": "Daten"
@@ -63,7 +64,9 @@
     "stars_other": "{{count}} Sterne",
     "stepDown": "{{name}} einen Schritt verringern",
     "stepUp": "{{name}} einen Schritt erhöhen",
-    "reset": "{{name}} zurücksetzen"
+    "reset": "{{name}} zurücksetzen",
+    "newFile": "Neue Datei",
+    "fileUnavailable": "Eine Datei, die du nicht öffnen kannst"
   },
   "cell": {
     "emptyValue": "—",

@@ -29,10 +29,12 @@ import { useAppendPropertyOption } from "@/hooks/useProperties";
 import { toPickerValue } from "@/lib/localDateTime";
 import { cn } from "@/lib/utils";
 
+import { FileFieldInput } from "./FileFieldInput";
 import {
   counterCount,
   counterSettings,
   type FieldDisplay,
+  fileFieldValue,
   numericValue,
   scaleValue,
   steppedCount,
@@ -47,7 +49,7 @@ export interface PropertyInputProps {
   onChange: (value: unknown) => void;
   disabled?: boolean;
   className?: string;
-  /** Initiative that scopes the `user_reference` picker. Falls back to the
+  /** Initiative that scopes the `user_reference` and `file` pickers. Falls back to the
    *  definition's own `initiative_id` when it carries one (a full
    *  `PropertyDefinitionRead`); required via this prop when the definition
    *  arrives as an embedded `PropertySummary`. */
@@ -97,7 +99,7 @@ const coerceStringArray = (value: unknown): string[] => {
   return [];
 };
 
-const coerceUserId = (value: unknown): number | null => {
+const coerceId = (value: unknown): number | null => {
   if (value == null) return null;
   if (typeof value === "number" && Number.isFinite(value)) return value;
   if (typeof value === "object" && value !== null && "id" in value) {
@@ -497,7 +499,7 @@ export const PropertyInput = ({
     }
 
     case MetadataType.user_reference: {
-      const currentId = coerceUserId(value);
+      const currentId = coerceId(value);
       // The people who can open the row the value sits on; without that row
       // (a filter), the property's initiative. Prefer the explicit prop,
       // falling back to the definition's own initiative when it carries one.
@@ -517,6 +519,20 @@ export const PropertyInput = ({
           emptyMessage={t("properties:input.textPlaceholder")}
           disabled={disabled}
           className={className}
+        />
+      );
+    }
+
+    case MetadataType.file: {
+      return (
+        <FileFieldInput
+          value={coerceId(value)}
+          shown={"value" in definition ? fileFieldValue(definition.value) : null}
+          onChange={onChange}
+          initiativeId={
+            initiativeId ?? ("initiative_id" in definition ? definition.initiative_id : null)
+          }
+          disabled={disabled}
         />
       );
     }

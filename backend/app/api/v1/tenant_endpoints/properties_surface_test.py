@@ -26,6 +26,7 @@ from httpx import AsyncClient
 from sqlmodel import select
 from sqlmodel.ext.asyncio.session import AsyncSession
 
+from app.core.file_types import FileType
 from app.core.tools import KINDS
 from app.core.tools import Tool
 from app.models.platform.guild import CommunityRole
@@ -561,6 +562,60 @@ async def test_put_refuses_a_person_who_cannot_open_it(
 
     assert response.status_code == 422
     assert response.json()["detail"] == "PERSON_CANNOT_READ"
+
+
+async def test_a_file_field_holds_one_file_of_its_initiative_until_it_is_purged(
+    client: AsyncClient, session: AsyncSession, acting_user
+):
+    """A file field names a file of the item's initiative, which reads back
+    as what draws it, then as its id alone once it is in the trash, and is
+    emptied when the file is purged."""
+    a, project = await _scene(TASKS, session, acting_user)
+    task = await TASKS.make(session, a, project, "E")
+    defn = await create_property_definition(
+        session, a.initiative, name="Design files", type=MetadataType.file
+    )
+    url = "https://example.com/designs/mockup"
+    design = await create_file(
+        session,
+        a.initiative,
+        a.user,
+        name="Mockup",
+        file_type=FileType.url,
+        content={"url": url},
+    )
+    elsewhere = await create_initiative(session, a.guild, a.user, name="B")
+    foreign = await create_file(session, elsewhere, a.user, name="Foreign")
+
+    refused = await _write(
+        client, a, TASKS, task, [{"property_id": defn.id, "value": foreign.id}]
+    )
+    assert refused.status_code == 400
+    assert refused.json()["detail"] == "PROPERTY_INVALID_VALUE_FOR_TYPE"
+
+    written = await _write(
+        client, a, TASKS, task, [{"property_id": defn.id, "value": design.id}]
+    )
+    assert written.status_code == 200, written.text
+    assert _values(written.json())[defn.id] == {
+        "id": design.id,
+        "name": "Mockup",
+        "file_type": "url",
+        "smart_link_url": url,
+    }
+
+    trashed = await client.delete(a.g(f"/files/{design.id}"), headers=a.headers)
+    assert trashed.status_code in (200, 204), trashed.text
+    read = await client.get(a.g(f"/tasks/{task}"), headers=a.headers)
+    assert _values(read.json()["properties"])[defn.id] == {"id": design.id}
+
+    purged = await client.delete(
+        a.g(f"/trash/file/{design.id}/purge"), headers=a.headers
+    )
+    assert purged.status_code == 204, purged.text
+    [held] = await _stored(session, TASKS, task)
+    await session.refresh(held)
+    assert held.value_file_id is None
 
 
 # ---------------------------------------------------------------------------

@@ -29,6 +29,7 @@ from app.models.tenant._mixins import CreatedByMixin
 from app.core.tools import INSTALL_METADATA_KIND, PROPERTY_TARGETS
 
 if TYPE_CHECKING:  # pragma: no cover
+    from app.models.tenant.file import File
     from app.models.tenant.initiative import Initiative
     from app.models.platform.user_profile_view import MemberProfile
 
@@ -58,6 +59,8 @@ class MetadataType(str, Enum):
     #: ``counter`` names and within its bounds, which a layout shows as a
     #: number, a bar or a clock.
     counter = "counter"
+    #: One file of the item's initiative, by its id.
+    file = "file"
     #: ``{url, text?}``.
     link = "link"
     #: ``{text, tone?}``.
@@ -252,6 +255,7 @@ VALUE_COLUMNS: tuple[str, ...] = (
     "value_date",
     "value_datetime",
     "value_user_id",
+    "value_file_id",
     "value_json",
 )
 
@@ -276,7 +280,8 @@ class MetadataValue(SQLModel, table=True):
     definition, whoever owns it, and a value goes with it.
 
     The value is in the typed column its definition's type keeps it in. A
-    link or a badge is kept whole in ``value_json`` and its words, which a
+    file field's names its file by a foreign key, so purging the file empties
+    the field. A link or a badge is kept whole in ``value_json`` and its words, which a
     filter compares, in ``value_text``. A plug-in's list field holds a value
     per element, each named by its ``ref``; every other value's ``ref`` is
     ``''``. ``state`` is the facets a plug-in's value is in, by facet id.
@@ -315,6 +320,11 @@ class MetadataValue(SQLModel, table=True):
             postgresql_where=text("value_json IS NOT NULL"),
         ),
         Index(
+            "ix_metadata_values_value_file_id",
+            "value_file_id",
+            postgresql_where=text("value_file_id IS NOT NULL"),
+        ),
+        Index(
             "ix_metadata_values_ref",
             "property_id",
             "ref",
@@ -350,6 +360,19 @@ class MetadataValue(SQLModel, table=True):
         default=None, sa_type=DateTime(timezone=True), nullable=True
     )
     value_user_id: Optional[int] = Field(default=None, nullable=True)
+    #: A file field's file. Purging the file empties it.
+    value_file_id: Optional[int] = Field(
+        default=None,
+        sa_column=Column(
+            Integer,
+            ForeignKey(
+                "files.id",
+                ondelete="SET NULL",
+                name="fk_metadata_values_value_file_id",
+            ),
+            nullable=True,
+        ),
+    )
     value_json: Optional[Any] = Field(default=None, sa_type=JSONB, nullable=True)
     state: Optional[dict] = Field(default=None, sa_type=JSONB, nullable=True)
     created_at: datetime = Field(
@@ -364,6 +387,9 @@ class MetadataValue(SQLModel, table=True):
     )
 
     definition: Optional[MetadataDefinition] = Relationship()
+    value_file: Optional["File"] = Relationship(
+        sa_relationship_kwargs={"viewonly": True},
+    )
     value_user: Optional["MemberProfile"] = Relationship(
         sa_relationship_kwargs={
             "primaryjoin": "foreign(MetadataValue.value_user_id) == MemberProfile.id",

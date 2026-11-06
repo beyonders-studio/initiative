@@ -199,6 +199,7 @@ Something only one project or one collection cares about is a **property** of th
 | **Money** | An amount, in the one currency it names. |
 | **Scale** | 0 to 100. A layout draws it as a percentage, stars or a bar. |
 | **Counter** | A number you tap up and down by its step, never past the minimum or maximum you give it. **Reset** sends it back to its initial value. A layout draws it as a number, a bar or a clock. |
+| **File** | One file from the initiative's Files: pick one, or make one with **New file**, which uploads a file, starts a document or saves a smart link. On the item's page a document, whiteboard, spreadsheet or smart link shows in place; any other file is a link to it. For several files, add them as links instead. |
 
 Typing a new option into a select adds it to the list. Two people tapping the same counter at once both count. Deleting metadata deletes every value set for it in the initiative, so it asks first.
 

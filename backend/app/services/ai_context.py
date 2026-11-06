@@ -160,7 +160,7 @@ async def activity_context(
 
 def _shown(field: PropertySummary) -> Any:
     """A field's value as the task's page shows it: an option by its label,
-    a person by their name."""
+    a person or a file by their name."""
     value = field.model_dump(mode="json", include={"value"}).get("value")
     if field.options and value is not None:
         labels = {option.value: option.label for option in field.options}
@@ -169,6 +169,8 @@ def _shown(field: PropertySummary) -> Any:
         return labels.get(value, value)
     if field.type is MetadataType.user_reference and isinstance(value, dict):
         return display_name(SimpleNamespace(**value))
+    if field.type is MetadataType.file and isinstance(value, dict):
+        return value.get("name")
     return value
 
 

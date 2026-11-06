@@ -100,8 +100,8 @@ def moment(value: Any, tz: str | None) -> str:
 
 def property_value(summary: Any, locale: str, tz: str | None) -> Any:
     """A custom property's value as its type shows it: an option by its
-    label, a person by name, a checkbox as yes or no, a moment with its
-    time."""
+    label, a person or a file by name, a checkbox as yes or no, a moment
+    with its time."""
     if summary is None or summary.value is None:
         return None
     value = summary.value
@@ -121,6 +121,8 @@ def property_value(summary: Any, locale: str, tz: str | None) -> Any:
                 display_name=value.get("display_name"),
             )
         )
+    if kind is MetadataType.file:
+        return value.get("name") if isinstance(value, dict) else None
     if kind is MetadataType.checkbox:
         return yes_no(value, locale)
     if kind is MetadataType.date:

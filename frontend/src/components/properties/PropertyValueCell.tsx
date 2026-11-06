@@ -9,6 +9,7 @@ import {
   type PropertySummary,
 } from "@/api/generated/initiativeAPI.schemas";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
+import { fileIcon } from "@/lib/fileIcon";
 import { formatDate, formatDateTime } from "@/lib/formatDate";
 import { numberFormat } from "@/lib/intl";
 import { getAvatarSrc, getInitialsForUser, getUserDisplayName } from "@/lib/userDisplay";
@@ -18,6 +19,8 @@ import {
   counterCount,
   counterSettings,
   type FieldDisplay,
+  type FileFieldValue,
+  fileFieldValue,
   isEmptyPropertyValue,
   numericValue,
   scaleValue,
@@ -26,6 +29,24 @@ import {
 import { iconForPropertyType } from "./propertyTypeIcons";
 
 type CellVariant = "cell" | "chip";
+
+/** A file a file field holds, by its icon and name; one the reader cannot
+ *  open says so. */
+export const FileFieldName = ({ file }: { file: FileFieldValue }) => {
+  const { t } = useTranslation("properties");
+  if (!file.name) {
+    return (
+      <span className="truncate text-muted-foreground italic">{t("input.fileUnavailable")}</span>
+    );
+  }
+  const { Icon, colorClass } = fileIcon(file);
+  return (
+    <span className="inline-flex min-w-0 max-w-full items-center gap-1.5">
+      <Icon className={cn("h-4 w-4 shrink-0", colorClass)} aria-hidden />
+      <span className="truncate">{file.name}</span>
+    </span>
+  );
+};
 
 export interface PropertyValueCellProps {
   summary: PropertySummary | undefined;
@@ -501,6 +522,11 @@ export const PropertyValueCell = ({
           </span>
         );
       }
+      break;
+    }
+    case MetadataType.file: {
+      const file = fileFieldValue(value);
+      body = file ? <FileFieldName file={file} /> : null;
       break;
     }
     default:

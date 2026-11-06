@@ -22,6 +22,7 @@
     "currency": "Money",
     "scale": "Scale",
     "counter": "Counter",
+    "file": "File",
     "link": "Link",
     "badge": "Badge",
     "json": "Data"
@@ -63,7 +64,9 @@
     "stars_other": "{{count}} stars",
     "stepDown": "Step {{name}} down",
     "stepUp": "Step {{name}} up",
-    "reset": "Reset {{name}}"
+    "reset": "Reset {{name}}",
+    "newFile": "New file",
+    "fileUnavailable": "A file you can't open"
   },
   "cell": {
     "emptyValue": "—",

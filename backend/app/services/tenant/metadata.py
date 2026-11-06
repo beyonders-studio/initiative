@@ -105,6 +105,7 @@ from app.db.session import (
 from app.models.platform.identity_ref import IdentityEntity
 from app.models.platform.user import User
 from app.models.platform.user_profile_view import MemberProfile
+from app.models.tenant.file import File
 from app.models.tenant.guild_plugin import GuildPlugin
 from app.models.tenant.metadata import (
     REF_LENGTH,
@@ -443,8 +444,8 @@ def _validate_value_for_type(
     persists as an attached-but-empty record.
 
     Raises ``HTTPException`` 400 on type mismatches or select/option
-    issues. Who a ``user_reference`` may name is asked of the whole set by
-    :func:`write_values`.
+    issues. Who a ``user_reference`` may name, and which file a ``file`` may,
+    is asked of the whole set by :func:`write_values`.
     """
     cols = _empty_columns()
 
@@ -502,10 +503,10 @@ def _validate_value_for_type(
                 seen.add(slug)
                 slugs.append(slug)
         cols["value_json"] = slugs
-    elif ptype is MetadataType.user_reference:
+    elif ptype in (MetadataType.user_reference, MetadataType.file):
         if not isinstance(raw_value, int) or isinstance(raw_value, bool):
             raise _bad_value()
-        cols["value_user_id"] = raw_value
+        cols[typed_column_for_property(ptype).key] = raw_value
     else:  # pragma: no cover - defensive; MetadataType is closed
         raise _bad_value()
 
@@ -537,8 +538,9 @@ async def write_values(
     value both stand too.
 
     Each value's definition must belong to ``initiative_id`` — the row's own
-    initiative — and a person a value names must be able to open the tool row
-    that governs ``row``. The values are the initiative's properties and, on a
+    initiative — a person a value names must be able to open the tool row
+    that governs ``row``, and a file a value names must be one of that
+    initiative's that the writer reads. The values are the initiative's properties and, on a
     task, its project's metadata; or with ``collection_id`` that collection's
     metadata on ``row``, a file in it. Neither write touches the other's, nor a
     plug-in's values. The caller has authorized the write and owns the commit.
@@ -602,6 +604,7 @@ async def write_values(
         return defn
 
     named: set[int] = set()
+    files: set[int] = set()
     rows = [
         MetadataValue(
             entity_type=spec.target,
@@ -635,6 +638,8 @@ async def write_values(
         cols = _validate_value_for_type(defn, entry.value)
         if cols["value_user_id"] is not None:
             named.add(cols["value_user_id"])
+        if cols["value_file_id"] is not None:
+            files.add(cols["value_file_id"])
         rows.append(
             MetadataValue(
                 entity_type=spec.target,
@@ -645,6 +650,14 @@ async def write_values(
         )
     governing = spec.governing(row, initiative_id)
     await named_people.require_readers(session, governing, named)
+    if files:
+        readable = await session.exec(
+            select(File.id).where(
+                col(File.id).in_(files), File.initiative_id == initiative_id
+            )
+        )
+        if files - set(readable.all()):
+            raise _bad_value()
     session.add_all(rows)
 
 
@@ -1234,6 +1247,8 @@ def _rehydrate_value(
         return list(row.value_json) if row.value_json is not None else []
     if ptype is MetadataType.user_reference:
         return _person(row.value_user_id, user)
+    if ptype is MetadataType.file:
+        return _file(row.value_file_id, row.value_file)
     return None  # pragma: no cover
 
 
@@ -1252,9 +1267,24 @@ def _person(user_id: Optional[int], user: Optional[MemberProfile]) -> Any:
     }
 
 
+def _file(file_id: Optional[int], file: Optional[File]) -> Any:
+    """The file a value names, as a reader is shown it: what draws its icon
+    and, for a link, where it points; its id alone where it is not read, or
+    is in the trash."""
+    if file is None:
+        return {"id": file_id} if file_id else None
+    return {
+        "id": file.id,
+        "name": file.name,
+        "file_type": file.file_type,
+        "smart_link_url": file.smart_link_url,
+    }
+
+
 def summaries_from_rows(rows: Iterable[MetadataValue]) -> List[PropertySummary]:
     """:class:`PropertySummary` list from value rows with ``definition``
-    (and ``value_user`` where it applies) loaded, sorted by name."""
+    (and ``value_user`` and ``value_file`` where they apply) loaded, sorted by
+    name."""
     summaries: List[PropertySummary] = []
     for row in rows:
         defn = row.definition
@@ -1304,6 +1334,7 @@ async def summaries_by_id(
             .options(
                 selectinload(MetadataValue.definition),
                 selectinload(MetadataValue.value_user),
+                selectinload(MetadataValue.value_file).undefer(File.smart_link_url),
             )
         )
     ).all()
@@ -1396,6 +1427,8 @@ def typed_column_for_property(property_type: MetadataType) -> Any:
         return MetadataValue.value_datetime
     if property_type is MetadataType.user_reference:
         return MetadataValue.value_user_id
+    if property_type is MetadataType.file:
+        return MetadataValue.value_file_id
     if property_type is MetadataType.multi_select:
         return MetadataValue.value_json
     raise ValueError(f"Unsupported property type: {property_type!r}")
@@ -1447,7 +1480,7 @@ def _coerce_filter_scalar(property_type: MetadataType, raw: Any) -> Any:
             if isinstance(raw, str):
                 return datetime.fromisoformat(raw.strip().replace("Z", "+00:00"))
             return None
-        if property_type is MetadataType.user_reference:
+        if property_type in (MetadataType.user_reference, MetadataType.file):
             if isinstance(raw, bool):
                 return None
             if isinstance(raw, int):

@@ -10,8 +10,8 @@ import {
 } from "@/api/generated/initiativeAPI.schemas";
 import { NeedAccessOr } from "@/components/access/RequestAccess";
 import { ToolCommentsPanel } from "@/components/comments/ToolCommentsPanel";
+import { isWideFile, ReadOnlyFileBody } from "@/components/files/detail/ReadOnlyFileBody";
 import { WikiChrome } from "@/components/initiativeTools/wikis/WikiChrome";
-import { isWideFile, WikiFileBody } from "@/components/initiativeTools/wikis/WikiFileBody";
 import {
   WikiConnectionsSheet,
   WikiPageConnections,
@@ -157,7 +157,15 @@ export const WikiFileView = () => {
                   body waits for this visit's own fetch. */}
               {file && fileQuery.isFetchedAfterMount ? (
                 <>
-                  <WikiFileBody file={file} />
+                  <ReadOnlyFileBody
+                    file={file}
+                    // Prose runs on in the wiki's own column rather than in a card.
+                    className={
+                      isWideFile(file)
+                        ? undefined
+                        : "max-h-none rounded-none border-0 bg-transparent shadow-none"
+                    }
+                  />
                   {/* A borrowed file is a page of this wiki while you are
                       reading it here, so it leads on like one. */}
                   <WikiPageNav

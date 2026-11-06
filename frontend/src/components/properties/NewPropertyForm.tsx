@@ -36,6 +36,7 @@ export const PROPERTY_TYPES: MetadataType[] = [
   MetadataType.currency,
   MetadataType.scale,
   MetadataType.counter,
+  MetadataType.file,
 ];
 
 /**
