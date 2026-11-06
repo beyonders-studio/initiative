@@ -27,10 +27,14 @@ interface FileFieldInputProps {
   disabled?: boolean;
 }
 
-/** A file this app draws itself, as its own page draws it, read-only. */
+/** A file this app draws itself, as its own page draws it, read-only. A
+ *  body loads its content once, so it waits for this visit's own fetch. */
 const FilePreview = ({ fileId }: { fileId: number }) => {
-  const file = useFile(fileId).data;
-  return file ? <ReadOnlyFileBody file={file} className="max-h-96" /> : null;
+  const fileQuery = useFile(fileId);
+  const file = fileQuery.data;
+  return file && fileQuery.isFetchedAfterMount ? (
+    <ReadOnlyFileBody file={file} className="max-h-96" />
+  ) : null;
 };
 
 /**
@@ -51,7 +55,8 @@ export const FileFieldInput = ({
   const { t } = useTranslation("properties");
   const gp = useCommunityPath();
   const [creating, setCreating] = useState(false);
-  // What was picked here, drawn until the server reads it back.
+  // What was picked here, drawn until the server reads it back: the picker
+  // knows only the file's name.
   const [picked, setPicked] = useState<FileFieldValue | null>(null);
   const initiative = useInitiative(disabled ? null : initiativeId).data;
   const canCreate = Boolean(
@@ -59,7 +64,7 @@ export const FileFieldInput = ({
   );
 
   const file =
-    value === null ? null : ([picked, shown].find((each) => each?.id === value) ?? { id: value });
+    value === null ? null : ([shown, picked].find((each) => each?.id === value) ?? { id: value });
   const take = (next: FileFieldValue) => {
     setPicked(next);
     onChange(next.id);
