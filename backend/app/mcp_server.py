@@ -409,7 +409,7 @@ def _conditions_description(dataset_name: str | None) -> str:
         return _CONDITIONS_SHAPE
     lines = [
         _field_line(field["name"], field["ops"], field["options"])
-        for field in fields_registry.describe(dataset_name)
+        for field in fields_registry.describe(fields_registry.dataset(dataset_name))
     ]
     spec = fields_registry.dataset(dataset_name)
     for name in _EXTRA_FILTER_FIELDS.get(dataset_name, ()):
@@ -432,7 +432,11 @@ def _sorting_description(dataset_name: str | None) -> str:
     # The fields a client offers that also sort, and the ones declared only to
     # be sorted on (a date window, a board column, a tag), which the offered
     # set — a set of filters — never holds.
-    names = [f["name"] for f in fields_registry.describe(dataset_name) if f["sortable"]]
+    names = [
+        f["name"]
+        for f in fields_registry.describe(fields_registry.dataset(dataset_name))
+        if f["sortable"]
+    ]
     names += [
         spec.name
         for spec in fields_registry.dataset(dataset_name).fields

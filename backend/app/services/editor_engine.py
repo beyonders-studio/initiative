@@ -23,7 +23,7 @@ from typing import Any, Optional
 
 from app.services.worker_pool import Pool, PoolError
 
-__all__ = ["EditorError", "apply", "bootstrap", "render", "shutdown"]
+__all__ = ["EditorError", "apply", "bootstrap", "render", "sheet_range", "shutdown"]
 
 _BACKEND = Path(__file__).resolve().parents[2]
 #: Where the editor's server build is: copied beside the backend in the image,
@@ -131,3 +131,10 @@ async def apply(state: bytes, content: dict) -> bytes:
         }
     )
     return base64.b64decode(reply["update"])
+
+
+async def sheet_range(content: dict, range_: Optional[str]) -> dict:
+    """``range_`` of a spreadsheet's stored content, read as the grid reads it:
+    ``{"columns", "rows", "sheets"}``, or ``{"refused", "sheets"}`` naming what
+    the range got wrong (``lib/spreadsheet/range.ts``)."""
+    return await _ask({"op": "sheet", "content": content, "range": range_})

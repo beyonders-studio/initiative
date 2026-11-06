@@ -8,12 +8,15 @@ what a client shows the person who has to change the query.
 
 from __future__ import annotations
 
+import json
+
 import pytest
 from pglast import ast, parse_sql
 
 from app.core.messages import QueryMessages
 from app.services.fields.spec import FieldType
 from app.services.query import QueryError, resolve
+from app.services.query.resolve import Sheet, SheetCall
 
 #: The function spellings this surface supports, as a reader writes them.
 #: Postgres reports the name it resolved, so a spelling that is really a node
@@ -758,3 +761,97 @@ def test_a_rounded_date_says_what_it_is_rounded_to(sql, grains):
     """A chart labels a period by the unit the statement rounded to, not by
     guessing from the dates that came back."""
     assert resolve(sql).column_grains == grains
+
+
+_BUDGET = SheetCall("Budget", "Q3!A1:C")
+_READ = {
+    _BUDGET: Sheet.from_range(
+        _BUDGET,
+        {
+            "columns": [
+                {"name": "Region", "type": "text"},
+                {"name": "Amount", "type": "number"},
+                {"name": "Due", "type": "date"},
+            ],
+            "rows": [["North", 10, "2026-01-05"], ["South", 20, None]],
+            "sheets": ["Q3"],
+        },
+    )
+}
+
+
+def test_a_sheet_is_read_like_a_dataset_once_its_cells_are():
+    """Before its cells are read a sheet holds any name and the statement is not
+    runnable; once read, its header names its columns ignoring case, the cells
+    are one bound parameter, and an output keeps the header it named."""
+    sql = (
+        "SELECT region, sum(amount) AS total, date_trunc('month', s.due) AS m "
+        "FROM sheet('Budget', 'Q3!A1:C') AS s GROUP BY region, m"
+    )
+    unread = resolve(sql)
+    assert unread.unread == (_BUDGET,)
+    assert unread.relations == ("files",)
+
+    read = resolve(sql, _READ)
+    assert read.unread == ()
+    assert "json_to_recordset($1) AS s(c1 text, c2 numeric, c3 date)" in read.sql
+    assert 's.c1 AS "Region"' in read.sql
+    assert json.loads(read.parameters[-1])[0] == {
+        "c1": "North",
+        "c2": 10,
+        "c3": "2026-01-05",
+    }
+    assert read.column_types[0] is FieldType.text
+    assert read.column_grains[2] == "month"
+
+
+@pytest.mark.parametrize(
+    ("sql", "code"),
+    [
+        ("SELECT a FROM sheet('Budget', 'Q3!A1:C', 3)", QueryMessages.SHEET_ARGUMENTS),
+        ("SELECT a FROM sheet(1.5)", QueryMessages.SHEET_ARGUMENTS),
+        ("SELECT a FROM sheet(region)", QueryMessages.SHEET_ARGUMENTS),
+        ("SELECT a FROM sheet('Budget', 7)", QueryMessages.SHEET_ARGUMENTS),
+        ("SELECT a FROM generate_series(1, 2)", QueryMessages.UNSUPPORTED_FUNCTION),
+        ("SELECT a FROM LATERAL sheet('Budget')", QueryMessages.UNSUPPORTED_SYNTAX),
+        (
+            "SELECT a FROM sheet('Budget') WITH ORDINALITY",
+            QueryMessages.UNSUPPORTED_SYNTAX,
+        ),
+        ("SELECT a FROM sheet('Budget') AS s(a, b)", QueryMessages.UNSUPPORTED_SYNTAX),
+        ("SELECT nope FROM sheet('Budget', 'Q3!A1:C')", QueryMessages.UNKNOWN_FIELD),
+        (
+            "SELECT region FROM sheet('Budget', 'Q3!A1:C') AS a "
+            "JOIN sheet('Budget', 'Q3!A1:C') AS b ON a.region = b.region",
+            QueryMessages.AMBIGUOUS_FIELD,
+        ),
+        (
+            "SELECT a FROM sheet('Budget'), sheet('Budget')",
+            QueryMessages.JOIN_WITHOUT_CONDITION,
+        ),
+    ],
+)
+def test_a_sheet_call_says_what_it_got_wrong(sql, code):
+    with pytest.raises(QueryError) as refused:
+        resolve(sql, _READ)
+    assert refused.value.code == code
+
+
+def test_a_name_both_a_dataset_and_a_read_sheet_hold_is_ambiguous():
+    with pytest.raises(QueryError) as refused:
+        resolve(
+            "SELECT title FROM sheet('Budget', 'Q3!A1:C') AS s "
+            "JOIN tasks AS t ON t.title = s.region",
+            {
+                _BUDGET: Sheet.from_range(
+                    _BUDGET,
+                    {
+                        "columns": [
+                            {"name": "title", "type": "text"},
+                            {"name": "region", "type": "text"},
+                        ]
+                    },
+                )
+            },
+        )
+    assert refused.value.code == QueryMessages.AMBIGUOUS_FIELD

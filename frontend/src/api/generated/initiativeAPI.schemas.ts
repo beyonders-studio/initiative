@@ -10401,6 +10401,15 @@ export interface PushTokenUnregisterRequest {
 }
 
 /**
+ * A range of a spreadsheet a built query reads.
+ */
+export interface QuerySheetSpec {
+  /** @exclusiveMinimum 0 */
+  file: number;
+  range?: string | null;
+}
+
+/**
  * One thing a built query returns.
  */
 export interface QueryColumnSpec {
@@ -10464,14 +10473,12 @@ export interface QuerySortSpec {
  *
  * The builder describes; the server writes the SQL. A statement built by
  * clicking is therefore always one this surface will run, because it is built
- * in the parse tree rather than assembled as text.
+ * in the parse tree rather than assembled as text. It reads one dataset or
+ * one range of a spreadsheet.
  */
 export interface QueryBuildRequest {
-  /**
-   * @minLength 1
-   * @maxLength 100
-   */
-  dataset: string;
+  dataset?: string | null;
+  sheet?: QuerySheetSpec | null;
   /**
    * @minItems 1
    * @maxItems 20
@@ -10487,12 +10494,22 @@ export interface QueryBuildRequest {
 }
 
 /**
+ * A range a statement reads with ``sheet()``, as the file holds it now.
+ */
+export interface QuerySheetDescription {
+  alias: string;
+  sheets: string[];
+  fields: FieldDescription[];
+}
+
+/**
  * The statement, and what it would return.
  */
 export interface QueryBuildResponse {
   sql: string;
   columns: QueryColumnDescription[];
   relations: string[];
+  sheets?: QuerySheetDescription[];
 }
 
 /**
@@ -10513,6 +10530,7 @@ export interface QueryRequest {
 export interface QueryShapeResponse {
   columns: QueryColumnDescription[];
   relations: string[];
+  sheets?: QuerySheetDescription[];
 }
 
 /**
