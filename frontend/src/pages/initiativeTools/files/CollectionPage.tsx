@@ -113,7 +113,7 @@ import { useCommunityPath } from "@/lib/communityUrl";
 import { formatPeriod } from "@/lib/formatDate";
 import { DetailLayoutView } from "@/lib/layouts/DetailLayoutView";
 import { requiredKeys, type StoredRegions } from "@/lib/layouts/detailLayout";
-import { withDisplays } from "@/lib/layouts/fields";
+import { useCounterSteps, withDisplays } from "@/lib/layouts/fields";
 import { FILE_DETAIL } from "@/lib/layouts/fileLayout";
 import { collectionFileFields } from "@/lib/layouts/files";
 import { toast } from "@/lib/mascotToast";
@@ -179,6 +179,18 @@ export function CollectionPage() {
   const collection = collectionQuery.data;
   const initiativeId = useCanonicalInitiativeId(collection?.initiative_id);
   const canEdit = Boolean(collection?.can.edit);
+  // The collection's metadata is the collection's to change; a file's own
+  // properties are the file's.
+  const stepCounter = useCounterSteps(
+    PropertyTarget.file,
+    useCallback(
+      (item, definition) =>
+        definition.collection_id !== null
+          ? canEdit
+          : (item as unknown as CollectionFileSummary).can.edit,
+      [canEdit]
+    )
+  );
   const filesRoute = gp(toolListRoute(Tool.file, initiativeId));
 
   useReadOnOpen(SearchEntityType.collection, collection?.id);
@@ -693,6 +705,7 @@ export function CollectionPage() {
             onActivate={onActivate}
             selecting={selecting}
             isSelected={isSelected}
+            stepCounter={stepCounter}
             table={(columns) => (
               <ToolIndexTable
                 tool={Tool.file}

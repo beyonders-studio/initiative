@@ -1,5 +1,5 @@
-import { Check, ExternalLink, Minus, Star } from "lucide-react";
-import { useMemo } from "react";
+import { Check, ExternalLink, Minus, Plus, Star } from "lucide-react";
+import { type MouseEvent, useEffect, useMemo, useRef, useState } from "react";
 import { useTranslation } from "react-i18next";
 
 import {
@@ -21,6 +21,7 @@ import {
   isEmptyPropertyValue,
   numericValue,
   scaleValue,
+  steppedCount,
 } from "./propertyHelpers";
 import { iconForPropertyType } from "./propertyTypeIcons";
 
@@ -40,6 +41,9 @@ export interface PropertyValueCellProps {
   /** On one line, its chips past the end cut off: a card whose height is
    *  reserved without measuring it. */
   oneLine?: boolean;
+  /** Steps a counter, where the reader may change it here, answering with
+   *  the item's values as the server then holds them. */
+  onStep?: (up: boolean) => Promise<PropertySummary[]>;
 }
 
 const formatNumber = (raw: unknown, options?: Intl.NumberFormatOptions): string => {
@@ -158,6 +162,94 @@ export const CounterValue = ({
   );
 };
 
+/** A small button beside a counter in a list, which steps it without
+ *  opening the row or the card it sits on. */
+const StepButton = ({
+  label,
+  disabled,
+  onClick,
+  children,
+}: {
+  label: string;
+  disabled: boolean;
+  onClick: () => void;
+  children: React.ReactNode;
+}) => (
+  <button
+    type="button"
+    aria-label={label}
+    disabled={disabled}
+    className="inline-flex size-5 shrink-0 items-center justify-center rounded-sm border text-muted-foreground hover:bg-accent hover:text-foreground focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring disabled:cursor-not-allowed disabled:opacity-40"
+    onPointerDown={(event) => event.stopPropagation()}
+    onClick={(event: MouseEvent) => {
+      event.preventDefault();
+      event.stopPropagation();
+      onClick();
+    }}
+  >
+    {children}
+  </button>
+);
+
+/**
+ * A counter between the buttons that step it. A step shows at once, and the
+ * server's answer once the last one lands, until the list reads it again.
+ */
+const SteppedCounter = ({
+  summary,
+  display,
+  onStep,
+}: {
+  summary: PropertySummary;
+  display: FieldDisplay;
+  onStep: (up: boolean) => Promise<PropertySummary[]>;
+}) => {
+  const { t } = useTranslation("properties");
+  const settings = counterSettings(summary.counter);
+  const held = counterCount(summary.counter, summary.value);
+  const [shown, setShown] = useState<number | null>(null);
+  const sending = useRef(0);
+  // The list's own read takes over once nothing is on its way.
+  useEffect(() => {
+    if (sending.current === 0) setShown(null);
+  }, [held]);
+  const count = shown ?? held;
+  const step = (up: boolean) => {
+    setShown(steppedCount(settings, count, up));
+    sending.current += 1;
+    onStep(up).then(
+      (values) => {
+        sending.current -= 1;
+        const answer = values.find((each) => each.property_id === summary.property_id);
+        if (sending.current === 0 && answer) setShown(counterCount(settings, answer.value));
+      },
+      () => {
+        sending.current -= 1;
+        setShown(null);
+      }
+    );
+  };
+  return (
+    <span className="inline-flex items-center gap-1.5">
+      <StepButton
+        label={t("input.stepDown", { name: summary.name })}
+        disabled={settings.min !== null && count <= settings.min}
+        onClick={() => step(false)}
+      >
+        <Minus className="h-3 w-3" aria-hidden />
+      </StepButton>
+      <CounterValue count={count} settings={summary.counter} display={display} />
+      <StepButton
+        label={t("input.stepUp", { name: summary.name })}
+        disabled={settings.max !== null && count >= settings.max}
+        onClick={() => step(true)}
+      >
+        <Plus className="h-3 w-3" aria-hidden />
+      </StepButton>
+    </span>
+  );
+};
+
 const coerceOptionMap = (options: PropertyOption[] | null | undefined) => {
   const map = new Map<string, PropertyOption>();
   for (const option of options ?? []) {
@@ -229,6 +321,7 @@ export const PropertyValueCell = ({
   nested = false,
   display,
   oneLine = false,
+  onStep,
 }: PropertyValueCellProps) => {
   const { t } = useTranslation("properties");
   const options = useMemo(() => coerceOptionMap(summary?.options), [summary?.options]);
@@ -320,7 +413,9 @@ export const PropertyValueCell = ({
       break;
     }
     case MetadataType.counter: {
-      body = (
+      body = onStep ? (
+        <SteppedCounter summary={summary} display={display ?? "number"} onStep={onStep} />
+      ) : (
         <CounterValue
           count={counterCount(summary.counter, value)}
           settings={summary.counter}

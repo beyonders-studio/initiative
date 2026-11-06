@@ -257,10 +257,8 @@ const CounterInput = ({
         step="any"
         aria-label={definition.name}
         value={coerceNumber(value)}
-        onChange={(e) => {
-          const parsed = numericValue(e.target.value);
-          onChange(parsed === null ? null : withinBounds(settings, parsed));
-        }}
+        // As typed: the bounds hold it once it is saved, not a digit at a time.
+        onChange={(e) => onChange(numericValue(e.target.value))}
         placeholder={String(settings.initial)}
         disabled={disabled}
         className="w-24 bg-transparent text-center tabular-nums"

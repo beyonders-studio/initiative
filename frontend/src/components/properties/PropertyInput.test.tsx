@@ -133,7 +133,7 @@ describe("PropertyInput", () => {
         counter: { step: 2, min: 0, max: 5, initial: 1 },
       });
 
-    it("steps from its initial value within its bounds, and resets to it", async () => {
+    it("steps from its initial value within its bounds, takes a count as typed, and resets", async () => {
       const onChange = vi.fn();
       const { rerender } = renderWithProviders(
         <PropertyInput definition={seats()} value={null} onChange={onChange} />
@@ -146,10 +146,11 @@ describe("PropertyInput", () => {
 
       rerender(<PropertyInput definition={seats()} value={5} onChange={onChange} />);
       expect(screen.getByRole("button", { name: "Step Seats up" })).toBeDisabled();
+      // The bounds hold it once it is saved, not a digit at a time.
       fireEvent.change(screen.getByRole("spinbutton", { name: "Seats" }), {
         target: { value: "9" },
       });
-      expect(onChange).toHaveBeenLastCalledWith(5);
+      expect(onChange).toHaveBeenLastCalledWith(9);
       await userEvent.click(screen.getByRole("button", { name: "Reset Seats" }));
       expect(onChange).toHaveBeenLastCalledWith(1);
     });

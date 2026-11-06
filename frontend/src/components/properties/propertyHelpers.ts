@@ -190,6 +190,20 @@ export const normalizePropertyValue = (property: PropertySummary): unknown =>
     ? (userReferenceValue(property)?.id ?? null)
     : (property.value ?? null);
 
+/** What a list draws of `definition` on an item holding `summaries`: its
+ *  value, or nothing where it holds none, but a counter, which holds its
+ *  initial value then. */
+export const listedValue = (
+  summaries: PropertySummary[] | undefined | null,
+  definition: PropertyDefinitionRead
+): PropertySummary | null => {
+  const summary = summaries?.find((each) => each.property_id === definition.id);
+  if (definition.type === MetadataType.counter) {
+    return summary ?? propertyStubFromDefinition(definition);
+  }
+  return summary && !isEmptyPropertyValue(summary.value) ? summary : null;
+};
+
 /** A property just picked, before it has a value, as an item lists it. */
 export const propertyStubFromDefinition = (
   definition: PropertyDefinitionRead

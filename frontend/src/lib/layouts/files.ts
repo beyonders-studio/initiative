@@ -7,12 +7,8 @@
 import type {
   CollectionFileSummary,
   PropertyDefinitionRead,
-  PropertySummary,
 } from "@/api/generated/initiativeAPI.schemas";
-import {
-  isEmptyPropertyValue,
-  nonEmptyPropertySummaries,
-} from "@/components/properties/propertyHelpers";
+import { listedValue, nonEmptyPropertySummaries } from "@/components/properties/propertyHelpers";
 
 import { at, detailLayoutSpec, type Region } from "./detailLayout";
 import type { ListShape } from "./draft";
@@ -91,11 +87,6 @@ export const FILE_LAYOUT = detailLayoutSpec({
   },
 });
 
-const heldValue = (summaries: PropertySummary[] | undefined, id: number) => {
-  const summary = summaries?.find((each) => each.property_id === id);
-  return summary && !isEmptyPropertyValue(summary.value) ? summary : null;
-};
-
 /**
  * Everything a collection's list can show of a file: its own fields, then the
  * collection's metadata (its values in the collection's list), then the
@@ -119,9 +110,9 @@ export const collectionFileFields = (
         ...field,
       })
     ),
-    ...propertyFields([...metadata, ...properties], (item, id) => {
+    ...propertyFields([...metadata, ...properties], (item, definition) => {
       const file = fileOf(item);
-      return heldValue(own.has(id) ? file.metadata : file.properties, id);
+      return listedValue(own.has(definition.id) ? file.metadata : file.properties, definition);
     }).map((field) => ({
       ...field,
       plain: true,

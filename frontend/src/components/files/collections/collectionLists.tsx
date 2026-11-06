@@ -52,12 +52,12 @@ const NO_TASK_HREF = () => "";
 /** What a collection's fields are drawn with: the files namespace beside the
  *  layouts', and the community's paths. A file is opened from its picture or
  *  its name's own link, not through a task's. */
-const useCollectionEnv = (): LayoutEnv => {
+const useCollectionEnv = (stepCounter?: LayoutEnv["stepCounter"]): LayoutEnv => {
   const { t } = useTranslation(["files", ...LAYOUT_NAMESPACES]);
   const communityPath = useCommunityPath();
   return useMemo(
-    () => ({ t: t as TranslateFn, communityPath, taskHref: NO_TASK_HREF }),
-    [t, communityPath]
+    () => ({ t: t as TranslateFn, communityPath, taskHref: NO_TASK_HREF, stepCounter }),
+    [t, communityPath, stepCounter]
   );
 };
 
@@ -69,9 +69,10 @@ const useCollectionEnv = (): LayoutEnv => {
 export const useCollectionCard = (
   card: LayoutNode,
   fields: ReadonlyMap<string, FieldDef>,
-  editing = false
+  editing = false,
+  stepCounter?: LayoutEnv["stepCounter"]
 ): CollectionCard | undefined => {
-  const env = useCollectionEnv();
+  const env = useCollectionEnv(stepCounter);
   return useMemo(() => {
     if (!card.children?.length) return undefined;
     const view: LayoutContext = {
@@ -113,9 +114,10 @@ export const useCollectionCard = (
 export const useCollectionColumns = (
   ids: readonly string[],
   fields: ReadonlyMap<string, FieldDef>,
-  editing = false
+  editing = false,
+  stepCounter?: LayoutEnv["stepCounter"]
 ): AppColumnDef<ToolIndexRow>[] => {
-  const env = useCollectionEnv();
+  const env = useCollectionEnv(stepCounter);
   return useMemo(
     () =>
       ids.flatMap((id) => {
@@ -166,6 +168,7 @@ export const CollectionListView = ({
   isSelected,
   table,
   editing = false,
+  stepCounter,
 }: {
   kind: CollectionList;
   definition: ListLayoutDefinitionInput;
@@ -181,15 +184,22 @@ export const CollectionListView = ({
   isSelected?: (file: FileSummary) => boolean;
   table: (columns: AppColumnDef<ToolIndexRow>[]) => ReactNode;
   editing?: boolean;
+  /** How its counters are stepped, where its reader may change them. */
+  stepCounter?: LayoutEnv["stepCounter"];
 }) => {
-  const card = useCollectionCard(cardOf(definition, fields, FILE_LIST_SHAPE), fields, editing);
+  const card = useCollectionCard(
+    cardOf(definition, fields, FILE_LIST_SHAPE),
+    fields,
+    editing,
+    stepCounter
+  );
   // The shipped columns are a fresh list each time: kept, so the table's
   // columns are made again only when what they show changes.
   const ids = useMemo(
     () => columnsOf({ columns: definition.columns }, fields, FILE_LIST_SHAPE),
     [definition.columns, fields]
   );
-  const columns = useCollectionColumns(ids, fields, editing);
+  const columns = useCollectionColumns(ids, fields, editing, stepCounter);
   const walls = { files, card, onActivate, selecting, isSelected };
   if (kind === "table") return table(columns);
   if (kind === "timeline") {
