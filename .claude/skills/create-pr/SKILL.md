@@ -131,8 +131,11 @@ Greptile work while it runs, and read its output when it breaks.
 
 Each time it breaks, handle the event (§5 or §6) and then **re-enter this loop**
 with `SEEN` updated to the review you just read. The loop is finished when
-`EVENT=ci-green` and every Greptile finding so far is fixed or answered (and,
-when the user asked for the re-review loop, the bar in §5 is met).
+`EVENT=ci-green`, Greptile's first review has posted, and every finding in it is
+fixed or answered (and, when the user asked for the re-review loop, the bar in
+§5 is met). CI often goes green first on a small PR, so after `EVENT=ci-green`
+keep waiting for that first review. Greptile sometimes never answers: if it
+hasn't posted 15 minutes after CI went green, stop and say so in the report.
 
 **Batching pushes.** A push cancels the in-flight run and restarts it from
 zero, so never push once per finding — collect a whole Greptile round (plus any
