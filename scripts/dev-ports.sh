@@ -40,14 +40,25 @@ export COMPOSE_FILE="${COMPOSE_FILE:-$DEV_MAIN_ROOT/docker-compose.yml}"
 # server, and role names of its own since roles are cluster-wide, so its
 # migrations never reach the database every other checkout runs on. A worktree
 # with no origin/dev to compare against gets one too, since nothing then shows
-# its migrations are dev's. scripts/dev-database.sh creates it;
-# drop_test_dbs.py --orphaned drops it once the worktree is gone.
-if [ "$DEV_CHECKOUT_ID" != main ] && [ -z "${DATABASE_NAME:-}" ]; then
+# its migrations are dev's. Its database URLs are the main checkout's with the
+# database changed (backend/scripts/dev_database_urls.py), and a checkout that
+# can't get them stops here rather than run on the shared one.
+# scripts/dev-database.sh creates the database; drop_test_dbs.py --orphaned
+# drops it once the worktree is gone.
+if [ "$DEV_CHECKOUT_ID" != main ] && [ -z "${DEV_DATABASE:-}" ]; then
     dev_base="$(git -C "$DEV_PORTS_ROOT" merge-base HEAD origin/dev 2>/dev/null || true)"
     if [ -z "$dev_base" ] ||
         [ -n "$(git -C "$DEV_PORTS_ROOT" diff --name-only "$dev_base" -- backend/alembic/versions)" ] ||
         [ -n "$(git -C "$DEV_PORTS_ROOT" ls-files --others --exclude-standard -- backend/alembic/versions)" ]; then
-        export DATABASE_NAME="initiative_dev_$DEV_CHECKOUT_ID"
+        DEV_DATABASE="initiative_dev_$DEV_CHECKOUT_ID"
+        if ! dev_database_urls="$(cd "$DEV_PORTS_ROOT/backend" &&
+            .venv/bin/python scripts/dev_database_urls.py "$DEV_DATABASE")"; then
+            echo "dev-ports: could not point this worktree at its own database, $DEV_DATABASE." >&2
+            unset DEV_DATABASE
+            return 1 2>/dev/null || exit 1
+        fi
+        eval "$dev_database_urls"
+        export DEV_DATABASE
         export GUILD_ROLE_PREFIX="dev_${DEV_CHECKOUT_ID}_"
         export PLATFORM_ROLE_PREFIX="dev_${DEV_CHECKOUT_ID}_"
     fi

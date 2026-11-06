@@ -10,22 +10,22 @@ SCRIPT_DIR="$(cd "$(dirname "$0")" && pwd)"
 cd "$SCRIPT_DIR/.."
 
 su_user="${POSTGRES_USER:-initiative}"
-if [ -n "${DATABASE_NAME:-}" ] && ! docker compose exec -T db psql -U "$su_user" -d postgres -tAc \
-    "SELECT 1 FROM pg_database WHERE datname = '$DATABASE_NAME'" | grep -q 1; then
-    echo "This branch changes migrations, so it runs on a dev database of its own: $DATABASE_NAME"
-    docker compose exec -T db createdb -U "$su_user" "$DATABASE_NAME"
+if [ -n "${DEV_DATABASE:-}" ] && ! docker compose exec -T db psql -U "$su_user" -d postgres -tAc \
+    "SELECT 1 FROM pg_database WHERE datname = '$DEV_DATABASE'" | grep -q 1; then
+    echo "This branch changes migrations, so it runs on a dev database of its own: $DEV_DATABASE"
+    docker compose exec -T db createdb -U "$su_user" "$DEV_DATABASE"
 fi
 
 # The login roles and the search operator class: a deployment gets these from
 # app.db.bootstrap at startup over its owner connection. A .env that names the
 # three logins usually gives no owner, and the compose superuser is right here,
 # so apply them the same way rather than leave every checkout to hit the boot
-# warning. A .env with DATABASE_URL as the owner needs no override. The settings
-# point the URL at this checkout's own database when it has one. Idempotent; a
-# failure is not fatal, since search works either way.
+# warning, on this checkout's own database when it has one. A .env with
+# DATABASE_URL as the owner needs no override. Idempotent; a failure is not
+# fatal, since search works either way.
 bootstrap_url=""
 if grep -qsE '^DATABASE_URL_APP=.+' backend/.env "$DEV_MAIN_ROOT/backend/.env"; then
-    bootstrap_url="postgresql+asyncpg://${su_user}:${POSTGRES_PASSWORD:-initiative}@localhost:5432/${POSTGRES_DB:-initiative}"
+    bootstrap_url="postgresql+asyncpg://${su_user}:${POSTGRES_PASSWORD:-initiative}@localhost:5432/${DEV_DATABASE:-${POSTGRES_DB:-initiative}}"
 fi
 if ! (
     cd backend && source .venv/bin/activate &&

@@ -7,6 +7,7 @@ import uuid
 from collections.abc import Sequence
 from enum import Enum
 from functools import lru_cache
+from pathlib import Path
 from typing import Annotated
 from urllib.parse import urlsplit
 
@@ -23,8 +24,6 @@ from pydantic_settings import BaseSettings, NoDecode, SettingsConfigDict
 from sqlalchemy.engine import make_url
 from sqlalchemy.exc import ArgumentError
 from starlette.requests import Request
-
-from app.core.env_files import ENV_FILES
 
 
 # App identity/shape — deliberately constants, not settings: the SPA, the
@@ -362,6 +361,30 @@ def derive_database_password(secret_key: str, role: str) -> str:
     ).hexdigest()
 
 
+#: This checkout's root, the directory above backend/.
+CHECKOUT = Path(__file__).resolve().parents[3]
+
+
+def main_checkout(checkout: Path = CHECKOUT) -> Path:
+    """The main checkout of the repository ``checkout`` is in: ``checkout`` itself,
+    unless it is a linked git worktree. A worktree's ``.git`` is a file naming its
+    directory under the main checkout's ``.git/worktrees/``."""
+    marker = checkout / ".git"
+    if not marker.is_file():
+        return checkout
+    gitdir = marker.read_text().strip().removeprefix("gitdir:").strip()
+    worktrees = (checkout / gitdir).resolve().parent
+    return worktrees.parent.parent if worktrees.name == "worktrees" else checkout
+
+
+# A linked worktree reads the main checkout's backend/.env, then its own on top,
+# so nothing is copied in and a worktree can still set a value of its own (OIDC
+# against a local provider, say).
+ENV_FILES: tuple[str | Path, ...] = (".env",)
+if main_checkout() != CHECKOUT:
+    ENV_FILES = (main_checkout() / "backend" / ".env", ".env")
+
+
 class Settings(BaseSettings):
     model_config = SettingsConfigDict(
         env_file=ENV_FILES,
@@ -408,10 +431,6 @@ class Settings(BaseSettings):
     # only the host and database and the app fills in that login. Unset, those
     # reads use DATABASE_URL_APP.
     DATABASE_URL_QUERY: str | None = None
-    # A database on the same server for every DATABASE_URL* to name instead of
-    # their own: a linked worktree whose branch changes migrations runs on its
-    # own dev database this way (scripts/dev-ports.sh sets it).
-    DATABASE_NAME: str | None = None
     # How long a pooled connection may live before it is retired and replaced.
     #
     # A backend permanently caches catalog entries for every table it touches
@@ -562,23 +581,6 @@ class Settings(BaseSettings):
         return value
 
     _database_logins_derived: bool = PrivateAttr(default=False)
-
-    @model_validator(mode="after")
-    def _name_the_database(self) -> "Settings":
-        # Before the logins are derived, so a derived login names it too.
-        if self.DATABASE_NAME:
-            for field in (
-                "DATABASE_URL",
-                "DATABASE_URL_APP",
-                "DATABASE_URL_ADMIN",
-                "DATABASE_URL_BOOTSTRAP",
-                "DATABASE_URL_LISTEN",
-                "DATABASE_URL_QUERY",
-            ):
-                if url := getattr(self, field):
-                    renamed = make_url(url).set(database=self.DATABASE_NAME)
-                    setattr(self, field, renamed.render_as_string(hide_password=False))
-        return self
 
     @model_validator(mode="after")
     def _resolve_database_logins(self) -> "Settings":

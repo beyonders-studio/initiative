@@ -22,8 +22,18 @@ DEV_PORTS_SH = BACKEND_DIR.parent / "scripts" / "dev-ports.sh"
 
 
 #: What dev-ports.sh decides beside the port: a worktree whose branch changes
-#: migrations runs on a database of its own, with role names of its own.
-DATABASE_VARIABLES = ("DATABASE_NAME", "GUILD_ROLE_PREFIX", "PLATFORM_ROLE_PREFIX")
+#: migrations runs on a database of its own (dev_database_urls.py), with role
+#: names of its own.
+DATABASE_VARIABLES = (
+    "DATABASE_URL",
+    "DATABASE_URL_APP",
+    "DATABASE_URL_ADMIN",
+    "DATABASE_URL_BOOTSTRAP",
+    "DATABASE_URL_LISTEN",
+    "DATABASE_URL_QUERY",
+    "GUILD_ROLE_PREFIX",
+    "PLATFORM_ROLE_PREFIX",
+)
 
 
 def dev_port() -> int:
@@ -35,13 +45,16 @@ def dev_port() -> int:
     names = ("DEV_BACKEND_PORT", *DATABASE_VARIABLES)
     printed = "; ".join(f'printf "%s\\n" "${{{name}:-}}"' for name in names)
     result = subprocess.run(
-        ["bash", "-c", f". {shlex.quote(str(DEV_PORTS_SH))}; {printed}"],
+        ["bash", "-c", f". {shlex.quote(str(DEV_PORTS_SH))} && {{ {printed}; }}"],
         capture_output=True,
         text=True,
     )
-    # dev-ports.sh explains itself on stderr when it cannot resolve a port.
+    # dev-ports.sh explains itself on stderr when it cannot resolve a port, and
+    # fails when it cannot give a worktree its own database.
     if result.stderr:
         print(result.stderr, end="", file=sys.stderr)
+    if result.returncode:
+        raise SystemExit("dev_api: no database for this checkout — see above.")
     values = dict(zip(names, result.stdout.split("\n")))
     for name in DATABASE_VARIABLES:
         if values.get(name):
