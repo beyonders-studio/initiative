@@ -385,7 +385,7 @@ jobs:
         working-directory: frontend
         run: pnpm build:editor-server
 
-      - name: Frozen migrations are unchanged, one Alembic head
+      - name: No merged migration edited, one Alembic head
         # scripts/ci/check runs the same checks locally (and before a push).
         if: github.event_name == 'pull_request'
         env:

@@ -27,7 +27,7 @@ Repo rules that this skill must honor (from `CLAUDE.md`):
 2. Run the quality gates for what changed (don't run the whole world if only
    one side changed):
    - **`scripts/ci/check`**: the fast checks CI runs, by the same script CI
-     calls (ruff, ruff format, ty, frozen migrations and one Alembic head,
+     calls (ruff, ruff format, ty, no merged migration edited, one Alembic head,
      biome, tsc, and generated-types / `env-contract.json` drift), for what the
      branch changed against `origin/dev`. No database, no tests; seconds.
      When `codegen` fails, read why before committing anything:

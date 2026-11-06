@@ -27,7 +27,7 @@ project files. Read `history/` only when asked to review past planning.
 - `.mcp.json` gives agents a `browser` MCP server: `@playwright/mcp`, running headless on the Chromium `pnpm exec playwright install chromium` downloads (no Google Chrome needed). An override in `frontend/pnpm-workspace.yaml` runs it on the Playwright `@playwright/test` is on, so either can be bumped alone; `frontend/src/__tests__/playwrightMcp.test.ts` fails if they would ever run different Chromium builds.
 - `docker-compose up --build` — start Postgres 17 and the app image (API and SPA from one uvicorn).
 - `cd backend && pytest` / `ruff check app` and `cd frontend && pnpm lint` — run tests and linters. Tests are co-located alongside source files in `app/` (not in a separate `tests/` directory).
-- `scripts/ci/check` — the fast checks CI runs (ruff, ruff format, ty, frozen migrations and one Alembic head, biome, tsc, and generated-types / `env-contract.json` drift), for what the branch changed against `origin/dev`. CI calls the same script for those steps, and the husky pre-push hook runs it (`git push --no-verify` skips it once). No tests and no database. `scripts/ci/check all` runs everything; `scripts/ci/check codegen` regenerates drifted files for you to review and commit.
+- `scripts/ci/check` — the fast checks CI runs (ruff, ruff format, ty, no merged migration edited, one Alembic head, biome, tsc, and generated-types / `env-contract.json` drift), for what the branch changed against `origin/dev`. CI calls the same script for those steps, and the husky pre-push hook runs it (`git push --no-verify` skips it once). No tests and no database. `scripts/ci/check all` runs everything; `scripts/ci/check codegen` regenerates drifted files for you to review and commit.
 - `scripts/ci/api-compat` — whether the API still takes what the last release's did (oasdiff against the `openapi.json` that release's GitHub release carries; needs Docker and `gh`). CI runs it on pull requests. A break made on purpose is listed in `backend/api-breaking-changes.md`, under the release it ships in.
 
 ## Generated API Types (Orval)
@@ -81,19 +81,6 @@ The native (Capacitor) app receives web-bundle updates over the air: each Docker
   - **The backup key is held offline by the owners.** To retire the release key: set `OTA_SIGNING_KEY` to the backup private key (every installed app already trusts it), then ship an app update whose `otaTrust.ts` replaces the retired public key with a new backup. No APK is needed, and servers do nothing.
   - **This key is the project's, not an operator's.** Unlike `SECRET_KEY`, which each deployment owns because it protects that deployment's own data, the update key vouches for code the project publishes to one app that talks to every server; a key held by each server would only prove what the server already sent.
 - Edge case the detector can't see: a native-affecting change that lands **only** via `pnpm-lock.yaml` (no `package.json` range change). Force a rebuild by editing `MIN_NATIVE_VERSION` manually that release.
-
-#### `RELEASED_MIGRATION` (the migration freeze line)
-
-The `RELEASED_MIGRATION` file at the project root holds the **Alembic head as of
-the last release** — the newest revision that has run on somebody's database.
-
-- `scripts/promote.sh` stamps it on every release, reading the head from the
-  revision files alone (no database, no running server).
-- Every revision **at or before** it is frozen: editing one in place changes
-  only what a fresh install gets, and no upgrade repairs the deployments that
-  already ran it. Anything after it is unreleased and free to edit.
-- See **Never edit a migration that has shipped** for the check and the
-  fix-forward pattern.
 
 ### Releasing a Version
 
@@ -418,8 +405,8 @@ Detect Changes job, and the run's summary page says which:
 test and the seam suite records the tree it tested (the `tested-raw-*` and
 `tested-tree-*` artifacts, `scripts/ci/tested_tree.sh`). A later push or pull
 request of that exact tree runs neither suite, and one that differs only in
-what a release rewrites (`VERSION`, `CHANGELOG.md`, `RELEASED_MIGRATION`, the
-`MIN_*_VERSION` files, the regenerated API client) runs the always-run core.
+what a release rewrites (`VERSION`, `CHANGELOG.md`, the `MIN_*_VERSION` files,
+the regenerated API client) runs the always-run core.
 So a release pull request cut from a tested dev commit, the push to `main` and
 the merge back into `dev` do not re-run the suite dev already passed.
 
@@ -715,41 +702,33 @@ The path depends on **where the table lives**:
 
 7. **Verify after migration** as `app_user` (not the superuser): for a shared/platform table, confirm each tier hits its ceiling (a missing policy silently returns zero rows; a wrong one leaks). For guild content, `SET ROLE guild_<id>` and confirm only that guild's schema is reachable.
 
-### Never edit a migration that has shipped
+### Never edit a migration
 
 A revision runs **once** per database and is then stamped. Editing it in place
-changes what a *fresh* install gets and **nothing else**: every deployment that
-already ran it keeps the old shape forever, and no upgrade will ever repair it.
-CI cannot catch this, because CI always builds from empty — it is green on
-exactly the change that breaks every existing install.
+changes what a *fresh* database gets and **nothing else**: every database that
+already ran it — deployments, the dev environment, other checkouts — keeps the
+old shape, and no upgrade will ever repair it. CI cannot catch this, because CI
+always builds from empty — it is green on exactly the change that breaks every
+existing install.
 
-`RELEASED_MIGRATION` at the project root records the Alembic head as of the last
-release, stamped by `scripts/promote.sh`. **Every revision at or before it has
-shipped and is frozen.** Anything after it is unreleased and still yours to edit
-in place — that is the normal way to iterate on a migration you have not released.
+**A revision on `dev` is never edited, released or not.** To change what one
+did, add a new revision after it. A revision your branch adds is yours to change
+until it merges.
 
-```bash
-cat RELEASED_MIGRATION        # the freeze line
-
-# Any revision your branch edits that is at or before it — fix these forward instead.
-git diff --name-only main...HEAD -- backend/alembic/versions \
-  | grep -oE '[0-9]{8}_[0-9]{4}' \
-  | awk -v frozen="$(cat RELEASED_MIGRATION)" '$0 <= frozen'
-```
-
-To change a frozen revision, add a new one that converges **both** histories —
-the deployments that ran the old shape and the fresh installs that got the new
-one. That means the DDL has to be conditional (`ADD COLUMN IF NOT EXISTS`,
-`DROP CONSTRAINT IF EXISTS`), not a bare `ADD COLUMN`.
+When a merged revision was edited anyway, the fix is a new revision that
+converges **both** histories — the databases that ran the old shape and the
+fresh installs that got the new one — so its DDL has to be conditional
+(`ADD COLUMN IF NOT EXISTS`, `DROP CONSTRAINT IF EXISTS`).
 [`20260907_0234`](backend/alembic/versions/20260907_0234_restore_dm_send_receipts.py)
 is the reference: `user_dm_settings.send_receipts` was added to an
 already-released revision, so every 0.65 install had the table without the
 column and no upgrade path to it (issue #1420).
 
-CI enforces the line: a pull request that modifies, renames or deletes a
-revision at or before `RELEASED_MIGRATION` fails the backend job (`Frozen
-migrations are unchanged` in `ci.yml`). That includes docstring and comment edits — nothing runs from
-those, but the check reads the file list, so leave released files alone.
+CI enforces this: a pull request that modifies, renames or deletes a revision
+already on its base branch fails the backend job (`No merged migration edited`
+in `ci.yml`; `scripts/ci/check migrations` locally and before a push). That
+includes docstring and comment edits — nothing runs from those, but the check
+reads the file list, so leave merged files alone.
 
 ### Rules for writing frontend code
 

@@ -216,7 +216,6 @@ class TreeIdTest(unittest.TestCase):
         "backend/app/main.py": "app\n",
         "VERSION": "1.2.2\n",
         "CHANGELOG.md": "## [Unreleased]\n",
-        "RELEASED_MIGRATION": "0001\n",
         "frontend/src/api/generated/version/version.ts": "1.2.2\n",
     }
 
@@ -225,7 +224,6 @@ class TreeIdTest(unittest.TestCase):
             **self.BASE,
             "VERSION": "1.2.3\n",
             "CHANGELOG.md": "## [1.2.3]\n",
-            "RELEASED_MIGRATION": "0002\n",
             "MIN_DESKTOP_VERSION": "1.2.3\n",
             "frontend/src/api/generated/version/version.ts": "1.2.3\n",
         }
