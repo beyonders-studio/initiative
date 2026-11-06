@@ -17,6 +17,7 @@ from typing import Any
 from pydantic import BaseModel
 from sqlmodel.ext.asyncio.session import AsyncSession
 
+from app.core.search import SearchEntityType
 from app.core.tools import Tool, tool_envelope_type
 from app.models.platform.user import User
 from app.models.tenant.dashboard import Dashboard
@@ -25,6 +26,7 @@ from app.schemas.tenant.import_envelopes import DashboardEnvelope
 from app.services.import_engine.common import unique_name_in_initiative
 from app.services.import_engine.contract import EnvelopeImportResult
 from app.services.import_engine.context import ImportContext
+from app.services.import_engine.references import note_or_settle
 from app.services.import_engine.importers._base import (
     NamesPeopleInPassing,
     PropertyRestore,
@@ -76,6 +78,10 @@ class DashboardImporter(NamesPeopleInPassing):
         )
         session.add(dashboard)
         await session.flush()
+        # Its statements name rows as they were numbered where it was exported.
+        dashboard.definition = note_or_settle(
+            context, SearchEntityType.dashboard, dashboard.id, definition
+        )
 
         await grant_ownership(
             session,

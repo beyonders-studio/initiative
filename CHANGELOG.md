@@ -69,6 +69,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Fixed
 
+- **Restored dashboards read what was restored with them.** Where a dashboard's SQL names a project, file or other item by id, a backup or import points it at the copy that came with it. An item that didn't come along matches nothing.
 - **Sign-in rules that place people in initiatives.** Each community's rules decide only its own initiatives' members, and a rule whose initiative or role was deleted places people in the community alone.
 - **A full community takes nobody new through sign-in rules.** A group rule that places people in a community stops at its member limit; a sign-in that would pass it is placed everywhere else as usual.
 - **Reaction emails after an account is deleted.** One still waiting to go out names the person as "Deleted user", as an assignment email already did.

@@ -16,7 +16,8 @@ from pglast import ast, parse_sql
 from app.core.messages import QueryMessages
 from app.services.fields.spec import FieldType
 from app.services.query import QueryError, resolve
-from app.services.query.resolve import Sheet, SheetCall
+from app.core.search import SearchEntityType
+from app.services.query.resolve import Sheet, SheetCall, remap_ids
 
 #: The function spellings this surface supports, as a reader writes them.
 #: Postgres reports the name it resolved, so a spelling that is really a node
@@ -855,3 +856,47 @@ def test_a_name_both_a_dataset_and_a_read_sheet_hold_is_ambiguous():
             },
         )
     assert refused.value.code == QueryMessages.AMBIGUOUS_FIELD
+
+
+def test_a_statement_names_rows_by_id_where_a_column_holds_one():
+    """Each constant a key column is compared with, and the file ``sheet()``
+    reads, is put through the mapping in place; a person, a constant in a
+    shape it does not read, and a statement that does not resolve are left
+    as they were."""
+    moved = {
+        (SearchEntityType.project, 12): 120,
+        (SearchEntityType.task, 7): 70,
+        (SearchEntityType.file, 42): 420,
+    }
+
+    def remap(kind: SearchEntityType, entity_id: int) -> int:
+        return moved.get((kind, entity_id), 0)
+
+    for sql, expected in (
+        (
+            "SELECT count(*) AS n FROM tasks WHERE project_id = 12 AND created_by = 12",
+            "SELECT count(*) AS n FROM tasks WHERE project_id = 120 AND created_by = 12",
+        ),
+        (
+            "SELECT t.title FROM tasks t WHERE t.id IN (7, 8) LIMIT 12",
+            "SELECT t.title FROM tasks t WHERE t.id IN (70, 0) LIMIT 12",
+        ),
+        (
+            "SELECT title FROM tasks WHERE project.id <> 12 -- the old one",
+            "SELECT title FROM tasks WHERE project.id <> 120 -- the old one",
+        ),
+        (
+            "SELECT b.x FROM sheet(42, 'Q3!A1:D') AS b JOIN projects p ON p.name = b.x",
+            "SELECT b.x FROM sheet(420, 'Q3!A1:D') AS b JOIN projects p ON p.name = b.x",
+        ),
+        (
+            "SELECT title FROM tasks WHERE project_id = CAST(12 AS integer)",
+            "SELECT title FROM tasks WHERE project_id = CAST(12 AS integer)",
+        ),
+        (
+            "SELECT title FROM tasks WHERE project_id IN (1 + 12, NULL, 12)",
+            "SELECT title FROM tasks WHERE project_id IN (1 + 12, NULL, 120)",
+        ),
+        ("SELECT a FROM nowhere WHERE id = 12", "SELECT a FROM nowhere WHERE id = 12"),
+    ):
+        assert remap_ids(sql, remap) == expected, sql
