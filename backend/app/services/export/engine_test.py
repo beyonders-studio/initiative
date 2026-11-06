@@ -221,9 +221,10 @@ async def test_render_to_storage_beats_once_per_artifact(monkeypatch, force_zip)
     assert sorted(archive.namelist()) == ["a.zip", "b.zip", "c.zip"]
 
 
-async def test_a_stored_file_goes_into_the_archive_from_storage(monkeypatch):
-    """A file exported unconverted is copied from storage into its entry a
-    piece at a time; only the rest of the batch is rendered."""
+def _stored_file_job(monkeypatch):
+    """A batch of one rendered item and one stored file, which storage hands
+    over in two pieces. Answers the request, the storage and the keys the
+    renderer was asked for."""
     from types import SimpleNamespace
 
     from app.services.export import engine
@@ -258,12 +259,49 @@ async def test_a_stored_file_goes_into_the_archive_from_storage(monkeypatch):
             ),
         ),
     )
+    return request, storage, asked
 
-    location = await engine.render_to_storage(request, job_id=9, source="copy-test")
+
+async def test_a_stored_file_goes_into_the_archive_from_storage(monkeypatch):
+    """A file exported unconverted is copied from storage into its entry a
+    piece at a time, beating between pieces; only the rest of the batch is
+    rendered."""
+    from app.services.export import engine
+
+    request, storage, asked = _stored_file_job(monkeypatch)
+    beats: list[int] = []
+
+    async def beat() -> None:
+        beats.append(1)
+
+    location = await engine.render_to_storage(
+        request, job_id=9, source="copy-test", heartbeat=beat
+    )
 
     archive = zipfile.ZipFile(io.BytesIO(storage.written[location.artifact_ref]))
     assert archive.read("assets/raffle.mov") == b"raffle reel"
     assert asked == ["manifest"]
+    # The rendered item, each of the file's two pieces, and the file.
+    assert len(beats) == 4
+
+
+async def test_a_copy_its_heartbeat_stops_closes_its_entry(monkeypatch):
+    """A heartbeat that raises mid-copy stops the export with its own error:
+    the entry is closed first, so closing the archive does not fail."""
+    from app.services.export import engine
+
+    request, _storage, _asked = _stored_file_job(monkeypatch)
+    beats: list[int] = []
+
+    async def beat() -> None:
+        beats.append(1)
+        if len(beats) == 2:
+            raise LookupError("taken over")
+
+    with pytest.raises(LookupError):
+        await engine.render_to_storage(
+            request, job_id=9, source="copy-test", heartbeat=beat
+        )
 
 
 def test_a_file_an_object_store_streams_is_stored_again_whole():
