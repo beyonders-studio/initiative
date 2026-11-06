@@ -116,6 +116,7 @@
     "addressesLabel": "Adresse {{n}} Bezeichnung",
     "websites": "Website {{n}}",
     "websitesLabel": "Website {{n}} Bezeichnung",
-    "partOf": "Organisation"
+    "partOf": "Organisation",
+    "metadata": "Metadaten: {{name}}"
   }
 }

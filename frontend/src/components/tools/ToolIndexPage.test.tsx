@@ -15,7 +15,13 @@ import userEvent from "@testing-library/user-event";
 import { HttpResponse, http } from "msw";
 import { describe, expect, it, onTestFinished, vi } from "vitest";
 
-import { buildNotificationPlace, buildProject, ownerCan, readerCan } from "@/__tests__/factories";
+import {
+  buildContact,
+  buildNotificationPlace,
+  buildProject,
+  ownerCan,
+  readerCan,
+} from "@/__tests__/factories";
 import { communityHttp } from "@/__tests__/helpers/communityHttp";
 import i18n from "@/__tests__/helpers/i18n-test";
 import { server } from "@/__tests__/helpers/msw-server";
@@ -78,22 +84,25 @@ const CARD_FIELDS: Partial<Record<Tool, Record<string, unknown>>> = {
   },
 };
 
-const row = (tool: Tool, fields: { id: number; name: string; archived_at?: string | null }) => ({
-  description: null,
-  initiative_id: INITIATIVE_ID,
-  community_id: 1,
-  created_by: 1,
-  created_at: "2026-01-01T00:00:00Z",
-  updated_at: "2026-01-01T00:00:00Z",
-  archived_at: null,
-  can: ownerCan(),
-  comments_enabled: false,
-  comment_count: 0,
-  tags: [],
-  grants: [],
-  ...CARD_FIELDS[tool],
-  ...fields,
-});
+const row = (tool: Tool, fields: { id: number; name: string; archived_at?: string | null }) =>
+  tool === Tool.contact
+    ? buildContact({ initiative_id: INITIATIVE_ID, ...fields })
+    : {
+        description: null,
+        initiative_id: INITIATIVE_ID,
+        community_id: 1,
+        created_by: 1,
+        created_at: "2026-01-01T00:00:00Z",
+        updated_at: "2026-01-01T00:00:00Z",
+        archived_at: null,
+        can: ownerCan(),
+        comments_enabled: false,
+        comment_count: 0,
+        tags: [],
+        grants: [],
+        ...CARD_FIELDS[tool],
+        ...fields,
+      };
 
 /**
  * Serve the tool's list endpoint, honouring what every tool's page can ask

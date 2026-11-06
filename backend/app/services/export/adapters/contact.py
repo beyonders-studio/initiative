@@ -9,7 +9,9 @@ The spreadsheet is one row per contact, in the columns the CSV import reads
 back (``import_engine.contacts_csv``), so an export comes back in unchanged:
 each value of a field and its label are a pair of columns, as many pairs as
 the contact with the most of them needs, then the organization a person is
-part of, the tags, and one column per initiative property the contacts hold.
+part of, the tags, and one column per initiative property the contacts hold,
+headed as metadata so its name never reads as another column's. Several tags,
+or choices, in one cell go one a line.
 
 Access rule: READ on the contact (exporting is a formatted read), enforced by
 the ``ToolExportAdapter.fetch`` seam at both count and build time, under the
@@ -92,12 +94,16 @@ def _envelope(contact: Contact) -> dict[str, Any]:
 
 def _property_cell(summary: Any, locale: str) -> Any:
     """A property's value as the import reads it back: as the list shows it,
-    but a moment in full and a person by handle, which name one exactly."""
+    but a moment in full and a person by handle, which name one exactly, and
+    each of several choices on a line of its own."""
     if summary is None:
         return None
     if summary.type in (MetadataType.datetime, MetadataType.user_reference):
         record = property_export_dict(summary)
         return record.get("value_text") or record.get("value_handle")
+    if summary.type is MetadataType.multi_select and summary.value is not None:
+        labels = {o.value: o.label for o in summary.options or ()}
+        return "\n".join(labels.get(each, each) for each in summary.value)
     return values.property_value(summary, locale, None)
 
 
@@ -140,7 +146,7 @@ def _table(
         values.Column(
             "tags",
             values.label("tag_ids", locale),
-            lambda c: ", ".join(
+            lambda c: "\n".join(
                 sorted((tag.name for tag in annotated_tags(c)), key=str.casefold)
             ),
         ),
@@ -153,7 +159,7 @@ def _table(
     columns += [
         values.Column(
             f"property.{property_id}",
-            name,
+            et("contacts.metadata", locale, name=name),
             lambda c, property_id=property_id: _property_cell(
                 next(
                     (s for s in portable_summaries(c) if s.property_id == property_id),

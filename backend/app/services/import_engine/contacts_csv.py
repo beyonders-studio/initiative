@@ -56,6 +56,7 @@ from app.schemas.tenant.import_job import (
     ContactCsvPreview,
     ContactCsvTarget as Target,
 )
+from app.schemas.tenant.tag import TagCreate
 from app.services.export import values
 from app.services.export.i18n import et
 from app.services.import_engine import engine as import_engine
@@ -132,7 +133,8 @@ _NUMBERED_PARTS = {
     "type": "label",
 }
 
-#: Where the number goes in a numbered header, while it is read.
+#: Where the number goes in a numbered header, and the name in a metadata
+#: one, while it is read.
 _SLOT = "\0"
 
 
@@ -140,16 +142,34 @@ def _norm(text: str) -> str:
     return " ".join(text.casefold().split())
 
 
+def _items(cell: str) -> list[str]:
+    """The tags or choices one cell holds: one a line, or apart by Google
+    Contacts' `` ::: ``. A comma is part of the item it is in."""
+    return [
+        item.strip()
+        for item in cell.replace(" ::: ", "\n").splitlines()
+        if item.strip()
+    ]
+
+
 @cache
 def _export_headers() -> tuple[
-    dict[str, Target], tuple[tuple[str, str, str, str], ...]
+    dict[str, Target],
+    tuple[tuple[str, str, str, str], ...],
+    tuple[tuple[str, str], ...],
 ]:
     """The headers the export writes, in every language it writes them: the
-    fixed ones by name, and each numbered one as the text either side of its
-    number, with the field and the part of it the column holds."""
+    fixed ones by name, each numbered one as the text either side of its
+    number, with the field and the part of it the column holds, and a
+    metadata one as the text either side of the metadata's name."""
     fixed: dict[str, Target] = {}
     numbered: list[tuple[str, str, str, str]] = []
+    metadata: list[tuple[str, str]] = []
     for locale in sorted(SUPPORTED_EMAIL_LOCALES):
+        before, _, after = _norm(et("contacts.metadata", locale, name=_SLOT)).partition(
+            _SLOT
+        )
+        metadata.append((before, after))
         fixed[_norm(et("contacts.name", locale))] = Target.name
         fixed[_norm(et("contacts.type", locale))] = Target.type
         fixed[_norm(et("contacts.partOf", locale))] = Target.organization
@@ -159,7 +179,7 @@ def _export_headers() -> tuple[
                 text = _norm(et(f"contacts.{key}", locale, n=_SLOT))
                 before, _, after = text.partition(_SLOT)
                 numbered.append((before, after, detail, part))
-    return fixed, tuple(numbered)
+    return fixed, tuple(numbered), tuple(metadata)
 
 
 @cache
@@ -181,10 +201,15 @@ def _reads_as(header: str, properties: dict[str, int]) -> tuple[Target, Any] | N
     """What a column looks like it holds, by its header: a target, with the
     property it fills, or a detail's ``(number, part)`` where it is numbered,
     or ``"part"`` for one part of a name. ``None`` for a header nothing
-    reads. The export's own headers come first, then the initiative's
-    properties, which the export heads by name, then the address books'."""
+    reads. A property the export heads as metadata comes first, then the
+    export's own headers, then the address books', then a property by its
+    name alone."""
     key = _norm(header)
-    fixed, numbered = _export_headers()
+    fixed, numbered, metadata = _export_headers()
+    for before, after in metadata:
+        name = key[len(before) : len(key) - len(after)]
+        if key.startswith(before) and key.endswith(after) and name in properties:
+            return Target.property, properties[name]
     if key in fixed:
         return fixed[key], None
     for before, after, detail, part in numbered:
@@ -193,19 +218,19 @@ def _reads_as(header: str, properties: dict[str, int]) -> tuple[Target, Any] | N
             key.startswith(before)
             and key.endswith(after)
             and len(key) > len(before) + len(after)
-            and number.isdigit()
+            and number.isdecimal()
         ):
             return Target(detail), (int(number), part)
-    if key in properties:
-        return Target.property, properties[key]
     if key in _HEADERS:
         return _HEADERS[key], None
     if key in _NAME_PARTS:
         return Target.name, "part"
     numbered_kind, _, part = key.rpartition(" - ")
     kind, _, number = numbered_kind.rpartition(" ")
-    if kind in _NUMBERED_KINDS and number.isdigit() and part in _NUMBERED_PARTS:
+    if kind in _NUMBERED_KINDS and number.isdecimal() and part in _NUMBERED_PARTS:
         return _NUMBERED_KINDS[kind], (int(number), _NUMBERED_PARTS[part])
+    if key in properties:
+        return Target.property, properties[key]
     return None
 
 
@@ -239,7 +264,7 @@ async def preview(
 ) -> ContactCsvPreview:
     """What the file holds, and the columns it looks like it has: each
     detail's value beside the label numbered with it, and a column headed with
-    the name of one of the initiative's properties as that property."""
+    one of the initiative's properties as that property."""
     headers, rows = read(content)
     properties = (
         {
@@ -322,7 +347,7 @@ def _row(number: int, cells: list[str], columns: list[ContactCsvColumn]) -> _Row
         elif column.target is Target.organization:
             organization = organization or value
         elif column.target is Target.tags:
-            tags += value.replace(":::", ",").split(",")
+            tags += _items(value)
         elif column.target is Target.property and column.property_id is not None:
             properties[column.property_id] = value
         elif column.target.value in details:
@@ -360,13 +385,13 @@ def _property_value(
         many = kind is MetadataType.multi_select
         picked = [
             options.get(_norm(part), part.strip())
-            for part in (text.split(",") if many else [text])
+            for part in (_items(text) if many else [text])
         ]
         return picked if many else picked[0]
     if kind is MetadataType.checkbox:
         return _words()[1].get(_norm(text), text)
     if kind is MetadataType.scale:
-        return int(text) if text.isdigit() else text
+        return int(text) if text.isdecimal() else text
     if kind is MetadataType.user_reference:
         return handles.get(handle_key(text), text)
     return text
@@ -577,9 +602,8 @@ async def apply(
     ):
         organizations.setdefault(_norm(name), existing_id)
 
-    tags = TagRestore(session)
     failed: list[ImportRowFailure] = []
-    created = 0
+    created = tags_created = tags_matched = 0
     parsed = [_row(number, cells, columns) for number, cells in rows]
     # Organizations go in first: a person's may be a row further down.
     for row in sorted(parsed, key=lambda r: not r.contact["is_organization"]):
@@ -611,9 +635,11 @@ async def apply(
                 )
             )
             continue
-        # Tags are resolved outside the row's savepoint: every row shares them.
-        for name in row.tags:
-            await tags.resolve(name)
+        try:
+            tag_names = [TagCreate(name=name).name for name in row.tags]
+        except ValidationError:
+            failed.append(ImportRowFailure(row=row.number, field=Target.tags.value))
+            continue
         # Named as the create names it: a property value is one of its
         # ``properties``.
         blamed = "properties"
@@ -627,7 +653,10 @@ async def apply(
                     place=place,
                     contact_in=contact_in,
                 )
-                await tags.attach(contact, row.tags)
+                # Its own restore: what the row's savepoint rolls back goes
+                # with it.
+                tags = TagRestore(session)
+                await tags.attach(contact, tag_names)
                 await metadata_service.write_on_create(
                     session, contact, contact_in.properties
                 )
@@ -664,6 +693,8 @@ async def apply(
             failed.append(ImportRowFailure(row=row.number, field=blamed))
             continue
         created += 1
+        tags_created += tags.created
+        tags_matched += tags.matched
         if contact.is_organization:
             organizations.setdefault(_norm(contact.name), contact.id)
         if made is not None and row.organization:
@@ -671,8 +702,8 @@ async def apply(
             organizations[_norm(row.organization)] = made
     await session.flush()
     return EnvelopeImportResult(
-        created={Tool.contact.plural: created, "tags": tags.created},
-        matched={"tags": tags.matched},
+        created={Tool.contact.plural: created, "tags": tags_created},
+        matched={"tags": tags_matched},
         failed={Tool.contact.plural: len(failed)} if failed else {},
         failed_rows=sorted(failed, key=lambda failure: failure.row),
     )

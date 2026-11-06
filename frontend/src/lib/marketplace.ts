@@ -38,6 +38,7 @@ export const UNSHELVED_KINDS = [
   ListingKind.calendar,
   ListingKind.post,
   ListingKind.wiki,
+  ListingKind.contact,
 ] as const;
 
 /** A shelf a community installs from — the values `?kind=` may name under

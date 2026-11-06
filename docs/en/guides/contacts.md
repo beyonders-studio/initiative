@@ -62,7 +62,7 @@ Type `#` and the contact's name in a description, document or wiki page to [link
 
 Already have the vendor list in a spreadsheet? **More actions** → **Import contacts from CSV** on the Contacts tab takes the file. Match each column to a field, a label, the organization, tags or metadata. Most columns match themselves, including the ones a phone or email account exports, and any row that doesn't fit is listed afterwards rather than half-imported.
 
-Export writes a CSV the same way, one row per contact, with columns like `Phone 1` and `Phone 1 label` when somebody has several. Import that file into another initiative, or back in here, and every column matches up on its own.
+Export writes a CSV the same way, one row per contact, with columns like `Phone 1` and `Phone 1 label` when somebody has several. Several tags, or several choices, share one cell, one to a line. Metadata columns say so in the header, like `Metadata: Deposit paid`. Import that file into another initiative, or back in here, and every column matches up on its own.
 
 ## Sharing and comments
 

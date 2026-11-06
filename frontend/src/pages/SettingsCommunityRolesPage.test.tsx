@@ -72,7 +72,7 @@ describe("SettingsCommunityRolesPage", () => {
     setup();
 
     const { dialog, offered } = await fillNewRole(user);
-    expect(offered).toHaveLength(5);
+    expect(offered).toHaveLength(6);
     await user.click(within(dialog).getByRole("button", { name: "Add role" }));
 
     await waitFor(() =>
@@ -80,7 +80,14 @@ describe("SettingsCommunityRolesPage", () => {
         {
           name: "Greeter",
           base_rung: "member",
-          surfaces: ["profile", "invites", "members", "community_calendars", "usage"],
+          surfaces: [
+            "profile",
+            "invites",
+            "members",
+            "community_calendars",
+            "community_contacts",
+            "usage",
+          ],
         },
       ])
     );

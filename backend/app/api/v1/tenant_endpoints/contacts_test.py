@@ -19,6 +19,7 @@ from app.core.messages import ContactMessages, InitiativeMessages
 from app.core.tools import Tool
 from app.models.platform.guild import CommunityRole
 from app.models.tenant.contact import Contact
+from app.models.tenant.metadata import MetadataType
 from app.models.tenant.resource_grant import ResourceAccessLevel, ResourceGrant
 from app.services.platform import app_settings as app_settings_service
 from app.services.platform import rules
@@ -373,12 +374,31 @@ async def test_a_contact_moves_into_the_communitys_contacts(
 async def test_contacts_go_out_as_a_spreadsheet_and_come_back_in(
     client: AsyncClient, session: AsyncSession, acting_user
 ):
-    """One row a contact, each phone a pair of columns. Imported into another
+    """One row a contact, each phone a pair of columns, several tags or
+    choices in one cell one a line, and metadata headed as metadata, so one
+    named ``Name`` is not the contact's name. Imported into another
     initiative with the columns its preview reads, it comes back as it went
-    out — details and labels, type, organization and tags — and a row whose
-    email is not one is left out and named."""
+    out — details and labels, type, organization, tags and metadata — and a
+    row whose email is not one, or whose tag is too long to be one, is left
+    out and named."""
     a = await acting_user(guild_role=CommunityRole.member, initiative=True)
+    other = await create_initiative(session, a.guild, a.user)
     venue = await create_tag(session, a.guild, name="Venue")
+    food = await create_tag(session, a.guild, name="Food, drinks")
+    meals = [
+        {"value": "brunch", "label": "Brunch"},
+        {"value": "dinner", "label": "Dinner, late"},
+    ]
+    meal = await create_property_definition(
+        session,
+        a.initiative,
+        name="Name",
+        type=MetadataType.multi_select,
+        options=meals,
+    )
+    await create_property_definition(
+        session, other, name="Name", type=MetadataType.multi_select, options=meals
+    )
     lodge = await client.post(
         a.g("/contacts/"),
         headers=a.headers,
@@ -399,7 +419,8 @@ async def test_contacts_go_out_as_a_spreadsheet_and_come_back_in(
                 {"label": "Mobile", "value": "+44 7700 900123"},
                 {"label": "Office", "value": "020 7946 0000"},
             ],
-            "tag_ids": [venue.id],
+            "tag_ids": [venue.id, food.id],
+            "properties": [{"property_id": meal.id, "value": ["brunch", "dinner"]}],
         },
     )
     linked = await client.post(
@@ -435,6 +456,7 @@ async def test_contacts_go_out_as_a_spreadsheet_and_come_back_in(
             "Phone 2 label",
             "Organization",
             "Tags",
+            "Metadata: Name",
         ],
         [
             "Priya Shah",
@@ -446,15 +468,19 @@ async def test_contacts_go_out_as_a_spreadsheet_and_come_back_in(
             "020 7946 0000",
             "Office",
             "Lakeside Lodge",
-            "Venue",
+            "Food, drinks\nVenue",
+            "Brunch\nDinner, late",
         ],
-        ["Lakeside Lodge", "Organization", "", "", "", "", "", "", "", ""],
+        ["Lakeside Lodge", "Organization", "", "", "", "", "", "", "", "", ""],
     ]
 
-    other = await create_initiative(session, a.guild, a.user)
     rows = io.StringIO()
     csv.writer(rows).writerows(
-        [*sheet, ["Bad Address", "Person", "not an email", "", "", "", "", "", "", ""]]
+        [
+            *sheet,
+            ["Bad Address", "Person", "not an email", "", "", "", "", "", "", "", ""],
+            ["Long Tag", "Person", "", "", "", "", "", "", "", "x" * 150, ""],
+        ]
     )
     preview = await client.post(
         a.g("/imports/contacts/preview"),
@@ -463,7 +489,7 @@ async def test_contacts_go_out_as_a_spreadsheet_and_come_back_in(
         content=rows.getvalue(),
     )
     assert preview.status_code == 200, preview.text
-    assert preview.json()["row_count"] == 3
+    assert preview.json()["row_count"] == 4
     imported = await client.post(
         a.g("/imports/contacts"),
         headers=a.headers,
@@ -476,7 +502,10 @@ async def test_contacts_go_out_as_a_spreadsheet_and_come_back_in(
     assert imported.status_code == 201, imported.text
     result = imported.json()["result"]
     assert result["created"]["contacts"] == 2
-    assert result["failed_rows"] == [{"row": 4, "field": "emails"}]
+    assert result["failed_rows"] == [
+        {"row": 4, "field": "emails"},
+        {"row": 5, "field": "tags"},
+    ]
 
     await route_session_to_guild(session, a.guild.id)
     made = dict(

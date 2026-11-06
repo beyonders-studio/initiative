@@ -195,6 +195,7 @@ const COMMENT_TARGETS = [
   "dashboard_id",
   "post_id",
   "wiki_id",
+  "contact_id",
 ] as const satisfies readonly (keyof CommentThreadParams & keyof CommentRead)[];
 
 const inThread = (comment: CommentRead, params: CommentThreadParams) => {
