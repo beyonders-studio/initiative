@@ -3,7 +3,7 @@
 These functions used to live only inside the migrations that created them, so
 "what is the rule right now" was answered by reading three migrations and a
 baseline in the right order. Now the module is the source — boot applies the
-seven that live in ``public``, provisioning renders the four that live in each
+ones that live in ``public``, provisioning renders the ones that live in each
 guild schema — which is only true for as long as something checks. This is
 that something.
 
@@ -29,7 +29,7 @@ from app.testing import create_guild
 
 
 #: ``pg_get_functiondef`` needs the argument types to identify an overload.
-#: These are the only signatures of the seven in ``public``; a second overload
+#: These are the only signatures in ``public``; a second overload
 #: of any of them would be a design change, and
 #: ``test_no_unexpected_overloads`` is what would say so.
 PUBLIC_SIGNATURES = {
@@ -148,7 +148,7 @@ async def test_none_runs_as_its_owner(session):
 
 
 async def test_no_unexpected_overloads(session):
-    """One definition per name in ``public`` — the seven signatures above are
+    """One definition per name in ``public`` — the signatures above are
     the whole set there."""
     rows = (
         await session.exec(
