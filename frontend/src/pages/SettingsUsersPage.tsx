@@ -3,7 +3,7 @@ import { Download, HandCoins, IdCard, RefreshCcw, UserMinus } from "lucide-react
 import { useState } from "react";
 import { useTranslation } from "react-i18next";
 
-import type { CommunityRole, UserCommunityMember } from "@/api/generated/initiativeAPI.schemas";
+import { CommunityRole, type UserCommunityMember } from "@/api/generated/initiativeAPI.schemas";
 import { MemberInvites } from "@/components/communities/CommunityInvites";
 import { MemberDisplayNameDialog } from "@/components/communities/MemberDisplayNameDialog";
 import { RemoveCommunityMemberDialog } from "@/components/communities/RemoveCommunityMemberDialog";
@@ -65,6 +65,8 @@ export const SettingsUsersPage = () => {
   const managesInvites = held.writes && held.holds("invites");
   const opensPage = managesMembers || held.holds("invites");
   const roleOptions = assignableCommunityRoles(Boolean(activeCommunity?.can.seat));
+  // Rungs are changed by whoever may make an admin, as on the members page.
+  const changesRungs = held.writes && held.managesAdmins;
 
   const activeCommunityId = activeCommunity?.id ?? null;
 
@@ -219,7 +221,8 @@ export const SettingsUsersPage = () => {
       cell: ({ row }) => {
         const communityMember = row.original;
         const isSelf = communityMember.id === user?.id;
-        const currentCommunityRole = communityMember.community_role ?? "member";
+        const currentCommunityRole = (communityMember.community_role ??
+          CommunityRole.member) as CommunityRole;
         if (!managesMembers) {
           return (
             <span className="text-sm">
@@ -227,6 +230,14 @@ export const SettingsUsersPage = () => {
             </span>
           );
         }
+        // A superadmin's rung answers to the seat.
+        const changeable =
+          !isSelf && changesRungs && (currentCommunityRole !== CommunityRole.superadmin || isSeat);
+        // The rung they hold is listed even where the reader can't give it,
+        // so the picker names it.
+        const options = roleOptions.includes(currentCommunityRole)
+          ? roleOptions
+          : [currentCommunityRole, ...roleOptions];
         return (
           <div className="flex flex-col gap-1">
             <Select
@@ -234,13 +245,19 @@ export const SettingsUsersPage = () => {
               onValueChange={(value) =>
                 handleRoleChange(communityMember.id, value as CommunityRole)
               }
-              disabled={isSelf || updateCommunityMembership.isPending}
+              disabled={!changeable || updateCommunityMembership.isPending}
             >
-              <SelectTrigger disabled={isSelf} className="min-w-40">
+              <SelectTrigger
+                disabled={!changeable}
+                className="min-w-40"
+                aria-label={t("users.communityRolePickerLabel", {
+                  name: getUserDisplayName(communityMember),
+                })}
+              >
                 <SelectValue />
               </SelectTrigger>
               <SelectContent>
-                {roleOptions.map((roleOption) => (
+                {options.map((roleOption) => (
                   <SelectItem key={roleOption} value={roleOption}>
                     {t(`users.communityRole.${roleOption}` as never)}
                   </SelectItem>
@@ -259,12 +276,20 @@ export const SettingsUsersPage = () => {
             cell: ({ row }) => {
               const communityMember = row.original;
               const roleId = heldRoleIds.get(communityMember.id) ?? null;
-              if (!managesMembers || customRolesClosed) {
+              if (!managesMembers) {
                 const name = customRoles.find((role) => role.id === roleId)?.name;
                 return name ? <span className="text-sm">{name}</span> : null;
               }
               // A role applies while its holder stands on its rung.
               const rung = isAdminRole(communityMember.community_role) ? "admin" : "member";
+              // Given only by somebody who could take off the one held now, as
+              // on the members page; the held one is listed either way.
+              const heldRole = customRoles.find((role) => role.id === roleId);
+              const changeable =
+                held.writes && !customRolesClosed && (!heldRole || held.takesOff(heldRole));
+              const options = customRoles.filter(
+                (role) => role.id === roleId || (changeable && held.gives(role))
+              );
               return (
                 <Select
                   value={roleId === null ? NO_CUSTOM_ROLE : String(roleId)}
@@ -274,9 +299,10 @@ export const SettingsUsersPage = () => {
                       roleId: value === NO_CUSTOM_ROLE ? null : Number(value),
                     })
                   }
-                  disabled={assignCustomRole.isPending}
+                  disabled={!changeable || assignCustomRole.isPending}
                 >
                   <SelectTrigger
+                    disabled={!changeable}
                     className="min-w-40"
                     aria-label={t("settings:customRoles.pickerLabel", {
                       name: getUserDisplayName(communityMember),
@@ -286,7 +312,7 @@ export const SettingsUsersPage = () => {
                   </SelectTrigger>
                   <SelectContent>
                     <SelectItem value={NO_CUSTOM_ROLE}>{t("settings:customRoles.none")}</SelectItem>
-                    {customRoles.map((role) => (
+                    {options.map((role) => (
                       <SelectItem key={role.id} value={String(role.id)}>
                         <span className="flex flex-col">
                           <span>{role.name}</span>

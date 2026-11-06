@@ -2,10 +2,10 @@ import { Pencil, Plus, Trash2 } from "lucide-react";
 import { type FormEvent, useEffect, useState } from "react";
 import { useTranslation } from "react-i18next";
 
-import type {
-  AdminSurface,
+import {
+  type AdminSurface,
   CommunityRole,
-  CustomRoleRead,
+  type CustomRoleRead,
 } from "@/api/generated/initiativeAPI.schemas";
 import { ListSkeleton, SkeletonRegion } from "@/components/skeletons/PageSkeletons";
 import { Alert, AlertDescription } from "@/components/ui/alert";
@@ -33,6 +33,7 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
+import { useAppConfig } from "@/hooks/useAppConfig";
 import { useCommunities } from "@/hooks/useCommunities";
 import {
   ADMIN_SURFACES,
@@ -187,14 +188,23 @@ const CustomRoleDialog = ({ role, open, onOpenChange }: CustomRoleDialogProps) =
 };
 
 /**
- * Community settings › Roles: the community's custom roles. A role on the
- * member rung gives a member some parts of running the community; one on the
- * admin rung narrows an admin to the parts it lists.
+ * Community settings › Roles: the roles every community has, then its custom
+ * ones. A role on the member rung gives a member some parts of running the
+ * community; one on the admin rung narrows an admin to the parts it lists.
  */
 export const SettingsCommunityRolesPage = () => {
-  const { t } = useTranslation(["settings", "common"]);
+  const { t } = useTranslation(["settings", "communities", "common"]);
   const { activeCommunity } = useCommunities();
+  const { guestsEnabled } = useAppConfig();
   const held = useHeldSurfaces();
+  // Highest first. Guests only where the deployment allows them and the
+  // community takes any, as on the Guests tab.
+  const builtInRoles: CommunityRole[] = [
+    CommunityRole.superadmin,
+    CommunityRole.admin,
+    CommunityRole.member,
+    ...(guestsEnabled && activeCommunity?.max_guests !== 0 ? [CommunityRole.guest] : []),
+  ];
   const rolesQuery = useCustomRoles({ enabled: held.holds("roles") });
   const deleteRole = useDeleteCustomRole();
   // `null` closed; `"new"` adds one.
@@ -228,7 +238,7 @@ export const SettingsCommunityRolesPage = () => {
             <CardTitle>{t("customRoles.title")}</CardTitle>
             <CardDescription>{t("customRoles.description")}</CardDescription>
           </div>
-          {roles.length > 0 ? addButton : null}
+          {addButton}
         </CardHeader>
         <CardContent className="space-y-4">
           {closed ? (
@@ -236,76 +246,81 @@ export const SettingsCommunityRolesPage = () => {
               <AlertDescription>{t("customRoles.closed")}</AlertDescription>
             </Alert>
           ) : null}
+          <ul className="divide-y rounded-md border">
+            {builtInRoles.map((role) => (
+              <li key={role} className="space-y-1.5 p-3">
+                <div className="flex flex-wrap items-center gap-2">
+                  <p className="font-medium">
+                    {t(`communities:users.communityRole.${role}` as never)}
+                  </p>
+                  <Badge variant="secondary" className="font-normal">
+                    {t("customRoles.builtIn")}
+                  </Badge>
+                </div>
+                <p className="text-muted-foreground text-xs">
+                  {t(`communities:users.communityRoleHelp.${role}` as never)}
+                </p>
+              </li>
+            ))}
+            {roles.map((role) => (
+              <li key={role.id} className="flex items-start justify-between gap-3 p-3">
+                <div className="min-w-0 space-y-1.5">
+                  <div className="flex flex-wrap items-center gap-2">
+                    <p className="font-medium">{role.name}</p>
+                    <span className="text-muted-foreground text-xs">
+                      {t(`customRoles.rung.${role.base_rung === "admin" ? "admin" : "member"}`)}
+                    </span>
+                  </div>
+                  {role.surfaces.length > 0 ? (
+                    <div className="flex flex-wrap gap-1">
+                      {role.surfaces.map((surface) => (
+                        <Badge key={surface} variant="secondary" className="font-normal">
+                          {t(`customRoles.surfaces.${surface}.label`)}
+                        </Badge>
+                      ))}
+                    </div>
+                  ) : (
+                    <p className="text-muted-foreground text-xs">{t("customRoles.holdsNothing")}</p>
+                  )}
+                  {fromDeployment(role) ? (
+                    <p className="text-muted-foreground text-xs">
+                      {t("customRoles.setByDeployment")}
+                    </p>
+                  ) : changes && !held.gives(role) ? (
+                    <p className="text-muted-foreground text-xs">{t("customRoles.beyondYours")}</p>
+                  ) : changes && !held.takesOff(role) ? (
+                    <p className="text-muted-foreground text-xs">
+                      {t("customRoles.widensAnAdmin")}
+                    </p>
+                  ) : null}
+                </div>
+                {changes && held.gives(role) && !fromDeployment(role) ? (
+                  <RowActionsMenu subject={role.name}>
+                    <DropdownMenuItem onSelect={() => setEditing(role)}>
+                      <Pencil className="h-4 w-4" />
+                      {t("common:edit")}
+                    </DropdownMenuItem>
+                    <DropdownMenuSeparator />
+                    <DropdownMenuItem
+                      className="text-destructive"
+                      disabled={!held.takesOff(role)}
+                      onSelect={() => setDeleting(role)}
+                    >
+                      <Trash2 className="h-4 w-4" />
+                      {t("common:delete")}
+                    </DropdownMenuItem>
+                  </RowActionsMenu>
+                ) : null}
+              </li>
+            ))}
+          </ul>
           {rolesQuery.isLoading ? (
             <SkeletonRegion label={t("customRoles.loading")}>
               <ListSkeleton rows={2} avatar={false} />
             </SkeletonRegion>
           ) : rolesQuery.isError ? (
             <p className="text-destructive text-sm">{t("customRoles.loadError")}</p>
-          ) : roles.length === 0 ? (
-            <div className="flex flex-wrap items-center gap-3">
-              <p className="text-muted-foreground text-sm">{t("customRoles.empty")}</p>
-              {addButton}
-            </div>
-          ) : (
-            <ul className="divide-y rounded-md border">
-              {roles.map((role) => (
-                <li key={role.id} className="flex items-start justify-between gap-3 p-3">
-                  <div className="min-w-0 space-y-1.5">
-                    <div className="flex flex-wrap items-center gap-2">
-                      <p className="font-medium">{role.name}</p>
-                      <span className="text-muted-foreground text-xs">
-                        {t(`customRoles.rung.${role.base_rung === "admin" ? "admin" : "member"}`)}
-                      </span>
-                    </div>
-                    {role.surfaces.length > 0 ? (
-                      <div className="flex flex-wrap gap-1">
-                        {role.surfaces.map((surface) => (
-                          <Badge key={surface} variant="secondary" className="font-normal">
-                            {t(`customRoles.surfaces.${surface}.label`)}
-                          </Badge>
-                        ))}
-                      </div>
-                    ) : (
-                      <p className="text-muted-foreground text-xs">
-                        {t("customRoles.holdsNothing")}
-                      </p>
-                    )}
-                    {fromDeployment(role) ? (
-                      <p className="text-muted-foreground text-xs">
-                        {t("customRoles.setByDeployment")}
-                      </p>
-                    ) : changes && !held.gives(role) ? (
-                      <p className="text-muted-foreground text-xs">
-                        {t("customRoles.beyondYours")}
-                      </p>
-                    ) : changes && !held.takesOff(role) ? (
-                      <p className="text-muted-foreground text-xs">
-                        {t("customRoles.widensAnAdmin")}
-                      </p>
-                    ) : null}
-                  </div>
-                  {changes && held.gives(role) && !fromDeployment(role) ? (
-                    <RowActionsMenu subject={role.name}>
-                      <DropdownMenuItem onSelect={() => setEditing(role)}>
-                        <Pencil className="h-4 w-4" />
-                        {t("common:edit")}
-                      </DropdownMenuItem>
-                      <DropdownMenuSeparator />
-                      <DropdownMenuItem
-                        className="text-destructive"
-                        disabled={!held.takesOff(role)}
-                        onSelect={() => setDeleting(role)}
-                      >
-                        <Trash2 className="h-4 w-4" />
-                        {t("common:delete")}
-                      </DropdownMenuItem>
-                    </RowActionsMenu>
-                  ) : null}
-                </li>
-              ))}
-            </ul>
-          )}
+          ) : null}
         </CardContent>
       </Card>
 

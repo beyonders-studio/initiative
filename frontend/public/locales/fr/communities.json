@@ -162,12 +162,14 @@
     "communityRole": {
       "admin": "Administrateur",
       "member": "Membre",
-      "superadmin": "Superadmin"
+      "superadmin": "Superadmin",
+      "guest": "Invité"
     },
     "communityRoleHelp": {
       "member": "Participe à ce à quoi on l'ajoute.",
       "admin": "Gère la communauté : membres, invitations, initiatives, paramètres.",
-      "superadmin": "Tout cela, plus la façon dont les gens entrent : connexion, IA et plug-ins. Seul un superadmin peut en nommer un autre."
+      "superadmin": "Tout cela, plus la façon dont les gens entrent : connexion, IA et plug-ins. Seul un superadmin peut en nommer un autre.",
+      "guest": "Présent pour un nombre de jours défini, et ne voit que ce que son invitation lui a donné."
     },
     "loadingSettings": "Chargement des paramètres…",
     "unableToLoadSettings": "Impossible de charger les paramètres.",
@@ -201,6 +203,7 @@
     "userIdColumn": "ID utilisateur",
     "userColumn": "Utilisateur",
     "communityRoleColumn": "Rôle dans la communauté",
+    "communityRolePickerLabel": "Rôle dans la communauté de {{name}}",
     "sourceColumn": "Origine",
     "actionsColumn": "Actions",
     "sourceOidc": "OIDC",
