@@ -103,7 +103,7 @@ async function findManifestRef(file: File): Promise<MemberRef> {
   const { offset, size, count } = await findCentralDirectory(file);
   const end = Math.min(offset + size, file.size);
   const nameBytes = new TextEncoder().encode(MANIFEST_NAME);
-  let dir = new DataView(new ArrayBuffer(0));
+  let dir: DataView = new DataView(new ArrayBuffer(0));
   let dirAt = offset;
   // Where the `length` bytes at `at` sit in the piece held, reading the piece
   // that starts there when they run past it.
