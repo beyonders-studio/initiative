@@ -46,7 +46,6 @@
   },
   "bindingSource": {
     "query": "SQL-Abfrage",
-    "sheet_range": "Tabellenbereich",
     "plugin": "Plug-in-Daten"
   },
   "gallery": {
@@ -88,7 +87,6 @@
     "widgetTitle": "Titel",
     "widgetTitlePlaceholder": "Leer lassen, um den Namen des Widgets zu verwenden",
     "source": "Datenquelle",
-    "choose": "Auswählen…",
     "preview": "Vorschau",
     "previewHint": "Deine eigenen Daten, genau so gezeichnet wie im Widget.",
     "sectionBinding": "Daten",
@@ -98,7 +96,6 @@
     "all_calendar": "Alle Kalender",
     "all_counter_group": "Alle Zählergruppen",
     "all_counter": "Alle Zähler",
-    "all_file": "Alle Tabellen",
     "pluginEndpoint": "Was es liest",
     "plugin": "Plug-in",
     "pluginPlaceholder": "Plug-in auswählen",
@@ -108,7 +105,7 @@
     "pluginParamNeedsSibling": "Wähle zuerst den Wert darüber.",
     "pluginParamListHint": "Werte durch Kommas trennen.",
     "all_property": "Keine Metadaten oder Eigenschaft",
-    "sqlHelp": "Ein reines Lese-SELECT über die Daten dieser Community. Es läuft unter deinem Konto und liefert daher nur, was du ohnehin sehen kannst."
+    "sqlHelp": "Ein reines Lese-SELECT über die Daten dieser Community. Es läuft unter deinem Konto und liefert daher nur, was du ohnehin sehen kannst. sheet('Budget', 'Sheet1!A1:D') liest einen Bereich einer Tabelle."
   },
   "picker": {
     "title": "Widget hinzufügen",
@@ -136,7 +133,6 @@
     "display": "Darstellung",
     "refresh": "Aktualisieren",
     "open": "Anzeigen, woher diese Daten stammen",
-    "restricted": "Kein Zugriff",
     "me": "Ich",
     "cappedHint": "Es passen mehr Zeilen als ein Widget auf einmal lädt – gezeigt werden die ersten {{count}}.",
     "rows_task_one": "{{count}} Aufgabe",
@@ -238,14 +234,6 @@
     "column": "Spalte",
     "card": "Karte"
   },
-  "bindingParam": {
-    "file": "Tabelle",
-    "sheet": "Blatt",
-    "range": "Bereich",
-    "plugin_uid": "Plug-in",
-    "source_id": "Plug-in-Datenquelle",
-    "sql": "Anweisung"
-  },
   "slot": {
     "label": "Bezeichnung",
     "value": "Wert",
@@ -262,6 +250,11 @@
   },
   "builder": {
     "dataset": "Daten aus",
+    "spreadsheet": "Tabelle",
+    "sheet": "Blatt",
+    "firstSheet": "Erstes sichtbares Blatt",
+    "range": "Bereich",
+    "rangeHelp": "Leer lassen für das ganze Blatt. A:D liest die Spalten A bis D bis zur letzten gefüllten Zeile.",
     "columns": "Anzeigen",
     "addColumn": "Spalte hinzufügen",
     "removeColumn": "Spalte entfernen",

@@ -15,13 +15,24 @@
  * datasets' fields are offered. That is a set intersection over words, not a
  * `FROM` clause being read — being wrong about it costs a suggestion, never a
  * statement, because nothing is completed that the author does not choose.
+ *
+ * A spreadsheet's range is read by `sheet('<name>', '<range>')`, so inside the
+ * quote that opens one the initiative's spreadsheets are offered by name. What
+ * a range holds is known only once the statement has been checked, which reads
+ * it; those columns are offered under the name the range is read under.
  */
 
 /** The word a completion replaces: what a name may be spelled with. */
 const WORD = /[A-Za-z0-9_]+$/;
 
 /** What kind of thing a suggestion is, for the icon and the grouping. */
-export type CompletionKind = "dataset" | "field" | "function" | "token" | "relation";
+export type CompletionKind =
+  | "dataset"
+  | "field"
+  | "function"
+  | "token"
+  | "relation"
+  | "spreadsheet";
 
 export interface Completion {
   /** The text inserted, and what is matched against. */
@@ -44,6 +55,12 @@ export interface DatasetFields {
 /** A name that qualifies the one being typed: `assignee.disp`. */
 const QUALIFIED = /([A-Za-z0-9_]+)\.([A-Za-z0-9_]*)$/;
 
+/** A name SQL reads as written, without quotes. */
+const PLAIN = /^[A-Za-z_][A-Za-z0-9_]*$/;
+
+/** A spreadsheet's name being typed as the first argument of `sheet()`. */
+const SPREADSHEET_NAME = /\bsheet\(\s*'((?:[^']|'')*)$/i;
+
 /** What is being completed at *caret*: the word, where it starts, and the name
  *  it is written under if it has one.
  *
@@ -54,11 +71,13 @@ const QUALIFIED = /([A-Za-z0-9_]+)\.([A-Za-z0-9_]*)$/;
 export const wordAt = (
   text: string,
   caret: number
-): { word: string; start: number; qualifier?: string } | null => {
+): { word: string; start: number; qualifier?: string; quoted?: boolean } | null => {
   // Completing from inside a word would replace only its left half.
   const next = text[caret];
   if (next && WORD.test(next)) return null;
   const before = text.slice(0, caret);
+  const named = SPREADSHEET_NAME.exec(before);
+  if (named) return { word: named[1], start: caret - named[1].length, quoted: true };
   const qualified = QUALIFIED.exec(before);
   if (qualified) {
     return {
@@ -95,6 +114,9 @@ export const completionsFor = (
     tokens = [],
     named = [],
     qualifier,
+    ranges = [],
+    spreadsheets = [],
+    quoted = false,
   }: {
     datasets: string[];
     functions: string[];
@@ -106,17 +128,34 @@ export const completionsFor = (
     named?: string[];
     /** The name this word is written under, where it has one. */
     qualifier?: string;
+    /** The ranges the statement read, each under the name it is read under.
+     *  Always in scope: the statement names them. */
+    ranges?: DatasetFields[];
+    /** The spreadsheets a `sheet()` call may name. */
+    spreadsheets?: string[];
+    /** Whether the word is a spreadsheet's name inside `sheet('`. */
+    quoted?: boolean;
   }
 ): Completion[] => {
   const needle = word.toLowerCase();
-  const inScope = named.length ? fields.filter((entry) => named.includes(entry.dataset)) : fields;
+  if (quoted) {
+    return spreadsheets
+      .filter((name) => matches(name, needle) && name.toLowerCase() !== needle)
+      .map((name): Completion => ({ name, kind: "spreadsheet" }));
+  }
+  const inScope = [
+    ...(named.length ? fields.filter((entry) => named.includes(entry.dataset)) : fields),
+    ...ranges,
+  ];
 
   // After a dot there is one kind of answer: a column of whatever the name in
   // front resolves to. A dataset resolves to itself; a relation resolves to
   // what it reaches. Nothing else may follow one, so nothing else is offered —
   // and an empty word is enough, because the list is already short.
   if (qualifier !== undefined) {
-    return fieldsUnder(qualifier, fields, inScope).filter((entry) => matches(entry.name, needle));
+    return fieldsUnder(qualifier, [...fields, ...ranges], inScope).filter((entry) =>
+      matches(entry.name, needle)
+    );
   }
 
   if (!needle) return [];
@@ -199,12 +238,19 @@ export const applyCompletion = (
 ): { text: string; caret: number } => {
   // A relation is never the end of a name: choosing one leaves the caret past
   // the dot, where the next thing offered is one of its columns.
+  // A spreadsheet's name closes the quote it was typed in, its own quotes
+  // doubled as a string constant's are. A field named by a header SQL cannot
+  // read bare (`Q3 total`) goes in double quotes.
   const inserted =
     completion.kind === "function"
       ? `${completion.name}(`
       : completion.kind === "relation"
         ? `${completion.name}.`
-        : completion.name;
+        : completion.kind === "spreadsheet"
+          ? `${completion.name.replace(/'/g, "''")}'`
+          : completion.kind === "field" && !PLAIN.test(completion.name)
+            ? `"${completion.name.replace(/"/g, '""')}"`
+            : completion.name;
   return {
     text: text.slice(0, start) + inserted + text.slice(end),
     caret: start + inserted.length,

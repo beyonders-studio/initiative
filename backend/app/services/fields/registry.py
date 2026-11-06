@@ -167,7 +167,7 @@ def sort_expression(dataset_name: str, field_name: str, ctx: SortContext) -> Any
     return sort_fields(dataset_name, ctx)[field_name]
 
 
-def describe(dataset_name: str) -> list[dict[str, Any]]:
+def describe(source: Dataset) -> list[dict[str, Any]]:
     """The dataset's fields as a client offers them, in the order it lists them.
 
     Deliberately not the resolvers: what a field compiles to is ours, and what
@@ -186,7 +186,7 @@ def describe(dataset_name: str) -> list[dict[str, Any]]:
             "sortable": spec.sortable,
             "options": list(spec.options),
         }
-        for spec in dataset(dataset_name).offered
+        for spec in source.offered
     ]
 
 

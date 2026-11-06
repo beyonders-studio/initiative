@@ -8,8 +8,9 @@
  * cannot read the bound rows therefore shows them an empty widget, not the
  * author's data. Nothing a definition can say reaches a URL.
  *
- * Three bindings, and two of them answer with the same envelope: a statement
- * and a spreadsheet range are both columns and rows. Every hook below is called
+ * Two bindings: a statement, which answers with columns and rows, and a
+ * plug-in's data, which answers with its own rows or, with a statement over
+ * them, with columns and rows too. Every hook below is called
  * on every render with `enabled` gating rather than conditionally, because
  * hooks must be unconditional. Disabled queries cost nothing, and the ones that
  * do run share React Query's cache — two widgets running the same statement
@@ -20,12 +21,11 @@
 import { useCallback, useMemo, useRef } from "react";
 
 import { resolvePluginBinding } from "@/api/pluginData";
-import { useFile } from "@/hooks/useFiles";
 import { usePluginData, usePluginWidgetCatalog } from "@/hooks/usePluginData";
 import { useSqlQuery, useWidgetQuery } from "@/hooks/useSqlQuery";
 import type { DataMeta, WidgetData, WidgetSource } from "@/lib/widgets/dataShapes";
 import { WidgetErrorCode } from "@/lib/widgets/errors";
-import { emptyDataFor, normalizeQueryRows, normalizeSheetRange } from "@/lib/widgets/normalize";
+import { emptyDataFor, normalizeQueryRows } from "@/lib/widgets/normalize";
 
 /** A normalized definition binding. Everything past `source` is the fetcher's
  *  to interpret — the backend deliberately does not re-declare these, so that
@@ -43,9 +43,6 @@ export interface WidgetBinding {
    *  than leaving somebody to read their own statement back. Absent for a
    *  statement that did not come from the builder. */
   spec?: unknown;
-  file_id?: number | null;
-  sheet?: string | null;
-  range?: string | null;
   /** `plugin`: which installed plug-in, which of its sources, and the arguments the
    *  source declared. The binding names a listing and a source id — never an
    *  address. Where the plug-in lives comes from the deployment's registration, and
@@ -150,7 +147,6 @@ export function useWidgetData(
     { enabled: scoped && source === "query" && !placed }
   );
   const answering = placed ? widgetQuery : sqlQuery;
-  const fileQuery = useFile(scoped && source === "sheet_range" ? (binding.file_id ?? null) : null);
 
   // The plug-in palette is one request per community, shared by every plug-in widget on the
   // canvas. It is what turns a binding's `plugin_uid` into an install id and tells
@@ -174,9 +170,8 @@ export function useWidgetData(
 
   const refetch = useCallback(() => {
     if (source === "query") void answering.refetch();
-    if (source === "sheet_range") void fileQuery.refetch();
     if (isPlugin) void pluginQuery.refetch();
-  }, [source, isPlugin, answering.refetch, fileQuery.refetch, pluginQuery.refetch]);
+  }, [source, isPlugin, answering.refetch, pluginQuery.refetch]);
 
   return useMemo<WidgetDataResult>(() => {
     const unbound = (): WidgetDataResult => ({
@@ -231,23 +226,6 @@ export function useWidgetData(
         return {
           data: { source: "rows", columns, rows, meta },
           isLoading: answering.isLoading,
-          isUnbound: false,
-          isRestricted: false,
-          refetch,
-          meta,
-        };
-      }
-
-      case "sheet_range": {
-        if (!binding.file_id || !binding.range) return unbound();
-        // A file outside this initiative is absent, not readable.
-        const file = fileQuery.data?.initiative_id === initiativeId ? fileQuery.data : undefined;
-        const range = file ? normalizeSheetRange(file, binding.sheet, binding.range) : null;
-        if (!range) return absent(fileQuery);
-        const meta: DataMeta = { total: range.rows.length, truncated: false };
-        return {
-          data: { source: "rows", ...range, meta },
-          isLoading: false,
           isUnbound: false,
           isRestricted: false,
           refetch,
@@ -362,15 +340,9 @@ export function useWidgetData(
     source,
     initiativeId,
     binding.sql,
-    binding.file_id,
-    binding.range,
-    binding.sheet,
     answering.data,
     answering.isLoading,
     answering.isError,
-    fileQuery.data,
-    fileQuery.isLoading,
-    fileQuery.isError,
     scoped,
     dashboardId,
     binding.plugin_uid,
@@ -383,6 +355,5 @@ export function useWidgetData(
     pluginQuery.isLoading,
     pluginQuery.isError,
     refetch,
-    fileQuery,
   ]);
 }

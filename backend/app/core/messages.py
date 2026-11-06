@@ -1137,6 +1137,25 @@ class QueryMessages:
     #: thing to compare them with is a field that holds one.
     VIEWER_NEEDS_A_PERSON = "QUERY_VIEWER_NEEDS_A_PERSON"
 
+    # Spreadsheets.
+
+    #: ``sheet()`` takes a spreadsheet's id or name, then a range as text.
+    SHEET_ARGUMENTS = "QUERY_SHEET_ARGUMENTS"
+    #: No spreadsheet by that id or name that this statement can read.
+    SHEET_NOT_FOUND = "QUERY_SHEET_NOT_FOUND"
+    #: Several spreadsheets have that name; the id says which.
+    SHEET_NAME_AMBIGUOUS = "QUERY_SHEET_NAME_AMBIGUOUS"
+    #: The id names a file that is not a spreadsheet.
+    SHEET_NOT_A_SPREADSHEET = "QUERY_SHEET_NOT_A_SPREADSHEET"
+    #: The range names a sheet the workbook does not have.
+    SHEET_UNKNOWN = "QUERY_SHEET_UNKNOWN"
+    #: The range is not one A1 notation can say.
+    SHEET_RANGE_INVALID = "QUERY_SHEET_RANGE_INVALID"
+    #: The range covers more cells than one range reads.
+    SHEET_RANGE_TOO_LARGE = "QUERY_SHEET_RANGE_TOO_LARGE"
+    #: The spreadsheet's cells could not be read just now.
+    SHEET_UNREADABLE = "QUERY_SHEET_UNREADABLE"
+
     # Execution.
 
     #: The planner's estimate for this statement is above what the surface

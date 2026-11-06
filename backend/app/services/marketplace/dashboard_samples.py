@@ -161,18 +161,6 @@ def _query_sample(sql: str, rng: random.Random) -> dict[str, Any] | None:
     }
 
 
-def _sheet_sample(rng: random.Random) -> dict[str, Any]:
-    return {
-        "columns": [
-            {"name": "Item", "type": FieldType.text.value},
-            {"name": "Value", "type": FieldType.number.value},
-        ],
-        "rows": [[label, rng.randint(0, 100)] for label in _LABELS],
-        "truncated": False,
-        "relations": [],
-    }
-
-
 def _widgets(envelope: dict[str, Any]) -> list[dict[str, Any]]:
     canvas = envelope.get("definition") or {}
     return [w for w in canvas.get("widgets") or [] if isinstance(w, dict)]
@@ -198,12 +186,11 @@ def generate_dashboard_sample(
             )
         )
         source = binding.get("source")
-        if source == "query" and isinstance(binding.get("sql"), str):
-            sample = _query_sample(binding["sql"], rng)
-        elif source == "sheet_range":
-            sample = _sheet_sample(rng)
-        else:
-            sample = None
+        sample = (
+            _query_sample(binding["sql"], rng)
+            if source == "query" and isinstance(binding.get("sql"), str)
+            else None
+        )
         if sample is not None:
             samples[widget_id] = sample
     return samples

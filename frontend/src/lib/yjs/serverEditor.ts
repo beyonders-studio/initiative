@@ -46,6 +46,7 @@ import { documentExtension } from "@/components/ui/editor/document-extension";
 import { MARKDOWN_TRANSFORMERS } from "@/components/ui/editor/extensions/markdown-shortcuts-extension";
 import { COLLAB_EXCLUDED_PROPERTIES } from "@/components/ui/editor/nodes/image-node";
 import { registerLegacyNodes } from "@/components/ui/editor/nodes/legacy-nodes";
+import { readRange } from "@/lib/spreadsheet/range";
 
 /** The id the browser's `CollaborationPlugin` binds under. */
 const ROOT_ID = "main";
@@ -373,9 +374,16 @@ function fromMarkdown(text: string, plain: boolean): string {
   });
 }
 
+/** A range of a spreadsheet's stored content, as a dashboard statement reads
+ *  it (`lib/spreadsheet/range.ts`). */
+function sheetRange(content: string, range: string | null): string {
+  return JSON.stringify(readRange(JSON.parse(content), range));
+}
+
 (globalThis as { serverEditor?: unknown }).serverEditor = {
   apply,
   bootstrap,
   fromMarkdown,
   render,
+  sheetRange,
 };
