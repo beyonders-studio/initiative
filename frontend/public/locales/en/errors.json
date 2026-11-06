@@ -149,6 +149,7 @@
   "PROPERTY_OPTIONS_REQUIRED": "A select or multi-select needs at least one option",
   "PROPERTY_DUPLICATE_OPTION_VALUE": "Each option needs a value of its own",
   "PROPERTY_CURRENCY_REQUIRED": "Money needs a currency",
+  "PROPERTY_COUNTER_MIN_GREATER_THAN_MAX": "A counter's minimum can't be more than its maximum",
   "PROPERTY_PROMOTE_TYPES_DIFFER": "Only properties of one type, and money in one currency, merge into one metadata field",
   "PROPERTY_PROMOTE_VALUE_NOT_EDITABLE": "Some of these values are on items you can't edit",
   "ATTACHMENT_IMAGE_ONLY": "Only image uploads are supported",

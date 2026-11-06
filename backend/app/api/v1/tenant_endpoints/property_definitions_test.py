@@ -616,6 +616,46 @@ async def test_money_names_its_currency_and_keeps_its_amount(
     assert stored.one() == Decimal("1234.56")
 
 
+async def test_a_counter_keeps_its_settings_and_no_other_type_does(
+    client: AsyncClient, acting_user
+):
+    a = await acting_user(guild_role=CommunityRole.admin, initiative=True)
+    payload = {"name": "Seats", "type": "counter", "initiative_id": a.initiative.id}
+    defaults = {"step": 1, "min": None, "max": None, "initial": 0}
+
+    created = await client.post(
+        a.g("/property-definitions/"), headers=a.headers, json=payload
+    )
+    assert created.status_code == 201, created.text
+    assert created.json()["counter"] == defaults
+    inverted = await client.post(
+        a.g("/property-definitions/"),
+        headers=a.headers,
+        json={**payload, "name": "Laps", "counter": {"min": 5, "max": 1}},
+    )
+    assert inverted.status_code == 422
+    assert "PROPERTY_COUNTER_MIN_GREATER_THAN_MAX" in str(inverted.json()["detail"])
+    number = await client.post(
+        a.g("/property-definitions/"),
+        headers=a.headers,
+        json={**payload, "name": "Points", "type": "number", "counter": defaults},
+    )
+    assert number.json()["counter"] is None
+
+    changed = await client.patch(
+        a.g(f"/property-definitions/{created.json()['id']}"),
+        headers=a.headers,
+        json={"counter": {"step": 5, "min": 0, "max": 100, "initial": 10}},
+    )
+    assert changed.status_code == 200, changed.text
+    assert changed.json()["definition"]["counter"] == {
+        "step": 5,
+        "min": 0,
+        "max": 100,
+        "initial": 10,
+    }
+
+
 # ---------------------------------------------------------------------------
 # A project's metadata
 # ---------------------------------------------------------------------------

@@ -21,8 +21,9 @@ from __future__ import annotations
 from dataclasses import dataclass
 from typing import Literal, Optional, Union
 
-#: How a list shows a scale.
-ScaleDisplay = Literal["number", "stars", "bar"]
+#: How a list shows a scale (a number, stars or a bar) or a counter (a
+#: number, a bar or a clock).
+FieldDisplay = Literal["number", "stars", "bar", "clock"]
 
 #: The groups shapes are offered in, in order.
 SHAPE_GROUPS: tuple[str, ...] = ("starters",)
@@ -37,7 +38,7 @@ class ShapeField:
     #: A ``MetadataType`` value.
     type: str
     #: For a scale, how the shape's lists show it.
-    display: Optional[ScaleDisplay] = None
+    display: Optional[FieldDisplay] = None
 
 
 #: What a card or a table column shows: a file's own field, by the id a

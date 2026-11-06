@@ -127,7 +127,12 @@ def property_value(summary: Any, locale: str, tz: str | None) -> Any:
         return date(value)
     if kind is MetadataType.datetime:
         return moment(value, tz)
-    if kind in (MetadataType.number, MetadataType.currency, MetadataType.scale):
+    if kind in (
+        MetadataType.number,
+        MetadataType.currency,
+        MetadataType.scale,
+        MetadataType.counter,
+    ):
         # An amount stays a number a sheet can add up; its currency is the
         # property's.
         return number(value)

@@ -52,6 +52,25 @@ class PropertyOption(SanitizedBaseModel):
     color: Optional[str] = Field(default=None, pattern=_HEX_COLOR_PATTERN)
 
 
+class CounterSettings(SanitizedBaseModel):
+    """How a counter field moves: by ``step`` a tap, never past ``min`` or
+    ``max``, and back to ``initial`` on a reset. A counter with no value
+    holds ``initial``."""
+
+    model_config = ConfigDict(json_schema_serialization_defaults_required=True)
+
+    step: float = Field(default=1, gt=0, allow_inf_nan=False)
+    min: Optional[float] = Field(default=None, allow_inf_nan=False)
+    max: Optional[float] = Field(default=None, allow_inf_nan=False)
+    initial: float = Field(default=0, allow_inf_nan=False)
+
+    @model_validator(mode="after")
+    def _ordered(self) -> "CounterSettings":
+        if self.min is not None and self.max is not None and self.min > self.max:
+            raise ValueError(PropertyMessages.COUNTER_MIN_GREATER_THAN_MAX)
+        return self
+
+
 class PropertyDefinitionBase(SanitizedBaseModel):
     name: str = Field(..., min_length=1, max_length=100)
     type: MetadataType
@@ -61,6 +80,9 @@ class PropertyDefinitionBase(SanitizedBaseModel):
     #: The currency a money property's amounts are in; required for one, and
     #: dropped for every other type.
     currency: Optional[CurrencyCode] = None
+    #: A counter's step, bounds and reset value; a counter left without them
+    #: takes the defaults, and every other type drops them.
+    counter: Optional[CounterSettings] = None
 
     @field_validator("name")
     def _strip_name(cls, v: str) -> str:
@@ -87,6 +109,10 @@ class PropertyDefinitionBase(SanitizedBaseModel):
             self.currency = None
         elif self.currency is None:
             raise ValueError(PropertyMessages.CURRENCY_REQUIRED)
+        if self.type is not MetadataType.counter:
+            self.counter = None
+        elif self.counter is None:
+            self.counter = CounterSettings()
         return self
 
 
@@ -123,6 +149,9 @@ class PropertyDefinitionUpdate(SanitizedBaseModel):
     #: A money property's currency. Its amounts stay as they are: nothing is
     #: converted.
     currency: Optional[CurrencyCode] = None
+    #: A counter's settings, all of them. Its values stay as they are until
+    #: they are next written, which holds them to the new bounds.
+    counter: Optional[CounterSettings] = None
 
     @field_validator("name")
     def _strip_name(cls, v: Optional[str]) -> Optional[str]:
@@ -252,6 +281,14 @@ class PropertyOptionsChange(SanitizedBaseModel):
     remove: List[str] = Field(default_factory=list, max_length=100)
 
 
+class PropertyStep(SanitizedBaseModel):
+    """One step of a counter, up or down, from the value it holds when the
+    step is written, so two people stepping it at once both count."""
+
+    property_id: int
+    up: bool
+
+
 class PropertyValuesSetRequest(SanitizedBaseModel):
     """Payload for ``PUT /properties/{target}/{entity_id}``: replace-all, or
     with ``merge`` only the properties it names.
@@ -266,15 +303,20 @@ class PropertyValuesSetRequest(SanitizedBaseModel):
     removed: List[int] = Field(default_factory=list, max_length=100)
     #: With ``merge``, multi-select values to change an option of.
     options: List[PropertyOptionsChange] = Field(default_factory=list, max_length=100)
+    #: With ``merge``, counters to step.
+    steps: List[PropertyStep] = Field(default_factory=list, max_length=100)
 
     @model_validator(mode="after")
     def removal_merges(self) -> "PropertyValuesSetRequest":
-        if (self.removed or self.options) and not self.merge:
-            raise ValueError("removed and options need merge")
-        changed = [change.property_id for change in self.options]
+        if (self.removed or self.options or self.steps) and not self.merge:
+            raise ValueError("removed, options and steps need merge")
+        changed = [
+            *(change.property_id for change in self.options),
+            *(step.property_id for step in self.steps),
+        ]
         written = {*self.removed, *(entry.property_id for entry in self.values)}
         if len(changed) != len(set(changed)) or written.intersection(changed):
-            raise ValueError("a property's options change once, and alone")
+            raise ValueError("a property changes or steps once, and alone")
         return self
 
 
@@ -318,6 +360,8 @@ class PropertySummary(SanitizedBaseModel):
     options: Optional[List[PropertyOption]] = None
     #: A money property's currency.
     currency: Optional[CurrencyCode] = None
+    #: A counter's step, bounds and reset value.
+    counter: Optional[CounterSettings] = None
     value: Any = Field(
         default=None,
         description=(

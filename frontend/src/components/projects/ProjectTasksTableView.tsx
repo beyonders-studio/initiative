@@ -23,6 +23,7 @@ import type {
   TaskListRead,
   TaskStatusRead,
 } from "@/api/generated/initiativeAPI.schemas";
+import { PropertyTarget } from "@/api/generated/initiativeAPI.schemas";
 import { TaskAssigneesCell } from "@/components/projects/TaskQuickActions";
 import { SortHeader } from "@/components/SortIcon";
 import { sharedTaskColumns } from "@/components/tasks/globalTaskColumns";
@@ -41,7 +42,7 @@ import { useMoveTaskToGroup } from "@/hooks/useTasks";
 import { useTaskTypeChange } from "@/hooks/useTaskTypeChange";
 import { fieldColumnId } from "@/lib/layouts/columns";
 import { columnsOf } from "@/lib/layouts/draft";
-import { useProjectLayoutEnv, withDisplays } from "@/lib/layouts/fields";
+import { useCounterSteps, useProjectLayoutEnv, withDisplays } from "@/lib/layouts/fields";
 import { groupRowId, groupRows, NO_GROUP, uniqueTasksFromRows } from "@/lib/layouts/grouping";
 import { pluginFields, usePluginsOnItems } from "@/lib/layouts/plugins";
 import { taskFields } from "@/lib/layouts/tasks";
@@ -356,7 +357,12 @@ const ProjectTasksTableViewComponent = ({
 }: ProjectTasksListViewProps) => {
   const { t, i18n } = useTranslation(["projects", "comments", "tasks"]);
   const statusDisabled = !canEditTaskDetails || taskActionsDisabled;
-  const env = useProjectLayoutEnv(taskHref);
+  const projectEnv = useProjectLayoutEnv(taskHref);
+  const stepCounter = useCounterSteps(
+    PropertyTarget.task,
+    useCallback(() => !statusDisabled, [statusDisabled])
+  );
+  const env = useMemo(() => ({ ...projectEnv, stepCounter }), [projectEnv, stepCounter]);
   const { mutate: moveTask, mutateAsync: moveTaskNow } = useMoveTaskToGroup();
   // A drop into another type asks first for what that type's page requires.
   const typeChange = useTaskTypeChange(projectId, initiativeId);

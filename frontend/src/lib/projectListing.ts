@@ -12,6 +12,7 @@
  */
 
 import type {
+  CounterSettingsOutput,
   CurrencyCode,
   MetadataType,
   PropertyDefinitionRead,
@@ -51,6 +52,7 @@ export interface ProjectListingPropertyDefinition {
   color?: string | null;
   options?: PropertyOption[] | null;
   currency?: CurrencyCode | null;
+  counter?: CounterSettingsOutput | null;
 }
 
 export interface ProjectListingTask {
@@ -219,6 +221,7 @@ export const projectListingBoard = (
       color: definition.color ?? null,
       options: definition.options ?? null,
       currency: definition.currency ?? null,
+      counter: definition.counter ?? null,
       project_id: null,
       collection_id: null,
       created_at: "",
@@ -240,6 +243,7 @@ export const projectListingBoard = (
         key: null,
         options: definition.options,
         currency: definition.currency,
+        counter: definition.counter,
         value: DATE_PROPERTY_TYPES.has(value.property_type)
           ? shifted(value.value_text, shift)
           : (value.value_text ?? value.value_number ?? value.value_boolean ?? value.value_json),

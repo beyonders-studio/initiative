@@ -13,6 +13,7 @@ import {
   List,
   ListChecks,
   type LucideIcon,
+  Tally5,
   User,
 } from "lucide-react";
 
@@ -30,6 +31,7 @@ export const PROPERTY_TYPE_ICONS: Record<MetadataType, LucideIcon> = {
   [MetadataType.user_reference]: User,
   [MetadataType.currency]: Banknote,
   [MetadataType.scale]: Gauge,
+  [MetadataType.counter]: Tally5,
   [MetadataType.link]: Link2,
   [MetadataType.badge]: Badge,
   [MetadataType.json]: Braces,

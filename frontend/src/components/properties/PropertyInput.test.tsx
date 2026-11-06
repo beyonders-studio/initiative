@@ -125,6 +125,48 @@ describe("PropertyInput", () => {
     });
   });
 
+  describe("counter type", () => {
+    const seats = () =>
+      def({
+        type: MetadataType.counter,
+        name: "Seats",
+        counter: { step: 2, min: 0, max: 5, initial: 1 },
+      });
+
+    it("steps from its initial value within its bounds, takes a count as typed, and resets", async () => {
+      const onChange = vi.fn();
+      const { rerender } = renderWithProviders(
+        <PropertyInput definition={seats()} value={null} onChange={onChange} />
+      );
+      await userEvent.click(screen.getByRole("button", { name: "Step Seats up" }));
+      expect(onChange).toHaveBeenLastCalledWith(3);
+      await userEvent.click(screen.getByRole("button", { name: "Step Seats down" }));
+      expect(onChange).toHaveBeenLastCalledWith(0);
+      expect(screen.getByRole("button", { name: "Reset Seats" })).toBeDisabled();
+
+      rerender(<PropertyInput definition={seats()} value={5} onChange={onChange} />);
+      expect(screen.getByRole("button", { name: "Step Seats up" })).toBeDisabled();
+      // The bounds hold it once it is saved, not a digit at a time.
+      fireEvent.change(screen.getByRole("spinbutton", { name: "Seats" }), {
+        target: { value: "9" },
+      });
+      expect(onChange).toHaveBeenLastCalledWith(9);
+      await userEvent.click(screen.getByRole("button", { name: "Reset Seats" }));
+      expect(onChange).toHaveBeenLastCalledWith(1);
+    });
+
+    it("leaves a step to onStep where it is given", async () => {
+      const onChange = vi.fn();
+      const onStep = vi.fn();
+      renderWithProviders(
+        <PropertyInput definition={seats()} value={3} onChange={onChange} onStep={onStep} />
+      );
+      await userEvent.click(screen.getByRole("button", { name: "Step Seats down" }));
+      expect(onStep).toHaveBeenCalledWith(false);
+      expect(onChange).not.toHaveBeenCalled();
+    });
+  });
+
   describe("checkbox type", () => {
     it("renders a checkbox and toggles onChange(true)", async () => {
       const onChange = vi.fn();

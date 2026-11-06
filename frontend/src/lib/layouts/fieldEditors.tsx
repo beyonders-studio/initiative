@@ -34,6 +34,7 @@ import {
   normalizePropertyValue,
   ownProperties,
   propertyStubFromDefinition,
+  steppedCount,
   userReferenceValue,
 } from "@/components/properties/propertyHelpers";
 import { iconForPropertyType } from "@/components/properties/propertyTypeIcons";
@@ -347,6 +348,7 @@ const PropertyField = <I extends { properties: PropertySummary[] }, P>({
 }) => {
   const { t } = useTranslation(["properties", "common"]);
   const save = useItemFieldSave(kind, id, property.name);
+  const adding = useContext(ItemDraftContext) !== null;
   const saved = normalizePropertyValue(property);
   const edit = (value: unknown): ItemEdit<I, P> => ({
     properties: { values: [{ property_id: property.property_id, value }] },
@@ -361,6 +363,17 @@ const PropertyField = <I extends { properties: PropertySummary[] }, P>({
       ),
     sameJson
   );
+  // A step is taken from what the counter holds when it lands, and shows at
+  // once as it reads from here.
+  const step = (up: boolean) => {
+    draft.restore();
+    void save.save({
+      properties: { values: [], steps: [{ property_id: property.property_id, up }] },
+      shows: {
+        properties: withValue(properties, property, steppedCount(property.counter, saved, up)),
+      } as Partial<I>,
+    });
+  };
   // The property stays until it is gone, so a failed removal says so here.
   const remove = () => {
     draft.restore();
@@ -395,6 +408,8 @@ const PropertyField = <I extends { properties: PropertySummary[] }, P>({
         definition={property}
         value={draft.value}
         onChange={draft.edit}
+        // An item being added has no counter to step yet.
+        onStep={adding ? undefined : step}
         disabled={readOnly}
         initiativeId={initiativeId}
         canOpen={canOpen}

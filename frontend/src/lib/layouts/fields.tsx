@@ -1,6 +1,6 @@
 import { Link } from "@tanstack/react-router";
 import { CornerLeftUp, type LucideIcon } from "lucide-react";
-import { type ComponentType, memo, useMemo } from "react";
+import { type ComponentType, memo, useCallback, useMemo } from "react";
 import { useTranslation } from "react-i18next";
 
 import type {
@@ -15,6 +15,7 @@ import type {
   TaskPriority,
   TaskTypeRead,
 } from "@/api/generated/initiativeAPI.schemas";
+import { MetadataType, type PropertyTarget } from "@/api/generated/initiativeAPI.schemas";
 import { FileTypeBadge } from "@/components/files/fileColumns";
 import { UnreadDot } from "@/components/notifications/UnreadDot";
 import { priorityVariant } from "@/components/projects/projectTasksConfig";
@@ -23,7 +24,7 @@ import { TaskBlockersHoverCard } from "@/components/projects/TaskBlockersHoverCa
 import { TaskDescriptionHoverCard } from "@/components/projects/TaskDescriptionHoverCard";
 import { TaskSubtasksHoverCard } from "@/components/projects/TaskSubtasksHoverCard";
 import { PropertyValueCell } from "@/components/properties/PropertyValueCell";
-import type { ScaleDisplay } from "@/components/properties/propertyHelpers";
+import type { FieldDisplay } from "@/components/properties/propertyHelpers";
 import { TagBadge } from "@/components/tags";
 import { TagBadgeList } from "@/components/tags/TagBadge";
 import { TaskChecklistProgress } from "@/components/tasks/TaskChecklistProgress";
@@ -31,6 +32,7 @@ import { DateCell } from "@/components/tasks/TaskDateCell";
 import { TaskTypeMark, TaskTypeOption } from "@/components/tasks/TaskTypeOption";
 import { Badge } from "@/components/ui/badge";
 import { MentionText } from "@/components/user/MentionText";
+import { useStepCounter } from "@/hooks/useProperties";
 import { useUnreadTree } from "@/hooks/useUnreadTree";
 import { useCommunityPath } from "@/lib/communityUrl";
 import { formatBytes } from "@/lib/fileUtils";
@@ -156,8 +158,8 @@ export type FieldDef = {
   plugin?: { install: number; field: PluginFieldDecl; on: PluginOnItems };
   /** A property field's definition. */
   property?: PropertyDefinitionRead;
-  /** How a scale is drawn where the list showing it says. */
-  display?: ScaleDisplay;
+  /** How a scale or a counter is drawn where the list showing it says. */
+  display?: FieldDisplay;
   /** A property drawn on a card as its value alone, not named: a
    *  collection's card under a picture, which reads as a caption or a price
    *  rather than a row of labelled chips. */
@@ -183,6 +185,14 @@ export type LayoutEnv = {
   /** What can be done with an item from where it is drawn, beside its title
    *  on a card: a board its reader may change. */
   itemActions?: ComponentType<{ item: LayoutItem }>;
+  /** Steps a counter on an item where the list's reader may change it there,
+   *  answering with the item's values as the server then holds them. Left
+   *  out, or answering null for an item they may not change, a counter is
+   *  drawn without its buttons. */
+  stepCounter?: (
+    item: LayoutItem,
+    definition: PropertyDefinitionRead
+  ) => ((up: boolean) => Promise<PropertySummary[]>) | null;
 };
 
 // The namespaces a layout's names are in, loaded together so none shows as a
@@ -196,6 +206,21 @@ export const LAYOUT_NAMESPACES = [
   "relations",
   "calendars",
 ] as const;
+
+/** How a list of `target`s steps its counters: an item's, where `may` says
+ *  its reader may change that counter on it from the list. `may` is kept
+ *  between renders by its caller. */
+export const useCounterSteps = (
+  target: PropertyTarget,
+  may: (item: LayoutItem, definition: PropertyDefinitionRead) => boolean
+): NonNullable<LayoutEnv["stepCounter"]> => {
+  const { mutateAsync } = useStepCounter(target);
+  return useCallback(
+    (item, definition) =>
+      may(item, definition) ? (up) => mutateAsync({ itemId: item.id, definition, up }) : null,
+    [may, mutateAsync]
+  );
+};
 
 /** The env of a project's views: one community, and its tasks' pages. */
 export const useProjectLayoutEnv = (taskHref: (taskId: number) => string): LayoutEnv => {
@@ -464,19 +489,27 @@ const TaskTypeField = ({ value, variant }: FieldRendererProps) => {
   return <TaskTypeMark type={type} className="h-lh" iconClassName="h-4 w-4" />;
 };
 
-const PropertyField = ({ value, field, variant, oneLine }: FieldRendererProps) => (
-  <PropertyValueCell
-    summary={(value as PropertySummary | null) ?? undefined}
-    variant={variant === "cell" || field.plain ? "cell" : "chip"}
-    display={field.display}
-    oneLine={oneLine}
-  />
-);
+const PropertyField = ({ value, item, field, variant, env, oneLine }: FieldRendererProps) => {
+  const summary = (value as PropertySummary | null) ?? undefined;
+  const step =
+    summary && field.property?.type === MetadataType.counter
+      ? env.stepCounter?.(item, field.property)
+      : null;
+  return (
+    <PropertyValueCell
+      summary={summary}
+      variant={variant === "cell" || field.plain ? "cell" : "chip"}
+      display={field.display}
+      oneLine={oneLine}
+      onStep={step ?? undefined}
+    />
+  );
+};
 
-/** `fields`, each scale drawn as a list's `displays` say. */
+/** `fields`, each scale or counter drawn as a list's `displays` say. */
 export const withDisplays = <F extends Pick<FieldDef, "display">>(
   fields: ReadonlyMap<string, F>,
-  displays: Readonly<Record<string, ScaleDisplay>> | null | undefined
+  displays: Readonly<Record<string, FieldDisplay>> | null | undefined
 ): ReadonlyMap<string, F> =>
   displays && Object.keys(displays).length > 0
     ? new Map(

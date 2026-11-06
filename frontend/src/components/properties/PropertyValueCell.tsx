@@ -1,8 +1,9 @@
-import { Check, ExternalLink, Minus, Star } from "lucide-react";
-import { useMemo } from "react";
+import { Check, ExternalLink, Minus, Plus, Star } from "lucide-react";
+import { type SyntheticEvent, useEffect, useMemo, useRef, useState } from "react";
 import { useTranslation } from "react-i18next";
 
 import {
+  type CounterSettingsOutput,
   MetadataType,
   type PropertyOption,
   type PropertySummary,
@@ -14,10 +15,13 @@ import { getAvatarSrc, getInitialsForUser, getUserDisplayName } from "@/lib/user
 import { cn } from "@/lib/utils";
 
 import {
+  counterCount,
+  counterSettings,
+  type FieldDisplay,
   isEmptyPropertyValue,
   numericValue,
-  type ScaleDisplay,
   scaleValue,
+  steppedCount,
 } from "./propertyHelpers";
 import { iconForPropertyType } from "./propertyTypeIcons";
 
@@ -31,11 +35,15 @@ export interface PropertyValueCellProps {
    * value opens via a programmatic handler instead of nesting an `<a>` in an
    * `<a>`, and stops the click from also triggering the outer link. */
   nested?: boolean;
-  /** How a scale is drawn, as the layout showing it says; a number without. */
-  display?: ScaleDisplay | null;
+  /** How a scale or a counter is drawn, as the layout showing it says; a
+   *  number without. */
+  display?: FieldDisplay | null;
   /** On one line, its chips past the end cut off: a card whose height is
    *  reserved without measuring it. */
   oneLine?: boolean;
+  /** Steps a counter, where the reader may change it here, answering with
+   *  the item's values as the server then holds them. */
+  onStep?: (up: boolean) => Promise<PropertySummary[]>;
 }
 
 const formatNumber = (raw: unknown, options?: Intl.NumberFormatOptions): string => {
@@ -47,7 +55,7 @@ const formatNumber = (raw: unknown, options?: Intl.NumberFormatOptions): string 
 const scaleStars = (value: number): number => Math.min(5, Math.max(0, Math.ceil(value / 20)));
 
 /** A scale of 0–100 as a number ("80%"), five stars or a bar. */
-export const ScaleValue = ({ value, display }: { value: number; display: ScaleDisplay }) => {
+export const ScaleValue = ({ value, display }: { value: number; display: FieldDisplay }) => {
   const { i18n } = useTranslation();
   const percent = numberFormat(i18n.language, { style: "percent" }).format(value / 100);
   if (display === "stars") {
@@ -80,6 +88,172 @@ export const ScaleValue = ({ value, display }: { value: number; display: ScaleDi
     );
   }
   return <span className="tabular-nums">{percent}</span>;
+};
+
+/** The most steps a counter's clock is drawn with, one segment each; a
+ *  counter with more fills its clock as a dial. */
+const MAX_CLOCK_SEGMENTS = 60;
+
+/** A slice of a 16-unit clock face, from one fraction of a turn to another. */
+const wedge = (from: number, to: number): string => {
+  const point = (turn: number) =>
+    `${8 + 7 * Math.sin(2 * Math.PI * turn)} ${8 - 7 * Math.cos(2 * Math.PI * turn)}`;
+  return `M8 8 L${point(from)} A7 7 0 ${to - from > 0.5 ? 1 : 0} 1 ${point(to)} Z`;
+};
+
+/** A counter's count as a number, then for a bar or a clock its place
+ *  between its bounds. A counter without both bounds is drawn as a number. */
+export const CounterValue = ({
+  count,
+  settings,
+  display,
+}: {
+  count: number;
+  settings: CounterSettingsOutput | null;
+  display: FieldDisplay;
+}) => {
+  const { min, max, step } = counterSettings(settings);
+  const number = <span className="tabular-nums">{formatNumber(count)}</span>;
+  const drawn = display === "bar" || display === "clock";
+  if (!drawn || min === null || max === null || max <= min) return number;
+  const filled = Math.min(1, Math.max(0, (count - min) / (max - min)));
+  const label = `${formatNumber(count)} / ${formatNumber(max)}`;
+  const segments = Math.round((max - min) / step);
+  return (
+    <span className="inline-flex items-center gap-1.5">
+      {number}
+      {display === "clock" ? (
+        <svg role="img" aria-label={label} viewBox="0 0 16 16" className="h-4 w-4 shrink-0">
+          <title>{label}</title>
+          <circle cx="8" cy="8" r="7" className="fill-muted-foreground/20" />
+          {segments >= 2 && segments <= MAX_CLOCK_SEGMENTS ? (
+            Array.from({ length: segments }, (_, index) => (
+              <path
+                // biome-ignore lint/suspicious/noArrayIndexKey: a clock's segments are its places
+                key={index}
+                d={wedge(index / segments, (index + 1) / segments)}
+                className={cn(
+                  "stroke-background",
+                  index < Math.round(filled * segments) ? "fill-primary" : "fill-transparent"
+                )}
+                strokeWidth={0.75}
+              />
+            ))
+          ) : filled >= 1 ? (
+            <circle cx="8" cy="8" r="7" className="fill-primary" />
+          ) : filled > 0 ? (
+            <path d={wedge(0, filled)} className="fill-primary" />
+          ) : null}
+        </svg>
+      ) : (
+        <span
+          role="img"
+          aria-label={label}
+          title={label}
+          className="inline-block h-1.5 w-16 overflow-hidden rounded-full bg-muted-foreground/20"
+        >
+          <span
+            className="block h-full rounded-full bg-primary"
+            style={{ width: `${filled * 100}%` }}
+          />
+        </span>
+      )}
+    </span>
+  );
+};
+
+/** Kept from the row or card a step button sits on: neither opens, and a
+ *  board's card is not picked up. */
+const keep = (event: SyntheticEvent) => event.stopPropagation();
+
+/** A small button beside a counter in a list, which steps it without
+ *  opening the row or the card it sits on, or dragging the card. */
+const StepButton = ({
+  label,
+  disabled,
+  onClick,
+  children,
+}: {
+  label: string;
+  disabled: boolean;
+  onClick: () => void;
+  children: React.ReactNode;
+}) => (
+  <button
+    type="button"
+    aria-label={label}
+    disabled={disabled}
+    className="inline-flex size-5 shrink-0 items-center justify-center rounded-sm border text-muted-foreground hover:bg-accent hover:text-foreground focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring disabled:cursor-not-allowed disabled:opacity-40"
+    onPointerDown={keep}
+    onMouseDown={keep}
+    onTouchStart={keep}
+    onClick={(event) => {
+      event.preventDefault();
+      event.stopPropagation();
+      onClick();
+    }}
+  >
+    {children}
+  </button>
+);
+
+/**
+ * A counter between the buttons that step it. A step shows at once, and the
+ * server's answer once the last one lands, until the list reads it again.
+ */
+const SteppedCounter = ({
+  summary,
+  display,
+  onStep,
+}: {
+  summary: PropertySummary;
+  display: FieldDisplay;
+  onStep: (up: boolean) => Promise<PropertySummary[]>;
+}) => {
+  const { t } = useTranslation("properties");
+  const settings = counterSettings(summary.counter);
+  const held = counterCount(summary.counter, summary.value);
+  const [shown, setShown] = useState<number | null>(null);
+  const sending = useRef(0);
+  // The list's own read takes over once nothing is on its way.
+  useEffect(() => {
+    if (sending.current === 0) setShown(null);
+  }, [held]);
+  const count = shown ?? held;
+  const step = (up: boolean) => {
+    setShown(steppedCount(settings, count, up));
+    sending.current += 1;
+    onStep(up).then(
+      (values) => {
+        sending.current -= 1;
+        const answer = values.find((each) => each.property_id === summary.property_id);
+        if (sending.current === 0 && answer) setShown(counterCount(settings, answer.value));
+      },
+      () => {
+        sending.current -= 1;
+        setShown(null);
+      }
+    );
+  };
+  return (
+    <span className="inline-flex items-center gap-1.5">
+      <StepButton
+        label={t("input.stepDown", { name: summary.name })}
+        disabled={settings.min !== null && count <= settings.min}
+        onClick={() => step(false)}
+      >
+        <Minus className="h-3 w-3" aria-hidden />
+      </StepButton>
+      <CounterValue count={count} settings={summary.counter} display={display} />
+      <StepButton
+        label={t("input.stepUp", { name: summary.name })}
+        disabled={settings.max !== null && count >= settings.max}
+        onClick={() => step(true)}
+      >
+        <Plus className="h-3 w-3" aria-hidden />
+      </StepButton>
+    </span>
+  );
 };
 
 const coerceOptionMap = (options: PropertyOption[] | null | undefined) => {
@@ -153,11 +327,13 @@ export const PropertyValueCell = ({
   nested = false,
   display,
   oneLine = false,
+  onStep,
 }: PropertyValueCellProps) => {
   const { t } = useTranslation("properties");
   const options = useMemo(() => coerceOptionMap(summary?.options), [summary?.options]);
 
-  if (!summary || isEmptyPropertyValue(summary.value)) {
+  // A counter with no value holds its initial value.
+  if (!summary || (isEmptyPropertyValue(summary.value) && summary.type !== MetadataType.counter)) {
     if (variant === "chip") return null;
     return (
       <span
@@ -240,6 +416,18 @@ export const PropertyValueCell = ({
     case MetadataType.scale: {
       const figure = scaleValue(value);
       body = figure === null ? null : <ScaleValue value={figure} display={display ?? "number"} />;
+      break;
+    }
+    case MetadataType.counter: {
+      body = onStep ? (
+        <SteppedCounter summary={summary} display={display ?? "number"} onStep={onStep} />
+      ) : (
+        <CounterValue
+          count={counterCount(summary.counter, value)}
+          settings={summary.counter}
+          display={display ?? "number"}
+        />
+      );
       break;
     }
     case MetadataType.checkbox: {

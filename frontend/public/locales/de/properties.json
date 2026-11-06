@@ -21,6 +21,7 @@
     "user_reference": "Person",
     "currency": "Geldbetrag",
     "scale": "Skala",
+    "counter": "Zähler",
     "link": "Link",
     "badge": "Abzeichen",
     "json": "Daten"
@@ -59,7 +60,10 @@
     "optionAddFailed": "Option konnte nicht hinzugefügt werden",
     "scalePlaceholder": "0–100",
     "stars_one": "{{count}} Stern",
-    "stars_other": "{{count}} Sterne"
+    "stars_other": "{{count}} Sterne",
+    "stepDown": "{{name}} einen Schritt verringern",
+    "stepUp": "{{name}} einen Schritt erhöhen",
+    "reset": "{{name}} zurücksetzen"
   },
   "cell": {
     "emptyValue": "—",
@@ -132,5 +136,17 @@
     "label": "Währung",
     "none": "Keine Währung passt",
     "default": "EUR"
+  },
+  "counter": {
+    "step": "Schrittweite",
+    "min": "Minimum",
+    "max": "Maximum",
+    "initial": "Anfangswert",
+    "stepPlaceholder": "1",
+    "minPlaceholder": "Keins",
+    "maxPlaceholder": "Keins",
+    "initialPlaceholder": "0",
+    "stepPositive": "Die Schrittweite muss größer als null sein",
+    "minAboveMax": "Das Minimum darf nicht größer als das Maximum sein"
   }
 }

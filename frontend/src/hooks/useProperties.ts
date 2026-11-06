@@ -2,6 +2,7 @@ import { useMutation, useQuery } from "@tanstack/react-query";
 import { useMemo } from "react";
 import { useTranslation } from "react-i18next";
 
+import { setCollectionFileMetadata } from "@/api/generated/files/files";
 import type {
   PropertyDefinitionBulkDelete,
   PropertyDefinitionCreate,
@@ -14,6 +15,7 @@ import type {
   PropertySummary,
 } from "@/api/generated/initiativeAPI.schemas";
 import { PropertyTarget } from "@/api/generated/initiativeAPI.schemas";
+import { setProperties } from "@/api/generated/properties/properties";
 import {
   createPropertyDefinition,
   deletePropertyDefinition,
@@ -290,3 +292,28 @@ export const propertySaves = Object.fromEntries(
     ]
   )
 ) as Record<PropertyTarget, FieldSaveKind<PropertyHolder, never>>;
+
+/** A counter on an item a list shows, stepped up or down. */
+export type CounterStep = { itemId: number; definition: PropertyDefinitionRead; up: boolean };
+
+/**
+ * Steps counters on the `target`s a list shows, each from what it holds when
+ * the step lands, and has the reads showing it read it again. A collection's
+ * metadata is the collection's, so it is stepped through the collection.
+ * Answers the item's values as the server then holds them.
+ */
+export const useStepCounter = (target: PropertyTarget) =>
+  useCommunityMutation<PropertySummary[], CounterStep>({
+    mutationFn: (communityId, { itemId, definition, up }) => {
+      const body = { merge: true, steps: [{ property_id: definition.id, up }] };
+      return definition.collection_id === null
+        ? setProperties(communityId, target, itemId, body)
+        : setCollectionFileMetadata(communityId, definition.collection_id, itemId, body);
+    },
+    invalidate: () =>
+      invalidate(
+        q.propertyHolder(target),
+        ...(target === PropertyTarget.file ? [q.allCollections()] : [])
+      ),
+    errorKey: "properties:manager.setValuesError",
+  });

@@ -503,6 +503,7 @@ const PluginScalar = ({
             key: field.key,
             options: kept?.options ?? null,
             currency: kept?.currency ?? null,
+            counter: null,
             value,
           }}
         />

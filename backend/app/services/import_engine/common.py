@@ -212,7 +212,12 @@ def decode_property_value(
     t = pv.property_type
     if t in (MetadataType.text, MetadataType.url, MetadataType.select):
         return {"value_text": pv.value_text}
-    if t in (MetadataType.number, MetadataType.currency, MetadataType.scale):
+    if t in (
+        MetadataType.number,
+        MetadataType.currency,
+        MetadataType.scale,
+        MetadataType.counter,
+    ):
         return {"value_number": pv.value_number}
     if t == MetadataType.checkbox:
         return {"value_boolean": pv.value_boolean}
