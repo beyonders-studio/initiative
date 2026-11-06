@@ -367,7 +367,7 @@ export const SignatureName = ({
   return (
     <span className="inline-flex min-w-0 max-w-full flex-wrap items-center gap-x-2 gap-y-1">
       <span className="inline-flex min-w-0 max-w-full items-center gap-2">
-        <PersonAvatar user={signature.user} name={signature.name} />
+        {signature.user ? <PersonAvatar user={signature.user} name={signature.name} /> : null}
         <span className="truncate">
           {t("cell.signed", { name: signature.name, date: formatDateTime(signature.signed_at) })}
         </span>

@@ -1294,7 +1294,9 @@ def _rehydrate_value(
     if ptype is MetadataType.file:
         return _file(row.value_file_id, row.value_file)
     if ptype is MetadataType.signature:
-        if row.value_user_id is None:
+        # Signed while it holds a time, whoever the signer is now: one whose
+        # account is gone reads as nobody.
+        if row.value_datetime is None:
             return None
         return {
             "user": _person(row.value_user_id, user),

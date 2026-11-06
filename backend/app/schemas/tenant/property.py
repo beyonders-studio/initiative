@@ -387,11 +387,12 @@ class PropertySummary(SanitizedBaseModel):
             return value
         if self.type is MetadataType.user_reference:
             return PluginPerson.model_validate(value).for_install()
-        if self.type is MetadataType.signature and isinstance(value["user"], dict):
+        if self.type is MetadataType.signature:
             # The typed name is a name, so it goes where names do.
+            signer = value["user"]
             return {
                 **value,
-                "user": PluginPerson.model_validate(value["user"]).for_install(),
+                "user": signer and PluginPerson.model_validate(signer).for_install(),
                 "name": None if names_withheld() else value["name"],
             }
         return value

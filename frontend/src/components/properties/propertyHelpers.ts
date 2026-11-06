@@ -198,9 +198,10 @@ export const fileFieldValue = (raw: unknown): FileFieldValue | null =>
     : null;
 
 /** A signature as the server reads it back: who signed (their id alone where
- *  the reader cannot see them), the name they typed, and when. */
+ *  the reader cannot see them, nobody where their account is gone), the name
+ *  they typed, and when. */
 export interface SignatureValue {
-  user: MemberLike;
+  user: MemberLike | null;
   name: string;
   signed_at: string;
 }
