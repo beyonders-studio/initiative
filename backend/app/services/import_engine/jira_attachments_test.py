@@ -270,3 +270,34 @@ async def test_a_long_download_keeps_the_job_alive(monkeypatch):
     )
 
     assert len(ticks) > 1
+
+
+async def test_a_cancel_waits_for_the_bundle_write_under_way(monkeypatch):
+    """A cancel that lands while a file is written into the bundle stops the
+    fetch once that write has finished, so the bundle can still be closed."""
+    import asyncio
+
+    monkeypatch.setattr(ja, "HEARTBEAT_SECONDS", 0.01)
+    written: list[str] = []
+    ticks: list[int] = []
+
+    async def tick() -> None:
+        ticks.append(1)
+        if len(ticks) > 1:
+            raise LookupError("cancelled")
+
+    async def slow_store(stored, source):
+        await asyncio.sleep(0.05)
+        written.append(stored.filename)
+
+    with pytest.raises(LookupError):
+        await ja.download_images(
+            [_issue("ACME-1", _att("11", "handbook.pdf", "application/pdf"))],
+            download=_downloader(),
+            store=slow_store,
+            budget_bytes=10_000,
+            max_files=100,
+            files_allowed=True,
+            tick=tick,
+        )
+    assert written == ["handbook.pdf"]

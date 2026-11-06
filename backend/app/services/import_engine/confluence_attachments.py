@@ -218,7 +218,10 @@ async def download_page_attachments(
             )
             spool.flush()
             await while_beating(
-                store(stored, Path(spool.name)), tick, every=HEARTBEAT_SECONDS
+                store(stored, Path(spool.name)),
+                tick,
+                every=HEARTBEAT_SECONDS,
+                finish=True,
             )
         if attachment.is_image:
             media.stored_images.setdefault(attachment.filename, stored)

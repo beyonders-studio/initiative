@@ -317,3 +317,38 @@ def test_a_file_an_object_store_streams_is_stored_again_whole():
     engine._store_again(storage, "raffle.mov", "exports/9-raffle.mov", None)
 
     assert storage.written == {"exports/9-raffle.mov": b"raffle reel"}
+
+
+async def test_an_archive_upload_outlives_a_heartbeat_that_stops_it(monkeypatch):
+    """A heartbeat that raises while the archive is being stored stops the
+    export only once the upload has finished with the file it reads."""
+    import time
+    from types import SimpleNamespace
+
+    from app.services.export import engine
+    from app.services.export.adapters import ADAPTERS
+
+    class SlowStorage(_RecordingStorage):
+        def write_file(self, key, path, *, content_type=None):
+            time.sleep(0.05)
+            super().write_file(key, path, content_type=content_type)
+
+    storage = SlowStorage()
+    monkeypatch.setattr(engine, "HEARTBEAT_SECONDS", 0.01)
+    monkeypatch.setattr(engine, "get_backend", lambda: _Streaming())
+    monkeypatch.setattr(engine, "get_guild_storage", lambda _guild_id: storage)
+    monkeypatch.setitem(ADAPTERS, "slow-test", SimpleNamespace(force_zip=True))
+    beats: list[int] = []
+
+    async def beat() -> None:
+        beats.append(1)
+        if len(beats) > 1:
+            raise LookupError("taken over")
+
+    with pytest.raises(LookupError):
+        await engine.render_to_storage(
+            _request("a"), job_id=9, source="slow-test", heartbeat=beat
+        )
+    # The archive was stored whole.
+    [stored] = storage.written.values()
+    assert zipfile.ZipFile(io.BytesIO(stored)).namelist() == ["a.zip"]

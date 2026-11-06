@@ -336,6 +336,7 @@ async def render_to_storage(
             ),
             beat,
             every=HEARTBEAT_SECONDS,
+            finish=True,
         )
         await beat()
         return ArtifactLocation(artifact_ref=key)
@@ -432,6 +433,7 @@ async def _stream_zip_to_storage(
                 ),
                 heartbeat,
                 every=HEARTBEAT_SECONDS,
+                finish=True,
             )
             return ArtifactLocation(destination_ref=destination_ref)
         storage = get_guild_storage(request.guild_id)
@@ -441,6 +443,7 @@ async def _stream_zip_to_storage(
             ),
             heartbeat,
             every=HEARTBEAT_SECONDS,
+            finish=True,
         )
     finally:
         await asyncio.to_thread(tmp_path.unlink, missing_ok=True)

@@ -298,6 +298,7 @@ async def while_beating(
     beat: Callable[[], Awaitable[None]] | None,
     *,
     every: float,
+    finish: bool = False,
 ) -> Result:
     """``work``, with ``beat`` awaited every ``every`` seconds while it runs.
 
@@ -305,30 +306,37 @@ async def while_beating(
     only while something touches it, and one step of a job can take longer
     than the sweep waits: a large file downloaded, copied or stored. A beat
     that raises, as one reporting a cancel does, stops ``work`` and raises in
-    its place."""
+    its place. ``finish`` lets ``work`` run to its end first instead: work in
+    a thread cannot be stopped, and what it reads or writes must outlast it.
+
+    Once ``work`` ends, a beat already under way finishes before this returns
+    and no other starts, so the caller has its session to itself again."""
     if beat is None:
         return await work
     running = asyncio.ensure_future(work)
+    ended = asyncio.Event()
 
     async def beating() -> None:
-        while True:
-            await asyncio.sleep(every)
-            await beat()
+        while not ended.is_set():
+            with suppress(TimeoutError):
+                await asyncio.wait_for(ended.wait(), timeout=every)
+            if not ended.is_set():
+                await beat()
 
     beats = asyncio.ensure_future(beating())
     try:
         await asyncio.wait({running, beats}, return_when=asyncio.FIRST_COMPLETED)
         if not running.done():
-            running.cancel()
-            with suppress(asyncio.CancelledError):
-                await running
-            beats.result()
-        return running.result()
+            if not finish:
+                running.cancel()
+            await asyncio.wait({running})
     finally:
-        beats.cancel()
-        running.cancel()
-        if beats.done() and not beats.cancelled():
-            beats.exception()
+        ended.set()
+        if not running.done():
+            running.cancel()
+        await asyncio.wait({beats})
+    beats.result()
+    return running.result()
 
 
 async def cancel_running_jobs() -> None:
