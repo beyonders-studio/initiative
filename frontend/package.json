@@ -123,7 +123,7 @@
     "i18next": "^26.5.7",
     "i18next-http-backend": "^4.0.9",
     "lexical": "^0.52.0",
-    "lucide-react": "^1.61.0",
+    "lucide-react": "^1.66.0",
     "mermaid": "^12.2.0",
     "papaparse": "^5.7.0",
     "pdfjs-dist": "6.3.289",
