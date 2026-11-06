@@ -1,9 +1,0 @@
-# Revisions listed here are skipped by `git blame` (bulk, no-behavior-change
-# changes that would otherwise obscure real authorship).
-#
-# Enable locally with:
-#   git config blame.ignoreRevsFile .git-blame-ignore-revs
-# GitHub applies this file automatically.
-
-# Apply ruff format to backend (bulk reformat)
-bf5ec34bb1aa843f267203e4c9fe3c20a5eaadd9
