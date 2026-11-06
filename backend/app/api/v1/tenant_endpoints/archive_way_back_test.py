@@ -9,6 +9,7 @@ back", which the capped permission level cannot give.
 from httpx import AsyncClient
 from sqlmodel.ext.asyncio.session import AsyncSession
 
+from app.core.tools import Tool
 from app.main import app
 from app.models.platform.guild import CommunityRole
 from app.schemas.tenant.archive import ArchivableType
@@ -16,18 +17,11 @@ from app.testing import create_counter_group, create_file
 
 
 #: The wire name of every archivable tool (and the collection, a sub-tool with
-#: a list of its own), paired with the list route that has
-#: to be able to show it once it is archived. Read off ``ArchivableType`` rather
-#: than written out, so a tool that becomes archivable joins this too.
-_TOOL_LISTS = {
-    "project": "projects",
-    "file": "files",
-    "counter_group": "counter-groups",
-    "calendar": "calendars",
-    "dashboard": "dashboards",
-    "post": "posts",
-    "wiki": "wikis",
-    "collection": "collections",
+#: a list of its own), paired with the list route that has to be able to show
+#: it once it is archived. Read off the ``Tool`` enum, so a new tool joins this
+#: by joining it.
+_TOOL_LISTS = {tool.value: tool.route_segment for tool in Tool} | {
+    "collection": "collections"
 }
 
 
