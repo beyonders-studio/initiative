@@ -200,8 +200,9 @@ Something only one project or one collection cares about is a **property** of th
 | **Scale** | 0 to 100. A layout draws it as a percentage, stars or a bar. |
 | **Counter** | A number you tap up and down by its step, never past the minimum or maximum you give it. **Reset** sends it back to its initial value. A layout draws it as a number, a bar or a clock. |
 | **File** | One file from the initiative's Files: pick one, or make one with **New file**, which uploads a file, starts a document or saves a smart link. On the item's page a document, whiteboard, spreadsheet or smart link shows in place; any other file is a link to it. For several files, add them as links instead. |
+| **Signature** | Who signed and when. **Sign** asks for your name under a statement of what signing means, and you only ever sign as yourself: never for somebody else, and never through a plug-in. A copy of the thing comes unsigned. The thing's page says if it was updated after it was signed. |
 
-Typing a new option into a select adds it to the list. Two people tapping the same counter at once both count. Deleting metadata deletes every value set for it in the initiative, so it asks first.
+Typing a new option into a select adds it to the list. Two people tapping the same counter at once both count. Anyone who can edit something can sign its signature field or clear it. Clearing has no undo: putting a signature back takes its signer signing again. Deleting metadata deletes every value set for it in the initiative, so it asks first.
 
 #### Everything in one place
 
