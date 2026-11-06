@@ -27,6 +27,7 @@ import { useTranslation } from "react-i18next";
 import {
   FileType,
   type QueryBuildRequest,
+  type QuerySheetDescription,
   type WidgetCatalog,
 } from "@/api/generated/initiativeAPI.schemas";
 import { type PluginEndpointRead, pluginWidgetEntry, pluginWidgetSource } from "@/api/pluginData";
@@ -68,13 +69,7 @@ import { catalogEntry, type DefinitionWidget, isPluginWidgetType } from "@/lib/w
 import { withParamAnswer } from "@/lib/widgets/pluginParams";
 import { canDraw, resolveMapping } from "@/lib/widgets/shape";
 import { shapeFor } from "@/lib/widgets/shapes";
-import {
-  type EntityKind,
-  type EntityParam,
-  paramsFor,
-  type SourceParam,
-  sourceDescriptor,
-} from "@/lib/widgets/sources";
+import { paramsFor, sourceDescriptor } from "@/lib/widgets/sources";
 import { localized } from "@/lib/widgets/widgetMeta";
 
 import { WidgetTile } from "./WidgetTile";
@@ -175,7 +170,7 @@ export function WidgetConfigDialog({
   // hands back. Without one they are the plug-in's own shape, which only the plug-in's
   // own module knows how to draw — so the source is offered and the statement
   // is what makes it usable.
-  const sources: string[] = isPlugin ? PLUGIN_SOURCES : ["query", "sheet_range", "plugin"];
+  const sources: string[] = isPlugin ? PLUGIN_SOURCES : ["query", "plugin"];
   const source = binding.source;
   const descriptor = sourceDescriptor(source);
 
@@ -196,24 +191,16 @@ export function WidgetConfigDialog({
   const pluginEndpoint = pluginEndpoints.find((candidate) => candidate.id === binding.endpoint_id);
   const pluginParams = (binding.params ?? {}) as Record<string, unknown>;
 
-  // Which lists this source's controls need. Enabled only while the control is
-  // on screen, so opening the dialog for a statement fetches nothing.
   const params = paramsFor(source);
-  const needs = (kind: EntityKind) =>
-    open && params.some((p) => p.kind === "entity" && p.entity === kind);
 
+  // The initiative's spreadsheets, which a statement may read a range of.
+  // Fetched only while a statement is being written.
   const files = useFilesList(
     { file_type: FileType.sheet, initiative_id: initiativeId },
-    { enabled: needs("file") }
+    { enabled: open && source === "query" }
   );
-
-  const entityOptions = useMemo(
-    (): Record<EntityKind, { value: string; label: string }[]> => ({
-      file: (files.data?.items ?? []).map((file) => ({
-        value: String(file.id),
-        label: file.name,
-      })),
-    }),
+  const spreadsheets = useMemo(
+    () => (files.data?.items ?? []).map((file) => ({ id: file.id, name: file.name })),
     [files.data]
   );
 
@@ -365,14 +352,14 @@ export function WidgetConfigDialog({
                 thing to type: one comes from the widget's type, the other is a
                 choice among the reads the plug-in declares. */}
             {(readsPlugin ? [] : params).map((param) => (
-              <ParamControl
+              <QueryParam
                 key={param.key as string}
-                param={param}
                 binding={binding}
-                entityOptions={entityOptions}
                 initiativeId={initiativeId}
+                spreadsheets={spreadsheets}
                 onChange={setBindingValue}
-                onQueryStatus={setQueryStatus}
+                onStatus={setQueryStatus}
+                paramKey={param.key}
               />
             ))}
 
@@ -523,90 +510,6 @@ export function WidgetConfigDialog({
   );
 }
 
-/** One binding parameter, drawn from what the registry says it is. */
-function ParamControl({
-  param,
-  binding,
-  entityOptions,
-  initiativeId,
-  onChange,
-  onQueryStatus,
-}: {
-  param: SourceParam;
-  binding: WidgetBinding;
-  entityOptions: Record<EntityKind, { value: string; label: string }[]>;
-  initiativeId: number;
-  onChange: (patch: Partial<WidgetBinding>) => void;
-  onQueryStatus: (status: QueryStatus) => void;
-}) {
-  const { t } = useTranslation(["dashboards", "common"]);
-  const key = param.key as string;
-
-  switch (param.kind) {
-    case "entity": {
-      const entity = param as EntityParam;
-      const value = binding[param.key];
-      return (
-        <section className="space-y-2">
-          <Label>{t(`dashboards:bindingParam.${entity.entity}` as const)}</Label>
-          <Select
-            value={typeof value === "number" ? String(value) : entity.required ? "" : "all"}
-            onValueChange={(next) =>
-              onChange({
-                [param.key]: next === "all" ? null : Number(next),
-              } as Partial<WidgetBinding>)
-            }
-          >
-            <SelectTrigger>
-              <SelectValue placeholder={t("dashboards:config.choose")} />
-            </SelectTrigger>
-            <SelectContent>
-              {!entity.required && (
-                <SelectItem value="all">
-                  {t(`dashboards:config.all_${entity.entity}` as const)}
-                </SelectItem>
-              )}
-              {entityOptions[entity.entity].map((option) => (
-                <SelectItem key={option.value} value={option.value}>
-                  {option.label}
-                </SelectItem>
-              ))}
-            </SelectContent>
-          </Select>
-        </section>
-      );
-    }
-
-    case "sql":
-      return (
-        <QueryParam
-          binding={binding}
-          initiativeId={initiativeId}
-          onChange={onChange}
-          onStatus={onQueryStatus}
-          paramKey={param.key as keyof WidgetBinding}
-        />
-      );
-
-    default:
-      return (
-        <section className="space-y-2">
-          <Label htmlFor={`param-${key}`}>
-            {t(`dashboards:bindingParam.${key}` as const, { defaultValue: key })}
-          </Label>
-          <Input
-            id={`param-${key}`}
-            value={(binding[param.key] as string) ?? ""}
-            placeholder={param.kind === "text" ? param.placeholder : undefined}
-            onChange={(event) =>
-              onChange({ [param.key]: event.target.value } as Partial<WidgetBinding>)
-            }
-          />
-        </section>
-      );
-  }
-}
-
 /**
  * The widget, running against what the controls currently say.
  *
@@ -714,12 +617,14 @@ type QueryStatus = "ok" | "checking" | "refused";
 function QueryParam({
   binding,
   initiativeId,
+  spreadsheets,
   paramKey,
   onChange,
   onStatus,
 }: {
   binding: WidgetBinding;
   initiativeId: number;
+  spreadsheets: readonly { id: number; name: string }[];
   paramKey: keyof WidgetBinding;
   onChange: (patch: Partial<WidgetBinding>) => void;
   onStatus: (status: QueryStatus) => void;
@@ -796,7 +701,15 @@ function QueryParam({
 
       <TabsContent value="build" className="space-y-3">
         {spec ? (
-          <QueryBuilder spec={spec} onChange={setSpec} initiativeId={initiativeId} />
+          <QueryBuilder
+            spec={spec}
+            onChange={setSpec}
+            initiativeId={initiativeId}
+            spreadsheets={spreadsheets}
+            // Only the answer for this description: an earlier one's range
+            // would offer another range's columns.
+            sheet={built.isPlaceholderData ? undefined : built.data?.sheets?.[0]}
+          />
         ) : (
           <div className="space-y-2 rounded-lg border border-dashed p-3">
             <p className="text-muted-foreground text-xs">{t("dashboards:builder.notBuilt")}</p>
@@ -821,6 +734,8 @@ function QueryParam({
           checking={checking}
           columns={checking || shape.isError ? undefined : shape.data?.columns}
           error={checking ? undefined : shape.error}
+          spreadsheets={spreadsheets}
+          sheets={(spec ? built.data?.sheets : shape.data?.sheets) ?? []}
         />
       </TabsContent>
     </Tabs>
@@ -840,16 +755,26 @@ function StatementEditor({
   checking,
   columns,
   error,
+  spreadsheets,
+  sheets,
 }: {
   statement: string;
   onWrite: (next: string) => void;
   checking: boolean;
   columns?: { name: string }[];
   error?: unknown;
+  spreadsheets: readonly { name: string }[];
+  /** The ranges the statement read when it was last checked, by the name
+   *  each is read under. */
+  sheets: readonly QuerySheetDescription[];
 }) {
   const { t } = useTranslation(["dashboards", "common"]);
   const { datasets, functions, tokens } = useQueryVocabulary();
   const fields = useFieldCatalogs(datasets);
+  const ranges = useMemo(
+    () => sheets.map((read) => ({ dataset: read.alias, fields: read.fields })),
+    [sheets]
+  );
 
   return (
     <>
@@ -861,6 +786,8 @@ function StatementEditor({
         functions={functions}
         fields={fields}
         tokens={tokens}
+        ranges={ranges}
+        spreadsheets={spreadsheets.map((file) => file.name)}
         aria-describedby="widget-sql-answer"
       />
       <p id="widget-sql-answer" className="text-xs">

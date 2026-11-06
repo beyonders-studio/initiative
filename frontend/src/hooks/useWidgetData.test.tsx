@@ -19,14 +19,10 @@ type QueryHook = (...args: unknown[]) => QueryState;
 const idle: QueryState = { data: undefined, isLoading: false, isError: false };
 const useSqlQuery = vi.fn<QueryHook>(() => idle);
 const useWidgetQuery = vi.fn<QueryHook>(() => idle);
-const useFile = vi.fn<QueryHook>(() => idle);
 
 vi.mock("@/hooks/useSqlQuery", () => ({
   useSqlQuery: (...args: unknown[]) => useSqlQuery(...args),
   useWidgetQuery: (...args: unknown[]) => useWidgetQuery(...args),
-}));
-vi.mock("@/hooks/useFiles", () => ({
-  useFile: (...args: unknown[]) => useFile(...args),
 }));
 // Mocked like every other sibling: this file is about how a binding becomes a
 // request, and the app hooks reach for community context a bare renderHook has no
@@ -48,7 +44,6 @@ const run = (binding: WidgetBinding, initiativeId: number | undefined) =>
 
 beforeEach(() => {
   useSqlQuery.mockClear();
-  useFile.mockClear();
 });
 
 describe("a query binding", () => {
@@ -111,22 +106,6 @@ describe("a query binding", () => {
     });
     expect(result.current.meta?.truncated).toBe(true);
     useSqlQuery.mockReturnValue(idle);
-  });
-});
-
-describe("a sheet-range binding", () => {
-  it("asks for nothing until it has both a file and a range", () => {
-    const { result } = run({ source: "sheet_range", file_id: 3 }, 4);
-    expect(result.current.isUnbound).toBe(true);
-  });
-
-  it("treats a file in another initiative as absent, not readable", () => {
-    // Bindings do not reach across initiatives; an id pointing elsewhere
-    // resolves the same way a deleted or unshared one does.
-    useFile.mockReturnValue({ ...idle, data: { initiative_id: 99, content: null } });
-    const { result } = run({ source: "sheet_range", file_id: 3, range: "A1:B2" }, 4);
-    expect(result.current.isRestricted).toBe(true);
-    useFile.mockReturnValue(idle);
   });
 });
 

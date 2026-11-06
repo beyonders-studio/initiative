@@ -46,7 +46,6 @@
   },
   "bindingSource": {
     "query": "Requête SQL",
-    "sheet_range": "Plage de feuille",
     "plugin": "Données du plug-in"
   },
   "gallery": {
@@ -88,7 +87,6 @@
     "widgetTitle": "Titre",
     "widgetTitlePlaceholder": "Laissez vide pour utiliser le nom du widget",
     "source": "Source de données",
-    "choose": "Choisir…",
     "preview": "Aperçu",
     "previewHint": "Vos propres données, telles que le widget les dessinera.",
     "sectionBinding": "Données",
@@ -98,7 +96,6 @@
     "all_calendar": "Tous les calendriers",
     "all_counter_group": "Tous les groupes de compteurs",
     "all_counter": "Tous les compteurs",
-    "all_file": "Toutes les feuilles de calcul",
     "pluginEndpoint": "Ce qu'il lit",
     "plugin": "Plug-in",
     "pluginPlaceholder": "Choisir un plug-in",
@@ -108,7 +105,7 @@
     "pluginParamNeedsSibling": "Choisissez d'abord la valeur ci-dessus.",
     "pluginParamListHint": "Séparez les valeurs par des virgules.",
     "all_property": "Aucune métadonnée ni propriété",
-    "sqlHelp": "Un SELECT en lecture seule sur les données de cette communauté. Il s'exécute en votre nom et ne renvoie donc que ce que vous pouvez déjà voir."
+    "sqlHelp": "Un SELECT en lecture seule sur les données de cette communauté. Il s'exécute en votre nom et ne renvoie donc que ce que vous pouvez déjà voir. sheet('Budget', 'Sheet1!A1:D') lit une plage d'une feuille de calcul."
   },
   "picker": {
     "title": "Ajouter un widget",
@@ -136,7 +133,6 @@
     "display": "Affichage",
     "refresh": "Actualiser",
     "open": "Voir d'où viennent ces données",
-    "restricted": "Accès refusé",
     "me": "Moi",
     "cappedHint": "Plus de lignes correspondent qu'un widget n'en charge d'un coup ; voici les {{count}} premières.",
     "rows_task_one": "{{count}} tâche",
@@ -238,14 +234,6 @@
     "column": "Colonne",
     "card": "Carte"
   },
-  "bindingParam": {
-    "file": "Feuille de calcul",
-    "sheet": "Feuille",
-    "range": "Plage",
-    "plugin_uid": "Plug-in",
-    "source_id": "Source de données du plug-in",
-    "sql": "Instruction"
-  },
   "slot": {
     "label": "Libellé",
     "value": "Valeur",
@@ -262,6 +250,11 @@
   },
   "builder": {
     "dataset": "Afficher les données de",
+    "spreadsheet": "Feuille de calcul",
+    "sheet": "Feuille",
+    "firstSheet": "Première feuille visible",
+    "range": "Plage",
+    "rangeHelp": "Laissez vide pour toute la feuille. A:D lit les colonnes A à D, jusqu'à la dernière ligne remplie.",
     "columns": "Afficher",
     "addColumn": "Ajouter une colonne",
     "removeColumn": "Retirer cette colonne",

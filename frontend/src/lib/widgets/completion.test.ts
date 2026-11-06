@@ -248,3 +248,43 @@ describe("reaching through a relation", () => {
     expect(applied.caret).toBe(16);
   });
 });
+
+describe("reading a spreadsheet", () => {
+  const RANGE: DatasetFields = {
+    dataset: "b",
+    fields: [
+      { name: "Region", type: "text" },
+      { name: "Amount", type: "number" },
+    ],
+  };
+
+  it("offers the spreadsheets by name inside the quote that opens one", () => {
+    const text = "SELECT x FROM sheet('Bu";
+    const found = wordAt(text, text.length);
+    expect(found).toEqual({ word: "Bu", start: text.length - 2, quoted: true });
+    const offered = completionsFor(found?.word ?? "", {
+      ...vocabulary,
+      spreadsheets: ["Budget", "Q3 Budget", "Roster"],
+      quoted: true,
+    });
+    expect(offered.map((entry) => entry.name)).toEqual(["Budget", "Q3 Budget"]);
+    expect(applyCompletion(text, found?.start ?? 0, text.length, offered[1]).text).toBe(
+      "SELECT x FROM sheet('Q3 Budget'"
+    );
+    expect(applyCompletion("sheet('", 7, 7, { name: "Jo's sheet", kind: "spreadsheet" }).text).toBe(
+      "sheet('Jo''s sheet'"
+    );
+  });
+
+  it("offers a range's columns bare and under the name it is read under", () => {
+    const named = datasetsNamed("SELECT re FROM tasks", DATASETS);
+    expect(
+      completionsFor("re", { ...vocabulary, named, ranges: [RANGE] }).map((entry) => entry.name)
+    ).toContain("Region");
+    expect(
+      completionsFor("", { ...vocabulary, qualifier: "b", ranges: [RANGE] }).map(
+        (entry) => entry.name
+      )
+    ).toEqual(["Region", "Amount"]);
+  });
+});
