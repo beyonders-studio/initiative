@@ -55,7 +55,6 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - **Imports and exports are one list in the API.** `GET /c/{id}/data-jobs/` and `GET /c/{id}/data-jobs/{job_id}` replace reading jobs from `/imports/jobs` and `/exports/jobs`; each job says its `direction`. A notification about an export made before the upgrade no longer opens it.
 - **Moving operations work clears the community it leaves.** Picking a different community on **Settings → Platform → Intake** leaves the old one's cases as ordinary tasks, but deletes their attachments, clears its project choices and takes the cases out of requesters' **My Tickets**. Choosing no community keeps everything for when you pick it again.
 - **Smaller downloads.** The app's JSON, text and SVG go out compressed to browsers that accept it.
-- **For plug-in authors:** this release serves plug-in API 10.0, so a plug-in installs or updates only from a release built with initiative-plugin-sdk 10.0. Installed plug-ins keep working.
 
 ### Removed
 
