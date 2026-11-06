@@ -1,9 +1,10 @@
 #!/usr/bin/env bash
-# Seed TTRPG dev data
+# Seed TTRPG dev data, into this checkout's dev database
 set -e
 SCRIPT_DIR="$(cd "$(dirname "$0")" && pwd)"
 cd "$SCRIPT_DIR/../backend"
 
+. "$SCRIPT_DIR/dev-ports.sh"
 . "$SCRIPT_DIR/dev-owner.sh"
 
 source .venv/bin/activate

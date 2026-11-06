@@ -21,28 +21,32 @@ BACKEND_DIR = Path(__file__).resolve().parents[1]
 DEV_PORTS_SH = BACKEND_DIR.parent / "scripts" / "dev-ports.sh"
 
 
+#: What dev-ports.sh decides beside the port: a worktree whose branch changes
+#: migrations runs on a database of its own, with role names of its own.
+DATABASE_VARIABLES = ("DATABASE_NAME", "GUILD_ROLE_PREFIX", "PLATFORM_ROLE_PREFIX")
+
+
 def dev_port() -> int:
-    """This checkout's backend port, straight from dev-ports.sh.
+    """This checkout's backend port, straight from dev-ports.sh, which also puts
+    the database this checkout runs on into the environment.
 
     An explicit DEV_BACKEND_PORT wins, exactly as it does in the shell scripts.
     """
-    pinned = os.environ.get("DEV_BACKEND_PORT")
-    if pinned:
-        return int(pinned)
-
+    names = ("DEV_BACKEND_PORT", *DATABASE_VARIABLES)
+    printed = "; ".join(f'printf "%s\\n" "${{{name}:-}}"' for name in names)
     result = subprocess.run(
-        [
-            "bash",
-            "-c",
-            f'. {shlex.quote(str(DEV_PORTS_SH))}; printf "%s" "${{DEV_BACKEND_PORT:-}}"',
-        ],
+        ["bash", "-c", f". {shlex.quote(str(DEV_PORTS_SH))}; {printed}"],
         capture_output=True,
         text=True,
     )
     # dev-ports.sh explains itself on stderr when it cannot resolve a port.
     if result.stderr:
         print(result.stderr, end="", file=sys.stderr)
-    port = result.stdout.strip()
+    values = dict(zip(names, result.stdout.split("\n")))
+    for name in DATABASE_VARIABLES:
+        if values.get(name):
+            os.environ.setdefault(name, values[name])
+    port = values.get("DEV_BACKEND_PORT")
     if not port:
         raise SystemExit("dev_api: no port for this checkout — see above.")
     return int(port)

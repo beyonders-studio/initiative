@@ -81,6 +81,10 @@ package = false
 # logger rather than formatted into the message).
 extend-select = ["G"]
 
+[tool.ruff.lint.per-file-ignores]
+# conftest gives the suite its SECRET_KEY before the app loads its settings.
+"conftest.py" = ["E402"]
+
 [tool.ty.rules]
 # Full default rule set is enforced (CI runs `scripts/ci/check ty`).
 # Only the rules below are off, because SQLModel models don't use Mapped[]

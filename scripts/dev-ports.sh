@@ -26,6 +26,33 @@ if [ -z "${DEV_CHECKOUT_ID:-}" ]; then
     fi
 fi
 
+# The main checkout. A linked worktree runs on its Postgres through its compose
+# file (and the .env beside it), and reads its backend/.env (app/core/config.py),
+# so none of them is copied in.
+DEV_MAIN_ROOT="$(git -C "$DEV_PORTS_ROOT" rev-parse --path-format=absolute --git-common-dir 2>/dev/null || true)"
+DEV_MAIN_ROOT="${DEV_MAIN_ROOT%/.git}"
+[ -d "$DEV_MAIN_ROOT/.git" ] || DEV_MAIN_ROOT="$DEV_PORTS_ROOT"
+export DEV_MAIN_ROOT
+export COMPOSE_FILE="${COMPOSE_FILE:-$DEV_MAIN_ROOT/docker-compose.yml}"
+
+# A worktree shares the main checkout's dev database unless its branch changes
+# migrations, committed or not. Then it gets a database of its own on the same
+# server, and role names of its own since roles are cluster-wide, so its
+# migrations never reach the database every other checkout runs on.
+# scripts/dev-database.sh creates it; drop_test_dbs.py --orphaned drops it once
+# the worktree is gone.
+if [ "$DEV_CHECKOUT_ID" != main ] && [ -z "${DATABASE_NAME:-}" ]; then
+    dev_base="$(git -C "$DEV_PORTS_ROOT" merge-base HEAD origin/dev 2>/dev/null || true)"
+    if [ -n "$dev_base" ] && {
+        [ -n "$(git -C "$DEV_PORTS_ROOT" diff --name-only "$dev_base" -- backend/alembic/versions)" ] ||
+            [ -n "$(git -C "$DEV_PORTS_ROOT" ls-files --others --exclude-standard -- backend/alembic/versions)" ]
+    }; then
+        export DATABASE_NAME="initiative_dev_$DEV_CHECKOUT_ID"
+        export GUILD_ROLE_PREFIX="dev_${DEV_CHECKOUT_ID}_"
+        export PLATFORM_ROLE_PREFIX="dev_${DEV_CHECKOUT_ID}_"
+    fi
+fi
+
 # Offsets are handed out by a small registry rather than derived from the path.
 # A digest would have to collide eventually — across a few dozen worktrees over
 # any range that keeps the ports tidy it is likelier than not — and two

@@ -36,6 +36,12 @@ from starlette.testclient import TestClient
 from sqlmodel import SQLModel
 from sqlmodel.ext.asyncio.session import AsyncSession
 
+# The suite needs no .env: it runs with this test-only key unless SECRET_KEY is
+# exported. 64 hex characters; not a secret.
+os.environ.setdefault(
+    "SECRET_KEY", "5b0e9c2d7a41f8e3c6b5d4a29f1e0c7b8a6d5e4f3c2b1a09f8e7d6c5b4a39281"
+)
+
 from app.core.config import settings
 from app.api import content_socket
 from app.core.rate_limit import limiter

@@ -35,7 +35,7 @@ A realistic, TTRPG-themed dataset that exercises the whole app. See `scripts/see
 
 The bootstrap owner from your `.env` (`FIRST_OWNER_EMAIL`) is also available with its configured password.
 
-The seeder records the accounts it created in `.vscode/.dev_seed_ids.json` (gitignored). Cleanup does not need it: it drops every community schema and wipes the shared rows.
+The seeder reads from the database whether it has seeded it, so a recreated volume is seeded again. Cleanup drops every community schema and wipes the shared rows.
 
 ### Manual Setup
 
