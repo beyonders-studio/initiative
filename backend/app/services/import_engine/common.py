@@ -206,8 +206,9 @@ def decode_property_value(
     string — and a member of the target initiative either way, because a
     property on a task in an initiative points at somebody in it.
 
-    Returns ``None`` when a user reference places nobody — the caller skips
-    that one value, and the property reads as empty.
+    Returns ``None`` when a user reference places nobody, and for a signature,
+    which an import signs for nobody — the caller skips that one value, and
+    the property reads as empty.
     """
     t = pv.property_type
     if t in (MetadataType.text, MetadataType.url, MetadataType.select):

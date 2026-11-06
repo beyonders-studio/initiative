@@ -23,6 +23,7 @@
     "scale": "Escala",
     "counter": "Contador",
     "file": "Archivo",
+    "signature": "Firma",
     "link": "Enlace",
     "badge": "Insignia",
     "json": "Datos"
@@ -66,11 +67,18 @@
     "stepUp": "Subir {{name}} un paso",
     "reset": "Restablecer {{name}}",
     "newFile": "Nuevo archivo",
-    "fileUnavailable": "Un archivo que no puedes abrir"
+    "fileUnavailable": "Un archivo que no puedes abrir",
+    "sign": "Firmar",
+    "signTitle": "Firmar {{name}}",
+    "signStatement": "Al escribir tu nombre y firmar, añades tu firma a este elemento tal como está ahora. Queda registrada con tu cuenta.",
+    "signNameLabel": "Tu nombre",
+    "signingAs": "Firmando como {{name}}"
   },
   "cell": {
     "emptyValue": "—",
-    "none": "Ninguno"
+    "none": "Ninguno",
+    "signed": "{{name}}, {{date}}",
+    "updatedAfterSigning": "Actualizado después de la firma"
   },
   "manager": {
     "title": "Metadatos",

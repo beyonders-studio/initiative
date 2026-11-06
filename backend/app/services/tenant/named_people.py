@@ -59,7 +59,7 @@ from app.models.tenant.initiative import (
     InitiativeRule,
 )
 from app.models.tenant.calendar_event import CalendarEvent, CalendarEventAttendee
-from app.models.tenant.metadata import MetadataValue
+from app.models.tenant.metadata import MetadataDefinition, MetadataType, MetadataValue
 from app.models.tenant.resource_grant import ResourceGrant
 from app.models.tenant.task import Task, TaskAssignee
 from app.services.membership import live_membership_clause
@@ -365,6 +365,15 @@ PERSON_REFS: dict[Tool, tuple[PersonRef, ...]] = {
 }
 
 
+#: A value that names a person, rather than a signature, which records who
+#: signed and keeps them.
+_NAMING = MetadataValue.property_id.not_in(
+    sa_select(MetadataDefinition.id).where(
+        MetadataDefinition.type == MetadataType.signature
+    )
+)
+
+
 def _property_ref(tool: Tool) -> PersonRef | None:
     """A person-valued property on anything ``tool`` governs: the tool row
     itself and every sub-tool row inside it, read from the properties seam. A
@@ -378,7 +387,7 @@ def _property_ref(tool: Tool) -> PersonRef | None:
         return None
 
     def within(gid: int) -> ColumnElement[bool]:
-        return or_(
+        return _NAMING & or_(
             *(
                 and_(
                     MetadataValue.entity_type == spec.target,
@@ -434,7 +443,7 @@ async def sweep_collections(
     guild_id = routed_guild_id(session)
     if guild_id is None:
         raise RuntimeError("people are named on content inside a community")
-    on = MetadataValue.entity_type == link_for(Collection).target
+    on = (MetadataValue.entity_type == link_for(Collection).target) & _NAMING
     unreadable = or_(
         *(
             and_(

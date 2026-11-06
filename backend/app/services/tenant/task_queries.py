@@ -46,10 +46,7 @@ from app.models.platform.guild import Guild
 from app.models.platform.user import User
 from app.models.tenant.comment import Comment, in_thread
 from app.models.tenant.project import Project
-from app.models.tenant.metadata import (
-    MetadataDefinition,
-    MetadataType,
-)
+from app.models.tenant.metadata import PERSON_TYPES, MetadataDefinition
 from app.models.tenant.relationship import EntityRelationship
 from app.models.tenant.task import RecurrenceStrategy, Task, TaskAssignee, TaskPriority
 from app.schemas.query import FilterCondition, FilterGroup, FilterOp, SortDir
@@ -1001,7 +998,7 @@ def read_person_filters(q: TaskListQuery) -> None:
                 defn = None
             if (
                 defn is not None
-                and defn.type is MetadataType.user_reference
+                and defn.type in PERSON_TYPES
                 and cond.value.get("value") is not None
             ):
                 cond.value = {

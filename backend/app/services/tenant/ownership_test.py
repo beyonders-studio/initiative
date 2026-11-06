@@ -1,9 +1,12 @@
 """Ownership: what it is, where it lives, and what happens when someone leaves."""
 
+from datetime import datetime, timezone
+
 from sqlmodel import select
 
 from app.core.tools import Tool
 from app.models.tenant._mixins import CreatedByMixin
+from app.models.tenant.metadata import MetadataType
 from app.models.tenant.resource_grant import ResourceAccessLevel, ResourceGrant
 from app.services.tenant import ownership as ownership_service
 from app.services.tenant import initiatives as initiatives_service
@@ -14,6 +17,8 @@ from app.testing import (
     create_guild_membership,
     create_initiative,
     create_initiative_member,
+    create_property_definition,
+    create_property_value,
     create_user,
     route_session_to_guild,
 )
@@ -167,7 +172,8 @@ async def test_departure_leaves_every_tool_unowned(session):
 
 
 async def test_departure_does_not_touch_authorship(session):
-    """The author wrote it; leaving does not change who did."""
+    """The author wrote it, and the signer signed it; leaving does not change
+    who did. A person field naming them is emptied."""
     admin = await create_user(session)
     guild = await create_guild(session, creator=admin)
     leaver = await create_user(session)
@@ -177,6 +183,19 @@ async def test_departure_does_not_touch_authorship(session):
 
     rows = await _one_of_every_tool(session, initiative, leaver)
     authors = {tool: row.created_by for tool, row in rows.items()}
+    signed, named = [
+        await create_property_value(
+            session,
+            rows[Tool.project],
+            await create_property_definition(
+                session, initiative, name=kind.value, type=kind
+            ),
+            value_user_id=leaver.id,
+            value_text="L.",
+            value_datetime=datetime.now(timezone.utc),
+        )
+        for kind in (MetadataType.signature, MetadataType.user_reference)
+    ]
 
     await initiatives_service.remove_user_from_guild_initiatives(
         session, guild_id=guild.id, user_id=leaver.id
@@ -189,6 +208,9 @@ async def test_departure_does_not_touch_authorship(session):
         assert rows[tool].created_by == expected, (
             f"{tool.value} authorship changed on departure"
         )
+    await session.refresh(signed)
+    await session.refresh(named)
+    assert (signed.value_user_id, named.value_user_id) == (leaver.id, None)
 
 
 async def test_transfer_moves_every_tool(session):

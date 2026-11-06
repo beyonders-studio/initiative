@@ -33,6 +33,7 @@ from app.models.platform.guild import CommunityRole
 from app.models.tenant.initiative import Initiative
 from app.models.tenant.metadata import MetadataType, MetadataValue
 from app.models.tenant.task import Task
+from app.services import audit as audit_service
 from app.services.tenant.metadata import PROPERTY_LINKS
 from app.testing import (
     Actor,
@@ -618,6 +619,63 @@ async def test_a_file_field_holds_one_file_of_its_initiative_until_it_is_purged(
     assert held.value_file_id is None
 
 
+async def test_a_signature_is_its_writers_and_stays_until_it_is_cleared(
+    client: AsyncClient, session: AsyncSession, acting_user, monkeypatch
+):
+    """Writing a signature's typed name signs it as the writer, now, without
+    the item reading as updated, and records the signing. A replace of every
+    value that doesn't name it keeps it, someone else signing replaces it,
+    and null clears it."""
+    lines: list[dict] = []
+    monkeypatch.setattr(audit_service, "_write", lines.append)
+    a, project = await _scene(TASKS, session, acting_user)
+    b = await acting_user(guild_role=CommunityRole.admin, guild=a.guild)
+    task = await TASKS.make(session, a, project, "E")
+    defn = await create_property_definition(
+        session, a.initiative, name="Approved", type=MetadataType.signature
+    )
+    before = await client.get(a.g(f"/tasks/{task}"), headers=a.headers)
+
+    signed = await _write(
+        client,
+        a,
+        TASKS,
+        task,
+        [{"property_id": defn.id, "value": " Ada L. "}],
+        merge=True,
+    )
+    assert signed.status_code == 200, signed.text
+    value = _values(signed.json())[defn.id]
+    assert (value["user"]["id"], value["name"]) == (a.user.id, "Ada L.")
+    after = await client.get(a.g(f"/tasks/{task}"), headers=a.headers)
+    assert after.json()["updated_at"] == before.json()["updated_at"]
+    assert after.json()["updated_at"] < value["signed_at"]
+    [line] = [x for x in lines if x["event_type"] == "signature.signed"]
+    assert (line["actor_user_id"], line["target"], line["detail"]) == (
+        a.user.id,
+        {"type": "task", "id": task},
+        {"property_id": defn.id},
+    )
+
+    kept = await _write(client, a, TASKS, task, [])
+    assert _values(kept.json())[defn.id] == value
+
+    resigned = await _write(
+        client,
+        b,
+        TASKS,
+        task,
+        [{"property_id": defn.id, "value": "Grace H."}],
+        merge=True,
+    )
+    assert _values(resigned.json())[defn.id]["user"]["id"] == b.user.id
+
+    cleared = await _write(
+        client, b, TASKS, task, [{"property_id": defn.id, "value": None}], merge=True
+    )
+    assert _values(cleared.json())[defn.id] is None
+
+
 # ---------------------------------------------------------------------------
 # A definition stays in its initiative; an entity stays in its community
 # ---------------------------------------------------------------------------
@@ -1027,7 +1085,20 @@ async def test_duplicating_a_task_in_its_project_carries_its_values(
     defn = await create_property_definition(
         session, a.initiative, name="Tag", type=MetadataType.text
     )
-    await _write(client, a, TASKS, task, [{"property_id": defn.id, "value": "carry"}])
+    # The copy was never signed.
+    signature = await create_property_definition(
+        session, a.initiative, name="Approved", type=MetadataType.signature
+    )
+    await _write(
+        client,
+        a,
+        TASKS,
+        task,
+        [
+            {"property_id": defn.id, "value": "carry"},
+            {"property_id": signature.id, "value": "Ada L."},
+        ],
+    )
 
     duplicated = await client.post(a.g(f"/tasks/{task}/duplicate"), headers=a.headers)
 

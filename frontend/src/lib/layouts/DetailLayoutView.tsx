@@ -59,7 +59,7 @@ import {
 import { LAYOUT_PARTS, type LayoutContext, type LayoutNode, type Parts, renderNode } from "./tree";
 
 /** What every kind of item drawn on a detail has. */
-type Item = PluginItem & { properties: PropertySummary[] };
+type Item = PluginItem & { properties: PropertySummary[]; updated_at?: string };
 
 /** Where one item lives, which the parts every item's detail has read. */
 export interface ItemHome<I, P> {
@@ -150,6 +150,7 @@ const propertiesOf = (item: Item, home: ItemHome<Item, unknown>) => ({
   initiativeId: home.initiativeId,
   canOpen: home.canOpen,
   owner: home.owner,
+  updatedAt: item.updated_at,
 });
 
 /** One field, by its id: one of its initiative's properties, a plug-in's, or

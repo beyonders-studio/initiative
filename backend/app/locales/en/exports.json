@@ -101,7 +101,8 @@
   },
   "values": {
     "yes": "Yes",
-    "no": "No"
+    "no": "No",
+    "signed": "Signed by {{name}}, {{date}}"
   },
   "contacts": {
     "name": "Name",

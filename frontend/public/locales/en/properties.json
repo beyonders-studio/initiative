@@ -23,6 +23,7 @@
     "scale": "Scale",
     "counter": "Counter",
     "file": "File",
+    "signature": "Signature",
     "link": "Link",
     "badge": "Badge",
     "json": "Data"
@@ -66,11 +67,18 @@
     "stepUp": "Step {{name}} up",
     "reset": "Reset {{name}}",
     "newFile": "New file",
-    "fileUnavailable": "A file you can't open"
+    "fileUnavailable": "A file you can't open",
+    "sign": "Sign",
+    "signTitle": "Sign {{name}}",
+    "signStatement": "Typing your name and signing adds your signature to this item as it is now. It's recorded under your account.",
+    "signNameLabel": "Your name",
+    "signingAs": "Signing as {{name}}"
   },
   "cell": {
     "emptyValue": "—",
-    "none": "None"
+    "none": "None",
+    "signed": "{{name}}, {{date}}",
+    "updatedAfterSigning": "Updated after signing"
   },
   "manager": {
     "title": "Metadata",

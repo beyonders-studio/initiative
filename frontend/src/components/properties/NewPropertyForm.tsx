@@ -37,6 +37,7 @@ export const PROPERTY_TYPES: MetadataType[] = [
   MetadataType.scale,
   MetadataType.counter,
   MetadataType.file,
+  MetadataType.signature,
 ];
 
 /**

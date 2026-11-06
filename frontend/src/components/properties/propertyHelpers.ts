@@ -197,6 +197,20 @@ export const fileFieldValue = (raw: unknown): FileFieldValue | null =>
     ? (raw as FileFieldValue)
     : null;
 
+/** A signature as the server reads it back: who signed (their id alone where
+ *  the reader cannot see them, nobody where their account is gone), the name
+ *  they typed, and when. */
+export interface SignatureValue {
+  user: MemberLike | null;
+  name: string;
+  signed_at: string;
+}
+
+export const signatureValue = (raw: unknown): SignatureValue | null =>
+  raw && typeof raw === "object" && typeof (raw as { signed_at?: unknown }).signed_at === "string"
+    ? (raw as SignatureValue)
+    : null;
+
 /** Convert a server ``PropertySummary.value`` into the shape an edited value
  *  takes: ``user_reference`` and ``file`` collapse to their numeric id
  *  (``PropertyInput`` round-trips the id), everything else passes through. */

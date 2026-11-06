@@ -37,6 +37,8 @@ class AuditCategory(str, Enum):
     #: Accounts and communities arriving and leaving, and data moved in
     #: bulk — exported, or destroyed.
     LIFECYCLE = "lifecycle"
+    #: What members attest to in a community's content: a signature.
+    CONTENT = "content"
 
 
 class AuditEventType(str, Enum):
@@ -456,6 +458,9 @@ class AuditEventType(str, Enum):
     #: Rows gone past recovery: one item purged from the trash by an admin,
     #: or a community's sweep, which carries counts and no actor.
     TRASH_PURGED = "trash.purged", AuditCategory.LIFECYCLE
+    #: A member signed a signature field on an item: ``target_type`` and
+    #: ``target_id`` name the item, ``detail.property_id`` the field.
+    SIGNATURE_SIGNED = "signature.signed", AuditCategory.CONTENT
     #: A personal API key is a credential, so it sits with the rest of them
     #: under authentication.
     API_KEY_CREATED = "api_key.created", AuditCategory.AUTHENTICATION
