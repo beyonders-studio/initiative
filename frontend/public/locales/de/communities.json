@@ -162,12 +162,14 @@
     "communityRole": {
       "admin": "Administrator",
       "member": "Mitglied",
-      "superadmin": "Superadmin"
+      "superadmin": "Superadmin",
+      "guest": "Gast"
     },
     "communityRoleHelp": {
       "member": "Nimmt an dem teil, wozu die Person hinzugefügt wurde.",
       "admin": "Führt die Community — Mitglieder, Einladungen, Initiativen, Einstellungen.",
-      "superadmin": "All das, plus wie Leute hereinkommen: Anmeldung, KI und Plug-ins. Nur ein Superadmin kann einen weiteren ernennen."
+      "superadmin": "All das, plus wie Leute hereinkommen: Anmeldung, KI und Plug-ins. Nur ein Superadmin kann einen weiteren ernennen.",
+      "guest": "Für eine festgelegte Anzahl von Tagen hier und sieht nur, was die Einladung gegeben hat."
     },
     "loadingSettings": "Einstellungen werden geladen…",
     "unableToLoadSettings": "Einstellungen konnten nicht geladen werden.",
@@ -201,6 +203,7 @@
     "userIdColumn": "Benutzer-ID",
     "userColumn": "Benutzer",
     "communityRoleColumn": "Community-Rolle",
+    "communityRolePickerLabel": "Community-Rolle für {{name}}",
     "sourceColumn": "Quelle",
     "actionsColumn": "Aktionen",
     "sourceOidc": "OIDC",

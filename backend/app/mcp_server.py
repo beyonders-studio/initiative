@@ -280,6 +280,9 @@ _ROUTE_MAPS = [
         pattern=r".*/collections/.*",
         mcp_type=MCPType.EXCLUDE,
     ),
+    # Nor are imports, and importing contacts would otherwise read as creating
+    # one.
+    RouteMap(methods=["POST"], pattern=r".*/imports/.*", mcp_type=MCPType.EXCLUDE),
     *_WRITE_ROUTE_MAPS,
     *_COMMENT_READ_ROUTE_MAPS,
     *_SEARCH_READ_ROUTE_MAPS,

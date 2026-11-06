@@ -162,12 +162,14 @@
     "communityRole": {
       "admin": "Administrador",
       "member": "Miembro",
-      "superadmin": "Superadministrador"
+      "superadmin": "Superadministrador",
+      "guest": "Invitado"
     },
     "communityRoleHelp": {
       "member": "Participa en aquello a lo que se le añade.",
       "admin": "Dirige la comunidad: miembros, invitaciones, iniciativas, ajustes.",
-      "superadmin": "Todo eso, y además cómo entra la gente: inicio de sesión, IA y complementos. Solo un superadministrador puede nombrar a otro."
+      "superadmin": "Todo eso, y además cómo entra la gente: inicio de sesión, IA y complementos. Solo un superadministrador puede nombrar a otro.",
+      "guest": "Está aquí durante un número fijo de días y solo ve lo que le dio su invitación."
     },
     "loadingSettings": "Cargando configuración…",
     "unableToLoadSettings": "No se pudo cargar la configuración.",
@@ -201,6 +203,7 @@
     "userIdColumn": "ID de usuario",
     "userColumn": "Usuario",
     "communityRoleColumn": "Rol en la comunidad",
+    "communityRolePickerLabel": "Rol en la comunidad de {{name}}",
     "sourceColumn": "Origen",
     "actionsColumn": "Acciones",
     "sourceOidc": "OIDC",

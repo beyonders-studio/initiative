@@ -2210,7 +2210,7 @@
   },
   "customRoles": {
     "title": "Roles",
-    "description": "A custom role gives a member part of running the community, or narrows an admin to part of it. Each person holds one at most.",
+    "description": "Everyone here holds one of the built-in roles. A custom role gives a member part of running the community, or narrows an admin to part of it. Each person holds one custom role at most.",
     "add": "Add role",
     "addTitle": "Add a role",
     "editTitle": "Edit {{name}}",
@@ -2229,7 +2229,7 @@
     "surfacesLabel": "What it holds",
     "notYours": "You don't hold this yourself, so you can't give it.",
     "holdsNothing": "Holds nothing yet.",
-    "empty": "This community has no custom roles.",
+    "builtIn": "Built-in",
     "loading": "Loading roles",
     "loadError": "Couldn't load the roles.",
     "closed": "Whoever runs this server has closed custom roles for this community. The roles it has keep applying.",

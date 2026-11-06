@@ -2210,7 +2210,7 @@
   },
   "customRoles": {
     "title": "Roles",
-    "description": "Un rol personalizado da a un miembro parte de la gestión de la comunidad, o limita a un administrador a una parte de ella. Cada persona tiene uno como máximo.",
+    "description": "Todos aquí tienen uno de los roles integrados. Un rol personalizado da a un miembro parte de la gestión de la comunidad, o limita a un administrador a una parte de ella. Cada persona tiene como máximo un rol personalizado.",
     "add": "Añadir rol",
     "addTitle": "Añadir un rol",
     "editTitle": "Editar {{name}}",
@@ -2229,7 +2229,7 @@
     "surfacesLabel": "Qué incluye",
     "notYours": "No tienes esto tú mismo, así que no puedes darlo.",
     "holdsNothing": "Aún no incluye nada.",
-    "empty": "Esta comunidad no tiene roles personalizados.",
+    "builtIn": "Integrado",
     "loading": "Cargando roles",
     "loadError": "No se pudieron cargar los roles.",
     "closed": "Quien administra este servidor ha desactivado los roles personalizados para esta comunidad. Los roles que tiene siguen aplicándose.",
