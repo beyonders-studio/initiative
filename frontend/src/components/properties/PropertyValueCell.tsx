@@ -23,7 +23,9 @@ import {
   fileFieldValue,
   isEmptyPropertyValue,
   numericValue,
+  type SignatureValue,
   scaleValue,
+  signatureValue,
   steppedCount,
 } from "./propertyHelpers";
 import { iconForPropertyType } from "./propertyTypeIcons";
@@ -65,6 +67,9 @@ export interface PropertyValueCellProps {
   /** Steps a counter, where the reader may change it here, answering with
    *  the item's values as the server then holds them. */
   onStep?: (up: boolean) => Promise<PropertySummary[]>;
+  /** When the item last changed, on its own page, which a signature made
+   *  before it says. */
+  updatedAt?: string | null;
 }
 
 const formatNumber = (raw: unknown, options?: Intl.NumberFormatOptions): string => {
@@ -336,6 +341,44 @@ export const extractUser = (raw: unknown): UserValue | null => {
   return null;
 };
 
+/** A person's avatar, at a cell's size. */
+const PersonAvatar = ({ user, name }: { user: UserValue; name: string }) => {
+  const src = getAvatarSrc(user);
+  return (
+    <Avatar className="h-5 w-5 text-3xs">
+      {src ? <AvatarImage src={src} alt={name} /> : null}
+      <AvatarFallback userId={user.id}>{getInitialsForUser(user)}</AvatarFallback>
+    </Avatar>
+  );
+};
+
+/** A signature: the signer's avatar, the name they typed and when. Given
+ *  when the item last changed, on its own page, it says whether that was
+ *  after the signing. */
+export const SignatureName = ({
+  signature,
+  updatedAt,
+}: {
+  signature: SignatureValue;
+  updatedAt?: string | null;
+}) => {
+  const { t } = useTranslation("properties");
+  const signed = new Date(signature.signed_at);
+  return (
+    <span className="inline-flex min-w-0 max-w-full flex-wrap items-center gap-x-2 gap-y-1">
+      <span className="inline-flex min-w-0 max-w-full items-center gap-2">
+        <PersonAvatar user={signature.user} name={signature.name} />
+        <span className="truncate">
+          {t("cell.signed", { name: signature.name, date: formatDateTime(signature.signed_at) })}
+        </span>
+      </span>
+      {updatedAt && new Date(updatedAt) > signed ? (
+        <span className="text-muted-foreground text-xs">{t("cell.updatedAfterSigning")}</span>
+      ) : null}
+    </span>
+  );
+};
+
 /**
  * Render a single PropertySummary value in either a `cell` (table) or
  * `chip` (card) layout. Empty values render an em-dash in `cell` mode and
@@ -349,6 +392,7 @@ export const PropertyValueCell = ({
   display,
   oneLine = false,
   onStep,
+  updatedAt,
 }: PropertyValueCellProps) => {
   const { t } = useTranslation("properties");
   const options = useMemo(() => coerceOptionMap(summary?.options), [summary?.options]);
@@ -511,13 +555,9 @@ export const PropertyValueCell = ({
         body = <span className="text-muted-foreground italic">{t("cell.emptyValue")}</span>;
       } else {
         const name = getUserDisplayName(user, `#${user.id}`);
-        const userAvatarSrc = getAvatarSrc(user);
         body = (
           <span className="inline-flex max-w-full items-center gap-2 truncate">
-            <Avatar className="h-5 w-5 text-3xs">
-              {userAvatarSrc ? <AvatarImage src={userAvatarSrc} alt={name} /> : null}
-              <AvatarFallback userId={user.id}>{getInitialsForUser(user)}</AvatarFallback>
-            </Avatar>
+            <PersonAvatar user={user} name={name} />
             <span className="truncate">{name}</span>
           </span>
         );
@@ -527,6 +567,11 @@ export const PropertyValueCell = ({
     case MetadataType.file: {
       const file = fileFieldValue(value);
       body = file ? <FileFieldName file={file} /> : null;
+      break;
+    }
+    case MetadataType.signature: {
+      const signature = signatureValue(value);
+      body = signature ? <SignatureName signature={signature} updatedAt={updatedAt} /> : null;
       break;
     }
     default:

@@ -154,6 +154,7 @@
   "PROPERTY_COUNTER_MIN_GREATER_THAN_MAX": "Le minimum d'un compteur ne peut pas dépasser son maximum",
   "PROPERTY_PROMOTE_TYPES_DIFFER": "Seules des propriétés d'un même type, et des montants dans une même devise, fusionnent en une métadonnée",
   "PROPERTY_PROMOTE_VALUE_NOT_EDITABLE": "Certaines de ces valeurs sont sur des éléments que vous ne pouvez pas modifier",
+  "PROPERTY_SIGNER_ONLY": "Seule une personne peut signer, en son propre nom",
   "ATTACHMENT_IMAGE_ONLY": "Seules les images peuvent être importées",
   "ATTACHMENT_INVALID_IMAGE": "Impossible de valider le contenu de l'image",
   "FILE_NAME_ALREADY_EXISTS": "Un fichier avec ce titre existe déjà dans cette initiative",

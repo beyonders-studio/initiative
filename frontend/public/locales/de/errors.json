@@ -156,6 +156,7 @@
   "PROPERTY_COUNTER_MIN_GREATER_THAN_MAX": "Das Minimum eines Zählers darf nicht größer als sein Maximum sein",
   "PROPERTY_PROMOTE_TYPES_DIFFER": "Nur Eigenschaften eines Typs, und Geldbeträge in einer Währung, lassen sich zu einem Metadatenfeld zusammenführen",
   "PROPERTY_PROMOTE_VALUE_NOT_EDITABLE": "Einige dieser Werte stehen an Elementen, die du nicht bearbeiten kannst",
+  "PROPERTY_SIGNER_ONLY": "Nur eine Person kann unterschreiben, in eigenem Namen",
   "ATTACHMENT_IMAGE_ONLY": "Es werden nur Bild-Uploads unterstützt",
   "ATTACHMENT_INVALID_IMAGE": "Bildinhalt konnte nicht validiert werden",
   "FILE_NAME_ALREADY_EXISTS": "Eine Datei mit diesem Titel existiert bereits in dieser Initiative",

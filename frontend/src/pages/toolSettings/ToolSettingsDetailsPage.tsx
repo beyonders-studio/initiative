@@ -163,6 +163,7 @@ export const ToolSettingsDetailsPage = () => {
               readOnly={!canManage}
               initiativeId={entity.initiative_id}
               canOpen={{ tool, id: entity.id }}
+              updatedAt={entity.updated_at}
               hideLabel
             />
           </CardContent>

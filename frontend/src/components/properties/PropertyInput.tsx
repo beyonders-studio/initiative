@@ -40,6 +40,7 @@ import {
   steppedCount,
   withinBounds,
 } from "./propertyHelpers";
+import { SignatureFieldInput } from "./SignatureFieldInput";
 
 type PropertyDefinitionLike = PropertyDefinitionRead | PropertySummary;
 
@@ -69,6 +70,9 @@ export interface PropertyInputProps {
    *  stepping it at once both count. Without it, a step is a value like any
    *  other: something nothing has saved yet, a filter. */
   onStep?: (up: boolean) => void;
+  /** When the item last changed, on its own page, which a signature made
+   *  before it says. */
+  updatedAt?: string | null;
 }
 
 // ── Type guards / coercion helpers ──────────────────────────────────────────
@@ -303,6 +307,7 @@ export const PropertyInput = ({
   selectedUser,
   display,
   onStep,
+  updatedAt,
 }: PropertyInputProps) => {
   const { t } = useTranslation(["properties", "common"]);
 
@@ -532,6 +537,18 @@ export const PropertyInput = ({
           initiativeId={
             initiativeId ?? ("initiative_id" in definition ? definition.initiative_id : null)
           }
+          disabled={disabled}
+        />
+      );
+    }
+
+    case MetadataType.signature: {
+      return (
+        <SignatureFieldInput
+          name={definition.name}
+          value={value}
+          onChange={onChange}
+          updatedAt={updatedAt}
           disabled={disabled}
         />
       );
