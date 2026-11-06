@@ -5,6 +5,10 @@ Such a test takes these off one guild schema first, newest first, and puts
 them back last, oldest first. A new revision that reshapes a table an older
 revision's test reaches is added to ``LATER`` here, once, rather than to every
 such test.
+
+Putting them back ends with ``public.relationship_kind_code`` as the newest
+revision left it: an older revision's conversion restates it as that revision
+left it, and it is one function for the whole database.
 """
 
 from __future__ import annotations
@@ -54,6 +58,9 @@ def _steps(bind: Any, *, forward: bool) -> list[Callable[[], None]]:
             lambda: queues._upgrade_schema(bind),
             contacts._apply_upgrade,
             pair._upgrade,
+            lambda: bind.exec_driver_sql(
+                contacts._kind_code_fn(contacts._KIND_CODES_AFTER)
+            ),
         ]
     return [
         pair._downgrade,
