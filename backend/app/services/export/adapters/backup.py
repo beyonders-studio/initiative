@@ -594,7 +594,9 @@ class _ScopeBuilder:
             self.session, self.user, self.params, section, initiative.id
         )
         if ids:
-            batched = adapter.prepares or section.preload is not None
+            fmt = self._tool_format(section)
+            whole = section.one_report and fmt != "json"
+            batched = adapter.prepares or section.preload is not None or whole
             for batch in [ids] if batched else [[entity_id] for entity_id in ids]:
                 entities = []
                 for entity_id in batch:
@@ -611,10 +613,26 @@ class _ScopeBuilder:
                     ctx, prepared=await adapter.prepare(self.session, entities, ctx)
                 )
                 self.reach |= await adapter.prepared_reach(
-                    self.session, replace(ctx, format=self._tool_format(section))
+                    self.session, replace(ctx, format=fmt)
                 )
                 if section.preload is not None:
                     await section.preload(self, entities)
+                if whole:
+                    # The initiative's entities as one file, as a selection of
+                    # them exports.
+                    ctx = replace(ctx, format=fmt)
+                    ctx = replace(
+                        ctx,
+                        prepared=await adapter.prepare(self.session, entities, ctx),
+                    )
+                    for item in adapter.batch(entities, ctx):
+                        self._append_report(
+                            item,
+                            f"{folder}/{section.folder}/{item.key}.{fmt}",
+                            fmt,
+                            adapter.template_id,
+                        )
+                    continue
                 for entity_id, entity in zip(batch, entities):
                     await self._add_entity(
                         section, initiative, folder, entity_id, entity, ctx
@@ -1541,6 +1559,9 @@ class BackupSection:
     #: Report formats per file type, for the tool whose formats depend on
     #: the entity rather than the tool.
     type_report_formats: Mapping[str, frozenset[str]] = field(default_factory=dict)
+    #: Whether a report writes the initiative's entities of this tool as one
+    #: file rather than one each: a spreadsheet of its contacts.
+    one_report: bool = False
     #: Whether a report-mode export carries this tool at all. A tool with no
     #: report shape is left out rather than dropping a lone JSON file into a
     #: zip of PDFs and spreadsheets.
@@ -1615,7 +1636,7 @@ _SECTIONS: tuple[BackupSection, ...] = (
     BackupSection(Tool.calendar, report_formats=frozenset({"ics", "json"})),
     BackupSection(Tool.post, in_reports=False),
     BackupSection(Tool.wiki, in_reports=False, fetch=_fetch_wiki_pages),
-    BackupSection(Tool.contact, in_reports=False),
+    BackupSection(Tool.contact, report_formats=frozenset({"csv"}), one_report=True),
     # A dashboard is a live canvas, not a document, so a report carries its
     # envelope too.
     BackupSection(Tool.dashboard, finish=_ScopeBuilder._record_foreign_dashboards),

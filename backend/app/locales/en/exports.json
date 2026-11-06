@@ -102,5 +102,20 @@
   "values": {
     "yes": "Yes",
     "no": "No"
+  },
+  "contacts": {
+    "name": "Name",
+    "type": "Type",
+    "person": "Person",
+    "organization": "Organization",
+    "emails": "Email {{n}}",
+    "emailsLabel": "Email {{n}} label",
+    "phones": "Phone {{n}}",
+    "phonesLabel": "Phone {{n}} label",
+    "addresses": "Address {{n}}",
+    "addressesLabel": "Address {{n}} label",
+    "websites": "Website {{n}}",
+    "websitesLabel": "Website {{n}} label",
+    "partOf": "Organization"
   }
 }

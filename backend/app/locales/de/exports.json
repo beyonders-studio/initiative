@@ -102,5 +102,20 @@
   "values": {
     "yes": "Ja",
     "no": "Nein"
+  },
+  "contacts": {
+    "name": "Name",
+    "type": "Typ",
+    "person": "Person",
+    "organization": "Organisation",
+    "emails": "E-Mail {{n}}",
+    "emailsLabel": "E-Mail {{n}} Bezeichnung",
+    "phones": "Telefon {{n}}",
+    "phonesLabel": "Telefon {{n}} Bezeichnung",
+    "addresses": "Adresse {{n}}",
+    "addressesLabel": "Adresse {{n}} Bezeichnung",
+    "websites": "Website {{n}}",
+    "websitesLabel": "Website {{n}} Bezeichnung",
+    "partOf": "Organisation"
   }
 }

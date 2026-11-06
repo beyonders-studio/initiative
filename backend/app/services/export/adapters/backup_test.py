@@ -19,6 +19,7 @@ def _report(formats: dict[str, Any]) -> dict[str, Any]:
         {"project": "pdf"},
         {"counter_group": "xlsx"},
         {"calendar": "json"},
+        {"contact": "csv"},
         {"file": {"lexical": "docx", "sheet": "csv"}},
     ],
 )

@@ -3,9 +3,13 @@ the community's, which the community contacts plug-in holds.
 
 Covers making, reading, changing and trashing one; who reads one by its
 sharing; who makes and edits a community contact; an initiative's task naming
-a community contact, which the contact's own links do not list; and moving a
-contact into the community's contacts.
+a community contact, which the contact's own links do not list; moving a
+contact into the community's contacts; and contacts going out as a spreadsheet
+and coming back in.
 """
+
+import csv
+import io
 
 from httpx import AsyncClient
 from sqlmodel import select
@@ -22,9 +26,11 @@ from app.testing import (
     create_contact,
     create_guest,
     create_guild_plugin,
+    create_initiative,
     create_property_definition,
     create_property_value,
     create_resource_grant,
+    create_tag,
     create_task,
     get_auth_headers,
     grant_role_permission,
@@ -362,3 +368,125 @@ async def test_a_contact_moves_into_the_communitys_contacts(
     again = await client.post(a.g(f"/contacts/{contact.id}/move"), headers=a.headers)
     assert again.status_code == 400
     assert again.json()["detail"] == ContactMessages.ALREADY_IN_COMMUNITY
+
+
+async def test_contacts_go_out_as_a_spreadsheet_and_come_back_in(
+    client: AsyncClient, session: AsyncSession, acting_user
+):
+    """One row a contact, each phone a pair of columns. Imported into another
+    initiative with the columns its preview reads, it comes back as it went
+    out — details and labels, type, organization and tags — and a row whose
+    email is not one is left out and named."""
+    a = await acting_user(guild_role=CommunityRole.member, initiative=True)
+    venue = await create_tag(session, a.guild, name="Venue")
+    lodge = await client.post(
+        a.g("/contacts/"),
+        headers=a.headers,
+        json={
+            "name": "Lakeside Lodge",
+            "is_organization": True,
+            "initiative_id": a.initiative.id,
+        },
+    )
+    priya = await client.post(
+        a.g("/contacts/"),
+        headers=a.headers,
+        json={
+            "name": "Priya Shah",
+            "initiative_id": a.initiative.id,
+            "emails": [{"label": "Work", "value": "priya@lakeside.example"}],
+            "phones": [
+                {"label": "Mobile", "value": "+44 7700 900123"},
+                {"label": "Office", "value": "020 7946 0000"},
+            ],
+            "tag_ids": [venue.id],
+        },
+    )
+    linked = await client.post(
+        a.g("/relationships/"),
+        headers=a.headers,
+        json={
+            "source": {"type": "contact", "id": priya.json()["id"]},
+            "relationship_type": "part_of",
+            "target": {"type": "contact", "id": lodge.json()["id"]},
+        },
+    )
+    assert linked.status_code == 201, linked.text
+
+    async def export(ids: list[int]) -> list[list[str]]:
+        response = await client.get(
+            a.g("/exports/contact"),
+            headers=a.headers,
+            params={"ids": ids, "format": "csv"},
+        )
+        assert response.status_code == 200, response.text
+        return list(csv.reader(io.StringIO(response.text.removeprefix("\ufeff"))))
+
+    sheet = await export([priya.json()["id"], lodge.json()["id"]])
+    assert sheet == [
+        [
+            "Name",
+            "Type",
+            "Email 1",
+            "Email 1 label",
+            "Phone 1",
+            "Phone 1 label",
+            "Phone 2",
+            "Phone 2 label",
+            "Organization",
+            "Tags",
+        ],
+        [
+            "Priya Shah",
+            "Person",
+            "priya@lakeside.example",
+            "Work",
+            "'+44 7700 900123",
+            "Mobile",
+            "020 7946 0000",
+            "Office",
+            "Lakeside Lodge",
+            "Venue",
+        ],
+        ["Lakeside Lodge", "Organization", "", "", "", "", "", "", "", ""],
+    ]
+
+    other = await create_initiative(session, a.guild, a.user)
+    rows = io.StringIO()
+    csv.writer(rows).writerows(
+        [*sheet, ["Bad Address", "Person", "not an email", "", "", "", "", "", "", ""]]
+    )
+    preview = await client.post(
+        a.g("/imports/contacts/preview"),
+        headers={**a.headers, "Content-Type": "text/plain"},
+        params={"initiative_id": other.id},
+        content=rows.getvalue(),
+    )
+    assert preview.status_code == 200, preview.text
+    assert preview.json()["row_count"] == 3
+    imported = await client.post(
+        a.g("/imports/contacts"),
+        headers=a.headers,
+        json={
+            "initiative_id": other.id,
+            "content": rows.getvalue(),
+            "columns": preview.json()["columns"],
+        },
+    )
+    assert imported.status_code == 201, imported.text
+    result = imported.json()["result"]
+    assert result["created"]["contacts"] == 2
+    assert result["failed_rows"] == [{"row": 4, "field": "emails"}]
+
+    await route_session_to_guild(session, a.guild.id)
+    made = dict(
+        (
+            await session.exec(
+                select(Contact.name, Contact.id).where(
+                    Contact.initiative_id == other.id
+                )
+            )
+        ).all()
+    )
+    assert set(made) == {"Priya Shah", "Lakeside Lodge"}
+    assert await export([made["Priya Shah"], made["Lakeside Lodge"]]) == sheet

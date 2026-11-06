@@ -18,7 +18,6 @@ from typing import Annotated, Optional
 
 from fastapi import APIRouter, Depends, HTTPException, status
 from sqlmodel import select
-from sqlmodel.ext.asyncio.session import AsyncSession
 
 from app.api import resource_access
 from app.api.actor_route import ActorRoute
@@ -31,9 +30,8 @@ from app.api.deps import (
     get_current_active_user,
     plugin_scope,
 )
-from app.core.messages import ContactMessages, GuildMessages
+from app.core.messages import ContactMessages
 from app.core.tools import Tool
-from app.models.platform.guild import AdminSurface
 from app.models.platform.user import User
 from app.models.tenant.comment import Comment
 from app.models.tenant.contact import DETAILS, Contact
@@ -43,7 +41,6 @@ from app.schemas.tenant.resource_grant import initiative_readable
 from app.schemas.tenant.tool import serialize_tool
 from app.services.tenant import attachments as attachments_service
 from app.services.tenant import contacts as contacts_service
-from app.services.tenant import guild_plugins as guild_plugins_service
 from app.services.tenant import metadata as metadata_service
 from app.services.tenant import ownership as ownership_service
 from app.services.tenant import tags as tags_service
@@ -54,33 +51,6 @@ CurrentUserDep = Annotated[User, Depends(get_current_active_user)]
 #: The routes an installed plug-in may call, under the contacts scopes.
 ContactsRead = Annotated[ActorContext, Depends(plugin_scope("contacts:read"))]
 ContactsWrite = Annotated[ActorContext, Depends(plugin_scope("contacts:write"))]
-
-
-async def _community_holder(
-    session: AsyncSession, user: Optional[User], guild_context: ActorContext
-) -> GuildPlugin:
-    """The install a community contact goes into, once the request may put one
-    there: a person holding the ``community_contacts`` surface, in a community
-    that has the plug-in."""
-    if user is None:
-        raise HTTPException(
-            status_code=status.HTTP_403_FORBIDDEN,
-            detail=ContactMessages.PLUGIN_INITIATIVE_REQUIRED,
-        )
-    if not guild_context.holds_surface(AdminSurface.community_contacts):
-        raise HTTPException(
-            status_code=status.HTTP_403_FORBIDDEN,
-            detail=GuildMessages.COMMUNITY_ADMIN_REQUIRED,
-        )
-    plugin = await guild_plugins_service.find_mounting_plugin(
-        session, tool=Tool.contact.value
-    )
-    if plugin is None:
-        raise HTTPException(
-            status_code=status.HTTP_403_FORBIDDEN,
-            detail=ContactMessages.PLUGIN_REQUIRED,
-        )
-    return plugin
 
 
 @router.get("/{contact_id}", response_model=ContactRead)
@@ -118,7 +88,9 @@ async def create_contact(
     initiative_id = contact_in.initiative_id
     plugin: Optional[GuildPlugin] = None
     if initiative_id is None:
-        plugin = await _community_holder(session, current_user, guild_context)
+        plugin = await contacts_service.community_holder(
+            session, current_user, guild_context
+        )
     else:
         await resource_access.prepare_create(
             session, Tool.contact, initiative_id, current_user, guild_context
@@ -223,7 +195,9 @@ async def move_contact(
             status_code=status.HTTP_400_BAD_REQUEST,
             detail=ContactMessages.ALREADY_IN_COMMUNITY,
         )
-    plugin = await _community_holder(session, current_user, guild_context)
+    plugin = await contacts_service.community_holder(
+        session, current_user, guild_context
+    )
     await resource_access.require_stays_in(session, contact.initiative_id, None)
 
     await metadata_service.drop_values(
