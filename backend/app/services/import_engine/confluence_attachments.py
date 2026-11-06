@@ -7,23 +7,27 @@ and being in the wiki is the relation that is a second view of it (D10).
 
 Both are blobs under the bundle's ``assets/``, restored by the ordinary
 backup apply — quota-checked, deduplicated and registered like any upload.
-Only what fits: a picture up to :data:`MAX_IMAGE_BYTES`, any other file up to
-:data:`MAX_FILE_BYTES`, and the bundle's budget across all of them. What does
-not fit, or will not download, is counted rather than guessed at.
+Only what fits: a picture up to :data:`MAX_IMAGE_BYTES`, and the bundle's
+budget across all of them, which any other file may take as much of as is
+left. Each is written to disk as it arrives, never held whole. What does not
+fit, or will not download, is counted rather than guessed at.
 """
 
 from __future__ import annotations
 
 import re
+import tempfile
 import uuid
 from dataclasses import dataclass, field
-from typing import Any, Awaitable, Callable, Optional
+from pathlib import Path
+from typing import Any, Awaitable, BinaryIO, Callable, Optional
 
 from app.core.messages import ImportEngineMessages
+from app.services.data_jobs import while_beating
+from app.services.import_engine.atlassian import HEARTBEAT_SECONDS
 from app.services.import_engine.contract import ImportEngineError
 from app.services.import_engine.jira_attachments import (
     IMAGE_TYPES,
-    MAX_FILE_BYTES,
     MAX_IMAGE_BYTES,
     REFUSED_TYPES,
     AssetBudget,
@@ -124,7 +128,7 @@ class AttachmentReport:
     count, since a picture a page never shows turns out to be a file."""
 
     bytes: int = 0
-    #: Over a per-file cap, or past the bundle's budget.
+    #: A picture over its cap, or a file past the bundle's budget.
     oversize: int = 0
     #: What the site would not hand over.
     unreadable: int = 0
@@ -134,7 +138,9 @@ class AttachmentReport:
     blocked: int = 0
 
 
-Downloader = Callable[[PageAttachment, int], Awaitable[bytes]]
+#: ``download(attachment, max_bytes, target)`` writes the attachment to
+#: ``target`` and answers its size.
+Downloader = Callable[[PageAttachment, int, BinaryIO], Awaitable[int]]
 
 
 async def download_page_attachments(
@@ -150,8 +156,8 @@ async def download_page_attachments(
 ) -> PageMedia:
     """Fetch one page's attachments, within the caps and the shared budget.
 
-    ``download(attachment, max_bytes)`` is the site call, and ``store``
-    takes each file as it arrives. One file that will
+    ``download`` is the site call, writing each file to a temporary one, and
+    ``store`` takes it from there as soon as it has arrived. One file that will
     not come is counted and skipped — a broken attachment is not a reason to
     lose the space — but being throttled stops the fetch, as it does
     everywhere else.
@@ -170,38 +176,50 @@ async def download_page_attachments(
         if not files_allowed and not attachment.is_image:
             report.blocked += 1
             continue
-        cap = MAX_IMAGE_BYTES if attachment.is_image else MAX_FILE_BYTES
         if (
-            attachment.size > cap
+            (attachment.is_image and attachment.size > MAX_IMAGE_BYTES)
             or attachment.size > budget.bytes_left
             or budget.files_left <= 0
         ):
             report.oversize += 1
             continue
-        try:
-            data = await download(attachment, min(cap, budget.bytes_left))
-        except ImportEngineError as exc:
-            if exc.code == ImportEngineMessages.IMPORT_SOURCE_RATE_LIMITED:
-                raise
-            if exc.code == ImportEngineMessages.IMPORT_TOO_LARGE:
-                report.oversize += 1
-            else:
-                report.unreadable += 1
-            continue
-        finally:
-            if tick is not None:
-                await tick()
-        budget.bytes_left -= len(data)
-        budget.files_left -= 1
-        report.bytes += len(data)
-        stored = StoredImage(
-            filename=attachment.filename,
-            storage_key=storage_key(attachment),
-            content_type=attachment.media_type or "application/octet-stream",
-            size_bytes=len(data),
-        )
-        await store(stored, data)
-        del data
+        with tempfile.NamedTemporaryFile(prefix="import-attachment-") as spool:
+            try:
+                size = await while_beating(
+                    download(
+                        attachment,
+                        min(MAX_IMAGE_BYTES, budget.bytes_left)
+                        if attachment.is_image
+                        else budget.bytes_left,
+                        spool,
+                    ),
+                    tick,
+                    every=HEARTBEAT_SECONDS,
+                )
+            except ImportEngineError as exc:
+                if exc.code == ImportEngineMessages.IMPORT_SOURCE_RATE_LIMITED:
+                    raise
+                if exc.code == ImportEngineMessages.IMPORT_TOO_LARGE:
+                    report.oversize += 1
+                else:
+                    report.unreadable += 1
+                continue
+            finally:
+                if tick is not None:
+                    await tick()
+            budget.bytes_left -= size
+            budget.files_left -= 1
+            report.bytes += size
+            stored = StoredImage(
+                filename=attachment.filename,
+                storage_key=storage_key(attachment),
+                content_type=attachment.media_type or "application/octet-stream",
+                size_bytes=size,
+            )
+            spool.flush()
+            await while_beating(
+                store(stored, Path(spool.name)), tick, every=HEARTBEAT_SECONDS
+            )
         if attachment.is_image:
             media.stored_images.setdefault(attachment.filename, stored)
             media.images.setdefault(

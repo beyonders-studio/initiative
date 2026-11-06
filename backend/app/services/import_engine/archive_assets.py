@@ -27,6 +27,8 @@ from sqlmodel.ext.asyncio.session import AsyncSession
 
 from app.core.messages import ImportEngineMessages
 from app.models.platform.user import User
+from app.services.data_jobs import while_beating
+from app.services.import_engine.atlassian import HEARTBEAT_SECONDS
 from app.services.import_engine.contract import ImportEngineError
 from app.services.import_engine.zip_bounds import copy_member
 
@@ -145,7 +147,7 @@ async def restore_assets(
     Raises ``IMPORT_QUOTA_EXCEEDED`` when the files would take the community
     past its storage quota, or when they read to more than the zip declared.
     On any failure the files already written are removed. ``heartbeat`` is
-    called after each file stored.
+    called after each file stored, and while a large one is copied or stored.
     """
     from app.services.storage import get_guild_storage
     from app.services.tenant.attachments import (
@@ -191,18 +193,14 @@ async def restore_assets(
             spool.truncate()
             # What the quota was checked against also bounds what is read: a
             # member is read no further than what is left of it.
-            try:
-                size = await asyncio.to_thread(
-                    copy_member,
-                    archive,
-                    info,
-                    spool,
-                    max_bytes=incoming - read_total,
-                    code=ImportEngineMessages.IMPORT_QUOTA_EXCEEDED,
-                )
-            except ImportEngineError:
-                raise
-            except Exception:
+            size = await while_beating(
+                asyncio.to_thread(
+                    _copy_out, archive, info, spool, incoming - read_total
+                ),
+                heartbeat,
+                every=HEARTBEAT_SECONDS,
+            )
+            if size is None:
                 outcome.missing.append(asset.key)
                 continue
             read_total += size
@@ -213,14 +211,18 @@ async def restore_assets(
                 if warning is not None:
                     outcome.warnings.append(warning)
                 continue
-            await store_upload(
-                session,
-                guild_id=guild_id,
-                filename=asset.key,
-                data=Path(spool.name),
-                content_type=content_type,
-                created_by=user.id,
-                initiative_id=initiative_id,
+            await while_beating(
+                store_upload(
+                    session,
+                    guild_id=guild_id,
+                    filename=asset.key,
+                    data=Path(spool.name),
+                    content_type=content_type,
+                    created_by=user.id,
+                    initiative_id=initiative_id,
+                ),
+                heartbeat,
+                every=HEARTBEAT_SECONDS,
             )
             outcome.written.append(asset.key)
             outcome.content_types[asset.key] = content_type
@@ -233,6 +235,26 @@ async def restore_assets(
     finally:
         spool.close()
     return outcome
+
+
+def _copy_out(
+    archive: zipfile.ZipFile, info: zipfile.ZipInfo, target: BinaryIO, max_bytes: int
+) -> int | None:
+    """Copy one member to ``target`` and answer its size, or ``None`` when it
+    cannot be read. One that reads past ``max_bytes`` raises
+    ``IMPORT_QUOTA_EXCEEDED``. Blocking; run it in a thread."""
+    try:
+        return copy_member(
+            archive,
+            info,
+            target,
+            max_bytes=max_bytes,
+            code=ImportEngineMessages.IMPORT_QUOTA_EXCEEDED,
+        )
+    except ImportEngineError:
+        raise
+    except Exception:
+        return None
 
 
 def remove_written(guild_id: int, keys: list[str]) -> None:

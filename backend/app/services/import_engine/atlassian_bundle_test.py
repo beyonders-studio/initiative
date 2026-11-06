@@ -45,18 +45,21 @@ def _finish(writer, **kwargs):
     )
 
 
-async def test_files_are_written_as_they_arrive_and_listed_when_named():
+async def test_files_are_written_as_they_arrive_and_listed_when_named(tmp_path):
     picture, notes, unshown = (
         _stored("k1.png"),
         _stored("k2.txt", content_type="text/plain", size=5),
         _stored("k3.png"),
     )
+    png, text = tmp_path / "door.png", tmp_path / "notes.txt"
+    png.write_bytes(b"\x89PNG")
+    text.write_bytes(b"notes")
     with BundleWriter() as writer:
-        await writer.put_asset(picture, b"\x89PNG")
-        await writer.put_asset(notes, b"notes")
-        await writer.put_asset(unshown, b"\x89PNG")
+        await writer.put_asset(picture, png)
+        await writer.put_asset(notes, text)
+        await writer.put_asset(unshown, png)
         # The same file twice is written once.
-        await writer.put_asset(picture, b"\x89PNG")
+        await writer.put_asset(picture, png)
         path = _finish(writer, images=[picture], task_files=[notes])
 
         archive = open_zip(path)

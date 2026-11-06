@@ -67,9 +67,9 @@ logger = logging.getLogger(__name__)
 STALE_RUNNING = timedelta(minutes=15)
 
 # A ``fetching`` row untouched this long is a crashed fetch. A live one
-# touches its row every few seconds between calls to the site, and no single
-# call outlasts this (see ``atlassian.RetryPolicy``), so a row this quiet has
-# nobody behind it.
+# touches its row every few seconds, between calls to the site and during a
+# long download (``data_jobs.while_beating``), so a row this quiet has nobody
+# behind it.
 STALE_FETCHING = timedelta(minutes=15)
 
 

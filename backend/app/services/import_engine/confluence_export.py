@@ -25,7 +25,7 @@ import sys
 import zipfile
 from dataclasses import dataclass, field
 from datetime import datetime
-from typing import Any, Optional, Union
+from typing import Any, BinaryIO, Optional, Union
 
 from app.core.messages import ImportEngineMessages
 from app.services.import_engine import confluence_attachments, confluence_mapping
@@ -38,7 +38,7 @@ from app.services.import_engine.confluence_storage import _Element, _parse, _tex
 from app.services.import_engine.contract import ImportEngineError
 from app.services.import_engine.jira_attachments import AssetBudget, AssetSink
 from app.services.import_engine import limits as import_limits
-from app.services.import_engine.zip_bounds import read_member
+from app.services.import_engine.zip_bounds import copy_member, read_member
 
 logger = logging.getLogger(__name__)
 
@@ -799,9 +799,9 @@ async def export_to_fetched(
     media: dict[str, confluence_attachments.PageMedia] = {}
     if asset_budget is not None and store is not None:
 
-        async def read(item: Any, max_bytes: int) -> bytes:
+        async def read(item: Any, max_bytes: int, target: BinaryIO) -> int:
             return await asyncio.to_thread(
-                read_member, archive, item.id, max_bytes=max_bytes
+                copy_member, archive, item.id, target, max_bytes=max_bytes
             )
 
         for page in space.pages[: len(pages)]:

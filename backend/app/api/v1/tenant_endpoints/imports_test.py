@@ -32,6 +32,7 @@ from app.testing.factories import (
     route_session_to_guild,
 )
 from app.services.import_engine import limits as import_limits
+from app.services.import_engine.atlassian_test import answered
 from app.schemas.tenant.tag import annotated_tags
 from app.services.tenant import tags as tags_service
 from app.db.request_context import SystemGuild
@@ -4723,7 +4724,9 @@ def _jira_site(
         if "/attachment/content/" in url and files:
             attachment_id = url.split("/attachment/content/")[1].split("?")[0]
             if attachment_id in files:
-                return httpx.Response(200, content=files[attachment_id])
+                return await answered(
+                    method, url, httpx.Response(200, content=files[attachment_id]), kw
+                )
         if url.endswith("/rest/api/3/field") and catalog is not None:
             return httpx.Response(200, json=catalog)
         if "/rest/agile/1.0/board/" in url and boards:
@@ -5815,7 +5818,8 @@ def _confluence_site(
                 302, headers={"location": f"https://media.example.com/{att_id}"}
             )
         if url.startswith("https://media.example.com/"):
-            return httpx.Response(200, content=blobs[url.rsplit("/", 1)[1]])
+            blob = blobs[url.rsplit("/", 1)[1]]
+            return await answered(method, url, httpx.Response(200, content=blob), kw)
         if "/wiki/api/v2/spaces?keys=" in url:
             return httpx.Response(
                 200,

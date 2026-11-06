@@ -13,6 +13,7 @@ import pytest
 from app.core.messages import ImportEngineMessages
 from app.services.import_engine import atlassian, confluence_fetch
 from app.services.import_engine.atlassian_bundle import BundleWriter, merge_people
+from app.services.import_engine.atlassian_test import answered
 from app.services.import_engine.contract import ImportEngineError
 from app.services.import_engine.jira_attachments import bundle_budget
 
@@ -118,7 +119,9 @@ def _site(
         if url.startswith("https://media.example.com/"):
             att_id = url.rsplit("/", 1)[1]
             if att_id in files:
-                return httpx.Response(200, content=files[att_id])
+                return await answered(
+                    method, url, httpx.Response(200, content=files[att_id]), kw
+                )
             return httpx.Response(404)
         if "/labels" in url:
             page_id = url.split("/pages/")[1].split("/")[0]

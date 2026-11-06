@@ -16,7 +16,7 @@ import logging
 import re
 from collections import Counter
 from dataclasses import dataclass, field
-from typing import Any, Awaitable, Callable, Optional
+from typing import Any, Awaitable, BinaryIO, Callable, Optional
 from urllib.parse import quote
 
 from app.core.messages import ImportEngineMessages
@@ -25,7 +25,7 @@ from app.services.import_engine.atlassian import (
     AtlassianCredential,
     Heartbeat,
     Walk,
-    get_bytes,
+    get_file,
     get_json,
     throttled,
 )
@@ -294,13 +294,16 @@ async def fetch_page_media(
     """A page's attachments, downloaded within what the bundle can hold."""
 
     async def download(
-        attachment: confluence_attachments.PageAttachment, max_bytes: int
-    ) -> bytes:
+        attachment: confluence_attachments.PageAttachment,
+        max_bytes: int,
+        target: BinaryIO,
+    ) -> int:
         # The download answers with one hop to Atlassian's media host.
-        return await get_bytes(
+        return await get_file(
             credential,
             f"/wiki/rest/api/content/{page_id}/child/attachment/"
             f"{attachment.id}/download",
+            target,
             max_bytes=max_bytes,
             follow_redirect=True,
         )
