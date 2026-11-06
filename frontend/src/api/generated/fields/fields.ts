@@ -175,7 +175,8 @@ export function useReadFieldCatalog<
  *
  * Both read from the validator's own allow-lists, so a word offered here is
  * one it accepts. Beside a dataset's fields (above), this is everything a
- * client needs to complete a statement somebody is writing.
+ * client needs to complete a statement somebody is writing. ``sheet`` is
+ * among the functions: it is called in ``FROM``, to read a spreadsheet.
  * @summary Read Query Vocabulary
  */
 export const readQueryVocabulary = (
