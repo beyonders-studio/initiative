@@ -12,6 +12,8 @@ with one rule set:
 - date/datetime    → ``value_text`` (ISO 8601)
 - multi_select     → ``value_json``
 - user_reference   → ``value_handle``, and ``value_name`` beside it
+- file             → ``value_name``, the file's name, which an import leaves
+  out: the file is not in the envelope
 
 A task's value of its project's metadata says ``project``, so an import puts
 it on the project's metadata rather than among the initiative's properties.
@@ -63,6 +65,9 @@ def property_export_dict(summary: PropertySummary) -> dict:
         record["value_name"] = (
             (value.get("display_name") or record["value_handle"]) if known else None
         )
+    elif prop_type == "file":
+        # For a reader; nothing an import could place.
+        record["value_name"] = value.get("name") if isinstance(value, dict) else None
     if summary.currency is not None:
         record["currency"] = summary.currency.value
     if summary.project_id is not None:
