@@ -1511,6 +1511,7 @@ def _definition_record(definition) -> dict:
         "color": definition.color,
         "options": list(definition.options or []),
         "currency": definition.currency,
+        "counter": definition.counter,
     }
 
 

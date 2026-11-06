@@ -1418,6 +1418,7 @@ export const MetadataType = {
   user_reference: "user_reference",
   currency: "currency",
   scale: "scale",
+  counter: "counter",
   link: "link",
   badge: "badge",
   json: "json",
@@ -1605,6 +1606,19 @@ export const CurrencyCode = {
 } as const;
 
 /**
+ * How a counter field moves: by ``step`` a tap, never past ``min`` or
+ * ``max``, and back to ``initial`` on a reset. A counter with no value
+ * holds ``initial``.
+ */
+export interface CounterSettingsOutput {
+  /** @exclusiveMinimum 0 */
+  step: number;
+  min: number | null;
+  max: number | null;
+  initial: number;
+}
+
+/**
  * Lightweight property value for embedding in entity reads.
  *
  * ``value`` is rehydrated from the correct typed column by the service
@@ -1621,6 +1635,7 @@ export interface PropertySummary {
   key: string | null;
   options: PropertyOption[] | null;
   currency: CurrencyCode | null;
+  counter: CounterSettingsOutput | null;
   /** Shaped by the definition's type. For user_reference, a person: id, username, discriminator, display_name and avatar_url, or an PluginPerson when the reader is an installed plug-in. A plug-in's value is as the plug-in wrote it: a list field's an array of its elements, newest first, each with its ref, and a value with a state the state beside it. */
   value: unknown;
 }
@@ -2865,6 +2880,7 @@ export interface PropertyDefinitionRead {
   color: string | null;
   options: PropertyOption[] | null;
   currency: CurrencyCode | null;
+  counter: CounterSettingsOutput | null;
   id: number;
   initiative_id: number;
   project_id: number | null;
@@ -2925,6 +2941,7 @@ export const CollectionShapeMetadataDisplay = {
   number: "number",
   stars: "stars",
   bar: "bar",
+  clock: "clock",
 } as const;
 
 /**
@@ -5070,6 +5087,19 @@ export interface CounterGroupUpdate {
 
 export interface CounterSetCountRequest {
   count: number | string;
+}
+
+/**
+ * How a counter field moves: by ``step`` a tap, never past ``min`` or
+ * ``max``, and back to ``initial`` on a reset. A counter with no value
+ * holds ``initial``.
+ */
+export interface CounterSettingsInput {
+  /** @exclusiveMinimum 0 */
+  step?: number;
+  min?: number | null;
+  max?: number | null;
+  initial?: number;
 }
 
 export type CounterSortDirection = (typeof CounterSortDirection)[keyof typeof CounterSortDirection];
@@ -7560,7 +7590,7 @@ export interface LayoutGrouping {
 }
 
 export type ListLayoutDefinitionOutputDisplays = {
-  [key: string]: "number" | "stars" | "bar";
+  [key: string]: "number" | "stars" | "bar" | "clock";
 } | null;
 
 /**
@@ -7816,7 +7846,7 @@ export interface LinkedTaskRead {
 }
 
 export type ListLayoutDefinitionInputDisplays = {
-  [key: string]: "number" | "stars" | "bar";
+  [key: string]: "number" | "stars" | "bar" | "clock";
 } | null;
 
 /**
@@ -10148,6 +10178,7 @@ export interface PropertyDefinitionCreate {
   color?: string | null;
   options?: PropertyOption[] | null;
   currency?: CurrencyCode | null;
+  counter?: CounterSettingsInput | null;
   initiative_id: number;
   project_id?: number | null;
   collection_id?: number | null;
@@ -10203,6 +10234,7 @@ export interface PropertyDefinitionUpdate {
   color?: string | null;
   options?: PropertyOption[] | null;
   currency?: CurrencyCode | null;
+  counter?: CounterSettingsInput | null;
 }
 
 /**
@@ -10228,6 +10260,15 @@ export interface PropertyOptionsChange {
   add?: string[];
   /** @maxItems 100 */
   remove?: string[];
+}
+
+/**
+ * One step of a counter, up or down, from the value it holds when the
+ * step is written, so two people stepping it at once both count.
+ */
+export interface PropertyStep {
+  property_id: number;
+  up: boolean;
 }
 
 /**
@@ -10264,6 +10305,8 @@ export interface PropertyValuesSetRequest {
   removed?: number[];
   /** @maxItems 100 */
   options?: PropertyOptionsChange[];
+  /** @maxItems 100 */
+  steps?: PropertyStep[];
 }
 
 /**

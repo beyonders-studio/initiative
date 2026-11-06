@@ -124,8 +124,10 @@ from app.services.marketplace.registration_lookup import RegistrationSnapshot
 from app.services.marketplace.widget_meta import in_language
 from app.schemas.tenant.property import (
     MAX_PROPERTY_FILTERS,
+    CounterSettings,
     PropertyOption,
     PropertyOptionsChange,
+    PropertyStep,
     PropertySummary,
     PropertyValueInput,
 )
@@ -266,7 +268,12 @@ def _values_of(definitions: Any) -> Any:
 
 #: The types whose value is ``value_number``.
 _NUMBER_TYPES = frozenset(
-    {MetadataType.number, MetadataType.currency, MetadataType.scale}
+    {
+        MetadataType.number,
+        MetadataType.currency,
+        MetadataType.scale,
+        MetadataType.counter,
+    }
 )
 
 #: The range of a scale.
@@ -315,6 +322,16 @@ def _coerce_scale(raw: Any) -> Decimal:
     if isinstance(raw, bool) or not isinstance(raw, int) or raw not in SCALE_RANGE:
         raise _bad_value()
     return Decimal(raw)
+
+
+def _within(defn: MetadataDefinition, number: Decimal) -> Decimal:
+    """``number`` held to a counter's bounds."""
+    settings = CounterSettings.model_validate(defn.counter or {})
+    if settings.min is not None:
+        number = max(number, Decimal(str(settings.min)))
+    if settings.max is not None:
+        number = min(number, Decimal(str(settings.max)))
+    return number
 
 
 def _coerce_bool(raw: Any) -> bool:
@@ -447,6 +464,11 @@ def _validate_value_for_type(
         cols["value_number"] = amount
     elif ptype is MetadataType.scale:
         cols["value_number"] = _coerce_scale(raw_value)
+    elif ptype is MetadataType.counter:
+        count = _coerce_number(raw_value)
+        if not count.is_finite():
+            raise _bad_value()
+        cols["value_number"] = _within(defn, count)
     elif ptype is MetadataType.checkbox:
         cols["value_boolean"] = _coerce_bool(raw_value)
     elif ptype is MetadataType.date:
@@ -503,14 +525,16 @@ async def write_values(
     initiative_id: Optional[int],
     removed: Optional[Sequence[int]] = None,
     options: Sequence[PropertyOptionsChange] = (),
+    steps: Sequence[PropertyStep] = (),
     collection_id: Optional[int] = None,
 ) -> None:
     """Replace every property value on ``row`` with ``values``. Given
     ``removed``, write only the properties ``values`` names and take off the
     ones ``removed`` names, leaving every other value as it is, so two writes
     of different properties both stand. ``options`` (with ``removed``)
-    changes options of multi-select values against what each holds when it
-    is written, so two changes of the same value both stand too.
+    changes options of multi-select values, and ``steps`` steps counters,
+    against what each holds when it is written, so two changes of the same
+    value both stand too.
 
     Each value's definition must belong to ``initiative_id`` — the row's own
     initiative — and a person a value names must be able to open the tool row
@@ -525,8 +549,15 @@ async def write_values(
         *(removed or ()),
         *(entry.property_id for entry in values),
         *(change.property_id for change in options),
+        *(step.property_id for step in steps),
     ]
-    stored = await _in_turn(session, spec.target, row.id, named_ids, options)
+    stored = await _in_turn(
+        session,
+        spec.target,
+        row.id,
+        named_ids,
+        [*(change.property_id for change in options), *(s.property_id for s in steps)],
+    )
     if removed is None:
         await session.exec(delete(MetadataValue).where(held))
     elif named_ids:
@@ -536,7 +567,7 @@ async def write_values(
                 MetadataValue.property_id.in_(named_ids),
             )
         )
-    if not values and not options:
+    if not values and not options and not steps:
         return
 
     requested_ids = [v.property_id for v in values]
@@ -547,7 +578,12 @@ async def write_values(
         )
 
     definitions = await load_definitions_by_ids(
-        session, [*requested_ids, *(change.property_id for change in options)]
+        session,
+        [
+            *requested_ids,
+            *(change.property_id for change in options),
+            *(step.property_id for step in steps),
+        ],
     )
 
     def definition(property_id: int) -> MetadataDefinition:
@@ -573,11 +609,26 @@ async def write_values(
             property_id=change.property_id,
             **_options_changed(
                 definition(change.property_id),
-                stored.get(change.property_id, []),
+                list(held.value_json or [])
+                if (held := stored.get(change.property_id))
+                else [],
                 change,
             ),
         )
         for change in options
+    ]
+    rows += [
+        MetadataValue(
+            entity_type=spec.target,
+            entity_id=row.id,
+            property_id=step.property_id,
+            **_stepped(
+                definition(step.property_id),
+                held.value_number if (held := stored.get(step.property_id)) else None,
+                step,
+            ),
+        )
+        for step in steps
     ]
     for entry in values:
         defn = definition(entry.property_id)
@@ -602,27 +653,31 @@ async def _in_turn(
     target: str,
     entity_id: int,
     named: Sequence[int],
-    options: Sequence[PropertyOptionsChange],
-) -> dict[int, list[str]]:
-    """Take this write's turn at every value it names, then read the options
-    each value ``options`` changes holds: a write of the same value made
-    meanwhile is the one a change is applied to, and none lands between the
-    read and this write's own."""
+    changed: Sequence[int],
+) -> dict[int, Any]:
+    """Take this write's turn at every value it names, then read the values
+    ``changed`` names, which a change or a step is applied to: a write of the
+    same value made meanwhile is the one it is applied to, and none lands
+    between the read and this write's own."""
     for property_id in sorted(set(named)):
         await advisory_lock(
             session,
             LockNamespace.PROPERTY_VALUE,
             f"{routed_guild_id(session)}:{target}:{entity_id}:{property_id}",
         )
-    if not options:
+    if not changed:
         return {}
     held = await session.exec(
-        select(MetadataValue.property_id, MetadataValue.value_json).where(
+        select(
+            MetadataValue.property_id,
+            MetadataValue.value_json,
+            MetadataValue.value_number,
+        ).where(
             _of(target, [entity_id]),
-            MetadataValue.property_id.in_([c.property_id for c in options]),
+            MetadataValue.property_id.in_(changed),
         )
     )
-    return {property_id: list(slugs or []) for property_id, slugs in held.all()}
+    return {value.property_id: value for value in held.all()}
 
 
 def _options_changed(
@@ -648,6 +703,22 @@ def _options_changed(
     return cols
 
 
+def _stepped(
+    defn: MetadataDefinition, stored: Optional[Decimal], step: PropertyStep
+) -> Dict[str, Any]:
+    """The typed columns of a counter once ``step`` is taken from what it
+    holds, or from its initial value where it holds none, within its
+    bounds."""
+    if defn.type is not MetadataType.counter:
+        raise _bad_value()
+    settings = CounterSettings.model_validate(defn.counter or {})
+    count = Decimal(str(settings.initial)) if stored is None else stored
+    by = Decimal(str(settings.step))
+    cols = _empty_columns()
+    cols["value_number"] = _within(defn, count + by if step.up else count - by)
+    return cols
+
+
 async def set_values(
     session: AsyncSession,
     row: Any,
@@ -656,6 +727,7 @@ async def set_values(
     initiative_id: Optional[int],
     removed: Optional[Sequence[int]] = None,
     options: Sequence[PropertyOptionsChange] = (),
+    steps: Sequence[PropertyStep] = (),
     collection_id: Optional[int] = None,
 ) -> None:
     """The whole write a person or a plug-in makes: resolve a plug-in's person
@@ -670,6 +742,7 @@ async def set_values(
         initiative_id=initiative_id,
         removed=removed,
         options=options,
+        steps=steps,
         collection_id=collection_id,
     )
     # A collection's metadata is the collection's, so it leaves the file as
@@ -837,6 +910,7 @@ async def copy_definitions(
             color=defn.color,
             options=defn.options,
             currency=defn.currency,
+            counter=defn.counter,
         )
         for defn in definitions
     ]
@@ -937,6 +1011,7 @@ async def promote(
             position=0 if last is None else last + 1,
             color=first.color,
             currency=first.currency,
+            counter=first.counter,
         )
     elif (target.type, target.currency) != shape:
         raise HTTPException(
@@ -1145,7 +1220,7 @@ def _rehydrate_value(
     ptype = defn.type
     if ptype in {MetadataType.text, MetadataType.url, MetadataType.select}:
         return row.value_text
-    if ptype in {MetadataType.number, MetadataType.currency}:
+    if ptype in {MetadataType.number, MetadataType.currency, MetadataType.counter}:
         return _number_to_json(row.value_number)
     if ptype is MetadataType.scale:
         return int(row.value_number) if row.value_number is not None else None
@@ -1194,6 +1269,7 @@ def summaries_from_rows(rows: Iterable[MetadataValue]) -> List[PropertySummary]:
                 collection_id=defn.collection_id,
                 options=_parsed_options(defn) or None,
                 currency=defn.currency,
+                counter=defn.counter,
                 value=_rehydrate_value(defn, row, row.value_user),
             )
         )

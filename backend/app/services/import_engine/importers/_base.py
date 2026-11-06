@@ -26,6 +26,7 @@ from app.schemas.tenant.project_export import (
     ProjectExportPropertyDefinition,
     ProjectExportTag,
 )
+from app.schemas.tenant.property import CounterSettings
 from app.services.import_engine.common import (
     decode_property_value,
     ensure_tag,
@@ -334,6 +335,11 @@ class PropertyRestore:
         currency = (declared.currency if declared is not None else None) or (
             value.currency if value is not None else None
         )
+        counter = (
+            (declared.counter if declared is not None else None) or CounterSettings()
+            if prop_type is MetadataType.counter
+            else None
+        )
         for candidate in (name, f"{name}_{prop_type.value}"):
             found = self._existing.get(candidate)
             if (
@@ -368,6 +374,7 @@ class PropertyRestore:
             ),
             color=declared.color if declared is not None else None,
             currency=currency,
+            counter=counter.model_dump() if counter is not None else None,
             options=(
                 declared.options
                 if declared is not None

@@ -6,7 +6,7 @@ from typing import Annotated, List, Optional, TYPE_CHECKING
 
 from pydantic import AliasChoices, ConfigDict, Field, model_validator
 
-from app.core.collection_shapes import SHAPES, ScaleDisplay
+from app.core.collection_shapes import SHAPES, FieldDisplay
 from app.core.file_types import FileType
 from app.core.identity_boundary import UPLOAD_PATH, GuildId, PersonId
 from app.schemas.base import MentionStr, SanitizedBaseModel, TitleStr
@@ -189,7 +189,7 @@ class CollectionShapeMetadata(SanitizedBaseModel):
     name: str
     type: MetadataType
     #: For a scale, how the shape's lists show it.
-    display: Optional[ScaleDisplay] = None
+    display: Optional[FieldDisplay] = None
     #: For money, the currency it starts in.
     currency: Optional[CurrencyCode] = None
 

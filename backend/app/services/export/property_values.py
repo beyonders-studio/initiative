@@ -43,7 +43,7 @@ def property_export_dict(summary: PropertySummary) -> dict:
     record: dict = {"property_name": summary.name, "property_type": prop_type}
     if prop_type in ("text", "url", "select"):
         record["value_text"] = value
-    elif prop_type in ("number", "currency", "scale"):
+    elif prop_type in ("number", "currency", "scale", "counter"):
         record["value_number"] = float(value) if value is not None else None
     elif prop_type == "checkbox":
         record["value_boolean"] = value

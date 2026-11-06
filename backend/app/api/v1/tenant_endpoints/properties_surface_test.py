@@ -356,6 +356,51 @@ async def test_option_changes_apply_to_what_the_value_holds(
     assert _values(response.json()) == {sprint.id: ["b", "c"]}
 
 
+async def test_steps_apply_to_what_the_counter_holds(
+    client: AsyncClient, session: AsyncSession, acting_user
+):
+    """A counter with no value steps from its initial value, by its step, and
+    neither a step nor a value written goes past its bounds. Only a counter
+    steps."""
+    a, parent = await _scene(TASKS, session, acting_user)
+    entity = await TASKS.make(session, a, parent, "E")
+    seats = await create_property_definition(
+        session,
+        a.initiative,
+        name="Seats",
+        type=MetadataType.counter,
+        counter={"step": 2, "min": 0, "max": 5, "initial": 1},
+    )
+    note = await create_property_definition(
+        session, a.initiative, name="Note", type=MetadataType.number
+    )
+
+    async def step(property_id: int, up: bool) -> Any:
+        return await _write(
+            client,
+            a,
+            TASKS,
+            entity,
+            [],
+            merge=True,
+            steps=[{"property_id": property_id, "up": up}],
+        )
+
+    counted = [
+        _values((await step(seats.id, up)).json())[seats.id]
+        for up in (True, True, False, False, False, False)
+    ]
+    assert counted == [3, 5, 3, 1, 0, 0]
+    written = await _write(
+        client, a, TASKS, entity, [{"property_id": seats.id, "value": 99}], merge=True
+    )
+    assert _values(written.json())[seats.id] == 5
+
+    refused = await step(note.id, True)
+    assert refused.status_code == 400
+    assert refused.json()["detail"] == "PROPERTY_INVALID_VALUE_FOR_TYPE"
+
+
 @pytest.mark.parametrize(
     ("type_", "add", "detail"),
     [

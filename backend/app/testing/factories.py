@@ -1087,6 +1087,9 @@ async def create_property_definition(
         "color": color,
         "options": options,
         "currency": "USD" if type is MetadataType.currency else None,
+        "counter": {"step": 1, "min": None, "max": None, "initial": 0}
+        if type is MetadataType.counter
+        else None,
     }
 
     data = {**defaults, **overrides}

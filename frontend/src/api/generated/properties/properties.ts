@@ -26,8 +26,8 @@ type SecondParameter<T extends (...args: never) => unknown> = Parameters<T>[1];
 
 /**
  * Replace the custom property values on one tool or sub-tool, or with
- * ``merge`` write only the ones named and leave the rest, and change options
- * of multi-select values against what each holds.
+ * ``merge`` write only the ones named and leave the rest, change options of
+ * multi-select values and step counters against what each holds.
  *
  * Requires write on the tool that governs it: a tool itself, or the tool a
  * sub-tool sits in (a task's project, an event's calendar). Each value's

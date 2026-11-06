@@ -54,6 +54,10 @@ class MetadataType(str, Enum):
     currency = "currency"
     #: 0 to 100, which a layout shows as a number, stars or a bar.
     scale = "scale"
+    #: A number people step up and down, by the step its definition's
+    #: ``counter`` names and within its bounds, which a layout shows as a
+    #: number, a bar or a clock.
+    counter = "counter"
     #: ``{url, text?}``.
     link = "link"
     #: ``{text, tone?}``.
@@ -108,6 +112,10 @@ class MetadataDefinition(CreatedByMixin, table=True):
         CheckConstraint(
             "(type = 'currency') = (currency IS NOT NULL)",
             name="ck_metadata_definitions_currency",
+        ),
+        CheckConstraint(
+            "(type = 'counter') = (counter IS NOT NULL)",
+            name="ck_metadata_definitions_counter",
         ),
         CheckConstraint(
             "num_nonnulls(project_id, collection_id, install_id) <= 1",
@@ -202,6 +210,11 @@ class MetadataDefinition(CreatedByMixin, table=True):
     #: every other type.
     currency: Optional[str] = Field(
         default=None, sa_column=Column(String(length=3), nullable=True)
+    )
+    #: A ``counter`` definition's ``{step, min, max, initial}``
+    #: (``CounterSettings``); None for every other type.
+    counter: Optional[dict] = Field(
+        default=None, sa_column=Column(JSONB(none_as_null=True), nullable=True)
     )
     created_at: datetime = Field(
         default_factory=lambda: datetime.now(timezone.utc),
