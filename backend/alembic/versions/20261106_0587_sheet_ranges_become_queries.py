@@ -29,8 +29,8 @@ rewritten like any other.
 A description holds at most 20 columns, so a range wider than that keeps its
 statement and opens on SQL.
 
-Revision ID: 20261106_0586
-Revises: 20261106_0585
+Revision ID: 20261106_0587
+Revises: 20261106_0586
 Create Date: 2026-11-06
 """
 
@@ -44,8 +44,8 @@ import sqlalchemy as sa
 from pglast import parse_sql
 from pglast.stream import RawStream
 
-revision = "20261106_0586"
-down_revision = "20261106_0585"
+revision = "20261106_0587"
+down_revision = "20261106_0586"
 branch_labels = None
 depends_on = None
 

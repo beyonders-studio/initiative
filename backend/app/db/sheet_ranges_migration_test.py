@@ -1,4 +1,4 @@
-"""Migration 20261106_0586 turns stored sheet-range bindings into statements.
+"""Migration 20261106_0587 turns stored sheet-range bindings into statements.
 
 Loaded by path, as the other migration tests load theirs, and asked of the
 rewrite itself: what each binding becomes, and what the downgrade puts back.
@@ -18,7 +18,7 @@ _PATH = (
     Path(__file__).resolve().parents[2]
     / "alembic"
     / "versions"
-    / "20261106_0586_sheet_ranges_become_queries.py"
+    / "20261106_0587_sheet_ranges_become_queries.py"
 )
 _spec = importlib.util.spec_from_file_location(_PATH.stem, _PATH)
 assert _spec and _spec.loader
