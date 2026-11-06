@@ -145,8 +145,10 @@ export const readRange = (content: unknown, range: string | null): RangeRead => 
   for (let row = r1; row < r1 + height; row++) {
     const line: CellValue[] = [];
     for (let col = c1; col < c1 + width; col++) {
+      // A formula that gives "" shows as an empty cell, and reads as one.
       const result = evaluator.evaluate(row, col, sheet.id);
-      line.push(result.error ?? result.value ?? null);
+      const value = result.error ?? result.value ?? null;
+      line.push(value === "" ? null : value);
     }
     read.push(line);
   }

@@ -10,9 +10,10 @@ The cells are read by the grid's own code in the editor's server build
 (:func:`app.services.editor_engine.sheet_range`): the range, the formulas and
 the header, as the grid shows them.
 
-A read is kept for :data:`_KEEP_SECONDS`, keyed on the file's last save, so a
-dashboard read by many people opens the workbook once per save. The key is
-asked only after the lookup has found the file for this statement.
+A range read is kept for :data:`_KEEP_SECONDS`, keyed on the file's last
+save, so a dashboard read by many people opens the workbook once per save. The
+key is asked only after the lookup has found the file for this statement. A
+range the reader refused is not kept.
 """
 
 from __future__ import annotations
@@ -32,8 +33,9 @@ from app.services.query.resolve import QueryError, Sheet, SheetCall
 
 #: How long a read range is kept. Short, so a ``TODAY()`` in one moves on.
 _KEEP_SECONDS = 60
-#: How many cells the kept ranges hold between them.
+#: How many cells the kept ranges hold between them, and how many ranges.
 _KEEP_CELLS = 1_000_000
+_KEEP_RANGES = 256
 
 #: Kept ranges, oldest first: when each was read, the answer, and its cells.
 _kept: OrderedDict[tuple[Any, ...], tuple[float, dict[str, Any], int]] = OrderedDict()
@@ -85,16 +87,22 @@ async def read(
                 answer = await editor_engine.sheet_range(content, call.range)
             except editor_engine.EditorError as failed:
                 raise QueryError(QueryMessages.SHEET_UNREADABLE) from failed
+            now = time.monotonic()
+            for stale in [
+                k for k, held in _kept.items() if now - held[0] > _KEEP_SECONDS
+            ]:
+                del _kept[stale]
             _kept.pop(key, None)
-            _kept[key] = (
-                time.monotonic(),
-                answer,
-                len(answer.get("rows") or ())
-                * max(1, len(answer.get("columns") or ())),
-            )
-            held = sum(entry[2] for entry in _kept.values())
-            while held > _KEEP_CELLS and _kept:
-                held -= _kept.popitem(last=False)[1][2]
+            if not answer.get("refused"):
+                _kept[key] = (
+                    now,
+                    answer,
+                    max(1, len(answer.get("rows") or ()))
+                    * max(1, len(answer.get("columns") or ())),
+                )
+            cells = sum(entry[2] for entry in _kept.values())
+            while _kept and (cells > _KEEP_CELLS or len(_kept) > _KEEP_RANGES):
+                cells -= _kept.popitem(last=False)[1][2]
 
         refused = answer.get("refused")
         if refused:

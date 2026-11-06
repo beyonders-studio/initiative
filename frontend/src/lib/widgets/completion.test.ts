@@ -274,6 +274,9 @@ describe("reading a spreadsheet", () => {
     expect(applyCompletion("sheet('", 7, 7, { name: "Jo's sheet", kind: "spreadsheet" }).text).toBe(
       "sheet('Jo''s sheet'"
     );
+    expect(applyCompletion("SELECT sum(q", 11, 12, { name: "Q3 total", kind: "field" }).text).toBe(
+      'SELECT sum("Q3 total"'
+    );
   });
 
   it("offers a range's columns bare and under the name it is read under", () => {

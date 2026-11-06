@@ -89,6 +89,18 @@ describe("readRange", () => {
     });
   });
 
+  it("reads a formula that gives an empty string as an empty cell", () => {
+    const blanks = {
+      sheets: [
+        { id: "s1", name: "S", cells: { "0:0": "Amount", "1:0": 5, "2:0": '=IF(1>2,1,"")' } },
+      ],
+    };
+    expect(readRange(blanks, "A1:A3")).toMatchObject({
+      columns: [{ name: "Amount", type: "number" }],
+      rows: [[5], [null]],
+    });
+  });
+
   it("says what a range got wrong", () => {
     expect(readRange(workbook, "Q4!A1")).toEqual({
       refused: "unknown_sheet",

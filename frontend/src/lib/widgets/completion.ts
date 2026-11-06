@@ -55,6 +55,9 @@ export interface DatasetFields {
 /** A name that qualifies the one being typed: `assignee.disp`. */
 const QUALIFIED = /([A-Za-z0-9_]+)\.([A-Za-z0-9_]*)$/;
 
+/** A name SQL reads as written, without quotes. */
+const PLAIN = /^[A-Za-z_][A-Za-z0-9_]*$/;
+
 /** A spreadsheet's name being typed as the first argument of `sheet()`. */
 const SPREADSHEET_NAME = /\bsheet\(\s*'((?:[^']|'')*)$/i;
 
@@ -236,7 +239,8 @@ export const applyCompletion = (
   // A relation is never the end of a name: choosing one leaves the caret past
   // the dot, where the next thing offered is one of its columns.
   // A spreadsheet's name closes the quote it was typed in, its own quotes
-  // doubled as a string constant's are.
+  // doubled as a string constant's are. A field named by a header SQL cannot
+  // read bare (`Q3 total`) goes in double quotes.
   const inserted =
     completion.kind === "function"
       ? `${completion.name}(`
@@ -244,7 +248,9 @@ export const applyCompletion = (
         ? `${completion.name}.`
         : completion.kind === "spreadsheet"
           ? `${completion.name.replace(/'/g, "''")}'`
-          : completion.name;
+          : completion.kind === "field" && !PLAIN.test(completion.name)
+            ? `"${completion.name.replace(/"/g, '""')}"`
+            : completion.name;
   return {
     text: text.slice(0, start) + inserted + text.slice(end),
     caret: start + inserted.length,

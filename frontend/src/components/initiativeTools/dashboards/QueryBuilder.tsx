@@ -61,6 +61,9 @@ const BUCKETS = ["day", "week", "month", "quarter", "year"] as const;
 /** The one column that is not a field: how many rows there are. */
 const COUNT_ALL: QueryColumnSpec = { field: "*", aggregate: "count", alias: "count" };
 
+/** The most columns a description holds (`QueryBuildRequest.columns`). */
+const MAX_COLUMNS = 20;
+
 /** The dataset picker's choice for a range of a spreadsheet. */
 const SPREADSHEET = "sheet";
 /** The sheet picker's choice for a range that names no sheet. */
@@ -190,7 +193,8 @@ export function QueryBuilder({
   }, [defaultFilters, spec, onChange]);
 
   /**
-   * A range starts with every one of its columns, shown as it is.
+   * A range starts with its columns, shown as they are: every one of them,
+   * as many as a description holds.
    *
    * Seeded once its columns arrive, for each range in turn: choosing another
    * file, sheet or range starts over, while removing columns from this one
@@ -205,7 +209,7 @@ export function QueryBuilder({
     if (spec.columns.some((column) => column.field !== "*")) return;
     onChange({
       ...spec,
-      columns: sheet.fields.map((field) => ({ field: field.name })),
+      columns: sheet.fields.slice(0, MAX_COLUMNS).map((field) => ({ field: field.name })),
       group_by: [],
     });
   }, [reading, sheet, spec, onChange]);

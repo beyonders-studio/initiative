@@ -22,7 +22,12 @@ for one, and is named in the log.
 What each widget was rides along under ``legacy`` (as in ``20260909_0241``),
 which is what lets the downgrade put it back. Dashboards and files force
 row-level security on their owner, which this runs as, so the force is lifted
-while the rows are read and written and restored whatever happens.
+while the rows are read and written and restored whatever happens; the
+dashboards' own triggers are held too, so an archived or trashed dashboard is
+rewritten like any other.
+
+A description holds at most 20 columns, so a range wider than that keeps its
+statement and opens on SQL.
 
 Revision ID: 20261106_0586
 Revises: 20261106_0585
@@ -45,6 +50,9 @@ branch_labels = None
 depends_on = None
 
 logger = logging.getLogger("alembic.runtime.migration")
+
+#: The most columns a builder description holds.
+_DESCRIBED_COLUMNS = 20
 
 #: The range a ``sheet_range`` binding took: one cell, or two corners.
 _RANGE = re.compile(r"^\s*\$?([A-Za-z]+)\$?(\d+)(?:\s*:\s*\$?([A-Za-z]+)\$?(\d+))?\s*$")
@@ -76,7 +84,7 @@ def _quoted(name: str) -> str:
     return '"' + name.replace('"', '""') + '"'
 
 
-def _reading(binding: dict, file) -> tuple[str, dict] | None:
+def _reading(binding: dict, file) -> tuple[str, dict | None] | None:
     """The statement and builder description that read what *binding* read
     from *file* (its ``name`` and ``content``), or ``None``."""
     content = file.content if isinstance(file.content, dict) else {}
@@ -122,7 +130,7 @@ def _reading(binding: dict, file) -> tuple[str, dict] | None:
         "where": [],
         "group_by": [],
     }
-    return statement, spec
+    return statement, spec if len(names) <= _DESCRIBED_COLUMNS else None
 
 
 def _rewrite(
@@ -156,7 +164,9 @@ def _rewrite(
         if reading is None:
             unbound.append(str(widget_id))
         else:
-            rewritten["sql"], rewritten["spec"] = reading
+            rewritten["sql"], spec = reading
+            if spec is not None:
+                rewritten["spec"] = spec
             legacy["sql"] = _fingerprint(rewritten["sql"])
             changed += 1
         widget["binding"] = rewritten
@@ -188,6 +198,9 @@ def upgrade() -> None:
             connection.execute(
                 sa.text(f'ALTER TABLE "{schema}".{table} NO FORCE ROW LEVEL SECURITY')
             )
+        connection.execute(
+            sa.text(f'ALTER TABLE "{schema}".dashboards DISABLE TRIGGER USER')
+        )
         try:
             stored = connection.execute(
                 sa.text(f'SELECT id, definition, config FROM "{schema}".dashboards')  # noqa: S608
@@ -251,6 +264,9 @@ def upgrade() -> None:
                 )
                 widgets += changed
         finally:
+            connection.execute(
+                sa.text(f'ALTER TABLE "{schema}".dashboards ENABLE TRIGGER USER')
+            )
             for table in ("dashboards", "files"):
                 connection.execute(
                     sa.text(f'ALTER TABLE "{schema}".{table} FORCE ROW LEVEL SECURITY')
@@ -299,6 +315,9 @@ def downgrade() -> None:
         connection.execute(
             sa.text(f'ALTER TABLE "{schema}".dashboards NO FORCE ROW LEVEL SECURITY')
         )
+        connection.execute(
+            sa.text(f'ALTER TABLE "{schema}".dashboards DISABLE TRIGGER USER')
+        )
         try:
             stored = connection.execute(
                 sa.text(f'SELECT id, definition, config FROM "{schema}".dashboards')  # noqa: S608
@@ -324,6 +343,9 @@ def downgrade() -> None:
                     },
                 )
         finally:
+            connection.execute(
+                sa.text(f'ALTER TABLE "{schema}".dashboards ENABLE TRIGGER USER')
+            )
             connection.execute(
                 sa.text(f'ALTER TABLE "{schema}".dashboards FORCE ROW LEVEL SECURITY')
             )
