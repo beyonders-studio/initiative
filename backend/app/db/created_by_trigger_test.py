@@ -77,12 +77,14 @@ async def test_a_write_that_skips_the_orm_is_stamped_too(session: AsyncSession):
 
     await _route(session, guild.id, actor.id)
     # A Core insert also skips the Python-side column defaults, so the
-    # timestamp is supplied here; ``created_by`` is the database's job.
+    # timestamps are supplied here; ``created_by`` is the database's job.
+    now = datetime.now(timezone.utc)
     await session.exec(
         insert(Counter).values(
             counter_group_id=group.id,
             name="written by statement",
-            created_at=datetime.now(timezone.utc),
+            created_at=now,
+            updated_at=now,
         )
     )
 

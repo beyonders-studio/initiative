@@ -1123,7 +1123,8 @@ async def test_backup_rejects_invalid_and_bomb_zips(
     assert escaped.status_code == 400
     assert escaped.json()["detail"] == "IMPORT_ZIP_INVALID"
 
-    monkeypatch.setattr(import_limits, "IMPORT_MAX_ZIP_MEMBERS", 1)
+    # A backup is held to the bundle bounds.
+    monkeypatch.setattr(import_limits, "IMPORT_MAX_BUNDLE_MEMBERS", 1)
     entry, envelope = _counter_group_entry()
     bomb = _make_backup_zip(
         _minimal_manifest(entries=[entry]),
@@ -1133,7 +1134,7 @@ async def test_backup_rejects_invalid_and_bomb_zips(
     assert too_many.status_code == 400
     assert too_many.json()["detail"] == "IMPORT_TOO_LARGE"
 
-    monkeypatch.setattr(import_limits, "IMPORT_MAX_ZIP_MEMBERS", 20_000)
+    monkeypatch.undo()
     future = _make_backup_zip({**_minimal_manifest(), "schema_version": 99})
     unsupported = await _upload_backup(client, a, future)
     assert unsupported.status_code == 400

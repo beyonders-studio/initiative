@@ -22,7 +22,12 @@ from sqlmodel.ext.asyncio.session import AsyncSession
 from app.core.config import settings
 from app.services.tenant import archive as archive_service
 from app.services.tenant.soft_delete import soft_delete_entity
-from app.testing import create_project, create_task, create_user
+from app.testing import (
+    create_project,
+    create_task,
+    create_user,
+    make_operations_community,
+)
 
 #: The tables the revision changes in a community's schema.
 _TABLES = ("projects", "tasks", "tool_layouts", "task_types", "intake_bindings")
@@ -79,6 +84,8 @@ async def test_every_project_gets_its_types_and_every_task_and_page_its_task_typ
     session, acting_user, provisioner
 ):
     a = await acting_user(guild_role="member", initiative=True, project=True)
+    # The intake tables the revision types are the operations community's now.
+    await make_operations_community(session, a.guild.id)
     german = await create_user(session, locale="de")
     gone = await create_user(session)
     german_project = await create_project(

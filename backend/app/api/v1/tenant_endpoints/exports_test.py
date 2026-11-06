@@ -2532,16 +2532,10 @@ async def test_initiative_backup_zip_layout_and_manifest(
     assert manifest["schema_version"] == 1
     assert manifest["guild"]["id"] == a.guild.id
     assert [i["id"] for i in manifest["initiatives"]] == [a.initiative.id]
+    # Every tool is on, and one holding nothing is in the backup whether or not
+    # anybody has written in it yet.
     assert manifest["initiatives"][0]["tools"] == {
-        "project": "included",
-        "file": "included",
-        "counter_group": "included",
-        "calendar": "included",
-        "post": "included",
-        # On, and holding nothing: a tool the initiative has is in the backup
-        # whether or not anybody has written in it yet.
-        "wiki": "included",
-        "dashboard": "included",
+        tool.value: "included" for tool in Tool
     }
 
     # Every file in the archive is accounted for by the manifest, and vice
@@ -3037,14 +3031,13 @@ async def test_estimate_reports_counts_uploads_and_ceilings(
     assert resp.status_code == 200
     body = resp.json()
     counts = {tool: t["count"] for tool, t in body["tools"].items()}
-    assert counts == {
+    # Every tool is on; the ones nobody has made anything in count none.
+    assert counts == {tool.value: 0 for tool in Tool} | {
         "project": 2,  # the actor fixture's project + Main Arc
         "file": 2,  # Campaign Notes + the file doc
         "counter_group": 1,
         "calendar": 1,
         "post": 1,
-        "wiki": 0,  # the tool is on; nobody has made one
-        "dashboard": 0,  # likewise
     }
     assert not any(t["disabled"] for t in body["tools"].values())
     assert body["uploads_count"] == 1
