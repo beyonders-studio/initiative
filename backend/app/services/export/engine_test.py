@@ -219,3 +219,48 @@ async def test_render_to_storage_beats_once_per_artifact(monkeypatch, force_zip)
     assert location.artifact_ref in storage.written
     archive = zipfile.ZipFile(io.BytesIO(storage.written[location.artifact_ref]))
     assert sorted(archive.namelist()) == ["a.zip", "b.zip", "c.zip"]
+
+
+async def test_a_stored_file_goes_into_the_archive_from_storage(monkeypatch):
+    """A file exported unconverted is copied from storage into its entry a
+    piece at a time; only the rest of the batch is rendered."""
+    from types import SimpleNamespace
+
+    from app.services.export import engine
+    from app.services.export.adapters import ADAPTERS
+    from app.services.export.contract import RenderItem, RenderRequest
+    from app.services.storage import ReadableBlob
+
+    asked: list[str] = []
+
+    class Recording(_Streaming):
+        async def render_stream(self, req):
+            asked.extend(item.key for item in req.batch)
+            async for artifact in super().render_stream(req):
+                yield artifact
+
+    storage = _RecordingStorage()
+    storage.open_readable = lambda key: ReadableBlob(stream=iter([b"raffle ", b"reel"]))
+    monkeypatch.setattr(engine, "get_backend", lambda: Recording())
+    monkeypatch.setattr(engine, "get_guild_storage", lambda _guild_id: storage)
+    monkeypatch.setitem(ADAPTERS, "copy-test", SimpleNamespace(force_zip=True))
+    request = RenderRequest(
+        guild_id=1,
+        template_id="data-table",
+        format="zip",
+        batch=(
+            RenderItem(key="manifest", data={}),
+            RenderItem(
+                key="raffle.mov",
+                data={"storage_key": "raffle.mov"},
+                filename="assets/raffle.mov",
+                format="file",
+            ),
+        ),
+    )
+
+    location = await engine.render_to_storage(request, job_id=9, source="copy-test")
+
+    archive = zipfile.ZipFile(io.BytesIO(storage.written[location.artifact_ref]))
+    assert archive.read("assets/raffle.mov") == b"raffle reel"
+    assert asked == ["manifest"]

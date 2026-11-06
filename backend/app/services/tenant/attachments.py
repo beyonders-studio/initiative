@@ -18,7 +18,6 @@ from typing import (
     BinaryIO,
     Dict,
     Iterable,
-    Iterator,
     Mapping,
     Set,
     Tuple,
@@ -42,7 +41,12 @@ from app.core.image_headers import read_image_header
 from app.db.advisory_locks import LockNamespace, advisory_lock
 from app.db.query import ids_in
 from app.services.platform import billing_changes
-from app.services.storage import ReadableBlob, get_guild_storage, open_seekable
+from app.services.storage import (
+    ReadableBlob,
+    blob_pieces,
+    get_guild_storage,
+    open_seekable,
+)
 
 logger = logging.getLogger(__name__)
 
@@ -879,7 +883,7 @@ def validate_stored(guild_id: int, key: str, size: int, filename: str | None) ->
         blob = storage.open_readable(key)
         if blob is None:
             raise ValueError("Uploaded file is missing")
-        upload_scanning.scan_stream(_pieces(blob), size)
+        upload_scanning.scan_stream(blob_pieces(blob), size)
     return mime
 
 
@@ -890,16 +894,6 @@ def validate_source(source: BinaryIO, filename: str | None) -> str:
     Raises :class:`RefusedFileTypeError` for a program."""
     detected = detect_mime_type(source.read(_head_bytes()))
     return _type_of(detected, source, filename)[0]
-
-
-def _pieces(blob: ReadableBlob) -> Iterator[bytes]:
-    """A stored file's bytes a piece at a time, from disk or from a stream."""
-    if blob.path is None:
-        yield from blob.stream or ()
-        return
-    with blob.path.open("rb") as handle:
-        while piece := handle.read(1024 * 1024):
-            yield piece
 
 
 def _type_of(
@@ -986,7 +980,7 @@ async def store_upload(
         size = data.stat().st_size
         if scan:
             await asyncio.to_thread(
-                upload_scanning.scan_stream, _pieces(ReadableBlob(path=data)), size
+                upload_scanning.scan_stream, blob_pieces(ReadableBlob(path=data)), size
             )
         await asyncio.to_thread(
             storage.write_file, filename, data, content_type=stored_type
