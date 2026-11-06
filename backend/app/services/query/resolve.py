@@ -37,18 +37,19 @@ from __future__ import annotations
 
 import json
 from dataclasses import dataclass
-from typing import Any, Mapping, Optional, Sequence
+from typing import Any, Callable, Mapping, Optional, Sequence
 
 from fastapi import status
 from pglast import ast, parse_sql
 from pglast.enums import A_Expr_Kind, SetOperation
-from pglast.parser import ParseError
+from pglast.parser import ParseError, scan
 from pglast.stream import RawStream
 from pglast.visitors import Visitor
 from sqlalchemy import column as sql_column
 
 from app.core.errors import CodedError
 from app.core.messages import QueryMessages
+from app.core.search import SearchEntityType
 from app.core.tools import Tool
 from app.db import gucs
 from app.services.fields import dataset
@@ -1283,3 +1284,79 @@ def resolve(sql: str, read: Mapping[SheetCall, Sheet] | None = None) -> Resolved
         sheets=tuple((calls[key][0], sheet) for key, sheet in sheets.items()),
         source=sql if any(not sheet.read for sheet in sheets.values()) else "",
     )
+
+
+def remap_ids(sql: str, remap: Callable[[SearchEntityType, int], int]) -> str:
+    """*sql*, with each row id it names as a constant put through *remap*.
+
+    A constant names a row where it is compared with ``=``, ``<>`` or ``IN`` to
+    a column that is a table's own id or a key into one, and where it is the
+    file ``sheet()`` reads; the row is of the kind that table holds
+    (:data:`~app.db.search_index.SEARCH_SOURCES`), so a person, who is not one,
+    is left alone. Each constant is replaced where it is written, so the rest
+    of the text, comments included, stays as it was. A statement that does not
+    resolve, and a constant written in a shape this does not read (a cast, a
+    comparison with the constant first), come back unchanged.
+    """
+    from app.db.search_index import SEARCH_SOURCES
+
+    numbers = [token for token in scan(sql) if token.name == "ICONST"]
+    # Where each constant to replace starts, its kind, and its value: found by
+    # what it is written after, since a parsed constant keeps no position.
+    found: list[tuple[int, SearchEntityType, int]] = []
+
+    def after(location: Any, values: Sequence[Any], kind: SearchEntityType) -> None:
+        if not isinstance(location, int):
+            # A join the resolver wrote in, which nobody typed.
+            return
+        tokens = [token for token in numbers if token.start > location][: len(values)]
+        for token, value in zip(tokens, values):
+            if (
+                isinstance(value, ast.A_Const)
+                and isinstance(value.val, ast.Integer)
+                and sql[token.start : token.end + 1] == str(value.val.ival)
+            ):
+                found.append((token.start, kind, value.val.ival))
+
+    class Sheets(Visitor):
+        def visit_FuncCall(self, ancestors: Any, call: ast.FuncCall) -> None:
+            if _name_parts(call.funcname) == [SHEET] and call.args:
+                after(call.location, call.args[:1], SearchEntityType.file)
+
+    try:
+        select = _parse(sql)
+        Sheets()(select)
+        sheets = {
+            key: Sheet.unread(call) for key, (_, call) in _take_sheets(select).items()
+        }
+        _expand_relations(select)
+        scope = _relations(select, sheets)
+    except QueryError:
+        return sql
+
+    class Ids(Visitor):
+        def visit_A_Expr(self, ancestors: Any, node: ast.A_Expr) -> None:
+            if node.kind == A_Expr_Kind.AEXPR_IN:
+                values = tuple(node.rexpr or ())
+            elif _name_parts(node.name) in (["="], ["<>"]):
+                values = (node.rexpr,)
+            else:
+                return
+            spec = _field_named(scope, node.lexpr)
+            try:
+                column = spec.column.property.columns[0]
+            except AttributeError:
+                return
+            tables = (
+                [column.table.name]
+                if column.primary_key
+                else [key.column.table.name for key in column.foreign_keys]
+            )
+            source = SEARCH_SOURCES.get(tables[0]) if len(tables) == 1 else None
+            if source is not None:
+                after(node.lexpr.location, values, source.entity_type)
+
+    Ids()(select)
+    for start, kind, value in sorted(found, key=lambda entry: entry[0], reverse=True):
+        sql = f"{sql[:start]}{remap(kind, value)}{sql[start + len(str(value)) :]}"
+    return sql
