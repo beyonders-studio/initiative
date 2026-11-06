@@ -1680,9 +1680,10 @@ def _departs(named: NamedPerson) -> str:
     else:
         head = f"DELETE FROM %1$I.{named.table} t"
         frozen = freeze_leg(named.table, "DELETE", alias="t")
+    kept = f" AND NOT ({named.kept})" if named.kept else ""
     return (
         f"    EXECUTE format($q${head} WHERE t.{named.column} = $1"
-        f" AND {initiative} IS NOT DISTINCT FROM $2"
+        f" AND {initiative} IS NOT DISTINCT FROM $2{kept}"
         f" AND (pg_trigger_depth() > 0 OR NOT COALESCE({frozen}, false))$q$,"
         " p_schema) USING p_user_id, p_initiative_id;"
     )

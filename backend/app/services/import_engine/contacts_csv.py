@@ -273,6 +273,7 @@ async def preview(
                 await load_initiative_properties(session, initiative_id=initiative_id)
             ).items()
             if definition.id is not None
+            and definition.type is not MetadataType.signature
         }
         if initiative_id is not None
         else {}
@@ -435,7 +436,9 @@ async def place(
             for definition in (
                 await load_initiative_properties(session, initiative_id=initiative.id)
             ).values()
+            # A column fills a value for nobody's signature.
             if definition.id is not None
+            and definition.type is not MetadataType.signature
         }
     if (
         not any(c.target is Target.name for c in request.columns)

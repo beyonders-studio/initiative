@@ -4,6 +4,7 @@ import {
   type ContactCsvColumn,
   type ContactCsvPreview,
   ContactCsvTarget,
+  MetadataType,
 } from "@/api/generated/initiativeAPI.schemas";
 import { Label } from "@/components/ui/label";
 import {
@@ -110,11 +111,14 @@ export function ContactColumnsStep({
                       {t(`wizard.contacts.targets.${target}`)}
                     </SelectItem>
                   ))}
-                  {(properties.data ?? []).map((property) => (
-                    <SelectItem key={property.id} value={`${PROPERTY}${property.id}`}>
-                      {property.name}
-                    </SelectItem>
-                  ))}
+                  {/* A column fills a value for nobody's signature. */}
+                  {(properties.data ?? [])
+                    .filter((property) => property.type !== MetadataType.signature)
+                    .map((property) => (
+                      <SelectItem key={property.id} value={`${PROPERTY}${property.id}`}>
+                        {property.name}
+                      </SelectItem>
+                    ))}
                 </SelectContent>
               </Select>
               {column && DETAILS.has(column.target) ? (

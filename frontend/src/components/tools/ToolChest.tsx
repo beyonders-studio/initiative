@@ -49,6 +49,7 @@ export interface ToolChestEntity {
   archived_at: string | null;
   tags: TagSummary[];
   properties?: PropertySummary[];
+  updated_at?: string;
   can: Pick<ToolCan, "edit" | "unarchive">;
 }
 
@@ -188,6 +189,7 @@ export const ToolChest = ({ tool, entity, template, kind, children }: ToolChestP
             readOnly={!canEdit}
             initiativeId={entity.initiative_id as number}
             canOpen={kind ? undefined : { tool, id: entity.id }}
+            updatedAt={entity.updated_at}
             hideLabel
           />
         </div>

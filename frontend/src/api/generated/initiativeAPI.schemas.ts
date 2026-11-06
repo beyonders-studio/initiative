@@ -1420,6 +1420,7 @@ export const MetadataType = {
   scale: "scale",
   counter: "counter",
   file: "file",
+  signature: "signature",
   link: "link",
   badge: "badge",
   json: "json",
@@ -1637,7 +1638,7 @@ export interface PropertySummary {
   options: PropertyOption[] | null;
   currency: CurrencyCode | null;
   counter: CounterSettingsOutput | null;
-  /** Shaped by the definition's type. For user_reference, a person: id, username, discriminator, display_name and avatar_url, or an PluginPerson when the reader is an installed plug-in. For file, a file: id, name, file_type and smart_link_url, or its id alone where the reader cannot open it. A plug-in's value is as the plug-in wrote it: a list field's an array of its elements, newest first, each with its ref, and a value with a state the state beside it. */
+  /** Shaped by the definition's type. For user_reference, a person: id, username, discriminator, display_name and avatar_url, or an PluginPerson when the reader is an installed plug-in. For file, a file: id, name, file_type and smart_link_url, or its id alone where the reader cannot open it. For signature, the signer as user (a person, shaped as user_reference's), the name they typed and when they signed: user, name and signed_at. A plug-in's value is as the plug-in wrote it: a list field's an array of its elements, newest first, each with its ref, and a value with a state the state beside it. */
   value: unknown;
 }
 

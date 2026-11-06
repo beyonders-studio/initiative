@@ -160,7 +160,7 @@ async def activity_context(
 
 def _shown(field: PropertySummary) -> Any:
     """A field's value as the task's page shows it: an option by its label,
-    a person or a file by their name."""
+    a person or a file by their name, a signature by the name typed and when."""
     value = field.model_dump(mode="json", include={"value"}).get("value")
     if field.options and value is not None:
         labels = {option.value: option.label for option in field.options}
@@ -171,6 +171,8 @@ def _shown(field: PropertySummary) -> Any:
         return display_name(SimpleNamespace(**value))
     if field.type is MetadataType.file and isinstance(value, dict):
         return value.get("name")
+    if field.type is MetadataType.signature and isinstance(value, dict):
+        return f"{value['name']}, {value['signed_at']}"
     return value
 
 

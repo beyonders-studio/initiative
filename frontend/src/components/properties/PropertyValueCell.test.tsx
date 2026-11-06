@@ -5,6 +5,7 @@ import { describe, expect, it, vi } from "vitest";
 import { buildPropertySummary } from "@/__tests__/factories/properties";
 import { renderWithProviders } from "@/__tests__/helpers/render";
 import { MetadataType } from "@/api/generated/initiativeAPI.schemas";
+import { formatDateTime } from "@/lib/formatDate";
 import { numberFormat } from "@/lib/intl";
 
 import { PropertyValueCell } from "./PropertyValueCell";
@@ -34,6 +35,23 @@ describe("PropertyValueCell", () => {
 
     rerender(<PropertyValueCell summary={{ ...field, value: { id: 7 } }} />);
     expect(screen.getByText("A file you can't open")).toBeInTheDocument();
+  });
+
+  it("says who signed and when, and on the item's page whether it changed since", () => {
+    const signedAt = "2026-11-06T18:00:00Z";
+    const field = buildPropertySummary({
+      type: MetadataType.signature,
+      value: { user: { id: 3, display_name: "Ada" }, name: "Ada L.", signed_at: signedAt },
+    });
+    const signed = `Ada L., ${formatDateTime(signedAt)}`;
+    const { rerender } = renderWithProviders(
+      <PropertyValueCell summary={field} updatedAt="2026-11-06T17:00:00Z" />
+    );
+    expect(screen.getByText(signed)).toBeInTheDocument();
+    expect(screen.queryByText("Updated after signing")).not.toBeInTheDocument();
+
+    rerender(<PropertyValueCell summary={field} updatedAt="2026-11-06T19:00:00Z" />);
+    expect(screen.getByText("Updated after signing")).toBeInTheDocument();
   });
 
   it("draws a scale as a number, stars or a bar, as its layout says", () => {

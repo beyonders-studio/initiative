@@ -25,7 +25,7 @@ from __future__ import annotations
 
 import re
 from dataclasses import dataclass, replace
-from typing import Callable, Iterable
+from typing import Callable, Iterable, Optional
 
 from app.db import gucs
 from app.core.plugin_scopes import tool_resource
@@ -1781,13 +1781,23 @@ class NamedPerson:
     column: str
     #: The row stays and the column is emptied, rather than the row deleted.
     clear: bool = False
+    #: The rows that keep the person, as a condition on ``t``, where ``%1$I``
+    #: is the schema: what records something they did, rather than names them.
+    kept: Optional[str] = None
 
 
 NAMED_PEOPLE: tuple[NamedPerson, ...] = (
     NamedPerson("task_assignees", "user_id"),
     NamedPerson("calendar_event_attendees", "user_id"),
     NamedPerson("calendar_event_answers", "user_id"),
-    NamedPerson("metadata_values", "value_user_id", clear=True),
+    # A signature says who signed, so it keeps them.
+    NamedPerson(
+        "metadata_values",
+        "value_user_id",
+        clear=True,
+        kept="t.property_id IN (SELECT d.id FROM %1$I.metadata_definitions d"
+        " WHERE d.type::text = 'signature')",
+    ),
     # What somebody asked for goes with them: nobody is left to answer for.
     NamedPerson("share_requests", "user_id"),
 )

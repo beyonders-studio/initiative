@@ -598,6 +598,7 @@ export const WikiPageView = () => {
                 readOnly={!canWrite}
                 initiativeId={propertiesInitiativeId}
                 canOpen={{ tool: Tool.wiki, id: wikiId }}
+                updatedAt={page.updated_at}
                 hideLabel
               />
             ) : null}

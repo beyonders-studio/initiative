@@ -154,6 +154,7 @@
   "PROPERTY_COUNTER_MIN_GREATER_THAN_MAX": "El mínimo de un contador no puede ser mayor que su máximo",
   "PROPERTY_PROMOTE_TYPES_DIFFER": "Solo las propiedades de un mismo tipo, y el dinero en una misma moneda, se combinan en un campo de metadatos",
   "PROPERTY_PROMOTE_VALUE_NOT_EDITABLE": "Algunos de estos valores están en elementos que no puedes editar",
+  "PROPERTY_SIGNER_ONLY": "Solo una persona puede firmar, en su propio nombre",
   "ATTACHMENT_IMAGE_ONLY": "Solo se admiten cargas de imágenes",
   "ATTACHMENT_INVALID_IMAGE": "No se pudo validar el contenido de la imagen",
   "FILE_NAME_ALREADY_EXISTS": "Ya existe un archivo con este título en esta iniciativa",

@@ -69,6 +69,13 @@ type BackendOp = (typeof BACKEND_OPS)[number];
 
 const DEFAULT_MAX_FILTERS = 5;
 
+/** The types compared as another: a counter with a number typed in, not
+ *  stepped to one, and a signature by who signed it. */
+const FILTERED_AS: Partial<Record<MetadataType, MetadataType>> = {
+  [MetadataType.counter]: MetadataType.number,
+  [MetadataType.signature]: MetadataType.user_reference,
+};
+
 /**
  * Return the ordered list of operators that make sense for a property type.
  * The first entry is used as the default when adding a new filter.
@@ -93,6 +100,7 @@ export const opsForType = (type: MetadataType): BackendOp[] => {
       // Backend always uses JSONB ``@>`` for multi_select; we only need one row.
       return ["eq"];
     case MetadataType.user_reference:
+    case MetadataType.signature:
       return ["eq", "in_", "is_null"];
     case MetadataType.file:
       return ["is_null"];
@@ -172,11 +180,7 @@ export const PropertyFilter = ({
         key: `${PROPERTY_KEY}${definition.id}`,
         name: definition.name,
         type: definition.type,
-        // A counter is compared with a number typed in, not stepped to one.
-        input:
-          definition.type === MetadataType.counter
-            ? { ...definition, type: MetadataType.number }
-            : definition,
+        input: { ...definition, type: FILTERED_AS[definition.type] ?? definition.type },
         plugin: false,
       })),
       ...(plugins?.fields ?? []).map((field) => ({

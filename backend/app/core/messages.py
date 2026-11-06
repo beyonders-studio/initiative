@@ -555,6 +555,8 @@ class PropertyMessages:
     PROMOTE_TYPES_DIFFER = "PROPERTY_PROMOTE_TYPES_DIFFER"
     #: A value to move sits on something the request may not edit.
     PROMOTE_VALUE_NOT_EDITABLE = "PROPERTY_PROMOTE_VALUE_NOT_EDITABLE"
+    #: A signature is written only by a person signing as themselves.
+    SIGNER_ONLY = "PROPERTY_SIGNER_ONLY"
 
 
 class AttachmentMessages:

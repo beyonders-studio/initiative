@@ -16,13 +16,14 @@ import {
 } from "react";
 import { useTranslation } from "react-i18next";
 
-import type {
-  ContentKind,
-  PropertyDefinitionRead,
-  PropertySummary,
-  TagSummary,
-  Tool,
-  UserSummary,
+import {
+  type ContentKind,
+  MetadataType,
+  type PropertyDefinitionRead,
+  type PropertySummary,
+  type TagSummary,
+  type Tool,
+  type UserSummary,
 } from "@/api/generated/initiativeAPI.schemas";
 import { usePersonMention } from "@/components/comments/usePersonMention";
 import { MentionComposer } from "@/components/markdown/MentionComposer";
@@ -308,6 +309,8 @@ type PropertiesProps<I extends { properties: PropertySummary[] }, P> = {
   /** The project whose metadata the item holds beside the initiative's
    *  properties: a task's. */
   owner?: MetadataOwner;
+  /** When the item last changed, which a signature made before it says. */
+  updatedAt?: string | null;
 };
 
 /** The item's properties with `property` as it reads after `value`, added
@@ -337,6 +340,7 @@ const PropertyField = <I extends { properties: PropertySummary[] }, P>({
   readOnly,
   initiativeId,
   canOpen,
+  updatedAt,
   property,
   placed = false,
 }: PropertiesProps<I, P> & {
@@ -354,12 +358,17 @@ const PropertyField = <I extends { properties: PropertySummary[] }, P>({
     properties: { values: [{ property_id: property.property_id, value }] },
     shows: { properties: withValue(properties, property, value) } as Partial<I>,
   });
+  // A signature cleared can't be put back: writing it again signs it anew,
+  // as whoever writes it.
+  const restorable = property.type !== MetadataType.signature;
   const draft = useFieldDraft(
     saved,
     (value) =>
       save.save(
         edit(value),
-        isEmptyPropertyValue(value) && !isEmptyPropertyValue(saved) ? edit(saved) : undefined
+        restorable && isEmptyPropertyValue(value) && !isEmptyPropertyValue(saved)
+          ? edit(saved)
+          : undefined
       ),
     sameJson
   );
@@ -379,7 +388,7 @@ const PropertyField = <I extends { properties: PropertySummary[] }, P>({
     draft.restore();
     void save.save(
       { properties: { values: [], removed: [property.property_id] }, shows: {} },
-      { ...edit(saved), shows: { properties } as Partial<I> }
+      restorable ? { ...edit(saved), shows: { properties } as Partial<I> } : undefined
     );
   };
   return (
@@ -414,6 +423,7 @@ const PropertyField = <I extends { properties: PropertySummary[] }, P>({
         initiativeId={initiativeId}
         canOpen={canOpen}
         selectedUser={userReferenceValue(property)}
+        updatedAt={updatedAt}
       />
     </FieldFrame>
   );
@@ -515,7 +525,7 @@ export const PlacedPropertyField = <I extends { properties: PropertySummary[] },
     if (isEmptyPropertyValue(property.value)) return null;
     return (
       <ReadField label={property.name}>
-        <PropertyValueCell summary={property} variant="cell" />
+        <PropertyValueCell summary={property} variant="cell" updatedAt={props.updatedAt} />
       </ReadField>
     );
   }
@@ -577,7 +587,11 @@ export const PropertiesField = <I extends { properties: PropertySummary[] }, P>(
                     <Icon className="h-3.5 w-3.5 shrink-0" aria-hidden />
                     <span className="truncate">{property.name}</span>
                   </span>
-                  <PropertyValueCell summary={property} variant="cell" />
+                  <PropertyValueCell
+                    summary={property}
+                    variant="cell"
+                    updatedAt={props.updatedAt}
+                  />
                 </li>
               );
             })}
