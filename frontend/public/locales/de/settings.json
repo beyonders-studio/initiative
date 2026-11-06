@@ -2210,7 +2210,7 @@
   },
   "customRoles": {
     "title": "Rollen",
-    "description": "Eine eigene Rolle gibt einem Mitglied einen Teil der Community-Verwaltung oder beschränkt einen Administrator auf einen Teil davon. Jede Person hat höchstens eine.",
+    "description": "Alle hier haben eine der integrierten Rollen. Eine eigene Rolle gibt einem Mitglied einen Teil der Community-Verwaltung oder beschränkt einen Administrator auf einen Teil davon. Jede Person hat höchstens eine eigene Rolle.",
     "add": "Rolle hinzufügen",
     "addTitle": "Rolle hinzufügen",
     "editTitle": "{{name}} bearbeiten",
@@ -2229,7 +2229,7 @@
     "surfacesLabel": "Was sie umfasst",
     "notYours": "Das hast du selbst nicht, also kannst du es nicht vergeben.",
     "holdsNothing": "Umfasst noch nichts.",
-    "empty": "Diese Community hat keine eigenen Rollen.",
+    "builtIn": "Integriert",
     "loading": "Rollen werden geladen",
     "loadError": "Die Rollen konnten nicht geladen werden.",
     "closed": "Wer diesen Server betreibt, hat eigene Rollen für diese Community geschlossen. Die vorhandenen Rollen gelten weiter.",

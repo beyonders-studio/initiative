@@ -77,6 +77,7 @@ import { SettingsUsersPage } from "./SettingsUsersPage";
 
 beforeEach(() => {
   state.invites = [];
+  state.members = [];
 });
 
 // The page's last render, whose reads are waited on before clicking into a
@@ -173,6 +174,19 @@ describe("SettingsUsersPage roles", () => {
     // not on the list it is offered.
     expect(await screen.findByText("Admin")).toBeInTheDocument();
     expect(screen.queryByText("Superadmin")).not.toBeInTheDocument();
+  });
+
+  it("names a superadmin's rung to an admin, and leaves changing it to the seat", async () => {
+    state.members = [buildUserCommunityMember({ community_role: "superadmin" })];
+    setup({ role: "admin" });
+
+    const picker = await screen.findByRole("combobox", { name: /community role for/i });
+    expect(picker).toHaveTextContent("Superadmin");
+    expect(picker).toBeDisabled();
+
+    cleanup();
+    setup({});
+    expect(await screen.findByRole("combobox", { name: /community role for/i })).toBeEnabled();
   });
 });
 
