@@ -433,7 +433,11 @@ def test_config_fills_only_what_the_definition_left_open():
             {
                 "id": "w1",
                 "type": "table",
-                "binding": {"source": "sheet_range", "file_id": 3, "range": None},
+                "binding": {
+                    "source": "query",
+                    "sql": "SELECT title FROM tasks",
+                    "spec": {"dataset": "tasks"},
+                },
             }
         )
     )
@@ -441,17 +445,17 @@ def test_config_fills_only_what_the_definition_left_open():
         {
             "widgets": {
                 "w1": {
-                    "range": "A1:B4",
-                    "file_id": 9,
-                    "source": "query",
-                    "sql": "SELECT title FROM tasks",
+                    "counter_id": 9,
+                    "spec": {"dataset": "projects"},
+                    "source": "plugin",
+                    "sql": "SELECT name FROM projects",
                     "initiative_id": 5,
                 }
             }
         },
         definition,
     )
-    assert config == {"widgets": {"w1": {"range": "A1:B4"}}}
+    assert config == {"widgets": {"w1": {"counter_id": 9}}}
 
 
 def test_config_for_a_removed_widget_is_dropped():
