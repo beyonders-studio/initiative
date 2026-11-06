@@ -4656,7 +4656,7 @@ export interface ContactSummary {
   emails: ContactDetail[];
   phones: ContactDetail[];
   addresses: ContactDetail[];
-  websites: ContactDetail[];
+  websites: ContactWebsite[];
   organization: ContactOrganization | null;
 }
 
@@ -4687,7 +4687,7 @@ export interface ContactRead {
   emails: ContactDetail[];
   phones: ContactDetail[];
   addresses: ContactDetail[];
-  websites: ContactDetail[];
+  websites: ContactWebsite[];
   organization: ContactOrganization | null;
 }
 

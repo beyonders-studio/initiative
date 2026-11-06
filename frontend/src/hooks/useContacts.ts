@@ -27,7 +27,7 @@ export const useMoveContact = (id: number, options?: MutationOpts<ContactRead, v
   useCommunityMutation<ContactRead, void>(
     {
       mutationFn: (communityId) => moveContact(communityId, id),
-      invalidate: () => invalidate(q.tool(Tool.contact, id)),
+      invalidate: () => invalidate(q.tool(Tool.contact, id), q.relationships()),
       errorKey: "contacts:error",
     },
     options

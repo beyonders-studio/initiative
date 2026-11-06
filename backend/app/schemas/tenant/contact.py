@@ -137,7 +137,7 @@ class ContactSummary(ToolSummaryBase):
     emails: List[ContactDetail] = Field(default_factory=list)
     phones: List[ContactDetail] = Field(default_factory=list)
     addresses: List[ContactDetail] = Field(default_factory=list)
-    websites: List[ContactDetail] = Field(default_factory=list)
+    websites: List[ContactWebsite] = Field(default_factory=list)
     #: A person's organization, read from their ``part_of`` link where the
     #: reader can open both; filled for a list page, None on a single read.
     organization: Optional[ContactOrganization] = None

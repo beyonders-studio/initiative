@@ -495,7 +495,7 @@ export function ContactDetailPage() {
 
       {contact ? (
         <div className="grid grid-cols-fill-80/2 items-start gap-6">
-          <ContactReach contact={contact} />
+          <ContactReach key={contact.id} contact={contact} />
           <ContactStanding contact={contact} links={links} />
           {contact.is_organization ? (
             <ContactPeople contact={contact} links={links} canAdd={canAddPeople} />

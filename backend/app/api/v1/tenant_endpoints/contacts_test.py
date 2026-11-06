@@ -118,6 +118,7 @@ async def test_an_initiative_contact_is_made_read_changed_and_trashed(
                 {"label": "Mobile", "value": "555 0100"},
                 {"label": "Office", "value": "555 0101"},
             ],
+            "websites": [{"value": "https://lakeside.example/" + "a" * 1500}],
         },
     )
     assert changed.status_code == 200, changed.text
@@ -126,6 +127,7 @@ async def test_an_initiative_contact_is_made_read_changed_and_trashed(
     assert read.json()["name"] == "Lakeside Lodge & Gardens"
     assert [p["value"] for p in read.json()["phones"]] == ["555 0100", "555 0101"]
     assert read.json()["emails"] == body["emails"]
+    assert len(read.json()["websites"][0]["value"]) == 1525
 
     # A list names each person's organization, read for the page at once.
     person = await client.post(
@@ -320,6 +322,14 @@ async def test_initiative_work_names_a_community_contact_one_way(
     )
     assert from_contact.status_code == 200, from_contact.text
     assert from_contact.json() == []
+    # Nor does the graph drawn around it.
+    around = await client.get(
+        a.g("/relationships/neighbourhood"),
+        headers=a.headers,
+        params={"entity": f"contact:{contact_id}", "hops": 2},
+    )
+    assert around.status_code == 200, around.text
+    assert (around.json()["nodes"], around.json()["edges"]) == ([], [])
 
 
 async def test_a_contact_moves_into_the_communitys_contacts(
