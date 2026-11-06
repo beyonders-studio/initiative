@@ -70,6 +70,12 @@ Not sure how the pieces fit together yet? [How Initiative is organized](../conce
 
     [:octicons-arrow-right-24: Wikis](wikis.md)
 
+-   :material-card-account-phone-outline: __Contacts__
+
+    The people and places your work involves, and how to reach them.
+
+    [:octicons-arrow-right-24: Contacts](contacts.md)
+
 -   :material-storefront-outline: __Plug-ins & the marketplace__
 
     Ready-made dashboards and plug-ins built by other groups.
