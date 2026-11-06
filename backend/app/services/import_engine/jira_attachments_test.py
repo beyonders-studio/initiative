@@ -242,3 +242,31 @@ def test_a_fetched_bundle_is_bounded_by_the_communitys_storage_left():
     assert ja.bundle_budget(5_000).bytes_left == 5_000
     assert ja.bundle_budget(-1).bytes_left == 0
     assert ja.bundle_budget(5_000).files_left == unbounded.files_left
+
+
+async def test_a_long_download_keeps_the_job_alive(monkeypatch):
+    """The fetch reports while an attachment is still arriving, not only
+    once it has."""
+    import asyncio
+
+    monkeypatch.setattr(ja, "HEARTBEAT_SECONDS", 0.01)
+    ticks: list[int] = []
+
+    async def tick() -> None:
+        ticks.append(1)
+
+    async def slow(attachment_id, max_bytes, target):
+        await asyncio.sleep(0.1)
+        return target.write(b"%PDF-slowly")
+
+    await ja.download_images(
+        [_issue("ACME-1", _att("11", "handbook.pdf", "application/pdf"))],
+        download=slow,
+        store=_sink(),
+        budget_bytes=10_000,
+        max_files=100,
+        files_allowed=True,
+        tick=tick,
+    )
+
+    assert len(ticks) > 1

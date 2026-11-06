@@ -23,6 +23,8 @@ from pathlib import Path
 from typing import Any, Awaitable, BinaryIO, Callable, Optional
 
 from app.core.messages import ImportEngineMessages
+from app.services.data_jobs import while_beating
+from app.services.import_engine.atlassian import HEARTBEAT_SECONDS
 from app.services.import_engine.contract import ImportEngineError
 from app.services.import_engine import limits as import_limits
 
@@ -250,10 +252,14 @@ async def download_images(
                 continue
             with tempfile.NamedTemporaryFile(prefix="import-attachment-") as spool:
                 try:
-                    size = await download(
-                        attachment.id,
-                        min(MAX_IMAGE_BYTES, left) if is_image else left,
-                        spool,
+                    size = await while_beating(
+                        download(
+                            attachment.id,
+                            min(MAX_IMAGE_BYTES, left) if is_image else left,
+                            spool,
+                        ),
+                        tick,
+                        every=HEARTBEAT_SECONDS,
                     )
                 except ImportEngineError as exc:
                     if exc.code == ImportEngineMessages.IMPORT_SOURCE_RATE_LIMITED:
@@ -274,7 +280,9 @@ async def download_images(
                     size_bytes=size,
                 )
                 spool.flush()
-                await store(stored, Path(spool.name))
+                await while_beating(
+                    store(stored, Path(spool.name)), tick, every=HEARTBEAT_SECONDS
+                )
             if is_image:
                 report.images += 1
                 report.image_bytes += stored.size_bytes

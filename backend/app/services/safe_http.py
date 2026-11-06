@@ -13,6 +13,7 @@ verification, and the ``Host`` header. Redirects are not followed.
 
 from __future__ import annotations
 
+import asyncio
 import logging
 import time
 from collections.abc import Mapping
@@ -302,12 +303,18 @@ async def request_public_target(
     raise RuntimeError(f"no validated address to connect to for {url!r}")
 
 
+#: How much of a body bound for a sink is gathered before it is written, in a
+#: thread, off the event loop.
+_SINK_PIECE_BYTES = 1024 * 1024
+
+
 async def _read_bounded(
     response: httpx.Response, max_bytes: int, sink: BinaryIO | None = None
 ) -> httpx.Response:
     """A streamed response read up to ``max_bytes`` decoded bytes: into
     memory, or written to ``sink`` from its start, emptied first, so that
-    after a retry or a redirect it holds the last response's body.
+    after a retry or a redirect it holds the last response's body. A sink is
+    written a piece of up to :data:`_SINK_PIECE_BYTES` at a time, in a thread.
 
     Returned as a plain response holding the decoded body, or none when it
     went to ``sink``, so the encoding headers that described the wire form
@@ -316,17 +323,20 @@ async def _read_bounded(
     body = bytearray()
     read = 0
     if sink is not None:
+        await asyncio.to_thread(sink.truncate, 0)
         sink.seek(0)
-        sink.truncate()
     try:
         async for chunk in response.aiter_bytes():
             read += len(chunk)
             if read > max_bytes:
                 raise ResponseTooLargeError(max_bytes, status_code=response.status_code)
-            if sink is None:
-                body += chunk
-            else:
-                sink.write(chunk)
+            body += chunk
+            if sink is not None and len(body) >= _SINK_PIECE_BYTES:
+                await asyncio.to_thread(sink.write, bytes(body))
+                body.clear()
+        if sink is not None and body:
+            await asyncio.to_thread(sink.write, bytes(body))
+            body.clear()
     finally:
         await response.aclose()
     headers = [

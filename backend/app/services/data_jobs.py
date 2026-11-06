@@ -37,7 +37,7 @@ from collections.abc import Awaitable, Callable
 from contextlib import suppress
 from dataclasses import dataclass, field
 from datetime import datetime, timezone
-from typing import Any
+from typing import Any, TypeVar
 
 from sqlalchemy import and_, func, or_
 from sqlmodel import col, select
@@ -288,6 +288,47 @@ class Dispatcher:
                 # again.
                 self.running.pop((guild_id, job_id), None)
         sweep_timers.wake("data_jobs", guild_id)
+
+
+Result = TypeVar("Result")
+
+
+async def while_beating(
+    work: Awaitable[Result],
+    beat: Callable[[], Awaitable[None]] | None,
+    *,
+    every: float,
+) -> Result:
+    """``work``, with ``beat`` awaited every ``every`` seconds while it runs.
+
+    A job's row reads as alive to the ``stale_jobs`` sweep of another process
+    only while something touches it, and one step of a job can take longer
+    than the sweep waits: a large file downloaded, copied or stored. A beat
+    that raises, as one reporting a cancel does, stops ``work`` and raises in
+    its place."""
+    if beat is None:
+        return await work
+    running = asyncio.ensure_future(work)
+
+    async def beating() -> None:
+        while True:
+            await asyncio.sleep(every)
+            await beat()
+
+    beats = asyncio.ensure_future(beating())
+    try:
+        await asyncio.wait({running, beats}, return_when=asyncio.FIRST_COMPLETED)
+        if not running.done():
+            running.cancel()
+            with suppress(asyncio.CancelledError):
+                await running
+            beats.result()
+        return running.result()
+    finally:
+        beats.cancel()
+        running.cancel()
+        if beats.done() and not beats.cancelled():
+            beats.exception()
 
 
 async def cancel_running_jobs() -> None:
