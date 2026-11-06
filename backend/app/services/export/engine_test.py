@@ -264,3 +264,18 @@ async def test_a_stored_file_goes_into_the_archive_from_storage(monkeypatch):
     archive = zipfile.ZipFile(io.BytesIO(storage.written[location.artifact_ref]))
     assert archive.read("assets/raffle.mov") == b"raffle reel"
     assert asked == ["manifest"]
+
+
+def test_a_file_an_object_store_streams_is_stored_again_whole():
+    """A single stored file a job exports unconverted is stored again under
+    the job's key; one that arrives as a stream goes through a temporary file
+    a piece at a time."""
+    from app.services.export import engine
+    from app.services.storage import ReadableBlob
+
+    storage = _RecordingStorage()
+    storage.open_readable = lambda key: ReadableBlob(stream=iter([b"raffle ", b"reel"]))
+
+    engine._store_again(storage, "raffle.mov", "exports/9-raffle.mov", None)
+
+    assert storage.written == {"exports/9-raffle.mov": b"raffle reel"}
