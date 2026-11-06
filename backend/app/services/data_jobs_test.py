@@ -54,3 +54,43 @@ async def test_a_beat_that_raises_stops_the_step_in_its_place():
     with pytest.raises(LookupError):
         await data_jobs.while_beating(download(), beat, every=0.01)
     assert stopped.is_set()
+
+
+async def test_a_beat_under_way_when_the_step_ends_finishes_first():
+    """The caller gets its session back only once a beat that was under way
+    has finished, not while a cancelled one is still unwinding."""
+    finished: list[int] = []
+
+    async def beat() -> None:
+        await asyncio.sleep(0.1)
+        finished.append(1)
+
+    async def build() -> str:
+        await asyncio.sleep(0.03)
+        return "built"
+
+    assert await data_jobs.while_beating(build(), beat, every=0.01) == "built"
+    assert finished == [1]
+
+
+async def test_work_that_must_finish_ends_before_a_beats_error():
+    """Work in a thread cannot be stopped, so with ``finish`` it runs to its
+    end and the beat's error comes after it."""
+    import time
+
+    import pytest
+
+    uploaded: list[int] = []
+
+    def upload() -> None:
+        time.sleep(0.05)
+        uploaded.append(1)
+
+    async def beat() -> None:
+        raise LookupError("taken over")
+
+    with pytest.raises(LookupError):
+        await data_jobs.while_beating(
+            asyncio.to_thread(upload), beat, every=0.01, finish=True
+        )
+    assert uploaded == [1]

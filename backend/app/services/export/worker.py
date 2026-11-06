@@ -25,9 +25,7 @@ stops without writing anything, so a job finishes and notifies once.
 
 from __future__ import annotations
 
-import asyncio
 import logging
-from collections.abc import Awaitable
 from contextlib import AbstractAsyncContextManager
 from datetime import datetime, timedelta, timezone
 
@@ -279,7 +277,9 @@ async def _execute(
             request = await apply_brand(request, user_session)
             return stamp_export(request, await name_here(user_session, user))
 
-    request = await _beating(build(), heartbeat)
+    request = await data_jobs.while_beating(
+        build(), heartbeat, every=atlassian.HEARTBEAT_SECONDS
+    )
 
     assert job.id is not None
     return request.initiative_ids, await export_engine.render_to_storage(
@@ -289,32 +289,6 @@ async def _execute(
         tz=(job.params or {}).get("tz"),
         heartbeat=heartbeat,
     )
-
-
-async def _beating(
-    work: Awaitable[export_engine.RenderRequest], heartbeat: data_jobs.Heartbeat
-) -> export_engine.RenderRequest:
-    """``work``, with ``heartbeat`` called every ``HEARTBEAT_SECONDS`` while it
-    runs, so a long build keeps its row fresh. A heartbeat that
-    raises (the row was taken over) cancels the work and raises."""
-
-    async def beat() -> None:
-        while True:
-            await asyncio.sleep(atlassian.HEARTBEAT_SECONDS)
-            await heartbeat()
-
-    worker = asyncio.ensure_future(work)
-    beater = asyncio.ensure_future(beat())
-    try:
-        await asyncio.wait({worker, beater}, return_when=asyncio.FIRST_COMPLETED)
-    finally:
-        for task in (worker, beater):
-            if not task.done():
-                task.cancel()
-        await asyncio.gather(worker, beater, return_exceptions=True)
-    if not beater.cancelled():
-        beater.result()
-    return worker.result()
 
 
 def _error_code(exc: Exception) -> str:

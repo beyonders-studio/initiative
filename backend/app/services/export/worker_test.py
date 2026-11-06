@@ -4,7 +4,6 @@ nothing, and a build is cancelled when its heartbeat finds the row taken.
 Claiming and slots are tested once, through imports; expiry in
 ``exports_test``."""
 
-import asyncio
 from datetime import datetime, timedelta, timezone
 
 import pytest
@@ -17,7 +16,6 @@ from app.models.tenant.data_job import DataJob, DataJobStatus
 from app.services.export import engine as export_engine
 from app.services.export import limits as export_limits
 from app.services.export import worker as export_worker
-from app.services.import_engine import atlassian
 from app.testing import (
     create_export_job,
     create_task,
@@ -132,21 +130,3 @@ async def test_a_render_that_lost_its_row_writes_nothing(
     assert done.status == "done"
     assert done.file_ref != "exports/lost.pdf"
     assert await _notices(session, a.user.id, job.id) == 1
-
-
-async def test_a_build_stops_when_its_heartbeat_finds_the_row_taken(monkeypatch):
-    """The heartbeat ticks while the adapter builds; one that raises cancels
-    the build rather than letting it run on."""
-    monkeypatch.setattr(atlassian, "HEARTBEAT_SECONDS", 0)
-    built = asyncio.Event()
-
-    async def build():
-        await asyncio.sleep(3600)
-        built.set()
-
-    async def heartbeat() -> None:
-        raise export_worker._Superseded
-
-    with pytest.raises(export_worker._Superseded):
-        await export_worker._beating(build(), heartbeat)
-    assert not built.is_set()

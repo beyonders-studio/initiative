@@ -42,6 +42,8 @@ from app.services.storage import (
     get_guild_storage,
 )
 from app.services.export import limits as export_limits
+from app.services.data_jobs import while_beating
+from app.services.import_engine.atlassian import HEARTBEAT_SECONDS
 from app.core.user_input_validators import resolve_zone
 from app.core.user_display import name_here
 
@@ -324,12 +326,17 @@ async def render_to_storage(
         # job's key, named as below.
         item = request.batch[0]
         key = f"exports/{job_id}-{_stored_name(item, request)}"
-        await asyncio.to_thread(
-            _store_again,
-            get_guild_storage(request.guild_id),
-            str(item.data["storage_key"]),
-            key,
-            str(item.data.get("content_type") or "") or None,
+        await while_beating(
+            asyncio.to_thread(
+                _store_again,
+                get_guild_storage(request.guild_id),
+                str(item.data["storage_key"]),
+                key,
+                str(item.data.get("content_type") or "") or None,
+            ),
+            beat,
+            every=HEARTBEAT_SECONDS,
+            finish=True,
         )
         await beat()
         return ArtifactLocation(artifact_ref=key)
@@ -417,16 +424,26 @@ async def _stream_zip_to_storage(
                 from app.core.messages import ExportMessages
 
                 raise ExportError(ExportMessages.EXPORT_DESTINATION_REQUIRED)
-            destination_ref = await asyncio.to_thread(
-                delivery.deliver,
-                tmp_path,
-                guild_id=guild_id,
-                filename=f"{stem}-{job_id}.zip",
+            destination_ref = await while_beating(
+                asyncio.to_thread(
+                    delivery.deliver,
+                    tmp_path,
+                    guild_id=guild_id,
+                    filename=f"{stem}-{job_id}.zip",
+                ),
+                heartbeat,
+                every=HEARTBEAT_SECONDS,
+                finish=True,
             )
             return ArtifactLocation(destination_ref=destination_ref)
         storage = get_guild_storage(request.guild_id)
-        await asyncio.to_thread(
-            storage.write_file, key, tmp_path, content_type="application/zip"
+        await while_beating(
+            asyncio.to_thread(
+                storage.write_file, key, tmp_path, content_type="application/zip"
+            ),
+            heartbeat,
+            every=HEARTBEAT_SECONDS,
+            finish=True,
         )
     finally:
         await asyncio.to_thread(tmp_path.unlink, missing_ok=True)
@@ -476,8 +493,8 @@ async def _write_archive(
         for item in copied:
             name = _dedupe_name(_stored_name(item, request), taken)
             taken.add(name)
-            await asyncio.to_thread(
-                _copy_stored, archive, name, storage, str(item.data["storage_key"])
+            await _copy_stored(
+                archive, name, storage, str(item.data["storage_key"]), heartbeat
             )
             await heartbeat()
     finally:
@@ -504,17 +521,30 @@ def _store_again(
         storage.write_file(target, Path(spool.name), content_type=content_type)
 
 
-def _copy_stored(
-    archive: zipfile.ZipFile, name: str, storage: StorageBackend, key: str
+async def _copy_stored(
+    archive: zipfile.ZipFile,
+    name: str,
+    storage: StorageBackend,
+    key: str,
+    heartbeat: Heartbeat,
 ) -> None:
     """Write the stored file ``key`` into ``archive`` as ``name``, a piece at a
-    time. Blocking; run it in a thread."""
-    blob = storage.open_readable(key)
+    time, each read and written in a thread, with ``heartbeat`` awaited
+    between pieces so a large file keeps the job alive. A heartbeat that
+    raises stops the copy with its entry closed, so the archive still
+    closes."""
+    blob = await asyncio.to_thread(storage.open_readable, key)
     if blob is None:
         raise FileNotFoundError(key)
-    with archive.open(name, "w", force_zip64=True) as entry:
-        for piece in blob_pieces(blob):
-            entry.write(piece)
+    pieces = blob_pieces(blob)
+    entry = await asyncio.to_thread(archive.open, name, "w", force_zip64=True)
+    try:
+        while (piece := await asyncio.to_thread(next, pieces, None)) is not None:
+            await asyncio.to_thread(entry.write, piece)
+            await heartbeat()
+    finally:
+        await asyncio.to_thread(entry.close)
+        pieces.close()
 
 
 def _bundle_stem(source: str, tz: str | None) -> str:

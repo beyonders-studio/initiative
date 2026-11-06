@@ -199,6 +199,7 @@ async def restore_assets(
                 ),
                 heartbeat,
                 every=HEARTBEAT_SECONDS,
+                finish=True,
             )
             if size is None:
                 outcome.missing.append(asset.key)
@@ -223,6 +224,7 @@ async def restore_assets(
                 ),
                 heartbeat,
                 every=HEARTBEAT_SECONDS,
+                finish=True,
             )
             outcome.written.append(asset.key)
             outcome.content_types[asset.key] = content_type

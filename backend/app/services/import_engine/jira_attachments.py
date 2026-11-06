@@ -281,7 +281,10 @@ async def download_images(
                 )
                 spool.flush()
                 await while_beating(
-                    store(stored, Path(spool.name)), tick, every=HEARTBEAT_SECONDS
+                    store(stored, Path(spool.name)),
+                    tick,
+                    every=HEARTBEAT_SECONDS,
+                    finish=True,
                 )
             if is_image:
                 report.images += 1
