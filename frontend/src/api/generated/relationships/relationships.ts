@@ -56,8 +56,7 @@ const withQueryKey = <T extends object, K>(query: T, queryKey: K): T & { queryKe
  * Every live edge touching one thing, rendered from its side.
  *
  * ``direction=inbound`` is "what links here": the things naming this one,
- * rather than the things it names. A community contact's lists no
- * initiative's content (``relationships.community_gathers``).
+ * rather than the things it names.
  * @summary List Relationships
  */
 export const listRelationships = (

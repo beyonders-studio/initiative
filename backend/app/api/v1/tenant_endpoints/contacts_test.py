@@ -285,11 +285,11 @@ async def test_the_communitys_contacts_are_its_surface_holders_to_make(
     ).status_code == 200
 
 
-async def test_initiative_work_names_a_community_contact_one_way(
+async def test_initiative_work_links_to_a_community_contact(
     client: AsyncClient, session: AsyncSession, acting_user
 ):
     """A task links to the community's contact across the initiative line,
-    and the contact's own links list no initiative's content."""
+    and a reader who can open the task sees the link from either end."""
     a = await acting_user(guild_role=CommunityRole.admin, initiative=True, project=True)
     await _install(session, a)
     made = await client.post(
@@ -321,7 +321,9 @@ async def test_initiative_work_names_a_community_contact_one_way(
         params={"entity": f"contact:{contact_id}"},
     )
     assert from_contact.status_code == 200, from_contact.text
-    assert from_contact.json() == []
+    assert [(e["other"]["type"], e["other"]["id"]) for e in from_contact.json()] == [
+        ("task", task.id)
+    ]
 
 
 async def test_a_contact_moves_into_the_communitys_contacts(

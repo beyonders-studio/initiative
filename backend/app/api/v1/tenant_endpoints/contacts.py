@@ -10,8 +10,7 @@ inside the community contacts plug-in, whose install owns it, and is made by
 holders of the ``community_contacts`` surface. Members read it through the
 share with everyone; a guest reads one only where it is shared with them by
 name. Holders of the surface edit it, and so does anyone given write on it.
-An initiative's content may link to one; its own links list no initiative's
-content (``relationships.community_gathers``).
+An initiative's content may link to one.
 """
 
 from datetime import datetime, timezone

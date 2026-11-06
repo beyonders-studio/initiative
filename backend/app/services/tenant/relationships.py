@@ -348,8 +348,7 @@ def refuse_across_initiatives(
       guild holds.
     * A **community contact** belongs to none because it is the community's
       address book, which any initiative's work may name. It pairs with
-      anything too; its own page lists none of the initiative content that
-      names it (:func:`community_gathers`).
+      anything too.
     * An **event on a guild calendar** belongs to none because that is what a
       guild calendar is: an event takes its initiative from its calendar, and a
       guild calendar has none. So it is guild-level content, and initiative
@@ -371,20 +370,6 @@ def refuse_across_initiatives(
     raise Refused(
         status_code=status.HTTP_400_BAD_REQUEST,
         detail=RelationshipMessages.CROSS_INITIATIVE,
-    )
-
-
-def community_gathers(
-    anchor: reference_targets.Resolved, end: reference_targets.Resolved
-) -> bool:
-    """Whether ``anchor``'s links list ``end``. A community contact's page
-    gathers no initiative's content: the links run from the initiative's side,
-    and the community's address book does not say which initiatives name one
-    of its entries."""
-    return not (
-        anchor.entity_type == SearchEntityType.contact
-        and anchor.initiative_id is None
-        and end.initiative_id is not None
     )
 
 

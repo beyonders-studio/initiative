@@ -188,12 +188,11 @@ async def list_relationships(
     """Every live edge touching one thing, rendered from its side.
 
     ``direction=inbound`` is "what links here": the things naming this one,
-    rather than the things it names. A community contact's lists no
-    initiative's content (``relationships.community_gathers``).
+    rather than the things it names.
     """
     ref = _parse_ref(entity)
     anchor = Endpoint(ref.type, ref.id)
-    anchored = await relationships_service.resolve(session, anchor, current_user.id)
+    await relationships_service.resolve(session, anchor, current_user.id)
 
     rows = await relationships_service.list_for_entity(
         session,
@@ -203,13 +202,7 @@ async def list_relationships(
         direction=direction,
     )
     rows.sort(key=lambda r: (r.created_at, r.id or 0))
-    titles = {
-        key: found
-        for key, found in (
-            await _titles_for(session, rows, anchor, current_user.id)
-        ).items()
-        if relationships_service.community_gathers(anchored, found)
-    }
+    titles = await _titles_for(session, rows, anchor, current_user.id)
     return [
         rendered
         for rendered in (_render(row, anchor=anchor, titles=titles) for row in rows)
