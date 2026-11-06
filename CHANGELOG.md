@@ -7,6 +7,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.78.0] - 2026-11-06
+
 ### Added
 
 - **Contacts.** An address book for the people and organizations your work involves, such as clients, vendors and venues: their emails, phones and addresses, and the tasks, events and files linked to them. Switch it on per initiative, or install **Community contacts** for one the whole community shares. Contacts export to CSV and import from one, so a list kept in a spreadsheet comes in.

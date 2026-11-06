@@ -28,7 +28,8 @@ class TestTheVocabularyIsTheValidatorsOwn:
 
     def test_every_function_offered_is_one_the_validator_accepts(self):
         """Called with an argument each takes, so a refusal here is the name
-        being unknown rather than the call being wrong."""
+        being unknown rather than the call being wrong. ``sheet`` is called
+        where it is written, in ``FROM``."""
         calls = {
             "count": "count(*)",
             "now": "now()",
@@ -39,9 +40,8 @@ class TestTheVocabularyIsTheValidatorsOwn:
         }
         for function in read_query_vocabulary().functions:
             call = calls.get(function, f"{function}(position)")
-            # ``sheet`` is read from, so it is called where a relation goes.
             sql = (
-                f"SELECT count(*) AS v FROM {SHEET}('Budget')"
+                "SELECT region FROM sheet('Budget')"
                 if function == SHEET
                 else f"SELECT {call} AS v FROM tasks"
             )
