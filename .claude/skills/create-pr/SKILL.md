@@ -1,20 +1,21 @@
 ---
 name: create-pr
-description: Open a pull request for the current changes and, when the user asks, watch it to green — poll CI and the Greptile review together, addressing review findings as soon as they post instead of waiting for the full rollup, fixing failures and re-reviewing until confidence is high. Use when the user says "make a PR", "open a pull request", "ship this", or asks to watch a PR's CI / review status.
+description: Open a pull request for the current changes, then watch it to green — poll CI and the Greptile review together, addressing review findings as soon as they post instead of waiting for the full rollup, fixing failures; asks Greptile to re-review until confidence is high only when the user wants that. Use when the user says "make a PR", "open a pull request", "ship this", or asks to watch a PR's CI / review status.
 user-invocable: true
 ---
 
-# /create-pr — Open a PR, and babysit it to green when asked
+# /create-pr — Open a PR and babysit it to green
 
-Create a pull request for the working changes, report it (§7) and stop.
+Create a pull request for the working changes, then stay with it: watch CI and
+the Greptile review *at the same time*, fix whatever lands first, and keep
+looping until every check is green and every review finding is fixed or
+answered (or the user tells you to stop). Greptile's feedback almost always
+arrives before CI finishes — address it then, rather than sitting on it until
+the rollup completes.
 
-Watching it is a separate ask. Only when the user asks you to watch the PR
-("watch it", "get it green", "loop until 5/5") do you stay with it: watch CI
-and the Greptile review *at the same time*, fix whatever lands first, and keep
-looping until every check is green and the review is clean (or the user tells
-you to stop). Greptile's feedback almost always arrives before CI finishes —
-address it then, rather than sitting on it until the rollup completes. Without
-that ask, §4's loop doesn't run.
+Asking Greptile to review again, round after round until it reaches 5/5, is a
+separate ask: do it only when the user asks for it ("get it to 5/5", "loop
+Greptile").
 
 Repo rules that this skill must honor (from `CLAUDE.md`):
 - **PRs target `dev`, never `main`.**
@@ -86,10 +87,7 @@ EOF
 
 Capture the PR number from the returned URL.
 
-## 4. Watch CI *and* Greptile together (only when asked)
-
-Run this only when the user asked you to watch the PR; otherwise go to §7 once
-it is open.
+## 4. Watch CI *and* Greptile together
 
 Greptile usually posts its first review while CI is still running, and CI
 failures usually surface one job at a time. **Do not wait for the whole rollup
@@ -132,8 +130,12 @@ session for 26 minutes would be wrong even if it could. Background it, do the
 Greptile work while it runs, and read its output when it breaks.
 
 Each time it breaks, handle the event (§5 or §6) and then **re-enter this loop**
-with `SEEN` updated to the review you just read. The loop is only finished when
-`EVENT=ci-green` *and* the Greptile bar in §5 is met.
+with `SEEN` updated to the review you just read. The loop is finished when
+`EVENT=ci-green`, Greptile's first review has posted, and every finding in it is
+fixed or answered (and, when the user asked for the re-review loop, the bar in
+§5 is met). CI often goes green first on a small PR, so after `EVENT=ci-green`
+keep waiting for that first review. Greptile sometimes never answers: if it
+hasn't posted 15 minutes after CI went green, stop and say so in the report.
 
 **Batching pushes.** A push cancels the in-flight run and restarts it from
 zero, so never push once per finding — collect a whole Greptile round (plus any
@@ -172,18 +174,17 @@ the PR itself):
 gh api "repos/$REPO/pulls/$PR/comments/<comment id>/replies" -f body="<reply>"
 ```
 
-If you aren't watching the PR, stop there. If you are, or the user asks for a
-re-review, post a comment holding only `@greptile` (it re-runs reliably only
-when it stands alone):
+Then go back to §4's loop (with `SEEN` set to the review you just handled).
+
+Only when the user asked for a re-review or the 5/5 loop, also post a comment
+holding only `@greptile` (it re-runs reliably only when it stands alone); §4's
+loop then waits on the re-review and any still-running CI together:
 
 ```bash
 gh pr comment "$PR" --body "@greptile"
 ```
 
-Then go back to §4's loop (with `SEEN` set to the review you just handled) —
-the re-review and any still-running CI are waited on together, not in sequence.
-
-**When watching, aim for 5/5 confidence.** Accept 4/5 only if the remaining findings are
+**In the re-review loop, aim for 5/5 confidence.** Accept 4/5 only if the remaining findings are
 genuinely out of scope for this PR.
 
 ## 6. Handle a CI failure
@@ -207,7 +208,7 @@ The CI workflow's jobs on this repo include **Backend Lint & Tests**,
      `CLAUDE.md` (Orval) and commit the output.
 3. Other jobs may still be running — fix the one you have while they finish. If
    a second job fails while you're working, fold that fix into the same commit.
-4. Commit and push; when watching, re-enter §4's loop.
+4. Commit, push, and re-enter §4's loop.
 
 **Frontend Lint & Tests** and **Check Generated Types** report in a few
 minutes; **Backend Lint & Tests** is the long pole. Detect Changes picks its
@@ -230,8 +231,7 @@ batch around it. A documentation-only PR skips the job.
 
 Summarize for the user:
 - PR URL and number.
-- Check status (table: check → pass/fail/pending). Without a watch ask, this
-  is one look at the checks as they stand; don't poll.
+- Final check status (table: check → pass/fail).
 - Greptile confidence score and any findings you intentionally left unaddressed
   (with the reason).
 - `mergeStateStatus` — if it's `BLOCKED` only on `REVIEW_REQUIRED`, say so:
