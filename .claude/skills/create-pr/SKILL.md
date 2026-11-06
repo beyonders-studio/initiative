@@ -1,16 +1,20 @@
 ---
 name: create-pr
-description: Open a pull request for the current changes, then watch it to green — poll CI and the Greptile review together, addressing review findings as soon as they post instead of waiting for the full rollup, fixing failures and re-reviewing until confidence is high. Use when the user says "make a PR", "open a pull request", "ship this", or asks to watch a PR's CI / review status.
+description: Open a pull request for the current changes and, when the user asks, watch it to green — poll CI and the Greptile review together, addressing review findings as soon as they post instead of waiting for the full rollup, fixing failures and re-reviewing until confidence is high. Use when the user says "make a PR", "open a pull request", "ship this", or asks to watch a PR's CI / review status.
 user-invocable: true
 ---
 
-# /create-pr — Open a PR and babysit it to green
+# /create-pr — Open a PR, and babysit it to green when asked
 
-Create a pull request for the working changes, then stay with it: watch CI and
-the Greptile review *at the same time*, fix whatever lands first, and keep
+Create a pull request for the working changes, report it (§7) and stop.
+
+Watching it is a separate ask. Only when the user asks you to watch the PR
+("watch it", "get it green", "loop until 5/5") do you stay with it: watch CI
+and the Greptile review *at the same time*, fix whatever lands first, and keep
 looping until every check is green and the review is clean (or the user tells
 you to stop). Greptile's feedback almost always arrives before CI finishes —
-address it then, rather than sitting on it until the rollup completes.
+address it then, rather than sitting on it until the rollup completes. Without
+that ask, §4's loop doesn't run.
 
 Repo rules that this skill must honor (from `CLAUDE.md`):
 - **PRs target `dev`, never `main`.**
@@ -82,7 +86,10 @@ EOF
 
 Capture the PR number from the returned URL.
 
-## 4. Watch CI *and* Greptile together
+## 4. Watch CI *and* Greptile together (only when asked)
+
+Run this only when the user asked you to watch the PR; otherwise go to §7 once
+it is open.
 
 Greptile usually posts its first review while CI is still running, and CI
 failures usually surface one job at a time. **Do not wait for the whole rollup
@@ -157,7 +164,17 @@ For each finding, judge whether it's a real issue in scope for this PR.
 - **In scope + valid** → fix it (edit, commit with the rest of the batch, push).
 - **Out of scope / false positive** → reply briefly saying why; don't fix.
 
-After pushing a round of fixes, ask for a re-review:
+After pushing a round of fixes, reply on each thread, one call per reply, with
+the path in quotes (never built from a word-split loop variable, which posts to
+the PR itself):
+
+```bash
+gh api "repos/$REPO/pulls/$PR/comments/<comment id>/replies" -f body="<reply>"
+```
+
+If you aren't watching the PR, stop there. If you are, or the user asks for a
+re-review, post a comment holding only `@greptile` (it re-runs reliably only
+when it stands alone):
 
 ```bash
 gh pr comment "$PR" --body "@greptile"
@@ -166,7 +183,7 @@ gh pr comment "$PR" --body "@greptile"
 Then go back to §4's loop (with `SEEN` set to the review you just handled) —
 the re-review and any still-running CI are waited on together, not in sequence.
 
-**Aim for 5/5 confidence.** Accept 4/5 only if the remaining findings are
+**When watching, aim for 5/5 confidence.** Accept 4/5 only if the remaining findings are
 genuinely out of scope for this PR.
 
 ## 6. Handle a CI failure
@@ -190,7 +207,7 @@ The CI workflow's jobs on this repo include **Backend Lint & Tests**,
      `CLAUDE.md` (Orval) and commit the output.
 3. Other jobs may still be running — fix the one you have while they finish. If
    a second job fails while you're working, fold that fix into the same commit.
-4. Commit, push, and re-enter §4's loop.
+4. Commit and push; when watching, re-enter §4's loop.
 
 **Frontend Lint & Tests** and **Check Generated Types** report in a few
 minutes; **Backend Lint & Tests** is the long pole. Detect Changes picks its
@@ -213,7 +230,8 @@ batch around it. A documentation-only PR skips the job.
 
 Summarize for the user:
 - PR URL and number.
-- Final check status (table: check → pass/fail).
+- Check status (table: check → pass/fail/pending). Without a watch ask, this
+  is one look at the checks as they stand; don't poll.
 - Greptile confidence score and any findings you intentionally left unaddressed
   (with the reason).
 - `mergeStateStatus` — if it's `BLOCKED` only on `REVIEW_REQUIRED`, say so:

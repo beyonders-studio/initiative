@@ -12,7 +12,7 @@ You've already been in it. Signing in puts you here, and the **Initiative logo**
 
 ## Home
 
-The page signing in drops you on. It's yours to arrange, because people turn up for wildly different reasons: some are here for their own to-do list, some to keep an eye on the scout group, some because their manager assigned them eleven things on a Friday afternoon.
+The page signing in drops you on. It's yours to arrange, because people turn up for wildly different reasons: some are here for their own to-do list, some to keep an eye on the soccer league, some because their manager assigned them eleven things on a Friday afternoon.
 
 It starts out arranged for whatever you told us when you signed up: your own list gets a planner, a community you run gets its activity and your projects, and a community you joined gets its people and what's coming up. **Getting started** sits near the top with a few first things to do — join a community, add a task, find a face for your profile — and ticks each one off by itself once you've actually done it. Hide it whenever you like. Press **Customize** and you can drag widgets about, pull a corner to resize one, open its settings, take it off, or **Add widget** for something else. On a phone they stack one above another, and customizing moves them up and down instead.
 
@@ -46,7 +46,7 @@ Here for more than one reason? Keep more than one home page. While customizing, 
 
 More are in [the marketplace](plugins-and-marketplace.md#home-layouts) — **Browse the marketplace** at the foot of the same picker.
 
-Each view gets a tab: work on one, the scout group on the other, the allotment rota on a third.
+Each view gets a tab: work on one, the soccer league on another.
 
 Each view can wear a banner, too. While customizing, **Banner** offers every one you have — the ones that come with Initiative and any from [decoration packs](plugins-and-marketplace.md#decoration-packs) — so the drama club's view can have the stage and work can have nothing at all. Give a pack back and its banner comes off the view with it.
 

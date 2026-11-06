@@ -155,17 +155,17 @@ describe("HomePage", () => {
       version: 1,
       views: [
         { id: MAIN_VIEW_ID, name: "Work" },
-        { id: "scouts", name: "Scouts" },
+        { id: "league", name: "League" },
       ],
-      current: "scouts",
+      current: "league",
     } satisfies HomeViews;
-    kept[homeViewKey("scouts")] = {
+    kept[homeViewKey("league")] = {
       version: 1,
       widgets: [{ id: "clock", type: "clock", grid: { x: 0, y: 0, w: 4, h: 4 } }],
     } satisfies HomeLayout;
     renderHome();
 
-    expect(await screen.findByRole("tab", { name: "Scouts" })).toHaveAttribute(
+    expect(await screen.findByRole("tab", { name: "League" })).toHaveAttribute(
       "aria-selected",
       "true"
     );
@@ -184,32 +184,32 @@ describe("HomePage", () => {
       version: 1,
       views: [
         { id: MAIN_VIEW_ID, name: "Home" },
-        { id: "scouts", name: "Scouts" },
+        { id: "league", name: "League" },
       ],
-      current: "scouts",
+      current: "league",
     } satisfies HomeViews;
-    kept[homeViewKey("scouts")] = { version: 1, widgets: [] } satisfies HomeLayout;
+    kept[homeViewKey("league")] = { version: 1, widgets: [] } satisfies HomeLayout;
     renderHome();
 
     await user.click(await screen.findByRole("button", { name: "Customize" }));
-    await user.click(screen.getByRole("button", { name: "Options for Scouts" }));
+    await user.click(screen.getByRole("button", { name: "Options for League" }));
     await user.click(await screen.findByRole("menuitem", { name: "Rename" }));
     const name = await screen.findByRole("textbox", { name: "Name" });
     await user.clear(name);
-    await user.type(name, "Cub pack{Enter}");
+    await user.type(name, "Rec league{Enter}");
     await waitFor(() =>
-      expect(keptViews(kept).views.find((view) => view.id === "scouts")?.name).toBe("Cub pack")
+      expect(keptViews(kept).views.find((view) => view.id === "league")?.name).toBe("Rec league")
     );
 
-    await user.click(screen.getByRole("button", { name: "Options for Cub pack" }));
+    await user.click(screen.getByRole("button", { name: "Options for Rec league" }));
     await user.click(await screen.findByRole("menuitem", { name: "Delete view" }));
-    const confirm = await screen.findByRole("alertdialog", { name: "Delete “Cub pack”?" });
+    const confirm = await screen.findByRole("alertdialog", { name: "Delete “Rec league”?" });
     await user.click(within(confirm).getByRole("button", { name: "Delete" }));
 
     await waitFor(() =>
       expect(keptViews(kept).views).toEqual([{ id: MAIN_VIEW_ID, name: "Home" }])
     );
-    expect(kept[homeViewKey("scouts")]).toBeNull();
+    expect(kept[homeViewKey("league")]).toBeNull();
     // Back on the one that is left.
     expect(await screen.findByRole("heading", { name: "Coming up" })).toBeInTheDocument();
   });
@@ -756,7 +756,7 @@ describe("HomePage", () => {
       version: 1,
       views: [
         { id: MAIN_VIEW_ID, name: "Home" },
-        { id: "scouts", name: "Scouts" },
+        { id: "league", name: "League" },
       ],
     } satisfies HomeViews;
     const { container } = renderHome();

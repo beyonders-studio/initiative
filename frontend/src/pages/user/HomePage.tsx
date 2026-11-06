@@ -5,7 +5,7 @@
  * follow, an organisation they run, work somebody handed them — so the page is
  * a canvas of widgets the reader arranges, starting from one of a few layouts
  * made for those reasons. Someone who is here for more than one keeps several
- * views — work on one, the scout group on another — and moves between them
+ * views — work on one, the soccer league on another — and moves between them
  * with tabs. It began as My Tasks, and with nothing arranged it still is: a
  * greeting over the focus card and the tasks table.
  */
