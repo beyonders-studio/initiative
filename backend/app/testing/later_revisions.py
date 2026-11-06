@@ -27,6 +27,7 @@ LATER: tuple[str, ...] = (
     "20261031_0573_a_rules_initiative_is_the_communitys.py",
     "20261105_0581_queues_are_projects.py",
     "20261105_0582_contacts.py",
+    "20261106_0583_roles_take_the_contacts_pair.py",
 )
 
 
@@ -40,7 +41,7 @@ def _load(name: str) -> ModuleType:
 
 
 def _steps(bind: Any, *, forward: bool) -> list[Callable[[], None]]:
-    batched, data_jobs, rules, defaults, claims, queues, contacts = (
+    batched, data_jobs, rules, defaults, claims, queues, contacts, pair = (
         _load(name) for name in LATER
     )
     if forward:
@@ -52,8 +53,10 @@ def _steps(bind: Any, *, forward: bool) -> list[Callable[[], None]]:
             claims._create,
             lambda: queues._upgrade_schema(bind),
             contacts._apply_upgrade,
+            pair._upgrade,
         ]
     return [
+        pair._downgrade,
         contacts._apply_downgrade,
         lambda: queues._downgrade_schema(bind),
         claims._drop,
