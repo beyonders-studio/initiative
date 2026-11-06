@@ -1,5 +1,6 @@
 {
   "open": "Modifier les dispositions",
+  "editLayout": "Modifier {{name}}",
   "title": "Modifier les dispositions",
   "close": "Fermer l’éditeur",
   "previewWidth": "Largeur de l’aperçu",
@@ -23,7 +24,8 @@
   "card": "Carte",
   "row": "Ligne",
   "group": "Groupe",
-  "allProperties": "Toutes les propriétés",
+  "allMetadata": "Toutes les métadonnées",
+  "allPropertiesAndMetadata": "Toutes les propriétés et métadonnées",
   "missingPart": "Un élément qui n’est plus disponible",
   "missingField": "Un champ qui n’est plus disponible",
   "columns": "Colonnes",
@@ -38,11 +40,14 @@
   "emptyGroup": "Vide. Déposez une partie ici, ou ajoutez-en une.",
   "builtIn": "Intégrés",
   "properties": "Propriétés",
+  "propertiesShownOn": "Affichée sur {{layouts}}",
+  "propertiesNowhere": "Affichée sur aucune disposition pour l'instant. Placez-la avec Ajouter.",
+  "propertiesPlacementHelp": "Une page qui affiche toutes les propriétés affiche aussitôt une nouvelle. Les cartes et les tableaux n'affichent que ce que vous y ajoutez.",
   "layoutParts": "Mise en page",
   "hidePart": "Masquer",
   "settings": "Réglages",
-  "cardHelp": "Ce que chaque tâche affiche sur le tableau. Sélectionnez un élément pour le modifier, ou ajoutez-en un sous le plan.",
-  "propertiesHelp": "Affiche chaque propriété pour laquelle une tâche a une valeur.",
+  "cardHelp": "Ce que chaque élément affiche sur sa carte. Sélectionnez un élément pour le modifier, ou ajoutez-en un sous le plan.",
+  "propertiesHelp": "Affiche chaque propriété et chaque métadonnée pour lesquelles une tâche a une valeur.",
   "pluginPartHelp": "Dessiné par le plug-in à partir de ses propres valeurs et actions.",
   "fieldHelp": "Affiche ce champ quand une tâche a une valeur pour lui.",
   "layout": "Disposition modifiée",
@@ -95,7 +100,7 @@
   "typedTaskLayout": "Page « {{name}} »",
   "detailHelp": "La disposition du détail de chaque tâche de ce projet. Ce qu'elle laisse de côté est masqué.",
   "useShipped": "Utiliser la disposition d'origine",
-  "shipped": "C'est la disposition d'origine. La modifier en fait celle du projet.",
+  "shipped": "C'est la disposition d'origine. Une modification s'applique à tous ceux qui la voient.",
   "detailTitleHelp": "Le détail de chaque tâche affiche son titre.",
   "opensFirst": "S'ouvre en premier",
   "shownInMenu": "Afficher dans le menu des dispositions",
@@ -105,6 +110,7 @@
   "pages": "Pages",
   "hidden": "Masquée",
   "showView": "Afficher {{name}} dans le menu des dispositions",
+  "deleteTaskType": "Supprimer le type de tâche {{name}}",
   "asShipped": "D'origine",
   "saveError": "Impossible d'enregistrer les dispositions",
   "listHelp": {
@@ -202,53 +208,17 @@
     "rowHelp": "Place côte à côte ce qu'elle contient."
   },
   "boxWith": "Boîte avec {{name}}",
-  "newField": "Nouveau champ",
-  "fieldsGroup": "Champs",
+  "newProperty": "Nouvelle propriété",
+  "newMetadata": "Nouvelles métadonnées",
+  "projectProperties": "Propriétés de ce projet",
+  "collectionProperties": "Propriétés de cette collection",
+  "initiativeMetadata": "Métadonnées de l'initiative",
   "panels": "Panneaux",
-  "fromProperty": "Propriété",
   "search": "Rechercher",
   "noMatches": "Aucun résultat.",
   "sectionHelp": "Avec un titre, elle s'ouvre et se ferme ; sans titre, c'est une boîte.",
-  "queueItemDetail": {
-    "name": "Détail de l'élément de file",
-    "help": "Comment chaque élément de cette file s'affiche quand on l'ouvre. Ce qu'il laisse de côté est masqué.",
-    "shipped": "Voici la mise en page d'origine. La modifier en fait celle de la file.",
-    "titleHelp": "Chaque élément affiche son libellé.",
-    "hiddenHelp": "Chaque élément peut afficher ceci. Retiré, il est masqué, et Ajouter le remet.",
-    "parts": {
-      "actions": "Menu",
-      "relations": "Relations"
-    },
-    "partHelp": {
-      "actions": "Ce qu'on peut faire d'autre avec l'élément : signaler, dupliquer et retirer.",
-      "relations": "Ce à quoi l'élément est lié."
-    },
-    "noItems": "Ajoutez un élément à la file pour voir sa mise en page ici."
-  },
   "tab": "Mises en page",
   "settingsDescription": "Comment il dispose ce qu'il contient : chaque mise en page, sa dernière modification et l'accès à l'éditeur. Tous ceux qui peuvent l'ouvrir les voient ; ce que chacun filtre et trie lui appartient.",
-  "galleryImageDetail": {
-    "name": "Détail de l'image",
-    "help": "Comment chaque image de cette galerie s'affiche quand on l'ouvre. Ce qu'il laisse de côté est masqué.",
-    "shipped": "Voici la mise en page d'origine. La modifier en fait celle de la galerie.",
-    "titleHelp": "Chaque image affiche son titre.",
-    "hiddenHelp": "Chaque image peut afficher ceci. Retiré, il est masqué, et Ajouter le remet.",
-    "parts": {
-      "actions": "Menu",
-      "relations": "Relations",
-      "picture": "Image",
-      "about": "Provenance",
-      "versions": "Versions"
-    },
-    "partHelp": {
-      "actions": "Ce qu'on peut faire d'autre avec l'image : signaler, télécharger, utiliser comme couverture et retirer.",
-      "relations": "Ce à quoi l'image est liée.",
-      "picture": "L'image elle-même.",
-      "about": "Qui l'a ajoutée et quand, et son fichier.",
-      "versions": "Chaque version envoyée, et en envoyer une nouvelle."
-    },
-    "noItems": "Ajoutez une image à la galerie pour voir sa mise en page ici."
-  },
   "counterDetail": {
     "name": "Détail du compteur",
     "help": "Comment chaque compteur de ce groupe s'affiche quand on l'ouvre pour le modifier. Ce qu'il laisse de côté est masqué.",
@@ -266,6 +236,14 @@
       "count": "Sa valeur, par pas ou fixée."
     },
     "noItems": "Ajoutez un compteur au groupe pour voir sa mise en page ici."
+  },
+  "fileDetail": {
+    "name": "Page du fichier",
+    "help": "Comment un fichier ouvert depuis cette collection s'affiche, à côté de son image ou de la collection, une fois que la collection a ses propres propriétés. Ce qu'il laisse de côté est masqué.",
+    "shipped": "Voici la mise en page d'origine. La modifier en fait celle de la collection.",
+    "titleHelp": "Chaque fichier affiche son nom.",
+    "hiddenHelp": "Chaque fichier peut afficher ceci. Retiré, il est masqué, et Ajouter le remet.",
+    "noItems": "Ajoutez un fichier à la collection pour voir sa mise en page ici."
   },
   "postDetail": {
     "name": "Détail de l'annonce",
@@ -293,5 +271,39 @@
     },
     "noItems": "Écrivez une annonce dans cette initiative pour voir sa mise en page ici."
   },
-  "calendarNote": "Un calendrier n’a ni carte ni colonnes à disposer. Son affichage, et le fait que le projet s’ouvre dessus, se règlent à droite."
+  "calendarNote": "Un calendrier n’a ni carte ni colonnes à disposer. Son affichage, et le fait que le projet s’ouvre dessus, se règlent à droite.",
+  "makeOpensFirst": "Ouvrir d’abord sur {{name}}",
+  "scaleDisplay": {
+    "label": "Afficher l'échelle comme",
+    "number": "Un nombre",
+    "stars": "Des étoiles",
+    "bar": "Une barre"
+  },
+  "counterDisplay": {
+    "label": "Afficher le compteur comme",
+    "number": "Un nombre",
+    "bar": "Une barre",
+    "clock": "Une horloge"
+  },
+  "fieldProperty": {
+    "metadata": "Métadonnée",
+    "metadataHelp": "C'est une métadonnée de l'initiative, qui se modifie dans ses paramètres.",
+    "openSettings": "Ouvrir les paramètres de l'initiative"
+  },
+  "required": {
+    "label": "Obligatoire",
+    "help": "Qui en ajoute un doit le remplir et ne peut plus le vider ensuite. Masqué, il n’est plus obligatoire.",
+    "always": "Un titre est toujours obligatoire.",
+    "on": "Obligatoire. Appuyez pour le rendre facultatif.",
+    "off": "Non obligatoire. Appuyez pour le rendre obligatoire.",
+    "onFor": "{{name}} : obligatoire. Appuyez pour le rendre facultatif.",
+    "offFor": "{{name}} : non obligatoire. Appuyez pour le rendre obligatoire.",
+    "alwaysFor": "{{name}} : obligatoire. Un titre est toujours obligatoire.",
+    "missing": "Obligatoire, pas encore rempli.",
+    "toAdd": "Remplissez ce qui est obligatoire pour l’ajouter.",
+    "ask": "Sa nouvelle page demande ces champs, encore vides. Remplissez-les et la modification se fait avec eux.",
+    "confirm": "Continuer",
+    "retypeTitle": "Ce que demande la page {{type}}",
+    "moveTitle": "Ce que demande {{project}}"
+  }
 }

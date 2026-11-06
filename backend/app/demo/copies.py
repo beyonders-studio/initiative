@@ -18,7 +18,7 @@ from datetime import datetime, timedelta, timezone
 from typing import cast
 
 from sqlalchemy import exists, func, or_
-from sqlmodel import select
+from sqlmodel import col, select
 from sqlmodel.ext.asyncio.session import AsyncSession
 
 from app.core import webhook_events
@@ -38,7 +38,7 @@ from app.models.platform.guild import (
 )
 from app.models.platform.guild_image import IMAGE_SPECS, GuildImage, GuildImageVariant
 from app.models.platform.user import User, UserRole, UserStatus
-from app.models.tenant.import_job import ImportJob, ImportJobStatus
+from app.models.tenant.data_job import DataJob, DataJobDirection, DataJobStatus
 from app.services.import_engine import backup as backup_service
 from app.services.import_engine import engine as import_engine
 from app.services.platform import guild_images, guild_purge
@@ -155,7 +155,7 @@ async def redeem(
                 guild_id=guild_id,
                 user=visitor if role is CommunityRole.superadmin else host,
                 payload=bundle,
-                status=ImportJobStatus.queued,
+                status=DataJobStatus.queued,
                 anchor=anchor,
                 people_map=seated,
                 join=[visitor_id] if role is not CommunityRole.superadmin else None,
@@ -165,7 +165,6 @@ async def redeem(
             sandbox.state = DemoSandboxState.live
             sandbox.invite_id = link.id
             sandbox.claimed_at = now
-            sandbox.import_job_id = job_id
             sandbox.visitor_id = visitor_id
             session.add(sandbox)
             first_open = link.uses == 0
@@ -286,8 +285,6 @@ class AccountCopy:
     expires_at: datetime | None
     #: The link, an invite into the pitch, it was opened from, while kept.
     invite_id: int | None
-    #: The import filling it, in its own schema.
-    import_job_id: int | None
 
 
 async def account_copy(user_id: int) -> AccountCopy | None:
@@ -300,7 +297,6 @@ async def account_copy(user_id: int) -> AccountCopy | None:
                     DemoSandbox.guild_id,
                     GuildMembership.guest_until,
                     DemoSandbox.invite_id,
-                    DemoSandbox.import_job_id,
                 )
                 .join(DemoSandbox, DemoSandbox.guild_id == GuildMembership.guild_id)
                 .where(
@@ -313,18 +309,21 @@ async def account_copy(user_id: int) -> AccountCopy | None:
     return None if row is None else AccountCopy(*row)
 
 
-async def copy_import(copy: AccountCopy) -> ImportJobStatus:
-    """Where the import filling the copy stands; one that is missing counts as
-    failed. Read on the system engine routed into the copy: a member visitor
-    does not read import jobs."""
+async def copy_import(copy: AccountCopy) -> DataJobStatus:
+    """Where the import filling the copy stands: its first import, which opening
+    it staged; one that is missing counts as failed. Read on the system engine
+    routed into the copy: a member visitor does not read import jobs."""
     async with cohorts.system_session(copy.guild_id) as session:
         await set_rls_context(session, SystemGuild(copy.guild_id))
         status = (
             await session.exec(
-                select(ImportJob.status).where(ImportJob.id == copy.import_job_id)
+                select(DataJob.status)
+                .where(DataJob.direction == DataJobDirection.import_)
+                .order_by(col(DataJob.id))
+                .limit(1)
             )
         ).first()
-    return ImportJobStatus.failed if status is None else ImportJobStatus(status)
+    return DataJobStatus.failed if status is None else DataJobStatus(status)
 
 
 # --- the pool loop -----------------------------------------------------------

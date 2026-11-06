@@ -8,7 +8,7 @@ and never waits on a reader.
 
 Four channels sit on this: :mod:`~app.services.platform.notification_stream`
 (the inbox moved), :mod:`~app.services.platform.account_stream` (your standing
-changed), :mod:`~app.services.platform.contacts_stream` and
+changed), :mod:`~app.services.platform.connections_stream` and
 :mod:`~app.services.platform.dm_stream`. They send the same shape and none owns
 the machinery, so there is one place to look when a frame does not arrive.
 
@@ -192,6 +192,20 @@ async def _publish_to_everyone(frame: Dict[str, Any]) -> bool:
     except Exception:
         logger.debug("user_stream: cross-process publish unavailable", exc_info=True)
         return False
+
+
+async def publish_to_everyone(frame: Dict[str, Any]) -> None:
+    """``frame`` for every connected reader, on this worker and the others.
+
+    For a change every account's answer is read from, such as a deployment
+    rule. Each reader refetches once, so it is for rare writes only. Where the
+    bus refuses it, everybody is told again once it is back.
+    """
+    global _dropped_remote
+
+    _deliver_local(None, frame)
+    if not await _publish_to_everyone(frame):
+        _dropped_remote = True
 
 
 async def on_bus_connected() -> None:

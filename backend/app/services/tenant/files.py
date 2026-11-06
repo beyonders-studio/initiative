@@ -10,17 +10,19 @@ from sqlmodel.ext.asyncio.session import AsyncSession
 
 from app.core.errors import CodedError
 from app.core.search import SearchEntityType
-from app.models.tenant.file import File, FileType
+from app.core.file_types import FileType, is_stored
+from app.models.tenant.file import File
 from app.models.tenant.resource_grant import ResourceGrant
-from app.core.references import unresolve_wikilinks_to
+from app.core.references import unlink_references
 from app.core.messages import FileMessages
 from app.services.tenant import attachments as attachments_service
 from app.services.tenant import body_states
+from app.services.tenant import collections as collections_service
 from app.services.tenant import comments as comments_service
 from app.services.tenant import content_references
 from app.services.tenant import file_versions
 from app.services.tenant import ownership as ownership_service
-from app.services.tenant import properties as properties_service
+from app.services.tenant import metadata as metadata_service
 from app.services.tenant import tags as tags_service
 from app.services.tenant.collaboration import collaboration_manager, written_into
 from app.db.session import routed_guild_id
@@ -67,18 +69,18 @@ class FileContentError(CodedError, ValueError):
 def normalize_file_content(
     payload: dict[str, Any] | None,
     *,
-    file_type: FileType = FileType.native,
+    file_type: FileType = FileType.lexical,
 ) -> dict[str, Any]:
     """Normalize content JSONB based on file type.
 
-    - native: ensure a Lexical root with at least one paragraph child
-    - whiteboard: ensure the Excalidraw scene shape {elements, appState, files}
-    - file: content is just a passthrough dict (usually empty)
+    - lexical: ensure a Lexical root with at least one paragraph child
+    - excalidraw: ensure the Excalidraw scene shape {elements, appState, files}
+    - a stored type: content is just a passthrough dict (usually empty)
     """
-    if file_type == FileType.file:
+    if is_stored(file_type):
         return payload if isinstance(payload, dict) else {}
 
-    if file_type == FileType.whiteboard:
+    if file_type == FileType.excalidraw:
         if not isinstance(payload, dict):
             return {"elements": [], "appState": {}, "files": {}}
         return {
@@ -87,7 +89,7 @@ def normalize_file_content(
             "files": payload.get("files") or {},
         }
 
-    if file_type == FileType.smart_link:
+    if file_type == FileType.url:
         if not isinstance(payload, dict):
             raise FileContentError(FileMessages.SMART_LINK_URL_REQUIRED)
         url = str(payload.get("url") or "").strip()
@@ -97,7 +99,7 @@ def normalize_file_content(
             raise FileContentError(FileMessages.SMART_LINK_URL_INVALID)
         return {"url": url}
 
-    if file_type == FileType.spreadsheet:
+    if file_type == FileType.sheet:
         # Imported lazily to avoid a circular import: files_spreadsheet
         # imports FileContentError from this module.
         from app.services.tenant.files_spreadsheet import (
@@ -106,7 +108,7 @@ def normalize_file_content(
 
         return normalize_spreadsheet_content(payload)
 
-    # native (default)
+    # lexical (default)
     if not isinstance(payload, dict):
         return deepcopy(EMPTY_LEXICAL_STATE)
     root = payload.get("root")
@@ -137,7 +139,7 @@ async def get_file_hydrated(
 ) -> File | None:
     """Load a file with everything a serialized ``FileRead`` or an
     export reads: the list loader's eager loads and the body, plus the tags,
-    comment count and owning plug-in a response carries.
+    comment count, owning plug-in and collections a response carries.
     :func:`get_file_for_grants` carries the list loads alone, which is what
     the access decision needs. Uniform ``(session, id)`` shape, the one ``resource_access``
     registers a loader by.
@@ -154,11 +156,13 @@ async def get_file_hydrated(
     file = (await session.exec(statement)).one_or_none()
     if file:
         await tags_service.annotate_tags(session, [file])
-        await properties_service.annotate_properties(session, [file])
+        await metadata_service.annotate_properties(session, [file])
         await comments_service.annotate_comment_counts(
             session, [file], column="file_id"
         )
         await ownership_service.annotate_owner_plugins(session, [file])
+        held = await collections_service.collection_ids_of(session, [file.id])
+        object.__setattr__(file, "collection_ids", held.get(file.id, []))
     return file
 
 
@@ -211,21 +215,19 @@ async def copy_contents(
     return []
 
 
-async def unresolve_wikilinks_to_file(
+async def unlink_references_to_file(
     session: AsyncSession,
     *,
     deleted_file_id: int,
 ) -> None:
-    """Blank every ``[[ ]]`` pointing at a file that is being hard-purged.
-
-    The link nodes stay and render as unresolved, which is what the editor shows
-    for a link whose target was never picked. Their ``references`` edges go with
-    the file itself, through the purge path's own sweep.
+    """Make every reference to a file that is being hard-purged, in the files
+    that point at it, the words it was written with. Their ``references``
+    edges go with the file itself, through the purge path's own sweep.
 
     Called by ``hard_purge_entity`` before the DELETEs are issued, while the
     edges naming the file are still there to find the files that carry
-    those links. Trashed ones are included — a file restored after the purge
-    must not come back with a dangling link.
+    those references. Trashed ones are included — a file restored after the
+    purge must not come back with a dangling link.
     """
 
     linking_files = await content_references.referencing_files(session, deleted_file_id)
@@ -237,7 +239,9 @@ async def unresolve_wikilinks_to_file(
     for doc in linking_files:
         if doc.content and isinstance(doc.content, dict):
             updated_content = deepcopy(doc.content)
-            if unresolve_wikilinks_to(updated_content, deleted_file_id):
+            if unlink_references(
+                updated_content, SearchEntityType.file, deleted_file_id
+            ):
                 doc.content = updated_content
                 # A session opens on the Yjs state, so the repair is written
                 # into it too.
@@ -253,7 +257,7 @@ async def unresolve_wikilinks_to_file(
 
     # Invalidate any in-memory collaboration rooms for affected files
     # This prevents a room's save from overwriting our changes when users disconnect
-    # Note: If a room has active collaborators, they'll have stale wikilinks until reload
+    # Note: If a room has active collaborators, they'll have stale references until reload
     # Rooms are keyed by (guild, file), and the files above were read
     # through this session, so the guild it is routed to is theirs. An unrouted
     # session reaches no guild schema and so has no room to invalidate.

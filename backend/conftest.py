@@ -120,6 +120,12 @@ _base_url = (
     f"{quote(_su_password, safe='')}@{_su_netloc}"
 )
 
+#: Shared tables the migrations fill with catalog data and no test writes, so
+#: the reset between tests leaves them alone: ``rule_choices``, the values each
+#: ``choice`` rule may take, and ``rule_key_writers``, who may write each
+#: community rule.
+_CATALOG_TABLES = frozenset({"rule_choices", "rule_key_writers"})
+
 # Per-run database so a worker's TRUNCATE/DROP never clobbers another worker's —
 # or another checkout's — data.
 TEST_DB_NAME = f"initiative_test_{RUN_ID}"
@@ -604,16 +610,20 @@ def handoff_signing_key(monkeypatch) -> str:
 
 @pytest.fixture(autouse=True)
 def _disable_hibp_check(monkeypatch):
-    """Disable the HaveIBeenPwned breach lookup for all tests by default.
+    """Answer the HaveIBeenPwned breach lookup "not breached" for all tests.
 
     Without this, every registration / password change test would make
-    a real outbound HTTPS call to the HIBP API — flaky and slow.
-    Tests that explicitly exercise the breach path opt back in via
-    their own monkeypatch + ``hibp.is_password_breached`` stub.
+    a real outbound HTTPS call to the HIBP API — flaky and slow. The
+    deployment's rule asks for the check by default, so the lookup itself is
+    stubbed. Tests that exercise the breach path put their own stub in its
+    place; the client's own tests put the real one back.
     """
-    from app.core.config import settings as app_settings
+    from app.services import hibp
 
-    monkeypatch.setattr(app_settings, "HIBP_CHECK_ENABLED", False)
+    async def _not_breached(_password: str) -> bool:
+        return False
+
+    monkeypatch.setattr(hibp, "is_password_breached", _not_breached)
 
 
 @pytest.fixture(scope="function")
@@ -1025,7 +1035,7 @@ async def session(engine) -> AsyncGenerator[AsyncSession, None]:
         shared_tables = ", ".join(
             f'"{table.name}"'
             for table in SQLModel.metadata.sorted_tables
-            if table.name in SHARED_TABLES
+            if table.name in SHARED_TABLES and table.name not in _CATALOG_TABLES
         )
         await conn.execute(
             text(f"TRUNCATE TABLE {shared_tables} RESTART IDENTITY CASCADE")

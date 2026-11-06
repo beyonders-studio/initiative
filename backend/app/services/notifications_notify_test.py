@@ -16,6 +16,8 @@ from app.models.platform.notification import Notification, NotificationType
 from app.services.platform import user_notifications
 from app.services import notifications
 from app.testing import (
+    create_collection,
+    create_file,
     create_resource_grant,
     create_task,
     create_user,
@@ -151,6 +153,34 @@ async def test_a_community_admin_is_among_the_readers(
         key="mention.comment",
         actor=owner.user,
     )
+
+
+async def test_a_notice_about_a_collection_reaches_who_opens_a_file_in_it(
+    session, acting_user
+):
+    owner = await acting_user(guild_role=CommunityRole.member, initiative=True)
+    other = await acting_user(
+        guild_role=CommunityRole.member,
+        guild=owner.guild,
+        initiative=owner.initiative,
+        initiative_role="member",
+    )
+    file = await create_file(session, owner.initiative, owner.user)
+    collection = await create_collection(
+        session, owner.initiative, owner.user, files=[file]
+    )
+    await set_rls_context(session, SystemGuild(owner.guild.id))
+
+    subject = await notifications.resolve_subject(
+        session, ("collection", collection.id)
+    )
+
+    assert subject is not None
+    assert subject.target_path == f"/go/collection/{collection.id}"
+    assert (subject.tool, subject.resource_id) == (Tool.file, None)
+    # The file is its owner's alone, so nobody else reads the collection.
+    assert owner.user.id in subject.readers
+    assert other.user.id not in subject.readers
 
 
 async def test_repeated_file_mentions_fold_into_one_line(client, session, acting_user):

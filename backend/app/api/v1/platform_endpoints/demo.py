@@ -47,7 +47,7 @@ from app.demo import accounts, copies, pitches, sales
 from app.models.platform.guild import CommunityRole
 from app.models.platform.guild_image import IMAGE_SPECS, GuildImageVariant
 from app.models.platform.identity_ref import IdentityEntity
-from app.models.tenant.import_job import ImportJobStatus
+from app.models.tenant.data_job import DataJobStatus
 from app.models.platform.user import User
 from app.schemas.platform.demo import (
     DemoCopyRead,
@@ -157,8 +157,8 @@ async def read_demo_copy(current_user: CurrentUserDep, _demo: DemoOnly) -> DemoC
     filled = await copies.copy_import(copy)
     return DemoCopyRead(
         community_id=copy.guild_id,
-        ready=filled is ImportJobStatus.done,
-        failed=filled is ImportJobStatus.failed,
+        ready=filled is DataJobStatus.done,
+        failed=filled is DataJobStatus.failed,
         expires_at=copy.expires_at,
     )
 

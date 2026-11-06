@@ -257,7 +257,7 @@ const recentComments = (): Spec => ({ communityPrefix: ["/api/v1/comments/recent
 
 const notifications = (): Spec => ({ personalPrefix: ["/api/v1/notifications"] });
 
-// ── Contacts: who may reach you, and who you have agreed with ────────────────
+// ── Connections: who may reach you, and who you have agreed with ─────────────
 
 /** The policy and its per-community toggles. */
 const dmSettings = (): Spec => ({ personalExact: ["/api/v1/me/dm-settings"] });
@@ -271,7 +271,7 @@ const contactGrants = (): Spec => ({
 const ignoredAccounts = (): Spec => ({ personalPrefix: ["/api/v1/me/ignored"] });
 
 /** Everyone the reader may reach: the community sections. */
-const contacts = (): Spec => ({ personalPrefix: ["/api/v1/me/contacts"] });
+const people = (): Spec => ({ personalPrefix: ["/api/v1/me/people"] });
 
 /**
  * The direct-message mailbox.
@@ -458,6 +458,12 @@ const communityInvites = (communityId: number): Spec => ({
   personalExact: [`/api/v1/communities/${communityId}/invites`],
 });
 
+// ── Custom roles (community) ─────────────────────────────────────────────────────
+// The community's roles, who holds which, and what the reader holds: one prefix,
+// since a change to any of them can change the others.
+
+const customRoles = (): Spec => ({ communityPrefix: ["/api/v1/custom-roles"] });
+
 // ── Calendar Events (community + me) ─────────────────────────────────────────────
 
 // The calendar-entries aggregate unions events + task markers; name it too so
@@ -471,16 +477,23 @@ const calendarEvent = (eventId: number): Spec => ({
   communityExact: [`/api/v1/calendar-events/${eventId}`],
 });
 
-const galleryImage = (galleryId: number, imageId: number): Spec => ({
-  communityExact: [`/api/v1/galleries/${galleryId}/images/${imageId}`],
+/** Access requests: where the reader stands on each thing, and the requests
+ *  waiting on their answer. Asking or answering moves both. */
+const shareRequests = (): Spec => ({ communityPrefix: ["/api/v1/share-requests"] });
+
+/** Files' collections: every list of them and each one's own read and files.
+ *  What is in one shows on its card (a count, a cover) and in its list. */
+const allCollections = (): Spec => ({ communityPrefix: ["/api/v1/collections"] });
+
+/** One collection's own read and its files. The trailing slash keeps
+ *  collection 1 from reaching collection 10. */
+const collection = (id: number): Spec => ({
+  communityExact: [`/api/v1/collections/${id}`],
+  communityPrefix: [`/api/v1/collections/${id}/`],
 });
 
 const counter = (counterId: number): Spec => ({
   communityExact: [`/api/v1/counters/${counterId}`],
-});
-
-const queueItem = (itemId: number): Spec => ({
-  communityExact: [`/api/v1/queue-items/${itemId}`],
 });
 
 // ── Posts (community) ────────────────────────────────────────────────────────────
@@ -565,14 +578,11 @@ const toolLists = (which: Tool): Spec => {
     communityPrefix: [`/api/v1/tools/${which}/counts`],
   });
   if (which === Tool.calendar) return compose(lists, allCalendarEvents());
-  // An initiative's list of layouts names its projects, queues, galleries and
-  // counter groups,
-  // by name. The entries carry projects by their dates and posts by their
+  // An initiative's list of layouts names its projects and counter groups, by
+  // name. The entries carry projects by their dates and posts by their
   // polls' closing.
   if (which === Tool.project) return compose(lists, initiativeLayouts(), allCalendarEntries());
-  if (which === Tool.queue || which === Tool.gallery || which === Tool.counter_group) {
-    return compose(lists, initiativeLayouts());
-  }
+  if (which === Tool.counter_group) return compose(lists, initiativeLayouts());
   if (which === Tool.post) return compose(lists, allCalendarEntries());
   return lists;
 };
@@ -587,8 +597,8 @@ const toolEntity = (which: Tool, id: number): Spec => ({
 });
 
 /**
- * One tool entity's own read and every read under its address — a gallery's
- * pictures, a wiki's pages, a project's activity and statuses. What a change
+ * One tool entity's own read and every read under its address — a wiki's
+ * pages, a project's activity and statuses. What a change
  * inside it makes stale. The trailing slash keeps project 1 from reaching
  * project 10.
  */
@@ -603,9 +613,10 @@ const tool = (which: Tool, id: number): Spec => compose(toolEntity(which, id), t
 // The same two, by name, for the call sites that already know their tool.
 const allProjects = (): Spec => toolList(Tool.project);
 const project = (id: number): Spec => toolEntity(Tool.project, id);
-const allFiles = (): Spec => toolList(Tool.file);
-const file = (id: number): Spec => toolEntity(Tool.file, id);
-const allQueues = (): Spec => toolList(Tool.queue);
+// A file shows in the collections it is in (their rows, covers and counts),
+// so a change to one refreshes them too.
+const allFiles = (): Spec => compose(toolList(Tool.file), allCollections());
+const file = (id: number): Spec => compose(toolEntity(Tool.file, id), allCollections());
 const allCounterGroups = (): Spec => toolList(Tool.counter_group);
 const counterGroup = (id: number): Spec => toolEntity(Tool.counter_group, id);
 const allCalendars = (): Spec => toolList(Tool.calendar);
@@ -614,10 +625,9 @@ const allDashboards = (): Spec => toolList(Tool.dashboard);
 const dashboard = (id: number): Spec => toolEntity(Tool.dashboard, id);
 const allPosts = (): Spec => toolList(Tool.post);
 const post = (id: number): Spec => toolEntity(Tool.post, id);
-const allGalleries = (): Spec => toolList(Tool.gallery);
-const gallery = (id: number): Spec => toolEntity(Tool.gallery, id);
 const allWikis = (): Spec => toolList(Tool.wiki);
 const wiki = (id: number): Spec => toolEntity(Tool.wiki, id);
+const allContacts = (): Spec => toolList(Tool.contact);
 
 // ── Property values (community) ──────────────────────────────────────────────────
 
@@ -644,7 +654,14 @@ const allPropertyHolders = (): Spec =>
 // name its rows one by one says so instead, and this is the answer.
 
 const communityContent = (): Spec =>
-  compose(allInitiatives(), ...TOOLS.map(toolList), allTasks(), allComments(), allReferences());
+  compose(
+    allInitiatives(),
+    ...TOOLS.map(toolList),
+    allCollections(),
+    allTasks(),
+    allComments(),
+    allReferences()
+  );
 
 /** Every description, by name. The only export a call site needs beside `invalidate`. */
 export const q = {
@@ -653,10 +670,11 @@ export const q = {
   allCalendarEvents,
   allCalendars,
   allComments,
+  allContacts,
   allCounterGroups,
   allDashboards,
   allFiles,
-  allGalleries,
+  allCollections,
   allCommunities,
   allInitiatives,
   allPosts,
@@ -664,7 +682,6 @@ export const q = {
   allProperties,
   allPropertyHolders,
   allReferences,
-  allQueues,
   allSettings,
   allTags,
   allWikis,
@@ -680,9 +697,7 @@ export const q = {
   calendar,
   captchaSettings,
   calendarEvent,
-  queueItem,
   counter,
-  galleryImage,
   communitySettings,
   notificationSettings,
   platformAuthSettings,
@@ -692,8 +707,8 @@ export const q = {
   filedTickets,
   moderationReports,
   contactGrants,
-  contacts,
   counterGroup,
+  customRoles,
   currentUser,
   dashboard,
   directMessages,
@@ -702,6 +717,7 @@ export const q = {
   fileVersions,
   emailSettings,
   personalItems,
+  people,
   activity,
   fcmConfig,
   communityAIConnections,
@@ -719,7 +735,7 @@ export const q = {
   platformAIConnections,
   platformAIMode,
   platformCommunities,
-  gallery,
+  collection,
   post,
   postTimeline,
   project,
@@ -730,6 +746,7 @@ export const q = {
   recentComments,
   relationships,
   resolvedAISettings,
+  shareRequests,
   storageSettings,
   tag,
   tagEntities,
@@ -762,7 +779,9 @@ export const q = {
  * Everything else survives. A platform or personal path (`/me/*`, `/users`,
  * `/communities`, `/me/personal-items`) answers the same in every community, and a
  * hand-written key that holds community data (`["query", communityId, …]`) carries the
- * community's id, so another community's entry is never the one read.
+ * community's id, so another community's entry is never the one read. A person's own
+ * views of a community's lists (`/c/{communityId}/view-preferences`) survive too, so
+ * coming back without a connection still shows a list the way they left it.
  */
 export const resetCommunityScopedQueries = (arrivingCommunityId?: number | null) =>
   queryClient.resetQueries({
@@ -770,7 +789,11 @@ export const resetCommunityScopedQueries = (arrivingCommunityId?: number | null)
       const first = query.queryKey[0];
       if (typeof first !== "string") return false;
       const match = COMMUNITY_SEGMENT.exec(first);
-      return match !== null && Number(match[1]) !== arrivingCommunityId;
+      return (
+        match !== null &&
+        Number(match[1]) !== arrivingCommunityId &&
+        match[2] !== "/view-preferences"
+      );
     },
   });
 

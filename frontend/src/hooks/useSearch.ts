@@ -86,7 +86,7 @@ const splitFilters = <TData>(
  * reader is still typing.
  *
  * This is the ONE lookup behind every picker in the app — the command palette,
- * a mention, a wikilink, a queue link, a template. They differ only in what
+ * a mention, a wikilink, a link, a template. They differ only in what
  * they narrow to: `types` for what kind of thing, `initiative_id` for where,
  * and `is_template` for whether it is a blueprint. A picker built on this gets
  * ranking, prefix matching and every access gate without asking for them.

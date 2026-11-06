@@ -30,7 +30,6 @@ import { Plus, X } from "lucide-react";
 import { useId, useMemo } from "react";
 import { useTranslation } from "react-i18next";
 
-import type { DatasetName } from "@/api/generated/initiativeAPI.schemas";
 import { Tool } from "@/api/generated/initiativeAPI.schemas";
 import { MemberMultiSelect } from "@/components/members/MemberSearchSelect";
 import { Button } from "@/components/ui/button";
@@ -45,7 +44,6 @@ import {
   SelectValue,
 } from "@/components/ui/select";
 import { Switch } from "@/components/ui/switch";
-import { useFieldCatalog } from "@/hooks/useFieldCatalog";
 import { useProjects, useTaskTypesOf } from "@/hooks/useProjects";
 import { useProperties } from "@/hooks/useProperties";
 import { useTags } from "@/hooks/useTags";
@@ -68,8 +66,12 @@ export interface FilterBuilderProps {
   onChange: (next: FilterNode[]) => void;
   /** The dashboard's initiative — every option list below is its own. */
   initiativeId: number;
-  /** What is being filtered. Its fields are what a row may be read against. */
-  dataset: string;
+  /** What a row may be read against: the fields of what is being filtered. */
+  fields: readonly FilterFieldSpec[];
+  /** What a new statement leaves out until its author says otherwise. */
+  defaults: readonly FilterLeaf[];
+  /** Whether the fields are still on their way. */
+  loading: boolean;
 }
 
 /** The value control a field starts empty at: a list for a picker that takes
@@ -183,7 +185,14 @@ function joinFilters(
   return [...kept, ...rows];
 }
 
-export function FilterBuilder({ value, onChange, initiativeId, dataset }: FilterBuilderProps) {
+export function FilterBuilder({
+  value,
+  onChange,
+  initiativeId,
+  fields,
+  defaults,
+  loading,
+}: FilterBuilderProps) {
   const { t } = useTranslation(["dashboards", "tasks", "common"]);
 
   // The option lists. Each is a query the canvas or dialog already makes, and
@@ -193,14 +202,6 @@ export function FilterBuilder({ value, onChange, initiativeId, dataset }: Filter
   const tags = useTags();
   const properties = useProperties({ initiativeId });
 
-  // What may be filtered on, from the server's field registry — one
-  // declaration, so a control cannot offer an operator the engine refuses.
-  const {
-    fields,
-    defaultFilters,
-    isLoading: fieldsLoading,
-  } = useFieldCatalog(dataset as DatasetName);
-  const defaults = defaultFilters as unknown as FilterLeaf[];
   const switchId = useId();
 
   const options = useMemo(
@@ -242,7 +243,7 @@ export function FilterBuilder({ value, onChange, initiativeId, dataset }: Filter
   // against: its operator list and its value control would both fall back to
   // the plainest thing they can draw, and editing one then rewrites a saved
   // filter into whatever that plain control emitted. So the rows wait.
-  if (fieldsLoading) {
+  if (loading) {
     return <p className="text-muted-foreground text-xs">{t("dashboards:filterBuilder.loading")}</p>;
   }
 
@@ -481,7 +482,7 @@ function LeafRow({
           <SelectContent>
             {fields.map((field) => (
               <SelectItem key={field.field} value={field.field}>
-                {fieldLabel(field.field, t)}
+                {field.label ?? fieldLabel(field.field, t)}
               </SelectItem>
             ))}
           </SelectContent>

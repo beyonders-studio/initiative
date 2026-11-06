@@ -8,9 +8,10 @@ import {
   WikiPageKind,
   WikiReadingWidth,
 } from "@/api/generated/initiativeAPI.schemas";
+import { NeedAccessOr } from "@/components/access/RequestAccess";
 import { ToolCommentsPanel } from "@/components/comments/ToolCommentsPanel";
+import { isWideFile, ReadOnlyFileBody } from "@/components/files/detail/ReadOnlyFileBody";
 import { WikiChrome } from "@/components/initiativeTools/wikis/WikiChrome";
-import { isWideFile, WikiFileBody } from "@/components/initiativeTools/wikis/WikiFileBody";
 import {
   WikiConnectionsSheet,
   WikiPageConnections,
@@ -89,11 +90,16 @@ export const WikiFileView = () => {
 
   if (!validIds || fileQuery.isError) {
     return (
-      <Card className="mx-auto mt-10 max-w-md">
-        <CardHeader>
-          <CardTitle>{t("pages.notFound")}</CardTitle>
-        </CardHeader>
-      </Card>
+      <NeedAccessOr
+        error={fileQuery.error}
+        entity={validIds ? { kind: "file", id: fileId } : undefined}
+      >
+        <Card className="mx-auto mt-10 max-w-md">
+          <CardHeader>
+            <CardTitle>{t("pages.notFound")}</CardTitle>
+          </CardHeader>
+        </Card>
+      </NeedAccessOr>
     );
   }
 
@@ -151,7 +157,15 @@ export const WikiFileView = () => {
                   body waits for this visit's own fetch. */}
               {file && fileQuery.isFetchedAfterMount ? (
                 <>
-                  <WikiFileBody file={file} />
+                  <ReadOnlyFileBody
+                    file={file}
+                    // Prose runs on in the wiki's own column rather than in a card.
+                    className={
+                      isWideFile(file)
+                        ? undefined
+                        : "max-h-none rounded-none border-0 bg-transparent shadow-none"
+                    }
+                  />
                   {/* A borrowed file is a page of this wiki while you are
                       reading it here, so it leads on like one. */}
                   <WikiPageNav

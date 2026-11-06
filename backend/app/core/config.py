@@ -7,6 +7,7 @@ import uuid
 from collections.abc import Sequence
 from enum import Enum
 from functools import lru_cache
+from pathlib import Path
 from typing import Annotated
 from urllib.parse import urlsplit
 
@@ -285,6 +286,14 @@ RUNTIME_SEEDED_SETTINGS = frozenset(
         "SMTP_PASSWORD",
         "SMTP_FROM_ADDRESS",
         "SMTP_TEST_RECIPIENT",
+        # Who may join and create, and the password breach check: seeded into
+        # their platform rules (app/core/rules.py) by the revision that moved
+        # them, and set in Settings → Platform from then on.
+        "ENABLE_PUBLIC_REGISTRATION",
+        "DISABLE_GUILD_CREATION",
+        "GUILD_CREATION_DAILY_LIMIT",
+        "HIBP_CHECK_ENABLED",
+        "EXPORT_GUILD_COOLDOWN_HOURS",
         # Object storage.
         "STORAGE_BACKEND",
         "S3_BUCKET",
@@ -352,9 +361,33 @@ def derive_database_password(secret_key: str, role: str) -> str:
     ).hexdigest()
 
 
+#: This checkout's root, the directory above backend/.
+CHECKOUT = Path(__file__).resolve().parents[3]
+
+
+def main_checkout(checkout: Path = CHECKOUT) -> Path:
+    """The main checkout of the repository ``checkout`` is in: ``checkout`` itself,
+    unless it is a linked git worktree. A worktree's ``.git`` is a file naming its
+    directory under the main checkout's ``.git/worktrees/``."""
+    marker = checkout / ".git"
+    if not marker.is_file():
+        return checkout
+    gitdir = marker.read_text().strip().removeprefix("gitdir:").strip()
+    worktrees = (checkout / gitdir).resolve().parent
+    return worktrees.parent.parent if worktrees.name == "worktrees" else checkout
+
+
+# A linked worktree reads the main checkout's backend/.env, then its own on top,
+# so nothing is copied in and a worktree can still set a value of its own (OIDC
+# against a local provider, say).
+ENV_FILES: tuple[str | Path, ...] = (".env",)
+if main_checkout() != CHECKOUT:
+    ENV_FILES = (main_checkout() / "backend" / ".env", ".env")
+
+
 class Settings(BaseSettings):
     model_config = SettingsConfigDict(
-        env_file=".env",
+        env_file=ENV_FILES,
         env_file_encoding="utf-8",
         extra="ignore",
         # A setting that fails is named in the error, never shown.
@@ -461,6 +494,29 @@ class Settings(BaseSettings):
         if value < 1:
             raise ValueError("must be at least 1")
         return value
+
+    @field_validator("STORAGE_ENCRYPTION")
+    @classmethod
+    def _storage_encryption_root(cls, value: str) -> str:
+        value = value.strip().lower()
+        if value not in ("", "local", "gcp_kms"):
+            raise ValueError('must be unset, "local" or "gcp_kms"')
+        return value
+
+    @model_validator(mode="after")
+    def _scanner_has_its_token(self) -> "Settings":
+        if self.UPLOAD_SCANNER_URL and not self.UPLOAD_SCANNER_TOKEN:
+            raise ValueError("UPLOAD_SCANNER_URL needs UPLOAD_SCANNER_TOKEN")
+        return self
+
+    @model_validator(mode="after")
+    def _kms_root_names_its_key(self) -> "Settings":
+        if self.STORAGE_ENCRYPTION == "gcp_kms" and not self.STORAGE_ENCRYPTION_KMS_KEY:
+            raise ValueError(
+                'STORAGE_ENCRYPTION="gcp_kms" needs STORAGE_ENCRYPTION_KMS_KEY: '
+                "projects/<p>/locations/<l>/keyRings/<r>/cryptoKeys/<k>"
+            )
+        return self
 
     @field_validator("DB_MAX_OVERFLOW")
     @classmethod
@@ -611,11 +667,6 @@ class Settings(BaseSettings):
         can be rotated without touching encrypted-at-rest data; falls back to
         SECRET_KEY for deployments that haven't set one."""
         return self.JWT_SIGNING_KEY or self.SECRET_KEY
-
-    @property
-    def registration_open(self) -> bool:
-        """Whether somebody may register without an invite."""
-        return self.ENABLE_PUBLIC_REGISTRATION and not self.DISABLE_GUILD_CREATION
 
     @property
     def app_url_is_https(self) -> bool:
@@ -873,6 +924,24 @@ class Settings(BaseSettings):
     # (serves blobs not yet copied by the backfill). Turn off once the backfill is
     # verified complete. Only consulted when STORAGE_BACKEND="s3".
     S3_LOCAL_FALLBACK: bool = False
+    # Encrypt every object a community stores, in the app, under a key of the
+    # community's own (app.services.storage_keys, app.core.storage_crypto).
+    # Unset (the default): objects are stored as they arrive, as always.
+    #   "local"    the community keys are wrapped under SECRET_KEY.
+    #   "gcp_kms"  they are wrapped by the Cloud KMS key STORAGE_ENCRYPTION_KMS_KEY,
+    #              which the app reaches as its own Google identity.
+    # Deployment-level on purpose: nothing in the app's settings turns it off.
+    # Objects stored before it was set stay readable, and a background pass
+    # encrypts them; objects stored encrypted stay readable if it is unset again.
+    STORAGE_ENCRYPTION: str = ""
+    # projects/<p>/locations/<l>/keyRings/<r>/cryptoKeys/<k>, for "gcp_kms".
+    STORAGE_ENCRYPTION_KMS_KEY: str = ""
+    # Scan every upload before it is stored, at this scanner (initiative_infra
+    # scanner/: a hash list, archives, YARA and ClamAV), presenting the token.
+    # Unset (the default): nothing is scanned. Set, it fails closed: while the
+    # scanner cannot answer, uploads are refused (app.services.upload_scanning).
+    UPLOAD_SCANNER_URL: str = ""
+    UPLOAD_SCANNER_TOKEN: str = ""
 
     # --- Marketplace ------------------------------------------------------
     # A directory of listing manifests (*.json) this deployment publishes as

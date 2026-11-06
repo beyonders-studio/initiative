@@ -4,7 +4,8 @@ name: Browser Journeys
 # an image started the way docker-compose.example.yml starts it. Release
 # Candidate and Build and Release need it to pass before an image is marked or
 # published as a release; it also runs on every push to dev, nightly, and on a
-# pull request labelled journeys. Each run keeps its HTML report.
+# pull request labelled journeys. Each run keeps its HTML report. A fork's push
+# to dev follows this repository's, so it walks nothing.
 
 on:
   workflow_call:
@@ -27,8 +28,9 @@ jobs:
   journeys:
     name: Browser Journeys
     if: >-
-      ${{ github.event_name != 'pull_request'
-      || contains(github.event.pull_request.labels.*.name, 'journeys') }}
+      ${{ (github.event_name != 'push' || github.repository == 'beyonders-studio/initiative')
+      && (github.event_name != 'pull_request'
+      || contains(github.event.pull_request.labels.*.name, 'journeys')) }}
     runs-on: ubuntu-24.04
     timeout-minutes: 30
     steps:

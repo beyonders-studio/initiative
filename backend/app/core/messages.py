@@ -12,7 +12,7 @@ class CommonMessages:
     UNKNOWN_TIMEZONE = "UNKNOWN_TIMEZONE"
 
     #: Somebody named on the content (an assignee, an attendee, a person
-    #: property, a queue item's person) cannot open what it sits in.
+    #: property) cannot open what it sits in.
     PERSON_CANNOT_READ = "PERSON_CANNOT_READ"
 
     #: The write reached content that is archived or in the trash, or something
@@ -289,6 +289,10 @@ class GuildMessages:
     BANNER_TEXT_COLOR_INVALID = "BANNER_TEXT_COLOR_INVALID"
     # Banner artwork is not part of what this guild has; the colour is.
     BANNER_IMAGE_NOT_ENTITLED = "BANNER_IMAGE_NOT_ENTITLED"
+    # The deployment has taken this setting away from the community.
+    COMMUNITY_SURFACE_CLOSED = "COMMUNITY_SURFACE_CLOSED"
+    # The deployment sets this rule for the community.
+    COMMUNITY_RULE_SET_BY_DEPLOYMENT = "COMMUNITY_RULE_SET_BY_DEPLOYMENT"
     CANNOT_CHANGE_OWN_ROLE = "CANNOT_CHANGE_OWN_ROLE"
     # 'support' is synthesized for PAM grantees only; it is never a stored
     # guild-membership role, so it cannot be assigned via the role endpoints.
@@ -308,6 +312,19 @@ class GuildMessages:
     INVITE_USED = "INVITE_USED"
     INVALID_PASSWORD = "COMMUNITY_INVALID_PASSWORD"
     CONFIRMATION_MISMATCH = "COMMUNITY_CONFIRMATION_MISMATCH"
+
+
+class ShareRequestMessages:
+    #: Nothing the reader can open or know is there.
+    NOT_FOUND = "SHARE_REQUEST_NOT_FOUND"
+    #: They already hold what they asked for.
+    ALREADY_SHARED = "SHARE_REQUEST_ALREADY_SHARED"
+    #: They asked for it already, and nobody has answered.
+    ALREADY_PENDING = "SHARE_REQUEST_ALREADY_PENDING"
+    #: A collection or wiki with nothing in it they can't open.
+    NOTHING_TO_ASK = "SHARE_REQUEST_NOTHING_TO_ASK"
+    #: The request is answered, or not one this person may answer.
+    CANNOT_ANSWER = "SHARE_REQUEST_CANNOT_ANSWER"
 
 
 class InitiativeMessages:
@@ -342,6 +359,12 @@ class InitiativeMessages:
     # Auto-join shapes onboarding for the whole guild, so only a guild admin sets
     # it — unlike join_policy, which any initiative manager may change.
     AUTO_JOIN_ADMIN_ONLY = "INITIATIVE_AUTO_JOIN_ADMIN_ONLY"
+    # The community sets this for every initiative in it.
+    SET_BY_COMMUNITY = "INITIATIVE_SET_BY_COMMUNITY"
+    # The community keeps its initiatives to their built-in roles.
+    CUSTOM_ROLES_OFF = "INITIATIVE_CUSTOM_ROLES_OFF"
+    # Only the community's admins set what every initiative starts from.
+    DEFAULTS_ADMIN_ONLY = "INITIATIVE_DEFAULTS_ADMIN_ONLY"
     # A PAM grant confers content read/write for a window; a membership row
     # would outlast it, so joining is for real guild members.
     GRANT_CANNOT_MANAGE_MEMBERS = "INITIATIVE_GRANT_CANNOT_MANAGE_MEMBERS"
@@ -378,6 +401,11 @@ class ToolLayoutMessages:
     TOO_MANY_PLUGIN_PARTS = "TOOL_LAYOUTS_TOO_MANY_PLUGIN_PARTS"
     # A change that would hide every one of a target's lists.
     ONE_LIST_SHOWN = "TOOL_LAYOUTS_ONE_LIST_SHOWN"
+    # A person adding an item without a field its page requires, or emptying
+    # one. ``params.fields`` names them, one a line: a built-in field by its
+    # id, a property by its name; ``params.keys`` holds each as its layout
+    # names it (``property:<id>``), for a client to ask for them.
+    REQUIRED_FIELDS_MISSING = "REQUIRED_FIELDS_MISSING"
 
 
 class ProjectMessages:
@@ -518,6 +546,17 @@ class PropertyMessages:
     NOT_INITIATIVE_MEMBER = "PROPERTY_NOT_INITIATIVE_MEMBER"
     OPTIONS_REQUIRED = "PROPERTY_OPTIONS_REQUIRED"
     DUPLICATE_OPTION_VALUE = "PROPERTY_DUPLICATE_OPTION_VALUE"
+    #: A money property names the currency its amounts are in.
+    CURRENCY_REQUIRED = "PROPERTY_CURRENCY_REQUIRED"
+    #: A counter's minimum is at most its maximum.
+    COUNTER_MIN_GREATER_THAN_MAX = "PROPERTY_COUNTER_MIN_GREATER_THAN_MAX"
+    #: Properties merged into one metadata field are of one type, and money in
+    #: one currency.
+    PROMOTE_TYPES_DIFFER = "PROPERTY_PROMOTE_TYPES_DIFFER"
+    #: A value to move sits on something the request may not edit.
+    PROMOTE_VALUE_NOT_EDITABLE = "PROPERTY_PROMOTE_VALUE_NOT_EDITABLE"
+    #: A signature is written only by a person signing as themselves.
+    SIGNER_ONLY = "PROPERTY_SIGNER_ONLY"
 
 
 class AttachmentMessages:
@@ -525,6 +564,17 @@ class AttachmentMessages:
     INVALID_IMAGE = "ATTACHMENT_INVALID_IMAGE"
     TOO_LARGE = "ATTACHMENT_TOO_LARGE"
     STORAGE_QUOTA_EXCEEDED = "ATTACHMENT_STORAGE_QUOTA_EXCEEDED"
+
+
+class ResumableMessages:
+    INVALID_REQUEST = "RESUMABLE_INVALID_REQUEST"
+    VERSION_UNSUPPORTED = "RESUMABLE_VERSION_UNSUPPORTED"
+    NOT_FOUND = "RESUMABLE_NOT_FOUND"
+    EXPIRED = "RESUMABLE_EXPIRED"
+    OFFSET_MISMATCH = "RESUMABLE_OFFSET_MISMATCH"
+    PAST_LENGTH = "RESUMABLE_PAST_LENGTH"
+    LOCKED = "RESUMABLE_LOCKED"
+    TOO_MANY = "RESUMABLE_TOO_MANY"
 
 
 class FileMessages:
@@ -540,6 +590,13 @@ class FileMessages:
     NOT_AN_UPLOADED_FILE = "FILE_NOT_AN_UPLOADED_FILE"
     VERSION_TYPE_MISMATCH = "FILE_VERSION_TYPE_MISMATCH"
     INVALID_FILE = "FILE_INVALID_FILE"
+    THUMBNAIL_NOT_WANTED = "FILE_THUMBNAIL_NOT_WANTED"
+    NOT_CONVERTIBLE = "FILE_NOT_CONVERTIBLE"
+    TOO_LARGE_TO_CONVERT = "FILE_TOO_LARGE_TO_CONVERT"
+    UNREADABLE_TEXT = "FILE_UNREADABLE_TEXT"
+    TYPE_NOT_ALLOWED = "FILE_TYPE_NOT_ALLOWED"
+    REFUSED_BY_SCAN = "FILE_REFUSED_BY_SCAN"
+    SCANNER_UNAVAILABLE = "FILE_SCANNER_UNAVAILABLE"
     FILE_TOO_LARGE = "FILE_TOO_LARGE"
 
 
@@ -592,6 +649,11 @@ class RelationshipMessages:
     #: that end. Refused here with a name, rather than left to arrive as the
     #: database declining the write.
     SOURCE_NOT_WRITABLE = "RELATIONSHIP_SOURCE_NOT_WRITABLE"
+    #: A link to a person says something about the item on its other end, so
+    #: making one asks to change that item, whichever side it is on.
+    ITEM_NOT_WRITABLE = "RELATIONSHIP_ITEM_NOT_WRITABLE"
+    #: A link has an item on at least one end.
+    BETWEEN_PEOPLE = "RELATIONSHIP_BETWEEN_PEOPLE"
     ENDPOINT_NOT_FOUND = "RELATIONSHIP_ENDPOINT_NOT_FOUND"
     CROSS_INITIATIVE = "RELATIONSHIP_CROSS_INITIATIVE"
     ENDPOINT_ARCHIVED = "RELATIONSHIP_ENDPOINT_ARCHIVED"
@@ -831,6 +893,9 @@ class AccessGrantMessages:
     CASE_CLOSED = "ACCESS_GRANT_CASE_CLOSED"
     #: The case is about another community.
     CASE_OTHER_COMMUNITY = "ACCESS_GRANT_CASE_OTHER_COMMUNITY"
+    #: Telling the community was chosen for a grant whose case does not offer
+    #: it, or that serves no case.
+    COMMUNITY_NOTICE_NOT_OFFERED = "ACCESS_GRANT_COMMUNITY_NOTICE_NOT_OFFERED"
     #: A settings rung reads; changing what it reaches takes a read_write
     #: content grant beside it.
     WRITE_GRANT_REQUIRED = "ACCESS_GRANT_WRITE_REQUIRED"
@@ -929,6 +994,11 @@ class UsernameMessages:
 
 class ProjectExportMessages:
     NO_TASK_STATUSES = "PROJECT_EXPORT_NO_TASK_STATUSES"
+
+
+class DataJobMessages:
+    #: An import or export job the caller cannot see, or none at all.
+    DATA_JOB_NOT_FOUND = "DATA_JOB_NOT_FOUND"
 
 
 class ExportMessages:
@@ -1067,6 +1137,25 @@ class QueryMessages:
     #: thing to compare them with is a field that holds one.
     VIEWER_NEEDS_A_PERSON = "QUERY_VIEWER_NEEDS_A_PERSON"
 
+    # Spreadsheets.
+
+    #: ``sheet()`` takes a spreadsheet's id or name, then a range as text.
+    SHEET_ARGUMENTS = "QUERY_SHEET_ARGUMENTS"
+    #: No spreadsheet by that id or name that this statement can read.
+    SHEET_NOT_FOUND = "QUERY_SHEET_NOT_FOUND"
+    #: Several spreadsheets have that name; the id says which.
+    SHEET_NAME_AMBIGUOUS = "QUERY_SHEET_NAME_AMBIGUOUS"
+    #: The id names a file that is not a spreadsheet.
+    SHEET_NOT_A_SPREADSHEET = "QUERY_SHEET_NOT_A_SPREADSHEET"
+    #: The range names a sheet the workbook does not have.
+    SHEET_UNKNOWN = "QUERY_SHEET_UNKNOWN"
+    #: The range is not one A1 notation can say.
+    SHEET_RANGE_INVALID = "QUERY_SHEET_RANGE_INVALID"
+    #: The range covers more cells than one range reads.
+    SHEET_RANGE_TOO_LARGE = "QUERY_SHEET_RANGE_TOO_LARGE"
+    #: The spreadsheet's cells could not be read just now.
+    SHEET_UNREADABLE = "QUERY_SHEET_UNREADABLE"
+
     # Execution.
 
     #: The planner's estimate for this statement is above what the surface
@@ -1107,6 +1196,21 @@ class CalendarMessages:
     # is recorded on the calendar plug-in's install, which is the community's own
     # configuration.
     PLUGIN_INITIATIVE_REQUIRED = "CALENDAR_PLUGIN_INITIATIVE_REQUIRED"
+
+
+class ContactMessages:
+    # A community contact lives inside the community contacts plug-in, which is
+    # what reaches it and what its removal takes with it.
+    PLUGIN_REQUIRED = "CONTACT_COMMUNITY_PLUGIN_REQUIRED"
+    # An installed plug-in creates a contact in an initiative; a community one
+    # is recorded on the community contacts plug-in's install.
+    PLUGIN_INITIATIVE_REQUIRED = "CONTACT_PLUGIN_INITIATIVE_REQUIRED"
+    # Moving a contact into the community's contacts, when it is there already.
+    ALREADY_IN_COMMUNITY = "CONTACT_ALREADY_IN_COMMUNITY"
+    # A phone number is digits and the marks people group them with.
+    PHONE_INVALID = "CONTACT_PHONE_INVALID"
+    # A website is an http or https address.
+    WEBSITE_INVALID = "CONTACT_WEBSITE_INVALID"
 
 
 class CalendarEventMessages:
@@ -1199,10 +1303,14 @@ class PostMessages:
     POLL_NOT_PUBLISHED = "POST_POLL_NOT_PUBLISHED"
 
 
-class GalleryMessages:
-    IMAGE_TOO_LARGE = "GALLERY_IMAGE_TOO_LARGE"
-    #: A cover has to be one of the gallery's own pictures.
-    COVER_NOT_IN_GALLERY = "GALLERY_COVER_NOT_IN_GALLERY"
+class CollectionMessages:
+    #: A file named for a collection is not one of its initiative's files the
+    #: reader can open.
+    FILE_NOT_AVAILABLE = "COLLECTION_FILE_NOT_AVAILABLE"
+    #: A cover has to be one of the collection's own files.
+    COVER_NOT_IN_COLLECTION = "COLLECTION_COVER_NOT_IN_COLLECTION"
+    #: A collection's fields hold values for its own files only.
+    FILE_NOT_IN_COLLECTION = "COLLECTION_FILE_NOT_IN_COLLECTION"
 
 
 class WikiMessages:
@@ -1309,12 +1417,6 @@ class MarketplaceRegistryMessages:
     #: A package's terms for a listing are not in the expected format, or name
     #: a combination terms never take. The listing keeps the terms it had.
     TERMS_INVALID = "MARKETPLACE_REGISTRY_TERMS_INVALID"
-
-
-class QueueMessages:
-    NO_ITEMS = "QUEUE_NO_ITEMS"
-    NO_CURRENT_ITEM = "QUEUE_NO_CURRENT_ITEM"
-    ITEM_NOT_HELD = "QUEUE_ITEM_NOT_HELD"
 
 
 class CounterMessages:
@@ -1672,6 +1774,9 @@ class PluginChannelMessages:
     #: on the item's kind, or sets a list field to what is not a list of
     #: elements.
     METADATA_LIST_MISMATCH = "PLUGIN_CHANNEL_METADATA_LIST_MISMATCH"
+    #: A value that is not one of its key's kind: a field's, as the pinned
+    #: version declares it.
+    METADATA_VALUE_INVALID = "PLUGIN_CHANNEL_METADATA_VALUE_INVALID"
 
 
 class WebhookSubscriptionMessages:
@@ -1706,6 +1811,8 @@ class AIMessages:
     SPEND_LIMIT_REACHED = "AI_SPEND_LIMIT_REACHED"
     #: The provider kept refusing for too many requests.
     RATE_LIMITED = "AI_RATE_LIMITED"
+    #: A selection too long for writing help to take at once.
+    SELECTION_TOO_LONG = "AI_SELECTION_TOO_LONG"
 
 
 class NativeMessages:
@@ -1744,6 +1851,15 @@ class BillingMessages:
     INVALID_PAYLOAD = "BILLING_INVALID_PAYLOAD"
     COMMUNITY_NOT_FOUND = "BILLING_COMMUNITY_NOT_FOUND"
     STATUS_NOT_SETTABLE = "BILLING_STATUS_NOT_SETTABLE"
+    #: A sync's rule this deployment knows but does not take over the sync,
+    #: one named twice, or a value its rule does not hold.
+    RULE_NOT_SYNCED = "BILLING_RULE_NOT_SYNCED"
+    #: A sync's rule asks for something this deployment does not offer, such
+    #: as a second factor where no kind of factor is permitted.
+    RULE_NOT_OFFERED = "BILLING_RULE_NOT_OFFERED"
+    #: A sync's custom roles name one twice (capitals aside), or give a role
+    #: on the member rung a surface that is for admins.
+    CUSTOM_ROLES_NOT_SYNCED = "BILLING_CUSTOM_ROLES_NOT_SYNCED"
     #: The notice could not be written down. Nothing was recorded, so the same
     #: key may be sent again.
     NOTICE_NOT_DELIVERED = "BILLING_NOTICE_NOT_DELIVERED"
@@ -1857,3 +1973,34 @@ class DemoMessages:
     DEMO_PERSONA_TAKEN = "DEMO_PERSONA_TAKEN"
     #: A link's end is in the past.
     DEMO_LINK_EXPIRY_INVALID = "DEMO_LINK_EXPIRY_INVALID"
+
+
+class ViewPreferenceMessages:
+    """A person's kept views of lists."""
+
+    #: A view of a community's list is kept in that community, not with the
+    #: account.
+    VIEW_KEPT_IN_THE_COMMUNITY = "VIEW_KEPT_IN_THE_COMMUNITY"
+
+
+class CustomRoleMessages:
+    """A community's custom roles."""
+
+    CUSTOM_ROLE_NOT_FOUND = "CUSTOM_ROLE_NOT_FOUND"
+    #: Another role already has the name.
+    CUSTOM_ROLE_NAME_TAKEN = "CUSTOM_ROLE_NAME_TAKEN"
+    #: The role holds a surface the writer does not, or sits on the admin rung
+    #: and the writer is not an admin.
+    CUSTOM_ROLE_BEYOND_YOURS = "CUSTOM_ROLE_BEYOND_YOURS"
+    #: Taking a role off an admin gives them every surface back, which takes
+    #: somebody who holds every one.
+    CUSTOM_ROLE_WIDENS_AN_ADMIN = "CUSTOM_ROLE_WIDENS_AN_ADMIN"
+    #: A role on the member rung holds a surface that is for admins.
+    CUSTOM_ROLE_SURFACE_NOT_FOR_MEMBERS = "CUSTOM_ROLE_SURFACE_NOT_FOR_MEMBERS"
+    #: The person given a role is not a member of the community.
+    CUSTOM_ROLE_HOLDER_NOT_MEMBER = "CUSTOM_ROLE_HOLDER_NOT_MEMBER"
+    #: The deployment defined the role: the community gives it, and does not
+    #: change or delete it.
+    CUSTOM_ROLE_SET_BY_DEPLOYMENT = "CUSTOM_ROLE_SET_BY_DEPLOYMENT"
+    #: A role the deployment defined has the name, capitals aside.
+    CUSTOM_ROLE_NAME_RESERVED = "CUSTOM_ROLE_NAME_RESERVED"

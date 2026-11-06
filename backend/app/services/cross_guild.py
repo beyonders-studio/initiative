@@ -16,7 +16,7 @@ from typing import Any, Awaitable, Callable, Mapping, Optional, Sequence, TypeVa
 from sqlmodel import col, select
 
 from app.services.membership import live_membership_clause
-from app.services.platform import guild_entitlements
+from app.services.platform import rules
 from sqlmodel.ext.asyncio.session import AsyncSession
 
 from app.core import auth_context
@@ -91,8 +91,8 @@ async def member_guild_ids(
     recorded = auth_context.current()
     if recorded.api_key_credential:
         conditions.append(
-            guild_entitlements.accepts_api_keys(
-                Guild.id, GuildMembership.api_keys_allowed
+            rules.community_rule_sql(
+                Guild.id, "api_keys", user_id=GuildMembership.user_id
             )
         )
     pinned = recorded.api_key_guild_id

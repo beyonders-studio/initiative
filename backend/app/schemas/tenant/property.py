@@ -1,4 +1,5 @@
-"""Pydantic schemas for custom property definitions and values."""
+"""Pydantic schemas for metadata definitions and values: an initiative's
+properties, and a project's, a collection's or a plug-in's metadata."""
 
 from datetime import datetime
 from enum import Enum
@@ -12,17 +13,22 @@ from pydantic import (
     model_validator,
 )
 
-from app.core.identity_boundary import responding_to_install
+from app.core.currencies import CURRENCY_CODES
+from app.core.identity_boundary import names_withheld, responding_to_install
 from app.core.messages import PropertyMessages
 from app.core.tools import PROPERTY_TARGETS
 from app.schemas.base import SanitizedBaseModel
 from app.schemas.platform.user import PluginPerson
 
-from app.models.tenant.property import PropertyType
+from app.models.tenant.metadata import PLUGIN_ONLY_TYPES, MetadataType
+
+# Cap on the number of property predicates accepted by list endpoints.
+# Bounds the per-request subquery count against the value table.
+MAX_PROPERTY_FILTERS = 5
 
 _SLUG_PATTERN = r"^[A-Za-z0-9][A-Za-z0-9_\-]*$"
 _HEX_COLOR_PATTERN = r"^#[0-9A-Fa-f]{6}$"
-_SELECT_TYPES = {PropertyType.select, PropertyType.multi_select}
+_SELECT_TYPES = {MetadataType.select, MetadataType.multi_select}
 
 # Derived, never re-declared: every Tool value plus every sub-tool (see
 # PROPERTY_TARGETS in app.core.tools). A new Tool lands here — and in the
@@ -34,6 +40,9 @@ PropertyTarget.__doc__ = (
     "What can carry custom property values: every tool and sub-tool."
 )
 
+CurrencyCode = Enum("CurrencyCode", {code: code for code in CURRENCY_CODES}, type=str)
+CurrencyCode.__doc__ = "The ISO 4217 code a money property's amounts are in."
+
 
 class PropertyOption(SanitizedBaseModel):
     """One option entry for select / multi_select property definitions."""
@@ -43,12 +52,37 @@ class PropertyOption(SanitizedBaseModel):
     color: Optional[str] = Field(default=None, pattern=_HEX_COLOR_PATTERN)
 
 
+class CounterSettings(SanitizedBaseModel):
+    """How a counter field moves: by ``step`` a tap, never past ``min`` or
+    ``max``, and back to ``initial`` on a reset. A counter with no value
+    holds ``initial``."""
+
+    model_config = ConfigDict(json_schema_serialization_defaults_required=True)
+
+    step: float = Field(default=1, gt=0, allow_inf_nan=False)
+    min: Optional[float] = Field(default=None, allow_inf_nan=False)
+    max: Optional[float] = Field(default=None, allow_inf_nan=False)
+    initial: float = Field(default=0, allow_inf_nan=False)
+
+    @model_validator(mode="after")
+    def _ordered(self) -> "CounterSettings":
+        if self.min is not None and self.max is not None and self.min > self.max:
+            raise ValueError(PropertyMessages.COUNTER_MIN_GREATER_THAN_MAX)
+        return self
+
+
 class PropertyDefinitionBase(SanitizedBaseModel):
     name: str = Field(..., min_length=1, max_length=100)
-    type: PropertyType
+    type: MetadataType
     position: float = 0.0
     color: Optional[str] = Field(default=None, pattern=_HEX_COLOR_PATTERN)
     options: Optional[List[PropertyOption]] = None
+    #: The currency a money property's amounts are in; required for one, and
+    #: dropped for every other type.
+    currency: Optional[CurrencyCode] = None
+    #: A counter's step, bounds and reset value; a counter left without them
+    #: takes the defaults, and every other type drops them.
+    counter: Optional[CounterSettings] = None
 
     @field_validator("name")
     def _strip_name(cls, v: str) -> str:
@@ -59,6 +93,8 @@ class PropertyDefinitionBase(SanitizedBaseModel):
 
     @model_validator(mode="after")
     def _validate_options(self) -> "PropertyDefinitionBase":
+        if self.type in PLUGIN_ONLY_TYPES:
+            raise ValueError("only a plug-in's metadata is of this type")
         if self.type in _SELECT_TYPES:
             if not self.options:
                 raise ValueError(PropertyMessages.OPTIONS_REQUIRED)
@@ -69,11 +105,33 @@ class PropertyDefinitionBase(SanitizedBaseModel):
             # Silently coerce away options on non-select types so create
             # calls from the client don't trip confusing errors.
             self.options = None
+        if self.type is not MetadataType.currency:
+            self.currency = None
+        elif self.currency is None:
+            raise ValueError(PropertyMessages.CURRENCY_REQUIRED)
+        if self.type is not MetadataType.counter:
+            self.counter = None
+        elif self.counter is None:
+            self.counter = CounterSettings()
         return self
 
 
 class PropertyDefinitionCreate(PropertyDefinitionBase):
     initiative_id: int
+    #: Make it this project's metadata rather than one of the initiative's
+    #: properties: its values on the project's tasks. The project is in
+    #: ``initiative_id``.
+    project_id: Optional[int] = None
+    #: Make it this collection's metadata: shown only with the collection,
+    #: its values on the collection's files. The collection is in
+    #: ``initiative_id``.
+    collection_id: Optional[int] = None
+
+    @model_validator(mode="after")
+    def _one_owner(self) -> "PropertyDefinitionCreate":
+        if self.project_id is not None and self.collection_id is not None:
+            raise ValueError("a definition has one owner")
+        return self
 
 
 class PropertyDefinitionUpdate(SanitizedBaseModel):
@@ -88,6 +146,12 @@ class PropertyDefinitionUpdate(SanitizedBaseModel):
     position: Optional[float] = None
     color: Optional[str] = Field(default=None, pattern=_HEX_COLOR_PATTERN)
     options: Optional[List[PropertyOption]] = None
+    #: A money property's currency. Its amounts stay as they are: nothing is
+    #: converted.
+    currency: Optional[CurrencyCode] = None
+    #: A counter's settings, all of them. Its values stay as they are until
+    #: they are next written, which holds them to the new bounds.
+    counter: Optional[CounterSettings] = None
 
     @field_validator("name")
     def _strip_name(cls, v: Optional[str]) -> Optional[str]:
@@ -117,8 +181,66 @@ class PropertyDefinitionRead(PropertyDefinitionBase):
 
     id: int
     initiative_id: int
+    #: The project or the collection whose metadata it is; neither for an
+    #: initiative's property.
+    project_id: Optional[int] = None
+    collection_id: Optional[int] = None
     created_at: datetime
     updated_at: datetime
+
+
+class MetadataOwnerKind(str, Enum):
+    """Who owns a definition people define: the initiative (its metadata), or
+    a project or a collection (its properties)."""
+
+    initiative = "initiative"
+    project = "project"
+    collection = "collection"
+
+
+class PropertyDefinitionGroup(SanitizedBaseModel):
+    """One owner's definitions, as the initiative's settings list them."""
+
+    model_config = ConfigDict(json_schema_serialization_defaults_required=True)
+
+    owner: MetadataOwnerKind
+    #: The project's or the collection's id; none for the initiative.
+    owner_id: Optional[int] = None
+    #: The project's or the collection's name; none for the initiative.
+    name: Optional[str] = None
+    #: Whether the reader may rename, reorder and delete these.
+    can_edit: bool
+    definitions: List[PropertyDefinitionRead]
+
+
+class PropertyDefinitionGroups(SanitizedBaseModel):
+    """An initiative's metadata, then the properties of each project and each
+    collection in it the reader may edit, each under its owner."""
+
+    groups: List[PropertyDefinitionGroup]
+
+
+class PropertyDefinitionBulkDelete(SanitizedBaseModel):
+    """Definitions of one initiative to delete together, or none of them."""
+
+    initiative_id: int
+    ids: List[int] = Field(..., min_length=1, max_length=100)
+
+
+class PropertyDefinitionPromote(SanitizedBaseModel):
+    """Properties of one type, from the initiative's projects and
+    collections, merged into one of its metadata, named ``name``."""
+
+    initiative_id: int
+    ids: List[int] = Field(..., min_length=1, max_length=100)
+    name: str = Field(..., min_length=1, max_length=100)
+
+    @field_validator("name")
+    def _strip_name(cls, v: str) -> str:
+        v = v.strip()
+        if not v:
+            raise ValueError("Property name cannot be empty")
+        return v
 
 
 class PropertyDefinitionUpdateResponse(SanitizedBaseModel):
@@ -159,6 +281,14 @@ class PropertyOptionsChange(SanitizedBaseModel):
     remove: List[str] = Field(default_factory=list, max_length=100)
 
 
+class PropertyStep(SanitizedBaseModel):
+    """One step of a counter, up or down, from the value it holds when the
+    step is written, so two people stepping it at once both count."""
+
+    property_id: int
+    up: bool
+
+
 class PropertyValuesSetRequest(SanitizedBaseModel):
     """Payload for ``PUT /properties/{target}/{entity_id}``: replace-all, or
     with ``merge`` only the properties it names.
@@ -173,15 +303,20 @@ class PropertyValuesSetRequest(SanitizedBaseModel):
     removed: List[int] = Field(default_factory=list, max_length=100)
     #: With ``merge``, multi-select values to change an option of.
     options: List[PropertyOptionsChange] = Field(default_factory=list, max_length=100)
+    #: With ``merge``, counters to step.
+    steps: List[PropertyStep] = Field(default_factory=list, max_length=100)
 
     @model_validator(mode="after")
     def removal_merges(self) -> "PropertyValuesSetRequest":
-        if (self.removed or self.options) and not self.merge:
-            raise ValueError("removed and options need merge")
-        changed = [change.property_id for change in self.options]
+        if (self.removed or self.options or self.steps) and not self.merge:
+            raise ValueError("removed, options and steps need merge")
+        changed = [
+            *(change.property_id for change in self.options),
+            *(step.property_id for step in self.steps),
+        ]
         written = {*self.removed, *(entry.property_id for entry in self.values)}
         if len(changed) != len(set(changed)) or written.intersection(changed):
-            raise ValueError("a property's options change once, and alone")
+            raise ValueError("a property changes or steps once, and alone")
         return self
 
 
@@ -214,32 +349,57 @@ class PropertySummary(SanitizedBaseModel):
 
     property_id: int
     name: str
-    type: PropertyType
+    type: MetadataType
+    #: Who owns the definition, at most one of these: the project or the
+    #: collection whose metadata it is, or the installed plug-in that keeps it
+    #: under ``key``. None of them for the initiative's property.
+    project_id: Optional[int] = None
+    collection_id: Optional[int] = None
+    install_id: Optional[int] = None
+    key: Optional[str] = None
     options: Optional[List[PropertyOption]] = None
+    #: A money property's currency.
+    currency: Optional[CurrencyCode] = None
+    #: A counter's step, bounds and reset value.
+    counter: Optional[CounterSettings] = None
     value: Any = Field(
         default=None,
         description=(
-            "Shaped by the property's type. For user_reference, a person: id, "
+            "Shaped by the definition's type. For user_reference, a person: id, "
             "username, discriminator, display_name and avatar_url, or an "
-            "PluginPerson when the reader is an installed plug-in."
+            "PluginPerson when the reader is an installed plug-in. For file, a "
+            "file: id, name, file_type and smart_link_url, or its id alone where "
+            "the reader cannot open it. For signature, the signer as user (a "
+            "person, shaped as user_reference's), the name they typed and when "
+            "they signed: user, name and signed_at. A plug-in's "
+            "value is as the plug-in wrote it: a list field's an array of its "
+            "elements, newest first, each with its ref, and a value with a state "
+            "the state beside it."
         ),
     )
 
     @field_serializer("value")
     def _value_out(self, value: Any) -> Any:
-        """A person a ``user_reference`` value names, as the response's reader
-        knows them: an installed plug-in gets an :class:`PluginPerson`."""
-        if (
-            self.type is not PropertyType.user_reference
-            or not isinstance(value, dict)
-            or not responding_to_install()
-        ):
+        """A person a ``user_reference`` value names, or a signature's signer,
+        as the response's reader knows them: an installed plug-in gets an
+        :class:`PluginPerson`."""
+        if not isinstance(value, dict) or not responding_to_install():
             return value
-        return PluginPerson.model_validate(value).for_install()
+        if self.type is MetadataType.user_reference:
+            return PluginPerson.model_validate(value).for_install()
+        if self.type is MetadataType.signature:
+            # The typed name is a name, so it goes where names do.
+            signer = value["user"]
+            return {
+                **value,
+                "user": signer and PluginPerson.model_validate(signer).for_install(),
+                "name": None if names_withheld() else value["name"],
+            }
+        return value
 
 
 def annotated_properties(entity: Any) -> List[PropertySummary]:
-    """The summaries ``properties_service.annotate_properties`` put on this
+    """The summaries ``metadata_service.annotate_properties`` put on this
     entity — read rather than recomputed, since a page's values are fetched for
     the whole page at once."""
     return list(getattr(entity, "properties", None) or [])

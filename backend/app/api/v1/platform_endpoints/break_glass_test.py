@@ -31,7 +31,7 @@ from app.core.login_methods import SecondFactorRequirement
 from app.models.platform.guild import Guild, CommunityRole
 from app.models.platform.user import UserRole
 from app.services.platform import access_grants as access_grants_service
-from app.services.platform import app_settings as app_settings_service
+from app.services.platform import rules
 from app.testing import (
     Actor,
     assertion_for,
@@ -349,9 +349,7 @@ async def test_the_deployments_requirement_asks_an_account_without_one(
     Asked of the rule directly: the deployment's own gate turns an account
     with neither away sooner."""
     a = await acting_user("operator")
-    row = await app_settings_service.get_app_settings(session)
-    row.second_factor_requirement = level
-    session.add(row)
+    await rules.put(session, "second_factor_requirement", level)
     await session.commit()
 
     auth_context.record(session_amr=signed_in_with)

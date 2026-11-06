@@ -85,8 +85,6 @@ export const TOOL_PALETTE: Record<Tool, ToolPaletteSource> = {
       return (query.data?.items ?? []).map((doc) => {
         const { Icon: DocIcon, colorClass } = fileIcon({
           file_type: doc.file_type,
-          mime_type: doc.file_content_type,
-          original_filename: doc.original_filename,
           smart_link_url: doc.smart_link_url,
         });
         return {
@@ -97,19 +95,6 @@ export const TOOL_PALETTE: Record<Tool, ToolPaletteSource> = {
           path: toolDetailRoute(Tool.file, doc.initiative_id, doc.id),
         };
       });
-    },
-  },
-  [Tool.queue]: {
-    useHeading: () => useGroupHeading(Tool.queue),
-    useItems: (ctx) => {
-      const query = useToolPaletteList(TOOL_HOOKS[Tool.queue].listQuery, BROWSE_PAGE, ctx);
-      return (query.data?.items ?? []).map((queue) => ({
-        id: queue.id,
-        label: queue.name,
-        keywords: [queue.description ?? ""],
-        icon: null,
-        path: toolDetailRoute(Tool.queue, queue.initiative_id, queue.id),
-      }));
     },
   },
   [Tool.counter_group]: {
@@ -169,19 +154,6 @@ export const TOOL_PALETTE: Record<Tool, ToolPaletteSource> = {
       }));
     },
   },
-  [Tool.gallery]: {
-    useHeading: () => useGroupHeading(Tool.gallery),
-    useItems: (ctx) => {
-      const query = useToolPaletteList(TOOL_HOOKS[Tool.gallery].listQuery, BROWSE_PAGE, ctx);
-      return (query.data?.items ?? []).map((gallery) => ({
-        id: gallery.id,
-        label: gallery.name,
-        keywords: [gallery.description ?? ""],
-        icon: null,
-        path: toolDetailRoute(Tool.gallery, gallery.initiative_id, gallery.id),
-      }));
-    },
-  },
   [Tool.wiki]: {
     useHeading: () => useGroupHeading(Tool.wiki),
     useItems: (ctx) => {
@@ -192,6 +164,20 @@ export const TOOL_PALETTE: Record<Tool, ToolPaletteSource> = {
         keywords: [wiki.description ?? ""],
         icon: null,
         path: toolDetailRoute(Tool.wiki, wiki.initiative_id, wiki.id),
+      }));
+    },
+  },
+  [Tool.contact]: {
+    useHeading: () => useGroupHeading(Tool.contact),
+    useItems: (ctx) => {
+      const query = useToolPaletteList(TOOL_HOOKS[Tool.contact].listQuery, BROWSE_PAGE, ctx);
+      return (query.data?.items ?? []).map((contact) => ({
+        id: contact.id,
+        label: contact.name,
+        // Found by how they are reached as well as by name.
+        keywords: [...contact.emails, ...contact.phones].map((detail) => detail.value),
+        icon: null,
+        path: toolDetailRoute(Tool.contact, contact.initiative_id, contact.id),
       }));
     },
   },

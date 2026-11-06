@@ -23,7 +23,7 @@ from typing import Awaitable, Callable, Optional, cast
 from sqlalchemy import delete as sa_delete, func
 from sqlalchemy.dialects.postgresql import insert as pg_insert
 from sqlalchemy.orm import selectinload
-from sqlmodel import select
+from sqlmodel import col, select
 from sqlmodel.ext.asyncio.session import AsyncSession
 
 from app.core.errors import CodedError
@@ -32,10 +32,12 @@ from app.core.reactions import ReactionTarget
 from app.core.tools import Tool
 from app.db import session as db_session
 from app.db.advisory_locks import LockNamespace, advisory_lock
+from app.models.tenant.batched_notice import BatchedNotice, BatchedNoticeKind
 from app.models.tenant.reaction import Reaction
 from app.models.platform.user import User
 from app.services.platform import accounts as accounts_service
 from app.schemas.tenant.reaction import ReactionGroup, ReactionSummary, ReactionUser
+from app.services.tenant.initiative_tools import tool_on_in
 
 logger = logging.getLogger(__name__)
 
@@ -152,7 +154,9 @@ async def _resolve_post(
     post = await posts_service.get_post(session, target_id)
     if post is None:
         raise ReactionNotFoundError(ReactionMessages.TARGET_NOT_FOUND)
-    if post.initiative is not None and not post.initiative.posts_enabled:
+    if post.initiative is not None and not await tool_on_in(
+        session, post.initiative, Tool.post
+    ):
         raise ReactionNotFoundError(ReactionMessages.TARGET_NOT_FOUND)
     # The notice's own switch, the counterpart to a thread's. Off means it
     # takes none and shows none, keeping the ones already on it.
@@ -341,7 +345,7 @@ async def toggle_reaction(
         .first()
     )
     if removed is not None:
-        await withdraw_digest_items(session, reaction_ids=[cast(int, removed)])
+        await withdraw_batched_notices(session, reaction_ids=[cast(int, removed)])
         await _withdraw_reaction_notification(
             session,
             reaction_id=cast(int, removed),
@@ -506,22 +510,20 @@ async def _withdraw_reaction_notification(
     )
 
 
-async def withdraw_digest_items(
+async def withdraw_batched_notices(
     session: AsyncSession, *, reaction_ids: Sequence[int]
 ) -> None:
-    """Drop not-yet-sent digest lines for reactions that no longer exist.
+    """Drop not-yet-sent batched lines for reactions that no longer exist.
 
     Un-reacting within the quiet period should leave no trace; a line that has
     already gone out is not chased.
     """
-    from app.models.tenant.reaction_digest import ReactionDigestItem
-
     if not reaction_ids:
         return
     await session.exec(
-        sa_delete(ReactionDigestItem).where(
-            ReactionDigestItem.reaction_id.in_(tuple(reaction_ids)),
-            ReactionDigestItem.processed_at.is_(None),
+        sa_delete(BatchedNotice).where(
+            col(BatchedNotice.reaction_id).in_(tuple(reaction_ids)),
+            col(BatchedNotice.processed_at).is_(None),
         )
     )
 
@@ -539,15 +541,15 @@ async def purge_reactions_for(
     reactor's alone, so the platform drops them.
     """
     from app.db.cohorts import exec_as_system
-    from app.models.tenant.reaction_digest import ReactionDigestItem
 
     if not target_ids:
         return
     ids = tuple(target_ids)
     await session.exec(
-        sa_delete(ReactionDigestItem).where(
-            ReactionDigestItem.target_type == target.value,
-            ReactionDigestItem.target_id.in_(ids),
+        sa_delete(BatchedNotice).where(
+            col(BatchedNotice.kind) == BatchedNoticeKind.reaction,
+            col(BatchedNotice.target_type) == target.value,
+            col(BatchedNotice.target_id).in_(ids),
         )
     )
     await exec_as_system(

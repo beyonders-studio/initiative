@@ -42,7 +42,7 @@
   "selectInitiative": "Select initiative",
   "deleteEventConfirm": "The event will be sent to the trash. You can restore it from Settings → Trash before the retention period ends.",
   "dangerZoneDescription": "Destructive actions. Deleted events go to the trash and can be restored before the retention period ends.",
-  "properties": "Properties",
+  "properties": "Metadata",
   "import": {
     "title": "Import Calendar Events",
     "importIcs": "Import .ics",

@@ -4,6 +4,7 @@ import { TablePlugin } from "@lexical/react/LexicalTablePlugin";
 import { type RefObject, useEffect, useState } from "react";
 import { useTranslation } from "react-i18next";
 
+import { writeWithAi } from "@/api/generated/ai/ai";
 import type { SearchEntityType } from "@/api/generated/initiativeAPI.schemas";
 import { ContentEditable } from "@/components/ui/editor/editor-ui/content-editable";
 import { MARKDOWN_TRANSFORMERS } from "@/components/ui/editor/extensions/markdown-shortcuts-extension";
@@ -16,6 +17,7 @@ import { ImportExportPlugin } from "@/components/ui/editor/plugins/actions/impor
 import { MarkdownTogglePlugin } from "@/components/ui/editor/plugins/actions/markdown-toggle-plugin";
 import { SpeechToTextPlugin } from "@/components/ui/editor/plugins/actions/speech-to-text-plugin";
 import { TreeViewPlugin } from "@/components/ui/editor/plugins/actions/tree-view-plugin";
+import { AIWritingPlugin } from "@/components/ui/editor/plugins/ai-writing-plugin";
 import { CalloutActionMenuPlugin } from "@/components/ui/editor/plugins/callout-action-menu-plugin";
 import { CodeActionMenuPlugin } from "@/components/ui/editor/plugins/code-action-menu-plugin";
 import { ComponentPickerMenuPlugin } from "@/components/ui/editor/plugins/component-picker-menu-plugin";
@@ -39,6 +41,7 @@ import { CalloutPickerPlugins } from "@/components/ui/editor/plugins/picker/call
 import { CheckListPickerPlugin } from "@/components/ui/editor/plugins/picker/check-list-picker-plugin";
 import { CodePickerPlugin } from "@/components/ui/editor/plugins/picker/code-picker-plugin";
 import { ColumnsLayoutPickerPlugin } from "@/components/ui/editor/plugins/picker/columns-layout-picker-plugin";
+import { ContinueWritingPickerPlugin } from "@/components/ui/editor/plugins/picker/continue-writing-picker-plugin";
 import { DiagramPickerPlugin } from "@/components/ui/editor/plugins/picker/diagram-picker-plugin";
 import { DividerPickerPlugin } from "@/components/ui/editor/plugins/picker/divider-picker-plugin";
 import { DrawingPickerPlugin } from "@/components/ui/editor/plugins/picker/drawing-picker-plugin";
@@ -93,6 +96,8 @@ import { ToolbarPlugin } from "@/components/ui/editor/plugins/toolbar/toolbar-pl
 import { WikilinksPlugin } from "@/components/ui/editor/plugins/wikilinks-plugin";
 import type { EditorVariant } from "@/components/ui/editor/variant";
 import { OverflowToolbar, type OverflowToolbarItem } from "@/components/ui/overflow-toolbar";
+import { useActiveCommunityId } from "@/hooks/useActiveCommunityId";
+import { useAIEnabled } from "@/hooks/useAIEnabled";
 import { cn } from "@/lib/utils";
 
 const placeholder = "Press / for commands...";
@@ -293,6 +298,10 @@ export function Plugins({
   // not the layout ones.
   const rich = variant === "document";
   const [floatingAnchorElem, setFloatingAnchorElem] = useState<HTMLDivElement | null>(null);
+  const communityId = useActiveCommunityId();
+  const { isEnabled: aiEnabled } = useAIEnabled();
+  // Writing help is for writing: offered where AI is on and the body is editable.
+  const aiWriting = aiEnabled && !readOnly && communityId > 0;
   const [isLinkEditMode, setIsLinkEditMode] = useState<boolean>(false);
 
   // Enforce read-only mode
@@ -416,6 +425,7 @@ export function Plugins({
               ...(supportsEntityMentions
                 ? [...SmartChipPickerPlugins(t, initiativeId), EmbedPickerPlugin(t)]
                 : []),
+              ...(aiWriting ? [ContinueWritingPickerPlugin(t)] : []),
               ColumnsLayoutPickerPlugin(),
               AlignmentPickerPlugin({ alignment: "left" }),
               AlignmentPickerPlugin({ alignment: "center" }),
@@ -439,7 +449,14 @@ export function Plugins({
         <FloatingTextFormatToolbarPlugin
           anchorElem={floatingAnchorElem}
           setIsLinkEditMode={setIsLinkEditMode}
+          aiWriting={aiWriting}
         />
+        {aiWriting && (
+          <AIWritingPlugin
+            anchorElem={floatingAnchorElem}
+            write={(body) => (options, signal) => writeWithAi(communityId, body, options, signal)}
+          />
+        )}
       </div>
       {showToolbar && (
         <ActionsPlugin>

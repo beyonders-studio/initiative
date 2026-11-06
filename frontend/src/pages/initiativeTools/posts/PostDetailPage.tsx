@@ -69,6 +69,7 @@ export function PostDetailPage() {
         keys="posts:"
         backTo={gp(toolListRoute(Tool.post, initiativeId))}
         backLabel={t("backToPosts")}
+        entity={{ kind: "post", id: parsedId }}
       />
     );
   }

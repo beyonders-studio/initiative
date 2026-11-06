@@ -7,12 +7,13 @@ guard of its own: what the database accepts is what the managed policies allow.
 from __future__ import annotations
 
 import pytest
+from sqlalchemy import text
 from sqlalchemy.exc import DBAPIError
 from sqlmodel import select
 
 from app.models.platform.guild import CommunityRole
 from app.models.platform.user import UserRole
-from app.models.tenant.initiative import InitiativeMember
+from app.models.tenant.initiative import InitiativeMember, InitiativeRule
 from app.services.tenant import initiatives as initiatives_service
 from app.testing import (
     create_access_grant,
@@ -185,3 +186,187 @@ async def test_the_administrator_adds_a_member_anywhere(
     s = await _writing_as(role_session, user_id=admin.user.id, guild_id=a.guild.id)
     await _add(s, initiative, newcomer.id, role_id)
     assert await _is_member(session, initiative, a.guild.id, newcomer.id)
+
+
+async def test_only_an_admin_writes_the_communitys_initiative_defaults(
+    acting_user, role_session
+):
+    """The community's own ``initiative_rules`` rows, the ones with no
+    initiative, are its admins' to write: a manager of every initiative in it
+    writes none."""
+    admin = await acting_user(guild_role=CommunityRole.admin, initiative=True)
+    pm = await acting_user(
+        guild_role=CommunityRole.member,
+        guild=admin.guild,
+        initiative=admin.initiative,
+        initiative_role="project_manager",
+    )
+
+    async def writes(actor) -> bool:
+        s = await _writing_as(
+            role_session, user_id=actor.user.id, guild_id=admin.guild.id
+        )
+        s.add(InitiativeRule(key="initiative_tool.post", enabled=False))
+        try:
+            await s.commit()
+        except DBAPIError:
+            return False
+        finally:
+            await s.rollback()
+        return True
+
+    assert not await writes(pm)
+    assert await writes(admin)
+
+
+async def test_whether_an_initiative_auto_joins_or_is_archived_is_the_communitys(
+    acting_user, role_session
+):
+    """Its managers rename it; joining new members to it and archiving it are
+    the community's: a holder of the initiatives surface."""
+    admin = await acting_user(guild_role=CommunityRole.admin, initiative=True)
+    manager = await acting_user(
+        guild_role=CommunityRole.member,
+        guild=admin.guild,
+        initiative=admin.initiative,
+        initiative_role="project_manager",
+    )
+    iid = admin.initiative.id
+
+    async def changes(actor, assignment: str) -> bool:
+        s = await _writing_as(
+            role_session, user_id=actor.user.id, guild_id=admin.guild.id
+        )
+        try:
+            await s.exec(text(f"UPDATE initiatives SET {assignment} WHERE id = {iid}"))
+            await s.commit()
+        except DBAPIError:
+            return False
+        finally:
+            await s.rollback()
+        return True
+
+    assert await changes(manager, "name = 'Renamed'")
+    assert not await changes(manager, "join_policy = 'open', auto_join = true")
+    assert not await changes(manager, "archived_at = now()")
+    assert await changes(admin, "join_policy = 'open', auto_join = true")
+    assert await changes(admin, "archived_at = now()")
+
+
+async def test_a_private_initiative_reads_as_absent_to_anybody_not_in_it(
+    session, acting_user, role_session
+):
+    """Its row, not only its content: its members, the community's admin and
+    the system engine read it; another member of the community reads none,
+    while an initiative on offer stays readable to them."""
+    admin = await acting_user(guild_role=CommunityRole.admin)
+    private_one = await create_initiative(session, admin.guild, admin.user)
+    open_one = await create_initiative(
+        session, admin.guild, admin.user, join_policy="open"
+    )
+    insider = await acting_user(
+        guild_role=CommunityRole.member,
+        guild=admin.guild,
+        initiative=private_one,
+        initiative_role="member",
+    )
+    outsider = await acting_user(guild_role=CommunityRole.member, guild=admin.guild)
+    ids = (private_one.id, open_one.id)
+
+    async def reads(actor) -> set[int]:
+        s = await _writing_as(
+            role_session, user_id=actor.user.id, guild_id=admin.guild.id
+        )
+        rows = await s.exec(text(f"SELECT id FROM initiatives WHERE id IN {ids}"))
+        return set(rows.scalars().all())
+
+    assert await reads(admin) == set(ids)
+    assert await reads(insider) == set(ids)
+    assert await reads(outsider) == {open_one.id}
+
+
+async def test_a_member_defines_a_field_and_only_a_manager_reshapes_it(
+    acting_user, role_session
+):
+    """Any member defines an initiative's field and adds options to it as they
+    pick a value nobody offered; renaming or removing it is its managers'."""
+    admin = await acting_user(guild_role=CommunityRole.admin, initiative=True)
+    manager = await acting_user(
+        guild_role=CommunityRole.member,
+        guild=admin.guild,
+        initiative=admin.initiative,
+        initiative_role="project_manager",
+    )
+    member = await acting_user(
+        guild_role=CommunityRole.member,
+        guild=admin.guild,
+        initiative=admin.initiative,
+        initiative_role="member",
+    )
+    iid = admin.initiative.id
+
+    async def runs(actor, sql: str) -> bool:
+        s = await _writing_as(
+            role_session, user_id=actor.user.id, guild_id=admin.guild.id
+        )
+        try:
+            changed = (await s.exec(text(sql))).rowcount
+            await s.commit()
+        except DBAPIError:
+            return False
+        finally:
+            await s.rollback()
+        return changed > 0
+
+    assert await runs(
+        member,
+        "INSERT INTO metadata_definitions"
+        " (initiative_id, name, type, position, options, created_at, updated_at)"
+        f" VALUES ({iid}, 'Stage', 'select', 0, '[{{\"value\": \"a\"}}]'::jsonb,"
+        " now(), now())",
+    )
+    field = f"name = 'Stage' AND initiative_id = {iid}"
+    assert await runs(
+        member,
+        "UPDATE metadata_definitions SET options = options"
+        f' || \'[{{"value": "b"}}]\'::jsonb WHERE {field}',
+    )
+    # An option already there keeps its label: a second one with its value is
+    # not an addition.
+    assert not await runs(
+        member,
+        "UPDATE metadata_definitions SET options = options"
+        f' || \'[{{"value": "a", "label": "Changed"}}]\'::jsonb WHERE {field}',
+    )
+    # Nor does it gain anything, a colour say.
+    assert not await runs(
+        member,
+        "UPDATE metadata_definitions SET options = jsonb_set(options, '{0,color}',"
+        f" '\"#ff0000\"') WHERE {field}",
+    )
+    assert not await runs(
+        member, f"UPDATE metadata_definitions SET name = 'Phase' WHERE {field}"
+    )
+    assert not await runs(
+        member, f"UPDATE metadata_definitions SET options = '[]'::jsonb WHERE {field}"
+    )
+    assert not await runs(member, f"DELETE FROM metadata_definitions WHERE {field}")
+    # A field with no options takes a list of them or nothing.
+    assert await runs(
+        member,
+        "INSERT INTO metadata_definitions"
+        " (initiative_id, name, type, position, created_at, updated_at)"
+        f" VALUES ({iid}, 'Done', 'checkbox', 1, now(), now())",
+    )
+    assert not await runs(
+        member,
+        "UPDATE metadata_definitions SET options = '{\"x\": 1}'::jsonb"
+        f" WHERE name = 'Done' AND initiative_id = {iid}",
+    )
+    assert await runs(
+        manager, f"UPDATE metadata_definitions SET name = 'Phase' WHERE {field}"
+    )
+    assert await runs(
+        manager,
+        f"DELETE FROM metadata_definitions WHERE name = 'Phase' AND initiative_id = {iid}",
+    )

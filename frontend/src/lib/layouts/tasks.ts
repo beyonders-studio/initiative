@@ -1,11 +1,12 @@
 import { Ban, MessageSquare } from "lucide-react";
 
-import type {
-  DetailLayoutDefinitionInput,
-  PropertyDefinitionRead,
+import {
+  type DetailLayoutDefinitionInput,
+  MetadataType,
+  type PropertyDefinitionRead,
 } from "@/api/generated/initiativeAPI.schemas";
 import { namePropertyColumns } from "@/components/properties/propertyColumns";
-import { isEmptyPropertyValue } from "@/components/properties/propertyHelpers";
+import { listedValue } from "@/components/properties/propertyHelpers";
 import { iconForPropertyType } from "@/components/properties/propertyTypeIcons";
 
 import { at, detailLayoutSpec, type Region, storedLayout } from "./detailLayout";
@@ -13,11 +14,12 @@ import { type FieldDef, propertyFieldId } from "./fields";
 import type { LayoutNode } from "./tree";
 
 const builtin = (
-  field: Omit<FieldDef, "source" | "label" | "hideable"> & Partial<FieldDef>
+  field: Omit<FieldDef, "source" | "label" | "hideable" | "requireable"> & Partial<FieldDef>
 ): FieldDef => ({
   source: "builtin",
   label: `kanban.fields.${field.id}`,
   hideable: true,
+  requireable: false,
   ...field,
 });
 
@@ -46,8 +48,18 @@ export const taskFields = (
     }),
     // A project with one type draws none: the type tells nothing apart.
     builtin({ id: "type", kind: "taskType", value: (task) => (typed ? task.task_type : null) }),
-    builtin({ id: "description", kind: "excerpt", value: (task) => task.description_excerpt }),
-    builtin({ id: "assignees", kind: "people", value: (task) => task.assignees }),
+    builtin({
+      id: "description",
+      kind: "excerpt",
+      requireable: true,
+      value: (task) => task.description_excerpt,
+    }),
+    builtin({
+      id: "assignees",
+      kind: "people",
+      requireable: true,
+      value: (task) => task.assignees,
+    }),
     builtin({
       id: "startDate",
       kind: "date",
@@ -62,8 +74,18 @@ export const taskFields = (
       past: "destructive",
       value: (task) => task.due_date,
     }),
-    builtin({ id: "recurrence", kind: "recurrence", value: (task) => task.recurrence }),
-    builtin({ id: "checklist", kind: "checklist", value: (task) => task.checklist_progress }),
+    builtin({
+      id: "recurrence",
+      kind: "recurrence",
+      requireable: true,
+      value: (task) => task.recurrence,
+    }),
+    builtin({
+      id: "checklist",
+      kind: "checklist",
+      requireable: true,
+      value: (task) => task.checklist_progress,
+    }),
     // How far the tasks that are part of this one have got, and the task
     // this one is part of.
     builtin({ id: "subtasks", kind: "subtasks", value: (task) => task.subtask_progress }),
@@ -91,11 +113,8 @@ export const taskFields = (
       phrase: "relations:blockers.label",
       value: (task) => task.blocked_by_open_count || null,
     }),
-    builtin({ id: "tags", kind: "tags", value: (task) => task.tags }),
-    ...propertyFields(definitions, (task, id) => {
-      const summary = task.properties?.find((s) => s.property_id === id);
-      return summary && !isEmptyPropertyValue(summary.value) ? summary : null;
-    }),
+    builtin({ id: "tags", kind: "tags", requireable: true, value: (task) => task.tags }),
+    ...propertyFields(definitions, (task, definition) => listedValue(task.properties, definition)),
     ...plugins,
   ];
   return new Map(fields.map((field) => [field.id, field]));
@@ -105,7 +124,7 @@ export const taskFields = (
  *  apart in their labels; `read` reads one's value off an item. */
 export const propertyFields = (
   definitions: PropertyDefinitionRead[],
-  read: (item: Parameters<FieldDef["value"]>[0], definitionId: number) => unknown
+  read: (item: Parameters<FieldDef["value"]>[0], definition: PropertyDefinitionRead) => unknown
 ): FieldDef[] =>
   namePropertyColumns(definitions).map(({ definition, label }) => ({
     id: propertyFieldId(definition.id),
@@ -113,8 +132,10 @@ export const propertyFields = (
     source: "property",
     label,
     hideable: true,
+    // A checkbox is always on or off, so never empty.
+    requireable: definition.type !== MetadataType.checkbox,
     icon: iconForPropertyType(definition.type),
-    value: (item) => read(item, definition.id),
+    value: (item) => read(item, definition),
     property: definition,
   }));
 
@@ -351,6 +372,8 @@ const shapeSpec = (shipped: Record<Region, LayoutNode[]>) =>
     kind: "task",
     shipped,
     fieldParts: ["field", "status", "dates", "properties"],
+    // Its dates are filled in as one: either of them fills them.
+    requiredParts: ["dates"],
     // Every shape has every part and field the plain one does, to place.
     knows: PLAIN,
   });

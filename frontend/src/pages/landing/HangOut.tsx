@@ -11,16 +11,7 @@
  */
 
 import { Link } from "@tanstack/react-router";
-import {
-  Bell,
-  CalendarDays,
-  Check,
-  Heart,
-  ListOrdered,
-  Megaphone,
-  ThumbsUp,
-  Users,
-} from "lucide-react";
+import { Bell, CalendarDays, Check, Heart, Megaphone, ThumbsUp, Users } from "lucide-react";
 import { useState } from "react";
 import { useTranslation } from "react-i18next";
 
@@ -217,16 +208,6 @@ const CommunityDrawing = () => {
               <Bell className="h-3.5 w-3.5" />
               {t("hangout.event.reminder")}
             </p>
-          </div>
-          <div className="flex items-center gap-2.5 rounded-2xl border bg-card px-3.5 py-3 text-sm">
-            <ListOrdered className="h-5 w-5 text-primary" />
-            <div>
-              <b className="block">{t("hangout.rota.title")}</b>
-              <small className="text-muted-foreground text-xs">{t("hangout.rota.detail")}</small>
-            </div>
-            <span className="ml-auto rounded-full bg-primary px-2 py-0.5 font-bold text-2xs text-primary-foreground">
-              {p("luis")}
-            </span>
           </div>
         </div>
       </div>

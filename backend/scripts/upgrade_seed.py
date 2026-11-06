@@ -43,7 +43,6 @@ from app.testing import (  # noqa: E402
     create_initiative_member,
     create_project,
     create_property_definition,
-    create_queue_item,
     create_reaction,
     create_tag,
     create_task,
@@ -106,7 +105,9 @@ async def seed(session: AsyncSession) -> None:
 
     await create_tag(session, guild)
     await create_upload(session, guild, owner)
-    await create_queue_item(session, by_name["queue"])
+    if "queue" in by_name:
+        # A release with queues gives the upgrade an item to make a task of.
+        await testing.create_queue_item(session, by_name["queue"])
     await create_counter(session, by_name["counter_group"])
     await create_calendar_event(session, by_name["calendar"], owner)
     await create_wiki_page(session, by_name["wiki"], owner)

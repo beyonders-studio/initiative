@@ -1,26 +1,33 @@
-import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
+import {
+  keepPreviousData,
+  useInfiniteQuery,
+  useMutation,
+  useQuery,
+  useQueryClient,
+} from "@tanstack/react-query";
 import { useTranslation } from "react-i18next";
 
 import {
+  convertFile,
   createFile,
   deleteFileVersion,
   duplicateFile,
-  generateSummary,
+  getListFilesQueryKey,
   getListFileVersionsQueryKey,
   getReadFileQueryKey,
+  listFiles,
   listFileVersions,
+  putVideoThumbnail,
   setFileGrants,
   uploadFile,
   uploadFileVersion,
 } from "@/api/generated/files/files";
 import type {
-  BodyUploadFile,
-  BodyUploadFileVersion,
   FileCreate,
+  FileListResponse,
   FileRead,
-  FileType,
   FileVersionRead,
-  GenerateFileSummaryResponse,
+  ListFilesParams,
   ResourceGrantSchema,
 } from "@/api/generated/initiativeAPI.schemas";
 import { SearchEntityType, Tool } from "@/api/generated/initiativeAPI.schemas";
@@ -28,9 +35,10 @@ import { invalidate, q } from "@/api/query-keys";
 import { relate } from "@/api/relationships";
 import { TOOL_HOOKS } from "@/hooks/toolHooks";
 import { useActiveCommunityId } from "@/hooks/useActiveCommunityId";
-import { useCommunityMutation } from "@/hooks/useApiMutation";
 import { getErrorMessage } from "@/lib/errorMessage";
+import type { EditorFileType } from "@/lib/fileTypes";
 import { toast } from "@/lib/mascotToast";
+import { type ResumableOptions, uploadInPieces } from "@/lib/resumableUpload";
 import type { MutationOpts } from "@/types/mutation";
 import type { QueryOpts } from "@/types/query";
 
@@ -49,6 +57,30 @@ export const useUpdateFile = files.useUpdate;
  */
 export const useDeleteFile = files.useDelete;
 export const useSetFileGrants = files.useSetGrants;
+
+const FEED_PAGE_SIZE = 60;
+
+/**
+ * Files page by page, as somebody scrolls a grid of them — the image
+ * chooser's pictures. `keepPreviousData` keeps the grid on screen while a
+ * changed filter loads rather than blanking it.
+ */
+export const useFilesFeed = (
+  params: Omit<ListFilesParams, "page" | "page_size">,
+  options?: { enabled?: boolean }
+) => {
+  const communityId = useActiveCommunityId();
+  return useInfiniteQuery({
+    // Its own key beside the list's: pages of the feed are a different shape.
+    queryKey: [...getListFilesQueryKey(communityId, params), "feed"],
+    queryFn: ({ pageParam }) =>
+      listFiles(communityId, { ...params, page: pageParam, page_size: FEED_PAGE_SIZE }),
+    initialPageParam: 1,
+    getNextPageParam: (last: FileListResponse) => (last.has_next ? last.page + 1 : undefined),
+    placeholderData: keepPreviousData,
+    enabled: options?.enabled ?? true,
+  });
+};
 
 // ── Cache helpers ───────────────────────────────────────────────────────────
 
@@ -91,9 +123,9 @@ type CreateFileInput = {
   is_template?: boolean;
   template_id?: number;
   project_id?: number;
-  /** Omit for native (text) files; file uploads go through useUploadFile instead. */
-  file_type?: Exclude<FileType, "file">;
-  /** Required for smart_link ({ url: "..." }). Optional/unused for other types. */
+  /** Omit for a text file; uploads go through useUploadFile instead. */
+  file_type?: EditorFileType;
+  /** Required for a link ({ url: "..." }). Optional/unused for other types. */
   content?: Record<string, unknown>;
   /** Full non-owner sharing state for the new file. */
   grants?: ResourceGrantSchema[];
@@ -178,7 +210,7 @@ type UploadFileInput = {
   project_id?: number;
   /** Full non-owner sharing state for the uploaded file. */
   grants?: ResourceGrantSchema[];
-};
+} & ResumableOptions;
 
 export const useUploadFile = (options?: MutationOpts<FileRead, UploadFileInput>) => {
   const { t } = useTranslation("files");
@@ -188,14 +220,16 @@ export const useUploadFile = (options?: MutationOpts<FileRead, UploadFileInput>)
   return useMutation({
     ...rest,
     mutationFn: async (data: UploadFileInput) => {
-      const { file, name, initiative_id, project_id, grants = [] } = data;
+      const { file, name, initiative_id, project_id, grants = [], ...sending } = data;
 
-      const uploadBody: BodyUploadFile = {
+      const newFile = await uploadInPieces(
+        communityId,
         file,
-        name,
-        initiative_id,
-      };
-      const newFile = await uploadFile(communityId, uploadBody);
+        file instanceof File ? file.name : name,
+        { purpose: "file", initiativeId: initiative_id },
+        (upload_id) => uploadFile(communityId, { name, initiative_id, upload_id }),
+        sending
+      );
 
       // Upload can't carry grants in payload — apply separately
       const failures = await applyFileGrants(communityId, newFile.id, grants);
@@ -223,7 +257,9 @@ export const useUploadFile = (options?: MutationOpts<FileRead, UploadFileInput>)
       onSuccess?.(...args);
     },
     onError: (...args) => {
-      toast.error(getErrorMessage(args[0], "files:create.uploadError"));
+      // Stopped on purpose: nothing went wrong.
+      if (!args[1].signal?.aborted)
+        toast.error(getErrorMessage(args[0], "files:create.uploadError"));
       onError?.(...args);
     },
     onSettled,
@@ -243,8 +279,10 @@ export const useFileVersions = (fileId: number | null, options?: QueryOpts<FileV
   });
 };
 
+type UploadFileVersionInput = { fileId: number; file: Blob } & ResumableOptions;
+
 export const useUploadFileVersion = (
-  options?: MutationOpts<FileVersionRead, { fileId: number; file: Blob }>
+  options?: MutationOpts<FileVersionRead, UploadFileVersionInput>
 ) => {
   const { t } = useTranslation("files");
   const communityId = useActiveCommunityId();
@@ -252,10 +290,15 @@ export const useUploadFileVersion = (
 
   return useMutation({
     ...rest,
-    mutationFn: async ({ fileId, file }: { fileId: number; file: Blob }) => {
-      const body: BodyUploadFileVersion = { file };
-      return uploadFileVersion(communityId, fileId, body);
-    },
+    mutationFn: ({ fileId, file, ...sending }: UploadFileVersionInput) =>
+      uploadInPieces(
+        communityId,
+        file,
+        file instanceof File ? file.name : "file",
+        { purpose: "file", fileId },
+        (upload_id) => uploadFileVersion(communityId, fileId, { upload_id }),
+        sending
+      ),
     onSuccess: (...args) => {
       const fileId = args[1].fileId;
       void invalidate(q.fileVersions(fileId));
@@ -265,10 +308,56 @@ export const useUploadFileVersion = (
       onSuccess?.(...args);
     },
     onError: (...args) => {
-      toast.error(getErrorMessage(args[0], "files:versions.uploadError"));
+      // Stopped on purpose: nothing went wrong.
+      if (!args[1].signal?.aborted)
+        toast.error(getErrorMessage(args[0], "files:versions.uploadError"));
       onError?.(...args);
     },
     onSettled,
+  });
+};
+
+/** Convert an uploaded file to edit it: it becomes a document or a
+ *  spreadsheet the app keeps, and its uploaded versions go. */
+export const useConvertFile = (options?: MutationOpts<FileRead, number>) => {
+  const { t } = useTranslation("files");
+  const communityId = useActiveCommunityId();
+  const { onSuccess, onError, onSettled, ...rest } = options ?? {};
+
+  return useMutation({
+    ...rest,
+    mutationFn: (fileId: number) => convertFile(communityId, fileId),
+    onSuccess: (...args) => {
+      const fileId = args[1];
+      void invalidate(q.file(fileId), q.fileVersions(fileId), q.allFiles());
+      toast.success(t("convert.success"));
+      onSuccess?.(...args);
+    },
+    onError: (...args) => {
+      toast.error(getErrorMessage(args[0], "files:convert.error"));
+      onError?.(...args);
+    },
+    onSettled,
+  });
+};
+
+/** Give a video version the frame the browser drew of it. Quiet: nobody asked
+ *  for it, so a refusal (a frame another editor sent first) says nothing. */
+export const usePutVideoThumbnail = () => {
+  const communityId = useActiveCommunityId();
+  return useMutation({
+    mutationFn: ({
+      fileId,
+      versionId,
+      frame,
+    }: {
+      fileId: number;
+      versionId: number;
+      frame: Blob;
+    }) => putVideoThumbnail(communityId, fileId, versionId, { file: frame }),
+    onSuccess: (_reply, { fileId }) => {
+      void invalidate(q.file(fileId), q.allFiles());
+    },
   });
 };
 
@@ -297,16 +386,3 @@ export const useDeleteFileVersion = (
     onSettled,
   });
 };
-
-// ── File-scoped mutations ───────────────────────────────────────────────────
-
-export const useGenerateFileSummary = (
-  fileId: number,
-  options?: MutationOpts<GenerateFileSummaryResponse, void>
-) =>
-  useCommunityMutation<GenerateFileSummaryResponse, void>(
-    {
-      mutationFn: (communityId) => generateSummary(communityId, fileId),
-    },
-    options
-  );

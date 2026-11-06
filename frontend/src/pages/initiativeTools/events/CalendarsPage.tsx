@@ -83,6 +83,7 @@ import { useCalendar, useCalendarsList } from "@/hooks/useCalendars";
 import { useCanonicalInitiativeId } from "@/hooks/useCanonicalInitiativeId";
 import { useCommunities } from "@/hooks/useCommunities";
 import { useCreateFromSearchParam } from "@/hooks/useCreateFromSearchParam";
+import { useHeldSurfaces } from "@/hooks/useCustomRoles";
 import { useExportJob } from "@/hooks/useExportJob";
 import { useToolCreateAccess } from "@/hooks/useInitiativeAccess";
 import { useInitiative } from "@/hooks/useInitiatives";
@@ -124,14 +125,15 @@ const calendarsViewSpec = (
   communityId: number,
   ...names: (string | number)[]
 ): ListViewSpec<CalendarViewFilters> => ({
-  key: viewKey(communityId, ...names),
+  key: viewKey(...names),
+  communityId,
   read: calendarViewFiltersFromStored,
   defaults: CALENDAR_VIEW_DEFAULTS,
-  carryOver: (items) => {
+  carryOver: (_items, account) => {
     const carried = carriedCalendarView({
       prefs: deviceJSON("initiative-calendars-prefs"),
       visibility: deviceJSON(`initiative-calendar-visibility:${communityId}`),
-      mode: items[CALENDAR_VIEW_MODE_KEY],
+      mode: account[CALENDAR_VIEW_MODE_KEY],
     });
     return carried && { mode: carried.mode, parts: { [LIST]: { filters: carried.filters } } };
   },
@@ -476,10 +478,11 @@ export const CalendarsView = ({
     enabled: !communityOnly,
   });
   // At community scope there is no initiative role to consult: the community's
-  // calendars are its admins' to add. The solo deep link is one calendar's
-  // surface, so it offers no list to add to.
+  // calendars are added by whoever holds them. The solo deep link is one
+  // calendar's surface, so it offers no list to add to.
+  const holdsCommunityCalendars = useHeldSurfaces().holds("community_calendars");
   const canCreateCalendars = communityScope
-    ? Boolean(activeCommunity?.can.administer_content)
+    ? holdsCommunityCalendars
     : solo
       ? false
       : (canCreate ?? canCreateCalendarsDerived);
@@ -982,6 +985,7 @@ export function CalendarFocusPage() {
         keys="calendars:"
         backTo={gp(toolListRoute(Tool.calendar, initiativeId))}
         backLabel={t("backToEvents")}
+        entity={{ kind: "calendar", id: calendarId }}
       />
     );
   }

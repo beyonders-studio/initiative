@@ -46,12 +46,6 @@ Not sure how the pieces fit together yet? [How Initiative is organized](../conce
 
     [:octicons-arrow-right-24: Calendar](calendar.md)
 
--   :material-format-list-numbered: __Queues__
-
-    Whose turn it is. Rotas, running orders, chore wheels.
-
-    [:octicons-arrow-right-24: Queues](queues.md)
-
 -   :material-counter: __Counters__
 
     Numbers that move. Tallies, totals, scores, seats left.
@@ -70,17 +64,17 @@ Not sure how the pieces fit together yet? [How Initiative is organized](../conce
 
     [:octicons-arrow-right-24: Posts](posts.md)
 
--   :material-image-multiple-outline: __Galleries__
-
-    A wall of pictures. Mockups, screenshots, the four logos that lost.
-
-    [:octicons-arrow-right-24: Galleries](galleries.md)
-
 -   :material-book-open-page-variant-outline: __Wikis__
 
     Linked pages, for the things your group knows rather than the things it is doing.
 
     [:octicons-arrow-right-24: Wikis](wikis.md)
+
+-   :material-card-account-phone-outline: __Contacts__
+
+    The people and places your work involves, and how to reach them.
+
+    [:octicons-arrow-right-24: Contacts](contacts.md)
 
 -   :material-storefront-outline: __Plug-ins & the marketplace__
 

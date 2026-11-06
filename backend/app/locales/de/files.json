@@ -1,0 +1,30 @@
+{
+  "collections": {
+    "shapes": {
+      "currency": "EUR",
+      "groups": {
+        "starters": "Beginnen mit"
+      },
+      "shapes": {
+        "gallery": {
+          "name": "Galerie",
+          "hint": "Bilder an einer Wand, unter jedem eine Bildunterschrift"
+        },
+        "catalog": {
+          "name": "Katalog",
+          "hint": "Dinge zum Durchstöbern, jedes mit Preis und Bewertung"
+        },
+        "log": {
+          "name": "Protokoll",
+          "hint": "Dateien nach Datum, die neuesten zuerst"
+        }
+      },
+      "fields": {
+        "caption": "Bildunterschrift",
+        "price": "Preis",
+        "rating": "Bewertung",
+        "date": "Datum"
+      }
+    }
+  }
+}

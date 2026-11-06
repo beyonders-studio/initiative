@@ -9,7 +9,6 @@ from pydantic import AwareDatetime, ConfigDict, Field, model_validator
 
 from app.core.identity_boundary import PersonId, with_mention_markup
 from app.schemas.base import LexicalState, MentionStr, SanitizedBaseModel, TitleStr
-from app.schemas.tenant.plugin_data import PluginValueSummary
 from app.schemas.tenant.property import PropertiesOnCreate
 from app.schemas.query import PageMeta
 from app.schemas.platform.user import ProfileDecorations
@@ -197,10 +196,6 @@ class PostRead(PostSummary):
     #: Absent from :class:`PostSummary` on purpose — a one-line surface shows a
     #: notice, not a ballot paper.
     poll: Optional[PollRead] = None
-    #: The values installed plug-ins show on the notice, from the installs on
-    #: and placed in its initiative. Its own read carries them; a board does
-    #: not.
-    plugin_values: List[PluginValueSummary] = Field(default_factory=list)
 
     @classmethod
     def derived_fields(

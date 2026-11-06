@@ -3,7 +3,7 @@ import type { ResourceGrantSchema } from "@/api/generated/initiativeAPI.schemas"
 /**
  * Default access grants for a newly created resource: every initiative member
  * gets read access. Seeds the {@link ShareControl} in all create dialogs
- * (project, queue, counter group, calendar event, file).
+ * (project, counter group, calendar event, file).
  *
  * This is a shared template — spread it (`[...DEFAULT_GRANTS]`) at each use site
  * (initial state and reset-on-close) so every dialog owns an independent array

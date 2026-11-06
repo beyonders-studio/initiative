@@ -12,18 +12,21 @@ from __future__ import annotations
 from datetime import datetime, timedelta, timezone
 
 
+from app.api.v1.tenant_endpoints.query_test import WORKBOOK
+from app.core.file_types import FileType
 from app.core.messages import QueryMessages
 from app.models.platform.guild import CommunityRole
-from app.models.tenant.property import PropertyType
+from app.models.tenant.metadata import MetadataType
 from app.models.tenant.task import TaskStatusCategory
 from app.services.query import executor
 from app.services.tenant.view_as_test import dashboard_body, dashboards_on
 from app.testing import (
+    create_counter_group,
+    create_file,
     create_initiative,
     create_project,
     create_property_definition,
     create_property_value,
-    create_queue,
     create_task,
 )
 
@@ -63,6 +66,14 @@ async def _one(client, actor, sql: str) -> dict:
 async def _author_with_tasks(session, acting_user):
     author = await acting_user(guild_role=CommunityRole.admin, initiative=True)
     await dashboards_on(session, author.initiative)
+    await create_file(
+        session,
+        author.initiative,
+        author.user,
+        name="Q3 Budget",
+        file_type=FileType.sheet,
+        content=WORKBOOK,
+    )
     project = await create_project(session, author.initiative, author.user)
     for offset, category in enumerate(
         (TaskStatusCategory.todo, TaskStatusCategory.todo, TaskStatusCategory.done)
@@ -101,6 +112,9 @@ async def test_the_canvas_answers_what_each_widget_answers(
         "SELECT priority = 'high' AS hot, "
         "sum(count(*)) OVER (ORDER BY priority = 'high') AS t "
         "FROM tasks GROUP BY hot",
+        # A spreadsheet's range, beside the community's own rows.
+        "SELECT region, sum(amount) AS total FROM sheet('Q3 Budget') "
+        "GROUP BY region ORDER BY region",
     )
     dashboard_id = await _canvas(client, author, *statements)
 
@@ -121,6 +135,7 @@ async def test_the_canvas_answers_what_each_widget_answers(
     assert canvas["w1"]["result"]["rows"] == [[3]]
     assert [row[1] for row in canvas["w8"]["result"]["rows"]] == [1, 2, 3]
     assert [row[1] for row in canvas["w9"]["result"]["rows"]] == [1, 2, 2]
+    assert canvas["w11"]["result"]["rows"] == [["North", 15], ["South", 20]]
 
 
 async def test_a_reader_sees_their_own_rows_or_the_initiatives(
@@ -138,10 +153,12 @@ async def test_a_reader_sees_their_own_rows_or_the_initiatives(
         author,
         "SELECT count(*) AS n FROM tasks",
         "SELECT count(*) AS n FROM tasks WHERE status.category = 'done'",
+        "SELECT count(*) AS n FROM sheet('Q3 Budget')",
     )
 
     before = await _data(client, reader, dashboard_id)
     assert [before[w]["result"]["rows"] for w in ("w1", "w2")] == [[[0]], [[0]]]
+    assert before["w3"]["error"] == QueryMessages.SHEET_NOT_FOUND
 
     shared = await client.put(
         author.g(f"/dashboards/{dashboard_id}/view-mode"),
@@ -151,7 +168,11 @@ async def test_a_reader_sees_their_own_rows_or_the_initiatives(
     assert shared.status_code == 200, shared.text
 
     after = await _data(client, reader, dashboard_id)
-    assert [after[w]["result"]["rows"] for w in ("w1", "w2")] == [[[3]], [[1]]]
+    assert [after[w]["result"]["rows"] for w in ("w1", "w2", "w3")] == [
+        [[3]],
+        [[1]],
+        [[3]],
+    ]
 
 
 async def test_a_property_is_reported_across_the_initiative(
@@ -161,16 +182,16 @@ async def test_a_property_is_reported_across_the_initiative(
     them. Another initiative's property of the same name stays out."""
     author, project = await _author_with_tasks(session, acting_user)
     points = await create_property_definition(
-        session, author.initiative, name="Points", type=PropertyType.number
+        session, author.initiative, name="Points", type=MetadataType.number
     )
     task = await create_task(session, project, title="Pointed")
-    queue = await create_queue(session, author.initiative, author.user)
+    group = await create_counter_group(session, author.initiative, author.user)
     await create_property_value(session, task, points, value_number=5)
-    await create_property_value(session, queue, points, value_number=3)
+    await create_property_value(session, group, points, value_number=3)
 
     elsewhere = await create_initiative(session, author.guild, author.user)
     elsewhere_points = await create_property_definition(
-        session, elsewhere, name="Points", type=PropertyType.number
+        session, elsewhere, name="Points", type=MetadataType.number
     )
     elsewhere_project = await create_project(session, elsewhere, author.user)
     elsewhere_task = await create_task(session, elsewhere_project)
@@ -182,25 +203,25 @@ async def test_a_property_is_reported_across_the_initiative(
         client,
         author,
         "SELECT property.name AS p, sum(value_number) AS total "
-        "FROM property_values GROUP BY property.name",
+        "FROM metadata_values GROUP BY property.name",
     )
     assert [(name, float(total)) for name, total in result["rows"]] == [("Points", 8.0)]
 
     releases = await create_property_definition(
-        session, author.initiative, name="Releases", type=PropertyType.multi_select
+        session, author.initiative, name="Releases", type=MetadataType.multi_select
     )
     await create_property_value(session, task, releases, value_json=["a", "b"])
     choices = await _one(
         client,
         author,
-        "SELECT value_json AS choices FROM property_values "
+        "SELECT value_json AS choices FROM metadata_values "
         "WHERE property.name = 'Releases'",
     )
     assert choices["rows"] == [['["a", "b"]']]
     one_choice = await _one(
         client,
         author,
-        "SELECT count(*) AS n FROM property_values WHERE value_json @> '[\"b\"]'",
+        "SELECT count(*) AS n FROM metadata_values WHERE value_json @> '[\"b\"]'",
     )
     assert one_choice["rows"] == [[1]]
 
@@ -214,12 +235,14 @@ async def test_a_widget_that_fails_does_not_blank_the_canvas(
         author,
         "SELECT count(*) AS n FROM tasks",
         "SELECT 1 / (count(*) - count(*)) AS broken FROM tasks",
+        "SELECT count(*) AS n FROM sheet('Nowhere')",
     )
 
     canvas = await _data(client, author, dashboard_id)
 
     assert canvas["w1"]["result"]["rows"] == [[3]]
     assert canvas["w2"] == {"result": None, "error": QueryMessages.EXECUTION_FAILED}
+    assert canvas["w3"] == {"result": None, "error": QueryMessages.SHEET_NOT_FOUND}
 
 
 async def test_a_guild_with_no_free_slot_refuses_the_canvas(

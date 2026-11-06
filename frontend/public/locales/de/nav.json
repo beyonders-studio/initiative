@@ -51,9 +51,6 @@
   "prideAuto": "Automatisch (Juni)",
   "prideOn": "An",
   "prideOff": "Aus",
-  "queues": "Abläufe (Queues)",
-  "allQueues": "Alle Abläufe (Queues)",
-  "createQueue": "Neuer Ablauf (Queue)",
   "counterGroups": "Zähler",
   "allCounterGroups": "Alle Zählergruppen",
   "createCounterGroup": "Neue Zählergruppe",
@@ -90,11 +87,11 @@
   "requestsWaiting_other": "{{count}} ausstehend",
   "posts": "Beiträge",
   "createPost": "Neuer Beitrag",
-  "galleries": "Galerien",
-  "createGallery": "Neue Galerie",
   "moderation": "Moderation",
   "wikis": "Wikis",
   "createWiki": "Neues Wiki",
+  "contacts": "Kontakte",
+  "createContact": "Neuer Kontakt",
   "sidebar": {
     "resize": "Ziehen, um die Seitenleiste breiter zu machen"
   },

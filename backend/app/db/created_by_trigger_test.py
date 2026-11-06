@@ -14,29 +14,30 @@ from sqlmodel import select
 from sqlmodel.ext.asyncio.session import AsyncSession
 
 from app.models.platform.guild import CommunityRole
-from app.models.tenant.queue import Queue, QueueItem
+from app.models.tenant.counter import Counter, CounterGroup
 from app.testing.factories import (
+    create_counter,
+    create_counter_group,
     create_guild,
     create_guild_membership,
     create_initiative,
-    create_queue,
     create_user,
 )
 from app.testing import route_as, route_system
 
 
 async def _workspace(session: AsyncSession):
-    """A guild with a queue in it, plus a second admin to act as: somebody who
-    may write the queue, so the trigger is the only question."""
+    """A guild with a counter group in it, plus a second admin to act as:
+    somebody who may write the group, so the trigger is the only question."""
     creator = await create_user(session)
     guild = await create_guild(session, creator=creator)
     initiative = await create_initiative(session, guild=guild, creator=creator)
-    queue = await create_queue(session, initiative=initiative, creator=creator)
+    group = await create_counter_group(session, initiative=initiative, creator=creator)
     actor = await create_user(session)
     await create_guild_membership(
         session, user=actor, guild=guild, role=CommunityRole.admin
     )
-    return guild, queue, actor
+    return guild, group, actor
 
 
 async def _route(session: AsyncSession, guild_id: int, user_id: int | None) -> None:
@@ -47,22 +48,23 @@ async def _route(session: AsyncSession, guild_id: int, user_id: int | None) -> N
         await route_as(session, user_id=user_id, guild_id=guild_id)
 
 
-async def _reload(session: AsyncSession, item_id: int) -> QueueItem:
+async def _reload(session: AsyncSession, counter_id: int) -> Counter:
     """Read the row back. The trigger writes to the row, not to the identity
     map, so a freshly flushed object still holds None until it is refreshed."""
     session.expunge_all()
-    return (await session.exec(select(QueueItem).where(QueueItem.id == item_id))).one()
+    return (await session.exec(select(Counter).where(Counter.id == counter_id))).one()
 
 
 async def test_insert_records_the_acting_user(session: AsyncSession):
-    guild, queue, actor = await _workspace(session)
+    guild, group, actor = await _workspace(session)
 
     await _route(session, guild.id, actor.id)
-    item = QueueItem(queue_id=queue.id, label="check the wiring")
-    session.add(item)
+    counter = await create_counter(
+        session, group, name="check the wiring", commit=False
+    )
     await session.flush()
 
-    assert (await _reload(session, item.id)).created_by == actor.id
+    assert (await _reload(session, counter.id)).created_by == actor.id
 
 
 async def test_a_write_that_skips_the_orm_is_stamped_too(session: AsyncSession):
@@ -71,22 +73,24 @@ async def test_a_write_that_skips_the_orm_is_stamped_too(session: AsyncSession):
     A bulk ``insert()`` never reaches the ORM's unit of work, so an app-layer
     hook could not see it. The database does not care how the row arrived.
     """
-    guild, queue, actor = await _workspace(session)
+    guild, group, actor = await _workspace(session)
 
     await _route(session, guild.id, actor.id)
     # A Core insert also skips the Python-side column defaults, so the
-    # timestamp is supplied here; ``created_by`` is the database's job.
+    # timestamps are supplied here; ``created_by`` is the database's job.
+    now = datetime.now(timezone.utc)
     await session.exec(
-        insert(QueueItem).values(
-            queue_id=queue.id,
-            label="written by statement",
-            created_at=datetime.now(timezone.utc),
+        insert(Counter).values(
+            counter_group_id=group.id,
+            name="written by statement",
+            created_at=now,
+            updated_at=now,
         )
     )
 
     row = (
         await session.exec(
-            select(QueueItem).where(QueueItem.label == "written by statement")
+            select(Counter).where(Counter.name == "written by statement")
         )
     ).one()
     assert row.created_by == actor.id
@@ -94,65 +98,66 @@ async def test_a_write_that_skips_the_orm_is_stamped_too(session: AsyncSession):
 
 async def test_an_explicit_author_is_kept(session: AsyncSession):
     """A caller restoring original authorship (backup import) keeps it."""
-    guild, queue, actor = await _workspace(session)
+    guild, group, actor = await _workspace(session)
     original = await create_user(session)
 
     await _route(session, guild.id, actor.id)
-    item = QueueItem(
-        queue_id=queue.id,
-        label="imported",
-        created_by=original.id,
+    counter = await create_counter(
+        session, group, name="imported", created_by=original.id, commit=False
     )
-    session.add(item)
     await session.flush()
 
-    assert (await _reload(session, item.id)).created_by == original.id
+    assert (await _reload(session, counter.id)).created_by == original.id
 
 
 async def test_an_edit_by_someone_else_leaves_the_author(session: AsyncSession):
     """Authorship is a historical fact: the trigger is INSERT-only."""
-    guild, queue, author = await _workspace(session)
+    guild, group, author = await _workspace(session)
     editor = await create_user(session)
     await create_guild_membership(
         session, user=editor, guild=guild, role=CommunityRole.admin
     )
 
     await _route(session, guild.id, author.id)
-    item = QueueItem(queue_id=queue.id, label="first draft")
-    session.add(item)
+    counter = await create_counter(session, group, name="first draft", commit=False)
     await session.flush()
-    item_id = item.id
+    counter_id = counter.id
 
     await _route(session, guild.id, editor.id)
-    row = await _reload(session, item_id)
-    row.label = "second draft"
+    row = await _reload(session, counter_id)
+    row.name = "second draft"
     await session.flush()
 
-    assert (await _reload(session, item_id)).created_by == author.id
+    assert (await _reload(session, counter_id)).created_by == author.id
 
 
 async def test_a_system_session_stamps_nothing(session: AsyncSession):
     """Background work and seeding have no one to name, so they name no one."""
-    guild, queue, _ = await _workspace(session)
+    guild, group, _ = await _workspace(session)
 
     await _route(session, guild.id, None)
-    item = QueueItem(queue_id=queue.id, label="swept up by a job")
-    session.add(item)
+    counter = await create_counter(
+        session, group, name="swept up by a job", commit=False
+    )
     await session.flush()
 
-    assert (await _reload(session, item.id)).created_by is None
+    assert (await _reload(session, counter.id)).created_by is None
 
 
 async def test_content_a_plugin_writes_may_name_no_author(session: AsyncSession):
     """A plug-in acting as its community has no one to name either, on the tool
     tables its scopes can write."""
-    guild, queue, _ = await _workspace(session)
+    guild, group, _ = await _workspace(session)
 
     await _route(session, guild.id, None)
-    written = Queue(initiative_id=queue.initiative_id, name="written by a plug-in")
+    written = CounterGroup(
+        initiative_id=group.initiative_id, name="written by a plug-in"
+    )
     session.add(written)
     await session.flush()
     session.expunge_all()
 
-    reloaded = (await session.exec(select(Queue).where(Queue.id == written.id))).one()
+    reloaded = (
+        await session.exec(select(CounterGroup).where(CounterGroup.id == written.id))
+    ).one()
     assert reloaded.created_by is None

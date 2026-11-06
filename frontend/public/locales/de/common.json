@@ -65,6 +65,7 @@
   "adding": "Wird hinzugefügt…",
   "rowActionsFor": "Aktionen für {{subject}}",
   "more": "Mehr",
+  "moreOptions": "Weitere Optionen",
   "less": "Weniger",
   "noResults": "Keine Ergebnisse gefunden",
   "tryAgain": "Erneut versuchen",
@@ -169,7 +170,7 @@
     "tags": "Tags",
     "tagsDescription": "Füge Tags hinzu, um zu organisieren und zu filtern.",
     "tagsNoAccess": "Du benötigst Schreibzugriff, um Tags zu verwalten.",
-    "propertiesDescription": "Werte für die benutzerdefinierten Eigenschaften, die diese Initiative festlegt.",
+    "propertiesDescription": "Werte für die Metadaten, die diese Initiative festlegt.",
     "comments": "Kommentare",
     "commentsDescription": "Lass andere dies kommentieren. Wenn du Kommentare deaktivierst, bleibt alles bereits Verfasste erhalten und erscheint wieder, sobald du sie erneut aktivierst.",
     "commentsToggle": "Kommentare aktivieren",
@@ -291,8 +292,7 @@
   },
   "fileDrop": {
     "release": "Hier ablegen",
-    "unsupported": "Diese Art von Datei kann hier nicht hochgeladen werden.",
-    "tooLarge": "Diese Datei ist größer, als dieser Server annimmt."
+    "unsupported": "Diese Art von Datei kann hier nicht hochgeladen werden."
   },
   "archiveError": "Das konnte nicht archiviert werden. Bitte versuche es erneut.",
   "unarchiveError": "Das konnte nicht aus dem Archiv geholt werden. Bitte versuche es erneut.",
@@ -313,6 +313,8 @@
     "taskList": "Aufgabenliste",
     "more": "Weitere Formatierung",
     "image": "Bild",
+    "uploadImage": "Bild hochladen",
+    "imageFromFiles": "Aus Dateien",
     "uploadingImage": "{{name}} wird hochgeladen…",
     "imageUploadFailed": "Das Bild konnte nicht hinzugefügt werden."
   },
@@ -396,11 +398,6 @@
       "this": "diese Datei",
       "plural": "Dateien"
     },
-    "queue": {
-      "name": "Warteschlange",
-      "this": "diese Warteschlange",
-      "plural": "Warteschlangen"
-    },
     "counter_group": {
       "name": "Zählergruppe",
       "this": "diese Zählergruppe",
@@ -421,25 +418,20 @@
       "this": "diesen Beitrag",
       "plural": "Beiträge"
     },
-    "gallery": {
-      "name": "Galerie",
-      "this": "diese Galerie",
-      "plural": "Galerien"
-    },
     "wiki": {
       "name": "Wiki",
       "this": "dieses Wiki",
       "plural": "Wikis"
     },
+    "contact": {
+      "name": "Kontakt",
+      "this": "diesen Kontakt",
+      "plural": "Kontakte"
+    },
     "task": {
       "name": "Aufgabe",
       "this": "diese Aufgabe",
       "plural": "Aufgaben"
-    },
-    "queue_item": {
-      "name": "Warteschlangenelement",
-      "this": "dieses Warteschlangenelement",
-      "plural": "Warteschlangenelemente"
     },
     "calendar_event": {
       "name": "Termin",
@@ -451,11 +443,6 @@
       "this": "diesen Zähler",
       "plural": "Zähler"
     },
-    "gallery_image": {
-      "name": "Bild",
-      "this": "dieses Bild",
-      "plural": "Bilder"
-    },
     "wiki_page": {
       "name": "Seite",
       "this": "diese Seite",
@@ -465,6 +452,11 @@
       "name": "Tag",
       "this": "diesen Tag",
       "plural": "Tags"
+    },
+    "collection": {
+      "name": "Sammlung",
+      "this": "diese Sammlung",
+      "plural": "Sammlungen"
     }
   }
 }

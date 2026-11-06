@@ -23,6 +23,7 @@ from app.services import email as email_service
 from app.services.auth import account_changes, addresses
 from app.services.platform import email_outbox, user_notifications
 from app.testing import create_guild, create_user, set_notification_prefs
+from app.services.platform import rules
 
 
 def _pieces(
@@ -230,8 +231,8 @@ async def test_a_channel_switched_off_after_writing_is_not_delivered(
         user,
         {"categories": {"mentions": {"email": False}, "account": {"email": False}}},
     )
-    quiet.allow_email_notifications = False
-    redacting.redact_notification_content = True
+    await rules.put(session, "allow_email_notifications", False, guild_id=quiet.id)
+    await rules.put(session, "redact_notification_content", True, guild_id=redacting.id)
     session.add_all([quiet, redacting])
     await session.commit()
     await email_outbox.enqueue_account_letter(

@@ -36,8 +36,10 @@ foothold in a guild is a legitimate install with nothing to render.
 from __future__ import annotations
 
 import re
+import string
 from typing import Any, Mapping, Optional
 
+from app.core.currencies import CURRENCY_CODES
 from app.core.plugin_scopes import ALL_SCOPES, plugin_scope_target
 from app.services.marketplace import contract, expressions, plugin_api
 from app.services.marketplace.manifest_values import (
@@ -2655,7 +2657,15 @@ def _item_field(
     }
     # Stored only when it is, as admin_only is.
     if field.get("list") is not None and _flag(field["list"], what=f"{what} list"):
+        if kind == "multi_select":
+            fail(f"{what}: a multi_select field is several values already")
         cleaned["list"] = True
+    if kind == "currency":
+        cleaned["currency"] = _choice(
+            field.get("currency"), _CURRENCIES, what=f"{what} currency"
+        )
+    if kind in ("select", "multi_select"):
+        cleaned["options"] = _field_options(field.get("options"), what=what)
     description = localized_text(field.get("description"), MAX_TEXT_LENGTH)
     if description is not None:
         cleaned["description"] = description
@@ -2677,6 +2687,55 @@ def _item_field(
     )
     if requires is not None:
         cleaned["requires"] = requires
+    return cleaned
+
+
+#: The currencies a currency field may name.
+_CURRENCIES = frozenset(CURRENCY_CODES)
+#: What an option's value is written in: a letter or a digit, then those, ``_``
+#: and ``-`` (``fieldOption``).
+_OPTION_START = frozenset(string.ascii_letters + string.digits)
+_OPTION_CHARS = _OPTION_START | {"_", "-"}
+MAX_OPTION_VALUE_LENGTH = contract.cap("optionValueLength")
+
+
+def _field_options(raw: Any, *, what: str) -> list[dict[str, Any]]:
+    """A select or multi_select field's options: at least one and at most
+    :data:`MAX_SELECT_OPTIONS`, each a value written in :data:`_OPTION_CHARS`
+    at most once, its label, and a ``#rrggbb`` colour if it has one."""
+    options = require_list(raw, f"{what} options", MAX_SELECT_OPTIONS)
+    if not options:
+        fail(f"{what}: a select field offers at least one option")
+    cleaned: list[dict[str, Any]] = []
+    for raw_option in options:
+        option = require_mapping(raw_option, f"{what} option")
+        value = option.get("value")
+        if not (
+            isinstance(value, str)
+            and 0 < len(value) <= MAX_OPTION_VALUE_LENGTH
+            and value[0] in _OPTION_START
+            and set(value) <= _OPTION_CHARS
+        ):
+            fail(
+                f"{what}: an option's value is a letter or a digit, then those, _ and -"
+            )
+        if any(kept["value"] == value for kept in cleaned):
+            fail(f"{what}: two options share the value {value!r}")
+        kept: dict[str, Any] = {
+            "value": value,
+            "label": _label(option.get("label"), what=f"{what} option {value!r}"),
+        }
+        color = option.get("color")
+        if color is not None:
+            if not (
+                isinstance(color, str)
+                and len(color) == 7
+                and color[0] == "#"
+                and set(color[1:]) <= set(string.hexdigits)
+            ):
+                fail(f"{what} option {value!r}: color must be #rrggbb")
+            kept["color"] = color
+        cleaned.append(kept)
     return cleaned
 
 

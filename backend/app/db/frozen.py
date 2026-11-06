@@ -52,7 +52,7 @@ from app.core.tools import (
     ARCHIVE_TARGETS,
     KINDS,
     PROPERTY_TARGETS,
-    LAYOUTS_PER_INSTANCE,
+    LAYOUT_INSTANCE_TABLES,
     Tool,
 )
 from app.db import gucs
@@ -84,10 +84,21 @@ FROZEN_PARENT_CONSTRAINT = "frozen_parent_guard"
 
 
 #: What a frozen row may still change: the columns that describe the freeze
-#: itself (the two lifecycle mixins' fields), plus the timestamp every write
-#: touches. Everything else is content.
+#: itself (the two lifecycle mixins' fields), the timestamp every write
+#: touches, and a thumbnail the app draws of what is already there, with the
+#: size it measured. Everything else is content.
 LIFECYCLE_COLUMNS: tuple[str, ...] = tuple(
-    sorted({*ArchiveMixin.model_fields, *SoftDeleteMixin.model_fields, "updated_at"})
+    sorted(
+        {
+            *ArchiveMixin.model_fields,
+            *SoftDeleteMixin.model_fields,
+            "updated_at",
+            "thumbnail_url",
+            "thumbnail_state",
+            "width",
+            "height",
+        }
+    )
 )
 
 #: Rows that hold a NAME which is unique among their siblings, mapped to the
@@ -190,8 +201,7 @@ FREEZE_EXEMPT_TABLES: frozenset[str] = frozenset(
         "event_outbox",
         "plugin_event_outbox",
         "search_entries",
-        "reaction_digest_items",
-        "task_assignment_digest_items",
+        "batched_notices",
         "event_reminder_dispatches",
         "timer_marks",
         "subscription_progress",
@@ -579,7 +589,7 @@ def frozen_write_triggers(table: str) -> list[str]:
     That inheriting row gets the two halves of the rule on two triggers, because
     they are asked about different states. Content is read-only under anything
     frozen. But coming out unstamped is refused only under something in the
-    TRASH: a comment, a queue item, a counter, a picture and a calendar event
+    TRASH: a comment, a counter, a picture and a calendar event
     carry no ``archived_at``, so unstamped inside an archived thing is the only
     state they have — it is what they were in before the trash took them, and it
     is what a restore has to put them back to.
@@ -856,8 +866,8 @@ def _reactions_leg(alias: str, trashed_ok: str) -> str:
     return f"COALESCE((CASE {alias}.target_type {arms} ELSE false END), false)"
 
 
-def _property_values_leg(alias: str, trashed_ok: str) -> str:
-    """A property value freezes with the thing it is on."""
+def _metadata_values_leg(alias: str, trashed_ok: str) -> str:
+    """A metadata value freezes with the thing it is on."""
     tables = entity_tables()
     arms = " ".join(
         f"WHEN '{target}' THEN resource_frozen("
@@ -890,9 +900,9 @@ def _tool_layouts_leg(alias: str, trashed_ok: str) -> str:
     """A view freezes with the instance it is for, or with its initiative
     when it is for a shared page."""
     arms = " ".join(
-        f"WHEN '{tool.value}' THEN resource_frozen("
-        f"'{tool.plural}', {alias}.tool_id, {trashed_ok})"
-        for tool in LAYOUTS_PER_INSTANCE
+        f"WHEN '{target}' THEN resource_frozen("
+        f"'{table}', {alias}.tool_id, {trashed_ok})"
+        for target, table in LAYOUT_INSTANCE_TABLES.items()
     )
     return (
         f"COALESCE((CASE WHEN {alias}.tool_id IS NULL THEN resource_frozen("
@@ -936,7 +946,7 @@ _UNFROZEN_ROWS: dict[str, Callable[[str], str]] = {
 _FREEZE_DEVIATIONS: dict[str, Callable[[str, str], str]] = {
     "comments": _comments_leg,
     "reactions": _reactions_leg,
-    "property_values": _property_values_leg,
+    "metadata_values": _metadata_values_leg,
     "relationships": _edge_leg,
     "resource_grants": _resource_grants_leg,
     "tool_layouts": _tool_layouts_leg,
@@ -1005,7 +1015,7 @@ def _trashed_ancestor_leg(table: str, alias: str) -> str | None:
     That is the ordering a cascaded restore depends on: the parent's
     ``deleted_at`` is cleared first, so by the time the child is written the
     walk sees an archive (if anything) and the child may come back unstamped —
-    which for a comment, a queue item, a counter, a picture or a calendar event
+    which for a comment, a counter, a picture or a calendar event
     is the only way it can come back at all.
 
     Asked of each way up on its own. A reply sits under its comment and under

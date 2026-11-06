@@ -13,11 +13,15 @@ import { beforeEach, describe, expect, it, vi } from "vitest";
 
 import { server } from "@/__tests__/helpers/msw-server";
 import { renderWithProviders } from "@/__tests__/helpers/render";
-import type { QueryBuildRequest } from "@/api/generated/initiativeAPI.schemas";
+import type {
+  QueryBuildRequest,
+  QuerySheetDescription,
+} from "@/api/generated/initiativeAPI.schemas";
 
 import { QueryBuilder } from "./QueryBuilder";
 
 const COUNT_ALL = { field: "*", aggregate: "count", alias: "count" };
+const NONE: { id: number; name: string }[] = [];
 
 const DEFAULTS: Record<string, { field: string; op: string; value: unknown }[]> = {
   tasks: [
@@ -63,10 +67,12 @@ const spec = (dataset: string): QueryBuildRequest =>
 function mount() {
   const onChange = vi.fn();
   const view = renderWithProviders(
-    <QueryBuilder spec={spec("tasks")} onChange={onChange} initiativeId={7} />
+    <QueryBuilder spec={spec("tasks")} onChange={onChange} initiativeId={7} spreadsheets={NONE} />
   );
   const show = (next: QueryBuildRequest) =>
-    view.rerender(<QueryBuilder spec={next} onChange={onChange} initiativeId={7} />);
+    view.rerender(
+      <QueryBuilder spec={next} onChange={onChange} initiativeId={7} spreadsheets={NONE} />
+    );
   const seeded = () =>
     (onChange.mock.calls.at(-1)?.[0] as QueryBuildRequest | undefined)?.where?.map(
       (condition) => (condition as { field: string }).field
@@ -128,6 +134,7 @@ describe("grouping", () => {
         }}
         onChange={onChange}
         initiativeId={7}
+        spreadsheets={NONE}
       />
     );
     expect(screen.getByText("One row for each Title and Priority")).toBeInTheDocument();
@@ -147,6 +154,7 @@ describe("grouping", () => {
         spec={{ ...spec("members"), columns: [{ field: "title" }], group_by: ["title"] }}
         onChange={vi.fn()}
         initiativeId={7}
+        spreadsheets={NONE}
       />
     );
     expect(screen.getByText("One row for each Title")).toBeInTheDocument();
@@ -158,6 +166,7 @@ describe("grouping", () => {
         spec={{ ...spec("members"), columns: [{ field: "title" }] }}
         onChange={vi.fn()}
         initiativeId={7}
+        spreadsheets={NONE}
       />
     );
     expect(screen.getByText("Every row, as it is")).toBeInTheDocument();
@@ -172,6 +181,7 @@ describe("a running total", () => {
         spec={{ ...spec("members"), columns: [{ field: "title" }, COUNT_ALL], group_by: ["title"] }}
         onChange={onChange}
         initiativeId={7}
+        spreadsheets={NONE}
       />
     );
     const user = userEvent.setup();
@@ -195,10 +205,73 @@ describe("a running total", () => {
         }}
         onChange={vi.fn()}
         initiativeId={7}
+        spreadsheets={NONE}
       />
     );
     expect(screen.getAllByRole("combobox", { name: /show as/i })[1]).toHaveTextContent(
       "Running count"
     );
+  });
+});
+
+describe("a spreadsheet's range", () => {
+  const read: QuerySheetDescription = {
+    alias: "sheet",
+    sheets: ["Q3 Actuals", "Totals"],
+    fields: [
+      {
+        name: "Region",
+        type: "text",
+        kind: "text",
+        ops: ["ilike"],
+        multiple: false,
+        sortable: true,
+      },
+      {
+        name: "No. sold",
+        type: "number",
+        kind: "number",
+        ops: ["eq"],
+        multiple: false,
+        sortable: true,
+      },
+    ],
+  };
+  const reading = { sheet: { file: 5 }, columns: [COUNT_ALL], where: [], group_by: [] };
+
+  it("starts with every column, named as its header is, and starts over on another sheet", async () => {
+    const onChange = vi.fn();
+    const view = renderWithProviders(
+      <QueryBuilder
+        spec={reading}
+        onChange={onChange}
+        initiativeId={7}
+        spreadsheets={[{ id: 5, name: "Budget" }]}
+        sheet={read}
+      />
+    );
+    const seeded = { ...reading, columns: [{ field: "Region" }, { field: "No. sold" }] };
+    await waitFor(() => expect(onChange).toHaveBeenLastCalledWith(seeded));
+
+    view.rerender(
+      <QueryBuilder
+        spec={seeded}
+        onChange={onChange}
+        initiativeId={7}
+        spreadsheets={[{ id: 5, name: "Budget" }]}
+        sheet={read}
+      />
+    );
+    expect(screen.getAllByRole("combobox", { name: "Column" })[1]).toHaveTextContent("No. sold");
+
+    const user = userEvent.setup();
+    await user.click(screen.getByRole("combobox", { name: "Sheet" }));
+    await user.click(await screen.findByRole("option", { name: "Q3 Actuals" }));
+    expect(onChange).toHaveBeenLastCalledWith({
+      sheet: { file: 5, range: "'Q3 Actuals'" },
+      columns: [COUNT_ALL],
+      where: [],
+      group_by: [],
+    });
   });
 });

@@ -4,8 +4,8 @@ One route serves every tool, so a new ``Tool`` member gets the surface with no
 per-tool endpoint: loading + authorization go through the unified
 resource-access registry, tag assignment through the tag-link registry, and the
 comment switch through the column every tool carries.
-Only the content-level extras (tasks, queue items) keep hand-written tag
-routes — they are sub-resources of a tool, not tools themselves.
+Only tasks keep hand-written tag routes — they are a tool's sub-resources,
+not tools themselves.
 """
 
 from datetime import datetime, timezone
@@ -26,6 +26,7 @@ from app.models.tenant.tag import Tag
 from app.schemas.tenant.comment import ToolCommentSettings
 from app.schemas.tenant.tag import TagSetRequest, TagSummary
 from app.services.content_sockets import sockets
+from app.services.tenant import required_fields
 from app.services.tenant import tags as tags_service
 
 router = APIRouter()
@@ -50,6 +51,7 @@ async def set_tool_tags(
         guild_context,
         access="write",
     )
+    required = await required_fields.required_of(session, guild_context, row)
     tag_ids = await tags_service.set_entity_tags(
         session,
         tags_service.TOOL_TAG_LINKS[tool],
@@ -59,6 +61,7 @@ async def set_tool_tags(
     )
     row.updated_at = datetime.now(timezone.utc)
     session.add(row)
+    await required_fields.refuse_emptied(session, required)
     await session.commit()
 
     sockets.signal(guild_context.guild_id, tool, row.id, "updated")

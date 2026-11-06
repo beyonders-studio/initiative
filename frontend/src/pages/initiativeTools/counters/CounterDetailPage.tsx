@@ -136,6 +136,7 @@ export function CounterDetailPage() {
           keys="counterGroups:"
           backTo={gp(toolListRoute(Tool.counter_group, initiativeId))}
           backLabel={t("backToGroups")}
+          entity={groupId === null ? undefined : { kind: "counter_group", id: groupId }}
         />
       </div>
     );

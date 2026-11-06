@@ -1,0 +1,30 @@
+{
+  "collections": {
+    "shapes": {
+      "currency": "USD",
+      "groups": {
+        "starters": "Start from"
+      },
+      "shapes": {
+        "gallery": {
+          "name": "Gallery",
+          "hint": "Pictures on a wall, with a caption under each"
+        },
+        "catalog": {
+          "name": "Catalog",
+          "hint": "Things to browse, each with a price and a rating"
+        },
+        "log": {
+          "name": "Log",
+          "hint": "Files kept by date, newest first"
+        }
+      },
+      "fields": {
+        "caption": "Caption",
+        "price": "Price",
+        "rating": "Rating",
+        "date": "Date"
+      }
+    }
+  }
+}

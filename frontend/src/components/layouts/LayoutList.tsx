@@ -1,4 +1,6 @@
-import { Star } from "lucide-react";
+import { Link } from "@tanstack/react-router";
+import { Pencil, Star, Trash2 } from "lucide-react";
+import { useState } from "react";
 import { useTranslation } from "react-i18next";
 
 import type {
@@ -8,8 +10,11 @@ import type {
   ListLayoutRead,
 } from "@/api/generated/initiativeAPI.schemas";
 import { layoutLook } from "@/components/projects/projectTasksConfig";
+import { TaskTypeDeleteDialog } from "@/components/projects/TaskTypeDeleteDialog";
+import { Button } from "@/components/ui/button";
 import { Switch } from "@/components/ui/switch";
 import { useSaveLayouts } from "@/hooks/useToolLayouts";
+import { atLeast, useWidthClass } from "@/hooks/useWidthClass";
 import { formatDateTime } from "@/lib/formatDate";
 
 type Layout = ListLayoutRead | DetailLayoutRead;
@@ -28,45 +33,69 @@ const setOf = (definition: ListLayoutRead["definition"]) =>
  * and its pages, a project's one per task type, each named for its type.
  *
  * Given its `target` by someone who may change it, each view is shown in its
- * layout menu or hidden from here, one at least staying shown.
+ * layout menu or hidden from here, one at least staying shown, and a shown one
+ * made the one it opens on; and each task type deleted with its page, one at
+ * least staying. Given its `editor` as well, each layout's name opens the
+ * editor on it.
  */
 export const LayoutList = ({
   layouts,
   target,
+  editor,
 }: {
   layouts: Layout[];
   /** Where to save a view shown or hidden; left out, the list only reads. */
   target?: GetLayoutsParams;
+  /** The layout editor's address. */
+  editor?: string;
 }) => {
   const { t } = useTranslation(["projects", "layouts", "common"]);
+  const [deleting, setDeleting] = useState<number | null>(null);
   const views = layouts.filter(isList);
   const pages = layouts.filter((layout) => !isList(layout));
   const shown = views.filter((view) => !view.hidden);
-  const typedPages = pages.some((page) => "task_type_id" in page && page.task_type_id);
+  const typed = pages.filter((page) => "task_type_id" in page && page.task_type_id).length;
+  // Only a project's pages are typed, so a typed page's target names it.
+  const projectId = target?.tool_id ?? null;
 
   const row = (layout: Layout) => {
     const { icon: Icon, labelKey } = layoutLook(layout.kind);
-    const typed = "task_type_id" in layout ? layout.task_type_id : null;
+    const typeId = "task_type_id" in layout ? layout.task_type_id : null;
     const name =
-      typed && "task_type_name" in layout
+      typeId && "task_type_name" in layout
         ? t("layouts:typedTaskLayout", { name: layout.task_type_name })
         : t(labelKey as never);
     const view = isList(layout) ? layout : null;
+    // What the editor's `?layout=` names it by.
+    const key = typeId ? `${layout.kind}:${typeId}` : layout.kind;
+    const nameClass = view?.hidden ? "truncate text-muted-foreground" : "truncate";
     return (
-      <li
-        key={typed ? `${layout.kind}:${typed}` : layout.kind}
-        className="flex items-center justify-between gap-3 px-3 py-2"
-      >
+      <li key={key} className="flex items-center justify-between gap-3 px-3 py-2">
         <span className="flex min-w-0 items-center gap-2">
           <Icon className="h-4 w-4 shrink-0 text-muted-foreground" aria-hidden="true" />
-          <span className={view?.hidden ? "truncate text-muted-foreground" : "truncate"}>
-            {name}
-          </span>
+          {editor ? (
+            <Link
+              to={editor}
+              search={{ layout: key }}
+              className={`${nameClass} hover:underline`}
+              aria-label={t("layouts:editLayout", { name })}
+            >
+              {name}
+            </Link>
+          ) : (
+            <span className={nameClass}>{name}</span>
+          )}
           {view?.is_default ? (
             <Star
               className="h-3 w-3 shrink-0 fill-current text-muted-foreground"
               aria-label={t("layouts:opensFirst")}
               role="img"
+            />
+          ) : view && target && !view.hidden ? (
+            <OpensFirstButton
+              target={target}
+              view={view}
+              label={t("layouts:makeOpensFirst", { name })}
             />
           ) : null}
           {view?.hidden && !target ? (
@@ -90,6 +119,21 @@ export const LayoutList = ({
               label={t("layouts:showView", { name })}
             />
           ) : null}
+          {typeId && projectId !== null ? (
+            <Button
+              variant="ghost"
+              size="icon"
+              className="h-7 w-7"
+              // A project keeps at least one task type.
+              disabled={typed <= 1}
+              onClick={() => setDeleting(typeId)}
+              aria-label={t("layouts:deleteTaskType", {
+                name: "task_type_name" in layout ? layout.task_type_name : "",
+              })}
+            >
+              <Trash2 className="h-4 w-4" />
+            </Button>
+          ) : null}
         </span>
       </li>
     );
@@ -102,14 +146,58 @@ export const LayoutList = ({
     </section>
   );
 
-  // One kind of layout alone needs no heading over it.
-  if (views.length === 0 || pages.length === 0) {
-    return <ul className="divide-y rounded-md border text-sm">{layouts.map(row)}</ul>;
-  }
+  return (
+    <>
+      {/* One kind of layout alone needs no heading over it. */}
+      {views.length === 0 || pages.length === 0 ? (
+        <ul className="divide-y rounded-md border text-sm">{layouts.map(row)}</ul>
+      ) : (
+        <div className="space-y-4">
+          {group(t("layouts:views"), views)}
+          {group(t(typed > 0 ? "layouts:taskPages" : "layouts:pages"), pages)}
+        </div>
+      )}
+      {projectId !== null && typed > 0 ? (
+        <TaskTypeDeleteDialog
+          projectId={projectId}
+          typeId={deleting}
+          onClose={() => setDeleting(null)}
+        />
+      ) : null}
+    </>
+  );
+};
+
+/**
+ * A target's layouts and the way into its editor, for someone who may change
+ * them. The editor needs a tablet-sized screen, and says so itself too; on a
+ * narrower one this says so in place of the way in.
+ */
+export const LayoutsOverview = ({
+  layouts,
+  target,
+  editor,
+}: {
+  layouts: Layout[];
+  target: GetLayoutsParams;
+  /** The layout editor's address. */
+  editor: string;
+}) => {
+  const { t } = useTranslation("layouts");
+  const wide = atLeast(useWidthClass(), "md");
   return (
     <div className="space-y-4">
-      {group(t("layouts:views"), views)}
-      {group(t(typedPages ? "layouts:taskPages" : "layouts:pages"), pages)}
+      <LayoutList layouts={layouts} target={target} editor={wide ? editor : undefined} />
+      {wide ? (
+        <Button asChild variant="outline" size="sm">
+          <Link to={editor}>
+            <Pencil className="h-4 w-4" />
+            {t("open")}
+          </Link>
+        </Button>
+      ) : (
+        <p className="text-muted-foreground text-sm">{t("compact")}</p>
+      )}
     </div>
   );
 };
@@ -138,5 +226,31 @@ const ViewSwitch = ({
       }
       aria-label={label}
     />
+  );
+};
+
+/** Make a shown view the one its target opens on. */
+const OpensFirstButton = ({
+  target,
+  view,
+  label,
+}: {
+  target: GetLayoutsParams;
+  view: ListLayoutRead;
+  label: string;
+}) => {
+  const save = useSaveLayouts(target);
+  return (
+    <Button
+      variant="ghost"
+      size="icon"
+      className="h-6 w-6 shrink-0 text-muted-foreground"
+      disabled={save.isPending}
+      onClick={() => save.mutate([{ opensOn: view.kind }])}
+      aria-label={label}
+      title={label}
+    >
+      <Star className="h-3 w-3" />
+    </Button>
   );
 };

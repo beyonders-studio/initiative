@@ -13,7 +13,11 @@ has no way to clean up after itself, so they accumulate in the cluster.
 ``--orphaned`` keeps every checkout that still exists — this repository's
 worktrees and any checkout in the dev-ports registry — and drops what the rest
 left behind. It is safe while other checkouts are testing: it never disconnects
-a session, so a database something is still using is reported and kept.
+a session, so a database something is still using is reported and kept. It also
+drops the dev database and roles of a worktree that is gone
+(``initiative_dev_<id>``, ``dev_<id>_…``): ``scripts/dev-ports.sh`` gives a
+worktree whose branch changes migrations a dev database of its own. A checkout's
+own dev database is never dropped here, and neither is the shared one.
 
 Credentials come from POSTGRES_USER/POSTGRES_PASSWORD (the dev-compose bootstrap
 superuser) and the host/port in DATABASE_URL, exactly as the suite does.
@@ -56,6 +60,10 @@ _NAME_CHECKOUT = re.compile(
     r"^(?:initiative_test|initiative_migrations_test|test|migtest)_([0-9a-f]{8})_"
 )
 
+# A worktree's own dev database and roles (scripts/dev-ports.sh):
+# initiative_dev_<id> and dev_<id>_....
+_DEV_NAME_CHECKOUT = re.compile(r"^(?:initiative_dev|dev)_([0-9a-f]{8})(?:_|$)")
+
 # scripts/dev-ports.sh's registry: one "<offset>\t<checkout path>" line each.
 DEV_PORTS_REGISTRY = Path(
     os.environ.get("DEV_PORTS_REGISTRY")
@@ -93,8 +101,10 @@ def _live_checkout_ids() -> set[str]:
     return ids
 
 
-def _is_orphaned(name: str, live: set[str]) -> bool:
-    match = _NAME_CHECKOUT.match(name)
+def _is_orphaned(
+    name: str, live: set[str], pattern: re.Pattern = _NAME_CHECKOUT
+) -> bool:
+    match = pattern.match(name)
     return match is not None and match.group(1) not in live
 
 
@@ -163,6 +173,21 @@ async def main() -> int:
         if args.orphaned:
             databases = [name for name in databases if _is_orphaned(name, live)]
             roles = [name for name in roles if _is_orphaned(name, live)]
+            databases += [
+                r["datname"]
+                for r in await conn.fetch(
+                    "SELECT datname FROM pg_database WHERE datname LIKE 'initiative_dev_%'"
+                    " ORDER BY datname"
+                )
+                if _is_orphaned(r["datname"], live, _DEV_NAME_CHECKOUT)
+            ]
+            roles += [
+                r["rolname"]
+                for r in await conn.fetch(
+                    "SELECT rolname FROM pg_roles WHERE rolname LIKE 'dev\\_%' ORDER BY rolname"
+                )
+                if _is_orphaned(r["rolname"], live, _DEV_NAME_CHECKOUT)
+            ]
 
         if args.all:
             where = "every checkout"

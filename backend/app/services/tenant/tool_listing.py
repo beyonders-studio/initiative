@@ -41,6 +41,7 @@ from app.models.tenant.initiative import Initiative
 from app.services import permissions as permissions_service
 from app.services.tenant import search as search_service
 from app.services.tenant import tags as tags_service
+from app.services.tenant.initiative_tools import tool_on_sql
 
 #: What ``sort_by`` accepts on every guild-wide tool list.
 TOOL_SORT_FIELDS = ("name", "initiative", "updated_at")
@@ -103,12 +104,11 @@ def initiative_switch_clause(
     same way, and neither costs a round trip.
 
     ``guild_level_rows`` admits the rows that belong to the guild rather than
-    to an initiative — calendars, where installing the plug-in is what turned the
-    tool on and no initiative has anything to say about it.
+    to an initiative — a community calendar or contact, where installing the
+    plug-in is what turned the tool on and no initiative has anything to say
+    about it.
     """
-    enabled = model.initiative_id.in_(
-        select(Initiative.id).where(getattr(Initiative, tool.view_permission).is_(True))
-    )
+    enabled = model.initiative_id.in_(select(Initiative.id).where(tool_on_sql(tool)))
     if guild_level_rows:
         return or_(model.initiative_id.is_(None), enabled)
     return enabled

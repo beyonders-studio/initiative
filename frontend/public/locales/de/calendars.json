@@ -42,7 +42,7 @@
   "selectInitiative": "Initiative auswählen",
   "deleteEventConfirm": "Der Termin wird in den Papierkorb verschoben. Du kannst ihn unter Einstellungen → Papierkorb wiederherstellen, bevor der Aufbewahrungszeitraum endet.",
   "dangerZoneDescription": "Destruktive Aktionen. Gelöschte Termine landen im Papierkorb und können wiederhergestellt werden, bevor der Aufbewahrungszeitraum endet.",
-  "properties": "Eigenschaften",
+  "properties": "Metadaten",
   "import": {
     "title": "Kalendertermine importieren",
     "importIcs": ".ics importieren",

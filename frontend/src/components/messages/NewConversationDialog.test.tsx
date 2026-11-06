@@ -11,7 +11,7 @@ import userEvent from "@testing-library/user-event";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 
 import { renderPage } from "@/__tests__/helpers/render";
-import type { ContactRead } from "@/api/generated/initiativeAPI.schemas";
+import type { PersonRead } from "@/api/generated/initiativeAPI.schemas";
 
 const mocks = vi.hoisted(() => ({
   sections: vi.fn(),
@@ -22,9 +22,9 @@ const mocks = vi.hoisted(() => ({
   startGroup: vi.fn(),
 }));
 
-vi.mock("@/hooks/useContacts", () => ({
-  useContactSections: (search: string) => mocks.sections(search),
-  useMoreCommunityContacts: (communityId: number, search: string, enabled: boolean) =>
+vi.mock("@/hooks/usePeople", () => ({
+  usePeopleSections: (search: string) => mocks.sections(search),
+  useMoreCommunityPeople: (communityId: number, search: string, enabled: boolean) =>
     mocks.more(communityId, search, enabled),
 }));
 
@@ -48,7 +48,7 @@ vi.mock("@/hooks/useMyMessages", async (importOriginal) => ({
 
 import { NewConversationDialog } from "./NewConversationDialog";
 
-const person = (id: number, username: string): ContactRead => ({
+const person = (id: number, username: string): PersonRead => ({
   id,
   username,
   discriminator: 1234,
@@ -61,7 +61,7 @@ const person = (id: number, username: string): ContactRead => ({
   shared_community_ids: [7],
 });
 
-const section = (items: ContactRead[]) => ({
+const section = (items: PersonRead[]) => ({
   community_id: 7,
   community_name: "Beyonders",
   icon_url: null,

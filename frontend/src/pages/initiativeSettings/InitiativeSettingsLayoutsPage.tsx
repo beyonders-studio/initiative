@@ -1,7 +1,7 @@
 /**
  * `/settings/layouts` — how each tool in this initiative draws what it holds,
  * in the sidebar's order: the calendar's and the notices' details, and each
- * project's, queue's, gallery's and counter group's layouts. Each layout says when it was last changed, and a project which list
+ * project's and counter group's layouts. Each layout says when it was last changed, and a project which list
  * it opens on; each has a way into its layout editor.
  */
 
@@ -95,8 +95,8 @@ const InitiativeLayouts = ({
   );
 };
 
-/** One instance's layouts (a project's, a queue's), opening its editor where
- *  the reader may change them and has the room the editor needs. */
+/** One instance's layouts (a project's, a counter group's), opening its editor
+ *  where the reader may change them and has the room the editor needs. */
 const InstanceLayouts = ({
   initiativeId,
   entry,

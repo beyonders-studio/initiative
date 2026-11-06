@@ -10,11 +10,11 @@ import {
   Upload,
   X,
 } from "lucide-react";
-import { useCallback, useEffect, useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { useTranslation } from "react-i18next";
 
-import type { FileType, ResourceGrantSchema } from "@/api/generated/initiativeAPI.schemas";
-import { SearchEntityType } from "@/api/generated/initiativeAPI.schemas";
+import type { FileRead, ResourceGrantSchema } from "@/api/generated/initiativeAPI.schemas";
+import { FileType, SearchEntityType } from "@/api/generated/initiativeAPI.schemas";
 import { CreateAccessSection } from "@/components/access/CreateAccessSection";
 import { DEFAULT_GRANTS } from "@/components/access/grants";
 import { AsyncCombobox } from "@/components/ui/async-combobox";
@@ -30,6 +30,7 @@ import {
 import { FileDropArea } from "@/components/ui/file-drop";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
+import { Progress } from "@/components/ui/progress";
 import {
   Select,
   SelectContent,
@@ -39,16 +40,12 @@ import {
 } from "@/components/ui/select";
 import { Switch } from "@/components/ui/switch";
 import { Tabs, TabsBar, TabsContent, TabsTrigger } from "@/components/ui/tabs";
-import { useAppConfig } from "@/hooks/useAppConfig";
 import { useCreateFile, useUploadFile } from "@/hooks/useFiles";
 import { useInitiative } from "@/hooks/useInitiatives";
 import { useCommunityPickerSuggestions } from "@/hooks/useSearch";
-import {
-  FILE_UPLOAD_ACCEPT,
-  formatBytes,
-  getFileTypeLabel,
-  nameWithoutExtension,
-} from "@/lib/fileUtils";
+import type { EditorFileType } from "@/lib/fileTypes";
+import { formatBytes, getFileTypeLabel, nameWithoutExtension } from "@/lib/fileUtils";
+import { numberFormat } from "@/lib/intl";
 import { toast } from "@/lib/mascotToast";
 import { matchSmartLinkProvider, SUPPORTED_PROVIDER_BADGES } from "@/lib/smartLinkProviders";
 import type { DialogProps } from "@/types/dialog";
@@ -59,14 +56,14 @@ type CreateFileDialogProps = DialogProps & {
   /** If provided, the created file will be auto-attached to this project */
   projectId?: number;
   /** Called after successful creation/upload */
-  onSuccess?: (file: { id: number }) => void;
+  onSuccess?: (file: FileRead) => void;
   /** A file dropped on the page to open this; the dialog opens on Upload holding it. */
   initialFile?: File | null;
 };
 
 /** The file types made from scratch here; files come in by upload, and
  *  smart links from their own tab. */
-type NewFileType = Exclude<FileType, "file" | "smart_link">;
+type NewFileType = Exclude<EditorFileType, typeof FileType.url>;
 
 export const CreateFileDialog = ({
   open,
@@ -76,8 +73,11 @@ export const CreateFileDialog = ({
   onSuccess,
   initialFile = null,
 }: CreateFileDialogProps) => {
-  const { t } = useTranslation(["files", "common"]);
-  const { maxUploadBytes } = useAppConfig();
+  const { t, i18n } = useTranslation(["files", "common"]);
+  const percent = numberFormat(i18n.resolvedLanguage ?? i18n.language, {
+    style: "percent",
+    maximumFractionDigits: 0,
+  });
 
   const [createDialogTab, setCreateDialogTab] = useState<"new" | "upload" | "smartLink">("new");
   const [newTitle, setNewTitle] = useState("");
@@ -87,10 +87,13 @@ export const CreateFileDialog = ({
   const [selectedTemplateLabel, setSelectedTemplateLabel] = useState<string | null>(null);
   const [templateSearch, setTemplateSearch] = useState("");
   const [isTemplateFile, setIsTemplateFile] = useState(false);
-  const [newFileType, setNewFileType] = useState<NewFileType>("native");
+  const [newFileType, setNewFileType] = useState<NewFileType>(FileType.lexical);
   const [selectedFile, setSelectedFile] = useState<File | null>(null);
   const [smartLinkUrl, setSmartLinkUrl] = useState("");
   const [grants, setGrants] = useState<ResourceGrantSchema[]>([...DEFAULT_GRANTS]);
+  // How much of the file being uploaded has arrived, and how to stop it.
+  const [sent, setSent] = useState(0);
+  const sending = useRef<AbortController | null>(null);
 
   const initiative = useInitiative(open ? initiativeId : null).data;
 
@@ -127,10 +130,14 @@ export const CreateFileDialog = ({
         setNewTitle(nameWithoutExtension(initialFile.name));
       }
     } else {
+      // Closing the dialog stops an upload still under way.
+      sending.current?.abort();
+      sending.current = null;
+      setSent(0);
       setNewTitle("");
       clearTemplate();
       setIsTemplateFile(false);
-      setNewFileType("native");
+      setNewFileType(FileType.lexical);
       setSelectedFile(null);
       setSmartLinkUrl("");
       setCreateDialogTab("new");
@@ -146,7 +153,7 @@ export const CreateFileDialog = ({
   }, [isTemplateFile, selectedTemplateId, clearTemplate]);
 
   // Clear template when the file type changes so we don't accidentally
-  // copy a native template into a whiteboard (or vice versa).
+  // copy a text template into a whiteboard (or vice versa).
   useEffect(() => {
     clearTemplate();
   }, [newFileType, clearTemplate]);
@@ -168,10 +175,6 @@ export const CreateFileDialog = ({
   });
 
   const handleFileSelect = (file: File) => {
-    if (maxUploadBytes !== null && file.size > maxUploadBytes) {
-      toast.error(t("create.fileTooLarge"));
-      return;
-    }
     setSelectedFile(file);
     if (!newTitle.trim()) {
       setNewTitle(nameWithoutExtension(file.name));
@@ -253,9 +256,11 @@ export const CreateFileDialog = ({
                   <SelectValue />
                 </SelectTrigger>
                 <SelectContent>
-                  <SelectItem value="native">{t("create.fileTypeText")}</SelectItem>
-                  <SelectItem value="whiteboard">{t("create.fileTypeWhiteboard")}</SelectItem>
-                  <SelectItem value="spreadsheet">{t("create.fileTypeSpreadsheet")}</SelectItem>
+                  <SelectItem value={FileType.lexical}>{t("create.fileTypeText")}</SelectItem>
+                  <SelectItem value={FileType.excalidraw}>
+                    {t("create.fileTypeWhiteboard")}
+                  </SelectItem>
+                  <SelectItem value={FileType.sheet}>{t("create.fileTypeSpreadsheet")}</SelectItem>
                 </SelectContent>
               </Select>
             </div>
@@ -349,11 +354,7 @@ export const CreateFileDialog = ({
                   </Button>
                 </div>
               ) : (
-                <FileDropArea
-                  accept={FILE_UPLOAD_ACCEPT}
-                  onFile={handleFileSelect}
-                  prompt={t("create.dropPrompt")}
-                />
+                <FileDropArea onFile={handleFileSelect} prompt={t("create.dropPrompt")} />
               )}
               <p className="whitespace-pre-line text-muted-foreground text-xs">
                 {t("create.fileHelp")}
@@ -426,6 +427,10 @@ export const CreateFileDialog = ({
           defaultOpen={false}
         />
 
+        {uploadFile.isPending ? (
+          <Progress value={sent * 100} aria-label={t("create.uploadingFile")} />
+        ) : null}
+
         <DialogFooter>
           {createDialogTab === "new" ? (
             <Button
@@ -460,12 +465,16 @@ export const CreateFileDialog = ({
               onClick={() => {
                 const trimmedTitle = newTitle.trim();
                 if (!selectedFile || !trimmedTitle) return;
+                sending.current = new AbortController();
+                setSent(0);
                 uploadFile.mutate({
                   file: selectedFile,
                   name: trimmedTitle,
                   initiative_id: initiativeId,
                   project_id: projectId,
                   grants,
+                  signal: sending.current.signal,
+                  onProgress: (arrived, total) => setSent(total ? arrived / total : 1),
                 });
               }}
               disabled={!canSubmitUpload}
@@ -473,7 +482,7 @@ export const CreateFileDialog = ({
               {uploadFile.isPending ? (
                 <>
                   <Loader2 className="h-4 w-4 animate-spin" />
-                  {t("create.uploadingFile")}
+                  {t("create.uploadingProgress", { percent: percent.format(sent) })}
                 </>
               ) : (
                 t("create.uploadFile")
@@ -489,7 +498,7 @@ export const CreateFileDialog = ({
                   name: trimmedTitle,
                   initiative_id: initiativeId,
                   project_id: projectId,
-                  file_type: "smart_link",
+                  file_type: FileType.url,
                   content: { url: trimmedSmartLinkUrl },
                   grants,
                 });

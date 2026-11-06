@@ -36,8 +36,8 @@ class RenderItem:
 
     ``format`` / ``template_id`` override the request's values for THIS item —
     the aggregate sources mix formats in one batch (a backup zips envelopes
-    beside file blobs; an à-la-carte report zips a project PDF beside a queue
-    CSV). ``None`` inherits the request value, so single-format sources are
+    beside file blobs; an à-la-carte report zips a project PDF beside a
+    counter group CSV). ``None`` inherits the request value, so single-format sources are
     untouched."""
 
     key: str
@@ -69,9 +69,9 @@ class RenderedArtifact:
     decides where the bytes go (inline response vs the guild storage backend),
     so filesystem/object-store access stays confined to the engine layer.
 
-    ``filename`` overrides the default ``{key}.{format}`` download name —
-    passthrough artifacts (an uploaded file exported unconverted) keep their
-    original name and extension this way."""
+    ``filename`` overrides the default ``{key}.{format}`` download name. An
+    uploaded file exported unconverted is never an artifact: the engine
+    copies it from storage under its own name."""
 
     key: str
     content_type: str

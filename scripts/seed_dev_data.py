@@ -1,12 +1,13 @@
 """TTRPG-themed dev data seeder for Initiative.
 
 Usage:
-    python seed_dev_data.py          # Create test data
-    python seed_dev_data.py --clean  # Remove seeded test data
+    python seed_dev_data.py           # Create test data
+    python seed_dev_data.py --clean   # Remove seeded test data
+    python seed_dev_data.py --status  # none, partial or complete
 
 Designed to run from the backend/ directory (CWD) so app imports resolve.
-Saves created IDs to .vscode/.dev_seed_ids.json. The dataset itself lives in
-``scripts/seed/``, one module per area; this file runs them in order.
+Whether the database is seeded is read from the database itself. The dataset
+lives in ``scripts/seed/``, one module per area; this file runs them in order.
 
 Creates 3 communities with multiple users, initiatives, projects, tasks, files,
 tags, and comments to exercise all features of the app, plus six small communities
@@ -54,30 +55,23 @@ from seed import (  # noqa: E402
     access_grants,
     accounts,
     calendars,
+    collections,
     comments,
     counters,
     dashboards,
     directory,
     files,
-    galleries,
     guilds,
     initiatives,
     operations,
     posts,
     projects,
     properties,
-    queues,
     tags,
     tickets,
     wikis,
 )
-from seed.state import (  # noqa: E402
-    clean,
-    load_state,
-    mark_seed_incomplete,
-    save_state,
-    state_outlived_its_database,
-)
+from seed.state import clean, seed_status  # noqa: E402
 
 #: Each community's content, in the order it is written. Tags come first so
 #: anything can carry one; archiving waits for the end (see ``projects``).
@@ -87,34 +81,28 @@ AREAS = (
     projects,
     files,
     comments,
-    queues,
     counters,
     dashboards,
     calendars,
     properties,
     posts,
-    galleries,
+    collections,
     wikis,
 )
 
 
 async def seed() -> None:
-    state = load_state()
-    if state is not None and await state_outlived_its_database(state):
-        print("The recorded seed data is gone (the database was recreated).")
-        print("  Seeding again from scratch.")
-        state = None
-    if state is not None:
-        if state.get("seed_incomplete"):
-            print("A previous seed was interrupted and left partial data.")
-            print("  Run with --clean, then dev-migrate, then seed again.")
-        else:
-            print("Seed data already exists (.vscode/.dev_seed_ids.json found).")
-            print("  Run with --clean first to remove existing data.")
+    status = await seed_status()
+    if status == "partial":
+        print("A previous seed was interrupted and left partial data.")
+        print("  Run with --clean, then dev-migrate, then seed again.")
+        return
+    if status == "complete":
+        print("Seed data already exists.")
+        print("  Run with --clean first to remove existing data.")
         return
 
     print("Seeding dev data (3 communities, multiple users)...")
-    mark_seed_incomplete()
     ids: defaultdict[str, list] = defaultdict(list)
 
     async with SystemSessionLocal() as session:
@@ -135,10 +123,6 @@ async def seed() -> None:
         print("\n  --- Community directory ---")
         await directory.seed(session, ids, users, seeded["tides"])
 
-        print("\n  Creating PAM access grants...")
-        await access_grants.seed(
-            session, ids, users, {key: guild.id for key, guild in seeded.items()}
-        )
         # Last, so it covers every community the run created — including the
         # directory fillers, which are seeded after communities 1-3.
         seated = await guilds.seat_superadmin(session, users["Community Superadmin"])
@@ -160,7 +144,12 @@ async def seed() -> None:
         filed = await tickets.seed(session, users, seeded["primary"])
         print(f"  {filed} cases waiting in {operations.OPERATIONS_GUILD_NAME}")
 
-    save_state(ids)
+        # Last of all: seed_status reads the grants as the sign a seed finished.
+        print("\n  Creating PAM access grants...")
+        await access_grants.seed(
+            session, ids, users, {key: guild.id for key, guild in seeded.items()}
+        )
+        await session.commit()
 
     print("\nDone! Dev data seeded successfully.")
     print(f"  {len(ids['users'])} users (password: changeme)")
@@ -170,7 +159,6 @@ async def seed() -> None:
     )
     print(f"  {len(ids['projects'])} projects, {len(ids['tasks'])} tasks")
     print(f"  {len(ids['files'])} files, {len(ids['tags'])} tags")
-    print(f"  {len(ids['queues'])} queues, {len(ids['queue_items'])} queue items")
     print(
         f"  {len(ids['counter_groups'])} counter groups, "
         f"{len(ids['counters'])} counters"
@@ -180,9 +168,9 @@ async def seed() -> None:
         f"{len(ids['calendar_event_attendees'])} attendees"
     )
     print(
-        f"  {len(ids['galleries'])} galleries, "
-        f"{len(ids['gallery_images'])} pictures "
-        f"({len(ids['gallery_image_versions'])} versions)"
+        f"  {len(ids['collections'])} collections holding "
+        f"{len(ids['collection_files'])} pictures "
+        f"({len(ids['file_versions'])} versions)"
     )
     print(
         f"  {len(ids['posts'])} posts "
@@ -219,5 +207,14 @@ async def seed() -> None:
     print("    (the compliance seat, in every seeded community)")
 
 
+async def print_status() -> None:
+    print(await seed_status())
+
+
 if __name__ == "__main__":
-    asyncio.run(clean() if "--clean" in sys.argv else seed())
+    if "--clean" in sys.argv:
+        asyncio.run(clean())
+    elif "--status" in sys.argv:
+        asyncio.run(print_status())
+    else:
+        asyncio.run(seed())

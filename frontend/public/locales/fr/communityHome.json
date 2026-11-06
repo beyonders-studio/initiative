@@ -96,19 +96,34 @@
       "files": "Type",
       "calendars": "Description",
       "dashboards": "Origine",
-      "posts": "Aperçu"
+      "posts": "Aperçu",
+      "contacts": "Téléphone ou e-mail"
     }
   },
   "detail": {
     "tasksDone": "{{completed}} tâches sur {{total}}",
     "fromMarketplace": "Place de marché",
     "builtHere": "Créé ici",
-    "fileType": {
-      "native": "Document texte",
-      "file": "Fichier",
+    "fileKind": {
+      "document": "Document",
+      "spreadsheet": "Feuille de calcul",
+      "presentation": "Présentation",
       "whiteboard": "Tableau blanc",
-      "smart_link": "Lien",
-      "spreadsheet": "Feuille de calcul"
+      "pdf": "PDF",
+      "image": "Image",
+      "video": "Vidéo",
+      "audio": "Audio",
+      "text": "Texte",
+      "compressed": "Compressé",
+      "design": "Design",
+      "3d": "3D",
+      "font": "Police",
+      "raw": "Photo RAW",
+      "code": "Code",
+      "ebook": "Livre numérique",
+      "cad": "CAO",
+      "link": "Lien",
+      "other": "Autre"
     }
   },
   "recentComments": {
@@ -135,5 +150,15 @@
       "projectEnd": "Fin du projet",
       "pollCloses": "Fin du sondage"
     }
+  },
+  "catchUp": {
+    "button": "Mettez-moi au courant",
+    "title": "Mettez-moi au courant",
+    "intro": "Un court résumé de ce qui a changé et que vous pouvez voir depuis votre dernière visite.",
+    "action": "Mettez-moi au courant",
+    "writing": "Mise à jour en cours…",
+    "cut": "Rédigé à partir des {{percent}} % de changements les plus susceptibles de vous concerner. Le reste ne tenait pas.",
+    "since": "Depuis le {{date}}",
+    "empty": "Rien de nouveau depuis votre dernière visite."
   }
 }

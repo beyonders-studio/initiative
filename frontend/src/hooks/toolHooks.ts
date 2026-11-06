@@ -40,6 +40,17 @@ import {
   updateCalendar,
 } from "@/api/generated/calendars/calendars";
 import {
+  createContact,
+  deleteContact,
+  duplicateContact,
+  getListContactsQueryKey,
+  getReadContactQueryKey,
+  listContacts,
+  readContact,
+  setContactGrants,
+  updateContact,
+} from "@/api/generated/contacts/contacts";
+import {
   createCounterGroup,
   deleteCounterGroup,
   duplicateCounterGroup,
@@ -72,17 +83,6 @@ import {
   setFileGrants,
   updateFile,
 } from "@/api/generated/files/files";
-import {
-  createGallery,
-  deleteGallery,
-  duplicateGallery,
-  getListGalleriesQueryKey,
-  getReadGalleryQueryKey,
-  listGalleries,
-  readGallery,
-  setGalleryGrants,
-  updateGallery,
-} from "@/api/generated/galleries/galleries";
 import type {
   ListFilesParams,
   ResourceGrantSchema,
@@ -91,22 +91,20 @@ import type {
 import { Tool } from "@/api/generated/initiativeAPI.schemas";
 import {
   getListMyCalendarsQueryKey,
+  getListMyContactsQueryKey,
   getListMyCounterGroupsQueryKey,
   getListMyDashboardsQueryKey,
   getListMyFilesQueryKey,
-  getListMyGalleriesQueryKey,
   getListMyPostsQueryKey,
   getListMyProjectsQueryKey,
-  getListMyQueuesQueryKey,
   getListMyWikisQueryKey,
   listMyCalendars,
+  listMyContacts,
   listMyCounterGroups,
   listMyDashboards,
   listMyFiles,
-  listMyGalleries,
   listMyPosts,
   listMyProjects,
-  listMyQueues,
   listMyWikis,
 } from "@/api/generated/my-tools/my-tools";
 import {
@@ -131,17 +129,6 @@ import {
   setProjectGrants,
   updateProject,
 } from "@/api/generated/projects/projects";
-import {
-  createQueue,
-  deleteQueue,
-  duplicateQueue,
-  getListQueuesQueryKey,
-  getReadQueueQueryKey,
-  listQueues,
-  readQueue,
-  setQueueGrants,
-  updateQueue,
-} from "@/api/generated/queues/queues";
 import {
   createWiki,
   deleteWiki,
@@ -478,6 +465,21 @@ const calendarEndpoints = {
   tool: Tool.calendar,
 };
 
+const contactEndpoints = {
+  listKey: getListContactsQueryKey,
+  list: listContacts,
+  myListKey: getListMyContactsQueryKey,
+  myList: listMyContacts,
+  detailKey: getReadContactQueryKey,
+  detail: readContact,
+  create: createContact,
+  update: updateContact,
+  remove: deleteContact,
+  setGrants: setContactGrants,
+  duplicate: duplicateContact,
+  tool: Tool.contact,
+};
+
 const counterGroupEndpoints = {
   listKey: getListCounterGroupsQueryKey,
   list: listCounterGroups,
@@ -542,21 +544,6 @@ const fileHooks = {
   useSetGrants: grantsHook(fileEndpoints, "files:settings.updateAccessError"),
 };
 
-const galleryEndpoints = {
-  listKey: getListGalleriesQueryKey,
-  list: listGalleries,
-  myListKey: getListMyGalleriesQueryKey,
-  myList: listMyGalleries,
-  detailKey: getReadGalleryQueryKey,
-  detail: readGallery,
-  create: createGallery,
-  update: updateGallery,
-  remove: deleteGallery,
-  setGrants: setGalleryGrants,
-  duplicate: duplicateGallery,
-  tool: Tool.gallery,
-};
-
 const postEndpoints = {
   listKey: getListPostsQueryKey,
   list: listPosts,
@@ -585,21 +572,6 @@ const projectEndpoints = {
   setGrants: setProjectGrants,
   duplicate: duplicateProject,
   tool: Tool.project,
-};
-
-const queueEndpoints = {
-  listKey: getListQueuesQueryKey,
-  list: listQueues,
-  myListKey: getListMyQueuesQueryKey,
-  myList: listMyQueues,
-  detailKey: getReadQueueQueryKey,
-  detail: readQueue,
-  create: createQueue,
-  update: updateQueue,
-  remove: deleteQueue,
-  setGrants: setQueueGrants,
-  duplicate: duplicateQueue,
-  tool: Tool.queue,
 };
 
 const wikiEndpoints = {
@@ -662,7 +634,6 @@ interface ToolQueries {
 export const TOOL_HOOKS = {
   [Tool.project]: makeToolHooks(projectEndpoints, { seedsDetailOnUpdate: true }),
   [Tool.file]: fileHooks,
-  [Tool.queue]: makeToolHooks(queueEndpoints),
   [Tool.counter_group]: makeToolHooks(counterGroupEndpoints),
   [Tool.calendar]: makeToolHooks(calendarEndpoints, { seedsDetailOnUpdate: true }),
   [Tool.dashboard]: makeToolHooks(dashboardEndpoints, { seedsDetailOnUpdate: true }),
@@ -670,8 +641,8 @@ export const TOOL_HOOKS = {
     seedsDetailOnUpdate: true,
     refreshesRelationships: true,
   }),
-  [Tool.gallery]: makeToolHooks(galleryEndpoints, { seedsDetailOnUpdate: true }),
   [Tool.wiki]: makeToolHooks(wikiEndpoints),
+  [Tool.contact]: makeToolHooks(contactEndpoints, { seedsDetailOnUpdate: true }),
 } satisfies Record<Tool, ToolQueries>;
 
 /**

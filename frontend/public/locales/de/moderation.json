@@ -43,17 +43,15 @@
     "task": "Eine Aufgabe",
     "file": "Eine Datei",
     "project": "Ein Projekt",
-    "queue": "Eine Warteschlange",
-    "queue_item": "Ein Eintrag",
-    "gallery": "Eine Galerie",
-    "gallery_image": "Ein Bild",
     "calendar": "Ein Kalender",
     "calendar_event": "Ein Termin",
     "counter": "Ein Zähler",
     "counter_group": "Eine Zählergruppe",
     "dashboard": "Ein Dashboard",
     "wiki": "Ein Wiki",
-    "wiki_page": "Eine Wiki-Seite"
+    "wiki_page": "Eine Wiki-Seite",
+    "contact": "Ein Kontakt",
+    "collection": "Eine Sammlung"
   },
   "paging": {
     "newer": "Neuer",

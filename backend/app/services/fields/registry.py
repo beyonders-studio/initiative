@@ -49,23 +49,20 @@ _BUILDERS: dict[str, Callable[[], Dataset]] = {
     "task_types": task_types_dataset.build,
     "task_assignees": task_assignees_dataset.build,
     "members": members_dataset.build,
-    "property_definitions": property_datasets.build_property_definitions,
-    "property_values": property_datasets.build_property_values,
+    "metadata_definitions": property_datasets.build_metadata_definitions,
+    "metadata_values": property_datasets.build_metadata_values,
     "relationships": relationships_dataset.build,
     # The datasets that are simply a tool. Declared together because there is
     # nothing to say about any of them individually (app.services.fields.tools).
     "files": tool_datasets.build_files,
     "file_versions": tool_datasets.build_file_versions,
-    "queues": tool_datasets.build_queues,
-    "queue_items": tool_datasets.build_queue_items,
     "calendars": tool_datasets.build_calendars,
     "dashboards": tool_datasets.build_dashboards,
     "posts": tool_datasets.build_posts,
-    "galleries": tool_datasets.build_galleries,
-    "gallery_images": tool_datasets.build_gallery_images,
-    "gallery_image_versions": tool_datasets.build_gallery_image_versions,
+    "collections": tool_datasets.build_collections,
     "wikis": tool_datasets.build_wikis,
     "wiki_pages": tool_datasets.build_wiki_pages,
+    "contacts": tool_datasets.build_contacts,
 }
 
 
@@ -170,7 +167,7 @@ def sort_expression(dataset_name: str, field_name: str, ctx: SortContext) -> Any
     return sort_fields(dataset_name, ctx)[field_name]
 
 
-def describe(dataset_name: str) -> list[dict[str, Any]]:
+def describe(source: Dataset) -> list[dict[str, Any]]:
     """The dataset's fields as a client offers them, in the order it lists them.
 
     Deliberately not the resolvers: what a field compiles to is ours, and what
@@ -189,7 +186,7 @@ def describe(dataset_name: str) -> list[dict[str, Any]]:
             "sortable": spec.sortable,
             "options": list(spec.options),
         }
-        for spec in dataset(dataset_name).offered
+        for spec in source.offered
     ]
 
 

@@ -212,7 +212,7 @@ TOKEN_PURPOSE = Guc("app.token_purpose", Kind.TEXT)
 STANDING_GUILD_ID = Guc("app.standing_guild_id", Kind.INT, standing=True)
 GUILD_ADMIN = Guc("app.guild_admin", Kind.BOOL, standing=True)
 GUILD_SEAT = Guc("app.guild_seat", Kind.BOOL, standing=True, read_once=True)
-#: The rung a membership or a live settings grant administers at, or ``''``.
+#: The rung a live settings grant lends, or ``''``.
 SETTINGS_RUNG = Guc("app.settings_rung", Kind.TEXT, standing=True, read_once=True)
 #: A live content grant covers the request, at read / read_write.
 PAM_READ = Guc("app.pam_read", Kind.BOOL, standing=True)
@@ -242,20 +242,30 @@ GUEST = Guc("app.guest", Kind.BOOL, standing=True)
 #: A guest's initiatives of the items shared with them one at a time. Empty
 #: for everyone else.
 GUEST_ITEM_INITIATIVES = Guc("app.guest_item_initiatives", Kind.IDS, standing=True)
+#: The surfaces the deployment has closed for the community: the ``surface.*``
+#: keys of ``app.core.rules`` whose deployment row says off.
+CLOSED_SURFACES = Guc("app.closed_surfaces", Kind.NAMES, standing=True)
+#: ``"<tool>=on"`` / ``"<tool>=off"`` where the community set a tool's switch
+#: for every initiative in it (``app.models.tenant.initiative.INITIATIVE_TOOL_KEYS``).
+COMMUNITY_TOOLS = Guc("app.community_tools", Kind.NAMES, standing=True)
+#: The admin surfaces the reader holds here
+#: (``app.models.platform.guild.AdminSurface``): a custom role's, or else
+#: every one for the admin rung and none below it.
+HELD_SURFACES = Guc("app.held_surfaces", Kind.NAMES, standing=True)
 
 # --- Somebody who filed a case ------------------------------------------------
 #: The tasks of the cases the routed account filed, read by the filer seam
 #: through the filer role's own row on ``intake_cases``. What the filer
-#: policies on a case's task and its comments admit, so neither has to read
-#: ``intake_cases`` back — whose own policy reads ``tasks``.
+#: policies on a case's task, its comments and its evidence admit, so none has
+#: to read ``intake_cases`` back — whose own policy reads ``tasks``.
 FILER_CASES = Guc("app.filer_cases", Kind.IDS, read_once=True)
 
 # --- Per-transaction flags ----------------------------------------------------
 #: Transaction-local flag marking a transaction as a purge.
 #:
 #: Purge is the one lifecycle step that writes frozen content rather than only
-#: removing it: a file being purged leaves wikilinks behind in the files
-#: that pointed at it, and those are unresolved before the row goes — including
+#: removing it: a file being purged leaves references behind in the files
+#: that pointed at it, and those are unlinked before the row goes — including
 #: in files that are themselves in the trash, which would otherwise be
 #: restored holding a link to nothing.
 #:

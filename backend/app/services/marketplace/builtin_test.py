@@ -24,8 +24,12 @@ from sqlmodel import col, select
 
 from app.models.platform.guild import CommunityRole
 from app.models.platform.marketplace import MarketplaceListing
-from app.models.tenant.property import PropertyValue
-from app.models.tenant.task import Task
+from app.models.tenant.metadata import (
+    MetadataDefinition,
+    MetadataType,
+    MetadataValue,
+)
+from app.models.tenant.task import Task, TaskType
 from app.models.tenant.tool_layout import ToolLayout
 from app.services.marketplace import catalog as catalog_service
 from app.services.marketplace.builtin import (
@@ -50,12 +54,38 @@ async def _seeded(session) -> dict[str, MarketplaceListing]:
     return {listing.public_id: listing for listing in listings}
 
 
-def _listed_tasks(envelope: dict) -> list[tuple[str, bool, int]]:
-    """Each task a project listing ships: its title, whether it repeats, and
-    how many property values it carries."""
+def _default_type(envelope: dict) -> str:
+    """The type a listing's task is when it names none."""
+    return next(t["name"] for t in envelope["task_types"] if t["is_default"])
+
+
+def _listed_tasks(envelope: dict) -> list[tuple[str, bool, int, str]]:
+    """Each task a project listing ships: its title, whether it repeats, how
+    many property values it carries, and its type."""
     return sorted(
-        (task["title"], task.get("recurrence") is not None, len(task["properties"]))
+        (
+            task["title"],
+            task.get("recurrence") is not None,
+            len(task["properties"]),
+            task.get("type_name") or _default_type(envelope),
+        )
         for task in envelope["tasks"]
+    )
+
+
+def _listed_layouts(envelope: dict) -> list[tuple[str, str | None]]:
+    """Each layout a project listing ships, and the type a task page is for."""
+    types = [t["name"] for t in envelope["task_types"]]
+    return sorted(
+        (
+            layout["kind"],
+            None
+            if layout["kind"] != "task"
+            else types[layout["task_type"] - 1]
+            if layout.get("task_type")
+            else _default_type(envelope),
+        )
+        for layout in envelope.get("layouts", [])
     )
 
 
@@ -67,19 +97,91 @@ async def _installed_tasks(session, guild_id: int, project_id: int):
     ).all()
     valued = (
         await session.exec(
-            select(PropertyValue.entity_id).where(
-                PropertyValue.entity_type == "task",
-                col(PropertyValue.entity_id).in_([task.id for task in tasks]),
+            select(MetadataValue.entity_id).where(
+                MetadataValue.entity_type == "task",
+                col(MetadataValue.entity_id).in_([task.id for task in tasks]),
             )
         )
     ).all()
+    types = {
+        task_type.id: task_type.name
+        for task_type in (
+            await session.exec(
+                select(TaskType).where(TaskType.project_id == project_id)
+            )
+        ).all()
+    }
     return sorted(
-        (task.title, task.recurrence is not None, valued.count(task.id))
+        (
+            task.title,
+            task.recurrence is not None,
+            valued.count(task.id),
+            types[task.task_type_id],
+        )
         for task in tasks
     )
 
 
+async def _installed_layouts(session, project_id: int):
+    """The same of the layouts an install stored."""
+    types = {
+        task_type.id: task_type.name
+        for task_type in (
+            await session.exec(
+                select(TaskType).where(TaskType.project_id == project_id)
+            )
+        ).all()
+    }
+    rows = await session.exec(
+        select(ToolLayout.kind, ToolLayout.task_type_id).where(
+            ToolLayout.tool_id == project_id
+        )
+    )
+    return sorted(
+        (kind, None if task_type_id is None else types[task_type_id])
+        for kind, task_type_id in rows.all()
+    )
+
+
+async def _initiative_metadata(session, initiative_id: int) -> list[str]:
+    """The names of the initiative's own metadata."""
+    rows = await session.exec(
+        select(MetadataDefinition.name).where(
+            MetadataDefinition.of_initiative(initiative_id)
+        )
+    )
+    return list(rows.all())
+
+
 class TestShippedManifests:
+    def test_every_shipped_project_has_its_own_types_and_their_pages(self):
+        """A project listing without types installs the four every new project
+        starts with, which name nothing the project is for. Each type it lists
+        is laid out for what it is, and the blank and the example agree."""
+        for manifest in load_builtin_manifests():
+            if manifest["kind"] != "project":
+                continue
+            envelopes = [manifest["definition"], manifest.get("example")]
+            for envelope in filter(None, envelopes):
+                types = envelope.get("task_types") or []
+                assert types, manifest["public_id"]
+                pages = {
+                    layout.get("task_type")
+                    for layout in envelope["layouts"]
+                    if layout["kind"] == "task"
+                }
+                assert pages == set(range(1, len(types) + 1)), manifest["public_id"]
+                names = {t["name"] for t in types}
+                assert {task.get("type_name") for task in envelope["tasks"]} <= names, (
+                    manifest["public_id"]
+                )
+            if manifest.get("example"):
+                for key in ("task_types", "layouts", "task_statuses"):
+                    assert manifest["definition"][key] == manifest["example"][key], (
+                        manifest["public_id"],
+                        key,
+                    )
+
     async def test_every_shipped_manifest_passes_the_validator(self):
         """The manifest-level checks, on every file, with no database in the way.
 
@@ -241,13 +343,75 @@ class TestShippedManifests:
                         start_from,
                     )
                     # An import leaves out a layout it cannot keep, so each one
-                    # listed has to land.
-                    layouts = await session.exec(
-                        select(ToolLayout.kind).where(ToolLayout.tool_id == project_id)
-                    )
-                    assert sorted(layouts.all()) == sorted(
-                        layout["kind"] for layout in shipped.get("layouts", [])
-                    ), (manifest["public_id"], start_from)
+                    # listed has to land, a task page on the type it is for.
+                    assert await _installed_layouts(
+                        session, project_id
+                    ) == _listed_layouts(shipped), (manifest["public_id"], start_from)
+        # A ready-made project's fields are its own properties: installing
+        # every one adds nothing to the initiative's metadata.
+        assert await _initiative_metadata(session, actor.initiative.id) == []
+
+    async def test_a_shipped_project_brings_its_own_properties(
+        self, client, acting_user, session
+    ):
+        """Installing a ready-made project makes its fields on the project,
+        none among the initiative's metadata, with the example's values on its
+        tasks, money in its currency, and its layouts naming them."""
+        manifest = next(
+            m
+            for m in load_builtin_manifests()
+            if m["public_id"] == "core.sales-pipeline"
+        )
+        await catalog_service.upsert_listing(session, manifest, source="builtin")
+        await session.commit()
+        actor = await acting_user(guild_role=CommunityRole.member, initiative=True)
+
+        response = await client.post(
+            actor.g(f"/marketplace/listings/by-uid/{manifest['uid']}/install"),
+            json={"initiative_id": actor.initiative.id, "start_from": "example"},
+            headers=actor.headers,
+        )
+        assert response.status_code == 201, response.text
+        project_id = response.json()["result"]["entity_id"]
+
+        await route_session_to_guild(session, actor.guild.id)
+        made = {
+            defn.name: defn
+            for defn in await session.exec(
+                select(MetadataDefinition).where(
+                    MetadataDefinition.project_id == project_id
+                )
+            )
+        }
+        assert set(made) == {"Company", "Contact", "Value", "Next step", "Source"}
+        assert await _initiative_metadata(session, actor.initiative.id) == []
+        value = made["Value"]
+        assert (value.type, value.currency) == (MetadataType.currency, "USD")
+        deal = (
+            await session.exec(
+                select(Task.id).where(
+                    Task.project_id == project_id, Task.title == "Copper Kettle Café"
+                )
+            )
+        ).one()
+        amounts = await session.exec(
+            select(MetadataValue.value_number).where(
+                MetadataValue.entity_type == "task",
+                MetadataValue.entity_id == deal,
+                MetadataValue.property_id == value.id,
+            )
+        )
+        assert amounts.all() == [1200]
+        table = (
+            await session.exec(
+                select(ToolLayout.definition).where(
+                    ToolLayout.tool == "project",
+                    ToolLayout.tool_id == project_id,
+                    ToolLayout.kind == "table",
+                )
+            )
+        ).one()
+        assert f"property:{value.id}" in table["columns"]
 
 
 class TestWithdrawingWhatIsNoLongerShipped:

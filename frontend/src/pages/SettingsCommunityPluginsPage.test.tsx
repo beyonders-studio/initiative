@@ -18,6 +18,7 @@ import type { CommunityPluginUninstallNotice } from "@/api/generated/initiativeA
 import { SettingsCommunityPluginsPage } from "./SettingsCommunityPluginsPage";
 
 let notice: CommunityPluginUninstallNotice | undefined;
+let closedSurfaces: string[] | null = null;
 const openAddress = vi.fn();
 const uninstall = vi.hoisted(() => vi.fn());
 
@@ -30,7 +31,12 @@ vi.mock("@/hooks/useCommunities", async (importOriginal) => ({
   ...(await importOriginal<typeof import("@/hooks/useCommunities")>()),
   useCommunities: () => ({
     activeCommunityId: 1,
-    activeCommunity: { id: 1, role: "superadmin", can: communityCan("superadmin") },
+    activeCommunity: {
+      id: 1,
+      role: "superadmin",
+      can: communityCan("superadmin"),
+      closed_surfaces: closedSurfaces,
+    },
   }),
 }));
 vi.mock("@/hooks/useBillingPortal", () => ({
@@ -49,6 +55,7 @@ vi.mock("@/hooks/useCommunityPlugins", async (importOriginal) => ({
 
 beforeEach(() => {
   notice = undefined;
+  closedSurfaces = null;
   openAddress.mockReset();
   uninstall.mockReset();
   uninstall.mockResolvedValue(undefined);
@@ -106,5 +113,20 @@ describe("erasing its data", () => {
     await userEvent.click(screen.getByRole("button", { name: "Remove and erase" }));
 
     await waitFor(() => expect(uninstall).toHaveBeenCalledWith(1, 4, { erase: true }));
+  });
+});
+
+describe("when whoever runs the server manages plug-ins", () => {
+  it("lists what is installed, says so, and offers nothing to change", async () => {
+    closedSurfaces = ["plugins"];
+    renderPage(SettingsCommunityPluginsPage);
+
+    expect(
+      await screen.findByText("Whoever runs this server manages plug-ins for this community.")
+    ).toBeInTheDocument();
+    expect(screen.getByText("PaidCo")).toBeInTheDocument();
+    expect(screen.queryByRole("textbox", { name: "Rename" })).toBeNull();
+    expect(screen.queryByRole("button", { name: "Turn off" })).toBeNull();
+    expect(screen.queryByRole("button", { name: "Remove" })).toBeNull();
   });
 });

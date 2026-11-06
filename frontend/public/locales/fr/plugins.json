@@ -35,7 +35,8 @@
     "upToDate": "À jour",
     "upgraded": "Mise à jour vers {{version}}.",
     "removeManagedNeutral": "Les frais de ce plug-in sont gérés par votre fournisseur.",
-    "removeManagedAction": "Gérer"
+    "removeManagedAction": "Gérer",
+    "closed": "La personne qui gère ce serveur s'occupe des plug-ins de cette communauté."
   },
   "updates": {
     "wants": "La version {{version}} souhaite :",
@@ -250,7 +251,7 @@
       "comments": "Commentaires",
       "relationships": "Liens",
       "tags": "Étiquettes",
-      "properties": "Propriétés",
+      "properties": "Métadonnées",
       "sharing": "Partage",
       "members": "Membres",
       "initiatives": "Initiatives",
@@ -264,10 +265,6 @@
       "files": {
         "read": "Lire les fichiers",
         "write": "Lire et modifier les fichiers"
-      },
-      "queues": {
-        "read": "Lire les files",
-        "write": "Lire et modifier les files"
       },
       "counter_groups": {
         "read": "Lire les compteurs",
@@ -285,13 +282,13 @@
         "read": "Lire les publications",
         "write": "Lire et modifier les publications"
       },
-      "galleries": {
-        "read": "Lire les galeries",
-        "write": "Lire et modifier les galeries"
-      },
       "wikis": {
         "read": "Lire les wikis",
         "write": "Lire et modifier les wikis"
+      },
+      "contacts": {
+        "read": "Lire les contacts",
+        "write": "Lire et modifier les contacts"
       },
       "comments": {
         "read": "Lire les commentaires",
@@ -306,8 +303,8 @@
         "write": "Lire et modifier les étiquettes"
       },
       "properties": {
-        "read": "Lire les propriétés personnalisées et leurs options",
-        "write": "Lire, créer et modifier les propriétés personnalisées"
+        "read": "Lire les métadonnées de l'initiative et leurs options",
+        "write": "Lire, créer et modifier les métadonnées de l'initiative"
       },
       "sharing": {
         "read": "Voir qui a accès à quoi",

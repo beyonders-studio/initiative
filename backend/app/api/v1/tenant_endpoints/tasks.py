@@ -24,7 +24,6 @@ from app.api.deps import (
     GuildContextDep,
 )
 from app.core import recurrence
-from app.core.audit_events import AuditEventType
 from app.core.messages import ChecklistMessages, QueryMessages, TaskMessages
 from app.db.query import build_paginated_response, paginated_query
 from app.db.session import routed_guild_id
@@ -55,23 +54,22 @@ from app.schemas.tenant.task import (
 )
 from app.schemas.platform.user import UserPublic
 from app.services import ai_generation as ai_generation_service
-from app.services import audit as audit_service
 from app.services import notifications as notifications_service
-from app.services.ai_settings import resolve_ai_settings
 from app.services.fields.grouping import GroupingError, group_rows
 from app.services.tenant import archive as archive_service
 from app.services.tenant import attachments as attachments_service
 from app.services.tenant import column_limits
 from app.services.tenant import overwrites
+from app.services.tenant import required_fields
 from app.services.tenant import cases as cases_service
-from app.services.tenant import properties as properties_service
+from app.services.tenant import metadata as metadata_service
 from app.services.tenant import tags as tags_service
 from app.services.tenant import task_checklist as checklist_service
 from app.services.tenant import task_hierarchy
 from app.services.tenant import task_creation as task_creation_service
 from app.core.tools import KINDS, Tool
 from app.services.tenant import named_people
-from app.services.tenant import task_description as task_description_service
+from app.services.tenant import descriptions as descriptions_service
 from app.services.tenant import task_queries
 from app.services.tenant import task_series
 from app.services.tenant import task_statuses as task_statuses_service
@@ -268,7 +266,7 @@ async def list_tasks(
 ) -> TaskListResponse:
     q = await task_queries.parse_task_list_query(session, conditions, sorting, tz)
     if current_user is None:
-        task_queries.refuse_person_filters(q)
+        task_queries.read_person_filters(q)
 
     # Guild-scoped list. Cross-guild "my tasks" aggregates live under
     # /me/tasks (see list_my_tasks above).
@@ -315,6 +313,7 @@ async def create_task(
     guild_context: ProjectsWrite,
 ) -> Task:
     task = await _insert_task(task_in, session, current_user, guild_context)
+    await required_fields.refuse_missing(session, guild_context, task)
     await session.commit()
     return await _response(session, task.id)
 
@@ -411,7 +410,7 @@ async def _insert_task(
         raise
 
     if task.description:
-        await task_description_service.description_saved(
+        await descriptions_service.description_saved(
             session,
             task,
             previous=None,
@@ -425,7 +424,7 @@ async def _insert_task(
         )
 
     _touch_project(project, datetime.now(timezone.utc))
-    await properties_service.write_on_create(session, task, task_in.properties)
+    await metadata_service.write_on_create(session, task, task_in.properties)
     return task
 
 
@@ -452,7 +451,7 @@ async def list_task_groups(
     list shows them, and the groups each task is in."""
     q = await task_queries.parse_task_list_query(session, conditions, None, tz)
     if current_user is None:
-        task_queries.refuse_person_filters(q)
+        task_queries.read_person_filters(q)
     build = await task_queries.guild_task_query_builder(
         session, current_user, guild_context, q=q, include_archived=include_archived
     )
@@ -592,22 +591,35 @@ async def take_task_case(
 async def _case_grants(guild_id: int, task_id: int) -> list[AccessGrantRead]:
     """The access grants asked for case ``task_id``, where this community is
     the operations community the grants' cases are in. Read on the system
-    engine: grants are shared rows, and the reader of a case is not the
-    approver of its grants."""
-    from sqlmodel import select
+    engine: the case's links are the platform's, grants are shared rows, and
+    the reader of a case is not the approver of its grants."""
+    from sqlmodel import col, select
 
-    from app.db.session import SystemSessionLocal
+    from app.db import cohorts
+    from app.db.request_context import SystemGuild
+    from app.db.session import SystemSessionLocal, set_rls_context
     from app.models.platform.access_grant import AccessGrant
+    from app.models.tenant.case_grant import CaseGrant
     from app.services.platform import access_grants as access_grants_service
     from app.services.platform.intake import configured_operations_guild_id
 
     if await configured_operations_guild_id() != guild_id:
         return []
+    async with cohorts.system_session(guild_id) as linked:
+        await set_rls_context(linked, SystemGuild(guild_id, read_only=True))
+        grant_ids = (
+            await linked.exec(
+                select(CaseGrant.grant_id).where(CaseGrant.task_id == task_id)
+            )
+        ).all()
+        await linked.rollback()
+    if not grant_ids:
+        return []
     async with SystemSessionLocal() as system:
         grants = (
             await system.exec(
                 select(AccessGrant)
-                .where(AccessGrant.case_task_id == task_id)
+                .where(col(AccessGrant.id).in_(grant_ids))
                 .order_by(AccessGrant.requested_at.desc(), AccessGrant.id.desc())
             )
         ).all()
@@ -623,8 +635,39 @@ async def update_task(
     guild_context: ProjectsWrite,
 ) -> Task:
     task = await resource_access.load_child(session, Task, task_id, access="write")
-    project = task.project
+    previous_type = task.task_type_id
+    required = await required_fields.required_of(session, guild_context, task)
+    let_go, retyped = await _apply_update(
+        task_in, task, task.project, session, current_user, guild_context
+    )
+    # A task given another type meets what that type's page requires, as does
+    # each task of its series the edit gave the type too; any other edit only
+    # keeps what it held.
+    if task.task_type_id != previous_type:
+        await required_fields.refuse_missing(session, guild_context, task, *retyped)
+    else:
+        await required_fields.refuse_emptied(session, required)
+    await session.commit()
+    # A picture taken out of the description goes once the edit has landed.
+    released_images = await attachments_service.release_unshown(
+        guild_context.guild_id, let_go, pasted_only=True
+    )
+    attachments_service.delete_blobs(guild_context.guild_id, released_images)
+    return await _response(session, task.id)
 
+
+async def _apply_update(
+    task_in: TaskUpdate,
+    task: Task,
+    project: Project,
+    session: ActorSessionDep,
+    current_user: ActorUserDep,
+    guild_context: ProjectsWrite,
+) -> tuple[set[str], list[Task]]:
+    """Write ``task_in`` to ``task``, in ``project``, in the session's
+    transaction: what an update commits, and what a move sends with the task.
+    The uploads its description let go of, to release once it lands, and the
+    other tasks of its series it gave its new type."""
     update_data = task_in.model_dump(exclude_unset=True)
     if update_data.get("recurrence", task.recurrence) is None:
         update_data.setdefault("recurrence_limit", None)
@@ -659,6 +702,7 @@ async def update_task(
         ]
     tag_ids = update_data.pop("tag_ids", None)
     update_data.pop("properties", None)
+    update_data.pop("merge_properties", None)
     checklist_sent = update_data.pop("checklist", None) is not None
     picked_in = update_data.pop("tz", None)
     scope = update_data.pop("scope", None)
@@ -815,7 +859,9 @@ async def update_task(
                 entity_id=task.id,
                 tag_ids=tag_ids,
             )
-        await properties_service.write_on_update(session, task, task_in.properties)
+        await metadata_service.write_on_update(
+            session, task, task_in.properties, merge=task_in.merge_properties
+        )
         if parent_sent:
             await task_hierarchy.set_parent(
                 session, task, parent_task_id, user_id=guild_context.user_id
@@ -823,7 +869,11 @@ async def update_task(
     except (HTTPException, CodedError):
         await session.rollback()
         raise
+    retyped: list[Task] = []
     if series:
+        retyped = [
+            member for member in series if member.task_type_id != task.task_type_id
+        ]
         await task_series.apply_to_others(
             session,
             series,
@@ -846,7 +896,7 @@ async def update_task(
 
     let_go: set[str] = set()
     if task.description != previous_description:
-        await task_description_service.description_saved(
+        await descriptions_service.description_saved(
             session,
             task,
             previous=previous_description,
@@ -859,15 +909,10 @@ async def update_task(
                 previous_description
             ) - attachments_service.upload_urls_in_markdown(task.description)
     await attachments_service.claim_uploads(session, task)
-
     _touch_project(project, now)
-    await session.commit()
-    # A picture taken out of the description goes once the edit has landed.
-    released_images = await attachments_service.release_unshown(
-        guild_context.guild_id, let_go, pasted_only=True
-    )
-    attachments_service.delete_blobs(guild_context.guild_id, released_images)
-    return await _response(session, task.id)
+    return let_go, [
+        member for member in retyped if member.task_type_id == task.task_type_id
+    ]
 
 
 @router.post("/{task_id}/move", response_model=TaskRead)
@@ -905,6 +950,11 @@ async def move_task(
     )
     now = datetime.now(timezone.utc)
     source_project = task.project
+    # Its project's metadata goes onto the destination's of the same name and
+    # type, and the rest is dropped.
+    carried = await metadata_service.lift_project_values(
+        session, task, target_project.id
+    )
     task.project_id = target_project.id
     task.task_type_id = await task_types_service.type_for_move(
         session, task.task_type_id, target_project.id
@@ -923,7 +973,9 @@ async def move_task(
     # their definitions belong to the old initiative and can't resolve in
     # the new one.
     if source_project.initiative_id != target_project.initiative_id:
-        await properties_service.drop_values(session, "task", [task.id])
+        await metadata_service.drop_values(session, "task", [task.id], moved=True)
+    await session.flush()
+    session.add_all(carried)
     # Only those who can open the destination stay assigned.
     await task_creation_service.set_task_assignees(
         session,
@@ -938,10 +990,24 @@ async def move_task(
     await attachments_service.claim_uploads(
         session, task, *comments.all(), carried=True
     )
+    # What the move is sent with is written once the task is there, and then
+    # the task meets what its page in the destination requires.
+    let_go, retyped = (
+        await _apply_update(
+            move_in.changes, task, target_project, session, current_user, guild_context
+        )
+        if move_in.changes is not None
+        else (set(), [])
+    )
+    await required_fields.refuse_missing(session, guild_context, task, *retyped)
 
     _touch_project(source_project, now)
     _touch_project(target_project, now)
     await session.commit()
+    released_images = await attachments_service.release_unshown(
+        guild_context.guild_id, let_go, pasted_only=True
+    )
+    attachments_service.delete_blobs(guild_context.guild_id, released_images)
     return await _response(session, task.id)
 
 
@@ -1246,6 +1312,7 @@ async def promote_checklist_item(
     the new task's description.
     """
     parent = await resource_access.load_child(session, Task, task_id, access="write")
+    required = await required_fields.required_of(session, guild_context, parent)
     item = next(
         (each for each in parent.checklist or [] if each.get("id") == item_id), None
     )
@@ -1289,46 +1356,12 @@ async def promote_checklist_item(
             status_code=status.HTTP_409_CONFLICT,
             detail=ChecklistMessages.ITEM_CHANGED,
         )
-    await session.commit()
     # The statement wrote behind the ORM's back, so the loaded row is stale.
+    await session.refresh(parent, ["checklist"])
+    await required_fields.refuse_emptied(session, required)
+    await session.commit()
     session.expire(parent)
     return await _response(session, task.id)
-
-
-async def _record_ai_request(
-    session: SessionDep,
-    *,
-    user: User,
-    guild_id: int,
-    purpose: str,
-    task_id: int,
-    initiative_id: Optional[int],
-) -> None:
-    """Write down that a task is about to be sent to an AI provider.
-
-    Which task, which connection and which provider — never any of the text.
-    Committed before the request goes out, since the disclosure does not wait
-    on the reply. A configuration that sends nothing records nothing.
-    """
-    resolved = await resolve_ai_settings(session, guild_id)
-    if not resolved.enabled or resolved.provider is None:
-        return
-    await audit_service.record(
-        session,
-        event_type=AuditEventType.AI_REQUEST_SENT,
-        actor_user_id=user.id,
-        guild_id=guild_id,
-        target_type="task",
-        target_id=task_id,
-        detail={
-            "purpose": purpose,
-            "initiative_id": initiative_id,
-            "scope": resolved.scope.value if resolved.scope else None,
-            "connection_id": resolved.connection_id,
-            "provider": resolved.provider.value,
-        },
-    )
-    await session.commit()
 
 
 # AI Generation endpoints
@@ -1343,12 +1376,13 @@ async def generate_task_checklist(
     task = await resource_access.load_child(session, Task, task_id, access="write")
     project = task.project
 
-    await _record_ai_request(
+    await ai_generation_service.record_request(
         session,
         user=current_user,
         guild_id=guild_context.guild_id,
         purpose="checklist",
-        task_id=task.id,
+        target_type="task",
+        target_id=task.id,
         initiative_id=project.initiative_id,
     )
 
@@ -1373,12 +1407,13 @@ async def generate_task_description(
     task = await resource_access.load_child(session, Task, task_id, access="write")
     project = task.project
 
-    await _record_ai_request(
+    await ai_generation_service.record_request(
         session,
         user=current_user,
         guild_id=guild_context.guild_id,
         purpose="description",
-        task_id=task.id,
+        target_type="task",
+        target_id=task.id,
         initiative_id=project.initiative_id,
     )
 

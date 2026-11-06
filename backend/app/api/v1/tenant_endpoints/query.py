@@ -22,6 +22,7 @@ from fastapi import APIRouter, Depends
 
 from app.api.deps import GuildContext, RLSSessionDep, get_guild_membership
 from app.db.session import routed_context
+from app.schemas.field_catalog import FieldDescription
 from app.schemas.sql_query import (
     QueryBuildRequest,
     QueryFilterGroupSpec,
@@ -31,9 +32,12 @@ from app.schemas.sql_query import (
     QueryRequest,
     QueryResponse,
     QueryShapeResponse,
+    QuerySheetDescription,
 )
+from app.services import fields as fields_registry
 from app.services import query as query_service
 from app.services.query import build as query_builder
+from app.services.query.resolve import SheetCall
 
 router = APIRouter()
 
@@ -48,12 +52,30 @@ async def describe_query(
 
     Costs a plan and no rows, so a builder may ask as often as it likes.
     """
-    columns, relations = await query_service.describe(
+    columns, statement = await query_service.describe(
         payload.sql,
         context=routed_context(session),
         initiative_id=payload.initiative_id,
     )
-    return QueryShapeResponse(columns=_described(columns), relations=list(relations))
+    return QueryShapeResponse(
+        columns=_described(columns),
+        relations=list(statement.relations),
+        sheets=_sheets(statement),
+    )
+
+
+def _sheets(statement: query_service.ResolvedQuery) -> list[QuerySheetDescription]:
+    """The ranges a statement read, as both endpoints describe them."""
+    return [
+        QuerySheetDescription(
+            alias=alias,
+            sheets=list(sheet.sheet_names),
+            fields=[
+                FieldDescription(**entry) for entry in fields_registry.describe(sheet)
+            ],
+        )
+        for alias, sheet in statement.sheets
+    ]
 
 
 def _described(
@@ -104,13 +126,16 @@ async def build_query(
     plan and no rows, so asking on each click is affordable.
     """
     sql = query_builder.build(_spec(payload))
-    columns, relations = await query_service.describe(
+    columns, statement = await query_service.describe(
         sql,
         context=routed_context(session),
         initiative_id=payload.initiative_id,
     )
     return QueryBuildResponse(
-        sql=sql, columns=_described(columns), relations=list(relations)
+        sql=sql,
+        columns=_described(columns),
+        relations=list(statement.relations),
+        sheets=_sheets(statement),
     )
 
 
@@ -130,6 +155,9 @@ def _spec(payload: QueryBuildRequest) -> query_builder.QuerySpec:
     """The request as the builder's own vocabulary."""
     return query_builder.QuerySpec(
         dataset=payload.dataset,
+        sheet=SheetCall(file=payload.sheet.file, range=payload.sheet.range)
+        if payload.sheet
+        else None,
         columns=tuple(
             query_builder.Column(
                 field=column.field,

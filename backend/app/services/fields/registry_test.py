@@ -295,21 +295,21 @@ LATER_OFFERED = {"task_type_id"}
 
 class TestDescription:
     def test_everything_the_old_frontend_list_offered_still_is(self):
-        by_name = {entry["name"]: entry for entry in describe("tasks")}
+        by_name = {entry["name"]: entry for entry in describe(dataset("tasks"))}
         for name, (ops, multiple) in PREVIOUSLY_OFFERED.items():
             assert name in by_name, f"{name} stopped being offered"
             assert by_name[name]["ops"] == ops, name
             assert by_name[name]["multiple"] is multiple, name
 
     def test_the_offered_set_is_the_old_one_plus_the_agreed_additions(self):
-        offered = {entry["name"] for entry in describe("tasks")}
+        offered = {entry["name"] for entry in describe(dataset("tasks"))}
         assert offered == set(PREVIOUSLY_OFFERED) | NEWLY_OFFERED | LATER_OFFERED
 
     def test_bookkeeping_is_hidden_everywhere_rather_than_per_dataset(self):
         """Soft-delete columns, the surrogate key, the tenant key and the
         ordering float mean nothing to somebody building a filter, and every
         table has them."""
-        offered = {entry["name"] for entry in describe("tasks")}
+        offered = {entry["name"] for entry in describe(dataset("tasks"))}
         assert offered.isdisjoint(
             {"id", "guild_id", "position", "deleted_at", "deleted_by", "purge_at"}
         )
@@ -325,11 +325,11 @@ class TestDescription:
         it. A control that picks one does not exist yet, and a text box supplies
         a string this resolver reads as nothing — so the field stays available
         to a stored definition and out of the list a client draws."""
-        offered = {entry["name"] for entry in describe("tasks")}
+        offered = {entry["name"] for entry in describe(dataset("tasks"))}
         assert "property_values" not in offered
 
     def test_an_entry_carries_what_a_control_needs(self):
-        by_name = {entry["name"]: entry for entry in describe("tasks")}
+        by_name = {entry["name"]: entry for entry in describe(dataset("tasks"))}
         assert by_name["priority"]["kind"] == "select"
         assert by_name["assignee_ids"]["kind"] == "member"
         assert by_name["due_date"]["type"] == "date"
@@ -337,7 +337,7 @@ class TestDescription:
     def test_a_reference_takes_its_control_from_the_table_it_points_at(self):
         """An integer that references ``users`` is a person, not a number.
         The foreign key says so, so no dataset restates it."""
-        by_name = {entry["name"]: entry for entry in describe("tasks")}
+        by_name = {entry["name"]: entry for entry in describe(dataset("tasks"))}
         assert by_name["created_by"]["kind"] == "member"
         assert by_name["project_id"]["kind"] == "project"
         assert by_name["task_status_id"]["kind"] == "task_status"
@@ -345,7 +345,7 @@ class TestDescription:
     def test_a_closed_vocabulary_carries_its_own_values(self):
         """Straight off the column that stores them, so a client keeps no copy
         and a value added by a migration is offered without a release."""
-        by_name = {entry["name"]: entry for entry in describe("tasks")}
+        by_name = {entry["name"]: entry for entry in describe(dataset("tasks"))}
         assert by_name["priority"]["options"] == list(
             Task.__table__.columns["priority"].type.enums
         )
@@ -357,13 +357,13 @@ class TestDescription:
         ]
 
     def test_a_field_with_no_closed_set_carries_no_options(self):
-        by_name = {entry["name"]: entry for entry in describe("tasks")}
+        by_name = {entry["name"]: entry for entry in describe(dataset("tasks"))}
         assert by_name["due_date"]["options"] == []
         assert by_name["assignee_ids"]["options"] == []
 
     def test_it_carries_no_resolvers(self):
         """What a field compiles to is ours; a client gets the description."""
-        for entry in describe("tasks"):
+        for entry in describe(dataset("tasks")):
             assert not any(callable(value) for value in entry.values())
 
 
@@ -380,12 +380,12 @@ class TestOperatorEnforcement:
 
     def test_a_control_never_offers_an_operator_the_engine_refuses(self):
         engine = allowed_ops("tasks")
-        for entry in describe("tasks"):
+        for entry in describe(dataset("tasks")):
             offered = {FilterOp(op) for op in entry["ops"]}
             assert offered <= engine[entry["name"]], entry["name"]
 
     def test_is_empty_is_offered_only_where_a_value_can_be_empty(self):
-        by_name = {entry["name"]: entry for entry in describe("tasks")}
+        by_name = {entry["name"]: entry for entry in describe(dataset("tasks"))}
         # created_at is NOT NULL; due_date is not.
         assert "is_null" not in by_name["created_at"]["ops"]
         assert "is_null" in by_name["due_date"]["ops"]

@@ -33,7 +33,7 @@ from app.models.tenant.plugin_placement import PluginPlacement
 from app.models.tenant.comment import Comment
 from app.models.tenant.file import File
 from app.models.tenant.guild_plugin import GuildPlugin
-from app.models.tenant.property import PropertyType
+from app.models.tenant.metadata import MetadataType
 from app.models.tenant.resource_grant import ResourceAccessLevel, ResourceGrant
 from app.services.marketplace import plugin_refs
 from app.core.image_headers import validate_image
@@ -673,7 +673,7 @@ async def test_a_person_is_named_to_a_plugin_only_under_members_read(
     task = await create_task(session, project, assignees=[seat.user])
     await create_comment(session, seat.user, task=task)
     owner = await create_property_definition(
-        session, installed.placed, name="Owner", type=PropertyType.user_reference
+        session, installed.placed, name="Owner", type=MetadataType.user_reference
     )
     await create_property_value(session, task, owner, value_user_id=seat.user.id)
     headers = install_headers(

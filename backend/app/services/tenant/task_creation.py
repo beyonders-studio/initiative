@@ -44,11 +44,11 @@ from app.schemas.tenant.task import ChecklistItemInput
 from app.services import notifications as notifications_service
 from app.services.tenant import relationships
 from app.services.tenant import named_people
-from app.services.tenant import properties as properties_service
+from app.services.tenant import metadata as metadata_service
 from app.services.tenant import tags as tags_service
 from app.services.tenant import task_checklist as checklist_service
 from app.services.tenant import task_completion
-from app.services.tenant import task_description as task_description_service
+from app.services.tenant import descriptions as descriptions_service
 from app.services.tenant import task_statuses as task_statuses_service
 from app.services.tenant import task_types as task_types_service
 from app.services.tenant.names import copy_name
@@ -495,7 +495,7 @@ async def copy_tasks(
             if assignees is None or assignee.id in assignees
         )
         if copy.description:
-            await task_description_service.record_references(
+            await descriptions_service.record_references(
                 session, copy, author_id=author_id
             )
     copied_ids = {s.id: c.id for s, c in zip(sources, copies)}
@@ -504,6 +504,6 @@ async def copy_tasks(
     )
     origin = await session.get(Project, sources[0].project_id) if sources else None
     if origin is not None and origin.initiative_id == target.initiative_id:
-        await properties_service.copy_values(session, Task, copied_ids)
+        await metadata_service.copy_values(session, Task, copied_ids)
     await relationships.copy_links(session, SearchEntityType.task, copied_ids)
     return copies

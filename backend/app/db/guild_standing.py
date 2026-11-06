@@ -52,6 +52,7 @@ from app.core.plugin_scopes import (
     STANDING_SCOPES,
     InstallLevel,
 )
+from app.core.rules import SetBy
 from app.core.tools import Tool
 from app.db import gucs
 from app.db.authorization import LIVE_GRANT, live_membership, sql_values
@@ -66,6 +67,7 @@ from app.models.platform.plugin_service_registration import (
 )
 from app.models.platform.guild import (
     GUILD_LADDER,
+    AdminSurface,
     LIVE_STATUS_VALUES,
     CommunityRole,
     CommunityStatus,
@@ -79,7 +81,14 @@ from app.models.platform.identity_ref import (
 )
 from app.models.platform.user import UserRole, UserStatus
 from app.models.tenant.plugin_member_consent import ConsentAccess
-from app.models.tenant.initiative import DEFAULT_PERMISSION_VALUES, PermissionKey
+from app.models.tenant.initiative import (
+    BUILTIN_MEMBER_ROLE,
+    INITIATIVE_CUSTOM_ROLES,
+    INITIATIVE_MEMBER_PREFIX,
+    INITIATIVE_TOOL_PREFIX,
+    DEFAULT_PERMISSION_VALUES,
+    PermissionKey,
+)
 
 if TYPE_CHECKING:  # pragma: no cover
     from sqlalchemy.ext.asyncio import AsyncSession
@@ -107,6 +116,8 @@ _ADMIN_RUNGS: tuple[CommunityRole, ...] = tuple(
     rung for rung in GUILD_LADDER if rung.reaches(CommunityRole.admin)
 )
 _ADMIN_RUNGS_SQL = sql_values(rung.value for rung in _ADMIN_RUNGS)
+#: ``app.held_surfaces`` for the admin rung: every surface.
+_EVERY_SURFACE = ",".join(surface.value for surface in AdminSurface)
 #: The highest rung held wins, so the ladder is walked from the top.
 _SETTINGS_RUNG_CASE = "\n".join(
     f"               WHEN bool_or(rung = '{rung.value}') THEN '{rung.value}'"
@@ -158,6 +169,33 @@ _GRANT_HELD = f"""COALESCE(CASE
 #: other role it is no membership and its holder is in no initiative.
 _ROUTED_AS_GUEST = "pg_has_role(current_user, 'guest_base', 'USAGE')"
 
+#: What the community sets for every initiative in it: its own
+#: ``initiative_rules`` rows, the ones with no initiative
+#: (``app.models.tenant.initiative.COMMUNITY_DEFAULT_KEYS``), read once. Each
+#: statement's ``WITH`` names it.
+_COMMUNITY_DEFAULTS_CTE = """community_defaults AS MATERIALIZED (
+  SELECT r.key, r.enabled
+  FROM initiative_rules r
+  WHERE r.initiative_id IS NULL
+)"""
+
+#: The roles what the community set for members holds for: the built-in
+#: member role, and while the community keeps initiatives to their built-in
+#: roles every custom role that is not a manager's. Over a row ``m`` carrying
+#: ``member_role`` and ``custom_role``.
+_HELD_FOR_MEMBERS = (
+    "(m.member_role OR (m.custom_role AND EXISTS ("
+    "SELECT 1 FROM community_defaults off"
+    f" WHERE off.key = '{INITIATIVE_CUSTOM_ROLES}' AND NOT off.enabled)))"
+)
+
+#: Whether a tool's switch is on in the initiative ``t`` names: the
+#: community's where it set one, the initiative's own otherwise.
+_TOOL_ON = (
+    "COALESCE((SELECT cd.enabled FROM community_defaults cd"
+    f" WHERE cd.key = '{INITIATIVE_TOOL_PREFIX}' || t.tool), t.enabled)"
+)
+
 #: The reader's own rows the person statement reads, each table once. Every
 #: key below is an aggregate over one of these, so a new key picks a row set
 #: rather than reading its table again. ``my_items`` is a guest's: the
@@ -165,19 +203,22 @@ _ROUTED_AS_GUEST = "pg_has_role(current_user, 'guest_base', 'USAGE')"
 #: membership row is a guest's.
 _PERSON_ROWS = f"""
 WITH my_row AS MATERIALIZED (
-  SELECT m.role,
+  SELECT m.role, m.joined_at,
          (m.role <> '{CommunityRole.guest.value}' OR {_ROUTED_AS_GUEST}) AS routed
   FROM public.guild_memberships m
   WHERE m.guild_id = {gucs.GUILD_ID} AND m.user_id = {gucs.USER_ID}
     AND {live_membership("m")}
 ),
 my_membership AS MATERIALIZED (
-  SELECT r.role FROM my_row r WHERE r.routed
+  SELECT r.role, r.joined_at FROM my_row r WHERE r.routed
 ),
 my_initiatives AS MATERIALIZED (
   SELECT im.initiative_id, im.role_id,
          COALESCE(r.is_manager, false) AS is_manager,
-         COALESCE(r.override_share_restrictions, false) AS overrides
+         COALESCE(r.override_share_restrictions, false) AS overrides,
+         COALESCE(r.is_builtin AND r.name = '{BUILTIN_MEMBER_ROLE}', false)
+           AS member_role,
+         COALESCE(NOT r.is_builtin AND NOT r.is_manager, false) AS custom_role
   FROM initiative_members im
   LEFT JOIN initiative_roles r ON r.id = im.role_id
   WHERE im.user_id = {gucs.USER_ID}
@@ -191,10 +232,15 @@ my_items AS MATERIALIZED (
       SELECT 1 FROM my_membership m WHERE m.role = '{CommunityRole.guest.value}'
     )
 ),
+{_COMMUNITY_DEFAULTS_CTE},
+-- What the community set for members holds where it reaches the role.
 my_role_permissions AS MATERIALIZED (
-  SELECT mi.initiative_id, rp.permission_key, rp.enabled
-  FROM my_initiatives mi
-  JOIN initiative_role_permissions rp ON rp.initiative_role_id = mi.role_id
+  SELECT rp.initiative_id, rp.key, COALESCE(cd.enabled, rp.enabled) AS enabled
+  FROM my_initiatives m
+  JOIN initiative_rules rp
+    ON rp.initiative_id = m.initiative_id AND rp.initiative_role_id = m.role_id
+  LEFT JOIN community_defaults cd
+    ON {_HELD_FOR_MEMBERS} AND cd.key = '{INITIATIVE_MEMBER_PREFIX}' || rp.key
 ),
 my_grants AS MATERIALIZED (
   SELECT g.purpose, g.access_level::text AS access_level
@@ -211,6 +257,20 @@ _PERSON_STANDING: dict[gucs.Guc, str] = {
     gucs.GUILD_ADMIN: f"""COALESCE((
       SELECT (m.role IN ({_ADMIN_RUNGS_SQL}))::text FROM my_membership m
     ), 'false')""",
+    # A custom role given during this membership, on the rung the membership
+    # holds, decides; otherwise the rung does.
+    gucs.HELD_SURFACES: f"""COALESCE((
+      SELECT CASE
+               WHEN r.id IS NOT NULL THEN array_to_string(r.surfaces, ',')
+               WHEN m.role IN ({_ADMIN_RUNGS_SQL}) THEN '{_EVERY_SURFACE}'
+               ELSE ''
+             END
+      FROM my_membership m
+      LEFT JOIN custom_role_members cm
+        ON cm.user_id = {gucs.USER_ID} AND cm.assigned_at >= m.joined_at
+      LEFT JOIN custom_roles r
+        ON r.id = cm.role_id AND r.base_rung = m.role::text
+    ), '')""",
     # The seat as ``guild_superadmin()`` answers it, lent by a grant only while
     # the grant is still held.
     gucs.GUILD_SEAT: f"""COALESCE((
@@ -229,11 +289,7 @@ _PERSON_STANDING: dict[gucs.Guc, str] = {
 {_SETTINGS_RUNG_CASE}
              END
       FROM (
-        SELECT m.role::text AS rung
-        FROM my_membership m
-        WHERE m.role IN ({_ADMIN_RUNGS_SQL})
-        UNION ALL
-        SELECT g.access_level FROM my_grants g
+        SELECT g.access_level AS rung FROM my_grants g
         WHERE g.purpose = '{AccessGrantPurpose.settings.value}'
       ) AS rungs
     ), '')""",
@@ -274,20 +330,28 @@ _PERSON_STANDING: dict[gucs.Guc, str] = {
       WHERE mi.role_id IS NOT NULL
     ), '')""",
     gucs.ROLE_GRANTS: """COALESCE((
-      SELECT string_agg(DISTINCT rp.initiative_id || ':' || rp.permission_key, ',')
+      SELECT string_agg(DISTINCT rp.initiative_id || ':' || rp.key, ',')
       FROM my_role_permissions rp
       WHERE rp.enabled
     ), '')""",
     gucs.ROLE_DENIES: """COALESCE((
-      SELECT string_agg(DISTINCT rp.initiative_id || ':' || rp.permission_key, ',')
+      SELECT string_agg(DISTINCT rp.initiative_id || ':' || rp.key, ',')
       FROM my_role_permissions rp
       WHERE NOT rp.enabled
+    ), '')""",
+    gucs.COMMUNITY_TOOLS: f"""COALESCE((
+      SELECT string_agg(
+        substr(cd.key, {len(INITIATIVE_TOOL_PREFIX) + 1})
+          || CASE WHEN cd.enabled THEN '=on' ELSE '=off' END,
+        ',' ORDER BY cd.key)
+      FROM community_defaults cd
+      WHERE cd.key LIKE 'initiative\\_tool.%'
     ), '')""",
     gucs.ENABLED_TOOLS: f"""COALESCE((
       SELECT string_agg(DISTINCT i.id || ':' || t.tool, ',')
       FROM initiatives i
       CROSS JOIN LATERAL (VALUES {_tool_switch_values()}) AS t(tool, enabled)
-      WHERE t.enabled
+      WHERE {_TOOL_ON}
         AND i.id IN (
           SELECT mi.initiative_id FROM my_initiatives mi
           UNION ALL
@@ -304,6 +368,15 @@ _PERSON_STANDING: dict[gucs.Guc, str] = {
     ), 'false')""",
     gucs.GUEST_ITEM_INITIATIVES: """COALESCE((
       SELECT string_agg(it.initiative_id::text, ',') FROM my_items it
+    ), '')""",
+    gucs.CLOSED_SURFACES: f"""COALESCE((
+      SELECT string_agg(r.key, ',' ORDER BY r.key)
+      FROM public.community_rules r
+      WHERE r.guild_id = {gucs.ROUTED_GUILD_ID}
+        AND r.user_id IS NULL
+        AND r.set_by = '{SetBy.deployment.value}'
+        AND r.key LIKE 'surface.%'
+        AND NOT r.enabled
     ), '')""",
     gucs.GUILD_AUTH_OK: """   (SELECT public.guild_auth_satisfied()::text)""",
     gucs.CONTENT_HOLD: f"""COALESCE((
@@ -399,6 +472,9 @@ _INSTALL_STANDING: dict[gucs.Guc, str] = {
     gucs.GUILD_ADMIN: """COALESCE((
       SELECT lv.administers::text FROM standing_level lv
     ), 'false')""",
+    gucs.HELD_SURFACES: f"""COALESCE((
+      SELECT '{_EVERY_SURFACE}' FROM standing_level lv WHERE lv.administers
+    ), '')""",
     gucs.GUILD_SEAT: """'false'""",
     gucs.SETTINGS_RUNG: """''""",
     gucs.PAM_GUILD_ID: """''""",
@@ -407,6 +483,7 @@ _INSTALL_STANDING: dict[gucs.Guc, str] = {
     gucs.PAM_MODERATE: """'false'""",
     gucs.GUEST: """'false'""",
     gucs.GUEST_ITEM_INITIATIVES: """''""",
+    gucs.CLOSED_SURFACES: """''""",
     gucs.MEMBER_INITIATIVES: """COALESCE((
       SELECT string_agg(p.initiative_id::text, ',' ORDER BY p.initiative_id)
       FROM placed p
@@ -428,12 +505,20 @@ _INSTALL_STANDING: dict[gucs.Guc, str] = {
     gucs.ROLE_DENIES: """COALESCE((
       SELECT string_agg(d.pair, ',' ORDER BY d.pair) FROM denied d
     ), '')""",
+    gucs.COMMUNITY_TOOLS: f"""COALESCE((
+      SELECT string_agg(
+        substr(cd.key, {len(INITIATIVE_TOOL_PREFIX) + 1})
+          || CASE WHEN cd.enabled THEN '=on' ELSE '=off' END,
+        ',' ORDER BY cd.key)
+      FROM community_defaults cd
+      WHERE cd.key LIKE 'initiative\\_tool.%'
+    ), '')""",
     gucs.ENABLED_TOOLS: f"""COALESCE((
       SELECT string_agg(DISTINCT i.id || ':' || t.tool, ',')
       FROM initiatives i
       JOIN placed p ON p.initiative_id = i.id
       CROSS JOIN LATERAL (VALUES {_tool_switch_values()}) AS t(tool, enabled)
-      WHERE t.enabled
+      WHERE {_TOOL_ON}
     ), '')""",
     gucs.OVERRIDE_INITIATIVES: """COALESCE((
       SELECT string_agg(DISTINCT o.initiative_id::text, ',')
@@ -520,7 +605,8 @@ _INSTALL_STANDING: dict[gucs.Guc, str] = {
 #: resolves for its grace window, as ``identity_refs.resolve_ref`` has it. The
 #: array chooses which rows are looked up; the sector is the routing's.
 INSTALL_STANDING_SQL = f"""
-WITH consent AS (
+WITH {_COMMUNITY_DEFAULTS_CTE},
+consent AS (
   SELECT c.initiative_id,
          c.granted_access = '{ConsentAccess.read_write.value}' AS writes
   FROM plugin_member_consents c
@@ -605,7 +691,10 @@ held AS (
 member_role AS (
   SELECT im.initiative_id, im.role_id,
          COALESCE(r.is_manager, false) AS is_manager,
-         COALESCE(r.override_share_restrictions, false) AS overrides
+         COALESCE(r.override_share_restrictions, false) AS overrides,
+         COALESCE(r.is_builtin AND r.name = '{BUILTIN_MEMBER_ROLE}', false)
+           AS member_role,
+         COALESCE(NOT r.is_builtin AND NOT r.is_manager, false) AS custom_role
   FROM initiative_members im
   LEFT JOIN initiative_roles r ON r.id = im.role_id
   WHERE {gucs.USER_ID} IS NOT NULL AND im.user_id = {gucs.USER_ID}
@@ -627,19 +716,21 @@ permitted AS (
   FROM placed p
   JOIN member_role mr ON mr.initiative_id = p.initiative_id
   CROSS JOIN (VALUES {_permission_default_values()}) AS k(key, is_default)
+  LEFT JOIN community_defaults cd
+    ON {_HELD_FOR_MEMBERS.replace("m.", "mr.")}
+   AND cd.key = '{INITIATIVE_MEMBER_PREFIX}' || k.key
   WHERE mr.is_manager
-     OR EXISTS (
-       SELECT 1 FROM initiative_role_permissions rp
+     OR COALESCE(cd.enabled, EXISTS (
+       SELECT 1 FROM initiative_rules rp
        WHERE rp.initiative_role_id = mr.role_id
-         AND rp.permission_key = k.key
+         AND rp.key = k.key
          AND rp.enabled
-     )
-     OR (k.is_default AND NOT EXISTS (
-       SELECT 1 FROM initiative_role_permissions rp
+     ) OR (k.is_default AND NOT EXISTS (
+       SELECT 1 FROM initiative_rules rp
        WHERE rp.initiative_role_id = mr.role_id
-         AND rp.permission_key = k.key
+         AND rp.key = k.key
          AND NOT rp.enabled
-     ))
+     )))
 ),
 granted AS (
   SELECT DISTINCT p.initiative_id || ':' || k.key AS pair
@@ -750,7 +841,7 @@ class GuildContext:
     #: ``public.guild_superadmin(guild, user)`` — the membership row's seat, or
     #: a live ``superadmin`` settings grant.
     guild_seat: bool = False
-    #: The rung this request administers the community at, or ``None``.
+    #: The rung a live settings grant lends here, or ``None``.
     settings_rung: Optional[str] = None
     #: A live content grant covers this request, at read / read_write.
     pam_read: bool = False
@@ -761,6 +852,8 @@ class GuildContext:
     guest: bool = False
     #: A guest's initiatives of the items shared with them one at a time.
     guest_item_initiatives: tuple[int, ...] = ()
+    #: The ``surface.*`` keys the deployment has closed for the community.
+    closed_surfaces: tuple[str, ...] = ()
     member_initiatives: tuple[int, ...] = ()
     manager_initiatives: tuple[int, ...] = ()
     member_role_ids: tuple[int, ...] = ()
@@ -770,6 +863,11 @@ class GuildContext:
     role_denies: tuple[str, ...] = ()
     #: ``"<initiative_id>:<tool>"`` where the initiative's switch is on.
     enabled_tools: tuple[str, ...] = ()
+    #: ``"<tool>=on"`` / ``"<tool>=off"`` where the community set a tool's
+    #: switch for every initiative (:meth:`community_tool`).
+    community_tools: tuple[str, ...] = ()
+    #: The admin surfaces the reader holds (:meth:`holds_surface`).
+    held_surfaces: tuple[str, ...] = ()
     #: Initiatives where the reader's role holds "Full access".
     override_initiatives: tuple[int, ...] = ()
     #: The community's sign-in policy is satisfied by this session.
@@ -802,6 +900,26 @@ class GuildContext:
         never answers yes here: what a grant reaches is its own two axes.
         """
         return self.guild_admin
+
+    def holds_surface(self, surface: AdminSurface) -> bool:
+        """Whether the reader holds ``surface``, as the database computed it:
+        what an admin route asks, where :attr:`is_admin` is the reach into
+        the community's content. A grant holds none."""
+        return surface.value in self.held_surfaces
+
+    @property
+    def holds_every_surface(self) -> bool:
+        """Whether the reader holds the whole catalog: an admin with no custom
+        role, or one whose role keeps every surface. What making or unmaking
+        an admin asks, since the admin rung holds every one."""
+        return all(self.holds_surface(surface) for surface in AdminSurface)
+
+    @property
+    def manages_admins(self) -> bool:
+        """Whether this request may make or unmake an admin: holding every
+        surface, as the admin rung does, or on a settings grant — the answer
+        the membership policy gives too."""
+        return self.holds_every_surface or self.settings_rung is not None
 
     @property
     def rung(self) -> "CommunityRole":
@@ -991,6 +1109,9 @@ class InstallContext:
     role_denies: tuple[str, ...] = ()
     #: ``"<initiative_id>:<tool>"`` where the initiative's switch is on.
     enabled_tools: tuple[str, ...] = ()
+    #: ``"<tool>=on"`` / ``"<tool>=off"`` where the community set a tool's
+    #: switch for every initiative (:meth:`community_tool`).
+    community_tools: tuple[str, ...] = ()
     #: For a member token, the member's initiative roles, and the initiatives
     #: where their role holds "Full access", within ``member_initiatives``.
     #: For the install itself, no roles, and "Full access" exactly where its
@@ -1002,6 +1123,8 @@ class InstallContext:
     manager_initiatives: tuple[int, ...] = ()
     #: Its token holds the guild admin standing. Never for a member token.
     guild_admin: bool = False
+    #: Every admin surface with that standing, none without it.
+    held_surfaces: tuple[str, ...] = ()
     #: The resources its scopes let it read, and write.
     install_read: tuple[str, ...] = ()
     install_write: tuple[str, ...] = ()
@@ -1042,6 +1165,9 @@ class InstallContext:
     @property
     def is_admin(self) -> bool:
         return self.guild_admin
+
+    def holds_surface(self, surface: AdminSurface) -> bool:
+        return surface.value in self.held_surfaces
 
     @property
     def content_read_only(self) -> bool:
@@ -1103,6 +1229,14 @@ class InstallContext:
 #: Who a request that names a plug-in scope is serving: a person's standing in
 #: the community, or an installed plug-in's.
 ActorContext = GuildContext | InstallContext
+
+
+def by_a_person(context: ActorContext) -> bool:
+    """Whether a person makes this request: through the app or the API, or
+    through a plug-in acting for them. A plug-in acting as itself is not one,
+    nor is anything that writes with no request (an import, an automation, a
+    repeating task's next one)."""
+    return not isinstance(context, InstallContext) or context.member_user_id is not None
 
 
 def _named(value: Any) -> dict[str, list[Any]]:

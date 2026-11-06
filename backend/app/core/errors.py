@@ -37,3 +37,7 @@ class CodedError(Exception):
         if self.params:
             return {"detail": self.code, "params": self.params}
         return {"detail": self.code}
+
+
+class PluginChannelError(CodedError):
+    """A refusal on the plug-in channel, as a message code plus its HTTP answer."""

@@ -1,11 +1,11 @@
 """Sharing a tool — one route, mounted once for every tool.
 
-``PUT /{tool}/{id}/grants`` replaces a resource's whole sharing state. Nine
-copies of it said the same thing: hand the body to
+``PUT /{tool}/{id}/grants`` replaces a resource's whole sharing state. A copy
+of it per tool said the same thing: hand the body to
 ``resource_access.set_resource_grants``, then answer with the row as a read
 would return it. Neither half depends on which tool it is beyond the Read model
 and the tool's own re-read, so the route is mounted per ``Tool`` straight out of
-the resource-access registry rather than written nine times over.
+the resource-access registry rather than written once per tool.
 
 The decision itself stays in ``resource_access.set_resource_grants`` — load,
 authorize managing access, rebuild every non-owner grant, let go of anyone the
@@ -13,8 +13,8 @@ new sharing no longer reaches — so this module adds no gate of its own.
 
 Afterwards every tool tells its room that sharing moved. The event carries the
 new grant list and nothing else; each open window refetches, and what it may
-then see is settled by the same gates any other read goes through. Queues and
-counters already did this; the other seven did not, which meant a window left
+then see is settled by the same gates any other read goes through. Counters
+already did this; the other tools did not, which meant a window left
 open kept showing a tool it had just been dropped from until something else
 refreshed it.
 

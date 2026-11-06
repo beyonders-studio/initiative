@@ -265,9 +265,15 @@ describe("CommunityHomePage", () => {
     ],
     [
       "a tool entity, to that entity",
-      { initiative: { queues_enabled: true } },
-      { title: "Combat Order", entity_type: "queue", entity_id: 8, tool: "queue", tool_id: 8 },
-      "/c/1/i/5/queues/8",
+      { initiative: { counter_groups_enabled: true } },
+      {
+        title: "Combat Order",
+        entity_type: "counter_group",
+        entity_id: 8,
+        tool: "counter_group",
+        tool_id: 8,
+      },
+      "/c/1/i/5/counter-groups/8",
     ],
     [
       "a community-level calendar, at the community route",
@@ -316,17 +322,17 @@ describe("CommunityHomePage", () => {
     ],
     [
       "a comment left on a tool entity, to that entity",
-      { initiative: { queues_enabled: true } },
+      { initiative: { counter_groups_enabled: true } },
       {
         comment_id: 12,
         content: "Order looks wrong",
-        entity_type: "queue",
+        entity_type: "counter_group",
         entity_id: 8,
         entity_name: "Combat Order",
         initiative_id: 5,
       },
       "on Combat Order",
-      "/c/1/i/5/queues/8",
+      "/c/1/i/5/counter-groups/8",
     ],
     [
       "a community-level calendar's comment, at the community route",

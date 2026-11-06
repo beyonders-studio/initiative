@@ -1089,25 +1089,30 @@ def describe_statement(
     over a plug-in's rows: a field is the field the registry declares, and an
     expression is typed by what it is built from.
     """
-    from app.services.fields import dataset
     from app.services.query.resolve import (
+        Sheet,
         _expand_relations,
         _relations,
-        _target_spec,
+        _field_named,
+        _take_sheets,
     )
 
     select = _parse(sql)
+    # A sheet is not read here, so its columns read as text.
+    sheets = {
+        key: Sheet.unread(call) for key, (_, call) in _take_sheets(select).items()
+    }
     _check_nodes(select)
     _expand_relations(select)
-    scope = _relations(select)
+    scope = _relations(select, sheets)
     declared: dict[str, RowColumn] = {}
-    for name in scope.values():
-        for field_name, spec in dataset(name).by_name.items():
+    for source in scope.values():
+        for field_name, spec in source.by_name.items():
             declared.setdefault(field_name, RowColumn(field_name, spec.type))
     columns = _output_columns(select, declared)
     described: list[StatementColumn] = []
     for target, column in zip(select.targetList or (), columns):
-        spec = _target_spec(target, scope)
+        spec = _field_named(scope, target.val)
         aggregate = (
             isinstance(target.val, ast.FuncCall)
             and _function_name(target.val) in _AGGREGATE_TYPES
@@ -1120,4 +1125,4 @@ def describe_statement(
                 aggregate=aggregate,
             )
         )
-    return tuple(described), tuple(sorted(set(scope.values())))
+    return tuple(described), tuple(sorted({source.name for source in scope.values()}))

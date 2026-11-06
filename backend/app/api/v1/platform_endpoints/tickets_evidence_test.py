@@ -97,7 +97,7 @@ async def test_a_filing_stores_its_files_sealed_beside_the_opening_words(
         )
     ).one()
     await set_rls_context(session, Unattributed())
-    assert row.case_id == case.id
+    assert row.case_task_id == case.task_id
     assert row.comment_id == opening.id
     assert row.created_by == asker.user.id
     assert row.content_type == "image/jpeg"
@@ -109,6 +109,64 @@ async def test_a_filing_stores_its_files_sealed_beside_the_opening_words(
     sealed = stored.path.read_bytes()
     assert sealed.startswith(b"IEV1")
     assert b"JFIF" not in sealed
+
+
+async def _opened(session, guild_id: int, row: Evidence) -> bytes:
+    await set_rls_context(session, SystemGuild(guild_id))
+    obj = await evidence_service.sealed(session, row.id)
+    await set_rls_context(session, Unattributed())
+    assert obj is not None
+    return b"".join(evidence_service.plaintext(guild_id, obj))
+
+
+async def test_with_storage_encrypted_evidence_goes_with_the_community_key(
+    client, session, desk, asker
+):
+    from app.db import session as db_session
+    from app.services import storage_keys
+    from app.services.storage_keys import DatabaseKeyStore, Keyring, LocalRoot
+
+    storage_keys.use_keyring(Keyring(DatabaseKeyStore(), LocalRoot()))
+    try:
+        response = await _ask(client, asker, asker.guild.id, [_jpeg()])
+        assert response.status_code == 202, response.text
+        (row,) = await _evidence(session, desk["guild_id"])
+        assert row.kek_version == blob_crypto.COMMUNITY_KEK_VERSION
+        assert (await _opened(session, desk["guild_id"], row)).startswith(b"\xff\xd8")
+
+        async with db_session.SystemSessionLocal() as system:
+            await storage_keys.destroy(system, desk["guild_id"])
+            await system.commit()
+        with pytest.raises(blob_crypto.BlobCryptoError):
+            await _opened(session, desk["guild_id"], row)
+    finally:
+        storage_keys.use_keyring(None)
+
+
+async def test_evidence_sealed_before_encryption_moves_onto_the_community_key(
+    client, session, desk, asker
+):
+    from app.services import storage_keys
+    from app.services.storage_keys import DatabaseKeyStore, Keyring, LocalRoot
+
+    response = await _ask(client, asker, asker.guild.id, [_jpeg()])
+    assert response.status_code == 202, response.text
+    (row,) = await _evidence(session, desk["guild_id"])
+    assert row.kek_version == blob_crypto.KEK_VERSION
+
+    storage_keys.use_keyring(Keyring(DatabaseKeyStore(), LocalRoot()))
+    try:
+        await set_rls_context(session, SystemGuild(desk["guild_id"]))
+        assert (
+            await evidence_service.adopt_community_key(session, desk["guild_id"]) == 1
+        )
+        await session.commit()
+        await set_rls_context(session, Unattributed())
+        (moved,) = await _evidence(session, desk["guild_id"])
+        assert moved.kek_version == blob_crypto.COMMUNITY_KEK_VERSION
+        assert (await _opened(session, desk["guild_id"], moved)).startswith(b"\xff\xd8")
+    finally:
+        storage_keys.use_keyring(None)
 
 
 async def test_a_file_the_stream_does_not_take_files_nothing(
@@ -384,7 +442,7 @@ async def _set_state(session, desk, task_id: int, *, done_days_ago: float | None
 
 async def _sweep(session, desk) -> int:
     await set_rls_context(session, SystemGuild(desk["guild_id"]))
-    return await evidence_service.purge_due(session, desk["guild_id"])
+    return await evidence_service.purge_cases_due(session, desk["guild_id"])
 
 
 async def test_a_closed_cases_files_are_kept_for_the_stream_then_go(
@@ -459,7 +517,7 @@ async def test_the_sweep_waits_while_a_hold_naming_the_case_is_placed(
         await set_rls_context(session, SystemGuild(desk["guild_id"]))
         await session.exec(text("SET LOCAL lock_timeout = '200ms'"))
         with pytest.raises(DBAPIError):
-            await evidence_service.purge_due(session, desk["guild_id"])
+            await evidence_service.purge_cases_due(session, desk["guild_id"])
         await session.rollback()
     assert len(await _evidence(session, desk["guild_id"])) == 1
     assert await _sweep(session, desk) == 1
@@ -570,7 +628,7 @@ async def test_what_was_written_before_a_failed_write_is_removed(
     )
     with pytest.raises(OSError):
         with evidence_service.Sealing(gid) as sealing:
-            sealing.store(session, prepared=files, created_by=None, case_id=1)
+            sealing.store(session, prepared=files, created_by=None, case_task_id=1)
     assert len(written) == 2
     assert not storage.exists(written[0])
 
@@ -586,7 +644,9 @@ async def test_what_was_written_for_rows_that_never_landed_is_removed(session, d
     with pytest.raises(DBAPIError):
         with evidence_service.Sealing(gid) as sealing:
             # No such case: the commit is refused.
-            sealing.store(session, prepared=files, created_by=None, case_id=999_999)
+            sealing.store(
+                session, prepared=files, created_by=None, case_task_id=999_999
+            )
             await session.commit()
             sealing.keep()
     await session.rollback()

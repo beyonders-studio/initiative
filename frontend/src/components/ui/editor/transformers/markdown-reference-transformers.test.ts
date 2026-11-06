@@ -116,10 +116,6 @@ describe("references in markdown", () => {
     ]);
   });
 
-  it("read a kind stored under its earlier spelling as today's", () => {
-    expect(inline(fromMarkdown("[[document:12|Brief]]"))).toEqual(["link file:12 Brief"]);
-  });
-
   it("leave an embed an embed", () => {
     const editor = fromMarkdown("![[task:12|Roll call]]");
     editor.getEditorState().read(() => {

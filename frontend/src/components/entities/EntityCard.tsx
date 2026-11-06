@@ -7,6 +7,7 @@ import {
   SearchEntityType,
   type SmartChipState,
 } from "@/api/generated/initiativeAPI.schemas";
+import { MemberAvatar } from "@/components/members/MemberSearchSelect";
 import { LazyImage } from "@/components/shared/LazyImage";
 import { Button } from "@/components/ui/button";
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip";
@@ -14,7 +15,7 @@ import { useRelativeTime } from "@/hooks/useRelativeTime";
 import { useCommunityPath } from "@/lib/communityUrl";
 import { entityRefTypeFor } from "@/lib/entityResolver";
 import { fileIcon } from "@/lib/fileIcon";
-import { relatedTarget } from "@/lib/relationships";
+import { isItem, relatedTarget } from "@/lib/relationships";
 import { hitIcon, searchHitPath } from "@/lib/searchResults";
 import { CHIP_TONE_CLASSES } from "@/lib/smartChips";
 import { entityRefRoute } from "@/lib/tools";
@@ -68,6 +69,9 @@ interface EntityCardProps {
  * most of them. A file picks its mark from what sort of file it is, out
  * of the same helper the file card uses.
  *
+ * A person is drawn by their face and opens their profile, which belongs to
+ * them rather than to this community, so the link leaves the community tree.
+ *
  * **`compact`** is a line in a list rather than a tile: the same facts, at the
  * size a sidebar column or a dialog can afford.
  */
@@ -88,25 +92,38 @@ export const EntityCard = ({
   const gp = useCommunityPath();
   const linked = useRelativeTime(linkedAt ?? null);
 
-  const target = relatedTarget(end);
+  const item = isItem(end) ? end : null;
+  const target = item ? relatedTarget(item) : null;
   // The direct address where the far end carried enough to build one, and the
   // resolver where it did not — a thing addressed inside a parent whose id
   // nobody told us still has a page, it just takes a redirect to reach.
-  const refType = entityRefTypeFor(end.type);
-  const path = searchHitPath(target) ?? (refType ? entityRefRoute(refType, end.id) : null);
+  const refType = item ? entityRefTypeFor(item.type) : null;
+  const path = target
+    ? (searchHitPath(target) ?? (refType ? entityRefRoute(refType, end.id) : null))
+    : null;
+  const href = item ? (path ? gp(path) : null) : end.handle ? `/u/${end.handle}` : null;
   // A file is not one sort of thing, so it picks its mark from what sort it
   // is — the same rule the file card follows, out of the same helper.
   const file = end.type === SearchEntityType.file ? fileIcon(end) : null;
-  const KindIcon = file?.Icon ?? hitIcon(target);
-  const kindLabel = t(`search:types.${end.type}`, { defaultValue: end.type });
+  const KindIcon = file?.Icon ?? (target ? hitIcon(target) : null);
+  const kindLabel = item
+    ? t(`search:types.${item.type}`, { defaultValue: item.type })
+    : t("card.person");
   const title = end.title?.trim() || t("untitled");
   const pictures = end.image_urls
     .map((url) => resolveUploadUrl(url))
     .filter((url): url is string => Boolean(url));
   const compact = variant === "compact";
 
-  /** The picture, emoji, colour or icon, filling whatever box it is given. */
-  const mark = pictures.length ? (
+  /** The face, picture, emoji, colour or icon, filling whatever box it is given. */
+  const mark = !item ? (
+    <div className="flex h-full items-center justify-center">
+      <MemberAvatar
+        user={{ id: end.id, display_name: end.title, avatar_url: end.image_urls[0] ?? null }}
+        className={compact ? "h-5 w-5 text-3xs" : "aspect-square h-1/2 w-auto text-2xl"}
+      />
+    </div>
+  ) : pictures.length ? (
     pictures.length === 1 ? (
       <LazyImage
         src={pictures[0]}
@@ -115,8 +132,8 @@ export const EntityCard = ({
         imgClassName="transition duration-300 group-hover:scale-105"
       />
     ) : (
-      // Several, because nobody picked one: a wall of them says what a gallery
-      // is better than any single picture would.
+      // Several, because nobody picked one: a wall of them says what a
+      // collection is better than any single picture would.
       <div
         className={cn(
           "grid h-full w-full gap-0.5",
@@ -149,14 +166,14 @@ export const EntityCard = ({
           className={cn("rounded-full", compact ? "h-2.5 w-2.5" : "h-1/4 w-1/4")}
           style={{ backgroundColor: end.color }}
         />
-      ) : (
+      ) : KindIcon ? (
         <KindIcon
           className={cn(
             compact ? "h-3.5 w-3.5" : "h-1/3 w-1/3",
             file?.colorClass ?? "text-muted-foreground"
           )}
         />
-      )}
+      ) : null}
     </div>
   );
 
@@ -246,9 +263,9 @@ export const EntityCard = ({
 
   return (
     <div className="group/row relative">
-      {path ? (
+      {href ? (
         <Link
-          to={gp(path)}
+          to={href}
           className={cn(
             shell,
             settled && "opacity-70",

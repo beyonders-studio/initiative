@@ -15,6 +15,7 @@ import { useTranslation } from "react-i18next";
 import { LogoIcon } from "@/components/LogoIcon";
 import { ModeToggle } from "@/components/ModeToggle";
 import { Button } from "@/components/ui/button";
+import { useLegalIndex } from "@/hooks/useLegalDocuments";
 import { reopenConsent } from "@/lib/consent";
 import { DOCS_URL, docsUrl, REPO_URL } from "@/lib/links";
 import { cn } from "@/lib/utils";
@@ -157,6 +158,7 @@ const External = ({ href, children }: { href: string; children: ReactNode }) => 
 const Footer = () => {
   const { t } = useTranslation("landing");
   const { showsPricing, cookieConsentEnabled } = useFrontDoor();
+  const { documents } = useLegalIndex();
 
   return (
     <footer className="border-t">
@@ -227,6 +229,25 @@ const Footer = () => {
         </div>
         <div className="mt-10 flex flex-wrap items-center gap-x-6 gap-y-2 text-muted-foreground text-sm">
           <p>{t("footer.copyright", { year: new Date().getFullYear() })}</p>
+          {/* Every document the deployment publishes, not only the ones an
+              account accepts: a refund policy has to be findable before
+              anyone buys. None where it names no portal. */}
+          {documents.map((document) =>
+            document.url ? (
+              <External key={document.slug} href={document.url}>
+                {document.title}
+              </External>
+            ) : (
+              <Link
+                key={document.slug}
+                to="/legal/$slug"
+                params={{ slug: document.slug }}
+                className={footerLink}
+              >
+                {document.title}
+              </Link>
+            )
+          )}
           {/* Taking an answer back has to be as easy as giving one, and a
               front-door reader has no settings page to go to. Only where the
               deployment asks the question at all. */}

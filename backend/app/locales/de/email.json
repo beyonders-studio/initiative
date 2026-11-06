@@ -69,10 +69,10 @@
       "title": "Deine Aufgabe wurde erwähnt",
       "body": "<strong>{{actor}}</strong> hat <strong>{{task}}</strong> in <strong>{{context}}</strong> erwähnt"
     },
-    "taskDescription": {
-      "subject": "Du wurdest in {{task}} erwähnt",
+    "description": {
+      "subject": "Du wurdest in {{title}} erwähnt",
       "title": "Du wurdest erwähnt",
-      "body": "<strong>{{actor}}</strong> hat dich in der Beschreibung von <strong>{{task}}</strong> erwähnt"
+      "body": "<strong>{{actor}}</strong> hat dich in der Beschreibung von <strong>{{title}}</strong> erwähnt"
     },
     "greeting": "Hallo <strong>{{name}}</strong>,",
     "buttonLabel": "Ansehen"
@@ -169,6 +169,15 @@
     "textBody_one": "Du hast {{count}} überfällige Aufgabe:",
     "textBody_other": "Du hast {{count}} überfällige Aufgaben:",
     "redactedItem": "Eine Aufgabe ist überfällig"
+  },
+  "comingUp": {
+    "subject": "Demnächst",
+    "title": "Demnächst",
+    "body_one": "Bei dir steht <strong>{{count}}</strong> Sache an:",
+    "body_other": "Bei dir stehen <strong>{{count}}</strong> Sachen an:",
+    "taskDetail": "fällig <strong>{{when}}</strong>, in <strong>{{projectName}}</strong>",
+    "eventDetail": "beginnt <strong>{{when}}</strong>",
+    "redactedItem": "Etwas steht an"
   },
   "accessGrant": {
     "buttonLabel": "Zugriffs-Dashboard öffnen",
@@ -388,7 +397,9 @@
       "cases": "Fälle",
       "direct_messages": "Nachrichten und Kontakte",
       "jobs": "Exporte und Importe",
-      "account": "Dein Konto"
+      "account": "Dein Konto",
+      "overdue": "Überfällig",
+      "coming_up": "Demnächst"
     }
   },
   "signInCode": {
@@ -436,6 +447,26 @@
     "contact": "Wende dich an <strong>{{contact}}</strong>, um das zu klären.",
     "contactNobody": "Wende dich an die Betreiber dieses Servers, um das zu klären.",
     "buttonLabel": "Tarif wiederherstellen"
+  },
+  "communityAccess": {
+    "granted": {
+      "subject": "Plattform-Mitarbeitende haben Zugriff auf {{community}}",
+      "title": "Plattform-Mitarbeitende haben Zugriff auf {{community}}",
+      "body": "Mitarbeitende dieses Servers haben am {{start}} Zugriff (<strong>{{level}}</strong>) auf <strong>{{community}}</strong> erhalten, bis {{end}}."
+    },
+    "ended": {
+      "subject": "Plattform-Mitarbeitende hatten Zugriff auf {{community}}",
+      "title": "Plattform-Mitarbeitende hatten Zugriff auf {{community}}",
+      "body": "Mitarbeitende dieses Servers hatten vom {{start}} bis {{end}} Zugriff (<strong>{{level}}</strong>) auf <strong>{{community}}</strong>. Dieser Zugriff ist beendet."
+    },
+    "case": {
+      "security": "Er galt einem Sicherheitsfall.",
+      "moderation": "Er galt einem Moderationsfall.",
+      "support": "Er galt einem Support-Fall."
+    },
+    "recorded": "Jede Anfrage, die damit gestellt wird, wird protokolliert.",
+    "contact": "Fragen dazu kannst du an <strong>{{contact}}</strong> richten.",
+    "moment": "{{date}}, {{time}} UTC"
   },
   "communityTrialEnding": {
     "subject": "Die Testphase von {{community}} endet am {{date}}",
@@ -522,6 +553,49 @@
       "subject": "Eine neue Möglichkeit, dich anzumelden",
       "title": "Eine neue Möglichkeit, dich anzumelden",
       "body": "Du kannst dich jetzt über <strong>{{provider}}</strong> bei deinem Konto anmelden, weil dort eine deiner Adressen bestätigt wurde."
+    }
+  },
+  "share": {
+    "requested": {
+      "read": {
+        "subject": "Bitte um Ansicht",
+        "title": "Bitte um Ansicht",
+        "body_one": "<strong>{{requester}}</strong> möchte <strong>{{title}}</strong> ansehen",
+        "body_other": "<strong>{{requester}}</strong> möchte {{count}} Dateien ansehen"
+      },
+      "write": {
+        "subject": "Bitte um Bearbeitung",
+        "title": "Bitte um Bearbeitung",
+        "body_one": "<strong>{{requester}}</strong> möchte <strong>{{title}}</strong> bearbeiten",
+        "body_other": "<strong>{{requester}}</strong> möchte {{count}} Dateien bearbeiten"
+      }
+    },
+    "granted": {
+      "read": {
+        "subject": "Du kannst es jetzt ansehen",
+        "title": "Du kannst es jetzt ansehen",
+        "body_one": "<strong>{{answerer}}</strong> hat dir <strong>{{title}}</strong> zum Ansehen freigegeben",
+        "body_other": "<strong>{{answerer}}</strong> hat dir {{count}} Dateien zum Ansehen freigegeben"
+      },
+      "write": {
+        "subject": "Du kannst es jetzt bearbeiten",
+        "title": "Du kannst es jetzt bearbeiten",
+        "body_one": "<strong>{{answerer}}</strong> hat dir <strong>{{title}}</strong> zum Bearbeiten freigegeben",
+        "body_other": "<strong>{{answerer}}</strong> hat dir {{count}} Dateien zum Bearbeiten freigegeben"
+      }
+    },
+    "declined": {
+      "subject": "Anfrage abgelehnt",
+      "title": "Anfrage abgelehnt",
+      "body_one": "<strong>{{answerer}}</strong> hat deine Anfrage abgelehnt",
+      "body_other": "<strong>{{answerer}}</strong> hat deine Anfrage für {{count}} Dateien abgelehnt"
+    }
+  },
+  "task": {
+    "reminder": {
+      "subject": "Erinnerung: {{task}}",
+      "title": "Erinnerung",
+      "body": "Du wolltest an <strong>{{task}}</strong> erinnert werden."
     }
   }
 }

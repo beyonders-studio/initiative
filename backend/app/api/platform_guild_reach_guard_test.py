@@ -103,14 +103,31 @@ _WRAPPERS: dict[tuple[str, str], str] = {
     (f"{_SERVICES}/provider_placement.py", "_initiatives_in"): (
         "reads one community's initiatives and roles for a provider placement rule"
     ),
-    (f"{_SERVICES}/provider_placement.py", "_resolve_destination"): (
-        "checks a provider placement rule's initiative is the named community's"
+    (f"{_SERVICES}/provider_placement.py", "rule_initiatives"): (
+        "reads the initiatives sign-in rules place people in, in the "
+        "community's schema where they are kept"
+    ),
+    (f"{_SERVICES}/provider_placement.py", "set_rule_initiative"): (
+        "checks and writes the initiative a sign-in rule places people in, in "
+        "the community the rule names"
+    ),
+    (f"{_SERVICES}/provider_placement.py", "drop_rule_initiative"): (
+        "drops the initiative a sign-in rule placed people in, in the "
+        "community the rule named"
     ),
     (f"{_SERVICES}/provider_placement.py", "list_targets"): (
         "lists a placeable community's initiatives for a provider placement rule"
     ),
     (f"{_ENDPOINTS}/settings.py", "_routed_to_community"): (
         "routes the operator's community sheet into a community that is still there"
+    ),
+    (f"{_SERVICES}/billing.py", "_apply_custom_roles"): (
+        "writes the deployment's custom roles in one community's own schema, "
+        "for the billing sync that names it"
+    ),
+    (f"{_SERVICES}/billing.py", "apply_community_sync"): (
+        "brings one community to billing's state, its custom roles written in "
+        "its own schema"
     ),
 }
 
@@ -160,6 +177,10 @@ _ALLOWED: dict[tuple[str, str], str] = {
         "destroys a community without a retention window, letting go of its "
         "plug-in connections in its own schema"
     ),
+    (f"{_ENDPOINTS}/billing.py", "sync_communities"): (
+        "billing's signed community sync: the deployment's custom roles, in "
+        "each community it names"
+    ),
     # --- Aggregates ----------------------------------------------------------
     (f"{_ENDPOINTS}/settings.py", "list_community_plugin_summaries"): (
         "the operator's community sheet: which installs report a usage summary"
@@ -194,6 +215,10 @@ _ALLOWED: dict[tuple[str, str], str] = {
     (f"{_SERVICES}/grant_cases.py", "case_exists"): (
         "grant cases: reads whether a case a grant serves is still there to be told"
     ),
+    (f"{_SERVICES}/grant_cases.py", "_case_stream"): (
+        "grant cases: reads which stream a grant's case is in, so the letter "
+        "telling its community says what kind of case it was"
+    ),
     (f"{_SERVICES}/intake.py", "case_locked"): (
         "intake: holds a case's task locked while a hold naming it is written, "
         "so evidence retention never decides the case's files in between"
@@ -208,6 +233,14 @@ _ALLOWED: dict[tuple[str, str], str] = {
     (f"{_SERVICES}/grant_cases.py", "cases_required"): (
         "grant cases: reads whether the operations community takes cases a "
         "grant may serve"
+    ),
+    (f"{_SERVICES}/grant_cases.py", "link"): (
+        "grant cases: writes down, in the operations community, which grants "
+        "serve a case"
+    ),
+    (f"{_SERVICES}/grant_cases.py", "cases_of"): (
+        "grant cases: reads the case each grant serves from the operations "
+        "community's links"
     ),
     (f"{_SERVICES}/intake.py", "open_case_counts"): (
         "intake: counts the open cases about an account, for the staff roster, "
@@ -261,14 +294,16 @@ _ALLOWED: dict[tuple[str, str], str] = {
         "names the initiatives provider placement rules place into, in the "
         "communities they apply to"
     ),
-    (f"{_SERVICES}/provider_placement.py", "_read_one"): (
-        "names the initiative a provider placement rule places into"
-    ),
-    (f"{_SERVICES}/provider_placement.py", "create_rule"): (
-        "checks a new provider placement rule's initiative"
+    (f"{_SERVICES}/provider_placement.py", "place_rule"): (
+        "checks and writes the initiative a new or changed sign-in rule "
+        "places people in, in the community it names"
     ),
     (f"{_SERVICES}/provider_placement.py", "update_rule"): (
-        "checks a changed provider placement rule's initiative"
+        "reads a provider placement rule's initiative before a change, and "
+        "drops it when the rule no longer names one"
+    ),
+    (f"{_SERVICES}/provider_placement.py", "delete_rule"): (
+        "drops the initiative a deleted provider placement rule placed people in"
     ),
 }
 

@@ -12,7 +12,7 @@
  * reason rather than run.
  */
 
-import { Braces, Columns3, Spline, Table2, UserRound } from "lucide-react";
+import { Braces, Columns3, FileSpreadsheet, Spline, Table2, UserRound } from "lucide-react";
 import { useCallback, useMemo, useRef, useState } from "react";
 import { useTranslation } from "react-i18next";
 
@@ -38,6 +38,7 @@ const ICONS: Record<CompletionKind, typeof Table2> = {
   function: Braces,
   token: UserRound,
   relation: Spline,
+  spreadsheet: FileSpreadsheet,
 };
 
 export interface SqlEditorProps {
@@ -48,6 +49,11 @@ export interface SqlEditorProps {
   fields: DatasetFields[];
   /** Names that stand for who is asking, offered beside the fields. */
   tokens?: string[];
+  /** The ranges the statement read when last checked, under the names each
+   *  is read under. */
+  ranges?: DatasetFields[];
+  /** The spreadsheets a `sheet()` call may name. */
+  spreadsheets?: string[];
   id?: string;
   rows?: number;
   disabled?: boolean;
@@ -61,6 +67,8 @@ export function SqlEditor({
   functions,
   fields,
   tokens,
+  ranges,
+  spreadsheets,
   id,
   rows = 6,
   disabled,
@@ -73,6 +81,7 @@ export function SqlEditor({
     start: number;
     caret: number;
     qualifier?: string;
+    quoted?: boolean;
   } | null>(null);
   const [anchor, setAnchor] = useState<{ top: number; left: number } | null>(null);
   const [highlighted, setHighlighted] = useState(0);
@@ -92,8 +101,11 @@ export function SqlEditor({
       tokens,
       named,
       qualifier: active.qualifier,
+      ranges,
+      spreadsheets,
+      quoted: active.quoted,
     }).slice(0, LIMIT);
-  }, [active, datasets, functions, fields, tokens, named]);
+  }, [active, datasets, functions, fields, tokens, named, ranges, spreadsheets]);
 
   const close = useCallback(() => {
     setActive(null);

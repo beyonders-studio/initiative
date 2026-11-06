@@ -5,14 +5,14 @@ import { Suspense, useCallback, useEffect, useMemo, useRef, useState } from "rea
 import { useTranslation } from "react-i18next";
 
 import { API_BASE_URL } from "@/api/client";
-import { notifyMentions } from "@/api/generated/files/files";
-import { Tool } from "@/api/generated/initiativeAPI.schemas";
+import { generateSummary, notifyMentions } from "@/api/generated/files/files";
+import { FileKind, Tool } from "@/api/generated/initiativeAPI.schemas";
+import { type AISummary, SummarySheet, useSummarySheet } from "@/components/ai/SummarySheet";
 import { ToolCommentsPanel } from "@/components/comments/ToolCommentsPanel";
 import { ToolRelationsPanel } from "@/components/entities/ToolRelationsPanel";
-import { FILE_BODIES } from "@/components/files/detail/fileBodies";
-import { FileAISummary } from "@/components/files/FileAISummary";
+import { FileCollections } from "@/components/files/collections/FileCollections";
+import { fileBody } from "@/components/files/detail/fileBodies";
 import { FileFeaturedImage } from "@/components/files/FileFeaturedImage";
-import { FileSidePanel, useFileSidePanel } from "@/components/files/FileSidePanel";
 import { clearWhiteboardSceneCache } from "@/components/files/whiteboardSceneCache";
 import { FileDetailSkeleton } from "@/components/skeletons/PageSkeletons";
 import { ToolAccessStatus } from "@/components/ToolAccessStatus";
@@ -60,10 +60,10 @@ export const FileDetailPage = () => {
   const { activeCommunityId } = useCommunities();
   const communityId = Number(communityIdParam);
   const gp = useCommunityPath();
-  const sidePanel = useFileSidePanel();
+  const sidePanel = useSummarySheet("file-side-panel-open");
   const outline = useDocumentOutline();
   const { isEnabled: isAIEnabled } = useAIEnabled();
-  const [aiSummary, setAiSummary] = useState<string | null>(null);
+  const [aiSummary, setAiSummary] = useState<AISummary | null>(null);
   const [featuredImageUrl, setFeaturedImageUrl] = useState<string | null>(null);
   const [isUploadingFeaturedImage, setIsUploadingFeaturedImage] = useState(false);
   // What the body last reported, and for which file: the page's copy of
@@ -81,7 +81,7 @@ export const FileDetailPage = () => {
 
   const fileQuery = useFile(Number.isFinite(parsedId) ? parsedId : null);
   const file = fileQuery.data;
-  const bodyKind = file ? FILE_BODIES[file.file_type] : null;
+  const bodyKind = file ? fileBody(file.file_type) : null;
   // Whether this file's room is in play: a body that joins none has no
   // work in a Yjs doc to hand over, and no connection to show.
   const joinsRoom = collaborationEnabled && (!bodyKind || bodyKind.roomSyncMs !== undefined);
@@ -176,7 +176,7 @@ export const FileDetailPage = () => {
     setFeaturedImageUrl(file.featured_image_url ?? null);
   }, [file, fileQuery.isFetchedAfterMount]);
 
-  const saved = useMemo(() => (file ? FILE_BODIES[file.file_type].saved(file) : undefined), [file]);
+  const saved = useMemo(() => (file ? fileBody(file.file_type).saved(file) : undefined), [file]);
   const editedBody = edited?.fileId === parsedId ? edited.content : undefined;
   const savedJson = useMemo(() => JSON.stringify(saved), [saved]);
   const editedJson = useMemo(() => JSON.stringify(editedBody), [editedBody]);
@@ -519,12 +519,14 @@ export const FileDetailPage = () => {
         keys="files:detail."
         backTo={gp(toolListRoute(Tool.file, initiativeId))}
         backLabel={t("detail.backToFiles")}
+        entity={{ kind: "file", id: parsedId }}
       />
     );
   }
 
-  const { Body, Actions, framed, editable, prose } = FILE_BODIES[file.file_type];
-  const isImageFile = Boolean(file.file_content_type?.startsWith("image/"));
+  const { Body, Actions, framed, editable, prose } = fileBody(file.file_type);
+  // A picture or a video is shown as itself, so it takes no featured image.
+  const showsItself = file.kind === FileKind.image || file.kind === FileKind.video;
   const showSummaryTab = prose && isAIEnabled;
   const body = (
     <Suspense
@@ -569,6 +571,9 @@ export const FileDetailPage = () => {
           >
             <ToolChestSegment label={t("detail.updatedLabel")}>
               <span>{relativeUpdatedAt}</span>
+            </ToolChestSegment>
+            <ToolChestSegment label={t("collections.heading")}>
+              <FileCollections file={file} />
             </ToolChestSegment>
             {showSummaryTab ? (
               <ToolChestSegment>
@@ -623,13 +628,14 @@ export const FileDetailPage = () => {
 
       <FeaturedImageProvider value={featuredImage}>
         <div className="space-y-6">
-          {/* An uploaded image is its own featured image. */}
-          {isImageFile ? null : (
+          {showsItself ? null : (
             <FileFeaturedImage
               url={featuredImageUrl}
               canEdit={canEditFile}
               uploading={isUploadingFeaturedImage}
               onUpload={handleFeaturedImageChange}
+              initiativeId={file.initiative_id}
+              onChoose={setFeaturedImage}
               onRemove={() => setFeaturedImage(null)}
             />
           )}
@@ -795,12 +801,12 @@ export const FileDetailPage = () => {
 
       {/* Side panel for the AI summary */}
       {showSummaryTab && (
-        <FileSidePanel
-          isOpen={sidePanel.isOpen}
+        <SummarySheet
+          open={sidePanel.isOpen}
           onOpenChange={sidePanel.setIsOpen}
-          summaryContent={
-            <FileAISummary fileId={parsedId} summary={aiSummary} onSummaryChange={setAiSummary} />
-          }
+          request={(options, signal) => generateSummary(communityId, parsedId, options, signal)}
+          summary={aiSummary}
+          onSummaryChange={setAiSummary}
         />
       )}
     </div>

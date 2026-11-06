@@ -10,6 +10,7 @@ import { Badge } from "@/components/ui/badge";
 import { useCommunities } from "@/hooks/useCommunities";
 import { useCommunityBillingSummary } from "@/hooks/useCommunityBillingSummary";
 import { useCommunitySettingsTabs } from "@/hooks/useCommunitySettingsTabs";
+import { useHeldSurfaces } from "@/hooks/useCustomRoles";
 import { trialDaysLeft } from "@/lib/billingSummary";
 import { extractSubPath, isCommunityScopedPath } from "@/lib/communityUrl";
 import { matchActiveTab } from "@/lib/tabs";
@@ -17,15 +18,12 @@ import { matchActiveTab } from "@/lib/tabs";
 export const CommunitySettingsLayout = () => {
   const { t } = useTranslation(["settings"]);
   const { activeCommunity } = useCommunities();
-  // Running the community: held as its admin, or lent by a settings grant at
-  // either rung.
-  const administers = Boolean(activeCommunity?.can.administer);
-  // Whether what the rung reaches may also be changed — the server's answer.
-  // Without it every control on these pages is shown disabled.
-  const changesSettings = Boolean(activeCommunity?.can.configure);
+  // Whether what the reader holds may also be changed. Without it every
+  // control on these pages is shown disabled.
+  const changesSettings = useHeldSurfaces().writes;
   const location = useLocation();
   const router = useRouter();
-  const tabs = useCommunitySettingsTabs();
+  const { tabs, isLoading } = useCommunitySettingsTabs();
 
   // The Usage tab says when the plan wants a look: a failed payment, or a
   // trial running out. Hosted only — the query never runs without a portal —
@@ -58,7 +56,13 @@ export const CommunitySettingsLayout = () => {
       : tabs;
   }, [tabs, summary, t]);
 
-  const canViewSettings = administers;
+  // Running any part of the community: held as its admin, by a custom role,
+  // or lent by a settings grant.
+  const canViewSettings = tabs.length > 0;
+
+  if (isLoading) {
+    return <SettingsPaneSkeleton />;
+  }
 
   if (!canViewSettings) {
     return (

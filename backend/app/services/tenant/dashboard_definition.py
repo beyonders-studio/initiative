@@ -346,14 +346,11 @@ WIDGET_SPECS: dict[str, WidgetSpec] = {
     ),
 }
 
-#: What a binding may name. Three, and only the first is ours to write: a
-#: **query** is a statement over this guild's datasets, a **sheet_range** is a
-#: cell range in a spreadsheet file, and **plugin** is an installed listing's
-#: own endpoint. The first two both answer with columns and rows, so a widget
-#: draws them by the same path and never learns which it was given.
+#: What a binding may name. Two, and only the first is ours to write: a
+#: **query** is a statement over this guild's datasets and its spreadsheets'
+#: ranges, and **plugin** is an installed listing's own endpoint.
 QUERY_SOURCE = "query"
-SHEET_SOURCE = "sheet_range"
-TABULAR_SOURCES: frozenset[str] = frozenset({QUERY_SOURCE, SHEET_SOURCE})
+TABULAR_SOURCES: frozenset[str] = frozenset({QUERY_SOURCE})
 
 
 # --- plug-in widgets ------------------------------------------------------------

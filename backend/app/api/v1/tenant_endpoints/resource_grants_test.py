@@ -11,12 +11,12 @@ from httpx import AsyncClient
 from sqlmodel.ext.asyncio.session import AsyncSession
 
 from app.testing.factories import (
+    create_counter_group,
     create_guild,
     create_guild_membership,
     create_initiative,
     create_initiative_member,
     create_project,
-    create_queue,
     create_user,
     get_auth_headers,
 )
@@ -80,7 +80,8 @@ async def test_bulk_applies_grants_across_many_projects(
 async def test_bulk_dispatches_across_resource_types(
     client: AsyncClient, session: AsyncSession
 ):
-    """One request mixing a project and a queue routes each to the right adapter."""
+    """One request mixing a project and a counter group routes each to the
+    right adapter."""
     owner = await create_user(session, email="owner@example.com")
     member = await create_user(session, email="member@example.com")
     guild = await create_guild(session)
@@ -89,7 +90,7 @@ async def test_bulk_dispatches_across_resource_types(
     initiative = await create_initiative(session, guild, owner)
     await create_initiative_member(session, initiative, member, role_name="member")
     project = await create_project(session, initiative, owner)
-    queue = await create_queue(session, initiative, owner)
+    group = await create_counter_group(session, initiative, owner)
     headers = get_auth_headers(owner)
 
     resp = await client.put(
@@ -103,8 +104,8 @@ async def test_bulk_dispatches_across_resource_types(
                     "grants": [{"user_id": member.id, "level": "read"}],
                 },
                 {
-                    "resource_type": "queue",
-                    "resource_id": queue.id,
+                    "resource_type": "counter_group",
+                    "resource_id": group.id,
                     "grants": [{"all_initiative_members": True, "level": "write"}],
                 },
             ]
@@ -116,7 +117,7 @@ async def test_bulk_dispatches_across_resource_types(
         for r in resp.json()["results"]
     }
     assert statuses[("project", project.id)] == "ok"
-    assert statuses[("queue", queue.id)] == "ok"
+    assert statuses[("counter_group", group.id)] == "ok"
 
 
 async def test_bulk_is_best_effort_per_item(client: AsyncClient, session: AsyncSession):

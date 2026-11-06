@@ -16,10 +16,10 @@ from app.db.schema_provisioning import guild_schema_name
 from app.db.soft_delete_filter import SOFT_DELETE_MODELS, select_including_deleted
 from app.db.tenancy import GUILD_SCOPED_TABLES
 from app.models.platform.user import User
-from app.models.tenant.file import File, FileType
+from app.core.file_types import FileType
+from app.models.tenant.file import File
 from app.models.tenant.initiative import Initiative
 from app.models.tenant.project import Project
-from app.models.tenant.queue import Queue
 from app.models.tenant.task import Task
 from app.models.tenant.upload import Upload
 from app.services.tenant.lifecycle_tree import CASCADE_CHILDREN, CASCADE_PARENTS
@@ -28,9 +28,11 @@ from app.services.tenant.soft_delete import (
     soft_delete_entity,
 )
 from app.testing.factories import (
+    create_file,
     create_guild,
     create_initiative,
     create_project,
+    create_upload,
     create_user,
 )
 
@@ -219,8 +221,6 @@ async def test_restrictive_delete_policy_exists_on_each_soft_delete_table(
         "comments",
         "initiatives",
         "tags",
-        "queues",
-        "queue_items",
         "calendars",
         "calendar_events",
     }
@@ -266,7 +266,7 @@ async def test_soft_delete_file_preserves_uploads(session: AsyncSession):
     doc = File(
         initiative_id=initiative.id,
         name="With image",
-        file_type=FileType.native,
+        file_type=FileType.lexical,
         content={"text": "uses /uploads/abc123.png"},
         featured_image_url="/uploads/abc123.png",
         created_by=user.id,
@@ -319,7 +319,7 @@ async def test_purge_file_uploads_escapes_like_wildcards(session: AsyncSession):
     doomed = File(
         initiative_id=initiative.id,
         name="Doomed",
-        file_type=FileType.native,
+        file_type=FileType.lexical,
         content={},
         featured_image_url="/uploads/file_v2.png",
         created_by=user.id,
@@ -331,7 +331,7 @@ async def test_purge_file_uploads_escapes_like_wildcards(session: AsyncSession):
     decoy = File(
         initiative_id=initiative.id,
         name="Decoy",
-        file_type=FileType.native,
+        file_type=FileType.lexical,
         content={"src": "/uploads/fileXv2.png"},
         created_by=user.id,
     )
@@ -349,6 +349,38 @@ async def test_purge_file_uploads_escapes_like_wildcards(session: AsyncSession):
         await session.exec(select(Upload).where(Upload.filename == "file_v2.png"))
     ).one_or_none()
     assert remaining is None
+
+
+async def test_purging_a_file_keeps_a_version_a_page_shows(session: AsyncSession):
+    """A picture picked from Files into a page of the same initiative is the
+    version's own stored file, so purging the file leaves it to the page."""
+    from app.services.tenant import file_versions
+    from app.services.tenant.attachments import purge_file_uploads
+
+    user = await create_user(session)
+    guild = await create_guild(session, creator=user)
+    initiative = await create_initiative(session, guild, user)
+    for name in ("shown.png", "alone.png"):
+        await create_upload(session, guild, user, filename=name)
+    doomed = await create_file(
+        session,
+        initiative,
+        user,
+        file_url=f"/uploads/{guild.id}/shown.png",
+        file_content_type="image/png",
+    )
+    await file_versions.add_version(
+        session,
+        doomed,
+        created_by=user.id,
+        file_url=f"/uploads/{guild.id}/alone.png",
+        file_content_type="image/png",
+    )
+    await create_file(
+        session, initiative, user, content={"src": f"/uploads/{guild.id}/shown.png"}
+    )
+
+    assert await purge_file_uploads(session, [doomed]) == {"alone.png"}
 
 
 async def test_trash_listing_dedupes_nested_comment_replies(
@@ -489,7 +521,6 @@ async def test_purging_a_uploaded_file_takes_every_version(session: AsyncSession
         initiative,
         user,
         name="Doomed file",
-        file_type=FileType.file,
         file_url=f"/uploads/{names[0]}",
         original_filename=names[0],
     )
@@ -522,11 +553,11 @@ async def test_purging_a_uploaded_file_takes_every_version(session: AsyncSession
 
 
 # ---------------------------------------------------------------------------
-# Wikilink unresolution at hard purge
+# Unlinking references at hard purge
 # ---------------------------------------------------------------------------
 
 
-def _wikilink_content(target_file_id: int) -> dict:
+def _linking_content(target_file_id: int) -> dict:
     return {
         "root": {
             "type": "root",
@@ -535,9 +566,10 @@ def _wikilink_content(target_file_id: int) -> dict:
                     "type": "paragraph",
                     "children": [
                         {
-                            "type": "wikilink",
-                            "documentId": target_file_id,
-                            "children": [],
+                            "type": "entity-mention",
+                            "entityType": "file",
+                            "entityId": target_file_id,
+                            "text": "Target",
                         }
                     ],
                 }
@@ -546,13 +578,18 @@ def _wikilink_content(target_file_id: int) -> dict:
     }
 
 
-async def test_hard_purge_unresolves_wikilinks_in_linking_files(
+def _unlinked(content: dict) -> bool:
+    node = content["root"]["children"][0]["children"][0]
+    return node["type"] == "text" and node["text"] == "Target"
+
+
+async def test_hard_purge_unlinks_references_in_linking_files(
     session: AsyncSession,
 ):
-    """Purging a file rewrites links pointing at it in surviving files
-    (documentId -> null) and takes the edges with it, so nothing dangles after
-    the row is gone. A Yjs state the editor cannot read is cleared, and the
-    next session makes it from the repaired content."""
+    """Purging a file makes references to it in surviving files their words
+    and takes the edges with it, so nothing dangles after the row is gone. A
+    Yjs state the editor cannot read is cleared, and the next session makes it
+    from the repaired content."""
     from sqlmodel import select
 
     from app.core.relationships import RelationshipType, node_id
@@ -572,7 +609,7 @@ async def test_hard_purge_unresolves_wikilinks_in_linking_files(
         initiative,
         user,
         name="Linking",
-        content=_wikilink_content(target.id),
+        content=_linking_content(target.id),
         yjs_state=b"stale-collab-state",
     )
     await content_references.sync_for_entity(
@@ -598,9 +635,7 @@ async def test_hard_purge_unresolves_wikilinks_in_linking_files(
             .options(undefer(File.content), undefer(File.yjs_state))
         )
     ).one()
-    wikilink_node = refreshed.content["root"]["children"][0]["children"][0]
-    assert wikilink_node["type"] == "wikilink"
-    assert wikilink_node["documentId"] is None
+    assert _unlinked(refreshed.content)
     assert refreshed.yjs_state is None
 
     edges = (
@@ -616,10 +651,10 @@ async def test_hard_purge_unresolves_wikilinks_in_linking_files(
     assert edges == []
 
 
-async def test_hard_purge_unresolves_wikilinks_in_trashed_linking_files(
+async def test_hard_purge_unlinks_references_in_trashed_linking_files(
     session: AsyncSession,
 ):
-    """A linking file sitting in the trash gets its links unresolved too —
+    """A linking file sitting in the trash gets its references unlinked too —
     restoring it after the purge must not bring back a dangling link."""
     from app.core.search import SearchEntityType
     from app.services.tenant import content_references
@@ -636,7 +671,7 @@ async def test_hard_purge_unresolves_wikilinks_in_trashed_linking_files(
         initiative,
         user,
         name="Trashed Linking",
-        content=_wikilink_content(target.id),
+        content=_linking_content(target.id),
     )
     await content_references.sync_for_entity(
         session,
@@ -665,8 +700,7 @@ async def test_hard_purge_unresolves_wikilinks_in_trashed_linking_files(
             .options(undefer(File.content))
         )
     ).one()
-    wikilink_node = refreshed.content["root"]["children"][0]["children"][0]
-    assert wikilink_node["documentId"] is None
+    assert _unlinked(refreshed.content)
 
 
 # ---------------------------------------------------------------------------
@@ -674,22 +708,22 @@ async def test_hard_purge_unresolves_wikilinks_in_trashed_linking_files(
 # ---------------------------------------------------------------------------
 
 
-async def test_restore_initiative_brings_back_an_archived_queues_items(
+async def test_restore_initiative_brings_back_an_archived_counter_groups_counters(
     session: AsyncSession,
 ):
-    """A queue item carries no ``archived_at``: inside an archived queue it is
-    simply live, because that is the only state it has. Restoring the
+    """A counter carries no ``archived_at``: inside an archived counter group
+    it is simply live, because that is the only state it has. Restoring the
     initiative has to put it back in exactly that state."""
-    from app.models.tenant.queue import QueueItem
+    from app.models.tenant.counter import Counter, CounterGroup
     from app.services.tenant.archive import archive_entity
-    from app.testing.factories import create_queue, create_queue_item
+    from app.testing.factories import create_counter, create_counter_group
 
     user = await create_user(session)
     guild = await create_guild(session, creator=user)
     initiative = await create_initiative(session, guild, user)
-    queue = await create_queue(session, initiative, user)
-    item = await create_queue_item(session, queue)
-    await archive_entity(session, queue)
+    group = await create_counter_group(session, initiative, user)
+    counter = await create_counter(session, group)
+    await archive_entity(session, group)
     await session.commit()
 
     await soft_delete_entity(
@@ -702,15 +736,17 @@ async def test_restore_initiative_brings_back_an_archived_queues_items(
 
     refreshed = (
         await session.exec(
-            select_including_deleted(QueueItem).where(QueueItem.id == item.id)
+            select_including_deleted(Counter).where(Counter.id == counter.id)
         )
     ).one()
     assert refreshed.deleted_at is None
-    refreshed_queue = (
-        await session.exec(select_including_deleted(Queue).where(Queue.id == queue.id))
+    refreshed_group = (
+        await session.exec(
+            select_including_deleted(CounterGroup).where(CounterGroup.id == group.id)
+        )
     ).one()
-    assert refreshed_queue.deleted_at is None
-    assert refreshed_queue.archived_at is not None
+    assert refreshed_group.deleted_at is None
+    assert refreshed_group.archived_at is not None
 
 
 async def test_restore_initiative_brings_back_an_archived_files_comments(
@@ -883,16 +919,14 @@ async def _file(
     from app.models.tenant.calendar_event import CalendarEvent
     from app.models.tenant.comment import Comment
     from app.models.tenant.counter import Counter
-    from app.models.tenant.gallery import GalleryImage
-    from app.models.tenant.queue import QueueItem
+    from app.models.tenant.collection import Collection
     from app.models.tenant.wiki import Wiki, WikiPage
     from app.testing.factories import (
         TOOL_FACTORIES,
         create_calendar_event,
         create_comment,
         create_counter,
-        create_gallery_image,
-        create_queue_item,
+        create_collection,
         create_task,
         create_wiki_page,
     )
@@ -903,8 +937,6 @@ async def _file(
         return await TOOL_FACTORIES[tool](session, parent, user)
     if model is Task:
         return await create_task(session, parent)
-    if model is QueueItem:
-        return await create_queue_item(session, parent)
     if model is Counter:
         return await create_counter(session, parent)
     if model is CalendarEvent:
@@ -918,8 +950,8 @@ async def _file(
                 **{fk: parent.id, "original_start": parent.start_at},
             )
         return await create_calendar_event(session, parent, user)
-    if model is GalleryImage:
-        return await create_gallery_image(session, parent, user)
+    if model is Collection:
+        return await create_collection(session, parent, user)
     if model is WikiPage:
         if fk == "wiki_id":
             return await create_wiki_page(session, parent, user)

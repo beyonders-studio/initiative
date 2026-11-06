@@ -20,6 +20,23 @@ describe("Lightbox", () => {
     expect(screen.getByText("2 / 3")).toBeInTheDocument();
   });
 
+  it("draws its panel beside the picture, and leaves keys typed there to it", () => {
+    const onIndexChange = vi.fn();
+    renderWithProviders(
+      <Lightbox
+        open
+        onOpenChange={() => {}}
+        items={items}
+        index={1}
+        onIndexChange={onIndexChange}
+        panel={<input aria-label="Caption" />}
+      />
+    );
+    const caption = screen.getByRole("textbox", { name: "Caption" });
+    fireEvent.keyDown(caption, { key: "ArrowRight" });
+    expect(onIndexChange).not.toHaveBeenCalled();
+  });
+
   it("pages with the arrow keys and the chevrons", () => {
     const onIndexChange = vi.fn();
     renderWithProviders(

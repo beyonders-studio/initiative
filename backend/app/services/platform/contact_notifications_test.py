@@ -86,7 +86,7 @@ class TestConnections:
         lines = await _lines(session, bo.user.id, "connection_requested")
         assert len(lines) == 1
         assert lines[0]["actor_id"] == ada.user.id
-        assert lines[0]["target_path"] == "/contacts"
+        assert lines[0]["target_path"] == "/profile/privacy"
         # The one doing the asking is not told they asked.
         assert await _lines(session, ada.user.id, "connection_requested") == []
 

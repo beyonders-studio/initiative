@@ -721,7 +721,7 @@ async def settle_report(
             session,
             source_guild_id=guild_id,
             report_id=report.id,
-            case_id=opened.case_id,
+            case_task_id=opened.task_id,
         )
         if outcome is ReportOutcome.held:
             from app.services.platform import holds as holds_service

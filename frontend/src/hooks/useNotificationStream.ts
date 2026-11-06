@@ -130,7 +130,7 @@ export const useNotificationStream = () => {
   // Who may reach this account, and who it has agreed something with. One
   // frame moves all three lists, because they change together: accepting a
   // connection opens a channel, and leaving a community closes one.
-  const refreshContacts = useCallback(() => {
+  const refreshConnections = useCallback(() => {
     void invalidate(q.contactGrants(), q.ignoredAccounts(), q.dmSettings());
   }, []);
 
@@ -140,10 +140,10 @@ export const useNotificationStream = () => {
   const resync = useCallback(() => {
     void invalidate(q.notifications());
     refreshAccount();
-    refreshContacts();
+    refreshConnections();
     void invalidate(q.directMessages());
     void refreshFiledTickets();
-  }, [refreshAccount, refreshContacts]);
+  }, [refreshAccount, refreshConnections]);
 
   useEffect(
     () => () => {
@@ -194,8 +194,8 @@ export const useNotificationStream = () => {
           receiveAlert(frame);
         } else if (frame.resource === "account") {
           refreshAccount();
-        } else if (frame.resource === "contacts") {
-          refreshContacts();
+        } else if (frame.resource === "connections") {
+          refreshConnections();
         } else if (frame.resource === "tickets") {
           // One of the tickets this person filed moved: the team answered, or
           // its state changed. The open ticket page reads it again.
@@ -239,5 +239,5 @@ export const useNotificationStream = () => {
       setConnected(false);
       connection.close();
     };
-  }, [userId, resync, refreshAccount, refreshContacts]);
+  }, [userId, resync, refreshAccount, refreshConnections]);
 };

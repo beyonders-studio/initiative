@@ -2,7 +2,7 @@
  * One line to add a task to a list, from the home page: the shortest way to a
  * first task, and to the next one. The task is the reader's own, so it lands
  * in their tasks straight away. Where the reader has titles read, what the
- * line says of a date, repeat, priority, tags or people is set on it too.
+ * line says of a type, date, repeat, priority, tags or people is set on it too.
  */
 
 import { Plus } from "lucide-react";
@@ -11,6 +11,7 @@ import { useTranslation } from "react-i18next";
 
 import { Tool } from "@/api/generated/initiativeAPI.schemas";
 import { usePersonMention } from "@/components/comments/usePersonMention";
+import { SmartTitleHints } from "@/components/tasks/SmartTitleHints";
 import { SmartTitleParts } from "@/components/tasks/SmartTitleParts";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -89,7 +90,10 @@ export const QuickAddTask = ({ list, name }: { list: HomeTaskList; name: string 
             placeholder={t("widgets.tasks.addPlaceholder", { list: name })}
             aria-label={t("widgets.tasks.addPlaceholder", { list: name })}
             disabled={create.isPending}
+            className={reads ? "pe-9" : undefined}
           />
+          {/* Inside the line's end, where it does not take from the box's width. */}
+          <SmartTitleHints className="absolute end-0.5 top-1/2 size-8 -translate-y-1/2" />
           {people.popover}
         </div>
         <Button type="submit" disabled={!clean || create.isPending}>

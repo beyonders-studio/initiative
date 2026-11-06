@@ -7,7 +7,7 @@ queue through the ordinary authorized endpoint and decrypts locally, so that
 request is the only place anything is decided and a frame delivered to the wrong
 socket would tell its reader nothing.
 
-A separate channel rather than an arm on ``contacts``: a contacts frame means
+A separate channel rather than an arm on ``connections``: a connections frame means
 "re-read three permission lists", and a mailbox poll should not ride behind it.
 """
 

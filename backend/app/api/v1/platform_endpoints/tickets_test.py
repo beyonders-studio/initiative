@@ -11,12 +11,13 @@ import json
 import pytest
 from sqlmodel import select
 
+from app.core.rules import SetBy
+from app.services.platform import rules
 from app.core.intake import IntakeStream, meta
 from app.core.messages import SupportMessages, TicketMessages
 from app.db.session import set_rls_context
 from app.models.platform.app_setting import AppSetting
 from app.models.platform.guild import CommunityRole
-from app.models.platform.guild_administration import GuildAdministration
 from app.models.tenant.comment import Comment, CommentAudience
 from app.models.tenant.intake import IntakeBinding, IntakeCase
 from app.models.tenant.task import Task, TaskStatus, TaskStatusCategory
@@ -25,6 +26,7 @@ from app.testing import (
     create_initiative,
     create_project,
     create_user,
+    make_operations_community,
 )
 from app.db.request_context import SystemGuild, Unattributed
 
@@ -78,13 +80,9 @@ async def _set_contacts(session, *, general=None, **streams) -> None:
 async def _set_support(session, guild_id: int, enabled: bool) -> None:
     """Grant the entitlement, the way the operator's Guilds tab does."""
     await set_rls_context(session, Unattributed())
-    row = (
-        await session.exec(
-            select(GuildAdministration).where(GuildAdministration.guild_id == guild_id)
-        )
-    ).one()
-    row.support_enabled = enabled
-    session.add(row)
+    await rules.put(
+        session, "help_requests", enabled, guild_id=guild_id, set_by=SetBy.deployment
+    )
     await session.commit()
 
 
@@ -96,13 +94,7 @@ async def operations(session):
     ops_initiative = await create_initiative(session, ops_guild, staff)
     ops_project = await create_project(session, ops_initiative, staff)
 
-    await set_rls_context(session, Unattributed())
-    row = (await session.exec(select(AppSetting).where(AppSetting.id == 1))).first()
-    if row is None:
-        row = AppSetting(id=1)
-    row.operations_guild_id = ops_guild.id
-    session.add(row)
-    await session.commit()
+    await make_operations_community(session, ops_guild.id)
 
     await set_rls_context(session, SystemGuild(ops_guild.id))
     session.add(IntakeBinding(stream=IntakeStream.support, project_id=ops_project.id))
@@ -151,13 +143,13 @@ async def test_the_case_names_who_asked_and_where_from(
 
     await set_rls_context(session, SystemGuild(operations["guild"].id))
     case = (await session.exec(select(IntakeCase))).one()
-    from app.models.tenant.property import PropertyValue
+    from app.models.tenant.metadata import MetadataValue
 
     values = (
         await session.exec(
-            select(PropertyValue).where(
-                PropertyValue.entity_type == "task",
-                PropertyValue.entity_id == case.task_id,
+            select(MetadataValue).where(
+                MetadataValue.entity_type == "task",
+                MetadataValue.entity_id == case.task_id,
             )
         )
     ).all()
@@ -455,19 +447,19 @@ async def test_an_account_question_from_inside_a_community_records_none(
 
     await set_rls_context(session, SystemGuild(operations["guild"].id))
     case = (await session.exec(select(IntakeCase))).one()
-    from app.models.tenant.property import PropertyDefinition, PropertyValue
+    from app.models.tenant.metadata import MetadataDefinition, MetadataValue
 
     held = dict(
         (
             await session.exec(
-                select(PropertyDefinition.name, PropertyValue.value_number)
+                select(MetadataDefinition.name, MetadataValue.value_number)
                 .join(
-                    PropertyDefinition,
-                    PropertyDefinition.id == PropertyValue.property_id,
+                    MetadataDefinition,
+                    MetadataDefinition.id == MetadataValue.property_id,
                 )
                 .where(
-                    PropertyValue.entity_type == "task",
-                    PropertyValue.entity_id == case.task_id,
+                    MetadataValue.entity_type == "task",
+                    MetadataValue.entity_id == case.task_id,
                 )
             )
         ).all()

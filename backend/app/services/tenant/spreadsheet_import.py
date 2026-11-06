@@ -1,4 +1,4 @@
-"""Read a CSV or XLSX file into the shape a spreadsheet file holds.
+"""Read a CSV, XLSX, XLS or ODS file into the shape a spreadsheet file holds.
 
 The inverse of :mod:`app.services.export.spreadsheet`, and deliberately its
 neighbour: the two have to agree about how a fill, a border or a currency
@@ -14,13 +14,18 @@ in step with the first.
 
 from __future__ import annotations
 
+import atexit
+import codecs
 import csv
 import io
 import math
 import re
+import tempfile
+import threading
 import zipfile
 from datetime import date, datetime, time
-from typing import Any
+from pathlib import Path
+from typing import Any, Optional
 
 from openpyxl import load_workbook
 from openpyxl.cell.cell import Cell
@@ -29,6 +34,7 @@ from openpyxl.utils.cell import coordinate_from_string
 from openpyxl.worksheet.worksheet import Worksheet
 
 from app.core.messages import FileMessages
+from app.services.worker_pool import Pool, PoolError
 from app.services.tenant.files_spreadsheet import (
     MAX_COLS,
     MAX_ROWS,
@@ -73,9 +79,19 @@ MAX_IMPORT_XLSX_BYTES: int = 100 * 1024 * 1024
 #: rather than an uploaded file, which cannot hold it.
 TEXT_TABLE_SUFFIXES = (".csv", ".tsv")
 
+#: Workbooks read by calamine (:mod:`app.services.sheet_worker`), in a
+#: process of their own. It reads values and not formatting; an ``.ods``
+#: file's formulas are read from its XML beside it, and an ``.xls`` file's
+#: formula arrives as the value it last showed.
+CALAMINE_SUFFIXES = (".xls", ".ods")
 
-def parse_spreadsheet_file(filename: str, data: bytes) -> list[dict[str, Any]]:
-    """The sheets a file holds, in canonical workbook form.
+
+def parse_spreadsheet_file(
+    filename: str, data: bytes, *, strict: bool = False
+) -> list[dict[str, Any]]:
+    """The sheets a file holds, in canonical workbook form. ``strict``
+    refuses a text table whose encoding isn't read whole, rather than
+    reading what it can of it.
 
     Raises :class:`FileContentError` for anything that is not a
     spreadsheet this can read.
@@ -85,9 +101,11 @@ def parse_spreadsheet_file(filename: str, data: bytes) -> list[dict[str, Any]]:
     base = name.rsplit("/", 1)[-1].rsplit(".", 1)[0] or "Imported"
 
     if lower.endswith(TEXT_TABLE_SUFFIXES):
-        raw = [_parse_csv(data, base, tab=lower.endswith(".tsv"))]
+        raw = [_parse_csv(data, base, tab=lower.endswith(".tsv"), strict=strict)]
     elif lower.endswith(".xlsx") or lower.endswith(".xlsm"):
         raw = _parse_xlsx(data)
+    elif lower.endswith(CALAMINE_SUFFIXES):
+        raw = _parse_with_calamine(data, suffix=lower[lower.rindex(".") :])
     else:
         raise FileContentError(FileMessages.SPREADSHEET_UNREADABLE_FILE)
 
@@ -105,20 +123,32 @@ def parse_spreadsheet_file(filename: str, data: bytes) -> list[dict[str, Any]]:
 # ── CSV ──────────────────────────────────────────────────────────────────────
 
 
-def _decode(data: bytes) -> str:
-    """Text from bytes, preferring UTF-8 and never failing on a file that
-    is not. A spreadsheet exported by an older tool is often cp1252, and a
-    mangled accent is a better outcome than a refused import."""
-    for encoding in ("utf-8-sig", "utf-8", "cp1252"):
+def decode_text(data: bytes) -> str | None:
+    """Text from bytes in an encoding read whole: UTF-8, UTF-16 where the
+    file starts with its mark, or cp1252, which a file exported by an older
+    tool often is. ``None`` for bytes none of them reads as text."""
+    if data.startswith((codecs.BOM_UTF16_LE, codecs.BOM_UTF16_BE)):
+        encodings: tuple[str, ...] = ("utf-16",)
+    else:
+        encodings = ("utf-8-sig", "cp1252")
+    for encoding in encodings:
         try:
-            return data.decode(encoding)
+            text = data.decode(encoding)
         except UnicodeDecodeError:
             continue
-    return data.decode("utf-8", errors="replace")
+        return None if "\x00" in text else text
+    return None
 
 
-def _parse_csv(data: bytes, name: str, *, tab: bool) -> dict[str, Any]:
-    text = _decode(data)
+def _parse_csv(data: bytes, name: str, *, tab: bool, strict: bool) -> dict[str, Any]:
+    text = decode_text(data)
+    if text is None:
+        # Into a workbook that keeps the original, a mangled accent is a
+        # better outcome than a refused import; a conversion keeps nothing
+        # else, so it refuses.
+        if strict:
+            raise FileContentError(FileMessages.SPREADSHEET_UNREADABLE_FILE)
+        text = data.decode("utf-8", errors="replace")
     delimiter = "\t" if tab else ","
     reader = csv.reader(io.StringIO(text, newline=""), delimiter=delimiter)
     cells: dict[str, Any] = {}
@@ -219,6 +249,80 @@ def _parse_xlsx(data: bytes) -> list[dict[str, Any]]:
         budget -= used
         sheets.append(sheet)
     return sheets
+
+
+# ── XLS and ODS, in a worker ─────────────────────────────────────────────────
+
+_HANDLER = Path(__file__).parent.parent / "sheet_worker.py"
+#: How long one workbook may take to read.
+_TIME_MS = 60_000
+_IDLE_SECONDS = 300
+_ADDRESS_SPACE_BYTES = 1536 * 1024 * 1024
+
+_pool: Optional[Pool] = None
+_pool_lock = threading.Lock()
+
+
+def _the_pool() -> Pool:
+    global _pool
+    with _pool_lock:
+        if _pool is None:
+            # The app's lifespan stops it; a process that has none stops it
+            # on its way out.
+            atexit.register(shutdown)
+            _pool = Pool(
+                handler=_HANDLER,
+                arguments=[
+                    str(MAX_IMPORT_CELLS),
+                    str(MAX_ROWS),
+                    str(MAX_COLS),
+                    str(MAX_IMPORT_SCAN),
+                    str(_ADDRESS_SPACE_BYTES),
+                ],
+                size=1,
+                time_ms=_TIME_MS,
+                idle_seconds=_IDLE_SECONDS,
+            )
+        return _pool
+
+
+def shutdown() -> None:
+    """Stop the pool's worker; the next workbook starts a new pool."""
+    global _pool
+    with _pool_lock:
+        pool, _pool = _pool, None
+    if pool is not None:
+        pool.shutdown()
+
+
+def _parse_with_calamine(data: bytes, *, suffix: str) -> list[dict[str, Any]]:
+    """The sheets of an ``.xls`` or ``.ods`` workbook, read by the worker."""
+    if suffix == ".ods":
+        _refuse_oversized_package(data)
+    if len(data) > MAX_IMPORT_XLSX_BYTES:
+        raise FileContentError(FileMessages.SPREADSHEET_FILE_TOO_LARGE)
+    with tempfile.NamedTemporaryFile(suffix=suffix) as copy:
+        copy.write(data)
+        copy.flush()
+        try:
+            read = _the_pool().ask({"path": copy.name})
+        except PoolError as exc:
+            raise FileContentError(FileMessages.SPREADSHEET_FILE_TOO_LARGE) from exc
+    if read.get("too_large"):
+        raise FileContentError(FileMessages.SPREADSHEET_FILE_TOO_LARGE)
+    if "sheets" not in read:
+        raise FileContentError(FileMessages.SPREADSHEET_UNREADABLE_FILE)
+    if len(read["sheets"]) > MAX_SHEETS:
+        raise FileContentError(FileMessages.SPREADSHEET_FILE_TOO_LARGE)
+    return [
+        {
+            "name": sheet["name"],
+            "cells": sheet["cells"],
+            "dimensions": _dimensions(sheet["rows"], sheet["cols"]),
+            **({"hidden": True} if sheet["hidden"] else {}),
+        }
+        for sheet in read["sheets"]
+    ]
 
 
 def _refuse_unreadable_shape(worksheets: list[Worksheet]) -> None:

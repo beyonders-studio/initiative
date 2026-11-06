@@ -23,7 +23,7 @@ describe("BrowseMarketplaceButton", () => {
   });
 
   it("renders nothing for a tool the marketplace has no shelf for", () => {
-    const { container } = renderPage(() => <BrowseMarketplaceButton tool={Tool.queue} />);
+    const { container } = renderPage(() => <BrowseMarketplaceButton tool={Tool.counter_group} />);
 
     expect(container.querySelector("a")).toBeNull();
   });

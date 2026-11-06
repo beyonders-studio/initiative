@@ -93,13 +93,12 @@
     "initiativeSettings": "Configuración de la iniciativa",
     "files": "Archivos",
     "projects": "Proyectos",
-    "queues": "Colas",
     "calendars": "Calendario",
     "dashboards": "Paneles",
     "counterGroups": "Contadores",
     "posts": "Publicaciones",
-    "galleries": "Galerías",
-    "wikis": "Wikis"
+    "wikis": "Wikis",
+    "contacts": "Contactos"
   },
   "settings": {
     "title": "Configuración de la iniciativa",
@@ -175,6 +174,8 @@
     "rolesDescription": "Lo que cada rol puede ver y lo que puede crear. Los gestores lo tienen todo.",
     "loadingRoles": "Cargando roles...",
     "addCustomRole": "Agregar rol personalizado",
+    "setByCommunity": "Tu comunidad define esto para todas las iniciativas.",
+    "customRolesOff": "Tu comunidad limita las iniciativas a sus roles integrados.",
     "builtIn": "Integrado",
     "manager": "Gerente",
     "fullAccess": "Acceso total",
@@ -190,7 +191,7 @@
     "deleted": "Iniciativa eliminada.",
     "deleteError": "No se pudo eliminar la iniciativa en este momento.",
     "deleteConfirmTitle": "¿Eliminar iniciativa?",
-    "deleteConfirmDescription": "<bold>{{name}}</bold> y todo su contenido (proyectos, tareas, archivos, colas, eventos) se enviará a la papelera. Puedes restaurar todo el árbol desde Configuración → Papelera antes de que finalice el período de retención.",
+    "deleteConfirmDescription": "<bold>{{name}}</bold> y todo su contenido (proyectos, tareas, archivos, eventos) se enviará a la papelera. Puedes restaurar todo el árbol desde Configuración → Papelera antes de que finalice el período de retención.",
     "deleteConfirmLabel": "Escribe <bold>{{name}}</bold> para confirmar:",
     "createRoleTitle": "Crear rol personalizado",
     "createRoleDescription": "Agrega un nuevo rol con permisos personalizados para esta iniciativa.",
@@ -222,21 +223,18 @@
     "permissionGroups": {
       "files": "Archivos",
       "projects": "Proyectos",
-      "queues": "Colas",
       "calendars": "Eventos",
       "dashboards": "Paneles",
       "counterGroups": "Contadores",
       "posts": "Publicaciones",
-      "galleries": "Galerías",
-      "wikis": "Wikis"
+      "wikis": "Wikis",
+      "contacts": "Contactos"
     },
     "permissions": {
       "viewFiles": "Ver archivos",
       "viewProjects": "Ver proyectos",
       "createFiles": "Crear archivos",
       "createProjects": "Crear proyectos",
-      "viewQueues": "Ver colas",
-      "createQueues": "Crear colas",
       "viewCalendars": "Ver eventos",
       "createCalendars": "Crear eventos",
       "viewDashboards": "Ver paneles",
@@ -245,12 +243,12 @@
       "createCounterGroups": "Crear contadores",
       "viewPosts": "Ver publicaciones",
       "createPosts": "Crear publicaciones",
-      "viewGalleries": "Ver galerías",
-      "createGalleries": "Crear galerías",
       "viewShort": "Ver",
       "createShort": "Crear",
       "viewWikis": "Ver wikis",
       "createWikis": "Crear wikis",
+      "viewContacts": "Ver contactos",
+      "createContacts": "Crear contactos",
       "dashboards_run_as_initiative": "Ejecutar paneles como Iniciativa"
     },
     "handleColumn": "Identificador",
@@ -284,8 +282,6 @@
   },
   "advancedTools": "Herramientas",
   "advancedToolsDescription": "Elige de qué se compone esta iniciativa. Los proyectos y los archivos vienen activados; el resto lo añades tú.",
-  "queuesFeature": "Colas",
-  "queuesFeatureDescription": "A quién le toca. Turnos, órdenes de actuación, ruedas de tareas, orden de iniciativa — y nunca le toca a nadie.",
   "calendarsFeature": "Calendario",
   "calendarsFeatureDescription": "Cosas que ocurren a una hora. Confirmaciones, recordatorios y un sitio donde mirar antes de que alguien pregunte si es este jueves.",
   "dashboardsFeature": "Paneles",
@@ -294,8 +290,6 @@
   "counterGroupsFeatureDescription": "Números que se mueven. Recuentos, totales, puntuaciones, plazas libres, puntos de vida: un número en el que todos en la sala coinciden.",
   "postsFeature": "Publicaciones",
   "postsFeatureDescription": "Un tablón de anuncios. Avisos, encuestas, quién los ha leído — con el importante fijado arriba, para que no se lo pierdan cuatro personas.",
-  "galleriesFeature": "Galerías",
-  "galleriesFeatureDescription": "Una pared de imágenes. Maquetas, capturas, los cuatro logos que perdieron.",
   "projectsFeature": "Proyectos",
   "projectsFeatureDescription": "Tableros de pendientes: quién lo lleva, en qué fase está, qué falta. Míralos como tabla, tablero Kanban o calendario: las mismas tareas, tú eliges.",
   "filesFeature": "Archivos",
@@ -329,5 +323,23 @@
     "firstIntroLink": "Leer más aquí"
   },
   "wikisFeature": "Wikis",
-  "wikisFeatureDescription": "Páginas que se enlazan entre sí. Manuales, referencias, eso que todo el mundo pregunta una y otra vez."
+  "wikisFeatureDescription": "Páginas que se enlazan entre sí. Manuales, referencias, eso que todo el mundo pregunta una y otra vez.",
+  "contactsFeature": "Contactos",
+  "contactsFeatureDescription": "Las personas y empresas para las que o con las que trabajáis: el cliente, el local, el proveedor, a un toque de una llamada.",
+  "communityDefaults": {
+    "title": "Todas las iniciativas",
+    "description": "Una herramienta o un permiso de miembro que definas aquí se aplica en todas las iniciativas de esta comunidad; sus responsables lo ven como definido. Si lo dejas a cada iniciativa, sigue siendo suyo.",
+    "toolsHeading": "Herramientas",
+    "memberHeading": "Lo que pueden hacer los miembros",
+    "memberHelp": "Para el rol integrado Miembro en cada iniciativa.",
+    "choice": {
+      "initiative": "Cada iniciativa decide",
+      "on": "Activado en todas",
+      "off": "Desactivado en todas"
+    },
+    "customRolesLabel": "Los responsables pueden añadir roles",
+    "customRolesHelp": "Si está desactivado, las iniciativas no pueden añadir roles, y los roles propios que ya tengan no pueden hacer más que los miembros.",
+    "saved": "Guardado para todas las iniciativas",
+    "error": "No se pudo guardar"
+  }
 }

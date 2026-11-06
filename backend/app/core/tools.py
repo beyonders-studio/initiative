@@ -22,8 +22,9 @@ def kind_refusal(kind: str, code: str, status_code: int) -> CodedError:
 
 
 def plural_of(stem: str) -> str:
-    """The plural spelling of a tool stem — ``post`` → ``posts``, ``gallery`` →
-    ``galleries``. The frontend's ``toolPlural`` applies the same rule."""
+    """The plural spelling of a tool stem — ``post`` → ``posts``,
+    ``counter_group`` → ``counter_groups``. The frontend's ``toolPlural``
+    applies the same rule."""
     if len(stem) > 1 and stem.endswith("y") and stem[-2] not in "aeiou":
         return stem[:-1] + "ies"
     return stem + "s"
@@ -32,18 +33,17 @@ def plural_of(stem: str) -> str:
 class Tool(str, Enum):
     project = "project"
     file = "file"
-    queue = "queue"
     counter_group = "counter_group"
     calendar = "calendar"
     dashboard = "dashboard"
     post = "post"
-    gallery = "gallery"
     wiki = "wiki"
+    contact = "contact"
 
     @property
     def plural(self) -> str:
         """Pluralized stem — the table-ish spelling every derived name uses
-        (``counter_group`` → ``counter_groups``, ``gallery`` → ``galleries``).
+        (``counter_group`` → ``counter_groups``).
 
         One rule, mirrored by the frontend's ``toolPlural``: a trailing ``y``
         after a consonant becomes ``ies``, and everything else takes an ``s``.
@@ -121,6 +121,10 @@ class Kind:
     code: int
     #: The tool this lives inside, for a kind that is not a tool itself.
     parent: Tool | None = None
+    #: Inside its tool but in no one instance of it: no column names a parent
+    #: row, and its own row security answers for it rather than a parent's
+    #: sharing (a collection, in Files).
+    standalone: bool = False
 
     @property
     def table(self) -> str:
@@ -129,8 +133,16 @@ class Kind:
 
     @property
     def parent_column(self) -> str | None:
-        """The column naming the tool this lives inside."""
-        return f"{self.parent.value}_id" if self.parent else None
+        """The column naming the tool instance this lives inside."""
+        if self.parent is None or self.standalone:
+            return None
+        return f"{self.parent.value}_id"
+
+    @property
+    def tool(self) -> Tool:
+        """The tool this kind is or lives in. Raises for one that is neither
+        (a tag)."""
+        return self.parent or Tool(self.value)
 
     def not_found(self, status_code: int = 404) -> CodedError:
         """No such <kind>, or not one this reader can see."""
@@ -138,9 +150,12 @@ class Kind:
 
 
 #: Every kind, keyed by its wire name. Append-only: a new kind takes the next
-#: unused code, and no existing code ever moves. The initial set was assigned in
-#: alphabetical order, which is where the resemblance ends — a derived ordinal
-#: changes under you the first time a member is added in the middle. Declared
+#: unused code, and no existing code ever moves. 7 and 8 were the libraries',
+#: 11 and 12 were the queues', and all four stay retired. 18 is the person's
+#: (``app.core.relationships.PERSON``), an edge end that is not a kind, and is
+#: never reused. The initial set was assigned in alphabetical order, which is
+#: where the resemblance ends — a derived ordinal changes under you the first
+#: time a member is added in the middle. Declared
 #: tools first, then what lives inside them, then the guild's vocabulary; the
 #: lists below derived from it keep that order.
 KINDS: dict[str, Kind] = {
@@ -148,19 +163,17 @@ KINDS: dict[str, Kind] = {
     for kind in (
         Kind(Tool.project.value, 10),
         Kind(Tool.file.value, 6),
-        Kind(Tool.queue.value, 11),
         Kind(Tool.counter_group.value, 4),
         Kind(Tool.calendar.value, 1),
         Kind(Tool.dashboard.value, 5),
         Kind(Tool.post.value, 9),
-        Kind(Tool.gallery.value, 7),
         Kind(Tool.wiki.value, 15),
+        Kind(Tool.contact.value, 19),
         Kind("task", 14, parent=Tool.project),
-        Kind("queue_item", 12, parent=Tool.queue),
         Kind("calendar_event", 2, parent=Tool.calendar),
         Kind("counter", 3, parent=Tool.counter_group),
-        Kind("gallery_image", 8, parent=Tool.gallery),
         Kind("wiki_page", 16, parent=Tool.wiki),
+        Kind("collection", 17, parent=Tool.file, standalone=True),
         Kind("tag", 13),
     )
 }
@@ -180,7 +193,7 @@ CONTENT_KINDS: tuple[str, ...] = tuple(t.value for t in Tool) + CHILD_KINDS
 # the initiative. Projects and files used to be exempt — always on, with no
 # column at all — because they were the only places content could live and the
 # other tools hung off them. Relationships ended that: anything links to
-# anything, so an initiative that is only a calendar, or only a gallery, is a
+# anything, so an initiative that is only a calendar, or only a wiki, is a
 # coherent thing to want rather than a half-built one.
 #
 # They keep the *default*, which is the part that was ever load-bearing. An
@@ -218,17 +231,19 @@ FEED_TOOLS: frozenset[Tool] = frozenset({Tool.calendar})
 # extras — sub-resources with a conversation of their own. A task holds one
 # because a task is a piece of work people talk about; a wiki page holds one
 # because a page is what somebody reads, and a note about the rota belongs on
-# the rota rather than on the handbook it is filed in.
+# the rota rather than on the handbook it is filed in; a collection holds one
+# because it is a thing in Files people talk about apart from its files.
 #
 # An extra carries no ``comments_enabled`` column of its own; it is reached
 # through the tool that owns it, and that tool's switch is what answers for it
-# — a wiki's switch turns off the threads on its pages. The task is the one
+# — a wiki's switch turns off the threads on its pages. The task is one
 # exception, and deliberately so: its thread predates the switch and belongs
-# to the task rather than to the project's tool surface.
+# to the task rather than to the project's tool surface. A collection is the
+# other: it sits in no one instance of Files, so it carries its own switch.
 #
 # Extras come first so the declaration order — and every derived column list —
 # keeps reading task-first, as it always has.
-COMMENTABLE_EXTRAS: tuple[str, ...] = ("task", "wiki_page")
+COMMENTABLE_EXTRAS: tuple[str, ...] = ("task", "wiki_page", "collection")
 COMMENT_TARGETS: tuple[str, ...] = COMMENTABLE_EXTRAS + tuple(t.value for t in Tool)
 
 
@@ -251,24 +266,25 @@ TRASH_TARGETS: tuple[str, ...] = CONTENT_KINDS + TRASHABLE_EXTRAS
 
 #: Archivable things that are not tools. Archiving says "this is finished with",
 #: which is true of anything an initiative offers — so every Tool is archivable,
-#: with no exceptions — and of these two, which are worked through and put away
-#: without being tools: a task, and an initiative itself.
-ARCHIVABLE_EXTRAS: tuple[str, ...] = ("task", "initiative")
+#: with no exceptions — and of these, which are worked through and put away
+#: without being tools: a task, an initiative itself, and a collection.
+ARCHIVABLE_EXTRAS: tuple[str, ...] = ("task", "initiative", "collection")
 ARCHIVE_TARGETS: tuple[str, ...] = tuple(t.value for t in Tool) + ARCHIVABLE_EXTRAS
 
 # Property surfaces: EVERY tool carries custom properties, plus every sub-tool —
 # the rows inside a tool that are things in their own right. The properties
-# seam (app.services.tenant.properties.PROPERTY_LINKS), the value table's
+# seam (app.services.tenant.metadata.PROPERTY_LINKS), the value table's
 # CHECK, its policies and the ``PropertyTarget`` schema enum all derive from
 # PROPERTY_TARGETS, so a new Tool carries properties with no per-surface edit.
 PROPERTY_TARGETS: tuple[str, ...] = CONTENT_KINDS
 
 # Items: the rows a tool lists one by one — every kind that lives inside a tool
-# but the wiki page, which is a document — and the post, which is the feed's
-# own item. The plug-in kit's contract names the same set (``itemKind``).
-ITEM_KINDS: tuple[str, ...] = tuple(k for k in CHILD_KINDS if k != "wiki_page") + (
-    Tool.post.value,
-)
+# but the wiki page, which is a document, and the collection, which groups
+# files — and the post, which is the feed's own item. The plug-in kit's
+# contract names the same set (``itemKind``).
+ITEM_KINDS: tuple[str, ...] = tuple(
+    k for k in CHILD_KINDS if k not in ("wiki_page", "collection")
+) + (Tool.post.value,)
 
 # Metadata surfaces: what an installed plug-in keeps its own values on. Every
 # item, and the install itself, whose values are on ``(plugin, <install id>)``.
@@ -279,32 +295,49 @@ METADATA_TARGETS: tuple[str, ...] = ITEM_KINDS + (INSTALL_METADATA_KIND,)
 
 # Layouts (``tool_layouts``): how an instance of a tool draws its items, and
 # one of them. Each of these tools has its own layouts per instance (a
-# project's, a queue's); the calendar and the posts feed are one page per
+# project's, a counter group's); the calendar and the posts feed are one page per
 # initiative, so their layouts belong to the initiative and name no instance.
 # The table's CHECKs, its policies, its events and its purge derive from these.
 LAYOUTS_PER_INSTANCE: tuple[Tool, ...] = (
     Tool.project,
-    Tool.queue,
     Tool.counter_group,
-    Tool.gallery,
 )
 LAYOUTS_SHARED: tuple[Tool, ...] = (Tool.calendar, Tool.post)
 LAYOUT_TOOLS: tuple[Tool, ...] = LAYOUTS_PER_INSTANCE + LAYOUTS_SHARED
+#: Kinds inside a tool that lay out what they hold themselves, as an instance
+#: does: a collection's files. ``tool_id`` is the row's own id.
+LAYOUT_KIND_TARGETS: tuple[str, ...] = ("collection",)
+#: Every value ``tool_layouts.tool`` takes.
+LAYOUT_TARGETS: tuple[str, ...] = (
+    *(tool.value for tool in LAYOUT_TOOLS),
+    *LAYOUT_KIND_TARGETS,
+)
 # A target has one layout of each kind its tool draws: how it lists what it
 # holds (``LIST_LAYOUTS``), and how it shows one of them on its own
-# (``DETAIL_LAYOUTS``: a project's task, the calendar's event). A tool with none here yet stores
-# none. The list a target opens on is one more row (``LAYOUT_DEFAULT``).
-LIST_LAYOUTS: dict[Tool, tuple[str, ...]] = {
+# (``DETAIL_LAYOUTS``: a project's task, the calendar's event, a collection's
+# file). A tool with none here yet stores none. The list a target opens on is
+# one more row (``LAYOUT_DEFAULT``).
+#: Every target that names an instance, and the table its ``tool_id`` points at.
+LAYOUT_INSTANCE_TABLES: dict[str, str] = {
+    **{tool.value: tool.plural for tool in LAYOUTS_PER_INSTANCE},
+    **{kind: KINDS[kind].table for kind in LAYOUT_KIND_TARGETS},
+}
+LIST_LAYOUTS: dict[str, tuple[str, ...]] = {
     Tool.project: ("table", "board", "gantt", "calendar"),
     Tool.calendar: ("calendar",),
+    "collection": ("masonry", "grid", "timeline", "table"),
 }
-DETAIL_LAYOUTS: dict[Tool, tuple[str, ...]] = {
+#: Lists a target draws hidden until it shows them; every other list shows as
+#: shipped. A new collection shows its grid and its table.
+LISTS_HIDDEN_AS_SHIPPED: dict[str, frozenset[str]] = {
+    "collection": frozenset({"masonry", "timeline"}),
+}
+DETAIL_LAYOUTS: dict[str, tuple[str, ...]] = {
     Tool.project: ("task",),
     Tool.calendar: ("calendar_event",),
-    Tool.queue: ("queue_item",),
-    Tool.gallery: ("gallery_image",),
     Tool.counter_group: ("counter",),
     Tool.post: ("post",),
+    "collection": ("file",),
 }
 #: The details laid out once per type of item rather than once per target: a
 #: project's task page is one per task type (``tool_layouts.task_type_id``).

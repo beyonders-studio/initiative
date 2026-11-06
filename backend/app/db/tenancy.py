@@ -38,6 +38,12 @@ decision.
 
 from __future__ import annotations
 
+from app.core.rules import (
+    SURFACE_AI_CONNECTIONS,
+    SURFACE_CUSTOM_ROLES,
+    SURFACE_PLUGINS,
+)
+
 from app.db.initiative_rls import INITIATIVE_SCOPED_TABLES
 from app.db.public_rls import SHARED_TABLE_REGISTRY
 
@@ -54,6 +60,7 @@ __all__ = [
     "CREATED_BY_EXEMPT_TABLES",
     "INITIATIVE_SCOPED_TABLES",
     "GUILD_SCOPED_TABLES",
+    "OPERATIONS_TABLES",
     "ALL_CLASSIFIED_TABLES",
     "is_guild_scoped",
     "is_shared",
@@ -89,6 +96,17 @@ GUILD_LEVEL_TABLES: frozenset[str] = frozenset(
         # soft_delete_admin_purge), never a membership scope. See the rendered RLS DDL.
         # Guild-wide config / data (no initiative scope)
         "guild_settings",
+        # The community's custom roles and who holds them: read within the
+        # schema, written under the no-escalation policies
+        # (app.db.guild_ddl._custom_roles_block).
+        "custom_roles",
+        "custom_role_members",
+        # Which custom role a provider's group gives: sign-in configuration,
+        # the seat's (SEAT_TABLES).
+        "custom_role_claim_rules",
+        # Which initiative a sign-in rule (public.oidc_claim_mappings) places
+        # people in: sign-in configuration, the seat's (SEAT_TABLES).
+        "claim_rule_initiatives",
         # Installed plug-ins: guild-wide by definition, and readable by any member —
         # the sidebar has to know a plug-in is there. Installing, configuring and
         # removing are the seat's (SEAT_TABLES below); what a member may do
@@ -115,6 +133,10 @@ GUILD_LEVEL_TABLES: frozenset[str] = frozenset(
         "guild_ai_connection_keys",
         "webhook_deliveries",  # per-subscription delivery ledger, no initiative of
         # its own; read through its subscription (LEDGER_TABLES below).
+        "webhook_refs",  # what each subscription calls the community and its
+        # people; the system engine's alone (LEDGER_TABLES below).
+        "case_grants",  # which access grant serves which operations case;
+        # the system engine's alone (LEDGER_TABLES below).
         "subscription_progress",  # how far through the change log subscribers
         # were told; the system engine's alone (LEDGER_TABLES below).
         "plugin_hook_deliveries",  # vendor webhook deliveries an install accepted;
@@ -131,7 +153,7 @@ GUILD_LEVEL_TABLES: frozenset[str] = frozenset(
         "initiatives",  # purge-guarded (admin-only DELETE) as well
         "initiative_members",
         "initiative_roles",
-        "initiative_role_permissions",
+        "initiative_rules",
         # Join requests: the requester is by definition NOT yet a member, so an
         # initiative-membership row gate would hide their own request from them
         # — the same reasoning that keeps initiative_members structural. Its
@@ -140,12 +162,12 @@ GUILD_LEVEL_TABLES: frozenset[str] = frozenset(
         "initiative_join_requests",
         # Own-row tables (also listed in OWN_ROW_TABLES below): guild-level
         # placement, but rows belong to ONE user and carry own_row_* policies.
-        "export_jobs",  # a job may span initiatives ("export all my tasks"), so
-        # it can't use initiative_access; the row holds selector text and gates
-        # the artifact download, so it must not be guild-wide-readable either.
-        "import_jobs",  # same shape as export_jobs: a backup import spans
-        # initiatives, and the row's options/plan/report text plus the staged
-        # payload it gates must not be guild-wide-readable.
+        "data_jobs",  # an import or export may span initiatives ("export all
+        # my tasks", a backup), so it can't use initiative_access; the row holds
+        # selector, plan and report text and gates its stored file, so it must
+        # not be guild-wide-readable either.
+        "pending_uploads",  # a file arriving in pieces is its uploader's until
+        # an endpoint takes it; a backup being uploaded spans initiatives.
         # A member's own credentials: their connection to an installed plug-in's
         # vendor (MEMBER_CREDENTIAL_TABLES). No FK to any initiative — a
         # plug-in is community-wide.
@@ -160,6 +182,11 @@ GUILD_LEVEL_TABLES: frozenset[str] = frozenset(
         # own_row_* policies. A member token's standing reads the member's own
         # row for its install.
         "plugin_member_consents",
+        # How a member shows the community's lists: their filters, order and
+        # layout for a project, a tool list, the roster. One owner per
+        # row; no initiative of its own, since a key may name the community's
+        # roster or its calendars together.
+        "view_preferences",
         # The platform's record of what it holds in the community: why, by
         # whom, under which case. Read by the system engine and a ``moderate``
         # grantee alone, never by the community — its policies are rendered
@@ -181,9 +208,7 @@ MANAGED_TABLES: dict[str, str] = {
     "initiatives": "id",
     "initiative_members": "initiative_id",
     "initiative_roles": "initiative_id",
-    "initiative_role_permissions": (
-        "(SELECT r.initiative_id FROM initiative_roles r WHERE r.id = initiative_role_id)"
-    ),
+    "initiative_rules": "initiative_id",
 }
 
 # --- Own-row overlay on guild-level tables -----------------------------------
@@ -194,9 +219,10 @@ MANAGED_TABLES: dict[str, str] = {
 # MUST also be in ``GUILD_LEVEL_TABLES`` (that's the schema-placement decision;
 # this is the policy overlay) — enforced in ``tenancy_test.py``.
 OWN_ROW_TABLES: dict[str, str] = {
-    "export_jobs": "created_by",
-    "import_jobs": "created_by",
+    "data_jobs": "created_by",
+    "pending_uploads": "created_by",
     "plugin_member_consents": "user_id",
+    "view_preferences": "user_id",
 }
 
 # --- Private-row overlay on initiative-scoped tables --------------------------
@@ -254,6 +280,8 @@ MEMBER_SECRET_TABLES: dict[str, tuple[str, str]] = {
 # ``GUILD_LEVEL_TABLES`` — enforced in ``tenancy_test.py``.
 SEAT_TABLES: frozenset[str] = frozenset(
     {
+        "claim_rule_initiatives",
+        "custom_role_claim_rules",
         "plugin_placements",
         "guild_ai_connection_keys",
         "guild_ai_connections",
@@ -262,25 +290,46 @@ SEAT_TABLES: frozenset[str] = frozenset(
     }
 )
 
+# --- Seat tables a surface key closes ------------------------------------------
+# The seat tables whose writes a community's surface key governs
+# (``app.core.rules``, ``surface.*``): table -> the key. While the deployment
+# has closed the surface, the seat writes none of them; the system engine
+# still does. Every entry here MUST also be in ``SEAT_TABLES``.
+SEAT_SURFACES: dict[str, str] = {
+    "custom_role_claim_rules": SURFACE_CUSTOM_ROLES,
+    "guild_ai_connections": SURFACE_AI_CONNECTIONS,
+    "guild_ai_connection_keys": SURFACE_AI_CONNECTIONS,
+    "guild_plugins": SURFACE_PLUGINS,
+    "guild_plugin_secrets": SURFACE_PLUGINS,
+    "plugin_placements": SURFACE_PLUGINS,
+}
+
 # --- Seat tables read by the seat alone ---------------------------------------
 # The seat tables whose rows are read by the seat or the system engine rather
 # than within the schema: rendered with the same ``seat_*`` policies, whose
 # read predicate is the seat's. Every entry here MUST also be in
 # ``SEAT_TABLES`` — enforced in ``tenancy_test.py``.
 SEAT_READ_TABLES: frozenset[str] = frozenset(
-    {"guild_ai_connection_keys", "guild_plugin_secrets"}
+    {
+        "claim_rule_initiatives",
+        "custom_role_claim_rules",
+        "guild_ai_connection_keys",
+        "guild_plugin_secrets",
+    }
 )
 
 # --- Ledger overlay on guild-level tables -------------------------------------
 # Guild-level bookkeeping a system job keeps about a parent row: table ->
 # (parent table, FK column). Read through the parent, so a row is visible to
 # whoever the parent's own policy shows the parent to; written by the system
-# engine alone. ``None`` for bookkeeping about no row, read and written by the
-# system engine alone. Rendered as ``ledger_*`` policies by
+# engine alone. ``None`` for bookkeeping nobody but the system engine reads,
+# whatever row it is about. Rendered as ``ledger_*`` policies by
 # ``app.db.guild_ddl.render_guild_rls_ddl``. Every entry here MUST also be in
 # ``GUILD_LEVEL_TABLES`` — enforced in ``tenancy_test.py``.
 LEDGER_TABLES: dict[str, tuple[str, str] | None] = {
     "webhook_deliveries": ("webhook_subscriptions", "subscription_id"),
+    "webhook_refs": None,
+    "case_grants": None,
     "subscription_progress": None,
     "plugin_hook_deliveries": ("guild_plugins", "install_id"),
     "plugin_schedule_runs": ("guild_plugins", "install_id"),
@@ -296,21 +345,27 @@ LEDGER_TABLES: dict[str, tuple[str, str] | None] = {
 # table is in neither bucket, so a new table forces the decision.
 CREATED_BY_EXEMPT_TABLES: frozenset[str] = frozenset(
     {
+        # A file in a collection: ``added_by`` already names who put it there.
+        "collection_files",
         # Roster rows: the membership IS the fact, and ``user_id`` already names
         # whose it is.
         "calendar_event_attendees",
         "calendar_event_answers",
+        "custom_role_members",
         "initiative_members",
-        "initiative_role_permissions",
+        "initiative_rules",
         "task_assignees",
-        # A knock at a door: ``user_id`` is both the author and the subject, and
-        # ``resolved_by`` already names the manager who answered it.
+        # A knock at a door: ``user_id`` is both the author and the subject (a
+        # person asks only for themselves), and ``resolved_by`` already names
+        # whoever answered it.
         "initiative_join_requests",
+        "share_requests",
         # Per-user state, keyed by the user it belongs to. ``user_id`` is both
         # the author and the subject, so a second copy of it says nothing.
         "guild_plugin_user_connections",
         "plugin_member_consents",
         "post_reads",
+        "view_preferences",
         # A fact about an install: where it appears. The rows a new initiative's
         # trigger writes have no person placing them.
         "plugin_placements",
@@ -322,14 +377,15 @@ CREATED_BY_EXEMPT_TABLES: frozenset[str] = frozenset(
         "plugin_connection_secrets",
         # A connection's shared key. The connection row names who made it.
         "guild_ai_connection_keys",
+        # Where a sign-in rule places people, under the rule's id. The rule's
+        # record names who wrote it.
+        "claim_rule_initiatives",
         # A ballot: ``user_id`` is the voter, which is both the author of the
         # row and its whole content.
         "post_poll_votes",
         "personal_items",
-        # A property value belongs to the initiative, not to whoever set it.
-        "property_values",
-        # A plug-in's own values: ``install_id`` names who keeps them.
-        "plugin_metadata",
+        # A value belongs to its definition's owner, not to whoever set it.
+        "metadata_values",
         # Machinery. Written by a trigger, a poller or a scheduler rather than
         # by a person; each already records the actor it needs (the outbox
         # carries ``actor_user_id``) or has none to record.
@@ -340,14 +396,17 @@ CREATED_BY_EXEMPT_TABLES: frozenset[str] = frozenset(
         "event_reminder_dispatches",
         "search_entries",
         "engagement_levels",
-        "reaction_digest_items",
-        "task_assignment_digest_items",
+        "batched_notices",
         "webhook_deliveries",
+        "webhook_refs",
         "subscription_progress",
         "timer_marks",
         # The key -> task map the intake writer reads. The case it points at
         # carries the author, and a system-opened one has none by design.
         "intake_cases",
+        # Which access grant serves which case. The grant names who asked for
+        # it.
+        "case_grants",
         # A report is not authored — it is a thing several people said about
         # one target. Who said it is the reporters table, and who settled it is
         # ``decided_by``; a creator column would be a third answer to neither
@@ -365,6 +424,16 @@ CREATED_BY_EXEMPT_TABLES: frozenset[str] = frozenset(
 # content (keys of INITIATIVE_PATHS) plus the guild-level exemptions. Derived,
 # so a guild table is declared in exactly ONE place.
 GUILD_SCOPED_TABLES: frozenset[str] = INITIATIVE_SCOPED_TABLES | GUILD_LEVEL_TABLES
+
+# Guild tables only the operations community fills
+# (``app_settings.operations_guild_id``). ``guild_template`` has them like every
+# guild table, and one community's schema does: provisioning leaves them out,
+# and choosing the operations community creates them
+# (``app.db.operations_schema``). Each is still classified above, which is how
+# it is secured there.
+OPERATIONS_TABLES: frozenset[str] = frozenset(
+    {"intake_bindings", "intake_cases", "case_grants"}
+)
 
 # Union of every table that has an explicit placement decision.
 ALL_CLASSIFIED_TABLES: frozenset[str] = SHARED_TABLES | GUILD_SCOPED_TABLES

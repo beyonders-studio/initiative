@@ -8,13 +8,14 @@ registered channels together.
 
 import json
 import re
+from datetime import datetime, timezone
 from pathlib import Path
 
 import httpx
 import pytest
 from sqlmodel import select
 
-from app.models.platform.notification import NotificationType
+from app.models.platform.notification import Notification, NotificationType
 from app.services.platform.push_notifications import (
     DEFAULT_CHANNEL,
     PUSH_CHANNELS,
@@ -146,7 +147,7 @@ async def test_delivery_reads_stamps_and_prunes_the_devices(session, monkeypatch
     """The recipient's rows are read, the delivered one stamped and the dead
     one dropped. A device whose session has ended, or that names no sign-in,
     is not sent to and is dropped too. The same value registered by another
-    account is left alone."""
+    account is left alone. Each send carries the recipient's unread count."""
     from app.models.platform.push_token import PushToken
     from app.services.platform import push_notifications, push_tokens
     from app.testing import create_user
@@ -169,9 +170,19 @@ async def test_delivery_reads_stamps_and_prunes_the_devices(session, monkeypatch
 
     monkeypatch.setattr(push_config, "ensure_push_config_fresh", _enabled)
 
+    badges: list[int | None] = []
+
     async def _send(
-        client, push_token, title, body, data=None, channel_id=None, platform=None
+        client,
+        push_token,
+        title,
+        body,
+        data=None,
+        channel_id=None,
+        platform=None,
+        badge=None,
     ):
+        badges.append(badge)
         return (True, False) if push_token == "live" else (False, True)
 
     monkeypatch.setattr(push_notifications, "send_push_notification", _send)
@@ -206,6 +217,16 @@ async def test_delivery_reads_stamps_and_prunes_the_devices(session, monkeypatch
             session_id=sid,
         )
     recipient_id, bystander_id = recipient.id, bystander.id
+    for read_at in (None, None, datetime.now(timezone.utc)):
+        session.add(
+            Notification(
+                user_id=recipient_id,
+                type=NotificationType.mention,
+                data={},
+                read_at=read_at,
+            )
+        )
+    await session.flush()
 
     again = await push_notifications.send_pushes(
         session,
@@ -213,6 +234,7 @@ async def test_delivery_reads_stamps_and_prunes_the_devices(session, monkeypatch
     )
     await session.commit()
     assert again == [False]
+    assert badges == [2, 2]
 
     session.expire_all()
     rows = (
@@ -392,6 +414,30 @@ async def _send_one(wire: _Wire, *, token: str, platform: str) -> tuple[bool, bo
             channel_id="mention",
             platform=platform,
         )
+
+
+@pytest.mark.parametrize(
+    ("token", "platform"),
+    [(_IOS_HANDLE, "ios"), (_ANDROID_HANDLE, "android")],
+)
+async def test_only_an_iphone_is_sent_the_badge(push_wire, token, platform):
+    """An Android launcher counts the tray's notifications itself."""
+    from app.services.platform import push_notifications
+
+    push_wire(_push_cfg(service_account=False))
+    wire = _Wire()
+
+    async with wire.client() as client:
+        await push_notifications.send_push_notification(
+            client, push_token=token, title="t", body="b", platform=platform, badge=3
+        )
+
+    (request,) = wire.sends
+    message = json.loads(request.content)["message"]
+    if platform == "ios":
+        assert message["apns"] == {"payload": {"aps": {"badge": 3}}}
+    else:
+        assert "apns" not in message
 
 
 @pytest.mark.parametrize("service_account", [True, False])

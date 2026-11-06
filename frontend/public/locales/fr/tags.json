@@ -17,9 +17,8 @@
     "children": {
       "task": "Tâches",
       "calendar_event": "Événements",
-      "gallery_image": "Images",
-      "queue_item": "Éléments de la file",
-      "wiki_page": "Pages"
+      "wiki_page": "Pages",
+      "collection": "Collections"
     },
     "columns": {
       "in": "Dans"

@@ -50,7 +50,7 @@ from app.models.platform.guild import CommunityStatus, Guild
 from app.services import audit as audit_service
 from app.services.marketplace import community_hooks, plugin_refs
 from app.services.platform.retention import COMMUNITY_DELETION, COMMUNITY_HOLD
-from app.services.platform import app_settings as app_settings_service
+from app.services.platform import rules
 from app.db.request_context import SystemGuild, Unattributed
 
 
@@ -241,7 +241,7 @@ async def finish_started_purges(session: AsyncSession) -> int:
     Returns how many were deleted. Each is claimed on its own, ``FOR UPDATE
     SKIP LOCKED``, and one that fails is logged and left for the next pass."""
     await set_rls_context(session, Unattributed())
-    days = COMMUNITY_DELETION.days(await app_settings_service.get_app_settings(session))
+    days = COMMUNITY_DELETION.days(await rules.platform_values(session))
     started = list(
         await session.exec(
             select(Guild.id)

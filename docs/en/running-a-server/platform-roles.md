@@ -102,6 +102,18 @@ Where your [operations community](#where-operations-work-lands) takes security, 
 
 The case hears what becomes of the grant: that it was asked for, how it was decided (an approval moves a case still waiting to be picked up into progress), each moderation act or suspension taken under it, and what it did — once an hour while it's live, and in full when it ends: what was read, counted by kind, and what was changed, listed, with who revoked it if somebody did. The case is only ever told ids, counts and the names of routes and acts, never what the community holds. A case lists its grants in its **Access** section, with **Request access** to ask for another. A moderator's request from a community's row, or from a case's **Holds**, starts on **Moderate**, which reading what the platform holds takes.
 
+#### Telling the community
+
+The case also decides whether the community hears about it. Its superadmins get an email naming the level, the kind of case and when — never the reason you wrote, which is for whoever approves it.
+
+| Case | The community is told |
+|---|---|
+| Support | Always, when the access starts. You're working on their behalf, so they hear about it. |
+| Security or moderation | Your choice on the form: **Don't tell it**, **When access starts**, or **Once access has ended**. The last one is for an investigation the community shouldn't hear about until it's done. |
+| No case | Not at all. |
+
+"When access starts" means on approval, or the moment glass is broken. A request that's denied touched nothing, so nobody is told about it. Approvers see the choice beside the case number.
+
 !!! info "A grant is never a membership"
     Whatever it reaches and whoever holds it, a grant runs out. Anything that would outlive it stays out of reach — a grantee can't answer a request to join an initiative, for instance, because the membership on the other side of that answer has no end date.
 
@@ -164,6 +176,8 @@ Deleted communities are in that list too, marked with the date everything in the
 Security notes, moderation reports, support requests and feedback each open a case in one community of your choosing: the **operations community**. It's an ordinary community in every respect, and its members work the cases like any other tasks.
 
 It's all one page, **Settings → Platform → Intake**. Pick the community, then say which of its projects each kind lands in, and if you like, which of that project's task types its cases are — or choose **Set this up for me** and get a ready-made project with its own statuses and fields. Pause a kind and it stops receiving; choose no community at all and nothing is routed anywhere.
+
+Choosing no community leaves everything where it is, so picking the same one again carries on. Picking a different one starts fresh there. The community you leave keeps its cases as ordinary tasks, but their attachments are deleted, its project choices are cleared, and requesters stop seeing those cases in **My Tickets**.
 
 Give security and moderation an initiative each, so only the people working those cases can read them. The page says so if two kinds share one.
 

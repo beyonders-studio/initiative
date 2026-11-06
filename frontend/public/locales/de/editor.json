@@ -120,6 +120,7 @@
   "imageDialog": {
     "urlTab": "URL",
     "fileTab": "Datei",
+    "filesTab": "Dateien",
     "imageUrl": "Bild-URL",
     "imageUrlPlaceholder": "https://example.com/bild.png",
     "altText": "Alternativtext",
@@ -182,12 +183,17 @@
       "assignee": "Zuständige Person",
       "checklist": "Erledigt",
       "due": "Fälligkeitsdatum",
+      "email": "E-Mail",
+      "phone": "Telefon",
       "priority": "Priorität",
       "progress": "Fortschritt",
       "status": "Status",
       "value": "Wert",
       "when": "Datum"
     },
+    "callHint": "Klicken zum Anrufen",
+    "contactEmail": "Kontakt-E-Mail",
+    "contactPhone": "Kontakt-Telefon",
     "counterValue": "Zählerstand",
     "eventWhen": "Termindatum",
     "insert": "Smart-Chip",
@@ -206,6 +212,35 @@
     "taskDue": "Fälligkeitsdatum",
     "taskPriority": "Priorität",
     "taskStatus": "Aufgabenstatus",
-    "whichFact": "Welchen Wert soll der Chip anzeigen?"
+    "whichFact": "Welchen Wert soll der Chip anzeigen?",
+    "writeHint": "Klicken zum Schreiben"
+  },
+  "summary": {
+    "title": "Zusammenfassung",
+    "aiNotEnabled": "KI-Funktionen sind nicht aktiviert. Konfiguriere die KI-Einstellungen, um Zusammenfassungen zu generieren.",
+    "generateDescription": "Generiere eine KI-gestützte Zusammenfassung dieses Dokuments.",
+    "generateButton": "Zusammenfassung generieren",
+    "generateError": "Zusammenfassung konnte nicht generiert werden. Bitte versuche es erneut.",
+    "generating": "Zusammenfassung wird generiert…",
+    "copy": "Zusammenfassung kopieren",
+    "regenerate": "Zusammenfassung neu generieren",
+    "cut": "Aus den ersten {{percent}} % geschrieben. Der Rest passte nicht hinein."
+  },
+  "writing": {
+    "menu": "Schreibhilfe",
+    "rewrite": "Umformulieren",
+    "shorten": "Kürzen",
+    "fix": "Rechtschreibung und Grammatik korrigieren",
+    "translate": "Übersetzen…",
+    "continue": "Weiterschreiben",
+    "preview": "Vorgeschlagener Text",
+    "writing": "Wird geschrieben…",
+    "discard": "Verwerfen",
+    "insert": "Einfügen",
+    "insertBelow": "Darunter einfügen",
+    "replace": "Ersetzen",
+    "changed": "Der Text wurde während des Schreibens geändert. Füge dies stattdessen darunter ein oder verwirf es.",
+    "cannotKeep": "Die Schreibhilfe kann diese Auswahl nicht unverändert zurücksetzen: Sie reicht über Listenpunkte oder eine Überschrift oder enthält etwa ein Bild. Wähle stattdessen Text innerhalb eines davon aus.",
+    "error": "Das konnte nicht geschrieben werden. Bitte versuche es erneut."
   }
 }

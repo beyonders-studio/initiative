@@ -62,6 +62,7 @@ from app.models.tenant.guild_plugin import GuildPlugin
 from app.models.tenant.resource_grant import ResourceAccessLevel, ResourceGrant
 from app.schemas.tenant.ownership import OwnerPluginSummary
 from app.services import audit as audit_service
+from app.services import permissions as permissions_service
 from app.services.marketplace import catalog as catalog_service
 
 
@@ -506,8 +507,41 @@ async def set_resource_owner(
         await session.flush()
     handover.user_id = new_owner.user_id
     handover.plugin_install_id = new_owner.plugin_install_id
+    # The owner row is scoped as its resource is, which moving a contact into
+    # the community's changes.
+    handover.initiative_id = row.initiative_id
     session.add(handover)
     await session.flush()
+
+
+async def give_to_install(
+    session: AsyncSession,
+    tool: Tool,
+    row: Any,
+    *,
+    install_id: int,
+    guild_id: int,
+    grants: Sequence[Any],
+    actor_user_id: Optional[int] = None,
+) -> None:
+    """Make a row of the whole community the install's that mounts its tool,
+    shared by ``grants``. Uninstalling trashes what the install owns; the owner
+    grant names the install row, so an uninstall holding that row finishes
+    first and this write fails. At community scope an everyone grant reads as
+    every member of the community."""
+    await set_resource_owner(
+        session, tool=tool, row=row, new_owner=Owner(plugin_install_id=install_id)
+    )
+    await permissions_service.replace_resource_grants(
+        session,
+        resource_type=tool.value,
+        resource_id=row.id,
+        guild_id=guild_id,
+        initiative_id=None,
+        owner_id=None,
+        grants=grants,
+        actor_user_id=actor_user_id,
+    )
 
 
 async def current_owner(

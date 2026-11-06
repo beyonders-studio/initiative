@@ -10,9 +10,12 @@
   "columns": {
     "owner": "Owner",
     "type": "Type",
+    "created": "Created",
+    "added": "Added",
     "community": "Community",
     "initiative": "Initiative",
-    "ownerFallback": "User {{id}}"
+    "ownerFallback": "User {{id}}",
+    "size": "Size"
   },
   "create": {
     "title": "New file",
@@ -47,11 +50,11 @@
     "templateToggle": "Toggle template status",
     "fileLabel": "File",
     "dropPrompt": "Drop a file here, or",
-    "fileHelp": "Supported: PDF, Word, Excel, PowerPoint, TXT, HTML, images, Markdown (max 50 MB)",
-    "fileTooLarge": "File is too large. Maximum size is 50 MB.",
+    "fileHelp": "Any file but a program. A large file carries on where it stopped if the connection drops.",
     "creating": "Creating…",
     "createFile": "Create file",
     "uploadingFile": "Uploading…",
+    "uploadingProgress": "Uploading… {{percent}}",
     "uploadFile": "Upload file",
     "createdAttached": "File created and attached.",
     "created": "File created.",
@@ -103,9 +106,16 @@
   "featuredImage": {
     "label": "Featured image",
     "upload": "Upload image",
+    "fromFiles": "From Files",
     "replace": "Replace",
     "remove": "Remove",
     "uploading": "Uploading…"
+  },
+  "imageChooser": {
+    "title": "Choose a picture from Files",
+    "description": "It goes in as it is now: a newer version of the file won't change it.",
+    "none": "No pictures here.",
+    "more": "Show more"
   },
   "outline": {
     "show": "Show contents",
@@ -121,9 +131,6 @@
     "updateAccessError": "Unable to update access",
     "dangerDescription": "Deleted files go to the trash and can be restored before the community's retention period ends.",
     "deleting": "Deleting…"
-  },
-  "sidePanel": {
-    "summaryTab": "Summary"
   },
   "smartLink": {
     "missingUrl": "This smart link has no URL.",
@@ -296,15 +303,6 @@
       "replaced_other": "{{count}} cells replaced"
     }
   },
-  "summary": {
-    "aiNotEnabled": "AI features are not enabled. Configure AI settings to generate file summaries.",
-    "generateDescription": "Generate an AI-powered summary of this file.",
-    "generateButton": "Generate Summary",
-    "generateError": "Failed to generate summary. Please try again.",
-    "generating": "Generating summary…",
-    "copy": "Copy summary",
-    "regenerate": "Regenerate summary"
-  },
   "type": {
     "template": "Template",
     "file": "File"
@@ -322,6 +320,26 @@
     "deleteSuccess": "Version deleted",
     "uploadError": "Failed to upload new version",
     "deleteError": "Failed to delete version"
+  },
+  "convert": {
+    "edit": "Edit",
+    "title": "Convert to edit?",
+    "toSheet": {
+      "xlsx": "It becomes a spreadsheet you can edit here. Its sheets, values, formulas, fills, borders and number formats come over; charts, pictures and macros don't.",
+      "ods": "It becomes a spreadsheet you can edit here. Its sheets, values and formulas come over; formatting stays behind.",
+      "values": "It becomes a spreadsheet you can edit here. Its sheets and values come over. Formulas come over as the values they show, and formatting stays behind.",
+      "table": "It becomes a spreadsheet you can edit here, its rows and columns as one sheet."
+    },
+    "toDocument": {
+      "markdown": "It becomes a document you can edit here. Headings, lists, tables, links and text formatting come over.",
+      "text": "It becomes a document you can edit here, its text as paragraphs.",
+      "word": "It becomes a document you can edit here. Headings, text formatting, lists, tables, links and pictures come over. Page layout, headers and footers, footnotes, comments and text boxes don't, and tracked changes come over accepted."
+    },
+    "replaces": "The uploaded file and its earlier versions are replaced. Export gets a file back out whenever you need one.",
+    "confirm": "Convert",
+    "converting": "Converting…",
+    "success": "Converted. It's yours to edit.",
+    "error": "Couldn't convert this file."
   },
   "viewer": {
     "loadError": "Unable to load file",
@@ -341,6 +359,8 @@
     "unknownFileType": "This file type cannot be previewed in the browser.",
     "downloadFile": "Download file",
     "image": "Image",
+    "video": "Video",
+    "audio": "Audio",
     "markdownDocument": "Markdown document",
     "showSource": "View source",
     "showRendered": "View rendered"
@@ -362,12 +382,124 @@
     "noMatchingFiles": "No files match your filters.",
     "type": "Filter by type",
     "allTypes": "All types",
-    "types": {
-      "native": "Text document",
-      "file": "File",
+    "kinds": {
+      "document": "Document",
+      "spreadsheet": "Spreadsheet",
+      "presentation": "Presentation",
       "whiteboard": "Whiteboard",
-      "smart_link": "Smart link",
-      "spreadsheet": "Spreadsheet"
+      "pdf": "PDF",
+      "image": "Image",
+      "video": "Video",
+      "audio": "Audio",
+      "text": "Text",
+      "compressed": "Compressed",
+      "design": "Design",
+      "3d": "3D",
+      "font": "Font",
+      "raw": "Camera raw",
+      "code": "Code",
+      "ebook": "E-book",
+      "cad": "CAD",
+      "link": "Link",
+      "other": "Other"
+    }
+  },
+  "collections": {
+    "heading": "Collections",
+    "fileCount_one": "{{count}} file",
+    "fileCount_other": "{{count}} files",
+    "addTo": "Add to collection",
+    "addToDescription_one": "Put this file in a collection. It stays in Files, and who can open it doesn't change.",
+    "addToDescription_other": "Put these {{count}} files in a collection. They stay in Files, and who can open them doesn't change.",
+    "noneToAddTo": "No collections to add to yet. Name a new one below.",
+    "namePlaceholder": "New collection name",
+    "addToNew": "Add to new collection",
+    "added_one": "Added to {{name}}",
+    "added_other": "{{count}} files added to {{name}}",
+    "created": "{{name}} created",
+    "addFiles": "Add files",
+    "pickFile": "Which file?",
+    "noFilesToAdd": "No files to add",
+    "fileAdded": "File added to the collection",
+    "uploadFiles": "Upload files",
+    "dropPrompt": "Drop files to upload them into this collection",
+    "removeFrom": "Remove from collection",
+    "removed_one": "{{count}} file removed from the collection",
+    "removed_other": "{{count}} files removed from the collection",
+    "emptied": "Its last file is out, so the collection went to the trash",
+    "trash": "Move to trash",
+    "trashTitle": "Move this collection to the trash?",
+    "trashDescription": "Its files stay where they are. It can be restored from the trash before the retention period ends.",
+    "trashed": "Collection moved to the trash",
+    "noFiles": "No files in this collection yet",
+    "noFilesDescription": "Add files from this initiative, or drop files anywhere on this page to upload them.",
+    "loadingFiles": "Loading files...",
+    "openFile": "Open file",
+    "filter": "Collection",
+    "anyCollection": "Any collection",
+    "groupByTag": "Group by tag",
+    "order": "Order",
+    "newestFirst": "Newest first",
+    "oldestFirst": "Oldest first",
+    "views": {
+      "label": "View",
+      "masonry": "Masonry",
+      "timeline": "Timeline"
+    },
+    "groups": {
+      "untagged": "Untagged",
+      "count_one": "{{count}} file",
+      "count_other": "{{count}} files"
+    },
+    "upload": {
+      "progress": "Uploading {{done}} of {{total}}...",
+      "finished_one": "{{count}} file added",
+      "finished_other": "{{count}} files added",
+      "finishedWithFailures": "{{done}} added, {{failed}} could not be",
+      "dismiss": "Dismiss",
+      "tooLarge": "larger than this server takes"
+    },
+    "backToFiles": "Back to Files",
+    "notFound": "Collection not found",
+    "notFoundDescription": "The collection you're looking for doesn't exist, or none of its files are ones you can open.",
+    "noAccess": "Access denied",
+    "noAccessDescription": "You don't have permission to view this collection.",
+    "error": "Couldn't change the collection",
+    "properties": {
+      "description": "What each file in this collection can hold here: its values belong to this collection, not to the file.",
+      "create": "New property",
+      "edit": "Edit property",
+      "delete": "Delete property",
+      "deleteTitle": "Delete this property?",
+      "deleteBody": "This removes the property and every file's value of it in this collection.",
+      "none": "No properties yet",
+      "heading": "In this collection",
+      "saveError": "Couldn't save the value",
+      "of": "{{name}}'s properties"
+    },
+    "addedOn": "Added {{date}}",
+    "createdOn": "Created {{date}}",
+    "listHelp": {
+      "masonry": "Each file at its own shape, packed into columns: what its card shows under the picture.",
+      "grid": "Each file as a square tile: what its card shows under the picture.",
+      "timeline": "Files by the day they were added: what each card shows under the picture.",
+      "table": "The collection's files as a table: which columns, in what order."
+    },
+    "shapes": {
+      "name": "Name",
+      "blank": "Blank",
+      "blankHint": "A grid and a table, and no properties of its own yet.",
+      "lists": "Shows {{lists}}",
+      "properties": "Properties: {{properties}}",
+      "copyLabel": "Or copy the shape of",
+      "copyPlaceholder": "Another collection",
+      "copyHint": "Its properties and what its lists show, without its files or their values.",
+      "create": "Create collection"
+    },
+    "required": {
+      "title": "What {{name}} asks for",
+      "description": "Each file put in this collection starts with these values.",
+      "confirm": "Continue"
     }
   }
 }

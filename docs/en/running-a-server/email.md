@@ -4,7 +4,7 @@ icon: lucide/mail
 
 # Email
 
-Initiative sends email for account verification, password resets, invitations, and the daily overdue-task digest. Point it at an **SMTP** mail server from **Settings → Platform → Email**, as the [owner](platform-roles.md).
+Initiative sends email for account verification, password resets, invitations, and the overdue and coming-up digests. Point it at an **SMTP** mail server from **Settings → Platform → Email**, as the [owner](platform-roles.md).
 
 !!! info "Without email, the email things don't happen"
     Initiative works perfectly well without SMTP — it simply can't send verification links, password resets, or email notifications. In-app bell notifications carry on regardless, so nobody is cut off.

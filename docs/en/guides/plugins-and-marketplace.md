@@ -49,7 +49,9 @@ When the publisher ships a newer version, the dashboard shows **Version X availa
 
 ### Adding a project
 
-Somebody has already worked out what a hiring pipeline needs as columns. A few listings ship with Initiative: a sales pipeline, a hiring pipeline, a bug tracker, a content calendar, a grant tracker, a product launch and facility maintenance.
+Somebody has already worked out what a hiring pipeline needs as columns. A few listings ship with Initiative: a sales pipeline, a hiring pipeline, a bug tracker, a content calendar, a grant tracker, a product launch, facility maintenance and plant care.
+
+Each comes with [task types](projects-and-tasks.md#task-types) of its own in place of the usual four, each with its own page: the bug tracker has bugs, feature requests and chores, and plant care has watering, fertilizing and repotting.
 
 1. Open the listing. **Blank** and **Example** show it both ways: the empty board you'd get, and the same board with some made-up work moving through it.
 2. Choose **Add to an initiative**, and pick the initiative and a name.
@@ -77,7 +79,7 @@ Adding a plug-in asks up to three things, and every answer can be changed later 
 
 | | What it means |
 |---|---|
-| **What it can reach** | The kinds of thing it may read, or read and change: projects, files, comments, tags, custom properties, and so on. Everything it asks for starts ticked; untick what you'd rather it didn't have. A line marked *This server doesn't allow it* is off-limits whatever you tick. Two lines start unticked: acting as a moderator, and acting as an admin (see below). |
+| **What it can reach** | The kinds of thing it may read, or read and change: projects, files, comments, tags, metadata, and so on. Everything it asks for starts ticked; untick what you'd rather it didn't have. A line marked *This server doesn't allow it* is off-limits whatever you tick. Two lines start unticked: acting as a moderator, and acting as an admin (see below). |
 | **Where it works** | Every current initiative, or only the ones you pick. A plug-in reads and changes things only in the initiatives it works in, so the committee's private budget initiative stays out of reach unless you put it there. |
 | **Who can open it there** | Only for a plug-in with a page inside initiatives: which roles see that page. Community admins always can. |
 | **Plug-ins that can use it** | Only when plug-ins already here have asked to use this one. Each starts ticked. |
@@ -86,7 +88,7 @@ A plug-in asking for nothing gets asked nothing. It just gets a name.
 
 Some plug-ins work through another one: automations that open GitHub issues, say. You're asked about that when the other one arrives, not before, so a community without GitHub is never asked whether automations may use it. Remove GitHub and that permission goes with it. Add it back and you're asked again.
 
-A plug-in allowed to change something, such as a task, can fill in that thing's [custom properties](initiatives.md#custom-properties) as well. **Properties** on its own is for making new ones: it lets the plug-in read an initiative's property definitions, and with write, add to them.
+A plug-in allowed to change something, such as a task, can fill in that thing's [metadata](initiatives.md#metadata) as well. **Metadata** on its own is for making new ones: it lets the plug-in read the initiative's metadata, and with write, add to it.
 
 !!! info "Some plug-ins have a minimum age"
     A listing that has one says so: **Ages 16+**, for the country your browser is set to. It can differ by country. The community can still add it; somebody under the age where they are just can't open or use it.
@@ -106,7 +108,7 @@ Ticking either lets the plug-in ask for that standing; it doesn't use it everywh
 
 ### What a plug-in puts on items
 
-Some plug-ins add to the things you already work with: an invoice number on a task, a **Paid** tick on a queue item, a progress bar on a counter that is very nearly at its fundraising target. They can appear on tasks, calendar events, queue items, counters, gallery pictures and posts.
+Some plug-ins add to the things you already work with: an invoice number on a task, a **Paid** tick on an event, a progress bar on a counter that is very nearly at its fundraising target. They can appear on tasks, calendar events, counters and posts.
 
 | | What you see |
 |---|---|
@@ -186,17 +188,14 @@ Artwork for your profile, and by far the least serious part of Initiative.
 
 Each pack is built around one thing a group of people has in common, and carries banners, frames and trophies you wear in whatever combination pleases you.
 
-Twenty-three packs ship with Initiative:
+Sixteen packs ship with Initiative:
 
 | | |
 |---|---|
-| **People and identity** | Pride, Multicultural, Disability, First Nations, Black heritage, Faith and Belief, Family |
 | **What you do** | Sports, Gaming, Drama, Cinema, Soundcheck, Observatory, Education |
 | **What you love** | Pets, Plants, Books, Tea, Travel, Nature, Winter, Zen, Spooky |
 
-Some run deep. Pride flies a flag, a turning ring and a heart for each of seven identities. Multicultural carries seventy flags. Disability has a trophy for eleven of the things people are, and a flag for all of them.
-
-The banners move, too: a playhead lights the notes it passes, a curtain runs in and out, skeletons dance until sunrise, a typewriter types a line at a time, a lake changes color the whole way down as the sun sets into it, and the view from a train window keeps going past.
+The banners move: a playhead lights the notes it passes, a curtain runs in and out, skeletons dance until sunrise, a typewriter types a line at a time, a lake changes color the whole way down as the sun sets into it, and the view from a train window keeps going past.
 
 What you take here is yours, not your community's. Download a pack in one community and you're wearing it in all of them, because your profile belongs to you.
 
@@ -208,7 +207,11 @@ Downloading a pack puts nothing on you. It just hands you the pieces — you cho
 
 Giving one back is the same click in reverse — open the pack's card and remove it. Its pieces leave your collection, and anything from it you were wearing comes off with them.
 
-![Decoration packs](../images/marketplace/decoration-packs.png)
+!!! screenshot "Decoration packs"
+    **Show:** the decoration packs shelf, a row of pack cards with their banners running.
+
+    Save as `en/images/marketplace/decoration-packs.png`, then replace this box with:
+    `![Decoration packs](../images/marketplace/decoration-packs.png)`
 
 ## Where listings come from
 
@@ -242,6 +245,6 @@ Plug-ins your community has already added open as usual. The first time you open
 ## Related
 
 - [Profile & preferences](../account/profile-and-preferences.md) — wearing what a decoration pack gave you.
-- [Tools](tools.md) — the calendar, queues, counters, dashboards and boards built into every initiative.
+- [Tools](tools.md) — the calendar, counters, dashboards and boards built into every initiative.
 - [Sharing & access](../sharing/index.md) — who can see what you add.
 - [Publishing your own listings](../running-a-server/publishing-listings.md) — for whoever runs the server, adding to its marketplace.

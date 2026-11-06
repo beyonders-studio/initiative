@@ -18,6 +18,7 @@ import {
   CodeIcon,
   ItalicIcon,
   LinkIcon,
+  Sparkles,
   StrikethroughIcon,
   SubscriptIcon,
   SuperscriptIcon,
@@ -25,12 +26,94 @@ import {
 } from "lucide-react";
 import { type Dispatch, type JSX, useCallback, useEffect, useRef, useState } from "react";
 import { createPortal } from "react-dom";
+import { useTranslation } from "react-i18next";
 
+import { AIWriteAction } from "@/api/generated/initiativeAPI.schemas";
+import { Button } from "@/components/ui/button";
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuSub,
+  DropdownMenuSubContent,
+  DropdownMenuSubTrigger,
+  DropdownMenuTrigger,
+} from "@/components/ui/dropdown-menu";
+import { AI_WRITE_COMMAND } from "@/components/ui/editor/plugins/ai-writing-plugin";
 import { getDOMRangeRect } from "@/components/ui/editor/utils/get-dom-range-rect";
 import { getSelectedNode } from "@/components/ui/editor/utils/get-selected-node";
 import { setFloatingElemPosition } from "@/components/ui/editor/utils/set-floating-elem-position";
 import { Separator } from "@/components/ui/separator";
 import { ToggleGroup, ToggleGroupItem } from "@/components/ui/toggle-group";
+import { displayNames } from "@/lib/intl";
+
+/** The languages a selection can be translated into, as language tags. */
+const TRANSLATE_INTO = [
+  "en",
+  "es",
+  "fr",
+  "de",
+  "it",
+  "pt",
+  "nl",
+  "pl",
+  "sv",
+  "uk",
+  "ru",
+  "ar",
+  "hi",
+  "zh",
+  "ja",
+  "ko",
+];
+
+/** Writing help for the selection, from the toolbar over it. */
+function AIWritingMenu({ editor }: { editor: LexicalEditor }) {
+  const { t, i18n } = useTranslation("editor");
+  const names = displayNames(i18n.language, { type: "language" });
+  const ask = (action: AIWriteAction, language?: string) =>
+    editor.dispatchCommand(AI_WRITE_COMMAND, { action, language });
+  return (
+    <DropdownMenu modal={false}>
+      <DropdownMenuTrigger asChild>
+        <Button
+          type="button"
+          variant="ghost"
+          size="sm"
+          aria-label={t("writing.menu")}
+          // Keeps the selection the help is asked about.
+          onMouseDown={(event) => event.preventDefault()}
+        >
+          <Sparkles className="h-4 w-4" />
+        </Button>
+      </DropdownMenuTrigger>
+      <DropdownMenuContent align="start" onCloseAutoFocus={(event) => event.preventDefault()}>
+        <DropdownMenuItem onSelect={() => ask(AIWriteAction.rewrite)}>
+          {t("writing.rewrite")}
+        </DropdownMenuItem>
+        <DropdownMenuItem onSelect={() => ask(AIWriteAction.shorten)}>
+          {t("writing.shorten")}
+        </DropdownMenuItem>
+        <DropdownMenuItem onSelect={() => ask(AIWriteAction.fix)}>
+          {t("writing.fix")}
+        </DropdownMenuItem>
+        <DropdownMenuSub>
+          <DropdownMenuSubTrigger>{t("writing.translate")}</DropdownMenuSubTrigger>
+          <DropdownMenuSubContent className="max-h-72 overflow-y-auto">
+            {TRANSLATE_INTO.map((language) => (
+              <DropdownMenuItem
+                key={language}
+                onSelect={() => ask(AIWriteAction.translate, language)}
+              >
+                {names.of(language)}
+              </DropdownMenuItem>
+            ))}
+          </DropdownMenuSubContent>
+        </DropdownMenuSub>
+      </DropdownMenuContent>
+    </DropdownMenu>
+  );
+}
 
 function FloatingTextFormat({
   editor,
@@ -44,9 +127,11 @@ function FloatingTextFormat({
   isSubscript,
   isSuperscript,
   setIsLinkEditMode,
+  aiWriting,
 }: {
   editor: LexicalEditor;
   anchorElem: HTMLElement;
+  aiWriting: boolean;
   isBold: boolean;
   isCode: boolean;
   isItalic: boolean;
@@ -272,6 +357,12 @@ function FloatingTextFormat({
               <SuperscriptIcon className="h-4 w-4" />
             </ToggleGroupItem>
           </ToggleGroup>
+          {aiWriting ? (
+            <>
+              <Separator orientation="vertical" />
+              <AIWritingMenu editor={editor} />
+            </>
+          ) : null}
         </>
       )}
     </div>
@@ -281,7 +372,8 @@ function FloatingTextFormat({
 function useFloatingTextFormatToolbar(
   editor: LexicalEditor,
   anchorElem: HTMLDivElement | null,
-  setIsLinkEditMode: Dispatch<boolean>
+  setIsLinkEditMode: Dispatch<boolean>,
+  aiWriting: boolean
 ): JSX.Element | null {
   const [isText, setIsText] = useState(false);
   const [isLink, setIsLink] = useState(false);
@@ -387,6 +479,7 @@ function useFloatingTextFormatToolbar(
       isUnderline={isUnderline}
       isCode={isCode}
       setIsLinkEditMode={setIsLinkEditMode}
+      aiWriting={aiWriting}
     />,
     anchorElem
   );
@@ -395,11 +488,14 @@ function useFloatingTextFormatToolbar(
 export function FloatingTextFormatToolbarPlugin({
   anchorElem,
   setIsLinkEditMode,
+  aiWriting = false,
 }: {
   anchorElem: HTMLDivElement | null;
   setIsLinkEditMode: Dispatch<boolean>;
+  /** Whether to offer writing help on the selection. */
+  aiWriting?: boolean;
 }): JSX.Element | null {
   const [editor] = useLexicalComposerContext();
 
-  return useFloatingTextFormatToolbar(editor, anchorElem, setIsLinkEditMode);
+  return useFloatingTextFormatToolbar(editor, anchorElem, setIsLinkEditMode, aiWriting);
 }

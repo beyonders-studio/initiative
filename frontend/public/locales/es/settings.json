@@ -33,7 +33,8 @@
       "integrations": "Integraciones",
       "usage": "Uso",
       "planAndUsage": "Plan y uso",
-      "guests": "Invitados"
+      "guests": "Invitados",
+      "roles": "Roles"
     },
     "tabBadge": {
       "paymentFailed": "Pago fallido",
@@ -214,6 +215,7 @@
     "connectionsDescription": "Define las conexiones de IA que pueden usar los miembros de esta comunidad.",
     "disabledDescription": "Las funciones de IA están desactivadas para la plataforma.",
     "managedByPlatform": "Las conexiones de IA se gestionan a nivel de plataforma. Los miembros configuran su propia clave en la configuración de su perfil.",
+    "managedByServer": "Quien gestiona este servidor administra la IA de esta comunidad.",
     "switchTitle": "IA en esta comunidad",
     "switchLabel": "Permitir funciones de IA",
     "switchHelp": "Desactivada, nada de esta comunidad se envía a un proveedor de IA, sea cual sea la conexión que configuren el servidor o la comunidad.",
@@ -375,7 +377,9 @@
       "cases": "Casos",
       "direct_messages": "Mensajes y contactos",
       "jobs": "Exportaciones e importaciones",
-      "account": "Tu cuenta"
+      "account": "Tu cuenta",
+      "overdue": "Tareas vencidas",
+      "coming_up": "Próximamente"
     },
     "reminderLeadTime": {
       "label": "Recordarme",
@@ -399,11 +403,12 @@
     "groups": {
       "your_communities": "En tus comunidades",
       "community": "Te necesita",
-      "account": "Solo tú"
+      "account": "Solo tú",
+      "digests": "Resúmenes"
     },
     "categoryDescriptions": {
       "mentions": "Alguien te nombró, te respondió o reaccionó a tu comentario.",
-      "assignments": "Te dieron una tarea o te invitaron a algo, o aquello en lo que estás vence, cambió, se canceló o está por empezar.",
+      "assignments": "Te dieron una tarea o te invitaron a algo, o aquello en lo que estás cambió, se canceló o está por empezar.",
       "subscriptions": "Cambios, comentarios y reacciones en lo que sigues, incluido lo que creaste. La campana de cualquier elemento lo detiene.",
       "news": "Se publicó algo, te añadieron a una iniciativa o a un proyecto, o respondieron a tu solicitud para unirte.",
       "approvals": "Alguien espera tu decisión. Siempre aparece en la campana.",
@@ -411,7 +416,9 @@
       "cases": "Se abrió un caso donde atiendes casos, o quien lo presentó respondió y nadie lo ha tomado.",
       "direct_messages": "Alguien te escribió, pidió conectar o aceptó. Quién y cuántos, nunca lo que dice un mensaje.",
       "jobs": "Terminó una exportación o importación que pediste.",
-      "account": "Se hizo algo con tu cuenta. Siempre aparece en la campana."
+      "account": "Se hizo algo con tu cuenta. Siempre aparece en la campana.",
+      "overdue": "Todas las tareas asignadas a ti que ya pasaron su fecha de vencimiento, en un solo mensaje.",
+      "coming_up": "Tareas que vencen y eventos que empiezan antes del próximo resumen, en un solo mensaje."
     },
     "quietHours": {
       "title": "Horas de silencio",
@@ -431,19 +438,15 @@
       "offHere": "Desactivado aquí: {{rows}}"
     },
     "timing": {
-      "title": "Cuándo te enteras",
-      "description": "El correo puede llegar al instante o agrupado. Solo se retiene lo que hayas pedido retener.",
       "cadence": {
         "label": "El correo llega",
         "instant": "Al instante",
         "hourly": "Una vez por hora",
         "daily": "Una vez al día",
-        "weekly": "Una vez por semana",
-        "help": "Todo lo retenido llega en un solo mensaje."
+        "weekly": "Una vez por semana"
       },
       "day": "El",
       "time": "A las",
-      "timeHelp": "Tu correo programado, y el recordatorio de tareas vencidas, salen a esta hora.",
       "personalInstant": "Enviar al instante lo dirigido a mí",
       "personalInstantHelp": "Menciones, respuestas, tareas asignadas, invitaciones y mensajes directos se saltan la cola.",
       "respectPresence": "No me interrumpas mientras uso Initiative",
@@ -468,6 +471,16 @@
       "saveError": "No se pudo actualizar cuándo te enteras",
       "zone": "Las horas están en {{timezone}}.",
       "changeZone": "Cambiar zona horaria"
+    },
+    "digests": {
+      "title": "Resúmenes",
+      "description": "Resúmenes programados. Todo lo que incluyen ya está en tu campana.",
+      "frequency": "Con qué frecuencia",
+      "daily": "Cada día",
+      "weekly": "Cada semana",
+      "gatheredEmail": "Correo agrupado",
+      "gatheredEmailHelp": "El correo de las filas de arriba llega al momento o agrupado en un solo mensaje.",
+      "afterPause": "Cuando termina una pausa o las horas de silencio, también recibes un resumen de lo que llegó."
     },
     "weekdays": {
       "1": "lunes",
@@ -750,6 +763,16 @@
       "idleLabel": "Minutos de inactividad",
       "idlePlaceholder": "Sin límite",
       "idleHint": "Cuánto puede estar una sesión sin tocarse antes de terminar. Déjalo en blanco para conservar la ventana fijada al desplegar el servidor. Usar la aplicación cuenta como tocarla, así que solo corre cuando alguien para. Una comunidad sujeta al estándar de cumplimiento lo acorta aún más para sus miembros."
+    },
+    "breachedPasswordCheck": {
+      "title": "Contraseñas filtradas",
+      "description": "Rechazar una contraseña nueva que ya haya aparecido en una filtración de datos.",
+      "label": "Comprobar las contraseñas nuevas con filtraciones conocidas",
+      "onHelp": "Solo los cinco primeros caracteres del hash de la contraseña salen de este servidor. La contraseña en sí, nunca.",
+      "offHelp": "Las contraseñas nuevas no se comprueban. Desactívalo solo si este servidor no puede acceder a internet.",
+      "enabledToast": "Las contraseñas nuevas se comprueban con filtraciones conocidas.",
+      "disabledToast": "Las contraseñas nuevas ya no se comprueban con filtraciones conocidas.",
+      "error": "No hemos podido cambiar la comprobación de contraseñas filtradas."
     },
     "secondFactorRequirement": {
       "title": "Autenticación en dos pasos",
@@ -1067,7 +1090,19 @@
     "caseRequiredNoneOpen": "Aquí el acceso se solicita para un caso, y no hay ningún caso abierto que puedas indicar. Abre uno primero.",
     "caseOptionalHint": "Opcional. Sin uno, anota después a mano en el caso lo que hiciste.",
     "caseOtherCommunity": "Este caso trata de la comunidad #{{community}}, no de la elegida.",
-    "caseMark": "Caso #{{id}}"
+    "caseMark": "Caso #{{id}}",
+    "notice": {
+      "label": "Avisar a la comunidad",
+      "none": "No avisar",
+      "when_granted": "Cuando empiece el acceso",
+      "when_ended": "Cuando el acceso haya terminado",
+      "help": "Sus superadministradores reciben por correo el nivel y el tipo de caso, nunca el motivo.",
+      "always": "El acceso para un caso de soporte siempre se comunica por correo a los superadministradores de la comunidad cuando empieza.",
+      "mark": {
+        "when_granted": "se avisa a la comunidad al empezar",
+        "when_ended": "se avisa a la comunidad al terminar"
+      }
+    }
   },
   "platformLayout": {
     "title": "Configuración de la plataforma",
@@ -1346,6 +1381,12 @@
       "supportLabel": "Solicitudes de ayuda",
       "supportHelp": "Permite que sus miembros envíen una solicitud de ayuda. Desactivado, el control Pedir ayuda abre las preguntas frecuentes.",
       "supportNeedsIntake": "Todavía no hay dónde enviar una solicitud de ayuda. Vincule el flujo de soporte a un proyecto en Configuración de la plataforma › Entradas y esto podrá activarse.",
+      "aiConnectionsLabel": "Sus propias conexiones de IA",
+      "aiConnectionsHelp": "Permite que la comunidad configure sus propios proveedores de IA. Desactivado, las que tiene se conservan y no se usan.",
+      "pluginsLabel": "Sus propios complementos",
+      "pluginsHelp": "Permite que la comunidad instale y configure complementos. Desactivado, los que tiene siguen funcionando como están.",
+      "customRolesLabel": "Roles personalizados",
+      "customRolesHelp": "Sus administradores pueden definir roles que dan a otras personas parte de la gestión de la comunidad. Desactivado, los roles que tiene siguen aplicándose.",
       "authOption": {
         "restrictions": {
           "label": "Su propio estándar de seguridad",
@@ -1461,6 +1502,7 @@
     }
   },
   "communityAuth": {
+    "setByDeployment": "Quien gestiona este servidor define esto para tu comunidad.",
     "shareUrl": {
       "title": "Enlace de inicio de sesión para miembros",
       "description": "Comparte este enlace con los miembros: ofrece los proveedores de inicio de sesión de esta comunidad y los lleva directamente a la comunidad.",
@@ -1863,7 +1905,28 @@
     "maxGuestDaysHelpText": "Ningún invitado se queda más que esto, configure lo que configure una comunidad.",
     "maxGuestDaysSave": "Guardar la estancia máxima de invitados",
     "maxGuestDaysSaved_one": "Los invitados se quedan {{count}} día como máximo.",
-    "maxGuestDaysSaved_other": "Los invitados se quedan {{count}} días como máximo."
+    "maxGuestDaysSaved_other": "Los invitados se quedan {{count}} días como máximo.",
+    "joinAndCreateTitle": "Quién puede unirse y crear",
+    "publicRegistrationLabel": "Permitir que cualquiera se registre",
+    "publicRegistrationHelpText": "Las personas pueden crear una cuenta sin invitación. Mientras la creación de comunidades esté desactivada, solo pueden registrarse las personas invitadas.",
+    "publicRegistrationEnabledToast": "Cualquiera puede registrarse.",
+    "publicRegistrationDisabledToast": "Solo las personas invitadas pueden registrarse.",
+    "communityCreationLabel": "Permitir que cualquiera cree una comunidad",
+    "communityCreationHelpText": "Si está desactivado, solo quienes gestionan comunidades en este servidor pueden crear una, y solo las personas invitadas pueden registrarse.",
+    "communityCreationEnabledToast": "Cualquiera puede crear una comunidad.",
+    "communityCreationDisabledToast": "Solo quienes gestionan comunidades pueden crear una.",
+    "creationDailyLimitLabel": "Comunidades que una cuenta puede crear al día",
+    "creationDailyLimitHelpText": "0 significa sin límite. No se aplica a quienes gestionan comunidades.",
+    "creationDailyLimitSave": "Guardar el límite diario de comunidades",
+    "creationDailyLimitSaved_one": "Cada cuenta puede crear {{count}} comunidad al día.",
+    "creationDailyLimitSaved_other": "Cada cuenta puede crear {{count}} comunidades al día.",
+    "creationDailyLimitSavedNone": "No hay límite diario de comunidades nuevas.",
+    "exportCooldownLabel": "Horas entre exportaciones de una comunidad",
+    "exportCooldownHelpText": "Cuánto espera una comunidad antes de poder exportarlo todo de nuevo. 0 significa sin espera.",
+    "exportCooldownSave": "Guardar el tiempo entre exportaciones de comunidades",
+    "exportCooldownSaved_one": "Las comunidades esperan {{count}} hora entre exportaciones.",
+    "exportCooldownSaved_other": "Las comunidades esperan {{count}} horas entre exportaciones.",
+    "exportCooldownSavedNone": "Las comunidades pueden exportar sin esperar."
   },
   "account": {
     "passwordTitle": "Contraseña",
@@ -2144,5 +2207,114 @@
     "noCommunity": "No abre ninguna comunidad ni necesita un acceso.",
     "open": "Abrir Control",
     "openError": "No se pudo abrir Control."
+  },
+  "customRoles": {
+    "title": "Roles",
+    "description": "Todos aquí tienen uno de los roles integrados. Un rol personalizado da a un miembro parte de la gestión de la comunidad, o limita a un administrador a una parte de ella. Cada persona tiene como máximo un rol personalizado.",
+    "add": "Añadir rol",
+    "addTitle": "Añadir un rol",
+    "editTitle": "Editar {{name}}",
+    "dialogDescription": "Ponle nombre, elige para quién es y marca lo que incluye.",
+    "nameLabel": "Nombre",
+    "rungLabel": "Para",
+    "rung": {
+      "member": "Miembros",
+      "admin": "Administradores"
+    },
+    "rungHelp": {
+      "member": "Da a un miembro lo que incluye, además de lo que ya hace.",
+      "admin": "Limita a un administrador a lo que incluye."
+    },
+    "rungFixed": "Para quién es un rol no se puede cambiar una vez creado.",
+    "surfacesLabel": "Qué incluye",
+    "notYours": "No tienes esto tú mismo, así que no puedes darlo.",
+    "holdsNothing": "Aún no incluye nada.",
+    "builtIn": "Integrado",
+    "loading": "Cargando roles",
+    "loadError": "No se pudieron cargar los roles.",
+    "closed": "Quien administra este servidor ha desactivado los roles personalizados para esta comunidad. Los roles que tiene siguen aplicándose.",
+    "deleteTitle": "¿Eliminar {{name}}?",
+    "deleteDescription": "Quienes lo tienen vuelven a su rol normal.",
+    "created": "Rol añadido",
+    "updated": "Rol guardado",
+    "deleted": "Rol eliminado",
+    "assigned": "Rol cambiado",
+    "createError": "No se pudo añadir el rol.",
+    "updateError": "No se pudo guardar el rol.",
+    "deleteError": "No se pudo eliminar el rol.",
+    "assignError": "No se pudo cambiar su rol.",
+    "column": "Rol personalizado",
+    "none": "Ninguno",
+    "pickerLabel": "Rol personalizado de {{name}}",
+    "appliesWhileMember": "Se aplica mientras sea miembro",
+    "appliesWhileAdmin": "Se aplica mientras sea administrador",
+    "surfaces": {
+      "profile": {
+        "label": "Perfil",
+        "description": "Cambiar el nombre, la imagen, el banner y la descripción de la comunidad."
+      },
+      "invites": {
+        "label": "Invitaciones",
+        "description": "Crear y eliminar enlaces de invitación, incluidas las invitaciones de invitado."
+      },
+      "members": {
+        "label": "Miembros",
+        "description": "Cambiar los roles y nombres de las personas, eliminarlas y dar roles personalizados."
+      },
+      "initiatives": {
+        "label": "Iniciativas",
+        "description": "Crear, archivar y eliminar cualquier iniciativa, y gestionar aquellas en las que no se está."
+      },
+      "community_calendars": {
+        "label": "Calendarios de la comunidad",
+        "description": "Añadir y cambiar los calendarios propios de la comunidad."
+      },
+      "community_contacts": {
+        "label": "Contactos de la comunidad",
+        "description": "Añadir y cambiar los contactos propios de la comunidad, y mover a ellos los contactos de una iniciativa."
+      },
+      "webhooks": {
+        "label": "Webhooks",
+        "description": "Configurar los webhooks de la comunidad."
+      },
+      "trash": {
+        "label": "Papelera",
+        "description": "Restaurar o eliminar definitivamente cualquier cosa de la papelera de la comunidad."
+      },
+      "usage": {
+        "label": "Uso",
+        "description": "Ver lo que usa la comunidad frente a sus límites."
+      },
+      "roles": {
+        "label": "Roles",
+        "description": "Añadir, cambiar y eliminar roles personalizados."
+      }
+    },
+    "beyondYours": "No puedes cambiar este rol: incluye algo que tú no tienes.",
+    "widensAnAdmin": "Solo un administrador que puede hacerlo todo puede eliminar un rol de administrador: quienes lo tienen lo recuperan todo.",
+    "setByDeployment": "Quien gestiona este servidor define este rol. Puedes asignarlo aquí, pero no cambiarlo ni eliminarlo."
+  },
+  "customRoleRules": {
+    "title": "Roles personalizados por grupo",
+    "description": "Da un rol personalizado a quien inicie sesión con un grupo. Un inicio de sesión lee estas reglas en orden y decide el primer grupo que coincida; un rol asignado a mano se mantiene.",
+    "add": "Añadir regla de rol",
+    "empty": "Ningún grupo da todavía un rol personalizado.",
+    "gives": "Con {{provider}}, da {{role}}",
+    "moveUp": "Subir {{group}}",
+    "moveDown": "Bajar {{group}}",
+    "remove": "Quitar regla",
+    "removeTitle": "¿Quitar esta regla?",
+    "removeDescription": "Quienes están en {{group}} conservan el rol hasta su próximo inicio de sesión.",
+    "dialogDescription": "Quien inicie sesión con este proveedor y tenga el grupo recibe el rol, salvo que antes coincida otra regla.",
+    "roleLabel": "Rol personalizado",
+    "rolePlaceholder": "Elige un rol",
+    "added": "Regla añadida",
+    "addError": "No se pudo añadir la regla",
+    "orderError": "No se pudieron reordenar las reglas",
+    "removeError": "No se pudo quitar la regla",
+    "closed": "Tu servidor ha desactivado los roles personalizados en esta comunidad. Estas reglas siguen aplicándose; nadie aquí puede cambiarlas.",
+    "loading": "Cargando reglas…",
+    "loadError": "No se pudieron cargar las reglas.",
+    "retry": "Reintentar"
   }
 }

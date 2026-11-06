@@ -17,7 +17,7 @@ from sqlmodel import select
 
 from app.db.session import set_rls_context
 from app.models.platform.guild import CommunityRole
-from app.models.tenant.file import FileType
+from app.core.file_types import FileType
 from app.models.tenant.search_entry import SearchEntry
 from app.services.tenant import file_versions
 from app.testing import Actor, create_file
@@ -78,7 +78,7 @@ async def test_a_native_file_indexes_its_prose(
 async def test_nested_editor_content_is_reached(
     session: AsyncSession, acting_user: ActingUser
 ) -> None:
-    """A mention, a wikilink and an image caption all keep text below the top
+    """A mention, a reference and an image caption all keep text below the top
     level; the recursive path is what picks them up."""
     a = await acting_user(guild_role=CommunityRole.admin, initiative=True)
     doc = await create_file(
@@ -109,7 +109,12 @@ async def test_nested_editor_content_is_reached(
                             }
                         },
                     },
-                    {"type": "wikilink", "text": "Q3 Plan", "documentId": 4},
+                    {
+                        "type": "entity-mention",
+                        "text": "Q3 Plan",
+                        "entityType": "file",
+                        "entityId": 4,
+                    },
                 ]
             }
         },
@@ -128,7 +133,7 @@ async def test_a_whiteboard_indexes_its_element_text(
         a.initiative,
         a.user,
         name="Board",
-        file_type=FileType.whiteboard,
+        file_type=FileType.excalidraw,
         content={
             "elements": [
                 {"type": "text", "text": "architecture sketch"},
@@ -152,7 +157,7 @@ async def test_a_current_spreadsheet_indexes_cells_and_sheet_names(
         a.initiative,
         a.user,
         name="Workbook",
-        file_type=FileType.spreadsheet,
+        file_type=FileType.sheet,
         content={
             "schema_version": 3,
             "kind": "workbook",
@@ -179,7 +184,7 @@ async def test_a_legacy_spreadsheet_still_indexes(
         a.initiative,
         a.user,
         name="Legacy",
-        file_type=FileType.spreadsheet,
+        file_type=FileType.sheet,
         content={
             "schema_version": 1,
             "kind": "sheet",
@@ -203,7 +208,7 @@ async def test_a_smart_link_indexes_its_url(
         a.initiative,
         a.user,
         name="Design system",
-        file_type=FileType.smart_link,
+        file_type=FileType.url,
         content={"url": "https://www.figma.com/file/abc/Design-System"},
     )
     assert await _finds(session, a.guild.id, "figma") == ["Design system"]
@@ -221,7 +226,6 @@ async def test_a_uploaded_file_indexes_its_filename_only(
         a.initiative,
         a.user,
         name="Contract",
-        file_type=FileType.file,
         content={},
         file_url=f"/uploads/{a.guild.id}/v1.pdf",
         original_filename="draft-agreement.pdf",

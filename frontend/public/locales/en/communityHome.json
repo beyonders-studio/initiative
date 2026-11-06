@@ -96,19 +96,34 @@
       "files": "Type",
       "calendars": "Description",
       "dashboards": "Source",
-      "posts": "Preview"
+      "posts": "Preview",
+      "contacts": "Phone or email"
     }
   },
   "detail": {
     "tasksDone": "{{completed}} of {{total}} tasks",
     "fromMarketplace": "Marketplace",
     "builtHere": "Built here",
-    "fileType": {
-      "native": "Text document",
-      "file": "File",
+    "fileKind": {
+      "document": "Document",
+      "spreadsheet": "Spreadsheet",
+      "presentation": "Presentation",
       "whiteboard": "Whiteboard",
-      "smart_link": "Link",
-      "spreadsheet": "Spreadsheet"
+      "pdf": "PDF",
+      "image": "Image",
+      "video": "Video",
+      "audio": "Audio",
+      "text": "Text",
+      "compressed": "Compressed",
+      "design": "Design",
+      "3d": "3D",
+      "font": "Font",
+      "raw": "Camera raw",
+      "code": "Code",
+      "ebook": "E-book",
+      "cad": "CAD",
+      "link": "Link",
+      "other": "Other"
     }
   },
   "recentComments": {
@@ -135,5 +150,15 @@
       "projectEnd": "Project ends",
       "pollCloses": "Poll closes"
     }
+  },
+  "catchUp": {
+    "button": "Catch me up",
+    "title": "Catch me up",
+    "intro": "A short summary of what changed that you can see since you were last here.",
+    "action": "Catch me up",
+    "writing": "Catching you up…",
+    "cut": "Written from the {{percent}}% of changes most likely to matter to you. The rest did not fit.",
+    "since": "Since {{date}}",
+    "empty": "Nothing new since you were last here."
   }
 }

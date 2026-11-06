@@ -15,12 +15,11 @@ from sqlmodel.ext.asyncio.session import AsyncSession
 
 from app.core.audit_events import AuditEventType
 from app.core.login_methods import LoginMethod, SecondFactorRequirement
+from app.models.platform.user_dm_settings import DmPolicy
+from app.schemas.ai_settings import AIConfigMode
 from app.core.security import AUTH_POLICY_UNMET_HEADER
-from app.models.platform.guild import Guild
-from app.models.platform.guild_auth_policy import GuildAuthPolicy
 from app.models.platform.user import UserRole
-from app.services.platform import app_settings as app_settings_service
-from app.services.platform import auth_posture
+from app.services.platform import auth_posture, rules
 from app.services.platform.auth_posture import (
     COMMUNITY_RULES,
     PLATFORM_RULES,
@@ -35,44 +34,10 @@ ALL_METHODS = frozenset(LoginMethod) - {LoginMethod.email_otp}
 FACTOR_REQUIREMENT = SignInRequirement("required", None, frozenset({LoginMethod.totp}))
 
 
-async def _settings(session: AsyncSession, **values: Any) -> None:
-    row = await app_settings_service.ensure_settings_row(session)
-    for name, value in values.items():
-        setattr(row, name, value)
-    session.add(row)
-    await session.commit()
-
-
 async def _put(session: AsyncSession, guild_id: int | None, key: str, value: Any):
     """Put ``value`` in place directly, as a rule's own write would leave it."""
-    if guild_id is None:
-        if key == "login_methods":
-            value = sorted(m.value for m in value)
-        await _settings(session, **{key: value})
-    elif key == "auth_policy":
-        session.add(
-            GuildAuthPolicy(
-                guild_id=guild_id,
-                policy=value.policy,
-                require_methods=sorted(m.value for m in value.methods),
-            )
-        )
-        await session.commit()
-    elif key == "guest_auth_policy":
-        session.add(
-            GuildAuthPolicy(
-                guild_id=guild_id,
-                policy="open",
-                guest_policy=value.policy,
-                guest_require_methods=sorted(m.value for m in value.methods),
-            )
-        )
-        await session.commit()
-    else:
-        guild = await session.get(Guild, guild_id)
-        setattr(guild, key, value)
-        session.add(guild)
-        await session.commit()
+    await rules.put(session, key, value, guild_id=guild_id)
+    await session.commit()
 
 
 @dataclass(frozen=True)
@@ -88,7 +53,7 @@ class Case:
 
 
 async def _no_factor_methods(session: AsyncSession) -> None:
-    await _settings(session, login_methods=[LoginMethod.password.value])
+    await _put(session, None, "login_methods", frozenset({LoginMethod.password}))
 
 
 PLATFORM_SETTINGS = AuditEventType.PLATFORM_SETTINGS_CHANGED
@@ -112,6 +77,36 @@ CASES: dict[tuple[str, str], Case] = {
     ("platform", "push_notifications_enabled"): Case(True, False, PLATFORM_SETTINGS),
     ("platform", "email_notifications_enabled"): Case(True, False, PLATFORM_SETTINGS),
     ("platform", "redact_notification_content"): Case(False, True, PLATFORM_SETTINGS),
+    ("platform", "engagement_ranking_enabled"): Case(True, False, PLATFORM_SETTINGS),
+    ("platform", "cookie_consent_enabled"): Case(False, True, PLATFORM_SETTINGS),
+    ("platform", "default_dm_policy"): Case(
+        DmPolicy.private, DmPolicy.public, PLATFORM_SETTINGS
+    ),
+    ("platform", "ai_config_mode"): Case(
+        AIConfigMode.disabled, AIConfigMode.platform, PLATFORM_SETTINGS
+    ),
+    ("platform", "community_directory_enabled"): Case(False, True, PLATFORM_SETTINGS),
+    ("platform", "community_age_gate_enabled"): Case(True, False, PLATFORM_SETTINGS),
+    ("platform", "direct_messages_enabled"): Case(True, False, PLATFORM_SETTINGS),
+    ("platform", "guests_enabled"): Case(False, True, PLATFORM_SETTINGS),
+    ("platform", "max_guest_days"): Case(90, 30, PLATFORM_SETTINGS),
+    ("platform", "erase_deleted_accounts"): Case(True, False, PLATFORM_SETTINGS),
+    ("platform", "deleted_account_retention_days"): Case(30, 7, PLATFORM_SETTINGS),
+    ("platform", "destroy_deleted_communities"): Case(True, False, PLATFORM_SETTINGS),
+    ("platform", "deleted_community_retention_days"): Case(90, 7, PLATFORM_SETTINGS),
+    ("platform", "delete_held_communities"): Case(True, False, PLATFORM_SETTINGS),
+    ("platform", "on_hold_community_deletion_days"): Case(30, 7, PLATFORM_SETTINGS),
+    ("platform", "marketplace_members_publish_directly"): Case(
+        False, True, PLATFORM_SETTINGS
+    ),
+    ("platform", "marketplace_registry_enabled"): Case(True, False, PLATFORM_SETTINGS),
+    ("platform", "public_registration_enabled"): Case(True, False, PLATFORM_SETTINGS),
+    ("platform", "community_creation_enabled"): Case(True, False, PLATFORM_SETTINGS),
+    ("platform", "community_creation_daily_limit"): Case(5, 1, PLATFORM_SETTINGS),
+    ("platform", "community_export_cooldown_hours"): Case(48, 0, PLATFORM_SETTINGS),
+    ("platform", "breached_password_check_enabled"): Case(
+        True, False, PLATFORM_SETTINGS
+    ),
     ("community", "auth_policy"): Case(
         SignInRequirement(),
         FACTOR_REQUIREMENT,
@@ -153,10 +148,9 @@ async def _context(session: AsyncSession, scope: str, *, entitled: bool = True):
     """A writer with no second factor, in a community holding its options or
     none of them, on a deployment permitting every way in."""
     owner = await create_user(session, role=UserRole.owner)
-    await _settings(
-        session,
-        login_methods=sorted(m.value for m in ALL_METHODS),
-        second_factor_requirement=SecondFactorRequirement.nobody,
+    await _put(session, None, "login_methods", ALL_METHODS)
+    await _put(
+        session, None, "second_factor_requirement", SecondFactorRequirement.nobody
     )
     if scope == "platform":
         return RuleContext.platform(session, owner)
@@ -226,7 +220,9 @@ async def test_one_change_loosens_before_it_tightens(session: AsyncSession):
     method that answers it is one change: the withdrawal is checked against
     the lowered requirement."""
     ctx = await _context(session, "platform")
-    await _settings(session, second_factor_requirement=SecondFactorRequirement.everyone)
+    await _put(
+        session, None, "second_factor_requirement", SecondFactorRequirement.everyone
+    )
 
     await auth_posture.change(
         ctx,

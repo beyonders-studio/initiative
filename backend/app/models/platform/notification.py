@@ -8,11 +8,17 @@ from sqlmodel import Field, Index, SQLModel
 
 class NotificationType(str, Enum):
     task_assignment = "task_assignment"
+    #: The overdue digest: every task still overdue, on the account's schedule.
     overdue_tasks = "overdue_tasks"
+    #: The coming-up digest: tasks due and events starting before the next one.
+    coming_up = "coming_up"
     initiative_added = "initiative_added"
     initiative_join_requested = "initiative_join_requested"
     initiative_join_approved = "initiative_join_approved"
     initiative_join_denied = "initiative_join_denied"
+    share_requested = "share_requested"
+    share_granted = "share_granted"
+    share_declined = "share_declined"
     project_added = "project_added"
     mention = "mention"
     comment_on_task = "comment_on_task"
@@ -36,6 +42,8 @@ class NotificationType(str, Enum):
     event_cancelled = "event_cancelled"
     event_rsvp = "event_rsvp"
     event_reminder = "event_reminder"
+    #: A reminder the recipient set on a task came due.
+    task_reminder = "task_reminder"
     export_ready = "export_ready"
     export_failed = "export_failed"
     import_ready = "import_ready"

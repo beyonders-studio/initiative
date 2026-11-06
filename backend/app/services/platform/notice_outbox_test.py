@@ -28,20 +28,30 @@ from app.testing import (
     set_notification_prefs,
 )
 from app.testing.sockets import settle
+from app.services.platform import rules
 
 
 @pytest.fixture
 def fcm(monkeypatch):
     """FCM, answering however the test says, and what was put on the wire:
-    each title, and each data payload under ``answer["data"]``."""
+    each title, and each data payload and badge under ``answer["data"]`` and
+    ``answer["badge"]``."""
     calls: list[str] = []
-    answer: dict = {"now": (True, False), "data": []}
+    answer: dict = {"now": (True, False), "data": [], "badge": []}
 
     async def _send(
-        client, push_token, title, body, data=None, channel_id=None, platform=None
+        client,
+        push_token,
+        title,
+        body,
+        data=None,
+        channel_id=None,
+        platform=None,
+        badge=None,
     ):
         calls.append(title)
         answer["data"].append(data)
+        answer["badge"].append(badge)
         return answer["now"]
 
     monkeypatch.setattr(push_notifications, "send_push_notification", _send)
@@ -83,7 +93,7 @@ async def _waiting(session: AsyncSession) -> list[NoticeOutboxItem]:
 async def test_a_notice_is_delivered_once_and_only_if_its_request_commits(
     session: AsyncSession, fcm, monkeypatch
 ):
-    pushed, _answer = fcm
+    pushed, answer = fcm
     mailed: list[tuple[int, int | None]] = []
 
     async def _mail(_session, recipient, *, notification_id=None, **_rest):
@@ -116,6 +126,8 @@ async def test_a_notice_is_delivered_once_and_only_if_its_request_commits(
     [line] = await _lines(session, recipient.id)
     assert mailed == [(recipient.id, line.id)]
     assert pushed == ["You were mentioned"]
+    # The badge counts the line the push announces.
+    assert answer["badge"] == [1]
     assert await _waiting(session) == []
 
 
@@ -125,8 +137,7 @@ async def test_a_redacting_community_writes_down_no_more_than_it_will_say(
     actor = await create_user(session)
     recipient = await create_user(session)
     guild = await create_guild(session, creator=actor)
-    guild.redact_notification_content = True
-    session.add(guild)
+    await rules.put(session, "redact_notification_content", True, guild_id=guild.id)
     await session.commit()
 
     with push_switched_on():
@@ -169,8 +180,7 @@ async def test_a_push_of_its_own_writes_no_line(session: AsyncSession, fcm):
             )
         ],
     )
-    guild.allow_push_notifications = False
-    session.add(guild)
+    await rules.put(session, "allow_push_notifications", False, guild_id=guild.id)
     await session.commit()
 
     await _deliver(session, datetime.now(timezone.utc))
@@ -241,8 +251,7 @@ async def test_a_retry_follows_the_communitys_switches_as_they_stand_then(
     await _deliver(session, start)
     assert len(pushed) == 2
 
-    guild.redact_notification_content = True
-    session.add(guild)
+    await rules.put(session, "redact_notification_content", True, guild_id=guild.id)
     await session.commit()
     answer["now"] = (True, False)
     await _deliver(session, start + timedelta(seconds=31))
@@ -256,8 +265,7 @@ async def test_a_retry_follows_the_communitys_switches_as_they_stand_then(
     await session.commit()
     at = datetime.now(timezone.utc)
     await _deliver(session, at)
-    guild.allow_push_notifications = False
-    session.add(guild)
+    await rules.put(session, "allow_push_notifications", False, guild_id=guild.id)
     await session.commit()
     await _deliver(session, at + timedelta(seconds=31))
     assert len(pushed) == 5
@@ -389,8 +397,7 @@ async def test_no_desktop_alert_where_it_is_refused(
             session, recipient, {"categories": {"mentions": {"desktop": False}}}
         )
     else:
-        guild.allow_push_notifications = False
-        session.add(guild)
+        await rules.put(session, "allow_push_notifications", False, guild_id=guild.id)
     await session.commit()
     app = account_socket(recipient.id)
 

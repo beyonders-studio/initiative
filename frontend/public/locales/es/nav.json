@@ -51,9 +51,6 @@
   "prideAuto": "Auto (junio)",
   "prideOn": "Activado",
   "prideOff": "Desactivado",
-  "queues": "Colas",
-  "allQueues": "Todas las colas",
-  "createQueue": "Nueva cola",
   "calendars": "Calendario",
   "allCalendarEvents": "Todos los eventos",
   "createCalendar": "Nuevo calendario",
@@ -90,11 +87,11 @@
   "requestsWaiting_other": "{{count}} pendientes",
   "posts": "Publicaciones",
   "createPost": "Nueva publicación",
-  "galleries": "Galerías",
-  "createGallery": "Nueva galería",
   "moderation": "Moderación",
   "wikis": "Wikis",
   "createWiki": "Nuevo wiki",
+  "contacts": "Contactos",
+  "createContact": "Nuevo contacto",
   "sidebar": {
     "resize": "Arrastra para cambiar el ancho de la barra lateral"
   },

@@ -25,7 +25,6 @@ const counter = (overrides: Partial<CounterRead> = {}): CounterRead => ({
   view_mode: CounterViewMode.number,
   position: "0",
   properties: [],
-  plugin_values: [],
   created_at: "2026-01-15T00:00:00.000Z",
   updated_at: "2026-01-15T00:00:00.000Z",
   ...overrides,

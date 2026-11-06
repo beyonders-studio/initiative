@@ -73,6 +73,15 @@ ALLOWED_DYNAMIC_SQL: dict[str, str] = {
     "app/db/schema_provisioning.py::apply_guild_timers": (
         "int-derived schema name + registry-rendered trigger DDL (constants)"
     ),
+    "app/db/schema_provisioning.py::_run_in_schema": (
+        "int-derived schema name + the bundle's registry-rendered operations DDL"
+    ),
+    "app/db/operations_schema.py::deprovision_operations": (
+        "int-derived schema name + the constant operations table names"
+    ),
+    "app/db/operations_schema.py::_drop_case_files": (
+        "int-derived schema name; values are bound"
+    ),
     "app/db/schema_provisioning.py::reindex_guild_search": (
         "int-derived guild_<id> schema name, registry-rendered "
         "reindex statements (constants), and a hex-digest generation marker"
@@ -89,7 +98,7 @@ ALLOWED_DYNAMIC_SQL: dict[str, str] = {
     "app/testing/guild_pool.py::drop": (
         "test harness: int-derived test_pool_<id> schema name"
     ),
-    "app/models/tenant/property.py::PropertyValue": (
+    "app/models/tenant/metadata.py::MetadataValue": (
         "model DDL: the CHECK lists the PROPERTY_TARGETS constant, the partial "
         "indexes name the model's own value columns"
     ),
@@ -107,6 +116,9 @@ ALLOWED_DYNAMIC_SQL: dict[str, str] = {
         "digest of the registry render"
     ),
     "app/db/backfill_uploads_to_s3.py::_guild_upload_meta": (
+        "admin backfill job; schema name is int-derived guild_<id>"
+    ),
+    "app/db/backfill_uploads_to_s3.py::_guild_import_payloads": (
         "admin backfill job; schema name is int-derived guild_<id>"
     ),
     "app/db/bootstrap.py::_revoke_former_set_config_holders": (

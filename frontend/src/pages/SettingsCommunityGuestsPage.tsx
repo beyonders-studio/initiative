@@ -47,6 +47,7 @@ import {
 import { useAppConfig } from "@/hooks/useAppConfig";
 import { useCommunities } from "@/hooks/useCommunities";
 import { useCommunityInvites } from "@/hooks/useCommunityInvites";
+import { useHeldSurfaces } from "@/hooks/useCustomRoles";
 import { useCommunityInitiatives } from "@/hooks/useInitiatives";
 import { useServerTableState } from "@/hooks/useServerTableState";
 import { useExtendGuest, useMakeGuestAMember, useUsers } from "@/hooks/useUsers";
@@ -137,10 +138,17 @@ export const SettingsCommunityGuestsPage = () => {
   const { activeCommunity } = useCommunities();
   const { guestsEnabled } = useAppConfig();
   const communityId = activeCommunity?.id ?? null;
-  // The rung that hands out invites, where the deployment and the community
-  // both take guests.
+  // Whoever hands out invites on the admin rung, where the deployment and the
+  // community both take guests: a guest invite can open any initiative.
+  // Changing a guest's stay is running the roster.
+  const held = useHeldSurfaces();
   const managesGuests =
-    Boolean(activeCommunity?.can.configure) && guestsEnabled && activeCommunity?.max_guests !== 0;
+    held.writes &&
+    held.holds("invites") &&
+    Boolean(activeCommunity?.can.administer) &&
+    guestsEnabled &&
+    activeCommunity?.max_guests !== 0;
+  const managesMembers = held.holds("members");
 
   const table = useServerTableState();
   const guestsQuery = useUsers({ ...table.params, guests: true }, { enabled: managesGuests });
@@ -229,36 +237,42 @@ export const SettingsCommunityGuestsPage = () => {
       header: t("guests.endsColumn"),
       cell: ({ row }) => <RelativeTime date={row.original.guest_until} className="text-sm" />,
     },
-    {
-      id: "actions",
-      header: t("users.actionsColumn"),
-      cell: ({ row }) => {
-        const guest = row.original;
-        return (
-          <RowActionsMenu subject={getUserDisplayName(guest)}>
-            <DropdownMenuItem onSelect={() => setExtending(guest)}>
-              <CalendarPlus className="h-4 w-4" />
-              {t("guests.extend")}
-            </DropdownMenuItem>
-            <DropdownMenuItem
-              disabled={makeMember.isPending}
-              onSelect={() => makeMember.mutate({ communityId, userId: guest.id })}
-            >
-              <UserCheck className="h-4 w-4" />
-              {t("guests.makeMember")}
-            </DropdownMenuItem>
-            <DropdownMenuSeparator />
-            <DropdownMenuItem
-              className="text-destructive"
-              onSelect={() => setRemoving({ userId: guest.id, name: getUserDisplayName(guest) })}
-            >
-              <UserMinus className="h-4 w-4" />
-              {t("users.removeFromCommunity")}
-            </DropdownMenuItem>
-          </RowActionsMenu>
-        );
-      },
-    },
+    ...(managesMembers
+      ? [
+          {
+            id: "actions",
+            header: t("users.actionsColumn"),
+            cell: ({ row }) => {
+              const guest = row.original;
+              return (
+                <RowActionsMenu subject={getUserDisplayName(guest)}>
+                  <DropdownMenuItem onSelect={() => setExtending(guest)}>
+                    <CalendarPlus className="h-4 w-4" />
+                    {t("guests.extend")}
+                  </DropdownMenuItem>
+                  <DropdownMenuItem
+                    disabled={makeMember.isPending}
+                    onSelect={() => makeMember.mutate({ communityId, userId: guest.id })}
+                  >
+                    <UserCheck className="h-4 w-4" />
+                    {t("guests.makeMember")}
+                  </DropdownMenuItem>
+                  <DropdownMenuSeparator />
+                  <DropdownMenuItem
+                    className="text-destructive"
+                    onSelect={() =>
+                      setRemoving({ userId: guest.id, name: getUserDisplayName(guest) })
+                    }
+                  >
+                    <UserMinus className="h-4 w-4" />
+                    {t("users.removeFromCommunity")}
+                  </DropdownMenuItem>
+                </RowActionsMenu>
+              );
+            },
+          } satisfies AppColumnDef<UserCommunityMember>,
+        ]
+      : []),
   ];
 
   return (

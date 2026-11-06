@@ -19,7 +19,6 @@ from app.core.security_rules import (
 )
 from app.db.request_context import SystemGuild, Unattributed
 from app.db.session import set_rls_context
-from app.models.platform.app_setting import AppSetting
 from app.models.tenant.intake import IntakeBinding, IntakeCase
 from app.services import audit as audit_service
 from app.services.platform import security_signals
@@ -29,6 +28,7 @@ from app.testing import (
     create_project,
     create_user,
     emitted,
+    make_operations_community,
 )
 
 #: Inside one ten-minute window, whenever the test runs.
@@ -49,13 +49,7 @@ async def security_desk(session):
     ops_guild = await create_guild(session, creator=staff)
     initiative = await create_initiative(session, ops_guild, staff)
     project = await create_project(session, initiative, staff)
-    await set_rls_context(session, Unattributed())
-    row = (await session.exec(select(AppSetting).where(AppSetting.id == 1))).first()
-    if row is None:
-        row = AppSetting(id=1)
-    row.operations_guild_id = ops_guild.id
-    session.add(row)
-    await session.commit()
+    await make_operations_community(session, ops_guild.id)
     await set_rls_context(session, SystemGuild(ops_guild.id))
     session.add(IntakeBinding(stream=IntakeStream.security, project_id=project.id))
     await session.commit()

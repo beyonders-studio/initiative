@@ -34,6 +34,7 @@ const blockerRow = (title: string, isOpen: boolean): RelationshipRead => ({
     id: 42,
     title,
     initiative_id: 3,
+    handle: null,
     updated_at: null,
     tool: Tool.project,
     tool_id: 1,
@@ -46,6 +47,7 @@ const blockerRow = (title: string, isOpen: boolean): RelationshipRead => ({
     original_filename: null,
     smart_link_url: null,
     is_open: isOpen,
+    starts_at: null,
   },
 });
 

@@ -48,10 +48,10 @@ async def _download(attachments, *, bytes_left=10_000, files_left=100, **kw):
     budget = AssetBudget(bytes_left=bytes_left, files_left=files_left)
     report = ca.AttachmentReport()
 
-    async def download(item, max_bytes):
+    async def download(item, max_bytes, target):
         if item.id in failures:
             raise ImportEngineError(failures[item.id])
-        return blobs.get(item.id, b"x" * item.size)
+        return target.write(blobs.get(item.id, b"x" * item.size))
 
     async def store(stored, data):
         pass
@@ -74,11 +74,11 @@ async def test_pictures_render_from_their_upload_and_other_files_wait_to_be_file
             attachment("1", "chart.png", "image/png"),
             attachment("2", "spec.pdf", "application/pdf"),
             attachment("3", "counts.csv", "text/csv"),
-            attachment("4", "build.zip", "application/zip"),
+            attachment("4", "setup.exe", "application/x-msdownload"),
         ]
     )
-    # A table of text comes over to become a spreadsheet; a type no file
-    # holds does not come at all.
+    # A table of text comes over to become a spreadsheet; a program does not
+    # come at all.
     assert set(media.files) == {"spec.pdf", "counts.csv"}
     assert report.refused == 1
     stored = media.stored_images["chart.png"]
@@ -96,14 +96,13 @@ async def test_what_does_not_fit_is_counted_not_fetched():
     media, report, _budget = await _download(
         [
             attachment("1", "huge.png", "image/png", ca.MAX_IMAGE_BYTES + 1),
-            attachment("2", "huge.pdf", "application/pdf", ca.MAX_FILE_BYTES + 1),
             attachment("3", "logo.svg", "image/svg+xml"),
             attachment("4", "past-budget.pdf", "application/pdf", 600),
         ],
         bytes_left=500,
     )
     assert media.files == {} and media.stored_images == {}
-    assert (report.oversize, report.refused) == (3, 1)
+    assert (report.oversize, report.refused) == (2, 1)
 
 
 async def test_the_budget_counts_files_as_well_as_bytes():

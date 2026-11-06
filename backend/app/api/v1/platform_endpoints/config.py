@@ -32,7 +32,7 @@ from app.services.platform.billing import billing_managed
 from app.core.version import get_min_desktop_version, get_min_native_version
 from app.services import captcha as captcha_service
 from app.services.platform import app_settings as app_settings_service
-from app.services.platform import auth_posture
+from app.services.platform import rules
 from app.services.tenant.attachments import MAX_FILE_SIZE
 
 router = APIRouter()
@@ -94,8 +94,9 @@ class AppConfig(BaseModel):
     # Whether the SPA reports each page it opens to ``/page-views``. True only
     # where Prometheus reads the counts (``METRICS_TOKEN`` is set).
     count_page_views: bool = False
-    # The upload size cap the server enforces on file endpoints. The SPA reads
-    # it for pre-flight checks so the number lives in exactly one place.
+    # The most a file sent with one request may be. The SPA reads it before
+    # reading an import file in the browser; a file sent in pieces has no cap
+    # but the community's storage.
     max_upload_bytes: int
     # Whether this deployment runs a community directory (owner-set, default
     # off). The SPA hides every way into it when false — the way in from the
@@ -185,6 +186,7 @@ async def get_app_config(session: SessionDep) -> AppConfig:
     )
 
     app_settings = await app_settings_service.get_app_settings(session)
+    stored = await rules.platform_values(session)
 
     return AppConfig(
         captcha=captcha,
@@ -192,18 +194,16 @@ async def get_app_config(session: SessionDep) -> AppConfig:
         faro_collector_url=settings.FARO_COLLECTOR_URL,
         count_page_views=settings.METRICS_TOKEN is not None,
         max_upload_bytes=MAX_FILE_SIZE,
-        community_directory_enabled=app_settings.community_directory_enabled,
-        community_age_gate_enabled=app_settings.community_age_gate_enabled,
-        direct_messages_enabled=app_settings.direct_messages_enabled,
-        guests_enabled=app_settings.guests_enabled,
-        engagement_ranking_enabled=app_settings.engagement_ranking_enabled,
-        cookie_consent_enabled=app_settings.cookie_consent_enabled,
+        community_directory_enabled=stored["community_directory_enabled"],
+        community_age_gate_enabled=stored["community_age_gate_enabled"],
+        direct_messages_enabled=stored["direct_messages_enabled"],
+        guests_enabled=stored["guests_enabled"],
+        engagement_ranking_enabled=stored["engagement_ranking_enabled"],
+        cookie_consent_enabled=stored["cookie_consent_enabled"],
         light_accent_color=app_settings.light_accent_color,
         dark_accent_color=app_settings.dark_accent_color,
         cookie_categories=[c.value for c in active_cookie_categories(settings)],
-        login_methods=sorted(
-            m.value for m in auth_posture.methods_from_row(app_settings)
-        ),
+        login_methods=sorted(m.value for m in stored["login_methods"]),
         min_native_version=get_min_native_version(),
         min_desktop_version=get_min_desktop_version(),
     )

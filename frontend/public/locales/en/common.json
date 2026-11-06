@@ -65,6 +65,7 @@
   "adding": "Adding…",
   "rowActionsFor": "Actions for {{subject}}",
   "more": "More",
+  "moreOptions": "More options",
   "less": "Less",
   "noResults": "No results found",
   "tryAgain": "Try again",
@@ -169,7 +170,7 @@
     "tags": "Tags",
     "tagsDescription": "Add tags to organize and filter.",
     "tagsNoAccess": "You need write access to manage tags.",
-    "propertiesDescription": "Values for the custom properties this initiative defines.",
+    "propertiesDescription": "Values for the metadata this initiative defines.",
     "comments": "Comments",
     "commentsDescription": "Let people comment on this. Turning comments off keeps everything already posted — it comes back when you turn them on again.",
     "commentsToggle": "Enable comments",
@@ -291,8 +292,7 @@
   },
   "fileDrop": {
     "release": "Drop it here",
-    "unsupported": "That kind of file can't be uploaded here.",
-    "tooLarge": "That file is larger than this server accepts."
+    "unsupported": "That kind of file can't be uploaded here."
   },
   "archiveError": "Couldn't archive that. Please try again.",
   "unarchiveError": "Couldn't unarchive that. Please try again.",
@@ -313,6 +313,8 @@
     "taskList": "Task list",
     "more": "More formatting",
     "image": "Image",
+    "uploadImage": "Upload a picture",
+    "imageFromFiles": "From Files",
     "uploadingImage": "Uploading {{name}}…",
     "imageUploadFailed": "Couldn't add that picture."
   },
@@ -396,11 +398,6 @@
       "this": "this file",
       "plural": "files"
     },
-    "queue": {
-      "name": "Queue",
-      "this": "this queue",
-      "plural": "queues"
-    },
     "counter_group": {
       "name": "Counter group",
       "this": "this counter group",
@@ -421,25 +418,20 @@
       "this": "this post",
       "plural": "posts"
     },
-    "gallery": {
-      "name": "Gallery",
-      "this": "this gallery",
-      "plural": "galleries"
-    },
     "wiki": {
       "name": "Wiki",
       "this": "this wiki",
       "plural": "wikis"
     },
+    "contact": {
+      "name": "Contact",
+      "this": "this contact",
+      "plural": "contacts"
+    },
     "task": {
       "name": "Task",
       "this": "this task",
       "plural": "tasks"
-    },
-    "queue_item": {
-      "name": "Queue item",
-      "this": "this queue item",
-      "plural": "queue items"
     },
     "calendar_event": {
       "name": "Event",
@@ -451,11 +443,6 @@
       "this": "this counter",
       "plural": "counters"
     },
-    "gallery_image": {
-      "name": "Picture",
-      "this": "this picture",
-      "plural": "pictures"
-    },
     "wiki_page": {
       "name": "Page",
       "this": "this page",
@@ -465,6 +452,11 @@
       "name": "Tag",
       "this": "this tag",
       "plural": "tags"
+    },
+    "collection": {
+      "name": "Collection",
+      "this": "this collection",
+      "plural": "collections"
     }
   }
 }

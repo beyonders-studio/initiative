@@ -1,7 +1,7 @@
 /**
  * Range selection for card grids — the shift-click gesture shared by every list
- * that turns its cards into checkboxes (projects, files, queues, counter
- * groups, dashboards).
+ * that turns its cards into checkboxes (projects, files, counter groups,
+ * dashboards).
  *
  * The rules are the ones people already know from file managers and mail
  * clients: a plain click flips one card and becomes the *anchor*; a shift-click

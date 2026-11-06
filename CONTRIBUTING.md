@@ -8,7 +8,7 @@ Thanks for your interest in contributing! This guide covers what you need to kno
 
 The project includes a VS Code task configuration that starts everything with a single command:
 
-1. **Prerequisites**: Docker, Python 3.10+ venv at `backend/.venv/`, Node.js 18+ with pnpm, PostgreSQL client tools (`pg_isready`)
+1. **Prerequisites**: Docker, Python 3.10+ venv at `backend/.venv/`, Node.js 26.12.1+ with pnpm, PostgreSQL client tools (`pg_isready`)
 2. **Configure**: Copy `backend/.env.example` to `backend/.env` and set `DATABASE_URL` / `SECRET_KEY`
 3. **Launch**: Open the VS Code Command Palette (`Ctrl+Shift+P`) and run **Tasks: Run Task** → **`dev:setup`**
 
@@ -35,7 +35,7 @@ A realistic, TTRPG-themed dataset that exercises the whole app. See `scripts/see
 
 The bootstrap owner from your `.env` (`FIRST_OWNER_EMAIL`) is also available with its configured password.
 
-The seeder records the accounts it created in `.vscode/.dev_seed_ids.json` (gitignored). Cleanup does not need it: it drops every community schema and wipes the shared rows.
+The seeder reads from the database whether it has seeded it, so a recreated volume is seeded again. Cleanup drops every community schema and wipes the shared rows.
 
 ### Manual Setup
 
@@ -44,7 +44,7 @@ If you prefer not to use VS Code tasks, you can start each service by hand.
 #### Prerequisites
 
 - Python 3.11+
-- Node.js 18+ with pnpm
+- Node.js 26.12.1+ with pnpm
 - PostgreSQL 17
 
 #### Backend
@@ -171,6 +171,8 @@ Commit the updated generated files alongside your schema changes. CI will fail i
 4. Keep commits focused — separate backend, frontend, and infra changes when practical
 5. Open a pull request **targeting `dev`** describing what changed and why
 6. Include screenshots or GIFs for UI changes
+
+**Actions in your fork.** With Actions turned on in a fork, nothing there runs on its own: pushes to the fork's `main` and `dev` and the scheduled runs check nothing, and the workflows that publish images, apps, docs or releases skip. A pull request inside your fork runs CI as it would here, and you can start the nightly (browser journeys included) or the security scan by hand. Your pull request to this repository runs every check it needs here. The checks live in the workflows, so they reach your fork when you sync it; scheduled runs read them from its default branch, so sync that one too if it isn't `dev`.
 
 **Important:** Do not open PRs against `main`. The `main` branch is restricted to project maintainers (@jordandrako, @LeeJMorel) who promote changes from `dev` using the release tooling below. PRs targeting `main` from non-maintainers will be closed.
 

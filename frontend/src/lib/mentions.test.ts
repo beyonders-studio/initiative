@@ -15,7 +15,7 @@ import {
 
 describe("what can be mentioned", () => {
   it("reaches every kind of thing except what people said about them", () => {
-    expect(MENTIONABLE_TYPES).toContain(SearchEntityType.queue);
+    expect(MENTIONABLE_TYPES).toContain(SearchEntityType.wiki);
     expect(MENTIONABLE_TYPES).toContain(SearchEntityType.calendar_event);
     expect(MENTIONABLE_TYPES).toContain(SearchEntityType.dashboard);
     expect(MENTIONABLE_TYPES).not.toContain(SearchEntityType.comment);
@@ -25,12 +25,6 @@ describe("what can be mentioned", () => {
     for (const type of MENTIONABLE_TYPES) {
       expect(typeForTrigger(typeTrigger(type))).toBe(type);
     }
-  });
-
-  it("still reads the shorthand already sitting in stored comments", () => {
-    expect(typeForTrigger("doc")).toBe(SearchEntityType.file);
-    // `#document[..](N)`: the kind's spelling before files were called files.
-    expect(typeForTrigger("document")).toBe(SearchEntityType.file);
   });
 
   // A name is what a mention points at, so it does not also spell one. The
@@ -80,7 +74,7 @@ describe("the mention being typed", () => {
 
 describe("what gets written into the comment", () => {
   it("writes the kind's own name, so the renderer reads back what it wrote", () => {
-    expect(entityMentionSyntax(SearchEntityType.queue, "Intake", 4)).toBe("#queue[Intake](4)");
+    expect(entityMentionSyntax(SearchEntityType.wiki, "Fete", 4)).toBe("#wiki[Fete](4)");
     expect(entityMentionSyntax(SearchEntityType.counter_group, "Q1", 7)).toBe(
       "#counter-group[Q1](7)"
     );
@@ -96,9 +90,9 @@ describe("what gets written into the comment", () => {
 
 describe("where # is offered", () => {
   it("is a standard document and nothing else", () => {
-    expect(supportsEntityMentions(FileType.native)).toBe(true);
+    expect(supportsEntityMentions(FileType.lexical)).toBe(true);
     for (const type of Object.values(FileType)) {
-      if (type === FileType.native) continue;
+      if (type === FileType.lexical) continue;
       expect(supportsEntityMentions(type)).toBe(false);
     }
   });

@@ -44,17 +44,22 @@ def test_kinds_keep_their_codes_and_live_where_their_sharing_says():
 
     Changing one silently re-encodes a kind: rows written before keep the old
     value, rows after get the new one, and nothing errors. This is the test that
-    holds that rule, because the database cannot. A kind inside a tool names
-    the tool whose sharing the policies already gate it by.
+    holds that rule, because the database cannot. The person's code comes
+    from the same sequence. A kind inside a tool names the tool whose sharing
+    the policies already gate it by; one in no one instance of its tool has no
+    sharing to be gated by.
     """
+    from app.core.relationships import PERSON
     from app.core.tools import KINDS
     from app.db.initiative_rls import governing_path
 
-    codes = [kind.code for kind in KINDS.values()]
+    codes = [kind.code for kind in (*KINDS.values(), PERSON)]
     assert len(codes) == len(set(codes))
     assert all(code > 0 for code in codes)
     for kind in KINDS.values():
-        if kind.parent is not None:
+        if kind.standalone:
+            assert governing_path(kind.table) is None, kind.value
+        elif kind.parent is not None:
             assert governing_path(kind.table) == (
                 kind.parent,
                 ((kind.parent_column, kind.parent.plural),),
@@ -99,7 +104,7 @@ def test_every_tool_is_commentable():
     # its CommentTarget — or an extra that forgets its column — fails here.
     from sqlalchemy import inspect as sa_inspect
 
-    from app.core.tools import COMMENTABLE_EXTRAS, COMMENT_TARGETS
+    from app.core.tools import COMMENTABLE_EXTRAS, COMMENT_TARGETS, KINDS
     from app.db.initiative_rls import _COMMENT_PARENTS
     from app.models.tenant.comment import Comment
     from app.schemas.tenant.comment import COMMENT_TARGET_FIELDS
@@ -124,9 +129,12 @@ def test_every_tool_is_commentable():
 
     # Every extra names a tool to answer for it, and a real column to reach it
     # by — that is what makes a thread on something that is not a tool gated
-    # like one.
+    # like one — or answers for itself, as a kind no sharing governs does.
     for column, extra in EXTRA_COMMENT_TARGETS.items():
         parent = next(p for p in _COMMENT_PARENTS if p.column == column)
+        if parent.governed_by is None:
+            assert KINDS[extra.kind].standalone, column
+            continue
         assert parent.tool_fk is not None, column
         extra_columns = {
             c.name for c in sa_inspect(extra.model).persist_selectable.columns
@@ -260,7 +268,7 @@ def test_a_tag_assignment_is_an_edge_like_any_other():
 def test_the_generic_tool_tags_route_is_the_only_tool_set_tags_surface():
     # ONE generic route serves every tool — its {tool} path param is the Tool
     # enum itself, so a new member is covered with no new endpoint. The
-    # content-level extras (tasks, events, queue items) take ``tag_ids`` on
+    # content-level extras (tasks, events) take ``tag_ids`` on
     # their own PATCH; the exact equality means a re-added set-tags route
     # fails here.
     from app.main import app
@@ -364,8 +372,8 @@ def test_tool_models_spell_the_shared_columns_the_same():
     # display column called `name` (files said `title` until 0191), and
     # the shared scope/author/lifecycle columns under their canonical names.
     # A new tool that renames one of these — or labels rows through a synonym
-    # like `title`/`label` — fails here. Sub-resources (tasks, queue items,
-    # calendar events) are not tools and keep their own words.
+    # like `title`/`label` — fails here. Sub-resources (tasks, calendar
+    # events) are not tools and keep their own words.
     from app.services.tenant.tags import TOOL_TAG_LINKS
 
     shared_columns = {

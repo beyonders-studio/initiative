@@ -14,7 +14,7 @@
 
 import type { ReactNode } from "react";
 
-import type { SearchEntityType, Tool } from "@/api/generated/initiativeAPI.schemas";
+import type { EndpointRef, Tool } from "@/api/generated/initiativeAPI.schemas";
 import type { RelationsLayout } from "@/components/entities/RelationsSection";
 import { RelationsSection } from "@/components/entities/RelationsSection";
 import { referenceTypeFor } from "@/lib/references";
@@ -27,8 +27,8 @@ interface ToolRelationsPanelProps {
   /** The tool entity itself, as its read schema returns it. */
   entity: ToolRelationEntity | null | undefined;
   /** The thing whose links these are, where it is not the tool entity itself —
-   *  an event, a counter, a picture, a queue item. */
-  target?: { type: SearchEntityType; id: number };
+   *  an event, a counter, a picture. */
+  target?: EndpointRef;
   canEdit: boolean;
   /** What the thing is called, for the middle of the graph. */
   entityTitle?: string;

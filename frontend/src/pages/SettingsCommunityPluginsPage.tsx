@@ -23,6 +23,11 @@
  * That is also where a plug-in's update cadence lives. An install takes new
  * versions on its own unless a community admin turns that off here, after which the
  * Update button beside it is how they land.
+ *
+ * Whoever runs the server can take plug-ins over for a community. The installed
+ * ones keep running and stay listed, members still answer for themselves and the
+ * seat can still revoke and block, but nothing here installs, changes or removes
+ * one.
  */
 
 import { Link } from "@tanstack/react-router";
@@ -37,6 +42,7 @@ import { PluginPlacementPanel } from "@/components/plugins/PluginPlacementPanel"
 import { PluginScopesPanel } from "@/components/plugins/PluginScopesPanel";
 import { PluginSettingsPanel } from "@/components/plugins/PluginSettingsPanel";
 import { PluginUpdatesPanel } from "@/components/plugins/PluginUpdatesPanel";
+import { Alert, AlertDescription } from "@/components/ui/alert";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
@@ -73,6 +79,7 @@ export function SettingsCommunityPluginsPage() {
   const holdsTheSeat = Boolean(activeCommunity?.can.seat);
   // Erasing a plug-in's data with it is for the community's own admins.
   const administers = Boolean(activeCommunity?.can.administer_content);
+  const closed = Boolean(activeCommunity?.closed_surfaces?.includes("plugins"));
 
   const plugins = pluginsQuery.data?.items ?? [];
 
@@ -83,6 +90,11 @@ export function SettingsCommunityPluginsPage() {
         <CardDescription>{t("plugins:manage.description")}</CardDescription>
       </CardHeader>
       <CardContent className="space-y-3">
+        {closed && (
+          <Alert>
+            <AlertDescription>{t("plugins:manage.closed")}</AlertDescription>
+          </Alert>
+        )}
         {pluginsQuery.isLoading ? (
           <Skeleton className="h-20 w-full" />
         ) : plugins.length ? (
@@ -92,12 +104,13 @@ export function SettingsCommunityPluginsPage() {
               plugin={plugin}
               canManage={Boolean(holdsTheSeat)}
               canErase={holdsTheSeat && administers}
+              closed={closed}
             />
           ))
         ) : (
           <div className="space-y-3 rounded-lg border border-dashed p-6 text-center">
             <p className="text-muted-foreground text-sm">{t("plugins:manage.empty")}</p>
-            {holdsTheSeat && (
+            {holdsTheSeat && !closed && (
               <Button variant="outline" asChild>
                 <Link to={gp("/marketplace")} search={{ kind: ListingKind.plugin }}>
                   <Store className="h-4 w-4" />
@@ -137,10 +150,13 @@ function PluginRow({
   plugin,
   canManage,
   canErase,
+  closed,
 }: {
   plugin: PluginListItem;
   canManage: boolean;
   canErase: boolean;
+  /** Plug-ins are managed by whoever runs the server, not here. */
+  closed: boolean;
 }) {
   const { t, i18n } = useTranslation(["plugins", "common"]);
   const [name, setName] = useState(plugin.name);
@@ -149,6 +165,7 @@ function PluginRow({
   const [open, setOpen] = useState(false);
   const update = useUpdateCommunityPlugin(plugin.id);
   const uninstall = useUninstallCommunityPlugin();
+  const canChange = canManage && !closed;
 
   const save = (patch: { name?: string; enabled?: boolean }) =>
     update.mutate(patch, {
@@ -178,7 +195,7 @@ function PluginRow({
       <div className="flex flex-wrap items-center gap-3 p-3">
         <Blocks className="h-5 w-5 shrink-0 text-muted-foreground" aria-hidden />
         <div className="min-w-0 flex-1 space-y-1">
-          {canManage ? (
+          {canChange ? (
             <Input
               value={name}
               onChange={(event) => setName(event.target.value)}
@@ -224,7 +241,7 @@ function PluginRow({
         <div className="flex shrink-0 items-center gap-2">
           {/* A plug-in the platform provides has no switch and no remove button:
               the affordances are absent rather than present-and-refusing. */}
-          {canManage && !plugin.mandatory && (
+          {canChange && !plugin.mandatory && (
             <>
               <Button
                 size="sm"
@@ -254,7 +271,7 @@ function PluginRow({
       <CollapsibleContent>
         {/* Fetched only once opened: the detail read carries every connection's
             whole pinned form, which the collapsed list has no use for. */}
-        {open && <PluginDetailPanels pluginId={plugin.id} canManage={canManage} />}
+        {open && <PluginDetailPanels pluginId={plugin.id} canManage={canManage} closed={closed} />}
       </CollapsibleContent>
 
       <ConfirmDialog
@@ -333,7 +350,15 @@ function RemovalNotice({ pluginId, locale }: { pluginId: number; locale: string 
  * and who opens it there, what it can reach, who has connected to it and how it
  * takes new versions.
  */
-function PluginDetailPanels({ pluginId, canManage }: { pluginId: number; canManage: boolean }) {
+function PluginDetailPanels({
+  pluginId,
+  canManage,
+  closed,
+}: {
+  pluginId: number;
+  canManage: boolean;
+  closed: boolean;
+}) {
   const { t } = useTranslation(["plugins", "common"]);
   const detail = useCommunityPluginDetail(pluginId);
 
@@ -346,9 +371,10 @@ function PluginDetailPanels({ pluginId, canManage }: { pluginId: number; canMana
         pluginId={pluginId}
         connections={detail.data.connections}
         canManage={canManage}
+        closed={closed}
       />
 
-      {canManage && (
+      {canManage && !closed && (
         <>
           <PluginSettingsPanel pluginId={pluginId} settings={detail.data.settings ?? []} />
 
@@ -360,15 +386,18 @@ function PluginDetailPanels({ pluginId, canManage }: { pluginId: number; canMana
           {(detail.data.requested_scopes ?? []).length > 0 && (
             <PluginScopesPanel plugin={detail.data} />
           )}
-
-          <section className="space-y-2">
-            <h3 className="font-medium text-sm">{t("plugins:members.title")}</h3>
-            <PluginMembersPanel pluginId={pluginId} enabled={canManage} />
-          </section>
-
-          <PluginUpdatesPanel plugin={detail.data} />
         </>
       )}
+
+      {/* Revoking and blocking stay the seat's while the rest is closed. */}
+      {canManage && (
+        <section className="space-y-2">
+          <h3 className="font-medium text-sm">{t("plugins:members.title")}</h3>
+          <PluginMembersPanel pluginId={pluginId} enabled={canManage} />
+        </section>
+      )}
+
+      {canManage && !closed && <PluginUpdatesPanel plugin={detail.data} />}
     </div>
   );
 }

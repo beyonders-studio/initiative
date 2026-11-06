@@ -39,7 +39,6 @@ export function buildCalendarEvent(overrides: Partial<CalendarEventRead> = {}): 
     overridden_fields: [],
     skipped_starts: [],
     extra_starts: [],
-    plugin_values: [],
     ...overrides,
   };
 }

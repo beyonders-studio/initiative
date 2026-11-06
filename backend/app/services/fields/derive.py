@@ -60,7 +60,7 @@ FK_CONTROLS: dict[str, ControlKind] = {
     "tags": ControlKind.tag,
     "calendars": ControlKind.calendar,
     "counter_groups": ControlKind.counter_group,
-    "property_definitions": ControlKind.property,
+    "metadata_definitions": ControlKind.property,
 }
 
 #: Tables a query never names. The guild is settled by the routing, so a column

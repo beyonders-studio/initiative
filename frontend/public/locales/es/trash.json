@@ -25,17 +25,15 @@
     "comment": "Comentario",
     "initiative": "Iniciativa",
     "tag": "Etiqueta",
-    "queue": "Cola",
-    "queue_item": "Elemento de cola",
     "calendar": "Calendario",
     "calendar_event": "Evento de calendario",
     "counter_group": "Grupo de contadores",
     "counter": "Contador",
     "dashboard": "Panel",
     "post": "Publicación",
-    "gallery": "Galería",
-    "gallery_image": "Imagen",
     "wiki": "Wiki",
-    "wiki_page": "Página"
+    "wiki_page": "Página",
+    "contact": "Contacto",
+    "collection": "Colección"
   }
 }

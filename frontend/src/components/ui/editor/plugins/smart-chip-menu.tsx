@@ -1,4 +1,14 @@
-import { CalendarClock, CircleDot, Flag, Gauge, ListChecks, SquareCheck, User } from "lucide-react";
+import {
+  CalendarClock,
+  CircleDot,
+  Flag,
+  Gauge,
+  ListChecks,
+  Mail,
+  Phone,
+  SquareCheck,
+  User,
+} from "lucide-react";
 import type { JSX } from "react";
 
 import { SmartChipKind } from "@/api/generated/initiativeAPI.schemas";
@@ -57,5 +67,15 @@ export const SMART_CHIP_MENU: Record<
     labelKey: "smartChips.eventWhen",
     icon: <CalendarClock className="size-4" />,
     keywords: ["event", "when", "date", "calendar", "chip"],
+  },
+  [SmartChipKind["contact:phone"]]: {
+    labelKey: "smartChips.contactPhone",
+    icon: <Phone className="size-4" />,
+    keywords: ["contact", "phone", "number", "call", "chip"],
+  },
+  [SmartChipKind["contact:email"]]: {
+    labelKey: "smartChips.contactEmail",
+    icon: <Mail className="size-4" />,
+    keywords: ["contact", "email", "mail", "address", "chip"],
   },
 };

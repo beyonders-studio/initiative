@@ -4,7 +4,7 @@ import { endOfMonth, startOfDay, startOfMonth } from "date-fns";
 import { HttpResponse } from "msw";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 
-import { buildDefaultTaskStatuses } from "@/__tests__/factories";
+import { buildDataJob, buildDefaultTaskStatuses } from "@/__tests__/factories";
 import { communityHttp } from "@/__tests__/helpers/communityHttp";
 import { server } from "@/__tests__/helpers/msw-server";
 import { renderWithProviders } from "@/__tests__/helpers/render";
@@ -26,9 +26,9 @@ const ESTIMATE = {
   tools: {
     project: { count: 3, disabled: false },
     file: { count: 5, disabled: false },
-    queue: { count: 0, disabled: true },
     counter_group: { count: 2, disabled: false },
     calendar: { count: 4, disabled: false },
+    wiki: { count: 0, disabled: true },
   },
   uploads_count: 1,
   uploads_bytes: 2_500_000,
@@ -52,27 +52,17 @@ function stubJobLifecycle(capture: (url: URL) => void) {
       capture(new URL(request.url));
       return HttpResponse.json({ id: 77, status: "queued" }, { status: 202 });
     }),
-    communityHttp.get("/exports/jobs/:jobId", ({ params }) => {
-      // Fall through for the literal sibling routes (/exports/estimate,
-      // /exports/community, /exports/initiative) — only numeric ids are jobs.
-      if (Number.isNaN(Number(params.jobId))) {
-        return undefined;
-      }
-      return HttpResponse.json({
-        id: 77,
-        community_id: 1,
-        created_by: 1,
-        source: "community",
-        template_id: "data-table",
-        format: "zip",
-        params: {},
-        status: "done",
-        error: null,
-        expires_at: null,
-        created_at: new Date().toISOString(),
-        updated_at: new Date().toISOString(),
-      });
-    }),
+    communityHttp.get("/data-jobs/:jobId", () =>
+      HttpResponse.json(
+        buildDataJob({
+          id: 77,
+          source: "community",
+          template_id: "data-table",
+          format: "zip",
+          status: "done",
+        })
+      )
+    ),
     communityHttp.get("/exports/jobs/:jobId/download", () =>
       HttpResponse.text("PK-zip", {
         headers: {
@@ -107,7 +97,7 @@ describe("ExportWizard", () => {
     // with its switch off and locked.
     await screen.findByText("3 items");
     expect(screen.getByText(/not enabled/i)).toBeInTheDocument();
-    expect(screen.getByRole("switch", { name: /queues/i })).toBeDisabled();
+    expect(screen.getByRole("switch", { name: /wikis/i })).toBeDisabled();
     // Uploads footprint from the estimate, human-formatted.
     expect(screen.getByText(/2\.4 MB/)).toBeInTheDocument();
 
@@ -116,9 +106,9 @@ describe("ExportWizard", () => {
     await userEvent.click(screen.getByRole("button", { name: /next/i }));
 
     // The confirm summary matches the payload: the deselected tool AND the
-    // disabled tool (Queues) are absent from the "will export" list.
+    // disabled tool (Wikis) are absent from the "will export" list.
     const summary = screen.getByText(/files ·/i, { selector: "p" });
-    expect(summary.textContent).not.toMatch(/queues/i);
+    expect(summary.textContent).not.toMatch(/wikis/i);
     expect(summary.textContent).not.toMatch(/counters/i);
     expect(summary.textContent).toMatch(/projects/i);
 
@@ -133,7 +123,7 @@ describe("ExportWizard", () => {
       file: true,
       counter_group: false,
       // Disabled tools submit as excluded — matching their locked-off switch.
-      queue: false,
+      wiki: false,
     });
     expect(params.get("formats")).toBeNull();
 
@@ -170,7 +160,7 @@ describe("ExportWizard", () => {
     expect(params.get("mode")).toBe("report");
     const formats = JSON.parse(params.get("formats")!);
     expect(formats.project).toBe("csv");
-    expect(formats.file).toEqual({ native: "pdf", spreadsheet: "xlsx" });
+    expect(formats.file).toEqual({ lexical: "pdf", sheet: "xlsx" });
     expect(formats.calendar).toBe("ics");
     expect(params.get("include_uploads")).toBeNull();
   });
@@ -182,25 +172,17 @@ describe("ExportWizard", () => {
         HttpResponse.json({ id: 88, status: "queued" }, { status: 202 })
       ),
       // The job never finishes during this test — it stays queued.
-      communityHttp.get("/exports/jobs/:jobId", ({ params }) => {
-        if (Number.isNaN(Number(params.jobId))) {
-          return undefined;
-        }
-        return HttpResponse.json({
-          id: 88,
-          community_id: 1,
-          created_by: 1,
-          source: "community",
-          template_id: "data-table",
-          format: "zip",
-          params: {},
-          status: "queued",
-          error: null,
-          expires_at: null,
-          created_at: new Date().toISOString(),
-          updated_at: new Date().toISOString(),
-        });
-      })
+      communityHttp.get("/data-jobs/:jobId", () =>
+        HttpResponse.json(
+          buildDataJob({
+            id: 88,
+            source: "community",
+            template_id: "data-table",
+            format: "zip",
+            status: "queued",
+          })
+        )
+      )
     );
 
     const { rerender } = renderWithProviders(
@@ -269,10 +251,7 @@ describe("ExportWizard", () => {
     server.use(
       communityHttp.get("/exports/estimate", ({ request }) => {
         estimates.push(new URL(request.url).searchParams);
-        return HttpResponse.json({
-          ...ESTIMATE,
-          tools: { ...ESTIMATE.tools, queue: { count: 6, disabled: false } },
-        });
+        return HttpResponse.json(ESTIMATE);
       })
     );
     let sent: URL | null = null;
@@ -301,16 +280,9 @@ describe("ExportWizard", () => {
     await user.click(within(projects).getByRole("button", { name: "Filter Projects" }));
     await user.click(within(projects).getByRole("radio", { name: "Active" }));
 
-    // Stopped queues, by the queue list's own status filter.
-    const queues = screen.getByRole("group", { name: "Queues" });
-    await user.click(within(queues).getByRole("button", { name: "Filter Queues" }));
-    await user.click(within(queues).getByRole("combobox", { name: "Status" }));
-    await user.click(await screen.findByRole("option", { name: "Inactive" }));
-
     const expected = {
       calendar: { search: "standup" },
       project: { archived: false },
-      queue: { is_active: false },
     };
     await waitFor(() =>
       expect(JSON.parse(estimates.at(-1)?.get("filters") ?? "null")).toEqual(expected)
@@ -319,7 +291,6 @@ describe("ExportWizard", () => {
     await user.click(screen.getByRole("button", { name: "Next" }));
     expect(screen.getByText("Calendar: “standup”")).toBeInTheDocument();
     expect(screen.getByText("Projects: Active only")).toBeInTheDocument();
-    expect(screen.getByText("Queues: 1 more filter")).toBeInTheDocument();
 
     await user.click(screen.getByRole("button", { name: /start export/i }));
     await waitFor(() => expect(sent).not.toBeNull());
@@ -386,10 +357,7 @@ describe("ExportWizard", () => {
     server.use(
       communityHttp.get("/exports/estimate", ({ request }) => {
         estimates.push(new URL(request.url).searchParams);
-        return HttpResponse.json({
-          ...ESTIMATE,
-          tools: { ...ESTIMATE.tools, queue: { count: 6, disabled: false } },
-        });
+        return HttpResponse.json(ESTIMATE);
       })
     );
     let sent: URL | null = null;
@@ -593,7 +561,7 @@ describe("ExportWizard", () => {
   it("goes from format to confirm for a tool whose content has no filter", async () => {
     let sent: URLSearchParams | null = null;
     server.use(
-      communityHttp.get("/exports/queue", ({ request }) => {
+      communityHttp.get("/exports/counter_group", ({ request }) => {
         sent = new URL(request.url).searchParams;
         return new HttpResponse("a,b", { headers: { "Content-Type": "text/csv" } });
       })
@@ -606,10 +574,10 @@ describe("ExportWizard", () => {
       <ExportWizard
         scope={{
           kind: "entities",
-          tool: Tool.queue,
+          tool: Tool.counter_group,
           ids: [7],
-          formats: TOOL_EXPORT_FORMATS[Tool.queue] ?? [],
-          filenameStem: "queues",
+          formats: TOOL_EXPORT_FORMATS[Tool.counter_group] ?? [],
+          filenameStem: "counter-groups",
           extraActions: [{ labelKey: "export.formatPng", onSelect: drawPicture }],
         }}
         open

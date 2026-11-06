@@ -9,7 +9,7 @@ import pytest
 
 from app.models.platform.guild import CommunityRole
 from app.services.platform import account_stream, user_stream
-from app.services.platform import app_settings as app_settings_service
+from app.services.platform import rules
 from app.services.platform import guilds as guilds_service
 from app.testing.sockets import settle
 from app.testing import create_guild, create_guild_membership, create_user
@@ -169,9 +169,8 @@ async def test_listing_a_community_pokes_every_member(
 
     # The directory is a platform-owner switch and starts off, so listing a
     # community is refused until it is on.
-    await app_settings_service.update_community_settings(
-        session, community_directory_enabled=True
-    )
+    await rules.put(session, "community_directory_enabled", True)
+    await session.commit()
 
     tab = account_socket(here.id)
 
@@ -220,6 +219,29 @@ async def test_deleting_a_guild_tells_the_people_who_were_in_it(
 
     await guilds_service.delete_guild(session, guild)
     await session.commit()
+    await settle()
+
+    assert [frame["resource"] for frame in tab.sent] == ["account"]
+
+
+async def test_letting_anyone_create_a_community_pokes_every_tab(
+    session, account_socket
+) -> None:
+    """Whether an account may create a community is part of ``/me``, so the
+    deployment's switch reaches every open tab, not only its writer's."""
+    from app.models.platform.user import UserRole
+    from app.services.platform import auth_posture
+
+    owner = await create_user(session, role=UserRole.owner)
+    member = await create_user(session)
+    tab = account_socket(member.id)
+    await rules.put(session, "community_creation_enabled", False)
+    await session.commit()
+
+    await auth_posture.change(
+        auth_posture.RuleContext.platform(session, owner),
+        {"community_creation_enabled": True},
+    )
     await settle()
 
     assert [frame["resource"] for frame in tab.sent] == ["account"]

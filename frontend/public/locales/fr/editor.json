@@ -120,6 +120,7 @@
   "imageDialog": {
     "urlTab": "URL",
     "fileTab": "Fichier",
+    "filesTab": "Fichiers",
     "imageUrl": "URL de l’image",
     "imageUrlPlaceholder": "https://example.com/image.png",
     "altText": "Texte alternatif",
@@ -182,12 +183,17 @@
       "assignee": "Personne assignée",
       "checklist": "Terminée",
       "due": "Date d'échéance",
+      "email": "E-mail",
+      "phone": "Téléphone",
       "priority": "Priorité",
       "progress": "Avancement",
       "status": "Statut",
       "value": "Valeur",
       "when": "Date"
     },
+    "callHint": "Cliquez pour appeler",
+    "contactEmail": "E-mail du contact",
+    "contactPhone": "Téléphone du contact",
     "counterValue": "Valeur du compteur",
     "eventWhen": "Date de l'événement",
     "insert": "Puce intelligente",
@@ -206,6 +212,35 @@
     "taskDue": "Date d'échéance",
     "taskPriority": "Priorité",
     "taskStatus": "Statut de la tâche",
-    "whichFact": "Quelle information la puce doit-elle afficher ?"
+    "whichFact": "Quelle information la puce doit-elle afficher ?",
+    "writeHint": "Cliquez pour écrire"
+  },
+  "summary": {
+    "title": "Résumé",
+    "aiNotEnabled": "Les fonctionnalités IA ne sont pas activées. Configurez les paramètres IA pour générer des résumés.",
+    "generateDescription": "Générer un résumé alimenté par l'IA pour ce document.",
+    "generateButton": "Générer un résumé",
+    "generateError": "Échec de la génération du résumé. Veuillez réessayer.",
+    "generating": "Génération du résumé…",
+    "copy": "Copier le résumé",
+    "regenerate": "Régénérer le résumé",
+    "cut": "Rédigé à partir des premiers {{percent}} %. Le reste ne tenait pas."
+  },
+  "writing": {
+    "menu": "Aide à l'écriture",
+    "rewrite": "Reformuler",
+    "shorten": "Raccourcir",
+    "fix": "Corriger l'orthographe et la grammaire",
+    "translate": "Traduire…",
+    "continue": "Continuer à écrire",
+    "preview": "Texte suggéré",
+    "writing": "Écriture…",
+    "discard": "Ignorer",
+    "insert": "Insérer",
+    "insertBelow": "Insérer en dessous",
+    "replace": "Remplacer",
+    "changed": "Le texte a changé pendant l'écriture. Insérez ceci en dessous ou ignorez-le.",
+    "cannotKeep": "L'aide à la rédaction ne peut pas remettre cette sélection telle quelle : elle couvre plusieurs éléments de liste ou un titre, ou contient par exemple une image. Sélectionnez plutôt du texte à l'intérieur de l'un d'eux.",
+    "error": "Impossible d'écrire cela. Veuillez réessayer."
   }
 }

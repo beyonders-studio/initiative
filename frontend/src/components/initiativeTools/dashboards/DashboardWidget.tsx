@@ -30,7 +30,6 @@ import {
   DropdownMenuItem,
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
-import { useBindingLabels } from "@/hooks/useBindingLabels";
 import { useWidgetCatalog } from "@/hooks/useDashboards";
 import { usePluginWidgetCatalog } from "@/hooks/usePluginData";
 import { useWidgetData, type WidgetBinding } from "@/hooks/useWidgetData";
@@ -102,10 +101,6 @@ export function DashboardWidget({
     widget.id
   );
 
-  // Names for the ids this binding mentions, resolved against the viewer's own
-  // reads — never against the definition. Off entirely in sample mode, which
-  // fetches nothing at all.
-  const labels = useBindingLabels(binding, initiativeId, !sampleData);
   const [view, setView] = useState<"scene" | "table">("scene");
 
   const pluginSample = pluginWidgetSample(
@@ -165,7 +160,6 @@ export function DashboardWidget({
           {!sampleData && (
             <WidgetProvenance
               binding={binding}
-              labels={labels}
               meta={live.meta}
               options={widget.options}
               widgetMeta={meta}

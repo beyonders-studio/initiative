@@ -5,6 +5,7 @@ import io
 import pytest
 from httpx import AsyncClient
 
+from app.testing import guild_administration
 from app.services.tenant.attachments import detect_document_image_type
 from app.models.platform.guild import CommunityRole
 
@@ -978,24 +979,15 @@ async def test_a_task_moved_to_another_initiative_takes_copies_of_its_pictures(
 async def test_the_quota_counts_files_the_uploader_cannot_read(
     client: AsyncClient, session, acting_user
 ):
-    from sqlmodel import select
 
-    from app.models.platform.guild_administration import GuildAdministration
     from app.testing import create_upload
 
     a = await acting_user(guild_role=CommunityRole.member)
     other = await acting_user(guild_role=CommunityRole.member, guild=a.guild)
     await create_upload(session, a.guild, other.user, size_bytes=1000)
-    administration = (
-        await session.exec(
-            select(GuildAdministration).where(
-                GuildAdministration.guild_id == a.guild.id
-            )
-        )
-    ).one()
-    administration.max_storage_bytes = 1000 + len(TINY_PNG) - 1
-    session.add(administration)
-    await session.commit()
+    await guild_administration(
+        session, a.guild, max_storage_bytes=1000 + len(TINY_PNG) - 1
+    )
 
     response = await client.post(
         a.g("/attachments/pasted"),

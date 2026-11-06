@@ -40,6 +40,8 @@ If your provider reports which groups somebody is in, **rules** say what those g
 - Standing is reconciled at **each sign-in** through that provider. Take a group away and the next sign-in takes the standing with it.
 - Memberships given by hand are never touched, and deleting a rule revokes nothing by itself — the next sign-in does.
 
+Where your community has [custom roles](../guides/communities.md#custom-roles), **Custom roles by group** gives one to whoever signs in carrying a group. Those rules are read in order, and the first group a sign-in carries decides the role. Like the rules above, they apply only to people your connection counts as yours, are reconciled at each sign-in, and leave a role somebody gave by hand alone.
+
 **Rules set by the deployment.** Your server's operators can write rules on a provider too. They place people here when your connection to that provider has **Let the deployment place people from this provider** switched on, or when the server applies its rules to every community. They're listed beside your own, read-only, and marked when they're not applying.
 
 !!! warning "An empty answer is still an answer"
@@ -118,6 +120,8 @@ If whoever runs your server withdraws one of the two switches, that half of the 
     **Connections** are rows joining your community to a provider in the server's registry, optionally narrowed by a claim and the values that count — `hd` for a Google Workspace domain, `tid` for an Entra tenant. Matching is case-insensitive and any-one-of. The values your session asserted are recorded when you sign in; *which* values count is read live, so editing a narrowing lands without waiting for anybody to sign in again.
 
     **Rules** map one group value, per provider, to a community role and optionally an initiative and a role in it. They reconcile in both directions at each sign-in through that provider: granting what they match, and releasing only what that same provider's earlier syncs granted.
+
+    **Custom role rules** map one group value, per provider, to a custom role. They are stored in the community's own schema, beside the roles, and read in order: the first match wins. An assignment records the provider that gave it, so a later sign-in through that provider changes or releases only its own.
 
     **The requirement** is one row per community: `open`, or `required` naming a provider and/or the methods a session must carry (`sso`, `totp`, `passkey`). `password` is refused by a database constraint — whether passwords exist at all is the server's question, not a community's. It is enforced at the community-context gate, which answers with a step-up challenge, and again inside the database's row-level security.
 

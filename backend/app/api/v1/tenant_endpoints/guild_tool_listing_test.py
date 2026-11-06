@@ -25,7 +25,6 @@ from app.testing import (
     create_file,
     create_initiative,
     create_project,
-    create_queue,
 )
 
 # Every tool the guild home can show: its list path, and the factory that
@@ -34,7 +33,6 @@ from app.testing import (
 TOOL_LISTS = [
     pytest.param("/projects/", create_project, id="projects"),
     pytest.param("/files/", create_file, id="files"),
-    pytest.param("/queues/", create_queue, id="queues"),
     pytest.param("/counter-groups/", create_counter_group, id="counter-groups"),
     pytest.param("/calendars/", create_calendar, id="calendars"),
     pytest.param("/dashboards/", create_dashboard, id="dashboards"),
@@ -44,7 +42,6 @@ TOOL_LISTS = [
 # that default to off, and a tool has to be on for its list to return anything
 # at all — so every initiative these tests make has all of them on.
 ALL_TOOLS_ON = {
-    "queues_enabled": True,
     "counter_groups_enabled": True,
     "calendars_enabled": True,
     "dashboards_enabled": True,

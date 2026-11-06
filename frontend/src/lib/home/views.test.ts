@@ -18,10 +18,10 @@ const three: HomeViews = {
   version: 1,
   views: [
     { id: "main", name: "Work" },
-    { id: "scouts", name: "Scouts" },
+    { id: "league", name: "League" },
     { id: "allotment", name: "Allotment" },
   ],
-  current: "scouts",
+  current: "league",
 };
 
 describe("readHomeViews", () => {
@@ -54,7 +54,7 @@ describe("readHomeViews", () => {
 describe("addView", () => {
   it("goes beside the view it was made from, and is opened", () => {
     const next = addView(three, { id: "fete", name: "Fete" }, "main");
-    expect(next.views.map((view) => view.id)).toEqual(["main", "fete", "scouts", "allotment"]);
+    expect(next.views.map((view) => view.id)).toEqual(["main", "fete", "league", "allotment"]);
     expect(next.current).toBe("fete");
   });
 
@@ -70,14 +70,14 @@ describe("addView", () => {
 
 describe("removeView", () => {
   it("shows the next view along in place of the one removed", () => {
-    const { views, next } = removeView(three, "scouts");
+    const { views, next } = removeView(three, "league");
     expect(views.views.map((view) => view.id)).toEqual(["main", "allotment"]);
     expect(next).toBe("allotment");
     expect(views.current).toBe("allotment");
   });
 
   it("falls back to the one before when the last is removed", () => {
-    expect(removeView(three, "allotment").next).toBe("scouts");
+    expect(removeView(three, "allotment").next).toBe("league");
   });
 
   it("keeps the only view there is", () => {
@@ -88,8 +88,8 @@ describe("removeView", () => {
 
 describe("moveView and renameView", () => {
   it("moves a view one tab along, and no further than the ends", () => {
-    expect(moveView(three, "scouts", -1).views.map((view) => view.id)).toEqual([
-      "scouts",
+    expect(moveView(three, "league", -1).views.map((view) => view.id)).toEqual([
+      "league",
       "main",
       "allotment",
     ]);

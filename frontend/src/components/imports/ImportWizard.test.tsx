@@ -34,7 +34,7 @@ const MANIFEST = {
   app_version: "0.56.0",
   exported_at: "2026-07-15T00:00:00Z",
   initiatives: [{ id: 1, name: "Lore", tools: {} }],
-  entries: [{ tool: "queue" }, { tool: "file" }],
+  entries: [{ tool: "wiki" }, { tool: "file" }],
   assets: [{ size_bytes: 2_500_000 }],
 };
 
@@ -42,6 +42,7 @@ const STAGED_JOB = {
   id: 55,
   community_id: 1,
   created_by: 1,
+  direction: "import",
   source: "backup",
   params: {},
   status: "staged",
@@ -52,7 +53,7 @@ const STAGED_JOB = {
         source_id: 1,
         name: "Lore",
         proposed_name: "Lore (imported)",
-        entry_counts: { queue: 1, file: 1 },
+        entry_counts: { wiki: 1, file: 1 },
       },
     ],
     asset_count: 1,
@@ -72,12 +73,11 @@ async function chooseBackup() {
   await userEvent.click(screen.getByRole("button", { name: /initiative backup/i }));
 }
 
-function pickFile() {
+function pickFile(
+  file = new File([new Uint8Array([1, 2, 3])], "backup.zip", { type: "application/zip" })
+) {
   const input = document.querySelector<HTMLInputElement>('input[type="file"]');
   if (!input) throw new Error("no file input");
-  const file = new File([new Uint8Array([1, 2, 3])], "backup.zip", {
-    type: "application/zip",
-  });
   Object.defineProperty(input, "files", { value: [file], configurable: true });
   input.dispatchEvent(new Event("change", { bubbles: true }));
 }
@@ -102,7 +102,7 @@ describe("ImportWizard", () => {
         confirmed = true;
         return HttpResponse.json({ ...STAGED_JOB, status: "queued" });
       }),
-      communityHttp.get("/imports/jobs/:jobId", () => {
+      communityHttp.get("/data-jobs/:jobId", () => {
         pollCount += 1;
         // First poll running, then done.
         if (pollCount < 2) {
@@ -113,7 +113,7 @@ describe("ImportWizard", () => {
           status: "done",
           result: {
             initiatives: [{ source_id: 1, initiative_id: 9, name: "Lore (imported)" }],
-            per_tool: { queue: { created: 1, failed: 0, skipped: 0 } },
+            per_tool: { wiki: { created: 1, failed: 0, skipped: 0 } },
             entries: [],
             assets_restored: 1,
             assets_deduped: 0,
@@ -181,7 +181,7 @@ describe("ImportWizard", () => {
     // reopening lands on its review once it has been staged.
     localStorage.setItem("imports:atlassian-job:1", "77");
     server.use(
-      communityHttp.get("/imports/jobs/:jobId", () =>
+      communityHttp.get("/data-jobs/:jobId", () =>
         HttpResponse.json({
           ...STAGED_JOB,
           id: 77,
@@ -216,7 +216,7 @@ describe("ImportWizard", () => {
       },
     };
     server.use(
-      communityHttp.get("/imports/jobs/:jobId", () => HttpResponse.json(staged)),
+      communityHttp.get("/data-jobs/:jobId", () => HttpResponse.json(staged)),
       communityHttp.post("/imports/jobs/:jobId/confirm", async ({ request }) => {
         confirmBody = (await request.json()) as Record<string, unknown>;
         return HttpResponse.json({ ...staged, status: "queued" });
@@ -234,7 +234,7 @@ describe("ImportWizard", () => {
   it("picks a Confluence fetch back up and shows what the spaces hold", async () => {
     localStorage.setItem("imports:atlassian-job:1", "78");
     server.use(
-      communityHttp.get("/imports/jobs/:jobId", () =>
+      communityHttp.get("/data-jobs/:jobId", () =>
         HttpResponse.json({
           ...STAGED_JOB,
           id: 78,
@@ -258,5 +258,61 @@ describe("ImportWizard", () => {
     expect(screen.getByText(/left out: toc ×2/i)).toBeInTheDocument();
     // No properties to untick: a wiki carries none.
     expect(screen.queryByRole("checkbox")).not.toBeInTheDocument();
+  });
+
+  it("maps a spreadsheet's columns, imports its contacts and names the rows left out", async () => {
+    const sheet =
+      "Name,E-mail 1 - Value,E-mail 1 - Label,Notes\nPriya,priya@example.com,Work,VIP\n";
+    let sent: Record<string, unknown> | null = null;
+    server.use(
+      communityHttp.post("/imports/contacts/preview", () =>
+        HttpResponse.json({
+          headers: ["Name", "E-mail 1 - Value", "E-mail 1 - Label", "Notes"],
+          row_count: 2,
+          samples: [["Priya", "priya@example.com", "Work", "VIP"]],
+          columns: [
+            { column: 0, target: "name" },
+            { column: 1, target: "emails", label_column: 2 },
+          ],
+        })
+      ),
+      communityHttp.post("/imports/contacts", async ({ request }) => {
+        sent = (await request.json()) as Record<string, unknown>;
+        return HttpResponse.json(
+          {
+            result: {
+              created: { contacts: 1, tags: 1 },
+              failed_rows: [{ row: 3, field: "emails" }],
+            },
+          },
+          { status: 201 }
+        );
+      })
+    );
+    const user = userEvent.setup();
+    renderWithProviders(
+      <ImportWizard open onOpenChange={() => {}} contactsInto={{ initiativeId: null }} />
+    );
+
+    pickFile(new File([sheet], "contacts.csv", { type: "text/csv" }));
+    // The email's labels come from the column the server paired with it.
+    expect(await screen.findByLabelText(/label for e-mail 1 - value/i)).toHaveTextContent(
+      /label from e-mail 1 - label/i
+    );
+    await user.click(screen.getByLabelText(/^notes$/i));
+    await user.click(await screen.findByRole("option", { name: "Tags" }));
+    await user.click(screen.getByRole("button", { name: /start import/i }));
+
+    await waitFor(() => expect(sent).not.toBeNull());
+    expect(sent).toEqual({
+      initiative_id: null,
+      content: sheet,
+      columns: [
+        { column: 0, target: "name" },
+        { column: 1, target: "emails", label_column: 2 },
+        { column: 3, target: "tags", label_column: null },
+      ],
+    });
+    expect(await screen.findByText(/row 3 · email/i)).toBeInTheDocument();
   });
 });

@@ -413,7 +413,8 @@ async def test_an_install_hears_what_it_writes_and_is_named_for_it(
     """An install's subscription carries the files of the initiative it
     is placed in, and names the plug-in when the plug-in wrote the change."""
     from app.db.install_standing_test import CLIENT, _install, _route
-    from app.models.tenant.file import File, FileType
+    from app.core.file_types import FileType
+    from app.models.tenant.file import File
     from app.services.tenant import outbox_poller as poller
     from app.testing import create_file
 
@@ -434,7 +435,7 @@ async def test_an_install_hears_what_it_writes_and_is_named_for_it(
     made = File(
         initiative_id=install.a.id,
         name="By the plug-in",
-        file_type=FileType.native,
+        file_type=FileType.lexical,
     )
     s.add(made)
     await s.commit()

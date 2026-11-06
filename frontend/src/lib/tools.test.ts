@@ -274,11 +274,12 @@ describe("tool routes", () => {
   });
 
   it("pluralizes and singularizes by one rule, not by adding or chopping an s", () => {
-    expect(toolPlural(Tool.gallery)).toBe("galleries");
-    expect(toolRouteSegment(Tool.gallery)).toBe("galleries");
-    expect(toolCamelPlural(Tool.gallery)).toBe("galleries");
-    expect(toolPascalPlural(Tool.gallery)).toBe("Galleries");
-    expect(singularOf("galleries")).toBe("gallery");
+    expect(toolPlural(Tool.counter_group)).toBe("counter_groups");
+    expect(toolRouteSegment(Tool.counter_group)).toBe("counter-groups");
+    expect(toolCamelPlural(Tool.counter_group)).toBe("counterGroups");
+    expect(toolPascalPlural(Tool.counter_group)).toBe("CounterGroups");
+    expect(toolPlural("calendar_entry" as Tool)).toBe("calendar_entries");
+    expect(singularOf("calendar_entries")).toBe("calendar_entry");
     expect(singularOf("counter_groups")).toBe("counter_group");
     expect(singularOf("tasks")).toBe("task");
   });
@@ -310,12 +311,14 @@ describe("tool route builders", () => {
     );
   });
 
-  // Only calendars have community-level entities (a plug-in installs one). A null
-  // initiative means "address me at the community route", never "unknown".
+  // Calendars and contacts have community-level entities (a community plug-in
+  // holds them). A null initiative means "address me at the community route",
+  // never "unknown".
   it("keeps a community-level entity at its community route", () => {
     expect(toolListRoute(Tool.calendar, null)).toBe("/calendars");
     expect(toolDetailRoute(Tool.calendar, null, 3)).toBe("/calendars/3");
     expect(toolSettingsRoute(Tool.calendar, null, 3)).toBe("/calendars/3/settings");
+    expect(toolDetailRoute(Tool.contact, null, 4)).toBe("/contacts/4");
   });
 
   it("nests a child entity under its parent", () => {
@@ -378,9 +381,8 @@ describe("tool relations", () => {
     expect(Object.values(PARENT_TOOL).every((tool) => TOOLS.includes(tool))).toBe(true);
     expect(Object.keys(PARENT_TOOL).sort()).toEqual([
       "calendar_event",
+      "collection",
       "counter",
-      "gallery_image",
-      "queue_item",
       "task",
       "wiki_page",
     ]);
@@ -439,7 +441,7 @@ describe("tool surfaces are wired, not just typed", () => {
 
 describe("tool exports", () => {
   it("every bulk-export tool has a format source, and only those", async () => {
-    const { FILE_TYPE_FORMATS, TOOL_EXPORT_FORMATS } = await import("@/components/exports/formats");
+    const { fileTypeFormats, TOOL_EXPORT_FORMATS } = await import("@/components/exports/formats");
     const { FileType } = await import("@/api/generated/initiativeAPI.schemas");
     const { BULK_EXPORT_TOOLS } = await import("@/lib/tools");
 
@@ -453,9 +455,7 @@ describe("tool exports", () => {
       ).toBeGreaterThan(0);
     }
     for (const type of Object.values(FileType)) {
-      expect(FILE_TYPE_FORMATS[type]?.length, `missing FILE_TYPE_FORMATS.${type}`).toBeGreaterThan(
-        0
-      );
+      expect(fileTypeFormats(type).length, `missing formats for ${type}`).toBeGreaterThan(0);
     }
     // Exact coverage: a formats entry for a non-export tool is drift too.
     for (const tool of TOOLS) {
@@ -486,8 +486,9 @@ describe("tool imports", () => {
   });
 
   // The data-jobs table labels a job by its `source` column, which the backend
-  // writes as the envelope type for an import and the adapter key for an
-  // export. Both are derived from the enum, so both label sets are too — a key
+  // writes as the envelope type for an import (`contacts-csv` for a
+  // spreadsheet of contacts) and the adapter key for an export. Both are
+  // derived from the enum, so both label sets are too — a key
   // that matches no source renders as its own raw key in the UI, which is how
   // `initiative-calendar-events` survived a calendar rename unnoticed.
   it("labels every import source in every locale", async () => {
@@ -495,7 +496,7 @@ describe("tool imports", () => {
     for (const locale of locales) {
       const file = await import(`../../public/locales/${locale}/imports.json`);
       const labels = (file.default ?? file).table.source as Record<string, string>;
-      const expected = ["backup", ...BULK_EXPORT_TOOLS.map(toolEnvelopeType)];
+      const expected = ["backup", "contacts-csv", ...BULK_EXPORT_TOOLS.map(toolEnvelopeType)];
       expect(Object.keys(labels).sort(), `${locale}/imports.json table.source`).toEqual(
         expected.sort()
       );
@@ -539,7 +540,10 @@ describe("toolInPath", () => {
   it("reads the outermost tool, so what it holds and its settings name it", () => {
     expect(toolInPath("/c/1/i/2/projects/3/tasks/5")).toEqual({ tool: Tool.project, id: 3 });
     expect(toolInPath("/c/1/i/2/wikis/4/files/8")).toEqual({ tool: Tool.wiki, id: 4 });
-    expect(toolInPath("/c/1/i/2/queues/6/settings/access")).toEqual({ tool: Tool.queue, id: 6 });
+    expect(toolInPath("/c/1/i/2/dashboards/6/settings/access")).toEqual({
+      tool: Tool.dashboard,
+      id: 6,
+    });
   });
 
   it("is null anywhere that is no tool's page", () => {

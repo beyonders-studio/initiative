@@ -11,12 +11,6 @@ interface FileDropOptions {
    * drop with nothing acceptable in it says so rather than doing nothing.
    */
   accept?: string;
-  /**
-   * The largest file taken, where the server has said. Checked here for a drop
-   * that opens a form already holding the file, which would otherwise be the
-   * first thing to find out it is too big.
-   */
-  maxBytes?: number | null;
 }
 
 /**
@@ -34,7 +28,7 @@ interface FileDropOptions {
 export const useFileDrop = (
   enabled: boolean,
   onFiles: (files: File[]) => void,
-  { accept, maxBytes }: FileDropOptions = {}
+  { accept }: FileDropOptions = {}
 ) => {
   const { t } = useTranslation("common");
   const depth = useRef(0);
@@ -76,13 +70,8 @@ export const useFileDrop = (
       depth.current = 0;
       setDragging(false);
       const dropped = Array.from(event.dataTransfer.files);
-      const acceptable = accept
-        ? dropped.filter((file) => matchesAccept(file.name, accept))
-        : dropped;
-      const files =
-        maxBytes == null ? acceptable : acceptable.filter((file) => file.size <= maxBytes);
+      const files = accept ? dropped.filter((file) => matchesAccept(file.name, accept)) : dropped;
       if (files.length > 0) onFiles(files);
-      else if (acceptable.length > 0) toast.error(t("fileDrop.tooLarge"));
       else if (dropped.length > 0) toast.error(t("fileDrop.unsupported"));
     },
   };

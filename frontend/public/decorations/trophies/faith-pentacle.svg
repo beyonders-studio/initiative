@@ -1,8 +1,0 @@
-<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 48 48" width="48" height="48"
-     role="presentation">
-  <title>Wiccan</title>
-  <circle cx="24" cy="24" r="23" fill="#1B2036"/>
-  <circle cx="24" cy="24" r="21" fill="none" stroke="#C8A45C" stroke-width="2"/>
-  <circle cx="24" cy="24" r="15.0" fill="none" stroke="#B8C4E0" stroke-width="2"/>
-  <path d="M24.00 11.40 L31.41 34.19 L12.02 20.11 L35.98 20.11 L16.59 34.19 Z" fill="none" stroke="#B8C4E0" stroke-width="2" stroke-linejoin="round"/>
-</svg>

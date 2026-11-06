@@ -60,7 +60,8 @@ export const projectViewSpec = (
   communityId: number,
   projectId: number
 ): ListViewSpec<TaskFilterSpec> => ({
-  key: viewKey(communityId, "project", projectId),
+  key: viewKey("project", projectId),
+  communityId,
   read: readTaskFilters,
   defaults: TASK_DEFAULTS,
 });

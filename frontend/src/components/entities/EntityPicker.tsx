@@ -8,6 +8,7 @@ import {
 } from "@/api/generated/initiativeAPI.schemas";
 import { AsyncCombobox } from "@/components/ui/async-combobox";
 import { useCommunityPickerSuggestions } from "@/hooks/useSearch";
+import type { ItemEndKind } from "@/lib/relationships";
 import { hitIcon } from "@/lib/searchResults";
 
 /**
@@ -23,10 +24,16 @@ export const LINKABLE_TYPES: SearchEntityType[] = Object.values(SearchEntityType
   (type) => type !== SearchEntityType.comment && type !== SearchEntityType.tag
 );
 
+/** A suggestion that can be a link end: what this picker hands back. */
+export type LinkableSuggestion = SearchSuggestion & { entity_type: ItemEndKind };
+
+const isLinkable = (item: SearchSuggestion): item is LinkableSuggestion =>
+  item.entity_type !== SearchEntityType.comment;
+
 interface EntityPickerProps {
   /**
    * The thing being linked from, so it is never offered as its own far end.
-   * Absent while linking from something that does not exist yet — a queue item
+   * Absent while linking from something that does not exist yet — an item
    * being composed — where there is no self to leave out.
    */
   subject?: EndpointRef;
@@ -34,8 +41,8 @@ interface EntityPickerProps {
   initiativeId: number | null;
   /** Narrow what may be picked. Defaults to every kind an edge may name. */
   types?: SearchEntityType[];
-  value: SearchSuggestion | null;
-  onChange: (value: SearchSuggestion | null) => void;
+  value: LinkableSuggestion | null;
+  onChange: (value: LinkableSuggestion | null) => void;
   disabled?: boolean;
 }
 
@@ -93,9 +100,9 @@ export const EntityPicker = ({
   });
 
   const byValue = useMemo(() => {
-    const map = new Map<string, SearchSuggestion>();
+    const map = new Map<string, LinkableSuggestion>();
     for (const item of suggestions.items) {
-      map.set(`${item.entity_type}:${item.entity_id}`, item);
+      if (isLinkable(item)) map.set(`${item.entity_type}:${item.entity_id}`, item);
     }
     return map;
   }, [suggestions.items]);

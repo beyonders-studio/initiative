@@ -3,7 +3,6 @@ import { describe, expect, it } from "vitest";
 
 import { SearchEntityType } from "@/api/generated/initiativeAPI.schemas";
 import {
-  $convertLegacyWikilink,
   $createEntityMentionNode,
   EntityMentionNode,
   type SerializedEntityMentionNode,
@@ -31,7 +30,7 @@ describe("a thing mentioned in a document", () => {
   it("survives being written down and read back", () => {
     // Read inside the editor: a node's own accessors need its state.
     const { serialized, entityType, entityId, text } = inEditor(() => {
-      const node = $createEntityMentionNode(SearchEntityType.queue, 12, "Intake queue");
+      const node = $createEntityMentionNode(SearchEntityType.counter_group, 12, "Summer fete");
       const serialized = node.exportJSON() as SerializedEntityMentionNode;
       const restored = EntityMentionNode.importJSON(serialized);
       return {
@@ -44,26 +43,13 @@ describe("a thing mentioned in a document", () => {
 
     expect(serialized).toMatchObject({
       type: "entity-mention",
-      entityType: SearchEntityType.queue,
+      entityType: SearchEntityType.counter_group,
       entityId: 12,
-      text: "Intake queue",
+      text: "Summer fete",
     });
-    expect(entityType).toBe(SearchEntityType.queue);
+    expect(entityType).toBe(SearchEntityType.counter_group);
     expect(entityId).toBe(12);
-    expect(text).toBe("Intake queue");
-  });
-
-  it("reads a kind stored under its earlier spelling as today's", () => {
-    const entityType = inEditor(() =>
-      EntityMentionNode.importJSON({
-        type: "entity-mention",
-        version: 1,
-        entityType: "document" as SearchEntityType,
-        entityId: 12,
-        text: "Roadmap",
-      }).getEntityType()
-    );
-    expect(entityType).toBe(SearchEntityType.file);
+    expect(text).toBe("Summer fete");
   });
 
   it("carries its label as text, which is what export and search read", () => {
@@ -104,22 +90,5 @@ describe("a thing mentioned in a document", () => {
       $createEntityMentionNode(SearchEntityType.task, 1, "Ship it").getTextContent()
     );
     expect(text).toBe("Ship it");
-  });
-});
-
-describe("a link written before references were one thing", () => {
-  it("is read as a reference to that document", () => {
-    const node = inEditor(() =>
-      $convertLegacyWikilink({ documentId: 12, documentTitle: "Roadmap" })
-    );
-    expect(node?.getEntityType()).toBe(SearchEntityType.file);
-    expect(node?.getEntityId()).toBe(12);
-    // The old stored title becomes the fallback, not the display name.
-    expect(node?.getTextContent()).toBe("Roadmap");
-  });
-
-  it("is dropped when it points at nothing", () => {
-    // `[[ ]]` could be written before its document existed.
-    expect(inEditor(() => $convertLegacyWikilink({ documentId: null }))).toBeNull();
   });
 });

@@ -16,6 +16,7 @@ import { CommunityClaimRulesSection } from "@/components/auth/CommunityClaimRule
 import { CommunityEngagementRankingSection } from "@/components/auth/CommunityEngagementRankingSection";
 import { CommunityNotificationPolicySection } from "@/components/auth/CommunityNotificationPolicySection";
 import { ConnectSignInWizard } from "@/components/auth/ConnectSignInWizard";
+import { CustomRoleClaimRulesSection } from "@/components/auth/CustomRoleClaimRulesSection";
 import { Alert, AlertDescription } from "@/components/ui/alert";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
@@ -459,6 +460,8 @@ const GuestStayCard = ({
   const update = useUpdateCommunityAuthSettings(communityId);
   const { value: days, valid } = readOptionalWholeNumber(form.values.days, 1, ceiling);
   const changed = days !== authSettings.guest_max_days;
+  // Set for this community by whoever runs the server.
+  const fixed = authSettings.set_by_deployment.includes("guest_max_days");
 
   const save = () => {
     const sent = form.values;
@@ -493,18 +496,21 @@ const GuestStayCard = ({
             className="w-40"
             value={form.values.days}
             placeholder={String(ceiling)}
+            disabled={fixed}
             onChange={(event) => form.set({ days: event.target.value })}
           />
           <Button
             onClick={save}
-            disabled={!valid || !changed || update.isPending}
+            disabled={fixed || !valid || !changed || update.isPending}
             aria-label={t("communityAuth.guestStay.save")}
           >
             {update.isPending ? t("common:submitting") : t("common:save")}
           </Button>
         </div>
         <p className="text-muted-foreground text-sm">
-          {t("communityAuth.guestStay.hint", { count: ceiling })}
+          {fixed
+            ? t("communityAuth.setByDeployment")
+            : t("communityAuth.guestStay.hint", { count: ceiling })}
         </p>
       </CardContent>
     </Card>
@@ -617,6 +623,10 @@ export const SettingsCommunitySecurityPage = () => {
   // Where the deployment already asks everybody, this community's switch has
   // nothing to add, so it says so rather than offering the same answer twice.
   const factorAskedByPlatform = savedPolicy?.factor_required_by_platform === true;
+  // What whoever runs the server sets for this community is shown, not offered.
+  const setByDeployment = new Set(authSettings?.set_by_deployment ?? []);
+  const factorFixed = setByDeployment.has("require_second_factor");
+  const sessionLimitFixed = setByDeployment.has("enforce_compliance_session");
   // The community's shareable sign-in URL, built on the server's origin (which is
   // the app's own origin on web, or the configured server on native).
   const { getServerOrigin } = useServer();
@@ -666,6 +676,8 @@ export const SettingsCommunitySecurityPage = () => {
           />
 
           <CommunityClaimRulesSection communityId={communityId} />
+
+          <CustomRoleClaimRulesSection communityId={communityId} />
 
           <SignInRequirementCard
             communityId={communityId}
@@ -726,14 +738,16 @@ export const SettingsCommunitySecurityPage = () => {
                     <p className="text-muted-foreground text-sm">
                       {factorAskedByPlatform
                         ? t("communityAuth.secondFactor.askedByPlatform")
-                        : t("communityAuth.secondFactor.help")}
+                        : factorFixed
+                          ? t("communityAuth.setByDeployment")
+                          : t("communityAuth.secondFactor.help")}
                     </p>
                   </div>
                   <Switch
                     id="community-second-factor"
                     checked={secondFactor.value || factorAskedByPlatform}
                     onCheckedChange={changeSecondFactor}
-                    disabled={updateSecondFactor.isPending || factorAskedByPlatform}
+                    disabled={updateSecondFactor.isPending || factorAskedByPlatform || factorFixed}
                   />
                 </div>
                 {secondFactor.error && (
@@ -756,14 +770,16 @@ export const SettingsCommunitySecurityPage = () => {
                     {t("communityAuth.sessionLimit.allowLabel")}
                   </Label>
                   <p className="text-muted-foreground text-sm">
-                    {t("communityAuth.sessionLimit.help")}
+                    {sessionLimitFixed
+                      ? t("communityAuth.setByDeployment")
+                      : t("communityAuth.sessionLimit.help")}
                   </p>
                 </div>
                 <Switch
                   id="community-session-limit"
                   checked={sessionLimit.value}
                   onCheckedChange={changeSessionLimit}
-                  disabled={updateSessionLimit.isPending}
+                  disabled={updateSessionLimit.isPending || sessionLimitFixed}
                 />
               </div>
               {sessionLimit.error && (

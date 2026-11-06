@@ -162,12 +162,14 @@
     "communityRole": {
       "admin": "Administrateur",
       "member": "Membre",
-      "superadmin": "Superadmin"
+      "superadmin": "Superadmin",
+      "guest": "Invité"
     },
     "communityRoleHelp": {
       "member": "Participe à ce à quoi on l'ajoute.",
       "admin": "Gère la communauté : membres, invitations, initiatives, paramètres.",
-      "superadmin": "Tout cela, plus la façon dont les gens entrent : connexion, IA et plug-ins. Seul un superadmin peut en nommer un autre."
+      "superadmin": "Tout cela, plus la façon dont les gens entrent : connexion, IA et plug-ins. Seul un superadmin peut en nommer un autre.",
+      "guest": "Présent pour un nombre de jours défini, et ne voit que ce que son invitation lui a donné."
     },
     "loadingSettings": "Chargement des paramètres…",
     "unableToLoadSettings": "Impossible de charger les paramètres.",
@@ -201,6 +203,7 @@
     "userIdColumn": "ID utilisateur",
     "userColumn": "Utilisateur",
     "communityRoleColumn": "Rôle dans la communauté",
+    "communityRolePickerLabel": "Rôle dans la communauté de {{name}}",
     "sourceColumn": "Origine",
     "actionsColumn": "Actions",
     "sourceOidc": "OIDC",
@@ -269,10 +272,23 @@
     "initiativeJoinRequested": "{{requester}} demande à rejoindre {{initiativeName}}.",
     "initiativeJoinApproved": "Votre demande pour rejoindre {{initiativeName}} a été acceptée.",
     "initiativeJoinDenied": "Votre demande pour rejoindre {{initiativeName}} a été refusée.",
+    "shareRequested": {
+      "read_one": "{{requester}} demande à voir {{title}}.",
+      "read_other": "{{requester}} demande à voir {{count}} fichiers.",
+      "write_one": "{{requester}} demande à modifier {{title}}.",
+      "write_other": "{{requester}} demande à modifier {{count}} fichiers."
+    },
+    "shareGranted": {
+      "read_one": "{{answerer}} vous a donné l'accès en lecture à {{title}}.",
+      "read_other": "{{answerer}} vous a donné l'accès en lecture à {{count}} fichiers.",
+      "write_one": "{{answerer}} vous a donné l'accès en modification à {{title}}.",
+      "write_other": "{{answerer}} vous a donné l'accès en modification à {{count}} fichiers."
+    },
+    "shareDeclined_one": "{{answerer}} a refusé votre demande.",
+    "shareDeclined_other": "{{answerer}} a refusé votre demande pour {{count}} fichiers.",
     "projectAdded": "Le projet {{projectName}} a été ajouté à {{initiativeName}}, dont vous faites partie.",
     "mentionComment": "{{mentionedBy}} vous a mentionné dans un commentaire sur {{contextTitle}}.",
-    "mentionFile": "{{mentionedBy}} vous a mentionné dans {{fileTitle}}.",
-    "mentionTaskDescription": "{{mentionedBy}} vous a mentionné dans {{taskTitle}}.",
+    "mentionIn": "{{mentionedBy}} vous a mentionné dans {{title}}.",
     "commentOnTask": "{{commenterName}} a commenté {{taskTitle}}.",
     "commentOnResource": "{{commenterName}} a commenté sur {{entityName}}.",
     "postPublished": "{{authorName}} a publié {{postName}}.",
@@ -299,6 +315,7 @@
     "eventCancelled": "{{canceller}} a annulé {{eventTitle}}.",
     "eventRsvp": "{{responder}} a répondu {{status}} à {{eventTitle}}.",
     "eventReminder": "{{eventTitle}} approche.",
+    "taskReminder": "Rappel : {{taskTitle}}",
     "accessLevelRead": "en lecture seule",
     "accessLevelReadWrite": "en lecture-écriture",
     "usernameChanged": "Un modérateur a changé votre nom d'utilisateur. Vous étiez {{previousHandle}}.",

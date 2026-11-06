@@ -46,7 +46,6 @@
   },
   "bindingSource": {
     "query": "Consulta SQL",
-    "sheet_range": "Rango de hoja",
     "plugin": "Datos del complemento"
   },
   "gallery": {
@@ -88,7 +87,6 @@
     "widgetTitle": "Título",
     "widgetTitlePlaceholder": "Déjalo vacío para usar el nombre del widget",
     "source": "Fuente de datos",
-    "choose": "Elegir…",
     "preview": "Vista previa",
     "previewHint": "Tus propios datos, tal como los dibujará el widget.",
     "sectionBinding": "Datos",
@@ -98,7 +96,6 @@
     "all_calendar": "Todos los calendarios",
     "all_counter_group": "Todos los grupos de contadores",
     "all_counter": "Todos los contadores",
-    "all_file": "Todas las hojas de cálculo",
     "pluginEndpoint": "Qué lee",
     "plugin": "Complemento",
     "pluginPlaceholder": "Elige un complemento",
@@ -107,8 +104,8 @@
     "pluginParamPlaceholder": "Elige…",
     "pluginParamNeedsSibling": "Elige primero el valor de arriba.",
     "pluginParamListHint": "Separa los valores con comas.",
-    "all_property": "Sin propiedad",
-    "sqlHelp": "Un SELECT de solo lectura sobre los datos de esta comunidad. Se ejecuta como tú, así que devuelve lo que ya puedes ver."
+    "all_property": "Sin metadatos ni propiedad",
+    "sqlHelp": "Un SELECT de solo lectura sobre los datos de esta comunidad. Se ejecuta como tú, así que devuelve lo que ya puedes ver. sheet('Budget', 'Sheet1!A1:D') lee un rango de una hoja de cálculo."
   },
   "picker": {
     "title": "Añadir un widget",
@@ -136,7 +133,6 @@
     "display": "Presentación",
     "refresh": "Actualizar",
     "open": "Ver de dónde vienen estos datos",
-    "restricted": "Sin acceso",
     "me": "Yo",
     "cappedHint": "Coinciden más filas de las que un widget carga de una vez; se muestran las primeras {{count}}.",
     "rows_task_one": "{{count}} tarea",
@@ -169,8 +165,8 @@
     "description": "Descripción",
     "updated_at": "Actualizado",
     "created_by": "Creado por",
-    "property": "Propiedad",
-    "property_id": "Propiedad",
+    "property": "Metadatos o propiedad",
+    "property_id": "Metadatos o propiedad",
     "value_text": "Texto",
     "value_number": "Número",
     "value_boolean": "Casilla",
@@ -238,14 +234,6 @@
     "column": "Columna",
     "card": "Tarjeta"
   },
-  "bindingParam": {
-    "file": "Hoja de cálculo",
-    "sheet": "Hoja",
-    "range": "Rango",
-    "plugin_uid": "Complemento",
-    "source_id": "Fuente de datos del complemento",
-    "sql": "Sentencia"
-  },
   "slot": {
     "label": "Etiqueta",
     "value": "Valor",
@@ -262,6 +250,11 @@
   },
   "builder": {
     "dataset": "Mostrar datos de",
+    "spreadsheet": "Hoja de cálculo",
+    "sheet": "Hoja",
+    "firstSheet": "Primera hoja visible",
+    "range": "Rango",
+    "rangeHelp": "Déjalo vacío para toda la hoja. A:D lee las columnas de la A a la D, hasta la última fila con datos.",
     "columns": "Mostrar",
     "addColumn": "Añadir columna",
     "removeColumn": "Quitar esta columna",
@@ -307,8 +300,8 @@
     "counters": "Contadores",
     "counter_groups": "Grupos de contadores",
     "task_statuses": "Estados de tarea",
-    "property_values": "Valores de propiedades",
-    "property_definitions": "Propiedades",
+    "metadata_values": "Valores de metadatos y propiedades",
+    "metadata_definitions": "Metadatos y propiedades",
     "relationships": "Vínculos"
   },
   "viewMode": {

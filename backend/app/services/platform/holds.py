@@ -142,7 +142,6 @@ async def _shown_uploads(
 ) -> set[str]:
     """The stored names of the uploads anything ``covered`` shows."""
     from app.models.tenant.file import File, FileVersion
-    from app.models.tenant.gallery import GalleryImage, GalleryImageVersion
     from app.services.tenant.attachments import (
         _upload_columns,
         upload_names,
@@ -152,7 +151,6 @@ async def _shown_uploads(
     texts: list[str] = []
     parents = {
         FileVersion: (File, "file_id"),
-        GalleryImageVersion: (GalleryImage, "gallery_image_id"),
     }
     for model, column in _upload_columns():
         if model in parents:

@@ -22,6 +22,7 @@ const config = vi.hoisted(() => ({
   retentionDays: 90 as number | null,
   holdDays: 30 as number | null,
   guests: false,
+  creation: true,
 }));
 
 vi.mock("@/hooks/useAppConfig", () => ({
@@ -47,6 +48,10 @@ vi.mock("@/hooks/useSettings", () => ({
       engagement_ranking_enabled: true,
       guests_enabled: config.guests,
       max_guest_days: 365,
+      public_registration_enabled: true,
+      community_creation_enabled: config.creation,
+      community_creation_daily_limit: 5,
+      community_export_cooldown_hours: 48,
     },
   }),
 }));
@@ -70,6 +75,7 @@ beforeEach(() => {
   config.retentionDays = 90;
   config.holdDays = 30;
   config.guests = false;
+  config.creation = true;
 });
 
 describe("SettingsPlatformCommunityPage", () => {
@@ -346,5 +352,90 @@ describe("guests", () => {
       community_directory_enabled: false,
       max_guest_days: 30,
     });
+  });
+});
+
+describe("who may join and create", () => {
+  it("closes sign-up to people without an invite", async () => {
+    renderPage();
+    const registration = await screen.findByLabelText("Let anyone sign up");
+
+    expect(registration).toBeChecked();
+    fireEvent.click(registration);
+
+    expect(updateMutate).toHaveBeenCalledWith({
+      community_directory_enabled: false,
+      public_registration_enabled: false,
+    });
+  });
+
+  it("stops accounts creating communities", async () => {
+    renderPage();
+    fireEvent.click(await screen.findByLabelText("Let anyone create a community"));
+
+    expect(updateMutate).toHaveBeenCalledWith({
+      community_directory_enabled: false,
+      community_creation_enabled: false,
+    });
+  });
+
+  it("saves 0 as no daily limit", async () => {
+    renderPage();
+
+    const box = (await screen.findByLabelText(
+      "Communities one account may create per day"
+    )) as HTMLInputElement;
+    expect(box.value).toBe("5");
+
+    await userEvent.clear(box);
+    await userEvent.type(box, "0");
+    await userEvent.click(screen.getByRole("button", { name: "Save the daily community limit" }));
+
+    expect(updateMutate).toHaveBeenCalledWith({
+      community_directory_enabled: false,
+      community_creation_daily_limit: 0,
+    });
+  });
+
+  it("leaves the daily limit alone while creation is off", async () => {
+    config.creation = false;
+    renderPage();
+
+    expect(
+      await screen.findByLabelText("Communities one account may create per day")
+    ).toBeDisabled();
+    expect(screen.getByRole("button", { name: "Save the daily community limit" })).toBeDisabled();
+  });
+});
+
+describe("the time between community exports", () => {
+  it("saves a new wait", async () => {
+    renderPage();
+
+    const box = (await screen.findByLabelText(
+      "Hours between community exports"
+    )) as HTMLInputElement;
+    expect(box.value).toBe("48");
+
+    await userEvent.clear(box);
+    await userEvent.type(box, "24");
+    await userEvent.click(
+      screen.getByRole("button", { name: "Save the time between community exports" })
+    );
+
+    expect(updateMutate).toHaveBeenCalledWith({
+      community_directory_enabled: false,
+      community_export_cooldown_hours: 24,
+    });
+  });
+
+  it("will not save a blank box", async () => {
+    renderPage();
+
+    await userEvent.clear(await screen.findByLabelText("Hours between community exports"));
+
+    expect(
+      screen.getByRole("button", { name: "Save the time between community exports" })
+    ).toBeDisabled();
   });
 });

@@ -69,10 +69,10 @@
       "title": "Votre tâche a été mentionnée",
       "body": "<strong>{{actor}}</strong> a mentionné <strong>{{task}}</strong> dans <strong>{{context}}</strong>"
     },
-    "taskDescription": {
-      "subject": "Vous avez été mentionné(e) dans {{task}}",
+    "description": {
+      "subject": "Vous avez été mentionné(e) dans {{title}}",
       "title": "Vous avez été mentionné(e)",
-      "body": "<strong>{{actor}}</strong> vous a mentionné(e) dans la description de <strong>{{task}}</strong>"
+      "body": "<strong>{{actor}}</strong> vous a mentionné(e) dans la description de <strong>{{title}}</strong>"
     },
     "greeting": "Bonjour <strong>{{name}}</strong>,",
     "buttonLabel": "Voir"
@@ -169,6 +169,15 @@
     "textBody_one": "Vous avez {{count}} tâche en retard :",
     "textBody_other": "Vous avez {{count}} tâches en retard :",
     "redactedItem": "Une tâche est en retard"
+  },
+  "comingUp": {
+    "subject": "À venir",
+    "title": "À venir",
+    "body_one": "Vous avez <strong>{{count}}</strong> chose à venir :",
+    "body_other": "Vous avez <strong>{{count}}</strong> choses à venir :",
+    "taskDetail": "échéance <strong>{{when}}</strong>, dans <strong>{{projectName}}</strong>",
+    "eventDetail": "commence <strong>{{when}}</strong>",
+    "redactedItem": "Quelque chose arrive bientôt"
   },
   "accessGrant": {
     "buttonLabel": "Ouvrir le tableau de bord des accès",
@@ -388,7 +397,9 @@
       "cases": "Dossiers",
       "direct_messages": "Messages et contacts",
       "jobs": "Exports et imports",
-      "account": "Votre compte"
+      "account": "Votre compte",
+      "overdue": "En retard",
+      "coming_up": "À venir"
     }
   },
   "signInCode": {
@@ -436,6 +447,26 @@
     "contact": "Contactez <strong>{{contact}}</strong> pour régler la situation.",
     "contactNobody": "Contactez la personne qui gère ce serveur pour régler la situation.",
     "buttonLabel": "Rétablir le forfait"
+  },
+  "communityAccess": {
+    "granted": {
+      "subject": "L’équipe de la plateforme a accès à {{community}}",
+      "title": "L’équipe de la plateforme a accès à {{community}}",
+      "body": "L’équipe de ce serveur a reçu un accès <strong>{{level}}</strong> à <strong>{{community}}</strong> le {{start}}, jusqu’au {{end}}."
+    },
+    "ended": {
+      "subject": "L’équipe de la plateforme a eu accès à {{community}}",
+      "title": "L’équipe de la plateforme a eu accès à {{community}}",
+      "body": "L’équipe de ce serveur a eu un accès <strong>{{level}}</strong> à <strong>{{community}}</strong> du {{start}} au {{end}}. Cet accès a pris fin."
+    },
+    "case": {
+      "security": "Il servait un dossier de sécurité.",
+      "moderation": "Il servait un dossier de modération.",
+      "support": "Il servait un dossier d’assistance."
+    },
+    "recorded": "Chaque requête faite avec lui est enregistrée.",
+    "contact": "Pour toute question, écrivez à <strong>{{contact}}</strong>.",
+    "moment": "{{date}}, {{time}} UTC"
   },
   "communityTrialEnding": {
     "subject": "L’essai de {{community}} se termine le {{date}}",
@@ -522,6 +553,49 @@
       "subject": "Une nouvelle façon de vous connecter à votre compte",
       "title": "Une nouvelle façon de vous connecter à votre compte",
       "body": "Il est désormais possible de se connecter à votre compte via <strong>{{provider}}</strong>, car l'une de vos adresses y a été vérifiée."
+    }
+  },
+  "share": {
+    "requested": {
+      "read": {
+        "subject": "Demande de consultation",
+        "title": "Demande de consultation",
+        "body_one": "<strong>{{requester}}</strong> demande à voir <strong>{{title}}</strong>",
+        "body_other": "<strong>{{requester}}</strong> demande à voir {{count}} fichiers"
+      },
+      "write": {
+        "subject": "Demande de modification",
+        "title": "Demande de modification",
+        "body_one": "<strong>{{requester}}</strong> demande à modifier <strong>{{title}}</strong>",
+        "body_other": "<strong>{{requester}}</strong> demande à modifier {{count}} fichiers"
+      }
+    },
+    "granted": {
+      "read": {
+        "subject": "Vous pouvez le voir",
+        "title": "Vous pouvez le voir",
+        "body_one": "<strong>{{answerer}}</strong> vous a permis de voir <strong>{{title}}</strong>",
+        "body_other": "<strong>{{answerer}}</strong> vous a permis de voir {{count}} fichiers"
+      },
+      "write": {
+        "subject": "Vous pouvez le modifier",
+        "title": "Vous pouvez le modifier",
+        "body_one": "<strong>{{answerer}}</strong> vous a permis de modifier <strong>{{title}}</strong>",
+        "body_other": "<strong>{{answerer}}</strong> vous a permis de modifier {{count}} fichiers"
+      }
+    },
+    "declined": {
+      "subject": "Demande refusée",
+      "title": "Demande refusée",
+      "body_one": "<strong>{{answerer}}</strong> a refusé votre demande",
+      "body_other": "<strong>{{answerer}}</strong> a refusé votre demande pour {{count}} fichiers"
+    }
+  },
+  "task": {
+    "reminder": {
+      "subject": "Rappel : {{task}}",
+      "title": "Rappel",
+      "body": "Vous avez demandé un rappel pour <strong>{{task}}</strong>."
     }
   }
 }

@@ -10,8 +10,7 @@ import pytest
 from httpx import AsyncClient
 from sqlmodel.ext.asyncio.session import AsyncSession
 
-from app.core.messages import AuthProviderMessages
-from app.models.platform.guild_auth_policy import GuildAuthPolicy
+from app.core.messages import AuthProviderMessages, GuildMessages
 from app.models.platform.guild import CommunityRole
 from app.testing.factories import (
     create_auth_provider,
@@ -21,6 +20,9 @@ from app.testing.factories import (
     create_user,
     get_auth_headers,
 )
+from app.core.login_methods import LoginMethod
+from app.core.rules import SURFACE_CUSTOM_ROLES, SetBy, SignInRequirement
+from app.services.platform import rules
 
 
 async def _seat(session: AsyncSession, *, auth_options: list[str] | None = None):
@@ -252,16 +254,11 @@ async def test_a_required_provider_cannot_be_disconnected(
     connection = await create_guild_provider_connection(
         session, guild=guild, provider=provider
     )
-    session.add(
-        GuildAuthPolicy(
-            guild_id=guild.id,
-            **{
-                "policy": "open",
-                f"{half}policy": "required",
-                f"{half}provider_id": provider.id,
-                f"{half}provider_slug": provider.slug,
-            },
-        )
+    await rules.put(
+        session,
+        f"{half}auth_policy",
+        SignInRequirement("required", provider.id),
+        guild_id=guild.id,
     )
     await session.commit()
 
@@ -281,13 +278,11 @@ async def test_a_required_provider_cannot_be_disabled(
     connection = await create_guild_provider_connection(
         session, guild=guild, provider=provider
     )
-    session.add(
-        GuildAuthPolicy(
-            guild_id=guild.id,
-            policy="required",
-            provider_id=provider.id,
-            provider_slug=provider.slug,
-        )
+    await rules.put(
+        session,
+        "auth_policy",
+        SignInRequirement("required", provider.id),
+        guild_id=guild.id,
     )
     await session.commit()
 
@@ -309,12 +304,11 @@ async def test_the_last_connection_for_an_sso_requirement_cannot_be_removed(
     connection = await create_guild_provider_connection(
         session, guild=guild, provider=provider
     )
-    session.add(
-        GuildAuthPolicy(
-            guild_id=guild.id,
-            policy="required",
-            require_methods=["sso"],
-        )
+    await rules.put(
+        session,
+        "auth_policy",
+        SignInRequirement("required", None, frozenset({LoginMethod.sso})),
+        guild_id=guild.id,
     )
     await session.commit()
 
@@ -336,12 +330,11 @@ async def test_an_sso_requirement_allows_one_of_multiple_connections_to_be_remov
         session, guild=guild, provider=first
     )
     await create_guild_provider_connection(session, guild=guild, provider=second)
-    session.add(
-        GuildAuthPolicy(
-            guild_id=guild.id,
-            policy="required",
-            require_methods=["sso"],
-        )
+    await rules.put(
+        session,
+        "auth_policy",
+        SignInRequirement("required", None, frozenset({LoginMethod.sso})),
+        guild_id=guild.id,
     )
     await session.commit()
 
@@ -350,3 +343,60 @@ async def test_an_sso_requirement_allows_one_of_multiple_connections_to_be_remov
     )
 
     assert response.status_code == 204, response.text
+
+
+async def test_the_seat_orders_the_groups_that_give_custom_roles(
+    client: AsyncClient, session: AsyncSession
+):
+    """Rules naming which custom role a group gives: added after the others,
+    put in a new order, and closed with the rest of the community's custom
+    roles."""
+    admin, guild = await _seat(session)
+    provider = await create_auth_provider(session, slug="corp")
+    await create_guild_provider_connection(session, guild=guild, provider=provider)
+    await session.commit()
+    headers = get_auth_headers(admin)
+    roles = f"/api/v1/c/{guild.id}/custom-roles/"
+    doors = (
+        await client.post(
+            roles,
+            headers=headers,
+            json={"name": "Doors", "base_rung": "member", "surfaces": ["invites"]},
+        )
+    ).json()["id"]
+    url = f"/api/v1/communities/{guild.id}/auth/role-rules"
+
+    ids = []
+    for group in ("staff", "crew"):
+        made = await client.post(
+            url,
+            headers=headers,
+            json={"provider_id": provider.id, "claim_value": group, "role_id": doors},
+        )
+        assert made.status_code == 201, made.text
+        ids.append(made.json()["id"])
+    # A sign-in matches a group whatever its capitals, so a rule does too.
+    again = await client.post(
+        url,
+        headers=headers,
+        json={"provider_id": provider.id, "claim_value": "Staff", "role_id": doors},
+    )
+    assert again.status_code == 409
+
+    ordered = await client.put(
+        f"{url}/order", headers=headers, json={"rule_ids": list(reversed(ids))}
+    )
+    assert ordered.status_code == 200, ordered.text
+    assert [r["claim_value"] for r in ordered.json()] == ["crew", "staff"]
+
+    await rules.put(
+        session,
+        SURFACE_CUSTOM_ROLES,
+        False,
+        guild_id=guild.id,
+        set_by=SetBy.deployment,
+    )
+    await session.commit()
+    closed = await client.delete(f"{url}/{ids[0]}", headers=headers)
+    assert closed.status_code == 403
+    assert closed.json()["detail"] == GuildMessages.COMMUNITY_SURFACE_CLOSED

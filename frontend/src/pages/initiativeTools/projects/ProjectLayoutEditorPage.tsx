@@ -56,6 +56,7 @@ export const ProjectLayoutEditorPage = () => {
       details={details}
       set={set}
       initialKind={layout}
+      ownPropertiesEditable={project.can.edit}
       onClose={() =>
         void navigate({
           to: gp(`${toolSettingsRoute(Tool.project, project.initiative_id, project.id)}/layouts`),

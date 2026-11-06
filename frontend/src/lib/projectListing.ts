@@ -12,10 +12,12 @@
  */
 
 import type {
+  CounterSettingsOutput,
+  CurrencyCode,
+  MetadataType,
   PropertyDefinitionRead,
   PropertyOption,
   PropertySummary,
-  PropertyType,
   RecurrenceStrategy,
   TaskListRead,
   TaskPriority,
@@ -24,7 +26,6 @@ import type {
   TaskTypeRead,
 } from "@/api/generated/initiativeAPI.schemas";
 import { defaultsForCategory } from "@/lib/taskStatusDefaults";
-import { markdownExcerpt } from "@/lib/text";
 
 export interface ProjectListingStatus {
   name: string;
@@ -37,7 +38,7 @@ export interface ProjectListingStatus {
 
 export interface ProjectListingPropertyValue {
   property_name: string;
-  property_type: PropertyType;
+  property_type: MetadataType;
   value_text?: string | null;
   value_number?: number | null;
   value_boolean?: boolean | null;
@@ -46,10 +47,12 @@ export interface ProjectListingPropertyValue {
 
 export interface ProjectListingPropertyDefinition {
   name: string;
-  type: PropertyType;
+  type: MetadataType;
   position: number;
   color?: string | null;
   options?: PropertyOption[] | null;
+  currency?: CurrencyCode | null;
+  counter?: CounterSettingsOutput | null;
 }
 
 export interface ProjectListingTask {
@@ -217,6 +220,10 @@ export const projectListingBoard = (
       position: definition.position,
       color: definition.color ?? null,
       options: definition.options ?? null,
+      currency: definition.currency ?? null,
+      counter: definition.counter ?? null,
+      project_id: null,
+      collection_id: null,
       created_at: "",
       updated_at: "",
     })
@@ -230,7 +237,13 @@ export const projectListingBoard = (
         property_id: definition.id,
         name: definition.name,
         type: definition.type,
+        project_id: null,
+        collection_id: null,
+        install_id: null,
+        key: null,
         options: definition.options,
+        currency: definition.currency,
+        counter: definition.counter,
         value: DATE_PROPERTY_TYPES.has(value.property_type)
           ? shifted(value.value_text, shift)
           : (value.value_text ?? value.value_number ?? value.value_boolean ?? value.value_json),
@@ -264,7 +277,8 @@ export const projectListingBoard = (
       recurrence_anchor: shifted(task.recurrence_anchor, shift),
       recurrence_anchor_count: task.recurrence_anchor_count ?? 0,
       recurrence_until: null,
-      description_excerpt: task.description ? markdownExcerpt(task.description) : null,
+      // A list row's excerpt is the server's, and a listing has none.
+      description_excerpt: null,
       has_description: Boolean(task.description),
       task_status_id: status.id,
       task_status: status,
@@ -290,7 +304,6 @@ export const projectListingBoard = (
       // A tag chip opens the community's own tag, and a listing's has none yet.
       tags: [],
       properties: task.properties.flatMap(summaryOf),
-      plugin_values: [],
     });
   });
   for (const tasks of Object.values(groupedTasks)) tasks.sort((a, b) => a.position - b.position);

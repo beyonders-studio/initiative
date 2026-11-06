@@ -10,9 +10,12 @@
   "columns": {
     "owner": "Propriétaire",
     "type": "Type",
+    "created": "Créé",
+    "added": "Ajouté",
     "community": "Communauté",
     "initiative": "Initiative",
-    "ownerFallback": "Utilisateur {{id}}"
+    "ownerFallback": "Utilisateur {{id}}",
+    "size": "Taille"
   },
   "create": {
     "title": "Nouveau fichier",
@@ -47,11 +50,11 @@
     "templateToggle": "Basculer le statut de modèle",
     "fileLabel": "Fichier",
     "dropPrompt": "Dépose un fichier ici, ou",
-    "fileHelp": "Formats supportés : PDF, Word, Excel, PowerPoint, TXT, HTML, images, Markdown (50 Mo max)",
-    "fileTooLarge": "Le fichier est trop volumineux. La taille maximale est de 50 Mo.",
+    "fileHelp": "Tout fichier sauf un programme. Un gros fichier reprend là où il s'était arrêté si la connexion est coupée.",
     "creating": "Création en cours…",
     "createFile": "Créer le fichier",
     "uploadingFile": "Téléchargement en cours…",
+    "uploadingProgress": "Téléchargement en cours… {{percent}}",
     "uploadFile": "Télécharger le fichier",
     "createdAttached": "Fichier créé et attaché.",
     "created": "Fichier créé.",
@@ -103,9 +106,16 @@
   "featuredImage": {
     "label": "Image à la une",
     "upload": "Téléverser une image",
+    "fromFiles": "Depuis Fichiers",
     "replace": "Remplacer",
     "remove": "Retirer",
     "uploading": "Téléversement en cours…"
+  },
+  "imageChooser": {
+    "title": "Choisir une image dans Fichiers",
+    "description": "Elle est insérée telle qu’elle est maintenant : une version plus récente du fichier ne la change pas.",
+    "none": "Aucune image ici.",
+    "more": "Afficher plus"
   },
   "outline": {
     "show": "Afficher le sommaire",
@@ -121,9 +131,6 @@
     "updateAccessError": "Impossible de mettre à jour l'accès",
     "dangerDescription": "Les fichiers supprimés vont à la corbeille et peuvent être restaurés avant la fin de la période de rétention de la communauté.",
     "deleting": "Suppression en cours…"
-  },
-  "sidePanel": {
-    "summaryTab": "Résumé"
   },
   "smartLink": {
     "missingUrl": "Ce lien intelligent n'a pas d'URL.",
@@ -296,15 +303,6 @@
       "replaced_other": "{{count}} cellules remplacées"
     }
   },
-  "summary": {
-    "aiNotEnabled": "Les fonctionnalités IA ne sont pas activées. Configurez les paramètres IA pour générer des résumés de fichiers.",
-    "generateDescription": "Générer un résumé alimenté par l'IA pour ce fichier.",
-    "generateButton": "Générer un résumé",
-    "generateError": "Échec de la génération du résumé. Veuillez réessayer.",
-    "generating": "Génération du résumé…",
-    "copy": "Copier le résumé",
-    "regenerate": "Régénérer le résumé"
-  },
   "type": {
     "template": "Modèle",
     "file": "Fichier"
@@ -322,6 +320,26 @@
     "deleteSuccess": "Version supprimée",
     "uploadError": "Échec du téléversement de la nouvelle version",
     "deleteError": "Échec de la suppression de la version"
+  },
+  "convert": {
+    "edit": "Modifier",
+    "title": "Convertir pour modifier ?",
+    "toSheet": {
+      "xlsx": "Il devient une feuille de calcul que vous pouvez modifier ici. Ses feuilles, valeurs, formules, remplissages, bordures et formats de nombre sont conservés ; les graphiques, images et macros ne le sont pas.",
+      "ods": "Il devient une feuille de calcul que vous pouvez modifier ici. Ses feuilles, valeurs et formules sont conservées ; la mise en forme ne l'est pas.",
+      "values": "Il devient une feuille de calcul que vous pouvez modifier ici. Ses feuilles et ses valeurs sont conservées. Les formules deviennent les valeurs qu'elles affichent, et la mise en forme n'est pas conservée.",
+      "table": "Il devient une feuille de calcul que vous pouvez modifier ici, ses lignes et colonnes formant une seule feuille."
+    },
+    "toDocument": {
+      "markdown": "Il devient un document que vous pouvez modifier ici. Les titres, listes, tableaux, liens et la mise en forme du texte sont conservés.",
+      "text": "Il devient un document que vous pouvez modifier ici, son texte en paragraphes.",
+      "word": "Il devient un document que vous pouvez modifier ici. Les titres, la mise en forme du texte, les listes, les tableaux, les liens et les images sont conservés. La mise en page, les en-têtes et pieds de page, les notes de bas de page, les commentaires et les zones de texte ne le sont pas, et les modifications suivies arrivent acceptées."
+    },
+    "replaces": "Le fichier téléversé et ses versions précédentes sont remplacés. L'export vous redonne un fichier quand vous en avez besoin.",
+    "confirm": "Convertir",
+    "converting": "Conversion…",
+    "success": "Converti. Vous pouvez le modifier.",
+    "error": "Impossible de convertir ce fichier."
   },
   "viewer": {
     "loadError": "Impossible de charger le fichier",
@@ -341,6 +359,8 @@
     "unknownFileType": "Ce type de fichier ne peut pas être prévisualisé dans le navigateur.",
     "downloadFile": "Télécharger le fichier",
     "image": "Image",
+    "video": "Vidéo",
+    "audio": "Audio",
     "markdownDocument": "Document Markdown",
     "showSource": "Voir la source",
     "showRendered": "Voir le rendu"
@@ -362,12 +382,124 @@
     "noMatchingFiles": "Aucun fichier ne correspond à vos filtres.",
     "type": "Filtrer par type",
     "allTypes": "Tous les types",
-    "types": {
-      "native": "Document texte",
-      "file": "Fichier",
+    "kinds": {
+      "document": "Document",
+      "spreadsheet": "Feuille de calcul",
+      "presentation": "Présentation",
       "whiteboard": "Tableau blanc",
-      "smart_link": "Lien intelligent",
-      "spreadsheet": "Feuille de calcul"
+      "pdf": "PDF",
+      "image": "Image",
+      "video": "Vidéo",
+      "audio": "Audio",
+      "text": "Texte",
+      "compressed": "Compressé",
+      "design": "Design",
+      "3d": "3D",
+      "font": "Police",
+      "raw": "Photo RAW",
+      "code": "Code",
+      "ebook": "Livre numérique",
+      "cad": "CAO",
+      "link": "Lien",
+      "other": "Autre"
+    }
+  },
+  "collections": {
+    "heading": "Collections",
+    "fileCount_one": "{{count}} fichier",
+    "fileCount_other": "{{count}} fichiers",
+    "addTo": "Ajouter à une collection",
+    "addToDescription_one": "Placez ce fichier dans une collection. Il reste dans Fichiers, et qui peut l’ouvrir ne change pas.",
+    "addToDescription_other": "Placez ces {{count}} fichiers dans une collection. Ils restent dans Fichiers, et qui peut les ouvrir ne change pas.",
+    "noneToAddTo": "Aucune collection à laquelle ajouter pour l’instant. Nommez-en une nouvelle ci-dessous.",
+    "namePlaceholder": "Nom de la nouvelle collection",
+    "addToNew": "Ajouter à une nouvelle collection",
+    "added_one": "Ajouté à {{name}}",
+    "added_other": "{{count}} fichiers ajoutés à {{name}}",
+    "created": "{{name}} créée",
+    "addFiles": "Ajouter des fichiers",
+    "pickFile": "Quel fichier ?",
+    "noFilesToAdd": "Aucun fichier à ajouter",
+    "fileAdded": "Fichier ajouté à la collection",
+    "uploadFiles": "Envoyer des fichiers",
+    "dropPrompt": "Déposez des fichiers pour les envoyer dans cette collection",
+    "removeFrom": "Retirer de la collection",
+    "removed_one": "{{count}} fichier retiré de la collection",
+    "removed_other": "{{count}} fichiers retirés de la collection",
+    "emptied": "Son dernier fichier en est sorti, la collection est donc passée à la corbeille",
+    "trash": "Mettre à la corbeille",
+    "trashTitle": "Mettre cette collection à la corbeille ?",
+    "trashDescription": "Ses fichiers restent où ils sont. Elle peut être restaurée depuis la corbeille avant la fin de la période de conservation.",
+    "trashed": "Collection mise à la corbeille",
+    "noFiles": "Aucun fichier dans cette collection pour l’instant",
+    "noFilesDescription": "Ajoutez des fichiers de cette initiative, ou déposez des fichiers n’importe où sur cette page pour les envoyer.",
+    "loadingFiles": "Chargement des fichiers...",
+    "openFile": "Ouvrir le fichier",
+    "filter": "Collection",
+    "anyCollection": "Toutes les collections",
+    "groupByTag": "Grouper par étiquette",
+    "order": "Ordre",
+    "newestFirst": "Plus récents d’abord",
+    "oldestFirst": "Plus anciens d’abord",
+    "views": {
+      "label": "Vue",
+      "masonry": "Mosaïque",
+      "timeline": "Chronologie"
+    },
+    "groups": {
+      "untagged": "Sans étiquette",
+      "count_one": "{{count}} fichier",
+      "count_other": "{{count}} fichiers"
+    },
+    "upload": {
+      "progress": "Envoi de {{done}} sur {{total}}...",
+      "finished_one": "{{count}} fichier ajouté",
+      "finished_other": "{{count}} fichiers ajoutés",
+      "finishedWithFailures": "{{done}} ajoutés, {{failed}} en échec",
+      "dismiss": "Fermer",
+      "tooLarge": "plus volumineux que ce que ce serveur accepte"
+    },
+    "backToFiles": "Retour aux fichiers",
+    "notFound": "Collection introuvable",
+    "notFoundDescription": "La collection que vous cherchez n’existe pas, ou aucun de ses fichiers ne vous est accessible.",
+    "noAccess": "Accès refusé",
+    "noAccessDescription": "Vous n’avez pas la permission de voir cette collection.",
+    "error": "Impossible de modifier la collection",
+    "properties": {
+      "description": "Ce que chaque fichier de cette collection peut porter ici : ses valeurs appartiennent à la collection, pas au fichier.",
+      "create": "Nouvelle propriété",
+      "edit": "Modifier la propriété",
+      "delete": "Supprimer la propriété",
+      "deleteTitle": "Supprimer cette propriété ?",
+      "deleteBody": "La propriété et la valeur de chaque fichier dans cette collection seront supprimées.",
+      "none": "Aucune propriété pour l'instant",
+      "heading": "Dans cette collection",
+      "saveError": "Impossible d'enregistrer la valeur",
+      "of": "Propriétés de {{name}}"
+    },
+    "addedOn": "Ajouté {{date}}",
+    "createdOn": "Créé {{date}}",
+    "listHelp": {
+      "masonry": "Chaque fichier dans sa propre forme, rangé en colonnes : ce que sa carte montre sous l'image.",
+      "grid": "Chaque fichier en vignette carrée : ce que sa carte montre sous l'image.",
+      "timeline": "Les fichiers selon le jour où ils ont été ajoutés : ce que chaque carte montre sous l'image.",
+      "table": "Les fichiers de la collection en tableau : quelles colonnes, dans quel ordre."
+    },
+    "shapes": {
+      "name": "Nom",
+      "blank": "Vierge",
+      "blankHint": "Une grille et un tableau, sans propriétés propres pour l'instant.",
+      "lists": "Affiche {{lists}}",
+      "properties": "Propriétés : {{properties}}",
+      "copyLabel": "Ou copier la forme de",
+      "copyPlaceholder": "Une autre collection",
+      "copyHint": "Ses propriétés et ce que montrent ses listes, sans ses fichiers ni leurs valeurs.",
+      "create": "Créer la collection"
+    },
+    "required": {
+      "title": "Ce que demande {{name}}",
+      "description": "Chaque fichier ajouté à cette collection commence avec ces valeurs.",
+      "confirm": "Continuer"
     }
   }
 }

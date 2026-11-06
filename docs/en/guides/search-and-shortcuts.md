@@ -20,8 +20,8 @@ Arrow keys move through results. ++enter++ jumps. For more than a quick jump, hi
 
 Everything in the community you're in:
 
-- **Tools** — projects, queues, counter groups, calendars, dashboards, posts, galleries, wikis.
-- **What's inside them** — tasks, queue items, counters, calendar events, pictures, wiki pages.
+- **Tools** — projects, counter groups, calendars, dashboards, posts, wikis, contacts, and the collections in Files.
+- **What's inside them** — tasks, counters, calendar events, pictures, wiki pages.
 - **Files, and their actual contents.** Not just titles: the words inside a text document, the text on a whiteboard, the cells and sheet names in a spreadsheet.
 - **Comments** on any of the above.
 - **Tags** and **people**. Search for somebody's display name or handle and you also find what mentions them — type it in whole words.

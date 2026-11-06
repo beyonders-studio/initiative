@@ -33,10 +33,10 @@ describe("what a # in a document matches", () => {
 
 describe("what the menu is allowed to offer", () => {
   it("narrows to the kind asked for, not the kind asked for a keystroke ago", () => {
-    // `#task:` names one kind, so a queue left on screen from `#ven` is not
+    // `#task:` names one kind, so a wiki left on screen from `#ven` is not
     // something Enter can land on.
     const stale = [
-      { entity_type: SearchEntityType.queue, entity_id: 1, title: "Vendors" },
+      { entity_type: SearchEntityType.wiki, entity_id: 1, title: "Vendors" },
       { entity_type: SearchEntityType.task, entity_id: 2, title: "Vendor call" },
     ];
     const wanted = activeMention("#task:ven")?.types;

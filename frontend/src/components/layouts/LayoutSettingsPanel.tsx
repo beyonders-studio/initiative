@@ -1,9 +1,20 @@
+import { Link } from "@tanstack/react-router";
 import { EyeClosed } from "lucide-react";
 import { type ReactNode, useEffect, useRef, useState } from "react";
 import { useTranslation } from "react-i18next";
 
-import type { TaskStatusRead, TaskTypeRead } from "@/api/generated/initiativeAPI.schemas";
+import {
+  MetadataType,
+  type TaskStatusRead,
+  type TaskTypeRead,
+} from "@/api/generated/initiativeAPI.schemas";
+import { InitiativeSettingsPropertiesTab } from "@/components/initiatives/settings/InitiativeSettingsPropertiesTab";
 import { listLayoutLooks } from "@/components/projects/projectTasksConfig";
+import {
+  COUNTER_DISPLAYS,
+  type FieldDisplay,
+  SCALE_DISPLAYS,
+} from "@/components/properties/propertyHelpers";
 import { TaskStatusOption } from "@/components/tasks/TaskStatusOption";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -17,6 +28,9 @@ import {
 } from "@/components/ui/select";
 import { Switch } from "@/components/ui/switch";
 import { MAX_COLUMN_LIMIT } from "@/hooks/useColumnLimits";
+import type { MetadataOwner } from "@/hooks/useProperties";
+import { useCommunityPath } from "@/lib/communityUrl";
+import { listFormat } from "@/lib/intl";
 import { LAYOUT_REGIONS } from "@/lib/layouts/detailLayout";
 import {
   cardOf,
@@ -29,6 +43,7 @@ import {
 } from "@/lib/layouts/draft";
 import { type FieldDef, LAYOUT_NAMESPACES } from "@/lib/layouts/fields";
 import type { LayoutNode } from "@/lib/layouts/tree";
+import { initiativeRoute } from "@/lib/tools";
 import type { TranslateFn } from "@/types/i18n";
 
 import type { EditableDetail } from "./details";
@@ -56,7 +71,9 @@ export const ListLayoutSettings = ({
   locked,
 }: {
   layout: ListLayout;
-  presets: EditablePresets;
+  /** The presets it offers, and the groupings with them; a list of files
+   *  offers neither. */
+  presets?: EditablePresets;
   /** The project's statuses, whose board columns can be limited. */
   statuses?: TaskStatusRead[];
   /** What the list is, as a key in `projects`. */
@@ -76,6 +93,20 @@ export const ListLayoutSettings = ({
 }) => {
   const { t } = useTranslation(LAYOUT_NAMESPACES);
   const translate = t as TranslateFn;
+  // The field selected, as a column or a part of the card.
+  const selectedField =
+    selection.kind === "column"
+      ? selection.field
+      : selection.kind === "part"
+        ? (() => {
+            const node = nodeAt(cardOf(layout.definition, fields, layout.shape), selection.path);
+            return node?.type === "field" ? String(node.props?.field) : null;
+          })()
+        : null;
+  // A scale or a counter selected, which the list may draw in more than one way.
+  const drawnType = selectedField !== null ? fields.get(selectedField)?.property?.type : undefined;
+  const drawn =
+    drawnType === MetadataType.scale || drawnType === MetadataType.counter ? drawnType : null;
   return (
     // Disabled as one, so a save under way leaves every control as it was.
     <fieldset disabled={locked} className="min-w-0">
@@ -109,9 +140,13 @@ export const ListLayoutSettings = ({
               />
             </div>
           ) : null}
-          <LayoutPresets layout={layout} of={presets} fields={fields} edits={edits} />
-          {layout.kind !== "calendar" ? (
-            <LayoutGroupings layout={layout} fields={fields} edits={edits} />
+          {presets ? (
+            <>
+              <LayoutPresets layout={layout} of={presets} fields={fields} edits={edits} />
+              {layout.kind !== "calendar" ? (
+                <LayoutGroupings layout={layout} fields={fields} edits={edits} />
+              ) : null}
+            </>
           ) : null}
           {layout.kind === "board" && statuses ? (
             <ColumnLimits layout={layout} statuses={statuses} edits={edits} />
@@ -122,13 +157,93 @@ export const ListLayoutSettings = ({
         <ColumnSettings field={selection.field} fields={fields} edits={edits} />
       ) : (
         <PartSettings
-          tree={cardOf(layout.definition, fields)}
+          tree={cardOf(layout.definition, fields, layout.shape)}
           path={selection.path}
           fields={fields}
           edits={edits}
         />
       )}
+      {selectedField !== null && drawn !== null ? (
+        <DisplaySetting
+          type={drawn}
+          value={layout.definition.displays?.[selectedField] ?? "number"}
+          onChange={(display) => edits.changeDisplay(selectedField, display)}
+        />
+      ) : null}
+      {selectedField !== null ? <MetadataFieldNote field={selectedField} fields={fields} /> : null}
     </fieldset>
+  );
+};
+
+/** Where the initiative's metadata a selected field shows is edited: the
+ *  initiative's settings, which this links to. The target's own properties
+ *  are managed in its properties panel. */
+const MetadataFieldNote = ({
+  field,
+  fields,
+}: {
+  field: string;
+  fields: ReadonlyMap<string, FieldDef>;
+}) => {
+  const { t } = useTranslation(["layouts"]);
+  const gp = useCommunityPath();
+  const definition = fields.get(field)?.property;
+  if (!definition || definition.project_id !== null || definition.collection_id !== null) {
+    return null;
+  }
+  return (
+    <Panel heading={t("layouts:fieldProperty.metadata")}>
+      <p className="text-muted-foreground text-sm">{t("layouts:fieldProperty.metadataHelp")}</p>
+      <Button type="button" variant="outline" size="sm" asChild>
+        <Link to={gp(`${initiativeRoute(definition.initiative_id)}/settings/properties`)}>
+          {t("layouts:fieldProperty.openSettings")}
+        </Link>
+      </Button>
+    </Panel>
+  );
+};
+
+/** How the list draws the scale or counter selected: a scale as a number,
+ *  five stars or a bar; a counter as a number, a bar or a clock. */
+const DisplaySetting = ({
+  type,
+  value,
+  onChange,
+}: {
+  type: typeof MetadataType.scale | typeof MetadataType.counter;
+  value: FieldDisplay;
+  onChange: (display: FieldDisplay) => void;
+}) => {
+  const { t } = useTranslation(["layouts"]);
+  const [label, offered] =
+    type === MetadataType.scale
+      ? [
+          t("layouts:scaleDisplay.label"),
+          SCALE_DISPLAYS.map((display) => [display, t(`layouts:scaleDisplay.${display}`)]),
+        ]
+      : [
+          t("layouts:counterDisplay.label"),
+          COUNTER_DISPLAYS.map((display) => [display, t(`layouts:counterDisplay.${display}`)]),
+        ];
+  return (
+    <div className="space-y-2 px-4 pb-4">
+      <Label htmlFor="field-display">{label}</Label>
+      <Select
+        value={offered.some(([display]) => display === value) ? value : "number"}
+        onValueChange={(next) => onChange(next as FieldDisplay)}
+      >
+        <SelectTrigger id="field-display">
+          <SelectValue />
+        </SelectTrigger>
+        <SelectContent>
+          {offered.map(([display, name]) => (
+            <SelectItem key={display} value={display}>
+              {name}
+            </SelectItem>
+          ))}
+        </SelectContent>
+      </Select>
+    </div>
   );
 };
 
@@ -251,10 +366,16 @@ export const DetailLayoutSettings = ({
 }) => {
   const { t } = useTranslation(LAYOUT_NAMESPACES);
   const translate = t as TranslateFn;
+  const node = selection.kind === "part" ? nodeAt(detail, selection.path) : undefined;
   return (
     <fieldset disabled={locked} className="min-w-0">
       {selection.kind === "part" ? (
-        <PartSettings tree={detail} path={selection.path} fields={fields} edits={edits} on={of} />
+        <>
+          <PartSettings tree={detail} path={selection.path} fields={fields} edits={edits} on={of} />
+          {node?.type === "field" ? (
+            <MetadataFieldNote field={String(node.props?.field)} fields={fields} />
+          ) : null}
+        </>
       ) : (
         <Panel heading={translate(of.words.name)}>
           <p className="text-muted-foreground text-sm">{translate(of.words.help)}</p>
@@ -262,6 +383,42 @@ export const DetailLayoutSettings = ({
         </Panel>
       )}
     </fieldset>
+  );
+};
+
+/** The target's own properties, managed beside its layouts: each with the
+ *  layouts that show it, as `shownOn` names them. */
+export const LayoutProperties = ({
+  initiativeId,
+  owner,
+  canManage,
+  shownOn,
+}: {
+  initiativeId: number;
+  owner: MetadataOwner;
+  /** Whether the request may make, edit and delete them: the server's
+   *  answer on the owner. */
+  canManage: boolean;
+  shownOn: (propertyId: number) => string[];
+}) => {
+  const { t, i18n } = useTranslation(["layouts"]);
+  return (
+    <Panel heading={t("layouts:properties")}>
+      <InitiativeSettingsPropertiesTab
+        initiativeId={initiativeId}
+        owner={owner}
+        canManage={canManage}
+        placement={(definition) => {
+          const names = shownOn(definition.id);
+          return names.length > 0
+            ? t("layouts:propertiesShownOn", {
+                layouts: listFormat(i18n.language).format(names),
+              })
+            : t("layouts:propertiesNowhere");
+        }}
+      />
+      <p className="text-muted-foreground text-xs">{t("layouts:propertiesPlacementHelp")}</p>
+    </Panel>
   );
 };
 

@@ -8,14 +8,13 @@
     "projects": "Proyectos",
     "tasks": "Tareas",
     "files": "Archivos",
-    "queues": "Colas",
     "counterGroups": "Grupos de contadores",
     "calendars": "Calendarios",
     "dashboards": "Paneles",
     "results": "Resultados",
     "posts": "Publicaciones",
-    "galleries": "Galerías",
-    "wikis": "Wikis"
+    "wikis": "Wikis",
+    "contacts": "Contactos"
   },
   "actions": {
     "addTask": "Agregar tarea",

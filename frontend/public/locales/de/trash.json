@@ -25,17 +25,15 @@
     "comment": "Kommentar",
     "initiative": "Initiative",
     "tag": "Tag",
-    "queue": "Warteschlange",
-    "queue_item": "Warteschlangen-Eintrag",
     "calendar": "Kalender",
     "calendar_event": "Kalendertermin",
     "counter_group": "Zählergruppe",
     "counter": "Zähler",
     "dashboard": "Dashboard",
     "post": "Beitrag",
-    "gallery": "Galerie",
-    "gallery_image": "Bild",
     "wiki": "Wiki",
-    "wiki_page": "Seite"
+    "wiki_page": "Seite",
+    "contact": "Kontakt",
+    "collection": "Sammlung"
   }
 }

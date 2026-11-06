@@ -308,44 +308,6 @@ async def test_tabular_formats_skip_template_resolution():
     assert artifacts[0].content_type.startswith("text/csv")
 
 
-async def test_renders_markdown_numbered_layout():
-    """layout=numbered renders an ordered turn-order list — details from the
-    non-title columns, the ``current`` row bolded, ``order`` never doubled
-    into the detail trail."""
-    artifacts = await LocalRenderBackend().render(
-        _request(
-            format="md",
-            layout="numbered",
-            columns=[
-                {"key": "order", "label": "#"},
-                {"key": "title", "label": "Item"},
-                {"key": "member", "label": "Member"},
-                {"key": "status", "label": "Status"},
-            ],
-            rows=[
-                # member=None must be skipped BEFORE stringifying — str(None)
-                # passes a truthiness guard, and its empty rendering would
-                # add a spurious "( · Current)" to the detail trail.
-                {
-                    "order": 1,
-                    "title": "Alice | piped",
-                    "member": None,
-                    "status": "Current",
-                    "current": True,
-                },
-                {"order": 2, "title": "Bob", "member": "", "status": ""},
-                {"order": 3, "title": "", "member": None, "status": "Hidden"},
-            ],
-        )
-    )
-    text = artifacts[0].content.decode("utf-8")
-    lines = text.splitlines()
-    assert "1. **Alice \\| piped** (Current)" in lines
-    assert "2. Bob" in lines
-    assert "3. (untitled) (Hidden)" in lines
-    assert not any("---" in line for line in lines)  # no table separator
-
-
 async def test_data_table_template_renders_payload_columns():
     """The generic template's whole point: the column set (labels, order,
     numeric cells) comes from the payload, no bespoke .typ per source."""

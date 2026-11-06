@@ -20,7 +20,6 @@ from app.schemas.recurrence import OccurrenceScope, TaskRule, validate_task_recu
 from app.schemas.platform.access_grant import AccessGrantRead
 from app.schemas.platform.user import PersonShape, UserPublic
 from app.schemas.tenant.evidence import EvidenceRead
-from app.schemas.tenant.plugin_data import PluginValueSummary
 from app.schemas.tenant.initiative import InitiativeSummary
 from app.schemas.tenant.task_status import TaskStatusRead
 from app.schemas.tenant.task_type import TaskTypeRead
@@ -197,6 +196,9 @@ class TaskUpdate(PropertiesOnUpdate):
     tz: Optional[str] = Field(default=None, max_length=64)
     recurrence_strategy: Optional[RecurrenceStrategy] = None
     recurrence_limit: Optional[int] = Field(default=None, ge=1, le=24, strict=True)
+    #: ``properties`` writes only the values it names, leaving the rest: what
+    #: a change of type (or a move) sends for the fields the new page requires.
+    merge_properties: bool = False
     # PATCH semantics: None = "leave unchanged"; a list (incl. []) = replace-all.
     tag_ids: Optional[List[int]] = Field(default=None, max_length=100)
     checklist: Optional[List[ChecklistItemInput]] = None
@@ -224,6 +226,9 @@ class TaskUpdate(PropertiesOnUpdate):
 
 class TaskMoveRequest(SanitizedBaseModel):
     target_project_id: int = Field(gt=0)
+    #: Written to the task once it is in the destination, in the same
+    #: request: the fields its page there requires that it does not fill.
+    changes: Optional[TaskUpdate] = None
 
 
 class TaskProjectSummary(SanitizedBaseModel):
@@ -289,9 +294,6 @@ class TaskRead(TaskBase):
     subtask_progress: Optional[ChecklistProgress] = None
     tags: List[TagSummary] = []
     properties: List[PropertySummary] = []
-    #: The values installed plug-ins show on the task, from the installs on
-    #: and placed in its initiative.
-    plugin_values: List[PluginValueSummary] = []
 
 
 class TaskListRead(TaskBase):
@@ -350,9 +352,6 @@ class TaskListRead(TaskBase):
     subtask_progress: Optional[ChecklistProgress] = None
     tags: List[TagSummary] = []
     properties: List[PropertySummary] = []
-    #: The values installed plug-ins show on the task, from the installs on
-    #: and placed in its initiative.
-    plugin_values: List[PluginValueSummary] = []
 
 
 class ColumnFillRead(SanitizedBaseModel):

@@ -3,8 +3,8 @@ import { UserX } from "lucide-react";
 import { useTranslation } from "react-i18next";
 
 import { CommunityCard } from "@/components/communities/CommunityCard";
-import { ContactActionButtons } from "@/components/contacts/ContactActionButtons";
-import { ContactActionsMenu } from "@/components/contacts/ContactActionsMenu";
+import { ConnectionActionButtons } from "@/components/connections/ConnectionActionButtons";
+import { ConnectionActionsMenu } from "@/components/connections/ConnectionActionsMenu";
 import { ReportButton } from "@/components/moderation/ReportButton";
 import { PageBanner } from "@/components/PageBanner";
 import { StatusMessage } from "@/components/StatusMessage";
@@ -104,14 +104,14 @@ export const UserProfilePage = () => {
                 yourself. */}
             {mine ? null : (
               <div className="mb-1 flex items-center gap-2">
-                <ContactActionButtons
+                <ConnectionActionButtons
                   user={{
                     id: profile.id,
                     username: profile.username,
                     discriminator: profile.discriminator,
                   }}
                 />
-                <ContactActionsMenu
+                <ConnectionActionsMenu
                   omit={["profile", "message", "connect", "ask"]}
                   user={{
                     id: profile.id,

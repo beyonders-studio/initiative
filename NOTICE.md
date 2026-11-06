@@ -21,34 +21,6 @@ people who made them.
   megabytes, which is not a thing to send anybody for a profile banner.
 - **`banners/pets-fetch.svg`** — a public-domain drawing of a dog, on the black
   it was drawn on, baked to a banner-sized image.
-- **`trophies/heritage-fist.svg`** — the raised fist is *Raised fist
-  pictogram* from [Openclipart](https://openclipart.org/)
-  ([FreeSVG](https://freesvg.org/vector-image-of-raised-fist-pictogram)),
-  released to the public domain. Recoloured and placed on a disc; the outline
-  is unchanged.
-- **`trophies/faith-*.svg`** — the religious symbols are drawn from Wikimedia
-  Commons, all public domain, used as published and only recoloured and scaled
-  onto our disc:
-  [Christian cross](https://commons.wikimedia.org/wiki/File:Christian_cross.svg)
-  by **Boris23**,
-  [Star and Crescent](https://commons.wikimedia.org/wiki/File:Star_and_Crescent.svg)
-  by **Kbolino**,
-  [Star of David](https://commons.wikimedia.org/wiki/File:Star_of_David.svg)
-  by **Zscout370**,
-  [Om](https://commons.wikimedia.org/wiki/File:Om.svg) by **Kashmiri**,
-  [Dharmacakra](https://commons.wikimedia.org/wiki/File:Dharmacakra.svg)
-  by **Liebeskind**,
-  [Khanda](https://commons.wikimedia.org/wiki/File:Khanda.svg),
-  [Yin yang](https://commons.wikimedia.org/wiki/File:Yin_yang.svg)
-  by **Gregory Maxwell**,
-  [Bahai star](https://commons.wikimedia.org/wiki/File:Bahai_star.svg), and
-  [Ahimsa](https://commons.wikimedia.org/wiki/File:Ahimsa.svg). The same nine
-  stand in the `frames/faith-circle.svg` frame. The torii is ours.
-- **`trophies/flag-canada.svg`** — the maple leaf is
-  [*Maple Leaf*](https://commons.wikimedia.org/wiki/File:Maple_Leaf.svg) by
-  **Zscout370**, from Wikimedia Commons, public domain — the geometry from the
-  flag's own construction sheet, used verbatim and placed the way that sheet
-  places it. The disc and the bars are ours.
 - **`trophies/plants-morel.svg`** — the morel is *Morel* by **platzster**, from
   [Openclipart](https://openclipart.org/), released to the public domain. Only
   the disc behind it and its colour are ours. The same drawing stands in the
@@ -75,18 +47,6 @@ people who made them.
 - **`banners/books-meadow.svg`** — a public-domain Art Nouveau colour print,
   baked at banner size on card of about its own age; the light crossing it is
   ours.
-
-- **`trophies/firstnations-handprint.svg`** — the hand is
-  [Red hand](https://commons.wikimedia.org/wiki/File:Red_hand.svg) by
-  **mjchael**, from Wikimedia Commons.
-- **`trophies/disability-wheelchair.svg`** — the International Symbol of Access,
-  from [Wheelchair symbol](https://commons.wikimedia.org/wiki/File:Wheelchair_symbol.svg)
-  on Wikimedia Commons. Original design by Susanne Koefoed for Rehabilitation
-  International.
-- **`trophies/disability-chronicpain.svg`**, **`trophies/disability-mentalhealth.svg`**
-  — the awareness ribbon is
-  [Black ribbon](https://commons.wikimedia.org/wiki/File:Black_ribbon.svg) from
-  Wikimedia Commons, recoloured.
 
 Everything else under `frontend/public/decorations/` is original work for this
 project. Where a pack draws on a living design tradition, the manifest says so:

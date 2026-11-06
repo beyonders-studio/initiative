@@ -22,7 +22,6 @@ from app.testing import (
     create_guild,
     create_initiative,
     create_project,
-    create_queue,
     create_user,
 )
 from app.testing.schema_harness import route_session_to_guild
@@ -173,7 +172,7 @@ async def test_pam_read_grant_does_not_fault_legacy_isolation_tables(
 
     A grantee leaves ``current_guild_id`` unset, so a policy that casts it to
     int without a NULLIF guard raises ``invalid input syntax for type integer``
-    and faults the whole query (queues, counters, …). This guards migration
+    and faults the whole query (counters, …). This guards migration
     ``20260530_0095``.
     """
     owner = await create_user(session, email="owner4@example.com", role=UserRole.owner)
@@ -182,7 +181,6 @@ async def test_pam_read_grant_does_not_fault_legacy_isolation_tables(
     )
     guild = await create_guild(session, creator=owner)
     init = await create_initiative(session, guild, owner)
-    queue = await create_queue(session, init, owner, name="Ops Queue")
     cg = CounterGroup(
         initiative_id=init.id,
         name="Stats",
@@ -195,13 +193,7 @@ async def test_pam_read_grant_does_not_fault_legacy_isolation_tables(
     await create_access_grant(session, user=support, guild=guild)
     reader = await reading_as(support.id, guild.id)
 
-    # Each of these would raise InvalidTextRepresentationError pre-0095.
-    visible_q = (
-        await reader.exec(
-            text("SELECT id FROM queues WHERE id = :q"), params={"q": queue.id}
-        )
-    ).all()
-    assert len(visible_q) == 1, "read grant should see the granted guild's queues"
+    # This would raise InvalidTextRepresentationError pre-0095.
     visible_cg = (
         await reader.exec(
             text("SELECT id FROM counter_groups WHERE id = :c"), params={"c": cg.id}

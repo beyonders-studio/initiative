@@ -152,21 +152,15 @@ async def test_a_document_with_no_content_starts_with_an_empty_paragraph():
 
 
 async def test_legacy_nodes_come_back_as_the_browser_shows_them():
-    wikilink = {
-        **_text("A page nobody wrote"),
-        "type": "wikilink",
-        "documentId": None,
-        "documentTitle": "A page nobody wrote",
-    }
     hashtag = {**_text("#idea"), "type": "hashtag"}
 
     rendered = await editor_engine.render(
-        await editor_engine.bootstrap(_document(_paragraph(wikilink, hashtag)))
+        await editor_engine.bootstrap(_document(_paragraph(_text("An "), hashtag)))
     )
 
     (paragraph,) = rendered["root"]["children"]
     assert [node["type"] for node in paragraph["children"]] == ["text"]
-    assert paragraph["children"][0]["text"] == "A page nobody wrote#idea"
+    assert paragraph["children"][0]["text"] == "An #idea"
 
 
 def _merged(*updates: bytes) -> bytes:
@@ -272,14 +266,15 @@ async def test_a_long_document_keeps_its_blocks_when_one_is_added():
 
 
 async def test_content_the_editor_refuses_is_an_error():
-    with pytest.raises(EditorError):
+    # The error names what the editor refused, not something it lacked.
+    with pytest.raises(EditorError, match="no-such-node"):
         await editor_engine.bootstrap(_document({"type": "no-such-node", "version": 1}))
 
 
 async def test_an_edit_the_editor_refuses_is_an_error():
     state = await editor_engine.bootstrap(_paragraphs("A"))
 
-    with pytest.raises(EditorError):
+    with pytest.raises(EditorError, match="no-such-node"):
         await editor_engine.apply(
             state, _document({"type": "no-such-node", "version": 1})
         )

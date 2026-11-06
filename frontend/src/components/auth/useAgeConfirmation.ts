@@ -41,7 +41,7 @@ export const useAgeConfirmation = (onConfirmed?: () => void) => {
       // all are all different now. Anything holding the old answer is dropped,
       // so the surface that asked shows what the answer opened instead of
       // needing a reload to notice.
-      await invalidate(q.dmSettings(), q.contacts(), q.contactGrants());
+      await invalidate(q.dmSettings(), q.people(), q.contactGrants());
       setBirthdate("");
       onConfirmed?.();
     } catch (err) {

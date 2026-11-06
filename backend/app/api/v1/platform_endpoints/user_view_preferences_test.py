@@ -101,6 +101,26 @@ async def test_scope_key_pattern_rejects_invalid(
         )
 
 
+async def test_a_communitys_view_is_not_kept_with_the_account(
+    client: AsyncClient, session: AsyncSession
+):
+    user = await create_user(session)
+    headers = get_auth_headers(user)
+    refused = await client.put(
+        "/api/v1/user-view-preferences/view:5:project:12",
+        headers=headers,
+        json={"value": {}},
+    )
+    assert refused.status_code == 400
+    assert refused.json()["detail"] == "VIEW_KEPT_IN_THE_COMMUNITY"
+    kept = await client.put(
+        "/api/v1/user-view-preferences/view:me:tasks",
+        headers=headers,
+        json={"value": {}},
+    )
+    assert kept.status_code == 204
+
+
 async def test_scope_key_length_cap(client: AsyncClient, session: AsyncSession):
     user = await create_user(session)
     too_long = "x" * 129  # MAX is 128

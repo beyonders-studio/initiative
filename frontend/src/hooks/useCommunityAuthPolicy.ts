@@ -14,14 +14,19 @@ import {
 import {
   createCommunityClaimRule,
   createCommunityProviderConnection,
+  createCustomRoleClaimRule,
   deleteCommunityClaimRule,
   deleteCommunityProviderConnection,
+  deleteCustomRoleClaimRule,
   getListCommunityClaimRulesQueryKey,
   getListCommunityProviderConnectionsQueryKey,
   getListConnectableProvidersQueryKey,
+  getListCustomRoleClaimRulesQueryKey,
   listCommunityClaimRules,
   listCommunityProviderConnections,
   listConnectableProviders,
+  listCustomRoleClaimRules,
+  orderCustomRoleClaimRules,
   updateCommunityProviderConnection,
 } from "@/api/generated/community-provider-connections/community-provider-connections";
 import type {
@@ -33,6 +38,8 @@ import type {
   CommunityProviderConnectionRead,
   CommunityProviderConnectionUpdate,
   ConnectableProviderRead,
+  CustomRoleClaimRuleCreate,
+  CustomRoleClaimRuleRead,
   LoginProvidersResponse,
 } from "@/api/generated/initiativeAPI.schemas";
 import type { QueryOpts } from "@/types/query";
@@ -217,6 +224,55 @@ export const useDeleteClaimRule = (communityId: number) => {
   const invalidate = useInvalidateClaimRules(communityId);
   return useMutation({
     mutationFn: (ruleId: number) => deleteCommunityClaimRule(communityId, ruleId),
+    onSuccess: invalidate,
+  });
+};
+
+/** Which custom role each group gives, in the order a sign-in reads them. */
+export const useCustomRoleClaimRules = (
+  communityId: number,
+  options?: QueryOpts<CustomRoleClaimRuleRead[]>
+) => {
+  return useQuery<CustomRoleClaimRuleRead[]>({
+    queryKey: getListCustomRoleClaimRulesQueryKey(communityId),
+    queryFn: () => listCustomRoleClaimRules(communityId),
+    enabled: communityId > 0,
+    ...options,
+  });
+};
+
+/** Refetch the rules. Returned, so a mutation stays pending until the new
+ *  order is in and the next move is built from it. */
+const useInvalidateCustomRoleClaimRules = (communityId: number) => {
+  const queryClient = useQueryClient();
+  return () =>
+    queryClient.invalidateQueries({
+      queryKey: getListCustomRoleClaimRulesQueryKey(communityId),
+    });
+};
+
+export const useCreateCustomRoleClaimRule = (communityId: number) => {
+  const invalidate = useInvalidateCustomRoleClaimRules(communityId);
+  return useMutation({
+    mutationFn: (data: CustomRoleClaimRuleCreate) => createCustomRoleClaimRule(communityId, data),
+    onSuccess: invalidate,
+  });
+};
+
+/** Put the rules in a new order: every rule's id, once. */
+export const useOrderCustomRoleClaimRules = (communityId: number) => {
+  const invalidate = useInvalidateCustomRoleClaimRules(communityId);
+  return useMutation({
+    mutationFn: (ruleIds: number[]) =>
+      orderCustomRoleClaimRules(communityId, { rule_ids: ruleIds }),
+    onSuccess: invalidate,
+  });
+};
+
+export const useDeleteCustomRoleClaimRule = (communityId: number) => {
+  const invalidate = useInvalidateCustomRoleClaimRules(communityId);
+  return useMutation({
+    mutationFn: (ruleId: number) => deleteCustomRoleClaimRule(communityId, ruleId),
     onSuccess: invalidate,
   });
 };

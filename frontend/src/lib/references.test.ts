@@ -18,14 +18,16 @@ describe("what [[ ]] can reach", () => {
   });
 
   it("leaves out a tool this initiative switched off", () => {
-    const types = linkableToolTypes(enabled({ queues_enabled: false }));
-    expect(types).not.toContain(SearchEntityType.queue);
+    const types = linkableToolTypes(enabled({ counter_groups_enabled: false }));
+    expect(types).not.toContain(SearchEntityType.counter_group);
     // The rest are untouched.
     expect(types).toContain(SearchEntityType.calendar);
   });
 
   it("keeps the core tools, which have no switch to turn off", () => {
-    const types = linkableToolTypes(enabled({ queues_enabled: false, calendars_enabled: false }));
+    const types = linkableToolTypes(
+      enabled({ counter_groups_enabled: false, calendars_enabled: false })
+    );
     expect(types).toContain(SearchEntityType.project);
     expect(types).toContain(SearchEntityType.file);
   });
@@ -42,8 +44,8 @@ describe("what [[ ]] can reach", () => {
 
 describe("what [[ ]] can create", () => {
   it("will not put back a tool the initiative turned off", () => {
-    const initiative = enabled({ queues_enabled: false });
-    expect(isCreatableFromName(SearchEntityType.queue, initiative)).toBe(false);
+    const initiative = enabled({ counter_groups_enabled: false });
+    expect(isCreatableFromName(SearchEntityType.counter_group, initiative)).toBe(false);
     expect(isCreatableFromName(SearchEntityType.file, initiative)).toBe(true);
   });
 

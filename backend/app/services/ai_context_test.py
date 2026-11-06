@@ -6,7 +6,7 @@ from datetime import datetime, timezone
 from app.core.relationships import RelationshipType
 from app.core.search import SearchEntityType
 from app.models.platform.guild import CommunityRole
-from app.models.tenant.property import PropertyType
+from app.models.tenant.metadata import MetadataType
 from app.models.tenant.task import TaskStatusCategory
 from app.services import ai_context
 from app.services.tenant import task_queries
@@ -52,7 +52,7 @@ async def test_a_task_is_told_with_its_links_and_newest_comments(
         session,
         a.initiative,
         name="Sign-off",
-        type=PropertyType.select,
+        type=MetadataType.select,
         options=[{"value": "legal", "label": "Requires legal approval"}],
     )
     await create_property_value(session, task, sign_off, value_text="legal")

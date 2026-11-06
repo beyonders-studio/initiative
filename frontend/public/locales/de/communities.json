@@ -162,12 +162,14 @@
     "communityRole": {
       "admin": "Administrator",
       "member": "Mitglied",
-      "superadmin": "Superadmin"
+      "superadmin": "Superadmin",
+      "guest": "Gast"
     },
     "communityRoleHelp": {
       "member": "Nimmt an dem teil, wozu die Person hinzugefügt wurde.",
       "admin": "Führt die Community — Mitglieder, Einladungen, Initiativen, Einstellungen.",
-      "superadmin": "All das, plus wie Leute hereinkommen: Anmeldung, KI und Plug-ins. Nur ein Superadmin kann einen weiteren ernennen."
+      "superadmin": "All das, plus wie Leute hereinkommen: Anmeldung, KI und Plug-ins. Nur ein Superadmin kann einen weiteren ernennen.",
+      "guest": "Für eine festgelegte Anzahl von Tagen hier und sieht nur, was die Einladung gegeben hat."
     },
     "loadingSettings": "Einstellungen werden geladen…",
     "unableToLoadSettings": "Einstellungen konnten nicht geladen werden.",
@@ -201,6 +203,7 @@
     "userIdColumn": "Benutzer-ID",
     "userColumn": "Benutzer",
     "communityRoleColumn": "Community-Rolle",
+    "communityRolePickerLabel": "Community-Rolle für {{name}}",
     "sourceColumn": "Quelle",
     "actionsColumn": "Aktionen",
     "sourceOidc": "OIDC",
@@ -269,10 +272,23 @@
     "initiativeJoinRequested": "{{requester}} möchte {{initiativeName}} beitreten.",
     "initiativeJoinApproved": "Deine Anfrage, {{initiativeName}} beizutreten, wurde angenommen.",
     "initiativeJoinDenied": "Deine Anfrage, {{initiativeName}} beizutreten, wurde abgelehnt.",
+    "shareRequested": {
+      "read_one": "{{requester}} möchte {{title}} ansehen.",
+      "read_other": "{{requester}} möchte {{count}} Dateien ansehen.",
+      "write_one": "{{requester}} möchte {{title}} bearbeiten.",
+      "write_other": "{{requester}} möchte {{count}} Dateien bearbeiten."
+    },
+    "shareGranted": {
+      "read_one": "{{answerer}} hat dir Lesezugriff auf {{title}} gegeben.",
+      "read_other": "{{answerer}} hat dir Lesezugriff auf {{count}} Dateien gegeben.",
+      "write_one": "{{answerer}} hat dir Bearbeitungszugriff auf {{title}} gegeben.",
+      "write_other": "{{answerer}} hat dir Bearbeitungszugriff auf {{count}} Dateien gegeben."
+    },
+    "shareDeclined_one": "{{answerer}} hat deine Anfrage abgelehnt.",
+    "shareDeclined_other": "{{answerer}} hat deine Anfrage für {{count}} Dateien abgelehnt.",
     "projectAdded": "{{projectName}} wurde zu {{initiativeName}} hinzugefügt, in der du Mitglied bist.",
     "mentionComment": "{{mentionedBy}} hat dich in einem Kommentar zu {{contextTitle}} erwähnt.",
-    "mentionFile": "{{mentionedBy}} hat dich in {{fileTitle}} erwähnt.",
-    "mentionTaskDescription": "{{mentionedBy}} hat dich in {{taskTitle}} erwähnt.",
+    "mentionIn": "{{mentionedBy}} hat dich in {{title}} erwähnt.",
     "commentOnTask": "{{commenterName}} hat {{taskTitle}} kommentiert.",
     "commentOnResource": "{{commenterName}} hat {{entityName}} kommentiert.",
     "postPublished": "{{authorName}} hat {{postName}} veröffentlicht.",
@@ -299,6 +315,7 @@
     "eventCancelled": "{{canceller}} hat {{eventTitle}} abgesagt.",
     "eventRsvp": "{{responder}} hat mit {{status}} auf {{eventTitle}} geantwortet.",
     "eventReminder": "{{eventTitle}} steht bald an.",
+    "taskReminder": "Erinnerung: {{taskTitle}}",
     "accessLevelRead": "schreibgeschützt",
     "accessLevelReadWrite": "Lesen und Schreiben",
     "usernameChanged": "Ein Moderator hat deinen Benutzernamen geändert. Du warst {{previousHandle}}.",

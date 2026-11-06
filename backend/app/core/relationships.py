@@ -9,7 +9,8 @@ else:
   vocabulary of binary relations;
 * :data:`ENDPOINT_KINDS` — what may sit on either end, and how a ``(kind,
   id)`` pair becomes one integer (the permanent codes are the kinds' own, in
-  :data:`app.core.tools.KINDS`).
+  :data:`app.core.tools.KINDS`), and :data:`PERSON`, the one end that is not a
+  kind.
 
 It is dependency-free (no models, no SQLAlchemy) so ``app.db``'s registry layer
 can import it alongside :mod:`app.core.tools`, the same way
@@ -172,17 +173,39 @@ class Provenance(str, Enum):
 PROVENANCES: tuple[Provenance, ...] = tuple(Provenance)
 
 
-#: What may sit on either end of an edge, keyed by kind. Derived from
+#: The kinds that may sit on either end of an edge, keyed by kind. Derived from
 #: ``REFERENCEABLE_TYPES`` — if a reference can name it, an edge can too, and
-#: the resolvers a reference already needs are the ones an endpoint needs.
+#: the resolvers a reference already needs are the ones an endpoint needs. A
+#: person may sit on an end too (:data:`PERSON`), and has no table here.
 ENDPOINT_KINDS: dict[SearchEntityType, Kind] = {
     kind: KINDS[kind.value] for kind in REFERENCEABLE_TYPES
 }
 
-#: The CHECK constraint's vocabulary, in a stable order.
-ENDPOINT_KIND_VALUES: tuple[str, ...] = tuple(
-    sorted(kind.value for kind in ENDPOINT_KINDS)
+#: A person on one end of an edge: a member's account, ``users.id``. Not one of
+#: :data:`~app.core.tools.KINDS`, which is what a reference names and search
+#: finds, and a person is neither; it takes its permanent code from the same
+#: sequence. The end that is not an item asks nothing of a reader, as a tag's
+#: does: an edge to a person is read and written through the item on its other
+#: end.
+PERSON = Kind("user", 18)
+
+#: Everything that may sit on either end, as the API names it: the kinds, and
+#: the person.
+EndpointKind = Enum(
+    "EndpointKind",
+    {v: v for v in sorted([*(kind.value for kind in ENDPOINT_KINDS), PERSON.value])},
+    type=str,
+    module=__name__,
 )
+
+#: The CHECK constraint's vocabulary, in a stable order.
+ENDPOINT_KIND_VALUES: tuple[str, ...] = tuple(kind.value for kind in EndpointKind)
+
+#: Each end's permanent code, by its name.
+_CODES: dict[str, int] = {
+    **{kind.value: endpoint.code for kind, endpoint in ENDPOINT_KINDS.items()},
+    PERSON.value: PERSON.code,
+}
 
 #: How many low bits of a node id hold the entity id. Entity ids are ``int4``,
 #: so 31 bits are in use and 32 is the natural boundary; the kind code occupies
@@ -191,7 +214,7 @@ ENDPOINT_KIND_VALUES: tuple[str, ...] = tuple(
 NODE_ID_SHIFT = 32
 
 
-def node_id(kind: SearchEntityType, entity_id: int) -> int:
+def node_id(kind: EndpointKind, entity_id: int) -> int:
     """One integer addressing one thing, derived rather than registered.
 
     Every graph algorithm — a recursive walk, a component pass, anything
@@ -203,26 +226,26 @@ def node_id(kind: SearchEntityType, entity_id: int) -> int:
     The database computes the same value in a generated column, so SQL and
     Python agree by construction rather than by convention.
     """
-    return (ENDPOINT_KINDS[kind].code << NODE_ID_SHIFT) | entity_id
+    return node_base(kind) | entity_id
 
 
-def node_base(kind: SearchEntityType) -> int:
+def node_base(kind: EndpointKind) -> int:
     """The high half of every node id of one kind.
 
     What a SQL expression adds an id column to, so a query can ask the indexed
     ``*_node`` column about a whole table's worth of rows without the database
     having to see through a two-column encoding it has no index for.
     """
-    return ENDPOINT_KINDS[kind].code << NODE_ID_SHIFT
+    return _CODES[kind.value] << NODE_ID_SHIFT
 
 
-def decode_node_id(value: int) -> tuple[SearchEntityType, int]:
+def decode_node_id(value: int) -> tuple[EndpointKind, int]:
     """``node_id`` backwards: the kind and the id it was built from."""
     code = value >> NODE_ID_SHIFT
     entity_id = value & ((1 << NODE_ID_SHIFT) - 1)
-    for kind, endpoint in ENDPOINT_KINDS.items():
-        if endpoint.code == code:
-            return kind, entity_id
+    for kind, kind_code in _CODES.items():
+        if kind_code == code:
+            return EndpointKind(kind), entity_id
     raise ValueError(f"no endpoint kind has code {code}")
 
 

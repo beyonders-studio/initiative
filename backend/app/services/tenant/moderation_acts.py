@@ -14,8 +14,10 @@ log, which is append-only (``app.db.moderation_log``):
   the one who put it there. Either way its author is told why, and never by
   whom.
 - **restore** — puts back what a removal took down.
-- **lock_comments** / **unlock_comments** — a locked thread reads as before,
-  and only the moderation set adds to it.
+- **lock_comments** / **unlock_comments** — a locked thread reads as it
+  stood: nobody adds to it or edits in it, a moderator included, until it is
+  unlocked (``comments._locked_now``). The acts here still reach what is in
+  it, and its authors may still take their own words back.
 - **clear_reactions** — every reaction on a comment or a post, gone.
 - **warn** — the author is told, in the moderator's words.
 
@@ -274,7 +276,11 @@ async def _place(
     subject = await notifications.resolve_subject(system, (target_type, row_id))
     if subject is None:
         return None, None
-    if subject.tool.value != target_type or subject.resource_id != row_id:
+    # A row governed by no tool row of its own (a collection) opens its tool's
+    # list, as a tool's own row does.
+    if subject.resource_id is not None and (
+        subject.tool.value != target_type or subject.resource_id != row_id
+    ):
         return (subject.tool.value, subject.resource_id), None
     if subject.initiative_id is None:
         return None, None

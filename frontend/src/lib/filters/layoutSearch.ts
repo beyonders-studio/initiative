@@ -4,12 +4,10 @@
  * it opens on. A list's `?preset=` names one of its layout's presets.
  */
 
-import { type DetailLayoutRead, ListLayoutReadKind } from "@/api/generated/initiativeAPI.schemas";
+import { DetailLayoutReadKind, ListLayoutReadKind } from "@/api/generated/initiativeAPI.schemas";
 
 const LISTS: readonly string[] = Object.values(ListLayoutReadKind);
-/** The details a target can lay out. */
-const DETAILS: readonly DetailLayoutRead["kind"][] = ["task"];
-const KINDS: readonly string[] = [...LISTS, ...DETAILS];
+const KINDS: readonly string[] = [...LISTS, ...Object.values(DetailLayoutReadKind)];
 
 /** Coerce a list's `?layout=`. Anything else is dropped, never thrown — a
  *  pasted link with a typo should still render the list. */

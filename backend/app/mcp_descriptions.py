@@ -65,7 +65,7 @@ TOOL_DESCRIPTIONS: dict[str, str] = {
     ),
     "list_initiatives": (
         "The initiatives the caller belongs to in a community. An initiative "
-        "holds the projects, files, queues and other tools; most lists narrow "
+        "holds the projects, files and other tools; most lists narrow "
         "by its `id` as `initiative_id`. A community admin can pass "
         "`scope=community` for every initiative in the community."
     ),
@@ -74,6 +74,11 @@ TOOL_DESCRIPTIONS: dict[str, str] = {
         "with what each publishes about itself. None of their content."
     ),
     "get_initiative": "Read one initiative by id: its settings and which tools it has on.",
+    "get_initiative_defaults": (
+        "What a community sets for every initiative in it: each tool's switch, "
+        "what the built-in member role may do, and whether managers may add "
+        "roles. A value set here stands over each initiative's own."
+    ),
     "list_initiative_roles": "An initiative's roles and what each may do.",
     "get_initiative_members": (
         "One page of an initiative's members, each with their role. Narrow with "
@@ -141,7 +146,7 @@ TOOL_DESCRIPTIONS: dict[str, str] = {
     ),
     "list_task_groups": (
         "The groups the tasks `conditions` match fall into, grouped by one "
-        "field (`group_by`, or `property:<id>` for a custom property), in the "
+        "field (`group_by`, or `property:<id>` for a property or metadata), in the "
         "order a grouped list shows them, and the groups each task id is in. "
         "A date groups by `bucket`."
     ),
@@ -153,7 +158,9 @@ TOOL_DESCRIPTIONS: dict[str, str] = {
     ),
     "read_task": (
         "Read one task by id: its status, people, dates, checklist, tags and "
-        "properties."
+        "custom values. `properties` lists them all: the initiative's "
+        "properties, its project's metadata (`project_id` set) and what "
+        "installed plug-ins show on it (`install_id` and `key` set)."
     ),
     "create_task": (
         "Create a task in a project (`project_id`). Left without "
@@ -174,7 +181,8 @@ TOOL_DESCRIPTIONS: dict[str, str] = {
     "move_task": (
         "Move a task to another project (`target_project_id`), into that "
         "project's default column. It keeps a type of the same name there, or "
-        "takes that project's default type."
+        "takes that project's default type, and its values of its project's "
+        "metadata where that project has metadata of the same name and type."
     ),
     "toggle_checklist_item": (
         "Tick or untick one checklist item on a task, by the item's `id` from "
@@ -199,7 +207,9 @@ TOOL_DESCRIPTIONS: dict[str, str] = {
     # --- Files --------------------------------------------------------------
     "read_file": (
         "Read one file by id, with its body. A body can be large: pass "
-        "`include_content=false` for the name, tags and properties alone."
+        "`include_content=false` for the name, tags and custom values alone. "
+        "`properties` lists the initiative's properties and the metadata of "
+        "each collection the file is in (`collection_id` set)."
     ),
     "update_file": (
         "Change a file. Only the fields sent change. To change its body, send "
@@ -208,13 +218,6 @@ TOOL_DESCRIPTIONS: dict[str, str] = {
         "and the file should be read again."
     ),
     "list_file_versions": "The stored versions of an uploaded file, newest first.",
-    # --- Queues -------------------------------------------------------------
-    "add_queue_item": (
-        "Add an item to a queue. `position` orders it among the others; "
-        "`user_id` names who it is for."
-    ),
-    "read_queue_item": "Read one queue item by id.",
-    "update_queue_item": "Change a queue item. Only the fields sent change.",
     # --- Counters -----------------------------------------------------------
     "add_counter": (
         "Add a counter to a counter group. `min`, `max` and `step` bound and "
@@ -288,20 +291,29 @@ TOOL_DESCRIPTIONS: dict[str, str] = {
         "The months a board has notices in, newest first, with how many in "
         "each. Takes the same filters as `list_posts`."
     ),
-    # --- Galleries ----------------------------------------------------------
-    "update_gallery": (
-        "Change a gallery's name or description, or choose its cover "
-        "(`cover_image_id`)."
+    # --- Collections --------------------------------------------------------
+    "list_collections": (
+        "The collections in an initiative's Files that the caller can see, "
+        "each with how many of its files they can open."
     ),
-    "list_gallery_images": (
-        "One page of a gallery's pictures, newest first (`oldest_first` to "
-        "reverse). Narrow with `search` or `tag_ids`."
+    "read_collection": "Read one collection of files by id.",
+    "list_collection_files": (
+        "The files in one collection the caller can open. Takes the same "
+        "filters as `list_files`."
     ),
-    "get_gallery_image_timeline": (
-        "The months a gallery has pictures in, newest first, with how many in each."
+    "list_collection_shapes": (
+        "The ready-made shapes a new collection can start as, with the lists "
+        "each shows and the metadata it brings."
     ),
-    "read_gallery_image": "Read one picture in a gallery by id.",
-    "list_gallery_image_versions": "Every stored rendition of a picture, newest first.",
+    "get_collection_file_metadata": (
+        "One file's values of a collection's metadata, for a file in the "
+        "collection the caller can open."
+    ),
+    "get_collection_files_timeline": (
+        "The months files joined one collection, newest first, with how many "
+        "the caller can open in each. Takes the same filters as "
+        "`list_collection_files`."
+    ),
     # --- Wikis --------------------------------------------------------------
     "update_wiki": (
         "Change a wiki: its name and description, its home page, page order "

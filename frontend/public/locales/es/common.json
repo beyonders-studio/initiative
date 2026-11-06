@@ -64,6 +64,7 @@
   "adding": "Añadiendo…",
   "rowActionsFor": "Acciones para {{subject}}",
   "more": "Más",
+  "moreOptions": "Más opciones",
   "less": "Menos",
   "noResults": "No se encontraron resultados",
   "tryAgain": "Intentar de nuevo",
@@ -169,7 +170,7 @@
     "tags": "Etiquetas",
     "tagsDescription": "Agrega etiquetas para organizar y filtrar.",
     "tagsNoAccess": "Necesitas acceso de escritura para administrar etiquetas.",
-    "propertiesDescription": "Valores de las propiedades personalizadas que define esta iniciativa.",
+    "propertiesDescription": "Valores de los metadatos que define esta iniciativa.",
     "comments": "Comentarios",
     "commentsDescription": "Permite que se comente esto. Si desactivas los comentarios, se conserva todo lo ya publicado y vuelve a aparecer cuando los actives de nuevo.",
     "commentsToggle": "Activar comentarios",
@@ -291,8 +292,7 @@
   },
   "fileDrop": {
     "release": "Suéltalo aquí",
-    "unsupported": "Ese tipo de archivo no se puede subir aquí.",
-    "tooLarge": "Ese archivo es más grande de lo que acepta este servidor."
+    "unsupported": "Ese tipo de archivo no se puede subir aquí."
   },
   "archiveError": "No se pudo archivar. Inténtalo de nuevo.",
   "unarchiveError": "No se pudo desarchivar. Inténtalo de nuevo.",
@@ -313,6 +313,8 @@
     "taskList": "Lista de tareas",
     "more": "Más formato",
     "image": "Imagen",
+    "uploadImage": "Subir una imagen",
+    "imageFromFiles": "Desde Archivos",
     "uploadingImage": "Subiendo {{name}}…",
     "imageUploadFailed": "No se pudo añadir esa imagen."
   },
@@ -396,11 +398,6 @@
       "this": "este archivo",
       "plural": "archivos"
     },
-    "queue": {
-      "name": "Cola",
-      "this": "esta cola",
-      "plural": "colas"
-    },
     "counter_group": {
       "name": "Grupo de contadores",
       "this": "este grupo de contadores",
@@ -421,25 +418,20 @@
       "this": "esta publicación",
       "plural": "publicaciones"
     },
-    "gallery": {
-      "name": "Galería",
-      "this": "esta galería",
-      "plural": "galerías"
-    },
     "wiki": {
       "name": "Wiki",
       "this": "este wiki",
       "plural": "wikis"
     },
+    "contact": {
+      "name": "Contacto",
+      "this": "este contacto",
+      "plural": "contactos"
+    },
     "task": {
       "name": "Tarea",
       "this": "esta tarea",
       "plural": "tareas"
-    },
-    "queue_item": {
-      "name": "Elemento de cola",
-      "this": "este elemento de cola",
-      "plural": "elementos de cola"
     },
     "calendar_event": {
       "name": "Evento",
@@ -451,11 +443,6 @@
       "this": "este contador",
       "plural": "contadores"
     },
-    "gallery_image": {
-      "name": "Imagen",
-      "this": "esta imagen",
-      "plural": "imágenes"
-    },
     "wiki_page": {
       "name": "Página",
       "this": "esta página",
@@ -465,6 +452,11 @@
       "name": "Etiqueta",
       "this": "esta etiqueta",
       "plural": "etiquetas"
+    },
+    "collection": {
+      "name": "Colección",
+      "this": "esta colección",
+      "plural": "colecciones"
     }
   }
 }

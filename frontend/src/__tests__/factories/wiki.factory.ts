@@ -37,6 +37,7 @@ export function buildWiki(overrides: Partial<WikiRead> = {}): WikiRead {
     can: ownerCan(),
     comments_enabled: true,
     comment_count: 0,
+    hidden_files: { count: 0, requested: 0 },
     tags: [],
     properties: [],
     grants: [],

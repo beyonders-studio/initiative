@@ -19,7 +19,7 @@ Three joins, one per way a tool reaches the schema:
 import pytest
 from sqlalchemy import text
 
-from app.core.relationships import ENDPOINT_KINDS, node_id
+from app.core.relationships import ENDPOINT_KINDS, PERSON, EndpointKind, node_id
 from app.core.tools import Tool
 from app.db.initiative_rls import COMMENT_PARENT_COLUMNS
 from app.db.schema_provisioning import (
@@ -84,23 +84,23 @@ async def test_every_endpoint_kind_is_known_to_the_database(engine):
     function, and the generated node columns are persisted. A kind the function
     has no arm for makes every write naming it fail; a kind whose code differs
     between Python and SQL makes the two disagree about what a row points at,
-    which nothing would report."""
+    which nothing would report. The person, an end that is no kind, too."""
     async with engine.connect() as conn:
-        for kind, endpoint in ENDPOINT_KINDS.items():
+        for endpoint in (*ENDPOINT_KINDS.values(), PERSON):
             code = (
                 await conn.execute(
                     text("SELECT public.relationship_kind_code(:kind)"),
-                    {"kind": kind.value},
+                    {"kind": endpoint.value},
                 )
             ).scalar()
             assert code is not None, (
-                f"public.relationship_kind_code has no arm for '{kind.value}' — "
+                f"public.relationship_kind_code has no arm for '{endpoint.value}' — "
                 "the kind was added to app.core.relationships without the "
                 "migration that replaces the function."
             )
             assert code == endpoint.code, (
-                f"'{kind.value}' is code {endpoint.code} in Python and {code} in "
-                "Postgres. A kind's code is permanent; one of them moved."
+                f"'{endpoint.value}' is code {endpoint.code} in Python and {code} "
+                "in Postgres. A kind's code is permanent; one of them moved."
             )
 
 
@@ -109,7 +109,7 @@ async def test_the_database_packs_node_ids_the_way_python_does(engine):
     edge table by; Postgres builds the stored columns. They are the same
     expression written twice, so this checks they still agree."""
     async with engine.connect() as conn:
-        for kind in ENDPOINT_KINDS:
+        for kind in EndpointKind:
             packed = (
                 await conn.execute(
                     text(

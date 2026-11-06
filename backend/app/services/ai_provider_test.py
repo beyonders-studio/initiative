@@ -107,6 +107,91 @@ def _chat_reply(text: str) -> dict:
     }
 
 
+def _sse(*events: dict, done: bool = False) -> str:
+    """A streamed answer, as server-sent events."""
+    lines = [
+        (f"event: {event['type']}\n" if "type" in event else "")
+        + f"data: {json.dumps(event)}\n\n"
+        for event in events
+    ]
+    return "".join(lines) + ("data: [DONE]\n\n" if done else "")
+
+
+def _anthropic_stream(*pieces: str) -> str:
+    message = {**_anthropic_reply(""), "content": [], "stop_reason": None}
+    message["usage"] = {**_usage(output_tokens=1), "cache_read_input_tokens": 2}
+    return _sse(
+        {"type": "message_start", "message": message},
+        # A model that thinks first streams its thinking apart from the text.
+        {
+            "type": "content_block_start",
+            "index": 0,
+            "content_block": {"type": "thinking", "thinking": "", "signature": ""},
+        },
+        {"type": "content_block_stop", "index": 0},
+        {
+            "type": "content_block_start",
+            "index": 1,
+            "content_block": {"type": "text", "text": ""},
+        },
+        *(
+            {
+                "type": "content_block_delta",
+                "index": 1,
+                "delta": {"type": "text_delta", "text": piece},
+            }
+            for piece in pieces
+        ),
+        {"type": "content_block_stop", "index": 1},
+        {
+            "type": "message_delta",
+            "delta": {"stop_reason": "end_turn", "stop_sequence": None},
+            "usage": {"output_tokens": 5},
+        },
+        {"type": "message_stop"},
+    )
+
+
+def _responses_stream(*pieces: str) -> str:
+    return _sse(
+        *(
+            {
+                "type": "response.output_text.delta",
+                "item_id": "msg_1",
+                "output_index": 0,
+                "content_index": 0,
+                "delta": piece,
+                "logprobs": [],
+                "sequence_number": number,
+            }
+            for number, piece in enumerate(pieces)
+        ),
+        {
+            "type": "response.completed",
+            "sequence_number": len(pieces),
+            "response": _responses_reply("".join(pieces)),
+        },
+    )
+
+
+def _chat_stream(*pieces: str) -> str:
+    chunk = {"id": "c1", "object": "chat.completion.chunk", "created": 0, "model": "m"}
+    return _sse(
+        *(
+            {
+                **chunk,
+                "choices": [
+                    {"index": 0, "delta": {"content": piece}, "finish_reason": None}
+                ],
+            }
+            for piece in pieces
+        ),
+        # The counts come on a last chunk of their own.
+        {**chunk, "choices": [], "usage": _chat_reply("")["usage"]},
+        done=True,
+    )
+
+
 class _Provider:
     """Answers every request with ``reply(body)``, or with ``status`` and
     ``error``, and keeps what was sent."""
@@ -135,7 +220,12 @@ class _Provider:
                 return lib.Response(
                     self.status, json=self.error, headers={"x-should-retry": "false"}
                 )
-            return lib.Response(200, json=self.reply(body))
+            reply = self.reply(body)
+            if isinstance(reply, str):
+                return lib.Response(
+                    200, text=reply, headers={"content-type": "text/event-stream"}
+                )
+            return lib.Response(200, json=reply)
 
         return handler
 
@@ -231,6 +321,37 @@ async def test_each_shape_through_its_sdk(
     with _resolves_to(PUBLIC_IP), pytest.raises(AIRequestError) as refused:
         await ai_provider.complete_text(target, JOB, PROMPT, guild_id=7)
     assert refused.value.code == AIMessages.INVALID_API_KEY
+
+
+@pytest.mark.parametrize(
+    ("provider", "stream"),
+    [
+        (AIProvider.anthropic, _anthropic_stream),
+        (AIProvider.openai, _responses_stream),
+        (AIProvider.groq, _chat_stream),
+    ],
+)
+async def test_each_shape_streams_its_answer(monkeypatch, caplog, provider, stream):
+    """The text comes as it is written, past any thinking; the usage is logged
+    once it ends; and the community's request is let go."""
+    fake = _Provider(monkeypatch, reply=lambda body: stream("Hello", " there"))
+
+    with (
+        _resolves_to(PUBLIC_IP),
+        caplog.at_level(logging.INFO, logger="app.services.ai_provider"),
+    ):
+        pieces = [
+            piece
+            async for piece in ai_provider.stream_text(
+                _target(provider), JOB, PROMPT, guild_id=7
+            )
+        ]
+
+    assert pieces == ["Hello", " there"]
+    assert fake.sent[0][1]["stream"] is True
+    [line] = [r.getMessage() for r in caplog.records if "AI usage" in r.getMessage()]
+    assert "input=10 output=5" in line
+    assert ai_provider._in_flight == {}
 
 
 async def test_the_openai_client_connects_to_the_validated_address(monkeypatch):

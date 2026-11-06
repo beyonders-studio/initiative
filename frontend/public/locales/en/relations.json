@@ -29,11 +29,13 @@
   "removed": "Link removed.",
   "dialog": {
     "title": "Add a link",
-    "description": "Find the thing first, then say how the two relate.",
-    "descriptionUpload": "Find the thing first, or upload a file, then say how the two relate.",
+    "description": "Find the thing or person first, then say how the two relate.",
+    "descriptionUpload": "Find the thing or person first, or upload a file, then say how the two relate.",
     "entity": "Thing",
     "entityPlaceholder": "Search by name…",
     "noResults": "Nothing matches.",
+    "person": "Person",
+    "noPeople": "No one matches.",
     "relationship": "Relationship",
     "sentenceLabel": "How the two relate",
     "submit": "Add link",
@@ -49,6 +51,7 @@
   },
   "card": {
     "kindLinked": "{{kind}} · linked {{date}}",
+    "person": "Person",
     "unreachable": "This version of the app cannot open that.",
     "remove": "Remove the link to {{title}}"
   },
@@ -111,16 +114,14 @@
     "counter_group": "This group",
     "dashboard": "This dashboard",
     "file": "This file",
-    "gallery": "This gallery",
-    "gallery_image": "This picture",
     "generic": "This",
     "post": "This post",
     "project": "This project",
-    "queue": "This queue",
-    "queue_item": "This item",
     "task": "This task",
     "wiki": "This wiki",
-    "wiki_page": "This page"
+    "wiki_page": "This page",
+    "contact": "This contact",
+    "collection": "This collection"
   },
   "blockers": {
     "label_one": "{{count}} thing is holding this up",
@@ -132,10 +133,8 @@
   "empty_counter": "Nothing linked yet. Link the task this counts towards, or the project it reports on.",
   "empty_counter_group": "Nothing linked yet. Link the project these numbers are about.",
   "empty_dashboard": "Nothing linked yet. Link the project this reports on, or the file that reads it.",
-  "empty_gallery": "Nothing linked yet. Link the project these pictures are for.",
-  "empty_gallery_image": "Nothing linked yet. Link the task this picture is for, or the file it belongs in.",
   "empty_post": "Nothing linked yet. Link the project this announces, or the file behind it.",
-  "empty_queue": "Nothing linked yet. Link the project this queue feeds.",
-  "empty_queue_item": "Nothing linked yet. Link the task this item became, or the file it came from.",
-  "empty_wiki_page": "Nothing linked yet. Mention this page with [[ from anywhere and it will show up here."
+  "empty_wiki_page": "Nothing linked yet. Mention this page with [[ from anywhere and it will show up here.",
+  "empty_contact": "Nothing linked yet. Link the task you're doing for them, the event they'll be at, or their contract.",
+  "empty_collection": "Nothing linked yet. Link the project these files are for."
 }

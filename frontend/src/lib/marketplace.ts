@@ -34,12 +34,11 @@ export const COMMUNITY_SHELVES = [
  */
 export const UNSHELVED_KINDS = [
   ListingKind.file,
-  ListingKind.queue,
   ListingKind.counter_group,
   ListingKind.calendar,
   ListingKind.post,
-  ListingKind.gallery,
   ListingKind.wiki,
+  ListingKind.contact,
 ] as const;
 
 /** A shelf a community installs from — the values `?kind=` may name under

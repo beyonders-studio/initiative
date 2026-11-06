@@ -96,19 +96,34 @@
       "files": "Typ",
       "calendars": "Beschreibung",
       "dashboards": "Herkunft",
-      "posts": "Vorschau"
+      "posts": "Vorschau",
+      "contacts": "Telefon oder E-Mail"
     }
   },
   "detail": {
     "tasksDone": "{{completed}} von {{total}} Aufgaben",
     "fromMarketplace": "Marktplatz",
     "builtHere": "Selbst erstellt",
-    "fileType": {
-      "native": "Textdokument",
-      "file": "Datei",
+    "fileKind": {
+      "document": "Dokument",
+      "spreadsheet": "Tabelle",
+      "presentation": "Präsentation",
       "whiteboard": "Whiteboard",
-      "smart_link": "Link",
-      "spreadsheet": "Tabelle"
+      "pdf": "PDF",
+      "image": "Bild",
+      "video": "Video",
+      "audio": "Audio",
+      "text": "Text",
+      "compressed": "Komprimiert",
+      "design": "Design",
+      "3d": "3D",
+      "font": "Schrift",
+      "raw": "Kamera-RAW",
+      "code": "Code",
+      "ebook": "E-Book",
+      "cad": "CAD",
+      "link": "Link",
+      "other": "Sonstiges"
     }
   },
   "recentComments": {
@@ -135,5 +150,15 @@
       "projectEnd": "Projekt endet",
       "pollCloses": "Umfrage endet"
     }
+  },
+  "catchUp": {
+    "button": "Bring mich auf den Stand",
+    "title": "Bring mich auf den Stand",
+    "intro": "Eine kurze Zusammenfassung dessen, was sich seit deinem letzten Besuch geändert hat und was du sehen kannst.",
+    "action": "Bring mich auf den Stand",
+    "writing": "Wird zusammengefasst…",
+    "cut": "Aus den {{percent}} % der Änderungen geschrieben, die dich am ehesten betreffen. Der Rest passte nicht hinein.",
+    "since": "Seit {{date}}",
+    "empty": "Nichts Neues seit deinem letzten Besuch."
   }
 }

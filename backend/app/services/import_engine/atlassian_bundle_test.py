@@ -45,18 +45,21 @@ def _finish(writer, **kwargs):
     )
 
 
-async def test_files_are_written_as_they_arrive_and_listed_when_named():
+async def test_files_are_written_as_they_arrive_and_listed_when_named(tmp_path):
     picture, notes, unshown = (
         _stored("k1.png"),
         _stored("k2.txt", content_type="text/plain", size=5),
         _stored("k3.png"),
     )
+    png, text = tmp_path / "door.png", tmp_path / "notes.txt"
+    png.write_bytes(b"\x89PNG")
+    text.write_bytes(b"notes")
     with BundleWriter() as writer:
-        await writer.put_asset(picture, b"\x89PNG")
-        await writer.put_asset(notes, b"notes")
-        await writer.put_asset(unshown, b"\x89PNG")
+        await writer.put_asset(picture, png)
+        await writer.put_asset(notes, text)
+        await writer.put_asset(unshown, png)
         # The same file twice is written once.
-        await writer.put_asset(picture, b"\x89PNG")
+        await writer.put_asset(picture, png)
         path = _finish(writer, images=[picture], task_files=[notes])
 
         archive = open_zip(path)
@@ -86,9 +89,9 @@ def test_an_unfinished_bundle_leaves_no_file_behind():
     assert not path.exists()
 
 
-def test_a_fetched_bundle_opens_past_the_upload_bounds(monkeypatch):
-    """The upload bounds are for zips somebody else built; one this app wrote
-    from a fetch is held to the fetch's own."""
+def test_a_bundle_opens_past_the_upload_bounds(monkeypatch):
+    """A backup, a Confluence export, or a bundle this app wrote from a fetch
+    is held to the bundle bounds rather than another zip's."""
     import io
 
     from app.services.import_engine import limits as import_limits
@@ -103,8 +106,8 @@ def test_a_fetched_bundle_opens_past_the_upload_bounds(monkeypatch):
 
     with pytest.raises(ImportEngineError):
         open_zip(payload)
-    assert len(open_zip(payload, fetched=True).infolist()) == 3
+    assert len(open_zip(payload, bundle=True).infolist()) == 3
 
-    monkeypatch.setattr(import_limits, "IMPORT_FETCH_MAX_ZIP_MEMBERS", 2)
+    monkeypatch.setattr(import_limits, "IMPORT_MAX_BUNDLE_MEMBERS", 2)
     with pytest.raises(ImportEngineError):
-        open_zip(payload, fetched=True)
+        open_zip(payload, bundle=True)

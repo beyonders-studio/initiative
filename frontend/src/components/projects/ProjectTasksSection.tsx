@@ -987,6 +987,7 @@ export const ProjectTasksSection = ({
               memberScope: { type: "canOpen", tool: Tool.project, id: projectId },
               statuses: sortedTaskStatuses,
               types: taskTypes,
+              projectId,
             }}
             value={appliedSpec}
             onChange={setFilters}
@@ -1022,6 +1023,7 @@ export const ProjectTasksSection = ({
             }
             isArchivingDoneTasks={archiveDoneTasks.isPending}
             card={layout?.definition.card as LayoutNode | null | undefined}
+            displays={layout?.definition.displays}
             columnLimits={columnLimits}
             grouping={grouping}
             onGroupingChange={setGrouping}
@@ -1082,6 +1084,7 @@ export const ProjectTasksSection = ({
                 onExitSelection={() => setSelectedTasks([])}
                 tableState={tableState}
                 viewColumns={layout?.definition.columns}
+                displays={layout?.definition.displays}
                 viewGroupings={layout?.definition.groupings}
                 columnLimits={columnLimits}
               />
@@ -1181,6 +1184,7 @@ export const ProjectTasksSection = ({
             <TaskBulkEditDialog
               selectedTasks={selectedTasks}
               taskStatuses={sortedTaskStatuses}
+              taskTypes={taskTypes ?? []}
               isFull={(statusId) =>
                 columnLimits.isFull(
                   statusId,
@@ -1188,6 +1192,7 @@ export const ProjectTasksSection = ({
                 )
               }
               projectId={projectId}
+              initiativeId={initiativeId}
               isSubmitting={bulkUpdateTasks.isPending}
               onApply={(changes) => {
                 bulkUpdateTasks.mutate({

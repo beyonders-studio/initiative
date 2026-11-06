@@ -38,13 +38,9 @@ export function buildRecentProjectItem(
 export function buildRecentFileItem(overrides: Partial<PersonalItemRead> = {}): PersonalItemRead {
   return buildRecentItem({
     entity_type: "file",
-    file_type: "native",
+    file_type: "lexical",
     ...overrides,
   });
-}
-
-export function buildRecentQueueItem(overrides: Partial<PersonalItemRead> = {}): PersonalItemRead {
-  return buildRecentItem({ entity_type: "queue", ...overrides });
 }
 
 export function buildRecentCounterGroupItem(

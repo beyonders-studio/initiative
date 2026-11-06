@@ -12,7 +12,7 @@ You've already been in it. Signing in puts you here, and the **Initiative logo**
 
 ## Home
 
-The page signing in drops you on. It's yours to arrange, because people turn up for wildly different reasons: some are here for their own to-do list, some to keep an eye on the scout group, some because their manager assigned them eleven things on a Friday afternoon.
+The page signing in drops you on. It's yours to arrange, because people turn up for wildly different reasons: some are here for their own to-do list, some to keep an eye on the soccer league, some because their manager assigned them eleven things on a Friday afternoon.
 
 It starts out arranged for whatever you told us when you signed up: your own list gets a planner, a community you run gets its activity and your projects, and a community you joined gets its people and what's coming up. **Getting started** sits near the top with a few first things to do — join a community, add a task, find a face for your profile — and ticks each one off by itself once you've actually done it. Hide it whenever you like. Press **Customize** and you can drag widgets about, pull a corner to resize one, open its settings, take it off, or **Add widget** for something else. On a phone they stack one above another, and customizing moves them up and down instead.
 
@@ -46,7 +46,7 @@ Here for more than one reason? Keep more than one home page. While customizing, 
 
 More are in [the marketplace](plugins-and-marketplace.md#home-layouts) — **Browse the marketplace** at the foot of the same picker.
 
-Each view gets a tab: work on one, the scout group on the other, the allotment rota on a third.
+Each view gets a tab: work on one, the soccer league on another.
 
 Each view can wear a banner, too. While customizing, **Banner** offers every one you have — the ones that come with Initiative and any from [decoration packs](plugins-and-marketplace.md#decoration-packs) — so the drama club's view can have the stage and work can have nothing at all. Give a pack back and its banner comes off the view with it.
 
@@ -70,7 +70,7 @@ Tick something off and it stays until tomorrow, struck through, with the count a
 
 Every [tool](tools.md) of every kind that's reached *you*, from every community, in one table. Pick a tool along the top and the table underneath changes. Each row says which community and which initiative it came from, so you can stop playing *which one was that in again*.
 
-A tool you have none of anywhere doesn't appear at all. Never touched a queue? No queue, and no empty table sulking behind it.
+A tool you have none of anywhere doesn't appear at all. Never touched a counter? No counters, and no empty table sulking behind them.
 
 "Reached you" means the same thing everywhere in your space: shared with you, shared with a role you hold, or shared with everyone in an initiative you're in. It does **not** mean "everything you could theoretically prise open if you went looking". Even a community admin, who can reach absolutely anything in their community, gets their own work here rather than a 400-row inventory of everybody else's.
 
@@ -144,7 +144,7 @@ Look for the bell:
 |---|---|
 | A tool | Beside the bookmark, next to its name. Subscribing to a tool covers everything inside it. |
 | A task or an event | With the other buttons at the top of it. |
-| A queue item, a picture or a counter | Beside its name. For a picture, that's under **Details**. |
+| A picture or a counter | Beside its name. For a picture, that's under **Details**. |
 | A wiki | Beside its name at the top of the wiki's sidebar. Each page has its own, beside the wiki's bookmark. |
 
 You hear about what other people do from the moment you subscribe, on one line per thing, so a flurry of edits to the same task is one notification rather than twelve. Your own changes stay quiet. Too much? Click the bell on that one thing — that holds even for something you made — or turn **Subscribed** down under [My Settings → Notifications](notifications.md). What you subscribe to is yours alone, and leaving a community takes your subscriptions there with you.

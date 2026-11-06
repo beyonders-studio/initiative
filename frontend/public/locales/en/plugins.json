@@ -35,7 +35,8 @@
     "upToDate": "Up to date",
     "upgraded": "Updated to {{version}}.",
     "removeManagedNeutral": "Charges for this plug-in are managed by your provider.",
-    "removeManagedAction": "Manage"
+    "removeManagedAction": "Manage",
+    "closed": "Whoever runs this server manages plug-ins for this community."
   },
   "updates": {
     "wants": "Version {{version}} wants to:",
@@ -250,7 +251,7 @@
       "comments": "Comments",
       "relationships": "Links",
       "tags": "Tags",
-      "properties": "Properties",
+      "properties": "Metadata",
       "sharing": "Sharing",
       "members": "Members",
       "initiatives": "Initiatives",
@@ -264,10 +265,6 @@
       "files": {
         "read": "Read files",
         "write": "Read and change files"
-      },
-      "queues": {
-        "read": "Read queues",
-        "write": "Read and change queues"
       },
       "counter_groups": {
         "read": "Read counters",
@@ -285,13 +282,13 @@
         "read": "Read posts",
         "write": "Read and change posts"
       },
-      "galleries": {
-        "read": "Read galleries",
-        "write": "Read and change galleries"
-      },
       "wikis": {
         "read": "Read wikis",
         "write": "Read and change wikis"
+      },
+      "contacts": {
+        "read": "Read contacts",
+        "write": "Read and change contacts"
       },
       "comments": {
         "read": "Read comments",
@@ -306,8 +303,8 @@
         "write": "Read and change tags"
       },
       "properties": {
-        "read": "Read custom properties and their options",
-        "write": "Read, create and change custom properties"
+        "read": "Read the initiative's metadata and its options",
+        "write": "Read, create and change the initiative's metadata"
       },
       "sharing": {
         "read": "See who has access to what",

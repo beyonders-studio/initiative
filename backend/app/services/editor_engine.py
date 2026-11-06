@@ -23,7 +23,7 @@ from typing import Any, Optional
 
 from app.services.worker_pool import Pool, PoolError
 
-__all__ = ["EditorError", "apply", "bootstrap", "render", "shutdown"]
+__all__ = ["EditorError", "apply", "bootstrap", "render", "sheet_range", "shutdown"]
 
 _BACKEND = Path(__file__).resolve().parents[2]
 #: Where the editor's server build is: copied beside the backend in the image,
@@ -112,6 +112,13 @@ async def render(state: bytes) -> dict:
     return reply["content"]
 
 
+async def from_markdown(text: str, *, plain: bool = False) -> dict:
+    """The editor JSON ``text`` reads as: as Markdown, through the editor's
+    own Markdown reading, or, ``plain``, as paragraphs."""
+    reply = await _ask({"op": "markdown", "text": text, "plain": plain})
+    return reply["content"]
+
+
 async def apply(state: bytes, content: dict) -> bytes:
     """The Yjs update that makes ``state`` read as ``content``, rewriting only
     what changed. Written as a Yjs client of its own."""
@@ -124,3 +131,10 @@ async def apply(state: bytes, content: dict) -> bytes:
         }
     )
     return base64.b64decode(reply["update"])
+
+
+async def sheet_range(content: dict, range_: Optional[str]) -> dict:
+    """``range_`` of a spreadsheet's stored content, read as the grid reads it:
+    ``{"columns", "rows", "sheets"}``, or ``{"refused", "sheets"}`` naming what
+    the range got wrong (``lib/spreadsheet/range.ts``)."""
+    return await _ask({"op": "sheet", "content": content, "range": range_})

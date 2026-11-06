@@ -14,7 +14,14 @@ A request is one of:
   JSON>}``;
 - ``{"op": "apply", "state": <base64>, "content": <editor JSON>, "client":
   <Yjs client id>}``, answered ``{"update": <base64>}``, the update that makes
-  the state read as the content.
+  the state read as the content;
+- ``{"op": "markdown", "text": <text>, "plain": <bool>}``, answered
+  ``{"content": <editor JSON>}``: the text read as Markdown, as the editor's
+  own Markdown view reads it, or, ``plain``, as paragraphs;
+- ``{"op": "sheet", "content": <spreadsheet content>, "range": <A1 range or
+  null>}``, answered ``{"columns", "rows", "sheets"}``: the range as a
+  dashboard statement reads it, or ``{"refused", "sheets"}`` naming what the
+  range got wrong.
 
 A request the editor refuses is answered ``{"error"}``; one that runs out of
 heap also carries ``"replace": true``, and the worker exits.
@@ -52,6 +59,24 @@ def answer(engine: MiniRacer, request: dict[str, Any]) -> dict[str, Any]:
         if request["op"] == "render":
             state = base64.b64decode(request["state"]).hex()
             return {"content": json.loads(engine.call("serverEditor.render", state))}
+        if request["op"] == "markdown":
+            return {
+                "content": json.loads(
+                    engine.call(
+                        "serverEditor.fromMarkdown",
+                        request["text"],
+                        bool(request["plain"]),
+                    )
+                )
+            }
+        if request["op"] == "sheet":
+            return json.loads(
+                engine.call(
+                    "serverEditor.sheetRange",
+                    json.dumps(request["content"]),
+                    request["range"],
+                )
+            )
         return {"error": f"no such operation: {request['op']}"}
     except JSOOMException:
         return {"error": "the editor ran out of memory", "replace": True}

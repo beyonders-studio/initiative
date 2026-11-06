@@ -16,6 +16,7 @@ import { type CSSProperties, type ReactNode, useState } from "react";
 import { useTranslation } from "react-i18next";
 
 import type { Tool } from "@/api/generated/initiativeAPI.schemas";
+import { AskToEdit } from "@/components/access/RequestAccess";
 import { BookmarkButton } from "@/components/BookmarkButton";
 import { useFullBleed } from "@/components/PageBanner";
 import { SubscribeButton } from "@/components/SubscribeButton";
@@ -37,7 +38,9 @@ export interface ToolPageHeaderProps {
   /** Ancestors after the tool-list crumb: a task's project, a setting's entity. */
   trail?: ToolBreadcrumbSegment[];
   /** The page's settings (community-relative), for someone who may change them:
-   *  the one thing across from the breadcrumb. */
+   *  the one thing across from the breadcrumb. Left out on a tool's own page
+   *  (`starId`), the reader may only read it, so "Ask to edit" stands there
+   *  instead. */
   settingsTo?: string;
   /** Search params the settings link carries (an event's occurrence). */
   settingsSearch?: Record<string, string>;
@@ -109,6 +112,8 @@ export const ToolPageHeader = ({
                 {t("toolSettings.title")}
               </Link>
             </Button>
+          ) : starId ? (
+            <AskToEdit kind={tool} entityId={starId} />
           ) : null}
         </div>
         <div className="space-y-2">

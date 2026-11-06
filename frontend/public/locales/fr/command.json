@@ -8,14 +8,13 @@
     "projects": "Projets",
     "tasks": "Tâches",
     "files": "Fichiers",
-    "queues": "Files",
     "counterGroups": "Groupes de compteurs",
     "calendars": "Calendriers",
     "dashboards": "Tableaux de bord",
     "results": "Résultats",
     "posts": "Publications",
-    "galleries": "Galeries",
-    "wikis": "Wikis"
+    "wikis": "Wikis",
+    "contacts": "Contacts"
   },
   "actions": {
     "addTask": "Ajouter une tâche",

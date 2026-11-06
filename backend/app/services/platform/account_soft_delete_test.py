@@ -13,7 +13,7 @@ from sqlmodel import select
 from sqlmodel.ext.asyncio.session import AsyncSession
 
 from app.core.messages import OperatorMessages
-from app.models.platform.app_setting import DEFAULT_ACCOUNT_RETENTION_DAYS
+from app.core.rules import DEFAULT_ACCOUNT_RETENTION_DAYS
 from app.models.platform.guild import GuildMembership, CommunityRole
 from app.models.platform.user import (
     ABSENT_STATUSES,

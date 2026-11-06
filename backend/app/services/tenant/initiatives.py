@@ -6,6 +6,7 @@ import logging
 from typing import Iterable
 
 from sqlalchemy import case, desc, func, or_
+from sqlalchemy.dialects.postgresql import insert as pg_insert
 from sqlalchemy.exc import IntegrityError
 from sqlalchemy.orm import aliased, selectinload
 from sqlmodel import select, delete, update
@@ -19,13 +20,16 @@ from app.core.messages import InitiativeMessages
 from app.db.session import routed_context
 from app.models.tenant.resource_grant import ResourceGrant
 from app.models.tenant.initiative import (
+    INITIATIVE_CUSTOM_ROLES,
+    INITIATIVE_MEMBER_PREFIX,
+    INITIATIVE_TOOL_KEYS,
     BUILTIN_ROLES,
     Initiative,
     InitiativeJoinPolicy,
     InitiativeJoinRequest,
     InitiativeMember,
     InitiativeRoleModel,
-    InitiativeRolePermission,
+    InitiativeRule,
     BUILTIN_ROLE_PERMISSIONS,
     JoinRequestStatus,
     PermissionKey,
@@ -35,6 +39,8 @@ from app.models.platform.user import User
 from app.models.platform.user_profile_view import MemberProfile
 from app.schemas.platform.user import UserInitiativeRole, UserSummary
 from app.schemas.tenant.initiative import (
+    InitiativeDefaultsRead,
+    InitiativeDefaultsUpdate,
     InitiativeDirectoryEntry,
     InitiativeJoinRequestRead,
 )
@@ -223,9 +229,10 @@ async def create_builtin_roles(
     for spec in BUILTIN_ROLES:
         for perm_key, enabled in spec.permissions.items():
             session.add(
-                InitiativeRolePermission(
+                InitiativeRule(
+                    initiative_id=initiative_id,
                     initiative_role_id=roles[spec.name].id,
-                    permission_key=perm_key,
+                    key=perm_key,
                     enabled=enabled,
                 )
             )
@@ -364,9 +371,9 @@ async def remove_user_from_guild_initiatives(
 
     Deleting each membership row runs ``tr_initiative_members_departure``,
     which drops every grant naming them in that initiative, owner rows
-    included, and takes them off its tasks, events, person fields and queue
-    items. ``member_departs`` with no initiative does the same for content
-    that belongs to the community itself. What they owned is left **unowned**
+    included, and takes them off its tasks, events and person fields.
+    ``member_departs`` with no initiative does the same for content that
+    belongs to the community itself. What they owned is left **unowned**
     rather than handed to anyone; guild admins can claim it whenever they
     choose (``app.services.tenant.ownership``). What they kept about its items
     (opens, bookmarks, subscriptions) goes too.
@@ -480,9 +487,10 @@ async def create_custom_role(
     perms = permissions or dict(BUILTIN_ROLE_PERMISSIONS["member"])
     for perm_key, enabled in perms.items():
         session.add(
-            InitiativeRolePermission(
+            InitiativeRule(
+                initiative_id=role.initiative_id,
                 initiative_role_id=role.id,
-                permission_key=perm_key,
+                key=perm_key,
                 enabled=enabled,
             )
         )
@@ -502,7 +510,7 @@ async def update_role_permissions(
     for perm_key, enabled in permissions.items():
         # Find existing permission
         existing = next(
-            (p for p in role.permissions if p.permission_key == perm_key),
+            (p for p in role.permissions if p.key == perm_key),
             None,
         )
         if existing:
@@ -510,9 +518,10 @@ async def update_role_permissions(
             session.add(existing)
         else:
             session.add(
-                InitiativeRolePermission(
+                InitiativeRule(
+                    initiative_id=role.initiative_id,
                     initiative_role_id=role.id,
-                    permission_key=perm_key,
+                    key=perm_key,
                     enabled=enabled,
                 )
             )
@@ -576,12 +585,12 @@ async def count_members_by_role(
 # ============================================================================
 
 #: The policies that put an initiative on the guild's directory for everyone.
-#: ``private`` is deliberately absent: RLS *would* permit listing it (the
-#: ``initiatives`` table is structural, so any guild member's session can read
-#: the row), so keeping private initiatives off the directory is an app-layer
-#: promise this constant makes in one place. The one exception is the caller's
-#: own membership — a private initiative is listed to its own members, which
-#: reveals nothing they don't already see in their sidebar.
+#: ``private`` is absent: the database hides a private initiative's row from
+#: anybody not in it (``private_initiative_read``), and this keeps it off the
+#: directory for the community's admin too, who reads every row. The one
+#: exception is the caller's own membership — a private initiative is listed to
+#: its own members, which reveals nothing they don't already see in their
+#: sidebar.
 LISTED_JOIN_POLICIES: tuple[str, ...] = (
     InitiativeJoinPolicy.request.value,
     InitiativeJoinPolicy.open.value,
@@ -1227,3 +1236,86 @@ async def create_imported_initiative(
     )
     await session.flush()
     return initiative
+
+
+def _member_key(key: PermissionKey) -> str:
+    return f"{INITIATIVE_MEMBER_PREFIX}{key.value}"
+
+
+async def _community_rows(session: AsyncSession) -> dict[str, InitiativeRule]:
+    """The community's own ``initiative_rules`` rows, by key: the ones with no
+    initiative."""
+    rows = await session.exec(
+        select(InitiativeRule).where(
+            InitiativeRule.initiative_id.is_(None)  # type: ignore[union-attr]
+        )
+    )
+    return {row.key: row for row in rows.all()}
+
+
+async def community_defaults(session: AsyncSession) -> InitiativeDefaultsRead:
+    """What the community sets for every initiative in it."""
+    rows = await _community_rows(session)
+    custom_roles = rows.get(INITIATIVE_CUSTOM_ROLES)
+    return InitiativeDefaultsRead(
+        tools={
+            tool: rows[key].enabled
+            for tool, key in INITIATIVE_TOOL_KEYS.items()
+            if key in rows
+        },
+        member_permissions={
+            key: rows[_member_key(key)].enabled
+            for key in PermissionKey
+            if _member_key(key) in rows
+        },
+        custom_roles=custom_roles is None or custom_roles.enabled,
+    )
+
+
+async def set_community_defaults(
+    session: AsyncSession,
+    *,
+    guild_id: int,
+    changes: InitiativeDefaultsUpdate,
+    actor_user_id: int,
+) -> InitiativeDefaultsRead:
+    """Change what the community sets for every initiative. Each initiative
+    keeps its own values beneath, which apply again where the community hands
+    a tool or a permission back. Written on the admin's own session: the
+    community's rows have no initiative, so no manager's policy admits them."""
+    before = await community_defaults(session)
+    stored: dict[str, bool | None] = {
+        **{INITIATIVE_TOOL_KEYS[tool]: on for tool, on in changes.tools.items()},
+        **{_member_key(key): on for key, on in changes.member_permissions.items()},
+    }
+    if changes.custom_roles is not None:
+        # Allowed is the default, so it is no row.
+        stored[INITIATIVE_CUSTOM_ROLES] = None if changes.custom_roles else False
+    for key, value in stored.items():
+        if value is None:
+            await session.exec(
+                delete(InitiativeRule).where(
+                    InitiativeRule.initiative_id.is_(None),  # type: ignore[union-attr]
+                    InitiativeRule.key == key,
+                )
+            )
+        else:
+            # Two admins saving the same key at once: the later one wins.
+            await session.exec(
+                pg_insert(InitiativeRule)
+                .values(key=key, enabled=value)
+                .on_conflict_do_update(
+                    constraint="uq_initiative_rules_subject", set_={"enabled": value}
+                )
+            )
+
+    after = await community_defaults(session)
+    await audit_service.record_settings_change(
+        session,
+        guild_id=guild_id,
+        actor_user_id=actor_user_id,
+        area="initiative_defaults",
+        before=before.model_dump(mode="json"),
+        after=after.model_dump(mode="json"),
+    )
+    return after

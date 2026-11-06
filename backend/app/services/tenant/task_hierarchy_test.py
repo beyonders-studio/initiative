@@ -382,7 +382,11 @@ async def test_promoting_needs_write_on_the_task(
 def test_title_from_line():
     assert title_from_line("Shoot the intro") == ("Shoot the intro", False)
     assert title_from_line("  Shoot   it ") == ("Shoot it", True)
-    assert title_from_line("Ping @[](4) on #[](task:12) #ops") == ("Ping on ops", True)
+    assert title_from_line("Ping @[](4) on #task[Brief](12) #ops") == (
+        "Ping on ops",
+        True,
+    )
     assert title_from_line("@[](4)") == ("", True)
+    assert title_from_line("Ask @[Ada]()") == ("Ask", True)
     long, shortened = title_from_line("word " * 100)
     assert shortened and len(long) <= 255 and long.endswith("…")

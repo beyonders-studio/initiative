@@ -24,8 +24,6 @@
     "project": "Projekt",
     "task": "Aufgabe",
     "file": "Datei",
-    "queue": "Ablauf",
-    "queue_item": "Ablaufelement",
     "counter_group": "Zählergruppe",
     "counter": "Zähler",
     "calendar": "Kalender",
@@ -33,11 +31,11 @@
     "dashboard": "Dashboard",
     "wiki": "Wiki",
     "wiki_page": "Wiki-Seite",
+    "contact": "Kontakt",
     "tag": "Tag",
     "comment": "Kommentar",
     "post": "Beitrag",
-    "gallery": "Galerie",
-    "gallery_image": "Bild"
+    "collection": "Sammlung"
   },
   "switchHint": "Tab zum Wechseln",
   "closeMatches": "Nichts passt genau zu „{{query}}“. Das hier kommt am nächsten.",

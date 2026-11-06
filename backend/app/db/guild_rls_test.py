@@ -17,6 +17,7 @@ import pytest
 from sqlalchemy import text
 
 from app.core.reactions import ReactionTarget
+from app.core.relationships import PERSON
 from app.db.initiative_rls import (
     COMMENT_PARENTS,
     CONTENT_KIND_TABLES,
@@ -25,6 +26,8 @@ from app.db.initiative_rls import (
     render_entity_access_fn,
 )
 from app.db.schema_provisioning import (
+    PARTS,
+    _apply_parts,
     drop_guild_schema,
     guild_schema_name,
     provision_guild_schema,
@@ -143,6 +146,8 @@ async def test_every_initiative_scoped_table_has_policies(engine):
     try:
         async with engine.begin() as conn:
             await provision_guild_schema(conn, _GID_POLICIES)
+            # As the operations community, so its own tables are checked too.
+            await _apply_parts(conn, _GID_POLICIES, PARTS, operations=True)
         async with engine.connect() as conn:
             pol_rows = await conn.execute(
                 text(
@@ -309,6 +314,7 @@ async def test_seat_and_ledger_tables_have_policies(engine):
     try:
         async with engine.begin() as conn:
             await provision_guild_schema(conn, gid)
+            await _apply_parts(conn, gid, PARTS, operations=True)
         async with engine.connect() as conn:
             rows = await conn.execute(
                 text(
@@ -426,13 +432,13 @@ _NO_SINGLE_PARENT = {
     # is a CASE over the column naming it.
     "comments": "one of eight tools, per row",
     "reactions": "one of eight tools, per row",
-    "reaction_digest_items": "gated exactly like the reaction it describes",
+    "batched_notices": "gated like the task or reaction it describes",
     "personal_items": "any tool or sub-tool, per row",
     "engagement_levels": "any tool or sub-tool, per row",
-    "property_values": "any tool or sub-tool, per row: read through its own table, written through entity_access",
-    "plugin_metadata": "any item, per row, read through its own table, or the install itself",
+    "metadata_values": "any tool or sub-tool, per row: read through its own table, written through entity_access, or the install itself",
     "search_entries": "names its tool in dac_tool",
     "tool_layouts": "any viewable tool, per row, or its initiative for a shared tool",
+    "share_requests": "any shareable tool, per row: read by the requester and whoever shares it",
     # One tool, two parents: a link must clear the gate on BOTH files, so
     # there is no single row to authorize against.
     # Two parents of any kind: an edge clears the gate on each end through
@@ -441,11 +447,14 @@ _NO_SINGLE_PARENT = {
     # No sharing leg at all — see the registry for each.
     "event_outbox": "names its tool in dac_tool",
     "plugin_event_outbox": "the events plug-ins emit are no tool's own table",
-    "property_definitions": "initiative configuration, not a tool's content",
+    "metadata_definitions": "initiative, project or collection configuration, or a plug-in's, not a tool's content",
     "resource_grants": "sharing itself; resource_access reads this table",
     "webhook_subscriptions": "integration config, gated by the initiative",
     "guest_invite_grants": "an invite's terms, the community's administration's",
     "uploads": "a stored file, gated by the initiative whose content shows it",
+    # No sharing: seen through the files in it, changed by file makers.
+    "collections": "seen through its files, changed by the initiative's file makers",
+    "collection_files": "read as its file, written as its collection is changed",
     # Gated on full access rather than sharing: the standing that opens these
     # is the one that already reaches every resource, so there is no per-resource
     # grant left to ask about.
@@ -659,8 +668,10 @@ def test_every_reaction_target_and_recentable_kind_is_an_arm():
 
 
 def test_the_entity_function_carries_one_arm_per_kind():
+    """And one for a person on an edge's end, which reads no table."""
     fn = render_entity_access_fn()
     for kind, table in entity_tables().items():
         assert f"WHEN '{kind}' THEN" in fn, kind
         assert f"FROM {table} re WHERE re.id = p_entity_id" in fn, kind
-    assert fn.count("WHEN '") == len(entity_tables())
+    assert f"WHEN '{PERSON.value}' THEN\n            RETURN true;" in fn
+    assert fn.count("WHEN '") == len(entity_tables()) + 1

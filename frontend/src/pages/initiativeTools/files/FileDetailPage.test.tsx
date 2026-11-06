@@ -38,7 +38,10 @@ vi.mock("@/components/ui/editor/editor", () => ({
   ),
 }));
 
-const seed = buildFileSummary({ id: 7, name: "Original", initiative_id: 1 });
+const seed = {
+  ...buildFileSummary({ id: 7, name: "Original", initiative_id: 1 }),
+  collection_ids: [],
+};
 
 const patches: Record<string, unknown>[] = [];
 /** What the server holds — a PATCH keeps what it was given, as the real one does. */
@@ -237,7 +240,10 @@ describe("switching files", () => {
       communityHttp.get("/files/:fileId", async ({ params }) => {
         if (params.fileId !== "8") return HttpResponse.json(stored);
         await arrived;
-        return HttpResponse.json(buildFileSummary({ id: 8, name: "Second", initiative_id: 1 }));
+        return HttpResponse.json({
+          ...buildFileSummary({ id: 8, name: "Second", initiative_id: 1 }),
+          collection_ids: [],
+        });
       })
     );
     // The app's own client keeps the last answer while the next one loads.

@@ -17,7 +17,13 @@ import {
 import { createContext, useContext, useEffect, useMemo, useRef, useState } from "react";
 import { useTranslation } from "react-i18next";
 
-import type { PropertyTarget, PropertyValueInput } from "@/api/generated/initiativeAPI.schemas";
+import type {
+  PropertyStep,
+  PropertySummary,
+  PropertyTarget,
+  PropertyValueInput,
+  PropertyValuesSetRequest,
+} from "@/api/generated/initiativeAPI.schemas";
 import { setProperties } from "@/api/generated/properties/properties";
 import { describes, type Spec } from "@/api/query-keys";
 import { useActiveCommunityId } from "@/hooks/useActiveCommunityId";
@@ -27,11 +33,13 @@ import { toast } from "@/lib/mascotToast";
 import { currentServerKey } from "@/lib/offlineSession";
 
 /** A change to some of an item's fields: what is sent, and how the item reads
- *  once it is saved. A change to its properties names only those it sets or
- *  takes off, so one person's leaves another's standing. */
+ *  once it is saved. A change to its properties names only those it sets,
+ *  takes off or steps, so one person's leaves another's standing. */
 export type ItemEdit<I, P> = { shows: Partial<I> } & (
   | { patch: P }
-  | { properties: { values: PropertyValueInput[]; removed?: number[] } }
+  | {
+      properties: { values: PropertyValueInput[]; removed?: number[]; steps?: PropertyStep[] };
+    }
 );
 
 /** One field's save, as {@link useItemFieldSave} answers it. */
@@ -53,6 +61,8 @@ export interface ItemDraft {
   /** Whether the field `id` shows a value it cannot take (a number left
    *  empty), which Add waits for. */
   hold: (id: string, holding: boolean) => void;
+  /** The fields changed so far, as Add sends them. */
+  sent: () => Record<string, unknown>;
 }
 
 export const ItemDraftContext = createContext<ItemDraft | null>(null);
@@ -67,6 +77,13 @@ export interface FieldSaveKind<I, P> {
   patch: (communityId: number, id: number, patch: P) => Promise<Partial<I>>;
   /** Where its properties are set. */
   properties: PropertyTarget;
+  /** Sets its properties where they are not set as a target's: a file's
+   *  values of a collection's metadata, which are the collection's. */
+  setProperties?: (
+    communityId: number,
+    id: number,
+    body: PropertyValuesSetRequest
+  ) => Promise<PropertySummary[]>;
   /** The lists showing the item that a saved edit makes stale. */
   lists: (edit: ItemEdit<I, P>) => Spec;
   /** The item's own read, read afresh once its last save settles. */
@@ -158,7 +175,7 @@ type Held<I> = I & { [OVER]?: I };
 /**
  * An item as the page passed it, or as a save of it answered over that same
  * copy, with saves not yet answered shown over either: for an item with no
- * read of its own (one the queue's or the gallery's read carries), whose save
+ * read of its own (one another read carries), whose save
  * kind's read key is {@link heldKey}. An answer stands until the page passes
  * a newer copy: the one it was answered over (a dialog opened again on what it
  * held) does not undo it. For a kind with a read of its own, it is `item`.
@@ -273,10 +290,12 @@ export const useItemFieldSave = <I, P>(
         ? kind.patch(save.communityId, save.id, edit.patch)
         : // Every kind that has properties reads them as `properties`.
           ({
-            properties: await setProperties(save.communityId, kind.properties, save.id, {
-              ...edit.properties,
-              merge: true,
-            }),
+            properties: await (kind.setProperties
+              ? kind.setProperties(save.communityId, save.id, { ...edit.properties, merge: true })
+              : setProperties(save.communityId, kind.properties, save.id, {
+                  ...edit.properties,
+                  merge: true,
+                })),
           } as unknown as Partial<I>);
     },
     onSuccess: async (written, save) => {

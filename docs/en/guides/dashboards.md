@@ -56,7 +56,7 @@ Usually faster than starting from a blank canvas, and often better, because some
 
 Two steps, and most people never leave the first.
 
-**Build** is clicking. Pick what to read — tasks, files, queue items, notices, events, your community's own people, or **Property values**, the initiative's own fields wherever they're set — then which columns, what to group them by, and what to narrow it to. The dashboard writes the query for you.
+**Build** is clicking. Pick what to read — tasks, files, notices, events, your community's own people, or **Metadata and property values**, the initiative's and its projects' and collections' own fields wherever they're set — then which columns, what to group them by, and what to narrow it to. The dashboard writes the query for you.
 
 **SQL** is the tab beside it, for the question clicking can't describe. It's real SQL, with the tables and columns offered as you type and the statement checked as you pause. One thing to know before you start: once you've edited the text, **Build** can't read it back. It offers to build a new query instead, which replaces what you wrote, so it never quietly mangles it.
 
@@ -87,9 +87,9 @@ Group a date by **day**, **week**, **month**, **quarter** or **year** and a char
 - **A target.** Give a chart, stat or progress bar a **Target** and a **Target date**. The chart draws it as a line, the progress bar marks it, and each says whether you've reached it, are on track, behind, or missed it, judged from the trend so far.
 - **A burn-up.** Show a count or total as **Running count** or **Running total**, and each point adds up everything before it.
 - **A split.** Group by a second column (status, say, beside the sprint) and a chart draws one series per value; **Stacked** piles them up. Past twelve series, the smallest fold into Other.
-- **Points per sprint.** Read **Property values**, filter by **Property**, show **Property › Name** and the total of **Number**, and group by the name.
+- **Points per sprint.** Read **Metadata and property values**, filter by **Metadata or property**, show **Metadata or property › Name** and the total of **Number**, and group by the name.
 
-In SQL, the same tables are `property_values` and `property_definitions`, and window functions work: `sum(…) OVER (…)`, `row_number()`, `lag()` and friends.
+In SQL, the same tables are `metadata_values` and `metadata_definitions`, and window functions work: `sum(…) OVER (…)`, `row_number()`, `lag()` and friends.
 
 ### Subtasks under their parent
 
@@ -107,6 +107,33 @@ LEFT JOIN tasks p ON p.id = r.target_id AND r.target_type = 'task'
 ```
 
 Give a Gantt `parent` as its **Group**, and each parent's bar folds up with its subtasks. The `#` and id keep two parents both called "Launch" from sharing a group. `done` goes to **Done**, which is how the Gantt knows what's finished: each parent fills up as its subtasks get done, and anything past its end and not done turns red. Without a **Done** column it counts the work and leaves the bars unfilled, because a date passing says nothing about whether anybody finished. A link only shows to somebody who can see both of the things it joins, and one that's been unlinked isn't there at all.
+
+### Reading a spreadsheet
+
+Somebody already keeps the budget in a spreadsheet, and nobody is going to retype it. So a tile can read one.
+
+In **Build**, choose **Spreadsheet** as the thing to read, then the file and the sheet. Leave **Range** empty for the whole sheet, or write one the way a spreadsheet does. Every column of the range comes in to start with, named by its header row, or by its letters (A, B, C) when the first row isn't headers. Formulas arrive as what they work out to, so the `=SUM()` at the bottom of the column is a number.
+
+| Range | Reads |
+|---|---|
+| `Q3!A1:D20` | Those cells on the sheet called Q3 |
+| `Q3!A:D` | Columns A to D, down to the last filled row |
+| `Q3!A5:D` | Columns A to D, from row 5 down |
+| `Q3` | The whole sheet |
+| `A1:D20` | Those cells on the first visible sheet |
+
+In **SQL**, a range is `sheet()` in the `FROM`, and from there it behaves like any other table, so it can sit right beside your tasks:
+
+```sql
+SELECT b.project, b.budget, count(t.id) AS open_tasks
+FROM sheet('Budget 2026', 'Q3!A1:B') AS b
+JOIN projects AS p ON p.name = b.project
+JOIN tasks AS t ON t.project_id = p.id
+WHERE t.completed_at IS NULL
+GROUP BY b.project, b.budget
+```
+
+Name the spreadsheet by its name, or by its id if you'd like the tile to survive somebody renaming the file to `Budget 2026 FINAL (2)`. A header with a space in it goes in double quotes, `sum("Q3 total")`, and capitals don't matter. A tile reads the spreadsheet as it was last saved, which is never more than about half a minute behind whoever is typing in it.
 
 ### Boards
 

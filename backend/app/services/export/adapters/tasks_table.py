@@ -9,7 +9,7 @@ backend-agnostic data payload the ``task-table`` template reads.
 accepts: ``{"conditions", "sorting", "tz", "include_archived"}``, the field
 their view of the list is grouped by (``group_by``), the layout fields its
 table shows (``columns``) and, for the detailed report, the parts of the task
-page in its order (``detail``). It is what an ExportJob row persists, and what
+page in its order (``detail``). It is what an export job row persists, and what
 the worker replays here at render time.
 
 Rows are the task list's own (``TaskListRead``), and a column is a field of
@@ -25,10 +25,8 @@ from typing import Any, Optional
 from sqlmodel import select
 from sqlmodel.ext.asyncio.session import AsyncSession
 
-import re
 
 from app.core.identity_boundary import STORED_MENTION
-from app.core.references import TEXT_REFERENCE, kind_for_trigger
 from app.models.platform.user import User
 from app.models.tenant.guild_plugin import GuildPlugin
 from app.models.tenant.task import TaskStatusCategory
@@ -44,35 +42,21 @@ from app.services.export.adapters._common import (
     require_may_leave,
 )
 from app.services.export import values
+from app.services.marketplace.widget_meta import in_language
 from app.services.export.contract import RenderItem, RenderRequest
 from app.services.export.i18n import et, export_locale
 from app.services.export.markdown import blocks_from_markdown
 from app.services.import_engine.mentions import mention_namer
 from app.core.user_display import display_name
 from app.services.export import limits as export_limits
-from app.services.tenant import properties as properties_service
+from app.services.tenant import metadata as metadata_service
 from app.services.tenant import task_queries
 
-# Mentions reach a report as ``@[Display Name](id)`` / ``#kind[Text](id)`` —
-# in a comment and in a task's description alike, a person's with the name
-# written in as the report was made (``mention_namer``). A printed report
-# shows ``@Display Name`` / the display text, not the reference markup. The
-# ``#`` half reads through the reference vocabulary the app writes with, so
-# every kind that can be mentioned flattens; a ``#`` word naming no kind stays
-# literal, as it does on screen.
-
-#: A picture in a comment — a pasted screenshot — prints as its alt text,
-#: the way the description's Markdown blocks print one.
-_IMAGE_RE = re.compile(r"!\[([^\]]*)\]\([^)]*\)")
-
-
-def _flatten_mentions(content: str) -> str:
-    content = _IMAGE_RE.sub(lambda m: m.group(1) or "[image]", content)
-    content = STORED_MENTION.sub(lambda m: f"@{m.group(1)}", content)
-    return TEXT_REFERENCE.sub(
-        lambda m: m.group(2) if kind_for_trigger(m.group(1)) else m.group(0),
-        content,
-    )
+# A person's mention reaches a report as ``@[Display Name](id)``, the name
+# written in as the report was made (``mention_namer``). A description or a
+# comment prints through its Markdown blocks, which read it as ``@Display
+# Name`` and a thing's as its name; the description column holds the list's
+# plain-text excerpt, where only the person's markup is left to flatten.
 
 
 #: How each field of a task's layout fills a table export's column: the field
@@ -240,9 +224,7 @@ class TasksTableAdapter:
                 out: list[dict[str, Any]] = []
                 for part in detail:
                     if part == "description":
-                        section: Any = blocks_from_markdown(
-                            _flatten_mentions(named(description or ""))
-                        )
+                        section: Any = blocks_from_markdown(named(description or ""))
                         out.append(
                             {
                                 "kind": part,
@@ -266,9 +248,9 @@ class TasksTableAdapter:
                             {
                                 "author": display_name(c.author) if c.author else "",
                                 "date": c.created_at.strftime("%Y-%m-%d"),
-                                # A null body would abort the compile; mention markup
-                                # flattens to its display text.
-                                "content": _flatten_mentions(named(c.content or "")),
+                                "blocks": blocks_from_markdown(
+                                    named(c.content or ""), line_breaks=True
+                                ),
                                 # A reply indents under its parent, as on screen.
                                 "depth": depth,
                             }
@@ -382,7 +364,7 @@ async def task_columns(
         and name.removeprefix(PROPERTY_FIELD_PREFIX).isdigit()
         and int(name.removeprefix(PROPERTY_FIELD_PREFIX)) <= _MAX_ROW_ID
     }
-    definitions = await properties_service.load_definitions_by_ids(
+    definitions = await metadata_service.load_definitions_by_ids(
         session, list(property_ids.values())
     )
     plugin_keys = {
@@ -411,8 +393,8 @@ async def task_columns(
             field, read = entry
             title = values.label(field, locale)
             if name == TaskFieldId.description:
-                cell = lambda t, read=read: _flatten_mentions(  # noqa: E731
-                    named(read(t, locale) or "")
+                cell = lambda t, read=read: STORED_MENTION.sub(  # noqa: E731
+                    lambda m: f"@{m.group(1)}", named(read(t, locale) or "")
                 )
             else:
                 cell = lambda t, read=read: read(t, locale)  # noqa: E731
@@ -440,11 +422,7 @@ async def task_columns(
                 continue
             given = decl.get("name")
             title = (
-                (
-                    given.get(locale)
-                    or given.get("en")
-                    or next(iter(given.values()), key)
-                )
+                in_language(given, locale) or key
                 if isinstance(given, dict)
                 else given or key
             )
@@ -453,8 +431,8 @@ async def task_columns(
                     next(
                         (
                             v.value
-                            for v in t.plugin_values
-                            if v.plugin_id == install and v.key == key
+                            for v in t.properties
+                            if v.install_id == install and v.key == key
                         ),
                         None,
                     ),

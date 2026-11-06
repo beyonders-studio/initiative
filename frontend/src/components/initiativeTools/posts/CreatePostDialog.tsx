@@ -4,7 +4,11 @@ import { Loader2, Vote } from "lucide-react";
 import { lazy, Suspense, useEffect, useState } from "react";
 import { useTranslation } from "react-i18next";
 
-import type { PostRead, ResourceGrantSchema } from "@/api/generated/initiativeAPI.schemas";
+import {
+  type PostRead,
+  type ResourceGrantSchema,
+  Tool,
+} from "@/api/generated/initiativeAPI.schemas";
 import { CreateAccessSection } from "@/components/access/CreateAccessSection";
 import { DEFAULT_GRANTS } from "@/components/access/grants";
 import {
@@ -14,6 +18,13 @@ import {
   PollEditor,
   pollDraftToWrite,
 } from "@/components/initiativeTools/posts/PollEditor";
+import {
+  EMPTY_REQUIRED,
+  missingIn,
+  RequiredValues,
+  useRequiredKeys,
+  valuesOf,
+} from "@/components/layouts/RequiredValues";
 import { Button } from "@/components/ui/button";
 import { ConfirmDialog } from "@/components/ui/confirm-dialog";
 import { DateTimePicker } from "@/components/ui/date-time-picker";
@@ -29,6 +40,8 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Skeleton } from "@/components/ui/skeleton";
 import { useCreatePost } from "@/hooks/usePosts";
+import { useProperties } from "@/hooks/useProperties";
+import { sharedTarget } from "@/hooks/useToolLayouts";
 import { fromLocalDateTimeInput } from "@/lib/formatDate";
 import { MAX_POST_TEXT_CHARS } from "@/lib/posts";
 import type { DialogProps } from "@/types/dialog";
@@ -56,7 +69,7 @@ export const CreatePostDialog = ({
   initiativeId,
   onSuccess,
 }: CreatePostDialogProps) => {
-  const { t } = useTranslation(["posts", "common", "access"]);
+  const { t } = useTranslation(["posts", "common", "access", "layouts"]);
   const [name, setName] = useState("");
   const [body, setBody] = useState<SerializedEditorState | null>(null);
   const [grants, setGrants] = useState<ResourceGrantSchema[]>([...DEFAULT_GRANTS]);
@@ -67,6 +80,12 @@ export const CreatePostDialog = ({
   // section below is opened by a button rather than always shown, so the
   // common case is not a form somebody has to scroll past.
   const [poll, setPoll] = useState<PollDraft | null>(null);
+  // What the initiative's posts page requires of a notice, asked for here
+  // because nothing else in this form sets it.
+  const required = useRequiredKeys(open ? sharedTarget(Tool.post, initiativeId) : null, "post");
+  const definitions = useProperties({ initiativeId, enabled: open }).data;
+  const [values, setValues] = useState(EMPTY_REQUIRED);
+  const missing = missingIn(required.keys, values, definitions);
 
   useEffect(() => {
     if (!open) {
@@ -75,6 +94,7 @@ export const CreatePostDialog = ({
       setGrants([...DEFAULT_GRANTS]);
       setScheduledFor("");
       setPoll(null);
+      setValues(EMPTY_REQUIRED);
     }
   }, [open]);
 
@@ -88,7 +108,11 @@ export const CreatePostDialog = ({
   // A half-written poll blocks the post rather than being quietly dropped:
   // somebody who started one meant to ask something.
   const canSubmit =
-    name.trim().length > 0 && !create.isPending && (poll === null || isPollDraftValid(poll));
+    name.trim().length > 0 &&
+    !create.isPending &&
+    (poll === null || isPollDraftValid(poll)) &&
+    !required.isLoading &&
+    missing.length === 0;
 
   // A composer full of links, mentions and chips is a composer full of things
   // that navigate, and navigating away closes the dialog with the whole
@@ -146,6 +170,15 @@ export const CreatePostDialog = ({
             </div>
           </div>
 
+          <RequiredValues
+            keys={required.keys}
+            definitions={definitions ?? []}
+            draft={values}
+            onChange={setValues}
+            initiativeId={initiativeId}
+            idPrefix="create-post"
+          />
+
           <div className="space-y-2">
             {poll === null ? (
               <Button
@@ -182,7 +215,10 @@ export const CreatePostDialog = ({
           <CreateAccessSection initiativeId={initiativeId} grants={grants} onChange={setGrants} />
         </div>
 
-        <DialogFooter>
+        <DialogFooter className="items-center">
+          {missing.length > 0 ? (
+            <p className="text-muted-foreground text-xs">{t("layouts:required.toAdd")}</p>
+          ) : null}
           <Button variant="outline" onClick={() => onOpenChange(false)}>
             {t("common:cancel")}
           </Button>
@@ -196,6 +232,8 @@ export const CreatePostDialog = ({
                 grants,
                 scheduled_for: fromLocalDateTimeInput(scheduledFor),
                 poll: poll ? pollDraftToWrite(poll) : null,
+                tag_ids: values.tags.map((tag) => tag.id),
+                properties: valuesOf(values),
               })
             }
           >

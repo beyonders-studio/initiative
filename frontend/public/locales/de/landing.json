@@ -16,7 +16,7 @@
     "titleAria": "Deine Gruppe hat viel zu tun. Zeit, die Initiative zu ergreifen.",
     "subtitle": "Die Projekte, Aufgaben, Dateien und Pläne deiner Gruppe an einem Ort. Statt verteilt auf einen Gruppenchat, zwei Tabellen, einen E-Mail-Verlauf vom März und den Kopf der Person, die das hier am längsten macht.",
     "freeTitle": "Kostenlos registrieren",
-    "freeBody": "Dein Konto und deine erste Community sind kostenlos, und jeder bezahlte Tarif startet mit 14 Tagen kostenlos zum Testen.",
+    "freeBody": "Dein Konto und Communities, die du für dich allein führst, sind kostenlos, und jeder bezahlte Tarif startet mit 14 Tagen kostenlos zum Testen.",
     "signUp": "Registrieren",
     "signIn": "Anmelden",
     "download": "Download",
@@ -62,13 +62,12 @@
     "note": "Schalte die ein, die deine Gruppe braucht. Ausschalten löscht später nichts.",
     "projects": "Boards, Tabellen und Kalender derselben Aufgaben, mit Konfetti, wenn du willst.",
     "files": "Seiten, Tabellen und Whiteboards, die ihr gemeinsam live bearbeitet.",
-    "queues": "Behalte im Blick, wer dran ist, denn anscheinend ist es nie jemand.",
     "counterGroups": "Verkaufte Tickets, zugesagte Kuchen, immer noch fehlende Stühle.",
     "calendars": "Termine mit Zusagen und Erinnerungen, damit nicht du alle erinnern musst.",
     "dashboards": "Deine Zahlen auf einem Bildschirm, und alle sehen nur, worauf sie Zugriff haben.",
     "wikis": "Schreib auf, was die Gruppe weiß, mit Links, die auch nach dem Umbenennen funktionieren.",
     "posts": "Ankündigungen, die nicht untergehen, mit Umfragen und Lesebestätigungen.",
-    "galleries": "Die Fotos vom Tag beisammen statt in sechs verschiedenen Handys."
+    "contacts": "Alle, für die oder mit denen ihr arbeitet, einen Tipp vom Anruf entfernt, mit allem, was für sie offen ist."
   },
   "together": {
     "titleStart": "Gemacht, um es",
@@ -156,10 +155,6 @@
       "rsvpMaybe": "Vielleicht",
       "rsvpNo": "Kann nicht",
       "reminder": "Erinnerung eine Stunde vorher"
-    },
-    "rota": {
-      "title": "Snackdienst",
-      "detail": "Runde 6, diese Woche ist Luis dran"
     },
     "points": {
       "planTitle": "Gemeinsam planen",

@@ -109,8 +109,6 @@ describe("CreateInitiativeWizard", () => {
       projects_enabled: true,
       files_enabled: true,
       calendars_enabled: true,
-      queues_enabled: false,
-      galleries_enabled: false,
     });
   });
 

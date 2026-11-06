@@ -17,9 +17,8 @@
     "children": {
       "task": "Aufgaben",
       "calendar_event": "Termine",
-      "gallery_image": "Bilder",
-      "queue_item": "Warteschlangeneinträge",
-      "wiki_page": "Seiten"
+      "wiki_page": "Seiten",
+      "collection": "Sammlungen"
     },
     "columns": {
       "in": "In"

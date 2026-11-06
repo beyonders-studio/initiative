@@ -14,12 +14,12 @@ from __future__ import annotations
 
 from app.core.tools import Tool
 from app.models.tenant.calendar import Calendar
+from app.models.tenant.contact import Contact
 from app.models.tenant.counter import Counter, CounterGroup
 from app.models.tenant.dashboard import Dashboard
 from app.models.tenant.file import File, FileVersion
-from app.models.tenant.gallery import Gallery, GalleryImage, GalleryImageVersion
+from app.models.tenant.collection import Collection
 from app.models.tenant.post import Post
-from app.models.tenant.queue import Queue, QueueItem
 from app.models.tenant.wiki import Wiki, WikiPage
 from app.services.fields.derive import derive_fields
 from app.services.fields.spec import Dataset, Hop, Relation
@@ -61,27 +61,6 @@ def build_file_versions() -> Dataset:
     )
 
 
-def build_queues() -> Dataset:
-    return Dataset(model=Queue, tool=Tool.queue, fields=derive_fields(Queue))
-
-
-def build_queue_items() -> Dataset:
-    """One item in a queue. Its own dataset because the question worth asking
-    is about the items, and the queue is what they are grouped by."""
-    return Dataset(
-        model=QueueItem,
-        tool=Tool.queue,
-        name_override="queue_items",
-        fields=derive_fields(QueueItem),
-        relations=(
-            Relation(
-                name="queue",
-                hops=(Hop(dataset="queues", left="queue_id", right="id"),),
-            ),
-        ),
-    )
-
-
 def build_counter_groups() -> Dataset:
     return Dataset(
         model=CounterGroup,
@@ -91,9 +70,9 @@ def build_counter_groups() -> Dataset:
 
 
 def build_counters() -> Dataset:
-    """One counter in a group. Its own dataset for the reason queue items
-    have one: what one counter reads is a question about the counters, and the
-    group is what they are grouped by."""
+    """One counter in a group. Its own dataset because what one counter reads
+    is a question about the counters, and the group is what they are grouped
+    by."""
     return Dataset(
         model=Counter,
         tool=Tool.counter_group,
@@ -132,19 +111,30 @@ def build_posts() -> Dataset:
     )
 
 
-def build_galleries() -> Dataset:
-    return Dataset(model=Gallery, tool=Tool.gallery, fields=derive_fields(Gallery))
+def build_collections() -> Dataset:
+    """A collection in Files, read as its reader sees it: one holding a file
+    they can open."""
+    return Dataset(
+        model=Collection,
+        tool=Tool.file,
+        name_override="collections",
+        fields=derive_fields(Collection),
+    )
 
 
 def build_wikis() -> Dataset:
     return Dataset(model=Wiki, tool=Tool.wiki, fields=derive_fields(Wiki))
 
 
+def build_contacts() -> Dataset:
+    return Dataset(model=Contact, tool=Tool.contact, fields=derive_fields(Contact))
+
+
 def build_wiki_pages() -> Dataset:
-    """One page of a wiki. Its own dataset for the reason queue items and
-    gallery pictures have one: what somebody asks about a wiki — how many
-    pages are still drafts, what has not been touched since spring — is a
-    question about the pages, and the wiki is what they are grouped by.
+    """One page of a wiki. Its own dataset for the reason counters have one:
+    what somebody asks about a wiki — how many pages are still drafts,
+    what has not been touched since spring — is a question about the pages,
+    and the wiki is what they are grouped by.
 
     A page's body and the Yjs state beside it are dropped: one is a structured
     blob and the other is a room's working copy of it, and neither is a value a
@@ -164,44 +154,4 @@ def build_wiki_pages() -> Dataset:
                 hops=(Hop(dataset="wikis", left="wiki_id", right="id"),),
             ),
         ),
-    )
-
-
-def build_gallery_images() -> Dataset:
-    """One picture in a gallery. Its own dataset for the reason queue items
-    have one: the question worth asking — how many arrived this month, which
-    are still untitled — is about the pictures, and the gallery is what they
-    are grouped by."""
-    return Dataset(
-        model=GalleryImage,
-        tool=Tool.gallery,
-        name_override="gallery_images",
-        fields=derive_fields(GalleryImage),
-        relations=(
-            Relation(
-                name="gallery",
-                hops=(Hop(dataset="galleries", left="gallery_id", right="id"),),
-            ),
-            Relation(
-                name="current_version",
-                hops=(
-                    Hop(
-                        dataset="gallery_image_versions",
-                        left="current_version_id",
-                        right="id",
-                    ),
-                ),
-            ),
-        ),
-    )
-
-
-def build_gallery_image_versions() -> Dataset:
-    """One uploaded rendition of a picture: its type, size and dimensions. A
-    picture reaches the one it shows as ``current_version``."""
-    return Dataset(
-        model=GalleryImageVersion,
-        tool=Tool.gallery,
-        name_override="gallery_image_versions",
-        fields=derive_fields(GalleryImageVersion),
     )
