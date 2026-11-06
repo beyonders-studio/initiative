@@ -322,14 +322,6 @@ async def test_initiative_work_names_a_community_contact_one_way(
     )
     assert from_contact.status_code == 200, from_contact.text
     assert from_contact.json() == []
-    # Nor does the graph drawn around it.
-    around = await client.get(
-        a.g("/relationships/neighbourhood"),
-        headers=a.headers,
-        params={"entity": f"contact:{contact_id}", "hops": 2},
-    )
-    assert around.status_code == 200, around.text
-    assert (around.json()["nodes"], around.json()["edges"]) == ([], [])
 
 
 async def test_a_contact_moves_into_the_communitys_contacts(

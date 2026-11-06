@@ -328,12 +328,11 @@ async def get_relations_neighbourhood(
     """
     ref = _parse_ref(entity)
     start = Endpoint(ref.type, ref.id)
-    start_row = await relationships_service.resolve(session, start, current_user.id)
+    await relationships_service.resolve(session, start, current_user.id)
 
     walked = await relationships_service.neighbourhood(
         session,
         start,
-        start_row=start_row,
         hops=hops,
         include_tags=include_tags,
         user_id=current_user.id,

@@ -962,7 +962,6 @@ async def neighbourhood(
     session: AsyncSession,
     start: Endpoint,
     *,
-    start_row: reference_targets.Resolved,
     hops: int,
     include_tags: bool,
     user_id: int | None,
@@ -979,9 +978,7 @@ async def neighbourhood(
 
     Labels are left out of the walk unless asked for. A tag is shared by
     everything carrying it, so walking through one reaches the whole community
-    in a hop. A person is reached and never walked on from, as in :func:`walk`,
-    and a community contact gathers no initiative's content here either
-    (:func:`community_gathers`).
+    in a hop. A person is reached and never walked on from, as in :func:`walk`.
     """
     bounded = max(1, min(hops, MAX_NEIGHBOURHOOD_HOPS))
     depths: dict[Endpoint, int] = {start: 0}
@@ -1024,10 +1021,6 @@ async def neighbourhood(
         frontier = []
         for crossing in crossings:
             if crossing.other not in depths and crossing.other not in ends:
-                continue
-            anchored = start_row if crossing.anchor == start else ends[crossing.anchor]
-            found = start_row if crossing.other == start else ends.get(crossing.other)
-            if found is not None and not community_gathers(anchored, found):
                 continue
             edges.setdefault(crossing.row.id, crossing)  # type: ignore[arg-type]
             if crossing.other in depths:
