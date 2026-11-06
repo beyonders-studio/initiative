@@ -7,7 +7,6 @@ import uuid
 from collections.abc import Sequence
 from enum import Enum
 from functools import lru_cache
-from pathlib import Path
 from typing import Annotated
 from urllib.parse import urlsplit
 
@@ -24,6 +23,8 @@ from pydantic_settings import BaseSettings, NoDecode, SettingsConfigDict
 from sqlalchemy.engine import make_url
 from sqlalchemy.exc import ArgumentError
 from starlette.requests import Request
+
+from app.core.env_files import ENV_FILES
 
 
 # App identity/shape — deliberately constants, not settings: the SPA, the
@@ -361,33 +362,9 @@ def derive_database_password(secret_key: str, role: str) -> str:
     ).hexdigest()
 
 
-#: This checkout's root, the directory above backend/.
-CHECKOUT = Path(__file__).resolve().parents[3]
-
-
-def main_checkout(checkout: Path = CHECKOUT) -> Path:
-    """The main checkout of the repository ``checkout`` is in: ``checkout`` itself,
-    unless it is a linked git worktree. A worktree's ``.git`` is a file naming its
-    directory under the main checkout's ``.git/worktrees/``."""
-    marker = checkout / ".git"
-    if not marker.is_file():
-        return checkout
-    gitdir = marker.read_text().strip().removeprefix("gitdir:").strip()
-    worktrees = (checkout / gitdir).resolve().parent
-    return worktrees.parent.parent if worktrees.name == "worktrees" else checkout
-
-
-# A linked worktree reads the main checkout's backend/.env, then its own on top,
-# so nothing is copied in and a worktree can still set a value of its own (OIDC
-# against a local provider, say).
-_ENV_FILES: tuple[str | Path, ...] = (".env",)
-if main_checkout() != CHECKOUT:
-    _ENV_FILES = (main_checkout() / "backend" / ".env", ".env")
-
-
 class Settings(BaseSettings):
     model_config = SettingsConfigDict(
-        env_file=_ENV_FILES,
+        env_file=ENV_FILES,
         env_file_encoding="utf-8",
         extra="ignore",
         # A setting that fails is named in the error, never shown.

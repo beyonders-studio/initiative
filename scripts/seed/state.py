@@ -9,7 +9,7 @@ from sqlmodel import select
 import app.db.session as db_session
 from app.db.request_context import Unattributed
 from app.db.session import SystemSessionLocal, set_rls_context
-from app.models.platform.app_setting import AppSetting
+from app.models.platform.access_grant import AccessGrant
 from app.services.auth import addresses
 from app.services.platform import rules
 
@@ -21,15 +21,15 @@ async def seed_status() -> str:
 
     The database is the record, so a recreated volume reads as unseeded and
     every checkout on the same database agrees. A seed writes its accounts
-    first and points the deployment at its operations community near the end,
-    so accounts with no pointer are a seed that stopped partway, whose rows the
-    next one would collide with.
+    first and its PAM access grants last, so accounts with no grant are a seed
+    that stopped partway, whose rows the next one would collide with.
     """
     async with SystemSessionLocal() as session:
         if await addresses.account_holding(session, USERS[0][0]) is None:
             return "none"
-        pointer = (await session.exec(select(AppSetting.operations_guild_id))).first()
-    return "complete" if pointer is not None else "partial"
+        await set_rls_context(session, Unattributed())
+        grant = (await session.exec(select(AccessGrant.id).limit(1))).first()
+    return "complete" if grant is not None else "partial"
 
 
 async def clean() -> None:

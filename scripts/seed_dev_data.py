@@ -123,10 +123,6 @@ async def seed() -> None:
         print("\n  --- Community directory ---")
         await directory.seed(session, ids, users, seeded["tides"])
 
-        print("\n  Creating PAM access grants...")
-        await access_grants.seed(
-            session, ids, users, {key: guild.id for key, guild in seeded.items()}
-        )
         # Last, so it covers every community the run created — including the
         # directory fillers, which are seeded after communities 1-3.
         seated = await guilds.seat_superadmin(session, users["Community Superadmin"])
@@ -147,6 +143,13 @@ async def seed() -> None:
         print("  Filing tickets, reports and a hold...")
         filed = await tickets.seed(session, users, seeded["primary"])
         print(f"  {filed} cases waiting in {operations.OPERATIONS_GUILD_NAME}")
+
+        # Last of all: seed_status reads the grants as the sign a seed finished.
+        print("\n  Creating PAM access grants...")
+        await access_grants.seed(
+            session, ids, users, {key: guild.id for key, guild in seeded.items()}
+        )
+        await session.commit()
 
     print("\nDone! Dev data seeded successfully.")
     print(f"  {len(ids['users'])} users (password: changeme)")

@@ -38,15 +38,15 @@ export COMPOSE_FILE="${COMPOSE_FILE:-$DEV_MAIN_ROOT/docker-compose.yml}"
 # A worktree shares the main checkout's dev database unless its branch changes
 # migrations, committed or not. Then it gets a database of its own on the same
 # server, and role names of its own since roles are cluster-wide, so its
-# migrations never reach the database every other checkout runs on.
-# scripts/dev-database.sh creates it; drop_test_dbs.py --orphaned drops it once
-# the worktree is gone.
+# migrations never reach the database every other checkout runs on. A worktree
+# with no origin/dev to compare against gets one too, since nothing then shows
+# its migrations are dev's. scripts/dev-database.sh creates it;
+# drop_test_dbs.py --orphaned drops it once the worktree is gone.
 if [ "$DEV_CHECKOUT_ID" != main ] && [ -z "${DATABASE_NAME:-}" ]; then
     dev_base="$(git -C "$DEV_PORTS_ROOT" merge-base HEAD origin/dev 2>/dev/null || true)"
-    if [ -n "$dev_base" ] && {
+    if [ -z "$dev_base" ] ||
         [ -n "$(git -C "$DEV_PORTS_ROOT" diff --name-only "$dev_base" -- backend/alembic/versions)" ] ||
-            [ -n "$(git -C "$DEV_PORTS_ROOT" ls-files --others --exclude-standard -- backend/alembic/versions)" ]
-    }; then
+        [ -n "$(git -C "$DEV_PORTS_ROOT" ls-files --others --exclude-standard -- backend/alembic/versions)" ]; then
         export DATABASE_NAME="initiative_dev_$DEV_CHECKOUT_ID"
         export GUILD_ROLE_PREFIX="dev_${DEV_CHECKOUT_ID}_"
         export PLATFORM_ROLE_PREFIX="dev_${DEV_CHECKOUT_ID}_"

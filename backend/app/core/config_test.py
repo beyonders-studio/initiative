@@ -12,7 +12,6 @@ from app.core.config import (
     DEFAULT_OIDC_SCOPES,
     Settings,
     derive_database_password,
-    main_checkout,
 )
 
 # Test-only key satisfying the SECRET_KEY validator (64 hex chars). Not a secret.
@@ -604,15 +603,3 @@ def test_database_name_points_every_url_at_that_database():
             settings.DATABASE_URL_ADMIN,
         ):
             assert make_url(url).database == "initiative_dev_ab12cd34"
-
-
-def test_a_linked_worktree_finds_its_main_checkout(tmp_path):
-    main = tmp_path / "initiative"
-    linked = tmp_path / "initiative-wt" / "feature"
-    (main / ".git" / "worktrees" / "feature").mkdir(parents=True)
-    linked.mkdir(parents=True)
-    (linked / ".git").write_text(f"gitdir: {main}/.git/worktrees/feature\n")
-    assert main_checkout(linked) == main.resolve()
-    (linked / ".git").write_text("gitdir: ../../initiative/.git/worktrees/feature\n")
-    assert main_checkout(linked) == main.resolve()
-    assert main_checkout(main) == main

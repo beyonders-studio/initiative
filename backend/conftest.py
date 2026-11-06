@@ -28,6 +28,7 @@ from alembic.script import ScriptDirectory
 from cryptography.hazmat.primitives import serialization as _serialization
 from cryptography.hazmat.primitives.asymmetric import ed25519 as _ed25519
 from httpx import ASGITransport, AsyncClient
+from pydantic_settings import BaseSettings, SettingsConfigDict
 from starlette.requests import HTTPConnection
 from sqlalchemy import event, text
 from sqlalchemy.ext.asyncio import AsyncEngine, async_sessionmaker, create_async_engine
@@ -36,11 +37,25 @@ from starlette.testclient import TestClient
 from sqlmodel import SQLModel
 from sqlmodel.ext.asyncio.session import AsyncSession
 
-# The suite needs no .env: it runs with this test-only key unless SECRET_KEY is
-# exported. 64 hex characters; not a secret.
-os.environ.setdefault(
-    "SECRET_KEY", "5b0e9c2d7a41f8e3c6b5d4a29f1e0c7b8a6d5e4f3c2b1a09f8e7d6c5b4a39281"
-)
+from app.core.env_files import ENV_FILES
+
+
+class _ConfiguredKey(BaseSettings):
+    """SECRET_KEY alone, read from where the app's settings read it."""
+
+    model_config = SettingsConfigDict(env_file=ENV_FILES, extra="ignore")
+    SECRET_KEY: str = ""
+
+
+# The suite runs with this test-only key (64 hex characters; not a secret) when
+# neither the environment nor a .env file sets SECRET_KEY, so it needs no .env.
+# A key that is set is kept: the bootstrap derives the passwords of the app's
+# server-wide logins from it, and a dev server on the same Postgres connects
+# with those logins too.
+if not _ConfiguredKey().SECRET_KEY:
+    os.environ["SECRET_KEY"] = (
+        "5b0e9c2d7a41f8e3c6b5d4a29f1e0c7b8a6d5e4f3c2b1a09f8e7d6c5b4a39281"
+    )
 
 from app.core.config import settings
 from app.api import content_socket
