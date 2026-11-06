@@ -893,6 +893,10 @@ def test_a_statement_names_rows_by_id_where_a_column_holds_one():
             "SELECT title FROM tasks WHERE project_id = CAST(12 AS integer)",
             "SELECT title FROM tasks WHERE project_id = CAST(12 AS integer)",
         ),
+        (
+            "SELECT title FROM tasks WHERE project_id IN (1 + 12, NULL, 12)",
+            "SELECT title FROM tasks WHERE project_id IN (1 + 12, NULL, 120)",
+        ),
         ("SELECT a FROM nowhere WHERE id = 12", "SELECT a FROM nowhere WHERE id = 12"),
     ):
         assert remap_ids(sql, remap) == expected, sql

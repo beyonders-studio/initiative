@@ -37,6 +37,7 @@ from __future__ import annotations
 
 import json
 from dataclasses import dataclass
+from itertools import islice
 from typing import Any, Callable, Mapping, Optional, Sequence
 
 from fastapi import status
@@ -1309,14 +1310,27 @@ def remap_ids(sql: str, remap: Callable[[SearchEntityType, int], int]) -> str:
         if not isinstance(location, int):
             # A join the resolver wrote in, which nobody typed.
             return
-        tokens = [token for token in numbers if token.start > location][: len(values)]
-        for token, value in zip(tokens, values):
+        # Each integer a value holds is written as one number token, in order,
+        # so a value takes as many tokens as it holds integers, and only a
+        # value that is one integer names a row.
+        tokens = iter([token for token in numbers if token.start > location])
+        for value in values:
+            held = 0
+
+            class Count(Visitor):
+                def visit_A_Const(self, ancestors: Any, constant: ast.A_Const) -> None:
+                    nonlocal held
+                    held += isinstance(constant.val, ast.Integer)
+
+            Count()(value)
+            taken = list(islice(tokens, held))
             if (
                 isinstance(value, ast.A_Const)
                 and isinstance(value.val, ast.Integer)
-                and sql[token.start : token.end + 1] == str(value.val.ival)
+                and len(taken) == 1
+                and sql[taken[0].start : taken[0].end + 1] == str(value.val.ival)
             ):
-                found.append((token.start, kind, value.val.ival))
+                found.append((taken[0].start, kind, value.val.ival))
 
     class Sheets(Visitor):
         def visit_FuncCall(self, ancestors: Any, call: ast.FuncCall) -> None:
