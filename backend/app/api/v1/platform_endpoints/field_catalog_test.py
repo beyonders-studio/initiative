@@ -13,7 +13,7 @@ from app.api.v1.platform_endpoints.field_catalog import read_query_vocabulary
 from app.models.platform.guild import CommunityRole
 from app.services.fields import dataset
 from app.services.fields.registry import dataset_names
-from app.services.query.resolve import QueryError, resolve
+from app.services.query.resolve import SHEET, QueryError, resolve
 
 
 class TestTheVocabularyIsTheValidatorsOwn:
@@ -39,8 +39,14 @@ class TestTheVocabularyIsTheValidatorsOwn:
         }
         for function in read_query_vocabulary().functions:
             call = calls.get(function, f"{function}(position)")
+            # ``sheet`` is read from, so it is called where a relation goes.
+            sql = (
+                f"SELECT count(*) AS v FROM {SHEET}('Budget')"
+                if function == SHEET
+                else f"SELECT {call} AS v FROM tasks"
+            )
             try:
-                resolve(f"SELECT {call} AS v FROM tasks")
+                resolve(sql)
             except QueryError as refused:
                 pytest.fail(f"{function} is offered but refused: {refused}")
 
