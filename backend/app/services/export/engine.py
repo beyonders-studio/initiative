@@ -11,8 +11,9 @@ adapter queried, and the download endpoint re-gates on the DataJob row.
 from __future__ import annotations
 
 import asyncio
+import zipfile
 from collections.abc import Awaitable, Callable
-from dataclasses import dataclass
+from dataclasses import dataclass, replace
 from datetime import datetime
 from typing import Any, Protocol
 
@@ -31,7 +32,7 @@ from app.services.export.contract import (
     RenderRequest,
 )
 from app.services.export.local_backend import LocalRenderBackend
-from app.services.storage import get_guild_storage
+from app.services.storage import StorageBackend, blob_pieces, get_guild_storage
 from app.services.export import limits as export_limits
 from app.core.user_input_validators import resolve_zone
 from app.core.user_display import name_here
@@ -326,8 +327,10 @@ async def _stream_zip_to_storage(
     """Build the archive on disk, then put the file where it belongs.
 
     Peak memory is one artifact plus the zip's compressor state, instead of
-    every rendered artifact and a second full copy in the zip buffer. The temp
-    file is removed either way; a failed job leaves nothing behind.
+    every rendered artifact and a second full copy in the zip buffer. A stored
+    file that goes in unconverted is not rendered at all: it is copied from
+    storage into its entry a piece at a time, however large. The temp file is
+    removed either way; a failed job leaves nothing behind.
 
     The routing decision is made on the **assembled** size rather than on the
     pre-flight estimate, because the estimate counts stored blob bytes and the
@@ -337,12 +340,17 @@ async def _stream_zip_to_storage(
     """
     from app.services.export import delivery
     import tempfile
-    import zipfile
     from pathlib import Path
 
     # Same naming as the eager path so the download endpoint recovers the same
     # filename: `exports/{job_id}-{stem}.zip`, prefix stripped on the way out.
     key = f"exports/{job_id}-{stem}.zip"
+    storage = get_guild_storage(request.guild_id)
+    copied = [i for i in request.batch if (i.format or request.format) == "file"]
+    rendered = replace(
+        request,
+        batch=tuple(i for i in request.batch if (i.format or request.format) != "file"),
+    )
     handle = tempfile.NamedTemporaryFile(suffix=".zip", delete=False)
     handle.close()
     tmp_path = Path(handle.name)
@@ -354,11 +362,18 @@ async def _stream_zip_to_storage(
             zipfile.ZipFile, tmp_path, "w", zipfile.ZIP_DEFLATED
         )
         try:
-            async for artifact in render_artifacts(request):
+            async for artifact in render_artifacts(rendered):
                 name = artifact.filename or f"{artifact.key}.{request.format}"
                 name = _dedupe_name(name, taken)
                 taken.add(name)
                 await asyncio.to_thread(archive.writestr, name, artifact.content)
+                await heartbeat()
+            for item in copied:
+                name = _dedupe_name(item.filename or f"{item.key}.file", taken)
+                taken.add(name)
+                await asyncio.to_thread(
+                    _copy_stored, archive, name, storage, str(item.data["storage_key"])
+                )
                 await heartbeat()
         finally:
             await asyncio.to_thread(archive.close)
@@ -375,13 +390,25 @@ async def _stream_zip_to_storage(
                 filename=f"{stem}-{job_id}.zip",
             )
             return ArtifactLocation(destination_ref=destination_ref)
-        storage = get_guild_storage(request.guild_id)
         await asyncio.to_thread(
             storage.write_file, key, tmp_path, content_type="application/zip"
         )
     finally:
         await asyncio.to_thread(tmp_path.unlink, missing_ok=True)
     return ArtifactLocation(artifact_ref=key)
+
+
+def _copy_stored(
+    archive: zipfile.ZipFile, name: str, storage: StorageBackend, key: str
+) -> None:
+    """Write the stored file ``key`` into ``archive`` as ``name``, a piece at a
+    time. Blocking; run it in a thread."""
+    blob = storage.open_readable(key)
+    if blob is None:
+        raise FileNotFoundError(key)
+    with archive.open(name, "w", force_zip64=True) as entry:
+        for piece in blob_pieces(blob):
+            entry.write(piece)
 
 
 def _bundle_stem(source: str, tz: str | None) -> str:
