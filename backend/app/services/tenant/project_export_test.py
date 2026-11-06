@@ -7,6 +7,7 @@ checklists, assignees, and property values.
 """
 
 from datetime import datetime, timezone
+from decimal import Decimal
 
 import pytest
 from pydantic import ValidationError
@@ -858,6 +859,54 @@ async def test_property_options_label_only_difference_matches(session: AsyncSess
     )
     assert result.renamed_property_count == 0
     assert result.matched["properties"] == 1
+
+
+async def test_a_counter_matches_only_one_kept_to_its_settings(session: AsyncSession):
+    """A counter of the same name that steps or stops otherwise is another
+    counter: the import makes its own and keeps its count. One with the same
+    settings is the same counter."""
+    owner, _, guild, source_initiative, source_project = await _seed_populated_project(
+        session
+    )
+    settings = {"step": 1, "min": 0, "max": 100, "initial": 0}
+    seats = await create_property_definition(
+        session,
+        source_initiative,
+        name="Seats",
+        type=MetadataType.counter,
+        counter=settings,
+    )
+    task = (
+        await session.exec(select(Task).where(Task.project_id == source_project.id))
+    ).first()
+    await create_property_value(session, task, seats, value_number=Decimal("50"))
+    envelope = await export_service.build_project_export(
+        session, await get_project_hydrated(session, source_project.id)
+    )
+    tight = await create_initiative(session, guild, owner, name="Tight")
+    same = await create_initiative(session, guild, owner, name="Same")
+    for target, counter in ((tight, {**settings, "max": 5}), (same, settings)):
+        await create_property_definition(
+            session, target, name="Seats", type=MetadataType.counter, counter=counter
+        )
+
+    renamed = await import_service.import_project(
+        session, envelope=envelope, target_initiative=tight, importer=owner
+    )
+    matched = await import_service.import_project(
+        session, envelope=envelope, target_initiative=same, importer=owner
+    )
+
+    assert (renamed.renamed_property_count, matched.renamed_property_count) == (1, 0)
+    kept = await session.exec(
+        select(MetadataDefinition.counter, MetadataValue.value_number)
+        .join(MetadataValue, MetadataValue.property_id == MetadataDefinition.id)
+        .where(
+            MetadataDefinition.initiative_id == tight.id,
+            MetadataDefinition.name == "Seats_counter",
+        )
+    )
+    assert kept.one() == (settings, Decimal("50"))
 
 
 async def test_unmatched_assignees_reported(session: AsyncSession):

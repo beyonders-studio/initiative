@@ -352,6 +352,12 @@ class PropertyRestore:
                 )
                 # Amounts in one currency are not amounts in another.
                 and found.currency == currency
+                # Nor is a count kept to one step and bounds kept to others.
+                and (
+                    declared is None
+                    or found.counter is None
+                    or CounterSettings.model_validate(found.counter) == counter
+                )
             ):
                 self.matched += 1
                 self._resolved[key] = found
