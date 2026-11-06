@@ -16,7 +16,7 @@
     {
       "label": "dev:db-start",
       "type": "shell",
-      "command": "docker compose up db -d --wait",
+      "command": ". scripts/dev-ports.sh && docker compose up db -d --wait",
       "options": { "cwd": "${workspaceFolder}" },
       "presentation": { "reveal": "silent", "panel": "shared" },
       "dependsOn": ["dev:free-ports"]
