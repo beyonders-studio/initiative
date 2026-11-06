@@ -1,4 +1,5 @@
 import {
+  type CounterSettingsInput,
   type ListLayoutDefinitionInputDisplays,
   MetadataType,
   type PropertyDefinitionRead,
@@ -22,11 +23,47 @@ export const slugify = (raw: string): string =>
     .replace(/^_+|_+$/g, "")
     .slice(0, 64);
 
-/** How a scale is drawn: a number, five stars, or a bar. */
-export type ScaleDisplay = NonNullable<ListLayoutDefinitionInputDisplays>[string];
+/** How a scale or a counter is drawn: a scale as a number, five stars or a
+ *  bar; a counter as a number, a bar or a clock. */
+export type FieldDisplay = NonNullable<ListLayoutDefinitionInputDisplays>[string];
 
 /** How each way of drawing a scale is offered, in order. */
-export const SCALE_DISPLAYS: ScaleDisplay[] = ["number", "stars", "bar"];
+export const SCALE_DISPLAYS = ["number", "stars", "bar"] as const satisfies FieldDisplay[];
+
+/** How each way of drawing a counter is offered, in order. */
+export const COUNTER_DISPLAYS = ["number", "bar", "clock"] as const satisfies FieldDisplay[];
+
+/** A counter's settings with every default filled in. */
+export const counterSettings = (settings: CounterSettingsInput | null | undefined) => ({
+  step: settings?.step ?? 1,
+  min: settings?.min ?? null,
+  max: settings?.max ?? null,
+  initial: settings?.initial ?? 0,
+});
+
+/** `count` held to a counter's bounds. */
+export const withinBounds = (settings: CounterSettingsInput | null | undefined, count: number) => {
+  const { min, max } = counterSettings(settings);
+  return Math.min(
+    max ?? Number.POSITIVE_INFINITY,
+    Math.max(min ?? Number.NEGATIVE_INFINITY, count)
+  );
+};
+
+/** What a counter holds: its value, or its initial value where it has none. */
+export const counterCount = (settings: CounterSettingsInput | null | undefined, raw: unknown) =>
+  numericValue(raw) ?? counterSettings(settings).initial;
+
+/** What a counter holds once it is stepped up or down, within its bounds. */
+export const steppedCount = (
+  settings: CounterSettingsInput | null | undefined,
+  raw: unknown,
+  up: boolean
+) => {
+  const { step } = counterSettings(settings);
+  const count = counterCount(settings, raw);
+  return withinBounds(settings, up ? count + step : count - step);
+};
 
 /** The figure a scale holds, from 0 to 100, or null where it holds none. A
  *  plug-in's may carry a state beside it, as `{value, state}`. */
@@ -166,5 +203,6 @@ export const propertyStubFromDefinition = (
   key: null,
   options: definition.options ?? null,
   currency: definition.currency ?? null,
+  counter: definition.counter ?? null,
   value: null,
 });

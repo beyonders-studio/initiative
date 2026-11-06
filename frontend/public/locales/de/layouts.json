@@ -279,6 +279,12 @@
     "stars": "Sterne",
     "bar": "Balken"
   },
+  "counterDisplay": {
+    "label": "Zähler anzeigen als",
+    "number": "Zahl",
+    "bar": "Balken",
+    "clock": "Uhr"
+  },
   "fieldProperty": {
     "metadata": "Metadaten",
     "metadataHelp": "Das sind Metadaten der Initiative. Sie werden in ihren Einstellungen bearbeitet.",

@@ -3,6 +3,7 @@ import { type ReactNode, useEffect, useMemo, useState } from "react";
 import { useTranslation } from "react-i18next";
 
 import {
+  type CounterSettingsInput,
   type CurrencyCode,
   MetadataType,
   type PropertyDefinitionCreate,
@@ -11,6 +12,10 @@ import {
   type PropertyDefinitionUpdate,
   type PropertyOption,
 } from "@/api/generated/initiativeAPI.schemas";
+import {
+  CounterSettingsFields,
+  counterSettingsValid,
+} from "@/components/properties/CounterSettingsFields";
 import { CurrencySelect, useDefaultCurrency } from "@/components/properties/CurrencySelect";
 import { PROPERTY_TYPES } from "@/components/properties/NewPropertyForm";
 import { normalizeOptionList, typeRequiresOptions } from "@/components/properties/propertyHelpers";
@@ -63,6 +68,8 @@ interface FormState {
   options: PropertyOption[];
   /** A money property's currency. */
   currency: CurrencyCode;
+  /** A counter's step, bounds and reset value. */
+  counter: CounterSettingsInput;
 }
 
 const emptyFormState = (currency: CurrencyCode): FormState => ({
@@ -71,6 +78,7 @@ const emptyFormState = (currency: CurrencyCode): FormState => ({
   color: null,
   options: [],
   currency,
+  counter: {},
 });
 
 const definitionToFormState = (
@@ -81,6 +89,7 @@ const definitionToFormState = (
   type: definition.type,
   color: definition.color,
   currency: definition.currency ?? currency,
+  counter: definition.counter ?? {},
   options: (definition.options ?? []).map((option) => ({
     value: option.value,
     label: option.label,
@@ -273,6 +282,7 @@ const PropertyDialog = ({
     if (typeRequiresOptions(formState.type)) {
       return normalizeOptionList(formState.options).length > 0;
     }
+    if (formState.type === MetadataType.counter) return counterSettingsValid(formState.counter);
     return true;
   }, [formState]);
 
@@ -293,6 +303,7 @@ const PropertyDialog = ({
         color: formState.color ?? null,
         options,
         ...(formState.type === MetadataType.currency ? { currency: formState.currency } : {}),
+        ...(formState.type === MetadataType.counter ? { counter: formState.counter } : {}),
         position,
       };
       try {
@@ -312,6 +323,7 @@ const PropertyDialog = ({
       // decide whether to include options in the PATCH payload.
       options: typeRequiresOptions(definition.type) ? options : undefined,
       currency: definition.type === MetadataType.currency ? formState.currency : undefined,
+      counter: definition.type === MetadataType.counter ? formState.counter : undefined,
     };
     try {
       const response = await updateMutation.mutateAsync({
@@ -398,6 +410,13 @@ const PropertyDialog = ({
                 onChange={(currency) => setFormState((prev) => ({ ...prev, currency }))}
               />
             </div>
+          ) : null}
+
+          {formState.type === MetadataType.counter ? (
+            <CounterSettingsFields
+              value={formState.counter}
+              onChange={(counter) => setFormState((prev) => ({ ...prev, counter }))}
+            />
           ) : null}
 
           <div className="space-y-2">

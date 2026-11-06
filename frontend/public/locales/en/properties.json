@@ -21,6 +21,7 @@
     "user_reference": "Person",
     "currency": "Money",
     "scale": "Scale",
+    "counter": "Counter",
     "link": "Link",
     "badge": "Badge",
     "json": "Data"
@@ -59,7 +60,10 @@
     "optionAddFailed": "Could not add option",
     "scalePlaceholder": "0–100",
     "stars_one": "{{count}} star",
-    "stars_other": "{{count}} stars"
+    "stars_other": "{{count}} stars",
+    "stepDown": "Step {{name}} down",
+    "stepUp": "Step {{name}} up",
+    "reset": "Reset {{name}}"
   },
   "cell": {
     "emptyValue": "—",
@@ -132,5 +136,17 @@
     "label": "Currency",
     "none": "No currency matches",
     "default": "USD"
+  },
+  "counter": {
+    "step": "Step",
+    "min": "Minimum",
+    "max": "Maximum",
+    "initial": "Initial value",
+    "stepPlaceholder": "1",
+    "minPlaceholder": "None",
+    "maxPlaceholder": "None",
+    "initialPlaceholder": "0",
+    "stepPositive": "The step has to be more than zero",
+    "minAboveMax": "The minimum can't be more than the maximum"
   }
 }

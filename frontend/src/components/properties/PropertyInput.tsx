@@ -1,4 +1,4 @@
-import { Check, ChevronDown, Plus, Star, X } from "lucide-react";
+import { Check, ChevronDown, Minus, Plus, RotateCcw, Star, X } from "lucide-react";
 import { useMemo, useState } from "react";
 import { useTranslation } from "react-i18next";
 
@@ -29,7 +29,15 @@ import { useAppendPropertyOption } from "@/hooks/useProperties";
 import { toPickerValue } from "@/lib/localDateTime";
 import { cn } from "@/lib/utils";
 
-import { type ScaleDisplay, scaleValue } from "./propertyHelpers";
+import {
+  counterCount,
+  counterSettings,
+  type FieldDisplay,
+  numericValue,
+  scaleValue,
+  steppedCount,
+  withinBounds,
+} from "./propertyHelpers";
 
 type PropertyDefinitionLike = PropertyDefinitionRead | PropertySummary;
 
@@ -54,7 +62,11 @@ export interface PropertyInputProps {
   selectedUser?: MemberLike | null;
   /** How a scale is set: as a number, by stars, or along a bar. A number
    *  without. */
-  display?: ScaleDisplay | null;
+  display?: FieldDisplay | null;
+  /** Steps a counter from what it holds when the step lands, so two people
+   *  stepping it at once both count. Without it, a step is a value like any
+   *  other: something nothing has saved yet, a filter. */
+  onStep?: (up: boolean) => void;
 }
 
 // ── Type guards / coercion helpers ──────────────────────────────────────────
@@ -113,6 +125,7 @@ const toDefinitionForPatch = (defn: PropertyDefinitionLike): PropertyDefinitionR
     color: null,
     options: summary.options ?? null,
     currency: summary.currency ?? null,
+    counter: summary.counter ?? null,
     project_id: summary.project_id,
     collection_id: summary.collection_id,
     created_at: "",
@@ -133,7 +146,7 @@ const ScaleInput = ({
   name: string;
   value: number | null;
   onChange: (value: unknown) => void;
-  display: ScaleDisplay;
+  display: FieldDisplay;
   disabled: boolean;
   className?: string;
 }) => {
@@ -205,6 +218,78 @@ const ScaleInput = ({
   );
 };
 
+/** A counter: stepped down and up by its step, typed, or reset to its
+ *  initial value, never past its bounds. */
+const CounterInput = ({
+  definition,
+  value,
+  onChange,
+  onStep,
+  disabled,
+  className,
+}: {
+  definition: PropertyDefinitionLike;
+  value: unknown;
+  onChange: (value: unknown) => void;
+  onStep?: (up: boolean) => void;
+  disabled: boolean;
+  className?: string;
+}) => {
+  const { t } = useTranslation("properties");
+  const settings = counterSettings(definition.counter);
+  const count = counterCount(settings, value);
+  const step = (up: boolean) => (onStep ? onStep(up) : onChange(steppedCount(settings, value, up)));
+  return (
+    <div className={cn("flex items-center gap-1", className)}>
+      <Button
+        type="button"
+        variant="outline"
+        size="icon-sm"
+        aria-label={t("input.stepDown", { name: definition.name })}
+        disabled={disabled || (settings.min !== null && count <= settings.min)}
+        onClick={() => step(false)}
+      >
+        <Minus className="h-4 w-4" />
+      </Button>
+      <Input
+        type="number"
+        inputMode="decimal"
+        step="any"
+        aria-label={definition.name}
+        value={coerceNumber(value)}
+        onChange={(e) => {
+          const parsed = numericValue(e.target.value);
+          onChange(parsed === null ? null : withinBounds(settings, parsed));
+        }}
+        placeholder={String(settings.initial)}
+        disabled={disabled}
+        className="w-24 bg-transparent text-center tabular-nums"
+      />
+      <Button
+        type="button"
+        variant="outline"
+        size="icon-sm"
+        aria-label={t("input.stepUp", { name: definition.name })}
+        disabled={disabled || (settings.max !== null && count >= settings.max)}
+        onClick={() => step(true)}
+      >
+        <Plus className="h-4 w-4" />
+      </Button>
+      <Button
+        type="button"
+        variant="ghost"
+        size="icon-sm"
+        className="text-muted-foreground"
+        aria-label={t("input.reset", { name: definition.name })}
+        disabled={disabled || count === withinBounds(settings, settings.initial)}
+        onClick={() => onChange(withinBounds(settings, settings.initial))}
+      >
+        <RotateCcw className="h-4 w-4" />
+      </Button>
+    </div>
+  );
+};
+
 // ── Component ──────────────────────────────────────────────────────────────
 
 export const PropertyInput = ({
@@ -217,6 +302,7 @@ export const PropertyInput = ({
   canOpen,
   selectedUser,
   display,
+  onStep,
 }: PropertyInputProps) => {
   const { t } = useTranslation(["properties", "common"]);
 
@@ -296,6 +382,19 @@ export const PropertyInput = ({
           value={scaleValue(value)}
           onChange={onChange}
           display={display ?? "number"}
+          disabled={disabled}
+          className={className}
+        />
+      );
+    }
+
+    case MetadataType.counter: {
+      return (
+        <CounterInput
+          definition={definition}
+          value={value}
+          onChange={onChange}
+          onStep={onStep}
           disabled={disabled}
           className={className}
         />

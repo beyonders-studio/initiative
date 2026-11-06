@@ -10,7 +10,11 @@ import {
 } from "@/api/generated/initiativeAPI.schemas";
 import { InitiativeSettingsPropertiesTab } from "@/components/initiatives/settings/InitiativeSettingsPropertiesTab";
 import { listLayoutLooks } from "@/components/projects/projectTasksConfig";
-import { SCALE_DISPLAYS, type ScaleDisplay } from "@/components/properties/propertyHelpers";
+import {
+  COUNTER_DISPLAYS,
+  type FieldDisplay,
+  SCALE_DISPLAYS,
+} from "@/components/properties/propertyHelpers";
 import { TaskStatusOption } from "@/components/tasks/TaskStatusOption";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -99,10 +103,10 @@ export const ListLayoutSettings = ({
             return node?.type === "field" ? String(node.props?.field) : null;
           })()
         : null;
-  const scale =
-    selectedField !== null && fields.get(selectedField)?.property?.type === MetadataType.scale
-      ? selectedField
-      : null;
+  // A scale or a counter selected, which the list may draw in more than one way.
+  const drawnType = selectedField !== null ? fields.get(selectedField)?.property?.type : undefined;
+  const drawn =
+    drawnType === MetadataType.scale || drawnType === MetadataType.counter ? drawnType : null;
   return (
     // Disabled as one, so a save under way leaves every control as it was.
     <fieldset disabled={locked} className="min-w-0">
@@ -159,10 +163,11 @@ export const ListLayoutSettings = ({
           edits={edits}
         />
       )}
-      {scale !== null ? (
-        <ScaleDisplaySetting
-          value={layout.definition.displays?.[scale] ?? "number"}
-          onChange={(display) => edits.changeDisplay(scale, display)}
+      {selectedField !== null && drawn !== null ? (
+        <DisplaySetting
+          type={drawn}
+          value={layout.definition.displays?.[selectedField] ?? "number"}
+          onChange={(display) => edits.changeDisplay(selectedField, display)}
         />
       ) : null}
       {selectedField !== null ? <MetadataFieldNote field={selectedField} fields={fields} /> : null}
@@ -198,26 +203,42 @@ const MetadataFieldNote = ({
   );
 };
 
-/** How the list draws the scale selected: a number, five stars, or a bar. */
-const ScaleDisplaySetting = ({
+/** How the list draws the scale or counter selected: a scale as a number,
+ *  five stars or a bar; a counter as a number, a bar or a clock. */
+const DisplaySetting = ({
+  type,
   value,
   onChange,
 }: {
-  value: ScaleDisplay;
-  onChange: (display: ScaleDisplay) => void;
+  type: typeof MetadataType.scale | typeof MetadataType.counter;
+  value: FieldDisplay;
+  onChange: (display: FieldDisplay) => void;
 }) => {
   const { t } = useTranslation(["layouts"]);
+  const [label, offered] =
+    type === MetadataType.scale
+      ? [
+          t("layouts:scaleDisplay.label"),
+          SCALE_DISPLAYS.map((display) => [display, t(`layouts:scaleDisplay.${display}`)]),
+        ]
+      : [
+          t("layouts:counterDisplay.label"),
+          COUNTER_DISPLAYS.map((display) => [display, t(`layouts:counterDisplay.${display}`)]),
+        ];
   return (
     <div className="space-y-2 px-4 pb-4">
-      <Label htmlFor="scale-display">{t("layouts:scaleDisplay.label")}</Label>
-      <Select value={value} onValueChange={(next) => onChange(next as ScaleDisplay)}>
-        <SelectTrigger id="scale-display">
+      <Label htmlFor="field-display">{label}</Label>
+      <Select
+        value={offered.some(([display]) => display === value) ? value : "number"}
+        onValueChange={(next) => onChange(next as FieldDisplay)}
+      >
+        <SelectTrigger id="field-display">
           <SelectValue />
         </SelectTrigger>
         <SelectContent>
-          {SCALE_DISPLAYS.map((display) => (
+          {offered.map(([display, name]) => (
             <SelectItem key={display} value={display}>
-              {t(`layouts:scaleDisplay.${display}`)}
+              {name}
             </SelectItem>
           ))}
         </SelectContent>

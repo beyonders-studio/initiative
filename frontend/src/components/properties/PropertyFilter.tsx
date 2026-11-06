@@ -81,6 +81,7 @@ export const opsForType = (type: MetadataType): BackendOp[] => {
     case MetadataType.number:
     case MetadataType.currency:
     case MetadataType.scale:
+    case MetadataType.counter:
     case MetadataType.date:
     case MetadataType.datetime:
       return ["eq", "lt", "lte", "gt", "gte", "is_null"];
@@ -169,7 +170,11 @@ export const PropertyFilter = ({
         key: `${PROPERTY_KEY}${definition.id}`,
         name: definition.name,
         type: definition.type,
-        input: definition,
+        // A counter is compared with a number typed in, not stepped to one.
+        input:
+          definition.type === MetadataType.counter
+            ? { ...definition, type: MetadataType.number }
+            : definition,
         plugin: false,
       })),
       ...(plugins?.fields ?? []).map((field) => ({
@@ -186,6 +191,7 @@ export const PropertyFilter = ({
           key: null,
           options: null,
           currency: null,
+          counter: null,
           value: null,
         },
         plugin: true,

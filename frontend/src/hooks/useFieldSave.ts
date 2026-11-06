@@ -18,6 +18,7 @@ import { createContext, useContext, useEffect, useMemo, useRef, useState } from 
 import { useTranslation } from "react-i18next";
 
 import type {
+  PropertyStep,
   PropertySummary,
   PropertyTarget,
   PropertyValueInput,
@@ -32,11 +33,13 @@ import { toast } from "@/lib/mascotToast";
 import { currentServerKey } from "@/lib/offlineSession";
 
 /** A change to some of an item's fields: what is sent, and how the item reads
- *  once it is saved. A change to its properties names only those it sets or
- *  takes off, so one person's leaves another's standing. */
+ *  once it is saved. A change to its properties names only those it sets,
+ *  takes off or steps, so one person's leaves another's standing. */
 export type ItemEdit<I, P> = { shows: Partial<I> } & (
   | { patch: P }
-  | { properties: { values: PropertyValueInput[]; removed?: number[] } }
+  | {
+      properties: { values: PropertyValueInput[]; removed?: number[]; steps?: PropertyStep[] };
+    }
 );
 
 /** One field's save, as {@link useItemFieldSave} answers it. */

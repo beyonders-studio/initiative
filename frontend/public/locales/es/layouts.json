@@ -279,6 +279,12 @@
     "stars": "Estrellas",
     "bar": "Una barra"
   },
+  "counterDisplay": {
+    "label": "Mostrar el contador como",
+    "number": "Un número",
+    "bar": "Una barra",
+    "clock": "Un reloj"
+  },
   "fieldProperty": {
     "metadata": "Metadatos",
     "metadataHelp": "Son metadatos de la iniciativa, que se editan en su configuración.",

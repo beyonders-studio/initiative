@@ -14,7 +14,7 @@ import type {
   ToolLayoutSetRead,
 } from "@/api/generated/initiativeAPI.schemas";
 import { listLayoutLooks } from "@/components/projects/projectTasksConfig";
-import type { ScaleDisplay } from "@/components/properties/propertyHelpers";
+import type { FieldDisplay } from "@/components/properties/propertyHelpers";
 import { Button } from "@/components/ui/button";
 import { ConfirmDialog } from "@/components/ui/confirm-dialog";
 import {
@@ -128,7 +128,7 @@ export type LayoutEdits = {
   /** At `index`, or last. */
   addColumn: (field: string, index?: number) => void;
   /** The open list draws the scale `field` as `display`. */
-  changeDisplay: (field: string, display: ScaleDisplay) => void;
+  changeDisplay: (field: string, display: FieldDisplay) => void;
   /** The open list offers `presets`, in order. */
   changePresets: (presets: LayoutPreset[]) => void;
   /** The open list offers `groupings`, in order, and starts grouped by

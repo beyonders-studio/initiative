@@ -279,6 +279,12 @@
     "stars": "Stars",
     "bar": "A bar"
   },
+  "counterDisplay": {
+    "label": "Show the counter as",
+    "number": "A number",
+    "bar": "A bar",
+    "clock": "A clock"
+  },
   "fieldProperty": {
     "metadata": "Metadata",
     "metadataHelp": "This is the initiative's metadata, which is edited in its settings.",

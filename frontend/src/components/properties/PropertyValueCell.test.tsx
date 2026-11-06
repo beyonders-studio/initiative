@@ -39,6 +39,27 @@ describe("PropertyValueCell", () => {
     expect(bar.firstElementChild).toHaveStyle({ width: "61%" });
   });
 
+  it("draws a counter as a number, a bar or a clock, from its initial value", () => {
+    const counter = buildPropertySummary({
+      type: MetadataType.counter,
+      counter: { step: 1, min: 0, max: 4, initial: 3 },
+      value: null,
+    });
+    const { rerender } = renderWithProviders(<PropertyValueCell summary={counter} />);
+    expect(screen.getByText("3")).toBeInTheDocument();
+
+    rerender(<PropertyValueCell summary={{ ...counter, value: 1 }} display="bar" />);
+    expect(screen.getByRole("img", { name: "1 / 4" }).firstElementChild).toHaveStyle({
+      width: "25%",
+    });
+
+    rerender(<PropertyValueCell summary={counter} display="clock" />);
+    const clock = screen.getByRole("img", { name: "3 / 4" });
+    // One segment a step, three of the four filled.
+    expect(clock.querySelectorAll("path")).toHaveLength(4);
+    expect(clock.querySelectorAll("path.fill-primary")).toHaveLength(3);
+  });
+
   it("reads a scale kept with a state beside it by its figure", () => {
     renderWithProviders(
       <PropertyValueCell

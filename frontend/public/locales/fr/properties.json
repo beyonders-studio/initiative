@@ -21,6 +21,7 @@
     "user_reference": "Personne",
     "currency": "Montant",
     "scale": "Échelle",
+    "counter": "Compteur",
     "link": "Lien",
     "badge": "Badge",
     "json": "Données"
@@ -59,7 +60,10 @@
     "optionAddFailed": "Impossible d'ajouter l'option",
     "scalePlaceholder": "0–100",
     "stars_one": "{{count}} étoile",
-    "stars_other": "{{count}} étoiles"
+    "stars_other": "{{count}} étoiles",
+    "stepDown": "Diminuer {{name}} d'un pas",
+    "stepUp": "Augmenter {{name}} d'un pas",
+    "reset": "Réinitialiser {{name}}"
   },
   "cell": {
     "emptyValue": "—",
@@ -132,5 +136,17 @@
     "label": "Devise",
     "none": "Aucune devise ne correspond",
     "default": "EUR"
+  },
+  "counter": {
+    "step": "Pas",
+    "min": "Minimum",
+    "max": "Maximum",
+    "initial": "Valeur initiale",
+    "stepPlaceholder": "1",
+    "minPlaceholder": "Aucun",
+    "maxPlaceholder": "Aucun",
+    "initialPlaceholder": "0",
+    "stepPositive": "Le pas doit être supérieur à zéro",
+    "minAboveMax": "Le minimum ne peut pas dépasser le maximum"
   }
 }

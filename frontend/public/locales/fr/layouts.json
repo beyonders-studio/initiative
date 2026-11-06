@@ -279,6 +279,12 @@
     "stars": "Des étoiles",
     "bar": "Une barre"
   },
+  "counterDisplay": {
+    "label": "Afficher le compteur comme",
+    "number": "Un nombre",
+    "bar": "Une barre",
+    "clock": "Une horloge"
+  },
   "fieldProperty": {
     "metadata": "Métadonnée",
     "metadataHelp": "C'est une métadonnée de l'initiative, qui se modifie dans ses paramètres.",

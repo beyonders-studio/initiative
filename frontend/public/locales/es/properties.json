@@ -21,6 +21,7 @@
     "user_reference": "Persona",
     "currency": "Importe",
     "scale": "Escala",
+    "counter": "Contador",
     "link": "Enlace",
     "badge": "Insignia",
     "json": "Datos"
@@ -59,7 +60,10 @@
     "optionAddFailed": "No se pudo agregar la opción",
     "scalePlaceholder": "0–100",
     "stars_one": "{{count}} estrella",
-    "stars_other": "{{count}} estrellas"
+    "stars_other": "{{count}} estrellas",
+    "stepDown": "Bajar {{name}} un paso",
+    "stepUp": "Subir {{name}} un paso",
+    "reset": "Restablecer {{name}}"
   },
   "cell": {
     "emptyValue": "—",
@@ -132,5 +136,17 @@
     "label": "Moneda",
     "none": "Ninguna moneda coincide",
     "default": "EUR"
+  },
+  "counter": {
+    "step": "Incremento",
+    "min": "Mínimo",
+    "max": "Máximo",
+    "initial": "Valor inicial",
+    "stepPlaceholder": "1",
+    "minPlaceholder": "Ninguno",
+    "maxPlaceholder": "Ninguno",
+    "initialPlaceholder": "0",
+    "stepPositive": "El incremento tiene que ser mayor que cero",
+    "minAboveMax": "El mínimo no puede ser mayor que el máximo"
   }
 }

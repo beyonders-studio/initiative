@@ -3,6 +3,7 @@ import { useMemo } from "react";
 import { useTranslation } from "react-i18next";
 
 import {
+  type CounterSettingsOutput,
   MetadataType,
   type PropertyOption,
   type PropertySummary,
@@ -14,9 +15,11 @@ import { getAvatarSrc, getInitialsForUser, getUserDisplayName } from "@/lib/user
 import { cn } from "@/lib/utils";
 
 import {
+  counterCount,
+  counterSettings,
+  type FieldDisplay,
   isEmptyPropertyValue,
   numericValue,
-  type ScaleDisplay,
   scaleValue,
 } from "./propertyHelpers";
 import { iconForPropertyType } from "./propertyTypeIcons";
@@ -31,8 +34,9 @@ export interface PropertyValueCellProps {
    * value opens via a programmatic handler instead of nesting an `<a>` in an
    * `<a>`, and stops the click from also triggering the outer link. */
   nested?: boolean;
-  /** How a scale is drawn, as the layout showing it says; a number without. */
-  display?: ScaleDisplay | null;
+  /** How a scale or a counter is drawn, as the layout showing it says; a
+   *  number without. */
+  display?: FieldDisplay | null;
   /** On one line, its chips past the end cut off: a card whose height is
    *  reserved without measuring it. */
   oneLine?: boolean;
@@ -47,7 +51,7 @@ const formatNumber = (raw: unknown, options?: Intl.NumberFormatOptions): string 
 const scaleStars = (value: number): number => Math.min(5, Math.max(0, Math.ceil(value / 20)));
 
 /** A scale of 0–100 as a number ("80%"), five stars or a bar. */
-export const ScaleValue = ({ value, display }: { value: number; display: ScaleDisplay }) => {
+export const ScaleValue = ({ value, display }: { value: number; display: FieldDisplay }) => {
   const { i18n } = useTranslation();
   const percent = numberFormat(i18n.language, { style: "percent" }).format(value / 100);
   if (display === "stars") {
@@ -80,6 +84,78 @@ export const ScaleValue = ({ value, display }: { value: number; display: ScaleDi
     );
   }
   return <span className="tabular-nums">{percent}</span>;
+};
+
+/** The most steps a counter's clock is drawn with, one segment each; a
+ *  counter with more fills its clock as a dial. */
+const MAX_CLOCK_SEGMENTS = 60;
+
+/** A slice of a 16-unit clock face, from one fraction of a turn to another. */
+const wedge = (from: number, to: number): string => {
+  const point = (turn: number) =>
+    `${8 + 7 * Math.sin(2 * Math.PI * turn)} ${8 - 7 * Math.cos(2 * Math.PI * turn)}`;
+  return `M8 8 L${point(from)} A7 7 0 ${to - from > 0.5 ? 1 : 0} 1 ${point(to)} Z`;
+};
+
+/** A counter's count as a number, then for a bar or a clock its place
+ *  between its bounds. A counter without both bounds is drawn as a number. */
+export const CounterValue = ({
+  count,
+  settings,
+  display,
+}: {
+  count: number;
+  settings: CounterSettingsOutput | null;
+  display: FieldDisplay;
+}) => {
+  const { min, max, step } = counterSettings(settings);
+  const number = <span className="tabular-nums">{formatNumber(count)}</span>;
+  const drawn = display === "bar" || display === "clock";
+  if (!drawn || min === null || max === null || max <= min) return number;
+  const filled = Math.min(1, Math.max(0, (count - min) / (max - min)));
+  const label = `${formatNumber(count)} / ${formatNumber(max)}`;
+  const segments = Math.round((max - min) / step);
+  return (
+    <span className="inline-flex items-center gap-1.5">
+      {number}
+      {display === "clock" ? (
+        <svg role="img" aria-label={label} viewBox="0 0 16 16" className="h-4 w-4 shrink-0">
+          <title>{label}</title>
+          <circle cx="8" cy="8" r="7" className="fill-muted-foreground/20" />
+          {segments >= 2 && segments <= MAX_CLOCK_SEGMENTS ? (
+            Array.from({ length: segments }, (_, index) => (
+              <path
+                // biome-ignore lint/suspicious/noArrayIndexKey: a clock's segments are its places
+                key={index}
+                d={wedge(index / segments, (index + 1) / segments)}
+                className={cn(
+                  "stroke-background",
+                  index < Math.round(filled * segments) ? "fill-primary" : "fill-transparent"
+                )}
+                strokeWidth={0.75}
+              />
+            ))
+          ) : filled >= 1 ? (
+            <circle cx="8" cy="8" r="7" className="fill-primary" />
+          ) : filled > 0 ? (
+            <path d={wedge(0, filled)} className="fill-primary" />
+          ) : null}
+        </svg>
+      ) : (
+        <span
+          role="img"
+          aria-label={label}
+          title={label}
+          className="inline-block h-1.5 w-16 overflow-hidden rounded-full bg-muted-foreground/20"
+        >
+          <span
+            className="block h-full rounded-full bg-primary"
+            style={{ width: `${filled * 100}%` }}
+          />
+        </span>
+      )}
+    </span>
+  );
 };
 
 const coerceOptionMap = (options: PropertyOption[] | null | undefined) => {
@@ -157,7 +233,8 @@ export const PropertyValueCell = ({
   const { t } = useTranslation("properties");
   const options = useMemo(() => coerceOptionMap(summary?.options), [summary?.options]);
 
-  if (!summary || isEmptyPropertyValue(summary.value)) {
+  // A counter with no value holds its initial value.
+  if (!summary || (isEmptyPropertyValue(summary.value) && summary.type !== MetadataType.counter)) {
     if (variant === "chip") return null;
     return (
       <span
@@ -240,6 +317,16 @@ export const PropertyValueCell = ({
     case MetadataType.scale: {
       const figure = scaleValue(value);
       body = figure === null ? null : <ScaleValue value={figure} display={display ?? "number"} />;
+      break;
+    }
+    case MetadataType.counter: {
+      body = (
+        <CounterValue
+          count={counterCount(summary.counter, value)}
+          settings={summary.counter}
+          display={display ?? "number"}
+        />
+      );
       break;
     }
     case MetadataType.checkbox: {
