@@ -20,11 +20,14 @@ import type {
   BodyStartConfluenceExportImport,
   BodyUploadBackup,
   ConfirmImportBody,
+  ContactCsvImportRequest,
+  ContactCsvPreview,
   DataJobRead,
   EnvelopeImportRequest,
   ForeignImportRequest,
   ForeignPreview,
   HTTPValidationError,
+  PreviewContactsImportParams,
 } from "../initiativeAPI.schemas";
 
 import { apiMutator } from "../../mutator";
@@ -436,6 +439,204 @@ export const useImportForeign = <TError = ErrorType<HTTPValidationError>, TConte
   TContext
 > => {
   return useMutation(getImportForeignMutationOptions(options), queryClient);
+};
+/**
+ * Say what a spreadsheet of contacts holds, without keeping any of it:
+ * its header, how many rows it has, the first few, and what each column
+ * looks like it holds. A contacts export's own columns read as what they
+ * hold, so it comes back in with nothing to choose.
+ * @summary Preview Contacts Import
+ */
+export const previewContactsImport = (
+  communityId: number,
+  previewContactsImportBody: BodyType<string>,
+  params?: PreviewContactsImportParams,
+  options?: SecondParameter<typeof apiMutator>,
+  signal?: AbortSignal
+) => {
+  return apiMutator<ContactCsvPreview>(
+    {
+      url: `/api/v1/c/${communityId}/imports/contacts/preview`,
+      method: "POST",
+      headers: { "Content-Type": "text/plain" },
+      data: previewContactsImportBody,
+      params,
+      signal,
+    },
+    options
+  );
+};
+
+export const getPreviewContactsImportMutationKey = () => ["previewContactsImport"] as const;
+
+export const getPreviewContactsImportMutationOptions = <
+  TError = ErrorType<HTTPValidationError>,
+  TContext = unknown,
+>(options?: {
+  mutation?: UseMutationOptions<
+    Awaited<ReturnType<typeof previewContactsImport>>,
+    TError,
+    PreviewContactsImportMutationVariables,
+    TContext
+  >;
+  request?: SecondParameter<typeof apiMutator>;
+}): UseMutationOptions<
+  Awaited<ReturnType<typeof previewContactsImport>>,
+  TError,
+  PreviewContactsImportMutationVariables,
+  TContext
+> => {
+  const mutationKey = getPreviewContactsImportMutationKey();
+  const { mutation: mutationOptions, request: requestOptions } = options
+    ? options.mutation && "mutationKey" in options.mutation && options.mutation.mutationKey
+      ? options
+      : { ...options, mutation: { ...options.mutation, mutationKey } }
+    : { mutation: { mutationKey }, request: undefined };
+
+  const mutationFn: MutationFunction<
+    Awaited<ReturnType<typeof previewContactsImport>>,
+    PreviewContactsImportMutationVariables
+  > = (props) => {
+    const { communityId, data, params } = props ?? {};
+
+    return previewContactsImport(communityId, data, params, requestOptions);
+  };
+
+  return { mutationFn, ...mutationOptions };
+};
+
+export type PreviewContactsImportMutationResult = NonNullable<
+  Awaited<ReturnType<typeof previewContactsImport>>
+>;
+export type PreviewContactsImportMutationBody = BodyType<string>;
+export type PreviewContactsImportMutationError = ErrorType<HTTPValidationError>;
+export type PreviewContactsImportMutationVariables = {
+  communityId: number;
+  data: BodyType<string>;
+  params?: PreviewContactsImportParams;
+};
+
+/**
+ * @summary Preview Contacts Import
+ */
+export const usePreviewContactsImport = <
+  TError = ErrorType<HTTPValidationError>,
+  TContext = unknown,
+>(
+  options?: {
+    mutation?: UseMutationOptions<
+      Awaited<ReturnType<typeof previewContactsImport>>,
+      TError,
+      PreviewContactsImportMutationVariables,
+      TContext
+    >;
+    request?: SecondParameter<typeof apiMutator>;
+  },
+  queryClient?: QueryClient
+): UseMutationResult<
+  Awaited<ReturnType<typeof previewContactsImport>>,
+  TError,
+  PreviewContactsImportMutationVariables,
+  TContext
+> => {
+  return useMutation(getPreviewContactsImportMutationOptions(options), queryClient);
+};
+/**
+ * Make a contact of each row of a spreadsheet, its columns read as
+ * ``columns`` says, in an initiative or, with none, the community's
+ * contacts. Each is made as ``POST /contacts/`` makes one, and needs what
+ * that needs there. A row that does not read as a contact is left out and
+ * named in the result's ``failed_rows``.
+ *
+ * Answers as ``/imports/envelope`` does — 201 with the counts when it
+ * applied in the request, 202 with the job when it did not.
+ * @summary Import Contacts
+ */
+export const importContacts = (
+  communityId: number,
+  contactCsvImportRequest: BodyType<ContactCsvImportRequest>,
+  options?: SecondParameter<typeof apiMutator>,
+  signal?: AbortSignal
+) => {
+  return apiMutator<unknown>(
+    {
+      url: `/api/v1/c/${communityId}/imports/contacts`,
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      data: contactCsvImportRequest,
+      signal,
+    },
+    options
+  );
+};
+
+export const getImportContactsMutationKey = () => ["importContacts"] as const;
+
+export const getImportContactsMutationOptions = <
+  TError = ErrorType<HTTPValidationError>,
+  TContext = unknown,
+>(options?: {
+  mutation?: UseMutationOptions<
+    Awaited<ReturnType<typeof importContacts>>,
+    TError,
+    ImportContactsMutationVariables,
+    TContext
+  >;
+  request?: SecondParameter<typeof apiMutator>;
+}): UseMutationOptions<
+  Awaited<ReturnType<typeof importContacts>>,
+  TError,
+  ImportContactsMutationVariables,
+  TContext
+> => {
+  const mutationKey = getImportContactsMutationKey();
+  const { mutation: mutationOptions, request: requestOptions } = options
+    ? options.mutation && "mutationKey" in options.mutation && options.mutation.mutationKey
+      ? options
+      : { ...options, mutation: { ...options.mutation, mutationKey } }
+    : { mutation: { mutationKey }, request: undefined };
+
+  const mutationFn: MutationFunction<
+    Awaited<ReturnType<typeof importContacts>>,
+    ImportContactsMutationVariables
+  > = (props) => {
+    const { communityId, data } = props ?? {};
+
+    return importContacts(communityId, data, requestOptions);
+  };
+
+  return { mutationFn, ...mutationOptions };
+};
+
+export type ImportContactsMutationResult = NonNullable<Awaited<ReturnType<typeof importContacts>>>;
+export type ImportContactsMutationBody = BodyType<ContactCsvImportRequest>;
+export type ImportContactsMutationError = ErrorType<HTTPValidationError>;
+export type ImportContactsMutationVariables = {
+  communityId: number;
+  data: BodyType<ContactCsvImportRequest>;
+};
+
+/**
+ * @summary Import Contacts
+ */
+export const useImportContacts = <TError = ErrorType<HTTPValidationError>, TContext = unknown>(
+  options?: {
+    mutation?: UseMutationOptions<
+      Awaited<ReturnType<typeof importContacts>>,
+      TError,
+      ImportContactsMutationVariables,
+      TContext
+    >;
+    request?: SecondParameter<typeof apiMutator>;
+  },
+  queryClient?: QueryClient
+): UseMutationResult<
+  Awaited<ReturnType<typeof importContacts>>,
+  TError,
+  ImportContactsMutationVariables,
+  TContext
+> => {
+  return useMutation(getImportContactsMutationOptions(options), queryClient);
 };
 /**
  * Prove an Atlassian API token and say what the site holds.

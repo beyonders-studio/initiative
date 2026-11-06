@@ -23,7 +23,7 @@ import type { UseQueryResult } from "@tanstack/react-query";
 import { Link, useRouter, useSearch } from "@tanstack/react-router";
 import type { SortingState } from "@tanstack/react-table";
 import type { FlatNamespace } from "i18next";
-import { LayoutGrid, List, Plus, Tags } from "lucide-react";
+import { FileSpreadsheet, LayoutGrid, List, Plus, Tags } from "lucide-react";
 import {
   type ComponentType,
   type ReactNode,
@@ -46,6 +46,7 @@ import { AddToCollectionButton } from "@/components/files/collections/AddToColle
 import { CollectionFilterField } from "@/components/files/collections/CollectionFilterField";
 import { FileCard } from "@/components/files/FileCard";
 import { useFileColumns } from "@/components/files/fileColumns";
+import { ImportWizard } from "@/components/imports/ImportWizard";
 import { ToolImportAction, useToolImportAction } from "@/components/imports/ToolImportAction";
 import { ContactCard, ContactMark } from "@/components/initiativeTools/contacts/ContactCard";
 import { CreateContactDialog } from "@/components/initiativeTools/contacts/CreateContactDialog";
@@ -84,6 +85,7 @@ import {
 } from "@/components/tools/ToolIndexTable";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
+import { DropdownMenuItem } from "@/components/ui/dropdown-menu";
 import { DropOverlay } from "@/components/ui/file-drop";
 import { TOOL_HOOKS } from "@/hooks/toolHooks";
 import { useActiveCommunityId } from "@/hooks/useActiveCommunityId";
@@ -220,6 +222,10 @@ export type ToolIndexEntry = {
   /** Files dropped anywhere on the list open the create dialog holding the
    *  first; `label` is the overlay's key in the tool's namespace. */
   fileDrop?: { label: string };
+  /** Rows come in from a spreadsheet too, through the import wizard's CSV
+   *  step, here and in the community's own list; `label` is the menu entry's
+   *  key in the tool's namespace. */
+  csvImport?: { label: string };
   /** The list layout as a sortable table, with these columns after the shared
    *  ones. Without it the list layout is one line a row. */
   table?: { useColumns: () => AppColumnDef<ToolIndexRow>[] };
@@ -449,6 +455,8 @@ const TOOL_INDEX: Record<Tool, ToolIndexEntry | ToolIndexOwnPage> = {
     // Made with how to reach them, not just a name.
     CreateDialog: CreateContactDialog,
     community: { CreateDialog: CreateContactDialog },
+    // An address book is often kept in a spreadsheet first.
+    csvImport: { label: "importCsv" },
     // The rows are contacts, which is what these columns read.
     table: { useColumns: useContactColumns as unknown as () => AppColumnDef<ToolIndexRow>[] },
   },
@@ -749,6 +757,9 @@ const ToolIndexBody = ({ tool, entry, fixedInitiativeId, canCreate }: ToolIndexB
     canImport: canCreateHere && !community,
     fixedInitiativeId: fixedInitiativeId ?? undefined,
   });
+  // A spreadsheet lands where the list is, the community's own included.
+  const csvImport = entry.csvImport && canCreateHere ? entry.csvImport : null;
+  const [csvImportOpen, setCsvImportOpen] = useState(false);
 
   // A file dragged in from the desktop lands wherever the cursor is, in any
   // layout, and opens the create dialog holding it. Off while a dialog is up:
@@ -899,16 +910,29 @@ const ToolIndexBody = ({ tool, entry, fixedInitiativeId, canCreate }: ToolIndexB
           label: t("common:toolbar.view"),
         }}
         menuItems={
-          (canCreateHere && toolListingKind(tool)) || importAction.menuItem ? (
+          (canCreateHere && toolListingKind(tool)) || importAction.menuItem || csvImport ? (
             <>
               {canCreateHere ? <BrowseMarketplaceMenuItem tool={tool} /> : null}
               {importAction.menuItem}
+              {csvImport ? (
+                <DropdownMenuItem onSelect={() => setCsvImportOpen(true)}>
+                  <FileSpreadsheet className="h-4 w-4" />
+                  {t(csvImport.label)}
+                </DropdownMenuItem>
+              ) : null}
             </>
           ) : null
         }
         onEnterSelection={!selection.active && list.rows.length > 0 ? selection.enter : undefined}
       />
       {importAction.dialog}
+      {csvImport ? (
+        <ImportWizard
+          open={csvImportOpen}
+          onOpenChange={setCsvImportOpen}
+          contactsInto={{ initiativeId: fixedInitiativeId }}
+        />
+      ) : null}
 
       <ToolFilterPanel
         open={filtersOpen}

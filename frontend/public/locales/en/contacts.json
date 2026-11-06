@@ -1,6 +1,7 @@
 {
   "title": "Contacts",
   "newContact": "New contact",
+  "importCsv": "Import contacts from CSV",
   "createDescription": "A person or an organization, and how to reach them.",
   "addPersonDescription": "Someone at {{name}}, and how to reach them.",
   "creating": "Creating...",

@@ -102,5 +102,21 @@
   "values": {
     "yes": "Sí",
     "no": "No"
+  },
+  "contacts": {
+    "name": "Nombre",
+    "type": "Tipo",
+    "person": "Persona",
+    "organization": "Organización",
+    "emails": "Correo {{n}}",
+    "emailsLabel": "Etiqueta de correo {{n}}",
+    "phones": "Teléfono {{n}}",
+    "phonesLabel": "Etiqueta de teléfono {{n}}",
+    "addresses": "Dirección {{n}}",
+    "addressesLabel": "Etiqueta de dirección {{n}}",
+    "websites": "Sitio web {{n}}",
+    "websitesLabel": "Etiqueta de sitio web {{n}}",
+    "partOf": "Organización",
+    "metadata": "Metadatos: {{name}}"
   }
 }

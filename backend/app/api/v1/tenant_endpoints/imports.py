@@ -1,8 +1,11 @@
-"""Import endpoints: envelopes, foreign-source files, Jira, and backup restores.
+"""Import endpoints: envelopes, foreign-source files, spreadsheets of
+contacts, Jira, and backup restores.
 
 Every route here writes, so every route re-checks that the community is
 writable. The engine behind them is shared: whatever file or site the work
-arrived from, it becomes an envelope, and one apply path puts the rows in.
+arrived from, it becomes an envelope, and one apply path puts the rows in. A
+spreadsheet of contacts is the one exception, made a row at a time through
+the contact's own create, on the same jobs and worker.
 Reading an import job is ``data_jobs``'s.
 """
 
@@ -21,6 +24,7 @@ from fastapi import (
     File,
     Form,
     HTTPException,
+    Query,
     Response,
     UploadFile,
     status,
@@ -39,13 +43,15 @@ from app.core.body_limit import MULTIPART_SLACK_BYTES, max_body
 from app.core.messages import ImportEngineMessages, ResumableMessages
 from app.core.version import get_version
 from app.models.platform.user import User
-from app.models.tenant.data_job import DataJobDirection, DataJobStatus
+from app.models.tenant.data_job import DataJob, DataJobDirection, DataJobStatus
 from app.schemas.tenant.atlassian import (
     AtlassianConnectRequest,
     AtlassianConnectResponse,
     AtlassianImportRequest,
 )
 from app.schemas.tenant.import_job import (
+    ContactCsvImportRequest,
+    ContactCsvPreview,
     EnvelopeImportRequest,
     EnvelopeImportResponse,
     ForeignImportRequest,
@@ -57,6 +63,7 @@ from app.services import data_jobs, resumable
 from app.services.import_engine import atlassian as atlassian_service
 from app.services.import_engine import atlassian_job
 from app.services.import_engine import backup as backup_service
+from app.services.import_engine import contacts_csv
 from app.services.import_engine import engine as import_engine
 from app.services.import_engine import envelope_archive
 from app.services.import_engine import foreign as foreign_service
@@ -94,6 +101,24 @@ def _upload_bytes() -> int:
     return import_limits.IMPORT_MAX_BACKUP_UPLOAD_BYTES + MULTIPART_SLACK_BYTES
 
 
+def _started(outcome: InlineImport | DataJob, guild_context: GuildContext) -> Response:
+    """201 with the counts when an import applied in the request, 202 with its
+    job when it did not."""
+    if isinstance(outcome, InlineImport):
+        return JSONResponse(
+            status_code=status.HTTP_201_CREATED,
+            content=EnvelopeImportResponse(result=outcome.result).model_dump(
+                mode="json"
+            ),
+        )
+    return JSONResponse(
+        status_code=status.HTTP_202_ACCEPTED,
+        content=serialize_data_job(outcome, guild_id=guild_context.guild_id).model_dump(
+            mode="json"
+        ),
+    )
+
+
 @router.post("/envelope", response_model=None, status_code=status.HTTP_201_CREATED)
 @max_body(_envelope_bytes, ImportEngineMessages.IMPORT_TOO_LARGE)
 async def import_envelope(
@@ -124,19 +149,7 @@ async def import_envelope(
         envelope=payload.envelope,
     )
 
-    if isinstance(outcome, InlineImport):
-        return JSONResponse(
-            status_code=status.HTTP_201_CREATED,
-            content=EnvelopeImportResponse(result=outcome.result).model_dump(
-                mode="json"
-            ),
-        )
-    return JSONResponse(
-        status_code=status.HTTP_202_ACCEPTED,
-        content=serialize_data_job(outcome, guild_id=guild_context.guild_id).model_dump(
-            mode="json"
-        ),
-    )
+    return _started(outcome, guild_context)
 
 
 @router.post(
@@ -173,19 +186,7 @@ async def import_envelope_archive(
             expected_type=envelope_type,
         )
 
-    if isinstance(outcome, InlineImport):
-        return JSONResponse(
-            status_code=status.HTTP_201_CREATED,
-            content=EnvelopeImportResponse(result=outcome.result).model_dump(
-                mode="json"
-            ),
-        )
-    return JSONResponse(
-        status_code=status.HTTP_202_ACCEPTED,
-        content=serialize_data_job(outcome, guild_id=guild_context.guild_id).model_dump(
-            mode="json"
-        ),
-    )
+    return _started(outcome, guild_context)
 
 
 # ---------------------------------------------------------------------------
@@ -264,19 +265,56 @@ async def import_foreign(
         envelope=mapped.envelope,
     )
 
-    if isinstance(started, InlineImport):
-        return JSONResponse(
-            status_code=status.HTTP_201_CREATED,
-            content=EnvelopeImportResponse(result=started.result).model_dump(
-                mode="json"
-            ),
-        )
-    return JSONResponse(
-        status_code=status.HTTP_202_ACCEPTED,
-        content=serialize_data_job(started, guild_id=guild_context.guild_id).model_dump(
-            mode="json"
-        ),
+    return _started(started, guild_context)
+
+
+# ---------------------------------------------------------------------------
+# Contacts from a spreadsheet
+# ---------------------------------------------------------------------------
+
+
+@router.post("/contacts/preview", response_model=ContactCsvPreview)
+@max_body(_envelope_bytes, ImportEngineMessages.IMPORT_TOO_LARGE)
+async def preview_contacts_import(
+    content: Annotated[str, Body(media_type="text/plain")],
+    session: RLSSessionDep,
+    _current_user: Annotated[User, Depends(get_current_active_user)],
+    guild_context: GuildContextDep,
+    initiative_id: Optional[int] = Query(
+        default=None,
+        description="The initiative the contacts go into, whose properties a "
+        "column headed with one's name fills; none for the community's contacts",
+    ),
+) -> ContactCsvPreview:
+    """Say what a spreadsheet of contacts holds, without keeping any of it:
+    its header, how many rows it has, the first few, and what each column
+    looks like it holds. A contacts export's own columns read as what they
+    hold, so it comes back in with nothing to choose."""
+    import_engine.require_writable(guild_context)
+    return await contacts_csv.preview(session, content, initiative_id=initiative_id)
+
+
+@router.post("/contacts", response_model=None, status_code=status.HTTP_201_CREATED)
+@max_body(_envelope_bytes, ImportEngineMessages.IMPORT_TOO_LARGE)
+async def import_contacts(
+    payload: ContactCsvImportRequest,
+    session: RLSSessionDep,
+    current_user: Annotated[User, Depends(get_current_active_user)],
+    guild_context: GuildContextDep,
+) -> Response:
+    """Make a contact of each row of a spreadsheet, its columns read as
+    ``columns`` says, in an initiative or, with none, the community's
+    contacts. Each is made as ``POST /contacts/`` makes one, and needs what
+    that needs there. A row that does not read as a contact is left out and
+    named in the result's ``failed_rows``.
+
+    Answers as ``/imports/envelope`` does — 201 with the counts when it
+    applied in the request, 202 with the job when it did not."""
+    import_engine.require_writable(guild_context)
+    started = await contacts_csv.start_import(
+        session, context=guild_context, user=current_user, request=payload
     )
+    return _started(started, guild_context)
 
 
 @router.post(

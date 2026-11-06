@@ -1,4 +1,5 @@
-"""Contacts — loaders for the address book tool.
+"""Contacts — loaders for the address book tool, and who may put one in the
+community's contacts.
 
 A contact is its own item with its own sharing, as a file is, so the loaders
 here eager-load its grants and the actions the request may take on it. One
@@ -9,15 +10,24 @@ contacts plug-in (``authorization.COMMUNITY_ROWS``).
 from __future__ import annotations
 
 from collections.abc import Iterable
+from typing import Optional
 
+from fastapi import HTTPException, status
 from sqlalchemy.orm import selectinload, undefer
 from sqlmodel import col, select
 from sqlmodel.ext.asyncio.session import AsyncSession
 
+from app.core.messages import ContactMessages, GuildMessages
 from app.core.relationships import RelationshipType
 from app.core.search import SearchEntityType
+from app.core.tools import Tool
+from app.db.guild_standing import ActorContext
+from app.models.platform.guild import AdminSurface
+from app.models.platform.user import User
 from app.models.tenant.contact import Contact
+from app.models.tenant.guild_plugin import GuildPlugin
 from app.models.tenant.relationship import EntityRelationship
+from app.services.tenant import guild_plugins as guild_plugins_service
 from app.services.tenant import metadata as metadata_service
 from app.services.tenant import tags as tags_service
 
@@ -92,3 +102,30 @@ async def organizations_of(
     for person_id, org_id, name, initiative_id in rows.all():
         found.setdefault(person_id, (org_id, name, initiative_id))
     return found
+
+
+async def community_holder(
+    session: AsyncSession, user: Optional[User], guild_context: ActorContext
+) -> GuildPlugin:
+    """The install a community contact goes into, once the request may put one
+    there: a person holding the ``community_contacts`` surface, in a community
+    that has the plug-in."""
+    if user is None:
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail=ContactMessages.PLUGIN_INITIATIVE_REQUIRED,
+        )
+    if not guild_context.holds_surface(AdminSurface.community_contacts):
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail=GuildMessages.COMMUNITY_ADMIN_REQUIRED,
+        )
+    plugin = await guild_plugins_service.find_mounting_plugin(
+        session, tool=Tool.contact.value
+    )
+    if plugin is None:
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail=ContactMessages.PLUGIN_REQUIRED,
+        )
+    return plugin

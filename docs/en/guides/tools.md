@@ -4,7 +4,7 @@ icon: lucide/wrench
 
 # Tools
 
-Everything that lives inside an initiative is a **tool**. There are nine kinds. Projects and files are switched on to begin with; the rest sit quietly, entirely unbothered by whether you ever open them.
+Everything that lives inside an initiative is a **tool**. There are eight kinds. Projects and files are switched on to begin with; the rest sit quietly, entirely unbothered by whether you ever open them.
 
 <div class="grid cards" markdown>
 
@@ -50,6 +50,12 @@ Everything that lives inside an initiative is a **tool**. There are nine kinds. 
 
     [:octicons-arrow-right-24: Wikis](wikis.md)
 
+-   :material-card-account-phone-outline: __Contacts__
+
+    The people and places your work involves, and how to reach them.
+
+    [:octicons-arrow-right-24: Contacts](contacts.md)
+
 </div>
 
 ## Add one when you actually need it
@@ -61,6 +67,7 @@ Most groups run on projects and files for a good long while, and there is nothin
 - A **dashboard**, when somebody who isn't doing the work starts asking how the work is going.
 - A **board**, the third time something important was announced in a chat and missed by four people.
 - A **wiki**, when every answer to "how does the float work?" is "ask Margaret".
+- **Contacts**, when the florist's number lives in three people's phones and all three of them are at the wedding.
 
 Switching one on is not a commitment or a lifestyle change. Switching it off later doesn't delete anything.
 

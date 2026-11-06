@@ -104,6 +104,8 @@ Type `/` in a text document and pick one, or use **Smart chip** in the toolbar's
 | Task checkbox | A box and the task's name. Tick it and the task itself is done |
 | Counter value | The current number, against its target if it has one |
 | Event date | When it happens, dimmed once it has |
+| Contact phone | Their first phone number. Tap it to call |
+| Contact email | Their first email address. Tap it to write |
 
 The chip carries the reading itself, so your sentence keeps its shape:
 

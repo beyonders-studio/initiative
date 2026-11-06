@@ -103,7 +103,10 @@
       "assets": "{{restored}} fichiers restaurés, {{deduped}} déjà présents",
       "unmatchedHandles": "Certaines personnes n'ont pas été placées. Personne ici ne leur correspond, ou vous ne pouvez pas les ajouter à cette initiative : {{handles}}",
       "failedEntries": "Éléments non importés :",
-      "nothing": "Rien n'a été importé."
+      "nothing": "Rien n'a été importé.",
+      "failedRows_one": "{{count}} ligne a été laissée de côté :",
+      "failedRows_other": "{{count}} lignes ont été laissées de côté :",
+      "failedRow": "Ligne {{row}} · {{field}}"
     },
     "atlassian": {
       "connect": {
@@ -224,6 +227,32 @@
         "filesBlocked_other": "{{count}} fichiers, car les fichiers sont désactivés dans cette initiative",
         "dropped": "Laissé de côté : {{items}}"
       }
+    },
+    "contacts": {
+      "title": "Importer des contacts",
+      "fileHint": "Un fichier CSV : un export de contacts, ou un tableur enregistré en CSV.",
+      "filePrompt": "Choisir un fichier CSV",
+      "where": "Dans un tableur : Fichier → Télécharger ou Enregistrer sous → CSV",
+      "columnsPrompt": "Que contient chaque colonne ?",
+      "rows_one": "{{count}} ligne à importer",
+      "rows_other": "{{count}} lignes à importer",
+      "note": "Chaque ligne devient un nouveau contact. Une ligne illisible est laissée de côté, et le rapport indique laquelle.",
+      "untitled": "Colonne {{n}}",
+      "labelOf": "Libellé de {{column}}",
+      "labelFrom": "Libellé tiré de {{column}}",
+      "noLabel": "Aucun libellé",
+      "targets": {
+        "ignore": "Laisser de côté",
+        "name": "Nom",
+        "type": "Personne ou organisation",
+        "emails": "E-mail",
+        "phones": "Téléphone",
+        "addresses": "Adresse",
+        "websites": "Site web",
+        "organization": "Organisation",
+        "tags": "Étiquettes",
+        "properties": "Propriétés"
+      }
     }
   },
   "envelope": {
@@ -275,7 +304,8 @@
       "initiative-wiki": "Wiki",
       "initiative-contact": "Contact",
       "initiative-counter-group": "Groupe de compteurs",
-      "initiative-dashboard": "Tableau de bord"
+      "initiative-dashboard": "Tableau de bord",
+      "contacts-csv": "Contacts depuis un tableur"
     },
     "cancel": "Annuler",
     "viewReport": "Voir le rapport",

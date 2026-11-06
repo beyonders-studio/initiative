@@ -486,8 +486,9 @@ describe("tool imports", () => {
   });
 
   // The data-jobs table labels a job by its `source` column, which the backend
-  // writes as the envelope type for an import and the adapter key for an
-  // export. Both are derived from the enum, so both label sets are too — a key
+  // writes as the envelope type for an import (`contacts-csv` for a
+  // spreadsheet of contacts) and the adapter key for an export. Both are
+  // derived from the enum, so both label sets are too — a key
   // that matches no source renders as its own raw key in the UI, which is how
   // `initiative-calendar-events` survived a calendar rename unnoticed.
   it("labels every import source in every locale", async () => {
@@ -495,7 +496,7 @@ describe("tool imports", () => {
     for (const locale of locales) {
       const file = await import(`../../public/locales/${locale}/imports.json`);
       const labels = (file.default ?? file).table.source as Record<string, string>;
-      const expected = ["backup", ...BULK_EXPORT_TOOLS.map(toolEnvelopeType)];
+      const expected = ["backup", "contacts-csv", ...BULK_EXPORT_TOOLS.map(toolEnvelopeType)];
       expect(Object.keys(labels).sort(), `${locale}/imports.json table.source`).toEqual(
         expected.sort()
       );
