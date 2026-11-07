@@ -150,12 +150,14 @@ describe("when whoever runs the server manages plug-ins", () => {
 describe("a version waiting for the seat", () => {
   it("marks its row, and the notice's link opens that row", async () => {
     pendingVersion = "1.1.0";
-    renderPage(SettingsCommunityPluginsPage, { routerSearch: { plugin: 4 } });
+    const { router } = renderPage(SettingsCommunityPluginsPage);
 
     expect(await screen.findByText("Update waiting")).toBeInTheDocument();
-    expect(screen.getByRole("button", { name: "Open settings" })).toHaveAttribute(
-      "aria-expanded",
-      "true"
-    );
+    const trigger = screen.getByRole("button", { name: "Open settings" });
+    expect(trigger).toHaveAttribute("aria-expanded", "false");
+
+    // Followed while the page is already open.
+    await router.navigate({ to: ".", search: { plugin: 4 } });
+    await waitFor(() => expect(trigger).toHaveAttribute("aria-expanded", "true"));
   });
 });

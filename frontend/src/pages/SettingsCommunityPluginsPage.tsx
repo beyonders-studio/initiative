@@ -172,17 +172,20 @@ function PluginRow({
   canErase: boolean;
   /** Plug-ins are managed by whoever runs the server, not here. */
   closed: boolean;
-  /** Opened and scrolled to on arrival: the row a link named. */
+  /** Opened and scrolled to: the row a link named. */
   initiallyOpen: boolean;
 }) {
   const { t, i18n } = useTranslation(["plugins", "common"]);
   const [name, setName] = useState(plugin.name);
   const [confirming, setConfirming] = useState(false);
   const [erase, setErase] = useState(false);
-  const [open, setOpen] = useState(initiallyOpen);
+  const [open, setOpen] = useState(false);
   const row = useRef<HTMLDivElement>(null);
+  // On arrival, and when a link names this row while the page is open.
   useEffect(() => {
-    if (initiallyOpen) row.current?.scrollIntoView?.({ block: "start" });
+    if (!initiallyOpen) return;
+    setOpen(true);
+    row.current?.scrollIntoView?.({ block: "start" });
   }, [initiallyOpen]);
   const update = useUpdateCommunityPlugin(plugin.id);
   const uninstall = useUninstallCommunityPlugin();
