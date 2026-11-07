@@ -11,9 +11,11 @@ import pytest
 from sqlmodel import update
 
 from app.core.messages import AIMessages, GuildMessages
+from app.db import post_commit
 from app.models.platform.ai_connection import PlatformAIConnection
 from app.models.platform.guild import CommunityRole, CommunityStatus, Guild
 from app.services import ai_settings as ai_settings_service
+from app.testing import billing_boundary, billing_guild_ref
 
 
 PLATFORM_MODE = "/api/v1/settings/ai/platform/mode"
@@ -383,6 +385,91 @@ async def test_a_community_s_connections_are_off_while_its_ai_is(client, acting_
         f"{conns}/{first['id']}", headers=seat.headers, json={"enabled": True}
     )
     assert turned_on.json()["enabled"] is True
+
+
+async def _connections_on(client, seat) -> list[bool]:
+    """Whether each of the community's connections is on, once the work its
+    last change left for after the commit has run."""
+    await post_commit.settle_all()
+    listed = await client.get(seat.g("/settings/ai/connections"), headers=seat.headers)
+    return [c["enabled"] for c in listed.json()]
+
+
+async def _a_connection(client, acting_user):
+    owner = await acting_user()
+    await _set_mode(client, owner, "community")
+    seat = await acting_user(guild_role=CommunityRole.superadmin, initiative=True)
+    created = await client.post(
+        seat.g("/settings/ai/connections"),
+        headers=seat.headers,
+        json={"label": "Team", "provider": "openai", "model": "m", "api_key": "k"},
+    )
+    return owner, seat, created.json()["id"]
+
+
+async def test_the_server_turning_ai_off_turns_the_connections_off(
+    client, acting_user, monkeypatch
+):
+    billing_boundary.configure(monkeypatch)
+    _owner, seat, _ = await _a_connection(client, acting_user)
+    restricted = {
+        "tier_name": "Gold",
+        "max_storage_bytes": 1024**3,
+        "max_users": 50,
+        "max_guests": 5,
+        "feature_keys": ["security_standards"],
+        "status": "active",
+    }
+    ref = await billing_guild_ref(seat.guild.id)
+
+    async def sync(version: int, fields: dict) -> None:
+        response = await billing_boundary.post(
+            client,
+            "communities/sync",
+            {
+                "communities": [
+                    {"community_ref": ref, "version": version, "fields": fields}
+                ]
+            },
+        )
+        assert "error" not in response.json()["results"][0], response.text
+
+    await sync(1, restricted)
+    assert await _connections_on(client, seat) == [True]
+    await sync(2, {**restricted, "rules": [{"key": "allow_ai", "value": False}]})
+    assert await _connections_on(client, seat) == [False]
+
+
+async def test_granting_restrictions_back_turns_the_connections_off(
+    client, acting_user
+):
+    """A community's own no to AI stops applying while it has no
+    restrictions, and its connections can be turned on; granted them back,
+    the no applies again and the connections go off."""
+    owner, seat, conn_id = await _a_connection(client, acting_user)
+    community = f"/api/v1/settings/communities/{seat.guild.id}"
+    await client.patch(
+        f"/api/v1/communities/{seat.guild.id}/auth-settings",
+        headers=seat.headers,
+        json={"allow_ai": False},
+    )
+    withdrawn = await client.patch(
+        community, headers=owner.headers, json={"auth_options": ["providers"]}
+    )
+    assert withdrawn.status_code == 200, withdrawn.text
+    turned_on = await client.put(
+        seat.g(f"/settings/ai/connections/{conn_id}"),
+        headers=seat.headers,
+        json={"enabled": True},
+    )
+    assert turned_on.status_code == 200, turned_on.text
+
+    await client.patch(
+        community,
+        headers=owner.headers,
+        json={"auth_options": ["providers", "restrictions"]},
+    )
+    assert await _connections_on(client, seat) == [False]
 
 
 async def test_a_connection_shows_how_its_last_request_went(

@@ -1431,6 +1431,9 @@ async def update_guild(
                 session, key, value, guild_id=guild_id, set_by=SetBy.deployment
             )
         await session.flush()
+        from app.services import ai_settings
+
+        ai_settings.turn_off_guild_connections_once_committed(session, guild_id)
     if retention_days_provided:
         from app.services.platform.app_settings import get_or_create_guild_settings
 
