@@ -86,6 +86,8 @@ CSP_EMBED_FRAME_ORIGINS = [
     "https://docs.google.com",
     "https://miro.com",
     "https://airtable.com",
+    "https://platform.twitter.com",
+    "https://embed.reddit.com",
 ]
 
 

@@ -3,6 +3,7 @@ import { useMemo } from "react";
 import { useTranslation } from "react-i18next";
 
 import { Button } from "@/components/ui/button";
+import { EmbedFrame } from "@/components/ui/embed-frame";
 import { matchSmartLinkProvider } from "@/lib/smartLinkProviders";
 import { cn } from "@/lib/utils";
 
@@ -42,13 +43,11 @@ export function SmartLinkFileViewer({ content, className }: SmartLinkFileViewerP
           className
         )}
       >
-        <iframe
+        <EmbedFrame
           src={match.embedSrc}
-          className="h-full w-full border-0"
           title={url}
-          allow={match.iframeAttrs.allow}
-          referrerPolicy={match.iframeAttrs.referrerPolicy}
-          allowFullScreen
+          {...match.iframeAttrs}
+          className="h-full w-full border-0"
         />
       </div>
     );
