@@ -1,4 +1,6 @@
-import { createFileRoute, lazyRouteComponent } from "@tanstack/react-router";
+import { createFileRoute } from "@tanstack/react-router";
+
+import { WikiPageView } from "@/pages/initiativeTools/wikis/WikiPageView";
 
 /**
  * One page of a wiki. A sibling route of the wiki's own index rather than a
@@ -21,9 +23,5 @@ export const Route = createFileRoute(
    */
   validateSearch: (search: Record<string, unknown>): { edit?: true } =>
     search.edit === true || search.edit === "true" ? { edit: true } : {},
-  component: lazyRouteComponent(() =>
-    import("@/pages/initiativeTools/wikis/WikiPageView").then((m) => ({
-      default: m.WikiPageView,
-    }))
-  ),
+  component: WikiPageView,
 });

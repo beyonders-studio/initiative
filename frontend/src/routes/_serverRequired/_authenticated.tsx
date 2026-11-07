@@ -120,7 +120,7 @@ function AuthenticatedLayout() {
   return <AppLayout />;
 }
 
-export function AppLayout() {
+function AppLayout() {
   // ALL hooks must be called before any conditional returns
   const { user, loading, logout } = useAuth();
   const {

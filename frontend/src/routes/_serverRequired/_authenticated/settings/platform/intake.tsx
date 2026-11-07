@@ -1,7 +1,7 @@
-import { createFileRoute, lazyRouteComponent } from "@tanstack/react-router";
+import { createFileRoute } from "@tanstack/react-router";
+
+import { SettingsIntakePage } from "@/pages/SettingsIntakePage";
 
 export const Route = createFileRoute("/_serverRequired/_authenticated/settings/platform/intake")({
-  component: lazyRouteComponent(() =>
-    import("@/pages/SettingsIntakePage").then((m) => ({ default: m.SettingsIntakePage }))
-  ),
+  component: SettingsIntakePage,
 });

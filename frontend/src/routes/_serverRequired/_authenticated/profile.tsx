@@ -1,9 +1,7 @@
-import { createFileRoute, lazyRouteComponent } from "@tanstack/react-router";
+import { createFileRoute } from "@tanstack/react-router";
+
+import { UserSettingsLayout } from "@/pages/user/settings/UserSettingsLayout";
 
 export const Route = createFileRoute("/_serverRequired/_authenticated/profile")({
-  component: lazyRouteComponent(() =>
-    import("@/pages/user/settings/UserSettingsLayout").then((m) => ({
-      default: m.UserSettingsLayout,
-    }))
-  ),
+  component: UserSettingsLayout,
 });
