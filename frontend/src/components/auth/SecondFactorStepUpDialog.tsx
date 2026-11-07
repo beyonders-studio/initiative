@@ -1,4 +1,4 @@
-import { Link, useLocation, useNavigate } from "@tanstack/react-router";
+import { Link, useLocation, useNavigate, useRouter } from "@tanstack/react-router";
 import { isAxiosError } from "axios";
 import { KeyRound, Mail } from "lucide-react";
 import { type FormEvent, useState } from "react";
@@ -58,13 +58,15 @@ export const SecondFactorStepUpDialog = () => {
   const { t } = useTranslation(["auth", "common"]);
   const { logout, stepUpWithFactor, stepUpWithPasskey, stepUpWithEmailCode } = useAuth();
   const { emailOtpLoginEnabled } = useAppConfig();
-  const location = useLocation();
+  const router = useRouter();
   const navigate = useNavigate();
   // Everything is accepted except the deployment's own ask while the person
   // is on the page that answers it: the shell around that page makes requests
   // of its own, and each would put this dialog back over the thing it is
   // asking them to do. Their next request elsewhere raises it again.
-  const onSecurityPage = location.pathname.startsWith("/profile/security");
+  const onSecurityPage = useLocation({
+    select: (location) => location.pathname.startsWith("/profile/security"),
+  });
   const { challenge, clear, open } = useAuthChallenge<FactorChallengeDetail>(
     AUTH_FACTOR_REQUIRED_EVENT,
     (detail) => !(detail?.platform === true && onSecurityPage)
@@ -199,7 +201,7 @@ export const SecondFactorStepUpDialog = () => {
   /** The other way to open a fresh session, for an account with no passkey to
    *  present: start one over, and come back to the page this was raised on. */
   const signInAgain = async () => {
-    const next = returnPath(location.href);
+    const next = returnPath(router.state.location.href);
     setSubmitting(true);
     try {
       await logout();

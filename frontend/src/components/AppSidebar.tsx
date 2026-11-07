@@ -69,7 +69,7 @@ export const AppSidebar = () => {
   const { communityDirectoryEnabled, isLoading: configLoading } = useAppConfig();
   const { activeCommunity, activeCommunityId } = useCommunities();
   const isMobile = !atLeast(useWidthClass(), "md");
-  const location = useLocation();
+  const pathname = useLocation({ select: (location) => location.pathname });
   const { t } = useTranslation(["nav", "tags", "initiatives"]);
 
   // Auto-close sidebar on mobile after navigation
@@ -93,7 +93,7 @@ export const AppSidebar = () => {
   const showOperatorDashboard = canAccessOperatorDashboard(user);
 
   // Determine sidebar mode from route
-  const isCommunityRoute = location.pathname.startsWith("/c/");
+  const isCommunityRoute = pathname.startsWith("/c/");
   // The community directory brings its own: what narrows it belongs beside the
   // cards it narrows, not on the page with them. Only where there is a
   // directory to narrow, though — where the owner runs none, the page says so
@@ -101,30 +101,29 @@ export const AppSidebar = () => {
   // twelve shelves that answer nothing. While the config is still loading the
   // directory gets the benefit of the doubt, so the two halves of the screen
   // arrive at the same answer at the same time.
-  const isDirectoryRoute =
-    location.pathname === "/communities" || location.pathname.startsWith("/communities/");
+  const isDirectoryRoute = pathname === "/communities" || pathname.startsWith("/communities/");
   const showDirectorySidebar = isDirectoryRoute && (communityDirectoryEnabled || configLoading);
 
   // Which project row to highlight. A project is addressed inside its
   // initiative, so the pattern has to carry that segment too.
   const activeProjectId = useMemo(() => {
-    const match = location.pathname.match(/^\/c\/\d+\/i\/\d+\/projects\/(\d+)/);
+    const match = pathname.match(/^\/c\/\d+\/i\/\d+\/projects\/(\d+)/);
     return match ? parseInt(match[1], 10) : null;
-  }, [location.pathname]);
+  }, [pathname]);
 
   // The wiki the reader is inside, and the page they are on. A wiki takes the
   // sidebar over the way My Messages does — a wiki is a list of pages and then
   // one of them, which is two levels in a column with room for one.
   const openWiki = useMemo(() => {
-    const match = location.pathname.match(/^\/c\/\d+\/i\/(\d+)\/wikis\/(\d+)/);
+    const match = pathname.match(/^\/c\/\d+\/i\/(\d+)\/wikis\/(\d+)/);
     if (!match) return null;
-    const page = location.pathname.match(/\/wikis\/\d+\/pages\/(\d+)/);
+    const page = pathname.match(/\/wikis\/\d+\/pages\/(\d+)/);
     return {
       initiativeId: parseInt(match[1], 10),
       wikiId: parseInt(match[2], 10),
       pageId: page ? parseInt(page[1], 10) : null,
     };
-  }, [location.pathname]);
+  }, [pathname]);
 
   // Climbing out is a per-visit choice, not a stored one: leaving the wiki's
   // URL puts the ordinary navigation back on its own.
@@ -167,7 +166,7 @@ export const AppSidebar = () => {
     staleTime: 60_000,
   });
   // Which of them is open: the tool the address names.
-  const activeTool = useMemo(() => getActiveRecentKey(location.pathname), [location.pathname]);
+  const activeTool = useMemo(() => getActiveRecentKey(pathname), [pathname]);
 
   // Every tool's per-initiative counts in one fan-out, keyed by `Tool`, so
   // the badges follow the registry rather than a list kept in step by hand.

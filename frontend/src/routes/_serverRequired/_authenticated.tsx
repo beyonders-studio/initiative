@@ -120,7 +120,7 @@ function AuthenticatedLayout() {
   return <AppLayout />;
 }
 
-export function AppLayout() {
+function AppLayout() {
   // ALL hooks must be called before any conditional returns
   const { user, loading, logout } = useAuth();
   const {
@@ -133,7 +133,7 @@ export function AppLayout() {
   // once the account has one rather than giving way to the app shell.
   const [startFlowBusy, setStartFlowBusy] = useState(false);
   useFinishPendingStart();
-  const location = useLocation();
+  const pathname = useLocation({ select: (location) => location.pathname });
   // Whether the route on screen lays itself out against the window. Read off
   // the matched routes rather than the path, so a route says it once where it
   // is declared.
@@ -222,7 +222,7 @@ export function AppLayout() {
     const layout = chooseNoCommunityLayout({
       hasCommunities: communities.length > 0,
       listFailed: communitiesError !== null,
-      pathname: location.pathname,
+      pathname: pathname,
       canAccessPlatformAreas: reachesPlatformAreas,
     });
     if (layout === "unavailable" && !startFlowBusy) {
@@ -279,7 +279,7 @@ export function AppLayout() {
   // (before the 30s-stale recents query refetches).
   const recentItems = recentQuery.data?.slice(0, user?.recent_tabs_limit ?? 20);
 
-  const activeRecentKey = getActiveRecentKey(location.pathname);
+  const activeRecentKey = getActiveRecentKey(pathname);
 
   // const isDark = document.documentElement.classList.contains("dark");
 
@@ -463,7 +463,7 @@ export function AppLayout() {
                   </main>
                 </div>
               </div>
-              <ActivityDrawer scope={activityScope(location.pathname)} />
+              <ActivityDrawer scope={activityScope(pathname)} />
               <BottomNav />
             </SidebarProvider>
           </DocumentOutlineScope>

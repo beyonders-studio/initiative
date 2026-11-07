@@ -4,7 +4,6 @@ import {
   AIConnectionManager,
   type ConnectionMutations,
 } from "@/components/settings/AIConnectionManager";
-import { CommunityAISwitchSection } from "@/components/settings/CommunityAISwitchSection";
 import { FormSkeleton, SkeletonRegion } from "@/components/skeletons/PageSkeletons";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { useAIEnabled } from "@/hooks/useAIEnabled";
@@ -17,11 +16,13 @@ import {
   useUpdateCommunityConnection,
 } from "@/hooks/useAISettings";
 import { useCommunities } from "@/hooks/useCommunities";
+import { useCommunityAuthSettings } from "@/hooks/useCommunityAuthPolicy";
 import { getProvidersForScope } from "@/lib/ai-providers";
 
 /**
- * The seat's AI surface: whether AI may be used here at all, and the
- * community's own AI connections when the platform is in `community` mode.
+ * The seat's AI surface: the community's own AI connections when the platform
+ * is in `community` mode. Whether AI may be used here at all is a restriction,
+ * on Security.
  */
 export const SettingsCommunityAIPage = () => {
   const { t } = useTranslation("settings");
@@ -41,6 +42,13 @@ export const SettingsCommunityAIPage = () => {
   const connectionsQuery = useCommunityConnections({
     enabled: Boolean(holdsTheSeat) && canManageConnections,
   });
+  // With AI off on Security, no connection can be turned on.
+  const authSettings = useCommunityAuthSettings(activeCommunity?.id ?? 0, {
+    enabled: holdsTheSeat && canManageConnections,
+  }).data;
+  const aiOff = Boolean(
+    authSettings?.auth_options.includes("restrictions") && !authSettings.allow_ai
+  );
 
   const mutations: ConnectionMutations = {
     create: useCreateCommunityConnection(),
@@ -77,35 +85,10 @@ export const SettingsCommunityAIPage = () => {
     );
   }
 
-  const aiSwitch = activeCommunity && <CommunityAISwitchSection communityId={activeCommunity.id} />;
-
-  if (!canManageConnections) {
-    return (
-      <div className="space-y-6">
-        {aiSwitch}
-        <Card>
-          <CardHeader>
-            <CardTitle>{t("communityAI.title")}</CardTitle>
-            <CardDescription>
-              {mode === "platform"
-                ? t("communityAI.managedByPlatform")
-                : t("communityAI.managedByServer")}
-            </CardDescription>
-          </CardHeader>
-        </Card>
-      </div>
-    );
-  }
-
   return (
-    <div className="space-y-6">
-      {aiSwitch}
-      <Card>
-        <CardHeader>
-          <CardTitle>{t("communityAI.connectionsTitle")}</CardTitle>
-          <CardDescription>{t("communityAI.connectionsDescription")}</CardDescription>
-        </CardHeader>
-        <CardContent>
+    <Card>
+      <CardContent className="pt-6">
+        {canManageConnections ? (
           <AIConnectionManager
             scope="community"
             connections={connectionsQuery.data ?? []}
@@ -113,9 +96,16 @@ export const SettingsCommunityAIPage = () => {
             isError={connectionsQuery.isError}
             providers={getProvidersForScope("community")}
             mutations={mutations}
+            locked={aiOff}
           />
-        </CardContent>
-      </Card>
-    </div>
+        ) : (
+          <p className="text-muted-foreground text-sm">
+            {mode === "platform"
+              ? t("communityAI.managedByPlatform")
+              : t("communityAI.managedByServer")}
+          </p>
+        )}
+      </CardContent>
+    </Card>
   );
 };

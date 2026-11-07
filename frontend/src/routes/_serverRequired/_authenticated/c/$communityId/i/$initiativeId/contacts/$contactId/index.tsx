@@ -1,7 +1,8 @@
-import { createFileRoute, lazyRouteComponent } from "@tanstack/react-router";
+import { createFileRoute } from "@tanstack/react-router";
 
 import { getReadContactQueryKey, readContact } from "@/api/generated/contacts/contacts";
 import { commentThreadQueryOptions } from "@/hooks/useComments";
+import { ContactDetailPage } from "@/pages/initiativeTools/contacts/ContactDetailPage";
 
 export const Route = createFileRoute(
   "/_serverRequired/_authenticated/c/$communityId/i/$initiativeId/contacts/$contactId/"
@@ -25,9 +26,5 @@ export const Route = createFileRoute(
       }),
     ]).catch(() => {});
   },
-  component: lazyRouteComponent(() =>
-    import("@/pages/initiativeTools/contacts/ContactDetailPage").then((m) => ({
-      default: m.ContactDetailPage,
-    }))
-  ),
+  component: ContactDetailPage,
 });

@@ -252,7 +252,9 @@ describe("My Messages", () => {
   it("is reachable at /messages", async () => {
     await renderMessages();
 
-    expect(await screen.findByRole("heading", { name: /my messages/i })).toBeInTheDocument();
+    expect(
+      await screen.findByRole("heading", { name: /pick a conversation/i })
+    ).toBeInTheDocument();
   });
 
   it("lands on the list rather than a note about where the list is", async () => {
@@ -684,7 +686,9 @@ describe("My Messages", () => {
     mocks.ensureDevice.mockResolvedValue("device-1");
     await userEvent.click(retry);
 
-    expect(await screen.findByRole("heading", { name: /my messages/i })).toBeInTheDocument();
+    expect(
+      await screen.findByRole("heading", { name: /pick a conversation/i })
+    ).toBeInTheDocument();
     expect(screen.queryByText(/could not be set up/i)).toBeNull();
   }, 15_000);
 
@@ -788,7 +792,9 @@ describe("My Messages", () => {
 
     await renderMessages();
 
-    expect(await screen.findByRole("heading", { name: /my messages/i })).toBeInTheDocument();
+    expect(
+      await screen.findByRole("heading", { name: /pick a conversation/i })
+    ).toBeInTheDocument();
     expect(screen.queryByLabelText(/date of birth/i)).toBeNull();
   });
 

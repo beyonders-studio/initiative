@@ -231,7 +231,15 @@ export default defineConfig({
     // generator skips them rather than treating each as a missing route.
     // Each route's component loads with the route, so the entry carries only
     // the route tree and what every page needs.
-    tanstackRouter({ autoCodeSplitting: true, routeFileIgnorePattern: "\\.test\\.[jt]sx?$" }),
+    // A route's loader travels with its page, so neither sits in the entry and
+    // one fetch brings both.
+    tanstackRouter({
+      autoCodeSplitting: true,
+      codeSplittingOptions: {
+        defaultBehavior: [["loader", "component"], ["errorComponent"], ["notFoundComponent"]],
+      },
+      routeFileIgnorePattern: "\\.test\\.[jt]sx?$",
+    }),
     react(),
     tailwindcss(),
     emojibasePlugin(),
@@ -287,13 +295,6 @@ export default defineConfig({
               name: "app",
               tags: ["$initial"],
               priority: 2,
-            },
-            // The icon picker imports every icon on demand; one chunk instead
-            // of one file per icon. Icons the entry uses stay in the entry.
-            {
-              name: "lucide-react",
-              test: /\/lucide-react\//,
-              priority: 1,
             },
           ],
         },

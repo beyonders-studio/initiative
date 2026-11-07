@@ -1,4 +1,4 @@
-import { createFileRoute, lazyRouteComponent } from "@tanstack/react-router";
+import { createFileRoute } from "@tanstack/react-router";
 
 import {
   getGetTagCountsQueryKey,
@@ -6,6 +6,7 @@ import {
   getTag,
   getTagCounts,
 } from "@/api/generated/tags/tags";
+import { TagDetailPage } from "@/pages/TagDetailPage";
 
 export const Route = createFileRoute("/_serverRequired/_authenticated/c/$communityId/tags_/$tagId")(
   {
@@ -35,8 +36,6 @@ export const Route = createFileRoute("/_serverRequired/_authenticated/c/$communi
         }),
       ]).catch(() => {});
     },
-    component: lazyRouteComponent(() =>
-      import("@/pages/TagDetailPage").then((m) => ({ default: m.TagDetailPage }))
-    ),
+    component: TagDetailPage,
   }
 );

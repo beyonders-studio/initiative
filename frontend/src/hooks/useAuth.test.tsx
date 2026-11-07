@@ -198,6 +198,20 @@ describe("useAuth identity ordering", () => {
     expect(auth.user).toBe(before);
   });
 
+  it("hands its readers the same value when nothing they read changed", async () => {
+    // Every screen reads this, so a fresh value re-renders all of them.
+    get.mockResolvedValue({ data: buildUser() });
+    renderAuth();
+    await waitFor(() => expect(auth.user).not.toBeNull());
+    const before = auth;
+
+    act(() => {
+      window.dispatchEvent(new Event("offline"));
+    });
+
+    expect(auth).toBe(before);
+  });
+
   it("still swaps the object when the account actually moved", async () => {
     get.mockResolvedValueOnce({ data: buildUser({ username: "Before" }) });
     renderAuth();

@@ -1,6 +1,6 @@
 /**
- * Community → AI: whether AI features may send this community's content to a
- * provider at all.
+ * Community → Security: whether AI features may send this community's content
+ * to a provider at all.
  *
  * The seat's answer narrows what the server offers and never widens it: with
  * it off, no connection is used here, whoever set one up.
@@ -40,8 +40,10 @@ export const CommunityAISwitchSection = ({ communityId }: { communityId: number 
       {
         onSuccess: () => {
           toast.success(t("communityAI.switchSaved"));
-          // The AI buttons read whether AI is on here.
+          // The AI buttons read whether AI is on here, and turning it off
+          // turns the community's connections off.
           void invalidate(q.resolvedAISettings());
+          void invalidate(q.communityAIConnections());
         },
         onError: (err: unknown) =>
           setError(getErrorMessage(err, "settings:communityAI.switchError")),

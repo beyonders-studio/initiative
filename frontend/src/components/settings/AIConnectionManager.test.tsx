@@ -42,7 +42,7 @@ const mutations = () =>
     fetchModels: mutation(),
   }) as unknown as ConnectionMutations;
 
-const render = (connections: AIConnectionResponse[], given = mutations()) =>
+const render = (connections: AIConnectionResponse[], given = mutations(), locked = false) =>
   renderWithProviders(
     <AIConnectionManager
       scope="community"
@@ -51,6 +51,7 @@ const render = (connections: AIConnectionResponse[], given = mutations()) =>
       isError={false}
       providers={["anthropic", "openai"]}
       mutations={given}
+      locked={locked}
     />
   );
 
@@ -79,6 +80,29 @@ describe("AIConnectionManager", () => {
     expect(screen.queryByText("Needs a model")).not.toBeInTheDocument();
     expect(screen.getByText(/claude-haiku-5-5/)).toBeInTheDocument();
     expect(screen.queryByText(/Failing since/)).not.toBeInTheDocument();
+  });
+
+  it("turns a connection off from its row and nothing else about it", async () => {
+    const given = mutations();
+    render([connection({ model: "claude-haiku-5-5" })], given);
+
+    await userEvent.click(screen.getByRole("switch", { name: "Use Team" }));
+
+    expect(given.update.mutate).toHaveBeenCalledWith(
+      { connectionId: 1, data: { enabled: false } },
+      expect.anything()
+    );
+  });
+
+  it("keeps every connection off while AI is off, and says where to turn it on", () => {
+    render([connection({ model: "claude-haiku-5-5" })], mutations(), true);
+
+    const toggle = screen.getByRole("switch", { name: "Use Team" });
+    expect(toggle).not.toBeChecked();
+    expect(toggle).toBeDisabled();
+    expect(
+      screen.getByText("Turn AI on under Security to use these connections.")
+    ).toBeInTheDocument();
   });
 
   it("says who a connection serves and how its last request went", () => {

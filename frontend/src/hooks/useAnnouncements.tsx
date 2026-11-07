@@ -50,7 +50,7 @@ export const useAnnouncementArchive = () => useListAnnouncements({ include_dismi
  *   a notice that asked for more than one comes back until it has them.
  */
 export const useAnnouncements = (enabled: boolean): UseAnnouncementsResult => {
-  const { pathname } = useLocation();
+  const pathname = useLocation({ select: (location) => location.pathname });
   const { data } = useListAnnouncements(undefined, {
     query: {
       enabled,

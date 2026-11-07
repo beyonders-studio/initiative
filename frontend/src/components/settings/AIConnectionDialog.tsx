@@ -191,19 +191,6 @@ export const AIConnectionDialog = ({
 
           <div className="flex items-center justify-between rounded-md border px-4 py-3">
             <div>
-              <p className="font-medium">{t("aiConnections.enabledLabel")}</p>
-              <p className="text-muted-foreground text-sm">
-                {t("aiConnections.enabledDescription")}
-              </p>
-            </div>
-            <Switch
-              checked={form.enabled}
-              onCheckedChange={(checked) => setField("enabled", Boolean(checked))}
-            />
-          </div>
-
-          <div className="flex items-center justify-between rounded-md border px-4 py-3">
-            <div>
               <p className="font-medium">{t("aiConnections.defaultLabel")}</p>
               <p className="text-muted-foreground text-sm">
                 {t("aiConnections.defaultDescription")}

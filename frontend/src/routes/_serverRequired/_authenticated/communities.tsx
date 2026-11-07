@@ -1,8 +1,9 @@
-import { createFileRoute, lazyRouteComponent } from "@tanstack/react-router";
+import { createFileRoute } from "@tanstack/react-router";
 
 import type { CommunityCategory } from "@/api/generated/initiativeAPI.schemas";
 import { asCommunityCategories } from "@/lib/communityCategories";
 import { type NearSearch, nearSearchFrom } from "@/lib/directoryNear";
+import { CommunitiesPage } from "@/pages/communities/CommunitiesPage";
 
 /** What the endpoint accepts, so a hand-typed address cannot ask for more. */
 const MAX_QUERY_LENGTH = 200;
@@ -31,9 +32,5 @@ export const Route = createFileRoute("/_serverRequired/_authenticated/communitie
       ...nearSearchFrom(search),
     };
   },
-  component: lazyRouteComponent(() =>
-    import("@/pages/communities/CommunitiesPage").then((m) => ({
-      default: m.CommunitiesPage,
-    }))
-  ),
+  component: CommunitiesPage,
 });

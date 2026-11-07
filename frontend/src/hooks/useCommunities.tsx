@@ -671,21 +671,38 @@ export const CommunityProvider = ({ children }: { children: ReactNode }) => {
       activeCommunity?.grantAccessLevel !== "read_write") ||
     Boolean(activeCommunity?.content_read_only);
 
-  const value: CommunityContextValue = {
-    communities,
-    activeCommunityId,
-    activeCommunity,
-    activeCommunityReadOnly,
-    loading,
-    error,
-    refreshCommunities,
-    switchCommunity,
-    syncCommunityFromUrl,
-    createCommunity,
-    updateCommunityInState,
-    reorderCommunities,
-    canCreateCommunities,
-  };
+  const value = useMemo<CommunityContextValue>(
+    () => ({
+      communities,
+      activeCommunityId,
+      activeCommunity,
+      activeCommunityReadOnly,
+      loading,
+      error,
+      refreshCommunities,
+      switchCommunity,
+      syncCommunityFromUrl,
+      createCommunity,
+      updateCommunityInState,
+      reorderCommunities,
+      canCreateCommunities,
+    }),
+    [
+      communities,
+      activeCommunityId,
+      activeCommunity,
+      activeCommunityReadOnly,
+      loading,
+      error,
+      refreshCommunities,
+      switchCommunity,
+      syncCommunityFromUrl,
+      createCommunity,
+      updateCommunityInState,
+      reorderCommunities,
+      canCreateCommunities,
+    ]
+  );
 
   return <CommunityContext.Provider value={value}>{children}</CommunityContext.Provider>;
 };

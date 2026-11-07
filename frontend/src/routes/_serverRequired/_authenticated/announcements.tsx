@@ -1,9 +1,7 @@
-import { createFileRoute, lazyRouteComponent } from "@tanstack/react-router";
+import { createFileRoute } from "@tanstack/react-router";
+
+import { AnnouncementsArchivePage } from "@/pages/AnnouncementsArchivePage";
 
 export const Route = createFileRoute("/_serverRequired/_authenticated/announcements")({
-  component: lazyRouteComponent(() =>
-    import("@/pages/AnnouncementsArchivePage").then((m) => ({
-      default: m.AnnouncementsArchivePage,
-    }))
-  ),
+  component: AnnouncementsArchivePage,
 });

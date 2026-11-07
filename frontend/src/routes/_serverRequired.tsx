@@ -35,7 +35,7 @@ export const Route = createFileRoute("/_serverRequired")({
 
 function ServerRequiredLayout() {
   const { loading, isNativePlatform, isServerConfigured } = useServer();
-  const { pathname } = useLocation();
+  const pathname = useLocation({ select: (location) => location.pathname });
   // OTA live updates (native only). Mounted here — once a server is configured but before
   // auth is required — so a fresh install can update its web bundle even from the login screen.
   const {

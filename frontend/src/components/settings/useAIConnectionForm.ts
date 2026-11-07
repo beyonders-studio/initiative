@@ -22,7 +22,6 @@ export interface AIConnectionFormState {
   baseUrl: string;
   model: string;
   apiKey: string;
-  enabled: boolean;
   isDefault: boolean;
   communities: AIConnectionCommunity[];
 }
@@ -33,7 +32,6 @@ const emptyForm: AIConnectionFormState = {
   baseUrl: "",
   model: "",
   apiKey: "",
-  enabled: true,
   isDefault: false,
   communities: [],
 };
@@ -44,7 +42,6 @@ const toFormState = (connection: AIConnectionResponse): AIConnectionFormState =>
   baseUrl: connection.base_url ?? "",
   model: connection.model ?? "",
   apiKey: "",
-  enabled: connection.enabled,
   isDefault: connection.is_default,
   communities: connection.communities,
 });
@@ -127,7 +124,6 @@ export const useAIConnectionForm = ({
         provider: form.provider,
         base_url: baseUrl,
         model: form.model || null,
-        enabled: form.enabled,
         is_default: form.isDefault,
       };
       if (form.apiKey) payload.api_key = form.apiKey;
@@ -155,7 +151,6 @@ export const useAIConnectionForm = ({
       base_url: baseUrl,
       model: form.model || null,
       api_key: form.apiKey || null,
-      enabled: form.enabled,
       is_default: form.isDefault,
       community_ids: scope === "platform" ? form.communities.map((c) => c.id) : [],
     };

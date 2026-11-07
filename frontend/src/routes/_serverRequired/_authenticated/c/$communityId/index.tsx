@@ -1,8 +1,8 @@
-import { createFileRoute, lazyRouteComponent } from "@tanstack/react-router";
-import { Suspense } from "react";
+import { createFileRoute } from "@tanstack/react-router";
 
 import { CommunityHomeSkeleton } from "@/components/skeletons/PageSkeletons";
 import { validateId } from "@/lib/routeSearch";
+import { CommunityHomePage } from "@/pages/CommunityHomePage";
 
 export const Route = createFileRoute("/_serverRequired/_authenticated/c/$communityId/")({
   /** `node` is the rail's open node; comments is the only one. */
@@ -21,19 +21,10 @@ export const Route = createFileRoute("/_serverRequired/_authenticated/c/$communi
     create: search.create === "true" ? "true" : undefined,
     plugin: validateId(search.plugin),
   }),
-  component: CommunityHome,
+  component: CommunityHomePage,
+  // The front page draws its own outline while its code is on the way, rather
+  // than the generic one the layout would otherwise show in its place.
+  pendingComponent: CommunityHomeSkeleton,
+  pendingMs: 0,
+  pendingMinMs: 0,
 });
-
-const LazyCommunityHomePage = lazyRouteComponent(() =>
-  import("@/pages/CommunityHomePage").then((m) => ({ default: m.CommunityHomePage }))
-);
-
-/** The front page draws its own outline while its code is on the way, rather
- *  than the generic one the layout would otherwise show in its place. */
-function CommunityHome() {
-  return (
-    <Suspense fallback={<CommunityHomeSkeleton />}>
-      <LazyCommunityHomePage />
-    </Suspense>
-  );
-}

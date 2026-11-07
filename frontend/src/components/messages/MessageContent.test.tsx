@@ -10,6 +10,8 @@
 import { render, screen } from "@testing-library/react";
 import { describe, expect, it } from "vitest";
 
+import { BLOCKED_URL } from "@/lib/safeUrl";
+
 import { MessageContent } from "./MessageContent";
 
 describe("a message body", () => {
@@ -52,14 +54,12 @@ describe("a message body", () => {
   });
 
   it("will not follow a scheme it does not trust", () => {
-    // The words survive; the destination does not. Queried off the DOM rather
-    // than by role: an anchor stripped back to an empty href is exactly what
-    // should be here, and it is no longer a link to ask for by name.
+    // The words survive; the destination becomes the blocked address.
     const { container } = render(<MessageContent body={"[tap](javascript:alert(1))"} />);
 
     const anchor = container.querySelector("a");
     expect(anchor).toHaveTextContent("tap");
-    expect(anchor?.getAttribute("href")).toBe("");
+    expect(anchor?.getAttribute("href")).toBe(BLOCKED_URL);
   });
 
   it("carries no markup of its own", () => {
