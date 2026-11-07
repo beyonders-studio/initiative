@@ -1774,6 +1774,7 @@
     "title": "Verbindungen",
     "subtitle_community": "Die KI-Anbieter und -Modelle, die Mitglieder dieser Community nutzen können.",
     "subtitle_platform": "Die KI-Anbieter und -Modelle, die Communities auf diesem Server nutzen können.",
+    "locked": "Schalte KI unter Sicherheit ein, um diese Verbindungen zu nutzen.",
     "add": "Verbindung hinzufügen",
     "toggleLabel": "{{label}} verwenden",
     "empty": "Noch keine Verbindungen. Füge eine hinzu, um KI-Funktionen zu aktivieren.",

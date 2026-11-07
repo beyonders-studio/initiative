@@ -354,6 +354,37 @@ async def test_a_community_can_switch_ai_off(client, acting_user):
     assert resolved.json()["enabled"] is True
 
 
+async def test_a_community_s_connections_are_off_while_its_ai_is(client, acting_user):
+    owner = await acting_user()
+    await _set_mode(client, owner, "community")
+    seat = await acting_user(guild_role=CommunityRole.superadmin, initiative=True)
+    settings_path = f"/api/v1/communities/{seat.guild.id}/auth-settings"
+    conns = seat.g("/settings/ai/connections")
+    body = {"label": "Team", "provider": "openai", "model": "m", "api_key": "k"}
+    first = (await client.post(conns, headers=seat.headers, json=body)).json()
+    assert first["enabled"] is True
+
+    await client.patch(settings_path, headers=seat.headers, json={"allow_ai": False})
+    listed = (await client.get(conns, headers=seat.headers)).json()
+    assert [c["enabled"] for c in listed] == [False]
+    second = (
+        await client.post(conns, headers=seat.headers, json={**body, "label": "B"})
+    ).json()
+    assert second["enabled"] is False
+    refused = await client.put(
+        f"{conns}/{first['id']}", headers=seat.headers, json={"enabled": True}
+    )
+    assert refused.status_code == 409
+    assert refused.json()["detail"] == AIMessages.NOT_ENABLED
+
+    # Back on, each connection is turned on again by itself.
+    await client.patch(settings_path, headers=seat.headers, json={"allow_ai": True})
+    turned_on = await client.put(
+        f"{conns}/{first['id']}", headers=seat.headers, json={"enabled": True}
+    )
+    assert turned_on.json()["enabled"] is True
+
+
 async def test_a_connection_shows_how_its_last_request_went(
     client, acting_user, monkeypatch
 ):

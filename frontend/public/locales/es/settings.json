@@ -1774,6 +1774,7 @@
     "title": "Conexiones",
     "subtitle_community": "Los proveedores y modelos de IA que pueden usar los miembros de esta comunidad.",
     "subtitle_platform": "Los proveedores y modelos de IA que pueden usar las comunidades de este servidor.",
+    "locked": "Activa la IA en Seguridad para usar estas conexiones.",
     "add": "Añadir conexión",
     "toggleLabel": "Usar {{label}}",
     "empty": "Aún no hay conexiones. Añade una para activar las funciones de IA.",

@@ -1774,6 +1774,7 @@
     "title": "Connections",
     "subtitle_community": "The AI providers and models members of this community can use.",
     "subtitle_platform": "The AI providers and models communities on this server can use.",
+    "locked": "Turn AI on under Security to use these connections.",
     "add": "Add connection",
     "toggleLabel": "Use {{label}}",
     "empty": "No connections yet. Add one to enable AI features.",

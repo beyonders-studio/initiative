@@ -450,6 +450,15 @@ async def _ai_mode_moved(ctx: RuleContext, before: Any, after: Any) -> None:
     ai_settings.invalidate_platform_ai_cache()
 
 
+async def _community_connections_off(ctx: RuleContext, before: Any, after: Any) -> None:
+    # Its own connections go off with it, so turning AI back on starts from
+    # none in use until each is turned on again.
+    from app.services import ai_settings
+
+    if before and not after and ctx.guild_id is not None:
+        await ai_settings.turn_off_guild_connections(ctx.guild_id)
+
+
 async def _drop_push_tokens(ctx: RuleContext, before: Any, after: Any) -> None:
     # The deployment stops keeping the addresses it was sending to. Devices
     # register again the next time the app starts, once push is back on.
@@ -740,10 +749,18 @@ def _platform(key: str, area: str, follow_up: FollowUp | None = None) -> Rule:
     return Rule(key, area=area, loose=stored.default, follow_up=follow_up)
 
 
-def _community(key: str, area: str, cls: type[Rule] = Rule) -> Rule:
+def _community(
+    key: str, area: str, cls: type[Rule] = Rule, follow_up: FollowUp | None = None
+) -> Rule:
     """A stored rule of a community, with the option it needs."""
     stored = rule_catalog.COMMUNITY_RULES[key]
-    return cls(key, area=area, loose=stored.default, entitlement=stored.entitlement)
+    return cls(
+        key,
+        area=area,
+        loose=stored.default,
+        entitlement=stored.entitlement,
+        follow_up=follow_up,
+    )
 
 
 #: The deployment's rules, by the field that names each.
@@ -814,7 +831,7 @@ COMMUNITY_RULES: dict[str, Rule] = {
         _community("allow_email_notifications", "notifications"),
         _community("redact_notification_content", "notifications"),
         _community("allow_engagement_ranking", "engagement_ranking"),
-        _community("allow_ai", "ai"),
+        _community("allow_ai", "ai", follow_up=_community_connections_off),
         # The longest a guest may stay. It bounds the guests made or extended
         # after it changes, and no others.
         _community("guest_max_days", "guests"),

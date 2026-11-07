@@ -26,6 +26,8 @@ interface AIConnectionManagerProps {
   /** Providers selectable in this scope (platform allows Ollama, community does not). */
   providers: AIProvider[];
   mutations: ConnectionMutations;
+  /** AI is off where these connections serve, so none can be turned on. */
+  locked?: boolean;
 }
 
 /**
@@ -40,6 +42,7 @@ export const AIConnectionManager = ({
   isError,
   providers,
   mutations,
+  locked = false,
 }: AIConnectionManagerProps) => {
   const { t } = useTranslation("settings");
   const [dialogOpen, setDialogOpen] = useState(false);
@@ -95,6 +98,7 @@ export const AIConnectionManager = ({
         <div>
           <h3 className="font-medium">{t("aiConnections.title")}</h3>
           <p className="text-muted-foreground text-sm">{t(`aiConnections.subtitle_${scope}`)}</p>
+          {locked && <p className="text-muted-foreground text-sm">{t("aiConnections.locked")}</p>}
         </div>
         <Button type="button" onClick={openCreate} className="shrink-0">
           <Plus className="h-4 w-4" />
@@ -121,8 +125,8 @@ export const AIConnectionManager = ({
               <AIConnectionRow
                 key={connection.id}
                 connection={connection}
-                enabled={pending ?? connection.enabled}
-                toggleDisabled={mutations.update.isPending}
+                enabled={!locked && (pending ?? connection.enabled)}
+                toggleDisabled={locked || mutations.update.isPending}
                 onToggle={(enabled) => handleToggle(connection, enabled)}
                 isTesting={mutations.test.isPending && mutations.test.variables === connection.id}
                 testDisabled={mutations.test.isPending}

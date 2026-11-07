@@ -40,8 +40,10 @@ export const CommunityAISwitchSection = ({ communityId }: { communityId: number 
       {
         onSuccess: () => {
           toast.success(t("communityAI.switchSaved"));
-          // The AI buttons read whether AI is on here.
+          // The AI buttons read whether AI is on here, and turning it off
+          // turns the community's connections off.
           void invalidate(q.resolvedAISettings());
+          void invalidate(q.communityAIConnections());
         },
         onError: (err: unknown) =>
           setError(getErrorMessage(err, "settings:communityAI.switchError")),

@@ -16,6 +16,7 @@ import {
   useUpdateCommunityConnection,
 } from "@/hooks/useAISettings";
 import { useCommunities } from "@/hooks/useCommunities";
+import { useCommunityAuthSettings } from "@/hooks/useCommunityAuthPolicy";
 import { getProvidersForScope } from "@/lib/ai-providers";
 
 /**
@@ -41,6 +42,13 @@ export const SettingsCommunityAIPage = () => {
   const connectionsQuery = useCommunityConnections({
     enabled: Boolean(holdsTheSeat) && canManageConnections,
   });
+  // With AI off on Security, no connection can be turned on.
+  const authSettings = useCommunityAuthSettings(activeCommunity?.id ?? 0, {
+    enabled: holdsTheSeat && canManageConnections,
+  }).data;
+  const aiOff = Boolean(
+    authSettings?.auth_options.includes("restrictions") && !authSettings.allow_ai
+  );
 
   const mutations: ConnectionMutations = {
     create: useCreateCommunityConnection(),
@@ -88,6 +96,7 @@ export const SettingsCommunityAIPage = () => {
             isError={connectionsQuery.isError}
             providers={getProvidersForScope("community")}
             mutations={mutations}
+            locked={aiOff}
           />
         ) : (
           <p className="text-muted-foreground text-sm">
