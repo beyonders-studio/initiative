@@ -44,7 +44,7 @@ import type { AccessGrantsForm, AccessGrantsSearch } from "@/lib/accessGrantsSea
 import { getErrorMessage } from "@/lib/errorMessage";
 import { minutesLeft } from "@/lib/formatDate";
 import { toast } from "@/lib/mascotToast";
-import { assertForBreakGlass, describePasskeyPromptError } from "@/lib/passkeys";
+import { assertForBreakGlass, describePasskeyPromptError, passkeysRunHere } from "@/lib/passkeys";
 import { Capability, hasCapability } from "@/lib/permissions";
 import { classifySecondFactorAnswer } from "@/lib/secondFactorAnswer";
 import { getUserDisplayName } from "@/lib/userDisplay";
@@ -499,7 +499,7 @@ const BreakGlassSection = () => {
             >
               {breakGlass.isPending ? t("common:submitting") : t("accessGrants.breakGlass.submit")}
             </Button>
-            {needsCode && hasKey && (
+            {needsCode && hasKey && passkeysRunHere() && (
               <Button
                 type="button"
                 variant="outline"

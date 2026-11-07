@@ -9102,6 +9102,7 @@ export interface PasskeySignUpFinish {
 export interface PasskeySignUpResult {
   access_token: string;
   token_type?: string;
+  refresh_token?: string | null;
   codes?: string[];
 }
 

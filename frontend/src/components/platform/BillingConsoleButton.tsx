@@ -29,7 +29,7 @@ import { useBreakGlassRequirements } from "@/hooks/useAccessGrants";
 import { useAppConfig } from "@/hooks/useAppConfig";
 import { getErrorCode, getErrorMessage } from "@/lib/errorMessage";
 import { toast } from "@/lib/mascotToast";
-import { assertForBreakGlass, describePasskeyPromptError } from "@/lib/passkeys";
+import { assertForBreakGlass, describePasskeyPromptError, passkeysRunHere } from "@/lib/passkeys";
 import { classifySecondFactorAnswer } from "@/lib/secondFactorAnswer";
 
 type BillingConsole = "support" | "operator";
@@ -174,7 +174,7 @@ const SecondFactorDialog = ({
             </p>
           </div>
           <DialogFooter className="flex-wrap gap-2">
-            {hasKey ? (
+            {hasKey && passkeysRunHere() ? (
               <Button
                 type="button"
                 variant="outline"

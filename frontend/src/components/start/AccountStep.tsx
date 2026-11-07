@@ -9,7 +9,7 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { useAppConfig } from "@/hooks/useAppConfig";
 import { useLegalIndex } from "@/hooks/useLegalDocuments";
-import { browserOffersPasskeys } from "@/lib/passkeys";
+import { passkeysRunHere } from "@/lib/passkeys";
 import { checkNewPassword } from "@/lib/passwordPolicy";
 
 /**
@@ -58,7 +58,7 @@ export const AccountStep = ({
   // A captcha token is spent by being checked, so every attempt gets a fresh
   // widget: bumping this remounts it.
   const [captchaKey, setCaptchaKey] = useState(0);
-  const keysOffered = passkeyLoginEnabled && browserOffersPasskeys();
+  const keysOffered = passkeyLoginEnabled && passkeysRunHere();
   const formDoor = passwordLoginEnabled || keysOffered;
   const incomplete = !email.trim() || (captcha !== null && !captchaToken) || blocked;
   // Its notice is still being read: wait, so it's there to agree to.

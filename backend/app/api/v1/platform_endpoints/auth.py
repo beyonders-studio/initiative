@@ -731,7 +731,11 @@ async def finish_passkey_sign_up(
         amr=passkey_amr(backed_up=registered.backed_up),
         audit_detail={"method": "passkey", "during": "registration"},
     )
-    return PasskeySignUpResult(access_token=token.access_token, codes=account.codes)
+    return PasskeySignUpResult(
+        access_token=token.access_token,
+        refresh_token=token.refresh_token,
+        codes=account.codes,
+    )
 
 
 @router.get("/bootstrap")
