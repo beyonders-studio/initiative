@@ -17,7 +17,13 @@ from app.core.messages import QueryMessages
 from app.services.fields.spec import FieldType
 from app.services.query import QueryError, resolve
 from app.core.search import SearchEntityType
-from app.services.query.resolve import Sheet, SheetCall, remap_ids
+from app.services.query.resolve import (
+    PluginCall,
+    PluginRows,
+    Sheet,
+    SheetCall,
+    remap_ids,
+)
 
 #: The function spellings this surface supports, as a reader writes them.
 #: Postgres reports the name it resolved, so a spelling that is really a node
@@ -836,6 +842,60 @@ def test_a_sheet_call_says_what_it_got_wrong(sql, code):
     with pytest.raises(QueryError) as refused:
         resolve(sql, _READ)
     assert refused.value.code == code
+
+
+_ORDERS = PluginCall("acme.shop", "orders", (("range", "30d"), ("tags", ("a", "b"))))
+
+
+def test_a_plugin_endpoint_is_read_like_a_dataset_once_it_answers():
+    """Its parameters are named arguments; its rows are one bound parameter
+    under the columns the endpoint declares, a value of another type read as
+    nothing; and it joins what any relation joins."""
+    sql = (
+        "SELECT t.title, o.status, sum(o.total) AS total "
+        "FROM plugin('acme.shop', 'orders', tags => ARRAY['a', 'b'], range => '30d') AS o "
+        "JOIN tasks AS t ON t.title = o.status GROUP BY t.title, o.status"
+    )
+    unread = resolve(sql)
+    assert unread.unread == (_ORDERS,)
+    assert unread.relations == ("plugins", "tasks")
+
+    rows = PluginRows.from_rows(
+        _ORDERS,
+        (("status", "string"), ("total", "int"), ("at", "datetime"), ("ok", "bool")),
+        [
+            {"status": "open", "total": 4, "at": "2026-11-01T10:00:00Z", "ok": True},
+            {"status": "shut", "total": "four", "at": "soon", "ok": "yes"},
+        ],
+    )
+    read = resolve(sql, {_ORDERS: rows})
+    assert read.unread == ()
+    assert (
+        "json_to_recordset($1) AS o(c1 text, c2 numeric, c3 timestamptz, c4 boolean)"
+        in read.sql
+    )
+    assert json.loads(read.parameters[-1]) == [
+        {"c1": "open", "c2": 4, "c3": "2026-11-01T10:00:00Z", "c4": True},
+        {"c1": "shut", "c2": None, "c3": None, "c4": None},
+    ]
+
+
+@pytest.mark.parametrize(
+    "sql",
+    [
+        "SELECT a FROM plugin('acme.shop')",
+        "SELECT a FROM plugin('acme.shop', 'orders', 'positional')",
+        "SELECT a FROM plugin('acme.shop', range => '30d', 'orders')",
+        "SELECT a FROM plugin('acme.shop', 'orders', range => status)",
+        "SELECT a FROM plugin('acme.shop', 'orders', range => NULL)",
+        "SELECT a FROM plugin('acme.shop', 'orders', tags => ARRAY[ARRAY['a']])",
+        "SELECT a FROM plugin(1, 'orders')",
+    ],
+)
+def test_a_plugin_call_takes_constants_by_name(sql):
+    with pytest.raises(QueryError) as refused:
+        resolve(sql)
+    assert refused.value.code == QueryMessages.PLUGIN_ARGUMENTS
 
 
 def test_a_name_both_a_dataset_and_a_read_sheet_hold_is_ambiguous():

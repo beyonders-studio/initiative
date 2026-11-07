@@ -13,7 +13,7 @@ from app.api.v1.platform_endpoints.field_catalog import read_query_vocabulary
 from app.models.platform.guild import CommunityRole
 from app.services.fields import dataset
 from app.services.fields.registry import dataset_names
-from app.services.query.resolve import SHEET, QueryError, resolve
+from app.services.query.resolve import PLUGIN, SHEET, QueryError, resolve
 
 
 class TestTheVocabularyIsTheValidatorsOwn:
@@ -40,11 +40,10 @@ class TestTheVocabularyIsTheValidatorsOwn:
         }
         for function in read_query_vocabulary().functions:
             call = calls.get(function, f"{function}(position)")
-            sql = (
-                "SELECT region FROM sheet('Budget')"
-                if function == SHEET
-                else f"SELECT {call} AS v FROM tasks"
-            )
+            sql = {
+                SHEET: "SELECT region FROM sheet('Budget')",
+                PLUGIN: "SELECT status FROM plugin('acme.shop', 'orders')",
+            }.get(function, f"SELECT {call} AS v FROM tasks")
             try:
                 resolve(sql)
             except QueryError as refused:

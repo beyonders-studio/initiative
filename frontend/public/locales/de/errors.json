@@ -260,6 +260,7 @@
   "QUERY_SHEET_RANGE_INVALID": "Dieser Bereich lässt sich nicht lesen. Schreibe ihn etwa als Sheet1!A1:D, A:C oder 2:10.",
   "QUERY_SHEET_RANGE_TOO_LARGE": "Dieser Bereich umfasst zu viele Zellen. Grenze ihn auf weniger Zeilen oder Spalten ein.",
   "QUERY_SHEET_UNREADABLE": "Diese Tabelle konnte gerade nicht gelesen werden. Versuche es noch einmal.",
+  "QUERY_PLUGIN_ARGUMENTS": "plugin() erwartet die ID eines Plug-ins und den Namen dessen, was es liest, danach seine Einstellungen mit Namen, jede ein Wert oder ein ARRAY von Werten, etwa plugin('acme.shop', 'orders', range => '30d').",
   "SHARING_PLUGIN_INSTALL_GRANT_NOT_SET_HERE": "Der Zugriff eines Plug-ins wird in den Einstellungen des Plug-ins erteilt, nicht hier.",
   "QUERY_TOO_EXPENSIVE": "Diese Abfrage verlangt mehr Arbeit, als eine Abfrage leisten darf. Grenze sie ein — weniger Tabellen oder ein Filter, der die Zeilen reduziert.",
   "QUERY_TIMED_OUT": "Diese Abfrage hat zu lange gedauert und wurde abgebrochen.",

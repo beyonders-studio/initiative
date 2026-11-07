@@ -260,6 +260,7 @@
   "QUERY_SHEET_RANGE_INVALID": "That range can't be read. Write it like Sheet1!A1:D, A:C or 2:10.",
   "QUERY_SHEET_RANGE_TOO_LARGE": "That range covers too many cells. Narrow it to fewer rows or columns.",
   "QUERY_SHEET_UNREADABLE": "This spreadsheet couldn't be read just now. Try again.",
+  "QUERY_PLUGIN_ARGUMENTS": "plugin() takes a plug-in's id and the name of what it reads, then its settings by name, each a value or an ARRAY of values, like plugin('acme.shop', 'orders', range => '30d').",
   "SHARING_PLUGIN_INSTALL_GRANT_NOT_SET_HERE": "A plug-in's access is granted in the plug-in's settings, not here.",
   "QUERY_TOO_EXPENSIVE": "This query asks for more work than one query may do. Narrow it — fewer tables, or a filter that cuts the rows down.",
   "QUERY_TIMED_OUT": "This query took too long and was stopped.",

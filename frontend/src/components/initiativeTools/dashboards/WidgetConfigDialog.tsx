@@ -3,9 +3,9 @@
  *
  * Setting up a binding is *authoring*: it writes the dashboard's own row and
  * takes DAC write, as distinct from a widget interacting with the data it shows,
- * which nothing here can do. Every control below chooses a source, an id, or a
- * comparison; none of them can name an endpoint, and the source list comes from
- * the served catalog, so this dialog can only ever offer what the backend
+ * which nothing here can do. Every control below chooses a dataset, an id, or a
+ * comparison; none of them can name an address, and what each offers comes from
+ * a served catalog, so this dialog can only ever offer what the backend
  * validator would accept.
  *
  * Two changes from the version that shipped first:
@@ -30,7 +30,13 @@ import {
   type QuerySheetDescription,
   type WidgetCatalog,
 } from "@/api/generated/initiativeAPI.schemas";
-import { type PluginEndpointRead, pluginWidgetEntry, pluginWidgetSource } from "@/api/pluginData";
+import {
+  type PluginEndpointRead,
+  pluginWidgetEntry,
+  pluginWidgetSource,
+  type QueryablePlugin,
+  queryablePlugins,
+} from "@/api/pluginData";
 import { QueryBuilder } from "@/components/initiativeTools/dashboards/QueryBuilder";
 import { SqlEditor } from "@/components/initiativeTools/dashboards/SqlEditor";
 import { PluginParamControl } from "@/components/plugins/PluginParamControl";
@@ -64,7 +70,6 @@ import { useServerForm } from "@/hooks/useServerForm";
 import { useWidgetData, type WidgetBinding } from "@/hooks/useWidgetData";
 import { useWidgetMeta } from "@/hooks/useWidgetMeta";
 import { getErrorMessage } from "@/lib/errorMessage";
-import type { WidgetSource } from "@/lib/widgets/dataShapes";
 import { catalogEntry, type DefinitionWidget, isPluginWidgetType } from "@/lib/widgets/definition";
 import { withParamAnswer } from "@/lib/widgets/pluginParams";
 import { canDraw, resolveMapping } from "@/lib/widgets/shape";
@@ -73,10 +78,6 @@ import { paramsFor, sourceDescriptor } from "@/lib/widgets/sources";
 import { localized } from "@/lib/widgets/widgetMeta";
 
 import { WidgetTile } from "./WidgetTile";
-
-/** The only source a plug-in widget binds. A namespaced type says which plug-in and
- *  which widget; `plugin` is what it draws through, always. */
-const PLUGIN_SOURCES: WidgetSource[] = ["plugin"];
 
 export interface WidgetConfigDialogProps {
   widget: DefinitionWidget | null;
@@ -133,44 +134,25 @@ export function WidgetConfigDialog({
     }));
 
   /**
-   * An installed plug-in's widget is not in the built-in catalog, and looking for
-   * it there is what left this dialog with nothing to offer.
+   * Which source a widget binds is decided by its type, so there is no choice
+   * to offer.
    *
-   * The two catalogs answer different questions and are served separately: the
-   * built-in one is this build's own vocabulary — size floors, bindable
-   * sources, display options per primitive — while a plug-in's widgets come from
-   * each install's pinned definition. A namespaced `plugin:<uid>:<widget>` type
-   * has never been in the first, so `catalogEntry` missed, `sources` fell back
-   * to `[]`, and the source list rendered empty for every plug-in widget on the
-   * canvas.
-   *
-   * A plug-in widget binds one source and it is always `plugin` — that is what the
-   * namespaced type means — so the list does not need looking up at all.
+   * An installed plug-in's widget, a namespaced `plugin:<uid>:<widget>` type,
+   * binds `plugin` — that is what the namespaced type means — and resolves its
+   * install and its reads from that install's pinned definition, not from the
+   * built-in catalog. Every built-in widget binds `query`, and reads a plug-in's
+   * data through a statement that calls `plugin()`.
    */
   const isPlugin = isPluginWidgetType(widget?.type ?? "");
-  //: A plug-in's *data*, whoever draws it — its own widget, or one of ours
-  //: pointed at it with a statement.
-  const readsPlugin = isPlugin || binding.source === "plugin";
-  const pluginCatalog = usePluginWidgetCatalog(open && readsPlugin);
-  // A plug-in widget resolves its plug-in from its own namespaced type. One of ours
-  // has no such type, so it resolves the plug-in it *named* — which is the only
-  // difference between the two, and why the picker below exists at all.
-  const plugin = useMemo(() => {
-    const byType = pluginWidgetEntry(pluginCatalog.data, widget?.type ?? "");
-    if (byType) return byType;
-    const named = (pluginCatalog.data?.items ?? []).find(
-      (item) => item.plugin_uid === binding.plugin_uid
-    );
-    return named ? { entry: named, widget: undefined } : undefined;
-  }, [pluginCatalog.data, widget?.type, binding.plugin_uid]);
+  // A plug-in widget's install, and the installs a statement may read.
+  const pluginCatalog = usePluginWidgetCatalog(open);
+  const plugin = useMemo(
+    () => pluginWidgetEntry(pluginCatalog.data, widget?.type ?? ""),
+    [pluginCatalog.data, widget?.type]
+  );
+  const queryable = useMemo(() => queryablePlugins(pluginCatalog.data), [pluginCatalog.data]);
 
   const entry = catalogEntry(catalog, widget?.type ?? "");
-  // A built-in widget reads a plug-in too, as far as the rows are described: a
-  // statement names what it returns, over columns the endpoint declared it
-  // hands back. Without one they are the plug-in's own shape, which only the plug-in's
-  // own module knows how to draw — so the source is offered and the statement
-  // is what makes it usable.
-  const sources: string[] = isPlugin ? PLUGIN_SOURCES : ["query", "plugin"];
   const source = binding.source;
   const descriptor = sourceDescriptor(source);
 
@@ -259,9 +241,7 @@ export function WidgetConfigDialog({
    * place to find out. The control that fills it is right there, so the answer
    * is to not offer the save rather than to explain the failure afterwards.
    */
-  // A plug-in binding without a read is one the server refuses, whichever kind of
-  // widget carries it — and one of ours has a plug-in to name as well.
-  const incomplete = readsPlugin && (!binding.endpoint_id || !binding.plugin_uid);
+  const incomplete = isPlugin && (!binding.endpoint_id || !binding.plugin_uid);
 
   /**
    * The same, for a statement the server would refuse.
@@ -314,28 +294,6 @@ export function WidgetConfigDialog({
 
             <section className="space-y-2">
               <h3 className="font-medium text-sm">{t("dashboards:config.sectionBinding")}</h3>
-              <Label htmlFor="widget-source">{t("dashboards:config.source")}</Label>
-              <Select
-                value={source}
-                onValueChange={(next) =>
-                  // Changing the source drops the old source's ids rather than
-                  // carrying a counter id onto a file binding.
-                  setBinding({ source: next as WidgetBinding["source"] })
-                }
-              >
-                <SelectTrigger id="widget-source">
-                  <SelectValue />
-                </SelectTrigger>
-                <SelectContent>
-                  {sources.map((option) => (
-                    <SelectItem key={option} value={option}>
-                      {t(`dashboards:bindingSource.${option}` as const, {
-                        defaultValue: option,
-                      })}
-                    </SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
               {descriptor && (
                 <p className="text-muted-foreground text-xs">
                   {t("dashboards:config.rowNoun", {
@@ -351,47 +309,21 @@ export function WidgetConfigDialog({
                 slots for it are `plugin_uid` and `endpoint_id`, and neither is a
                 thing to type: one comes from the widget's type, the other is a
                 choice among the reads the plug-in declares. */}
-            {(readsPlugin ? [] : params).map((param) => (
+            {(isPlugin ? [] : params).map((param) => (
               <QueryParam
                 key={param.key as string}
                 binding={binding}
                 initiativeId={initiativeId}
                 spreadsheets={spreadsheets}
+                plugins={queryable}
                 onChange={setBindingValue}
                 onStatus={setQueryStatus}
                 paramKey={param.key}
               />
             ))}
 
-            {readsPlugin && (
+            {isPlugin && (
               <section className="space-y-4">
-                {!isPlugin && (
-                  <div className="space-y-2">
-                    <Label htmlFor="plugin-uid">{t("dashboards:config.plugin")}</Label>
-                    <Select
-                      value={binding.plugin_uid ?? ""}
-                      onValueChange={(next) =>
-                        setBindingValue({
-                          plugin_uid: next,
-                          // A different plug-in's reads are not this one's.
-                          endpoint_id: undefined,
-                          params: undefined,
-                        })
-                      }
-                    >
-                      <SelectTrigger id="plugin-uid">
-                        <SelectValue placeholder={t("dashboards:config.pluginPlaceholder")} />
-                      </SelectTrigger>
-                      <SelectContent>
-                        {(pluginCatalog.data?.items ?? []).map((item) => (
-                          <SelectItem key={item.plugin_uid} value={item.plugin_uid}>
-                            {item.name}
-                          </SelectItem>
-                        ))}
-                      </SelectContent>
-                    </Select>
-                  </div>
-                )}
                 <div className="space-y-2">
                   <Label htmlFor="plugin-endpoint">{t("dashboards:config.pluginEndpoint")}</Label>
                   <Select value={binding.endpoint_id ?? ""} onValueChange={setPluginEndpoint}>
@@ -515,8 +447,8 @@ export function WidgetConfigDialog({
  *
  * The viewer's own data through the viewer's own session — the preview is not a
  * privileged read, and someone configuring a widget sees exactly what they
- * would see with it placed. It resolves nothing until the widget is on a
- * dashboard, because `plugin` bindings are decided against that row.
+ * would see with it placed. A plug-in widget's preview resolves nothing until
+ * the widget is on a dashboard, because it is read for that row.
  */
 function BindingPreview({
   widget,
@@ -618,6 +550,7 @@ function QueryParam({
   binding,
   initiativeId,
   spreadsheets,
+  plugins,
   paramKey,
   onChange,
   onStatus,
@@ -625,6 +558,7 @@ function QueryParam({
   binding: WidgetBinding;
   initiativeId: number;
   spreadsheets: readonly { id: number; name: string }[];
+  plugins: readonly QueryablePlugin[];
   paramKey: keyof WidgetBinding;
   onChange: (patch: Partial<WidgetBinding>) => void;
   onStatus: (status: QueryStatus) => void;
@@ -685,6 +619,14 @@ function QueryParam({
     onStatus(status);
   }, [status, onStatus]);
 
+  // The ranges and plug-in endpoints the statement read, as the server last
+  // described them.
+  const described = spec ? built.data : shape.data;
+  const reads = useMemo(
+    () => [...(described?.sheets ?? []), ...(described?.plugins ?? [])],
+    [described]
+  );
+
   /** An edit by hand. The description stops being true of the statement the
    *  moment it is one somebody typed, so it goes. */
   const write = (next: string) => {
@@ -706,9 +648,11 @@ function QueryParam({
             onChange={setSpec}
             initiativeId={initiativeId}
             spreadsheets={spreadsheets}
-            // Only the answer for this description: an earlier one's range
-            // would offer another range's columns.
+            plugins={plugins}
+            // Only the answer for this description: an earlier one's range or
+            // endpoint would offer another one's columns.
             sheet={built.isPlaceholderData ? undefined : built.data?.sheets?.[0]}
+            plugin={built.isPlaceholderData ? undefined : built.data?.plugins?.[0]}
           />
         ) : (
           <div className="space-y-2 rounded-lg border border-dashed p-3">
@@ -735,7 +679,8 @@ function QueryParam({
           columns={checking || shape.isError ? undefined : shape.data?.columns}
           error={checking ? undefined : shape.error}
           spreadsheets={spreadsheets}
-          sheets={(spec ? built.data?.sheets : shape.data?.sheets) ?? []}
+          plugins={plugins}
+          reads={reads}
         />
       </TabsContent>
     </Tabs>
@@ -756,7 +701,8 @@ function StatementEditor({
   columns,
   error,
   spreadsheets,
-  sheets,
+  plugins,
+  reads,
 }: {
   statement: string;
   onWrite: (next: string) => void;
@@ -764,16 +710,18 @@ function StatementEditor({
   columns?: { name: string }[];
   error?: unknown;
   spreadsheets: readonly { name: string }[];
-  /** The ranges the statement read when it was last checked, by the name
-   *  each is read under. */
-  sheets: readonly QuerySheetDescription[];
+  /** The installs a `plugin()` call may name. */
+  plugins: readonly QueryablePlugin[];
+  /** The ranges and plug-in endpoints the statement read when it was last
+   *  checked, by the name each is read under. */
+  reads: readonly Pick<QuerySheetDescription, "alias" | "fields">[];
 }) {
   const { t } = useTranslation(["dashboards", "common"]);
   const { datasets, functions, tokens } = useQueryVocabulary();
   const fields = useFieldCatalogs(datasets);
   const ranges = useMemo(
-    () => sheets.map((read) => ({ dataset: read.alias, fields: read.fields })),
-    [sheets]
+    () => reads.map((read) => ({ dataset: read.alias, fields: read.fields })),
+    [reads]
   );
 
   return (
@@ -788,6 +736,7 @@ function StatementEditor({
         tokens={tokens}
         ranges={ranges}
         spreadsheets={spreadsheets.map((file) => file.name)}
+        plugins={plugins}
         aria-describedby="widget-sql-answer"
       />
       <p id="widget-sql-answer" className="text-xs">

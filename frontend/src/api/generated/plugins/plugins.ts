@@ -74,7 +74,8 @@ const withQueryKey = <T extends object, K>(query: T, queryKey: K): T & { queryKe
 };
 
 /**
- * Which widgets this guild's installed plug-ins contribute.
+ * Which widgets and read endpoints this guild's installed plug-ins
+ * contribute.
  *
  * Every member may read it: a plug-in's existence is guild-wide knowledge and the
  * palette carries no guild data — declarations, module source, and sample
@@ -217,11 +218,12 @@ export function useReadPluginWidgetCatalog<
 }
 
 /**
- * One of a plug-in's read endpoints, resolved for this viewer.
+ * One of a plug-in's read endpoints, as a widget being configured would
+ * show it, made as the dashboard's view mode says.
  *
  * Returns the plug-in's rows verbatim with the time they were obtained. A plug-in
  * that is unreachable, slow, oversized, or answering in a shape this build
- * does not accept comes back as a named message code, so the canvas draws one
+ * does not accept comes back as a named message code, so the preview draws one
  * error tile instead of the request becoming a server fault.
  * @summary Read Plugin Data
  */

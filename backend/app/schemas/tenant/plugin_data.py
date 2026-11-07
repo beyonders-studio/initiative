@@ -28,19 +28,6 @@ from pydantic import Field
 
 from app.core.tools import ITEM_KINDS
 from app.schemas.base import RawTextStr, SanitizedBaseModel
-from app.schemas.sql_query import QueryColumnDescription
-
-
-class PluginDataTable(SanitizedBaseModel):
-    """Rows a statement produced, and what they hold.
-
-    Positional against ``columns`` rather than keyed by name, for the reason
-    every other read of this surface is: a statement may name two outputs the
-    same thing, and a mapping would keep one of the two.
-    """
-
-    columns: List[QueryColumnDescription] = []
-    rows: List[List[Any]] = []
 
 
 class PluginSummaryReturn(SanitizedBaseModel):
@@ -77,10 +64,6 @@ class PluginDataResponse(SanitizedBaseModel):
     #: The endpoint's single-valued returns: what the answer says about itself
     #: rather than about any one item in it, and still there when there are no
     #: items at all.
-    #: What a statement made of those rows, where the binding carried one.
-    #: Absent otherwise: a plug-in's own rows are read by the names its manifest
-    #: declared, and its widget module already knows them.
-    table: Optional["PluginDataTable"] = None
     values: Dict[str, Any] = {}
     #: When the *upstream* call happened. A cached body keeps the time it was
     #: actually obtained, so a viewer can tell how fresh the answer is rather
@@ -166,8 +149,8 @@ class PluginEndpointRead(SanitizedBaseModel):
     #: applies the deployment's own ceiling on top.
     cache_ttl_seconds: int = 0
     params: List[PluginDataParam] = []
-    #: What it hands back. A widget binds against this, and a statement over
-    #: its rows is checked against it.
+    #: What it hands back. A widget binds against this, and a statement
+    #: reading it has a column for each return marked ``list``.
     returns: List[PluginDataReturn] = []
 
 
@@ -195,10 +178,13 @@ class PluginWidgetRead(SanitizedBaseModel):
 
 
 class PluginWidgetCatalogEntry(SanitizedBaseModel):
-    """One installed plug-in's contribution to the widget palette."""
+    """One installed plug-in's widgets and read endpoints."""
 
     plugin_id: int
     plugin_uid: str = Field(max_length=14)
+    #: The id a statement names it by in ``plugin()``; each endpoint's id is
+    #: ``plugin.<public_id>.<name>``.
+    public_id: Optional[str] = None
     name: str
     enabled: bool = True
     widgets: List[PluginWidgetRead] = []

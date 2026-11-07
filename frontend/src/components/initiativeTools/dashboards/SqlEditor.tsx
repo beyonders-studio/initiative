@@ -12,7 +12,17 @@
  * reason rather than run.
  */
 
-import { Braces, Columns3, FileSpreadsheet, Spline, Table2, UserRound } from "lucide-react";
+import {
+  Blocks,
+  Braces,
+  Columns3,
+  FileSpreadsheet,
+  Plug,
+  SlidersHorizontal,
+  Spline,
+  Table2,
+  UserRound,
+} from "lucide-react";
 import { useCallback, useMemo, useRef, useState } from "react";
 import { useTranslation } from "react-i18next";
 
@@ -25,6 +35,8 @@ import {
   completionsFor,
   type DatasetFields,
   datasetsNamed,
+  type PluginReads,
+  type WordAt,
   wordAt,
 } from "@/lib/widgets/completion";
 
@@ -39,6 +51,9 @@ const ICONS: Record<CompletionKind, typeof Table2> = {
   token: UserRound,
   relation: Spline,
   spreadsheet: FileSpreadsheet,
+  plugin: Blocks,
+  endpoint: Plug,
+  param: SlidersHorizontal,
 };
 
 export interface SqlEditorProps {
@@ -54,6 +69,8 @@ export interface SqlEditorProps {
   ranges?: DatasetFields[];
   /** The spreadsheets a `sheet()` call may name. */
   spreadsheets?: string[];
+  /** The installed plug-ins a `plugin()` call may name. */
+  plugins?: readonly PluginReads[];
   id?: string;
   rows?: number;
   disabled?: boolean;
@@ -69,6 +86,7 @@ export function SqlEditor({
   tokens,
   ranges,
   spreadsheets,
+  plugins,
   id,
   rows = 6,
   disabled,
@@ -76,13 +94,7 @@ export function SqlEditor({
 }: SqlEditorProps) {
   const { t } = useTranslation("dashboards");
   const textareaRef = useRef<HTMLTextAreaElement>(null);
-  const [active, setActive] = useState<{
-    word: string;
-    start: number;
-    caret: number;
-    qualifier?: string;
-    quoted?: boolean;
-  } | null>(null);
+  const [active, setActive] = useState<(WordAt & { caret: number }) | null>(null);
   const [anchor, setAnchor] = useState<{ top: number; left: number } | null>(null);
   const [highlighted, setHighlighted] = useState(0);
 
@@ -103,9 +115,11 @@ export function SqlEditor({
       qualifier: active.qualifier,
       ranges,
       spreadsheets,
+      plugins,
       quoted: active.quoted,
+      call: active.call,
     }).slice(0, LIMIT);
-  }, [active, datasets, functions, fields, tokens, named, ranges, spreadsheets]);
+  }, [active, datasets, functions, fields, tokens, named, ranges, spreadsheets, plugins]);
 
   const close = useCallback(() => {
     setActive(null);

@@ -135,6 +135,26 @@ GROUP BY b.project, b.budget
 
 Name the spreadsheet by its name, or by its id if you'd like the tile to survive somebody renaming the file to `Budget 2026 FINAL (2)`. A header with a space in it goes in double quotes, `sum("Q3 total")`, and capitals don't matter. A tile reads the spreadsheet as it was last saved, which is never more than about half a minute behind whoever is typing in it.
 
+### Reading a plug-in
+
+A plug-in your community installed can feed a tile too: the shop's orders, the issue tracker's open bugs, whatever it has to say.
+
+In **Build**, choose **Plug-in data**, then the plug-in and what to read from it, and fill in anything it asks for, like a date range or which shop. Every column it sends comes in to start with.
+
+In **SQL** it's `plugin()` in the `FROM`: the plug-in's id, the name of what to read, then its settings by name. From there it's a table like any other, so it can sit beside your tasks or your spreadsheet:
+
+```sql
+SELECT o.status, count(*) AS orders, sum(o.total) AS revenue
+FROM plugin('acme.shop', 'orders', range => '30d') AS o
+GROUP BY o.status
+```
+
+A setting that takes several values is a list: `tags => ARRAY['bug', 'regression']`. The SQL box offers each plug-in, what it can read and its settings as you type, so nobody has to remember how `acme.shop` is spelled.
+
+Whose account the plug-in answers with follows **Run dashboard as**. On **Individual**, it's your own connection to it when you've made one and the plug-in can use it, and the community's otherwise. On **Initiative**, it's always the community's, so everybody sees the same numbers. Something only your own account can see, like your own pull requests, doesn't fit on an **Initiative** dashboard, and its tile says so rather than picking somebody's account to show.
+
+A plug-in's answer is reused for as long as the plug-in says it stays fresh, five minutes at most.
+
 ### Boards
 
 One of the tiles is a **board**: your tasks dealt into columns, and you say what a column stands for. A status. The people on the work, so everyone gets a column and you can see who is carrying what. Priority. Project. Any column the tile's query returns will do.

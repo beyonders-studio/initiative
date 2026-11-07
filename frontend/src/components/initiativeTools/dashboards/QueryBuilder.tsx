@@ -11,10 +11,11 @@
  * The SQL is shown, read-only, because somebody should be able to see what
  * their clicking produced — and because it is the thing that gets stored.
  *
- * What it reads is one of the registry's datasets or a range of one of the
- * initiative's spreadsheets. A range's columns are whatever its header says, so
- * they come from the server's answer to the description rather than from the
- * registry, and choosing a range starts with every one of them.
+ * What it reads is one of the registry's datasets, a range of one of the
+ * initiative's spreadsheets, or one of an installed plug-in's read endpoints. A
+ * range's columns are whatever its header says and an endpoint's are the returns
+ * it declares, so they come from the server's answer to the description rather
+ * than from the registry, and choosing either starts with every one of them.
  */
 
 import { Plus, X } from "lucide-react";
@@ -25,10 +26,15 @@ import {
   DatasetName,
   type QueryBuildRequest,
   type QueryColumnSpec,
+  type QueryPluginDescription,
+  type QueryPluginSpec,
+  type QueryPluginSpecParams,
   type QuerySheetDescription,
   type QuerySheetSpec,
 } from "@/api/generated/initiativeAPI.schemas";
+import type { QueryablePlugin } from "@/api/pluginData";
 import { FilterBuilder, fieldLabel } from "@/components/initiativeTools/dashboards/FilterBuilder";
+import { PluginParamControl } from "@/components/plugins/PluginParamControl";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -44,6 +50,7 @@ import { useFieldCatalogs } from "@/hooks/useQueryVocabulary";
 import { listFormat } from "@/lib/intl";
 import { joinRange, splitRange } from "@/lib/spreadsheet/range";
 import { type FilterLeaf, type FilterNode, toFilterFieldSpec } from "@/lib/widgets/conditions";
+import { withParamAnswer } from "@/lib/widgets/pluginParams";
 
 /** The datasets a query may name. Read from the generated enum, which is the
  *  backend's own registry — so a dataset declared there is offered here on the
@@ -68,6 +75,8 @@ const MAX_COLUMNS = 20;
 const SPREADSHEET = "sheet";
 /** The sheet picker's choice for a range that names no sheet. */
 const FIRST_SHEET = "";
+/** The dataset picker's choice for one of a plug-in's read endpoints. */
+const PLUGIN_DATA = "plugin";
 
 /** What a statement is grouped by: once any column is a count or a total,
  *  every column shown as it is — the only grouping Postgres accepts, so it is
@@ -96,6 +105,13 @@ export interface QueryBuilderProps {
    *  sheets and the range's columns. Absent until it has answered for this
    *  description. */
   sheet?: QuerySheetDescription;
+  /** The installs a statement may read, for a description that reads one of
+   *  their endpoints. */
+  plugins: readonly QueryablePlugin[];
+  /** What the server read of the endpoint the description names: its columns,
+   *  from the plug-in's declaration. Absent until it has answered for this
+   *  description. */
+  plugin?: QueryPluginDescription;
 }
 
 export function QueryBuilder({
@@ -104,19 +120,32 @@ export function QueryBuilder({
   initiativeId,
   spreadsheets,
   sheet,
+  plugins,
+  plugin,
 }: QueryBuilderProps) {
   const { t, i18n } = useTranslation(["dashboards", "common"]);
   const reading = spec.sheet ?? null;
+  const calling = spec.plugin ?? null;
+  // A range and an endpoint are described by the server's answer rather than
+  // by the registry.
+  const described = reading ? sheet : calling ? plugin : undefined;
+  const ownColumns = Boolean(reading || calling);
+  const installed = plugins.find((candidate) => candidate.publicId === calling?.plugin);
+  const endpoint = installed?.endpoints.find((candidate) => candidate.name === calling?.endpoint);
   const catalog = useFieldCatalog(spec.dataset as DatasetName);
   const { relations, defaultFilters } = catalog;
-  // A range's columns are named by its header as written, so each carries its
-  // name as its label rather than being worded as a registry field.
+  // A range's columns are named by its header as written, and an endpoint's by
+  // their keys, so each carries its name as its label rather than being worded
+  // as a registry field.
   const fields = useMemo(
     () =>
-      reading
-        ? (sheet?.fields ?? []).map((field) => ({ ...toFilterFieldSpec(field), label: field.name }))
+      ownColumns
+        ? (described?.fields ?? []).map((field) => ({
+            ...toFilterFieldSpec(field),
+            label: field.name,
+          }))
         : catalog.fields,
-    [reading, sheet, catalog.fields]
+    [ownColumns, described, catalog.fields]
   );
   // What each related dataset holds. A relation says only its name and where
   // it arrives; what may be named there is that dataset's own description, so
@@ -127,8 +156,8 @@ export function QueryBuilder({
   // for a SELECT to read, and offering one would produce a query the server
   // then refuses.
   const selectable = useMemo(
-    () => fields.filter((field) => reading || !field.field.endsWith("_ids")),
-    [fields, reading]
+    () => fields.filter((field) => ownColumns || !field.field.endsWith("_ids")),
+    [fields, ownColumns]
   );
 
   /** What a related dataset offers, prefixed with the relation that reaches
@@ -193,32 +222,51 @@ export function QueryBuilder({
   }, [defaultFilters, spec, onChange]);
 
   /**
-   * A range starts with its columns, shown as they are: every one of them,
-   * as many as a description holds.
+   * A range or an endpoint starts with its columns, shown as they are: every
+   * one of them, as many as a description holds.
    *
-   * Seeded once its columns arrive, for each range in turn: choosing another
-   * file, sheet or range starts over, while removing columns from this one
-   * leaves the range unchanged, so nothing puts them back.
+   * Seeded once its columns arrive, for each range or endpoint in turn:
+   * choosing another file, sheet, range or endpoint starts over, while removing
+   * columns from this one leaves it unchanged, so nothing puts them back. An
+   * endpoint's parameters do not change its columns, so answering one does not
+   * start over either.
    */
-  const seededRange = useRef<string | null>(null);
+  const seededColumns = useRef<string | null>(null);
   useEffect(() => {
-    if (!reading || !sheet?.fields.length) return;
-    const key = `${reading.file}:${reading.range ?? ""}`;
-    if (seededRange.current === key) return;
-    seededRange.current = key;
+    const key = reading
+      ? `sheet:${reading.file}:${reading.range ?? ""}`
+      : calling
+        ? `plugin:${calling.plugin}:${calling.endpoint}`
+        : null;
+    if (!key || !described?.fields.length) return;
+    if (seededColumns.current === key) return;
+    seededColumns.current = key;
     if (spec.columns.some((column) => column.field !== "*")) return;
     onChange({
       ...spec,
-      columns: sheet.fields.slice(0, MAX_COLUMNS).map((field) => ({ field: field.name })),
+      columns: described.fields.slice(0, MAX_COLUMNS).map((field) => ({ field: field.name })),
       group_by: [],
     });
-  }, [reading, sheet, spec, onChange]);
+  }, [reading, calling, described, spec, onChange]);
 
   /** Read another range. Nothing chosen against the old one survives. */
   const read = (next: QuerySheetSpec) =>
     onChange({ sheet: next, columns: [COUNT_ALL], where: [], group_by: [] });
   const parts = splitRange(reading?.range ?? null);
   const sheetNames = sheet?.sheets ?? [];
+
+  /** Read another endpoint. Nothing chosen against the old one survives. */
+  const call = (next: QueryPluginSpec) =>
+    onChange({ plugin: next, columns: [COUNT_ALL], where: [], group_by: [] });
+
+  /** Answer one of the endpoint's parameters, the way a plug-in widget's form
+   *  does. The columns and filters stay: an endpoint returns the same columns
+   *  whatever it is asked. */
+  const setParam = (key: string, value: unknown) => {
+    if (!calling) return;
+    const params = withParamAnswer(endpoint?.params ?? [], calling.params ?? {}, key, value);
+    onChange({ ...spec, plugin: { ...calling, params: params as QueryPluginSpecParams } });
+  };
 
   const setColumn = (index: number, column: QueryColumnSpec) =>
     patch({ columns: spec.columns.map((held, at) => (at === index ? column : held)) });
@@ -233,16 +281,18 @@ export function QueryBuilder({
       <section className="space-y-2">
         <Label>{t("dashboards:builder.dataset")}</Label>
         <Select
-          value={reading ? SPREADSHEET : (spec.dataset ?? undefined)}
+          value={reading ? SPREADSHEET : calling ? PLUGIN_DATA : (spec.dataset ?? undefined)}
           onValueChange={(choice) =>
             // A different dataset has different fields, so nothing chosen
             // against the old one survives.
             choice === SPREADSHEET
               ? read({ file: spreadsheets[0].id })
-              : onChange({ dataset: choice, columns: [COUNT_ALL], where: [], group_by: [] })
+              : choice === PLUGIN_DATA
+                ? call({ plugin: plugins[0].publicId, endpoint: plugins[0].endpoints[0].name })
+                : onChange({ dataset: choice, columns: [COUNT_ALL], where: [], group_by: [] })
           }
         >
-          <SelectTrigger>
+          <SelectTrigger aria-label={t("dashboards:builder.dataset")}>
             <SelectValue />
           </SelectTrigger>
           <SelectContent>
@@ -253,6 +303,9 @@ export function QueryBuilder({
             ))}
             <SelectItem value={SPREADSHEET} disabled={!spreadsheets.length}>
               {t("dashboards:builder.spreadsheet")}
+            </SelectItem>
+            <SelectItem value={PLUGIN_DATA} disabled={!plugins.length}>
+              {t("dashboards:builder.pluginData")}
             </SelectItem>
           </SelectContent>
         </Select>
@@ -317,6 +370,64 @@ export function QueryBuilder({
             />
             <p className="text-muted-foreground text-xs">{t("dashboards:builder.rangeHelp")}</p>
           </div>
+        </section>
+      )}
+
+      {calling && (
+        <section className="grid grid-cols-pair gap-2">
+          <div className="space-y-1">
+            <Label>{t("dashboards:builder.plugin")}</Label>
+            <Select
+              value={calling.plugin}
+              onValueChange={(publicId) => {
+                const next = plugins.find((candidate) => candidate.publicId === publicId);
+                if (next) call({ plugin: publicId, endpoint: next.endpoints[0].name });
+              }}
+            >
+              <SelectTrigger aria-label={t("dashboards:builder.plugin")}>
+                <SelectValue />
+              </SelectTrigger>
+              <SelectContent>
+                {plugins.map((candidate) => (
+                  <SelectItem key={candidate.publicId} value={candidate.publicId}>
+                    {candidate.entry.name}
+                  </SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+          </div>
+          <div className="space-y-1">
+            <Label>{t("dashboards:builder.endpoint")}</Label>
+            <Select
+              value={calling.endpoint}
+              onValueChange={(name) => call({ plugin: calling.plugin, endpoint: name })}
+            >
+              <SelectTrigger aria-label={t("dashboards:builder.endpoint")}>
+                <SelectValue />
+              </SelectTrigger>
+              <SelectContent>
+                {(installed?.endpoints ?? []).map((candidate) => (
+                  <SelectItem key={candidate.name} value={candidate.name}>
+                    {candidate.name}
+                  </SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+          </div>
+          {/* The endpoint's own parameters, asked the way a plug-in widget's
+              form asks them: a menu where the plug-in offers one, a field
+              where it does not. */}
+          {(endpoint?.params ?? []).map((param) => (
+            <PluginParamControl
+              key={param.key}
+              param={param}
+              pluginId={installed?.entry.plugin_id}
+              endpointId={endpoint?.id}
+              values={calling.params ?? {}}
+              open
+              onChange={setParam}
+            />
+          ))}
         </section>
       )}
 
@@ -460,7 +571,7 @@ export function QueryBuilder({
         <FilterBuilder
           fields={fields}
           defaults={defaultFilters as unknown as FilterLeaf[]}
-          loading={reading ? !sheet : catalog.isLoading}
+          loading={ownColumns ? !described : catalog.isLoading}
           initiativeId={initiativeId}
           value={(spec.where ?? []) as FilterNode[]}
           onChange={(where) => patch({ where })}

@@ -47,7 +47,7 @@ from app.db.session import set_rls_context
 from app.services.fields.spec import FieldType
 from app.services.query import sheets
 from app.services.query.canvas import compile_canvas
-from app.services.query.resolve import QueryError, ResolvedQuery, resolve
+from app.services.query.resolve import QueryError, ResolvedQuery, SheetCall, resolve
 
 
 @dataclass(frozen=True)
@@ -309,11 +309,14 @@ async def _with_cells(
     session: Any, statement: ResolvedQuery, guild_id: int
 ) -> ResolvedQuery:
     """*statement*, resolved again with what its sheets read, in *session*'s
-    routed transaction: the files are found as the statement's own rows are."""
-    if not statement.unread:
+    routed transaction: the files are found as the statement's own rows are.
+    What its other calls already read is kept."""
+    unread = [call for call in statement.unread if isinstance(call, SheetCall)]
+    if not unread:
         return statement
     return resolve(
-        statement.source, await sheets.read(session, statement.unread, guild_id)
+        statement.source,
+        {**statement.read, **await sheets.read(session, unread, guild_id)},
     )
 
 
@@ -397,10 +400,13 @@ async def run(
 
 
 async def describe(
-    sql: str, *, context: RequestContext, initiative_id: int | None = None
+    statement: ResolvedQuery,
+    *,
+    context: RequestContext,
+    initiative_id: int | None = None,
 ) -> tuple[tuple[QueryColumn, ...], ResolvedQuery]:
-    """What *sql* would return, without returning it, and the statement it
-    resolved to, whose sheets say what each read.
+    """What *statement* would return, without returning it, and the statement
+    it resolved to once its sheets were read, which says what each read.
 
     The statement is prepared and its description read back. Preparing plans;
     it does not execute, so this costs a plan and no rows however much data the
@@ -410,7 +416,6 @@ async def describe(
     It runs in the same transaction and role as the real thing, because a
     statement is only preparable against the schema its reader is routed to.
     """
-    statement = resolve(sql)
     routed = _as_query(context, initiative_id)
     guild_id = routed.guild_id
 

@@ -4,7 +4,7 @@ A dashboard is queries over the community it sits in, so its listing cannot
 show the publisher's results: those are their community's numbers, not
 something they made for the listing. It shows generated rows instead, shaped
 like each query's answer — the columns the statement returns, named and typed
-from the field registry (``query.rows.describe_statement``), with plausible
+from the field registry (:func:`describe_statement`), with plausible
 values of each type: dates around a fixed day, statuses from the default set,
 names from a neutral list.
 
@@ -21,10 +21,25 @@ from __future__ import annotations
 import hashlib
 import json
 import random
+from dataclasses import dataclass
 from datetime import datetime, timedelta, timezone
-from typing import Any
+from typing import Any, Mapping, Optional
 
+from pglast import ast
+
+from app.core.messages import QueryMessages
 from app.services.fields.spec import FieldType
+from app.services.query.resolve import (
+    QueryError,
+    _check_nodes,
+    _expand_relations,
+    _field_named,
+    _name_parts,
+    _parse,
+    _read_by,
+    _relations,
+    _take_calls,
+)
 
 __all__ = [
     "MAX_SAMPLE_BYTES",
@@ -124,10 +139,147 @@ def _value(column: Any, rng: random.Random, row: int, grouped: bool) -> Any:
     return rng.choice(options)
 
 
-def _query_sample(sql: str, rng: random.Random) -> dict[str, Any] | None:
-    from app.services.query.resolve import QueryError
-    from app.services.query.rows import describe_statement
+#: What each aggregate answers. ``None``: whatever its argument was — the
+#: largest date is a date.
+_AGGREGATE_TYPES: dict[str, Optional[FieldType]] = {
+    "count": FieldType.number,
+    "sum": FieldType.number,
+    "avg": FieldType.number,
+    "min": None,
+    "max": None,
+}
 
+#: What each other function answers, where it is fixed.
+_FUNCTION_TYPES: dict[str, Optional[FieldType]] = {
+    "abs": FieldType.number,
+    "round": FieldType.number,
+    "length": FieldType.number,
+    "lower": FieldType.text,
+    "upper": FieldType.text,
+    "concat": FieldType.text,
+    "date_trunc": FieldType.date,
+    "extract": FieldType.number,
+    "now": FieldType.date,
+    "coalesce": None,
+    "row_number": FieldType.number,
+    "rank": FieldType.number,
+    "dense_rank": FieldType.number,
+    "percent_rank": FieldType.number,
+    "cume_dist": FieldType.number,
+    "ntile": FieldType.number,
+    "lag": None,
+    "lead": None,
+    "first_value": None,
+    "last_value": None,
+    "nth_value": None,
+}
+
+
+@dataclass(frozen=True)
+class StatementColumn:
+    """One column a statement returns, as far as the tree says."""
+
+    name: str
+    type: FieldType
+    #: The closed vocabulary the column draws from, when it is a field that has
+    #: one (a status category, a priority).
+    options: tuple[str, ...] = ()
+    #: Whether it is an aggregate over rows rather than a value of one row.
+    aggregate: bool = False
+
+
+def _function_name(call: ast.FuncCall) -> str:
+    names = _name_parts(call.funcname)
+    return names[-1] if names else ""
+
+
+def _type_of(node: Any, declared: Mapping[str, FieldType]) -> FieldType:
+    """What an output expression holds, worked out from the tree. Where a type
+    cannot be, it reads as text, which is what an unrecognised value is to a
+    reader."""
+    first = getattr(node, "args", None) or ()
+    if isinstance(node, ast.ColumnRef):
+        names = _name_parts(node.fields)
+        return declared.get(names[-1], FieldType.text) if names else FieldType.text
+    if isinstance(node, ast.A_Const):
+        if isinstance(node.val, (ast.Integer, ast.Float)):
+            return FieldType.number
+        return (
+            FieldType.boolean if isinstance(node.val, ast.Boolean) else FieldType.text
+        )
+    if isinstance(node, ast.FuncCall):
+        name = _function_name(node)
+        fixed = {**_AGGREGATE_TYPES, **_FUNCTION_TYPES}.get(name, FieldType.text)
+        if fixed is not None:
+            return fixed
+        return _type_of(first[0], declared) if first else FieldType.text
+    if isinstance(node, (ast.CoalesceExpr, ast.MinMaxExpr)):
+        return _type_of(first[0], declared) if first else FieldType.text
+    if isinstance(node, ast.CaseExpr):
+        for when in first:
+            if isinstance(when, ast.CaseWhen):
+                return _type_of(when.result, declared)
+        return _type_of(node.defresult, declared) if node.defresult else FieldType.text
+    if isinstance(node, ast.A_Expr):
+        # Arithmetic answers with a number; a comparison with a yes or no.
+        operator = _name_parts(node.name)
+        return (
+            FieldType.number
+            if operator and operator[-1] in {"+", "-", "*", "/", "%"}
+            else FieldType.boolean
+        )
+    if isinstance(node, (ast.BoolExpr, ast.NullTest, ast.BooleanTest)):
+        return FieldType.boolean
+    return FieldType.text
+
+
+def describe_statement(
+    sql: str,
+) -> tuple[tuple[StatementColumn, ...], tuple[str, ...]]:
+    """What a statement over the community's datasets returns, and which
+    datasets it reads — worked out from the tree alone.
+
+    The live path asks the database about any output the registry cannot name.
+    A listing previewing on sample rows has no database to ask, so a field is
+    the field the registry declares, and an expression is typed by what it is
+    built from. A spreadsheet or a plug-in is not read here, so its columns
+    read as text.
+    """
+    select = _parse(sql)
+    recordsets = {
+        key: _read_by(None, call) for key, (_, call) in _take_calls(select).items()
+    }
+    _check_nodes(select)
+    _expand_relations(select)
+    scope = _relations(select, recordsets)
+    declared: dict[str, FieldType] = {}
+    for source in scope.values():
+        for field_name, spec in source.by_name.items():
+            declared.setdefault(field_name, spec.type)
+    described: list[StatementColumn] = []
+    for position, target in enumerate(select.targetList or ()):
+        if not isinstance(target, ast.ResTarget):
+            raise QueryError(QueryMessages.UNSUPPORTED_SYNTAX, type(target).__name__)
+        spec = _field_named(scope, target.val)
+        names = _name_parts(getattr(target.val, "fields", None))
+        described.append(
+            StatementColumn(
+                name=target.name
+                or (names[-1] if names else "")
+                or (isinstance(target.val, ast.FuncCall) and _function_name(target.val))
+                or f"column{position + 1}",
+                type=spec.type if spec is not None else _type_of(target.val, declared),
+                options=tuple(spec.options) if spec is not None else (),
+                aggregate=isinstance(target.val, ast.FuncCall)
+                and _function_name(target.val) in _AGGREGATE_TYPES,
+            )
+        )
+    if not described:
+        raise QueryError(QueryMessages.UNSUPPORTED_SYNTAX, "SELECT")
+    return tuple(described), tuple(sorted({source.name for source in scope.values()}))
+
+
+def _query_sample(sql: str, rng: random.Random) -> dict[str, Any] | None:
     try:
         columns, relations = describe_statement(sql)
     except QueryError:

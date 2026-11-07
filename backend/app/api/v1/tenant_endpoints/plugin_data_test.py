@@ -34,6 +34,7 @@ for real.
 from datetime import datetime, timezone
 from urllib.parse import quote
 
+import asyncio
 import json
 import httpx
 import jwt
@@ -64,6 +65,8 @@ from app.services.tenant.dashboard_definition import normalize_dashboard_definit
 from app.testing.fake_vendor import API_HOST, FakeVendor, declarative_plugin
 from app.models.platform.access_grant import AccessGrantPurpose, SettingsLevel
 from app.models.platform.user import UserRole
+from app.models.tenant.dashboard import DashboardViewMode
+from app.models.tenant.resource_grant import ResourceAccessLevel
 from app.testing import (
     create_plugin_user_connection,
     create_access_grant,
@@ -261,7 +264,7 @@ def _definition() -> dict:
     }
 
 
-def _dashboard_definition(*endpoint_ids: str, sql: str | None = None) -> dict:
+def _dashboard_definition(*endpoint_ids: str) -> dict:
     return normalize_dashboard_definition(
         {
             "widgets": [
@@ -272,7 +275,6 @@ def _dashboard_definition(*endpoint_ids: str, sql: str | None = None) -> dict:
                         "source": "plugin",
                         "plugin_uid": PLUGIN_UID,
                         "endpoint_id": endpoint_id,
-                        **({"sql": sql} if sql else {}),
                     },
                 }
                 for index, endpoint_id in enumerate(endpoint_ids)
@@ -322,6 +324,8 @@ def upstream(monkeypatch):
             self.rows: list = [{"id": 1}]
             self.values: dict = {}
             self.error: Exception | None = None
+            #: Holds each call until this many are waiting together.
+            self.together: asyncio.Barrier | None = None
 
         @property
         def count(self) -> int:
@@ -331,6 +335,8 @@ def upstream(monkeypatch):
 
     async def _fake_read_answer(request, *, endpoint, transport=None):
         recorder.calls.append(request)
+        if recorder.together is not None:
+            await asyncio.wait_for(recorder.together.wait(), timeout=2)
         if recorder.error is not None:
             raise recorder.error
         return list(recorder.rows), dict(recorder.values)
@@ -364,9 +370,7 @@ async def _install(session: AsyncSession, actor, **overrides):
     )
 
 
-async def _workspace(
-    session: AsyncSession, acting_user, *sources: str, sql: str | None = None
-):
+async def _workspace(session: AsyncSession, acting_user, *sources: str):
     """A guild admin with a dashboards-enabled initiative, an installed plug-in, a
     live registration, and a dashboard binding the given sources."""
     a = await acting_user(guild_role=CommunityRole.admin, initiative=True)
@@ -380,9 +384,23 @@ async def _workspace(
         session,
         a.initiative,
         a.user,
-        definition=_dashboard_definition(*(sources or (ORDERS_SUMMARY,)), sql=sql),
+        definition=_dashboard_definition(*(sources or (ORDERS_SUMMARY,))),
     )
     return a, plugin, dashboard
+
+
+async def _editor(session: AsyncSession, acting_user, a, dashboard):
+    """A member of the dashboard's initiative who may edit it."""
+    member = await acting_user(
+        guild_role=CommunityRole.member,
+        guild=a.guild,
+        initiative=a.initiative,
+        initiative_role="member",
+    )
+    await create_resource_grant(
+        session, dashboard, level=ResourceAccessLevel.write, user=member.user
+    )
+    return member
 
 
 def _url(actor, plugin, endpoint_id: str, dashboard, **params) -> str:
@@ -445,6 +463,26 @@ class TestGates:
         assert response.status_code == 404
         assert upstream.count == 0
 
+    async def test_previewing_a_widget_takes_write_access_to_its_dashboard(
+        self, client, acting_user, session, upstream
+    ):
+        """Somebody who reads the dashboard reads its widgets with the canvas,
+        with the parameters each stores."""
+        a, plugin, dashboard = await _workspace(session, acting_user)
+        viewer = await acting_user(
+            guild_role=CommunityRole.member,
+            guild=a.guild,
+            initiative=a.initiative,
+            initiative_role="member",
+        )
+
+        response = await client.get(
+            _url(viewer, plugin, ORDERS_SUMMARY, dashboard, params='{"range":"7d"}'),
+            headers=viewer.headers,
+        )
+        assert response.status_code == 403
+        assert upstream.count == 0
+
     async def test_a_dashboard_is_not_a_key_to_every_source(
         self, client, acting_user, session, upstream
     ):
@@ -493,12 +531,7 @@ class TestAdminOnly:
         ``visibility: "guild_admin"`` — not against anything the request
         supplied."""
         a, plugin, dashboard = await _workspace(session, acting_user, source)
-        member = await acting_user(
-            guild_role=CommunityRole.member,
-            guild=a.guild,
-            initiative=a.initiative,
-            initiative_role="member",
-        )
+        member = await _editor(session, acting_user, a, dashboard)
 
         response = await client.get(
             _url(member, plugin, source, dashboard), headers=member.headers
@@ -767,15 +800,10 @@ class TestCache:
     async def test_repeat_reads_of_guild_data_cost_one_upstream_call(
         self, client, acting_user, session, upstream
     ):
-        """Twenty viewers of a dashboard are one call to the plug-in, which is what
-        keeps a single-replica community container comfortable."""
+        """Two people reading one source are one call to the plug-in, which is
+        what keeps a single-replica community container comfortable."""
         a, plugin, dashboard = await _workspace(session, acting_user)
-        member = await acting_user(
-            guild_role=CommunityRole.member,
-            guild=a.guild,
-            initiative=a.initiative,
-            initiative_role="member",
-        )
+        member = await _editor(session, acting_user, a, dashboard)
 
         first = await client.get(
             _url(a, plugin, ORDERS_SUMMARY, dashboard), headers=a.headers
@@ -815,12 +843,7 @@ class TestCache:
         shared entry would show one person the other's data.
         """
         a, plugin, dashboard = await _workspace(session, acting_user, MY_PRS)
-        b = await acting_user(
-            guild_role=CommunityRole.member,
-            guild=a.guild,
-            initiative=a.initiative,
-            initiative_role="member",
-        )
+        b = await _editor(session, acting_user, a, dashboard)
         await _connect(session, plugin=plugin, user=a.user, ref="cr_alice")
         await _connect(session, plugin=plugin, user=b.user, ref="cr_bob")
 
@@ -941,6 +964,7 @@ class TestWidgetCatalog:
         entry = response.json()["items"][0]
         assert entry["plugin_uid"] == PLUGIN_UID
         assert entry["plugin_id"] == plugin.id
+        assert entry["public_id"] == PUBLIC_ID
 
         widget = entry["widgets"][0]
         assert widget["type"] == f"plugin:{PLUGIN_UID}:summary"
@@ -1391,16 +1415,12 @@ class TestListParams:
         assert upstream.count == 0
 
 
-class TestAStatementOverTheRows:
-    """A built-in widget pointed at a plug-in.
+class TestTheCanvas:
+    """A dashboard's widgets read a plug-in with what they store, in its
+    canvas read: a plug-in's own widget with its binding's parameters, and a
+    built-in widget with a statement that names the endpoint."""
 
-    The plug-in's own rows are read by its own module, by the names its manifest
-    declared. A statement is what lets a chart or a table be pointed at them
-    instead — evaluated here, over the answer the proxy already fetched, so
-    twenty viewers are still one upstream call.
-    """
-
-    async def test_the_widget_gets_what_its_statement_made_of_the_rows(
+    async def test_a_statement_and_a_plugin_widget_read_one_answer(
         self, client, session, acting_user, upstream
     ):
         upstream.rows = [
@@ -1408,79 +1428,107 @@ class TestAStatementOverTheRows:
             {"days": "mon", "totals": 4},
             {"days": "tue", "totals": 5},
         ]
-        a, plugin, dashboard = await _workspace(
-            session,
-            acting_user,
-            ORDERS_SUMMARY,
-            sql="SELECT days AS day, sum(totals) AS total FROM rows GROUP BY days",
-        )
-        response = await client.get(
-            _url(a, plugin, ORDERS_SUMMARY, dashboard, widget_id="w1"),
-            headers=a.headers,
-        )
-        assert response.status_code == 200, response.json()
-        body = response.json()
-        assert body["table"]["columns"] == [
-            {"name": "day", "type": "text", "grain": None, "date_only": False},
-            {"name": "total", "type": "number", "grain": None, "date_only": False},
-        ]
-        assert body["table"]["rows"] == [["mon", 7.0], ["tue", 5.0]]
-
-    async def test_two_outputs_of_one_name_both_survive(
-        self, client, session, acting_user, upstream
-    ):
-        """Positional, for the reason every read of this surface is: a mapping
-        would keep one of the two."""
-        upstream.rows = [{"days": "mon", "totals": 3}]
-        a, plugin, dashboard = await _workspace(
-            session,
-            acting_user,
-            ORDERS_SUMMARY,
-            sql="SELECT days, totals AS days FROM rows",
-        )
-        response = await client.get(
-            _url(a, plugin, ORDERS_SUMMARY, dashboard, widget_id="w1"),
-            headers=a.headers,
-        )
-        assert response.status_code == 200, response.json()
-        assert response.json()["table"]["rows"] == [["mon", 3]]
-
-    async def test_a_binding_with_no_statement_is_untouched(
-        self, client, session, acting_user, upstream
-    ):
-        """The plug-in's own widget still reads its own rows, by its own names."""
+        upstream.values = {"total": 12}
         a, plugin, dashboard = await _workspace(session, acting_user)
-        response = await client.get(
-            _url(a, plugin, ORDERS_SUMMARY, dashboard), headers=a.headers
+        dashboard.definition = normalize_dashboard_definition(
+            {
+                "widgets": [
+                    {
+                        "id": "own",
+                        "type": f"plugin:{PLUGIN_UID}:summary",
+                        "binding": {
+                            "source": "plugin",
+                            "plugin_uid": PLUGIN_UID,
+                            "endpoint_id": ORDERS_SUMMARY,
+                            "params": {"range": "7d"},
+                        },
+                    },
+                    {
+                        "id": "chart",
+                        "type": "table",
+                        "binding": {
+                            "source": "query",
+                            "sql": f"SELECT o.days AS day, sum(o.totals) AS total "
+                            f"FROM plugin('{PUBLIC_ID}', 'orders-summary', "
+                            f"range => '7d') AS o GROUP BY o.days ORDER BY 1",
+                        },
+                    },
+                ]
+            }
         )
-        assert response.status_code == 200
-        body = response.json()
-        assert body["table"] is None
-        assert body["rows"] == [{"id": 1}]
+        session.add(dashboard)
+        await session.commit()
 
-    async def test_the_statement_that_runs_is_the_stored_one(
+        response = await client.get(
+            a.g(f"/dashboards/{dashboard.id}/data"), headers=a.headers
+        )
+        assert response.status_code == 200, response.text
+        widgets = response.json()["widgets"]
+        assert widgets["own"]["plugin"]["rows"] == upstream.rows
+        assert widgets["own"]["plugin"]["values"] == {"total": 12}
+        assert widgets["chart"]["result"]["rows"] == [["mon", 7], ["tue", 5]]
+        assert upstream.count == 1
+        assert json.loads(upstream.calls[0].content)["params"] == {"range": "7d"}
+
+    async def test_plugins_are_called_together(
         self, client, session, acting_user, upstream
     ):
-        """Naming a widget that is not on this dashboard changes nothing —
-        there is nowhere for a request to put a statement of its own."""
-        a, plugin, dashboard = await _workspace(
-            session,
-            acting_user,
-            ORDERS_SUMMARY,
-            sql="SELECT days AS day FROM rows",
+        """Each widget's call is settled first, and then every plug-in is
+        called at once, so the canvas waits for the slowest of them."""
+        upstream.together = asyncio.Barrier(2)
+        a, plugin, dashboard = await _workspace(session, acting_user)
+        dashboard.definition = normalize_dashboard_definition(
+            {
+                "widgets": [
+                    {
+                        "id": f"w{days}",
+                        "type": f"plugin:{PLUGIN_UID}:summary",
+                        "binding": {
+                            "source": "plugin",
+                            "plugin_uid": PLUGIN_UID,
+                            "endpoint_id": ORDERS_SUMMARY,
+                            "params": {"range": f"{days}d"},
+                        },
+                    }
+                    for days in (7, 30)
+                ]
+            }
         )
+        session.add(dashboard)
+        await session.commit()
+
         response = await client.get(
-            _url(a, plugin, ORDERS_SUMMARY, dashboard, widget_id="nope"),
-            headers=a.headers,
+            a.g(f"/dashboards/{dashboard.id}/data"), headers=a.headers
         )
-        assert response.status_code == 200
-        # Untransformed, because no widget of that id binds this endpoint.
-        assert response.json()["table"] is None
+        widgets = response.json()["widgets"]
+        assert widgets["w7"]["plugin"]["rows"] == [{"id": 1}]
+        assert widgets["w30"]["plugin"]["rows"] == [{"id": 1}]
+        assert upstream.count == 2
 
+    async def test_a_dashboard_run_as_its_initiative_calls_as_the_installation(
+        self, client, session, acting_user, upstream
+    ):
+        """An endpoint on each member's own connection answers for one person,
+        so a dashboard everyone sees the same way says it needs one."""
+        a, plugin, dashboard = await _workspace(session, acting_user, MY_PRS)
+        await _connect(session, plugin=plugin, user=a.user, ref="cr_alice")
 
-# ---------------------------------------------------------------------------
-# A declarative plug-in: Initiative calls the vendor itself
-# ---------------------------------------------------------------------------
+        mine = await client.get(
+            a.g(f"/dashboards/{dashboard.id}/data"), headers=a.headers
+        )
+        dashboard.view_mode = DashboardViewMode.initiative.value
+        session.add(dashboard)
+        await session.commit()
+        everyones = await client.get(
+            a.g(f"/dashboards/{dashboard.id}/data"), headers=a.headers
+        )
+
+        assert mine.json()["widgets"]["w1"]["plugin"]["rows"] == [{"id": 1}]
+        assert (
+            everyones.json()["widgets"]["w1"]["error"]
+            == PluginDataMessages.CONNECTION_REQUIRED
+        )
+        assert upstream.count == 1
 
 
 class TestDeclarative:

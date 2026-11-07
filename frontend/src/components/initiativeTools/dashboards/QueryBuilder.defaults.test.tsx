@@ -11,17 +11,21 @@ import userEvent from "@testing-library/user-event";
 import { HttpResponse, http } from "msw";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 
+import { buildPluginCatalogEntry } from "@/__tests__/factories";
 import { server } from "@/__tests__/helpers/msw-server";
 import { renderWithProviders } from "@/__tests__/helpers/render";
 import type {
   QueryBuildRequest,
+  QueryPluginDescription,
   QuerySheetDescription,
 } from "@/api/generated/initiativeAPI.schemas";
+import { type QueryablePlugin, queryablePlugins } from "@/api/pluginData";
 
 import { QueryBuilder } from "./QueryBuilder";
 
 const COUNT_ALL = { field: "*", aggregate: "count", alias: "count" };
 const NONE: { id: number; name: string }[] = [];
+const NO_PLUGINS: QueryablePlugin[] = [];
 
 const DEFAULTS: Record<string, { field: string; op: string; value: unknown }[]> = {
   tasks: [
@@ -67,11 +71,23 @@ const spec = (dataset: string): QueryBuildRequest =>
 function mount() {
   const onChange = vi.fn();
   const view = renderWithProviders(
-    <QueryBuilder spec={spec("tasks")} onChange={onChange} initiativeId={7} spreadsheets={NONE} />
+    <QueryBuilder
+      spec={spec("tasks")}
+      onChange={onChange}
+      initiativeId={7}
+      spreadsheets={NONE}
+      plugins={NO_PLUGINS}
+    />
   );
   const show = (next: QueryBuildRequest) =>
     view.rerender(
-      <QueryBuilder spec={next} onChange={onChange} initiativeId={7} spreadsheets={NONE} />
+      <QueryBuilder
+        spec={next}
+        onChange={onChange}
+        initiativeId={7}
+        spreadsheets={NONE}
+        plugins={NO_PLUGINS}
+      />
     );
   const seeded = () =>
     (onChange.mock.calls.at(-1)?.[0] as QueryBuildRequest | undefined)?.where?.map(
@@ -135,6 +151,7 @@ describe("grouping", () => {
         onChange={onChange}
         initiativeId={7}
         spreadsheets={NONE}
+        plugins={NO_PLUGINS}
       />
     );
     expect(screen.getByText("One row for each Title and Priority")).toBeInTheDocument();
@@ -155,6 +172,7 @@ describe("grouping", () => {
         onChange={vi.fn()}
         initiativeId={7}
         spreadsheets={NONE}
+        plugins={NO_PLUGINS}
       />
     );
     expect(screen.getByText("One row for each Title")).toBeInTheDocument();
@@ -167,6 +185,7 @@ describe("grouping", () => {
         onChange={vi.fn()}
         initiativeId={7}
         spreadsheets={NONE}
+        plugins={NO_PLUGINS}
       />
     );
     expect(screen.getByText("Every row, as it is")).toBeInTheDocument();
@@ -182,6 +201,7 @@ describe("a running total", () => {
         onChange={onChange}
         initiativeId={7}
         spreadsheets={NONE}
+        plugins={NO_PLUGINS}
       />
     );
     const user = userEvent.setup();
@@ -206,6 +226,7 @@ describe("a running total", () => {
         onChange={vi.fn()}
         initiativeId={7}
         spreadsheets={NONE}
+        plugins={NO_PLUGINS}
       />
     );
     expect(screen.getAllByRole("combobox", { name: /show as/i })[1]).toHaveTextContent(
@@ -247,6 +268,7 @@ describe("a spreadsheet's range", () => {
         onChange={onChange}
         initiativeId={7}
         spreadsheets={[{ id: 5, name: "Budget" }]}
+        plugins={NO_PLUGINS}
         sheet={read}
       />
     );
@@ -259,6 +281,7 @@ describe("a spreadsheet's range", () => {
         onChange={onChange}
         initiativeId={7}
         spreadsheets={[{ id: 5, name: "Budget" }]}
+        plugins={NO_PLUGINS}
         sheet={read}
       />
     );
@@ -269,6 +292,119 @@ describe("a spreadsheet's range", () => {
     await user.click(await screen.findByRole("option", { name: "Q3 Actuals" }));
     expect(onChange).toHaveBeenLastCalledWith({
       sheet: { file: 5, range: "'Q3 Actuals'" },
+      columns: [COUNT_ALL],
+      where: [],
+      group_by: [],
+    });
+  });
+});
+
+describe("a plug-in's endpoint", () => {
+  const read: QueryPluginDescription = {
+    alias: "plugin",
+    fields: [
+      { name: "status", type: "text", kind: "text", ops: ["eq"], multiple: false, sortable: true },
+      {
+        name: "total",
+        type: "number",
+        kind: "number",
+        ops: ["eq"],
+        multiple: false,
+        sortable: true,
+      },
+    ],
+  };
+  const shop = buildPluginCatalogEntry();
+  const plugins = queryablePlugins({
+    items: [
+      {
+        ...shop,
+        endpoints: [
+          ...(shop.endpoints ?? []),
+          { id: "plugin.acme.shop.refunds", params: [], returns: [] },
+          // Not under the plug-in's own prefix, so no call can name it.
+          { id: "plugin.other.feed", params: [], returns: [] },
+        ],
+      },
+      // No public id, so no call can name it either.
+      buildPluginCatalogEntry({ public_id: null, name: "Unregistered" }),
+    ],
+  });
+  const reading: QueryBuildRequest = {
+    plugin: { plugin: "acme.shop", endpoint: "orders" },
+    columns: [COUNT_ALL],
+    where: [],
+    group_by: [],
+  };
+
+  const show = (next: QueryBuildRequest, onChange = vi.fn()) => {
+    const view = renderWithProviders(
+      <QueryBuilder
+        spec={next}
+        onChange={onChange}
+        initiativeId={7}
+        spreadsheets={NONE}
+        plugins={plugins}
+        plugin={read}
+      />
+    );
+    return { onChange, view };
+  };
+
+  it("is chosen beside the datasets, once a plug-in has something to read", async () => {
+    const user = userEvent.setup();
+    const { onChange } = show(spec("members"));
+    await user.click(screen.getByRole("combobox", { name: "Show data from" }));
+    await user.click(await screen.findByRole("option", { name: "Plug-in data" }));
+    expect(onChange).toHaveBeenLastCalledWith(reading);
+  });
+
+  it("offers only the installs and endpoints a statement can name", async () => {
+    const user = userEvent.setup();
+    show(reading);
+    await user.click(screen.getByRole("combobox", { name: "Plug-in" }));
+    expect((await screen.findAllByRole("option")).map((option) => option.textContent)).toEqual([
+      "Shop",
+    ]);
+    await user.keyboard("{Escape}");
+
+    await user.click(screen.getByRole("combobox", { name: "What it reads" }));
+    expect((await screen.findAllByRole("option")).map((option) => option.textContent)).toEqual([
+      "orders",
+      "refunds",
+    ]);
+  });
+
+  it("starts with every column it returns, and keeps them when a setting is answered", async () => {
+    const { onChange, view } = show(reading);
+    const seeded = { ...reading, columns: [{ field: "status" }, { field: "total" }] };
+    await waitFor(() => expect(onChange).toHaveBeenLastCalledWith(seeded));
+
+    view.rerender(
+      <QueryBuilder
+        spec={seeded}
+        onChange={onChange}
+        initiativeId={7}
+        spreadsheets={NONE}
+        plugins={plugins}
+        plugin={read}
+      />
+    );
+    const user = userEvent.setup();
+    await user.type(screen.getByLabelText("Range"), "30d");
+    expect(onChange).toHaveBeenLastCalledWith({
+      ...seeded,
+      plugin: { ...seeded.plugin, params: { range: "30d" } },
+    });
+  });
+
+  it("starts over on another endpoint", async () => {
+    const user = userEvent.setup();
+    const { onChange } = show(reading);
+    await user.click(screen.getByRole("combobox", { name: "What it reads" }));
+    await user.click(await screen.findByRole("option", { name: "refunds" }));
+    expect(onChange).toHaveBeenLastCalledWith({
+      plugin: { plugin: "acme.shop", endpoint: "refunds" },
       columns: [COUNT_ALL],
       where: [],
       group_by: [],

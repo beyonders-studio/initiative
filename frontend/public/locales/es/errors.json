@@ -255,6 +255,7 @@
   "QUERY_SHEET_RANGE_INVALID": "Ese rango no se puede leer. Escríbelo como Sheet1!A1:D, A:C o 2:10.",
   "QUERY_SHEET_RANGE_TOO_LARGE": "Ese rango abarca demasiadas celdas. Redúcelo a menos filas o columnas.",
   "QUERY_SHEET_UNREADABLE": "No se pudo leer esta hoja de cálculo ahora mismo. Inténtalo de nuevo.",
+  "QUERY_PLUGIN_ARGUMENTS": "plugin() recibe el id de un complemento y el nombre de lo que lee, y luego sus ajustes por nombre, cada uno un valor o un ARRAY de valores, como plugin('acme.shop', 'orders', range => '30d').",
   "SHARING_PLUGIN_INSTALL_GRANT_NOT_SET_HERE": "El acceso de un complemento se concede en los ajustes del complemento, no aquí.",
   "QUERY_TOO_EXPENSIVE": "Esta consulta pide más trabajo del que puede hacer una consulta. Redúcela: menos tablas, o un filtro que recorte las filas.",
   "QUERY_TIMED_OUT": "Esta consulta tardó demasiado y se detuvo.",

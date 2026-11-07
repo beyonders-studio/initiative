@@ -1156,6 +1156,12 @@ class QueryMessages:
     #: The spreadsheet's cells could not be read just now.
     SHEET_UNREADABLE = "QUERY_SHEET_UNREADABLE"
 
+    # Plug-ins.
+
+    #: ``plugin()`` takes a plug-in's public id and an endpoint's name, then
+    #: parameters by name, each a constant or an ``ARRAY`` of them.
+    PLUGIN_ARGUMENTS = "QUERY_PLUGIN_ARGUMENTS"
+
     # Execution.
 
     #: The planner's estimate for this statement is above what the surface
