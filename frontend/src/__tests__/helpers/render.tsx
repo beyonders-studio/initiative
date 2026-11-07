@@ -104,7 +104,6 @@ function buildDefaultAuth(): React.ComponentProps<typeof AuthContext.Provider>["
     sessionUnverified: false,
     login: vi.fn(),
     completeSecondFactor: vi.fn(),
-    applyPasskeySignIn: vi.fn(),
     register: vi.fn(),
     completeOidcLogin: vi.fn(),
     stepUpWithFactor: vi.fn(),

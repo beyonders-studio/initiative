@@ -6,6 +6,7 @@ from pydantic import AliasChoices, ConfigDict, EmailStr, Field, field_validator
 
 from app.core.user_agents import ClientKind
 from app.schemas.base import RawTextStr, SanitizedBaseModel
+from app.services.auth.native_handoff import is_verifier
 
 
 class LoginProviderEntry(SanitizedBaseModel):
@@ -90,12 +91,6 @@ class PasswordResetSubmit(SanitizedBaseModel):
     password: RawTextStr = Field(max_length=256)
 
 
-#: RFC 7636 §4.1: a verifier is 43–128 unreserved characters.
-_VERIFIER_CHARS = frozenset(
-    "ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789-._~"
-)
-
-
 class NativeSignInRedeem(SanitizedBaseModel):
     """The code a sign-in in the phone's browser came back with, and the PKCE
     verifier the app began it with."""
@@ -106,7 +101,7 @@ class NativeSignInRedeem(SanitizedBaseModel):
     @field_validator("code_verifier")
     @classmethod
     def _unreserved(cls, value: str) -> str:
-        if not set(value) <= _VERIFIER_CHARS:
+        if not is_verifier(value):
             raise ValueError("code_verifier holds a character RFC 7636 does not allow")
         return value
 

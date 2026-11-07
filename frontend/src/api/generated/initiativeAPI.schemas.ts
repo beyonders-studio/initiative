@@ -9054,19 +9054,9 @@ export type PasskeySignInFinishCredential = { [key: string]: unknown };
  */
 export interface PasskeySignInFinish {
   credential: PasskeySignInFinishCredential;
-  mobile?: boolean;
   /** @maxLength 255 */
   device_name?: string;
-  code_challenge?: string;
-}
-
-/**
- * A session for a browser, or a way back to the app for a phone.
- */
-export interface PasskeySignInResult {
-  access_token?: string | null;
-  token_type?: string;
-  redirect_to?: string | null;
+  code_verifier?: string;
 }
 
 /**
@@ -9074,7 +9064,7 @@ export interface PasskeySignInResult {
  * it holds for this domain, and the assertion names the credential.
  */
 export interface PasskeySignInStart {
-  [key: string]: unknown;
+  code_challenge?: string;
 }
 
 export type PasskeySignUpFinishCredential = { [key: string]: unknown };
@@ -9102,6 +9092,7 @@ export interface PasskeySignUpFinish {
    * @maxLength 64
    */
   name?: string;
+  code_verifier?: string;
 }
 
 /**
@@ -9137,6 +9128,7 @@ export interface PasskeySignUpStart {
   birthdate?: string | null;
   /** @maxItems 32 */
   accepted_documents?: string[];
+  code_challenge?: string;
 }
 
 export type PasskeyStepUpFinishCredential = { [key: string]: unknown };

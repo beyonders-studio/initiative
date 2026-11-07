@@ -30,12 +30,7 @@ import {
   registerUser,
   verifyStepUpCode,
 } from "@/api/generated/auth/auth";
-import type {
-  PasskeySignInResult,
-  Token,
-  UserCreate,
-  UserRead,
-} from "@/api/generated/initiativeAPI.schemas";
+import type { Token, UserCreate, UserRead } from "@/api/generated/initiativeAPI.schemas";
 import { readMe } from "@/api/generated/users/users";
 import { clearAllWhiteboardSceneCaches } from "@/components/files/whiteboardSceneCache";
 import { forgetMessagesOnThisDevice, serveAccount } from "@/crypto/messaging";
@@ -116,9 +111,8 @@ interface AuthContextValue {
   sessionUnverified: boolean;
   login: (payload: LoginPayload) => Promise<void>;
   completeSecondFactor: (payload: SecondFactorPayload) => Promise<void>;
-  applyPasskeySignIn: (result: PasskeySignInResult) => Promise<void>;
-  /** Adopt a session a sign-in route answered with directly: a code sent to
-   *  an address, or a demo link. */
+  /** Adopt a session a sign-in route answered with directly: a passkey, a
+   *  code sent to an address, or a demo link. */
   applySignIn: (token: Token) => Promise<void>;
   stepUpWithFactor: (payload: StepUpPayload) => Promise<void>;
   stepUpWithPasskey: () => Promise<void>;
@@ -502,18 +496,7 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
     [adoptSession]
   );
 
-  const applyPasskeySignIn = useCallback(
-    async (result: PasskeySignInResult) => {
-      const accessToken = result.access_token;
-      if (!accessToken) {
-        throw new Error(t("login.passkeyFailed"));
-      }
-      await adoptSession({ access_token: accessToken }, { begin: true });
-    },
-    [adoptSession, t]
-  );
-
-  /** Adopt the session a code sent to an address, or a demo link, produced. */
+  /** Adopt the session a passkey, a code sent to an address, or a demo link produced. */
   const applySignIn = useCallback(
     async (token: Token) => {
       await adoptSession(token, { begin: true });
@@ -710,7 +693,6 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
       sessionUnverified,
       login,
       completeSecondFactor,
-      applyPasskeySignIn,
       applySignIn,
       stepUpWithFactor,
       stepUpWithPasskey,
@@ -728,7 +710,6 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
       sessionUnverified,
       login,
       completeSecondFactor,
-      applyPasskeySignIn,
       applySignIn,
       stepUpWithFactor,
       stepUpWithPasskey,

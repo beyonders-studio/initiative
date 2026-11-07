@@ -458,42 +458,6 @@ describe("useAuth password sign-in on native", () => {
   });
 });
 
-describe("useAuth passkey sign-in", () => {
-  beforeEach(() => {
-    get.mockReset();
-    post.mockReset().mockResolvedValue({ data: {} });
-    getItem.mockReset().mockReturnValue(null);
-    setAuthToken.mockReset();
-  });
-
-  it("takes the session the ceremony produced and reads the account", async () => {
-    get.mockResolvedValueOnce({ data: buildUser({ username: "Nobody yet" }) });
-    renderAuth();
-    await waitFor(() => expect(auth.user?.username).toBe("Nobody yet"));
-
-    get.mockResolvedValueOnce({ data: buildUser({ username: "Signed in" }) });
-    await act(async () => {
-      await auth.applyPasskeySignIn({ access_token: "fresh-token", token_type: "bearer" });
-    });
-
-    expect(setAuthToken).toHaveBeenCalledWith("fresh-token");
-    expect(auth.token).toBe("fresh-token");
-    expect(auth.user?.username).toBe("Signed in");
-  });
-
-  it("refuses an answer with no session in it", async () => {
-    // The mobile shape: the ceremony was run on behalf of an app, and what
-    // comes back is a way home rather than a session for this browser.
-    get.mockResolvedValue({ data: buildUser() });
-    renderAuth();
-    await waitFor(() => expect(auth.user).not.toBeNull());
-
-    await expect(
-      auth.applyPasskeySignIn({ token_type: "bearer", redirect_to: "initiative://oidc/callback" })
-    ).rejects.toThrow();
-  });
-});
-
 describe("useAuth account switch", () => {
   beforeEach(() => {
     get.mockReset();

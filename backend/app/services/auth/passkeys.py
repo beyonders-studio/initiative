@@ -43,6 +43,7 @@ from app.core import native_apps
 from app.core.clock import utcnow
 from app.services.auth import challenges as challenge_service
 from app.services.auth.challenges import ChallengePurpose
+from app.services.auth.oidc.flow_state import s256
 
 logger = logging.getLogger(__name__)
 
@@ -506,12 +507,15 @@ async def _claim(
     credential: dict[str, Any],
     user_id: int | None,
     purposes: Sequence[ChallengePurpose],
+    code_verifier: str,
 ) -> tuple[str, AuthChallenge] | PresentationRefused:
     """Find the challenge the browser signed and take one of its attempts.
 
     The challenge must have been issued to ``user_id`` — to no account at all
-    where that is ``None``. Hands back the value, for the library to check the
-    ceremony against, and the claimed row, for :func:`_spend`.
+    where that is ``None`` — and, where it was begun with the app's S256
+    challenge as its answer, be finished with the verifier behind it. Hands
+    back the value, for the library to check the ceremony against, and the
+    claimed row, for :func:`_spend`.
     """
     value = challenge_in(credential)
     if value is None:
@@ -520,7 +524,16 @@ async def _claim(
     challenge = await challenge_service.claim_attempt(
         session, value=value, purposes=purposes
     )
-    if challenge is None or challenge.user_id != user_id:
+    if (
+        challenge is None
+        or challenge.user_id != user_id
+        or (
+            challenge.answer_hash is not None
+            and not challenge_service.answered_by(
+                challenge, value=value, answer=s256(code_verifier)
+            )
+        )
+    ):
         # The attempt is counted whether or not the answer was any good, so
         # what it wrote stands.
         return PresentationRefused(reason=None, keep=True)
@@ -544,6 +557,7 @@ async def present_against_challenge(
     user_id: int | None,
     credential: dict[str, Any],
     purposes: Sequence[ChallengePurpose],
+    code_verifier: str = "",
 ) -> PresentedPasskey | PresentationRefused:
     """Take a credential's assertion against the challenge it signed, once.
 
@@ -558,7 +572,11 @@ async def present_against_challenge(
     decides what the proof is worth; nothing here opens or upgrades anything.
     """
     claimed = await _claim(
-        session, credential=credential, user_id=user_id, purposes=purposes
+        session,
+        credential=credential,
+        user_id=user_id,
+        purposes=purposes,
+        code_verifier=code_verifier,
     )
     if isinstance(claimed, PresentationRefused):
         return claimed
@@ -606,6 +624,7 @@ async def register_against_challenge(
     user_id: int | None,
     credential: dict[str, Any],
     purposes: Sequence[ChallengePurpose],
+    code_verifier: str = "",
 ) -> RegisteredCredential | PresentationRefused:
     """Take a new credential against the challenge it was made for, once.
 
@@ -616,7 +635,11 @@ async def register_against_challenge(
     stores it, and a refusal is ended the same way as an assertion's.
     """
     claimed = await _claim(
-        session, credential=credential, user_id=user_id, purposes=purposes
+        session,
+        credential=credential,
+        user_id=user_id,
+        purposes=purposes,
+        code_verifier=code_verifier,
     )
     if isinstance(claimed, PresentationRefused):
         return claimed

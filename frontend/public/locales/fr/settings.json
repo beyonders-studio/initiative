@@ -2086,7 +2086,6 @@
     "unsupported": "Ce navigateur ne peut pas créer de clé d'accès. Ouvrez cette page dans un navigateur à jour.",
     "siteUnsupported": "Les clés d'accès exigent que ce site ait un vrai nom de domaine et https. La personne qui gère le site peut y remédier.",
     "limitReached": "Ce compte a autant de clés d'accès qu'il peut en avoir ({{limit}}). Supprimez-en une pour en ajouter une autre.",
-    "addFromBrowser": "Une clé d'accès s'ajoute depuis un navigateur connecté à ce site. « Ajouter une clé d'accès » en ouvre un pour vous.",
     "notOffered": "Ce site ne propose pas de clés d'accès. Celles que vous avez sont conservées.",
     "error": "Cela n'a pas fonctionné. Réessayez."
   },
