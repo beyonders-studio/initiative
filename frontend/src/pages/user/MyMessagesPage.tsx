@@ -736,25 +736,27 @@ function Thread({
             touch screen has no hover, and a tooltip's own trigger closes it
             on click, so the click is taken here instead. Anywhere else closes
             it again. */}
-        <Tooltip open={encryptionShown} onOpenChange={setEncryptionShown}>
-          <TooltipTrigger asChild>
-            <Button
-              variant="ghost"
-              size="icon"
-              className="size-6 shrink-0 text-muted-foreground"
-              aria-label={t("encryptedNotice")}
-              onClick={(event) => {
-                event.preventDefault();
-                setEncryptionShown(true);
-              }}
-            >
-              <ShieldCheck className="size-3.5" aria-hidden />
-            </Button>
-          </TooltipTrigger>
-          <TooltipContent side="bottom" className="max-w-64">
-            {t("encryptedNotice")}
-          </TooltipContent>
-        </Tooltip>
+        <TooltipProvider delayDuration={200}>
+          <Tooltip open={encryptionShown} onOpenChange={setEncryptionShown}>
+            <TooltipTrigger asChild>
+              <Button
+                variant="ghost"
+                size="icon"
+                className="size-6 shrink-0 text-muted-foreground"
+                aria-label={t("encryptedNotice")}
+                onClick={(event) => {
+                  event.preventDefault();
+                  setEncryptionShown(true);
+                }}
+              >
+                <ShieldCheck className="size-3.5" aria-hidden />
+              </Button>
+            </TooltipTrigger>
+            <TooltipContent side="bottom" className="max-w-64">
+              {t("encryptedNotice")}
+            </TooltipContent>
+          </Tooltip>
+        </TooltipProvider>
       </div>
       <div
         ref={log}
