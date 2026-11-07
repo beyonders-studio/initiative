@@ -116,6 +116,8 @@ _SUMMARY = {
     "next_charge": {"total": 1250, "currency": "USD"},
     "scheduled_change": {"action": "cancel", "on": "2026-11-01"},
     "payment_failed": False,
+    "can_upgrade": True,
+    "can_cancel": False,
 }
 
 
