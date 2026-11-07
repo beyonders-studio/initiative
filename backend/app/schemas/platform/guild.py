@@ -307,6 +307,10 @@ class CommunityBillingSummaryRead(SanitizedBaseModel):
     next_charge: Optional[CommunityBillingChargeRead] = None
     scheduled_change: Optional[CommunityBillingChangeRead] = None
     payment_failed: bool = False
+    #: Whether the portal offers a plan above this one, and whether it can
+    #: cancel this one; the panel offers each only when billing says so.
+    can_upgrade: bool = False
+    can_cancel: bool = False
 
 
 class CommunityInviteGrant(SanitizedBaseModel):

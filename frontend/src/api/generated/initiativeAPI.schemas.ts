@@ -3321,6 +3321,8 @@ export interface CommunityBillingSummaryRead {
   next_charge?: CommunityBillingChargeRead | null;
   scheduled_change?: CommunityBillingChangeRead | null;
   payment_failed?: boolean;
+  can_upgrade?: boolean;
+  can_cancel?: boolean;
 }
 
 /**

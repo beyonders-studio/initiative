@@ -47,7 +47,11 @@ const EMPTY: CommunityBillingSummaryRead = {
   next_charge: null,
   scheduled_change: null,
   payment_failed: false,
+  can_upgrade: true,
+  can_cancel: false,
 };
+
+const CANCEL_NOTE = /read-only for 30 days so you can export it, then put on hold and deleted/;
 
 /** A local calendar day `days` from today, as the API sends a DATE. */
 const dayFromToday = (days: number): string => {
@@ -123,15 +127,23 @@ describe("CommunityBillingPanel", () => {
     expect(container).toBeEmptyDOMElement();
   });
 
-  it("shows just the plan name on a free plan", () => {
+  it("shows just the plan name on a free plan, with plans above it and nothing to cancel", () => {
     renderWithProviders(<CommunityBillingPanel />);
     expect(screen.getByText("Tin")).toBeInTheDocument();
     expect(screen.queryByText(/Renews|Trial|Ends|Payment failed/)).not.toBeInTheDocument();
+    expect(screen.getByText("Upgrade")).toBeInTheDocument();
     expect(screen.getByText("Manage billing")).toBeInTheDocument();
-    expect(
-      screen.getByText(/read-only for 30 days so you can export it, then put on hold and deleted/)
-    ).toBeInTheDocument();
+    expect(screen.queryByText(CANCEL_NOTE)).not.toBeInTheDocument();
     expect(screen.getByText(/Change your plan or payment method/)).toBeInTheDocument();
+  });
+
+  it("offers no upgrade and no cancel on the top plan", () => {
+    state.summary = { ...EMPTY, tier_name: "Enterprise", can_upgrade: false };
+    renderWithProviders(<CommunityBillingPanel />);
+    expect(screen.getByText("Enterprise")).toBeInTheDocument();
+    expect(screen.queryByText("Upgrade")).not.toBeInTheDocument();
+    expect(screen.getByText("Manage billing")).toBeInTheDocument();
+    expect(screen.queryByText(CANCEL_NOTE)).not.toBeInTheDocument();
   });
 
   it("shows when a running trial ends", () => {
@@ -160,9 +172,12 @@ describe("CommunityBillingPanel", () => {
       tier_name: "Gold",
       renews_on: renews,
       next_charge: { total: 1250, currency: "USD" },
+      can_cancel: true,
     };
     renderWithProviders(<CommunityBillingPanel />);
     expect(screen.getByText(`Renews ${longDate(renews)} · $12.50`)).toBeInTheDocument();
+    // A card subscription is running, so the portal can cancel it.
+    expect(screen.getByText(CANCEL_NOTE)).toBeInTheDocument();
   });
 
   it("reads minor units by the currency's fraction digits", () => {
