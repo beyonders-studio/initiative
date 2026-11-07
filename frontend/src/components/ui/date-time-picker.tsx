@@ -7,11 +7,10 @@ import { Button } from "@/components/ui/button";
 import { Calendar } from "@/components/ui/calendar";
 import { Input } from "@/components/ui/input";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
-import { useAuth } from "@/hooks/useAuth";
-import { useTimeFormat } from "@/hooks/useTimeFormat";
 import { parseLocalCalendarDate, resolveLocalDateTime } from "@/lib/localDateTime";
 import { dateTimePattern } from "@/lib/timeFormat";
 import { cn } from "@/lib/utils";
+import { useTimeFormat } from "@/ui/host";
 
 interface DateTimePickerProps {
   id?: string;
@@ -98,7 +97,6 @@ export const DateTimePicker = ({
   includeTime = true,
 }: DateTimePickerProps) => {
   const { t } = useTranslation(["dates", "common"]);
-  const { user } = useAuth();
   // Read so the typed and trigger labels re-render on a clock change.
   useTimeFormat();
   const parsedValue = value
@@ -143,14 +141,6 @@ export const DateTimePicker = ({
     }
   }
 
-  const resolvedWeekStartsOn = (calendarProps?.weekStartsOn ?? user?.week_starts_on ?? 0) as
-    | 0
-    | 1
-    | 2
-    | 3
-    | 4
-    | 5
-    | 6;
   const mergedCalendarProps = React.useMemo(() => {
     const currentYear = new Date().getFullYear();
     return {
@@ -158,9 +148,8 @@ export const DateTimePicker = ({
       startMonth: new Date(currentYear - 120, 0),
       endMonth: new Date(currentYear + 10, 11),
       ...(calendarProps ?? {}),
-      weekStartsOn: resolvedWeekStartsOn,
     };
-  }, [calendarProps, resolvedWeekStartsOn]);
+  }, [calendarProps]);
 
   const handleSelectDate = (date: Date | undefined) => {
     if (!date) {

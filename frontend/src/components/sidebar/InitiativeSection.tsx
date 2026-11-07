@@ -10,6 +10,7 @@ import type {
 } from "@/api/generated/initiativeAPI.schemas";
 import { Tool } from "@/api/generated/initiativeAPI.schemas";
 import { UnreadDot } from "@/components/notifications/UnreadDot";
+import { SidebarMenu, SidebarMenuButton, SidebarMenuItem } from "@/components/sidebar/sidebar";
 import { ToolCreateButton } from "@/components/tools/ToolCreateButton";
 import { Button } from "@/components/ui/button";
 import { Collapsible, CollapsibleContent, CollapsibleTrigger } from "@/components/ui/collapsible";
@@ -19,7 +20,6 @@ import {
   DropdownMenuItem,
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
-import { SidebarMenu, SidebarMenuButton, SidebarMenuItem } from "@/components/ui/sidebar";
 import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip";
 import { useUnreadTree } from "@/hooks/useUnreadTree";
 import { communityPath } from "@/lib/communityUrl";

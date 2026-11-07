@@ -11,7 +11,6 @@ import {
   TableHeader,
   TableRow,
 } from "@/components/ui/table";
-import { TOOLS } from "@/lib/tools";
 import { cn } from "@/lib/utils";
 
 /**
@@ -481,14 +480,6 @@ interface LabelledSkeletonProps {
   /** Announced to assistive tech. Defaults to the shared "Loading…". */
   label?: string;
 }
-
-/** The initiative page: its header, the tool tabs, and the first tab's list. */
-export const InitiativePageSkeleton = ({ label }: LabelledSkeletonProps) => (
-  <SkeletonRegion label={label} className="space-y-4 sm:space-y-6">
-    <PageHeaderSkeleton dot description meta action tabs={TOOLS.length} />
-    <ToolListSkeleton className="pt-2" />
-  </SkeletonRegion>
-);
 
 /** A calendar's page: breadcrumb, controls, and the month grid. */
 export const CalendarPageSkeleton = ({ label }: LabelledSkeletonProps) => (

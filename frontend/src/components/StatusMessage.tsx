@@ -1,4 +1,3 @@
-import { Link } from "@tanstack/react-router";
 import type { ReactNode } from "react";
 
 import { Button } from "@/components/ui/button";
@@ -9,6 +8,7 @@ import {
   EmptyMedia,
   EmptyTitle,
 } from "@/components/ui/empty";
+import { host } from "@/ui/host";
 
 interface StatusMessageProps {
   icon: ReactNode;
@@ -42,9 +42,9 @@ export function StatusMessage({
       {action}
       {backTo && backLabel && (
         <Button variant="link" size="sm" asChild className="px-0">
-          <Link to={backTo} search={backSearch}>
+          <host.Link to={backTo} search={backSearch}>
             {backLabel}
-          </Link>
+          </host.Link>
         </Button>
       )}
     </Empty>

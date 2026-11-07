@@ -26,6 +26,7 @@ import { useTranslation } from "react-i18next";
 
 import type { CommunityRead } from "@/api/generated/initiativeAPI.schemas";
 import { Galaxy } from "@/components/icons/Galaxy";
+import { useSidebar } from "@/components/sidebar/sidebar";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { Button } from "@/components/ui/button";
 import {
@@ -39,7 +40,6 @@ import {
 } from "@/components/ui/dialog";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
-import { useSidebar } from "@/components/ui/sidebar";
 import { Textarea } from "@/components/ui/textarea";
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip";
 import { useAppConfig } from "@/hooks/useAppConfig";

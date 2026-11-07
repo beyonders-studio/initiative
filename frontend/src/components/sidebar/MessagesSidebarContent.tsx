@@ -2,8 +2,8 @@ import { ChevronLeft } from "lucide-react";
 import { useTranslation } from "react-i18next";
 
 import { ConversationList } from "@/components/messages/ConversationList";
+import { SidebarContent, SidebarGroup, SidebarHeader } from "@/components/sidebar/sidebar";
 import { Button } from "@/components/ui/button";
-import { SidebarContent, SidebarGroup, SidebarHeader } from "@/components/ui/sidebar";
 
 /**
  * Who you are talking to, in the column the navigation was in.

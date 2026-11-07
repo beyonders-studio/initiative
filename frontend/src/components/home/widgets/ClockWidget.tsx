@@ -30,12 +30,12 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { SearchableCombobox } from "@/components/ui/searchable-combobox";
 import { ToggleGroup, ToggleGroupItem } from "@/components/ui/toggle-group";
-import { useTimeFormat } from "@/hooks/useTimeFormat";
 import { dateTimeFormat, numberFormat } from "@/lib/intl";
 import { toast } from "@/lib/mascotToast";
 import { hour12Option } from "@/lib/timeFormat";
 import { isKnownTimezone, TIMEZONE_OPTIONS } from "@/lib/timezones";
 import { cn } from "@/lib/utils";
+import { useTimeFormat } from "@/ui/host";
 
 import type { HomeWidgetProps, HomeWidgetSettingsProps } from "./types";
 

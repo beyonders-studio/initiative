@@ -1,7 +1,9 @@
 import { Capacitor } from "@capacitor/core";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 
-import { canCapturePhoto, capturePhoto, PhotoCaptureError } from "./nativeCamera";
+import { PhotoCaptureError } from "@/ui/host";
+
+import { canCapturePhoto, capturePhoto } from "./nativeCamera";
 
 const takePhoto = vi.fn();
 const chooseFromGallery = vi.fn();

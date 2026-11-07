@@ -19,6 +19,7 @@ import type { UserRead } from "@/api/generated/initiativeAPI.schemas";
 import { ThoughtBubble } from "@/components/icons/ThoughtBubble";
 import { AppearanceMenuItems, ThemeIcon } from "@/components/ModeToggle";
 import { NotificationBell } from "@/components/notifications/NotificationBell";
+import { SidebarFooter } from "@/components/sidebar/sidebar";
 import { AskForHelpButton } from "@/components/support/AskForHelpButton";
 import { openFeedback, useFeedbackOffered } from "@/components/tickets/FeedbackSheet";
 import { UserHandle } from "@/components/UserHandle";
@@ -37,7 +38,6 @@ import {
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
 import { Popover, PopoverAnchor, PopoverContent } from "@/components/ui/popover";
-import { SidebarFooter } from "@/components/ui/sidebar";
 import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip";
 import { PresenceDot } from "@/components/user/PresenceDot";
 import { PresenceMenuItems } from "@/components/user/PresenceMenuItems";

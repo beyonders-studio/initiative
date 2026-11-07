@@ -1,13 +1,7 @@
 import { render, screen, within } from "@testing-library/react";
 import { describe, expect, it } from "vitest";
 
-import {
-  CardGridSkeleton,
-  InitiativePageSkeleton,
-  PageSkeleton,
-  SkeletonRegion,
-  TableSkeleton,
-} from "./PageSkeletons";
+import { CardGridSkeleton, PageSkeleton, SkeletonRegion, TableSkeleton } from "./PageSkeletons";
 
 describe("SkeletonRegion", () => {
   it("is a busy status region announcing the shared loading label", () => {
@@ -63,8 +57,8 @@ describe("CardGridSkeleton", () => {
 
 describe("page skeletons", () => {
   it("wrap their layout in a labelled status region", () => {
-    render(<InitiativePageSkeleton label="Loading initiative…" />);
-    expect(screen.getByRole("status")).toHaveTextContent("Loading initiative…");
+    render(<PageSkeleton label="Loading the page…" />);
+    expect(screen.getByRole("status")).toHaveTextContent("Loading the page…");
   });
 
   it("fall back to the shared label", () => {

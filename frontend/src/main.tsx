@@ -20,6 +20,7 @@ import { PrideProvider } from "@/hooks/usePride";
 import { useRouteGuardSync } from "@/hooks/useRouteGuardSync";
 import { ServerProvider, useServer } from "@/hooks/useServer";
 import { ThemeProvider } from "@/hooks/useTheme";
+import { connectKit } from "@/lib/kitHost";
 import { prepareOfflineCache } from "@/lib/offlineBoot";
 import { bindOnlineManagerToDevice } from "@/lib/onlineStatus";
 import { queryClient } from "@/lib/queryClient";
@@ -61,6 +62,7 @@ const InnerApp = () => {
 
 async function bootstrap() {
   await initStorage();
+  connectKit();
 
   // What this device last loaded, if it is still ours and still fresh. Decided
   // before render so a launch with no signal has its content in hand rather

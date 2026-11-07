@@ -1,8 +1,8 @@
 import type React from "react";
 import { useRef, useState } from "react";
 
-import { isOwnOrigin } from "@/api/client";
 import { useFrameMessages } from "@/hooks/useFrameMessages";
+import { host } from "@/ui/host";
 
 /** The tallest a frame grows to fit what it reports. */
 const MAX_HEIGHT = 2000;
@@ -44,7 +44,7 @@ export function EmbedFrame({
     if (reported !== null && reported > 0) setHeight(Math.min(reported, MAX_HEIGHT));
   });
 
-  if (isOwnOrigin(src)) return null;
+  if (host.isOwnOrigin(src)) return null;
 
   return (
     <iframe

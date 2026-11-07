@@ -2,9 +2,9 @@ import { useMemo } from "react";
 
 import { useDateLocale } from "@/hooks/useDateLocale";
 import { useRelativeTime } from "@/hooks/useRelativeTime";
-import { useTimeFormat } from "@/hooks/useTimeFormat";
 import { dateTimeFormat } from "@/lib/intl";
 import { hour12Option } from "@/lib/timeFormat";
+import { useTimeFormat } from "@/ui/host";
 
 type RelativeTimeProps = {
   /** Timestamp to describe relative to now. */

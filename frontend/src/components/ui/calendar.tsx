@@ -5,6 +5,7 @@ import { type DayButton, DayPicker, getDefaultClassNames } from "react-day-picke
 import { Button, buttonVariants } from "@/components/ui/button";
 import { dateTimeFormat } from "@/lib/intl";
 import { cn } from "@/lib/utils";
+import { useWeekStart } from "@/ui/host";
 
 function Calendar({
   className,
@@ -19,9 +20,12 @@ function Calendar({
   buttonVariant?: React.ComponentProps<typeof Button>["variant"];
 }) {
   const defaultClassNames = getDefaultClassNames();
+  // The reader's week, unless the caller asks for another.
+  const weekStartsOn = useWeekStart();
 
   return (
     <DayPicker
+      weekStartsOn={weekStartsOn}
       showOutsideDays={showOutsideDays}
       className={cn(
         "group/calendar bg-background in-data-[slot=card-content]:bg-transparent in-data-[slot=popover-content]:bg-transparent p-3 [--cell-size:2rem]",

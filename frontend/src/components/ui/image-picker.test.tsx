@@ -2,27 +2,18 @@ import { fireEvent, render, screen, waitFor } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 
+import { PhotoCaptureError, type PhotoSource, setHost } from "@/ui/host";
+
 import { acceptsNonImages, ImagePicker } from "./image-picker";
 
-const canCapturePhoto = vi.fn(() => false);
 const capturePhoto = vi.fn();
-
-vi.mock("@/lib/nativeCamera", async () => {
-  const actual = await vi.importActual<typeof import("@/lib/nativeCamera")>("@/lib/nativeCamera");
-  return {
-    ...actual,
-    canCapturePhoto: () => canCapturePhoto(),
-    capturePhoto: (source: "camera" | "library") => capturePhoto(source),
-  };
-});
-
+const camera = { capture: (source: PhotoSource) => capturePhoto(source) };
 const toastError = vi.fn();
-vi.mock("@/lib/mascotToast", () => ({ toast: { error: (m: string) => toastError(m) } }));
 
 const photo = () => new File(["binary"], "photo-1.jpg", { type: "image/jpeg" });
 
 beforeEach(() => {
-  canCapturePhoto.mockReturnValue(false);
+  setHost({ camera: null, toast: { success: vi.fn(), error: toastError } });
   capturePhoto.mockReset();
   toastError.mockReset();
 });
@@ -82,7 +73,7 @@ describe("in a browser", () => {
 });
 
 describe("on the native app", () => {
-  beforeEach(() => canCapturePhoto.mockReturnValue(true));
+  beforeEach(() => setHost({ camera }));
 
   it("offers the camera first, and hides the file field", async () => {
     const { container } = render(<ImagePicker onSelect={vi.fn()} />);
@@ -132,7 +123,6 @@ describe("on the native app", () => {
   });
 
   it("explains a refused permission", async () => {
-    const { PhotoCaptureError } = await import("@/lib/nativeCamera");
     capturePhoto.mockRejectedValue(new PhotoCaptureError("permission"));
     vi.spyOn(console, "error").mockImplementation(() => {});
     render(<ImagePicker onSelect={vi.fn()} />);

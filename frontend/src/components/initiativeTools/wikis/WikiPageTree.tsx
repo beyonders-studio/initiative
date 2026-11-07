@@ -24,9 +24,9 @@ import {
   type WikiPageSummary,
 } from "@/api/generated/initiativeAPI.schemas";
 import { UnreadDot } from "@/components/notifications/UnreadDot";
+import { SidebarMenu, SidebarMenuButton, SidebarMenuItem } from "@/components/sidebar/sidebar";
 import { Button } from "@/components/ui/button";
 import { Collapsible, CollapsibleContent, CollapsibleTrigger } from "@/components/ui/collapsible";
-import { SidebarMenu, SidebarMenuButton, SidebarMenuItem } from "@/components/ui/sidebar";
 import { useUnreadTree } from "@/hooks/useUnreadTree";
 import { fileIcon } from "@/lib/fileIcon";
 import { cn } from "@/lib/utils";
